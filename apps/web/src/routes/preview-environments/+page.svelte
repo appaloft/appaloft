@@ -8,7 +8,7 @@
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import { Skeleton } from "$lib/components/ui/skeleton";
-  import * as Table from "$lib/components/ui/table";
+  import { readErrorMessage } from "$lib/api/client";
   import { webDocsHrefs } from "$lib/console/docs-help";
   import { createConsoleQueries } from "$lib/console/queries";
   import {
@@ -38,11 +38,9 @@
   const environments = $derived(environmentsQuery.data?.items ?? []);
   const resources = $derived(resourcesQuery.data?.items ?? []);
   const previewEnvironments = $derived(previewEnvironmentsQuery.data?.items ?? []);
-  const pageLoading = $derived(
-    projectsQuery.isPending ||
-      environmentsQuery.isPending ||
-      resourcesQuery.isPending ||
-      previewEnvironmentsQuery.isPending,
+  const previewEnvironmentsLoading = $derived(previewEnvironmentsQuery.isPending);
+  const previewEnrichmentLoading = $derived(
+    projectsQuery.isPending || environmentsQuery.isPending || resourcesQuery.isPending,
   );
   const activeCount = $derived(
     previewEnvironments.filter((previewEnvironment) => previewEnvironment.status === "active")
@@ -81,7 +79,7 @@
     { label: $t(i18nKeys.console.previewEnvironments.pageTitle) },
   ]}
 >
-  {#if pageLoading}
+  {#if previewEnvironmentsLoading}
     <div class="space-y-5">
       <section class="space-y-3">
         <Skeleton class="h-5 w-44" />
@@ -121,6 +119,20 @@
         <GitPullRequestArrow class="size-4" />
         {$t(i18nKeys.common.actions.openDocumentation)}
       </Button>
+    </section>
+  {:else if previewEnvironmentsQuery.error}
+    <section class="space-y-5 py-2">
+      <Badge class="w-fit" variant="destructive">
+        {$t(i18nKeys.common.status.failed)}
+      </Badge>
+      <div class="max-w-2xl space-y-3">
+        <h1 class="text-2xl font-semibold md:text-3xl">
+          {$t(i18nKeys.console.previewEnvironments.listTitle)}
+        </h1>
+        <p class="text-sm leading-6 text-muted-foreground">
+          {readErrorMessage(previewEnvironmentsQuery.error)}
+        </p>
+      </div>
     </section>
   {:else}
     <div class="space-y-8">
@@ -168,90 +180,94 @@
           <p class="mt-1 text-sm text-muted-foreground">
             {$t(i18nKeys.console.previewEnvironments.listDescription)}
           </p>
+          {#if previewEnrichmentLoading}
+            <p class="mt-1 text-xs text-muted-foreground">
+              {$t(i18nKeys.common.status.loading)}
+            </p>
+          {/if}
         </div>
 
-        <div class="console-record-list">
-          <Table.Root>
-            <Table.Header>
-              <Table.Row class="hover:bg-transparent">
-                <Table.Head class="min-w-64">
-                  {$t(i18nKeys.common.domain.source)}
-                </Table.Head>
-                <Table.Head>{$t(i18nKeys.common.domain.status)}</Table.Head>
-                <Table.Head>{$t(i18nKeys.common.domain.project)}</Table.Head>
-                <Table.Head>{$t(i18nKeys.common.domain.environment)}</Table.Head>
-                <Table.Head>{$t(i18nKeys.common.domain.resource)}</Table.Head>
-                <Table.Head>{$t(i18nKeys.console.previewEnvironments.expiresAt)}</Table.Head>
-                <Table.Head>{$t(i18nKeys.console.previewEnvironments.updatedAt)}</Table.Head>
-                <Table.Head class="w-12">
-                  <span class="sr-only">{$t(i18nKeys.common.actions.openResource)}</span>
-                </Table.Head>
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
-              {#each previewEnvironments as previewEnvironment (previewEnvironment.previewEnvironmentId)}
-                {@const project = findProject(projects, previewEnvironment.projectId)}
-                {@const environment = findEnvironment(environments, previewEnvironment.environmentId)}
-                {@const resource = findResource(resources, previewEnvironment.resourceId)}
-                <Table.Row class="group">
-                  <Table.Cell class="max-w-80">
-                    <div class="block min-w-0">
-                      <span class="block truncate font-medium">
-                        {previewEnvironment.source.repositoryFullName}
-                      </span>
-                      <span class="mt-1 block truncate text-xs text-muted-foreground">
-                        {$t(i18nKeys.console.previewEnvironments.pullRequest)}
-                        #{previewEnvironment.source.pullRequestNumber}
-                      </span>
-                      <span
-                        class="mt-1 block truncate font-mono text-xs text-muted-foreground"
-                        title={previewEnvironment.source.sourceBindingFingerprint}
-                      >
-                        {$t(i18nKeys.console.previewEnvironments.sourceBinding)}
-                        {previewEnvironment.source.sourceBindingFingerprint}
-                      </span>
-                    </div>
-                  </Table.Cell>
-                  <Table.Cell>
-                    <Badge variant={previewEnvironmentStatusVariant(previewEnvironment.status)}>
-                      {$t(previewEnvironmentStatusLabelKey(previewEnvironment.status))}
-                    </Badge>
-                  </Table.Cell>
-                  <Table.Cell class="max-w-44 truncate">
-                    {project?.name ?? previewEnvironment.projectId}
-                  </Table.Cell>
-                  <Table.Cell class="max-w-40 truncate">
-                    {environment?.name ?? previewEnvironment.environmentId}
-                  </Table.Cell>
-                  <Table.Cell class="max-w-44 truncate">
-                    {resource?.name ?? previewEnvironment.resourceId}
-                  </Table.Cell>
-                  <Table.Cell class="text-muted-foreground">
-                    {previewEnvironment.expiresAt
-                      ? formatTime(previewEnvironment.expiresAt)
-                      : $t(i18nKeys.console.previewEnvironments.noExpiry)}
-                  </Table.Cell>
-                  <Table.Cell class="text-muted-foreground">
+        <div class="console-record-list" data-preview-environments-display-surface>
+          {#each previewEnvironments as previewEnvironment (previewEnvironment.previewEnvironmentId)}
+            {@const project = findProject(projects, previewEnvironment.projectId)}
+            {@const environment = findEnvironment(environments, previewEnvironment.environmentId)}
+            {@const resource = findResource(resources, previewEnvironment.resourceId)}
+            <article class="console-record-row lg:grid-cols-[minmax(0,1fr)_auto]">
+              <div class="min-w-0 space-y-3">
+                <div class="flex min-w-0 flex-wrap items-center gap-2">
+                  <GitPullRequestArrow class="size-4 shrink-0 text-muted-foreground" />
+                  <h3 class="min-w-0 truncate font-medium">
+                    {previewEnvironment.source.repositoryFullName}
+                    #{previewEnvironment.source.pullRequestNumber}
+                  </h3>
+                  <Badge variant={previewEnvironmentStatusVariant(previewEnvironment.status)}>
+                    {$t(previewEnvironmentStatusLabelKey(previewEnvironment.status))}
+                  </Badge>
+                </div>
+
+                <div class="grid gap-2 text-xs text-muted-foreground md:grid-cols-2 xl:grid-cols-4">
+                  <div class="rounded-md bg-muted/20 px-3 py-2">
+                    <p class="uppercase tracking-wide">
+                      {$t(i18nKeys.common.domain.project)}
+                    </p>
+                    <p class="mt-1 truncate font-medium text-foreground">
+                      {project?.name ?? previewEnvironment.projectId}
+                    </p>
+                  </div>
+                  <div class="rounded-md bg-muted/20 px-3 py-2">
+                    <p class="uppercase tracking-wide">
+                      {$t(i18nKeys.common.domain.environment)}
+                    </p>
+                    <p class="mt-1 truncate font-medium text-foreground">
+                      {environment?.name ?? previewEnvironment.environmentId}
+                    </p>
+                  </div>
+                  <div class="rounded-md bg-muted/20 px-3 py-2">
+                    <p class="uppercase tracking-wide">
+                      {$t(i18nKeys.common.domain.resource)}
+                    </p>
+                    <p class="mt-1 truncate font-medium text-foreground">
+                      {resource?.name ?? previewEnvironment.resourceId}
+                    </p>
+                  </div>
+                  <div class="rounded-md bg-muted/20 px-3 py-2">
+                    <p class="uppercase tracking-wide">
+                      {$t(i18nKeys.console.previewEnvironments.expiresAt)}
+                    </p>
+                    <p class="mt-1 truncate font-medium text-foreground">
+                      {previewEnvironment.expiresAt
+                        ? formatTime(previewEnvironment.expiresAt)
+                        : $t(i18nKeys.console.previewEnvironments.noExpiry)}
+                    </p>
+                  </div>
+                </div>
+
+                <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                  <span class="min-w-0 truncate font-mono" title={previewEnvironment.source.sourceBindingFingerprint}>
+                    {$t(i18nKeys.console.previewEnvironments.sourceBinding)}
+                    {previewEnvironment.source.sourceBindingFingerprint}
+                  </span>
+                  <span>
+                    {$t(i18nKeys.console.previewEnvironments.updatedAt)}
                     {formatTime(previewEnvironment.updatedAt)}
-                  </Table.Cell>
-                  <Table.Cell class="text-right">
-                    <a
-                      href={resource
-                        ? resourcePreviewEnvironmentDetailHref(
-                            resource,
-                            previewEnvironment.previewEnvironmentId,
-                          )
-                        : previewEnvironmentDetailHref(previewEnvironment.previewEnvironmentId)}
-                      aria-label={$t(i18nKeys.common.actions.viewDetails)}
-                      class="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                    >
-                      <ArrowRight class="size-4" />
-                    </a>
-                  </Table.Cell>
-                </Table.Row>
-              {/each}
-            </Table.Body>
-          </Table.Root>
+                  </span>
+                </div>
+              </div>
+
+              <a
+                href={resource
+                  ? resourcePreviewEnvironmentDetailHref(
+                      resource,
+                      previewEnvironment.previewEnvironmentId,
+                    )
+                  : previewEnvironmentDetailHref(previewEnvironment.previewEnvironmentId)}
+                aria-label={$t(i18nKeys.common.actions.viewDetails)}
+                class="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <ArrowRight class="size-4" />
+              </a>
+            </article>
+          {/each}
         </div>
       </section>
     </div>

@@ -86,6 +86,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   import { Textarea } from "$lib/components/ui/textarea";
   import { Badge } from "$lib/components/ui/badge";
   import * as Dialog from "$lib/components/ui/dialog";
+  import * as Select from "$lib/components/ui/select";
   import {
     endpointFromTemplate,
     readBlueprintCatalogExtensionMetadata,
@@ -603,13 +604,15 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     enabled = true,
     lockedProjectId = "",
     lockedProjectName = "",
-    statePath = "/deploy",
-    stateModal = "",
+    statePath = "/",
+    stateBaseSearch = "",
+    stateModal = "quick-deploy",
   }: {
     enabled?: boolean;
     lockedProjectId?: string;
     lockedProjectName?: string;
     statePath?: string;
+    stateBaseSearch?: string;
     stateModal?: string;
   } = $props();
 
@@ -845,6 +848,11 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   } | null>(null);
   let workflowProgressDialogOpen = $state(false);
   let lastCreatedDeploymentId = $state("");
+  let lastCreatedDeploymentOwner = $state<{
+    projectId: string;
+    environmentId: string;
+    resourceId: string;
+  } | null>(null);
   let lastOperatorWorkId = $state("");
   let workflowDeploymentTraceLink = $state("");
   let blueprintOperatorWorkFollowEpoch = 0;
@@ -1081,6 +1089,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
 
     return [];
   });
+  const sourceVersionKindLabel = $derived(sourceVersionKind || "infer");
   const sourceVersionPlaceholder = $derived.by(() => {
     if (sourceKind === "docker-image") {
       return "latest";
@@ -1879,9 +1888,19 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   const domainBindingSummary = $derived(
     selectedResourceAccessRoute?.url ?? $t(i18nKeys.console.quickDeploy.domainBindingsAfterDeploy),
   );
-  const quickDeployGitHubReturnPath =
-    "/deploy?source=github&githubMode=browser&step=source";
-  const quickDeployGitHubReturnPathEncoded = encodeURIComponent(quickDeployGitHubReturnPath);
+  const quickDeployGitHubReturnPath = $derived.by(() => {
+    const url = new URL(browser ? window.location.href : page.url.href);
+    url.pathname = statePath || "/";
+    url.search = stateBaseSearch;
+    setSearchParam(url.searchParams, "modal", stateModal || "quick-deploy");
+    url.searchParams.set("source", "github");
+    url.searchParams.set("githubMode", "browser");
+    url.searchParams.set("step", "source");
+    return `${url.pathname}${url.search}`;
+  });
+  const quickDeployGitHubReturnPathEncoded = $derived(
+    encodeURIComponent(quickDeployGitHubReturnPath),
+  );
   const canAdvance = $derived(stepIsComplete(activeStep));
   const quickDeployReady = $derived(
     stepIsComplete("source") &&
@@ -2664,8 +2683,8 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
 
   function buildDeployStateUrl(): URL {
     const url = new URL(browser ? window.location.href : page.url.href);
-    url.pathname = statePath || "/deploy";
-    url.search = "";
+    url.pathname = statePath || "/";
+    url.search = stateBaseSearch;
 
     const params = url.searchParams;
     setSearchParam(params, "modal", stateModal);
@@ -3406,7 +3425,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       githubSourceMode = "browser";
       const endpoint =
         authSession.session && !githubConnected ? "/api/auth/link-social" : "/api/auth/sign-in/social";
-      const callbackURL = browser ? buildDeployStateUrl() : new URL("/deploy", API_BASE);
+      const callbackURL = browser ? buildDeployStateUrl() : new URL("/?modal=quick-deploy", API_BASE);
       callbackURL.searchParams.set("source", "github");
       callbackURL.searchParams.set("githubMode", "browser");
       callbackURL.searchParams.set("step", "source");
@@ -3579,15 +3598,25 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   }
 
   function lastCreatedDeploymentHref(): string {
-    if (!selectedProjectId || !selectedEnvironmentId || !selectedResourceId) {
+    const owner = lastCreatedDeploymentOwner ?? (
+      selectedProjectId && selectedEnvironmentId && selectedResourceId
+        ? {
+            projectId: selectedProjectId,
+            environmentId: selectedEnvironmentId,
+            resourceId: selectedResourceId,
+          }
+        : null
+    );
+
+    if (!owner) {
       return `/deployments/${encodeURIComponent(lastCreatedDeploymentId)}`;
     }
 
     return deploymentDetailHref({
       id: lastCreatedDeploymentId,
-      projectId: selectedProjectId,
-      environmentId: selectedEnvironmentId,
-      resourceId: selectedResourceId,
+      projectId: owner.projectId,
+      environmentId: owner.environmentId,
+      resourceId: owner.resourceId,
     });
   }
 
@@ -4753,6 +4782,10 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
         return executeQuickDeployDependencyProvisioning(step.input);
       case "deployments.create": {
         deploymentCreateInFlight = true;
+        selectedProjectId = step.input.projectId;
+        selectedServerId = step.input.serverId;
+        selectedEnvironmentId = step.input.environmentId;
+        selectedResourceId = step.input.resourceId;
         try {
           return await createDeploymentWithProgress(
             step.input,
@@ -4789,6 +4822,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   async function handleQuickDeploy(): Promise<void> {
     deployFeedback = null;
     lastCreatedDeploymentId = "";
+    lastCreatedDeploymentOwner = null;
     lastAccessUrl = "";
     workflowProgressDialogOpen = false;
     resetWorkflowProgress();
@@ -5006,6 +5040,11 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       selectedServerId = workflowResult.serverId;
       selectedEnvironmentId = workflowResult.environmentId;
       selectedResourceId = workflowResult.resourceId;
+      lastCreatedDeploymentOwner = {
+        projectId: workflowResult.projectId,
+        environmentId: workflowResult.environmentId,
+        resourceId: workflowResult.resourceId,
+      };
 
       await refreshWorkspaceData();
       const refreshedResources = await orpcClient.resources.list({
@@ -5315,14 +5354,16 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
                   {#if selectedBlueprintIdentity && selectedBlueprintVariantOptions.length > 0}
                     <label class="block space-y-1.5">
                       <span class="text-xs font-medium text-muted-foreground">部署方案</span>
-                      <select
-                        class="min-h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                        bind:value={selectedBlueprintVariant}
-                      >
-                        {#each selectedBlueprintVariantOptions as variant (variant.id)}
-                          <option value={variant.id}>{variant.label ?? variant.id}</option>
-                        {/each}
-                      </select>
+                      <Select.Root bind:value={selectedBlueprintVariant} type="single">
+                        <Select.Trigger class="w-full">
+                          {selectedBlueprintVariantLabel()}
+                        </Select.Trigger>
+                        <Select.Content>
+                          {#each selectedBlueprintVariantOptions as variant (variant.id)}
+                            <Select.Item value={variant.id}>{variant.label ?? variant.id}</Select.Item>
+                          {/each}
+                        </Select.Content>
+                      </Select.Root>
                       <span class="block text-xs leading-5 text-muted-foreground">
                         {selectedBlueprintVariantDefinition?.summary ??
                           "选择同一 Blueprint 的不同依赖资源或运行配置。"}
@@ -5619,16 +5660,17 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
                   <label class="text-xs font-medium text-muted-foreground" for="source-version-kind">
                     {$t(i18nKeys.console.resources.sourceVersionKind)}
                   </label>
-                  <select
-                    id="source-version-kind"
-                    class="min-h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                    bind:value={sourceVersionKind}
-                  >
-                    <option value="">infer</option>
-                    {#each sourceVersionKindOptions as versionKind (versionKind)}
-                      <option value={versionKind}>{versionKind}</option>
-                    {/each}
-                  </select>
+                  <Select.Root bind:value={sourceVersionKind} type="single">
+                    <Select.Trigger id="source-version-kind" class="w-full">
+                      {sourceVersionKindLabel}
+                    </Select.Trigger>
+                    <Select.Content>
+                      <Select.Item value="">infer</Select.Item>
+                      {#each sourceVersionKindOptions as versionKind (versionKind)}
+                        <Select.Item value={versionKind}>{versionKind}</Select.Item>
+                      {/each}
+                    </Select.Content>
+                  </Select.Root>
                 </div>
               </div>
             {/if}
@@ -6898,14 +6940,16 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
               {#if selectedBlueprintVariantOptions.length > 0}
                 <label class="block space-y-1.5">
                   <span class="text-xs text-muted-foreground">部署方案</span>
-                  <select
-                    class="min-h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                    bind:value={selectedBlueprintVariant}
-                  >
-                    {#each selectedBlueprintVariantOptions as variant (variant.id)}
-                      <option value={variant.id}>{variant.label ?? variant.id}</option>
-                    {/each}
-                  </select>
+                  <Select.Root bind:value={selectedBlueprintVariant} type="single">
+                    <Select.Trigger class="w-full">
+                      {selectedBlueprintVariantLabel()}
+                    </Select.Trigger>
+                    <Select.Content>
+                      {#each selectedBlueprintVariantOptions as variant (variant.id)}
+                        <Select.Item value={variant.id}>{variant.label ?? variant.id}</Select.Item>
+                      {/each}
+                    </Select.Content>
+                  </Select.Root>
                 </label>
               {/if}
               <div class="console-subtle-panel px-3 py-2 text-sm">

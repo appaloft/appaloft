@@ -3,7 +3,7 @@ import { type AppaloftTranslationResource } from "./zh-CN";
 export const enUS = {
   common: {
     actions: {
-      backToDeployments: "Back to deployments",
+      backToDeployments: "Back to deployment records",
       backToProjects: "Back to projects",
       backToServers: "Back to servers",
       bindDomain: "Bind domain",
@@ -25,7 +25,7 @@ export const enUS = {
       learnMore: "Learn more",
       openDocs: "Open related docs",
       openDocumentation: "Documentation",
-      openDeployments: "Open deployments",
+      openDeployments: "Open deployment records",
       openProject: "Open project",
       openResource: "Open resource",
       openTerminal: "Open terminal",
@@ -45,7 +45,7 @@ export const enUS = {
       testConnectivity: "Test connectivity",
       viewAll: "View all",
       viewDeployment: "View deployment",
-      viewDeployments: "View deployments",
+      viewDeployments: "View deployment records",
       viewDetails: "View details",
       viewProgress: "View progress",
       viewProjects: "View projects",
@@ -66,7 +66,7 @@ export const enUS = {
       createdAt: "Created",
       database: "Database",
       deployment: "Deployment",
-      deployments: "Deployments",
+      deployments: "Deployment records",
       description: "Description",
       destination: "Destination",
       exposure: "Exposure",
@@ -367,6 +367,8 @@ export const enUS = {
       dangerConfirmPlaceholder: "usr...",
       dangerDescription:
         "Delete the signed-in account. This does not delete organizations, projects, deployments, deploy tokens, or retained history.",
+      dangerDialogDescription:
+        "Type the account ID before deleting this account. Confirmation immediately submits the deletion request and signs out this session.",
       dangerZoneTitle: "Danger zone",
       deleteAccount: "Delete account",
       deletingAccount: "Deleting account",
@@ -378,6 +380,7 @@ export const enUS = {
         "Manage profile metadata, sign-in security, active sessions, and account deletion.",
       introTitle: "Account settings",
       lastActiveAt: "Last active",
+      lifecycleManageAction: "Open lifecycle governance",
       operationFailed: "Account settings update failed",
       profileSaved: "Account profile saved",
       profileTitle: "Profile",
@@ -394,9 +397,10 @@ export const enUS = {
       backup: "Create backup",
       backupCreated: "Backup created",
       backupDescription:
-        "Create a provider backup for the selected dependency resource. Read models show only safe artifact handles.",
+        "Create a provider backup for the selected dependency resource. Lists show only safe backup references.",
       backupFailed: "Backup failed",
       backupListTitle: "Backups and restore",
+      backupManageAction: "Open backup flow",
       backupRetention: "Require backup retention",
       backupRetentionReason: "Retention reason",
       backupRetentionReasonPlaceholder: "For example: production data protection",
@@ -406,11 +410,16 @@ export const enUS = {
       backupPolicyConfigureFailed: "Backup policy failed",
       backupPolicyDescription:
         "Opt in to periodic backups for the selected dependency resource. The shell runner must be enabled before policies execute.",
+      backupPolicyDialogTitle: "Configure backup policy",
       backupPolicyEnabled: "Enabled",
       backupPolicyIntervalHours: "Interval hours",
+      backupPolicyManageAction: "Manage backup policy",
       backupPolicyNextRun: "Next run",
       backupPolicyRetentionDays: "Retention days",
       bindingReadiness: "Binding readiness",
+      lifecycleDescription:
+        "Review provider realization, binding readiness, and retention policy. Destructive actions stay inside confirmation dialogs.",
+      lifecycleManageAction: "Open lifecycle governance",
       acceptPlanAction: "Accept plan",
       acceptPlanAcknowledge:
         "I acknowledge Appaloft will perform the planned dependency resource mutation",
@@ -434,6 +443,15 @@ export const enUS = {
       creatingPlan: "Creating plan",
       createSucceeded: "Dependency resource created",
       deleteAction: "Delete resource",
+      deleteConfirmLabel: "Enter the dependency resource id to confirm deletion",
+      deleteDialogDescription:
+        "Delete a dependency resource only after confirming bindings and retention policy. Provider data cleanup depends on backend safety checks.",
+      deleteDialogTitle: "Delete dependency resource",
+      deleteDialogWarning:
+        "This is a dangerous action. The default list shows state only; deletion must happen from this confirmation dialog.",
+      dangerZoneDescription:
+        "Deletion affects bindings, backups, and provider cleanup. Enter it only from the selected resource danger zone.",
+      dangerZoneTitle: "Danger zone",
       deleteFailed: "Delete failed",
       deleteSucceeded: "Dependency resource deleted",
       dockerBacked: "Managed dependencies",
@@ -463,7 +481,7 @@ export const enUS = {
       modeCreateDescription: "Create an Appaloft-managed dependency resource.",
       modeReuse: "Reuse",
       modeReuseDescription: "Register an existing external dependency resource.",
-      createUnavailable: "Provider adapter pending for this dependency kind.",
+      createUnavailable: "This dependency kind cannot be created yet.",
       namePlaceholder: "Main database",
       pageDescription:
         "Provision, backup, restore, and delete managed database, cache, object storage, and search services.",
@@ -477,10 +495,14 @@ export const enUS = {
       reuseAction: "Reuse external service",
       reuseNotice: "External dependency resource",
       restoreAction: "Restore backup",
+      restoreManageAction: "Open restore flow",
       restoreAcknowledgeData:
         "I acknowledge restore overwrites the current provider data in this dependency resource",
       restoreAcknowledgeRuntime:
         "I acknowledge Appaloft will not automatically restart or redeploy running workloads",
+      restoreDialogDescription:
+        "Choose a ready backup and acknowledge the impact on provider data and running workloads.",
+      restoreDialogTitle: "Restore dependency resource backup",
       restoreFailed: "Restore failed",
       restoreSucceeded: "Restore requested",
       selectBackup: "Select backup",
@@ -498,6 +520,17 @@ export const enUS = {
       accessUrlEmpty:
         "This deployment does not have a public access URL yet. Check logs to confirm deployment or port mapping completion.",
       accessUrlTitle: "Access URL",
+      accessSnapshotDescription:
+        "Shows the access entry recorded by this deployment. It does not claim the resource still uses this address.",
+      accessSnapshotEmpty:
+        "This deployment did not record an access URL. Open the resource page for current access.",
+      accessSnapshotTitle: "Deployment access snapshot",
+      attemptObservationDescription:
+        "Open logs, timeline, and environment snapshot recorded by this deployment. These records do not change when the resource moves on.",
+      attemptObservationTitle: "Deployment record observation",
+      attemptSnapshotDescription:
+        "An immutable deployment record with the project, environment, resource, source, timestamps, and failure summary captured at execution time.",
+      attemptSnapshotTitle: "Deployment snapshot",
       buildCommand: "Build command",
       buildStrategy: "Build strategy",
       composeFile: "Compose file",
@@ -505,6 +538,17 @@ export const enUS = {
       copyLogs: "Copy logs",
       copyLogsCopied: "Copied",
       copyLogsFailed: "Copy failed",
+      currentResourceStateChanged: "Resource has moved on",
+      currentResourceStateCurrent: "Resource currently points to this deployment",
+      currentResourceStateDescription:
+        "The resource page shows current access, health, runtime logs, and terminal. This section only links there so historical deployment status is not treated as current resource state.",
+      currentResourceStateTitle: "Current resource state",
+      currentResourceStateUnknown: "Current resource state unknown",
+      currentResourceObservationDescription:
+        "Open the resource's current runtime, logs, and terminal. It may no longer match this historical deployment.",
+      currentResourceObservationEmpty:
+        "This detail could not resolve the related resource, so current resource observation is unavailable.",
+      currentResourceObservationTitle: "Current resource observation",
       detailDescription: "Deployment execution, snapshot, and logs",
       description: "Deployment records and project relationships",
       detectSummary: "Detect summary",
@@ -514,12 +558,20 @@ export const enUS = {
       dockerfilePath: "Dockerfile path",
       dockerImage: "Docker image",
       emptyBody:
-        "Deployment records connect project, environment, and server, then store the runtime plan and environment snapshot. Quick Deploy can start the first record.",
+        "Deployment records appear here after a resource creates a deployment. Create or redeploy from the project resources view or the resource detail page.",
       emptyTitle: "No deployment records yet.",
       executionDescription: "Only runtime-affecting commands, ports, and image details are shown.",
       executionKind: "Execution kind",
       executionShape: "Execution shape",
       executionTitle: "Execution config",
+      failedAttemptHint: "Failed deployments",
+      filteredRecords: "Current filter result",
+      filterAllEnvironments: "All environments",
+      filterAllResources: "All resources",
+      filterAllStatuses: "All statuses",
+      filtersDescription:
+        "Filter deployment records by project, environment, resource, and status. Create or retry deployments from project resource views or resource pages.",
+      filtersTitle: "Filter deployment records",
       focusDescription:
         "Treat each release as a traceable event; server, snapshot, and command details live on the detail page.",
       focusTitle: "Deployment records and runtime state",
@@ -538,7 +590,10 @@ export const enUS = {
       metadataTitle: "Metadata",
       needsAttention: "Needs attention",
       latestDescription: "Quickly verify the project, environment, server, and source binding.",
+      latestFailureTitle: "Latest failure summary",
       latestTitle: "Latest",
+      noFailureSummary:
+        "This deployment did not return a failure summary. Use the timeline or deployment logs for more context.",
       noLogs: "This deployment has no logs yet.",
       noFilteredDeployments: "No deployments match the current filter.",
       noSnapshotVariables: "This environment snapshot has no variables.",
@@ -546,6 +601,7 @@ export const enUS = {
         "The current list does not include this deployment. It may have been removed or not returned by the backend.",
       notFoundTitle: "Deployment not found.",
       openAccessUrl: "Open URL",
+      openResourceLogs: "Open resource logs",
       overviewTab: "Overview",
       logsTab: "Logs",
       snapshotTab: "Environment snapshot",
@@ -554,6 +610,7 @@ export const enUS = {
       pageDescription: "Deployment records and project relationships",
       pageDescriptionForProject: "Deployments for {{projectName}}",
       pageTitle: "Deployments",
+      openProjectResources: "Open project resources",
       partialDataDescription:
         "Some deployment detail sections are unavailable. Stable deployment identity, snapshot, and logs remain available where present.",
       partialDataTitle: "This deployment detail is partially available.",
@@ -581,19 +638,23 @@ export const enUS = {
       progressTraceLabel: "trace",
       progressWaiting: "Waiting for deployment progress...",
       records: "Deployment records",
+      runningAttemptHint: "In-flight deployments",
       recoveryAvailable: "Available",
       recoveryCandidateCount: "{{count}} rollback candidates",
       recoveryCommandNotActive: "Specified, not active",
       recoveryDescription:
-        "Readiness uses durable deployment, snapshot, artifact, and resource state before admitting retry, redeploy, or rollback.",
-      recoveryNoReasons: "No blockers from the readiness query.",
+        "Recovery checks the deployment record, snapshot, retained output, and current resource state before retry, redeploy, or rollback.",
+      recoveryDialogDescription:
+        "Recovery creates a new deployment record; this page remains the read-only record for the current deployment.",
+      recoveryNoReasons: "No blockers found.",
+      recoveryOpenDialogAction: "Open recovery action",
       recoveryReasonAttemptNotTerminal: "Deployment is still running or waiting to finish.",
       recoveryReasonAttemptStatusNotRecoverable: "This deployment status is not recoverable.",
       recoveryReasonCommandNotActive: "The recovery command is specified but not active yet.",
       recoveryReasonNoRollbackCandidate: "No successful retained rollback candidate is available.",
       recoveryReasonResourceProfileInvalid: "Current resource profile is missing or invalid.",
       recoveryReasonResourceRuntimeBusy: "Another deployment owns the resource runtime scope.",
-      recoveryReasonRuntimeArtifactMissing: "Required retained runtime artifact is missing.",
+      recoveryReasonRuntimeArtifactMissing: "Required retained runtime output is missing.",
       recoveryReasonSnapshotMissing: "Required deployment or environment snapshot is missing.",
       recoveryRedeployAction: "Redeploy now",
       recoveryRedeployingAction: "Redeploying",
@@ -603,14 +664,21 @@ export const enUS = {
       recoveryRetryTitle: "Retry",
       recoveryRollbackAction: "Roll back now",
       recoveryRollbackCandidate: "Candidate {{deploymentId}}",
+      recoveryRollbackCandidateDescription:
+        "Choose a successful deployment record with retained output as the rollback target.",
+      recoveryRollbackCandidateTitle: "Rollback candidate",
       recoveryRollingBackAction: "Rolling back",
       recoveryRollbackTitle: "Rollback",
+      recoverySelectActionDescription:
+        "Choose a recovery action before viewing checks, candidates, and the confirm action. The default page stays display-only.",
+      recoverySelectActionTitle: "Choose recovery action",
       recoveryTitle: "Recovery readiness",
       runtimePlanDescription: "The executable plan generated from detect and plan.",
       runtimePlanTitle: "Runtime plan",
       snapshotDescription:
         "The immutable environment snapshot captured for this deployment. Secret values stay masked.",
       snapshotTitle: "Environment snapshot",
+      succeededAttemptHint: "Succeeded deployments",
       relatedContextUnavailable:
         "Related project, environment, resource, or server context could not be fully resolved.",
       sectionFallbackUnavailable: "A deployment detail section could not be loaded.",
@@ -644,23 +712,40 @@ export const enUS = {
         "No deployment records yet. Quick deploy creates the project relationship, environment snapshot, and deployment record.",
       latestDeploymentTitle: "Latest deployment",
       modeCard: "Mode",
-      pageDescription: "Control plane status, recent actions, and entry points",
+      pageDescription: "Deployment, project, and resource access status",
       pageTitle: "Home",
-      projectRelationsDescription:
-        "Only the first three projects are shown here; the full relationship view is on the projects page.",
-      projectRelationsEmpty:
-        "After you create the first project, project and deployment relationships appear here.",
-      projectRelationsTitle: "Project relationships",
       projectsDescription:
-        "Open a project to manage its apps, resources, deployments, environments, and access routes.",
-      projectsHeading: "Projects",
-      projectsKicker: "Workspace",
+        "Review deployment, access route, and runtime target status across projects.",
+      projectsHeading: "Operations status",
+      projectsKicker: "Console",
       readinessCard: "Readiness",
       serverAvailableTarget: "Available as deployment targets",
       serverCreatedDuringDeployment: "Can be created during deployment",
       environmentSnapshotEntry: "Saved variable snapshot entry",
       environmentCreatedDuringDeployment: "Create the first environment during deployment",
       activeDeploymentsMetric: "In flight",
+      activeDeploymentsDescription:
+        "Deployments that are currently being created, planned, or run.",
+      activeDeploymentsTitle: "Active deployments",
+      attentionDescription:
+        "Projects with failed deployments, active deployments, undeployed resources, or missing access routes.",
+      attentionFailedDescription:
+        "{{project}} has {{count}} failed deployments. The latest affected resource is {{resource}}.",
+      attentionFailedTitle: "Failed deployment",
+      attentionHeading: "Project health",
+      attentionNoAccessDescription:
+        "{{project}} has {{count}} resources without a current access route. Review networking from the project page.",
+      attentionNoAccessTitle: "Missing access route",
+      attentionNoDeploymentDescription:
+        "{{project}} has {{count}} resources but no deployment records yet.",
+      attentionNoDeploymentTitle: "Resources not deployed",
+      attentionRunningDescription:
+        "{{project}} has {{count}} deployments in progress. Current resource: {{resource}}.",
+      attentionRunningTitle: "Deployment in progress",
+      attentionTitle: "Projects",
+      attentionToneCritical: "Review",
+      attentionToneProgress: "In progress",
+      attentionToneSetup: "Setup needed",
       aiIntegrationDescription:
         "The skill owns agent workflow judgment; MCP calls the same operation catalog precisely.",
       aiIntegrationMcpBody:
@@ -682,22 +767,35 @@ export const enUS = {
         "Choose a local folder, GitHub repository, remote Git URL, Docker image, Compose file, or Blueprint to create the first project.",
       emptyStateTitle: "No deployed applications yet",
       failedDeploymentsMetric: "Failed",
+      failedDeploymentsDescription:
+        "Failed deployments link to observation and recovery. Configuration stays out of home.",
+      failedDeploymentsTitle: "Failed deployments",
       healthyDeploymentsMetric: "Healthy",
+      recentActivityDescription:
+        "Deployments, configuration changes, and automation events appear here.",
+      recentActivityReadModelGap:
+        "Recent activity will summarize deployments, configuration changes, and automation events. Use recent deployment records for the latest changes right now.",
+      recentActivityTitle: "Recent activity",
       managedServicesMetric: "Managed services",
       accessRouteTitle: "Access",
       moreResources: "+{{count}} more",
-      nextStepsDescription: "Keep creation and full management in their dedicated views.",
-      nextStepsTitle: "Next actions",
+      nextStepsDescription: "Common creation and review entry points.",
+      nextStepsTitle: "Shortcuts",
       noAccessRoute: "No access route yet",
+      noActiveDeployments: "No deployments are currently running.",
+      noAttentionDescription:
+        "Failed, active, undeployed, and access route states will appear here.",
+      noAttentionTitle: "Project status is clear",
       noDeploymentsShort: "No deployments yet",
+      noFailedDeployments: "No failed deployments right now.",
       noProjectDescription: "No description",
       noResourcesInProject: "No resources yet",
       operationContextDescription:
-        "Small operational context without turning home into a metrics board.",
+        "Compact cross-project signals for active deployments, failures, resources, and servers.",
       operationContextTitle: "Operations",
-      quickActionsDescription: "Continue from deploys, servers, and managed services",
-      quickActionsTitle: "Common actions",
-      recentDeploymentsDescription: "Recent deployment records across visible projects.",
+      recentDeploymentsDescription: "Recently created or updated deployment records.",
+      recentDeploymentsReadModelGap:
+        "Deployment records are shown here first. Configuration and automation events appear in recent activity.",
       recentDeploymentsTitle: "Recent deployments",
       resourceKindApplication: "Application",
       resourceKindCache: "Cache",
@@ -755,6 +853,7 @@ export const enUS = {
         "Change the console domain by rerunning the installer with the new domain; the operation is idempotent and keeps the existing database volume.",
       rerunTitle: "Change the console domain",
       refreshDoctor: "Refresh doctor",
+      reviewUpgrade: "Review update",
       runtimeStatusGeneratedAtLabel: "Status generated at",
       sourceTitle: "Source version",
       supabaseBranchLabel: "Supabase branch",
@@ -791,7 +890,7 @@ export const enUS = {
       workerObservedRuntimeSummary: "Worker replicas {{online}}/{{expected}}",
       workerObservedRuntimeWorkers: "Backend worker replicas",
       workerObservedRuntimeWorkersBody:
-        "These are the replicas observed by the heartbeat read model after one worker service is scaled with replicas.",
+        "These are the worker replicas currently observed in heartbeat after the service is scaled.",
       workerRawRetentionHours: "{{hours}}h raw retention",
       workerRuntimeBackend: "backend",
       workerRuntimeGroup: "group",
@@ -810,6 +909,7 @@ export const enUS = {
       workerRuntimeUnavailable: "System doctor did not return durable worker runtime topology.",
       workerRuntimeWorkerId: "Replica ID",
       workerRuntimeWorkerIds: "process worker IDs",
+      workerRuntimeSlot: "Slot",
       workerRuntimeWorkers: "process worker executors",
       workerSafetyCertificateRetry: "Certificate retry only",
       workerSafetyDurableProcessDelivery: "Durable work delivery",
@@ -846,12 +946,91 @@ export const enUS = {
       workerWorkTitle: "Recent work",
       workerWorkUpdatedAt: "Updated",
     },
+    installedApplications: {
+      accessEmpty:
+        "This installation result has no public access summary. Domains, TLS, and access policy stay on the resource networking page.",
+      accessTitle: "Public URLs",
+      backToMarketplace: "Back to Marketplace",
+      breadcrumbCurrent: "Install result",
+      breadcrumbMarketplace: "Marketplace",
+      componentFallback: "component",
+      createdAtLabel: "Created",
+      dependenciesEmpty: "This installation did not record dependency resources.",
+      dependenciesTitle: "Dependency resources",
+      dependencyFallback: "dependency",
+      dependencyModeFallback: "bind",
+      deploymentObservationTitle: "Deployment observation",
+      fallbackEnvironment: "Environment",
+      fallbackProject: "Project",
+      historyTitle: "Install history",
+      installResultDescription: "The install result view does not own resource configuration.",
+      installResultTitle: "Install result",
+      lastChangedAtLabel: "Last changed",
+      latestDeploymentEmpty: "No deployment record yet",
+      latestDeploymentLabel: "Latest deployment: ",
+      lifecycleDescription:
+        "Upgrade, rollback, and uninstall require focused confirmation flows. This page only shows status, impact, and related entry points; it does not show default-page forms.",
+      lifecycleTitle: "Lifecycle",
+      nextActionsDescription:
+        "This page shows the installation outcome. Continue in the project, resource, deployment, or dependency resource page.",
+      nextActionsTitle: "Next steps",
+      notFoundBadge: "Not found",
+      notFoundDescription:
+        "This install result could not be loaded. Return to Marketplace or reopen it from the install completion page.",
+      notFoundTitle: "Install result not found",
+      openGovernance: "Open governance",
+      openLatestDeployment: "Open latest deployment",
+      openPrimaryResource: "Open first resource",
+      openProject: "Open project",
+      openPublicUrl: "Open public URL",
+      openResource: "Open resource",
+      outcomeDependencies: "Dependencies",
+      outcomeDependenciesDescription: "Bindings and governance continue on dependency resources",
+      outcomePublicUrls: "Public URLs",
+      outcomePublicUrlsDescription: "Access governance continues on resource networking",
+      outcomeResources: "Resources",
+      outcomeResourcesDescription: "Configuration and runtime remain on resource pages",
+      pageDescription:
+        "Aggregate view produced by a Blueprint install; resource runtime, configuration, and networking stay on the owning resource pages.",
+      pageFallbackTitle: "Install result",
+      plannedStatus: "planned",
+      progressFallback: "Install progress updates appear here.",
+      projectSummaryDescription:
+        "Review the project resource board, environments, and deployment rollup.",
+      projectSummaryTitle: "Project",
+      resourceControlsDescription:
+        "Configuration, networking, runtime, and deployment actions belong on resource pages.",
+      resourceControlsTitle: "Resource",
+      resourcesEmpty: "Created resources appear here after installation completes.",
+      resourcesTitle: "Created resources",
+      rollbackDescription:
+        "Rollback depends on install history and resource deployment state; it is not submitted directly from this aggregate page.",
+      rollbackNotRequested: "Not requested",
+      rollbackRequested: "Requested",
+      rollbackTitle: "Rollback",
+      tabAccess: "Access",
+      tabAriaLabel: "Install result page",
+      tabDependencies: "Dependency resources",
+      tabHistory: "History and lifecycle",
+      tabOverview: "Overview",
+      tabResources: "Resources",
+      uninstallBadge: "Confirmation required",
+      uninstallDescription:
+        "Uninstall must list affected resources, dependency resources, and public URLs before strong confirmation.",
+      uninstallTitle: "Uninstall",
+      updatedAtLabel: "Updated",
+      upgradeBadge: "Review required",
+      upgradeDescription:
+        "Upgrade must show version differences, resource impact, and the deployment plan before confirmation.",
+      upgradeTitle: "Upgrade",
+      versionLabel: "Version",
+    },
     nav: {
       accountSecurity: "Account security",
       deploy: "Quick deploy",
       dependencyResources: "Dependency resources",
       domainBindings: "Domain bindings",
-      deployments: "Deployments",
+      deployments: "Deployment records",
       extensions: "Extensions",
       home: "Home",
       instance: "Instance",
@@ -926,6 +1105,12 @@ export const enUS = {
       manageTokens: "Manage tokens",
       memberRemoved: "Member removed",
       memberRestored: "Member restored",
+      memberLifecycleDialogDescription:
+        "Choose one access lifecycle operation for this member, then confirm it explicitly.",
+      memberLifecycleDialogTitle: "Member lifecycle governance",
+      memberLifecycleRemoveOption:
+        "Remove active access while keeping membership history available for audit.",
+      memberLifecycleRestoreOption: "Restore access for this previously removed member.",
       membersDescription: "View current organization members and roles.",
       membersTitle: "Members",
       methodGithub: "GitHub",
@@ -934,6 +1119,7 @@ export const enUS = {
       methodOidc: "OIDC",
       methodDisabled: "Disabled",
       methodEnabled: "Enabled",
+      lifecycleManageAction: "Open lifecycle governance",
       nameLabel: "Organization name",
       noDisplayName: "No display name",
       organizationId: "Organization ID",
@@ -953,6 +1139,9 @@ export const enUS = {
       logoUrlPlaceholder: "https://example.com/logo.png",
       removeMember: "Remove",
       removeMemberConfirm: "Remove member {{memberId}} from this organization?",
+      removeMemberDialogDescription:
+        "Member removal is an access lifecycle action. The member loses active access while audit history remains available.",
+      removeMemberDialogTitle: "Confirm member removal",
       removingMember: "Removing",
       removedMembersDescription:
         "Removed members no longer have active access. They are kept here for audit and can be restored.",
@@ -960,8 +1149,14 @@ export const enUS = {
       repositoryScopeLabel: "Repository scope",
       repositoryScopePlaceholder: "owner/repository",
       restoreMember: "Restore",
+      restoreMemberDialogDescription:
+        "Restoring a member grants organization access again with the role recorded before removal.",
+      restoreMemberDialogTitle: "Confirm member restore",
       restoringMember: "Restoring",
       revokeConfirm: "Revoke deploy token {{tokenId}}?",
+      revokeTokenDialogDescription:
+        "Revoking this deploy token immediately invalidates it. Automation using it must move to another credential.",
+      revokeTokenDialogTitle: "Confirm deploy token revoke",
       revokeToken: "Revoke",
       revokingToken: "Revoking",
       roleAdmin: "Admin",
@@ -972,6 +1167,9 @@ export const enUS = {
       roleUpdated: "Role updated",
       roleViewer: "Viewer",
       rotateConfirm: "Rotate deploy token {{tokenId}}? The old secret stops working.",
+      rotateTokenDialogDescription:
+        "Rotation creates a new raw token and stops the old secret. The raw value is shown only once after rotation.",
+      rotateTokenDialogTitle: "Confirm deploy token rotation",
       rotateToken: "Rotate",
       rotatingToken: "Rotating",
       secretSuffix: "Secret suffix",
@@ -996,6 +1194,12 @@ export const enUS = {
       tokenCreateDescription:
         "Scope a token to one workflow command, and optionally to one repository full name.",
       tokenCreateTitle: "Create deploy token",
+      tokenLifecycleDialogDescription:
+        "Choose one lifecycle operation for this deploy token, then confirm it explicitly.",
+      tokenLifecycleDialogTitle: "Deploy token lifecycle governance",
+      tokenLifecycleRevokeOption: "Invalidate this token for future automation after confirmation.",
+      tokenLifecycleRotateOption:
+        "Issue a new secret and stop accepting the previous one after confirmation.",
       tokenNameLabel: "Token name",
       tokenNamePlaceholder: "GitHub Action deploy",
       tokenRevoked: "Deploy token revoked",
@@ -1044,6 +1248,9 @@ export const enUS = {
       pullRequest: "Pull request",
       repository: "Repository",
       lifecycleTitle: "Lifecycle",
+      lifecycleManageAction: "Open lifecycle governance",
+      lifecycleReady: "This preview environment can request cleanup after confirmation.",
+      lifecycleBlocked: "The current status does not accept a new cleanup request.",
       ownerTitle: "Owner",
       sourceTitle: "Source",
       sourceBinding: "Source binding",
@@ -1055,9 +1262,14 @@ export const enUS = {
     previewPolicies: {
       configuredSource: "Configured",
       defaultSource: "Default",
+      disabledValue: "Off",
+      editPolicyAction: "Edit policy",
+      changeScopeAction: "Change scope",
+      currentScopeTitle: "Current scope",
       emptyProjectsBody:
         "Project-scoped and resource-scoped preview policies are available after a project exists.",
       emptyProjectsTitle: "No projects are available for preview policy yet.",
+      enabledValue: "On",
       forkModeDisabled: "Block fork previews",
       forkModeLabel: "Fork previews",
       forkModeWithSecrets: "Allow forks with secrets",
@@ -1074,8 +1286,7 @@ export const enUS = {
       policySaveFailed: "Preview policy was not saved",
       previewTtlHoursLabel: "Preview TTL hours",
       projectScope: "Project",
-      readbackDescription:
-        "Effective policy readback shows whether this scope is using defaults or configured settings.",
+      readbackDescription: "Shows whether this scope is using defaults or configured settings.",
       readbackTitle: "Effective policy",
       resourceScope: "Resource",
       sameRepositoryPreviewsLabel: "Allow same-repository previews",
@@ -1087,6 +1298,7 @@ export const enUS = {
       selectResourceLabel: "Resource",
       selectScopeLabel: "Scope",
       sourceLabel: "Source",
+      scopeRequired: "Select a project and resource scope before editing the policy.",
       updatedAt: "Updated",
     },
     terminal: {
@@ -1107,10 +1319,14 @@ export const enUS = {
       lifecycleExpireOld: "Expire old sessions",
       lifecycleExpireSucceeded: "Old terminal sessions expired",
       lifecycleExpiredCount: "{{count}} expired",
+      lifecycleManageAction: "Open lifecycle governance",
       lifecycleRefresh: "Refresh sessions",
       lifecycleScopeResource: "Resource",
       lifecycleScopeServer: "Server",
       lifecycleTitle: "Active terminal sessions",
+      resourceUnavailableBody:
+        "This resource does not have a deployment workspace that can open a terminal yet. Check deployments or use a server terminal when you need host-level access.",
+      resourceUnavailableTitle: "No resource terminal target yet",
       resourceDescription:
         "Starts in the latest deployment workspace resolved from runtime metadata.",
       resourceTitle: "Resource terminal",
@@ -1124,11 +1340,19 @@ export const enUS = {
         "Resource terminal needs a successful deployment with workspace metadata. Pick a deployment that recorded its workspace, redeploy the resource, or use the server terminal.",
     },
     projects: {
+      activityDescription:
+        "Deployments, configuration changes, and automation events for this project appear here.",
+      activityGapDescription:
+        "Activity will summarize deployments, configuration changes, and automation events for this project. Use Resources and Deployments for the latest changes right now.",
+      activityGapTitle: "Activity summary",
+      activityTitle: "Activity",
+      addResourceAction: "Add resource",
       activeProjects: "With deployments",
       active: "Active",
       archiveAction: "Archive",
       archiveConfirm:
         "Archive this project? New resources, environments, deployments, and project renames will be blocked while existing history remains visible. This will not create a deployment, rewrite snapshots, or change running runtime state.",
+      archiveDialogTitle: "Confirm project archive",
       archiveFailed: "Project was not archived",
       archiveNotice:
         "This project is archived. Existing resources, environments, deployments, snapshots, runtime state, and access routes remain visible, but new mutations are blocked.",
@@ -1138,13 +1362,27 @@ export const enUS = {
       restoreAction: "Restore",
       restoreConfirm:
         "Restore this project? New project-scoped resources, environments, and deployments can be created again. Existing child resources and deployment history will not be changed.",
+      restoreDialogTitle: "Confirm project restore",
       restoreFailed: "Project was not restored",
       restoreSucceeded: "Project restored",
       deleteAction: "Delete",
       deleteBlocked: "Delete blocked by {{count}} retained record(s)",
       deleteConfirmPrompt: "Type the project id to delete this archived project.",
+      deleteDialogDescription:
+        "Deletion is available only after the project is archived and delete safety passes. Type the project id to confirm.",
+      deleteDialogTitle: "Confirm project deletion",
       deleteFailed: "Project was not deleted",
       deleteSucceeded: "Project deleted",
+      attentionFailedDeploymentTitle: "Failed deployment",
+      attentionNoAccessDetail:
+        "No resource currently has a public access route. Open networking on a resource to manage access.",
+      attentionNoAccessTitle: "No public access",
+      attentionNoDeploymentDetail:
+        "Resources exist, but no deployment record has been created for this project.",
+      attentionNoDeploymentTitle: "Deploy a resource",
+      attentionRunningDeploymentTitle: "Deployment running",
+      attentionTitle: "Attention",
+      deployedResourcesLabel: "deployed",
       detailDescription: "Environments, resources, and deployment records for this project",
       description: "Projects, environments, and deployment relationships",
       emptyBody:
@@ -1168,10 +1406,20 @@ export const enUS = {
       environmentArchiveAction: "Archive",
       environmentArchiveConfirm:
         "Archive this environment? New variables, resources, and deployments will be blocked while existing history remains visible.",
+      environmentArchiveDialogTitle: "Confirm environment archive",
       environmentArchiveFailed: "Environment was not archived",
       environmentArchiveSucceeded: "Environment archived",
       environmentArchived: "Archived",
       environmentArchivedAt: "Archived at",
+      environmentLifecycleArchiveOption:
+        "Stop new changes for this environment while keeping history visible.",
+      environmentLifecycleDialogDescription:
+        "Choose one lifecycle operation for this environment, then explicitly confirm it.",
+      environmentLifecycleDialogTitle: "Environment lifecycle governance",
+      environmentLifecycleLockOption:
+        "Temporarily block variables, resources, promotions, and deployments.",
+      environmentLifecycleUnlockOption:
+        "Allow this locked environment to accept configuration and deployment changes again.",
       environmentCloneAction: "Clone",
       environmentCloneFailed: "Environment was not cloned",
       environmentCloneNameLabel: "Clone name",
@@ -1195,25 +1443,35 @@ export const enUS = {
       environmentLockAction: "Lock",
       environmentLockConfirm:
         "Lock this environment? Variables, resources, promotions, and deployments will be blocked until it is unlocked.",
+      environmentLockDialogTitle: "Confirm environment lock",
       environmentLockFailed: "Environment was not locked",
       environmentLockSucceeded: "Environment locked",
       environmentLocked: "Locked",
       environmentLockedAt: "Locked at",
       environmentUnlockAction: "Unlock",
+      environmentUnlockConfirm:
+        "Unlock this environment? Variables, resources, and deployment flows can be changed again.",
+      environmentUnlockDialogTitle: "Confirm environment unlock",
       environmentUnlockFailed: "Environment was not unlocked",
       environmentUnlockSucceeded: "Environment unlocked",
       environmentsDescription: "Configuration boundaries grouped under this project.",
       environmentsTitle: "Environments",
+      failedDeploymentsLabel: "failed",
       focusDescription:
         "The project list keeps ownership, environment count, resource count, and latest deployment visible. Execution details move to detail pages.",
       focusLabel: "Project index",
       focusTitle: "Project ownership and deployment relationships",
+      healthSummaryGap: "Project health is shown from deployment status and access state.",
       lastDeployment: "Latest deployment",
+      latestDeploymentTitle: "Latest deployment",
       latestResource: "Latest resource",
+      manageAccessAction: "Manage access",
+      noAccessResourcesLabel: "without access",
       noDeploymentShort: "No deployment yet",
       noDescription: "No description.",
       noEnvironment:
         "This project has no environment yet. You can create a production environment during deployment.",
+      noAttentionTitle: "No failed or running deployment needs attention.",
       noProjectDeploymentBody:
         "Runs, rollbacks, and environment snapshots appear here as deployment records are created.",
       noProjectDeploymentTitle: "This project has no deployments.",
@@ -1239,11 +1497,27 @@ export const enUS = {
         "Resources whose environment kind is preview. These include previews without a source-driven preview record.",
       previewResourcesTitle: "Preview resources",
       previewTitle: "Preview",
+      previewsTitle: "Previews",
       allEnvironments: "All environments",
       dangerZoneDescription:
         "Archive and deletion are separated from normal settings because they change whether future project-scoped operations are allowed.",
       dangerZoneTitle: "Danger zone",
       environmentFilterLabel: "Environment",
+      environmentManageDescription:
+        "Rename, clone, lock, or archive one environment at a time. Resource configuration stays on resource pages.",
+      environmentVariablesLabel: "variables",
+      generalSettingsTitle: "General",
+      lifecycleArchiveOption:
+        "Block new resources, environments, and deployments while keeping existing records visible.",
+      lifecycleDeleteOption:
+        "Delete the project boundary only after the project is archived and safety checks pass.",
+      lifecycleManageAction: "Open lifecycle governance",
+      lifecycleRestoreOption:
+        "Allow an archived project to accept resource, environment, and deployment changes again.",
+      lifecycleTitle: "Lifecycle",
+      openFailedDeploymentAction: "Open failed deployment",
+      openRunningDeploymentAction: "Open running deployment",
+      operationalSummaryTitle: "Operational summary",
       projectsWithResources: "With resources",
       publicAccessDescription: "Default access URLs created by resource deployments.",
       publicAccessTitle: "Public access",
@@ -1254,6 +1528,7 @@ export const enUS = {
       renameSucceeded: "Project renamed",
       settingsDescription:
         "Project lifecycle changes use dedicated operations. They do not create deployments, rewrite historical snapshots, or immediately change runtime state.",
+      settingsDescriptionLabel: "Description",
       settingsTitle: "Project settings",
       createResourceDescription:
         "Define the resource source and network, then start the first deployment in the current project, environment, and server.",
@@ -1290,6 +1565,12 @@ export const enUS = {
       recentDeploymentsTitle: "Recent deployments",
       resourcesDescription: "Deployment artifacts and service boundaries.",
       resourcesTitle: "Resources",
+      runningDeploymentsLabel: "running",
+      settingsEditProjectAction: "Edit project",
+      settingsLifecycleDescription:
+        "Archive and restore change whether future project-scoped operations are allowed. They do not delete resources or deployment history.",
+      settingsSlugLabel: "Slug",
+      undeployedResourcesLabel: "undeployed",
     },
     domainBindings: {
       confirmOwnership: "Confirm ownership",
@@ -1303,20 +1584,36 @@ export const enUS = {
       createDescription:
         "Choose the project, environment, resource, server, and destination before creating durable domain binding state.",
       createErrorTitle: "Unable to create domain binding",
+      createOwnerHint: "Create domain bindings from a resource Networking page.",
       createSuccessTitle: "Domain binding accepted",
       createTitle: "Create domain binding",
       deleteBinding: "Delete",
       deleteCheck: "Check delete",
       deleteCheckBlockedTitle: "Delete is blocked",
       deleteCheckErrorTitle: "Unable to check delete safety",
+      deleteCheckFirst: "Check delete safety, then enter the binding id to confirm deletion.",
       deleteCheckSafeTitle: "Safe to delete",
+      deleteConfirmLabel: "Enter the domain binding id to confirm deletion",
+      deleteDialogDescription:
+        "Deletion affects only this domain binding active lifecycle. Generated access, deployment snapshots, and audit remain preserved.",
+      deleteDialogTitle: "Delete domain binding",
       deleteErrorTitle: "Unable to delete domain binding",
+      dangerZoneDescription:
+        "Delete only after checking binding safety. Daily governance lists do not expose destructive actions directly.",
+      dangerZoneTitle: "Danger zone",
       deleteSafety: "Delete safety",
       deleteSafetyPreserves:
         "Generated access, deployment snapshots, and route audit are preserved.",
       deleteSuccessTitle: "Domain binding deleted",
       destinationHelp:
         "If the selected resource already has a destination it is prefilled; otherwise enter the target destination ID.",
+      lifecycleBlocked: "Needs governance",
+      lifecycleDescription:
+        "Review whether this binding can be archived or deleted. Destructive actions stay inside the confirmation dialog.",
+      selectedBinding: "Selected domain binding",
+      lifecycleReady: "Ready for governance",
+      lifecycleStatus: "Lifecycle status",
+      lifecycleManageAction: "Open lifecycle governance",
       dnsCheckedAt: "Checked",
       dnsExpectedTargets: "Expected targets",
       dnsLookupFailed: "Lookup failed",
@@ -1328,6 +1625,8 @@ export const enUS = {
       dnsStepTitle: "DNS ownership",
       dnsUnresolved: "Unresolved",
       emptyBody: "A domain binding stores verification, certificate, and readiness state.",
+      emptyGlobalBody:
+        "Domain bindings are created from a resource Networking page; this page is for lookup, verification, routing, and certificate governance.",
       emptyTitle: "No domain bindings yet.",
       filterAllProjects: "All projects",
       formDestinationPlaceholder: "Destination id",
@@ -1337,11 +1636,13 @@ export const enUS = {
       listDescription: "Accepted bindings and their current verification status.",
       listTitle: "Domain binding list",
       lifecycleGuideTitle: "Verification path",
+      manageRoute: "Manage route",
       noCanonicalDomainOptions: "Create a served domain first.",
       noEnvironmentOptions: "No environments available.",
       noProjectOptions: "No projects available.",
       noResourceOptions: "No resources available.",
       noServerOptions: "No servers available.",
+      openResourceNetworking: "Choose resource",
       pageDescription: "Durable domain, routing, and TLS lifecycle",
       pageTitle: "Domain bindings",
       proxyReadiness: "Proxy readiness",
@@ -1352,6 +1653,10 @@ export const enUS = {
       retryVerificationErrorTitle: "Unable to retry verification",
       retryVerificationSuccessTitle: "Verification retry started",
       routeReadiness: "Route readiness",
+      routeDialogDescription:
+        "Change routing behavior for this domain binding only. The collection remains a read-only governance view.",
+      routeDialogTitle: "Manage domain route",
+      routeManagedInDialog: "Managed in dialog",
       routeModeRedirect: "Redirect to canonical",
       routeModeServe: "Serve traffic",
       tlsStepTitle: "TLS certificate",
@@ -1385,7 +1690,7 @@ export const enUS = {
       observationWindowEmpty: "No records match this Monitor window.",
       observationWindowHandoff: "Monitor window: {{from}} to {{to}} · {{scopeKind}} {{scopeId}}",
       openCapacity: "Capacity",
-      openCleanup: "Cleanup",
+      openCleanup: "Governance",
       openDiagnostics: "Diagnostics",
       openEvents: "Events",
       openLogs: "Logs",
@@ -1486,6 +1791,21 @@ export const enUS = {
       dangerZoneDescription:
         "Archive and delete are isolated from normal resource configuration. Deletion requires the resource slug and is only available after the resource is archived, except for preview resources.",
       dangerZoneTitle: "Danger zone",
+      lifecycleArchiveOption:
+        "Block future profile edits and deployment entry points while preserving deployments, logs, routes, and bindings.",
+      lifecycleDeleteOption:
+        "Delete the resource boundary only after the resource is archived. Audit and external records remain with their owners.",
+      lifecycleDescription:
+        "Review the resource lifecycle state, then open one focused governance flow for the intended operation.",
+      lifecycleDialogDescription:
+        "Choose one lifecycle operation for this resource, then explicitly confirm it.",
+      lifecycleDialogTitle: "Resource lifecycle governance",
+      lifecycleManageAction: "Open lifecycle governance",
+      lifecyclePreviewDeleteOption:
+        "Clean up the preview resource. If it is not archived yet, it will be archived before deletion.",
+      lifecyclePreviewResourceNotice:
+        "Preview resources can enter cleanup directly without a separate archive step.",
+      lifecycleStatus: "Lifecycle status",
       composeProfileDescription:
         "Compose resources group multiple services and choose a target service for traffic.",
       composeProfileTitle: "Compose stack",
@@ -1506,7 +1826,7 @@ export const enUS = {
       configurationImportAction: "Import variables",
       configurationImportContent: ".env content",
       configurationImportDescription:
-        "Paste dotenv content into the resource override layer. Secret-like keys are masked on readback.",
+        "Paste dotenv content into the resource override layer. Secret-like keys are masked when displayed.",
       configurationImportFailed: "Variables were not imported",
       configurationImportPlainKeys: "Force plain keys",
       configurationImportSecretKeys: "Force secret keys",
@@ -1528,6 +1848,7 @@ export const enUS = {
       configurationSecretDescription:
         "Secret values are stored on the write side and masked everywhere they are read back.",
       configurationSetAction: "Set variable",
+      configurationTab: "Configuration",
       configurationTitle: "Configuration",
       configurationUnsetAction: "Unset",
       configurationUnsetFailed: "Resource variable was not removed",
@@ -1562,7 +1883,7 @@ export const enUS = {
       storageVolume: "Storage volume",
       storageVolumeAttachmentCount: "{{count}} attachments",
       storageVolumeBackupSummaryDescription:
-        "Restore points belong to the selected storage volume. Open backups for plan, create, restore, and prune controls.",
+        "Restore points belong to storage volumes. This page shows the current owner summary; backup and cleanup controls stay in focused governance flows.",
       storageVolumeBackupSummaryTitle: "Backup restore points",
       storageBackupRestorePointCount: "{{count}} restore points",
       storageBackupPolicyOptional: "Optional",
@@ -1743,7 +2064,7 @@ export const enUS = {
       profileDiagnosticsSuggestedCommand: "Suggested command",
       profileDiagnosticsTitle: "Profile diagnostics",
       deploymentsDescription:
-        "Deployment attempts for this resource, newest first, with source and status context.",
+        "Deployment records for this resource, newest first, with source and status context.",
       deploymentsTitle: "Deployments",
       domainBindingsDescription:
         "These are custom domain bindings for the current resource. Default generated access appears in the access area.",
@@ -1806,6 +2127,7 @@ export const enUS = {
         "External resources keep project ownership and access context without a Appaloft runtime.",
       externalProfileTitle: "External resource",
       generatedAccessRoute: "Generated default access",
+      generalSection: "General",
       staticArtifactAccessRoute: "Static artifact access",
       healthChecks: "Health checks",
       healthDescription:
@@ -1823,9 +2145,19 @@ export const enUS = {
       healthRuntime: "Runtime",
       healthSourceIssues: "Source issues",
       healthTitle: "Resource health",
+      jobsTab: "Jobs",
       logsTab: "Logs",
+      networkingTab: "Networking",
       overviewDescription:
-        "Current access, health, latest deployment, and runtime shape for this resource.",
+        "Read the current access, health, latest deployment, configuration summary, dependencies, and next action without editing long forms.",
+      overviewConfigurationSummary: "Configuration summary",
+      overviewCurrentAccess: "Current access",
+      overviewCurrentHealth: "Current health",
+      overviewDependenciesEmpty: "No dependency bindings are attached.",
+      overviewDependencyBindingsSummary: "{{count}} active bindings",
+      overviewDependencyResourcesSummary: "{{count}} available dependency resources",
+      overviewLatestDeployment: "Latest deployment",
+      overviewNextActions: "Next actions",
       overviewNoAccessDescription:
         "Deploy the resource or bind a custom domain to create an operator-facing address.",
       overviewNoAccessTitle: "No access URL is available yet.",
@@ -1864,8 +2196,7 @@ export const enUS = {
         "Source, runtime strategy, and network port come from the resource profile and are not entered again here.",
       newDeploymentSourceTitle: "Resource source",
       newDeploymentSuccessTitle: "Deployment created",
-      newDeploymentTargetDescription:
-        "Choose only the server and destination for this deployment attempt.",
+      newDeploymentTargetDescription: "Choose only the server and destination for this deployment.",
       newDeploymentTargetTitle: "Deployment target",
       newDeploymentPlanAction: "Preview plan",
       newDeploymentPlanPending: "Planning",
@@ -1919,10 +2250,11 @@ export const enUS = {
       runtimeName: "Runtime name",
       runtimeNamePlaceholder: "www",
       runtimeControlsDescription:
-        "Stop, start, or restart the current runtime without creating a new deployment attempt.",
+        "Stop, start, or restart the current runtime without creating a new deployment.",
       runtimeControlsLatest: "Latest control",
       runtimeControlsTitle: "Runtime controls",
       runtimeControlFailed: "Runtime control failed",
+      runtimeControlManageAction: "Open runtime controls",
       runtimeControlRestart: "Restart",
       runtimeControlRestartSuccess: "Runtime restart accepted",
       runtimeControlStart: "Start",
@@ -1940,6 +2272,10 @@ export const enUS = {
       runtimeLogsStopFollow: "Stop",
       runtimeLogsStreamDisconnected: "Runtime log stream disconnected.",
       runtimeLogsTitle: "Runtime logs",
+      runtimeLogsUnavailableBody:
+        "Runtime logs will appear here after a deployment records application output. This resource does not have readable runtime logs yet.",
+      runtimeLogsUnavailableTitle: "No runtime logs yet",
+      runtimeTab: "Runtime",
       runtimeProfileFormDescription:
         "Change the durable runtime planning profile used by future deployments.",
       runtimeProfileSaveFailed: "Runtime profile was not saved",
@@ -1957,7 +2293,13 @@ export const enUS = {
       runtimeStrategyWorkspaceCommands: "Workspace commands",
       serviceTopologyDescription: "Declared service boundaries inside this resource.",
       serviceTopologyTitle: "Service topology",
-      settingsTab: "Configuration",
+      settingsDescription:
+        "Identity, placement, lifecycle, and links to the resource areas that own detailed changes.",
+      settingsHandoffsDescription:
+        "Open the area that owns the change instead of editing long forms from the settings overview.",
+      settingsHandoffsTitle: "Related areas",
+      settingsTab: "Settings",
+      settingsTitle: "Resource settings",
       scheduledTaskCommandIntent: "Command intent",
       scheduledTaskCommandIntentPlaceholder: "bun run db:migrate",
       scheduledTaskConcurrencyForbid: "Forbid concurrent runs",
@@ -1977,13 +2319,17 @@ export const enUS = {
       scheduledTaskDisable: "Disable",
       scheduledTaskEnable: "Enable",
       scheduledTaskLatestRun: "Latest run",
+      scheduledTaskLifecycleAction: "Lifecycle governance",
       scheduledTaskRetryLimit: "Retries",
       scheduledTaskRunAccepted: "Scheduled task run accepted",
       scheduledTaskRunFailed: "Scheduled task run was not accepted",
       scheduledTaskRunLogs: "Logs",
       scheduledTaskRunLogsEmpty: "This run has no log entries.",
       scheduledTaskRunLogsLoading: "Loading task run logs...",
-      scheduledTaskRunLogsSelect: "Select a run to read logs.",
+      scheduledTaskRunManageAction: "Run management",
+      scheduledTaskRunManageDescription:
+        "Review this task before starting a manual run or changing its enabled state.",
+      scheduledTaskRunManageTitle: "Manage scheduled task",
       scheduledTaskRunNow: "Run now",
       scheduledTaskRunsEmpty: "No scheduled task runs are visible for this resource yet.",
       scheduledTaskRunsLoadFailed: "Unable to load scheduled task runs",
@@ -2384,15 +2730,19 @@ export const enUS = {
       capacityCategoryUnusedImages: "Unused images",
       capacityConfirmApply: "Run destructive runtime capacity prune on {{serverId}}?",
       capacityDescription:
-        "Read safe runtime target capacity signals and preview cleanup candidates before any destructive action.",
+        "Review safe runtime capacity signals and preview reclaimable items before any destructive action.",
       capacityDryRunBadge: "Dry-run first",
       capacityErrorTitle: "Unable to read server capacity",
+      capacityGovernanceAction: "Open governance flow",
+      capacityGovernanceDescription:
+        "Show capacity signals and preview results by default. Runtime storage changes stay inside a single confirmation flow.",
+      capacityGovernanceTitle: "Capacity governance",
       capacityInspectedAt: "Inspected {{time}}",
       capacityPreviewAction: "Preview prune",
       capacityPruneBefore: "Before",
       capacityPruneCategories: "Categories",
       capacityPruneDescription:
-        "Dry-run is the default. Build cache and unused images are explicit opt-in categories.",
+        "Preview is the default. Build cache and unused images are cleaned only after explicit selection.",
       capacityPruneFailed: "Runtime capacity prune failed",
       capacityPruneSucceeded: "Runtime capacity prune completed",
       capacityPruneSummary:
@@ -2401,6 +2751,9 @@ export const enUS = {
       capacityRefresh: "Refresh capacity",
       capacitySafeReclaimable: "Safe reclaimable",
       capacityStoppedContainers: "Stopped containers",
+      capacitySurfaceDescription:
+        "Review capacity signals, preview results, and the governance entry. Runtime storage changes open the confirmation flow.",
+      capacitySurfaceTitle: "Capacity governance",
       capacityTab: "Capacity",
       capacityTitle: "Runtime capacity",
       capacityWarningsTitle: "Warnings",
@@ -2410,6 +2763,9 @@ export const enUS = {
         "Run a command-style probe: local targets check the local runner, SSH targets check SSH and Docker.",
       connectivityLastResult: "Latest result",
       connectivityNoResult: "No connectivity result yet.",
+      connectivitySurfaceDescription:
+        "Open connectivity for the latest probe and rerun SSH, Docker, or local runner checks when needed.",
+      connectivitySurfaceTitle: "Connectivity",
       connectivityTab: "Connectivity",
       connectivityTitle: "Connectivity test",
       createCredentialValidationError:
@@ -2488,6 +2844,7 @@ export const enUS = {
         "Preview whether this server still has deployments, domains, credentials, routes, logs, or audit records that must remain visible before deletion.",
       deleteSafetyEligible: "Eligible",
       deleteSafetyTitle: "Delete safety",
+      deleteGovernanceAction: "Open delete governance",
       deleteServerAction: "Delete server",
       deleteServerActionAria: "Delete server {{name}}",
       deleteServerBlockedDescription: "Resolve every blocker before this server can be deleted.",
@@ -2501,6 +2858,9 @@ export const enUS = {
       deleteServerReadyDescription:
         "Safety checks are clear. Typed confirmation is still required before deletion.",
       deleteServerSucceeded: "Server deleted",
+      deploymentsSurfaceDescription:
+        "Read-only deployment records hosted on this server. Create or retry deployments from project resource views or resource pages.",
+      deploymentsSurfaceTitle: "Hosted deployments",
       deleteCredentialAction: "Delete",
       deleteCredentialActionAria: "Delete SSH credential {{name}}",
       deleteCredentialConfirmMismatch: "The typed credential id must match exactly.",
@@ -2517,6 +2877,18 @@ export const enUS = {
       deleteCredentialUsageReady: "Usage is zero; typed confirmation is still required.",
       deleteCredentialUsageUnavailable:
         "Usage could not be read safely. Retry before deleting this credential.",
+      lifecycleDeactivateOption:
+        "Stop the server from receiving new deployments, scheduled work, and proxy configuration.",
+      lifecycleDeleteOption:
+        "Remove this runtime surface from normal server selection only after delete safety passes.",
+      lifecycleDialogDescription:
+        "Choose one lifecycle operation for this server, then explicitly confirm it.",
+      lifecycleDialogTitle: "Server lifecycle governance",
+      lifecycleGovernanceDescription:
+        "Review server lifecycle and delete safety first, then open one focused governance flow for the intended operation.",
+      lifecycleGovernanceTitle: "Lifecycle governance",
+      lifecycleManageAction: "Open lifecycle governance",
+      lifecycleStatus: "Lifecycle status",
       rotateCredentialAcknowledgeLabel:
         "I understand active and inactive servers using this credential will use the rotated material for future work.",
       rotateCredentialAction: "Rotate",
@@ -2563,11 +2935,21 @@ export const enUS = {
       pageTitle: "Servers",
       proxyAccessTab: "Proxy & Access",
       reorderHandle: "Drag to reorder",
+      renameDialogDescription:
+        "Only changes the display name shown in the console. Host, provider, credential, and deployment history stay unchanged.",
+      renameDialogTitle: "Edit server display name",
       renameFailed: "Unable to rename server",
       renameLabel: "Display name",
       renameSucceeded: "Server name saved",
+      runtimeTab: "Runtime",
+      runtimeSurfaceDescription:
+        "Inspect server-level monitor signals or open a server terminal without creating a deployment.",
+      runtimeSurfaceTitle: "Runtime observation",
+      serverIdLabel: "Server ID",
       settingsDescription:
         "Change the display name without changing the server id, host, provider, credential, proxy, lifecycle, or deployment history.",
+      settingsGeneralSection: "General",
+      settingsTab: "Settings",
       settingsTitle: "Server settings",
       savedCredentialLibraryCount: "{{count}} saved",
       savedCredentialLibraryDescription:

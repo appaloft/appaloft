@@ -32,6 +32,7 @@
   import ConsoleEmptyState from "$lib/components/console/ConsoleEmptyState.svelte";
   import ConsoleResourceCanvas from "$lib/components/console/ConsoleResourceCanvas.svelte";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
+  import ConsoleStatePanel from "$lib/components/console/ConsoleStatePanel.svelte";
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
   import EnvironmentCreateForm from "$lib/components/console/EnvironmentCreateForm.svelte";
   import ProjectCreateForm from "$lib/components/console/ProjectCreateForm.svelte";
@@ -44,6 +45,7 @@
   import { Skeleton } from "$lib/components/ui/skeleton";
   import { webDocsHrefs } from "$lib/console/docs-help";
   import { createConsoleQueries } from "$lib/console/queries";
+  import { canRunProductQueries } from "$lib/console/auth-query-gate";
   import { modalIsOpen, setModalOpen } from "$lib/console/url-modal";
   import { formatTime } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
@@ -130,8 +132,9 @@
   };
   const dependencyResourceSelectContentClass = "z-[60]";
   const dependencyResourceNestedDialogClass = "z-[70]";
+  const allDependencyResourceFilterValue = "__all_dependency_resources__";
 
-  const { projectsQuery, environmentsQuery, serversQuery } = createConsoleQueries(browser, {
+  const { authSessionQuery, projectsQuery, environmentsQuery, serversQuery } = createConsoleQueries(browser, {
     resources: false,
     deployments: false,
     previewEnvironments: false,
@@ -139,17 +142,22 @@
     certificates: false,
     providers: false,
   });
+  const dependencyResourceQueriesEnabled = $derived(
+    browser && canRunProductQueries(authSessionQuery.data),
+  );
   const dependencyResourcesQuery = createQuery(() =>
     queryOptions({
       queryKey: ["dependency-resources", { limit: 100 }],
       queryFn: () => orpcClient.dependencyResources.list({ limit: 100 }),
-      enabled: browser,
+      enabled: dependencyResourceQueriesEnabled,
       staleTime: 5_000,
     }),
   );
 
-  let selectedProjectId = $state("");
-  let selectedEnvironmentId = $state("");
+  let filterProjectId = $state("");
+  let filterEnvironmentId = $state("");
+  let createProjectId = $state("");
+  let createEnvironmentId = $state("");
   let selectedServerId = $state("");
   let provisioningMode = $state<ProvisioningMode>("create");
   let createKind = $state<DependencyKind>("postgres");
@@ -170,16 +178,28 @@
   let environmentCreateDialogOpen = $state(false);
   let serverCreateDialogOpen = $state(false);
   let openEnvironmentAfterProjectCreate = $state(false);
+  let backupCreateDialogOpen = $state(false);
+  let restoreBackupDialogOpen = $state(false);
+  let backupPolicyDialogOpen = $state(false);
+  let deleteDependencyResourceDialogOpen = $state(false);
+  let deleteDependencyResourceConfirmation = $state("");
 
   const projects = $derived(projectsQuery.data?.items ?? []);
   const environments = $derived(environmentsQuery.data?.items ?? []);
   const servers = $derived(serversQuery.data?.items ?? []);
   const dependencyResources = $derived(dependencyResourcesQuery.data?.items ?? []);
-  const pageLoading = $derived(
-    projectsQuery.isPending ||
-      environmentsQuery.isPending ||
-      serversQuery.isPending ||
-      dependencyResourcesQuery.isPending,
+  const dependencyResourcesLoading = $derived(
+    (authSessionQuery.isPending && !authSessionQuery.data) ||
+      (dependencyResourceQueriesEnabled &&
+        dependencyResourcesQuery.isPending &&
+        !dependencyResourcesQuery.data),
+  );
+  const dependencyResourcesError = $derived(
+    dependencyResourcesQuery.error ? readErrorMessage(dependencyResourcesQuery.error) : "",
+  );
+  const dependencyResourceEnrichmentLoading = $derived(
+    dependencyResourceQueriesEnabled &&
+      (projectsQuery.isPending || environmentsQuery.isPending || serversQuery.isPending),
   );
   const activeSingleServerTargets = $derived(
     servers.filter(
@@ -189,16 +209,27 @@
         (server.providerKey === "local-shell" || server.providerKey === "generic-ssh"),
     ),
   );
-  const projectEnvironments = $derived(
-    selectedProjectId
-      ? environments.filter((environment) => environment.projectId === selectedProjectId)
+  const filterProjectEnvironments = $derived(
+    filterProjectId
+      ? environments.filter((environment) => environment.projectId === filterProjectId)
+      : environments,
+  );
+  const filterProjectSelectValue = $derived(
+    filterProjectId || allDependencyResourceFilterValue,
+  );
+  const filterEnvironmentSelectValue = $derived(
+    filterEnvironmentId || allDependencyResourceFilterValue,
+  );
+  const createProjectEnvironments = $derived(
+    createProjectId
+      ? environments.filter((environment) => environment.projectId === createProjectId)
       : environments,
   );
   const filteredDependencyResources = $derived(
     dependencyResources.filter(
       (resource) =>
-        (!selectedProjectId || resource.projectId === selectedProjectId) &&
-        (!selectedEnvironmentId || resource.environmentId === selectedEnvironmentId),
+        (!filterProjectId || resource.projectId === filterProjectId) &&
+        (!filterEnvironmentId || resource.environmentId === filterEnvironmentId),
     ),
   );
   const selectedDependencyResource = $derived(
@@ -211,7 +242,7 @@
         orpcClient.dependencyResources.listBackups({
           dependencyResourceId: selectedDependencyResourceId,
         }),
-      enabled: browser && selectedDependencyResourceId.length > 0,
+      enabled: dependencyResourceQueriesEnabled && selectedDependencyResourceId.length > 0,
       staleTime: 5_000,
     }),
   );
@@ -222,7 +253,7 @@
         orpcClient.dependencyResources.listBackupPolicies({
           dependencyResourceId: selectedDependencyResourceId,
         }),
-      enabled: browser && selectedDependencyResourceId.length > 0,
+      enabled: dependencyResourceQueriesEnabled && selectedDependencyResourceId.length > 0,
       staleTime: 5_000,
     }),
   );
@@ -234,8 +265,8 @@
   const readyBackups = $derived(selectedBackups.filter((backup) => backup.status === "ready"));
   const latestBackup = $derived(readyBackups[0] ?? selectedBackups[0] ?? null);
   const canCreate = $derived(
-    selectedProjectId.length > 0 &&
-      selectedEnvironmentId.length > 0 &&
+    createProjectId.length > 0 &&
+      createEnvironmentId.length > 0 &&
       createName.trim().length > 0 &&
       (provisioningMode === "create"
         ? selectedServerId.length > 0
@@ -253,6 +284,10 @@
     selectedDependencyResourceId.length > 0 &&
       Number.parseInt(backupPolicyRetentionDays, 10) > 0 &&
       Number.parseInt(backupPolicyIntervalHours, 10) > 0,
+  );
+  const canDeleteSelectedDependencyResource = $derived(
+    Boolean(selectedDependencyResource) &&
+      deleteDependencyResourceConfirmation.trim() === selectedDependencyResource?.id,
   );
   const reuseConnectionUrlValidation = $derived(
     provisioningMode === "reuse" && reuseConnectionUrl.trim().length > 0
@@ -323,6 +358,7 @@
         title: $t(i18nKeys.console.dependencyResources.backupCreated),
         detail: result.id,
       };
+      backupCreateDialogOpen = false;
       void invalidateDependencyResourceQueries();
     },
     onError: (error) => {
@@ -348,6 +384,7 @@
       };
       restoreAcknowledgeData = false;
       restoreAcknowledgeRuntime = false;
+      restoreBackupDialogOpen = false;
       void invalidateDependencyResourceQueries();
     },
     onError: (error) => {
@@ -370,6 +407,8 @@
       if (selectedDependencyResourceId === result.id) {
         selectedDependencyResourceId = "";
       }
+      deleteDependencyResourceConfirmation = "";
+      deleteDependencyResourceDialogOpen = false;
       void invalidateDependencyResourceQueries();
     },
     onError: (error) => {
@@ -394,6 +433,7 @@
         title: $t(i18nKeys.console.dependencyResources.backupPolicyConfigured),
         detail: result.id,
       };
+      backupPolicyDialogOpen = false;
       void invalidateDependencyResourceQueries();
     },
     onError: (error) => {
@@ -406,20 +446,29 @@
   }));
 
   $effect(() => {
-    if (!selectedProjectId && projects.length > 0) {
-      selectedProjectId = projects[0]?.id ?? "";
+    if (!createProjectId && projects.length > 0) {
+      createProjectId = projects[0]?.id ?? "";
     }
   });
 
   $effect(() => {
-    if (!selectedEnvironmentId && projectEnvironments.length > 0) {
-      selectedEnvironmentId = projectEnvironments[0]?.id ?? "";
+    if (!createEnvironmentId && createProjectEnvironments.length > 0) {
+      createEnvironmentId = createProjectEnvironments[0]?.id ?? "";
     }
     if (
-      selectedEnvironmentId &&
-      !projectEnvironments.some((environment) => environment.id === selectedEnvironmentId)
+      createEnvironmentId &&
+      !createProjectEnvironments.some((environment) => environment.id === createEnvironmentId)
     ) {
-      selectedEnvironmentId = projectEnvironments[0]?.id ?? "";
+      createEnvironmentId = createProjectEnvironments[0]?.id ?? "";
+    }
+  });
+
+  $effect(() => {
+    if (
+      filterEnvironmentId &&
+      !filterProjectEnvironments.some((environment) => environment.id === filterEnvironmentId)
+    ) {
+      filterEnvironmentId = "";
     }
   });
 
@@ -483,7 +532,7 @@
   }
 
   function openEnvironmentCreateDialog(): void {
-    if (!selectedProjectId) {
+    if (!createProjectId) {
       openEnvironmentAfterProjectCreate = true;
       projectCreateDialogOpen = true;
       return;
@@ -504,9 +553,17 @@
     void setModalOpen(page, "create-dependency-resource", open);
   }
 
+  function selectDependencyResourceProjectFilter(value: string): void {
+    filterProjectId = value === allDependencyResourceFilterValue ? "" : value;
+  }
+
+  function selectDependencyResourceEnvironmentFilter(value: string): void {
+    filterEnvironmentId = value === allDependencyResourceFilterValue ? "" : value;
+  }
+
   function handleProjectCreated(project: CreateProjectResponse): void {
-    selectedProjectId = project.id;
-    selectedEnvironmentId = "";
+    createProjectId = project.id;
+    createEnvironmentId = "";
     projectCreateDialogOpen = false;
     if (openEnvironmentAfterProjectCreate) {
       openEnvironmentAfterProjectCreate = false;
@@ -515,7 +572,7 @@
   }
 
   function handleEnvironmentCreated(environment: CreateEnvironmentResponse): void {
-    selectedEnvironmentId = environment.id;
+    createEnvironmentId = environment.id;
     environmentCreateDialogOpen = false;
   }
 
@@ -595,8 +652,8 @@
             mode: "create",
             create: {
               kind: createKind,
-              projectId: selectedProjectId,
-              environmentId: selectedEnvironmentId,
+              projectId: createProjectId,
+              environmentId: createEnvironmentId,
               serverId: selectedServerId,
               name: createName.trim(),
             },
@@ -605,8 +662,8 @@
             mode: "reuse",
             reuse: {
               kind: createKind,
-              projectId: selectedProjectId,
-              environmentId: selectedEnvironmentId,
+              projectId: createProjectId,
+              environmentId: createEnvironmentId,
               name: createName.trim(),
               connectionUrl: reuseConnectionUrl.trim(),
               ...(reuseSecretRef.trim() ? { secretRef: reuseSecretRef.trim() } : {}),
@@ -662,14 +719,51 @@
     restoreAcknowledgeRuntime = false;
   }
 
-  function backupResource(resource: DependencyResourceSummary): void {
+  function openBackupCreateDialog(resource: DependencyResourceSummary): void {
     selectedDependencyResourceId = resource.id;
-    createBackupMutation.mutate(resource.id);
+    selectedBackupId = "";
+    backupCreateDialogOpen = true;
   }
 
-  function deleteResource(resource: DependencyResourceSummary): void {
+  function confirmBackupResource(): void {
+    if (!selectedDependencyResource || createBackupMutation.isPending) {
+      return;
+    }
+
+    createBackupMutation.mutate(selectedDependencyResource.id);
+  }
+
+  function confirmDeleteDependencyResource(resource: DependencyResourceSummary): void {
+    if (
+      deleteDependencyResourceConfirmation.trim() !== resource.id ||
+      deleteDependencyResourceMutation.isPending
+    ) {
+      return;
+    }
+
     selectedDependencyResourceId = resource.id;
     deleteDependencyResourceMutation.mutate(resource.id);
+  }
+
+  function openRestoreBackupDialog(): void {
+    restoreAcknowledgeData = false;
+    restoreAcknowledgeRuntime = false;
+    restoreBackupDialogOpen = true;
+  }
+
+  function openBackupPolicyDialog(): void {
+    if (selectedBackupPolicy) {
+      backupPolicyRetentionDays = String(selectedBackupPolicy.retentionDays);
+      backupPolicyIntervalHours = String(selectedBackupPolicy.scheduleIntervalHours);
+      backupPolicyEnabled = selectedBackupPolicy.enabled;
+    }
+    backupPolicyDialogOpen = true;
+  }
+
+  function openDeleteDependencyResourceDialog(resource: DependencyResourceSummary): void {
+    selectedDependencyResourceId = resource.id;
+    deleteDependencyResourceConfirmation = "";
+    deleteDependencyResourceDialogOpen = true;
   }
 
   function restoreBackup(): void {
@@ -725,14 +819,23 @@
   title={$t(i18nKeys.console.dependencyResources.pageTitle)}
   description={$t(i18nKeys.console.dependencyResources.pageDescription)}
 >
-  {#if pageLoading}
+  {#if dependencyResourcesLoading}
     <div class="space-y-5">
       <Skeleton class="h-8 w-72" />
       <Skeleton class="h-44 w-full" />
       <Skeleton class="h-80 w-full" />
     </div>
+  {:else if dependencyResourcesError}
+    <ConsoleStatePanel
+      tone="error"
+      title={$t(i18nKeys.errors.web.backendUnavailable)}
+      description={$t(i18nKeys.console.dependencyResources.pageDescription)}
+      detail={dependencyResourcesError}
+      actionLabel={$t(i18nKeys.console.runtimeUsage.refreshNow)}
+      actionOnclick={() => dependencyResourcesQuery.refetch()}
+    />
   {:else}
-    <ConsoleResourceCanvas>
+    <ConsoleResourceCanvas data-dependency-resources-display-surface>
       <section class="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
         <div class="max-w-3xl space-y-2">
           <div class="flex items-center gap-2">
@@ -749,24 +852,41 @@
       </section>
 
       {#if dependencyResources.length > 0}
-        <div class="flex flex-wrap items-center justify-between gap-3">
+        <div
+          class="flex flex-wrap items-center justify-between gap-3"
+          data-dependency-resource-filter-toolbar
+        >
           <div class="flex flex-wrap gap-2">
-            <Select.Root bind:value={selectedProjectId} type="single">
+            <Select.Root
+              value={filterProjectSelectValue}
+              onValueChange={selectDependencyResourceProjectFilter}
+              type="single"
+            >
               <Select.Trigger class="min-w-48">
-                {selectedProjectId ? projectName(selectedProjectId) : $t(i18nKeys.console.dependencyResources.filterAll)}
+                {filterProjectId ? projectName(filterProjectId) : $t(i18nKeys.console.dependencyResources.filterAll)}
               </Select.Trigger>
               <Select.Content>
+                <Select.Item value={allDependencyResourceFilterValue}>
+                  {$t(i18nKeys.console.dependencyResources.filterAll)}
+                </Select.Item>
                 {#each projects as project (project.id)}
                   <Select.Item value={project.id}>{project.name}</Select.Item>
                 {/each}
               </Select.Content>
             </Select.Root>
-            <Select.Root bind:value={selectedEnvironmentId} type="single">
+            <Select.Root
+              value={filterEnvironmentSelectValue}
+              onValueChange={selectDependencyResourceEnvironmentFilter}
+              type="single"
+            >
               <Select.Trigger class="min-w-48">
-                {selectedEnvironmentId ? environmentName(selectedEnvironmentId) : $t(i18nKeys.console.dependencyResources.filterAll)}
+                {filterEnvironmentId ? environmentName(filterEnvironmentId) : $t(i18nKeys.console.dependencyResources.filterAll)}
               </Select.Trigger>
               <Select.Content>
-                {#each projectEnvironments as environment (environment.id)}
+                <Select.Item value={allDependencyResourceFilterValue}>
+                  {$t(i18nKeys.console.dependencyResources.filterAll)}
+                </Select.Item>
+                {#each filterProjectEnvironments as environment (environment.id)}
                   <Select.Item value={environment.id}>{environment.name}</Select.Item>
                 {/each}
               </Select.Content>
@@ -776,6 +896,11 @@
             <Plus class="size-4" />
             {provisioningActionLabel()}
           </Button>
+          {#if dependencyResourceEnrichmentLoading}
+            <p class="w-full text-xs text-muted-foreground">
+              {$t(i18nKeys.common.status.loading)}
+            </p>
+          {/if}
         </div>
       {/if}
 
@@ -804,18 +929,297 @@
         />
       {/if}
 
-      <Dialog.Root
-        bind:open={dependencyResourceCreateDialogOpen}
-        onOpenChange={setDependencyResourceCreateDialogOpen}
-      >
-        <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-5xl">
-          <Dialog.Header>
-            <Dialog.Title>{provisioningActionLabel()}</Dialog.Title>
-            <Dialog.Description>
-              {$t(i18nKeys.console.dependencyResources.createDescription)}
-            </Dialog.Description>
-          </Dialog.Header>
-          <section class="space-y-5 px-5 pb-5">
+      {#if dependencyResources.length > 0}
+        <section class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
+          <div class="space-y-4">
+            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <h2 class="text-lg font-semibold">{$t(i18nKeys.console.dependencyResources.focusTitle)}</h2>
+            </div>
+
+            {#if filteredDependencyResources.length === 0}
+              <section class="console-panel space-y-2 p-5">
+                <h3 class="font-semibold">{$t(i18nKeys.console.dependencyResources.emptyTitle)}</h3>
+                <p class="text-sm text-muted-foreground">
+                  {$t(i18nKeys.console.dependencyResources.emptyBody)}
+                </p>
+              </section>
+            {:else}
+              <div class="console-record-list" data-dependency-resource-list-display-surface>
+                {#each filteredDependencyResources as resource (resource.id)}
+                  <article
+                    class={[
+                      "console-record-row lg:grid-cols-[minmax(0,1fr)_auto]",
+                      selectedDependencyResourceId === resource.id ? "bg-muted/50" : "",
+                    ]}
+                  >
+                  <div class="min-w-0 space-y-3">
+                    <div class="flex min-w-0 flex-wrap items-center gap-2">
+                      <Badge variant="outline">{kindLabel(resource.kind)}</Badge>
+                      <h3 class="truncate font-semibold">{resource.name}</h3>
+                      <Badge variant={statusVariant(resource.lifecycleStatus)}>
+                        {resource.lifecycleStatus}
+                      </Badge>
+                      <Badge variant={statusVariant(resource.bindingReadiness.status)}>
+                        {$t(i18nKeys.console.dependencyResources.bindingReadiness)} · {resource.bindingReadiness.status}
+                      </Badge>
+                    </div>
+                    <div class="grid gap-2 text-xs text-muted-foreground md:grid-cols-2 xl:grid-cols-4">
+                      <div class="rounded-md bg-muted/20 px-3 py-2">
+                        <p class="uppercase tracking-wide">
+                          {$t(i18nKeys.common.domain.project)}
+                        </p>
+                        <p class="mt-1 truncate font-medium text-foreground">
+                          {projectName(resource.projectId)}
+                        </p>
+                      </div>
+                      <div class="rounded-md bg-muted/20 px-3 py-2">
+                        <p class="uppercase tracking-wide">
+                          {$t(i18nKeys.common.domain.environment)}
+                        </p>
+                        <p class="mt-1 truncate font-medium text-foreground">
+                          {environmentName(resource.environmentId)}
+                        </p>
+                      </div>
+                      <div class="rounded-md bg-muted/20 px-3 py-2">
+                        <p class="uppercase tracking-wide">
+                          {$t(i18nKeys.console.dependencyResources.sourceMode)}
+                        </p>
+                        <p class="mt-1 truncate font-medium text-foreground">
+                          {resource.sourceMode}
+                        </p>
+                      </div>
+                      <div class="rounded-md bg-muted/20 px-3 py-2">
+                        <p class="uppercase tracking-wide">
+                          {$t(i18nKeys.console.dependencyResources.backupRetention)}
+                        </p>
+                        <p class="mt-1 truncate font-medium text-foreground">
+                          {resource.backupRelationship?.retentionRequired
+                            ? $t(i18nKeys.common.status.active)
+                            : $t(i18nKeys.common.status.notConfigured)}
+                        </p>
+                      </div>
+                    </div>
+                    {#if resource.connection}
+                      <p class="truncate font-mono text-xs text-muted-foreground">
+                        {resource.connection.maskedConnection}
+                      </p>
+                    {/if}
+                  </div>
+                  <div class="flex flex-wrap gap-2 lg:justify-end">
+                    <Button size="sm" variant="outline" onclick={() => selectResource(resource)}>
+                      {$t(i18nKeys.common.actions.viewDetails)}
+                    </Button>
+                  </div>
+                  </article>
+                {/each}
+              </div>
+            {/if}
+          </div>
+
+        <aside class="console-side-panel space-y-5" data-dependency-resource-detail-display-surface>
+          {#if selectedDependencyResource}
+            <div class="space-y-3" data-dependency-resource-identity-summary>
+              <Badge variant="outline">
+                <BadgeCheck class="size-3.5" />
+                {$t(i18nKeys.console.dependencyResources.selectedResource)}
+              </Badge>
+              <h2 class="truncate text-lg font-semibold">{selectedDependencyResource.name}</h2>
+              <dl class="grid gap-2 text-sm">
+                <div class="rounded-md border bg-background px-3 py-2">
+                  <dt class="text-xs text-muted-foreground">ID</dt>
+                  <dd class="mt-1 break-all font-mono text-xs">{selectedDependencyResource.id}</dd>
+                </div>
+                <div class="rounded-md border bg-background px-3 py-2">
+                  <dt class="text-xs text-muted-foreground">
+                    {$t(i18nKeys.console.dependencyResources.endpoint)}
+                  </dt>
+                  <dd class="mt-1 truncate font-medium">
+                    {selectedDependencyResource.connection?.host ??
+                      selectedDependencyResource.connection?.maskedConnection ??
+                      "-"}
+                  </dd>
+                </div>
+                <div class="rounded-md border bg-background px-3 py-2">
+                  <dt class="text-xs text-muted-foreground">
+                    {$t(i18nKeys.console.dependencyResources.providerHandle)}
+                  </dt>
+                  <dd class="mt-1 break-all font-mono text-xs">
+                    {selectedDependencyResource.providerRealization?.providerResourceHandle ?? "-"}
+                  </dd>
+                </div>
+              </dl>
+            </div>
+
+            <div class="console-section space-y-3" data-dependency-resource-backup-summary>
+              <div class="space-y-1">
+                <h3 class="flex items-center gap-2 font-semibold">
+                  <HardDriveDownload class="size-4" />
+                  {$t(i18nKeys.console.dependencyResources.backupListTitle)}
+                </h3>
+                <p class="text-sm text-muted-foreground">
+                  {$t(i18nKeys.console.dependencyResources.backupDescription)}
+                </p>
+              </div>
+              {#if selectedResourceBackupsQuery.isPending}
+                <Skeleton class="h-20 w-full" />
+              {:else if selectedBackups.length === 0}
+                <dl class="grid gap-2 text-sm">
+                  <div class="flex items-center justify-between gap-3">
+                    <dt class="text-muted-foreground">
+                      {$t(i18nKeys.console.dependencyResources.latestBackup)}
+                    </dt>
+                    <dd class="font-medium">-</dd>
+                  </div>
+                  <div class="flex items-center justify-between gap-3">
+                    <dt class="text-muted-foreground">
+                      {$t(i18nKeys.console.dependencyResources.backupStatus)}
+                    </dt>
+                    <dd class="font-medium">0</dd>
+                  </div>
+                </dl>
+              {:else}
+                <dl class="grid gap-2 text-sm">
+                  <div class="flex items-center justify-between gap-3">
+                    <dt class="text-muted-foreground">
+                      {$t(i18nKeys.console.dependencyResources.latestBackup)}
+                    </dt>
+                    <dd class="min-w-0 truncate font-medium">
+                      {latestBackup ? backupLabel(latestBackup) : "-"}
+                    </dd>
+                  </div>
+                  <div class="flex items-center justify-between gap-3">
+                    <dt class="text-muted-foreground">
+                      {$t(i18nKeys.console.dependencyResources.backupStatus)}
+                    </dt>
+                    <dd class="font-medium">{readyBackups.length} / {selectedBackups.length}</dd>
+                  </div>
+                </dl>
+              {/if}
+              <div class="grid gap-2 sm:grid-cols-2">
+                <Button
+                  class="w-full"
+                  variant="outline"
+                  disabled={createBackupMutation.isPending}
+                  onclick={() => openBackupCreateDialog(selectedDependencyResource)}
+                >
+                  <HardDriveDownload class="size-4" />
+                  {$t(i18nKeys.console.dependencyResources.backupManageAction)}
+                </Button>
+                <Button
+                  class="w-full"
+                  variant="outline"
+                  disabled={readyBackups.length === 0 || restoreBackupMutation.isPending}
+                  onclick={openRestoreBackupDialog}
+                >
+                  <ArchiveRestore class="size-4" />
+                  {$t(i18nKeys.console.dependencyResources.restoreManageAction)}
+                </Button>
+              </div>
+            </div>
+
+            <div class="console-section space-y-3" data-dependency-resource-policy-summary>
+              <div class="space-y-1">
+                <h3 class="font-semibold">
+                  {$t(i18nKeys.console.dependencyResources.backupPolicy)}
+                </h3>
+                <p class="text-sm text-muted-foreground">
+                  {$t(i18nKeys.console.dependencyResources.backupPolicyDescription)}
+                </p>
+              </div>
+              <dl class="grid gap-2 text-sm">
+                <div class="flex items-center justify-between gap-3">
+                  <dt class="text-muted-foreground">
+                    {$t(i18nKeys.console.dependencyResources.backupPolicyEnabled)}
+                  </dt>
+                  <dd class="font-medium">
+                    {selectedBackupPolicy?.enabled
+                      ? $t(i18nKeys.common.status.active)
+                      : $t(i18nKeys.common.status.notConfigured)}
+                  </dd>
+                </div>
+                <div class="flex items-center justify-between gap-3">
+                  <dt class="text-muted-foreground">
+                    {$t(i18nKeys.console.dependencyResources.backupPolicyNextRun)}
+                  </dt>
+                  <dd class="font-medium">
+                    {selectedBackupPolicy ? formatTime(selectedBackupPolicy.nextRunAt) : "-"}
+                  </dd>
+                </div>
+              </dl>
+              <Button
+                class="w-full"
+                type="button"
+                variant="outline"
+                onclick={openBackupPolicyDialog}
+              >
+                <HardDriveDownload class="size-4" />
+                {$t(i18nKeys.console.dependencyResources.backupPolicyManageAction)}
+              </Button>
+            </div>
+
+            <div class="console-section space-y-3" data-dependency-resource-lifecycle-handoff>
+              <div class="space-y-1">
+                <h3 class="font-semibold">
+                  {$t(i18nKeys.common.domain.status)}
+                </h3>
+                <p class="text-sm text-muted-foreground">
+                  {$t(i18nKeys.console.dependencyResources.lifecycleDescription)}
+                </p>
+              </div>
+              <dl class="grid gap-2 text-sm">
+                <div class="flex items-center justify-between gap-3">
+                  <dt class="text-muted-foreground">
+                    {$t(i18nKeys.console.dependencyResources.realizationStatus)}
+                  </dt>
+                  <dd class="font-medium">
+                    {selectedDependencyResource.providerRealization?.status ??
+                      selectedDependencyResource.lifecycleStatus}
+                  </dd>
+                </div>
+                <div class="flex items-center justify-between gap-3">
+                  <dt class="text-muted-foreground">
+                    {$t(i18nKeys.console.dependencyResources.bindingReadiness)}
+                  </dt>
+                  <dd class="font-medium">
+                    {selectedDependencyResource.bindingReadiness.status}
+                  </dd>
+                </div>
+              </dl>
+              <Button
+                class="w-full"
+                type="button"
+                variant="outline"
+                disabled={deleteDependencyResourceMutation.isPending}
+                onclick={() => openDeleteDependencyResourceDialog(selectedDependencyResource)}
+              >
+                <BadgeCheck class="size-4" />
+                {$t(i18nKeys.console.dependencyResources.lifecycleManageAction)}
+              </Button>
+            </div>
+          {:else}
+            <div class="space-y-3 text-sm text-muted-foreground">
+              <Server class="size-5" />
+              <p>{$t(i18nKeys.console.dependencyResources.emptyBody)}</p>
+            </div>
+          {/if}
+        </aside>
+        </section>
+      {/if}
+    </ConsoleResourceCanvas>
+  {/if}
+
+  <Dialog.Root
+    bind:open={dependencyResourceCreateDialogOpen}
+    onOpenChange={setDependencyResourceCreateDialogOpen}
+  >
+    <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-5xl">
+      <Dialog.Header>
+        <Dialog.Title>{provisioningActionLabel()}</Dialog.Title>
+        <Dialog.Description>
+          {$t(i18nKeys.console.dependencyResources.createDescription)}
+        </Dialog.Description>
+      </Dialog.Header>
+      <section class="space-y-5 px-5 pb-5">
         <form
           id="dependency-resource-create-form"
           class="space-y-4"
@@ -874,10 +1278,10 @@
                   <Plus class="size-3.5" />
                 </Button>
               {:else}
-                <Select.Root bind:value={selectedProjectId} type="single">
+                <Select.Root bind:value={createProjectId} type="single">
                   <Select.Trigger class="w-full">
-                    {selectedProjectId
-                      ? projectName(selectedProjectId)
+                    {createProjectId
+                      ? projectName(createProjectId)
                       : $t(i18nKeys.console.dependencyResources.selectProject)}
                   </Select.Trigger>
                   <Select.Content class={dependencyResourceSelectContentClass}>
@@ -891,7 +1295,7 @@
 
             <label class="space-y-1.5 text-sm font-medium">
               <span class="console-field-label">{$t(i18nKeys.common.domain.environment)}</span>
-              {#if projectEnvironments.length === 0}
+              {#if createProjectEnvironments.length === 0}
                 <Button
                   class="h-8 w-full justify-between px-2.5 text-muted-foreground"
                   variant="outline"
@@ -902,14 +1306,14 @@
                   <Plus class="size-3.5" />
                 </Button>
               {:else}
-                <Select.Root bind:value={selectedEnvironmentId} type="single">
+                <Select.Root bind:value={createEnvironmentId} type="single">
                   <Select.Trigger class="w-full">
-                    {selectedEnvironmentId
-                      ? environmentName(selectedEnvironmentId)
+                    {createEnvironmentId
+                      ? environmentName(createEnvironmentId)
                       : $t(i18nKeys.console.dependencyResources.selectEnvironment)}
                   </Select.Trigger>
                   <Select.Content class={dependencyResourceSelectContentClass}>
-                    {#each projectEnvironments as environment (environment.id)}
+                    {#each createProjectEnvironments as environment (environment.id)}
                       <Select.Item value={environment.id}>{environment.name}</Select.Item>
                     {/each}
                   </Select.Content>
@@ -1064,256 +1468,9 @@
             </div>
           </section>
         {/if}
-          </section>
-        </Dialog.Content>
-      </Dialog.Root>
-
-      {#if dependencyResources.length > 0}
-        <section class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
-          <div class="space-y-4">
-            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <h2 class="text-lg font-semibold">{$t(i18nKeys.console.dependencyResources.focusTitle)}</h2>
-            </div>
-
-            {#if filteredDependencyResources.length === 0}
-              <section class="console-panel space-y-2 p-5">
-                <h3 class="font-semibold">{$t(i18nKeys.console.dependencyResources.emptyTitle)}</h3>
-                <p class="text-sm text-muted-foreground">
-                  {$t(i18nKeys.console.dependencyResources.emptyBody)}
-                </p>
-              </section>
-            {:else}
-              <div class="console-record-list">
-                {#each filteredDependencyResources as resource (resource.id)}
-                  <article
-                    class={[
-                      "console-record-row lg:grid-cols-[minmax(0,1fr)_auto]",
-                      selectedDependencyResourceId === resource.id ? "bg-muted/50" : "",
-                    ]}
-                  >
-                  <div class="min-w-0 space-y-3">
-                    <div class="flex min-w-0 flex-wrap items-center gap-2">
-                      <Badge variant="outline">{kindLabel(resource.kind)}</Badge>
-                      <h3 class="truncate font-semibold">{resource.name}</h3>
-                      <Badge variant={statusVariant(resource.lifecycleStatus)}>
-                        {resource.lifecycleStatus}
-                      </Badge>
-                      <Badge variant={statusVariant(resource.bindingReadiness.status)}>
-                        {$t(i18nKeys.console.dependencyResources.bindingReadiness)} · {resource.bindingReadiness.status}
-                      </Badge>
-                    </div>
-                    <div class="grid gap-3 text-xs text-muted-foreground md:grid-cols-3">
-                      <p class="truncate">
-                        {$t(i18nKeys.common.domain.project)}: {projectName(resource.projectId)}
-                      </p>
-                      <p class="truncate">
-                        {$t(i18nKeys.common.domain.environment)}: {environmentName(resource.environmentId)}
-                      </p>
-                      <p class="truncate">
-                        {$t(i18nKeys.console.dependencyResources.sourceMode)}: {resource.sourceMode}
-                      </p>
-                    </div>
-                    {#if resource.connection}
-                      <p class="truncate font-mono text-xs text-muted-foreground">
-                        {resource.connection.maskedConnection}
-                      </p>
-                    {/if}
-                  </div>
-                  <div class="flex flex-wrap gap-2 lg:justify-end">
-                    <Button size="sm" variant="outline" onclick={() => selectResource(resource)}>
-                      {$t(i18nKeys.common.actions.viewDetails)}
-                    </Button>
-                    <Button
-                      id={`dependency-resource-backup-action-${resource.id}`}
-                      size="sm"
-                      variant="outline"
-                      disabled={createBackupMutation.isPending}
-                      onclick={() => backupResource(resource)}
-                    >
-                      <HardDriveDownload class="size-4" />
-                      {$t(i18nKeys.console.dependencyResources.backup)}
-                    </Button>
-                    <Button
-                      id={`dependency-resource-delete-action-${resource.id}`}
-                      size="sm"
-                      variant="outline"
-                      disabled={deleteDependencyResourceMutation.isPending}
-                      onclick={() => deleteResource(resource)}
-                    >
-                      <Trash2 class="size-4" />
-                      {$t(i18nKeys.console.dependencyResources.deleteAction)}
-                    </Button>
-                  </div>
-                  </article>
-                {/each}
-              </div>
-            {/if}
-          </div>
-
-        <aside class="console-side-panel space-y-5">
-          {#if selectedDependencyResource}
-            <div class="space-y-2">
-              <Badge variant="outline">
-                <BadgeCheck class="size-3.5" />
-                {$t(i18nKeys.console.dependencyResources.selectedResource)}
-              </Badge>
-              <h2 class="truncate text-lg font-semibold">{selectedDependencyResource.name}</h2>
-              <div class="grid gap-2 text-xs text-muted-foreground">
-                <p class="break-all">ID: {selectedDependencyResource.id}</p>
-                <p>
-                  {$t(i18nKeys.console.dependencyResources.realizationStatus)}:
-                  {selectedDependencyResource.providerRealization?.status ?? selectedDependencyResource.lifecycleStatus}
-                </p>
-                <p>
-                  {$t(i18nKeys.console.dependencyResources.endpoint)}:
-                  {selectedDependencyResource.connection?.host ?? selectedDependencyResource.connection?.maskedConnection ?? "-"}
-                </p>
-                <p class="break-all">
-                  {$t(i18nKeys.console.dependencyResources.providerHandle)}:
-                  {selectedDependencyResource.providerRealization?.providerResourceHandle ?? "-"}
-                </p>
-              </div>
-            </div>
-
-            <div class="console-section space-y-3">
-              <div class="space-y-1">
-                <h3 class="flex items-center gap-2 font-semibold">
-                  <HardDriveDownload class="size-4" />
-                  {$t(i18nKeys.console.dependencyResources.backupListTitle)}
-                </h3>
-                <p class="text-sm text-muted-foreground">
-                  {$t(i18nKeys.console.dependencyResources.backupDescription)}
-                </p>
-              </div>
-              <Button
-                class="w-full"
-                variant="outline"
-                disabled={createBackupMutation.isPending}
-                onclick={() => backupResource(selectedDependencyResource)}
-              >
-                <HardDriveDownload class="size-4" />
-                {$t(i18nKeys.console.dependencyResources.backup)}
-              </Button>
-
-              {#if selectedResourceBackupsQuery.isPending}
-                <Skeleton class="h-20 w-full" />
-              {:else if selectedBackups.length === 0}
-                <p class="text-sm text-muted-foreground">{$t(i18nKeys.console.dependencyResources.latestBackup)}: -</p>
-              {:else}
-                <div class="space-y-2">
-                  <p class="text-sm text-muted-foreground">
-                    {$t(i18nKeys.console.dependencyResources.latestBackup)}:
-                    {latestBackup ? backupLabel(latestBackup) : "-"}
-                  </p>
-                  <Select.Root bind:value={selectedBackupId} type="single">
-                    <Select.Trigger class="w-full">
-                      {selectedBackupId
-                        ? selectedBackupLabel()
-                        : $t(i18nKeys.console.dependencyResources.selectBackup)}
-                    </Select.Trigger>
-                    <Select.Content>
-                      {#each readyBackups as backup (backup.id)}
-                        <Select.Item value={backup.id}>{backupLabel(backup)}</Select.Item>
-                      {/each}
-                    </Select.Content>
-                  </Select.Root>
-                  <label class="flex gap-2 text-sm text-muted-foreground">
-                    <input
-                      id="dependency-resource-restore-data-ack-input"
-                      class="mt-0.5 size-4 accent-primary"
-                      type="checkbox"
-                      bind:checked={restoreAcknowledgeData}
-                    />
-                    <span>{$t(i18nKeys.console.dependencyResources.restoreAcknowledgeData)}</span>
-                  </label>
-                  <label class="flex gap-2 text-sm text-muted-foreground">
-                    <input
-                      id="dependency-resource-restore-runtime-ack-input"
-                      class="mt-0.5 size-4 accent-primary"
-                      type="checkbox"
-                      bind:checked={restoreAcknowledgeRuntime}
-                    />
-                    <span>{$t(i18nKeys.console.dependencyResources.restoreAcknowledgeRuntime)}</span>
-                  </label>
-                  <Button
-                    class="w-full"
-                    disabled={!canRestore || restoreBackupMutation.isPending}
-                    onclick={restoreBackup}
-                  >
-                    <ArchiveRestore class="size-4" />
-                    {$t(i18nKeys.console.dependencyResources.restoreAction)}
-                  </Button>
-                </div>
-              {/if}
-            </div>
-
-            <form class="console-section space-y-3" onsubmit={configureBackupPolicy}>
-              <div class="space-y-1">
-                <h3 class="font-semibold">
-                  {$t(i18nKeys.console.dependencyResources.backupPolicy)}
-                </h3>
-                <p class="text-sm text-muted-foreground">
-                  {$t(i18nKeys.console.dependencyResources.backupPolicyDescription)}
-                </p>
-              </div>
-              <div class="grid gap-3 sm:grid-cols-2">
-                <label class="space-y-1.5 text-sm font-medium">
-                  <span class="console-field-label">
-                    {$t(i18nKeys.console.dependencyResources.backupPolicyRetentionDays)}
-                  </span>
-                  <Input
-                    id="dependency-resource-backup-policy-retention-input"
-                    type="number"
-                    min="1"
-                    bind:value={backupPolicyRetentionDays}
-                  />
-                </label>
-                <label class="space-y-1.5 text-sm font-medium">
-                  <span class="console-field-label">
-                    {$t(i18nKeys.console.dependencyResources.backupPolicyIntervalHours)}
-                  </span>
-                  <Input
-                    id="dependency-resource-backup-policy-interval-input"
-                    type="number"
-                    min="1"
-                    bind:value={backupPolicyIntervalHours}
-                  />
-                </label>
-              </div>
-              <label class="flex gap-2 text-sm text-muted-foreground">
-                <input
-                  id="dependency-resource-backup-policy-enabled-input"
-                  class="mt-0.5 size-4 accent-primary"
-                  type="checkbox"
-                  bind:checked={backupPolicyEnabled}
-                />
-                <span>{$t(i18nKeys.console.dependencyResources.backupPolicyEnabled)}</span>
-              </label>
-              <p class="text-xs text-muted-foreground">
-                {$t(i18nKeys.console.dependencyResources.backupPolicyNextRun)}:
-                {selectedBackupPolicy ? formatTime(selectedBackupPolicy.nextRunAt) : "-"}
-              </p>
-              <Button
-                id="dependency-resource-backup-policy-configure-action"
-                class="w-full"
-                type="submit"
-                disabled={!canConfigureBackupPolicy || configureBackupPolicyMutation.isPending}
-              >
-                <HardDriveDownload class="size-4" />
-                {$t(i18nKeys.common.actions.save)}
-              </Button>
-            </form>
-          {:else}
-            <div class="space-y-3 text-sm text-muted-foreground">
-              <Server class="size-5" />
-              <p>{$t(i18nKeys.console.dependencyResources.emptyBody)}</p>
-            </div>
-          {/if}
-        </aside>
-        </section>
-      {/if}
-    </ConsoleResourceCanvas>
-  {/if}
+      </section>
+    </Dialog.Content>
+  </Dialog.Root>
 
   <Dialog.Root bind:open={projectCreateDialogOpen}>
     <Dialog.Content
@@ -1353,7 +1510,7 @@
           panel={false}
           showIntro={false}
           idPrefix="dependency-resource-environment-create"
-          projectId={selectedProjectId}
+          projectId={createProjectId}
           onCreated={handleEnvironmentCreated}
         />
       </div>
@@ -1377,6 +1534,241 @@
           onCreated={handleServerCreated}
         />
       </div>
+    </Dialog.Content>
+  </Dialog.Root>
+
+  <Dialog.Root bind:open={backupCreateDialogOpen}>
+    <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-xl">
+      <Dialog.Header>
+        <Dialog.Title>{$t(i18nKeys.console.dependencyResources.backup)}</Dialog.Title>
+        <Dialog.Description>
+          {$t(i18nKeys.console.dependencyResources.backupDescription)}
+        </Dialog.Description>
+      </Dialog.Header>
+      <section class="space-y-5 px-5 pb-5" data-dependency-resource-backup-create-dialog>
+        {#if selectedDependencyResource}
+          <div class="rounded-md border bg-muted/20 px-3 py-2">
+            <p class="text-xs text-muted-foreground">
+              {$t(i18nKeys.console.dependencyResources.selectedResource)}
+            </p>
+            <p class="mt-1 truncate text-sm font-medium">{selectedDependencyResource.name}</p>
+            <div class="mt-2 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+              <p class="truncate">{kindLabel(selectedDependencyResource.kind)}</p>
+              <p class="truncate">
+                {$t(i18nKeys.console.dependencyResources.sourceMode)}:
+                {selectedDependencyResource.sourceMode}
+              </p>
+              <p class="truncate">
+                {$t(i18nKeys.console.dependencyResources.realizationStatus)}:
+                {selectedDependencyResource.providerRealization?.status ??
+                  selectedDependencyResource.lifecycleStatus}
+              </p>
+              <p class="truncate">
+                {$t(i18nKeys.console.dependencyResources.latestBackup)}:
+                {latestBackup ? backupLabel(latestBackup) : "-"}
+              </p>
+            </div>
+          </div>
+        {/if}
+
+        <div class="flex justify-end gap-2">
+          <Button type="button" variant="outline" onclick={() => (backupCreateDialogOpen = false)}>
+            {$t(i18nKeys.common.actions.cancel)}
+          </Button>
+          <Button
+            type="button"
+            disabled={!selectedDependencyResource || createBackupMutation.isPending}
+            onclick={confirmBackupResource}
+          >
+            <HardDriveDownload class="size-4" />
+            {createBackupMutation.isPending
+              ? $t(i18nKeys.common.status.loading)
+              : $t(i18nKeys.console.dependencyResources.backup)}
+          </Button>
+        </div>
+      </section>
+    </Dialog.Content>
+  </Dialog.Root>
+
+  <Dialog.Root bind:open={restoreBackupDialogOpen}>
+    <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-xl">
+      <Dialog.Header>
+        <Dialog.Title>{$t(i18nKeys.console.dependencyResources.restoreDialogTitle)}</Dialog.Title>
+        <Dialog.Description>
+          {$t(i18nKeys.console.dependencyResources.restoreDialogDescription)}
+        </Dialog.Description>
+      </Dialog.Header>
+      <section class="space-y-5 px-5 pb-5">
+        {#if selectedDependencyResource}
+          <div class="rounded-md border bg-muted/20 px-3 py-2">
+            <p class="text-xs text-muted-foreground">
+              {$t(i18nKeys.console.dependencyResources.selectedResource)}
+            </p>
+            <p class="mt-1 truncate text-sm font-medium">{selectedDependencyResource.name}</p>
+          </div>
+        {/if}
+
+        <label class="space-y-1.5 text-sm font-medium">
+          <span class="console-field-label">
+            {$t(i18nKeys.console.dependencyResources.selectBackup)}
+          </span>
+          <Select.Root bind:value={selectedBackupId} type="single">
+            <Select.Trigger class="w-full">
+              {selectedBackupId
+                ? selectedBackupLabel()
+                : $t(i18nKeys.console.dependencyResources.selectBackup)}
+            </Select.Trigger>
+            <Select.Content>
+              {#each readyBackups as backup (backup.id)}
+                <Select.Item value={backup.id}>{backupLabel(backup)}</Select.Item>
+              {/each}
+            </Select.Content>
+          </Select.Root>
+        </label>
+
+        <div class="space-y-3 rounded-md border border-destructive/25 bg-destructive/5 p-3">
+          <label class="flex gap-2 text-sm text-muted-foreground">
+            <input
+              id="dependency-resource-restore-data-ack-input"
+              class="mt-0.5 size-4 accent-primary"
+              type="checkbox"
+              bind:checked={restoreAcknowledgeData}
+            />
+            <span>{$t(i18nKeys.console.dependencyResources.restoreAcknowledgeData)}</span>
+          </label>
+          <label class="flex gap-2 text-sm text-muted-foreground">
+            <input
+              id="dependency-resource-restore-runtime-ack-input"
+              class="mt-0.5 size-4 accent-primary"
+              type="checkbox"
+              bind:checked={restoreAcknowledgeRuntime}
+            />
+            <span>{$t(i18nKeys.console.dependencyResources.restoreAcknowledgeRuntime)}</span>
+          </label>
+        </div>
+
+        <div class="flex justify-end">
+          <Button
+            type="button"
+            disabled={!canRestore || restoreBackupMutation.isPending}
+            onclick={restoreBackup}
+          >
+            <ArchiveRestore class="size-4" />
+            {$t(i18nKeys.console.dependencyResources.restoreAction)}
+          </Button>
+        </div>
+      </section>
+    </Dialog.Content>
+  </Dialog.Root>
+
+  <Dialog.Root bind:open={backupPolicyDialogOpen}>
+    <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-xl">
+      <Dialog.Header>
+        <Dialog.Title>{$t(i18nKeys.console.dependencyResources.backupPolicyDialogTitle)}</Dialog.Title>
+        <Dialog.Description>
+          {$t(i18nKeys.console.dependencyResources.backupPolicyDescription)}
+        </Dialog.Description>
+      </Dialog.Header>
+      <form class="space-y-5 px-5 pb-5" onsubmit={configureBackupPolicy}>
+        <div class="grid gap-3 sm:grid-cols-2">
+          <label class="space-y-1.5 text-sm font-medium">
+            <span class="console-field-label">
+              {$t(i18nKeys.console.dependencyResources.backupPolicyRetentionDays)}
+            </span>
+            <Input
+              id="dependency-resource-backup-policy-retention-input"
+              type="number"
+              min="1"
+              bind:value={backupPolicyRetentionDays}
+            />
+          </label>
+          <label class="space-y-1.5 text-sm font-medium">
+            <span class="console-field-label">
+              {$t(i18nKeys.console.dependencyResources.backupPolicyIntervalHours)}
+            </span>
+            <Input
+              id="dependency-resource-backup-policy-interval-input"
+              type="number"
+              min="1"
+              bind:value={backupPolicyIntervalHours}
+            />
+          </label>
+        </div>
+        <label class="flex gap-2 text-sm text-muted-foreground">
+          <input
+            id="dependency-resource-backup-policy-enabled-input"
+            class="mt-0.5 size-4 accent-primary"
+            type="checkbox"
+            bind:checked={backupPolicyEnabled}
+          />
+          <span>{$t(i18nKeys.console.dependencyResources.backupPolicyEnabled)}</span>
+        </label>
+        <p class="text-xs text-muted-foreground">
+          {$t(i18nKeys.console.dependencyResources.backupPolicyNextRun)}:
+          {selectedBackupPolicy ? formatTime(selectedBackupPolicy.nextRunAt) : "-"}
+        </p>
+        <div class="flex justify-end">
+          <Button
+            id="dependency-resource-backup-policy-configure-action"
+            type="submit"
+            disabled={!canConfigureBackupPolicy || configureBackupPolicyMutation.isPending}
+          >
+            <HardDriveDownload class="size-4" />
+            {$t(i18nKeys.common.actions.save)}
+          </Button>
+        </div>
+      </form>
+    </Dialog.Content>
+  </Dialog.Root>
+
+  <Dialog.Root bind:open={deleteDependencyResourceDialogOpen}>
+    <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-xl">
+      <Dialog.Header>
+        <Dialog.Title>{$t(i18nKeys.console.dependencyResources.deleteDialogTitle)}</Dialog.Title>
+        <Dialog.Description>
+          {$t(i18nKeys.console.dependencyResources.deleteDialogDescription)}
+        </Dialog.Description>
+      </Dialog.Header>
+      <section class="space-y-5 px-5 pb-5">
+        {#if selectedDependencyResource}
+          <div class="rounded-md border bg-muted/20 px-3 py-2">
+            <p class="text-xs text-muted-foreground">
+              {$t(i18nKeys.console.dependencyResources.selectedResource)}
+            </p>
+            <p class="mt-1 truncate text-sm font-medium">{selectedDependencyResource.name}</p>
+            <p class="mt-1 break-all font-mono text-xs text-muted-foreground">
+              {selectedDependencyResource.id}
+            </p>
+          </div>
+          <div class="rounded-md border border-destructive/25 bg-destructive/5 px-3 py-2 text-sm text-muted-foreground">
+            {$t(i18nKeys.console.dependencyResources.deleteDialogWarning)}
+          </div>
+          <label class="space-y-1.5 text-sm font-medium">
+            <span class="console-field-label">
+              {$t(i18nKeys.console.dependencyResources.deleteConfirmLabel)}
+            </span>
+            <Input
+              id="dependency-resource-delete-confirmation"
+              bind:value={deleteDependencyResourceConfirmation}
+              autocomplete="off"
+              placeholder={selectedDependencyResource.id}
+              aria-invalid={deleteDependencyResourceConfirmation.length > 0 &&
+                deleteDependencyResourceConfirmation.trim() !== selectedDependencyResource.id}
+            />
+          </label>
+          <div class="flex justify-end">
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={!canDeleteSelectedDependencyResource}
+              onclick={() => confirmDeleteDependencyResource(selectedDependencyResource)}
+            >
+              <Trash2 class="size-4" />
+              {$t(i18nKeys.console.dependencyResources.deleteAction)}
+            </Button>
+          </div>
+        {/if}
+      </section>
     </Dialog.Content>
   </Dialog.Root>
 </ConsoleShell>

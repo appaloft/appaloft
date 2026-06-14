@@ -1,4 +1,4 @@
-export const defaultAppaloftDeployPath = "/deploy" as const;
+export const defaultAppaloftDeployPath = "/" as const;
 export const defaultDeployButtonBadgePath = "/badge/deploy.svg" as const;
 
 export type BlueprintDeployHandoffSource =
@@ -70,6 +70,7 @@ export function createBlueprintDeployHandoffUrl(input: BlueprintDeployHandoffInp
   const projectName = trimmed(input.projectName);
   const step = input.step ?? "project";
 
+  url.searchParams.set("modal", "quick-deploy");
   url.searchParams.set("source", "blueprint");
 
   if (input.source.kind === "catalog") {

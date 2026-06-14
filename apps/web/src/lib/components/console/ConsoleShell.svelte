@@ -12,7 +12,6 @@
     LogIn,
     Moon,
     Package,
-    Play,
     ArrowRight,
     Rocket,
     Server,
@@ -26,6 +25,7 @@
   import { Badge } from "$lib/components/ui/badge";
   import * as Breadcrumb from "$lib/components/ui/breadcrumb";
   import { Button } from "$lib/components/ui/button";
+  import * as Dialog from "$lib/components/ui/dialog";
   import {
     DropdownMenu,
     DropdownMenuContent,
@@ -36,6 +36,7 @@
   } from "$lib/components/ui/dropdown-menu";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import ConsoleOrganizationSwitcher from "$lib/components/console/ConsoleOrganizationSwitcher.svelte";
+  import QuickDeploySheet from "$lib/components/console/QuickDeploySheet.svelte";
   import ConsoleUserMenu from "$lib/components/console/ConsoleUserMenu.svelte";
   import {
     Sidebar,
@@ -60,6 +61,7 @@
     defaultConsoleSidebarOpen,
     readBrowserConsoleSidebarOpen,
   } from "$lib/console/sidebar-state";
+  import { modalIsOpen, setModalOpen } from "$lib/console/url-modal";
   import { orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
   import { projectDetailHref } from "$lib/console/utils";
@@ -85,6 +87,7 @@
     title: string;
     description: string;
     breadcrumbs?: BreadcrumbItem[];
+    quickDeployModalEnabled?: boolean;
     children: Snippet;
   };
 
@@ -110,10 +113,11 @@
     },
   ] as const;
 
-  let { title, description, breadcrumbs = [], children }: Props = $props();
+  let { title, breadcrumbs = [], quickDeployModalEnabled = true, children }: Props = $props();
   let projectSearch = $state("");
   let colorMode = $state<"light" | "dark">("light");
   let colorModeReady = $state(false);
+  let quickDeployDialogOpen = $state(false);
   let sidebarOpen = $state(
     browser ? readBrowserConsoleSidebarOpen(window) : defaultConsoleSidebarOpen,
   );
@@ -250,18 +254,8 @@
   });
 
   $effect(() => {
-    if (!browser) {
-      return;
-    }
-
-    const openQuickDeploy = () => {
-      void goto("/deploy");
-    };
-
-    window.addEventListener("appaloft:open-quick-deploy", openQuickDeploy);
-    return () => {
-      window.removeEventListener("appaloft:open-quick-deploy", openQuickDeploy);
-    };
+    quickDeployDialogOpen =
+      quickDeployModalEnabled && modalIsOpen(page, "quick-deploy");
   });
 
   function openHealthCheck(): void {
@@ -294,6 +288,11 @@
 
   function switcherItems(item: BreadcrumbItem): BreadcrumbSwitcherItem[] {
     return item.switcherItems ?? [];
+  }
+
+  function setQuickDeployDialogOpen(open: boolean): void {
+    quickDeployDialogOpen = open;
+    void setModalOpen(page, "quick-deploy", open);
   }
 </script>
 
@@ -439,11 +438,11 @@
   <SidebarInset>
     <header
       data-console-header
-      class="sticky top-0 z-10 flex h-14 items-center justify-between border-b px-4 backdrop-blur-md md:px-6"
+      class="sticky top-0 z-10 flex h-14 items-center justify-between border-b pl-2 pr-3 backdrop-blur-md md:pl-3 md:pr-4"
     >
-      <div class="flex min-w-0 flex-1 items-center gap-3">
+      <div class="flex min-w-0 flex-1 items-center gap-2">
         <SidebarTrigger />
-        <div class="min-w-0 flex-1">
+        <div class="flex min-w-0 flex-1 items-center">
           {#if visibleBreadcrumbs.length > 0}
             <Breadcrumb.Root class="min-w-0">
               <Breadcrumb.List class="flex-nowrap gap-1 overflow-hidden sm:gap-1.5">
@@ -549,7 +548,6 @@
               </Breadcrumb.List>
             </Breadcrumb.Root>
           {/if}
-          <p class="truncate text-xs text-muted-foreground">{description}</p>
         </div>
       </div>
       <div class="flex shrink-0 items-center gap-2">
@@ -565,14 +563,6 @@
           {:else}
             <Moon class="size-4" />
           {/if}
-        </Button>
-        <Button
-          href="/deploy"
-          size="sm"
-          variant="outline"
-        >
-          <Play class="size-4" />
-          {$t(i18nKeys.common.actions.quickDeploy)}
         </Button>
       </div>
     </header>
@@ -623,3 +613,19 @@
     </main>
   </SidebarInset>
 </SidebarProvider>
+
+{#if quickDeployModalEnabled && quickDeployDialogOpen}
+  <Dialog.Root open={true} onOpenChange={setQuickDeployDialogOpen}>
+    <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-7xl">
+      <Dialog.Header>
+        <Dialog.Title>{$t(i18nKeys.common.actions.quickDeploy)}</Dialog.Title>
+        <Dialog.Description>
+          {$t(i18nKeys.console.deployments.description)}
+        </Dialog.Description>
+      </Dialog.Header>
+      <div class="max-h-[calc(100vh-12rem)] overflow-y-auto px-5 pb-5">
+        <QuickDeploySheet statePath={page.url.pathname} stateModal="quick-deploy" />
+      </div>
+    </Dialog.Content>
+  </Dialog.Root>
+{/if}

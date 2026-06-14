@@ -1559,7 +1559,7 @@ describe("public docs operation coverage", () => {
         ]),
       );
       expect(topic.webSurfaces?.join("\n")).toContain(
-        "apps/web/src/routes/resources/[resourceId]/+page.svelte",
+        "apps/web/src/routes/resources/[resourceId=consoleObjectId]/+page.svelte",
       );
     }
 
@@ -1597,7 +1597,7 @@ describe("public docs operation coverage", () => {
         ]),
       );
       expect(topic.webSurfaces?.join("\n")).toContain(
-        "apps/web/src/routes/resources/[resourceId]/+page.svelte",
+        "apps/web/src/routes/resources/[resourceId=consoleObjectId]/+page.svelte",
       );
     }
 

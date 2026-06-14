@@ -312,7 +312,7 @@ Use query state for tabs and inner panels:
 
 ```text
 /resources/:resourceId?tab=configure&section=runtime
-/servers/:serverId?tab=terminal
+/servers/:serverId?tab=runtime&section=terminal
 ```
 
 Do not use hash anchors for core configuration panels that swap operational content.

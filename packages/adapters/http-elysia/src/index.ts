@@ -175,7 +175,8 @@ const loginPath = "/login";
 const resetPasswordPath = "/reset-password";
 const signUpPath = "/sign-up";
 const verifyEmailPath = "/verify-email";
-const githubAppQuickDeployReturnPath = "/deploy?source=github&githubMode=browser&step=source";
+const githubAppQuickDeployReturnPath =
+  "/?modal=quick-deploy&source=github&githubMode=browser&step=source";
 
 function publicReadiness(readiness: ReadinessResponse): ReadinessResponse {
   const details: Record<string, string> = {};

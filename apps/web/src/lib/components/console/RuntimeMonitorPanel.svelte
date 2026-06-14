@@ -6,8 +6,8 @@
     FileText,
     Gauge,
     RefreshCw,
+    Settings2,
     ShieldAlert,
-    Trash2,
   } from "@lucide/svelte";
   import { createMutation } from "@tanstack/svelte-query";
   import type {
@@ -21,6 +21,7 @@
   import { readErrorMessage } from "$lib/api/client";
   import RuntimeUsagePanel from "$lib/components/console/RuntimeUsagePanel.svelte";
   import { Button } from "$lib/components/ui/button";
+  import * as Dialog from "$lib/components/ui/dialog";
   import { Input } from "$lib/components/ui/input";
   import {
     appendRuntimeMonitoringSample,
@@ -111,6 +112,7 @@
   let thresholdDiskWarning = $state("");
   let thresholdDiskCritical = $state("");
   let thresholdPolicyFingerprint = $state("");
+  let thresholdDialogOpen = $state(false);
   let thresholdFeedback = $state<{ kind: "error" | "success"; title: string; detail: string } | null>(
     null,
   );
@@ -286,6 +288,30 @@
     thresholdDiskCritical = form.rules.disk.critical;
   });
 
+  const thresholdRuleSummaries = $derived.by(() => [
+    {
+      key: "cpu",
+      label: $t(i18nKeys.console.runtimeUsage.thresholdCpuTitle),
+      warning: thresholdCpuWarning,
+      critical: thresholdCpuCritical,
+    },
+    {
+      key: "memory",
+      label: $t(i18nKeys.console.runtimeUsage.thresholdMemoryTitle),
+      warning: thresholdMemoryWarning,
+      critical: thresholdMemoryCritical,
+    },
+    {
+      key: "disk",
+      label: $t(i18nKeys.console.runtimeUsage.thresholdDiskTitle),
+      warning: thresholdDiskWarning,
+      critical: thresholdDiskCritical,
+    },
+  ]);
+  const configuredThresholdRuleSummaries = $derived(
+    thresholdRuleSummaries.filter((rule) => rule.warning || rule.critical),
+  );
+
   function thresholdStateLabel(
     state: RuntimeMonitoringThresholdsResponse["evaluation"]["state"] | undefined,
   ): string {
@@ -316,6 +342,25 @@
         return $t(i18nKeys.common.domain.resource);
       case "server":
         return $t(i18nKeys.common.domain.server);
+    }
+  }
+
+  function resetThresholdForm(): void {
+    const form = runtimeMonitoringThresholdFormFromPolicy(thresholds);
+    thresholdEnabled = form.enabled;
+    thresholdCpuWarning = form.rules.cpu.warning;
+    thresholdCpuCritical = form.rules.cpu.critical;
+    thresholdMemoryWarning = form.rules.memory.warning;
+    thresholdMemoryCritical = form.rules.memory.critical;
+    thresholdDiskWarning = form.rules.disk.warning;
+    thresholdDiskCritical = form.rules.disk.critical;
+    thresholdFeedback = null;
+  }
+
+  function setThresholdDialogOpen(open: boolean): void {
+    thresholdDialogOpen = open;
+    if (open) {
+      resetThresholdForm();
     }
   }
 
@@ -366,6 +411,7 @@
         title: $t(i18nKeys.console.runtimeUsage.thresholdConfigureSaved),
         detail: result.policy.policyId,
       };
+      thresholdDialogOpen = false;
       void queryClient.invalidateQueries({
         queryKey: runtimeMonitoringScopeQueryKey("runtime-monitoring-thresholds", scope),
       });
@@ -393,21 +439,24 @@
         </p>
       </div>
       <div class="flex flex-wrap items-center gap-2">
-        <label class="inline-flex items-center gap-2 text-sm text-muted-foreground" for="runtime-monitor-time-range">
+        <div
+          class="inline-flex items-center gap-1 rounded-md border bg-muted/20 p-1 text-sm text-muted-foreground"
+          aria-label={$t(i18nKeys.console.runtimeUsage.timeRange)}
+        >
           <Clock3 class="size-4" />
           <span class="sr-only">{$t(i18nKeys.console.runtimeUsage.timeRange)}</span>
-          <select
-            id="runtime-monitor-time-range"
-            class="h-9 rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground shadow-sm"
-            value={timeRange}
-            onchange={(event) =>
-              selectTimeRange(event.currentTarget.value as RuntimeMonitoringTimeRangeId)}
-          >
-            {#each runtimeMonitoringTimeRangeOptions as option (option)}
-              <option value={option}>{timeRangeLabel(option)}</option>
-            {/each}
-          </select>
-        </label>
+          {#each runtimeMonitoringTimeRangeOptions as option (option)}
+            <Button
+              type="button"
+              size="sm"
+              variant={timeRange === option ? "default" : "ghost"}
+              aria-pressed={timeRange === option}
+              onclick={() => selectTimeRange(option)}
+            >
+              {timeRangeLabel(option)}
+            </Button>
+          {/each}
+        </div>
         <Button type="button" variant="outline" onclick={() => onRefresh?.()} disabled={refreshing}>
           <RefreshCw class="size-4" />
           {refreshing
@@ -428,7 +477,7 @@
         {/if}
         {#if cleanupHref}
           <Button href={observationLinks.cleanup} variant="outline">
-            <Trash2 class="size-4" />
+            <Settings2 class="size-4" />
             {$t(i18nKeys.console.runtimeUsage.openCleanup)}
           </Button>
         {/if}
@@ -529,7 +578,7 @@
       {/if}
     </div>
 
-    <div class="mt-4 rounded-md border bg-muted/20 p-3">
+    <div class="mt-4 rounded-md border bg-muted/20 p-3" data-runtime-threshold-display-surface>
       <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div class="flex min-w-0 items-center gap-2">
           <Activity class="size-4 text-muted-foreground" />
@@ -622,13 +671,24 @@
           <ShieldAlert class="size-4 text-muted-foreground" />
           <p class="text-sm font-medium">{$t(i18nKeys.console.runtimeUsage.thresholdTitle)}</p>
         </div>
-        <p class="text-sm font-semibold">
-          {#if thresholdsLoading}
-            {$t(i18nKeys.console.runtimeUsage.thresholdLoading)}
-          {:else}
-            {thresholdStateLabel(thresholdSummary?.state)}
-          {/if}
-        </p>
+        <div class="flex flex-wrap items-center gap-2">
+          <p class="text-sm font-semibold">
+            {#if thresholdsLoading}
+              {$t(i18nKeys.console.runtimeUsage.thresholdLoading)}
+            {:else}
+              {thresholdStateLabel(thresholdSummary?.state)}
+            {/if}
+          </p>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={thresholdsLoading}
+            onclick={() => setThresholdDialogOpen(true)}
+          >
+            {$t(i18nKeys.common.actions.edit)}
+          </Button>
+        </div>
       </div>
       <p class="mt-2 text-xs leading-5 text-muted-foreground">
         {#if thresholdsError}
@@ -645,97 +705,29 @@
         {/if}
       </p>
 
-      <form class="mt-4 space-y-3" onsubmit={configureThresholdPolicy}>
-        <div class="grid gap-3 lg:grid-cols-3">
-          <div class="rounded-md border bg-background/60 p-3">
-            <p class="text-xs font-semibold text-foreground">
-              {$t(i18nKeys.console.runtimeUsage.thresholdCpuTitle)}
-            </p>
-            <div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-              <label class="space-y-1.5 text-xs font-medium text-muted-foreground">
-                {$t(i18nKeys.console.runtimeUsage.thresholdWarningLabel)}
-                <Input
-                  bind:value={thresholdCpuWarning}
-                  inputmode="decimal"
-                  placeholder={$t(i18nKeys.console.runtimeUsage.thresholdPercentPlaceholder)}
-                />
-              </label>
-              <label class="space-y-1.5 text-xs font-medium text-muted-foreground">
-                {$t(i18nKeys.console.runtimeUsage.thresholdCriticalLabel)}
-                <Input
-                  bind:value={thresholdCpuCritical}
-                  inputmode="decimal"
-                  placeholder={$t(i18nKeys.console.runtimeUsage.thresholdPercentPlaceholder)}
-                />
-              </label>
+      {#if configuredThresholdRuleSummaries.length > 0}
+        <div class="mt-4 grid gap-2 md:grid-cols-3">
+          {#each configuredThresholdRuleSummaries as rule (rule.key)}
+            <div class="rounded-md border bg-background/60 px-3 py-2 text-xs">
+              <p class="font-semibold text-foreground">{rule.label}</p>
+              <div class="mt-2 flex flex-wrap gap-2 text-muted-foreground">
+                {#if rule.warning}
+                  <span>
+                    {$t(i18nKeys.console.runtimeUsage.thresholdWarningLabel)}:
+                    <span class="font-medium text-foreground">{rule.warning}</span>
+                  </span>
+                {/if}
+                {#if rule.critical}
+                  <span>
+                    {$t(i18nKeys.console.runtimeUsage.thresholdCriticalLabel)}:
+                    <span class="font-medium text-foreground">{rule.critical}</span>
+                  </span>
+                {/if}
+              </div>
             </div>
-          </div>
-
-          <div class="rounded-md border bg-background/60 p-3">
-            <p class="text-xs font-semibold text-foreground">
-              {$t(i18nKeys.console.runtimeUsage.thresholdMemoryTitle)}
-            </p>
-            <div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-              <label class="space-y-1.5 text-xs font-medium text-muted-foreground">
-                {$t(i18nKeys.console.runtimeUsage.thresholdWarningLabel)}
-                <Input
-                  bind:value={thresholdMemoryWarning}
-                  inputmode="numeric"
-                  placeholder={$t(i18nKeys.console.runtimeUsage.thresholdBytesPlaceholder)}
-                />
-              </label>
-              <label class="space-y-1.5 text-xs font-medium text-muted-foreground">
-                {$t(i18nKeys.console.runtimeUsage.thresholdCriticalLabel)}
-                <Input
-                  bind:value={thresholdMemoryCritical}
-                  inputmode="numeric"
-                  placeholder={$t(i18nKeys.console.runtimeUsage.thresholdBytesPlaceholder)}
-                />
-              </label>
-            </div>
-          </div>
-
-          <div class="rounded-md border bg-background/60 p-3">
-            <p class="text-xs font-semibold text-foreground">
-              {$t(i18nKeys.console.runtimeUsage.thresholdDiskTitle)}
-            </p>
-            <div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-              <label class="space-y-1.5 text-xs font-medium text-muted-foreground">
-                {$t(i18nKeys.console.runtimeUsage.thresholdWarningLabel)}
-                <Input
-                  bind:value={thresholdDiskWarning}
-                  inputmode="numeric"
-                  placeholder={$t(i18nKeys.console.runtimeUsage.thresholdBytesPlaceholder)}
-                />
-              </label>
-              <label class="space-y-1.5 text-xs font-medium text-muted-foreground">
-                {$t(i18nKeys.console.runtimeUsage.thresholdCriticalLabel)}
-                <Input
-                  bind:value={thresholdDiskCritical}
-                  inputmode="numeric"
-                  placeholder={$t(i18nKeys.console.runtimeUsage.thresholdBytesPlaceholder)}
-                />
-              </label>
-            </div>
-          </div>
+          {/each}
         </div>
-
-        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-          <label class="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-            <input
-              class="size-4 rounded border-border"
-              type="checkbox"
-              bind:checked={thresholdEnabled}
-            />
-            {$t(i18nKeys.console.runtimeUsage.thresholdEnabledLabel)}
-          </label>
-          <Button disabled={configureThresholdMutation.isPending} type="submit">
-            {configureThresholdMutation.isPending
-              ? $t(i18nKeys.common.actions.saving)
-              : $t(i18nKeys.common.actions.save)}
-          </Button>
-        </div>
-      </form>
+      {/if}
 
       {#if thresholdFeedback}
         <div
@@ -750,3 +742,127 @@
 
   <RuntimeUsagePanel usage={currentUsage} loading={currentLoading} error={currentError} />
 </div>
+
+<Dialog.Root bind:open={thresholdDialogOpen} onOpenChange={setThresholdDialogOpen}>
+  <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-4xl">
+    <Dialog.Header>
+      <Dialog.Title>{$t(i18nKeys.console.runtimeUsage.thresholdTitle)}</Dialog.Title>
+      <Dialog.Description>
+        {#if thresholdSummary && !thresholdSummary.hasPolicy}
+          {$t(i18nKeys.console.runtimeUsage.thresholdNoPolicy)}
+        {:else if thresholdSummary}
+          {$t(i18nKeys.console.runtimeUsage.thresholdSummary, {
+            crossings: thresholdSummary.crossingCount,
+            actions: thresholdSummary.nextActionCount,
+          })}
+        {:else}
+          {$t(i18nKeys.console.runtimeUsage.thresholdUnavailable)}
+        {/if}
+      </Dialog.Description>
+    </Dialog.Header>
+
+    <form class="space-y-4 px-5 pb-5" onsubmit={configureThresholdPolicy} data-runtime-threshold-dialog>
+      <div class="grid gap-3 lg:grid-cols-3">
+        <div class="rounded-md border bg-background p-3">
+          <p class="text-xs font-semibold text-foreground">
+            {$t(i18nKeys.console.runtimeUsage.thresholdCpuTitle)}
+          </p>
+          <div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+            <label class="space-y-1.5 text-xs font-medium text-muted-foreground">
+              <span>{$t(i18nKeys.console.runtimeUsage.thresholdWarningLabel)}</span>
+              <Input
+                bind:value={thresholdCpuWarning}
+                inputmode="decimal"
+                placeholder={$t(i18nKeys.console.runtimeUsage.thresholdPercentPlaceholder)}
+              />
+            </label>
+            <label class="space-y-1.5 text-xs font-medium text-muted-foreground">
+              <span>{$t(i18nKeys.console.runtimeUsage.thresholdCriticalLabel)}</span>
+              <Input
+                bind:value={thresholdCpuCritical}
+                inputmode="decimal"
+                placeholder={$t(i18nKeys.console.runtimeUsage.thresholdPercentPlaceholder)}
+              />
+            </label>
+          </div>
+        </div>
+
+        <div class="rounded-md border bg-background p-3">
+          <p class="text-xs font-semibold text-foreground">
+            {$t(i18nKeys.console.runtimeUsage.thresholdMemoryTitle)}
+          </p>
+          <div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+            <label class="space-y-1.5 text-xs font-medium text-muted-foreground">
+              <span>{$t(i18nKeys.console.runtimeUsage.thresholdWarningLabel)}</span>
+              <Input
+                bind:value={thresholdMemoryWarning}
+                inputmode="numeric"
+                placeholder={$t(i18nKeys.console.runtimeUsage.thresholdBytesPlaceholder)}
+              />
+            </label>
+            <label class="space-y-1.5 text-xs font-medium text-muted-foreground">
+              <span>{$t(i18nKeys.console.runtimeUsage.thresholdCriticalLabel)}</span>
+              <Input
+                bind:value={thresholdMemoryCritical}
+                inputmode="numeric"
+                placeholder={$t(i18nKeys.console.runtimeUsage.thresholdBytesPlaceholder)}
+              />
+            </label>
+          </div>
+        </div>
+
+        <div class="rounded-md border bg-background p-3">
+          <p class="text-xs font-semibold text-foreground">
+            {$t(i18nKeys.console.runtimeUsage.thresholdDiskTitle)}
+          </p>
+          <div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+            <label class="space-y-1.5 text-xs font-medium text-muted-foreground">
+              <span>{$t(i18nKeys.console.runtimeUsage.thresholdWarningLabel)}</span>
+              <Input
+                bind:value={thresholdDiskWarning}
+                inputmode="numeric"
+                placeholder={$t(i18nKeys.console.runtimeUsage.thresholdBytesPlaceholder)}
+              />
+            </label>
+            <label class="space-y-1.5 text-xs font-medium text-muted-foreground">
+              <span>{$t(i18nKeys.console.runtimeUsage.thresholdCriticalLabel)}</span>
+              <Input
+                bind:value={thresholdDiskCritical}
+                inputmode="numeric"
+                placeholder={$t(i18nKeys.console.runtimeUsage.thresholdBytesPlaceholder)}
+              />
+            </label>
+          </div>
+        </div>
+      </div>
+
+      {#if thresholdFeedback}
+        <div
+          class={`rounded-md border p-3 text-xs ${thresholdFeedback.kind === "error" ? "border-destructive/30 text-destructive" : "border-border text-foreground"}`}
+        >
+          <p class="font-medium">{thresholdFeedback.title}</p>
+          <p class="mt-1 text-muted-foreground">{thresholdFeedback.detail}</p>
+        </div>
+      {/if}
+
+      <Dialog.Footer class="px-0 pb-0">
+        <label class="mr-auto flex items-center gap-2 text-xs font-medium text-muted-foreground">
+          <input
+            class="size-4 rounded border-border"
+            type="checkbox"
+            bind:checked={thresholdEnabled}
+          />
+          {$t(i18nKeys.console.runtimeUsage.thresholdEnabledLabel)}
+        </label>
+        <Button type="button" variant="outline" onclick={() => setThresholdDialogOpen(false)}>
+          {$t(i18nKeys.common.actions.cancel)}
+        </Button>
+        <Button disabled={configureThresholdMutation.isPending} type="submit">
+          {configureThresholdMutation.isPending
+            ? $t(i18nKeys.common.actions.saving)
+            : $t(i18nKeys.common.actions.save)}
+        </Button>
+      </Dialog.Footer>
+    </form>
+  </Dialog.Content>
+</Dialog.Root>

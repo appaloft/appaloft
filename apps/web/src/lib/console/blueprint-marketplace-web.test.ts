@@ -138,6 +138,24 @@ describe("Blueprint marketplace console surface", () => {
     expect(detailPageSource).toContain("官方网站");
     expect(detailPageSource).toContain("部署方案");
     expect(detailPageSource).toContain("升级策略");
+    expect(detailPageSource).toContain("应用服务、后台任务或静态站点");
+    expect(detailPageSource).toContain("安装后生成访问入口");
+    expect(detailPageSource).toContain("安装后会创建的应用运行单元。");
+    expect(detailPageSource).toContain("端口");
+    expect(detailPageSource).toContain("访问路径");
+    expect(detailPageSource).toContain("依赖绑定");
+    expect(detailPageSource).toContain("必填");
+    expect(detailPageSource).toContain("可选");
+    expect(detailPageSource).not.toContain("service / worker / static surface");
+    expect(detailPageSource).not.toContain("route intent from Blueprint");
+    expect(detailPageSource).not.toContain("可部署 workload");
+    expect(detailPageSource).not.toContain(">Ports<");
+    expect(detailPageSource).not.toContain(">Routes<");
+    expect(detailPageSource).not.toContain(">Bindings<");
+    expect(detailPageSource).not.toContain('"required" : "optional"');
+    expect(detailPageSource).not.toContain('"resource pending"');
+    expect(detailPageSource).not.toContain('"dependency pending"');
+    expect(detailPageSource).not.toContain("Generate dry-run");
     expect(detailPageSource).toContain("upgradePlanEndpoint");
     expect(detailPageSource).toContain("installEndpoint");
     expect(detailPageSource).toContain("installedApplicationEndpoint");
@@ -160,7 +178,9 @@ describe("Blueprint marketplace console surface", () => {
     expect(detailPageSource).toContain("{#if upgradePlanEndpoint}");
     expect(detailPageSource).toContain("applicationId");
     expect(detailPageSource).toContain("preservedUserConfigurationWarnings");
-    expect(detailPageSource).toContain("nonExecution?.marker");
+    expect(detailPageSource).toContain("upgradePlanOutput.nonExecution");
+    expect(detailPageSource).toContain("仅生成计划");
+    expect(detailPageSource).toContain("可执行计划");
     expect(detailPageSource).not.toContain("currentVersion:");
     expect(detailPageSource).toContain("<details");
     expect(quickDeploySource).toContain("blueprintSlug");
@@ -224,5 +244,59 @@ describe("Blueprint marketplace console surface", () => {
     expect(viteConfigSource).toContain("createRuntimeExtensionProxyPrefixes");
     expect(blueprintCatalogSchemaSource).toContain("BlueprintRegistryDisplayMetadataResponse");
     expect(blueprintCatalogSchemaSource).not.toContain("@appaloft/blueprints");
+  });
+
+  test("[MARKETPLACE-CATALOG-IA-001] keeps catalog display-first and out of runtime ownership", async () => {
+    const [listPageSource, selectorSource, sharedPackageSource, sharedCardSource] =
+      await Promise.all([
+        readFile(new URL("../../routes/marketplace/+page.svelte", import.meta.url), "utf8"),
+        readFile(
+          new URL("../components/console/BlueprintCatalogSelector.svelte", import.meta.url),
+          "utf8",
+        ),
+        readFile(
+          new URL(
+            "../../../../../packages/blueprint-marketplace-web/src/BlueprintMarketplacePage.svelte",
+            import.meta.url,
+          ),
+          "utf8",
+        ),
+        readFile(
+          new URL(
+            "../../../../../packages/blueprint-marketplace-web/src/BlueprintMarketplaceCard.svelte",
+            import.meta.url,
+          ),
+          "utf8",
+        ),
+      ]);
+
+    expect(listPageSource).toContain("data-marketplace-catalog-display-surface");
+    expect(selectorSource).toContain("data-blueprint-marketplace-selector");
+    expect(selectorSource).toContain('primaryAction={onselect ? "select" : "detail"}');
+    expect(selectorSource).toContain(
+      'subtitle="选择官方 Blueprint，先看清应用组件、依赖资源和部署计划，再进入部署流程。"',
+    );
+    expect(sharedPackageSource).toContain("data-blueprint-marketplace-page");
+    expect(sharedPackageSource).toContain("data-blueprint-marketplace-controls");
+    expect(sharedPackageSource).toContain("data-blueprint-marketplace-search");
+    expect(sharedPackageSource).toContain("data-blueprint-marketplace-category-tabs");
+    expect(sharedPackageSource).toContain("data-blueprint-marketplace-groups");
+    expect(sharedPackageSource).toContain("createBlueprintDetailHref");
+    expect(sharedPackageSource).toContain("createBlueprintDeployHandoffUrl");
+    expect(sharedPackageSource).toContain('primaryAction === "select"');
+    expect(sharedPackageSource).not.toContain("<form");
+    expect(sharedPackageSource).not.toContain("<textarea");
+    expect(sharedPackageSource).not.toContain("orpcClient.resources");
+    expect(sharedPackageSource).not.toContain("orpcClient.deployments");
+    expect(sharedPackageSource).not.toContain("orpcClient.servers");
+    expect(sharedPackageSource).not.toMatch(/\b(delete|destroy|danger|archive)\b/i);
+    expect(sharedCardSource).toContain("data-blueprint-marketplace-card");
+    expect(sharedCardSource).toContain("data-blueprint-marketplace-facts");
+    expect(sharedCardSource).toContain("labels.dependencies");
+    expect(sharedCardSource).toContain("labels.ports");
+    expect(sharedCardSource).toContain("variantSummary()");
+    expect(sharedCardSource).toContain("componentSummary()");
+    expect(sharedCardSource).not.toContain("<form");
+    expect(sharedCardSource).not.toContain("<textarea");
   });
 });

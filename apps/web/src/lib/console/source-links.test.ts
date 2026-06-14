@@ -5,7 +5,10 @@ describe("source link console surface", () => {
   test("[SOURCE-LINK-STATE-008] resource page exposes HTTP relink action", async () => {
     const [pageSource, clientContractSource] = await Promise.all([
       readFile(
-        new URL("../../routes/resources/[resourceId]/+page.svelte", import.meta.url),
+        new URL(
+          "../../routes/resources/[resourceId=consoleObjectId]/+page.svelte",
+          import.meta.url,
+        ),
         "utf8",
       ),
       readFile(
@@ -15,7 +18,8 @@ describe("source link console surface", () => {
     ]);
 
     expect(pageSource).toContain("orpcClient.sourceLinks.relink");
-    expect(pageSource).toContain("resource-source-link-form");
+    expect(pageSource).toContain("data-resource-source-link-surface");
+    expect(pageSource).toContain("data-resource-source-link-dialog");
     expect(pageSource).toContain("sourceLinkFingerprint");
     expect(clientContractSource).toContain("sourceLinks: {");
     expect(clientContractSource).toContain("RelinkSourceLinkCommandInput");

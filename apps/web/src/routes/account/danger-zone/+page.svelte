@@ -5,6 +5,7 @@
 
   import SettingsShell from "$lib/components/console/SettingsShell.svelte";
   import { Button } from "$lib/components/ui/button";
+  import * as Dialog from "$lib/components/ui/dialog";
   import { Input } from "$lib/components/ui/input";
   import { readErrorMessage } from "$lib/api/client";
   import { accountSettingsItems } from "$lib/console/settings-nav";
@@ -12,6 +13,7 @@
   import { orpcClient } from "$lib/orpc";
 
   let confirmationUserId = $state("");
+  let deleteAccountDialogOpen = $state(false);
   let operationNotice = $state("");
   let operationError = $state("");
 
@@ -53,6 +55,21 @@
     if (canDeleteAccount) {
       deleteAccountMutation.mutate();
     }
+  }
+
+  function openDeleteAccountDialog(): void {
+    confirmationUserId = "";
+    operationError = "";
+    deleteAccountDialogOpen = true;
+  }
+
+  function closeDeleteAccountDialog(): void {
+    if (deleteAccountMutation.isPending) {
+      return;
+    }
+
+    confirmationUserId = "";
+    deleteAccountDialogOpen = false;
   }
 </script>
 
@@ -98,27 +115,27 @@
           <p class="mt-1.5 break-words text-muted-foreground">{readErrorMessage(profileQuery.error)}</p>
         </div>
       {:else if profile}
-        <form class="space-y-4" onsubmit={submitDeleteAccount}>
+        <div class="space-y-4" data-account-danger-summary>
           <div class="rounded-[calc(var(--radius-lg)-2px)] border bg-background/70 p-4 text-sm">
             <p class="text-xs text-muted-foreground">{$t(i18nKeys.console.accountSettings.accountId)}</p>
             <p class="mt-1 break-all font-mono">{profile.userId}</p>
           </div>
-          <label class="appaloft-field-stack">
-            <span class="appaloft-field-label">{$t(i18nKeys.console.accountSettings.dangerConfirmLabel)}</span>
-            <Input
-              bind:value={confirmationUserId}
-              class="bg-background"
-              placeholder={$t(i18nKeys.console.accountSettings.dangerConfirmPlaceholder)}
-              autocomplete="off"
-            />
-          </label>
-          <Button type="submit" variant="destructive" disabled={!canDeleteAccount}>
-            <Trash2 class="size-4" />
-            {deleteAccountMutation.isPending
-              ? $t(i18nKeys.console.accountSettings.deletingAccount)
-              : $t(i18nKeys.console.accountSettings.deleteAccount)}
+          <div
+            class="rounded-[calc(var(--radius-lg)-2px)] border border-destructive/25 bg-background/70 p-4 text-sm"
+            data-account-danger-blocker-check
+          >
+            <p class="font-medium text-destructive">
+              {$t(i18nKeys.console.accountSettings.dangerConfirmLabel)}
+            </p>
+            <p class="mt-1 leading-6 text-muted-foreground">
+              {$t(i18nKeys.console.accountSettings.dangerDialogDescription)}
+            </p>
+          </div>
+          <Button type="button" variant="outline" onclick={openDeleteAccountDialog}>
+            <ShieldAlert class="size-4" />
+            {$t(i18nKeys.console.accountSettings.lifecycleManageAction)}
           </Button>
-        </form>
+        </div>
       {/if}
 
       {#if operationNotice}
@@ -129,4 +146,56 @@
       {/if}
     </section>
   </div>
+
+  <Dialog.Root bind:open={deleteAccountDialogOpen} onOpenChange={(open) => {
+    if (!open) {
+      closeDeleteAccountDialog();
+    }
+  }}>
+    <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)}>
+      <Dialog.Header>
+        <Dialog.Title>{$t(i18nKeys.console.accountSettings.deleteAccount)}</Dialog.Title>
+        <Dialog.Description>
+          {$t(i18nKeys.console.accountSettings.dangerDialogDescription)}
+        </Dialog.Description>
+      </Dialog.Header>
+
+      {#if profile}
+        <form class="space-y-5 px-5 pb-5" onsubmit={submitDeleteAccount} data-account-delete-dialog>
+          <div class="rounded-[calc(var(--radius-lg)-2px)] border bg-muted/30 p-4 text-sm">
+            <p class="text-xs text-muted-foreground">{$t(i18nKeys.console.accountSettings.accountId)}</p>
+            <p class="mt-1 break-all font-mono">{profile.userId}</p>
+          </div>
+
+          <label class="appaloft-field-stack">
+            <span class="appaloft-field-label">{$t(i18nKeys.console.accountSettings.dangerConfirmLabel)}</span>
+            <Input
+              bind:value={confirmationUserId}
+              placeholder={$t(i18nKeys.console.accountSettings.dangerConfirmPlaceholder)}
+              autocomplete="off"
+            />
+          </label>
+
+          {#if operationError}
+            <div class="rounded-[calc(var(--radius-lg)-2px)] border border-destructive/30 bg-destructive/5 p-4 text-sm">
+              <p class="font-medium text-destructive">{$t(i18nKeys.console.accountSettings.operationFailed)}</p>
+              <p class="mt-1.5 break-words text-muted-foreground">{operationError}</p>
+            </div>
+          {/if}
+
+          <Dialog.Footer class="border-t pt-5">
+            <Button type="button" variant="outline" onclick={closeDeleteAccountDialog}>
+              {$t(i18nKeys.common.actions.cancel)}
+            </Button>
+            <Button type="submit" variant="destructive" disabled={!canDeleteAccount}>
+              <Trash2 class="size-4" />
+              {deleteAccountMutation.isPending
+                ? $t(i18nKeys.console.accountSettings.deletingAccount)
+                : $t(i18nKeys.console.accountSettings.deleteAccount)}
+            </Button>
+          </Dialog.Footer>
+        </form>
+      {/if}
+    </Dialog.Content>
+  </Dialog.Root>
 </SettingsShell>

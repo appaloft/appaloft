@@ -40,8 +40,7 @@ jobs:
         id: classify
         shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_REF: ${{ github.base_ref }}
           BEFORE_SHA: ${{ github.event.before }}
         run: |
           set -euo pipefail
@@ -53,7 +52,7 @@ jobs:
           fi
 
           if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
-            gh pr diff "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --name-only > changed-files.txt
+            git diff --name-only "origin/${BASE_REF}...HEAD" > changed-files.txt
           elif [[ -n "${BEFORE_SHA}" && "${BEFORE_SHA}" != "0000000000000000000000000000000000000000" ]]; then
             git diff --name-only "${BEFORE_SHA}" "${GITHUB_SHA}" > changed-files.txt
           else

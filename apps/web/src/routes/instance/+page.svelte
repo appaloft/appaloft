@@ -32,9 +32,8 @@
   import SettingsShell from "$lib/components/console/SettingsShell.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
-  import * as Table from "$lib/components/ui/table";
+  import * as Dialog from "$lib/components/ui/dialog";
   import { webDocsHrefs } from "$lib/console/docs-help";
-  import { requestConsoleConfirm } from "$lib/console/modal-interaction";
   import { instanceSettingsItems } from "$lib/console/settings-nav";
   import { formatTime } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
@@ -75,7 +74,11 @@
 
   const currentOrigin = $derived(page.url.origin);
   let upgradeFeedback = $state<UpgradeFeedback | null>(null);
+  let applyUpgradeDialogOpen = $state(false);
   let terminalSessionFeedback = $state<TerminalSessionFeedback | null>(null);
+  let terminalSessionCloseDialogOpen = $state(false);
+  let terminalSessionsExpireDialogOpen = $state(false);
+  let selectedTerminalSessionId = $state("");
   let { section = null }: Props = $props();
   const activeSection = $derived.by<InstanceSection>(() => {
     if (section) {
@@ -184,6 +187,7 @@
         title: $t(i18nKeys.console.instance.upgradeSucceededTitle),
         detail: `${$t(i18nKeys.console.instance.targetVersionLabel)} ${result.targetVersion}`,
       };
+      applyUpgradeDialogOpen = false;
       void queryClient.invalidateQueries({ queryKey: ["instance-upgrade"] });
     },
     onError: (error) => {
@@ -257,6 +261,9 @@
   const currentOrganization = $derived(contextQuery.data?.currentOrganization ?? null);
   const organizations = $derived(contextQuery.data?.organizations ?? []);
   const terminalSessions = $derived(terminalSessionsQuery.data?.items ?? []);
+  const selectedTerminalSession = $derived(
+    terminalSessions.find((session) => session.sessionId === selectedTerminalSessionId) ?? null,
+  );
   const maintenanceWorkers = $derived(doctor?.maintenanceWorkers ?? []);
   const durableWorker = $derived(
     maintenanceWorkers.find((worker) => worker.key === "durable-worker-runtime") ?? null,
@@ -493,41 +500,63 @@ server-config-deploy: true`);
       : session.serverId;
   }
 
-  async function closeTerminalSession(session: TerminalSessionSummary): Promise<void> {
-    if (!browser || closeTerminalSessionMutation.isPending) {
+  function openApplyUpgradeDialog(): void {
+    upgradeFeedback = null;
+    applyUpgradeDialogOpen = true;
+  }
+
+  function setApplyUpgradeDialogOpen(open: boolean): void {
+    applyUpgradeDialogOpen = open;
+  }
+
+  function confirmApplyUpgrade(): void {
+    if (!browser || !canApplyUpgrade || applyUpgradeMutation.isPending) {
       return;
     }
 
-    if (
-      !(await requestConsoleConfirm({
-        message: $t(i18nKeys.console.terminal.lifecycleCloseConfirm, {
-          sessionId: session.sessionId,
-        }),
-        destructive: true,
-      }))
-    ) {
+    upgradeFeedback = null;
+    applyUpgradeMutation.mutate();
+  }
+
+  function openTerminalSessionCloseDialog(session: TerminalSessionSummary): void {
+    selectedTerminalSessionId = session.sessionId;
+    terminalSessionFeedback = null;
+    terminalSessionCloseDialogOpen = true;
+  }
+
+  function setTerminalSessionCloseDialogOpen(open: boolean): void {
+    terminalSessionCloseDialogOpen = open;
+    if (!open) {
+      selectedTerminalSessionId = "";
+    }
+  }
+
+  function openTerminalSessionsExpireDialog(): void {
+    terminalSessionFeedback = null;
+    terminalSessionsExpireDialogOpen = true;
+  }
+
+  function setTerminalSessionsExpireDialogOpen(open: boolean): void {
+    terminalSessionsExpireDialogOpen = open;
+  }
+
+  function confirmCloseTerminalSession(session: TerminalSessionSummary | null): void {
+    if (!browser || closeTerminalSessionMutation.isPending || !session) {
       return;
     }
 
     terminalSessionFeedback = null;
+    terminalSessionCloseDialogOpen = false;
     closeTerminalSessionMutation.mutate({ sessionId: session.sessionId });
   }
 
-  async function expireOldTerminalSessions(): Promise<void> {
+  function confirmExpireTerminalSessions(): void {
     if (!browser || expireTerminalSessionsMutation.isPending) {
       return;
     }
 
-    if (
-      !(await requestConsoleConfirm({
-        message: $t(i18nKeys.console.terminal.lifecycleExpireConfirm),
-        destructive: true,
-      }))
-    ) {
-      return;
-    }
-
     terminalSessionFeedback = null;
+    terminalSessionsExpireDialogOpen = false;
     expireTerminalSessionsMutation.mutate();
   }
 </script>
@@ -559,7 +588,7 @@ server-config-deploy: true`);
 
   <div class="mx-auto max-w-6xl space-y-4">
         {#if activeSection === "overview"}
-          <section class="console-panel p-5">
+          <section class="console-panel p-5" data-instance-overview-display-surface>
             <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div class="min-w-0">
                 <div class="flex flex-wrap items-center gap-2">
@@ -593,13 +622,14 @@ server-config-deploy: true`);
                 </Button>
                 <Button
                   type="button"
+                  variant="outline"
                   disabled={!canApplyUpgrade}
-                  onclick={() => applyUpgradeMutation.mutate()}
+                  onclick={openApplyUpgradeDialog}
                 >
-                  <Download class="mr-2 size-4" />
+                  <ClipboardList class="mr-2 size-4" />
                   {applyUpgradeMutation.isPending
                     ? $t(i18nKeys.console.instance.applyingUpgrade)
-                    : $t(i18nKeys.console.instance.applyUpgrade)}
+                    : $t(i18nKeys.console.instance.reviewUpgrade)}
                 </Button>
               </div>
             </div>
@@ -771,7 +801,7 @@ server-config-deploy: true`);
             {/if}
           </section>
         {:else if activeSection === "workers"}
-          <section class="space-y-5">
+          <section class="space-y-5" data-instance-workers-display-surface>
             <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div class="max-w-2xl space-y-2">
                 <div class="flex flex-wrap items-center gap-2">
@@ -915,33 +945,37 @@ server-config-deploy: true`);
                               </div>
 
                               {#if observed.heartbeat.workers.length > 0}
-                                <div class="mt-3 overflow-hidden rounded-md border bg-background">
-                                  <Table.Root>
-                                    <Table.Header>
-                                      <Table.Row class="hover:bg-transparent">
-                                        <Table.Head>{$t(i18nKeys.console.instance.workerRuntimeWorkerId)}</Table.Head>
-                                        <Table.Head>{$t(i18nKeys.common.domain.status)}</Table.Head>
-                                        <Table.Head>{$t(i18nKeys.console.instance.workerRuntimeLastSeen)}</Table.Head>
-                                      </Table.Row>
-                                    </Table.Header>
-                                    <Table.Body>
-                                      {#each observed.heartbeat.workers as runtimeWorker (runtimeWorker.workerId)}
-                                        <Table.Row>
-                                          <Table.Cell class="max-w-72 break-all font-mono text-xs">
-                                            {runtimeWorker.workerId}
-                                          </Table.Cell>
-                                          <Table.Cell>
-                                            <Badge variant={runtimeWorker.online ? "default" : "outline"}>
-                                              {workerOnlineStatusLabel(runtimeWorker)}
-                                            </Badge>
-                                          </Table.Cell>
-                                          <Table.Cell class="text-muted-foreground">
-                                            {formatTime(runtimeWorker.lastSeenAt)}
-                                          </Table.Cell>
-                                        </Table.Row>
-                                      {/each}
-                                    </Table.Body>
-                                  </Table.Root>
+                                <div class="console-record-list mt-3">
+                                  {#each observed.heartbeat.workers as runtimeWorker (runtimeWorker.workerId)}
+                                    <div class="console-record-row gap-4 lg:grid-cols-[minmax(0,1fr)_7rem_9rem_12rem] lg:items-center">
+                                      <div class="min-w-0">
+                                        <p class="text-xs font-medium text-muted-foreground">
+                                          {$t(i18nKeys.console.instance.workerRuntimeWorkerId)}
+                                        </p>
+                                        <p class="mt-1 break-all font-mono text-xs">{runtimeWorker.workerId}</p>
+                                      </div>
+                                      <div class="text-sm">
+                                        <p class="text-xs font-medium text-muted-foreground">
+                                          {$t(i18nKeys.console.instance.workerRuntimeSlot)}
+                                        </p>
+                                        <p class="mt-1 font-mono">{runtimeWorker.slot}</p>
+                                      </div>
+                                      <div>
+                                        <p class="text-xs font-medium text-muted-foreground">
+                                          {$t(i18nKeys.common.domain.status)}
+                                        </p>
+                                        <Badge class="mt-1" variant={runtimeWorker.online ? "default" : "outline"}>
+                                          {workerOnlineStatusLabel(runtimeWorker)}
+                                        </Badge>
+                                      </div>
+                                      <div class="text-sm text-muted-foreground">
+                                        <p class="text-xs font-medium">
+                                          {$t(i18nKeys.console.instance.workerRuntimeLastSeen)}
+                                        </p>
+                                        <p class="mt-1">{formatTime(runtimeWorker.lastSeenAt)}</p>
+                                      </div>
+                                    </div>
+                                  {/each}
                                 </div>
                               {/if}
                             {:else}
@@ -1030,33 +1064,37 @@ server-config-deploy: true`);
                         </div>
 
                         {#if durableRuntimeTopology.heartbeat.workers.length > 0}
-                          <div class="overflow-hidden rounded-md border">
-                            <Table.Root>
-                              <Table.Header>
-                                <Table.Row class="hover:bg-transparent">
-                                  <Table.Head>{$t(i18nKeys.console.instance.workerRuntimeWorkerId)}</Table.Head>
-                                  <Table.Head>{$t(i18nKeys.common.domain.status)}</Table.Head>
-                                  <Table.Head>{$t(i18nKeys.console.instance.workerRuntimeLastSeen)}</Table.Head>
-                                </Table.Row>
-                              </Table.Header>
-                              <Table.Body>
-                                {#each durableRuntimeTopology.heartbeat.workers as runtimeWorker (runtimeWorker.workerId)}
-                                  <Table.Row>
-                                    <Table.Cell class="max-w-72 break-all font-mono text-xs">
-                                      {runtimeWorker.workerId}
-                                    </Table.Cell>
-                                    <Table.Cell>
-                                      <Badge variant={runtimeWorker.online ? "default" : "outline"}>
-                                        {workerOnlineStatusLabel(runtimeWorker)}
-                                      </Badge>
-                                    </Table.Cell>
-                                    <Table.Cell class="text-muted-foreground">
-                                      {formatTime(runtimeWorker.lastSeenAt)}
-                                    </Table.Cell>
-                                  </Table.Row>
-                                {/each}
-                              </Table.Body>
-                            </Table.Root>
+                          <div class="console-record-list" data-instance-runtime-workers-list>
+                            {#each durableRuntimeTopology.heartbeat.workers as runtimeWorker (runtimeWorker.workerId)}
+                              <div class="console-record-row gap-4 lg:grid-cols-[minmax(0,1fr)_7rem_9rem_12rem] lg:items-center">
+                                <div class="min-w-0">
+                                  <p class="text-xs font-medium text-muted-foreground">
+                                    {$t(i18nKeys.console.instance.workerRuntimeWorkerId)}
+                                  </p>
+                                  <p class="mt-1 break-all font-mono text-xs">{runtimeWorker.workerId}</p>
+                                </div>
+                                <div class="text-sm">
+                                  <p class="text-xs font-medium text-muted-foreground">
+                                    {$t(i18nKeys.console.instance.workerRuntimeSlot)}
+                                  </p>
+                                  <p class="mt-1 font-mono">{runtimeWorker.slot}</p>
+                                </div>
+                                <div>
+                                  <p class="text-xs font-medium text-muted-foreground">
+                                    {$t(i18nKeys.common.domain.status)}
+                                  </p>
+                                  <Badge class="mt-1" variant={runtimeWorker.online ? "default" : "outline"}>
+                                    {workerOnlineStatusLabel(runtimeWorker)}
+                                  </Badge>
+                                </div>
+                                <div class="text-sm text-muted-foreground">
+                                  <p class="text-xs font-medium">
+                                    {$t(i18nKeys.console.instance.workerRuntimeLastSeen)}
+                                  </p>
+                                  <p class="mt-1">{formatTime(runtimeWorker.lastSeenAt)}</p>
+                                </div>
+                              </div>
+                            {/each}
                           </div>
                         {/if}
                       </div>
@@ -1092,57 +1130,53 @@ server-config-deploy: true`);
                       {$t(i18nKeys.common.status.loading)}
                     </div>
                   {:else if operatorWorkItems.length > 0}
-                    <div class="mt-5 overflow-hidden rounded-md border">
-                      <Table.Root>
-                        <Table.Header>
-                          <Table.Row class="hover:bg-transparent">
-                            <Table.Head class="min-w-56">
-                              {$t(i18nKeys.console.instance.workerWorkItem)}
-                            </Table.Head>
-                            <Table.Head>{$t(i18nKeys.common.domain.status)}</Table.Head>
-                            <Table.Head>{$t(i18nKeys.console.instance.workerWorkScope)}</Table.Head>
-                            <Table.Head>{$t(i18nKeys.console.instance.workerWorkUpdatedAt)}</Table.Head>
-                            <Table.Head class="w-24">
-                              <span class="sr-only">{$t(i18nKeys.common.actions.viewDetails)}</span>
-                            </Table.Head>
-                          </Table.Row>
-                        </Table.Header>
-                        <Table.Body>
-                          {#each operatorWorkItems as work (work.id)}
-                            <Table.Row class={selectedWorkId === work.id ? "bg-primary/5" : ""}>
-                              <Table.Cell class="max-w-80">
-                                <div class="min-w-0">
-                                  <p class="truncate font-medium">{work.operationKey}</p>
-                                  <p class="mt-1 truncate font-mono text-xs text-muted-foreground">
-                                    {work.id}
-                                  </p>
-                                  {#if work.phase || work.step}
-                                    <p class="mt-1 truncate text-xs text-muted-foreground">
-                                      {work.phase ?? "-"}{#if work.step} / {work.step}{/if}
-                                    </p>
-                                  {/if}
-                                </div>
-                              </Table.Cell>
-                              <Table.Cell>
-                                <Badge variant={workStatusVariant(work.status)}>
-                                  {workStatusLabel(work.status)}
-                                </Badge>
-                              </Table.Cell>
-                              <Table.Cell class="max-w-48 truncate font-mono text-xs">
-                                {workScopeLabel(work)}
-                              </Table.Cell>
-                              <Table.Cell class="text-muted-foreground">
-                                {formatTime(work.updatedAt)}
-                              </Table.Cell>
-                              <Table.Cell class="text-right">
-                                <Button href={workerDetailHref(work.id)} size="sm" variant="outline">
-                                  {$t(i18nKeys.common.actions.viewDetails)}
-                                </Button>
-                              </Table.Cell>
-                            </Table.Row>
-                          {/each}
-                        </Table.Body>
-                      </Table.Root>
+                    <div class="mt-5 console-record-list" data-instance-operator-work-list>
+                      {#each operatorWorkItems as work (work.id)}
+                        <a
+                          href={workerDetailHref(work.id)}
+                          class={[
+                            "console-record-row group gap-4 lg:grid-cols-[minmax(0,1fr)_9rem_12rem_12rem_auto] lg:items-center",
+                            selectedWorkId === work.id ? "bg-primary/5" : "",
+                          ]}
+                        >
+                          <div class="min-w-0">
+                            <p class="truncate font-medium">{work.operationKey}</p>
+                            <p class="mt-1 truncate font-mono text-xs text-muted-foreground">
+                              {work.id}
+                            </p>
+                            {#if work.phase || work.step}
+                              <p class="mt-1 truncate text-xs text-muted-foreground">
+                                {work.phase ?? "-"}{#if work.step} / {work.step}{/if}
+                              </p>
+                            {/if}
+                          </div>
+                          <div>
+                            <p class="text-xs font-medium text-muted-foreground">
+                              {$t(i18nKeys.common.domain.status)}
+                            </p>
+                            <Badge class="mt-1" variant={workStatusVariant(work.status)}>
+                              {workStatusLabel(work.status)}
+                            </Badge>
+                          </div>
+                          <div class="min-w-0 text-sm">
+                            <p class="text-xs font-medium text-muted-foreground">
+                              {$t(i18nKeys.console.instance.workerWorkScope)}
+                            </p>
+                            <p class="mt-1 truncate font-mono text-xs">{workScopeLabel(work)}</p>
+                          </div>
+                          <div class="text-sm text-muted-foreground">
+                            <p class="text-xs font-medium">
+                              {$t(i18nKeys.console.instance.workerWorkUpdatedAt)}
+                            </p>
+                            <p class="mt-1">{formatTime(work.updatedAt)}</p>
+                          </div>
+                          <span
+                            class="inline-flex items-center justify-end text-sm font-medium text-muted-foreground transition-colors group-hover:text-foreground"
+                          >
+                            {$t(i18nKeys.common.actions.viewDetails)}
+                          </span>
+                        </a>
+                      {/each}
                     </div>
                   {:else}
                     <div class="mt-5 rounded-md border border-dashed bg-muted/15 px-4 py-6 text-sm text-muted-foreground">
@@ -1152,7 +1186,7 @@ server-config-deploy: true`);
                 </section>
               </div>
 
-              <aside class="console-panel p-5">
+              <aside class="console-panel p-5" data-instance-worker-events-observation>
                 <div class="flex items-center gap-3">
                   <ClipboardList class="size-5 text-primary" />
                   <div>
@@ -1277,7 +1311,7 @@ server-config-deploy: true`);
             </div>
           </section>
         {:else if activeSection === "maintenance"}
-          <section class="console-panel p-5">
+          <section class="console-panel p-5" data-instance-maintenance-display-surface>
             <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div class="min-w-0">
                 <div class="flex flex-wrap items-center gap-2">
@@ -1417,7 +1451,7 @@ server-config-deploy: true`);
             {/if}
           </section>
         {:else if activeSection === "sessions"}
-          <section class="console-panel p-5">
+          <section class="console-panel p-5" data-instance-sessions-display-surface>
             <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div class="min-w-0">
                 <div class="flex flex-wrap items-center gap-2">
@@ -1450,17 +1484,6 @@ server-config-deploy: true`);
                     ? $t(i18nKeys.common.status.loading)
                     : $t(i18nKeys.console.terminal.lifecycleRefresh)}
                 </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={expireTerminalSessionsMutation.isPending}
-                  onclick={expireOldTerminalSessions}
-                >
-                  <Clock3 class="mr-2 size-4" />
-                  {expireTerminalSessionsMutation.isPending
-                    ? $t(i18nKeys.common.actions.saving)
-                    : $t(i18nKeys.console.terminal.lifecycleExpireOld)}
-                </Button>
               </div>
             </div>
 
@@ -1485,47 +1508,74 @@ server-config-deploy: true`);
               </p>
             {/if}
 
-            <div class="mt-5 space-y-3">
+            <div
+              class="mt-5 rounded-md border bg-muted/15 px-3 py-2"
+              data-instance-terminal-sessions-lifecycle-handoff
+            >
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div class="flex min-w-0 items-start gap-3">
+                  <ShieldCheck class="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                  <div class="min-w-0">
+                    <p class="text-sm font-semibold">
+                      {$t(i18nKeys.console.terminal.lifecycleManageAction)}
+                    </p>
+                    <p class="mt-1 text-xs text-muted-foreground">
+                      {$t(i18nKeys.console.terminal.lifecycleExpireConfirm)}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={expireTerminalSessionsMutation.isPending}
+                  onclick={openTerminalSessionsExpireDialog}
+                >
+                  <ShieldCheck class="size-4" />
+                  {$t(i18nKeys.console.terminal.lifecycleManageAction)}
+                </Button>
+              </div>
+            </div>
+
+            <div class="console-record-list mt-5" data-instance-terminal-sessions-list>
               {#if terminalSessions.length > 0}
                 {#each terminalSessions as session (session.sessionId)}
-                  <article class="rounded-md border bg-background p-4">
-                    <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                      <div class="min-w-0 space-y-2">
-                        <div class="flex flex-wrap items-center gap-2">
-                          <Terminal class="size-4 text-muted-foreground" />
-                          <p class="break-all font-mono text-sm font-medium">{session.sessionId}</p>
-                          <Badge variant={session.status === "active" ? "default" : "secondary"}>
-                            {session.status}
-                          </Badge>
-                          <Badge variant="outline">{terminalSessionScopeLabel(session)}</Badge>
-                        </div>
-                        <p class="break-all text-sm text-muted-foreground">
-                          {terminalSessionTargetLabel(session)}
-                          {#if session.deploymentId}
-                            · {session.deploymentId}
-                          {/if}
-                        </p>
-                        {#if session.workingDirectory}
-                          <p class="break-all rounded-md bg-muted px-3 py-2 font-mono text-xs">
-                            {session.workingDirectory}
-                          </p>
-                        {/if}
-                        <p class="text-xs text-muted-foreground">
-                          {$t(i18nKeys.console.terminal.lifecycleCreatedAt)}
-                          {session.createdAt}
-                        </p>
+                  <article class="console-record-row lg:grid-cols-[minmax(0,1fr)_auto]">
+                    <div class="min-w-0 space-y-2">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <Terminal class="size-4 text-muted-foreground" />
+                        <p class="break-all font-mono text-sm font-medium">{session.sessionId}</p>
+                        <Badge variant={session.status === "active" ? "default" : "secondary"}>
+                          {session.status}
+                        </Badge>
+                        <Badge variant="outline">{terminalSessionScopeLabel(session)}</Badge>
                       </div>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        disabled={closeTerminalSessionMutation.isPending}
-                        onclick={() => closeTerminalSession(session)}
-                      >
-                        <X class="mr-2 size-4" />
-                        {$t(i18nKeys.common.actions.closeTerminal)}
-                      </Button>
+                      <p class="break-all text-sm text-muted-foreground">
+                        {terminalSessionTargetLabel(session)}
+                        {#if session.deploymentId}
+                          · {session.deploymentId}
+                        {/if}
+                      </p>
+                      {#if session.workingDirectory}
+                        <p class="break-all rounded-md bg-muted px-3 py-2 font-mono text-xs">
+                          {session.workingDirectory}
+                        </p>
+                      {/if}
+                      <p class="text-xs text-muted-foreground">
+                        {$t(i18nKeys.console.terminal.lifecycleCreatedAt)}
+                        {session.createdAt}
+                      </p>
                     </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={closeTerminalSessionMutation.isPending}
+                      onclick={() => openTerminalSessionCloseDialog(session)}
+                    >
+                      <ShieldCheck class="size-4" />
+                      {$t(i18nKeys.console.terminal.lifecycleManageAction)}
+                    </Button>
                   </article>
                 {/each}
               {:else if terminalSessionsQuery.isPending}
@@ -1540,7 +1590,7 @@ server-config-deploy: true`);
             </div>
           </section>
         {:else}
-          <section class="console-panel p-5">
+          <section class="console-panel p-5" data-instance-guidance-display-surface>
             <div class="min-w-0">
               <div class="flex flex-wrap items-center gap-2">
                 <Badge variant="outline">{$t(i18nKeys.console.instance.guidanceTitle)}</Badge>
@@ -1614,4 +1664,154 @@ server-config-deploy: true`);
           </section>
         {/if}
   </div>
+
+  <Dialog.Root bind:open={applyUpgradeDialogOpen} onOpenChange={setApplyUpgradeDialogOpen}>
+    <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)}>
+      <Dialog.Header>
+        <Dialog.Title>{$t(i18nKeys.console.instance.applyUpgrade)}</Dialog.Title>
+        <Dialog.Description>
+          {$t(i18nKeys.console.instance.updatesBody)}
+        </Dialog.Description>
+      </Dialog.Header>
+      <div class="space-y-4 px-5 py-4" data-instance-apply-upgrade-dialog>
+        <dl class="grid gap-3 sm:grid-cols-3">
+          <div class="rounded-[calc(var(--radius-lg)-2px)] border bg-muted/30 p-3">
+            <dt class="text-xs font-medium uppercase text-muted-foreground">
+              {$t(i18nKeys.console.instance.currentVersionLabel)}
+            </dt>
+            <dd class="mt-1 break-all font-mono text-sm">{currentVersion}</dd>
+          </div>
+          <div class="rounded-[calc(var(--radius-lg)-2px)] border bg-muted/30 p-3">
+            <dt class="text-xs font-medium uppercase text-muted-foreground">
+              {$t(i18nKeys.console.instance.targetVersionLabel)}
+            </dt>
+            <dd class="mt-1 break-all font-mono text-sm">
+              {instanceUpgradeQuery.data?.targetVersion ?? "-"}
+            </dd>
+          </div>
+          <div class="rounded-[calc(var(--radius-lg)-2px)] border bg-muted/30 p-3">
+            <dt class="text-xs font-medium uppercase text-muted-foreground">
+              {$t(i18nKeys.console.instance.latestVersionLabel)}
+            </dt>
+            <dd class="mt-1 break-all font-mono text-sm">
+              {instanceUpgradeQuery.data?.latestVersion ?? "-"}
+            </dd>
+          </div>
+        </dl>
+
+        <div class="rounded-[calc(var(--radius-lg)-2px)] border bg-muted/30 p-3">
+          <p class="text-sm font-medium">{$t(i18nKeys.console.instance.upgradeCommandTitle)}</p>
+          <pre class="mt-3 overflow-x-auto rounded-md border bg-background p-3 text-xs"><code>{upgradeCommand}</code></pre>
+        </div>
+      </div>
+      <Dialog.Footer class="border-t p-5">
+        <Button type="button" variant="outline" onclick={() => setApplyUpgradeDialogOpen(false)}>
+          {$t(i18nKeys.common.actions.cancel)}
+        </Button>
+        <Button type="button" disabled={!canApplyUpgrade} onclick={confirmApplyUpgrade}>
+          <Download class="size-4" />
+          {applyUpgradeMutation.isPending
+            ? $t(i18nKeys.console.instance.applyingUpgrade)
+            : $t(i18nKeys.console.instance.applyUpgrade)}
+        </Button>
+      </Dialog.Footer>
+    </Dialog.Content>
+  </Dialog.Root>
+
+  <Dialog.Root
+    bind:open={terminalSessionsExpireDialogOpen}
+    onOpenChange={setTerminalSessionsExpireDialogOpen}
+  >
+    <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)}>
+      <Dialog.Header>
+        <Dialog.Title>{$t(i18nKeys.console.terminal.lifecycleExpireOld)}</Dialog.Title>
+        <Dialog.Description>
+          {$t(i18nKeys.console.terminal.lifecycleExpireConfirm)}
+        </Dialog.Description>
+      </Dialog.Header>
+      <div class="space-y-4 px-5 py-4" data-instance-terminal-expire-dialog>
+        <div class="rounded-[calc(var(--radius-lg)-2px)] border bg-muted/30 p-3 text-sm">
+          <p class="font-medium">
+            {$t(i18nKeys.console.terminal.lifecycleActiveSummary, {
+              count: terminalSessions.length,
+            })}
+          </p>
+          <p class="mt-1 text-muted-foreground">
+            {$t(i18nKeys.console.terminal.lifecycleDescription)}
+          </p>
+        </div>
+      </div>
+      <Dialog.Footer class="border-t p-5">
+        <Button
+          type="button"
+          variant="outline"
+          onclick={() => setTerminalSessionsExpireDialogOpen(false)}
+        >
+          {$t(i18nKeys.common.actions.cancel)}
+        </Button>
+        <Button
+          type="button"
+          variant="destructive"
+          disabled={expireTerminalSessionsMutation.isPending}
+          onclick={confirmExpireTerminalSessions}
+        >
+          <Clock3 class="size-4" />
+          {expireTerminalSessionsMutation.isPending
+            ? $t(i18nKeys.common.actions.saving)
+            : $t(i18nKeys.console.terminal.lifecycleExpireOld)}
+        </Button>
+      </Dialog.Footer>
+    </Dialog.Content>
+  </Dialog.Root>
+
+  <Dialog.Root
+    bind:open={terminalSessionCloseDialogOpen}
+    onOpenChange={setTerminalSessionCloseDialogOpen}
+  >
+    {#if selectedTerminalSession}
+      <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)}>
+        <Dialog.Header>
+          <Dialog.Title>{$t(i18nKeys.common.actions.closeTerminal)}</Dialog.Title>
+          <Dialog.Description>
+            {$t(i18nKeys.console.terminal.lifecycleCloseConfirm, {
+              sessionId: selectedTerminalSession.sessionId,
+            })}
+          </Dialog.Description>
+        </Dialog.Header>
+        <div class="space-y-4 px-5 py-4" data-instance-terminal-close-dialog>
+          <div class="rounded-[calc(var(--radius-lg)-2px)] border bg-muted/30 p-3 text-sm">
+            <p class="break-all font-mono font-medium">{selectedTerminalSession.sessionId}</p>
+            <p class="mt-1 break-all text-muted-foreground">
+              {terminalSessionScopeLabel(selectedTerminalSession)} · {terminalSessionTargetLabel(selectedTerminalSession)}
+            </p>
+            {#if selectedTerminalSession.workingDirectory}
+              <p class="mt-2 break-all rounded-md bg-background px-3 py-2 font-mono text-xs">
+                {selectedTerminalSession.workingDirectory}
+              </p>
+            {/if}
+          </div>
+        </div>
+        <Dialog.Footer class="border-t p-5">
+          <Button
+            type="button"
+            variant="outline"
+            onclick={() => setTerminalSessionCloseDialogOpen(false)}
+          >
+            {$t(i18nKeys.common.actions.cancel)}
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={closeTerminalSessionMutation.isPending}
+            onclick={() => confirmCloseTerminalSession(selectedTerminalSession)}
+          >
+            <X class="size-4" />
+            {closeTerminalSessionMutation.isPending
+              ? $t(i18nKeys.common.actions.saving)
+              : $t(i18nKeys.common.actions.closeTerminal)}
+          </Button>
+        </Dialog.Footer>
+      </Dialog.Content>
+    {/if}
+  </Dialog.Root>
 </SettingsShell>

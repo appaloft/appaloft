@@ -7,14 +7,12 @@
   import ResourceHealthDot from "$lib/components/console/ResourceHealthDot.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
-  import * as Table from "$lib/components/ui/table";
   import { selectCurrentResourceAccessRoute } from "$lib/console/resource-access-route";
   import {
     deploymentDetailHref,
     formatTime,
     latestResourceDeployment,
     resourceDetailHref,
-    resourceNewDeploymentHref,
   } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
 
@@ -26,7 +24,9 @@
     emptyDescription: string;
     createHref?: string;
     createLabel?: string;
+    createAction?: () => void;
     createDisabled?: boolean;
+    onDeployResource?: (resource: ResourceSummary) => void;
     showEnvironment?: boolean;
   };
 
@@ -38,7 +38,9 @@
     emptyDescription,
     createHref = "",
     createLabel = "",
+    createAction,
     createDisabled = false,
+    onDeployResource,
     showEnvironment = false,
   }: Props = $props();
 
@@ -59,114 +61,121 @@
   <ConsoleStatePanel
     title={emptyTitle}
     description={emptyDescription}
-    actionHref={createHref}
+    actionHref={createAction ? "" : createHref}
+    actionOnclick={createAction}
     actionLabel={createLabel}
     actionDisabled={createDisabled}
   />
 {:else}
-  <div class="console-record-list">
-    <Table.Root>
-      <Table.Header>
-        <Table.Row class="hover:bg-transparent">
-          <Table.Head class="min-w-64">{$t(i18nKeys.common.domain.resource)}</Table.Head>
-          <Table.Head>{$t(i18nKeys.common.domain.status)}</Table.Head>
+  <div class="console-record-list" data-resource-record-list>
+    {#each resources as resource (resource.id)}
+      {@const latestDeployment = latestResourceDeployment(resource, deployments)}
+      {@const childDeployments = resourceDeployments(resource)}
+      {@const currentAccessUrl = accessUrl(resource)}
+      <article
+        class="console-record-row gap-4 xl:grid-cols-[minmax(0,1.3fr)_8rem_minmax(0,1fr)_minmax(0,1fr)_10rem_auto] xl:items-center"
+        data-resource-record-row
+      >
+        <div class="min-w-0 space-y-1">
+          <a
+            href={resourceDetailHref(resource)}
+            class="block min-w-0 underline-offset-4 hover:underline"
+          >
+            <span class="flex min-w-0 items-center gap-2">
+              <ResourceHealthDot resourceId={resource.id} class="shrink-0" />
+              <span class="truncate font-medium">{resource.name}</span>
+              <Badge variant="secondary">{resource.kind}</Badge>
+            </span>
+            <span class="mt-1 block truncate text-xs text-muted-foreground">
+              {resource.description ?? resource.slug}
+            </span>
+          </a>
+        </div>
+
+        <div>
+          <p class="text-xs font-medium text-muted-foreground">{$t(i18nKeys.common.domain.status)}</p>
+          <div class="mt-1">
+            <DeploymentStatusBadge status={resource.lastDeploymentStatus ?? latestDeployment?.status} />
+          </div>
+        </div>
+
+        <div class="grid min-w-0 gap-2 text-sm sm:grid-cols-2 xl:grid-cols-1" data-resource-owner-summary>
           {#if showEnvironment}
-            <Table.Head>{$t(i18nKeys.common.domain.environment)}</Table.Head>
+            <div class="min-w-0">
+              <p class="text-xs font-medium text-muted-foreground">{$t(i18nKeys.common.domain.environment)}</p>
+              <p class="mt-1 truncate">{environmentName(resource.environmentId)}</p>
+            </div>
           {/if}
-          <Table.Head>{$t(i18nKeys.console.projects.lastDeployment)}</Table.Head>
-          <Table.Head>{$t(i18nKeys.console.projects.publicAccessTitle)}</Table.Head>
-          <Table.Head>{$t(i18nKeys.common.domain.createdAt)}</Table.Head>
-          <Table.Head class="w-28"><span class="sr-only">{$t(i18nKeys.common.actions.viewDetails)}</span></Table.Head>
-        </Table.Row>
-      </Table.Header>
-      <Table.Body>
-        {#each resources as resource (resource.id)}
-          {@const latestDeployment = latestResourceDeployment(resource, deployments)}
-          {@const childDeployments = resourceDeployments(resource)}
-          {@const currentAccessUrl = accessUrl(resource)}
-          <Table.Row class="group">
-            <Table.Cell class="max-w-80">
-              <a href={resourceDetailHref(resource)} class="block min-w-0 underline-offset-4 group-hover:underline">
-                <span class="flex min-w-0 items-center gap-2">
-                  <ResourceHealthDot resourceId={resource.id} class="shrink-0" />
-                  <span class="truncate font-medium">{resource.name}</span>
-                  <Badge variant="secondary">{resource.kind}</Badge>
-                </span>
-                <span class="mt-1 block truncate text-xs text-muted-foreground">
-                  {resource.description ?? resource.slug}
-                </span>
+          <div class="min-w-0">
+            <p class="text-xs font-medium text-muted-foreground">
+              {$t(i18nKeys.console.projects.lastDeployment)}
+            </p>
+            {#if latestDeployment}
+              <a
+                href={deploymentDetailHref(latestDeployment)}
+                class="mt-1 block truncate underline-offset-4 hover:underline"
+              >
+                {latestDeployment.runtimePlan.source.displayName}
               </a>
-            </Table.Cell>
-            <Table.Cell>
-              <DeploymentStatusBadge status={resource.lastDeploymentStatus ?? latestDeployment?.status} />
-            </Table.Cell>
-            {#if showEnvironment}
-              <Table.Cell class="max-w-40 truncate">
-                {environmentName(resource.environmentId)}
-              </Table.Cell>
+              <a
+                href={`${resourceDetailHref(resource)}?tab=deployments`}
+                class="mt-1 block truncate text-xs text-muted-foreground underline-offset-4 hover:underline"
+              >
+                {formatTime(latestDeployment.createdAt)} · {childDeployments.length}
+                {$t(i18nKeys.common.domain.deployments)}
+              </a>
+            {:else}
+              <p class="mt-1 text-muted-foreground">
+                {$t(i18nKeys.console.projects.noDeploymentShort)}
+              </p>
             {/if}
-            <Table.Cell class="max-w-48">
-              {#if latestDeployment}
-                <a
-                  href={deploymentDetailHref(latestDeployment)}
-                  class="block truncate text-sm underline-offset-4 hover:underline"
-                >
-                  {latestDeployment.runtimePlan.source.displayName}
-                </a>
-                <a
-                  href={`${resourceDetailHref(resource)}?tab=deployments`}
-                  class="mt-1 block truncate text-xs text-muted-foreground underline-offset-4 hover:underline"
-                >
-                  {formatTime(latestDeployment.createdAt)} · {childDeployments.length}
-                  {$t(i18nKeys.common.domain.deployments)}
-                </a>
-              {:else}
-                <span class="text-muted-foreground">
-                  {$t(i18nKeys.console.projects.noDeploymentShort)}
-                </span>
-              {/if}
-            </Table.Cell>
-            <Table.Cell class="max-w-56">
-              {#if currentAccessUrl}
-                <a
-                  href={currentAccessUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  class="flex min-w-0 items-center gap-2 font-mono text-xs underline-offset-4 hover:underline"
-                >
-                  <Globe2 class="size-3 shrink-0 text-muted-foreground" />
-                  <span class="truncate">{currentAccessUrl}</span>
-                </a>
-              {:else}
-                <span class="text-muted-foreground">{$t(i18nKeys.console.projects.noPublicAccess)}</span>
-              {/if}
-            </Table.Cell>
-            <Table.Cell class="text-muted-foreground">
-              {formatTime(resource.createdAt)}
-            </Table.Cell>
-            <Table.Cell class="text-right">
-              <div class="flex justify-end gap-1">
-                <Button
-                  href={resourceNewDeploymentHref(resource)}
-                  size="sm"
-                  variant="outline"
-                  aria-label={$t(i18nKeys.common.actions.quickDeploy)}
-                >
-                  <Plus class="size-4" />
-                </Button>
-                <Button
-                  href={resourceDetailHref(resource)}
-                  size="sm"
-                  variant="outline"
-                  aria-label={$t(i18nKeys.common.actions.viewDetails)}
-                >
-                  <ArrowRight class="size-4" />
-                </Button>
-              </div>
-            </Table.Cell>
-          </Table.Row>
-        {/each}
-      </Table.Body>
-    </Table.Root>
+          </div>
+        </div>
+
+        <div class="min-w-0 text-sm">
+          <p class="text-xs font-medium text-muted-foreground">
+            {$t(i18nKeys.console.projects.publicAccessTitle)}
+          </p>
+          {#if currentAccessUrl}
+            <a
+              href={currentAccessUrl}
+              target="_blank"
+              rel="noreferrer"
+              class="mt-1 flex min-w-0 items-center gap-2 font-mono text-xs underline-offset-4 hover:underline"
+            >
+              <Globe2 class="size-3 shrink-0 text-muted-foreground" />
+              <span class="truncate">{currentAccessUrl}</span>
+            </a>
+          {:else}
+            <p class="mt-1 text-muted-foreground">{$t(i18nKeys.console.projects.noPublicAccess)}</p>
+          {/if}
+        </div>
+
+        <div class="text-sm text-muted-foreground">
+          <p class="text-xs font-medium">{$t(i18nKeys.common.domain.createdAt)}</p>
+          <p class="mt-1">{formatTime(resource.createdAt)}</p>
+        </div>
+
+        <div class="flex justify-start gap-1 xl:justify-end">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            aria-label={$t(i18nKeys.common.actions.quickDeploy)}
+            onclick={() => onDeployResource?.(resource)}
+          >
+            <Plus class="size-4" />
+          </Button>
+          <Button
+            href={resourceDetailHref(resource)}
+            size="sm"
+            variant="outline"
+            aria-label={$t(i18nKeys.common.actions.viewDetails)}
+          >
+            <ArrowRight class="size-4" />
+          </Button>
+        </div>
+      </article>
+    {/each}
   </div>
 {/if}

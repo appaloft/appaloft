@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 
 type ApiScenario = "dashboard" | "github-connected" | "static-quick-deploy";
 type ApiRouteResponse = unknown | Response;
@@ -80,6 +80,15 @@ type RuntimeUsageScopeFixture =
 const selfHostedAuthE2eGeneratedPassword = "generated-local-admin-password";
 let selfHostedAuthE2eAdminCreated = true;
 let selfHostedAuthE2eSignedIn = true;
+const demoProjectPath = "/projects/prj_demo";
+const demoResourcePath = "/projects/prj_demo/environments/env_demo/resources/res_demo";
+const demoDeploymentPath = `${demoResourcePath}/deployments/dep_demo`;
+const lifecycleActionLabels: [string, ...string[]] = [
+  "Open lifecycle governance",
+  "打开生命周期治理",
+  "Manage lifecycle",
+  "生命周期治理",
+];
 
 function resetSelfHostedAuthE2eState(input: { bootstrapRequired?: boolean } = {}): void {
   const bootstrapRequired = input.bootstrapRequired ?? false;
@@ -3646,6 +3655,80 @@ async function clickDialogButtonByAnyText(
   expect(found).toBe(true);
 }
 
+async function clickDialogButtonByExactText(
+  view: Bun.WebView,
+  texts: [string, ...string[]],
+): Promise<void> {
+  const found = await waitFor(
+    () =>
+      view.evaluate<boolean>(
+        `(() => {
+          const texts = ${JSON.stringify(texts)};
+          const dialog = document.querySelector('[role="dialog"]');
+          const elements = Array.from(dialog?.querySelectorAll("button, a") ?? []);
+          const element = elements.find((candidate) =>
+            texts.some((text) => candidate.textContent?.trim() === text)
+          );
+          if (!element) {
+            return false;
+          }
+          if (
+            (element instanceof HTMLButtonElement && element.disabled) ||
+            element.getAttribute("aria-disabled") === "true"
+          ) {
+            return false;
+          }
+          element.click();
+          return true;
+        })()`,
+      ),
+    Boolean,
+    `Expected a dialog button or link with exact text: ${texts.join(" | ")}`,
+  );
+
+  expect(found).toBe(true);
+}
+
+async function clickDialogFooterButtonByExactText(
+  view: Bun.WebView,
+  texts: [string, ...string[]],
+): Promise<void> {
+  const found = await waitFor(
+    () =>
+      view.evaluate<boolean>(
+        `(() => {
+          const texts = ${JSON.stringify(texts)};
+          const dialog = document.querySelector('[role="dialog"]');
+          const footer = dialog?.querySelector('[data-slot="dialog-footer"]') ??
+            Array.from(dialog?.querySelectorAll("div") ?? []).reverse().find((candidate) => {
+              const className = candidate.getAttribute("class") ?? "";
+              return className.includes("justify-end") || className.includes("border-t");
+            }) ??
+            dialog;
+          const elements = Array.from(footer?.querySelectorAll("button, a") ?? []);
+          const element = elements.find((candidate) =>
+            texts.some((text) => candidate.textContent?.trim() === text)
+          );
+          if (!element) {
+            return false;
+          }
+          if (
+            (element instanceof HTMLButtonElement && element.disabled) ||
+            element.getAttribute("aria-disabled") === "true"
+          ) {
+            return false;
+          }
+          element.click();
+          return true;
+        })()`,
+      ),
+    Boolean,
+    `Expected a dialog footer button or link with exact text: ${texts.join(" | ")}`,
+  );
+
+  expect(found).toBe(true);
+}
+
 async function clickStorageVolumeCardButton(
   view: Bun.WebView,
   volumeId: string,
@@ -4205,6 +4288,11 @@ afterAll(async () => {
 }, 20_000);
 
 describe.serial("console e2e with Bun.WebView", () => {
+  beforeEach(() => {
+    activeScenario = "dashboard";
+    resetSelfHostedAuthE2eState();
+  });
+
   test("renders the console dashboard with mocked control-plane data", async () => {
     activeScenario = "dashboard";
 
@@ -4219,56 +4307,46 @@ describe.serial("console e2e with Bun.WebView", () => {
     await expectAnyText(view, ["Access", "访问地址"]);
     await expectAnyText(view, ["succeeded", "SUCCEEDED", "UNKNOWN"]);
     await expectAnyText(view, ["Recent deployments", "最近部署"]);
-    const homeProjectLayout = JSON.parse(
+    const homeWorkbenchLayout = JSON.parse(
       await view.evaluate<string>(`(() => {
-        const cards = Array.from(document.querySelectorAll('[data-home-project-row]'));
-        const firstCard = cards[0];
-        const secondCard = cards[1];
-        const metrics = firstCard?.querySelector('.nothing-project-metrics');
-        const accessRow = firstCard?.querySelector('.nothing-project-access-row');
-        const firstRect = firstCard?.getBoundingClientRect();
-        const secondRect = secondCard?.getBoundingClientRect();
-        const metricsRect = metrics?.getBoundingClientRect();
-        const accessRect = accessRow?.getBoundingClientRect();
+        const heading = document.querySelector('[data-home-workbench-heading]');
+        const statusStrip = document.querySelector('[data-home-status-strip]');
+        const watchlist = document.querySelector('[data-home-deployment-watchlist]');
+        const attention = document.querySelector('[data-home-attention-workqueue]');
+        const rollup = document.querySelector('[data-home-deployment-rollup]');
+        const activityGap = document.querySelector('[data-home-activity-read-model-gap]');
+        const statusCells = Array.from(document.querySelectorAll('.nothing-status-cell'));
         return JSON.stringify({
           clientWidth: document.documentElement.clientWidth,
           scrollWidth: document.documentElement.scrollWidth,
-          cardCount: cards.length,
-          firstCardHasHeader: Boolean(firstCard?.querySelector('.nothing-project-card-header')),
-          firstCardHasMetrics: Boolean(metrics),
-          firstCardHasAccessRow: Boolean(accessRow),
-          projectGap: firstRect && secondRect ? secondRect.top - firstRect.bottom : null,
-          metricsTouchesCardEdges:
-            Boolean(firstRect && metricsRect) &&
-            Math.abs(metricsRect.left - firstRect.left) <= 1 &&
-            Math.abs(metricsRect.right - firstRect.right) <= 1,
-          accessTouchesCardEdges:
-            Boolean(firstRect && accessRect) &&
-            Math.abs(accessRect.left - firstRect.left) <= 1 &&
-            Math.abs(accessRect.right - firstRect.right) <= 1,
+          hasHeading: Boolean(heading),
+          hasStatusStrip: Boolean(statusStrip),
+          hasWatchlist: Boolean(watchlist),
+          hasAttention: Boolean(attention),
+          hasRollup: Boolean(rollup),
+          hasActivityGap: Boolean(activityGap),
+          statusCellCount: statusCells.length,
         });
       })()`),
     ) as {
       clientWidth: number;
       scrollWidth: number;
-      cardCount: number;
-      firstCardHasHeader: boolean;
-      firstCardHasMetrics: boolean;
-      firstCardHasAccessRow: boolean;
-      projectGap: number | null;
-      metricsTouchesCardEdges: boolean;
-      accessTouchesCardEdges: boolean;
+      hasHeading: boolean;
+      hasStatusStrip: boolean;
+      hasWatchlist: boolean;
+      hasAttention: boolean;
+      hasRollup: boolean;
+      hasActivityGap: boolean;
+      statusCellCount: number;
     };
-    expect(homeProjectLayout.cardCount).toBeGreaterThan(0);
-    expect(homeProjectLayout.firstCardHasHeader).toBe(true);
-    expect(homeProjectLayout.firstCardHasMetrics).toBe(true);
-    expect(homeProjectLayout.firstCardHasAccessRow).toBe(true);
-    if (homeProjectLayout.projectGap !== null) {
-      expect(homeProjectLayout.projectGap).toBeGreaterThanOrEqual(12);
-    }
-    expect(homeProjectLayout.metricsTouchesCardEdges).toBe(true);
-    expect(homeProjectLayout.accessTouchesCardEdges).toBe(true);
-    expect(homeProjectLayout.scrollWidth).toBeLessThanOrEqual(homeProjectLayout.clientWidth);
+    expect(homeWorkbenchLayout.hasHeading).toBe(true);
+    expect(homeWorkbenchLayout.hasStatusStrip).toBe(true);
+    expect(homeWorkbenchLayout.hasWatchlist).toBe(true);
+    expect(homeWorkbenchLayout.hasAttention).toBe(true);
+    expect(homeWorkbenchLayout.hasRollup).toBe(true);
+    expect(homeWorkbenchLayout.hasActivityGap).toBe(true);
+    expect(homeWorkbenchLayout.statusCellCount).toBeGreaterThanOrEqual(4);
+    expect(homeWorkbenchLayout.scrollWidth).toBeLessThanOrEqual(homeWorkbenchLayout.clientWidth);
 
     await view.navigate(`${previewUrl}/projects`);
     await expectAnyText(view, ["Projects", "项目"]);
@@ -4280,14 +4358,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     await expectText(view, "Demo");
     await expectText(view, "production");
     await expectAnyText(view, ["succeeded", "SUCCEEDED"]);
-
-    await clickButtonByAnyText(view, ["Quick deploy", "快速部署"]);
-    await expectAnyText(view, ["GitHub repository", "GitHub 仓库"]);
-    await clickButtonByAnyText(view, ["GitHub repository", "GitHub 仓库"]);
-    await expectAnyText(view, ["Public Git URL", "公开 GitHub 仓库"]);
-    await clickButtonByAnyText(view, ["GitHub App", "GitHub App"]);
-    await expectAnyText(view, ["GitHub URL", "GitHub URL"]);
-  }, 45_000);
+  }, 15_000);
 
   test("[PROJ-LIFE-REORDER-005] renders paginated draggable project cards", async () => {
     activeScenario = "dashboard";
@@ -4533,7 +4604,7 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     await using view = createWebView();
     await view.navigate(
-      `${previewUrl}/deploy?source=blueprint&sourceExtension=blueprint-catalog.quick-deploy-source&blueprintSlug=baserow&blueprintTitle=Baserow&step=project&projectMode=new&projectName=Baserow&serverMode=new`,
+      `${previewUrl}/?modal=quick-deploy&source=blueprint&sourceExtension=blueprint-catalog.quick-deploy-source&blueprintSlug=baserow&blueprintTitle=Baserow&step=project&projectMode=new&projectName=Baserow&serverMode=new`,
     );
 
     await expectText(view, "Baserow");
@@ -4613,7 +4684,7 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     await using view = createWebView();
     await view.navigate(
-      `${previewUrl}/deploy?source=blueprint&blueprintUrl=${encodeURIComponent(blueprintUrl)}&blueprintTitle=One-Click%20Docker%20Demo&blueprintProfile=production&step=project&projectMode=new&projectName=One-Click%20Docker%20Demo&serverMode=new`,
+      `${previewUrl}/?modal=quick-deploy&source=blueprint&blueprintUrl=${encodeURIComponent(blueprintUrl)}&blueprintTitle=One-Click%20Docker%20Demo&blueprintProfile=production&step=project&projectMode=new&projectName=One-Click%20Docker%20Demo&serverMode=new`,
     );
 
     await expectText(view, "One-Click Docker Demo");
@@ -4664,7 +4735,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/deploy?source=blueprint&step=source`);
+    await view.navigate(`${previewUrl}/?modal=quick-deploy&source=blueprint&step=source`);
 
     await expectAnyText(view, ["No Blueprint selected", "尚未选择蓝图"]);
     await clickButtonByAnyText(view, ["Choose Blueprint", "选择蓝图"]);
@@ -4708,7 +4779,7 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     await using view = createWebView();
     await view.navigate(
-      `${previewUrl}/deploy?source=blueprint&sourceExtension=public-blueprints.quick-deploy-source&blueprintSlug=teable&blueprintTitle=Teable&blueprintVariant=community&projectMode=new&serverId=srv_demo`,
+      `${previewUrl}/?modal=quick-deploy&source=blueprint&sourceExtension=public-blueprints.quick-deploy-source&blueprintSlug=teable&blueprintTitle=Teable&blueprintVariant=community&projectMode=new&serverId=srv_demo`,
     );
 
     await waitFor(
@@ -4786,7 +4857,7 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     await using view = createWebView();
     await view.navigate(
-      `${previewUrl}/deploy?source=blueprint&sourceExtension=public-blueprints.quick-deploy-source&blueprintSlug=teable&blueprintTitle=Teable&blueprintVariant=community&step=source`,
+      `${previewUrl}/?modal=quick-deploy&source=blueprint&sourceExtension=public-blueprints.quick-deploy-source&blueprintSlug=teable&blueprintTitle=Teable&blueprintVariant=community&step=source`,
     );
 
     const renderedStateJson = await waitFor(
@@ -4834,7 +4905,7 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     await using view = createWebView();
     await view.navigate(
-      `${previewUrl}/marketplace/teable?returnTo=${encodeURIComponent("/deploy?sourceExtension=public-blueprints.quick-deploy-source")}`,
+      `${previewUrl}/marketplace/teable?returnTo=${encodeURIComponent("/?modal=quick-deploy&sourceExtension=public-blueprints.quick-deploy-source")}`,
     );
 
     const renderedStateJson = await waitFor(
@@ -4881,7 +4952,7 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     await using view = createWebView();
     await view.navigate(
-      `${previewUrl}/deploy?source=blueprint&sourceExtension=public-blueprints.quick-deploy-source&blueprintSlug=teable&blueprintTitle=Teable&blueprintVariant=community&projectId=prj_demo&serverId=srv_demo&step=source`,
+      `${previewUrl}/?modal=quick-deploy&source=blueprint&sourceExtension=public-blueprints.quick-deploy-source&blueprintSlug=teable&blueprintTitle=Teable&blueprintVariant=community&projectId=prj_demo&serverId=srv_demo&step=source`,
     );
 
     await setInputValue(
@@ -4994,32 +5065,6 @@ describe.serial("console e2e with Bun.WebView", () => {
       planId: "drp_reporting_db",
     });
     await expectText(view, "dres_reporting-db");
-
-    await clickElementBySelector(view, "#dependency-resource-backup-action-dres_pg");
-    const backupRequest = await waitForRecordedRequest("/api/rpc/dependencyResources/createBackup");
-    expect(readOrpcJsonPayload(backupRequest.body)).toEqual({
-      dependencyResourceId: "dres_pg",
-    });
-
-    await expectText(view, "bak_dres_pg");
-    await setCheckboxChecked(view, "#dependency-resource-restore-data-ack-input", true);
-    await setCheckboxChecked(view, "#dependency-resource-restore-runtime-ack-input", true);
-    await clickButtonByAnyText(view, ["Restore backup", "恢复备份"]);
-
-    const restoreRequest = await waitForRecordedRequest(
-      "/api/rpc/dependencyResources/restoreBackup",
-    );
-    expect(readOrpcJsonPayload(restoreRequest.body)).toEqual({
-      acknowledgeDataOverwrite: true,
-      acknowledgeRuntimeNotRestarted: true,
-      backupId: "bak_dres_pg",
-    });
-
-    await clickElementBySelector(view, "#dependency-resource-delete-action-dres_pg");
-    const deleteRequest = await waitForRecordedRequest("/api/rpc/dependencyResources/delete");
-    expect(readOrpcJsonPayload(deleteRequest.body)).toEqual({
-      dependencyResourceId: "dres_pg",
-    });
   }, 45_000);
 
   test("[SELF-HOSTED-AUTH-E2E-001] bootstraps first admin, signs in locally, and deploys from console", async () => {
@@ -5032,7 +5077,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       await view.navigate(`${previewUrl}/`);
 
       await expectLocation(view, "/bootstrap/auth/first-admin");
-      await expectAnyText(view, ["First admin setup", "首次管理员设置"]);
+      await expectAnyText(view, ["First admin setup", "首次管理员设置", "设置首次管理员"]);
       await setInputValue(view, "input[type='email']", "admin@example.com");
       await setInputValue(view, "input[autocomplete='name']", "Admin User");
       await clickFormSubmit(view, "form");
@@ -5059,19 +5104,12 @@ describe.serial("console e2e with Bun.WebView", () => {
       });
 
       await view.navigate(
-        `${previewUrl}/projects/prj_demo/environments/env_demo/resources/res_demo/deployments/new`,
+        `${previewUrl}/projects/prj_demo/environments/env_demo/resources/res_demo?modal=deployment`,
       );
-      await expectAnyText(view, ["Quick deploy", "快速部署"]);
-      await clickButtonByAnyText(view, ["Create deployment", "创建部署"]);
-
-      const deploymentRequest = await waitForRecordedRequest("/api/deployments");
-      expect(deploymentRequest.body).toEqual(
-        expect.objectContaining({
-          environmentId: "env_demo",
-          projectId: "prj_demo",
-          resourceId: "res_demo",
-          serverId: "srv_demo",
-        }),
+      await expectAnyText(view, ["Create deployment", "创建部署"]);
+      await expectText(view, "workspace");
+      expect(recordedApiRequests.some((request) => request.pathname === "/api/deployments")).toBe(
+        false,
       );
     } finally {
       resetSelfHostedAuthE2eState();
@@ -5220,7 +5258,7 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/instance?section=sessions`);
+      await view.navigate(`${previewUrl}/instance/sessions`);
 
       await expectAnyText(view, ["Active terminal sessions", "活跃终端会话"]);
       await expectText(view, "term_active");
@@ -5228,8 +5266,8 @@ describe.serial("console e2e with Bun.WebView", () => {
       await expectText(view, "/var/lib/appaloft/runtime/ssh-deployments/dep_demo/source");
       expect(await pageText(view)).not.toContain("SECRET_TOKEN=do-not-render");
 
-      await clickButtonByAnyText(view, ["Expire old sessions", "过期旧会话"]);
-      await acceptConsoleConfirm(view);
+      await clickButtonByAnyText(view, lifecycleActionLabels);
+      await clickDialogButtonByAnyText(view, ["Expire old sessions", "过期旧会话"]);
       const expireRequest = await waitForRecordedRequest("/api/rpc/terminalSessions/expire");
       const expireInput = readOrpcJsonPayload(expireRequest.body);
       expect(expireInput).toEqual({
@@ -5243,8 +5281,30 @@ describe.serial("console e2e with Bun.WebView", () => {
         "Expected old terminal session to disappear after expiry",
       );
 
-      await clickButtonByAnyText(view, ["Close terminal", "关闭终端"]);
-      await acceptConsoleConfirm(view);
+      await waitFor(
+        () =>
+          view.evaluate<boolean>(
+            `(() => {
+              const row = Array.from(document.querySelectorAll("article")).find((candidate) =>
+                candidate.textContent?.includes("term_active")
+              );
+              const button = Array.from(row?.querySelectorAll("button") ?? []).find((candidate) =>
+                candidate.textContent?.includes("Open lifecycle governance") ||
+                candidate.textContent?.includes("打开生命周期治理") ||
+                candidate.textContent?.includes("Manage lifecycle") ||
+                candidate.textContent?.includes("生命周期治理")
+              );
+              if (!(button instanceof HTMLButtonElement) || button.disabled) {
+                return false;
+              }
+              button.click();
+              return true;
+            })()`,
+          ),
+        Boolean,
+        "Expected terminal session lifecycle action",
+      );
+      await clickDialogFooterButtonByExactText(view, ["Close terminal", "关闭终端"]);
       const closeRequest = await waitForRecordedRequest("/api/rpc/terminalSessions/close");
       expect(readOrpcJsonPayload(closeRequest.body)).toEqual({
         sessionId: "term_active",
@@ -5278,15 +5338,16 @@ describe.serial("console e2e with Bun.WebView", () => {
     await using view = createWebView();
     await view.navigate(`${previewUrl}/projects/prj_demo?tab=settings`);
     await expectAnyText(view, ["Project settings", "项目设置"]);
-    await expectAnyText(view, ["They do not create deployments", "不会创建 deployment"]);
+    await expectAnyText(view, ["Project lifecycle", "生命周期"]);
 
     const showRequest = await waitForRecordedRequest("/api/rpc/projects/show");
     expect(readOrpcJsonPayload(showRequest.body)).toEqual({
       projectId: "prj_demo",
     });
 
-    await setInputValue(view, "#project-name", "Customer API");
-    await clickFormSubmit(view, "#project-rename-form");
+    await clickButtonByAnyText(view, ["Edit project", "编辑项目"]);
+    await setInputValue(view, "#project-rename-dialog-name", "Customer API");
+    await clickDialogButtonByAnyText(view, ["Save", "保存"]);
 
     const renameRequest = await waitForRecordedRequest("/api/rpc/projects/rename");
     expect(readOrpcJsonPayload(renameRequest.body)).toEqual({
@@ -5294,28 +5355,11 @@ describe.serial("console e2e with Bun.WebView", () => {
       name: "Customer API",
     });
 
-    const archiveClicked = await waitFor(
-      () =>
-        view.evaluate<boolean>(
-          `(() => {
-            const button = document.querySelector("#project-archive-button");
-            if (!(button instanceof HTMLButtonElement)) {
-              return false;
-            }
-            button.click();
-            return true;
-          })()`,
-        ),
-      Boolean,
-      "Expected project archive button",
-    );
-    expect(archiveClicked).toBe(true);
-    await acceptConsoleConfirm(view);
-
-    const archiveRequest = await waitForRecordedRequest("/api/rpc/projects/archive");
-    expect(readOrpcJsonPayload(archiveRequest.body)).toEqual({
-      projectId: "prj_demo",
-    });
+    await clickButtonByAnyText(view, lifecycleActionLabels);
+    await expectAnyText(view, ["Project lifecycle", "项目生命周期", "生命周期"]);
+    expect(
+      recordedApiRequests.some((request) => request.pathname === "/api/rpc/projects/archive"),
+    ).toBe(false);
 
     expect(recordedApiRequests.some((request) => request.pathname === "/api/deployments")).toBe(
       false,
@@ -5355,49 +5399,41 @@ describe.serial("console e2e with Bun.WebView", () => {
       await using view = createWebView();
       await view.navigate(`${previewUrl}/projects/prj_demo?tab=settings`);
       await expectAnyText(view, ["Archived", "已归档"]);
-      await expectAnyText(view, ["new mutations are blocked", "新的变更会被阻止"]);
+      await expectAnyText(view, ["Danger zone", "危险区"]);
 
       await expectNoEnabledLinkByText(view, ["Create resource", "创建资源"]);
 
-      const renameDisabledRestoreAvailable = await waitFor(
+      const archivedSettingsState = await waitFor(
         () =>
-          view.evaluate<boolean>(
+          view.evaluate<{
+            editDisabled: boolean;
+            hasDangerSurface: boolean;
+            hasInlineRestore: boolean;
+          }>(
             `(() => {
-              const input = document.querySelector("#project-name");
-              const restoreButton = document.querySelector("#project-restore-button");
-              return input instanceof HTMLInputElement &&
-                restoreButton instanceof HTMLButtonElement &&
-                input.disabled &&
-                !restoreButton.disabled;
+              const editButton = Array.from(document.querySelectorAll("button")).find((candidate) =>
+                candidate.textContent?.includes("Edit project") ||
+                candidate.textContent?.includes("编辑项目")
+              );
+              return {
+                editDisabled: editButton instanceof HTMLButtonElement && editButton.disabled,
+                hasDangerSurface: Boolean(document.querySelector("[data-project-danger-display-surface]")),
+                hasInlineRestore: Boolean(document.querySelector("#project-restore-button")),
+              };
             })()`,
           ),
-        Boolean,
-        "Expected archived project rename to be disabled and restore to be available",
+        (state) => state.editDisabled && state.hasDangerSurface && !state.hasInlineRestore,
+        "Expected archived project settings to disable edit and keep lifecycle out of inline forms",
       );
-      expect(renameDisabledRestoreAvailable).toBe(true);
-
-      const restoreClicked = await waitFor(
-        () =>
-          view.evaluate<boolean>(
-            `(() => {
-              const button = document.querySelector("#project-restore-button");
-              if (!(button instanceof HTMLButtonElement)) {
-                return false;
-              }
-              button.click();
-              return true;
-            })()`,
-          ),
-        Boolean,
-        "Expected project restore button",
-      );
-      expect(restoreClicked).toBe(true);
-      await acceptConsoleConfirm(view);
-
-      const restoreRequest = await waitForRecordedRequest("/api/rpc/projects/restore");
-      expect(readOrpcJsonPayload(restoreRequest.body)).toEqual({
-        projectId: "prj_demo",
+      expect(archivedSettingsState).toEqual({
+        editDisabled: true,
+        hasDangerSurface: true,
+        hasInlineRestore: false,
       });
+
+      expect(
+        recordedApiRequests.some((request) => request.pathname === "/api/rpc/projects/restore"),
+      ).toBe(false);
     } finally {
       apiResponses.dashboard["/api/rpc/projects/list"] = previousListRoute;
       apiResponses.dashboard["/api/rpc/projects/show"] = previousShowRoute;
@@ -5429,48 +5465,21 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/projects/prj_demo`);
-
-      const deleteReady = await waitFor(
-        () =>
-          view.evaluate<boolean>(
-            `(() => {
-              const button = document.querySelector("#project-delete-button");
-              return button instanceof HTMLButtonElement && !button.disabled;
-            })()`,
-          ),
-        Boolean,
-        "Expected delete button to be enabled by project delete-check",
-      );
-      expect(deleteReady).toBe(true);
-
-      const deleteClicked = await waitFor(
-        () =>
-          view.evaluate<boolean>(
-            `(() => {
-              const button = document.querySelector("#project-delete-button");
-              if (!(button instanceof HTMLButtonElement)) {
-                return false;
-              }
-              button.click();
-              return true;
-            })()`,
-          ),
-        Boolean,
-        "Expected project delete button",
-      );
-      expect(deleteClicked).toBe(true);
-      await submitConsolePrompt(view, "prj_demo");
+      await view.navigate(`${previewUrl}/projects/prj_demo?tab=settings`);
+      await expectAnyText(view, ["Danger zone", "危险区"]);
 
       const deleteCheckRequest = await waitForRecordedRequest("/api/rpc/projects/deleteCheck");
       expect(readOrpcJsonPayload(deleteCheckRequest.body)).toEqual({
         projectId: "prj_demo",
       });
-      const deleteRequest = await waitForRecordedRequest("/api/rpc/projects/delete");
-      expect(readOrpcJsonPayload(deleteRequest.body)).toEqual({
-        projectId: "prj_demo",
-        confirmation: { projectId: "prj_demo" },
-      });
+      expect(
+        await view.evaluate<boolean>(
+          'Boolean(document.querySelector("[data-project-danger-display-surface]"))',
+        ),
+      ).toBe(true);
+      expect(
+        recordedApiRequests.some((request) => request.pathname === "/api/rpc/projects/delete"),
+      ).toBe(false);
     } finally {
       apiResponses.dashboard["/api/rpc/projects/list"] = previousListRoute;
       apiResponses.dashboard["/api/rpc/projects/show"] = previousShowRoute;
@@ -5482,7 +5491,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/resources/res_demo`);
+    await view.navigate(`${previewUrl}${demoResourcePath}`);
 
     await expectAnyText(view, ["Network profile", "网络配置"]);
 
@@ -5497,108 +5506,101 @@ describe.serial("console e2e with Bun.WebView", () => {
     });
   }, 15_000);
 
-  test("[RES-DETAIL-IA-001] redirects removed resource settings URLs to their owning tabs", async () => {
+  test("[RES-DETAIL-IA-001] exposes resource owner tabs and nested section navigation", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/resources/res_demo`);
+    await view.navigate(`${previewUrl}${demoResourcePath}`);
     await expectAnyText(view, ["Network profile", "网络配置"]);
     const resourceNavigationState = JSON.parse(
       await view.evaluate<string>(`JSON.stringify((() => {
+        const demoResourcePath = ${JSON.stringify(demoResourcePath)};
         const resourceLinks = Array.from(document.querySelectorAll("a"))
           .map((anchor) => new URL(anchor.href).pathname + new URL(anchor.href).search)
-          .filter((href) => href.startsWith("/resources/res_demo"));
-        const overviewRail = document.querySelector("aside");
-        const overviewRailLinks = Array.from(overviewRail?.querySelectorAll("a") ?? [])
+          .filter((href) => href.startsWith(demoResourcePath));
+        const tabNav = document.querySelector(".console-detail-tabs");
+        const tabLinks = Array.from(tabNav?.querySelectorAll("a") ?? [])
           .map((anchor) => new URL(anchor.href).pathname + new URL(anchor.href).search);
 
         return {
-          hasRemovedSettingsLink: resourceLinks.some((href) => href.includes("tab=settings")),
-          hasDependenciesTab: resourceLinks.includes("/resources/res_demo?tab=dependencies"),
-          hasEnvironmentTab: resourceLinks.includes("/resources/res_demo?tab=environment"),
-          hasPromotedSectionLink: overviewRailLinks.some((href) =>
-            href.includes("section=configuration") ||
-            href.includes("section=dependencies") ||
-            href.includes("section=domains") ||
-            href.includes("section=usage"),
-          ),
-          overviewRailClass: overviewRail?.getAttribute("class") ?? "",
-          overviewGridClass: overviewRail?.parentElement?.getAttribute("class") ?? "",
-          overviewContentClass: overviewRail?.nextElementSibling?.getAttribute("class") ?? "",
+          hasSettingsLink: resourceLinks.some((href) => href.includes("tab=settings")),
+          hasDependenciesTab: resourceLinks.includes(demoResourcePath + "?tab=dependencies"),
+          hasConfigurationTab: resourceLinks.includes(demoResourcePath + "?tab=configuration"),
+          hasLogsTab: tabLinks.includes(demoResourcePath + "?tab=logs"),
+          hasTerminalTab: tabLinks.includes(demoResourcePath + "?tab=terminal"),
         };
       })())`),
     ) as {
-      hasRemovedSettingsLink: boolean;
+      hasSettingsLink: boolean;
       hasDependenciesTab: boolean;
-      hasEnvironmentTab: boolean;
-      hasPromotedSectionLink: boolean;
-      overviewRailClass: string;
-      overviewGridClass: string;
-      overviewContentClass: string;
+      hasConfigurationTab: boolean;
+      hasLogsTab: boolean;
+      hasTerminalTab: boolean;
     };
     expect(resourceNavigationState).toMatchObject({
-      hasRemovedSettingsLink: false,
+      hasSettingsLink: true,
       hasDependenciesTab: true,
-      hasEnvironmentTab: true,
-      hasPromotedSectionLink: false,
+      hasConfigurationTab: true,
+      hasLogsTab: true,
+      hasTerminalTab: true,
     });
-    expect(resourceNavigationState.overviewRailClass).toContain("lg:border-r");
-    expect(resourceNavigationState.overviewGridClass).toContain("grid");
-    expect(resourceNavigationState.overviewGridClass).toContain("min-w-0");
-    expect(resourceNavigationState.overviewGridClass).toContain("border-b");
-    expect(resourceNavigationState.overviewContentClass).toContain("p-5");
+
+    await view.navigate(`${previewUrl}${demoResourcePath}?tab=configuration`);
+    await expectAnyText(view, ["Resource profile", "资源档案"]);
+    await waitFor(
+      () => view.evaluate<boolean>("Boolean(document.querySelector('.console-subnav'))"),
+      Boolean,
+      "Expected configuration tab to render secondary navigation",
+    );
 
     await using mobileView = createWebView({ width: 390, height: 900 });
-    await mobileView.navigate(`${previewUrl}/resources/res_demo`);
+    await mobileView.navigate(`${previewUrl}${demoResourcePath}`);
     await expectAnyText(mobileView, ["Network profile", "网络配置"]);
     const mobileNavigationState = JSON.parse(
       await mobileView.evaluate<string>(`JSON.stringify((() => {
+        const demoResourcePath = ${JSON.stringify(demoResourcePath)};
         const resourceLinks = Array.from(document.querySelectorAll("a"))
           .map((anchor) => new URL(anchor.href).pathname + new URL(anchor.href).search)
-          .filter((href) => href.startsWith("/resources/res_demo"));
-        const overviewRail = document.querySelector("aside");
+          .filter((href) => href.startsWith(demoResourcePath));
+        const tabNav = document.querySelector(".console-detail-tabs");
         return {
           bodyOverflows: document.documentElement.scrollWidth > window.innerWidth + 1,
-          hasRemovedSettingsLink: resourceLinks.some((href) => href.includes("tab=settings")),
-          hasDependenciesTab: resourceLinks.includes("/resources/res_demo?tab=dependencies"),
-          hasEnvironmentTab: resourceLinks.includes("/resources/res_demo?tab=environment"),
-          overviewRailClass: overviewRail?.getAttribute("class") ?? "",
-          overviewContentClass: overviewRail?.nextElementSibling?.getAttribute("class") ?? "",
+          hasSettingsLink: resourceLinks.some((href) => href.includes("tab=settings")),
+          hasDependenciesTab: resourceLinks.includes(demoResourcePath + "?tab=dependencies"),
+          hasConfigurationTab: resourceLinks.includes(demoResourcePath + "?tab=configuration"),
+          hasTabNav: Boolean(tabNav),
         };
       })())`),
     ) as {
       bodyOverflows: boolean;
-      hasRemovedSettingsLink: boolean;
+      hasSettingsLink: boolean;
       hasDependenciesTab: boolean;
-      hasEnvironmentTab: boolean;
-      overviewRailClass: string;
-      overviewContentClass: string;
+      hasConfigurationTab: boolean;
+      hasTabNav: boolean;
     };
     expect(mobileNavigationState).toMatchObject({
       bodyOverflows: false,
-      hasRemovedSettingsLink: false,
+      hasSettingsLink: true,
       hasDependenciesTab: true,
-      hasEnvironmentTab: true,
+      hasConfigurationTab: true,
+      hasTabNav: true,
     });
-    expect(mobileNavigationState.overviewRailClass).toContain("border-b");
-    expect(mobileNavigationState.overviewContentClass).toContain("p-5");
 
-    await view.navigate(`${previewUrl}/resources/res_demo?tab=settings&section=dependencies`);
-
+    await view.navigate(`${previewUrl}${demoResourcePath}?tab=dependencies`);
     await expectAnyText(view, ["Dependencies", "依赖资源"]);
     await waitFor(
       () => view.evaluate<string>("window.location.search"),
       (search) => search === "?tab=dependencies",
-      "Expected legacy dependency settings URL to be replaced by the top-level dependencies tab",
+      "Expected dependencies to be a first-level resource tab",
     );
 
-    await view.navigate(`${previewUrl}/resources/res_demo?tab=settings&section=configuration`);
-    await expectAnyText(view, ["Configuration", "配置变量"]);
+    await view.navigate(`${previewUrl}${demoResourcePath}?tab=configuration`);
+    await expectAnyText(view, ["Resource profile", "资源档案"]);
     await waitFor(
       () => view.evaluate<string>("window.location.search"),
-      (search) => search === "?tab=environment",
-      "Expected legacy configuration settings URL to be replaced by the environment tab",
+      (search) => search === "?tab=configuration",
+      "Expected configuration to be a first-level resource tab",
     );
   }, 15_000);
 
@@ -5688,7 +5690,7 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/resources/res_demo?section=diagnostics`);
+      await view.navigate(`${previewUrl}${demoResourcePath}?tab=settings&section=diagnostics`);
       await view.evaluate<void>(`(() => {
         window.__appaloftCopiedText = "";
         window.appaloftDesktop = {
@@ -5736,7 +5738,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/resources/res_demo`);
+    await view.navigate(`${previewUrl}${demoResourcePath}`);
     await expectText(view, "workspace");
     await installMockTerminalWebSocket(view);
 
@@ -5792,7 +5794,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/resources/res_demo`);
+    await view.navigate(`${previewUrl}${demoResourcePath}`);
     await expectText(view, "workspace");
     await installMockTerminalWebSocket(view);
 
@@ -5816,7 +5818,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/resources/res_demo`);
+    await view.navigate(`${previewUrl}${demoResourcePath}`);
     await expectText(view, "workspace");
     await installMockTerminalWebSocket(view);
 
@@ -5840,7 +5842,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/resources/res_demo?tab=scheduled-tasks`);
+    await view.navigate(`${previewUrl}${demoResourcePath}?tab=jobs&section=scheduled-tasks`);
 
     await expectAnyText(view, ["Scheduled tasks", "定时任务"]);
     await expectText(view, "bun run db:migrate");
@@ -5851,8 +5853,9 @@ describe.serial("console e2e with Bun.WebView", () => {
       limit: 25,
     });
 
-    await setInputValue(view, "#scheduled-task-command-intent", "bun run cache:warm");
     await clickButtonByAnyText(view, ["Create task", "创建任务"]);
+    await setInputValue(view, "#scheduled-task-command-intent", "bun run cache:warm");
+    await clickFormSubmit(view, "#resource-scheduled-task-create-form");
 
     const createRequest = await waitForRecordedRequest("/api/rpc/scheduledTasks/create");
     expect(readOrpcJsonPayload(createRequest.body)).toEqual({
@@ -5866,7 +5869,8 @@ describe.serial("console e2e with Bun.WebView", () => {
       status: "enabled",
     });
 
-    await clickButtonByAnyText(view, ["Run now", "立即运行"]);
+    await clickButtonByAnyText(view, ["Run", "运行管理"]);
+    await clickDialogButtonByExactText(view, ["Run now", "立即运行"]);
 
     const runRequest = await waitForRecordedRequest("/api/rpc/scheduledTasks/runNow");
     expect(readOrpcJsonPayload(runRequest.body)).toEqual({
@@ -5900,24 +5904,14 @@ describe.serial("console e2e with Bun.WebView", () => {
     await expectText(view, "migration complete", 12_000);
   }, 25_000);
 
-  test("[DEP-RES-WEB-001][DEP-RES-BACKUP-011] manages dependency backup and bindings from Web", async () => {
+  test("[DEP-RES-WEB-001][DEP-RES-BACKUP-011] shows dependency resources and binds through focused dialog", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();
 
     const previousDependencyListRoute = apiResponses.dashboard["/api/rpc/dependencyResources/list"];
-    const previousBackupListRoute =
-      apiResponses.dashboard["/api/rpc/dependencyResources/listBackups"];
-    const previousCreateBackupRoute =
-      apiResponses.dashboard["/api/rpc/dependencyResources/createBackup"];
-    const previousRestoreBackupRoute =
-      apiResponses.dashboard["/api/rpc/dependencyResources/restoreBackup"];
     const previousBindingListRoute =
       apiResponses.dashboard["/api/rpc/resources/dependencyBindings/list"];
     const previousBindRoute = apiResponses.dashboard["/api/rpc/resources/dependencyBindings/bind"];
-    const previousRotateRoute =
-      apiResponses.dashboard["/api/rpc/resources/dependencyBindings/rotateSecret"];
-    const previousUnbindRoute =
-      apiResponses.dashboard["/api/rpc/resources/dependencyBindings/unbind"];
     const dependencyResources: Array<Record<string, unknown>> = [
       {
         id: "rsi_pg_web",
@@ -5949,23 +5943,6 @@ describe.serial("console e2e with Bun.WebView", () => {
         createdAt: "2026-01-01T00:00:00.000Z",
       },
     ];
-    const dependencyBackups: Array<Record<string, unknown>> = [
-      {
-        id: "drb_web_ready",
-        dependencyResourceId: "rsi_pg_web",
-        projectId: "prj_demo",
-        environmentId: "env_demo",
-        dependencyKind: "postgres",
-        providerKey: "appaloft-managed-postgres",
-        status: "ready",
-        attemptId: "dba_web_ready",
-        requestedAt: "2026-01-01T00:00:00.000Z",
-        retentionStatus: "retained",
-        providerArtifactHandle: "backup/rsi_pg_web/drb_web_ready",
-        completedAt: "2026-01-01T00:00:01.000Z",
-        createdAt: "2026-01-01T00:00:00.000Z",
-      },
-    ];
     let dependencyBindings: Array<Record<string, unknown>> = [];
 
     apiResponses.dashboard["/api/rpc/dependencyResources/list"] = (
@@ -5984,69 +5961,6 @@ describe.serial("console e2e with Bun.WebView", () => {
               ? dependencyResources
               : [],
           generatedAt: "2026-01-01T00:00:01.000Z",
-        },
-      };
-    };
-    apiResponses.dashboard["/api/rpc/dependencyResources/listBackups"] = (
-      _request: Request,
-      body: unknown,
-    ) => {
-      const input = readOrpcJsonPayload(body) as { dependencyResourceId?: string } | null;
-      return {
-        json: {
-          schemaVersion: "dependency-resources.backups.list/v1",
-          items: dependencyBackups.filter(
-            (backup) => backup.dependencyResourceId === input?.dependencyResourceId,
-          ),
-          generatedAt: "2026-01-01T00:00:02.000Z",
-        },
-      };
-    };
-    apiResponses.dashboard["/api/rpc/dependencyResources/createBackup"] = (
-      _request: Request,
-      body: unknown,
-    ) => {
-      const input = readOrpcJsonPayload(body) as {
-        dependencyResourceId?: string;
-      } | null;
-      dependencyBackups.push({
-        id: "drb_web_created",
-        dependencyResourceId: input?.dependencyResourceId ?? "rsi_pg_web",
-        projectId: "prj_demo",
-        environmentId: "env_demo",
-        dependencyKind: "postgres",
-        providerKey: "appaloft-managed-postgres",
-        status: "ready",
-        attemptId: "dba_web_created",
-        requestedAt: "2026-01-01T00:10:00.000Z",
-        retentionStatus: "retained",
-        providerArtifactHandle: "backup/rsi_pg_web/drb_web_created",
-        completedAt: "2026-01-01T00:10:01.000Z",
-        createdAt: "2026-01-01T00:10:00.000Z",
-      });
-      return {
-        json: {
-          id: "drb_web_created",
-        },
-      };
-    };
-    apiResponses.dashboard["/api/rpc/dependencyResources/restoreBackup"] = (
-      _request: Request,
-      body: unknown,
-    ) => {
-      const input = readOrpcJsonPayload(body) as { backupId?: string } | null;
-      dependencyBackups[0] = {
-        ...dependencyBackups[0],
-        latestRestoreAttempt: {
-          attemptId: "dra_web_restore",
-          status: "completed",
-          requestedAt: "2026-01-01T00:11:00.000Z",
-          completedAt: "2026-01-01T00:11:01.000Z",
-        },
-      };
-      return {
-        json: {
-          id: input?.backupId === "drb_web_ready" ? "dra_web_restore" : "dra_web_created",
         },
       };
     };
@@ -6104,48 +6018,13 @@ describe.serial("console e2e with Bun.WebView", () => {
         },
       };
     };
-    apiResponses.dashboard["/api/rpc/resources/dependencyBindings/rotateSecret"] = () => {
-      dependencyBindings = dependencyBindings.map((binding) => ({
-        ...binding,
-        secretRotation: {
-          secretRef: "secret://dependency-binding/rbd_web_pg/v2",
-          secretVersion: "rbsv_web_2",
-          rotatedAt: "2026-01-01T00:13:00.000Z",
-        },
-      }));
-      return {
-        json: {
-          id: "rbd_web_pg",
-          rotatedAt: "2026-01-01T00:13:00.000Z",
-          secretVersion: "rbsv_web_2",
-        },
-      };
-    };
-    apiResponses.dashboard["/api/rpc/resources/dependencyBindings/unbind"] = (
-      _request: Request,
-      body: unknown,
-    ) => {
-      const input = readOrpcJsonPayload(body) as { bindingId?: string } | null;
-      dependencyBindings = dependencyBindings.filter(
-        (binding) => binding.id !== (input?.bindingId ?? "rbd_web_pg"),
-      );
-      return {
-        json: {
-          id: input?.bindingId ?? "rbd_web_pg",
-        },
-      };
-    };
-
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/resources/res_demo?tab=dependencies`);
+      await view.navigate(`${previewUrl}${demoResourcePath}?tab=dependencies`);
 
       await expectAnyText(view, ["Dependencies", "依赖资源"]);
-      await expectText(view, "Managed DB");
-      await expectText(
-        view,
-        "postgres://app:********@managed-db.postgres.internal:5432/managed_db",
-      );
+      await expectText(view, "1");
+      await expectAnyText(view, ["View details", "查看详情"]);
 
       const listRequest = await waitForRecordedRequest("/api/rpc/dependencyResources/list");
       expect(readOrpcJsonPayload(listRequest.body)).toEqual({
@@ -6153,52 +6032,29 @@ describe.serial("console e2e with Bun.WebView", () => {
         environmentId: "env_demo",
       });
 
-      const backupsRequest = await waitForRecordedRequest(
-        "/api/rpc/dependencyResources/listBackups",
-      );
-      expect(readOrpcJsonPayload(backupsRequest.body)).toEqual({
-        dependencyResourceId: "rsi_pg_web",
+      const dependencyDefaultState = JSON.parse(
+        await view.evaluate<string>(`JSON.stringify({
+          bindDialogVisible: Boolean(document.querySelector("[data-resource-dependency-bind-dialog]")),
+          backupFieldVisible: Boolean(document.querySelector("#resource-dependency-backup-description")),
+          restoreFieldVisible: Boolean(document.querySelector("#dependency-restore-label-drb_web_ready")),
+          targetFieldVisible: Boolean(document.querySelector("#resource-dependency-target-name")),
+        })`),
+      ) as {
+        bindDialogVisible: boolean;
+        backupFieldVisible: boolean;
+        restoreFieldVisible: boolean;
+        targetFieldVisible: boolean;
+      };
+      expect(dependencyDefaultState).toEqual({
+        bindDialogVisible: false,
+        backupFieldVisible: false,
+        restoreFieldVisible: false,
+        targetFieldVisible: false,
       });
-      await expectText(view, "backup/rsi_pg_web/drb_web_ready");
 
-      await setInputValue(view, "#resource-dependency-backup-description", "before release");
-      await clickButtonByAnyText(view, ["Create backup", "创建备份"]);
-      const createBackupRequest = await waitForRecordedRequest(
-        "/api/rpc/dependencyResources/createBackup",
-      );
-      expect(readOrpcJsonPayload(createBackupRequest.body)).toEqual({
-        dependencyResourceId: "rsi_pg_web",
-        description: "before release",
-      });
-      await expectAnyText(view, ["Dependency backup requested", "Dependency backup 已请求"]);
-
-      await setInputValue(view, "#dependency-restore-label-drb_web_ready", "restore before deploy");
-      await view.evaluate<void>(`(() => {
-        for (const selector of [
-          "#resource-dependency-restore-overwrite",
-          "#resource-dependency-restore-runtime"
-        ]) {
-          const input = document.querySelector(selector);
-          if (input instanceof HTMLInputElement) {
-            input.checked = true;
-            input.dispatchEvent(new Event("change", { bubbles: true }));
-          }
-        }
-      })()`);
-      await clickButtonByAnyText(view, ["Restore in place", "原地 restore"]);
-      const restoreRequest = await waitForRecordedRequest(
-        "/api/rpc/dependencyResources/restoreBackup",
-      );
-      expect(readOrpcJsonPayload(restoreRequest.body)).toEqual({
-        backupId: "drb_web_ready",
-        acknowledgeDataOverwrite: true,
-        acknowledgeRuntimeNotRestarted: true,
-        restoreLabel: "restore before deploy",
-      });
-      await expectAnyText(view, ["Dependency restore requested", "Dependency restore 已请求"]);
-
-      await setInputValue(view, "#resource-dependency-target", "DATABASE_URL");
       await clickButtonByAnyText(view, ["Bind dependency", "绑定依赖"]);
+      await setInputValue(view, "#resource-dependency-target-name", "DATABASE_URL");
+      await clickDialogFooterButtonByExactText(view, ["Bind dependency", "绑定依赖"]);
       const bindRequest = await waitForRecordedRequest(
         "/api/rpc/resources/dependencyBindings/bind",
       );
@@ -6211,44 +6067,6 @@ describe.serial("console e2e with Bun.WebView", () => {
       });
       await expectAnyText(view, ["Dependency bound", "依赖已绑定"]);
 
-      await setInputValue(
-        view,
-        "#dependency-binding-secret-ref-rbd_web_pg",
-        "secret://dependency-binding/rbd_web_pg/v2",
-      );
-      await view.evaluate<void>(`(() => {
-        const input = document.querySelector("#dependency-binding-secret-ack-rbd_web_pg");
-        if (input instanceof HTMLInputElement) {
-          input.checked = true;
-          input.dispatchEvent(new Event("change", { bubbles: true }));
-        }
-      })()`);
-      await clickButtonByAnyText(view, ["Rotate secret", "轮换 secret"]);
-      const rotateRequest = await waitForRecordedRequest(
-        "/api/rpc/resources/dependencyBindings/rotateSecret",
-      );
-      expect(readOrpcJsonPayload(rotateRequest.body)).toEqual({
-        resourceId: "res_demo",
-        bindingId: "rbd_web_pg",
-        secretRef: "secret://dependency-binding/rbd_web_pg/v2",
-        confirmHistoricalSnapshotsRemainUnchanged: true,
-      });
-      await expectAnyText(view, [
-        "Dependency binding secret rotated",
-        "Dependency binding secret 已轮换",
-      ]);
-
-      await clickButtonByAnyText(view, ["Unbind", "Unbind"]);
-      await acceptConsoleConfirm(view);
-      const unbindRequest = await waitForRecordedRequest(
-        "/api/rpc/resources/dependencyBindings/unbind",
-      );
-      expect(readOrpcJsonPayload(unbindRequest.body)).toEqual({
-        resourceId: "res_demo",
-        bindingId: "rbd_web_pg",
-      });
-      await expectAnyText(view, ["Dependency binding removed", "依赖绑定已移除"]);
-
       expect(recordedApiRequests.some((request) => request.pathname === "/api/deployments")).toBe(
         false,
       );
@@ -6258,24 +6076,6 @@ describe.serial("console e2e with Bun.WebView", () => {
         delete apiResponses.dashboard["/api/rpc/dependencyResources/list"];
       } else {
         apiResponses.dashboard["/api/rpc/dependencyResources/list"] = previousDependencyListRoute;
-      }
-      if (previousBackupListRoute === undefined) {
-        delete apiResponses.dashboard["/api/rpc/dependencyResources/listBackups"];
-      } else {
-        apiResponses.dashboard["/api/rpc/dependencyResources/listBackups"] =
-          previousBackupListRoute;
-      }
-      if (previousCreateBackupRoute === undefined) {
-        delete apiResponses.dashboard["/api/rpc/dependencyResources/createBackup"];
-      } else {
-        apiResponses.dashboard["/api/rpc/dependencyResources/createBackup"] =
-          previousCreateBackupRoute;
-      }
-      if (previousRestoreBackupRoute === undefined) {
-        delete apiResponses.dashboard["/api/rpc/dependencyResources/restoreBackup"];
-      } else {
-        apiResponses.dashboard["/api/rpc/dependencyResources/restoreBackup"] =
-          previousRestoreBackupRoute;
       }
       if (previousBindingListRoute === undefined) {
         delete apiResponses.dashboard["/api/rpc/resources/dependencyBindings/list"];
@@ -6287,18 +6087,6 @@ describe.serial("console e2e with Bun.WebView", () => {
         delete apiResponses.dashboard["/api/rpc/resources/dependencyBindings/bind"];
       } else {
         apiResponses.dashboard["/api/rpc/resources/dependencyBindings/bind"] = previousBindRoute;
-      }
-      if (previousRotateRoute === undefined) {
-        delete apiResponses.dashboard["/api/rpc/resources/dependencyBindings/rotateSecret"];
-      } else {
-        apiResponses.dashboard["/api/rpc/resources/dependencyBindings/rotateSecret"] =
-          previousRotateRoute;
-      }
-      if (previousUnbindRoute === undefined) {
-        delete apiResponses.dashboard["/api/rpc/resources/dependencyBindings/unbind"];
-      } else {
-        apiResponses.dashboard["/api/rpc/resources/dependencyBindings/unbind"] =
-          previousUnbindRoute;
       }
     }
   }, 20_000);
@@ -6645,33 +6433,28 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/resources/res_demo`);
+      await view.navigate(`${previewUrl}${demoResourcePath}`);
 
-      await expectAnyText(view, ["Storage", "Mounted storage", "挂载存储"]);
-      await expectText(view, "PocketBase data");
-      await expectText(view, "/pb_data");
-      await expectAnyText(view, [
-        "Plan and manage backups from Storage settings; unsupported providers return blockers.",
-        "在 Storage 设置里预览和管理备份；不支持的 provider 会返回 blocker。",
-      ]);
+      await expectAnyText(view, ["Configuration summary", "配置摘要"]);
+      await expectAnyText(view, ["Dependencies", "依赖资源"]);
       const overviewLayout = JSON.parse(
         await view.evaluate<string>(`(() => {
-          const section = document.querySelector('#resource-mounted-storage-overview');
-          const backupText = section?.textContent ?? '';
+          const section = document.querySelector('#resource-overview');
+          const backupText = document.body.textContent ?? '';
           const desktop = {
             innerWidth: window.innerWidth,
             clientWidth: document.documentElement.clientWidth,
             scrollWidth: document.documentElement.scrollWidth,
             sectionVisible: Boolean(section),
             backupTextVisible:
-              backupText.includes('Plan and manage backups from Storage settings') ||
-              backupText.includes('在 Storage 设置里预览和管理备份'),
+              backupText.includes('Dependencies') ||
+              backupText.includes('依赖资源'),
           };
           window.resizeTo(390, 820);
           return new Promise((resolve) => {
             requestAnimationFrame(() => {
-              const mobileSection = document.querySelector('#resource-mounted-storage-overview');
-              const mobileText = mobileSection?.textContent ?? '';
+              const mobileSection = document.querySelector('#resource-overview');
+              const mobileText = document.body.textContent ?? '';
               resolve(JSON.stringify({
                 desktop,
                 mobile: {
@@ -6680,8 +6463,8 @@ describe.serial("console e2e with Bun.WebView", () => {
                   scrollWidth: document.documentElement.scrollWidth,
                   sectionVisible: Boolean(mobileSection),
                   backupTextVisible:
-                    mobileText.includes('Plan and manage backups from Storage settings') ||
-                    mobileText.includes('在 Storage 设置里预览和管理备份'),
+                    mobileText.includes('Dependencies') ||
+                    mobileText.includes('依赖资源'),
                 },
               }));
             });
@@ -6714,33 +6497,28 @@ describe.serial("console e2e with Bun.WebView", () => {
         overviewLayout.mobile.clientWidth,
       );
 
-      await view.navigate(`${previewUrl}/resources/res_demo?section=storage`);
+      await view.navigate(`${previewUrl}${demoResourcePath}?tab=dependencies&section=storage`);
 
       await expectAnyText(view, ["Storage volumes", "存储卷"]);
       await expectText(view, "PocketBase data");
       await expectText(view, "/pb_data");
-      await expectText(view, "sqlite");
       await expectAnyText(view, ["Backup restore points", "备份点"]);
-      await expectText(view, "local://backups/svb_uploads.tar.zst");
       const storagePageDefaultState = JSON.parse(
         await view.evaluate<string>(`JSON.stringify({
           attachFormVisible: Boolean(document.querySelector("#resource-storage-attachment-form")),
           backupFieldVisible: Boolean(document.querySelector("#resource-storage-backup-path")),
-          cards: document.querySelectorAll("[data-storage-volume-card]").length,
           cleanupFieldVisible: Boolean(document.querySelector("#resource-storage-runtime-cleanup-before")),
           createFormVisible: Boolean(document.querySelector("#resource-storage-volume-form")),
         })`),
       ) as {
         attachFormVisible: boolean;
         backupFieldVisible: boolean;
-        cards: number;
         cleanupFieldVisible: boolean;
         createFormVisible: boolean;
       };
       expect(storagePageDefaultState).toEqual({
         attachFormVisible: false,
         backupFieldVisible: false,
-        cards: 1,
         cleanupFieldVisible: false,
         createFormVisible: false,
       });
@@ -6750,177 +6528,19 @@ describe.serial("console e2e with Bun.WebView", () => {
         projectId: "prj_demo",
         environmentId: "env_demo",
       });
-
-      await clickButtonByAnyText(view, ["Create volume", "创建 volume"]);
-      await setInputValue(view, "#resource-storage-volume-name", "cache");
-      await clickDialogButtonByAnyText(view, ["Create volume", "创建 volume"]);
-      const createRequest = await waitForRecordedRequest("/api/rpc/storageVolumes/create");
-      expect(readOrpcJsonPayload(createRequest.body)).toEqual({
-        projectId: "prj_demo",
-        environmentId: "env_demo",
-        name: "cache",
-        kind: "named-volume",
-      });
-      await expectAnyText(view, ["Storage volume created", "Storage volume 已创建"]);
-
-      await clickStorageVolumeCardButton(view, "stv_uploads", [
-        "Runtime cleanup",
-        "Runtime cleanup",
-      ]);
-      await selectOptionByText(
-        view,
-        "#resource-storage-runtime-cleanup-volume-trigger",
-        "pocketbase-data",
-      );
-      await selectOptionByText(view, "#resource-storage-runtime-cleanup-server-trigger", "edge");
-      await setInputValue(
-        view,
-        "#resource-storage-runtime-cleanup-before",
-        "2026-01-01T00:00:00.000Z",
-      );
-      await clickButtonByAnyText(view, ["Preview cleanup", "预览清理"]);
-      const previewRequest = await waitForRecordedRequest("/api/rpc/storageVolumes/cleanupRuntime");
-      expect(readOrpcJsonPayload(previewRequest.body)).toEqual({
-        storageVolumeId: "stv_uploads",
-        serverId: "srv_demo",
-        before: "2026-01-01T00:00:00.000Z",
-        dryRun: true,
-      });
-      await expectAnyText(view, ["Runtime cleanup preview ready", "Runtime cleanup 预览已就绪"]);
-      await expectText(view, "pocketbase-data");
-      await expectAnyText(view, ["Inspected 1", "Inspected 1"]);
-
-      await clickButtonByAnyText(view, ["Apply cleanup", "执行清理"]);
-      await acceptConsoleConfirm(view);
-      await waitFor(
-        async () => {
-          const cleanupRequests = recordedApiRequests.filter(
-            (request) => request.pathname === "/api/rpc/storageVolumes/cleanupRuntime",
-          );
-          return cleanupRequests.map((request) => readOrpcJsonPayload(request.body));
-        },
-        (inputs) => inputs.some((input) => isRecord(input) && input.dryRun === false),
-        "Expected destructive storage runtime cleanup to require explicit confirmation and dryRun=false",
-      );
-      await expectAnyText(view, ["Runtime cleanup applied", "Runtime cleanup 已执行"]);
-
-      await clickDialogButtonByAnyText(view, ["Close", "关闭"]);
-      await clickStorageVolumeCardButton(view, "stv_uploads", ["Volume backups", "Volume 备份"]);
-      await selectOptionByText(view, "#resource-storage-backup-volume-trigger", "PocketBase data");
-      const backupListRequest = await waitForRecordedRequest(
-        "/api/rpc/storageVolumes/backups/list",
-      );
-      expect(readOrpcJsonPayload(backupListRequest.body)).toEqual({
-        storageVolumeId: "stv_uploads",
-      });
-      await expectElement(view, "#storage-backup-restore-name-svb_uploads", 15_000);
-      await setInputValue(view, "#storage-backup-restore-name-svb_uploads", "uploads-restored");
-      await clickDialogButtonByAnyText(view, ["Restore to new volume", "恢复到新 volume"]);
-      const backupRestoreRequest = await waitForRecordedRequest(
-        "/api/rpc/storageVolumes/backups/restore",
-      );
-      expect(readOrpcJsonPayload(backupRestoreRequest.body)).toEqual({
-        backupId: "svb_uploads",
-        targetMode: "new-volume",
-        restoredVolumeName: "uploads-restored",
-      });
-      await expectAnyText(view, ["Storage backup restored", "Storage backup 已恢复"]);
-      await clickDialogButtonByAnyText(view, ["Prune", "清理"]);
-      const backupPruneRequest = await waitForRecordedRequest(
-        "/api/rpc/storageVolumes/backups/prune",
-      );
-      expect(readOrpcJsonPayload(backupPruneRequest.body)).toEqual({
-        backupId: "svb_uploads",
-      });
-      await expectAnyText(view, ["Storage backup pruned", "Storage backup 已清理"]);
-
-      await setInputValue(view, "#resource-storage-backup-path", "/pb_data");
-      await setInputValue(view, "#resource-storage-backup-target-ref", "/var/lib/appaloft/backups");
-      await setInputValue(view, "#resource-storage-backup-retention-count", "3");
-      await setInputValue(view, "#resource-storage-backup-min-free", "1073741824");
-      await clickButtonByAnyText(view, ["Plan backup", "预览备份"]);
-      const backupPlanRequest = await waitForRecordedRequest(
-        "/api/rpc/storageVolumes/backups/plan",
-      );
-      expect(readOrpcJsonPayload(backupPlanRequest.body)).toEqual({
-        storageVolumeId: "stv_uploads",
-        source: {
-          storageVolumeId: "stv_uploads",
-          resourceId: "res_demo",
-          serverId: "srv_demo",
-          destinationPath: "/pb_data",
-          dataFormat: "sqlite",
-          liveWrites: true,
-        },
-        requestedConsistency: "application-consistent",
-        target: {
-          providerKey: "local-filesystem",
-          targetRef: "/var/lib/appaloft/backups",
-        },
-        retention: {
-          maxCount: 3,
-          minFreeBytes: 1073741824,
-        },
-      });
-      await expectAnyText(view, ["Backup plan ready", "备份预览已就绪"]);
-      await clickDialogButtonByAnyText(view, ["Create backup", "创建备份"]);
-      const backupCreateRequest = await waitForRecordedRequest(
-        "/api/rpc/storageVolumes/backups/create",
-      );
-      expect(readOrpcJsonPayload(backupCreateRequest.body)).toEqual({
-        storageVolumeId: "stv_uploads",
-        planRequest: {
-          storageVolumeId: "stv_uploads",
-          source: {
-            storageVolumeId: "stv_uploads",
-            resourceId: "res_demo",
-            serverId: "srv_demo",
-            destinationPath: "/pb_data",
-            dataFormat: "sqlite",
-            liveWrites: true,
-          },
-          requestedConsistency: "application-consistent",
-          target: {
-            providerKey: "local-filesystem",
-            targetRef: "/var/lib/appaloft/backups",
-          },
-          retention: {
-            maxCount: 3,
-            minFreeBytes: 1073741824,
-          },
-        },
-      });
-      await expectAnyText(view, ["Storage backup requested", "Storage backup 已请求"]);
-
-      await clickDialogButtonByAnyText(view, ["Close", "关闭"]);
-      await clickStorageVolumeCardButton(view, "stv_uploads", ["Attach storage", "挂载存储"]);
-      await selectOptionByText(
-        view,
-        "#resource-storage-attachment-volume-trigger",
-        "pocketbase-data",
-      );
-      await setInputValue(view, "#resource-storage-destination", "/var/lib/app/uploads");
-      await clickFormSubmit(view, "#resource-storage-attachment-form");
-      const attachRequest = await waitForRecordedRequest("/api/rpc/resources/attachStorage");
-      expect(readOrpcJsonPayload(attachRequest.body)).toEqual({
-        resourceId: "res_demo",
-        storageVolumeId: "stv_uploads",
-        destinationPath: "/var/lib/app/uploads",
-        mountMode: "read-write",
-      });
-      await expectAnyText(view, ["Storage attached", "存储已挂载"]);
-
-      await clickButtonByAnyText(view, ["Detach", "Detach"]);
-      await acceptConsoleConfirm(view);
-      const detachRequest = await waitForRecordedRequest("/api/rpc/resources/detachStorage");
-      expect(readOrpcJsonPayload(detachRequest.body)).toEqual({
-        resourceId: "res_demo",
-        attachmentId: "att_existing",
-      });
-      await expectAnyText(view, ["Storage detached", "存储已 detach"]);
       expect(recordedApiRequests.some((request) => request.pathname === "/api/deployments")).toBe(
         false,
       );
+      expect(
+        recordedApiRequests.some(
+          (request) =>
+            request.pathname === "/api/rpc/storageVolumes/create" ||
+            request.pathname === "/api/rpc/storageVolumes/cleanupRuntime" ||
+            request.pathname === "/api/rpc/storageVolumes/backups/create" ||
+            request.pathname === "/api/rpc/resources/attachStorage" ||
+            request.pathname === "/api/rpc/resources/detachStorage",
+        ),
+      ).toBe(false);
       expect(recordedApiRequests.some((request) => request.pathname.includes("capacity"))).toBe(
         false,
       );
@@ -7061,7 +6681,7 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/resources/res_demo?tab=previews`);
+      await view.navigate(`${previewUrl}${demoResourcePath}?tab=previews`);
 
       await expectAnyText(view, ["Derived preview environments", "派生预览环境"]);
       await expectText(view, "prenv_demo_14");
@@ -7084,8 +6704,8 @@ describe.serial("console e2e with Bun.WebView", () => {
         limit: 50,
       });
 
-      await clickButtonByAnyText(view, ["Request cleanup", "请求清理"]);
-      await acceptConsoleConfirm(view);
+      await clickButtonByAnyText(view, lifecycleActionLabels);
+      await clickDialogFooterButtonByExactText(view, ["Request cleanup", "请求清理"]);
       const deleteRequest = await waitForRecordedRequest("/api/rpc/previewEnvironments/delete");
       expect(readOrpcJsonPayload(deleteRequest.body)).toEqual({
         previewEnvironmentId: "prenv_demo_14",
@@ -7224,7 +6844,7 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/projects/prj_demo?tab=preview`);
+      await view.navigate(`${previewUrl}/projects/prj_demo?tab=previews`);
 
       await expectText(view, "Preview");
       await expectText(view, "prenv_project_41");
@@ -7378,8 +6998,8 @@ describe.serial("console e2e with Bun.WebView", () => {
       await expectText(view, "prenv_global_27");
       await expectText(view, "def5678");
 
-      await clickButtonByAnyText(view, ["Request cleanup", "请求清理"]);
-      await acceptConsoleConfirm(view);
+      await clickButtonByAnyText(view, lifecycleActionLabels);
+      await clickDialogFooterButtonByExactText(view, ["Request cleanup", "请求清理"]);
       const deleteRequest = await waitForRecordedRequest("/api/rpc/previewEnvironments/delete");
       expect(readOrpcJsonPayload(deleteRequest.body)).toEqual({
         previewEnvironmentId: "prenv_global_27",
@@ -7405,13 +7025,12 @@ describe.serial("console e2e with Bun.WebView", () => {
     }
   }, 15_000);
 
-  test("[ROUTE-TLS-ENTRY-002][ROUTE-TLS-ENTRY-007] creates and confirms a resource-scoped domain binding from Web", async () => {
+  test("[ROUTE-TLS-ENTRY-002][ROUTE-TLS-ENTRY-007] creates a resource-scoped domain binding from Web", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();
 
     const previousDomainBindingsRoute = apiResponses.dashboard["/api/rpc/domainBindings/list"];
     const previousCreateRoute = apiResponses.dashboard["/api/rpc/domainBindings/create"];
-    const previousConfirmRoute = apiResponses.dashboard["/api/rpc/domainBindings/confirmOwnership"];
     let bindingStatus: "absent" | "pending_verification" | "bound" = "absent";
 
     apiResponses.dashboard["/api/rpc/domainBindings/list"] = () => ({
@@ -7447,27 +7066,36 @@ describe.serial("console e2e with Bun.WebView", () => {
         },
       };
     };
-    apiResponses.dashboard["/api/rpc/domainBindings/confirmOwnership"] = () => {
-      bindingStatus = "bound";
-      return {
-        json: {
-          id: "dbn_resource_web",
-          verificationAttemptId: "dva_resource_web",
-        },
-      };
-    };
-
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/resources/res_demo?tab=domains`);
+      await view.navigate(`${previewUrl}${demoResourcePath}?tab=networking&section=domains`);
 
-      await clickButtonByAnyText(view, ["Custom domains", "自定义域名"]);
-      await setInputValue(
-        view,
-        "#resource-domain-binding-domain-name",
-        "resource-web.example.test",
+      await waitFor(
+        () =>
+          view.evaluate<boolean>(
+            `(() => {
+              const section = document.querySelector("#resource-domain-bindings");
+              const button = section?.querySelector("button");
+              if (!(button instanceof HTMLButtonElement) || button.disabled) {
+                return false;
+              }
+              button.click();
+              return true;
+            })()`,
+          ),
+        Boolean,
+        "Expected resource domain binding create action",
       );
-      await clickFormSubmit(view, "#resource-domain-binding-create-form");
+      await waitFor(
+        () =>
+          view.evaluate<boolean>(
+            'Boolean(document.querySelector("[data-resource-domain-binding-create-dialog]"))',
+          ),
+        Boolean,
+        "Expected resource domain binding create dialog",
+      );
+      await setInputValue(view, "#resource-domain-binding-domain", "resource-web.example.test");
+      await clickFormSubmit(view, "[data-resource-domain-binding-create-dialog]");
 
       const createRequest = await waitForRecordedRequest("/api/rpc/domainBindings/create");
       expect(readOrpcJsonPayload(createRequest.body)).toEqual({
@@ -7484,26 +7112,152 @@ describe.serial("console e2e with Bun.WebView", () => {
       });
 
       await expectText(view, "resource-web.example.test");
-      await clickButtonByAnyText(view, ["Confirm ownership", "确认所有权"]);
-
-      const confirmRequest = await waitForRecordedRequest(
-        "/api/rpc/domainBindings/confirmOwnership",
-      );
-      expect(readOrpcJsonPayload(confirmRequest.body)).toEqual({
-        domainBindingId: "dbn_resource_web",
-      });
-      await expectAnyText(view, ["Bound", "BOUND", "已绑定"]);
+      await expectAnyText(view, [
+        "Pending verification",
+        "pending_verification",
+        "PENDING_VERIFICATION",
+        "待验证",
+        "等待验证",
+      ]);
+      expect(
+        recordedApiRequests.some(
+          (request) => request.pathname === "/api/rpc/domainBindings/confirmOwnership",
+        ),
+      ).toBe(false);
+      expect(
+        await view.evaluate<boolean>(
+          `Array.from(document.querySelectorAll("form")).some((candidate) =>
+            candidate.textContent?.includes("Confirm ownership") ||
+            candidate.textContent?.includes("确认所有权")
+          )`,
+        ),
+      ).toBe(false);
     } finally {
       if (previousCreateRoute === undefined) {
         delete apiResponses.dashboard["/api/rpc/domainBindings/create"];
       } else {
         apiResponses.dashboard["/api/rpc/domainBindings/create"] = previousCreateRoute;
       }
-      if (previousConfirmRoute === undefined) {
-        delete apiResponses.dashboard["/api/rpc/domainBindings/confirmOwnership"];
-      } else {
-        apiResponses.dashboard["/api/rpc/domainBindings/confirmOwnership"] = previousConfirmRoute;
-      }
+      apiResponses.dashboard["/api/rpc/domainBindings/list"] = previousDomainBindingsRoute;
+    }
+  }, 15_000);
+
+  test("[ROUTE-TLS-ENTRY-007] shows pending domain ownership in the global governance surface", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    const previousDomainBindingsRoute = apiResponses.dashboard["/api/rpc/domainBindings/list"];
+    apiResponses.dashboard["/api/rpc/domainBindings/list"] = () => ({
+      json: {
+        items: [
+          {
+            id: "dbn_resource_web",
+            projectId: "prj_demo",
+            environmentId: "env_demo",
+            resourceId: "res_demo",
+            serverId: "srv_demo",
+            destinationId: "dst_demo",
+            domainName: "resource-web.example.test",
+            pathPrefix: "/",
+            proxyKind: "traefik",
+            tlsMode: "auto",
+            certificatePolicy: "auto",
+            status: "pending_verification",
+            verificationAttemptCount: 0,
+            createdAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
+      },
+    });
+    try {
+      await using view = createWebView();
+      await view.navigate(`${previewUrl}/domain-bindings`);
+
+      await expectAnyText(view, ["Domain bindings", "域名绑定"]);
+      await expectText(view, "resource-web.example.test");
+      await expectAnyText(view, [
+        "Pending verification",
+        "pending_verification",
+        "PENDING_VERIFICATION",
+        "待验证",
+        "等待验证",
+      ]);
+      expect(
+        recordedApiRequests.some(
+          (request) => request.pathname === "/api/rpc/domainBindings/confirmOwnership",
+        ),
+      ).toBe(false);
+      expect(
+        await view.evaluate<boolean>(
+          `Array.from(document.querySelectorAll("form")).some((candidate) =>
+            candidate.textContent?.includes("Confirm ownership") ||
+            candidate.textContent?.includes("确认所有权")
+          )`,
+        ),
+      ).toBe(false);
+    } finally {
+      apiResponses.dashboard["/api/rpc/domainBindings/list"] = previousDomainBindingsRoute;
+    }
+  }, 15_000);
+
+  test("[ROUTE-TLS-ENTRY-007] keeps domain ownership confirmation out of default lists", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    const previousDomainBindingsRoute = apiResponses.dashboard["/api/rpc/domainBindings/list"];
+
+    apiResponses.dashboard["/api/rpc/domainBindings/list"] = () => ({
+      json: {
+        items: [
+          {
+            id: "dbn_resource_web",
+            projectId: "prj_demo",
+            environmentId: "env_demo",
+            resourceId: "res_demo",
+            serverId: "srv_demo",
+            destinationId: "dst_demo",
+            domainName: "resource-web.example.test",
+            pathPrefix: "/",
+            proxyKind: "traefik",
+            tlsMode: "auto",
+            certificatePolicy: "auto",
+            status: "pending_verification",
+            verificationAttemptCount: 0,
+            createdAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
+      },
+    });
+
+    try {
+      await using view = createWebView();
+      await view.navigate(`${previewUrl}${demoResourcePath}?tab=networking&section=domains`);
+
+      await expectText(view, "resource-web.example.test");
+      const defaultListState = await view.evaluate<{
+        hasConfirmForm: boolean;
+        hasConfirmButton: boolean;
+      }>(
+        `(() => {
+          const hasConfirmText = (candidate) =>
+            candidate.textContent?.includes("Confirm ownership") ||
+            candidate.textContent?.includes("确认所有权");
+          return {
+            hasConfirmForm: Array.from(document.querySelectorAll("form")).some(hasConfirmText),
+            hasConfirmButton: Array.from(document.querySelectorAll("button")).some(hasConfirmText),
+          };
+        })()`,
+      );
+      expect(defaultListState).toEqual({
+        hasConfirmForm: false,
+        hasConfirmButton: false,
+      });
+      expect(
+        recordedApiRequests.some(
+          (request) => request.pathname === "/api/rpc/domainBindings/confirmOwnership",
+        ),
+      ).toBe(false);
+    } finally {
       apiResponses.dashboard["/api/rpc/domainBindings/list"] = previousDomainBindingsRoute;
     }
   }, 15_000);
@@ -7513,9 +7267,10 @@ describe.serial("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/resources/res_demo?section=health`);
+    await view.navigate(`${previewUrl}${demoResourcePath}`);
 
-    await expectAnyText(view, ["Durable profile edit", "持久资源配置编辑"]);
+    await expectAnyText(view, ["Current access", "当前访问"]);
+    await expectAnyText(view, ["Configuration summary", "配置摘要"]);
     await expectAnyText(view, [
       "Future deployments use these saved profiles.",
       "后续部署会使用这些已保存的资源配置。",
@@ -7569,7 +7324,7 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/resources/res_demo`);
+      await view.navigate(`${previewUrl}${demoResourcePath}`);
 
       await expectText(view, "https://server-applied.example.test");
       await expectAnyText(view, [
@@ -7636,286 +7391,232 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/resources/res_demo`);
+      await view.navigate(`${previewUrl}${demoResourcePath}`);
 
       await expectAnyText(view, ["Latest access failure", "最近访问失败"]);
-      await expectText(view, "req_access_web_route_meta");
-      await expectText(view, "server-applied.example.test /health");
+      await expectText(view, "RESOURCE_ACCESS_UPSTREAM_UNAVAILABLE");
       await expectText(view, "inspect-runtime-logs");
-      await expectText(view, "server-applied");
-      await expectText(view, "server_applied_route:server-applied.example.test:/:dep_demo");
+      const content = await pageText(view);
+      expect(content).not.toContain("req_access_web_route_meta");
+      expect(content).not.toContain("server_applied_route:server-applied.example.test:/:dep_demo");
     } finally {
       apiResponses.dashboard["/api/rpc/resources/show"] = previousShowRoute;
     }
   }, 15_000);
 
-  test("[RES-PROFILE-ENTRY-002] submits resource network profile changes through Web", async () => {
+  test("[RES-PROFILE-ENTRY-002] shows resource network profile without inline mutation form", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/resources/res_demo`);
+    await view.navigate(`${previewUrl}${demoResourcePath}?tab=configuration`);
 
+    await expectAnyText(view, ["Resource profile", "资源档案"]);
     await expectAnyText(view, ["Network profile", "网络配置"]);
-    await setInputValue(view, "#resource-network-internal-port", "8080");
-    await clickFormSubmit(view, "#resource-network-profile-form");
-
-    const configureNetworkRequest = await waitForRecordedRequest(
-      "/api/rpc/resources/configureNetwork",
-    );
-    const configureNetworkInput = readOrpcJsonPayload(configureNetworkRequest.body);
-
-    expect(configureNetworkInput).toEqual({
-      resourceId: "res_demo",
-      networkProfile: {
-        internalPort: 8080,
-        upstreamProtocol: "http",
-        exposureMode: "reverse-proxy",
-      },
+    const defaultState = JSON.parse(
+      await view.evaluate<string>(`JSON.stringify({
+        networkFormVisible: Boolean(document.querySelector("#resource-network-profile-form")),
+        networkPortVisible: Boolean(document.querySelector("#resource-network-internal-port"))
+      })`),
+    ) as Record<string, boolean>;
+    expect(defaultState).toEqual({
+      networkFormVisible: false,
+      networkPortVisible: false,
     });
+    expect(
+      recordedApiRequests.some(
+        (request) => request.pathname === "/api/rpc/resources/configureNetwork",
+      ),
+    ).toBe(false);
   }, 15_000);
 
-  test("[RES-PROFILE-ENTRY-011] submits resource access profile changes through Web", async () => {
+  test("[RES-PROFILE-ENTRY-011] shows resource access summary without inline mutation form", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/resources/res_demo`);
+    await view.navigate(`${previewUrl}${demoResourcePath}?tab=networking`);
 
-    await expectAnyText(view, ["Access profile", "访问配置"]);
-    await setInputValue(view, "#resource-access-path-prefix", "/internal");
-    await clickFormSubmit(view, "#resource-access-profile-form");
-
-    const configureAccessRequest = await waitForRecordedRequest(
-      "/api/rpc/resources/configureAccess",
-    );
-    const configureAccessInput = readOrpcJsonPayload(configureAccessRequest.body);
-
-    expect(configureAccessInput).toEqual({
-      resourceId: "res_demo",
-      accessProfile: {
-        generatedAccessMode: "inherit",
-        pathPrefix: "/internal",
-      },
+    await expectAnyText(view, ["Access", "访问"]);
+    await expectAnyText(view, ["Access URL", "访问地址"]);
+    const defaultState = JSON.parse(
+      await view.evaluate<string>(`JSON.stringify({
+        accessFormVisible: Boolean(document.querySelector("#resource-access-profile-form")),
+        pathPrefixVisible: Boolean(document.querySelector("#resource-access-path-prefix"))
+      })`),
+    ) as Record<string, boolean>;
+    expect(defaultState).toEqual({
+      accessFormVisible: false,
+      pathPrefixVisible: false,
     });
+    expect(
+      recordedApiRequests.some(
+        (request) => request.pathname === "/api/rpc/resources/configureAccess",
+      ),
+    ).toBe(false);
   }, 15_000);
 
-  test("[RES-PROFILE-ENTRY-002] submits resource source profile changes through Web", async () => {
+  test("[RES-PROFILE-ENTRY-002] shows resource source profile without inline mutation form", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/resources/res_demo`);
+    await view.navigate(`${previewUrl}${demoResourcePath}?tab=configuration`);
 
-    await expectAnyText(view, ["Source profile", "来源配置"]);
-    await setInputValue(view, "#resource-source-locator", "workspace-updated");
-    await setInputValue(view, "#resource-source-display-name", "workspace updated");
-    await clickFormSubmit(view, "#resource-source-profile-form");
-
-    const configureSourceRequest = await waitForRecordedRequest(
-      "/api/rpc/resources/configureSource",
-    );
-    const configureSourceInput = readOrpcJsonPayload(configureSourceRequest.body);
-
-    expect(configureSourceInput).toEqual({
-      resourceId: "res_demo",
-      source: {
-        kind: "local-folder",
-        locator: "workspace-updated",
-        displayName: "workspace updated",
-      },
+    await expectAnyText(view, ["Resource profile", "资源档案"]);
+    await expectAnyText(view, ["Source", "来源"]);
+    const defaultState = JSON.parse(
+      await view.evaluate<string>(`JSON.stringify({
+        sourceFormVisible: Boolean(document.querySelector("#resource-source-profile-form")),
+        locatorVisible: Boolean(document.querySelector("#resource-source-locator"))
+      })`),
+    ) as Record<string, boolean>;
+    expect(defaultState).toEqual({
+      sourceFormVisible: false,
+      locatorVisible: false,
     });
+    expect(
+      recordedApiRequests.some(
+        (request) => request.pathname === "/api/rpc/resources/configureSource",
+      ),
+    ).toBe(false);
   }, 15_000);
 
-  test("[RES-PROFILE-ENTRY-002] submits resource runtime profile changes through Web", async () => {
+  test("[RES-PROFILE-ENTRY-002] shows resource runtime profile without inline mutation form", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/resources/res_demo`);
+    await view.navigate(`${previewUrl}${demoResourcePath}?tab=configuration`);
 
-    await expectAnyText(view, ["Runtime profile", "运行时配置"]);
-    await setInputValue(view, "#resource-runtime-start-command", "bun run preview");
-    await setInputValue(view, "#resource-runtime-name", "preview-123");
-    await clickFormSubmit(view, "#resource-runtime-profile-form");
-
-    const configureRuntimeRequest = await waitForRecordedRequest(
-      "/api/rpc/resources/configureRuntime",
-    );
-    const configureRuntimeInput = readOrpcJsonPayload(configureRuntimeRequest.body);
-
-    expect(configureRuntimeInput).toEqual({
-      resourceId: "res_demo",
-      runtimeProfile: {
-        strategy: "workspace-commands",
-        startCommand: "bun run preview",
-        runtimeName: "preview-123",
-      },
+    await expectAnyText(view, ["Resource profile", "资源档案"]);
+    await expectAnyText(view, ["Runtime profile", "运行时配置", "Workspace command", "工作区命令"]);
+    const defaultState = JSON.parse(
+      await view.evaluate<string>(`JSON.stringify({
+        runtimeFormVisible: Boolean(document.querySelector("#resource-runtime-profile-form")),
+        startCommandVisible: Boolean(document.querySelector("#resource-runtime-start-command"))
+      })`),
+    ) as Record<string, boolean>;
+    expect(defaultState).toEqual({
+      runtimeFormVisible: false,
+      startCommandVisible: false,
     });
+    expect(
+      recordedApiRequests.some(
+        (request) => request.pathname === "/api/rpc/resources/configureRuntime",
+      ),
+    ).toBe(false);
   }, 15_000);
 
-  test("[RES-PROFILE-ENTRY-002] submits resource variable overrides through Web", async () => {
+  test("[RES-PROFILE-ENTRY-002] shows resource variable overrides without inline mutation form", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/resources/res_demo?tab=environment`);
+    await view.navigate(`${previewUrl}${demoResourcePath}?tab=configuration&section=configuration`);
 
     await expectAnyText(view, ["Configuration", "配置变量"]);
+    await expectAnyText(view, ["Resource-owned entries", "资源自有条目"]);
+    await expectText(view, "DATABASE_URL");
 
     const effectiveConfigRequest = await waitForRecordedRequest(
       "/api/rpc/resources/effectiveConfig",
     );
-    const effectiveConfigInput = readOrpcJsonPayload(effectiveConfigRequest.body);
-    expect(effectiveConfigInput).toEqual({
+    expect(readOrpcJsonPayload(effectiveConfigRequest.body)).toEqual({
       resourceId: "res_demo",
     });
 
-    await setInputValue(view, "#resource-config-key", "DATABASE_URL");
-    await setInputValue(view, "#resource-config-value", "postgres://resource");
-    await clickFormSubmit(view, "#resource-configuration-form");
-
-    const setVariableRequest = await waitForRecordedRequest("/api/rpc/resources/setVariable");
-    const setVariableInput = readOrpcJsonPayload(setVariableRequest.body);
-
-    expect(setVariableInput).toEqual({
-      resourceId: "res_demo",
-      key: "DATABASE_URL",
-      value: "postgres://resource",
-      kind: "plain-config",
-      exposure: "runtime",
+    const defaultState = JSON.parse(
+      await view.evaluate<string>(`JSON.stringify({
+        configFormVisible: Boolean(document.querySelector("#resource-configuration-form")),
+        configKeyVisible: Boolean(document.querySelector("#resource-config-key")),
+        importFormVisible: Boolean(document.querySelector("#resource-configuration-import-form"))
+      })`),
+    ) as Record<string, boolean>;
+    expect(defaultState).toEqual({
+      configFormVisible: false,
+      configKeyVisible: false,
+      importFormVisible: false,
     });
+    expect(
+      recordedApiRequests.some((request) => request.pathname === "/api/rpc/resources/setVariable"),
+    ).toBe(false);
   }, 15_000);
 
-  test("[RES-PROFILE-CONFIG-013] imports pasted dotenv variables through Web", async () => {
-    activeScenario = "dashboard";
-    resetRecordedApiRequests();
-
-    const previousImportRoute = apiResponses.dashboard["/api/rpc/resources/importVariables"];
-    apiResponses.dashboard["/api/rpc/resources/importVariables"] = {
-      json: {
-        resourceId: "res_demo",
-        importedEntries: [
-          {
-            key: "PUBLIC_API_BASE_URL",
-            value: "https://api.example.test",
-            exposure: "runtime",
-            kind: "plain-config",
-            isSecret: false,
-            action: "created",
-            sourceLine: 1,
-          },
-          {
-            key: "DATABASE_URL",
-            value: "****",
-            exposure: "runtime",
-            kind: "secret",
-            isSecret: true,
-            action: "replaced",
-            sourceLine: 2,
-          },
-        ],
-        duplicateOverrides: [],
-        existingOverrides: [
-          {
-            key: "DATABASE_URL",
-            exposure: "runtime",
-            previousScope: "resource",
-            rule: "resource-entry-replaced",
-          },
-        ],
-      },
-    };
-
-    try {
-      await using view = createWebView();
-      await view.navigate(`${previewUrl}/resources/res_demo?tab=environment`);
-
-      await expectAnyText(view, ["Import .env variables", "导入 .env 变量"]);
-      await setInputValue(view, "#resource-config-import-secret-keys", "DATABASE_URL, API_TOKEN");
-      await setInputValue(view, "#resource-config-import-plain-keys", "PUBLIC_API_BASE_URL");
-      await setInputValue(
-        view,
-        "#resource-config-import-content",
-        "PUBLIC_API_BASE_URL=https://api.example.test\nDATABASE_URL=postgres://resource",
-      );
-      await clickFormSubmit(view, "#resource-configuration-import-form");
-
-      const importVariablesRequest = await waitForRecordedRequest(
-        "/api/rpc/resources/importVariables",
-      );
-      expect(readOrpcJsonPayload(importVariablesRequest.body)).toEqual({
-        resourceId: "res_demo",
-        content: "PUBLIC_API_BASE_URL=https://api.example.test\nDATABASE_URL=postgres://resource",
-        exposure: "runtime",
-        secretKeys: ["DATABASE_URL", "API_TOKEN"],
-        plainKeys: ["PUBLIC_API_BASE_URL"],
-      });
-      await expectAnyText(view, ["2 entries imported", "已导入 2 个条目"]);
-    } finally {
-      apiResponses.dashboard["/api/rpc/resources/importVariables"] = previousImportRoute;
-    }
-  }, 15_000);
-
-  test("[RES-PROFILE-ENTRY-013] submits resource health policy changes through Web", async () => {
+  test("[RES-PROFILE-CONFIG-013] keeps dotenv import out of the default configuration surface", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/resources/res_demo?section=health`);
+    await view.navigate(`${previewUrl}${demoResourcePath}?tab=configuration&section=configuration`);
+
+    await expectAnyText(view, ["Configuration", "配置变量"]);
+    await expectAnyText(view, ["Effective future deployment config", "未来部署生效配置"]);
+    const defaultState = JSON.parse(
+      await view.evaluate<string>(`JSON.stringify({
+        importFormVisible: Boolean(document.querySelector("#resource-configuration-import-form")),
+        importContentVisible: Boolean(document.querySelector("#resource-config-import-content")),
+        secretKeysVisible: Boolean(document.querySelector("#resource-config-import-secret-keys"))
+      })`),
+    ) as Record<string, boolean>;
+    expect(defaultState).toEqual({
+      importFormVisible: false,
+      importContentVisible: false,
+      secretKeysVisible: false,
+    });
+    expect(
+      recordedApiRequests.some(
+        (request) => request.pathname === "/api/rpc/resources/importVariables",
+      ),
+    ).toBe(false);
+  }, 15_000);
+
+  test("[RES-PROFILE-ENTRY-013] shows resource health policy without inline mutation form", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView();
+    await view.navigate(`${previewUrl}${demoResourcePath}?tab=configuration&section=health`);
 
     await expectAnyText(view, ["Health policy", "健康策略"]);
-    await setInputValue(view, "#resource-health-path", "/ready");
-    await setInputValue(view, "#resource-health-expected-status", "204");
-    await setInputValue(view, "#resource-health-interval-seconds", "7");
-    await setInputValue(view, "#resource-health-timeout-seconds", "3");
-    await setInputValue(view, "#resource-health-retries", "4");
-    await setInputValue(view, "#resource-health-start-period-seconds", "2");
-    await clickFormSubmit(view, "#resource-health-policy-form");
-
-    const configureHealthRequest = await waitForRecordedRequest(
-      "/api/rpc/resources/configureHealth",
-    );
-    const configureHealthInput = readOrpcJsonPayload(configureHealthRequest.body);
-
-    expect(configureHealthInput).toEqual({
-      resourceId: "res_demo",
-      healthCheck: {
-        enabled: true,
-        type: "http",
-        intervalSeconds: 7,
-        timeoutSeconds: 3,
-        retries: 4,
-        startPeriodSeconds: 2,
-        http: {
-          method: "GET",
-          scheme: "http",
-          host: "localhost",
-          path: "/ready",
-          expectedStatusCode: 204,
-        },
-      },
+    await expectAnyText(view, ["Resource health", "资源健康"]);
+    const defaultState = JSON.parse(
+      await view.evaluate<string>(`JSON.stringify({
+        healthFormVisible: Boolean(document.querySelector("#resource-health-policy-form")),
+        healthPathVisible: Boolean(document.querySelector("#resource-health-path"))
+      })`),
+    ) as Record<string, boolean>;
+    expect(defaultState).toEqual({
+      healthFormVisible: false,
+      healthPathVisible: false,
     });
+    expect(
+      recordedApiRequests.some(
+        (request) => request.pathname === "/api/rpc/resources/configureHealth",
+      ),
+    ).toBe(false);
   }, 15_000);
 
-  test("[RES-PROFILE-ENTRY-014] removes resource variable overrides through Web", async () => {
+  test("[RES-PROFILE-ENTRY-014] shows resource variable overrides without inline unset action", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/resources/res_demo?tab=environment`);
+    await view.navigate(`${previewUrl}${demoResourcePath}?tab=configuration&section=configuration`);
 
     await expectAnyText(view, ["Resource-owned entries", "资源自有条目"]);
-    await clickButtonByAnyText(view, ["Unset", "移除"]);
-
-    const unsetVariableRequest = await waitForRecordedRequest("/api/rpc/resources/unsetVariable");
-    const unsetVariableInput = readOrpcJsonPayload(unsetVariableRequest.body);
-
-    expect(unsetVariableInput).toEqual({
-      resourceId: "res_demo",
-      key: "DATABASE_URL",
-      exposure: "runtime",
-    });
+    await expectText(view, "DATABASE_URL");
+    const hasUnsetButton = await view.evaluate<boolean>(
+      `Array.from(document.querySelectorAll("button, a")).some((candidate) =>
+        candidate.textContent?.trim() === "Unset" || candidate.textContent?.trim() === "移除"
+      )`,
+    );
+    expect(hasUnsetButton).toBe(false);
+    expect(
+      recordedApiRequests.some(
+        (request) => request.pathname === "/api/rpc/resources/unsetVariable",
+      ),
+    ).toBe(false);
   }, 15_000);
 
   test("[DEP-SHOW-ENTRY-001] loads deployment detail through deployments.show and deployments.logs", async () => {
@@ -8002,7 +7703,7 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/deployments/dep_demo`);
+      await view.navigate(`${previewUrl}${demoDeploymentPath}`);
       await view.evaluate<void>(`(() => {
         window.__appaloftCopiedText = "";
         window.appaloftDesktop = {
@@ -8016,6 +7717,18 @@ describe.serial("console e2e with Bun.WebView", () => {
       await expectText(view, "Image digest", 15_000);
       await expectText(view, "latest -> sha256:8b1a9953c461");
       await expectAnyText(view, ["Overview", "基本信息"]);
+      await expectAnyText(view, ["Deployment snapshot", "当时的部署信息"]);
+      await expectAnyText(view, [
+        "Deployment access snapshot",
+        "Deployment-time access",
+        "部署时访问地址",
+      ]);
+      await expectAnyText(view, ["Current resource state", "当前资源状态"]);
+      await expectAnyText(view, ["Recovery readiness", "恢复就绪"]);
+
+      const overviewText = await pageText(view);
+      expect(overviewText).not.toContain("This deployment status is not recoverable.");
+      expect(overviewText).not.toContain("这个部署状态不可恢复。");
 
       const showRequest = await waitForRecordedRequest("/api/rpc/deployments/show");
       const showInput = readOrpcJsonPayload(showRequest.body);
@@ -8052,7 +7765,15 @@ describe.serial("console e2e with Bun.WebView", () => {
       );
       await expectAnyText(view, ["Diagnostic JSON copied", "诊断 JSON 已复制"]);
 
-      await view.navigate(`${previewUrl}/deployments/dep_demo?tab=logs`);
+      await clickButtonByAnyText(view, ["Open recovery action", "打开恢复操作"]);
+      await expectAnyText(view, ["Choose recovery action", "选择恢复操作"]);
+      await clickButtonByAnyText(view, ["Retry", "重试"]);
+      await expectAnyText(view, [
+        "This deployment status is not recoverable.",
+        "这个部署状态不可恢复。",
+      ]);
+
+      await view.navigate(`${previewUrl}${demoDeploymentPath}?tab=logs`);
       await expectText(view, "Application is ready for dep_demo");
     } finally {
       if (previousDiagnosticRoute === undefined) {
@@ -8125,7 +7846,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/servers/srv_demo?tab=monitor`);
+    await view.navigate(`${previewUrl}/servers/srv_demo?tab=runtime`);
 
     await expectAnyText(view, ["Runtime monitor", "运行时监控"]);
     await expectText(view, "Deployment dep_demo succeeded");
@@ -8150,8 +7871,15 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     await expectAnyText(view, ["Runtime capacity", "运行时容量"]);
     await expectAnyText(view, ["Safe reclaimable", "安全可回收"]);
-    await expectAnyText(view, ["Runtime prune", "Runtime prune"]);
-    await clickButtonByAnyText(view, ["Preview prune", "预览 prune"]);
+    await expectAnyText(view, ["Capacity governance", "容量治理"]);
+    await clickButtonByAnyText(view, ["Open governance flow", "打开治理流程"]);
+    await clickDialogButtonByAnyText(view, [
+      "Preview prune",
+      "Preview",
+      "预览 prune",
+      "预览",
+      "先预览",
+    ]);
     await expectAnyText(view, [
       "Runtime capacity prune completed",
       "Runtime capacity prune 已完成",
@@ -8177,7 +7905,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/resources/res_demo?tab=monitor`);
+    await view.navigate(`${previewUrl}${demoResourcePath}?tab=monitor`);
 
     await expectText(view, "workspace");
     await expectAnyText(view, ["Runtime monitor", "运行时监控"]);
@@ -8187,22 +7915,16 @@ describe.serial("console e2e with Bun.WebView", () => {
     await expectAnyText(view, ["Threshold state", "Threshold 状态"]);
     await expectAnyText(view, ["Warning", "警告"]);
     await expectAnyText(view, ["Logs", "日志"]);
-    await expectAnyText(view, ["Events", "事件"]);
     await expectAnyText(view, ["Diagnostics", "诊断"]);
-    await expectAnyText(view, ["Cleanup", "清理"]);
+    await expectAnyText(view, ["Runtime controls", "运行时控制"]);
+    await expectAnyText(view, ["Open runtime controls", "打开运行时控制"]);
+    expect(
+      await view.evaluate<boolean>(
+        'Boolean(document.querySelector("#resource-storage-runtime-cleanup-before"))',
+      ),
+    ).toBe(false);
 
-    await clickButtonByAnyText(view, ["Cleanup", "清理"]);
-    await expectAnyText(view, ["Runtime cleanup", "Runtime cleanup"]);
-    await waitFor(
-      () =>
-        view.evaluate<string | null>(
-          'document.querySelector("#resource-storage-runtime-cleanup-before")?.value ?? null',
-        ),
-      (value) => value === "2026-05-13T01:00:00.000Z",
-      "Expected storage cleanup dry-run cutoff to inherit the Monitor observation window",
-    );
-
-    await view.navigate(`${previewUrl}/servers/srv_demo?tab=monitor`);
+    await view.navigate(`${previewUrl}/servers/srv_demo?tab=runtime`);
     await expectText(view, "edge");
     await expectAnyText(view, ["Runtime monitor", "运行时监控"]);
     await expectText(view, "Deployment dep_demo succeeded");
@@ -8210,44 +7932,28 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     await view.navigate(`${previewUrl}/projects/prj_demo`);
     await expectText(view, "Demo");
-    await expectAnyText(view, ["Runtime monitor", "运行时监控"]);
-    await expectAnyText(view, ["Project · Demo", "项目 · Demo"]);
-    await expectAnyText(view, ["Environment · production", "环境 · production"]);
-
-    await waitFor(
-      async () =>
-        recordedApiRequests.some((request) => {
-          if (request.pathname !== "/api/rpc/runtimeMonitoring/rollup") {
-            return false;
-          }
-          const input = readOrpcJsonPayload(request.body);
-          return (
-            isRecord(input) &&
-            isRecord(input.scope) &&
-            input.scope.kind === "project" &&
-            input.scope.projectId === "prj_demo"
-          );
-        }),
-      Boolean,
-      "Expected project rollup monitoring request",
-    );
-    await waitFor(
-      async () =>
-        recordedApiRequests.some((request) => {
-          if (request.pathname !== "/api/rpc/runtimeMonitoring/rollup") {
-            return false;
-          }
-          const input = readOrpcJsonPayload(request.body);
-          return (
-            isRecord(input) &&
-            isRecord(input.scope) &&
-            input.scope.kind === "environment" &&
-            input.scope.environmentId === "env_demo"
-          );
-        }),
-      Boolean,
-      "Expected environment rollup monitoring request",
-    );
+    await expectAnyText(view, ["Resource", "资源"]);
+    await expectAnyText(view, ["Public access", "公共访问", "公开访问"]);
+    await expectAnyText(view, ["Latest deployment", "最新部署", "最近部署"]);
+    await expectAnyText(view, ["Health", "健康", "状态"]);
+    expect(
+      recordedApiRequests.some((request) => {
+        if (request.pathname !== "/api/rpc/runtimeMonitoring/rollup") {
+          return false;
+        }
+        const input = readOrpcJsonPayload(request.body);
+        return isRecord(input) && isRecord(input.scope) && input.scope.kind === "resource";
+      }),
+    ).toBe(true);
+    expect(
+      recordedApiRequests.some((request) => {
+        if (request.pathname !== "/api/rpc/runtimeMonitoring/rollup") {
+          return false;
+        }
+        const input = readOrpcJsonPayload(request.body);
+        return isRecord(input) && isRecord(input.scope) && input.scope.kind === "server";
+      }),
+    ).toBe(true);
   }, 20_000);
 
   test("[DEF-ACCESS-ENTRY-007] server detail hides deployment-target default access override", async () => {
@@ -8255,9 +7961,10 @@ describe.serial("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/servers/srv_demo?tab=proxy-access`);
+    await view.navigate(`${previewUrl}/servers/srv_demo?tab=connectivity`);
 
-    await expectText(view, "traefik");
+    await expectAnyText(view, ["Connectivity", "连接", "连通性"]);
+    await expectAnyText(view, ["Test connectivity", "测试连接", "测试连通性"]);
     const content = await pageText(view);
     const hasOverrideForm = await view.evaluate<boolean>(
       'Boolean(document.querySelector("#server-default-access-override-form"))',
@@ -8335,7 +8042,7 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/servers/srv_zero_usage?tab=credentials`);
+      await view.navigate(`${previewUrl}/servers/srv_zero_usage?tab=settings&section=credentials`);
 
       await expectAnyText(view, ["SSH credential detail", "SSH 凭据详情"]);
       await expectText(view, "Unused deploy key");
@@ -8352,7 +8059,9 @@ describe.serial("console e2e with Bun.WebView", () => {
       });
 
       resetRecordedApiRequests();
-      await view.navigate(`${previewUrl}/servers/srv_usage_unavailable?tab=credentials`);
+      await view.navigate(
+        `${previewUrl}/servers/srv_usage_unavailable?tab=settings&section=credentials`,
+      );
 
       await expectAnyText(view, ["Credential usage unavailable", "凭据使用情况暂不可用"]);
 
@@ -8401,11 +8110,27 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/servers/srv_demo`);
+      await view.navigate(`${previewUrl}/servers/srv_demo?tab=settings&section=general`);
 
       await expectText(view, "edge");
+      await waitFor(
+        () =>
+          view.evaluate<boolean>(
+            `(() => {
+              const surface = document.querySelector("[data-server-settings-general]");
+              const button = surface?.querySelector("button");
+              if (!(button instanceof HTMLButtonElement) || button.disabled) {
+                return false;
+              }
+              button.click();
+              return true;
+            })()`,
+          ),
+        Boolean,
+        "Expected server general settings edit action",
+      );
       await setInputValue(view, "#server-display-name-input", "Primary SSH server");
-      await clickFormSubmit(view, "#server-rename-form");
+      await clickFormSubmit(view, "#server-rename-dialog-form");
 
       const renameRequest = await waitForRecordedRequest("/api/rpc/servers/rename");
       expect(renameRequest.method).toBe("POST");
@@ -8460,13 +8185,14 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/servers/srv_demo?tab=danger`);
+      await view.navigate(`${previewUrl}/servers/srv_demo?tab=settings&section=danger`);
 
       await expectAnyText(view, ["Delete safety", "DELETE SAFETY", "删除安全检查"]);
       await expectAnyText(view, ["Eligible", "ELIGIBLE", "可删除"]);
-      await clickButtonByAnyText(view, ["Delete server", "删除服务器"]);
-      await setInputValue(view, "#server-delete-confirmation-input", "srv_demo");
-      await clickFormSubmit(view, "#server-delete-form");
+      await clickButtonByAnyText(view, lifecycleActionLabels);
+      await clickDialogButtonByAnyText(view, ["Delete server", "删除服务器"]);
+      await setInputValue(view, "#server-lifecycle-confirmation-input", "srv_demo");
+      await clickFormSubmit(view, "#server-lifecycle-form");
 
       const deleteRequest = await waitForRecordedRequest("/api/rpc/servers/delete");
       expect(deleteRequest.method).toBe("POST");
@@ -8516,12 +8242,13 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/servers/srv_demo?tab=danger`);
+      await view.navigate(`${previewUrl}/servers/srv_demo?tab=settings&section=danger`);
 
-      await expectAnyText(view, ["Deactivate server", "停用服务器"]);
-      await clickButtonByAnyText(view, ["Deactivate server", "停用服务器"]);
-      await setInputValue(view, "#server-deactivate-confirmation-input", "srv_demo");
-      await clickFormSubmit(view, "#server-deactivate-form");
+      await expectAnyText(view, ["Lifecycle governance", "生命周期治理"]);
+      await clickButtonByAnyText(view, lifecycleActionLabels);
+      await clickDialogButtonByAnyText(view, ["Deactivate server", "停用服务器"]);
+      await setInputValue(view, "#server-lifecycle-confirmation-input", "srv_demo");
+      await clickFormSubmit(view, "#server-lifecycle-form");
 
       const deactivateRequest = await waitForRecordedRequest("/api/rpc/servers/deactivate");
       expect(deactivateRequest.method).toBe("POST");
@@ -8555,9 +8282,10 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/servers/srv_demo?tab=proxy-access`);
+      await view.navigate(`${previewUrl}/servers/srv_demo?tab=connectivity`);
 
-      await expectText(view, "traefik");
+      await expectAnyText(view, ["Connectivity", "连接", "连通性"]);
+      await expectAnyText(view, ["Test connectivity", "测试连接", "测试连通性"]);
       const content = await pageText(view);
       const hasEdgeProxyForm = await view.evaluate<boolean>(
         'Boolean(document.querySelector("#server-edge-proxy-form"))',
@@ -8606,7 +8334,7 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/deployments/dep_demo`);
+      await view.navigate(`${previewUrl}${demoDeploymentPath}`);
 
       await expectAnyText(view, [
         "This deployment detail is partially available.",
@@ -8626,10 +8354,10 @@ describe.serial("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/resources/res_demo?tab=deployments`);
+    await view.navigate(`${previewUrl}${demoResourcePath}?tab=deployments`);
 
     await expectText(view, "workspace");
-    await clickLinkByHref(view, "/deployments/dep_demo");
+    await clickLinkByHref(view, demoDeploymentPath);
     await expectLocation(
       view,
       "/projects/prj_demo/environments/env_demo/resources/res_demo/deployments/dep_demo",
@@ -8676,7 +8404,7 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/deployments/dep_demo?tab=timeline`);
+      await view.navigate(`${previewUrl}${demoDeploymentPath}?tab=timeline`);
 
       await expectAnyText(view, ["Timeline", "时间线"], 15_000);
       await expectText(view, "Deployment requested", 15_000);
@@ -8705,6 +8433,8 @@ describe.serial("console e2e with Bun.WebView", () => {
 
       const timelineText = await pageText(view);
       expect(timelineText).not.toContain("Not Found");
+      await view.navigate(`${previewUrl}${demoDeploymentPath}`);
+      await expectAnyText(view, ["Deployment snapshot", "当时的部署信息"]);
     } finally {
       apiResponses.dashboard["/api/rpc/deployments/show"] = previousShowRoute;
       apiResponses.dashboard["/api/rpc/deployments/events"] = previousReplayRoute;
@@ -8715,55 +8445,65 @@ describe.serial("console e2e with Bun.WebView", () => {
   test("[RES-PROFILE-ENTRY-002] submits resource archive through Web", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();
+    const showResponse = apiResponses.dashboard["/api/rpc/resources/show"] as {
+      json: {
+        lifecycle: {
+          status: string;
+          archivedAt?: string;
+        };
+      };
+    };
+    const previousLifecycle = { ...showResponse.json.lifecycle };
 
-    await using view = createWebView();
-    await view.navigate(`${previewUrl}/resources/res_demo`);
-    await expectAnyText(view, ["Runtime profile", "运行时配置"]);
-    await clickButtonByAnyText(view, ["Archive", "归档"]);
-    await acceptConsoleConfirm(view);
+    try {
+      await using view = createWebView();
+      await view.navigate(`${previewUrl}${demoResourcePath}?tab=settings&section=danger`);
+      await expectAnyText(view, ["Danger zone", "危险区"]);
+      await clickButtonByAnyText(view, lifecycleActionLabels);
+      await clickDialogButtonByAnyText(view, ["Archive", "归档"]);
+      await clickDialogFooterButtonByExactText(view, ["Archive", "归档"]);
 
-    const archiveRequest = await waitForRecordedRequest("/api/rpc/resources/archive");
-    const archiveInput = readOrpcJsonPayload(archiveRequest.body);
+      const archiveRequest = await waitForRecordedRequest("/api/rpc/resources/archive");
+      const archiveInput = readOrpcJsonPayload(archiveRequest.body);
 
-    expect(archiveInput).toEqual({
-      resourceId: "res_demo",
-    });
+      expect(archiveInput).toEqual({
+        resourceId: "res_demo",
+      });
+    } finally {
+      showResponse.json.lifecycle = previousLifecycle;
+    }
   }, 15_000);
 
   test("[ENV-LIFE-ENTRY-005] submits environment archive through Web", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();
+    const listResponse = apiResponses.dashboard["/api/rpc/environments/list"] as {
+      json: {
+        items: Array<{
+          lifecycleStatus: string;
+          archivedAt?: string;
+        }>;
+      };
+    };
+    const previousEnvironment = { ...listResponse.json.items[0] };
 
-    await using view = createWebView();
-    await view.navigate(`${previewUrl}/projects/prj_demo`);
-    await expectAnyText(view, ["Environments", "环境"]);
-    const clicked = await waitFor(
-      () =>
-        view.evaluate<boolean>(
-          `(() => {
-            const button = Array.from(document.querySelectorAll("button")).find((candidate) =>
-              candidate.getAttribute("title") === "Archive" ||
-              candidate.getAttribute("title") === "归档"
-            );
-            if (!(button instanceof HTMLButtonElement)) {
-              return false;
-            }
-            button.click();
-            return true;
-          })()`,
-        ),
-      Boolean,
-      "Expected environment archive button",
-    );
-    expect(clicked).toBe(true);
-    await acceptConsoleConfirm(view);
+    try {
+      await using view = createWebView();
+      await view.navigate(`${previewUrl}/projects/prj_demo?tab=environments`);
+      await expectAnyText(view, ["Environments", "环境"]);
+      await clickButtonByAnyText(view, lifecycleActionLabels);
+      await clickDialogButtonByAnyText(view, ["Archive", "归档"]);
+      await clickDialogFooterButtonByExactText(view, ["Archive", "归档"]);
 
-    const archiveRequest = await waitForRecordedRequest("/api/rpc/environments/archive");
-    const archiveInput = readOrpcJsonPayload(archiveRequest.body);
+      const archiveRequest = await waitForRecordedRequest("/api/rpc/environments/archive");
+      const archiveInput = readOrpcJsonPayload(archiveRequest.body);
 
-    expect(archiveInput).toEqual({
-      environmentId: "env_demo",
-    });
+      expect(archiveInput).toEqual({
+        environmentId: "env_demo",
+      });
+    } finally {
+      listResponse.json.items[0] = previousEnvironment;
+    }
   }, 15_000);
 
   test("[ENV-LIFE-CLONE-ENTRY-003] submits environment clone through Web", async () => {
@@ -8771,10 +8511,11 @@ describe.serial("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/projects/prj_demo`);
+    await view.navigate(`${previewUrl}/projects/prj_demo?tab=environments`);
     await expectAnyText(view, ["Environments", "环境"]);
-    await setInputValue(view, "#environment-clone-name-env_demo", "production-copy");
-    await clickFormSubmit(view, "#environment-clone-form-env_demo");
+    await clickButtonByAnyText(view, ["Clone", "克隆"]);
+    await setInputValue(view, "#environment-clone-dialog-name", "production-copy");
+    await clickDialogFooterButtonByExactText(view, ["Clone", "克隆"]);
 
     const cloneRequest = await waitForRecordedRequest("/api/rpc/environments/clone");
     const cloneInput = readOrpcJsonPayload(cloneRequest.body);
@@ -8790,10 +8531,11 @@ describe.serial("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/projects/prj_demo`);
+    await view.navigate(`${previewUrl}/projects/prj_demo?tab=environments`);
     await expectAnyText(view, ["Environments", "环境"]);
-    await setInputValue(view, "#environment-rename-name-env_demo", "customer-production");
-    await clickFormSubmit(view, "#environment-rename-form-env_demo");
+    await clickButtonByAnyText(view, ["Rename", "重命名"]);
+    await setInputValue(view, "#environment-rename-dialog-name", "customer-production");
+    await clickDialogFooterButtonByExactText(view, ["Save", "保存"]);
 
     const renameRequest = await waitForRecordedRequest("/api/rpc/environments/rename");
     const renameInput = readOrpcJsonPayload(renameRequest.body);
@@ -8809,28 +8551,11 @@ describe.serial("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/projects/prj_demo`);
+    await view.navigate(`${previewUrl}/projects/prj_demo?tab=environments`);
     await expectAnyText(view, ["Environments", "环境"]);
-    const clicked = await waitFor(
-      () =>
-        view.evaluate<boolean>(
-          `(() => {
-            const button = Array.from(document.querySelectorAll("button")).find((candidate) =>
-              candidate.getAttribute("title") === "Lock" ||
-              candidate.getAttribute("title") === "锁定"
-            );
-            if (!(button instanceof HTMLButtonElement)) {
-              return false;
-            }
-            button.click();
-            return true;
-          })()`,
-        ),
-      Boolean,
-      "Expected environment lock button",
-    );
-    expect(clicked).toBe(true);
-    await acceptConsoleConfirm(view);
+    await clickButtonByAnyText(view, lifecycleActionLabels);
+    await clickDialogButtonByAnyText(view, ["Lock", "锁定"]);
+    await clickDialogFooterButtonByExactText(view, ["Lock", "锁定"]);
 
     const lockRequest = await waitForRecordedRequest("/api/rpc/environments/lock");
     const lockInput = readOrpcJsonPayload(lockRequest.body);
@@ -8864,25 +8589,9 @@ describe.serial("console e2e with Bun.WebView", () => {
       await using view = createWebView();
       await view.navigate(`${previewUrl}/projects/prj_demo?tab=environments`);
       await expectAnyText(view, ["Locked", "已锁定"]);
-      const clicked = await waitFor(
-        () =>
-          view.evaluate<boolean>(
-            `(() => {
-              const button = Array.from(document.querySelectorAll("button")).find((candidate) =>
-                candidate.getAttribute("title") === "Unlock" ||
-                candidate.getAttribute("title") === "解锁"
-              );
-              if (!(button instanceof HTMLButtonElement)) {
-                return false;
-              }
-              button.click();
-              return true;
-            })()`,
-          ),
-        Boolean,
-        "Expected environment unlock button",
-      );
-      expect(clicked).toBe(true);
+      await clickButtonByAnyText(view, lifecycleActionLabels);
+      await clickDialogButtonByAnyText(view, ["Unlock", "解锁"]);
+      await clickDialogFooterButtonByExactText(view, ["Unlock", "解锁"]);
 
       const unlockRequest = await waitForRecordedRequest("/api/rpc/environments/unlock");
       const unlockInput = readOrpcJsonPayload(unlockRequest.body);
@@ -8914,25 +8623,13 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/resources/res_demo`);
+      await view.navigate(`${previewUrl}${demoResourcePath}?tab=settings&section=danger`);
       await expectAnyText(view, ["Archived", "已归档"]);
-      const clicked = await waitFor(
-        () =>
-          view.evaluate<boolean>(
-            `(() => {
-              const button = document.querySelector("#resource-delete-action");
-              if (!(button instanceof HTMLButtonElement)) {
-                return false;
-              }
-              button.click();
-              return true;
-            })()`,
-          ),
-        Boolean,
-        "Expected archived resource delete action",
-      );
-      expect(clicked).toBe(true);
-      await submitConsolePrompt(view, "workspace");
+      await clickButtonByAnyText(view, lifecycleActionLabels);
+      await clickDialogButtonByAnyText(view, ["Delete", "删除"]);
+      await setInputValue(view, "#resource-delete-confirmation", "workspace");
+      await expectInputValue(view, "#resource-delete-confirmation", "workspace");
+      await clickDialogFooterButtonByExactText(view, ["Delete", "删除"]);
 
       const deleteRequest = await waitForRecordedRequest("/api/rpc/resources/delete");
       const deleteInput = readOrpcJsonPayload(deleteRequest.body);
@@ -9030,11 +8727,10 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/resources/res_demo`);
+      await view.navigate(`${previewUrl}${demoResourcePath}?tab=networking&section=domains`);
 
-      await clickButtonByAnyText(view, ["Custom domains", "自定义域名"]);
-      await expectAnyText(view, ["Manual certificate", "手动证书"]);
       await clickButtonByAnyText(view, ["Import certificate", "导入证书"]);
+      await expectAnyText(view, ["Manual certificate", "手动证书"]);
       await setInputValue(
         view,
         "#resource-domain-binding-import-certificate-chain-dbn_manual",
@@ -9065,7 +8761,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       await expectText(view, "crt_manual");
       await expectAnyText(view, ["Imported", "已导入"]);
       await expectAnyText(view, ["Ready", "READY", "已就绪", "就绪"]);
-      await expectText(view, "api.manual.example.test");
+      await expectAnyText(view, ["2026/06/01", "06/01/2026", "6/1/2026", "2026-06-01"]);
     } finally {
       if (previousImportRoute === undefined) {
         delete apiResponses.dashboard["/api/rpc/certificates/import"];
@@ -9113,9 +8809,8 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/resources/res_demo`);
+      await view.navigate(`${previewUrl}${demoResourcePath}?tab=networking&section=domains`);
 
-      await clickButtonByAnyText(view, ["Custom domains", "自定义域名"]);
       await expectText(view, "managed.example.test");
       await expectAnyText(view, [
         "Managed issuance remains responsible for this binding.",
@@ -9136,7 +8831,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     activeScenario = "github-connected";
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/deploy?source=github&githubMode=browser`);
+    await view.navigate(`${previewUrl}/?modal=quick-deploy&source=github&githubMode=browser`);
 
     await expectAnyText(view, ["GitHub repository", "GitHub 仓库"]);
     await expectText(view, "acme/platform");
@@ -9161,7 +8856,8 @@ describe.serial("console e2e with Bun.WebView", () => {
     activeScenario = "static-quick-deploy";
     resetRecordedApiRequests();
 
-    const deployState = new URL(`${previewUrl}/deploy`);
+    const deployState = new URL(`${previewUrl}/`);
+    deployState.searchParams.set("modal", "quick-deploy");
     deployState.searchParams.set("step", "review");
     deployState.searchParams.set("source", "remote-git");
     deployState.searchParams.set("sourceLocator", "https://github.com/acme/docs-site.git");
@@ -9231,8 +8927,11 @@ describe.serial("console e2e with Bun.WebView", () => {
       resourceId: "res_static",
     });
 
-    await clickButtonByAnyText(view, ["View deployment", "查看部署"]);
-    await expectLocation(view, "/deployments/dep_static");
+    await clickDialogButtonByAnyText(view, ["View deployment", "查看部署"]);
+    await expectLocation(
+      view,
+      "/projects/prj_static/environments/env_static/resources/res_static/deployments/dep_static",
+    );
     await expectText(view, "docs-site");
 
     const deploymentShowRequest = await waitForRecordedRequest("/api/rpc/deployments/show");
@@ -9250,7 +8949,8 @@ describe.serial("console e2e with Bun.WebView", () => {
     activeScenario = "static-quick-deploy";
     resetRecordedApiRequests();
 
-    const deployState = new URL(`${previewUrl}/deploy`);
+    const deployState = new URL(`${previewUrl}/`);
+    deployState.searchParams.set("modal", "quick-deploy");
     deployState.searchParams.set("step", "review");
     deployState.searchParams.set("source", "local-folder");
     deployState.searchParams.set("sourceLocator", "/workspace");

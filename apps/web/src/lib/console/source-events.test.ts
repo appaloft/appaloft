@@ -30,12 +30,21 @@ describe("source event console diagnostics", () => {
 
   test("[SRC-AUTO-ENTRY-003] Resource detail mounts source event diagnostics against public help anchors", async () => {
     const source = await readFile(
-      new URL("../../routes/resources/[resourceId]/+page.svelte", import.meta.url),
+      new URL("../../routes/resources/[resourceId=consoleObjectId]/+page.svelte", import.meta.url),
       "utf8",
     );
 
     expect(source).toContain("orpcClient.sourceEvents.list");
     expect(source).toContain('queryKey: ["source-events", "resource", resourceId]');
+    const sourceEventsQuerySource =
+      source.match(
+        /const resourceSourceEventsQuery = createQuery\(\(\) =>[\s\S]*?const resourcePreviewEnvironmentsQuery = createQuery/,
+      )?.[0] ?? "";
+    expect(source).toContain("const resourceSourceEventsEnabled = $derived");
+    expect(source).toContain('activeTab === "jobs"');
+    expect(source).toContain('activeResourceSection === "source-events"');
+    expect(sourceEventsQuerySource).toContain("enabled: resourceSourceEventsEnabled");
+    expect(sourceEventsQuerySource).not.toContain("enabled: browser && resourceId.length > 0,");
     expect(source).toContain("sourceEventVisibleOutcomes");
     expect(source).toContain("sourceAutoDeployDedupe");
     expect(source).toContain("sourceAutoDeployIgnoredEvents");

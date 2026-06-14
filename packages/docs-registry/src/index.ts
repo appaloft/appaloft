@@ -953,7 +953,9 @@ export const publicDocsHelpTopics = {
       "docs/specs/008-resource-detail-profile-editing/spec.md",
       "docs/specs/009-resource-detail-profile-editing-closure/spec.md",
     ],
-    webSurfaces: ["apps/web/src/routes/resources/[resourceId]/+page.svelte: resource source form"],
+    webSurfaces: [
+      "apps/web/src/routes/resources/[resourceId=consoleObjectId]/+page.svelte: resource source form",
+    ],
   },
   "resource.runtime-profile": {
     id: "resource.runtime-profile",
@@ -987,7 +989,7 @@ export const publicDocsHelpTopics = {
       "docs/specs/009-resource-detail-profile-editing-closure/spec.md",
     ],
     webSurfaces: [
-      "apps/web/src/routes/resources/[resourceId]/+page.svelte: resource runtime profile form",
+      "apps/web/src/routes/resources/[resourceId=consoleObjectId]/+page.svelte: resource runtime profile form",
     ],
   },
   "resource.profile-drift": {
@@ -1023,7 +1025,7 @@ export const publicDocsHelpTopics = {
       "docs/testing/deployment-config-file-test-matrix.md",
     ],
     webSurfaces: [
-      "apps/web/src/routes/resources/[resourceId]/+page.svelte: resource diagnostics panel",
+      "apps/web/src/routes/resources/[resourceId=consoleObjectId]/+page.svelte: resource diagnostics panel",
     ],
   },
   "resource.health-profile": {
@@ -1054,7 +1056,7 @@ export const publicDocsHelpTopics = {
       "docs/specs/009-resource-detail-profile-editing-closure/spec.md",
     ],
     webSurfaces: [
-      "apps/web/src/routes/resources/[resourceId]/+page.svelte: resource health policy form",
+      "apps/web/src/routes/resources/[resourceId=consoleObjectId]/+page.svelte: resource health policy form",
     ],
   },
   "resource.network-profile": {
@@ -1090,7 +1092,7 @@ export const publicDocsHelpTopics = {
       "docs/specs/009-resource-detail-profile-editing-closure/spec.md",
     ],
     webSurfaces: [
-      "apps/web/src/routes/resources/[resourceId]/+page.svelte: resource network profile form",
+      "apps/web/src/routes/resources/[resourceId=consoleObjectId]/+page.svelte: resource network profile form",
     ],
   },
   "resource.access-profile": {
@@ -1124,7 +1126,9 @@ export const publicDocsHelpTopics = {
       "docs/specs/007-resource-access-profile-configuration/spec.md",
       "docs/specs/009-resource-detail-profile-editing-closure/spec.md",
     ],
-    webSurfaces: ["apps/web/src/routes/resources/[resourceId]/+page.svelte: resource access form"],
+    webSurfaces: [
+      "apps/web/src/routes/resources/[resourceId=consoleObjectId]/+page.svelte: resource access form",
+    ],
   },
   "storage.volume-lifecycle": {
     id: "storage.volume-lifecycle",
@@ -1530,7 +1534,7 @@ export const publicDocsHelpTopics = {
       "docs/testing/deployment-target-lifecycle-test-matrix.md",
     ],
     webSurfaces: [
-      "apps/web/src/routes/servers/[serverId]/+page.svelte: server edge proxy intent selector",
+      "apps/web/src/routes/servers/[serverId=consoleObjectId]/+page.svelte: server edge proxy intent selector",
     ],
   },
   "default-access.policy": {
@@ -1561,7 +1565,7 @@ export const publicDocsHelpTopics = {
     ],
     webSurfaces: [
       "apps/web/src/routes/servers/+page.svelte: system default access policy form and readback",
-      "apps/web/src/routes/servers/[serverId]/+page.svelte: server default access override form and readback",
+      "apps/web/src/routes/servers/[serverId=consoleObjectId]/+page.svelte: server default access override form and readback",
     ],
   },
   "server.terminal-session": {
@@ -1590,8 +1594,8 @@ export const publicDocsHelpTopics = {
     ],
     aliases: ["terminal", "shell", "ssh session", "terminal session lifecycle", "终端"],
     webSurfaces: [
-      "apps/web/src/routes/resources/[resourceId]/+page.svelte: resource-scoped terminal open and attach",
-      "apps/web/src/routes/servers/[serverId]/+page.svelte: server-scoped terminal open and attach",
+      "apps/web/src/routes/resources/[resourceId=consoleObjectId]/+page.svelte: resource-scoped terminal open and attach",
+      "apps/web/src/routes/servers/[serverId=consoleObjectId]/+page.svelte: server-scoped terminal open and attach",
       "apps/web/src/routes/instance/+page.svelte: active terminal session lifecycle list, close, and expire with Bun.WebView route coverage",
     ],
   },
@@ -1694,7 +1698,7 @@ export const publicDocsHelpTopics = {
       "docs/specs/031-resource-secret-operations-and-effective-config/spec.md",
     ],
     webSurfaces: [
-      "apps/web/src/routes/resources/[resourceId]/+page.svelte: resource configuration section",
+      "apps/web/src/routes/resources/[resourceId=consoleObjectId]/+page.svelte: resource configuration section",
     ],
   },
   "environment.diff-promote": {
@@ -1737,9 +1741,9 @@ export const publicDocsHelpTopics = {
       "docs/specs/005-resource-access-route-precedence/spec.md",
     ],
     webSurfaces: [
-      "apps/web/src/routes/resources/[resourceId]/+page.svelte: resource access area",
+      "apps/web/src/routes/resources/[resourceId=consoleObjectId]/+page.svelte: resource access area",
       "apps/web/src/lib/components/console/QuickDeploySheet.svelte: completion feedback",
-      "apps/web/src/routes/deployments/[deploymentId]/+page.svelte: deployment access URL area",
+      "apps/web/src/routes/deployments/[deploymentId=deploymentId]/+page.svelte: deployment access URL area",
     ],
   },
   "domain.custom-domain-binding": {
@@ -1764,7 +1768,7 @@ export const publicDocsHelpTopics = {
     ],
     webSurfaces: [
       "apps/web/src/routes/domain-bindings/+page.svelte: standalone domain binding create form",
-      "apps/web/src/routes/resources/[resourceId]/+page.svelte: resource-scoped domain binding create form",
+      "apps/web/src/routes/resources/[resourceId=consoleObjectId]/+page.svelte: resource-scoped domain binding create form",
     ],
   },
   "domain.ownership-check": {
@@ -1789,7 +1793,7 @@ export const publicDocsHelpTopics = {
     ],
     webSurfaces: [
       "apps/web/src/routes/domain-bindings/+page.svelte: standalone ownership confirmation action",
-      "apps/web/src/routes/resources/[resourceId]/+page.svelte: resource-scoped ownership confirmation action",
+      "apps/web/src/routes/resources/[resourceId=consoleObjectId]/+page.svelte: resource-scoped ownership confirmation action",
     ],
   },
   "certificate.readiness": {
@@ -1958,8 +1962,8 @@ export const publicDocsHelpTopics = {
       "docs/testing/resource-diagnostic-summary-test-matrix.md",
     ],
     webSurfaces: [
-      "apps/web/src/routes/resources/[resourceId]/+page.svelte: resource detail diagnostic copy action",
-      "apps/web/src/routes/deployments/[deploymentId]/+page.svelte: deployment detail diagnostic copy action",
+      "apps/web/src/routes/resources/[resourceId=consoleObjectId]/+page.svelte: resource detail diagnostic copy action",
+      "apps/web/src/routes/deployments/[deploymentId=deploymentId]/+page.svelte: deployment detail diagnostic copy action",
       "apps/web/src/lib/components/console/QuickDeploySheet.svelte: Quick Deploy completion diagnostic copy action",
     ],
   },
