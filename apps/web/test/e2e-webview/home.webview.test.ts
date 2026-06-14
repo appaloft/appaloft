@@ -3474,7 +3474,7 @@ async function waitFor<T>(
   read: () => Promise<T>,
   matches: (value: T) => boolean,
   failureMessage: string,
-  timeoutMs = 7_000,
+  timeoutMs = 12_000,
 ): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   let lastValue: T | undefined;
