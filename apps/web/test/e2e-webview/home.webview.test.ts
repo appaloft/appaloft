@@ -5396,8 +5396,9 @@ describe.serial("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
     const previousListRoute = apiResponses.dashboard["/api/rpc/projects/list"];
     const previousShowRoute = apiResponses.dashboard["/api/rpc/projects/show"];
+    const projectId = "prj_demo";
     const archivedProject = {
-      id: "prj_demo",
+      id: projectId,
       name: "Demo",
       slug: "demo",
       description: "Demo project",
@@ -5464,8 +5465,9 @@ describe.serial("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
     const previousListRoute = apiResponses.dashboard["/api/rpc/projects/list"];
     const previousShowRoute = apiResponses.dashboard["/api/rpc/projects/show"];
+    const projectId = "prj_delete_demo";
     const archivedProject = {
-      id: "prj_demo",
+      id: projectId,
       name: "Demo",
       slug: "demo",
       description: "Demo project",
@@ -5484,12 +5486,12 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/projects/prj_demo?tab=settings`);
+      await view.navigate(`${previewUrl}/projects/${projectId}?tab=settings`);
       await expectAnyText(view, ["Danger zone", "危险区"]);
 
       const deleteCheckRequest = await waitForRecordedRequest("/api/rpc/projects/deleteCheck");
       expect(readOrpcJsonPayload(deleteCheckRequest.body)).toEqual({
-        projectId: "prj_demo",
+        projectId,
       });
       expect(
         await view.evaluate<boolean>(
