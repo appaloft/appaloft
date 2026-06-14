@@ -5736,6 +5736,7 @@ export interface ProcessAttemptRecord {
 export interface ProcessAttemptListFilter {
   kind?: ProcessAttemptKind;
   status?: ProcessAttemptStatus;
+  projectId?: string;
   resourceId?: string;
   serverId?: string;
   deploymentId?: string;

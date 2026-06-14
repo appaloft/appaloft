@@ -17,6 +17,7 @@ export class ListOperatorWorkQuery extends Query<OperatorWorkList> {
   constructor(
     public readonly kind?: OperatorWorkKind,
     public readonly status?: OperatorWorkStatus,
+    public readonly projectId?: string,
     public readonly resourceId?: string,
     public readonly serverId?: string,
     public readonly deploymentId?: string,
@@ -31,6 +32,7 @@ export class ListOperatorWorkQuery extends Query<OperatorWorkList> {
         new ListOperatorWorkQuery(
           parsed.kind,
           parsed.status,
+          trimToUndefined(parsed.projectId),
           trimToUndefined(parsed.resourceId),
           trimToUndefined(parsed.serverId),
           trimToUndefined(parsed.deploymentId),

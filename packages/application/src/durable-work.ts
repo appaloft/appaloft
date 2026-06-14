@@ -348,6 +348,28 @@ function addMilliseconds(timestamp: string, milliseconds: number): Result<string
   return ok(new Date(base + milliseconds).toISOString());
 }
 
+async function appendDurableWorkEvent(
+  context: RepositoryContext,
+  adapter: DurableWorkQueueAdapter,
+  input: Omit<DurableWorkEventRecord, "id" | "sequence">,
+): Promise<void> {
+  try {
+    const events = await adapter.listEvents(context, input.workItemId);
+    if (events.isErr()) {
+      return;
+    }
+
+    const sequence = events.value.reduce((max, event) => Math.max(max, event.sequence), 0) + 1;
+    await adapter.appendEvent(context, {
+      ...input,
+      id: `${input.workItemId}_${input.kind}_${sequence}`,
+      sequence,
+    });
+  } catch {
+    // Progress events are observability only; worker completion must remain authoritative.
+  }
+}
+
 export async function drainDurableWorkOnce(
   context: ExecutionContext,
   adapter: DurableWorkQueueAdapter,
@@ -399,6 +421,20 @@ export async function drainDurableWorkOnce(
     }
 
     claimed += 1;
+    await appendDurableWorkEvent(repositoryContext, adapter, {
+      workItemId: claim.value.workItem.id,
+      kind: "claimed",
+      status: "running",
+      ...(claim.value.workItem.phase ? { phase: claim.value.workItem.phase } : {}),
+      ...(claim.value.workItem.step ? { step: claim.value.workItem.step } : {}),
+      message: "Operator work was claimed by a worker.",
+      workerId: input.worker.workerId,
+      workerGroup: input.worker.workerGroup,
+      occurredAt: input.now,
+      ...(claim.value.workItem.safeDetails
+        ? { safeDetails: claim.value.workItem.safeDetails }
+        : {}),
+    });
 
     try {
       const handled = await handler.handle(context, claim.value.workItem, input.worker);
@@ -415,6 +451,22 @@ export async function drainDurableWorkOnce(
         });
         if (completion.isErr()) {
           return err(completion.error);
+        }
+        if (completion.value.status === "completed") {
+          await appendDurableWorkEvent(repositoryContext, adapter, {
+            workItemId: claim.value.workItem.id,
+            kind: "completed",
+            status: "failed",
+            ...(completion.value.workItem.phase ? { phase: completion.value.workItem.phase } : {}),
+            ...(completion.value.workItem.step ? { step: completion.value.workItem.step } : {}),
+            message: "Operator work failed.",
+            workerId: input.worker.workerId,
+            workerGroup: input.worker.workerGroup,
+            occurredAt: input.now,
+            ...(completion.value.workItem.safeDetails
+              ? { safeDetails: completion.value.workItem.safeDetails }
+              : {}),
+          });
         }
         failed += 1;
         continue;
@@ -437,6 +489,25 @@ export async function drainDurableWorkOnce(
       if (completion.isErr()) {
         return err(completion.error);
       }
+      if (completion.value.status === "completed") {
+        await appendDurableWorkEvent(repositoryContext, adapter, {
+          workItemId: claim.value.workItem.id,
+          kind: "completed",
+          status: completion.value.workItem.status,
+          ...(completion.value.workItem.phase ? { phase: completion.value.workItem.phase } : {}),
+          ...(completion.value.workItem.step ? { step: completion.value.workItem.step } : {}),
+          message:
+            completion.value.workItem.status === "succeeded"
+              ? "Operator work completed."
+              : "Operator work reached a terminal status.",
+          workerId: input.worker.workerId,
+          workerGroup: input.worker.workerGroup,
+          occurredAt: input.now,
+          ...(completion.value.workItem.safeDetails
+            ? { safeDetails: completion.value.workItem.safeDetails }
+            : {}),
+        });
+      }
 
       completed += completion.value.status === "completed" ? 1 : 0;
     } catch (error) {
@@ -455,6 +526,22 @@ export async function drainDurableWorkOnce(
       });
       if (completion.isErr()) {
         return err(completion.error);
+      }
+      if (completion.value.status === "completed") {
+        await appendDurableWorkEvent(repositoryContext, adapter, {
+          workItemId: claim.value.workItem.id,
+          kind: "completed",
+          status: "failed",
+          ...(completion.value.workItem.phase ? { phase: completion.value.workItem.phase } : {}),
+          ...(completion.value.workItem.step ? { step: completion.value.workItem.step } : {}),
+          message: "Operator work failed with an unhandled error.",
+          workerId: input.worker.workerId,
+          workerGroup: input.worker.workerGroup,
+          occurredAt: input.now,
+          ...(completion.value.workItem.safeDetails
+            ? { safeDetails: completion.value.workItem.safeDetails }
+            : {}),
+        });
       }
       failed += 1;
     }

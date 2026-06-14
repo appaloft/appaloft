@@ -47,6 +47,7 @@ import { type ShowOperatorWorkQuery } from "./show-operator-work.query";
 type OperatorWorkFilter = {
   kind?: OperatorWorkKind;
   status?: OperatorWorkStatus;
+  projectId?: string;
   resourceId?: string;
   serverId?: string;
   deploymentId?: string;
@@ -500,6 +501,7 @@ function matchesFilter(item: OperatorWorkItem, filter: OperatorWorkFilter): bool
   return (
     (!filter.kind || item.kind === filter.kind) &&
     (!filter.status || item.status === filter.status) &&
+    (!filter.projectId || item.projectId === filter.projectId) &&
     (!filter.resourceId || item.resourceId === filter.resourceId) &&
     (!filter.serverId || item.serverId === filter.serverId) &&
     (!filter.deploymentId || item.deploymentId === filter.deploymentId)
@@ -555,6 +557,7 @@ export class OperatorWorkQueryService {
     const filter: OperatorWorkFilter = {
       ...(query.kind ? { kind: query.kind } : {}),
       ...(query.status ? { status: query.status } : {}),
+      ...(query.projectId ? { projectId: query.projectId } : {}),
       ...(query.resourceId ? { resourceId: query.resourceId } : {}),
       ...(query.serverId ? { serverId: query.serverId } : {}),
       ...(query.deploymentId ? { deploymentId: query.deploymentId } : {}),
@@ -570,6 +573,7 @@ export class OperatorWorkQueryService {
           await this.durableWorkLedger.listItems(repositoryContext, {
             ...(filter.kind ? { kind: filter.kind } : {}),
             ...(isDurableWorkItemStatus(filter.status) ? { status: filter.status } : {}),
+            ...(filter.projectId ? { projectId: filter.projectId } : {}),
             ...(filter.resourceId ? { resourceId: filter.resourceId } : {}),
             ...(filter.serverId ? { serverId: filter.serverId } : {}),
             ...(filter.deploymentId ? { deploymentId: filter.deploymentId } : {}),
@@ -699,7 +703,15 @@ export class OperatorWorkQueryService {
 
     const list = await this.list(
       context,
-      new ListOperatorWorkQuery(undefined, undefined, undefined, undefined, undefined, 200),
+      new ListOperatorWorkQuery(
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        200,
+      ),
     );
     const item = list.items.find((candidate) => candidate.id === query.workId);
 

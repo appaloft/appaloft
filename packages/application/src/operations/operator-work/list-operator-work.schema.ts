@@ -17,6 +17,7 @@ const queryLimitSchema = z
 export const listOperatorWorkQueryInputSchema = z.object({
   kind: z.enum(operatorWorkKinds).optional(),
   status: z.enum(operatorWorkStatuses).optional(),
+  projectId: z.string().optional(),
   resourceId: z.string().optional(),
   serverId: z.string().optional(),
   deploymentId: z.string().optional(),
