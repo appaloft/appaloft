@@ -189,17 +189,11 @@ function operatorWorkMessage(event: OperatorWorkObservedEvent): string {
   const parts = [
     event.message,
     event.step ? `step: ${event.step}` : undefined,
-    operatorWorkWorkerMessagePart(event),
     event.errorCode ? `error: ${event.errorCode}` : undefined,
     ...operatorWorkSafeDetailMessageParts(event.safeDetails),
   ].filter(Boolean);
 
-  return parts.join(" · ") || `Operator work ${event.kind}`;
-}
-
-function operatorWorkWorkerMessagePart(event: OperatorWorkObservedEvent): string | undefined {
-  const worker = [event.workerGroup, event.workerId].filter(Boolean).join("/");
-  return worker ? `worker: ${worker}` : undefined;
+  return parts.join(" · ") || `Deployment task ${event.kind}`;
 }
 
 function operatorWorkSafeDetailMessageParts(
