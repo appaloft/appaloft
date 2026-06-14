@@ -5362,6 +5362,25 @@ describe.serial("console e2e with Bun.WebView", () => {
     await view.navigate(`${previewUrl}/projects/prj_demo?tab=settings`);
     await expectAnyText(view, ["Project settings", "项目设置"]);
     await expectAnyText(view, ["Project lifecycle", "生命周期"]);
+    expect(
+      await view.evaluate<boolean>(
+        `(() => {
+          const settings = document.querySelector("[data-project-settings-display-surface]");
+          const general = document.querySelector("[data-project-settings-general]");
+          const danger = document.querySelector("[data-project-danger-display-surface]");
+          const activeSubnav = settings?.querySelector('[aria-current="page"]');
+          return Boolean(
+            settings &&
+            general &&
+            !danger &&
+            (
+              activeSubnav?.textContent?.includes("General") ||
+              activeSubnav?.textContent?.includes("通用")
+            )
+          );
+        })()`,
+      ),
+    ).toBe(true);
 
     const showRequest = await waitForRecordedRequest("/api/rpc/projects/show");
     expect(readOrpcJsonPayload(showRequest.body)).toEqual({
@@ -5423,16 +5442,15 @@ describe.serial("console e2e with Bun.WebView", () => {
       await using view = createWebView();
       await view.navigate(`${previewUrl}/projects/prj_demo?tab=settings`);
       await expectAnyText(view, ["Archived", "已归档"]);
-      await expectAnyText(view, ["Danger zone", "危险区"]);
 
       await expectNoEnabledLinkByText(view, ["Create resource", "创建资源"]);
 
-      const archivedSettingsState = await waitFor(
+      const archivedGeneralState = await waitFor(
         () =>
           view.evaluate<{
             editDisabled: boolean;
+            hasGeneralSurface: boolean;
             hasDangerSurface: boolean;
-            hasInlineRestore: boolean;
           }>(
             `(() => {
               const editButton = Array.from(document.querySelectorAll("button")).find((candidate) =>
@@ -5441,17 +5459,41 @@ describe.serial("console e2e with Bun.WebView", () => {
               );
               return {
                 editDisabled: editButton instanceof HTMLButtonElement && editButton.disabled,
+                hasGeneralSurface: Boolean(document.querySelector("[data-project-settings-general]")),
                 hasDangerSurface: Boolean(document.querySelector("[data-project-danger-display-surface]")),
-                hasInlineRestore: Boolean(document.querySelector("#project-restore-button")),
               };
             })()`,
           ),
-        (state) => state.editDisabled && state.hasDangerSurface && !state.hasInlineRestore,
-        "Expected archived project settings to disable edit and keep lifecycle out of inline forms",
+        (state) => state.editDisabled && state.hasGeneralSurface && !state.hasDangerSurface,
+        "Expected archived project general settings to disable edit",
       );
-      expect(archivedSettingsState).toEqual({
+      expect(archivedGeneralState).toEqual({
         editDisabled: true,
+        hasGeneralSurface: true,
+        hasDangerSurface: false,
+      });
+
+      await view.navigate(`${previewUrl}/projects/prj_demo?tab=settings&section=danger`);
+      await expectAnyText(view, ["Danger zone", "危险区"]);
+      const archivedDangerState = await waitFor(
+        () =>
+          view.evaluate<{
+            hasDangerSurface: boolean;
+            hasGeneralSurface: boolean;
+            hasInlineRestore: boolean;
+          }>(
+            `(() => ({
+              hasDangerSurface: Boolean(document.querySelector("[data-project-danger-display-surface]")),
+              hasGeneralSurface: Boolean(document.querySelector("[data-project-settings-general]")),
+              hasInlineRestore: Boolean(document.querySelector("#project-restore-button")),
+            }))()`,
+          ),
+        (state) => state.hasDangerSurface && !state.hasGeneralSurface && !state.hasInlineRestore,
+        "Expected archived project danger settings to keep lifecycle out of inline forms",
+      );
+      expect(archivedDangerState).toEqual({
         hasDangerSurface: true,
+        hasGeneralSurface: false,
         hasInlineRestore: false,
       });
 
@@ -5490,7 +5532,7 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/projects/${projectId}?tab=settings`);
+      await view.navigate(`${previewUrl}/projects/${projectId}?tab=settings&section=danger`);
       await expectAnyText(view, ["Danger zone", "危险区"]);
 
       const deleteCheckRequest = await waitForRecordedRequest(
@@ -5502,7 +5544,19 @@ describe.serial("console e2e with Bun.WebView", () => {
       });
       expect(
         await view.evaluate<boolean>(
-          'Boolean(document.querySelector("[data-project-danger-display-surface]"))',
+          `(() => {
+            const danger = document.querySelector("[data-project-danger-display-surface]");
+            const general = document.querySelector("[data-project-settings-general]");
+            const activeSubnav = document.querySelector("[data-project-settings-display-surface] [aria-current='page']");
+            return Boolean(
+              danger &&
+              !general &&
+              (
+                activeSubnav?.textContent?.includes("Danger zone") ||
+                activeSubnav?.textContent?.includes("危险区")
+              )
+            );
+          })()`,
         ),
       ).toBe(true);
       expect(

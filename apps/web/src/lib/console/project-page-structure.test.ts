@@ -31,9 +31,7 @@ describe("project detail page structure", () => {
     expect(projectSource).toContain("i18nKeys.console.projects.healthSummaryGap");
     expect(projectSource).toContain('from "$lib/console/layout-classes"');
     expect(projectSource).toContain("<div class={detailPageClass}>");
-    expect(projectSource).toContain(
-      "<Tabs.Root value={activeProjectTab} class={detailBodyClass}>",
-    );
+    expect(projectSource).toContain("<Tabs.Root value={activeProjectTab} class={detailBodyClass}>");
     expect(projectSource).toContain("detailTabPanelScrollClass");
     expect(projectSource.match(/detailTabPanelScrollClass/g)?.length).toBeGreaterThanOrEqual(7);
     expect(projectSource).not.toContain("console-detail-");
@@ -53,10 +51,32 @@ describe("project detail page structure", () => {
     expect(projectSource).toContain("environmentCloneDialogOpen");
     expect(projectSource).toContain("i18nKeys.console.projects.activityGapTitle");
     expect(projectSource).toContain("i18nKeys.console.projects.dangerZoneTitle");
+    expect(projectSource).toContain('type ProjectSettingsSection = "general" | "danger"');
+    expect(projectSource).toContain(
+      'const projectSettingsSections = ["general", "danger"] as const',
+    );
+    expect(projectSource).toContain(
+      'parseProjectSettingsSection(page.url.searchParams.get("section"))',
+    );
+    expect(projectSource).toContain("projectSettingsSectionHref(section)");
+    expect(projectSource).toContain("selectProjectSettingsSection(section, event)");
+    expect(projectSource).toContain("data-project-settings-display-surface");
+    expect(projectSource).toContain("data-project-settings-general");
+    expect(projectSource).toContain("detailTabPanelSubnavClass");
+    expect(projectSource).toContain("detailSubnavLayoutClass");
+    expect(projectSource).toContain("detailSubnavClass");
+    expect(projectSource).toContain("subnavListClass");
+    expect(projectSource).toContain("subnavItemClass");
+    expect(projectSource).toContain("detailSubnavContentClass");
+    expect(projectSource.indexOf("data-project-settings-general")).toBeLessThan(
+      projectSource.indexOf("data-project-danger-display-surface"),
+    );
+    expect(projectSource).toContain('{#if activeProjectSettingsSection === "general"}');
+    expect(projectSource).toContain('{:else if activeProjectSettingsSection === "danger"}');
     expect(projectSource.indexOf('value="overview"')).toBeLessThan(
       projectSource.indexOf("i18nKeys.console.runtimeUsage.monitorTitle"),
     );
-    expect(projectSource.indexOf("i18nKeys.console.projects.dangerZoneTitle")).toBeGreaterThan(
+    expect(projectSource.indexOf("data-project-danger-display-surface")).toBeGreaterThan(
       projectSource.indexOf('value="settings"'),
     );
     expect(projectSource).not.toContain(`id={\`environment-rename-form-\${environment.id}\`}`);
