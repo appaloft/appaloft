@@ -1580,7 +1580,7 @@
 
         <Tabs.Content
           value="overview"
-          class="console-detail-tab-panel console-detail-tab-panel-scroll flex flex-col gap-6"
+          class="console-detail-tab-panel console-detail-tab-panel-scroll mt-0 flex flex-col gap-6 pt-0"
         >
           <section class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
             <div class="space-y-5">
@@ -2061,7 +2061,7 @@
 
         <Tabs.Content
           value="resources"
-          class="console-detail-tab-panel console-detail-tab-panel-scroll"
+          class="console-detail-tab-panel console-detail-tab-panel-scroll mt-0 pt-0"
         >
           <section class="space-y-4">
             <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
@@ -2141,7 +2141,7 @@
 
         <Tabs.Content
           value="previews"
-          class="console-detail-tab-panel console-detail-tab-panel-scroll"
+          class="console-detail-tab-panel console-detail-tab-panel-scroll mt-0 pt-0"
         >
           <section class="space-y-6">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -2314,7 +2314,7 @@
 
         <Tabs.Content
           value="environments"
-          class="console-detail-tab-panel console-detail-tab-panel-scroll"
+          class="console-detail-tab-panel console-detail-tab-panel-scroll mt-0 pt-0"
         >
           <section class="space-y-4">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -2446,7 +2446,7 @@
 
         <Tabs.Content
           value="deployments"
-          class="console-detail-tab-panel console-detail-tab-panel-scroll"
+          class="console-detail-tab-panel console-detail-tab-panel-scroll mt-0 pt-0"
         >
           <section class="space-y-4">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -2529,7 +2529,7 @@
 
         <Tabs.Content
           value="activity"
-          class="console-detail-tab-panel console-detail-tab-panel-scroll"
+          class="console-detail-tab-panel console-detail-tab-panel-scroll mt-0 pt-0"
           data-project-activity-display-surface
         >
           <section class="console-panel space-y-5 p-5">
@@ -2568,7 +2568,7 @@
 
         <Tabs.Content
           value="settings"
-          class="console-detail-tab-panel console-detail-tab-panel-scroll"
+          class="console-detail-tab-panel console-detail-tab-panel-scroll mt-0 pt-0"
         >
           <section class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
             <div class="space-y-4">

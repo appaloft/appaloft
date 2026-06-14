@@ -106,6 +106,10 @@ const retiredIntentRoutesSource = readFileSync(
   fileURLToPath(new URL("./retired-intent-routes.ts", import.meta.url)),
   "utf8",
 );
+const consoleLayoutCssSource = readFileSync(
+  fileURLToPath(new URL("../../routes/layout.css", import.meta.url)),
+  "utf8",
+);
 const serverDetailPageSource = readFileSync(
   fileURLToPath(
     new URL("../../routes/servers/[serverId=consoleObjectId]/+page.svelte", import.meta.url),
@@ -818,6 +822,8 @@ describe("console page structure", () => {
     expect(resourceListTableSource).toContain("data-resource-record-list");
     expect(resourceListTableSource).toContain("data-resource-record-row");
     expect(resourceListTableSource).toContain("data-resource-owner-summary");
+    expect(resourceListTableSource).toContain("xl:items-center xl:py-3");
+    expect(resourceListTableSource).toContain("xl:grid-flow-col xl:grid-cols-none xl:auto-cols-fr");
     expect(resourceListTableSource).not.toContain('from "$lib/components/ui/table"');
     expect(resourceListTableSource).not.toContain("<Table.Root");
     expect(consoleStatePanelSource).toContain("{#if actionLabel && actionOnclick}");
@@ -1064,6 +1070,8 @@ describe("console page structure", () => {
       "Resource has no observable runtime deployment",
     );
     expect(resourceTerminalTabSource).toContain("<TerminalSessionPanel");
+    expect(resourceTerminalTabSource).toContain("docsHref={webDocsHrefs.serverTerminalSession}");
+    expect(resourceTerminalTabSource).not.toContain('<div class="flex justify-end">');
     expect(resourceTerminalTabSource).toContain("data-resource-terminal-unavailable-state");
     expect(resourceTerminalTabSource).toContain("terminal.resourceUnavailableTitle");
     expect(resourceTerminalTabSource).toContain("terminal.resourceUnavailableBody");
@@ -1114,6 +1122,23 @@ describe("console page structure", () => {
     expect(settingsGeneralSource).not.toContain("serviceTopologyTitle");
     assertDisplaySurfaceIsFormFree(settingsGeneralSource);
     expect(configurationProfileSource).toContain("<ResourceProfileSummary");
+  });
+
+  test("[RESOURCE-HEALTH-IA-001] keeps health summary items visually bounded", () => {
+    const healthPolicySource = sourceBetween(
+      resourceDetailPageSource,
+      'id="resource-health-policy"',
+      '{:else if activeResourceSection === "danger"}',
+    );
+
+    expect(healthPolicySource).toContain("healthRuntime");
+    expect(healthPolicySource).toContain("healthPolicy");
+    expect(healthPolicySource).toContain("healthPublicAccess");
+    expect(healthPolicySource).toContain("healthProxy");
+    expect(
+      healthPolicySource.match(/class="rounded-md border bg-background px-3 py-2"/g)?.length,
+    ).toBeGreaterThanOrEqual(4);
+    expect(healthPolicySource).not.toContain('class="rounded-md bg-muted/25 px-3 py-2"');
   });
 
   test("[RESOURCE-NETWORKING-IA-001] owns domain binding creation from a focused dialog", () => {
@@ -1302,6 +1327,23 @@ describe("console page structure", () => {
     expect(resourceLifecycleDialogSource).toContain("lifecycleArchiveOption");
     expect(resourceLifecycleDialogSource).toContain("lifecycleDeleteOption");
     expect(resourceLifecycleDialogSource).toContain("lifecyclePreviewDeleteOption");
+    expect(resourceLifecycleDialogSource).toContain(
+      '<Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-2xl">',
+    );
+    expect(resourceLifecycleDialogSource).toContain(
+      'class="box-border min-w-0 w-full space-y-5 overflow-x-hidden px-5 pb-5"',
+    );
+    expect(resourceLifecycleDialogSource).toContain('class="grid min-w-0 gap-2 sm:grid-cols-2"');
+    expect(
+      resourceLifecycleDialogSource.match(
+        /class="h-auto min-w-0 w-full max-w-full items-start justify-start whitespace-normal px-3 py-3 text-left"/g,
+      )?.length,
+    ).toBeGreaterThanOrEqual(2);
+    expect(resourceLifecycleDialogSource).toContain('class="mt-0.5 size-4 shrink-0"');
+    expect(resourceLifecycleDialogSource).toContain('class="min-w-0 flex-1"');
+    expect(resourceLifecycleDialogSource).toContain(
+      'class="block break-words text-xs font-normal leading-snug opacity-80"',
+    );
     expect(resourceLifecycleDialogSource).toContain("<Input");
     expect(resourceLifecycleDialogSource).toContain(
       "resourceDeleteConfirmation.trim() !== resource.slug",
@@ -1325,6 +1367,12 @@ describe("console page structure", () => {
     expect(resourceDetailPageSource).toContain("openRuntimeControlDialog");
     expect(resourceDetailPageSource).toContain("confirmSelectedRuntimeControl");
     expect(resourceDetailPageSource).toContain("data-resource-runtime-control-dialog");
+    expect(runtimeControlPanelSource).toContain(
+      '<section id="resource-runtime-control" class="space-y-4">',
+    );
+    expect(runtimeControlPanelSource).not.toContain(
+      'id="resource-runtime-control" class="space-y-4 p-5"',
+    );
     expect(runtimeControlPanelSource).toContain("onclick={openRuntimeControlDialog}");
     expect(runtimeControlPanelSource).toContain("runtimeControlManageAction");
     expect(runtimeControlPanelSource).not.toContain('openRuntimeControlDialog("stop")');
@@ -1591,10 +1639,28 @@ describe("console page structure", () => {
       "<ConsoleResourceCanvas data-servers-display-surface>",
       "</ConsoleResourceCanvas>",
     );
+    const serverRowHeaderSource = sourceBetween(
+      serversDisplaySurface,
+      "data-server-row-header",
+      "data-server-row-readiness",
+    );
+    const serverOperationalLinksSource = sourceBetween(
+      serversDisplaySurface,
+      "data-server-row-operational-links",
+      "</article>",
+    );
 
     expect(serversDisplaySurface).toContain("data-server-list");
     expect(serversDisplaySurface).toContain("data-server-row");
     expect(serversDisplaySurface).toContain("data-server-row-lifecycle");
+    expect(serverRowHeaderSource.indexOf("<h3")).toBeGreaterThanOrEqual(0);
+    expect(serverRowHeaderSource.indexOf("data-server-row-lifecycle")).toBeGreaterThan(
+      serverRowHeaderSource.indexOf("<h3"),
+    );
+    expect(serverRowHeaderSource.indexOf("data-server-row-lifecycle")).toBeLessThan(
+      serverRowHeaderSource.indexOf("title={`${server.host}:${server.port}`}"),
+    );
+    expect(serverRowHeaderSource).toContain('class="shrink-0"');
     expect(serversDisplaySurface).toContain("data-server-row-readiness");
     expect(serversDisplaySurface).toContain("runtimeAvailabilityLabel(server.runtimeAvailability)");
     expect(serversDisplaySurface).toContain(
@@ -1614,6 +1680,11 @@ describe("console page structure", () => {
     expect(serversDisplaySurface).toContain("data-server-row-operational-links");
     expect(serversDisplaySurface).toContain("serverRuntimeHref(server.id)");
     expect(serversDisplaySurface).toContain("serverConnectivityHref(server.id)");
+    expect(serverOperationalLinksSource).toContain("serverDetailHref(server.id)");
+    expect(serverOperationalLinksSource.indexOf("serverDetailHref(server.id)")).toBeGreaterThan(
+      serverOperationalLinksSource.indexOf("serverConnectivityHref(server.id)"),
+    );
+    expect(serverOperationalLinksSource).toContain("i18nKeys.common.actions.viewDetails");
     expect(serversDisplaySurface).not.toContain("serverTerminalHref");
     expect(serversDisplaySurface).not.toContain("openServerDeleteDialog");
     expect(serversDisplaySurface).not.toContain("openServerDeactivateDialog");
@@ -1635,8 +1706,19 @@ describe("console page structure", () => {
     expect(serverDetailPageSource).toContain('<div class="console-detail-page">');
     expect(serverDetailPageSource).toContain("console-detail-header");
     expect(serverDetailPageSource).toContain(
-      '<Tabs.Root value={activeTab} class="console-detail-body">',
+      '<Tabs.Root value={activeTab} class="console-detail-body console-server-detail-body">',
     );
+    expect(consoleLayoutCssSource).toContain(
+      ".console-server-detail-body > .console-detail-tab-panel",
+    );
+    expect(consoleLayoutCssSource).toContain("margin-top: 0;");
+    expect(consoleLayoutCssSource).toContain(
+      ".console-server-detail-body > .console-detail-tab-panel-scroll",
+    );
+    expect(consoleLayoutCssSource).toContain(
+      ".console-server-detail-body .console-detail-subnav-layout > .console-subnav-content",
+    );
+    expect(consoleLayoutCssSource).toContain("padding-top: 0;");
     expect(serverDetailPageSource).toContain(
       'class="console-detail-tab-panel console-detail-tab-panel-scroll space-y-5"',
     );
@@ -1665,7 +1747,7 @@ describe("console page structure", () => {
     const serverHeaderSource = sourceBetween(
       serverDetailPageSource,
       '<section class="console-detail-header">',
-      '<Tabs.Root value={activeTab} class="console-detail-body">',
+      '<Tabs.Root value={activeTab} class="console-detail-body console-server-detail-body">',
     );
 
     expect(serverOverviewSource).toContain("data-server-overview-operational-surfaces");
@@ -1701,7 +1783,7 @@ describe("console page structure", () => {
     const serverHeaderSource = sourceBetween(
       serverDetailPageSource,
       '<section class="console-detail-header">',
-      '<Tabs.Root value={activeTab} class="console-detail-body">',
+      '<Tabs.Root value={activeTab} class="console-detail-body console-server-detail-body">',
     );
     const serverConnectivityTabSource = sourceBetween(
       serverDetailPageSource,

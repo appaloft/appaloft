@@ -8,6 +8,7 @@
   import { API_BASE } from "$lib/api/client";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
+  import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
   import { i18nKeys, t } from "$lib/i18n";
   import { orpcClient } from "$lib/orpc";
 
@@ -31,6 +32,8 @@
     autoOpen = true,
     fallbackHref = "",
     fallbackLabel = "",
+    docsHref = "",
+    docsAriaLabel = "",
   }: {
     scope: TerminalScope;
     title?: string;
@@ -39,6 +42,8 @@
     autoOpen?: boolean;
     fallbackHref?: string;
     fallbackLabel?: string;
+    docsHref?: string;
+    docsAriaLabel?: string;
   } = $props();
 
   let terminalElement = $state<HTMLDivElement | null>(null);
@@ -385,7 +390,12 @@
 <section class="console-panel space-y-3 p-4">
   <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
     <div class="min-w-0">
-      <h2 class="text-lg font-semibold">{panelTitle}</h2>
+      <div class="flex items-center gap-2">
+        <h2 class="text-lg font-semibold">{panelTitle}</h2>
+        {#if docsHref}
+          <DocsHelpLink href={docsHref} ariaLabel={docsAriaLabel || $t(i18nKeys.common.actions.openDocs)} />
+        {/if}
+      </div>
       <p class="mt-1 text-sm text-muted-foreground">{panelDescription}</p>
     </div>
     <div class="flex shrink-0 flex-wrap items-center gap-2">

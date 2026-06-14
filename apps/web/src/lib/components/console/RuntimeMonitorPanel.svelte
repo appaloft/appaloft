@@ -3,8 +3,11 @@
     Activity,
     ClipboardList,
     Clock3,
+    Cpu,
     FileText,
     Gauge,
+    HardDrive,
+    MemoryStick,
     RefreshCw,
     Settings2,
     ShieldAlert,
@@ -245,6 +248,7 @@
   const liveSignals = $derived.by(() => [
     {
       key: "cpu",
+      icon: Cpu,
       label: $t(i18nKeys.console.runtimeUsage.cpu),
       value: formatRuntimeMonitoringPercent(latestSignalValue("cpu", latestChartSample?.cpuLoadPercent)),
       data: runtimeMonitoringSignalChartPoints(rollup, chartSamples, "cpu"),
@@ -253,6 +257,7 @@
     },
     {
       key: "memory",
+      icon: MemoryStick,
       label: $t(i18nKeys.console.runtimeUsage.memory),
       value: formatRuntimeMonitoringPercent(latestSignalValue("memory", latestChartSample?.memoryPercent)),
       data: runtimeMonitoringSignalChartPoints(rollup, chartSamples, "memory"),
@@ -261,6 +266,7 @@
     },
     {
       key: "disk",
+      icon: HardDrive,
       label: $t(i18nKeys.console.runtimeUsage.disk),
       value: formatRuntimeMonitoringPercent(latestSignalValue("disk", latestChartSample?.diskPercent)),
       data: runtimeMonitoringSignalChartPoints(rollup, chartSamples, "disk"),
@@ -440,7 +446,7 @@
       </div>
       <div class="flex flex-wrap items-center gap-2">
         <div
-          class="inline-flex items-center gap-1 rounded-md border bg-muted/20 p-1 text-sm text-muted-foreground"
+          class="inline-flex h-8 items-center gap-1 rounded-md border bg-background px-1 text-sm text-muted-foreground"
           aria-label={$t(i18nKeys.console.runtimeUsage.timeRange)}
         >
           <Clock3 class="size-4" />
@@ -448,9 +454,12 @@
           {#each runtimeMonitoringTimeRangeOptions as option (option)}
             <Button
               type="button"
-              size="sm"
-              variant={timeRange === option ? "default" : "ghost"}
+              variant="ghost"
+              class={timeRange === option
+                ? "h-6 border-primary/30 bg-primary/10 px-2 text-primary shadow-none hover:bg-primary/15 hover:text-primary"
+                : "h-6 bg-transparent px-2 text-muted-foreground hover:bg-primary/5 hover:text-foreground"}
               aria-pressed={timeRange === option}
+              data-runtime-time-range-option={option}
               onclick={() => selectTimeRange(option)}
             >
               {timeRangeLabel(option)}
@@ -486,9 +495,12 @@
 
     <div class="mt-4 grid gap-3 lg:grid-cols-3">
       {#each liveSignals as signal (signal.key)}
-        <article class="rounded-md border bg-muted/20 p-3">
+        <article class="rounded-md border bg-muted/20 p-3" data-runtime-signal-card={signal.key}>
           <div class="space-y-1">
-            <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">{signal.label}</p>
+            <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <signal.icon class="size-4" aria-hidden="true" data-runtime-signal-icon />
+              {signal.label}
+            </p>
             <p class="text-xl font-semibold leading-none">
               {signal.value ??
                 (currentLoading

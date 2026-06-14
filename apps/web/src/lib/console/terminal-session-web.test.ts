@@ -86,6 +86,8 @@ describe("terminal session Web console surface", () => {
     expect(panelSource).toContain("cols: terminalCols");
     expect(panelSource).toContain("initialRows: terminalRows");
     expect(panelSource).toContain("initialCols: terminalCols");
+    expect(panelSource).toContain("docsHref");
+    expect(panelSource).toContain("<DocsHelpLink");
     expect(panelSource).toContain("ws.onopen");
     expect(panelSource).toContain("sendResize()");
   });

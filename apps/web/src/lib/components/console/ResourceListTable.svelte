@@ -73,7 +73,7 @@
       {@const childDeployments = resourceDeployments(resource)}
       {@const currentAccessUrl = accessUrl(resource)}
       <article
-        class="console-record-row gap-4 xl:grid-cols-[minmax(0,1.3fr)_8rem_minmax(0,1fr)_minmax(0,1fr)_10rem_auto] xl:items-center"
+        class="console-record-row gap-4 xl:grid-cols-[minmax(0,1.3fr)_8rem_minmax(0,1fr)_minmax(0,1fr)_10rem_auto] xl:items-center xl:py-3"
         data-resource-record-row
       >
         <div class="min-w-0 space-y-1">
@@ -99,7 +99,10 @@
           </div>
         </div>
 
-        <div class="grid min-w-0 gap-2 text-sm sm:grid-cols-2 xl:grid-cols-1" data-resource-owner-summary>
+        <div
+          class="grid min-w-0 gap-2 text-sm sm:grid-cols-2 xl:grid-flow-col xl:grid-cols-none xl:auto-cols-fr"
+          data-resource-owner-summary
+        >
           {#if showEnvironment}
             <div class="min-w-0">
               <p class="text-xs font-medium text-muted-foreground">{$t(i18nKeys.common.domain.environment)}</p>
