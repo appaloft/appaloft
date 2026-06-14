@@ -37,6 +37,10 @@ import { tokens } from "../../tokens";
 import { dependencyBindingSnapshotSummaryFromReferenceSummaries } from "./dependency-binding-snapshot-references";
 import { DeploymentRecoveryReadinessQuery } from "./deployment-recovery-readiness.query";
 import { type DeploymentRecoveryReadinessQueryService } from "./deployment-recovery-readiness.query-service";
+import {
+  maskDeploymentEnvironmentSnapshot,
+  maskDeploymentLikeSummarySecrets,
+} from "./deployment-summary-redaction";
 import { isServerBackedDeploymentSummary } from "./deployment-target-guards";
 import { type ShowDeploymentQuery } from "./show-deployment.query";
 
@@ -70,23 +74,11 @@ function deploymentReadInfraError(deploymentId: string, error: unknown): DomainE
   });
 }
 
-function maskedEnvironmentSnapshot(
-  snapshot: DeploymentSummary["environmentSnapshot"],
-): DeploymentSummary["environmentSnapshot"] {
-  return {
-    ...snapshot,
-    variables: snapshot.variables.map((variable) => ({
-      ...variable,
-      value: variable.isSecret || variable.kind === "secret" ? "********" : variable.value,
-    })),
-  };
-}
-
 function toDeploymentDetailSummary(deployment: DeploymentSummary): DeploymentDetailSummary {
   const { logs: _logs, ...summary } = deployment;
   return {
     ...summary,
-    environmentSnapshot: maskedEnvironmentSnapshot(summary.environmentSnapshot),
+    environmentSnapshot: maskDeploymentEnvironmentSnapshot(summary.environmentSnapshot),
   };
 }
 
@@ -281,7 +273,7 @@ export class ShowDeploymentQueryService {
 
       return ok({
         schemaVersion: "deployments.show/v1",
-        deployment: detailSummary,
+        deployment: maskDeploymentLikeSummarySecrets(detailSummary),
         status: {
           current: deployment.status,
           createdAt: deployment.createdAt,

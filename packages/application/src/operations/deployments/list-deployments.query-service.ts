@@ -3,6 +3,7 @@ import { type ExecutionContext, toRepositoryContext } from "../../execution-cont
 import { type DeploymentReadModel } from "../../ports";
 import { tokens } from "../../tokens";
 import { boundedListLimit } from "../shared-schema";
+import { maskDeploymentSummarySecrets } from "./deployment-summary-redaction";
 
 @injectable()
 export class ListDeploymentsQueryService {
@@ -19,13 +20,15 @@ export class ListDeploymentsQueryService {
       limit?: number;
     },
   ): Promise<{ items: Awaited<ReturnType<DeploymentReadModel["list"]>> }> {
+    const items = await this.readModel.list(toRepositoryContext(context), {
+      ...(input?.projectId ? { projectId: input.projectId } : {}),
+      ...(input?.resourceId ? { resourceId: input.resourceId } : {}),
+      ...(input?.includeArchived !== undefined ? { includeArchived: input.includeArchived } : {}),
+      limit: boundedListLimit(input?.limit),
+    });
+
     return {
-      items: await this.readModel.list(toRepositoryContext(context), {
-        ...(input?.projectId ? { projectId: input.projectId } : {}),
-        ...(input?.resourceId ? { resourceId: input.resourceId } : {}),
-        ...(input?.includeArchived !== undefined ? { includeArchived: input.includeArchived } : {}),
-        limit: boundedListLimit(input?.limit),
-      }),
+      items: items.map(maskDeploymentSummarySecrets),
     };
   }
 }

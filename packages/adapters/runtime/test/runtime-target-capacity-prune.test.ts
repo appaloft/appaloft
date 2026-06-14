@@ -279,6 +279,79 @@ describe("runtime target capacity prune adapter", () => {
     expect(explicitRendered).not.toContain("pglite");
   });
 
+  test("[RT-CAP-PRUNE-012] target filter limits dry-run output and destructive matching", () => {
+    const runtimeRoot = mkdtempSync(join(tmpdir(), "appaloft-capacity-prune-target-"));
+    const sourceRoot = join(runtimeRoot, "ssh-deployments");
+    const keepWorkspace = join(sourceRoot, "dep_keep");
+    const targetWorkspace = join(sourceRoot, "dep_target");
+    mkdirSync(keepWorkspace, { recursive: true });
+    mkdirSync(targetWorkspace, { recursive: true });
+    writeFileSync(join(keepWorkspace, "artifact.txt"), "keep\n");
+    writeFileSync(join(targetWorkspace, "artifact.txt"), "target\n");
+
+    try {
+      const dryRunScript = renderRuntimeTargetCapacityPruneScript({
+        runtimeRoot,
+        before: "2099-01-01T00:00:00.000Z",
+        categories: ["source-workspaces"],
+        target: "dep_target",
+        dryRun: true,
+      });
+      const dryRunOutput = ash.execute(dryRunScript);
+      const dryRun = parseRuntimeTargetCapacityPruneOutput({
+        stdout: dryRunOutput.stdout,
+        stderr: dryRunOutput.stderr,
+        server: serverState(),
+        before: "2099-01-01T00:00:00.000Z",
+        categories: ["source-workspaces"],
+        dryRun: true,
+        prunedAt: "2026-01-01T00:10:00.000Z",
+      });
+
+      expect(dryRun.isOk()).toBe(true);
+      expect(dryRun._unsafeUnwrap()).toMatchObject({
+        summary: {
+          inspectedCount: 1,
+          matchedCount: 1,
+        },
+        candidates: [expect.objectContaining({ id: "dep_target", action: "matched" })],
+      });
+      expect(existsSync(keepWorkspace)).toBe(true);
+      expect(existsSync(targetWorkspace)).toBe(true);
+
+      const destructiveScript = renderRuntimeTargetCapacityPruneScript({
+        runtimeRoot,
+        before: "2099-01-01T00:00:00.000Z",
+        categories: ["source-workspaces"],
+        target: targetWorkspace,
+        dryRun: false,
+      });
+      const destructiveOutput = ash.execute(destructiveScript);
+      const destructive = parseRuntimeTargetCapacityPruneOutput({
+        stdout: destructiveOutput.stdout,
+        stderr: destructiveOutput.stderr,
+        server: serverState(),
+        before: "2099-01-01T00:00:00.000Z",
+        categories: ["source-workspaces"],
+        dryRun: false,
+        prunedAt: "2026-01-01T00:10:00.000Z",
+      });
+
+      expect(destructive.isOk()).toBe(true);
+      expect(destructive._unsafeUnwrap()).toMatchObject({
+        summary: {
+          inspectedCount: 1,
+          prunedCount: 1,
+        },
+        candidates: [expect.objectContaining({ id: "dep_target", action: "pruned" })],
+      });
+      expect(existsSync(keepWorkspace)).toBe(true);
+      expect(existsSync(targetWorkspace)).toBe(false);
+    } finally {
+      rmSync(runtimeRoot, { recursive: true, force: true });
+    }
+  });
+
   test("[RT-CAP-PRUNE-011] remote-state marker dry-run output is bounded and reports estimated reclaimable bytes", () => {
     const runtimeRoot = mkdtempSync(join(tmpdir(), "appaloft-capacity-prune-markers-"));
     const stateRoot = join(runtimeRoot, "state");

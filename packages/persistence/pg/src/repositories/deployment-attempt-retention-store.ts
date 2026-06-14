@@ -100,6 +100,7 @@ export class PgDeploymentAttemptRetentionStore implements DeploymentAttemptReten
     const referenceRows = await executor
       .selectFrom("deployments")
       .select([
+        "id",
         "source_deployment_id",
         "rollback_candidate_deployment_id",
         "rollback_of_deployment_id",
@@ -117,7 +118,12 @@ export class PgDeploymentAttemptRetentionStore implements DeploymentAttemptReten
       )
       .execute();
 
+    const candidateSet = new Set(candidateIds);
     for (const row of referenceRows) {
+      if (candidateSet.has(row.id)) {
+        continue;
+      }
+
       for (const value of [
         row.source_deployment_id,
         row.rollback_candidate_deployment_id,

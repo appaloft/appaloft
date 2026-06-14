@@ -147,7 +147,7 @@ export function renderStorageRuntimeCleanupScript(input: {
       emit_candidate "$APPALOFT_DOCKER_VOLUME_NAME" named-volume "$APPALOFT_DOCKER_VOLUME_NAME" "$created_at" blocked ownership-unproven
       exit 0
     fi
-    active_container=$(docker ps -q --filter "volume=$APPALOFT_DOCKER_VOLUME_NAME" 2>/dev/null | head -n 1)
+    active_container=$(docker ps -aq --filter "volume=$APPALOFT_DOCKER_VOLUME_NAME" 2>/dev/null | head -n 1)
     if [ -n "$active_container" ]; then
       emit_candidate "$APPALOFT_DOCKER_VOLUME_NAME" named-volume "$APPALOFT_DOCKER_VOLUME_NAME" "$created_at" blocked active-runtime
       exit 0

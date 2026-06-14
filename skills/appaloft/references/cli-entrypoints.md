@@ -83,7 +83,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft runtime-monitoring rollup <scope> --from <iso> --to <iso> --bucket <bucket>` - `runtime-monitoring.rollup`
 - `appaloft runtime-monitoring thresholds configure <scope> --rule <json>` - `runtime-monitoring.thresholds.configure`
 - `appaloft runtime-monitoring thresholds show <scope>` - `runtime-monitoring.thresholds.show`
-- `appaloft server capacity prune <serverId> --before <iso>` - `servers.capacity.prune`
+- `appaloft server capacity prune <serverId> --before <iso> [--target <id-or-target>]` - `servers.capacity.prune`
 - `appaloft server capacity policy configure --scope <scope> --retention-days <days>` - `scheduled-runtime-prune-policies.configure`
 - `appaloft server capacity policy list` - `scheduled-runtime-prune-policies.list`
 - `appaloft server capacity policy show <policyId>` - `scheduled-runtime-prune-policies.show`
