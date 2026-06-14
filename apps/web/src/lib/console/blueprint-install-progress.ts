@@ -94,6 +94,9 @@ export function summarizeBlueprintInstallProgress(
   snapshot: BlueprintInstallProgressSnapshot | null | undefined,
 ): BlueprintInstallStatusSummary {
   const components = snapshot?.installedApplication?.components ?? [];
+  const failedComponentDeployment = components.find((component) =>
+    ["failed", "canceled"].includes(String(component.deployment?.status ?? "")),
+  )?.deployment;
   const executionStatus =
     snapshot?.progress?.status ??
     snapshot?.executionStatus ??
@@ -117,6 +120,8 @@ export function summarizeBlueprintInstallProgress(
     snapshot?.progress?.failure?.code ??
     snapshot?.installedApplication?.executionFailure?.reason ??
     snapshot?.installedApplication?.executionFailure?.code ??
+    failedComponentDeployment?.reason ??
+    failedComponentDeployment?.status ??
     (blueprintInstallTerminalFailureStatuses.has(normalizedExecutionStatus)
       ? normalizedExecutionStatus
       : "") ??
@@ -206,6 +211,9 @@ function operatorWorkSafeDetailMessageParts(
   return [
     ["failure_code", "failure"],
     ["failure_phase", "phase"],
+    ["failure_failurePhase", "deployment phase"],
+    ["failure_componentId", "component"],
+    ["failure_deploymentStatus", "deployment"],
     ["failure_operation", "operation"],
     ["resourceSlug", "resource"],
   ].flatMap(([key, label]) => {

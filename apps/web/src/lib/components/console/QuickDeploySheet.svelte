@@ -4088,6 +4088,35 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       : "";
   }
 
+  async function readBlueprintInstallProgressSummary(
+    applicationId: string,
+  ): Promise<BlueprintInstallStatusSummary | null> {
+    if (!applicationId) {
+      return null;
+    }
+
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<null>((resolve) => {
+      timeoutId = setTimeout(() => resolve(null), 4_000);
+    });
+
+    try {
+      const readback = await Promise.race([
+        orpcClient.blueprints.installation.show({ applicationId }) as Promise<BlueprintInstallProgressSnapshot>,
+        timeout,
+      ]);
+
+      return readback ? summarizeBlueprintInstallProgress(readback) : null;
+    } catch (error) {
+      workflowProgressError = readErrorMessage(error);
+      return null;
+    } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    }
+  }
+
   function blueprintDeploymentTerminalStatus(): string {
     return [...workflowDeploymentProgressEvents]
       .reverse()
@@ -4257,25 +4286,13 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     installSummary: BlueprintInstallStatusSummary,
   ): Promise<BlueprintInstallStatusSummary> {
     let latestSummary = installSummary;
-
-    if (latestSummary.applicationId) {
-      try {
-        const readback = (await orpcClient.blueprints.installation.show({
-          applicationId: latestSummary.applicationId,
-        })) as BlueprintInstallProgressSnapshot;
-        latestSummary = summarizeBlueprintInstallProgress(readback);
-      } catch (error) {
-        workflowProgressError = readErrorMessage(error);
-      }
-    }
-
     lastOperatorWorkId = latestSummary.operatorWorkId || lastOperatorWorkId;
 
-    if (!latestSummary.deploymentId && latestSummary.operatorWorkId) {
+    if (lastOperatorWorkId) {
       try {
-        const workProgress = await replayBlueprintOperatorWorkProgress(latestSummary.operatorWorkId);
+        const workProgress = await replayBlueprintOperatorWorkProgress(lastOperatorWorkId);
         if (workProgress.status === "running") {
-          startBlueprintOperatorWorkFollow(latestSummary.operatorWorkId, workProgress.cursor);
+          startBlueprintOperatorWorkFollow(lastOperatorWorkId, workProgress.cursor);
         } else {
           latestSummary = {
             ...latestSummary,
@@ -4294,14 +4311,21 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       }
     }
 
-    if (latestSummary.applicationId) {
-      try {
-        const readback = (await orpcClient.blueprints.installation.show({
-          applicationId: latestSummary.applicationId,
-        })) as BlueprintInstallProgressSnapshot;
-        latestSummary = summarizeBlueprintInstallProgress(readback);
-      } catch {
-        // The operator-work stream already carries a safe status if readback is temporarily unavailable.
+    const readbackSummary = await readBlueprintInstallProgressSummary(latestSummary.applicationId);
+    if (readbackSummary) {
+      latestSummary = {
+        ...latestSummary,
+        ...readbackSummary,
+        terminalStatus:
+          latestSummary.terminalStatus === "failed"
+            ? "failed"
+            : readbackSummary.terminalStatus,
+        userStatus:
+          latestSummary.userStatus === "failed" ? "failed" : readbackSummary.userStatus,
+        failureReason: latestSummary.failureReason || readbackSummary.failureReason,
+      };
+      if (latestSummary.operatorWorkId) {
+        lastOperatorWorkId = latestSummary.operatorWorkId;
       }
     }
 
@@ -4484,7 +4508,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       lastCreatedDeploymentId = installSummary.deploymentId || lastCreatedDeploymentId;
       selectedResourceId = installSummary.resourceId || selectedResourceId;
 
-      if (lastCreatedDeploymentId) {
+      if (lastCreatedDeploymentId && installSummary.terminalStatus !== "failed") {
         await observeDeploymentProgressAfterAcceptance(
           lastCreatedDeploymentId,
           appendWorkflowDeploymentProgressEvent,
@@ -4529,7 +4553,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
             : installSummary.message ||
               (lastOperatorWorkId
                 ? $t(i18nKeys.console.quickDeploy.blueprintInstallAcceptedDetail, {
-                    workId: lastOperatorWorkId,
+                    status: installSummary.executionStatus,
                   })
                 : $t(i18nKeys.console.quickDeploy.blueprintInstallAcceptedFallback, {
                     status: installSummary.executionStatus,
