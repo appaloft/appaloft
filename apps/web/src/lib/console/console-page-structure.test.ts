@@ -1068,6 +1068,8 @@ describe("console page structure", () => {
       "Resource has no observable runtime deployment",
     );
     expect(resourceTerminalTabSource).toContain("<TerminalSessionPanel");
+    expect(resourceTerminalTabSource).toContain("docsHref={webDocsHrefs.serverTerminalSession}");
+    expect(resourceTerminalTabSource).not.toContain('<div class="flex justify-end">');
     expect(resourceTerminalTabSource).toContain("data-resource-terminal-unavailable-state");
     expect(resourceTerminalTabSource).toContain("terminal.resourceUnavailableTitle");
     expect(resourceTerminalTabSource).toContain("terminal.resourceUnavailableBody");
