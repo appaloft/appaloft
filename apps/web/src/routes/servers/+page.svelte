@@ -519,7 +519,7 @@
                 data-server-id={server.id}
               >
                 <div class="min-w-0" data-server-row-header>
-                  <div class="flex min-w-0 items-start justify-between gap-3">
+                  <div class="flex min-w-0 items-start gap-3">
                     <div class="min-w-0 space-y-1">
                       <div class="flex min-w-0 items-center gap-2">
                         {#if serverSortMode}
@@ -536,6 +536,13 @@
                         {/if}
                         <Server class="size-4 shrink-0 text-muted-foreground" />
                         <h3 class="min-w-0 truncate text-base font-semibold">{server.name}</h3>
+                        <Badge
+                          class="shrink-0"
+                          variant={serverLifecycleVariant(server.lifecycleStatus)}
+                          data-server-row-lifecycle
+                        >
+                          {serverLifecycleLabel(server.lifecycleStatus)}
+                        </Badge>
                       </div>
                       <p
                         class="truncate font-mono text-sm text-muted-foreground"
@@ -544,9 +551,6 @@
                         {server.host}:{server.port}
                       </p>
                     </div>
-                    <Badge variant={serverLifecycleVariant(server.lifecycleStatus)} data-server-row-lifecycle>
-                      {serverLifecycleLabel(server.lifecycleStatus)}
-                    </Badge>
                   </div>
                 </div>
 

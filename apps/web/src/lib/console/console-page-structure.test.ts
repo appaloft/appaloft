@@ -1635,10 +1635,23 @@ describe("console page structure", () => {
       "<ConsoleResourceCanvas data-servers-display-surface>",
       "</ConsoleResourceCanvas>",
     );
+    const serverRowHeaderSource = sourceBetween(
+      serversDisplaySurface,
+      "data-server-row-header",
+      "data-server-row-readiness",
+    );
 
     expect(serversDisplaySurface).toContain("data-server-list");
     expect(serversDisplaySurface).toContain("data-server-row");
     expect(serversDisplaySurface).toContain("data-server-row-lifecycle");
+    expect(serverRowHeaderSource.indexOf("<h3")).toBeGreaterThanOrEqual(0);
+    expect(serverRowHeaderSource.indexOf("data-server-row-lifecycle")).toBeGreaterThan(
+      serverRowHeaderSource.indexOf("<h3"),
+    );
+    expect(serverRowHeaderSource.indexOf("data-server-row-lifecycle")).toBeLessThan(
+      serverRowHeaderSource.indexOf('title={`${server.host}:${server.port}`}'),
+    );
+    expect(serverRowHeaderSource).toContain('class="shrink-0"');
     expect(serversDisplaySurface).toContain("data-server-row-readiness");
     expect(serversDisplaySurface).toContain("runtimeAvailabilityLabel(server.runtimeAvailability)");
     expect(serversDisplaySurface).toContain(
