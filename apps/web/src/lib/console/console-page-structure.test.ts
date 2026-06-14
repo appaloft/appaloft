@@ -939,6 +939,17 @@ describe("console page structure", () => {
     expect(resourceDetailBodySource).toContain("{@render resourceRuntimeControlPanel()}");
     expect(resourceDetailPageSource).toContain("onclick={openRuntimeControlDialog}");
     expect(resourceDetailPageSource).not.toContain("onclick={() => openRuntimeControlDialog");
+    const latestDeploymentSummarySource = sourceBetween(
+      resourceDetailPageSource,
+      "data-resource-latest-deployment-summary",
+      "{:else}",
+    );
+    expect(latestDeploymentSummarySource.match(/border border-border/g)?.length).toBe(3);
+    expect(latestDeploymentSummarySource).toContain(
+      "<DeploymentStatusBadge status={latestDeployment.status} />",
+    );
+    expect(latestDeploymentSummarySource).not.toContain("border-destructive");
+    expect(latestDeploymentSummarySource).not.toContain("border-red");
   });
 
   test("[RESOURCE-DETAIL-IA-001C] keeps monitor, logs, terminal, and job creation at the right layer", () => {
