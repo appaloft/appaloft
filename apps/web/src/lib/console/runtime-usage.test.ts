@@ -81,6 +81,11 @@ describe("runtime usage console readback", () => {
     expect(monitorSource).toContain("runtimeMonitoringTimeRangeOptions");
     expect(monitorSource).toContain("runtimeMonitoringRefreshIntervalMs");
     expect(monitorSource).toContain('viewBox="0 0 360 150"');
+    expect(monitorSource).toContain("icon: Cpu");
+    expect(monitorSource).toContain("icon: MemoryStick");
+    expect(monitorSource).toContain("icon: HardDrive");
+    expect(monitorSource).toContain("data-runtime-signal-card={signal.key}");
+    expect(monitorSource).toContain("data-runtime-signal-icon");
     expect(monitorSource).toContain("chartY(tick)");
     expect(monitorSource).toContain("retainedSamples");
     expect(monitorSource).toContain("rollup");
