@@ -1585,32 +1585,33 @@ describe("console page structure", () => {
     expect(existsSync(legacyServerCreateRoutePath)).toBe(false);
   });
 
-  test("[SERVER-COLLECTION-IA-002] presents server cards as runtime placement summaries", () => {
+  test("[SERVER-COLLECTION-IA-002] presents server rows as runtime placement summaries", () => {
     const serversDisplaySurface = sourceBetween(
       serversPageSource,
       "<ConsoleResourceCanvas data-servers-display-surface>",
       "</ConsoleResourceCanvas>",
     );
 
-    expect(serversDisplaySurface).toContain("data-server-card");
-    expect(serversDisplaySurface).toContain("data-server-card-lifecycle");
-    expect(serversDisplaySurface).toContain("data-server-card-readiness");
+    expect(serversDisplaySurface).toContain("data-server-list");
+    expect(serversDisplaySurface).toContain("data-server-row");
+    expect(serversDisplaySurface).toContain("data-server-row-lifecycle");
+    expect(serversDisplaySurface).toContain("data-server-row-readiness");
     expect(serversDisplaySurface).toContain("runtimeAvailabilityLabel(server.runtimeAvailability)");
     expect(serversDisplaySurface).toContain(
       "runtimeAvailabilityVariant(server.runtimeAvailability)",
     );
-    expect(serversDisplaySurface).toContain("data-server-card-proxy");
+    expect(serversDisplaySurface).toContain("data-server-row-proxy");
     expect(serversDisplaySurface).toContain("edgeProxyStatusLabel(server.edgeProxy.status)");
     expect(serversDisplaySurface).toContain("edgeProxyStatusVariant(server.edgeProxy?.status)");
-    expect(serversDisplaySurface).toContain("data-server-card-capacity");
+    expect(serversDisplaySurface).toContain("data-server-row-capacity");
     expect(serversDisplaySurface).toContain("serverCapacityHref(server.id)");
     expect(serversDisplaySurface).toContain("capacityGovernanceAction");
-    expect(serversDisplaySurface).toContain("data-server-card-ownership");
+    expect(serversDisplaySurface).toContain("data-server-row-ownership");
     expect(serversDisplaySurface).toContain("server.targetKind");
     expect(serversDisplaySurface).toContain("serverProviderDisplayLabel");
-    expect(serversDisplaySurface).toContain("data-server-card-deployment-rollup");
+    expect(serversDisplaySurface).toContain("data-server-row-deployment-rollup");
     expect(serversDisplaySurface).toContain("serverDeploymentsHref(server.id)");
-    expect(serversDisplaySurface).toContain("data-server-card-operational-links");
+    expect(serversDisplaySurface).toContain("data-server-row-operational-links");
     expect(serversDisplaySurface).toContain("serverRuntimeHref(server.id)");
     expect(serversDisplaySurface).toContain("serverConnectivityHref(server.id)");
     expect(serversDisplaySurface).not.toContain("serverTerminalHref");
