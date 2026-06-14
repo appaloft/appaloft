@@ -1640,6 +1640,11 @@ describe("console page structure", () => {
       "data-server-row-header",
       "data-server-row-readiness",
     );
+    const serverOperationalLinksSource = sourceBetween(
+      serversDisplaySurface,
+      "data-server-row-operational-links",
+      "</article>",
+    );
 
     expect(serversDisplaySurface).toContain("data-server-list");
     expect(serversDisplaySurface).toContain("data-server-row");
@@ -1671,6 +1676,11 @@ describe("console page structure", () => {
     expect(serversDisplaySurface).toContain("data-server-row-operational-links");
     expect(serversDisplaySurface).toContain("serverRuntimeHref(server.id)");
     expect(serversDisplaySurface).toContain("serverConnectivityHref(server.id)");
+    expect(serverOperationalLinksSource).toContain("serverDetailHref(server.id)");
+    expect(serverOperationalLinksSource.indexOf("serverDetailHref(server.id)")).toBeGreaterThan(
+      serverOperationalLinksSource.indexOf("serverConnectivityHref(server.id)"),
+    );
+    expect(serverOperationalLinksSource).toContain("i18nKeys.common.actions.viewDetails");
     expect(serversDisplaySurface).not.toContain("serverTerminalHref");
     expect(serversDisplaySurface).not.toContain("openServerDeleteDialog");
     expect(serversDisplaySurface).not.toContain("openServerDeactivateDialog");
