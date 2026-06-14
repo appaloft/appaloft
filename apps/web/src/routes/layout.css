@@ -701,3 +701,14 @@
     color: var(--primary);
   }
 }
+
+@layer utilities {
+  .console-server-detail-body > .console-detail-tab-panel {
+    margin-top: 0;
+  }
+
+  .console-server-detail-body > .console-detail-tab-panel-scroll,
+  .console-server-detail-body .console-detail-subnav-layout > .console-subnav-content {
+    padding-top: 0;
+  }
+}

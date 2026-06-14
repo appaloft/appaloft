@@ -5387,57 +5387,57 @@
 
 {#snippet resourceRuntimeControlPanel()}
   {#if resource}
-    <section id="resource-runtime-control" class="space-y-4 p-5">
-    <div class="rounded-md border bg-card p-4">
-      <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <div class="flex items-center gap-2">
-            <h2 class="text-lg font-semibold">
-              {$t(i18nKeys.console.resources.runtimeControlsTitle)}
-            </h2>
-            <DocsHelpLink
-              href={webDocsHrefs.resourceRuntimeControls}
-              ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-            />
-          </div>
-          <p class="mt-1 text-sm text-muted-foreground">
-            {$t(i18nKeys.console.resources.runtimeControlsDescription)}
-          </p>
-          {#if resourceHealth?.latestRuntimeControl}
-            <p class="mt-2 text-xs text-muted-foreground">
-              {$t(i18nKeys.console.resources.runtimeControlsLatest)}:
-              {resourceHealth.latestRuntimeControl.operation} ·
-              {resourceHealth.latestRuntimeControl.status} ·
-              {resourceHealth.latestRuntimeControl.runtimeState}
+    <section id="resource-runtime-control" class="space-y-4">
+      <div class="rounded-md border bg-card p-4">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div class="flex items-center gap-2">
+              <h2 class="text-lg font-semibold">
+                {$t(i18nKeys.console.resources.runtimeControlsTitle)}
+              </h2>
+              <DocsHelpLink
+                href={webDocsHrefs.resourceRuntimeControls}
+                ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+              />
+            </div>
+            <p class="mt-1 text-sm text-muted-foreground">
+              {$t(i18nKeys.console.resources.runtimeControlsDescription)}
             </p>
-          {/if}
+            {#if resourceHealth?.latestRuntimeControl}
+              <p class="mt-2 text-xs text-muted-foreground">
+                {$t(i18nKeys.console.resources.runtimeControlsLatest)}:
+                {resourceHealth.latestRuntimeControl.operation} ·
+                {resourceHealth.latestRuntimeControl.status} ·
+                {resourceHealth.latestRuntimeControl.runtimeState}
+              </p>
+            {/if}
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onclick={openRuntimeControlDialog}
+              disabled={isResourceArchived || runtimeControlPending}
+            >
+              <Gauge class={["size-4", runtimeControlPending ? "animate-spin" : ""]} />
+              {$t(i18nKeys.console.resources.runtimeControlManageAction)}
+            </Button>
+          </div>
         </div>
-        <div class="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onclick={openRuntimeControlDialog}
-            disabled={isResourceArchived || runtimeControlPending}
+        {#if runtimeControlFeedback}
+          <div
+            class={[
+              "mt-4 rounded-md border px-3 py-2 text-sm",
+              runtimeControlFeedback.kind === "success"
+                ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-700"
+                : "border-destructive/30 bg-destructive/5 text-destructive",
+            ]}
           >
-            <Gauge class={["size-4", runtimeControlPending ? "animate-spin" : ""]} />
-            {$t(i18nKeys.console.resources.runtimeControlManageAction)}
-          </Button>
-        </div>
+            <span class="font-medium">{runtimeControlFeedback.title}</span>
+            <span class="ml-2">{runtimeControlFeedback.detail}</span>
+          </div>
+        {/if}
       </div>
-      {#if runtimeControlFeedback}
-        <div
-          class={[
-            "mt-4 rounded-md border px-3 py-2 text-sm",
-            runtimeControlFeedback.kind === "success"
-              ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-700"
-              : "border-destructive/30 bg-destructive/5 text-destructive",
-          ]}
-        >
-          <span class="font-medium">{runtimeControlFeedback.title}</span>
-          <span class="ml-2">{runtimeControlFeedback.detail}</span>
-        </div>
-      {/if}
-    </div>
     </section>
   {/if}
 {/snippet}
@@ -7605,7 +7605,7 @@
                         {/if}
                       </div>
                       <dl class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                        <div class="rounded-md border bg-background px-3 py-2">
                           <dt class="text-xs text-muted-foreground">
                             {$t(i18nKeys.console.resources.healthRuntime)}
                           </dt>
@@ -7613,7 +7613,7 @@
                             {resourceHealthSectionStatusLabel(resourceHealth?.runtime.lifecycle)}
                           </dd>
                         </div>
-                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                        <div class="rounded-md border bg-background px-3 py-2">
                           <dt class="text-xs text-muted-foreground">
                             {$t(i18nKeys.console.resources.healthPolicy)}
                           </dt>
@@ -7621,7 +7621,7 @@
                             {resourceHealthSectionStatusLabel(resourceHealth?.healthPolicy.status)}
                           </dd>
                         </div>
-                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                        <div class="rounded-md border bg-background px-3 py-2">
                           <dt class="text-xs text-muted-foreground">
                             {$t(i18nKeys.console.resources.healthPublicAccess)}
                           </dt>
@@ -7629,7 +7629,7 @@
                             {resourceHealthSectionStatusLabel(resourceHealth?.publicAccess.status)}
                           </dd>
                         </div>
-                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                        <div class="rounded-md border bg-background px-3 py-2">
                           <dt class="text-xs text-muted-foreground">
                             {$t(i18nKeys.console.resources.healthProxy)}
                           </dt>
@@ -8145,16 +8145,12 @@
         {:else if activeTab === "terminal"}
           <div class="console-detail-tab-panel console-detail-tab-panel-scroll">
             <section class="space-y-3" data-resource-terminal-panel>
-              <div class="flex justify-end">
-                <DocsHelpLink
-                  href={webDocsHrefs.serverTerminalSession}
-                  ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                />
-              </div>
               {#if terminalDeploymentId}
                 <TerminalSessionPanel
                   title={$t(i18nKeys.console.terminal.resourceTitle)}
                   description={$t(i18nKeys.console.terminal.resourceDescription)}
+                  docsHref={webDocsHrefs.serverTerminalSession}
+                  docsAriaLabel={$t(i18nKeys.common.actions.openDocs)}
                   fallbackHref={latestDeployment?.serverId ? serverTerminalHref(latestDeployment.serverId) : ""}
                   fallbackLabel={$t(i18nKeys.console.terminal.serverTitle)}
                   scope={{
@@ -9462,7 +9458,7 @@
           resourceLifecycleDialogOpen = true;
         }
       }}>
-        <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)}>
+        <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-2xl">
           <Dialog.Header>
             <Dialog.Title>{$t(i18nKeys.console.resources.lifecycleDialogTitle)}</Dialog.Title>
             <Dialog.Description>
@@ -9470,7 +9466,7 @@
             </Dialog.Description>
           </Dialog.Header>
           <form
-            class="space-y-5 px-5 pb-5"
+            class="box-border min-w-0 w-full space-y-5 overflow-x-hidden px-5 pb-5"
             onsubmit={(event) => {
               event.preventDefault();
               if (selectedResourceLifecycleAction === "archive") {
@@ -9493,21 +9489,21 @@
               </p>
             </div>
 
-            <div class="grid gap-2 sm:grid-cols-2">
+            <div class="grid min-w-0 gap-2 sm:grid-cols-2">
               {#if !isPreviewEnvironmentResource}
                 <Button
                   type="button"
                   variant={selectedResourceLifecycleAction === "archive" ? "destructive" : "outline"}
-                  class="h-auto justify-start px-3 py-3 text-left"
+                  class="h-auto min-w-0 w-full max-w-full items-start justify-start whitespace-normal px-3 py-3 text-left"
                   disabled={isResourceArchived || archiveResourceMutation.isPending}
                   onclick={() => selectResourceLifecycleAction("archive")}
                 >
-                  <Archive class="size-4 shrink-0" />
-                  <span class="min-w-0">
+                  <Archive class="mt-0.5 size-4 shrink-0" />
+                  <span class="min-w-0 flex-1">
                     <span class="block font-medium">
                       {$t(i18nKeys.console.resources.archiveAction)}
                     </span>
-                    <span class="block text-xs font-normal opacity-80">
+                    <span class="block break-words text-xs font-normal leading-snug opacity-80">
                       {$t(i18nKeys.console.resources.lifecycleArchiveOption)}
                     </span>
                   </span>
@@ -9516,17 +9512,17 @@
               <Button
                 type="button"
                 variant={selectedResourceLifecycleAction === "delete" ? "destructive" : "outline"}
-                class="h-auto justify-start px-3 py-3 text-left"
+                class="h-auto min-w-0 w-full max-w-full items-start justify-start whitespace-normal px-3 py-3 text-left"
                 disabled={!isPreviewEnvironmentResource &&
                   (!isResourceArchived || deleteResourceMutation.isPending)}
                 onclick={() => selectResourceLifecycleAction("delete")}
               >
-                <Trash2 class="size-4 shrink-0" />
-                <span class="min-w-0">
+                <Trash2 class="mt-0.5 size-4 shrink-0" />
+                <span class="min-w-0 flex-1">
                   <span class="block font-medium">
                     {$t(i18nKeys.console.resources.deleteAction)}
                   </span>
-                  <span class="block text-xs font-normal opacity-80">
+                  <span class="block break-words text-xs font-normal leading-snug opacity-80">
                     {#if isPreviewEnvironmentResource}
                       {$t(i18nKeys.console.resources.lifecyclePreviewDeleteOption)}
                     {:else}

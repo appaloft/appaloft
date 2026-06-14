@@ -1001,7 +1001,7 @@
         </div>
       </section>
 
-      <Tabs.Root value={activeTab} class="console-detail-body">
+      <Tabs.Root value={activeTab} class="console-detail-body console-server-detail-body">
           <nav
             aria-label={$t(i18nKeys.console.servers.pageTitle)}
             class="console-detail-tabs"
