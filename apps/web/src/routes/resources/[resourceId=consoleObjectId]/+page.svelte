@@ -6551,8 +6551,11 @@
                     </Button>
                   </div>
                   {#if latestDeployment}
-                    <div class="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_10rem_12rem]">
-                      <div class="min-w-0 rounded-md bg-muted/25 px-3 py-2">
+                    <div
+                      class="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_10rem_12rem]"
+                      data-resource-latest-deployment-summary
+                    >
+                      <div class="min-w-0 rounded-md border border-border bg-muted/25 px-3 py-2">
                         <p class="text-xs text-muted-foreground">
                           {$t(i18nKeys.common.domain.deployment)}
                         </p>
@@ -6563,7 +6566,7 @@
                           {latestDeployment.id}
                         </a>
                       </div>
-                      <div class="rounded-md bg-muted/25 px-3 py-2">
+                      <div class="rounded-md border border-border bg-muted/25 px-3 py-2">
                         <p class="text-xs text-muted-foreground">
                           {$t(i18nKeys.common.domain.status)}
                         </p>
@@ -6571,7 +6574,7 @@
                           <DeploymentStatusBadge status={latestDeployment.status} />
                         </div>
                       </div>
-                      <div class="rounded-md bg-muted/25 px-3 py-2">
+                      <div class="rounded-md border border-border bg-muted/25 px-3 py-2">
                         <p class="text-xs text-muted-foreground">
                           {$t(i18nKeys.common.domain.time)}
                         </p>
