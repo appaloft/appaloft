@@ -632,7 +632,7 @@
     }
   });
   const canSubmitEnvironmentLifecycleAction = $derived.by(() => {
-    if (!project || !selectedEnvironment || !selectedEnvironmentLifecycleAction || isProjectArchived) {
+    if (!project || !selectedEnvironment || !selectedEnvironmentLifecycleAction) {
       return false;
     }
 
@@ -644,11 +644,13 @@
         );
       case "lock":
         return (
+          !isProjectArchived &&
           selectedEnvironment.lifecycleStatus === "active" &&
           !lockEnvironmentMutation.isPending
         );
       case "unlock":
         return (
+          !isProjectArchived &&
           selectedEnvironment.lifecycleStatus === "locked" &&
           !unlockEnvironmentMutation.isPending
         );
@@ -995,7 +997,7 @@
   }
 
   function openEnvironmentLifecycleDialog(environment: EnvironmentSummary): void {
-    if (!browser || !project || isProjectArchived) {
+    if (!browser || !project) {
       return;
     }
 
@@ -2401,7 +2403,6 @@
                           type="button"
                           size="sm"
                           variant="outline"
-                          disabled={isProjectArchived}
                           onclick={() => openEnvironmentLifecycleDialog(environment)}
                         >
                           <Gauge class="size-4" />
@@ -2978,8 +2979,7 @@
                 type="button"
                 variant={selectedEnvironmentLifecycleAction === "archive" ? "destructive" : "outline"}
                 class="h-auto justify-start px-3 py-3 text-left"
-                disabled={isProjectArchived ||
-                  selectedEnvironment.lifecycleStatus === "archived" ||
+                disabled={selectedEnvironment.lifecycleStatus === "archived" ||
                   archiveEnvironmentMutation.isPending}
                 onclick={() => {
                   selectedEnvironmentLifecycleAction = "archive";

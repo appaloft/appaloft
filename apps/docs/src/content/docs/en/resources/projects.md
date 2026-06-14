@@ -52,7 +52,7 @@ Restore archived projects that should receive new resources, environments, or de
 
 <h3 id="project-delete">Delete a project</h3>
 
-Run delete-check before deleting an archived project. Delete is enabled only when no retained environments, resources, deployment history, source events, domains, certificates, logs, audit, or runtime support records still depend on the project. Project delete removes the project from normal project lists through a tombstone; it does not cascade cleanup or erase retained history.
+Run delete-check before deleting an archived project. Delete is enabled only when no retained environments, resources, deployment history, source events, domains, certificates, logs, audit, or runtime support records still depend on the project. Empty environments with no environment variables and no non-deleted resources do not block deletion; project delete archives those empty environments through the environment lifecycle before removing the project from normal project lists through a tombstone. It does not cascade other cleanup or erase retained history.
 
 <h2 id="concept-resource">Resource</h2>
 

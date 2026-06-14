@@ -8506,6 +8506,50 @@ describe.serial("console e2e with Bun.WebView", () => {
     }
   }, 15_000);
 
+  test("[ENV-LIFE-ENTRY-006] archived project can still archive a retained environment through Web", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+    const previousListRoute = apiResponses.dashboard["/api/rpc/projects/list"];
+    const previousShowRoute = apiResponses.dashboard["/api/rpc/projects/show"];
+    const archivedProject = {
+      id: "prj_demo",
+      name: "Demo",
+      slug: "demo",
+      description: "Demo project",
+      lifecycleStatus: "archived",
+      archivedAt: "2026-01-01T00:00:05.000Z",
+      createdAt: "2026-01-01T00:00:00.000Z",
+    };
+    apiResponses.dashboard["/api/rpc/projects/list"] = {
+      json: {
+        items: [archivedProject],
+      },
+    };
+    apiResponses.dashboard["/api/rpc/projects/show"] = {
+      json: archivedProject,
+    };
+
+    try {
+      await using view = createWebView();
+      await view.navigate(`${previewUrl}/projects/prj_demo?tab=environments`);
+      await expectAnyText(view, ["Archived", "已归档"]);
+      await expectAnyText(view, ["Environments", "环境"]);
+      await clickButtonByAnyText(view, lifecycleActionLabels);
+      await clickDialogButtonByAnyText(view, ["Archive", "归档"]);
+      await clickDialogFooterButtonByExactText(view, ["Archive", "归档"]);
+
+      const archiveRequest = await waitForRecordedRequest("/api/rpc/environments/archive");
+      const archiveInput = readOrpcJsonPayload(archiveRequest.body);
+
+      expect(archiveInput).toEqual({
+        environmentId: "env_demo",
+      });
+    } finally {
+      apiResponses.dashboard["/api/rpc/projects/list"] = previousListRoute;
+      apiResponses.dashboard["/api/rpc/projects/show"] = previousShowRoute;
+    }
+  }, 15_000);
+
   test("[ENV-LIFE-CLONE-ENTRY-003] submits environment clone through Web", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();

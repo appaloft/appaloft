@@ -604,11 +604,20 @@ export interface ProjectDeletionBlocker extends Omit<ProjectDeleteBlocker, "kind
   kind: Exclude<ProjectDeleteBlockerKind, "active-project">;
 }
 
+export interface ProjectEmptyEnvironmentArchiveCandidate {
+  environmentId: string;
+  lifecycleStatus: "active" | "locked";
+}
+
 export interface ProjectDeletionBlockerReader {
   findBlockers(
     context: RepositoryContext,
     input: { projectId: string },
   ): Promise<Result<ProjectDeletionBlocker[], DomainError>>;
+  findEmptyEnvironmentArchiveCandidates(
+    context: RepositoryContext,
+    input: { projectId: string },
+  ): Promise<Result<ProjectEmptyEnvironmentArchiveCandidate[], DomainError>>;
 }
 
 export interface ServerRepository {
