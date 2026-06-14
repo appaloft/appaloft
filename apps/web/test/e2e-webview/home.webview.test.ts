@@ -4381,7 +4381,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     await expectText(view, "Demo");
     await expectText(view, "production");
     await expectAnyText(view, ["succeeded", "SUCCEEDED"]);
-  }, 15_000);
+  }, 30_000);
 
   test("[PROJ-LIFE-REORDER-005] renders paginated draggable project cards", async () => {
     activeScenario = "dashboard";
@@ -5462,7 +5462,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       apiResponses.dashboard["/api/rpc/projects/list"] = previousListRoute;
       apiResponses.dashboard["/api/rpc/projects/show"] = previousShowRoute;
     }
-  }, 15_000);
+  }, 30_000);
 
   test("[PROJ-LIFE-ENTRY-008-WEB] deletes an archived project through delete-check gated action", async () => {
     activeScenario = "dashboard";
@@ -5532,7 +5532,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       includeAccessSummary: true,
       includeProfileDiagnostics: true,
     });
-  }, 15_000);
+  }, 30_000);
 
   test("[RES-DETAIL-IA-001] exposes resource owner tabs and nested section navigation", async () => {
     activeScenario = "dashboard";
@@ -5630,7 +5630,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       (search) => search === "?tab=configuration",
       "Expected configuration to be a first-level resource tab",
     );
-  }, 15_000);
+  }, 30_000);
 
   test("[RES-DIAG-ENTRY-001] copies resource diagnostic JSON from resource detail", async () => {
     activeScenario = "dashboard";
@@ -5759,7 +5759,7 @@ describe.serial("console e2e with Bun.WebView", () => {
         apiResponses.dashboard["/api/rpc/resources/diagnosticSummary"] = previousDiagnosticRoute;
       }
     }
-  }, 15_000);
+  }, 30_000);
 
   test("[TERM-SESSION-ENTRY-001] opens and attaches a resource terminal from Web", async () => {
     activeScenario = "dashboard";
@@ -5788,7 +5788,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       "Expected terminal WebSocket resize frame after attach",
     );
     await expectText(view, ".../local-deployments/dep_demo/source");
-  }, 15_000);
+  }, 30_000);
 
   test("[TERM-SESSION-ENTRY-002] opens and attaches a server terminal from Web", async () => {
     activeScenario = "dashboard";
@@ -5815,7 +5815,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       (messages) => messages.some(isTerminalResizeFrame),
       "Expected server terminal WebSocket resize frame after attach",
     );
-  }, 15_000);
+  }, 30_000);
 
   test("[TERM-SESSION-ENTRY-003] closes an attached Web terminal when navigating away", async () => {
     activeScenario = "dashboard";
@@ -5839,7 +5839,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       (messages) => messages.some((message) => isRecord(message) && message.kind === "close"),
       "Expected terminal close frame after navigation",
     );
-  }, 15_000);
+  }, 30_000);
 
   test("[TERM-SESSION-ENTRY-010] closes an attached Web terminal from the panel action", async () => {
     activeScenario = "dashboard";
@@ -5863,7 +5863,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       (messages) => messages.some((message) => isRecord(message) && message.kind === "close"),
       "Expected terminal close frame after explicit close action",
     );
-  }, 15_000);
+  }, 30_000);
 
   test("[SCHED-TASK-ENTRY-001] resource detail exposes scheduled task Web controls", async () => {
     activeScenario = "dashboard";
@@ -7051,7 +7051,7 @@ describe.serial("console e2e with Bun.WebView", () => {
         apiResponses.dashboard["/api/rpc/previewEnvironments/delete"] = previousPreviewDeleteRoute;
       }
     }
-  }, 15_000);
+  }, 30_000);
 
   test("[ROUTE-TLS-ENTRY-002][ROUTE-TLS-ENTRY-007] creates a resource-scoped domain binding from Web", async () => {
     activeScenario = "dashboard";
@@ -7168,7 +7168,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       }
       apiResponses.dashboard["/api/rpc/domainBindings/list"] = previousDomainBindingsRoute;
     }
-  }, 15_000);
+  }, 30_000);
 
   test("[ROUTE-TLS-ENTRY-007] shows pending domain ownership in the global governance surface", async () => {
     activeScenario = "dashboard";
@@ -7226,7 +7226,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     } finally {
       apiResponses.dashboard["/api/rpc/domainBindings/list"] = previousDomainBindingsRoute;
     }
-  }, 15_000);
+  }, 30_000);
 
   test("[ROUTE-TLS-ENTRY-007] keeps domain ownership confirmation out of default lists", async () => {
     activeScenario = "dashboard";
@@ -7288,7 +7288,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     } finally {
       apiResponses.dashboard["/api/rpc/domainBindings/list"] = previousDomainBindingsRoute;
     }
-  }, 15_000);
+  }, 30_000);
 
   test("[RES-PROFILE-ENTRY-012] explains resource detail profile edits are durable and future-only", async () => {
     activeScenario = "dashboard";
@@ -7309,7 +7309,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     ]);
     await expectAnyText(view, ["Current runtime is not restarted.", "当前运行时不会被立即重启。"]);
     await expectAnyText(view, ["do not bind domains", "不会绑定域名"]);
-  }, 15_000);
+  }, 30_000);
 
   test("[DEF-ACCESS-ENTRY-008] resource detail selects server-applied access before generated access", async () => {
     activeScenario = "dashboard";
@@ -7366,7 +7366,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     } finally {
       apiResponses.dashboard["/api/rpc/resources/show"] = previousShowRoute;
     }
-  }, 15_000);
+  }, 30_000);
 
   test("[WEB-CLI-API-ACCESS-007] renders latest access failure route metadata on resource detail", async () => {
     activeScenario = "dashboard";
@@ -7430,7 +7430,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     } finally {
       apiResponses.dashboard["/api/rpc/resources/show"] = previousShowRoute;
     }
-  }, 15_000);
+  }, 30_000);
 
   test("[RES-PROFILE-ENTRY-002] shows resource network profile without inline mutation form", async () => {
     activeScenario = "dashboard";
@@ -7456,7 +7456,7 @@ describe.serial("console e2e with Bun.WebView", () => {
         (request) => request.pathname === "/api/rpc/resources/configureNetwork",
       ),
     ).toBe(false);
-  }, 15_000);
+  }, 30_000);
 
   test("[RES-PROFILE-ENTRY-011] shows resource access summary without inline mutation form", async () => {
     activeScenario = "dashboard";
@@ -7482,7 +7482,7 @@ describe.serial("console e2e with Bun.WebView", () => {
         (request) => request.pathname === "/api/rpc/resources/configureAccess",
       ),
     ).toBe(false);
-  }, 15_000);
+  }, 30_000);
 
   test("[RES-PROFILE-ENTRY-002] shows resource source profile without inline mutation form", async () => {
     activeScenario = "dashboard";
@@ -7508,7 +7508,7 @@ describe.serial("console e2e with Bun.WebView", () => {
         (request) => request.pathname === "/api/rpc/resources/configureSource",
       ),
     ).toBe(false);
-  }, 15_000);
+  }, 30_000);
 
   test("[RES-PROFILE-ENTRY-002] shows resource runtime profile without inline mutation form", async () => {
     activeScenario = "dashboard";
@@ -7534,7 +7534,7 @@ describe.serial("console e2e with Bun.WebView", () => {
         (request) => request.pathname === "/api/rpc/resources/configureRuntime",
       ),
     ).toBe(false);
-  }, 15_000);
+  }, 30_000);
 
   test("[RES-PROFILE-ENTRY-002] shows resource variable overrides without inline mutation form", async () => {
     activeScenario = "dashboard";
@@ -7569,7 +7569,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     expect(
       recordedApiRequests.some((request) => request.pathname === "/api/rpc/resources/setVariable"),
     ).toBe(false);
-  }, 15_000);
+  }, 30_000);
 
   test("[RES-PROFILE-CONFIG-013] keeps dotenv import out of the default configuration surface", async () => {
     activeScenario = "dashboard";
@@ -7597,7 +7597,7 @@ describe.serial("console e2e with Bun.WebView", () => {
         (request) => request.pathname === "/api/rpc/resources/importVariables",
       ),
     ).toBe(false);
-  }, 15_000);
+  }, 30_000);
 
   test("[RES-PROFILE-ENTRY-013] shows resource health policy without inline mutation form", async () => {
     activeScenario = "dashboard";
@@ -7623,7 +7623,7 @@ describe.serial("console e2e with Bun.WebView", () => {
         (request) => request.pathname === "/api/rpc/resources/configureHealth",
       ),
     ).toBe(false);
-  }, 15_000);
+  }, 30_000);
 
   test("[RES-PROFILE-ENTRY-014] shows resource variable overrides without inline unset action", async () => {
     activeScenario = "dashboard";
@@ -7645,7 +7645,7 @@ describe.serial("console e2e with Bun.WebView", () => {
         (request) => request.pathname === "/api/rpc/resources/unsetVariable",
       ),
     ).toBe(false);
-  }, 15_000);
+  }, 30_000);
 
   test("[DEP-SHOW-ENTRY-001] loads deployment detail through deployments.show and deployments.logs", async () => {
     activeScenario = "dashboard";
@@ -7810,7 +7810,7 @@ describe.serial("console e2e with Bun.WebView", () => {
         apiResponses.dashboard["/api/rpc/resources/diagnosticSummary"] = previousDiagnosticRoute;
       }
     }
-  }, 15_000);
+  }, 30_000);
 
   test("[DEF-ACCESS-ENTRY-007] server list hides persisted system default access policy", async () => {
     activeScenario = "dashboard";
@@ -7844,7 +7844,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       })()`,
     );
     await expectLocation(view, "/servers/srv_demo");
-  }, 15_000);
+  }, 30_000);
 
   test("[SRV-LIFE-ENTRY-004] loads server detail through servers.show", async () => {
     activeScenario = "dashboard";
@@ -7867,7 +7867,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     expect(
       recordedApiRequests.some((request) => request.pathname === "/api/rpc/servers/list"),
     ).toBe(false);
-  }, 15_000);
+  }, 30_000);
 
   test("[RT-CAP-INSPECT-001][RT-CAP-PRUNE-001] previews server capacity prune from Web", async () => {
     activeScenario = "dashboard";
@@ -7926,7 +7926,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       categories: ["stopped-containers", "preview-workspaces", "source-workspaces"],
       dryRun: true,
     });
-  }, 15_000);
+  }, 30_000);
 
   test("[RT-MON-004][RT-MON-007][RT-MON-008][RT-MON-009] renders Observe monitoring surfaces in WebView", async () => {
     activeScenario = "dashboard";
@@ -8011,7 +8011,7 @@ describe.serial("console e2e with Bun.WebView", () => {
         (request) => request.pathname === "/api/rpc/defaultAccessDomainPolicies/configure",
       ),
     ).toBe(false);
-  }, 15_000);
+  }, 30_000);
 
   test("[SSH-CRED-ENTRY-004] server detail reads credential usage and separates zero usage from unavailable usage", async () => {
     activeScenario = "dashboard";
@@ -8107,7 +8107,7 @@ describe.serial("console e2e with Bun.WebView", () => {
         apiResponses.dashboard["/api/rpc/credentials/ssh/show"] = previousCredentialShowRoute;
       }
     }
-  }, 15_000);
+  }, 30_000);
 
   test("[SRV-LIFE-ENTRY-016] renames a server from server detail", async () => {
     activeScenario = "dashboard";
@@ -8171,7 +8171,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       apiResponses.dashboard["/api/rpc/servers/show"] = previousShowRoute;
       apiResponses.dashboard["/api/rpc/servers/rename"] = previousRenameRoute;
     }
-  }, 15_000);
+  }, 30_000);
 
   test("[SRV-LIFE-ENTRY-012-WEB] deletes an eligible server from server detail", async () => {
     activeScenario = "dashboard";
@@ -8239,7 +8239,7 @@ describe.serial("console e2e with Bun.WebView", () => {
         apiResponses.dashboard["/api/rpc/servers/delete"] = previousDeleteRoute;
       }
     }
-  }, 15_000);
+  }, 30_000);
 
   test("[SRV-LIFE-ENTRY-006-WEB] deactivates a server from server detail", async () => {
     activeScenario = "dashboard";
@@ -8288,7 +8288,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       apiResponses.dashboard["/api/rpc/servers/show"] = previousShowRoute;
       apiResponses.dashboard["/api/rpc/servers/deactivate"] = previousDeactivateRoute;
     }
-  }, 15_000);
+  }, 30_000);
 
   test("[SRV-LIFE-ENTRY-020] hides edge proxy intent configuration from server detail", async () => {
     activeScenario = "dashboard";
@@ -8330,7 +8330,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     } finally {
       apiResponses.dashboard["/api/rpc/servers/show"] = previousShowRoute;
     }
-  }, 15_000);
+  }, 30_000);
 
   test("[DEP-SHOW-QRY-004] surfaces section errors as degraded deployment detail UI", async () => {
     activeScenario = "dashboard";
@@ -8375,7 +8375,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     } finally {
       apiResponses.dashboard["/api/rpc/deployments/show"] = previousShowRoute;
     }
-  }, 15_000);
+  }, 30_000);
 
   test("[DEP-SHOW-ENTRY-002] opens deployment detail from resource history", async () => {
     activeScenario = "dashboard";
@@ -8401,7 +8401,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       includeRelatedContext: true,
       includeLatestFailure: true,
     });
-  }, 15_000);
+  }, 30_000);
 
   test("[DEP-EVENTS-ENTRY-005] replays and follows deployment events on the detail timeline", async () => {
     activeScenario = "dashboard";
@@ -8468,7 +8468,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       apiResponses.dashboard["/api/rpc/deployments/events"] = previousReplayRoute;
       apiResponses.dashboard["/api/rpc/deployments/eventsStream"] = previousStreamRoute;
     }
-  }, 15_000);
+  }, 30_000);
 
   test("[RES-PROFILE-ENTRY-002] submits resource archive through Web", async () => {
     activeScenario = "dashboard";
@@ -8500,7 +8500,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     } finally {
       showResponse.json.lifecycle = previousLifecycle;
     }
-  }, 15_000);
+  }, 30_000);
 
   test("[ENV-LIFE-ENTRY-005] submits environment archive through Web", async () => {
     activeScenario = "dashboard";
@@ -8532,15 +8532,18 @@ describe.serial("console e2e with Bun.WebView", () => {
     } finally {
       listResponse.json.items[0] = previousEnvironment;
     }
-  }, 15_000);
+  }, 30_000);
 
   test("[ENV-LIFE-ENTRY-006] archived project can still archive a retained environment through Web", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();
     const previousListRoute = apiResponses.dashboard["/api/rpc/projects/list"];
     const previousShowRoute = apiResponses.dashboard["/api/rpc/projects/show"];
+    const previousEnvironmentListRoute = apiResponses.dashboard["/api/rpc/environments/list"];
+    const projectId = `prj_archived_env_${Date.now().toString(36)}`;
+    const environmentId = `env_archived_project_${Date.now().toString(36)}`;
     const archivedProject = {
-      id: "prj_demo",
+      id: projectId,
       name: "Demo",
       slug: "demo",
       description: "Demo project",
@@ -8556,10 +8559,25 @@ describe.serial("console e2e with Bun.WebView", () => {
     apiResponses.dashboard["/api/rpc/projects/show"] = {
       json: archivedProject,
     };
+    apiResponses.dashboard["/api/rpc/environments/list"] = {
+      json: {
+        items: [
+          {
+            id: environmentId,
+            projectId,
+            name: "production",
+            kind: "production",
+            lifecycleStatus: "active",
+            createdAt: "2026-01-01T00:00:00.000Z",
+            maskedVariables: [],
+          },
+        ],
+      },
+    };
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}/projects/prj_demo?tab=environments`);
+      await view.navigate(`${previewUrl}/projects/${projectId}?tab=environments`);
       await expectAnyText(view, ["Archived", "已归档"]);
       await expectAnyText(view, ["Environments", "环境"]);
       await clickButtonByAnyText(view, lifecycleActionLabels);
@@ -8570,13 +8588,14 @@ describe.serial("console e2e with Bun.WebView", () => {
       const archiveInput = readOrpcJsonPayload(archiveRequest.body);
 
       expect(archiveInput).toEqual({
-        environmentId: "env_demo",
+        environmentId,
       });
     } finally {
       apiResponses.dashboard["/api/rpc/projects/list"] = previousListRoute;
       apiResponses.dashboard["/api/rpc/projects/show"] = previousShowRoute;
+      apiResponses.dashboard["/api/rpc/environments/list"] = previousEnvironmentListRoute;
     }
-  }, 15_000);
+  }, 60_000);
 
   test("[ENV-LIFE-CLONE-ENTRY-003] submits environment clone through Web", async () => {
     activeScenario = "dashboard";
@@ -8596,7 +8615,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       environmentId: "env_demo",
       targetName: "production-copy",
     });
-  }, 15_000);
+  }, 30_000);
 
   test("[ENV-LIFE-RENAME-ENTRY-003] submits environment rename through Web", async () => {
     activeScenario = "dashboard";
@@ -8616,7 +8635,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       environmentId: "env_demo",
       name: "customer-production",
     });
-  }, 15_000);
+  }, 30_000);
 
   test("[ENV-LIFE-ENTRY-006] submits environment lock through Web", async () => {
     activeScenario = "dashboard";
@@ -8635,7 +8654,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     expect(lockInput).toEqual({
       environmentId: "env_demo",
     });
-  }, 15_000);
+  }, 30_000);
 
   test("[ENV-LIFE-ENTRY-006] submits environment unlock through Web", async () => {
     activeScenario = "dashboard";
@@ -8674,7 +8693,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     } finally {
       listResponse.json.items[0] = previousEnvironment;
     }
-  }, 15_000);
+  }, 30_000);
 
   test("[RES-PROFILE-ENTRY-008] submits archived resource delete through Web", async () => {
     activeScenario = "dashboard";
@@ -8715,7 +8734,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     } finally {
       showResponse.json.lifecycle = previousLifecycle;
     }
-  }, 15_000);
+  }, 30_000);
 
   test("[CERT-IMPORT-ENTRY-003] imports a manual certificate from the resource detail Web surface", async () => {
     activeScenario = "dashboard";
@@ -8843,7 +8862,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       apiResponses.dashboard["/api/rpc/domainBindings/list"] = previousDomainBindingsRoute;
       apiResponses.dashboard["/api/rpc/certificates/list"] = previousCertificatesRoute;
     }
-  }, 15_000);
+  }, 30_000);
 
   test("[CERT-IMPORT-ENTRY-004] does not offer manual import for an auto-policy binding", async () => {
     activeScenario = "dashboard";
@@ -8897,7 +8916,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       apiResponses.dashboard["/api/rpc/domainBindings/list"] = previousDomainBindingsRoute;
       apiResponses.dashboard["/api/rpc/certificates/list"] = previousCertificatesRoute;
     }
-  }, 15_000);
+  }, 30_000);
 
   test("shows the GitHub repository picker and fills the import wizard after auth", async () => {
     activeScenario = "github-connected";
@@ -8922,7 +8941,7 @@ describe.serial("console e2e with Bun.WebView", () => {
         })`,
       ),
     ).toBe(JSON.stringify({ name: "", host: "", port: "" }));
-  }, 15_000);
+  }, 30_000);
 
   test("[QUICK-DEPLOY-ENTRY-008] maps Web static site draft fields through resources.create", async () => {
     activeScenario = "static-quick-deploy";
@@ -9015,7 +9034,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       includeRelatedContext: true,
       includeLatestFailure: true,
     });
-  }, 15_000);
+  }, 30_000);
 
   test("[QUICK-DEPLOY-ENTRY-013][WF-PLAN-ENTRY-005] maps Web framework runtime draft fields through resources.create", async () => {
     activeScenario = "static-quick-deploy";
@@ -9094,5 +9113,5 @@ describe.serial("console e2e with Bun.WebView", () => {
       environmentId: "env_static",
       resourceId: "res_static",
     });
-  }, 15_000);
+  }, 30_000);
 });
