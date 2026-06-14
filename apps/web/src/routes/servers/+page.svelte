@@ -663,14 +663,11 @@
                       <Network class="size-3.5" />
                       {$t(i18nKeys.console.servers.connectivityTab)}
                     </Button>
+                    <Button href={serverDetailHref(server.id)} size="sm" variant="outline">
+                      {$t(i18nKeys.common.actions.viewDetails)}
+                      <ArrowRight class="size-3.5" />
+                    </Button>
                   </div>
-                  <a
-                    href={serverDetailHref(server.id)}
-                    class="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:w-full md:justify-end"
-                  >
-                    {$t(i18nKeys.common.actions.viewDetails)}
-                    <ArrowRight class="size-4" />
-                  </a>
                 </div>
               </article>
             {/each}
