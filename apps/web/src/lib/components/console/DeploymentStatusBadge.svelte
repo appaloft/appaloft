@@ -11,6 +11,13 @@
 
   let { status, class: className = "" }: Props = $props();
 
+  const inFlight = $derived(
+    status === "created" ||
+      status === "planning" ||
+      status === "planned" ||
+      status === "running" ||
+      status === "cancel-requested",
+  );
   const tone = $derived.by(() => {
     switch (status) {
       case "succeeded":
@@ -23,13 +30,22 @@
       case "planning":
       case "planned":
       case "running":
-        return "border-transparent bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300";
+      case "cancel-requested":
+        return "border-transparent bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300";
       default:
         return "border-border bg-muted text-muted-foreground";
     }
   });
 </script>
 
-<Badge class={[tone, className]} variant="outline">
+<Badge class={["inline-flex items-center gap-1.5", tone, className]} variant="outline">
+  {#if inFlight}
+    <span class="relative flex size-2 shrink-0" aria-hidden="true" data-deployment-running-signal>
+      <span
+        class="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-70 motion-reduce:animate-none"
+      ></span>
+      <span class="relative inline-flex size-2 rounded-full bg-amber-500"></span>
+    </span>
+  {/if}
   {deploymentStatusLabel(status)}
 </Badge>

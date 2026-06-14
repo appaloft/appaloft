@@ -6690,15 +6690,6 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
                     {quickDeployDiagnosticSummaryButtonLabel}
                   </Button>
                 {/if}
-                {#if lastOperatorWorkId}
-                  <Button
-                    href={`/instance/workers?workId=${encodeURIComponent(lastOperatorWorkId)}`}
-                    size="sm"
-                    variant="outline"
-                  >
-                    {$t(i18nKeys.console.quickDeploy.blueprintInstallOpenWork)}
-                  </Button>
-                {/if}
                 {#if lastCreatedDeploymentId}
                   {#if diagnosticSummaryError}
                     <p class="mt-2 text-sm text-destructive">{diagnosticSummaryError}</p>
@@ -6739,17 +6730,11 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   feedback={deployFeedback}
   deploymentId={lastCreatedDeploymentId}
   traceLink={workflowDeploymentTraceLink}
-  operatorWorkId={lastOperatorWorkId}
   onClose={() => {
     workflowProgressDialogOpen = false;
   }}
   onOpenDeployment={() => {
     void goto(lastCreatedDeploymentHref());
-  }}
-  onOpenOperatorWork={() => {
-    if (lastOperatorWorkId) {
-      void goto(`/instance/workers?workId=${encodeURIComponent(lastOperatorWorkId)}`);
-    }
   }}
 />
 

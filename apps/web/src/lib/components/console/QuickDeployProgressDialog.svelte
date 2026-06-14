@@ -27,11 +27,9 @@
     progressError?: string;
     feedback?: QuickDeployFeedback;
     deploymentId?: string;
-    operatorWorkId?: string;
     traceLink?: string;
     onClose?: () => void;
     onOpenDeployment?: () => void;
-    onOpenOperatorWork?: () => void;
   };
 
   let {
@@ -42,11 +40,9 @@
     progressError = "",
     feedback = null,
     deploymentId = "",
-    operatorWorkId = "",
     traceLink = "",
     onClose,
     onOpenDeployment,
-    onOpenOperatorWork,
   }: Props = $props();
 
   function workflowStepLabel(kind: QuickDeployWorkflowStep["kind"]): string {
@@ -195,9 +191,6 @@
               {#if deploymentId}
                 <span>{$t(i18nKeys.console.deployments.progressDeploymentLabel)} {deploymentId}</span>
               {/if}
-              {#if operatorWorkId}
-                <span>work {operatorWorkId}</span>
-              {/if}
               {#if traceLink}
                 <span class="max-w-full truncate">
                   {$t(i18nKeys.console.deployments.progressTraceLabel)} {traceLink}
@@ -223,11 +216,6 @@
             {#if deploymentId && onOpenDeployment}
               <Button type="button" size="sm" variant="outline" onclick={() => onOpenDeployment?.()}>
                 {$t(i18nKeys.common.actions.viewDeployment)}
-              </Button>
-            {/if}
-            {#if operatorWorkId && onOpenOperatorWork}
-              <Button type="button" size="sm" variant="outline" onclick={() => onOpenOperatorWork?.()}>
-                {$t(i18nKeys.console.quickDeploy.blueprintInstallOpenWork)}
               </Button>
             {/if}
             <Button

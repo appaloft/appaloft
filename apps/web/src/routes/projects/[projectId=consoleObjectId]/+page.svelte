@@ -7,6 +7,7 @@
     Archive,
     ArrowLeft,
     ArrowRight,
+    ChevronDown,
     Copy,
     ExternalLink,
     FolderOpen,
@@ -51,6 +52,14 @@
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import * as Dialog from "$lib/components/ui/dialog";
+  import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+  } from "$lib/components/ui/dropdown-menu";
   import { Input } from "$lib/components/ui/input";
   import * as Select from "$lib/components/ui/select";
   import { Skeleton } from "$lib/components/ui/skeleton";
@@ -1127,19 +1136,71 @@
 
   function operatorWorkAttentionDetail(work: OperatorWorkItem): string {
     const safeDetails = work.safeDetails ?? {};
-    const failureCode =
-      stringSafeDetail(safeDetails.failure_code) ??
-      stringSafeDetail(safeDetails.code) ??
-      work.errorCode ??
+    const isFailure = work.status === "failed" || work.status === "dead-lettered";
+    const failureCode = isFailure
+      ? stringSafeDetail(safeDetails.failure_code) ??
+        stringSafeDetail(safeDetails.code) ??
+        work.errorCode ??
+        work.status
+      : undefined;
+    const currentPhase =
+      (isFailure ? stringSafeDetail(safeDetails.failure_phase) : undefined) ??
+      work.phase ??
+      work.step ??
       work.status;
-    const failurePhase =
-      stringSafeDetail(safeDetails.failure_phase) ?? work.phase ?? work.step ?? work.status;
     const operation =
       stringSafeDetail(safeDetails.failure_operation) ?? work.operationKey;
+    const statusLabel = operatorWorkStatusLabel(work.status);
 
-    return [work.id, work.step ?? work.status, failureCode, failurePhase, operation, formatTime(work.updatedAt)]
-      .filter(Boolean)
+    return [statusLabel, currentPhase, work.step, failureCode, operation, formatTime(work.updatedAt)]
+      .filter((part, index, parts): part is string => Boolean(part) && parts.indexOf(part) === index)
       .join(" · ");
+  }
+
+  function operatorWorkStatusLabel(status: OperatorWorkItem["status"]): string {
+    switch (status) {
+      case "failed":
+      case "dead-lettered":
+        return $t(i18nKeys.common.status.failed);
+      case "running":
+      case "pending":
+      case "retry-scheduled":
+        return $t(i18nKeys.common.status.running);
+      case "succeeded":
+        return $t(i18nKeys.console.deployments.progressStatusSucceeded);
+      case "canceled":
+        return $t(i18nKeys.common.status.stopped);
+      default:
+        return $t(i18nKeys.common.status.unknown);
+    }
+  }
+
+  function projectAttentionStatusLabel(item: ProjectAttentionItem): string {
+    if (item.tone === "destructive") {
+      return $t(i18nKeys.common.status.failed);
+    }
+
+    if (item.tone === "warning") {
+      return $t(i18nKeys.common.status.running);
+    }
+
+    return $t(i18nKeys.common.status.unknown);
+  }
+
+  function projectAttentionIsLive(item: ProjectAttentionItem): boolean {
+    return item.tone === "warning";
+  }
+
+  function projectAttentionCardClass(item: ProjectAttentionItem): string {
+    if (item.tone === "destructive") {
+      return "border-destructive/30 bg-destructive/5";
+    }
+
+    if (item.tone === "warning") {
+      return "border-amber-200 bg-amber-50/70 dark:border-amber-900/60 dark:bg-amber-950/20";
+    }
+
+    return "border-border bg-background";
   }
 
   function stringSafeDetail(value: unknown): string | undefined {
@@ -1724,37 +1785,106 @@
                 {#if projectAttentionItems.length > 0}
                   <div class="space-y-2">
                     {#each projectAttentionItems as item (`${item.kind}-${item.href ?? item.resourceId ?? item.title}`)}
-                      {#if item.href}
-                        <a
-                          href={item.href}
-                          class={[
-                            "block rounded-md border px-3 py-2 transition hover:bg-muted/40",
-                            item.tone === "destructive"
-                              ? "border-destructive/30 bg-destructive/5"
-                              : "border-border bg-background",
-                          ]}
-                        >
-                          <p class="text-sm font-medium">{item.title}</p>
-                          <p class="mt-1 text-xs leading-5 text-muted-foreground">{item.detail}</p>
-                          <p class="mt-2 text-xs font-medium text-foreground">{item.action}</p>
-                        </a>
-                      {:else}
-                        <button
-                          type="button"
-                          class={[
-                            "block w-full rounded-md border px-3 py-2 text-left transition hover:bg-muted/40 disabled:pointer-events-none disabled:opacity-55",
-                            item.tone === "destructive"
-                              ? "border-destructive/30 bg-destructive/5"
-                              : "border-border bg-background",
-                          ]}
-                          disabled={isProjectArchived}
-                          onclick={() => openProjectAttentionAction(item)}
-                        >
-                          <p class="text-sm font-medium">{item.title}</p>
-                          <p class="mt-1 text-xs leading-5 text-muted-foreground">{item.detail}</p>
-                          <p class="mt-2 text-xs font-medium text-foreground">{item.action}</p>
-                        </button>
-                      {/if}
+                      <article
+                        class={[
+                          "rounded-md border px-3 py-2 transition hover:bg-muted/40",
+                          projectAttentionCardClass(item),
+                        ]}
+                        data-project-attention-progress-item
+                      >
+                        <div class="flex min-w-0 items-start justify-between gap-2">
+                          <div class="min-w-0">
+                            <div class="flex min-w-0 items-center gap-2">
+                              <span
+                                class="relative flex size-2.5 shrink-0"
+                                aria-hidden="true"
+                                data-project-attention-status-signal
+                              >
+                                {#if projectAttentionIsLive(item)}
+                                  <span
+                                    class="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-70 motion-reduce:animate-none"
+                                  ></span>
+                                {/if}
+                                <span
+                                  class={[
+                                    "relative inline-flex size-2.5 rounded-full",
+                                    item.tone === "destructive"
+                                      ? "bg-destructive"
+                                      : item.tone === "warning"
+                                        ? "bg-amber-500"
+                                        : "bg-muted-foreground",
+                                  ]}
+                                ></span>
+                              </span>
+                              <p class="min-w-0 truncate text-sm font-medium">{item.title}</p>
+                            </div>
+                            <p class="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
+                              {item.detail}
+                            </p>
+                          </div>
+
+                          <DropdownMenu>
+                            <DropdownMenuTrigger
+                              class="group/dropdown-trigger inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              aria-label={$t(i18nKeys.common.actions.viewProgress)}
+                              title={$t(i18nKeys.common.actions.viewProgress)}
+                              data-project-attention-progress-trigger
+                            >
+                              <ChevronDown class="size-3.5 transition-transform group-data-[state=open]/dropdown-trigger:rotate-180" />
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" sideOffset={6} class="w-72">
+                              <DropdownMenuLabel class="truncate">{item.title}</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              <div class="space-y-2 px-2 py-1.5 text-xs">
+                                <div class="flex items-center justify-between gap-3">
+                                  <span class="text-muted-foreground">
+                                    {$t(i18nKeys.common.domain.status)}
+                                  </span>
+                                  <span class="font-medium">{projectAttentionStatusLabel(item)}</span>
+                                </div>
+                                <p class="leading-5 text-muted-foreground">{item.detail}</p>
+                              </div>
+                              <DropdownMenuSeparator />
+                              {#if item.href}
+                                <DropdownMenuItem
+                                  onclick={() => {
+                                    if (item.href) void goto(item.href);
+                                  }}
+                                >
+                                  <ArrowRight class="size-4" />
+                                  {$t(i18nKeys.common.actions.viewDeployment)}
+                                </DropdownMenuItem>
+                              {:else}
+                                <DropdownMenuItem
+                                  disabled={isProjectArchived}
+                                  onclick={() => openProjectAttentionAction(item)}
+                                >
+                                  <RotateCcw class="size-4" />
+                                  {item.action}
+                                </DropdownMenuItem>
+                              {/if}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+
+                        <div class="mt-2">
+                          {#if item.href}
+                            <Button href={item.href} size="sm" variant="outline">
+                              {item.action}
+                            </Button>
+                          {:else}
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={isProjectArchived}
+                              onclick={() => openProjectAttentionAction(item)}
+                            >
+                              {item.action}
+                            </Button>
+                          {/if}
+                        </div>
+                      </article>
                     {/each}
                   </div>
                 {:else}
