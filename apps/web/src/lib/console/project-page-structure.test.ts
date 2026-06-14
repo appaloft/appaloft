@@ -35,7 +35,7 @@ describe("project detail page structure", () => {
     expect(projectSource).toContain("console-detail-tab-panel console-detail-tab-panel-scroll");
     expect(
       projectSource.match(
-        /console-detail-tab-panel console-detail-tab-panel-scroll[^\"]*mt-0[^\"]*pt-0/g,
+        /console-detail-tab-panel console-detail-tab-panel-scroll[^"]*mt-0[^"]*pt-0/g,
       )?.length,
     ).toBe(7);
     expect(projectSource).not.toContain('<div class="space-y-0">');

@@ -823,9 +823,7 @@ describe("console page structure", () => {
     expect(resourceListTableSource).toContain("data-resource-record-row");
     expect(resourceListTableSource).toContain("data-resource-owner-summary");
     expect(resourceListTableSource).toContain("xl:items-center xl:py-3");
-    expect(resourceListTableSource).toContain(
-      "xl:grid-flow-col xl:grid-cols-none xl:auto-cols-fr",
-    );
+    expect(resourceListTableSource).toContain("xl:grid-flow-col xl:grid-cols-none xl:auto-cols-fr");
     expect(resourceListTableSource).not.toContain('from "$lib/components/ui/table"');
     expect(resourceListTableSource).not.toContain("<Table.Root");
     expect(consoleStatePanelSource).toContain("{#if actionLabel && actionOnclick}");
@@ -1372,7 +1370,9 @@ describe("console page structure", () => {
     expect(runtimeControlPanelSource).toContain(
       '<section id="resource-runtime-control" class="space-y-4">',
     );
-    expect(runtimeControlPanelSource).not.toContain('id="resource-runtime-control" class="space-y-4 p-5"');
+    expect(runtimeControlPanelSource).not.toContain(
+      'id="resource-runtime-control" class="space-y-4 p-5"',
+    );
     expect(runtimeControlPanelSource).toContain("onclick={openRuntimeControlDialog}");
     expect(runtimeControlPanelSource).toContain("runtimeControlManageAction");
     expect(runtimeControlPanelSource).not.toContain('openRuntimeControlDialog("stop")');
@@ -1658,7 +1658,7 @@ describe("console page structure", () => {
       serverRowHeaderSource.indexOf("<h3"),
     );
     expect(serverRowHeaderSource.indexOf("data-server-row-lifecycle")).toBeLessThan(
-      serverRowHeaderSource.indexOf('title={`${server.host}:${server.port}`}'),
+      serverRowHeaderSource.indexOf("title={`${server.host}:${server.port}`}"),
     );
     expect(serverRowHeaderSource).toContain('class="shrink-0"');
     expect(serversDisplaySurface).toContain("data-server-row-readiness");
