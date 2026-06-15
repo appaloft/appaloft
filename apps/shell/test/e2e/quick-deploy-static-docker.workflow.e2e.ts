@@ -12,8 +12,8 @@ import {
   runDocker,
   runShellCli,
   usesExternalServer,
-  waitForDeploymentLogs,
   waitForDeploymentSucceeded,
+  waitForDeploymentTimeline,
 } from "./support/shell-e2e-fixture";
 
 const fixtureDir = fixturePath("static-site");
@@ -170,19 +170,19 @@ describe("quick deploy static Docker workflow e2e", () => {
         },
       });
 
-      const logs = await waitForDeploymentLogs(
+      const timeline = await waitForDeploymentTimeline(
         deploymentId,
         workspace.cliOptions,
         ["Generated static site Dockerfile", "Container is reachable"],
         { label: "static site deployment" },
       );
-      expect(logs.stdout).toContain("Generated static site Dockerfile");
-      expect(logs.stdout).toContain("Container is reachable");
+      expect(timeline.stdout).toContain("Generated static site Dockerfile");
+      expect(timeline.stdout).toContain("Container is reachable");
       const runtimeUrl = /Container is reachable at (http:\/\/127\.0\.0\.1:\d+\/)/u.exec(
-        logs.stdout,
+        timeline.stdout,
       )?.[1];
       if (!runtimeUrl) {
-        throw new Error(`Could not find runtime static URL in logs:\n${logs.stdout}`);
+        throw new Error(`Could not find runtime static URL in timeline:\n${timeline.stdout}`);
       }
 
       const html = await waitForStaticSite(runtimeUrl);

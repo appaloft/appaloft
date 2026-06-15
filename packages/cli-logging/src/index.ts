@@ -30,14 +30,14 @@ import {
 
 type OutputStream = Pick<NodeJS.WriteStream, "columns" | "isTTY" | "write">;
 
-export interface DeploymentLogRendererOptions {
+export interface DeploymentProgressRendererOptions {
   appLogLines?: number;
   color?: boolean;
   interactive?: boolean;
   output?: OutputStream;
 }
 
-export interface CliLogRendererOptions extends Omit<DeploymentLogRendererOptions, "output"> {
+export interface CliLogRendererOptions extends Omit<DeploymentProgressRendererOptions, "output"> {
   stdout?: OutputStream;
   stderr?: OutputStream;
 }
@@ -255,7 +255,7 @@ function truncate(value: string, width: number): string {
   return `${value.slice(0, Math.max(0, width - 3))}...`;
 }
 
-export class DeploymentLogRenderer {
+export class DeploymentProgressRenderer {
   private readonly output: OutputStream;
   private readonly appLogLines: number;
   private readonly color: boolean;
@@ -266,7 +266,7 @@ export class DeploymentLogRenderer {
   private timer: ReturnType<typeof setInterval> | undefined;
   private started = false;
 
-  constructor(options: DeploymentLogRendererOptions = {}) {
+  constructor(options: DeploymentProgressRendererOptions = {}) {
     this.output = options.output ?? process.stderr;
     this.appLogLines = Math.max(0, Math.trunc(options.appLogLines ?? 3));
     this.color = options.color ?? Boolean(this.output.isTTY && !process.env.NO_COLOR);
@@ -464,12 +464,12 @@ export class DeploymentLogRenderer {
 export class CliLogRenderer {
   private readonly stdout: OutputStream;
   private readonly stderr: OutputStream;
-  private readonly deploymentRenderer: DeploymentLogRenderer;
+  private readonly deploymentRenderer: DeploymentProgressRenderer;
 
   constructor(options: CliLogRendererOptions = {}) {
     this.stdout = options.stdout ?? process.stdout;
     this.stderr = options.stderr ?? process.stderr;
-    this.deploymentRenderer = new DeploymentLogRenderer({
+    this.deploymentRenderer = new DeploymentProgressRenderer({
       output: this.stderr,
       ...(options.appLogLines === undefined ? {} : { appLogLines: options.appLogLines }),
       ...(options.color === undefined ? {} : { color: options.color }),
@@ -496,10 +496,10 @@ export class CliLogRenderer {
   }
 }
 
-export function createDeploymentLogRenderer(
-  options?: DeploymentLogRendererOptions,
-): DeploymentLogRenderer {
-  return new DeploymentLogRenderer(options);
+export function createDeploymentProgressRenderer(
+  options?: DeploymentProgressRendererOptions,
+): DeploymentProgressRenderer {
+  return new DeploymentProgressRenderer(options);
 }
 
 export function createCliLogRenderer(options?: CliLogRendererOptions): CliLogRenderer {

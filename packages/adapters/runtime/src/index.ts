@@ -5,8 +5,8 @@ import {
   CommandText,
   DisplayNameText,
   DeploymentTargetDescriptor,
-  DeploymentLogEntry,
-  DeploymentLogSourceValue,
+  DeploymentTimelineJournalEntry,
+  DeploymentTimelineSourceValue,
   DeploymentPhaseValue,
   DetectSummary,
   EdgeProxyKindValue,
@@ -1340,7 +1340,7 @@ export class DefaultRuntimePlanResolver implements RuntimePlanResolver {
 interface ExecutionSession {
   deploymentId: string;
   status: "running" | "succeeded" | "failed" | "rolled-back";
-  logs: DeploymentLogEntry[];
+  timeline: DeploymentTimelineJournalEntry[];
 }
 
 type LogPhase = "detect" | "plan" | "package" | "deploy" | "verify" | "rollback";
@@ -1350,10 +1350,10 @@ function phaseLog(
   phase: LogPhase,
   message: string,
   level: LogLevel = "info",
-): DeploymentLogEntry {
-  return DeploymentLogEntry.rehydrate({
+): DeploymentTimelineJournalEntry {
+  return DeploymentTimelineJournalEntry.rehydrate({
     timestamp: OccurredAt.rehydrate(new Date().toISOString()),
-    source: DeploymentLogSourceValue.rehydrate("appaloft"),
+    source: DeploymentTimelineSourceValue.rehydrate("appaloft"),
     phase: DeploymentPhaseValue.rehydrate(phase),
     level: LogLevelValue.rehydrate(level),
     message: MessageText.rehydrate(message),
@@ -1409,7 +1409,7 @@ export class InMemoryExecutionBackend implements ExecutionBackend {
     this.sessions.set(deployment.toState().id.value, {
       deploymentId: deployment.toState().id.value,
       status: result.status,
-      logs: result.logs,
+      timeline: result.timeline,
     });
     return deployment;
   }
@@ -1427,7 +1427,7 @@ export class InMemoryExecutionBackend implements ExecutionBackend {
         },
       },
       async () => {
-        const logs: DeploymentLogEntry[] = [
+        const timeline: DeploymentTimelineJournalEntry[] = [
           phaseLog(
             "detect",
             `Resolved ${state.runtimePlan.source.kind} source ${state.runtimePlan.source.displayName}`,
@@ -1440,7 +1440,7 @@ export class InMemoryExecutionBackend implements ExecutionBackend {
           phaseLog("deploy", `Applying runtime plan ${state.runtimePlan.id}`),
           phaseLog("verify", `Checking deployment health for resource ${state.resourceId.value}`),
         ];
-        for (const log of logs) {
+        for (const log of timeline) {
           await this.report(context, {
             deploymentId: state.id.value,
             phase: log.phase as "detect" | "plan" | "package" | "deploy" | "verify",
@@ -1451,7 +1451,7 @@ export class InMemoryExecutionBackend implements ExecutionBackend {
 
         if (shouldFail(deployment)) {
           const message = context.t(i18nKeys.backend.progress.simulatedVerificationFailure);
-          logs.push(phaseLog("verify", message, "error"));
+          timeline.push(phaseLog("verify", message, "error"));
           await this.report(context, {
             deploymentId: state.id.value,
             phase: "verify",
@@ -1465,7 +1465,7 @@ export class InMemoryExecutionBackend implements ExecutionBackend {
               ExecutionResult.rehydrate({
                 exitCode: ExitCode.rehydrate(1),
                 status: ExecutionStatusValue.rehydrate("failed"),
-                logs,
+                timeline,
                 retryable: true,
                 errorCode: ErrorCodeText.rehydrate("simulated_failure"),
               }),
@@ -1474,7 +1474,7 @@ export class InMemoryExecutionBackend implements ExecutionBackend {
         }
 
         const completedMessage = context.t(i18nKeys.backend.progress.deploymentCompleted);
-        logs.push(phaseLog("verify", completedMessage));
+        timeline.push(phaseLog("verify", completedMessage));
         await this.report(context, {
           deploymentId: state.id.value,
           phase: "verify",
@@ -1488,7 +1488,7 @@ export class InMemoryExecutionBackend implements ExecutionBackend {
             ExecutionResult.rehydrate({
               exitCode: ExitCode.rehydrate(0),
               status: ExecutionStatusValue.rehydrate("succeeded"),
-              logs,
+              timeline,
               retryable: false,
             }),
           ),
@@ -1500,13 +1500,13 @@ export class InMemoryExecutionBackend implements ExecutionBackend {
   async cancel(
     context: ExecutionContext,
     deployment: Deployment,
-  ): Promise<Result<{ logs: DeploymentLogEntry[] }>> {
+  ): Promise<Result<{ timeline: DeploymentTimelineJournalEntry[] }>> {
     const deploymentId = deployment.toState().id.value;
-    const logs = [phaseLog("deploy", "Canceled in-memory execution")];
+    const timeline = [phaseLog("deploy", "Canceled in-memory execution")];
     this.sessions.set(deploymentId, {
       deploymentId,
       status: "failed",
-      logs,
+      timeline,
     });
     await this.report(context, {
       deploymentId,
@@ -1514,7 +1514,7 @@ export class InMemoryExecutionBackend implements ExecutionBackend {
       status: "succeeded",
       message: "Canceled in-memory execution",
     });
-    return ok({ logs });
+    return ok({ timeline });
   }
 
   async rollback(
@@ -1532,12 +1532,12 @@ export class InMemoryExecutionBackend implements ExecutionBackend {
           return err(domainError.invariant(context.t(i18nKeys.backend.progress.rollbackPlanEmpty)));
         }
 
-        const logs: DeploymentLogEntry[] = [
+        const timeline: DeploymentTimelineJournalEntry[] = [
           phaseLog("rollback", `Loading snapshot ${plan.snapshotId}`),
           phaseLog("rollback", `Executing rollback plan ${plan.id}`),
           phaseLog("rollback", context.t(i18nKeys.backend.progress.rollbackCompleted)),
         ];
-        for (const log of logs) {
+        for (const log of timeline) {
           await this.report(context, {
             deploymentId: deployment.toState().id.value,
             phase: "rollback",
@@ -1552,7 +1552,7 @@ export class InMemoryExecutionBackend implements ExecutionBackend {
             ExecutionResult.rehydrate({
               exitCode: ExitCode.rehydrate(0),
               status: ExecutionStatusValue.rehydrate("rolled-back"),
-              logs,
+              timeline,
               retryable: false,
             }),
           ),
@@ -1590,7 +1590,7 @@ export class ExecutionBackendRuntimeTargetAdapter implements RuntimeTargetBacken
   async cancel(
     context: ExecutionContext,
     deployment: Deployment,
-  ): Promise<Result<{ logs: DeploymentLogEntry[] }>> {
+  ): Promise<Result<{ timeline: DeploymentTimelineJournalEntry[] }>> {
     return await this.backend.cancel(context, deployment);
   }
 
@@ -1745,7 +1745,7 @@ export class RoutingExecutionBackend implements ExecutionBackend {
   async cancel(
     context: ExecutionContext,
     deployment: Deployment,
-  ): Promise<Result<{ logs: DeploymentLogEntry[] }>> {
+  ): Promise<Result<{ timeline: DeploymentTimelineJournalEntry[] }>> {
     return await this.backendFor(deployment, ["runtime.cleanup"]).cancel(context, deployment);
   }
 

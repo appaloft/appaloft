@@ -315,9 +315,9 @@ function deploymentSummary(): DeploymentSummary {
       precedence: [],
       variables: [],
     },
-    logs: [],
+    timeline: [],
     createdAt: "2026-01-01T00:00:00.000Z",
-    logCount: 0,
+    timelineCount: 0,
   };
 }
 
@@ -394,7 +394,7 @@ function queryService(
       count: async () => 1,
       list: async () => [deployment],
       findOne: async () => deployment,
-      findLogs: async () => [],
+      findTimeline: async () => [],
     } satisfies DeploymentReadModel);
 
   return new RuntimeUsageInspectionQueryService(

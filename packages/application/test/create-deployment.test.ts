@@ -19,7 +19,6 @@ import {
   DeploymentByIdSpec,
   DeploymentDependencyRuntimeSecretRef,
   DeploymentId,
-  DeploymentLogEntry,
   DeploymentPhaseValue,
   type DeploymentSelectionSpec,
   DeploymentTarget,
@@ -27,6 +26,7 @@ import {
   DeploymentTargetDescriptor,
   DeploymentTargetId,
   DeploymentTargetName,
+  DeploymentTimelineJournalEntry,
   Destination,
   DestinationId,
   DestinationKindValue,
@@ -138,7 +138,7 @@ import {
   PassThroughMutationCoordinator,
   SequenceIdGenerator,
 } from "@appaloft/testkit";
-import { DeploymentLogProgressRecorder } from "../src/deployment-progress-recorder";
+import { DeploymentTimelineProgressRecorder } from "../src/deployment-progress-recorder";
 import {
   type DurableWorkClaimInput,
   type DurableWorkClaimResult,
@@ -204,7 +204,6 @@ import {
   DeploymentDurableWorkHandler,
   DeploymentFactory,
   DeploymentLifecycleService,
-  DeploymentLogsQueryService,
   DeploymentSnapshotFactory,
   ProvisionDependencyResourceUseCase,
   RestoreDependencyResourceBackupUseCase,
@@ -346,8 +345,8 @@ class HermeticExecutionBackend implements ExecutionBackend {
         exitCode: ExitCode.rehydrate(0),
         status: ExecutionStatusValue.rehydrate("succeeded"),
         retryable: false,
-        logs: [
-          DeploymentLogEntry.rehydrate({
+        timeline: [
+          DeploymentTimelineJournalEntry.rehydrate({
             timestamp: OccurredAt.rehydrate("2026-01-01T00:02:00.000Z"),
             phase: DeploymentPhaseValue.rehydrate("deploy"),
             level: LogLevelValue.rehydrate("info"),
@@ -371,8 +370,8 @@ class HermeticExecutionBackend implements ExecutionBackend {
         exitCode: ExitCode.rehydrate(0),
         status: ExecutionStatusValue.rehydrate("rolled-back"),
         retryable: false,
-        logs: [
-          DeploymentLogEntry.rehydrate({
+        timeline: [
+          DeploymentTimelineJournalEntry.rehydrate({
             timestamp: OccurredAt.rehydrate("2026-01-01T00:04:00.000Z"),
             phase: DeploymentPhaseValue.rehydrate("rollback"),
             level: LogLevelValue.rehydrate("info"),
@@ -385,10 +384,10 @@ class HermeticExecutionBackend implements ExecutionBackend {
     return ok({ deployment });
   }
 
-  async cancel(): Promise<Result<{ logs: DeploymentLogEntry[] }>> {
+  async cancel(): Promise<Result<{ timeline: DeploymentTimelineJournalEntry[] }>> {
     return ok({
-      logs: [
-        DeploymentLogEntry.rehydrate({
+      timeline: [
+        DeploymentTimelineJournalEntry.rehydrate({
           timestamp: OccurredAt.rehydrate("2026-01-01T00:04:00.000Z"),
           phase: DeploymentPhaseValue.rehydrate("deploy"),
           level: LogLevelValue.rehydrate("warn"),
@@ -563,8 +562,8 @@ class CapacityExhaustedExecutionBackend extends HermeticExecutionBackend {
         status: ExecutionStatusValue.rehydrate("failed"),
         retryable: true,
         errorCode: ErrorCodeText.rehydrate("runtime_target_resource_exhausted"),
-        logs: [
-          DeploymentLogEntry.rehydrate({
+        timeline: [
+          DeploymentTimelineJournalEntry.rehydrate({
             timestamp: OccurredAt.rehydrate("2026-01-01T00:02:00.000Z"),
             phase: DeploymentPhaseValue.rehydrate("deploy"),
             level: LogLevelValue.rehydrate("error"),
@@ -587,7 +586,7 @@ class CapacityExhaustedExecutionBackend extends HermeticExecutionBackend {
 }
 
 class CancelFailingExecutionBackend extends HermeticExecutionBackend {
-  override async cancel(): Promise<Result<{ logs: DeploymentLogEntry[] }>> {
+  override async cancel(): Promise<Result<{ timeline: DeploymentTimelineJournalEntry[] }>> {
     return err(
       domainError.conflict("Hermetic cancellation failed", {
         phase: "runtime-execution",
@@ -1141,7 +1140,6 @@ async function createDeploymentFixture(
     clock,
     context,
     createDeploymentUseCase,
-    deploymentLogs: new DeploymentLogsQueryService(deploymentReadModel),
     deploymentReadModel,
     dependencyBindings,
     dependencyBindingReadModel,
@@ -1549,8 +1547,8 @@ function createHistoricalDeployment(input: {
           exitCode: ExitCode.rehydrate(input.status === "failed" ? 1 : 0),
           status: ExecutionStatusValue.rehydrate(input.status),
           retryable: input.status === "failed",
-          logs: [
-            DeploymentLogEntry.rehydrate({
+          timeline: [
+            DeploymentTimelineJournalEntry.rehydrate({
               timestamp: OccurredAt.rehydrate("2026-01-01T00:10:00.000Z"),
               phase: DeploymentPhaseValue.rehydrate("deploy"),
               level: LogLevelValue.rehydrate("info"),
@@ -1825,7 +1823,7 @@ describe("CreateDeploymentUseCase", () => {
     });
   });
 
-  test("[PROC-DELIVERY-WORKER-022] preserves durable progress logs when worker completion persists", async () => {
+  test("[PROC-DELIVERY-WORKER-022] preserves durable progress timeline when worker completion persists", async () => {
     const durableWork = new RecordingDurableWorkAdapter();
     let progressRecorder: DeploymentProgressRecorder | undefined;
     const executionBackend = new DurableProgressDeferredExecutionBackend(() => {
@@ -1849,7 +1847,7 @@ describe("CreateDeploymentUseCase", () => {
       executionBackend,
       processAttemptRecorder,
     });
-    progressRecorder = new DeploymentLogProgressRecorder(deployments, logger);
+    progressRecorder = new DeploymentTimelineProgressRecorder(deployments, logger);
     const accepted = await createDeploymentUseCase.execute(context, {
       ...createDeploymentInput,
       executionMode: "detached",
@@ -1890,7 +1888,7 @@ describe("CreateDeploymentUseCase", () => {
       DeploymentByIdSpec.create(DeploymentId.rehydrate(accepted.value.id)),
     );
     expect(running?.toState().status.value).toBe("running");
-    expect(running?.toState().logs.map((log) => log.message)).toContain(
+    expect(running?.toState().timeline.map((log) => log.message)).toContain(
       "Runtime container was started",
     );
 
@@ -1904,10 +1902,10 @@ describe("CreateDeploymentUseCase", () => {
       DeploymentByIdSpec.create(DeploymentId.rehydrate(accepted.value.id)),
     );
     expect(completed?.toState().status.value).toBe("succeeded");
-    expect(completed?.toState().logs.map((log) => log.message)).toContain(
+    expect(completed?.toState().timeline.map((log) => log.message)).toContain(
       "Runtime container was started",
     );
-    expect(completed?.toState().logs.map((log) => log.message)).toContain(
+    expect(completed?.toState().timeline.map((log) => log.message)).toContain(
       "Hermetic execution backend applied runtime plan",
     );
   });
@@ -2483,7 +2481,6 @@ describe("CreateDeploymentUseCase", () => {
       createBackup,
       createDeploymentInput,
       createDeploymentUseCase,
-      deploymentLogs,
       deploymentReadModel,
       dependencyResourceBackupProvider,
       provisionDependencyResource,
@@ -2513,7 +2510,10 @@ describe("CreateDeploymentUseCase", () => {
       repositoryContext,
       DeploymentByIdSpec.create(DeploymentId.rehydrate(createdDeployment.id)),
     );
-    const observedLogs = await deploymentLogs.execute(context, createdDeployment.id);
+    const observedLogs = await deploymentReadModel.findTimeline(
+      repositoryContext,
+      createdDeployment.id,
+    );
 
     expect(observed).toMatchObject({
       id: createdDeployment.id,
@@ -2526,7 +2526,7 @@ describe("CreateDeploymentUseCase", () => {
         }),
       ],
     });
-    expect(observedLogs.logs).toContainEqual(
+    expect(observedLogs).toContainEqual(
       expect.objectContaining({
         level: "info",
         message: "Hermetic execution backend applied runtime plan",
@@ -2566,7 +2566,6 @@ describe("CreateDeploymentUseCase", () => {
       createBackup,
       createDeploymentInput,
       createDeploymentUseCase,
-      deploymentLogs,
       deploymentReadModel,
       dependencyResourceBackupProvider,
       dependencyResourceSecretStore,
@@ -2613,7 +2612,10 @@ describe("CreateDeploymentUseCase", () => {
       repositoryContext,
       DeploymentByIdSpec.create(DeploymentId.rehydrate(createdDeployment.id)),
     );
-    const observedLogs = await deploymentLogs.execute(context, createdDeployment.id);
+    const observedLogs = await deploymentReadModel.findTimeline(
+      repositoryContext,
+      createdDeployment.id,
+    );
 
     expect(observed).toMatchObject({
       id: createdDeployment.id,
@@ -2626,7 +2628,7 @@ describe("CreateDeploymentUseCase", () => {
         }),
       ],
     });
-    expect(observedLogs.logs).toContainEqual(
+    expect(observedLogs).toContainEqual(
       expect.objectContaining({
         level: "info",
         message: "Hermetic execution backend applied runtime plan",
@@ -3493,7 +3495,7 @@ describe("CreateDeploymentUseCase", () => {
         isSecret: true,
       }),
     ]);
-    expect(deployment?.toState().logs).toHaveLength(1);
+    expect(deployment?.toState().timeline).toHaveLength(1);
     expect(eventBus.events.length).toBeGreaterThan(0);
   });
 
@@ -4570,7 +4572,7 @@ describe("CreateDeploymentUseCase", () => {
     expect(deployment?.toState()).toMatchObject({
       status: { value: "failed" },
     });
-    expect(deployment?.toState().logs.at(-1)?.toState().phase.value).toBe("package");
+    expect(deployment?.toState().timeline.at(-1)?.toState().phase.value).toBe("package");
     expect(deployment?.toState().runtimePlan.toState().execution.toState().metadata).toMatchObject({
       phase: "image-build",
       step: "static-package",

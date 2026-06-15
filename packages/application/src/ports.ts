@@ -12,12 +12,12 @@ import {
   type DependencyResourceBackupMutationSpec,
   type DependencyResourceBackupSelectionSpec,
   type Deployment,
-  type DeploymentLogEntry,
-  type DeploymentLogSource,
   type DeploymentMutationSpec,
   type DeploymentSelectionSpec,
   type DeploymentStatus,
   type DeploymentTargetState,
+  type DeploymentTimelineJournalEntry,
+  type DeploymentTimelineJournalSource,
   type DeploymentTriggerKind,
   type DeployToken,
   type DeployTokenMutationSpec,
@@ -280,7 +280,7 @@ export type DeploymentProgressStatus = "running" | "succeeded" | "failed";
 
 export interface DeploymentProgressEvent {
   timestamp: string;
-  source: DeploymentLogSource;
+  source: DeploymentTimelineJournalSource;
   phase: DeploymentProgressPhase;
   level: LogLevel;
   message: string;
@@ -311,124 +311,100 @@ export interface DeploymentProgressObserver {
   subscribe(listener: DeploymentProgressListener): () => void;
 }
 
-export type DeploymentObservedEventSource =
-  | "domain-event"
-  | "process-observation"
-  | "progress-projection";
+export type DeploymentTimelineSource =
+  | "appaloft"
+  | "ssh"
+  | "docker"
+  | "application"
+  | "provider"
+  | "health"
+  | "domain-event";
 
-export type DeploymentObservedEventType =
-  | "deployment-requested"
-  | "build-requested"
-  | "deployment-started"
-  | "deployment-succeeded"
-  | "deployment-failed"
-  | "deployment-progress";
+export type DeploymentTimelineKind =
+  | "lifecycle"
+  | "step"
+  | "command"
+  | "output"
+  | "container-log"
+  | "health-check"
+  | "status"
+  | "diagnostic"
+  | "gap";
 
-export type DeploymentEventStreamPhase = "event-replay" | "live-follow";
-
-export interface DeploymentObservedEvent {
+export interface DeploymentTimelineEntry {
   deploymentId: string;
   sequence: number;
   cursor: string;
-  emittedAt: string;
-  source: DeploymentObservedEventSource;
-  eventType: DeploymentObservedEventType;
+  occurredAt: string;
+  source: DeploymentTimelineSource;
+  kind: DeploymentTimelineKind;
   phase?: DeploymentProgressPhase;
-  status?: string;
-  retriable?: boolean;
-  summary?: string;
+  level: LogLevel;
+  message: string;
+  status?: DeploymentProgressStatus | "canceled" | "rolled-back";
+  stream?: "stdout" | "stderr";
+  step?: {
+    current: number;
+    total: number;
+    label: string;
+  };
+  metadata?: Record<string, string | number | boolean | null>;
 }
 
-export interface DeploymentEventStreamGap {
-  code: string;
-  phase: DeploymentEventStreamPhase;
-  retriable: boolean;
-  cursor?: string;
-  lastSequence?: number;
-  recommendedAction?: "restart-stream" | "open-deployment-detail";
-}
-
-export type DeploymentEventStreamEnvelope =
+export type DeploymentTimelineEnvelope =
   | {
-      schemaVersion: "deployments.stream-events/v1";
-      kind: "event";
-      event: DeploymentObservedEvent;
+      schemaVersion: "deployments.timeline/v1";
+      kind: "entry";
+      entry: DeploymentTimelineEntry;
     }
   | {
-      schemaVersion: "deployments.stream-events/v1";
+      schemaVersion: "deployments.timeline/v1";
       kind: "heartbeat";
       at: string;
       cursor?: string;
     }
   | {
-      schemaVersion: "deployments.stream-events/v1";
+      schemaVersion: "deployments.timeline/v1";
       kind: "gap";
-      gap: DeploymentEventStreamGap;
+      entry: DeploymentTimelineEntry;
     }
   | {
-      schemaVersion: "deployments.stream-events/v1";
+      schemaVersion: "deployments.timeline/v1";
       kind: "closed";
       reason: "completed" | "cancelled" | "source-ended" | "idle-timeout";
       cursor?: string;
     }
   | {
-      schemaVersion: "deployments.stream-events/v1";
+      schemaVersion: "deployments.timeline/v1";
       kind: "error";
       error: DomainError;
     };
 
-export interface DeploymentEventObservationRequest {
+export interface DeploymentTimelineObservationRequest {
   cursor?: string;
-  historyLimit: number;
+  limit: number;
   includeHistory: boolean;
   follow: boolean;
   untilTerminal: boolean;
+  kinds?: DeploymentTimelineKind[];
+  sources?: DeploymentTimelineSource[];
 }
 
-export interface DeploymentEventObservationContext {
+export interface DeploymentTimelineObservationContext {
   deployment: DeploymentSummary;
 }
 
-export interface DeploymentEventStream extends AsyncIterable<DeploymentEventStreamEnvelope> {
+export interface DeploymentTimelineStream extends AsyncIterable<DeploymentTimelineEnvelope> {
   close(): Promise<void>;
 }
 
-export interface DeploymentEventObserver {
+export interface DeploymentTimelineObserver {
   open(
     context: ExecutionContext,
-    observationContext: DeploymentEventObservationContext,
-    request: DeploymentEventObservationRequest,
+    observationContext: DeploymentTimelineObservationContext,
+    request: DeploymentTimelineObservationRequest,
     signal: AbortSignal,
-  ): Promise<Result<DeploymentEventStream>>;
-}
-
-export interface DomainEventStreamObservationRequest {
-  deploymentId: string;
-  cursor?: string;
-  historyLimit: number;
-  includeHistory: boolean;
-  untilTerminal: boolean;
-}
-
-export type DomainEventStreamObservationReplayResult =
-  | {
-      available: true;
-      envelopes: DeploymentEventStreamEnvelope[];
-    }
-  | {
-      available: false;
-    };
-
-export interface DomainEventStreamObservationReader {
-  replayDeploymentEvents(
-    context: RepositoryContext,
-    request: DomainEventStreamObservationRequest,
-  ): Promise<Result<DomainEventStreamObservationReplayResult>>;
-  openDeploymentEventStream(
-    context: RepositoryContext,
-    request: DomainEventStreamObservationRequest,
-    signal: AbortSignal,
-  ): Promise<Result<DomainEventStreamObservationReplayResult | DeploymentEventStream>>;
+  ): Promise<Result<DeploymentTimelineStream>>;
 }
 
 export interface DomainEventStreamRecordInput {
@@ -3947,7 +3923,7 @@ export interface ScheduledTaskRuntimeExecutionResult {
   exitCode: number;
   startedAt: string;
   finishedAt: string;
-  logs: ScheduledTaskRunLogEntry[];
+  timeline: ScheduledTaskRunLogEntry[];
   failureSummary?: string;
 }
 
@@ -4010,7 +3986,7 @@ export interface ResourceHealthDeploymentContext {
   destinationId?: string;
   lastError?: {
     timestamp: string;
-    phase: DeploymentLogSummary["phase"];
+    phase: DeploymentTimelineJournalSummary["phase"];
     message: string;
   };
 }
@@ -4333,9 +4309,9 @@ export interface ResourceHealthHistory {
   sourceErrors: ResourceHealthSourceError[];
 }
 
-export interface DeploymentLogSummary {
+export interface DeploymentTimelineJournalSummary {
   timestamp: string;
-  source: DeploymentLogSource;
+  source: DeploymentTimelineJournalSource;
   phase: "detect" | "plan" | "package" | "deploy" | "verify" | "rollback";
   level: LogLevel;
   message: string;
@@ -4633,7 +4609,7 @@ export type ResourceDiagnosticSource =
   | "deployment"
   | "access"
   | "proxy"
-  | "deployment-logs"
+  | "deployment-timeline"
   | "runtime-logs"
   | "system"
   | "copy";
@@ -4691,10 +4667,10 @@ export interface ResourceDiagnosticDeployment {
   createdAt: string;
   startedAt?: string;
   finishedAt?: string;
-  logCount: number;
+  timelineCount: number;
   lastError?: {
     timestamp: string;
-    phase: DeploymentLogSummary["phase"];
+    phase: DeploymentTimelineJournalSummary["phase"];
     message: string;
   };
 }
@@ -4751,8 +4727,8 @@ export interface ResourceDiagnosticProxy {
 
 export interface ResourceDiagnosticLogLine {
   timestamp?: string;
-  source?: DeploymentLogSource;
-  phase?: DeploymentLogSummary["phase"];
+  source?: DeploymentTimelineJournalSource;
+  phase?: DeploymentTimelineJournalSummary["phase"];
   level?: LogLevel;
   stream?: ResourceRuntimeLogStreamName;
   serviceName?: string;
@@ -4798,7 +4774,7 @@ export interface ResourceDiagnosticSummary {
   deployment?: ResourceDiagnosticDeployment;
   access: ResourceDiagnosticAccess;
   proxy: ResourceDiagnosticProxy;
-  deploymentLogs: ResourceDiagnosticLogSection;
+  deploymentTimeline: ResourceDiagnosticLogSection;
   runtimeLogs: ResourceDiagnosticLogSection;
   system: ResourceDiagnosticSystem;
   sourceErrors: ResourceDiagnosticSourceError[];
@@ -5062,13 +5038,13 @@ export interface BaseDeploymentSummary {
     }>;
   };
   dependencyBindingReferences?: DeploymentDependencyBindingSnapshotReferenceSummary[];
-  logs: DeploymentLogSummary[];
+  timeline: DeploymentTimelineJournalSummary[];
   createdAt: string;
   startedAt?: string;
   finishedAt?: string;
   archivedAt?: string;
   rollbackOfDeploymentId?: string;
-  logCount: number;
+  timelineCount: number;
 }
 
 export type ServerBackedDeploymentSummary = BaseDeploymentSummary & {
@@ -5087,7 +5063,7 @@ export type DeploymentSummary =
   | ServerBackedDeploymentSummary
   | ServerlessStaticArtifactDeploymentSummary;
 
-export type DeploymentDetailSummary = Omit<DeploymentSummary, "logs">;
+export type DeploymentDetailSummary = Omit<DeploymentSummary, "timeline">;
 
 export type DeploymentPlanReadinessStatus = "ready" | "blocked" | "warning";
 
@@ -5325,7 +5301,7 @@ export interface DeploymentAttemptTimeline {
   createdAt: string;
   startedAt?: string;
   finishedAt?: string;
-  logCount: number;
+  timelineCount: number;
 }
 
 export interface DeploymentAttemptSnapshot {
@@ -5336,8 +5312,8 @@ export interface DeploymentAttemptSnapshot {
 
 export interface DeploymentAttemptFailureSummary {
   timestamp: string;
-  source: DeploymentLogSource;
-  phase: DeploymentLogSummary["phase"];
+  source: DeploymentTimelineJournalSource;
+  phase: DeploymentTimelineJournalSummary["phase"];
   level: LogLevel;
   message: string;
 }
@@ -5382,7 +5358,7 @@ export interface DeploymentRelatedContext {
 }
 
 export type DeploymentAttemptNextAction =
-  | "logs"
+  | "timeline"
   | "resource-detail"
   | "resource-health"
   | "diagnostic-summary";
@@ -5436,8 +5412,8 @@ export interface DeploymentRecoveryRecommendedAction {
   kind: "query" | "command" | "workflow-action";
   targetOperation:
     | "deployments.show"
-    | "deployments.stream-events"
-    | "deployments.logs"
+    | "deployments.timeline"
+    | "deployments.timeline.stream"
     | "resources.health"
     | "resources.diagnostic-summary"
     | "deployments.retry"
@@ -5980,16 +5956,24 @@ export interface ProcessAttemptCompleter {
   ): Promise<Result<ProcessAttemptCompletionResult>>;
 }
 
-export type StreamDeploymentEventsResult =
+export interface DeploymentTimelineReadResult {
+  schemaVersion: "deployments.timeline/v1";
+  deploymentId: string;
+  entries: DeploymentTimelineEntry[];
+  nextCursor?: string;
+  hasMore: boolean;
+}
+
+export type StreamDeploymentTimelineResult =
   | {
       mode: "bounded";
       deploymentId: string;
-      envelopes: DeploymentEventStreamEnvelope[];
+      envelopes: DeploymentTimelineEnvelope[];
     }
   | {
       mode: "stream";
       deploymentId: string;
-      stream: DeploymentEventStream;
+      stream: DeploymentTimelineStream;
     };
 
 export interface DomainBindingSummary {
@@ -6579,30 +6563,6 @@ export interface DomainEventStreamPruneResult extends DomainEventStreamPruneStor
   aggregateType?: string;
   deploymentId?: string;
   limit?: number;
-  dryRun: boolean;
-  prunedAt: string;
-}
-
-export interface DeploymentLogPruneInput {
-  before: string;
-  deploymentId?: string;
-  resourceId?: string;
-  serverId?: string;
-  dryRun: boolean;
-}
-
-export interface DeploymentLogPruneStoreResult {
-  matchedCount: number;
-  prunedCount: number;
-  affectedDeploymentCount: number;
-}
-
-export interface DeploymentLogPruneResult extends DeploymentLogPruneStoreResult {
-  schemaVersion: "deployments.logs.prune/v1";
-  before: string;
-  deploymentId?: string;
-  resourceId?: string;
-  serverId?: string;
   dryRun: boolean;
   prunedAt: string;
 }
@@ -8248,13 +8208,6 @@ export interface DomainEventStreamRetentionStore {
   ): Promise<Result<DomainEventStreamPruneStoreResult>>;
 }
 
-export interface DeploymentLogRetentionStore {
-  prune(
-    context: RepositoryContext,
-    input: DeploymentLogPruneInput,
-  ): Promise<Result<DeploymentLogPruneStoreResult>>;
-}
-
 export interface DeploymentAttemptRetentionStore {
   prune(
     context: RepositoryContext,
@@ -8883,7 +8836,7 @@ export interface DeploymentReadModel {
     context: RepositoryContext,
     spec: DeploymentSelectionSpec,
   ): Promise<DeploymentSummary | null>;
-  findLogs(context: RepositoryContext, id: string): Promise<DeploymentLogSummary[]>;
+  findTimeline(context: RepositoryContext, id: string): Promise<DeploymentTimelineJournalSummary[]>;
 }
 
 export interface DomainBindingReadModel {
@@ -9452,7 +9405,7 @@ export interface ExecutionBackend {
   cancel(
     context: ExecutionContext,
     deployment: Deployment,
-  ): Promise<Result<{ logs: DeploymentLogEntry[] }>>;
+  ): Promise<Result<{ timeline: DeploymentTimelineJournalEntry[] }>>;
   rollback(
     context: ExecutionContext,
     deployment: Deployment,

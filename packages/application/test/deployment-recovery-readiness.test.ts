@@ -51,7 +51,7 @@ class StaticDeploymentReadModel implements DeploymentReadModel {
     return null;
   }
 
-  async findLogs(): Promise<DeploymentSummary["logs"]> {
+  async findTimeline(): Promise<DeploymentSummary["timeline"]> {
     return [];
   }
 }
@@ -148,11 +148,11 @@ function deploymentSummary(overrides?: Partial<DeploymentSummary>): DeploymentSu
       precedence: ["defaults", "project", "environment", "deployment"],
       variables: [],
     },
-    logs: [],
+    timeline: [],
     createdAt: "2026-01-01T00:00:05.000Z",
     startedAt: "2026-01-01T00:00:06.000Z",
     finishedAt: "2026-01-01T00:00:09.000Z",
-    logCount: 0,
+    timelineCount: 0,
     ...overrides,
     target: {
       kind: "server-backed",

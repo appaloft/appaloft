@@ -49,7 +49,7 @@ export type ResourceAccessFailureOwnerHint =
 export type ResourceAccessFailureNextAction =
   | "check-health"
   | "inspect-runtime-logs"
-  | "inspect-deployment-logs"
+  | "inspect-deployment-timeline"
   | "inspect-proxy-preview"
   | "diagnostic-summary"
   | "verify-domain"

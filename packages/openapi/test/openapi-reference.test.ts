@@ -70,8 +70,8 @@ describe("Appaloft OpenAPI reference package", () => {
     ]);
     expect(spec.paths?.["/domain-bindings"]?.post?.tags).toEqual(["Access And Domains"]);
     expect(spec.paths?.["/certificates"]?.get?.tags).toEqual(["Certificates"]);
-    expect(spec.paths?.["/deployments/{deploymentId}/events"]?.get?.tags).toEqual([
-      "Observability",
+    expect(spec.paths?.["/deployments/{deploymentId}/timeline"]?.get?.tags).toEqual([
+      "Deployments",
     ]);
     expect(spec.paths?.["/domain-events/prune"]?.post?.tags).toEqual(["Observability"]);
     expect(spec.paths?.["/integrations"]?.get?.tags).toEqual(["Integrations"]);
@@ -107,8 +107,9 @@ describe("Appaloft OpenAPI reference package", () => {
   test("[TS-SDK-OPENAPI-001] annotates catalog-backed OpenAPI operations with Appaloft SDK metadata", async () => {
     const spec = await createAppaloftOpenApiSpec();
     const createProject = spec.paths?.["/projects"]?.post;
-    const replayDeploymentEvents = spec.paths?.["/deployments/{deploymentId}/events"]?.get;
-    const streamDeploymentEvents = spec.paths?.["/deployments/{deploymentId}/events/stream"]?.get;
+    const deploymentTimeline = spec.paths?.["/deployments/{deploymentId}/timeline"]?.get;
+    const deploymentTimelineStream =
+      spec.paths?.["/deployments/{deploymentId}/timeline/stream"]?.get;
 
     expect(createProject).toBeDefined();
     expect(createProject).toMatchObject({
@@ -122,19 +123,19 @@ describe("Appaloft OpenAPI reference package", () => {
       "x-appaloft-streaming": false,
     });
 
-    expect(replayDeploymentEvents).toMatchObject({
-      "x-appaloft-operation-key": "deployments.stream-events",
+    expect(deploymentTimeline).toMatchObject({
+      "x-appaloft-operation-key": "deployments.timeline",
       "x-appaloft-operation-kind": "query",
       "x-appaloft-operation-domain": "deployments",
-      "x-appaloft-message-name": "StreamDeploymentEventsQuery",
+      "x-appaloft-message-name": "DeploymentTimelineQuery",
       "x-appaloft-docs-href": "/docs/deploy/lifecycle/#deployment-lifecycle",
       "x-appaloft-auth-policy": "product-session",
       "x-appaloft-error-family": "structured-platform-error",
       "x-appaloft-streaming": false,
     });
 
-    expect(streamDeploymentEvents).toMatchObject({
-      "x-appaloft-operation-key": "deployments.stream-events",
+    expect(deploymentTimelineStream).toMatchObject({
+      "x-appaloft-operation-key": "deployments.timeline.stream",
       "x-appaloft-streaming": true,
     });
   });

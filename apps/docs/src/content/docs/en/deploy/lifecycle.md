@@ -15,7 +15,7 @@ relatedOperations:
   - deployments.create
   - deployments.plan
   - deployments.show
-  - deployments.stream-events
+  - deployments.timeline.stream
 sidebar:
   label: "Lifecycle"
   order: 3
@@ -65,7 +65,7 @@ Verify checks process state, health policy, proxy routing, and access URLs.
 
 Verify failure does not always mean the process failed to start. It may be health path, listener port, proxy routing, or access URL observation.
 
-Use `appaloft deployments events <deploymentId> --follow --json` when you need a structured replay or live event stream after the original deploy command has disconnected. The stream can return event, heartbeat, gap, closed, or error envelopes; a gap means re-open observation or inspect deployment detail before choosing recovery.
+Use `appaloft deployments timeline <deploymentId> --follow --json` when you need a structured replay or live timeline stream after the original deploy command has disconnected. The stream can return entry, heartbeat, gap, closed, or error envelopes; a gap means re-open observation or inspect deployment detail before choosing recovery.
 
 <h3 id="deployment-rollback">Rollback</h3>
 

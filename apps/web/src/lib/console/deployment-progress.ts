@@ -1,9 +1,9 @@
 import {
   type CreateDeploymentInput,
   type CreateDeploymentResponse,
-  type DeploymentEventStreamEnvelope,
   type DeploymentProgressEvent,
   type DeploymentSummary,
+  type DeploymentTimelineEnvelope,
 } from "@appaloft/contracts";
 
 import { API_BASE, readErrorMessage, requestWithMetadata } from "$lib/api/client";
@@ -53,18 +53,6 @@ const deploymentStatusProgressStatus = {
 } as const satisfies Record<
   DeploymentSummary["status"],
   NonNullable<DeploymentProgressEvent["status"]>
->;
-
-const deploymentEventPhaseFallback = {
-  "deployment-requested": "detect",
-  "build-requested": "plan",
-  "deployment-started": "deploy",
-  "deployment-succeeded": "verify",
-  "deployment-failed": "verify",
-  "deployment-progress": "deploy",
-} as const satisfies Record<
-  Extract<DeploymentEventStreamEnvelope, { kind: "event" }>["event"]["eventType"],
-  DeploymentProgressEvent["phase"]
 >;
 
 export function createDeploymentRequestId(): string {
@@ -275,14 +263,14 @@ type DeploymentProgressSource = Pick<
   DeploymentSummary,
   "id" | "status" | "createdAt" | "startedAt" | "finishedAt"
 > & {
-  logs?: DeploymentSummary["logs"];
+  timeline?: DeploymentSummary["timeline"];
 };
 
 export function progressEventsFromDeployment(
   deployment: DeploymentProgressSource,
-  logs: DeploymentSummary["logs"] = deployment.logs ?? [],
+  timeline: DeploymentSummary["timeline"] = deployment.timeline ?? [],
 ): DeploymentProgressEvent[] {
-  const logEvents = logs.map((log) => {
+  const logEvents = timeline.map((log) => {
     return {
       timestamp: log.timestamp,
       source: log.source,
@@ -315,16 +303,16 @@ export function progressEventsFromDeployment(
   ];
 }
 
-export function deploymentEventEnvelopeCursor(
-  envelope: DeploymentEventStreamEnvelope,
+export function deploymentTimelineEnvelopeCursor(
+  envelope: DeploymentTimelineEnvelope,
 ): string | undefined {
   switch (envelope.kind) {
-    case "event":
-      return envelope.event.cursor;
+    case "entry":
+      return envelope.entry.cursor;
     case "heartbeat":
       return envelope.cursor;
     case "gap":
-      return envelope.gap.cursor;
+      return envelope.entry.cursor;
     case "closed":
       return envelope.cursor;
     case "error":
@@ -332,30 +320,30 @@ export function deploymentEventEnvelopeCursor(
   }
 }
 
-export function latestDeploymentEventCursor(
-  envelopes: DeploymentEventStreamEnvelope[],
+export function latestDeploymentTimelineCursor(
+  envelopes: DeploymentTimelineEnvelope[],
 ): string | undefined {
   const cursors = envelopes
-    .map((envelope) => deploymentEventEnvelopeCursor(envelope))
+    .map((envelope) => deploymentTimelineEnvelopeCursor(envelope))
     .filter((cursor) => typeof cursor === "string");
 
   return cursors.at(-1);
 }
 
-export function mergeDeploymentEventEnvelopes(
-  currentEnvelopes: DeploymentEventStreamEnvelope[],
-  incomingEnvelopes: DeploymentEventStreamEnvelope[],
-): DeploymentEventStreamEnvelope[] {
-  const merged = new Map<string, DeploymentEventStreamEnvelope>();
+export function mergeDeploymentTimelineEnvelopes(
+  currentEnvelopes: DeploymentTimelineEnvelope[],
+  incomingEnvelopes: DeploymentTimelineEnvelope[],
+): DeploymentTimelineEnvelope[] {
+  const merged = new Map<string, DeploymentTimelineEnvelope>();
 
   for (const envelope of [...currentEnvelopes, ...incomingEnvelopes]) {
     const key =
-      envelope.kind === "event"
-        ? `event:${envelope.event.cursor}`
+      envelope.kind === "entry"
+        ? `entry:${envelope.entry.cursor}`
         : envelope.kind === "heartbeat"
           ? `heartbeat:${envelope.cursor ?? envelope.at}`
           : envelope.kind === "gap"
-            ? `gap:${envelope.gap.cursor ?? envelope.gap.code}:${envelope.gap.phase}`
+            ? `gap:${envelope.entry.cursor}`
             : envelope.kind === "closed"
               ? `closed:${envelope.cursor ?? envelope.reason}`
               : `error:${envelope.error.code}:${envelope.error.message}`;
@@ -364,64 +352,65 @@ export function mergeDeploymentEventEnvelopes(
   }
 
   return [...merged.values()].sort((left, right) => {
-    if (left.kind === "event" && right.kind === "event") {
-      if (left.event.sequence !== right.event.sequence) {
-        return left.event.sequence - right.event.sequence;
+    if (left.kind === "entry" && right.kind === "entry") {
+      if (left.entry.sequence !== right.entry.sequence) {
+        return left.entry.sequence - right.entry.sequence;
       }
 
-      return left.event.cursor.localeCompare(right.event.cursor);
+      return left.entry.cursor.localeCompare(right.entry.cursor);
     }
 
-    if (left.kind === "event") {
+    if (left.kind === "entry") {
       return -1;
     }
 
-    if (right.kind === "event") {
+    if (right.kind === "entry") {
       return 1;
     }
 
-    const leftCursor = deploymentEventEnvelopeCursor(left) ?? "";
-    const rightCursor = deploymentEventEnvelopeCursor(right) ?? "";
+    const leftCursor = deploymentTimelineEnvelopeCursor(left) ?? "";
+    const rightCursor = deploymentTimelineEnvelopeCursor(right) ?? "";
     return leftCursor.localeCompare(rightCursor);
   });
 }
 
-export function deploymentEventProgressEvents(
-  envelopes: DeploymentEventStreamEnvelope[],
+export function deploymentTimelineProgressEvents(
+  envelopes: DeploymentTimelineEnvelope[],
 ): DeploymentProgressEvent[] {
   return envelopes.flatMap((envelope) => {
-    if (envelope.kind !== "event") {
+    if (envelope.kind !== "entry") {
       return [];
     }
 
-    const phase = envelope.event.phase ?? deploymentEventPhaseFallback[envelope.event.eventType];
-    const status = deploymentEventStatus(envelope.event);
+    const phase = envelope.entry.phase ?? "deploy";
+    const status = deploymentTimelineStatus(envelope.entry.status);
 
     return [
       {
-        timestamp: envelope.event.emittedAt,
-        source: envelope.event.source === "process-observation" ? "application" : "appaloft",
+        timestamp: envelope.entry.occurredAt,
+        source: envelope.entry.source === "application" ? "application" : "appaloft",
         phase,
-        level: deploymentEventLevel(envelope.event),
-        message: envelope.event.summary ?? envelope.event.eventType,
-        deploymentId: envelope.event.deploymentId,
+        level: envelope.entry.level,
+        message: envelope.entry.message,
+        deploymentId: envelope.entry.deploymentId,
         ...(status ? { status } : {}),
-        step: {
+        ...(envelope.entry.stream ? { stream: envelope.entry.stream } : {}),
+        step: envelope.entry.step ?? {
           ...progressStepForPhase(phase),
-          label: envelope.event.summary ?? envelope.event.eventType,
+          label: envelope.entry.message,
         },
       } satisfies DeploymentProgressEvent,
     ];
   });
 }
 
-export function deploymentEventProgressStatus(
-  envelopes: DeploymentEventStreamEnvelope[],
+export function deploymentTimelineProgressStatus(
+  envelopes: DeploymentTimelineEnvelope[],
   fallbackStatus: DeploymentSummary["status"] | null | undefined,
 ): DeploymentProgressDialogStatus {
-  const lastEvent = [...envelopes].reverse().find((envelope) => envelope.kind === "event");
-  if (lastEvent?.kind === "event") {
-    const status = deploymentEventStatus(lastEvent.event);
+  const lastEvent = [...envelopes].reverse().find((envelope) => envelope.kind === "entry");
+  if (lastEvent?.kind === "entry") {
+    const status = deploymentTimelineStatus(lastEvent.entry.status);
     if (status) {
       return status;
     }
@@ -536,26 +525,28 @@ export async function observeDeploymentProgressAfterAcceptance(
   options: CreateDeploymentProgressStreamOptions,
 ): Promise<void> {
   try {
-    const replay = await orpcClient.deployments.events({
+    const replay = await orpcClient.deployments.timeline({
       deploymentId,
-      historyLimit: 100,
-      includeHistory: true,
-      follow: false,
-      untilTerminal: true,
+      limit: 100,
     });
+    const replayEnvelopes: DeploymentTimelineEnvelope[] = replay.entries.map((entry) => ({
+      schemaVersion: "deployments.timeline/v1",
+      kind: "entry",
+      entry,
+    }));
 
-    for (const event of deploymentEventProgressEvents(replay.envelopes)) {
+    for (const event of deploymentTimelineProgressEvents(replayEnvelopes)) {
       onEvent(event);
     }
 
-    if (deploymentEventProgressStatus(replay.envelopes, "running") !== "running") {
+    if (deploymentTimelineProgressStatus(replayEnvelopes, "running") !== "running") {
       return;
     }
 
-    const cursor = latestDeploymentEventCursor(replay.envelopes);
-    const stream = await orpcClient.deployments.eventsStream({
+    const cursor = latestDeploymentTimelineCursor(replayEnvelopes);
+    const stream = await orpcClient.deployments.timelineStream({
       deploymentId,
-      historyLimit: 0,
+      limit: 0,
       includeHistory: false,
       follow: true,
       untilTerminal: true,
@@ -569,8 +560,8 @@ export async function observeDeploymentProgressAfterAcceptance(
         const envelope = result.value;
 
         switch (envelope.kind) {
-          case "event":
-            for (const event of deploymentEventProgressEvents([envelope])) {
+          case "entry":
+            for (const event of deploymentTimelineProgressEvents([envelope])) {
               onEvent(event);
             }
             break;
@@ -625,41 +616,18 @@ function progressDialogStatusFromProgressEvent(
   }
 }
 
-function deploymentEventLevel(
-  event: Extract<DeploymentEventStreamEnvelope, { kind: "event" }>["event"],
-): DeploymentProgressEvent["level"] {
-  const status = deploymentEventStatus(event);
-  if (status === "failed") {
-    return "error";
-  }
-
-  if (event.source === "process-observation") {
-    return "info";
-  }
-
-  return "info";
-}
-
-function deploymentEventStatus(
-  event: Extract<DeploymentEventStreamEnvelope, { kind: "event" }>["event"],
+function deploymentTimelineStatus(
+  status: Extract<DeploymentTimelineEnvelope, { kind: "entry" }>["entry"]["status"],
 ): DeploymentProgressEvent["status"] | undefined {
-  switch (event.status) {
+  switch (status) {
     case "running":
     case "succeeded":
     case "failed":
-      return event.status;
-  }
-
-  switch (event.eventType) {
-    case "deployment-succeeded":
-      return "succeeded";
-    case "deployment-failed":
+      return status;
+    case "canceled":
       return "failed";
-    case "deployment-requested":
-    case "build-requested":
-    case "deployment-started":
-    case "deployment-progress":
-      return "running";
+    case "rolled-back":
+      return "succeeded";
   }
 }
 

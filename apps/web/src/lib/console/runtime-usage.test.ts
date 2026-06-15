@@ -227,7 +227,7 @@ describe("runtime usage console readback", () => {
     expect(monitorSource).not.toContain("eventsHref?: string");
     expect(monitorSource).not.toContain("capacityHref?: string");
     expect(monitorSource).not.toContain("runtimeLogs");
-    expect(monitorSource).not.toContain("deploymentLogs");
+    expect(monitorSource).not.toContain("deploymentTimeline");
     expect(monitorSource).not.toContain("logLines");
 
     expect(serverSource).not.toContain('eventsHref={serverTabHref("deployments")}');
@@ -261,7 +261,7 @@ describe("runtime usage console readback", () => {
       "observationTo: resourceRuntimeMonitoringObservationHandoff.to",
     );
 
-    expect(samplesSpec).toContain("runtime logs, deployment logs");
+    expect(samplesSpec).toContain("runtime logs, deployment timeline");
     expect(samplesSpec).toContain("not be persisted in monitoring samples");
     expect(rollupSpec).toContain("must not copy log lines into rollup output");
   });

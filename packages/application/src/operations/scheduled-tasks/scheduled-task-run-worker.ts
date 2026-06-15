@@ -222,7 +222,7 @@ export class ScheduledTaskRunWorker {
         return err(runtimeResult.error);
       }
 
-      const logs: ScheduledTaskRunLogRecord[] = runtimeResult.value.logs.map((entry) => ({
+      const logs: ScheduledTaskRunLogRecord[] = runtimeResult.value.timeline.map((entry) => ({
         id: idGenerator.next("stlog"),
         runId: runState.id.value,
         taskId: runState.taskId.value,

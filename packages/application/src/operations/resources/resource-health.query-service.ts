@@ -72,7 +72,7 @@ function compareCreatedAtDesc(left: DeploymentSummary, right: DeploymentSummary)
 function deploymentLastError(
   deployment: DeploymentSummary,
 ): ResourceHealthDeploymentContext["lastError"] {
-  const lastError = [...deployment.logs].reverse().find((log) => log.level === "error");
+  const lastError = [...deployment.timeline].reverse().find((log) => log.level === "error");
 
   return lastError
     ? {

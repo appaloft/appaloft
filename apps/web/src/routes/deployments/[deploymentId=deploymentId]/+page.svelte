@@ -20,11 +20,11 @@
     Terminal,
   } from "@lucide/svelte";
   import {
-    type DeploymentEventStreamEnvelope,
     type DeploymentDetailSummary,
-    type DeploymentLogsResponse,
     type DeploymentRecoveryReadinessResponse,
     type DeploymentProgressEvent,
+    type DeploymentTimelineEnvelope,
+    type DeploymentTimelineResponse,
     type RedeployDeploymentInput,
     type RetryDeploymentInput,
     type RollbackDeploymentInput,
@@ -49,11 +49,11 @@
     detailTabsClass,
   } from "$lib/console/layout-classes";
   import {
-    deploymentEventProgressEvents,
-    deploymentEventProgressStatus,
+    deploymentTimelineProgressEvents,
+    deploymentTimelineProgressStatus,
     groupDeploymentProgressEvents,
-    latestDeploymentEventCursor,
-    mergeDeploymentEventEnvelopes,
+    latestDeploymentTimelineCursor,
+    mergeDeploymentTimelineEnvelopes,
     observeDeploymentProgressAfterAcceptance,
     progressSourceLabel,
     progressStatusVariant,
@@ -83,8 +83,8 @@
     url: string;
     kind: AccessUrlKind;
   };
-  type DeploymentDetailTab = "overview" | "logs" | "timeline" | "snapshot";
-  type DeploymentLogEntry = DeploymentLogsResponse["logs"][number];
+  type DeploymentDetailTab = "overview" | "timeline" | "snapshot";
+  type DeploymentTimelineJournalEntry = DeploymentTimelineResponse["entries"][number];
   type DeploymentRecoveryAction = "retry" | "redeploy" | "rollback";
   type AppaloftDesktopBridge = {
     copyText?: (text: string) => Promise<void>;
@@ -94,7 +94,7 @@
       appaloftDesktop?: AppaloftDesktopBridge;
     };
 
-  const deploymentDetailTabs = ["overview", "logs", "timeline", "snapshot"] as const;
+  const deploymentDetailTabs = ["overview", "timeline", "snapshot"] as const;
   const { projectsQuery, environmentsQuery, resourcesQuery, deploymentsQuery } =
     createConsoleQueries(browser, {
       health: false,
@@ -112,14 +112,14 @@
   let deploymentProgressDeploymentId = $state("");
   let recoveryDeploymentProgressStatus = $state<DeploymentProgressDialogStatus>("idle");
   let recoveryDeploymentProgressEvents = $state<DeploymentProgressEvent[]>([]);
-  let liveDeploymentEventEnvelopes = $state<DeploymentEventStreamEnvelope[]>([]);
-  let deploymentEventFollowError = $state("");
-  let deploymentEventsFollowing = $state(false);
-  let deploymentEventFollowGeneration = 0;
-  let deploymentEventStream: Awaited<
-    ReturnType<typeof orpcClient.deployments.eventsStream>
+  let liveDeploymentTimelineEnvelopes = $state<DeploymentTimelineEnvelope[]>([]);
+  let deploymentTimelineFollowError = $state("");
+  let deploymentTimelineFollowing = $state(false);
+  let deploymentTimelineFollowGeneration = 0;
+  let deploymentTimelineStream: Awaited<
+    ReturnType<typeof orpcClient.deployments.timelineStream>
   > | null = null;
-  let logsCopyState = $state<"idle" | "copied" | "failed">("idle");
+  let timelineCopyState = $state<"idle" | "copied" | "failed">("idle");
   let accessUrlCopyState = $state<"idle" | "copied" | "failed">("idle");
   let diagnosticSummaryLoading = $state(false);
   let diagnosticSummaryCopyState = $state<"idle" | "copied" | "failed">("idle");
@@ -129,7 +129,7 @@
   let recoveryDialogOpen = $state(false);
   let selectedRecoveryAction = $state<DeploymentRecoveryAction | null>(null);
   let selectedRollbackCandidateId = $state("");
-  let logsCopyResetTimeout: ReturnType<typeof setTimeout> | undefined;
+  let timelineCopyResetTimeout: ReturnType<typeof setTimeout> | undefined;
   let accessUrlCopyResetTimeout: ReturnType<typeof setTimeout> | undefined;
   let diagnosticSummaryCopyResetTimeout: ReturnType<typeof setTimeout> | undefined;
 
@@ -149,27 +149,13 @@
       staleTime: 5_000,
     }),
   );
-  const deploymentLogsQuery = createQuery(() =>
+  const deploymentTimelineQuery = createQuery(() =>
     queryOptions({
-      queryKey: ["deployments", "logs", deploymentId],
+      queryKey: ["deployments", "timeline", deploymentId],
       queryFn: () =>
-        orpcClient.deployments.logs({
+        orpcClient.deployments.timeline({
           deploymentId,
-        }),
-      enabled: browser && deploymentId.length > 0,
-      staleTime: 5_000,
-    }),
-  );
-  const deploymentEventsQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["deployments", "events", deploymentId],
-      queryFn: () =>
-        orpcClient.deployments.events({
-          deploymentId,
-          historyLimit: 100,
-          includeHistory: true,
-          follow: false,
-          untilTerminal: true,
+          limit: 100,
         }),
       enabled: browser && deploymentId.length > 0,
       staleTime: 5_000,
@@ -219,22 +205,34 @@
   const listedDeployment = $derived(findDeployment(deployments, deploymentId));
   const headerDeployment = $derived(deployment ?? listedDeployment);
   const recoveryReadiness = $derived(deploymentRecoveryReadinessQuery.data ?? null);
-  const deploymentLogs = $derived(deploymentLogsQuery.data?.logs ?? []);
-  const replayDeploymentEventEnvelopes = $derived(deploymentEventsQuery.data?.envelopes ?? []);
-  const deploymentEventEnvelopes = $derived(
-    mergeDeploymentEventEnvelopes(replayDeploymentEventEnvelopes, liveDeploymentEventEnvelopes),
+  const deploymentTimeline = $derived(deploymentTimelineQuery.data?.entries ?? []);
+  const replayDeploymentTimelineEnvelopes = $derived(
+    (deploymentTimelineQuery.data?.entries ?? []).map(
+      (entry) =>
+        ({
+          schemaVersion: "deployments.timeline/v1",
+          kind: "entry",
+          entry,
+        }) satisfies DeploymentTimelineEnvelope,
+    ),
+  );
+  const deploymentTimelineEnvelopes = $derived(
+    mergeDeploymentTimelineEnvelopes(
+      replayDeploymentTimelineEnvelopes,
+      liveDeploymentTimelineEnvelopes,
+    ),
   );
   const deploymentObservedProgressEvents = $derived(
-    deploymentEventProgressEvents(deploymentEventEnvelopes),
+    deploymentTimelineProgressEvents(deploymentTimelineEnvelopes),
   );
-  const replayDeploymentEventError = $derived(
-    deploymentEventsQuery.error ? readErrorMessage(deploymentEventsQuery.error) : "",
+  const replayDeploymentTimelineError = $derived(
+    deploymentTimelineQuery.error ? readErrorMessage(deploymentTimelineQuery.error) : "",
   );
   const deploymentProgressEvents = $derived(
     deploymentObservedProgressEvents.length > 0
       ? deploymentObservedProgressEvents
       : deployment
-        ? progressEventsFromDeployment(deployment, deploymentLogs)
+        ? progressEventsFromDeployment(deployment)
         : [],
   );
   const deploymentProgressDialogEvents = $derived(
@@ -246,11 +244,11 @@
     recoveryDeploymentProgressStatus !== "idle"
       ? recoveryDeploymentProgressStatus
       : deployment
-      ? deploymentEventProgressStatus(deploymentEventEnvelopes, deployment.status)
+      ? deploymentTimelineProgressStatus(deploymentTimelineEnvelopes, deployment.status)
       : "idle",
   );
   const deploymentProgressStreamError = $derived(
-    deploymentEventFollowError || replayDeploymentEventError,
+    deploymentTimelineFollowError || replayDeploymentTimelineError,
   );
   const deploymentTimelineSections = $derived(
     groupDeploymentProgressEvents(deploymentProgressEvents),
@@ -320,17 +318,17 @@
   const accessUrls = $derived(deployment ? deploymentAccessUrls(deployment, server?.host) : []);
   const primaryAccessUrl = $derived(accessUrls[0] ?? null);
   const activeTab = $derived(parseDeploymentDetailTab(page.url.searchParams.get("tab")));
-  const shouldFollowDeploymentEvents = $derived(
+  const shouldFollowDeploymentTimeline = $derived(
     browser &&
       Boolean(deployment) &&
       deploymentProgressDeploymentId === deployment?.id &&
       deploymentProgressDialogStatus === "running" &&
       (activeTab === "timeline" || deploymentProgressDialogOpen),
   );
-  const logsCopyLabel = $derived(
-    logsCopyState === "copied"
+  const timelineCopyLabel = $derived(
+    timelineCopyState === "copied"
       ? $t(i18nKeys.console.deployments.copyLogsCopied)
-      : logsCopyState === "failed"
+      : timelineCopyState === "failed"
         ? $t(i18nKeys.console.deployments.copyLogsFailed)
         : $t(i18nKeys.console.deployments.copyLogs),
   );
@@ -433,7 +431,6 @@
   const resourceTerminalUrl = $derived(
     deploymentResourceRef ? resourceTerminalHref(deploymentResourceRef, deployment?.id) : "",
   );
-  const deploymentLogsHref = $derived(deployment ? deploymentTabHref("logs") : "");
   const deploymentTimelineHref = $derived(deployment ? deploymentTabHref("timeline") : "");
   const deploymentSnapshotHref = $derived(deployment ? deploymentTabHref("snapshot") : "");
   const deploymentIsCurrentResourceState = $derived(
@@ -470,7 +467,7 @@
   }
 
   function appendRecoveryDeploymentProgressEvent(event: DeploymentProgressEvent): void {
-    liveDeploymentEventEnvelopes = [];
+    liveDeploymentTimelineEnvelopes = [];
     recoveryDeploymentProgressEvents = [...recoveryDeploymentProgressEvents, event];
     deploymentProgressDeploymentId = event.deploymentId ?? deploymentProgressDeploymentId;
 
@@ -490,13 +487,15 @@
     recoveryDeploymentProgressEvents = [];
     recoveryDeploymentProgressStatus = "running";
     deploymentProgressDialogOpen = true;
-    deploymentEventFollowError = "";
+    deploymentTimelineFollowError = "";
 
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["deployments"] }),
       queryClient.invalidateQueries({ queryKey: ["deployments", "recovery-readiness", deploymentId] }),
       queryClient.invalidateQueries({ queryKey: ["deployments", "show", acceptedDeploymentId] }),
-      queryClient.invalidateQueries({ queryKey: ["deployments", "events", acceptedDeploymentId] }),
+      queryClient.invalidateQueries({
+        queryKey: ["deployments", "timeline", acceptedDeploymentId],
+      }),
     ]);
 
     await observeDeploymentProgressAfterAcceptance(
@@ -504,7 +503,7 @@
       appendRecoveryDeploymentProgressEvent,
       {
         onStreamError: (message) => {
-          deploymentEventFollowError = message;
+          deploymentTimelineFollowError = message;
         },
       },
     );
@@ -642,7 +641,7 @@
     }
   }
 
-  function logLevelClass(level: DeploymentLogEntry["level"]): string {
+  function logLevelClass(level: DeploymentTimelineJournalEntry["level"]): string {
     switch (level) {
       case "error":
         return "text-red-300";
@@ -655,8 +654,8 @@
     }
   }
 
-  function logSourceLabel(log: DeploymentLogEntry): string {
-    return log.source === "application" ? "app" : "appaloft";
+  function logSourceLabel(log: DeploymentTimelineJournalEntry): string {
+    return log.source === "application" ? "app" : log.source;
   }
 
   function logTimeLabel(timestamp: string): string {
@@ -796,23 +795,23 @@
     }
   }
 
-  function formatDeploymentLogCopyLine(log: DeploymentLogEntry): string {
-    return [log.timestamp, log.source, log.level, log.phase, log.message].join(" ");
+  function formatDeploymentTimelineCopyLine(log: DeploymentTimelineJournalEntry): string {
+    return [log.occurredAt, log.source, log.level, log.phase ?? log.kind, log.message].join(" ");
   }
 
-  function formatDeploymentLogsCopyText(logs: DeploymentLogsResponse["logs"]): string {
-    return logs.map(formatDeploymentLogCopyLine).join("\n");
+  function formatDeploymentTimelineCopyText(logs: DeploymentTimelineResponse["entries"]): string {
+    return logs.map(formatDeploymentTimelineCopyLine).join("\n");
   }
 
-  function markLogsCopyState(state: "copied" | "failed"): void {
-    if (logsCopyResetTimeout) {
-      clearTimeout(logsCopyResetTimeout);
+  function markTimelineCopyState(state: "copied" | "failed"): void {
+    if (timelineCopyResetTimeout) {
+      clearTimeout(timelineCopyResetTimeout);
     }
 
-    logsCopyState = state;
-    logsCopyResetTimeout = setTimeout(() => {
-      logsCopyState = "idle";
-      logsCopyResetTimeout = undefined;
+    timelineCopyState = state;
+    timelineCopyResetTimeout = setTimeout(() => {
+      timelineCopyState = "idle";
+      timelineCopyResetTimeout = undefined;
     }, 1800);
   }
 
@@ -891,7 +890,7 @@
       const summary = await orpcClient.resources.diagnosticSummary({
         resourceId: deployment.resourceId,
         deploymentId: deployment.id,
-        includeDeploymentLogTail: true,
+        includeDeploymentTimelineTail: true,
         includeRuntimeLogTail: true,
         includeProxyConfiguration: true,
         tailLines: 20,
@@ -915,16 +914,16 @@
     }
   }
 
-  async function handleCopyDeploymentLogs(): Promise<void> {
-    if (!browser || !deployment || deploymentLogs.length === 0) {
+  async function handleCopyDeploymentTimeline(): Promise<void> {
+    if (!browser || !deployment || deploymentTimeline.length === 0) {
       return;
     }
 
     try {
-      await copyTextToClipboard(formatDeploymentLogsCopyText(deploymentLogs));
-      markLogsCopyState("copied");
+      await copyTextToClipboard(formatDeploymentTimelineCopyText(deploymentTimeline));
+      markTimelineCopyState("copied");
     } catch {
-      markLogsCopyState("failed");
+      markTimelineCopyState("failed");
     }
   }
 
@@ -941,65 +940,65 @@
     }
   }
 
-  function isActiveDeploymentEventFollow(
+  function isActiveDeploymentTimelineFollow(
     currentDeploymentId: string,
     generation: number,
   ): boolean {
     return (
       deployment?.id === currentDeploymentId &&
-      deploymentEventFollowGeneration === generation &&
-      shouldFollowDeploymentEvents
+      deploymentTimelineFollowGeneration === generation &&
+      shouldFollowDeploymentTimeline
     );
   }
 
-  function stopDeploymentEventFollow(): void {
-    deploymentEventFollowGeneration += 1;
-    const stream = deploymentEventStream;
-    deploymentEventStream = null;
-    deploymentEventsFollowing = false;
+  function stopDeploymentTimelineFollow(): void {
+    deploymentTimelineFollowGeneration += 1;
+    const stream = deploymentTimelineStream;
+    deploymentTimelineStream = null;
+    deploymentTimelineFollowing = false;
     void stream?.return?.().catch(() => undefined);
   }
 
-  async function consumeDeploymentEventStream(
+  async function consumeDeploymentTimelineStream(
     currentDeploymentId: string,
     generation: number,
     cursor: string | undefined,
   ): Promise<void> {
     try {
-      const stream = await orpcClient.deployments.eventsStream({
+      const stream = await orpcClient.deployments.timelineStream({
         deploymentId: currentDeploymentId,
-        historyLimit: 0,
+        limit: 0,
         includeHistory: false,
         follow: true,
         untilTerminal: true,
         ...(cursor ? { cursor } : {}),
       });
 
-      if (!isActiveDeploymentEventFollow(currentDeploymentId, generation)) {
+      if (!isActiveDeploymentTimelineFollow(currentDeploymentId, generation)) {
         await stream.return?.();
         return;
       }
 
-      deploymentEventStream = stream;
+      deploymentTimelineStream = stream;
       let result = await stream.next();
 
-      while (isActiveDeploymentEventFollow(currentDeploymentId, generation) && !result.done) {
+      while (isActiveDeploymentTimelineFollow(currentDeploymentId, generation) && !result.done) {
         const envelope = result.value;
 
-        liveDeploymentEventEnvelopes = mergeDeploymentEventEnvelopes(
-          liveDeploymentEventEnvelopes,
+        liveDeploymentTimelineEnvelopes = mergeDeploymentTimelineEnvelopes(
+          liveDeploymentTimelineEnvelopes,
           [envelope],
         );
 
         if (envelope.kind === "gap") {
-          deploymentEventFollowError = $t(
+          deploymentTimelineFollowError = $t(
             i18nKeys.console.deployments.progressStreamDisconnected,
           );
           break;
         }
 
         if (envelope.kind === "error") {
-          deploymentEventFollowError = envelope.error.message;
+          deploymentTimelineFollowError = envelope.error.message;
           break;
         }
 
@@ -1010,16 +1009,16 @@
         result = await stream.next();
       }
     } catch (error) {
-      if (isActiveDeploymentEventFollow(currentDeploymentId, generation)) {
-        deploymentEventFollowError = readErrorMessage(error);
+      if (isActiveDeploymentTimelineFollow(currentDeploymentId, generation)) {
+        deploymentTimelineFollowError = readErrorMessage(error);
       }
     } finally {
       if (
         deployment?.id === currentDeploymentId &&
-        deploymentEventFollowGeneration === generation
+        deploymentTimelineFollowGeneration === generation
       ) {
-        deploymentEventStream = null;
-        deploymentEventsFollowing = false;
+        deploymentTimelineStream = null;
+        deploymentTimelineFollowing = false;
       }
     }
   }
@@ -1027,43 +1026,43 @@
   $effect(() => {
     const currentDeploymentId = deploymentId;
 
-    liveDeploymentEventEnvelopes = [];
+    liveDeploymentTimelineEnvelopes = [];
     recoveryDeploymentProgressEvents = [];
     recoveryDeploymentProgressStatus = "idle";
-    deploymentEventFollowError = "";
+    deploymentTimelineFollowError = "";
     deploymentProgressRequestId = "";
     deploymentProgressDeploymentId = currentDeploymentId;
-    stopDeploymentEventFollow();
+    stopDeploymentTimelineFollow();
   });
 
   $effect(() => {
     if (
-      !shouldFollowDeploymentEvents ||
+      !shouldFollowDeploymentTimeline ||
       !deployment ||
-      deploymentEventsFollowing ||
-      deploymentEventsQuery.isPending
+      deploymentTimelineFollowing ||
+      deploymentTimelineQuery.isPending
     ) {
-      if (!shouldFollowDeploymentEvents) {
-        stopDeploymentEventFollow();
+      if (!shouldFollowDeploymentTimeline) {
+        stopDeploymentTimelineFollow();
       }
       return;
     }
 
-    const generation = deploymentEventFollowGeneration + 1;
-    deploymentEventFollowGeneration = generation;
-    deploymentEventFollowError = "";
-    deploymentEventsFollowing = true;
-    void consumeDeploymentEventStream(
+    const generation = deploymentTimelineFollowGeneration + 1;
+    deploymentTimelineFollowGeneration = generation;
+    deploymentTimelineFollowError = "";
+    deploymentTimelineFollowing = true;
+    void consumeDeploymentTimelineStream(
       deployment.id,
       generation,
-      latestDeploymentEventCursor(deploymentEventEnvelopes),
+      latestDeploymentTimelineCursor(deploymentTimelineEnvelopes),
     );
   });
 
   onDestroy(() => {
-    stopDeploymentEventFollow();
-    if (logsCopyResetTimeout) {
-      clearTimeout(logsCopyResetTimeout);
+    stopDeploymentTimelineFollow();
+    if (timelineCopyResetTimeout) {
+      clearTimeout(timelineCopyResetTimeout);
     }
     if (accessUrlCopyResetTimeout) {
       clearTimeout(accessUrlCopyResetTimeout);
@@ -1131,8 +1130,6 @@
     switch (tab) {
       case "overview":
         return $t(i18nKeys.console.deployments.overviewTab);
-      case "logs":
-        return $t(i18nKeys.console.deployments.logsTab);
       case "timeline":
         return $t(i18nKeys.console.deployments.timelineTab);
       case "snapshot":
@@ -1539,10 +1536,6 @@
                   </p>
                 </div>
                 <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-4" data-deployment-observation-actions>
-                  <Button href={deploymentLogsHref} variant="outline" class="justify-start">
-                    <FileText class="size-4" />
-                    {$t(i18nKeys.console.deployments.logsTab)}
-                  </Button>
                   <Button href={deploymentTimelineHref} variant="outline" class="justify-start">
                     <Clock3 class="size-4" />
                     {$t(i18nKeys.console.deployments.timelineTab)}
@@ -1705,76 +1698,6 @@
         </Tabs.Content>
 
         <Tabs.Content
-          value="logs"
-          class={[detailTabPanelScrollClass, "space-y-4"]}
-        >
-          <section class="space-y-4">
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <h2 class="flex items-center gap-2 text-lg font-semibold">
-                  <FileText class="size-5 text-muted-foreground" />
-                  {$t(i18nKeys.console.deployments.logsTitle)}
-                </h2>
-                <p class="mt-1 text-sm text-muted-foreground">
-                  {$t(i18nKeys.console.deployments.logsDescription, {
-                    count: deployment.logCount,
-                  })}
-                </p>
-              </div>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                disabled={deploymentLogs.length === 0}
-                aria-label={logsCopyLabel}
-                title={logsCopyLabel}
-                onclick={handleCopyDeploymentLogs}
-              >
-                {#if logsCopyState === "copied"}
-                  <Check class="size-4" />
-                {:else}
-                  <Copy class="size-4" />
-                {/if}
-                {logsCopyLabel}
-              </Button>
-            </div>
-
-            {#if deploymentLogsQuery.isPending}
-              <div class="space-y-2 rounded-md border bg-muted/20 p-4">
-                <Skeleton class="h-4 w-full" />
-                <Skeleton class="h-4 w-5/6" />
-                <Skeleton class="h-4 w-2/3" />
-              </div>
-            {:else if deploymentLogs.length > 0}
-              <div class="max-h-[42rem] overflow-auto rounded-md border border-zinc-800 bg-zinc-950 px-4 py-3 font-mono text-xs text-zinc-200 shadow-inner">
-                <div class="space-y-1">
-                  {#each deploymentLogs as log, index (`${log.timestamp}-${index}`)}
-                    <div class="grid grid-cols-[4.75rem_minmax(0,1fr)] gap-x-2 gap-y-1 leading-5 md:grid-cols-[4.75rem_5rem_3.5rem_5rem_minmax(0,1fr)]">
-                      <span class="text-zinc-600">{logTimeLabel(log.timestamp)}</span>
-                      <span class={log.source === "application" ? "text-sky-300" : "text-emerald-300"}>
-                        {logSourceLabel(log)}
-                      </span>
-                      <span class={logLevelClass(log.level)}>{log.level}</span>
-                      <span class="text-zinc-500">{log.phase}</span>
-                      <span
-                        class={`col-span-2 min-w-0 break-words md:col-span-1 ${logLevelClass(log.level)} ${log.source === "application" ? "md:pl-3" : ""}`}
-                      >
-                        {log.source === "application" ? "└ " : ""}
-                        {log.message}
-                      </span>
-                    </div>
-                  {/each}
-                </div>
-              </div>
-            {:else}
-              <div class="console-subtle-panel px-4 py-4 text-sm text-muted-foreground">
-                {$t(i18nKeys.console.deployments.noLogs)}
-              </div>
-            {/if}
-          </section>
-        </Tabs.Content>
-
-        <Tabs.Content
           value="timeline"
           class={[detailTabPanelScrollClass, "space-y-4"]}
           data-deployment-attempt-timeline
@@ -1804,11 +1727,27 @@
                       : deploymentProgressDialogStatus,
                   )}
                 </Badge>
-                {#if deploymentEventsFollowing}
+                {#if deploymentTimelineFollowing}
                   <Badge variant="secondary">
                     {$t(i18nKeys.console.deployments.progressStatusRunning)}
                   </Badge>
                 {/if}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={deploymentTimeline.length === 0}
+                  aria-label={timelineCopyLabel}
+                  title={timelineCopyLabel}
+                  onclick={handleCopyDeploymentTimeline}
+                >
+                  {#if timelineCopyState === "copied"}
+                    <Check class="size-4" />
+                  {:else}
+                    <Copy class="size-4" />
+                  {/if}
+                  {timelineCopyLabel}
+                </Button>
               </div>
             </div>
 

@@ -655,7 +655,7 @@ export class CreateDeploymentUseCase {
       const cancelTransitionResult = this.deploymentLifecycleService.cancelForSupersede(
         activeDeployment,
         supersedingDeploymentId,
-        cancelResult.value.logs,
+        cancelResult.value.timeline,
       );
       if (cancelTransitionResult.isErr()) {
         return err(cancelTransitionResult.error);

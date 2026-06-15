@@ -1539,7 +1539,6 @@ export const retentionDefaultScopeSchema = z.enum(["organization", "system"]);
 
 export const retentionDefaultCategorySchema = z.enum([
   "audit-rows",
-  "deployment-logs",
   "domain-event-streams",
   "process-attempts",
   "provider-job-logs",
@@ -1758,7 +1757,7 @@ export const resourceAccessFailureDiagnosticSchema = z.object({
   nextAction: z.enum([
     "check-health",
     "inspect-runtime-logs",
-    "inspect-deployment-logs",
+    "inspect-deployment-timeline",
     "inspect-proxy-preview",
     "diagnostic-summary",
     "verify-domain",
@@ -4605,9 +4604,17 @@ export const diffEnvironmentResponseSchema = z.array(
   }),
 );
 
-export const deploymentLogEntrySchema = z.object({
+export const deploymentTimelineJournalEntrySchema = z.object({
   timestamp: z.string(),
-  source: z.enum(["appaloft", "application"]),
+  source: z.enum([
+    "appaloft",
+    "ssh",
+    "docker",
+    "application",
+    "provider",
+    "health",
+    "domain-event",
+  ]),
   phase: z.enum(["detect", "plan", "package", "deploy", "verify", "rollback"]),
   level: z.enum(["debug", "info", "warn", "error"]),
   message: z.string(),
@@ -4616,7 +4623,7 @@ export const deploymentLogEntrySchema = z.object({
 
 export const deploymentProgressEventSchema = z.object({
   timestamp: z.string(),
-  source: z.enum(["appaloft", "application"]),
+  source: deploymentTimelineJournalEntrySchema.shape.source,
   phase: z.enum(["detect", "plan", "package", "deploy", "verify", "rollback"]),
   level: z.enum(["debug", "info", "warn", "error"]),
   message: z.string(),
@@ -4628,6 +4635,48 @@ export const deploymentProgressEventSchema = z.object({
     label: z.string(),
   }),
   stream: z.enum(["stdout", "stderr"]).optional(),
+});
+
+export const deploymentTimelineEntrySchema = z.object({
+  deploymentId: z.string(),
+  sequence: z.number().int().positive(),
+  cursor: z.string(),
+  occurredAt: z.string(),
+  source: z.enum([
+    "appaloft",
+    "ssh",
+    "docker",
+    "application",
+    "provider",
+    "health",
+    "domain-event",
+  ]),
+  kind: z.enum([
+    "lifecycle",
+    "step",
+    "command",
+    "output",
+    "container-log",
+    "health-check",
+    "status",
+    "diagnostic",
+    "gap",
+  ]),
+  phase: z.enum(["detect", "plan", "package", "deploy", "verify", "rollback"]).optional(),
+  level: z.enum(["debug", "info", "warn", "error"]),
+  message: z.string(),
+  status: z.enum(["running", "succeeded", "failed", "canceled", "rolled-back"]).optional(),
+  stream: z.enum(["stdout", "stderr"]).optional(),
+  step: z
+    .object({
+      current: z.number(),
+      total: z.number(),
+      label: z.string(),
+    })
+    .optional(),
+  metadata: z
+    .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
+    .optional(),
 });
 
 export const runtimePlanSchema = z.object({
@@ -4928,8 +4977,8 @@ export const deploymentSummarySchema = z.object({
       }),
     )
     .optional(),
-  logs: z.array(deploymentLogEntrySchema),
-  logCount: z.number(),
+  timeline: z.array(deploymentTimelineJournalEntrySchema),
+  timelineCount: z.number(),
   createdAt: z.string(),
   startedAt: z.string().optional(),
   finishedAt: z.string().optional(),
@@ -5229,7 +5278,7 @@ export const pruneOperatorWorkResponseSchema = z.object({
 });
 
 export const deploymentDetailSummarySchema = deploymentSummarySchema.omit({
-  logs: true,
+  timeline: true,
 });
 
 export const deploymentRelatedContextSchema = z.object({
@@ -5309,7 +5358,7 @@ export const deploymentAttemptTimelineSchema = z.object({
   createdAt: z.string(),
   startedAt: z.string().optional(),
   finishedAt: z.string().optional(),
-  logCount: z.number().int().nonnegative(),
+  timelineCount: z.number().int().nonnegative(),
 });
 
 export const deploymentAttemptSnapshotSchema = z.object({
@@ -5329,9 +5378,9 @@ export const deploymentAttemptSnapshotSchema = z.object({
 
 export const deploymentAttemptFailureSummarySchema = z.object({
   timestamp: z.string(),
-  source: deploymentLogEntrySchema.shape.source,
-  phase: deploymentLogEntrySchema.shape.phase,
-  level: deploymentLogEntrySchema.shape.level,
+  source: deploymentTimelineJournalEntrySchema.shape.source,
+  phase: deploymentTimelineJournalEntrySchema.shape.phase,
+  level: deploymentTimelineJournalEntrySchema.shape.level,
   message: z.string(),
 });
 
@@ -5638,8 +5687,8 @@ export const deploymentRecoveryRecommendedActionSchema = z.object({
   kind: z.enum(["query", "command", "workflow-action"]),
   targetOperation: z.enum([
     "deployments.show",
-    "deployments.stream-events",
-    "deployments.logs",
+    "deployments.timeline",
+    "deployments.timeline.stream",
     "resources.health",
     "resources.diagnostic-summary",
     "deployments.retry",
@@ -5701,28 +5750,18 @@ export const showDeploymentResponseSchema = z.object({
   latestFailure: deploymentAttemptFailureSummarySchema.optional(),
   recoverySummary: deploymentAttemptRecoverySummarySchema.optional(),
   nextActions: z.array(
-    z.enum(["logs", "resource-detail", "resource-health", "diagnostic-summary"]),
+    z.enum(["timeline", "resource-detail", "resource-health", "diagnostic-summary"]),
   ),
   sectionErrors: z.array(deploymentDetailSectionErrorSchema),
   generatedAt: z.string(),
 });
 
-export const deploymentLogsResponseSchema = z.object({
+export const deploymentTimelineResponseSchema = z.object({
+  schemaVersion: z.literal("deployments.timeline/v1"),
   deploymentId: z.string(),
-  logs: z.array(deploymentLogEntrySchema),
-});
-
-export const pruneDeploymentLogsResponseSchema = z.object({
-  schemaVersion: z.literal("deployments.logs.prune/v1"),
-  before: z.string(),
-  deploymentId: z.string().optional(),
-  resourceId: z.string().optional(),
-  serverId: z.string().optional(),
-  dryRun: z.boolean(),
-  matchedCount: z.number(),
-  prunedCount: z.number(),
-  affectedDeploymentCount: z.number(),
-  prunedAt: z.string(),
+  entries: z.array(deploymentTimelineEntrySchema),
+  nextCursor: z.string().optional(),
+  hasMore: z.boolean(),
 });
 
 export const scheduledTaskRunStatusSchema = z.enum([
@@ -5824,26 +5863,6 @@ export const scheduledTaskRunLogsResponseSchema = z.object({
   generatedAt: z.string(),
 });
 
-export const deploymentObservedEventSchema = z.object({
-  deploymentId: z.string(),
-  sequence: z.number().int().positive(),
-  cursor: z.string(),
-  emittedAt: z.string(),
-  source: z.enum(["domain-event", "process-observation", "progress-projection"]),
-  eventType: z.enum([
-    "deployment-requested",
-    "build-requested",
-    "deployment-started",
-    "deployment-succeeded",
-    "deployment-failed",
-    "deployment-progress",
-  ]),
-  phase: z.enum(["detect", "plan", "package", "deploy", "verify", "rollback"]).optional(),
-  status: z.string().optional(),
-  retriable: z.boolean().optional(),
-  summary: z.string().optional(),
-});
-
 export const resourceRuntimeLogLineSchema = z.object({
   resourceId: z.string(),
   deploymentId: z.string().optional(),
@@ -5920,45 +5939,6 @@ export const operatorWorkEventStreamResponseSchema = z.object({
 export const operatorWorkEventStreamStreamResponseSchema = z.object({
   workId: z.string(),
 });
-
-export const deploymentEventStreamGapSchema = z.object({
-  code: z.string(),
-  phase: z.enum(["event-replay", "live-follow"]),
-  retriable: z.boolean(),
-  cursor: z.string().optional(),
-  lastSequence: z.number().int().positive().optional(),
-  recommendedAction: z.enum(["restart-stream", "open-deployment-detail"]).optional(),
-});
-
-export const deploymentEventStreamEnvelopeSchema = z.discriminatedUnion("kind", [
-  z.object({
-    schemaVersion: z.literal("deployments.stream-events/v1"),
-    kind: z.literal("event"),
-    event: deploymentObservedEventSchema,
-  }),
-  z.object({
-    schemaVersion: z.literal("deployments.stream-events/v1"),
-    kind: z.literal("heartbeat"),
-    at: z.string(),
-    cursor: z.string().optional(),
-  }),
-  z.object({
-    schemaVersion: z.literal("deployments.stream-events/v1"),
-    kind: z.literal("gap"),
-    gap: deploymentEventStreamGapSchema,
-  }),
-  z.object({
-    schemaVersion: z.literal("deployments.stream-events/v1"),
-    kind: z.literal("closed"),
-    reason: z.enum(["completed", "cancelled", "source-ended", "idle-timeout"]),
-    cursor: z.string().optional(),
-  }),
-  z.object({
-    schemaVersion: z.literal("deployments.stream-events/v1"),
-    kind: z.literal("error"),
-    error: domainErrorResponseSchema,
-  }),
-]);
 
 export const resourceRuntimeLogEventSchema = z.discriminatedUnion("kind", [
   z.object({
@@ -6047,12 +6027,37 @@ export const pruneResourceRuntimeControlAttemptsResponseSchema = z.object({
   prunedAt: z.string(),
 });
 
-export const deploymentEventStreamResponseSchema = z.object({
-  deploymentId: z.string(),
-  envelopes: z.array(deploymentEventStreamEnvelopeSchema),
-});
+export const deploymentTimelineEnvelopeSchema = z.discriminatedUnion("kind", [
+  z.object({
+    schemaVersion: z.literal("deployments.timeline/v1"),
+    kind: z.literal("entry"),
+    entry: deploymentTimelineEntrySchema,
+  }),
+  z.object({
+    schemaVersion: z.literal("deployments.timeline/v1"),
+    kind: z.literal("heartbeat"),
+    at: z.string(),
+    cursor: z.string().optional(),
+  }),
+  z.object({
+    schemaVersion: z.literal("deployments.timeline/v1"),
+    kind: z.literal("gap"),
+    entry: deploymentTimelineEntrySchema,
+  }),
+  z.object({
+    schemaVersion: z.literal("deployments.timeline/v1"),
+    kind: z.literal("closed"),
+    reason: z.enum(["completed", "cancelled", "source-ended", "idle-timeout"]),
+    cursor: z.string().optional(),
+  }),
+  z.object({
+    schemaVersion: z.literal("deployments.timeline/v1"),
+    kind: z.literal("error"),
+    error: domainErrorResponseSchema,
+  }),
+]);
 
-export const deploymentEventStreamStreamResponseSchema = z.object({
+export const deploymentTimelineStreamResponseSchema = z.object({
   deploymentId: z.string(),
 });
 
@@ -6138,7 +6143,7 @@ export const resourceDiagnosticSourceErrorSchema = z.object({
     "deployment",
     "access",
     "proxy",
-    "deployment-logs",
+    "deployment-timeline",
     "runtime-logs",
     "system",
     "copy",
@@ -6251,7 +6256,7 @@ export const resourceDiagnosticDeploymentSchema = z.object({
   createdAt: z.string(),
   startedAt: z.string().optional(),
   finishedAt: z.string().optional(),
-  logCount: z.number(),
+  timelineCount: z.number(),
   lastError: z
     .object({
       timestamp: z.string(),
@@ -6312,7 +6317,7 @@ export const resourceDiagnosticProxySchema = z.object({
 
 export const resourceDiagnosticLogLineSchema = z.object({
   timestamp: z.string().optional(),
-  source: z.enum(["appaloft", "application"]).optional(),
+  source: deploymentTimelineJournalEntrySchema.shape.source.optional(),
   phase: z.enum(["detect", "plan", "package", "deploy", "verify", "rollback"]).optional(),
   level: z.enum(["debug", "info", "warn", "error"]).optional(),
   stream: z.enum(["stdout", "stderr", "unknown"]).optional(),
@@ -6359,7 +6364,7 @@ export const resourceDiagnosticSummarySchema = z.object({
   deployment: resourceDiagnosticDeploymentSchema.optional(),
   access: resourceDiagnosticAccessSchema,
   proxy: resourceDiagnosticProxySchema,
-  deploymentLogs: resourceDiagnosticLogSectionSchema,
+  deploymentTimeline: resourceDiagnosticLogSectionSchema,
   runtimeLogs: resourceDiagnosticLogSectionSchema,
   system: resourceDiagnosticSystemSchema,
   sourceErrors: z.array(resourceDiagnosticSourceErrorSchema),
@@ -7157,8 +7162,12 @@ export type DeploymentAttemptRecoverySummary = z.infer<
 >;
 export type ShowDeploymentInput = z.infer<typeof showDeploymentInputSchema>;
 export type ShowDeploymentResponse = z.infer<typeof showDeploymentResponseSchema>;
-export type DeploymentLogsResponse = z.infer<typeof deploymentLogsResponseSchema>;
-export type PruneDeploymentLogsResponse = z.infer<typeof pruneDeploymentLogsResponseSchema>;
+export type DeploymentTimelineEntry = z.infer<typeof deploymentTimelineEntrySchema>;
+export type DeploymentTimelineEnvelope = z.infer<typeof deploymentTimelineEnvelopeSchema>;
+export type DeploymentTimelineResponse = z.infer<typeof deploymentTimelineResponseSchema>;
+export type DeploymentTimelineStreamResponse = z.infer<
+  typeof deploymentTimelineStreamResponseSchema
+>;
 export type ScheduledTaskRunStatus = z.infer<typeof scheduledTaskRunStatusSchema>;
 export type ScheduledTaskRunTriggerKind = z.infer<typeof scheduledTaskRunTriggerKindSchema>;
 export type ScheduledTaskRunSummary = z.infer<typeof scheduledTaskRunSummarySchema>;
@@ -7172,13 +7181,6 @@ export type ListScheduledTaskRunsResponse = z.infer<typeof listScheduledTaskRuns
 export type ShowScheduledTaskRunResponse = z.infer<typeof showScheduledTaskRunResponseSchema>;
 export type ScheduledTaskRunLogEntry = z.infer<typeof scheduledTaskRunLogEntrySchema>;
 export type ScheduledTaskRunLogsResponse = z.infer<typeof scheduledTaskRunLogsResponseSchema>;
-export type DeploymentObservedEvent = z.infer<typeof deploymentObservedEventSchema>;
-export type DeploymentEventStreamGap = z.infer<typeof deploymentEventStreamGapSchema>;
-export type DeploymentEventStreamEnvelope = z.infer<typeof deploymentEventStreamEnvelopeSchema>;
-export type DeploymentEventStreamResponse = z.infer<typeof deploymentEventStreamResponseSchema>;
-export type DeploymentEventStreamStreamResponse = z.infer<
-  typeof deploymentEventStreamStreamResponseSchema
->;
 export type DomainErrorResponse = z.infer<typeof domainErrorResponseSchema>;
 export type ResourceRuntimeLogLine = z.infer<typeof resourceRuntimeLogLineSchema>;
 export type ResourceRuntimeLogEvent = z.infer<typeof resourceRuntimeLogEventSchema>;

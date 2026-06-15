@@ -56,12 +56,12 @@ Let Web, desktop, CLI, HTTP/oRPC, automation, and future MCP users answer:
 - did deployment admission, runtime execution, generated access, proxy route realization, and log
   observation each succeed, fail, or remain unavailable?
 - what stable error codes, phases, related ids, and retry hints should be included in a bug report?
-- what sanitized recent deployment logs or runtime log lines are safe to copy?
+- what sanitized recent deployment timeline entries or runtime log lines are safe to copy?
 - what safe local installation context is relevant when the app runs in desktop/local mode?
 
 The diagnostic summary is not a replacement for:
 
-- `deployments.logs`;
+- `deployments.timeline`;
 - `resources.runtime-logs`;
 - `resources.proxy-configuration.preview`;
 - generated access summaries;

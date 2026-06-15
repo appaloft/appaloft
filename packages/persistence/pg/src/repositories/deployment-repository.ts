@@ -33,7 +33,7 @@ import {
   resolveRepositoryContextOrganizationId,
   resolveRepositoryExecutor,
   serializeDeploymentDependencyBindingReferences,
-  serializeDeploymentLogs,
+  serializeDeploymentTimeline,
   serializeEnvironmentSnapshot,
   serializeRuntimePlan,
 } from "./shared";
@@ -109,7 +109,7 @@ class KyselyDeploymentMutationVisitor
         dependency_binding_references: serializeDeploymentDependencyBindingReferences(
           spec.state.dependencyBindingReferences,
         ),
-        logs: serializeDeploymentLogs(spec.state.logs),
+        timeline: serializeDeploymentTimeline(spec.state.timeline),
         created_at: spec.state.createdAt.value,
         started_at: spec.state.startedAt?.value ?? null,
         finished_at: spec.state.finishedAt?.value ?? null,
@@ -235,7 +235,7 @@ export class PgDeploymentRepository implements DeploymentRepository {
               >,
               dependency_binding_references: mutation.values
                 .dependency_binding_references as unknown as Record<string, unknown>[],
-              logs: mutation.values.logs as unknown as Record<string, unknown>[],
+              timeline: mutation.values.timeline as unknown as Record<string, unknown>[],
               started_at: mutation.values.started_at ?? null,
               finished_at: mutation.values.finished_at ?? null,
               trigger_kind: mutation.values.trigger_kind,

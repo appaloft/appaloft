@@ -34,10 +34,14 @@ import {
 } from "@appaloft/core";
 import { MemoryDeploymentRepository, NoopLogger } from "@appaloft/testkit";
 
-import { createExecutionContext, DeploymentLogProgressRecorder, toRepositoryContext } from "../src";
+import {
+  createExecutionContext,
+  DeploymentTimelineProgressRecorder,
+  toRepositoryContext,
+} from "../src";
 
-describe("DeploymentLogProgressRecorder", () => {
-  test("[DEP-PROGRESS-RECORDER-001] persists deployment progress events into deployment logs", async () => {
+describe("DeploymentTimelineProgressRecorder", () => {
+  test("[DEP-PROGRESS-RECORDER-001] persists deployment progress events into deployment timeline", async () => {
     const context = createExecutionContext({ entrypoint: "system" });
     const repository = new MemoryDeploymentRepository();
     const deployment = createDeployment();
@@ -48,7 +52,7 @@ describe("DeploymentLogProgressRecorder", () => {
       UpsertDeploymentSpec.fromDeployment(deployment),
     );
 
-    const recorder = new DeploymentLogProgressRecorder(repository, new NoopLogger());
+    const recorder = new DeploymentTimelineProgressRecorder(repository, new NoopLogger());
 
     const event = {
       timestamp: "2026-06-14T07:05:54.000Z",
@@ -68,10 +72,10 @@ describe("DeploymentLogProgressRecorder", () => {
       toRepositoryContext(context),
       DeploymentByIdSpec.create(DeploymentId.rehydrate("dep_progress_1")),
     );
-    const logs = persisted?.toState().logs ?? [];
+    const timeline = persisted?.toState().timeline ?? [];
 
-    expect(logs).toHaveLength(1);
-    const [log] = logs;
+    expect(timeline).toHaveLength(1);
+    const [log] = timeline;
     expect(log?.timestamp).toBe("2026-06-14T07:05:54.000Z");
     expect(log?.phase).toBe("deploy");
     expect(log?.message).toBe("Runtime container was started");

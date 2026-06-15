@@ -6,7 +6,6 @@ export const retentionDefaultScopeSchema = z.enum(["organization", "system"]);
 
 export const retentionDefaultCategorySchema = z.enum([
   "audit-rows",
-  "deployment-logs",
   "domain-event-streams",
   "process-attempts",
   "provider-job-logs",

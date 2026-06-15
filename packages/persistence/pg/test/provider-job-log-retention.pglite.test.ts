@@ -155,7 +155,7 @@ async function seedDeployment(
     id: string;
     resourceId: string;
     serverId: string;
-    logs?: Record<string, unknown>[];
+    timeline?: Record<string, unknown>[];
   },
 ): Promise<void> {
   await db
@@ -197,7 +197,7 @@ async function seedDeployment(
         variables: [],
       },
       dependency_binding_references: [],
-      logs: input.logs ?? [],
+      timeline: input.timeline ?? [],
       created_at: "2026-01-01T00:00:00.000Z",
       started_at: "2026-01-01T00:00:01.000Z",
       finished_at: "2026-01-01T00:00:04.000Z",
@@ -231,7 +231,7 @@ describe("provider job log retention persistence", () => {
         id: "dep_web",
         resourceId: "res_web",
         serverId: "srv_primary",
-        logs: [
+        timeline: [
           {
             level: "info",
             message: "deployment log retained",
@@ -316,7 +316,7 @@ describe("provider job log retention persistence", () => {
         .execute();
       const deployments = await database.db
         .selectFrom("deployments")
-        .select(["id", "logs"])
+        .select(["id", "timeline"])
         .orderBy("id")
         .execute();
 
@@ -350,7 +350,7 @@ describe("provider job log retention persistence", () => {
         "pjl_other_resource",
       ]);
       expect(deployments.map((row) => row.id)).toEqual(["dep_api", "dep_web"]);
-      expect(deployments.find((row) => row.id === "dep_web")?.logs).toEqual([
+      expect(deployments.find((row) => row.id === "dep_web")?.timeline).toEqual([
         {
           level: "info",
           message: "deployment log retained",

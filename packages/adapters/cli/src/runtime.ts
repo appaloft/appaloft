@@ -10,7 +10,7 @@ import {
   type ResourceDiagnosticSummary,
   type ResourceRuntimeLogLine,
   type ResourceRuntimeLogsResult,
-  type StreamDeploymentEventsResult,
+  type StreamDeploymentTimelineResult,
   type StreamOperatorWorkEventsResult,
   type TerminalSessionDescriptor,
   type TerminalSessionGateway,
@@ -260,13 +260,13 @@ function runtimeLogErrorFromUnknown(error: unknown): DomainError {
   });
 }
 
-function deploymentEventStreamErrorFromUnknown(error: unknown): DomainError {
+function deploymentTimelineStreamErrorFromUnknown(error: unknown): DomainError {
   if (isDomainError(error)) {
     return error;
   }
 
-  return domainError.infra("Deployment event stream failed", {
-    phase: "cli-deployment-event-stream",
+  return domainError.infra("Deployment timeline stream failed", {
+    phase: "cli-deployment-timeline-stream",
     message: error instanceof Error ? error.message : String(error),
   });
 }
@@ -543,7 +543,7 @@ export function formatResourceDiagnosticSummary(summary: ResourceDiagnosticSumma
     `Access: ${summary.access.status}${summary.access.reasonCode ? ` · ${summary.access.reasonCode}` : ""}`,
     ...(accessRoute ? [`Route: ${accessRoute}`] : []),
     `Proxy: ${summary.proxy.status}${summary.proxy.providerKey ? ` · ${summary.proxy.providerKey}` : ""}${summary.proxy.proxyRouteStatus ? ` · ${summary.proxy.proxyRouteStatus}` : ""}`,
-    `Deployment logs: ${summary.deploymentLogs.status} · ${summary.deploymentLogs.lineCount}/${summary.deploymentLogs.tailLimit}`,
+    `Deployment timeline: ${summary.deploymentTimeline.status} · ${summary.deploymentTimeline.lineCount}/${summary.deploymentTimeline.tailLimit}`,
     `Runtime logs: ${summary.runtimeLogs.status} · ${summary.runtimeLogs.lineCount}/${summary.runtimeLogs.tailLimit}`,
     `Redaction: ${summary.redaction.masked ? "masked" : "not-masked"} · ${summary.redaction.maskedValueCount} value(s)`,
   ];
@@ -622,8 +622,8 @@ export const runResourceRuntimeLogsQuery = (
     });
   });
 
-export const runDeploymentEventStreamQuery = (
-  message: Result<AppQuery<StreamDeploymentEventsResult>>,
+export const runDeploymentTimelineQuery = (
+  message: Result<AppQuery<StreamDeploymentTimelineResult>>,
 ): Effect.Effect<void, DomainError, CliRuntime> =>
   Effect.gen(function* () {
     const cli = yield* CliRuntime;
@@ -657,7 +657,7 @@ export const runDeploymentEventStreamQuery = (
           await closeAsyncIterableIfPresent(output.stream);
         }
       },
-      catch: deploymentEventStreamErrorFromUnknown,
+      catch: deploymentTimelineStreamErrorFromUnknown,
     });
   });
 

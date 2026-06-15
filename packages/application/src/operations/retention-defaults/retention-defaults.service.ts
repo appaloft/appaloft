@@ -6,7 +6,6 @@ export type RetentionDefaultScope = "organization" | "system";
 
 export type RetentionDefaultCategory =
   | "audit-rows"
-  | "deployment-logs"
   | "domain-event-streams"
   | "process-attempts"
   | "provider-job-logs"

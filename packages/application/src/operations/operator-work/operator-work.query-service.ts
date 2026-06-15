@@ -110,7 +110,9 @@ function deploymentNextActions(status: OperatorWorkStatus): OperatorWorkNextActi
 
 function deploymentToWorkItem(deployment: DeploymentSummary): OperatorWorkItem {
   const status = deploymentStatusToOperatorWorkStatus(deployment.status);
-  const latestErrorLog = [...deployment.logs].reverse().find((entry) => entry.level === "error");
+  const latestErrorLog = [...deployment.timeline]
+    .reverse()
+    .find((entry) => entry.level === "error");
 
   return {
     id: deployment.id,
@@ -139,7 +141,7 @@ function deploymentToWorkItem(deployment: DeploymentSummary): OperatorWorkItem {
       runtimeTargetProviderKey: deployment.runtimePlan.target.providerKey,
       buildStrategy: deployment.runtimePlan.buildStrategy,
       packagingMode: deployment.runtimePlan.packagingMode,
-      logCount: deployment.logCount,
+      timelineCount: deployment.timelineCount,
     },
   };
 }

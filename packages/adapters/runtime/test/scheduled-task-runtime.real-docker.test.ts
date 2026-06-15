@@ -242,7 +242,7 @@ function deploymentSummary(input: {
       precedence: [],
       variables: [],
     },
-    logs: [],
+    timeline: [],
     createdAt: "2026-05-15T00:00:00.000Z",
     logCount: 0,
   };
@@ -317,7 +317,7 @@ describe("scheduled task runtime real Docker smoke", () => {
         const execution = result._unsafeUnwrap();
         expect(execution.status).toBe("succeeded");
         expect(execution.exitCode).toBe(0);
-        expect(execution.logs.map((entry) => entry.message).join("\n")).toContain(
+        expect(execution.timeline.map((entry) => entry.message).join("\n")).toContain(
           "scheduled-task-real-local-docker",
         );
       } finally {
@@ -374,7 +374,7 @@ describe("scheduled task runtime real SSH Docker smoke", () => {
         const execution = result._unsafeUnwrap();
         expect(execution.status).toBe("succeeded");
         expect(execution.exitCode).toBe(0);
-        expect(execution.logs.map((entry) => entry.message).join("\n")).toContain(
+        expect(execution.timeline.map((entry) => entry.message).join("\n")).toContain(
           "scheduled-task-real-ssh-docker",
         );
       } finally {

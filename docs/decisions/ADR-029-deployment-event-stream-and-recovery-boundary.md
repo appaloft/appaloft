@@ -2,11 +2,12 @@
 
 ## Status
 
-Accepted
+Superseded by
+[ADR-084: Deployment Timeline Journal Boundary](./ADR-084-deployment-timeline-journal-boundary.md).
 
 ## Decision
 
-Deployment observation and recovery split into three explicit public-surface boundaries:
+Deployment observation and recovery originally split into three explicit public-surface boundaries:
 
 1. `deployments.show` remains the immutable deployment-attempt detail query.
 2. `deployments.logs` remains the full deployment-attempt log query.
@@ -103,10 +104,10 @@ It must not:
 - [Business Operation Map](../BUSINESS_OPERATION_MAP.md)
 - [Deployment Detail And Observation Workflow Spec](../workflows/deployment-detail-and-observation.md)
 - [deployments.show Query Spec](../queries/deployments.show.md)
-- [deployments.stream-events Query Spec](../queries/deployments.stream-events.md)
-- [Deployment Event Stream Error Spec](../errors/deployments.stream-events.md)
-- [Deployment Event Stream Test Matrix](../testing/deployments.stream-events-test-matrix.md)
-- [Deployment Event Stream Implementation Plan](../implementation/deployments.stream-events-plan.md)
+- [deployments.stream-events Query Spec](../queries/deployments.timeline.md)
+- [Deployment Event Stream Error Spec](../errors/deployments.timeline.md)
+- [Deployment Event Stream Test Matrix](../testing/deployment-timeline-journal-test-matrix.md)
+- [Deployment Event Stream Implementation Plan](../specs/095-deployment-timeline-journal/spec.md)
 - [ADR-016: Deployment Command Surface Reset](./ADR-016-deployment-command-surface-reset.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
 
@@ -127,6 +128,8 @@ hardening, not first-class boundary creation: cursor reconnect, explicit gap env
 follow failure behavior, CLI follow/cancellation coverage, and recovery edge-case tests are tracked
 by [Deployment Observation And Recovery Hardening](../specs/071-deployment-observation-and-recovery/spec.md).
 
-## Open Questions
+## Supersession Note
 
-- None.
+ADR-084 replaces `deployments.stream-events` and `deployments.logs` with a single Deployment
+Timeline Journal boundary. This ADR remains as historical context for why reconnect stayed a read
+surface instead of returning as a deployment command.

@@ -85,7 +85,7 @@ class EmptyDeploymentReadModel implements DeploymentReadModel {
     return null;
   }
 
-  async findLogs(): Promise<[]> {
+  async findTimeline(): Promise<[]> {
     return [];
   }
 }

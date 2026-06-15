@@ -6,7 +6,8 @@ Date: 2026-05-12
 
 ## Context
 
-ADR-029 defines deployment event-stream observation as a read/query boundary. ADR-048 defines
+ADR-029 originally defined deployment event-stream observation as a read/query boundary. ADR-084 now
+defines deployment observation through the Deployment Timeline Journal. ADR-048 defines
 audit-row pruning and explicitly excludes domain event streams. Phase 9 still requires documented
 retention behavior for event streams before audit/event retention can be considered complete.
 
@@ -66,9 +67,9 @@ domain event stream rows when such rows are retained for observation or replay.
 ## Consequences
 
 - `audit-events.prune` remains scoped to retained audit rows.
-- `deployments.stream-events` prefers the retained event observation store for cursor-stable
-  replay, pruned-cursor gap detection, and follow-mode cursor continuation. Embedded deployment
-  logs remain governed by `deployments.logs.prune`, not by `domain-events.prune`.
+- Domain-event retention remains separate from deployment timeline retention. Deployment
+  observation reads the Deployment Timeline Journal selected by ADR-084, not
+  `domain_event_stream_records`.
 - Future event observation surfaces must document how destructive event-stream prune affects replay
   cursors and gap responses.
 - Persistence implementation must live behind application ports and `packages/persistence/pg`;
@@ -92,11 +93,10 @@ domain event stream rows when such rows are retained for observation or replay.
   prune watermark state, application command/schema/handler/use case, CLI and HTTP/oRPC
   entrypoints, operation catalog entries, public docs/help coverage, and tests for
   `DOMAIN-EVENT-RETENTION-001` through `DOMAIN-EVENT-RETENTION-005`.
-- Published deployment domain events are recorded into retained observation rows. When retained
-  state exists, `deployments.stream-events` uses retained stable cursors for bounded replay,
-  pruned-cursor gap detection, and follow-mode cursor continuation.
-- The legacy embedded deployment-log and live progress observer path remains a fallback for streams
-  without retained rows. Broader retention of non-domain progress observations remains future
-  observability hardening.
+- Published deployment domain events may still be recorded into retained domain-event observation
+  rows for retention and diagnostics. They no longer provide the deployment-observation source for
+  Web, CLI, API, or SDK timeline reads.
+- The legacy embedded deployment-log and deployment event-stream fallback path is superseded by the
+  Deployment Timeline Journal boundary in ADR-084.
 - Outbox/inbox retention, organization retention defaults, and scheduled audit/event retention
   automation remain separate governed slices.

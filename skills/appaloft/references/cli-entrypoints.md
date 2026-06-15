@@ -211,10 +211,8 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft deployments show <deploymentId>` - `deployments.show`
 - `appaloft deployments plan --project <projectId> --environment <environmentId> --resource <resourceId> --server <serverId> [--destination <destinationId>]` - `deployments.plan`
 - `appaloft deployments recovery-readiness <deploymentId>` - `deployments.recovery-readiness`
-- `appaloft logs <deploymentId>` - `deployments.logs`
-- `appaloft deployments logs prune --before <iso>` - `deployments.logs.prune`
-- `appaloft deployments events <deploymentId>` - `deployments.stream-events`
-- `appaloft deployments events <deploymentId> --follow --json` - `deployments.stream-events`
+- `appaloft deployments timeline <deploymentId>` - `deployments.timeline`
+- `appaloft deployments timeline <deploymentId> --follow --json` - `deployments.timeline.stream`
 - `appaloft work list` - `operator-work.list`
 - `appaloft work show <workId>` - `operator-work.show`
 - `appaloft work events <workId> --follow --json` - `operator-work.stream-events`
@@ -294,5 +292,5 @@ Accepted application-bundle installs must include all three acknowledgement valu
 
 After install returns, use `monitoring.workId` with `appaloft work watch <workId> --json` or
 `appaloft work events <workId> --follow --json`. Use `monitoring.deploymentIds[]` with
-`appaloft deployments events <deploymentId> --follow --json` and
+`appaloft deployments timeline <deploymentId> --follow --json` and
 `appaloft deployments show <deploymentId>`.

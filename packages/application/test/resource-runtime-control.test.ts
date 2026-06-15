@@ -47,9 +47,9 @@ import {
   type CoordinationOwner,
   type CoordinationPolicy,
   type CoordinationScope,
-  type DeploymentLogSummary,
   type DeploymentReadModel,
   type DeploymentSummary,
+  type DeploymentTimelineJournalSummary,
   type MutationCoordinator,
   type MutationCoordinatorRunExclusiveInput,
   type ProcessAttemptRecord,
@@ -105,7 +105,7 @@ class StaticDeploymentReadModel implements DeploymentReadModel {
     return null;
   }
 
-  async findLogs(): Promise<DeploymentLogSummary[]> {
+  async findTimeline(): Promise<DeploymentTimelineJournalSummary[]> {
     return [];
   }
 }
@@ -306,11 +306,11 @@ function deploymentSummary(overrides?: Partial<DeploymentSummary>): DeploymentSu
       precedence: ["environment", "deployment"],
       variables: [],
     },
-    logs: [],
+    timeline: [],
     createdAt: "2026-01-01T00:00:00.000Z",
     startedAt: "2026-01-01T00:00:01.000Z",
     finishedAt: "2026-01-01T00:00:04.000Z",
-    logCount: 0,
+    timelineCount: 0,
     ...overrides,
     target: {
       kind: "server-backed",

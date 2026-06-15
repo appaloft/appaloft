@@ -282,7 +282,7 @@ function deploymentSummary(input?: {
       precedence: ["defaults", "environment", "deployment"],
       variables: [],
     },
-    logs: [],
+    timeline: [],
     createdAt: "2026-01-01T00:00:00.000Z",
     logCount: 0,
   };

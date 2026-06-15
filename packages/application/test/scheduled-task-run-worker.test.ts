@@ -217,7 +217,7 @@ describe("ScheduledTaskRunWorker", () => {
       exitCode: 0,
       startedAt: "2026-05-05T00:20:00.000Z",
       finishedAt: "2026-05-05T00:20:05.000Z",
-      logs: [
+      timeline: [
         {
           timestamp: "2026-05-05T00:20:01.000Z",
           stream: "stdout",
@@ -225,12 +225,12 @@ describe("ScheduledTaskRunWorker", () => {
         },
       ],
     });
-    const logs = new RecordingScheduledTaskRunLogRecorder();
+    const timeline = new RecordingScheduledTaskRunLogRecorder();
     const worker = new ScheduledTaskRunWorker(
       runs,
       new StaticScheduledTaskDefinitionRepository(taskFixture()),
       runtime,
-      logs,
+      timeline,
       new SequenceIdGenerator(),
       new FixedClock("2026-05-05T00:20:00.000Z"),
     );
@@ -252,7 +252,7 @@ describe("ScheduledTaskRunWorker", () => {
       },
     ]);
     expect(runs.states.map((state) => state.status.value)).toEqual(["running", "succeeded"]);
-    expect(logs.records).toEqual([
+    expect(timeline.records).toEqual([
       {
         id: "stlog_0001",
         runId: "str_manual",
@@ -287,9 +287,9 @@ describe("ScheduledTaskRunWorker", () => {
       startedAt: "2026-05-05T00:20:00.000Z",
       finishedAt: "2026-05-05T00:20:05.000Z",
       failureSummary: "temporary network timeout",
-      logs: [],
+      timeline: [],
     });
-    const logs = new RecordingScheduledTaskRunLogRecorder();
+    const timeline = new RecordingScheduledTaskRunLogRecorder();
     const claimer = new RecordingProcessAttemptClaimer({
       status: "claimed",
       attempt: {
@@ -306,7 +306,7 @@ describe("ScheduledTaskRunWorker", () => {
       runs,
       new StaticScheduledTaskDefinitionRepository(taskFixture()),
       runtime,
-      logs,
+      timeline,
       new SequenceIdGenerator(),
       new FixedClock("2026-05-05T00:20:00.000Z"),
       claimer,
@@ -373,7 +373,7 @@ describe("ScheduledTaskRunWorker", () => {
       exitCode: 0,
       startedAt: "2026-05-05T00:20:00.000Z",
       finishedAt: "2026-05-05T00:20:05.000Z",
-      logs: [],
+      timeline: [],
     });
     const claimer = new RecordingProcessAttemptClaimer({
       status: "already-claimed",

@@ -226,14 +226,14 @@ function recommendedActions(input: {
     },
     {
       kind: "query",
-      targetOperation: "deployments.logs",
-      label: "Inspect deployment logs",
+      targetOperation: "deployments.timeline",
+      label: "Inspect deployment timeline",
       safeByDefault: true,
     },
     {
       kind: "query",
-      targetOperation: "deployments.stream-events",
-      label: "Replay deployment events",
+      targetOperation: "deployments.timeline.stream",
+      label: "Follow deployment timeline",
       safeByDefault: true,
     },
     {
@@ -425,7 +425,7 @@ export class DeploymentRecoveryReadinessQueryService {
         generatedAt: this.clock.now(),
         stateVersion: `${deployment.id}:${deployment.status}:${
           deployment.finishedAt ?? deployment.startedAt ?? deployment.createdAt
-        }:${deployment.logCount}`,
+        }:${deployment.timelineCount}`,
         recoverable: retryable || redeployable || rollbackReady,
         retryable,
         redeployable,

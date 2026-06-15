@@ -55,7 +55,7 @@ describe("scheduled task application model", () => {
       handlerName: "ScheduledTaskRunLogsQueryHandler",
       serviceName: "ScheduledTaskRunLogsQueryService",
       transports: {
-        orpc: { method: "GET", path: "/api/scheduled-task-runs/{runId}/logs" },
+        orpc: { method: "GET", path: "/api/scheduled-task-runs/{runId}/timeline" },
       },
     });
   });
@@ -89,7 +89,7 @@ describe("scheduled task application model", () => {
       status: "failed",
       triggerKind: "scheduled",
     });
-    const logs = ScheduledTaskRunLogsQuery.create({
+    const timeline = ScheduledTaskRunLogsQuery.create({
       runId: "str_daily_migration_1",
       taskId: "tsk_daily_migration",
       resourceId: "res_api",
@@ -101,7 +101,7 @@ describe("scheduled task application model", () => {
     expect(runNow.isOk()).toBe(true);
     expect(listTasks.isOk()).toBe(true);
     expect(listRuns.isOk()).toBe(true);
-    expect(logs.isOk()).toBe(true);
+    expect(timeline.isOk()).toBe(true);
 
     expect(create._unsafeUnwrap()).toMatchObject({
       resourceId: "res_api",
@@ -128,7 +128,7 @@ describe("scheduled task application model", () => {
       status: "failed",
       triggerKind: "scheduled",
     });
-    expect(logs._unsafeUnwrap()).toMatchObject({
+    expect(timeline._unsafeUnwrap()).toMatchObject({
       runId: "str_daily_migration_1",
       taskId: "tsk_daily_migration",
       resourceId: "res_api",

@@ -17,7 +17,7 @@ that re-evaluate readiness server-side before accepting recovery work.
 - [Deployment Recovery Readiness Error Spec](../errors/deployment-recovery-readiness.md)
 - [Deployment Recovery Readiness Test Matrix](../testing/deployment-recovery-readiness-test-matrix.md)
 - [deployments.show Query Spec](./deployments.show.md)
-- [deployments.stream-events Query Spec](./deployments.stream-events.md)
+- [deployments.timeline Query Spec](./deployments.timeline.md)
 
 ## Intent
 

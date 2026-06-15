@@ -173,7 +173,7 @@ describe("runtime target failure classification", () => {
   test("[DEP-CREATE-ASYNC-019] derives local Docker failure result fields from apply logs", () => {
     expect(
       runtimeTargetCapacityAwareFailureFields({
-        logs: [
+        timeline: [
           {
             message: "Docker container failed to start: ENOSPC: no space left on device",
             phase: "deploy",
@@ -199,7 +199,7 @@ describe("runtime target failure classification", () => {
   test("[DEP-CREATE-ASYNC-019] derives generic-SSH Docker build exhaustion result fields", () => {
     expect(
       runtimeTargetCapacityAwareFailureFields({
-        logs: [
+        timeline: [
           {
             message:
               "SSH Docker image build failed: failed to solve layer write /var/lib/docker/buildkit/cache.db: no space left on device",
@@ -224,7 +224,7 @@ describe("runtime target failure classification", () => {
   test("[DEP-CREATE-ASYNC-019] preserves fallback runtime failure fields without capacity signals", () => {
     expect(
       runtimeTargetCapacityAwareFailureFields({
-        logs: [{ message: "SSH Docker Compose deployment failed", phase: "deploy" }],
+        timeline: [{ message: "SSH Docker Compose deployment failed", phase: "deploy" }],
         errorCode: "ssh_docker_compose_failed",
         metadata: { runtimeTarget: "generic-ssh" },
         serverId: "srv_ssh",

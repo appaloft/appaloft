@@ -13,14 +13,14 @@
   - [Async Lifecycle And Acceptance](../../architecture/async-lifecycle-and-acceptance.md)
   - [Error Model](../../errors/model.md)
 - Local specs:
-  - [deployments.stream-events](../../queries/deployments.stream-events.md)
+  - [deployments.stream-events](../../queries/deployments.timeline.md)
   - [deployments.recovery-readiness](../../queries/deployments.recovery-readiness.md)
   - [deployments.retry](../../commands/deployments.retry.md)
   - [deployments.redeploy](../../commands/deployments.redeploy.md)
   - [deployments.rollback](../../commands/deployments.rollback.md)
   - [Deployment Detail And Observation](../../workflows/deployment-detail-and-observation.md)
 - Test matrices:
-  - [Deployment Event Stream Test Matrix](../../testing/deployments.stream-events-test-matrix.md)
+  - [Deployment Event Stream Test Matrix](../../testing/deployment-timeline-journal-test-matrix.md)
   - [Deployment Recovery Readiness Test Matrix](../../testing/deployment-recovery-readiness-test-matrix.md)
   - [Public Documentation Test Matrix](../../testing/public-documentation-test-matrix.md)
 

@@ -23,7 +23,7 @@ export const resourceDiagnosticSummaryQueryInputSchema = z
     deploymentId: optionalNonEmptyTrimmedString("Deployment id"),
     observationFrom: optionalIsoTimestamp("Observation from"),
     observationTo: optionalIsoTimestamp("Observation to"),
-    includeDeploymentLogTail: booleanInput(true),
+    includeDeploymentTimelineTail: booleanInput(true),
     includeRuntimeLogTail: booleanInput(false),
     includeProxyConfiguration: booleanInput(false),
     tailLines: z.coerce.number().int().min(0).max(50).default(20),
