@@ -1488,6 +1488,201 @@
   <title>{project?.name ?? $t(i18nKeys.console.projects.pageTitle)} · Appaloft</title>
 </svelte:head>
 
+{#snippet projectDetailLoadingSkeleton()}
+  <div class={detailPageClass} data-project-detail-loading-skeleton>
+    <section class={detailHeaderClass}>
+      <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+        <div class="max-w-3xl space-y-3">
+          <div class="flex flex-wrap items-center gap-2">
+            <Badge variant="outline">{$t(i18nKeys.common.domain.project)}</Badge>
+            <Skeleton class="h-5 w-32 rounded-md" />
+            <Skeleton class="h-5 w-16 rounded-md" />
+          </div>
+          <div class="space-y-2">
+            <Skeleton class="h-8 w-72 max-w-full" />
+            <Skeleton class="h-4 w-full max-w-2xl" />
+            <Skeleton class="h-4 w-3/5 max-w-xl" />
+          </div>
+          <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            <span class="inline-flex items-center gap-2">
+              {$t(i18nKeys.common.domain.createdAt)} · <Skeleton class="h-3 w-32" />
+            </span>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap gap-2">
+          <Button type="button" disabled>
+            <Plus class="size-4" />
+            {$t(i18nKeys.console.projects.addResourceAction)}
+          </Button>
+          <Button type="button" variant="outline" disabled>
+            {$t(i18nKeys.common.actions.viewAll)}
+            <ArrowRight class="size-4" />
+          </Button>
+        </div>
+      </div>
+
+      <section class="grid gap-3 lg:grid-cols-4" aria-label={$t(i18nKeys.console.projects.operationalSummaryTitle)}>
+        {#each [
+          i18nKeys.common.domain.resources,
+          i18nKeys.console.projects.publicAccessTitle,
+          i18nKeys.console.projects.latestDeploymentTitle,
+          i18nKeys.console.projects.attentionTitle,
+        ] as summaryTitle}
+          <article class="console-subtle-panel p-4">
+            <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {$t(summaryTitle)}
+            </p>
+            <Skeleton class="mt-2 h-8 w-12" />
+            <Skeleton class="mt-2 h-3 w-32 max-w-full" />
+          </article>
+        {/each}
+      </section>
+    </section>
+
+    <Tabs.Root value={activeProjectTab} class={detailBodyClass}>
+      <nav aria-label={$t(i18nKeys.console.projects.pageTitle)} class={detailTabsClass}>
+        {#each projectDetailTabs as tab (tab)}
+          <a
+            href={projectTabHref(tab)}
+            class={detailTabClass}
+            aria-current={activeProjectTab === tab ? "page" : undefined}
+            onclick={(event) => selectProjectTab(tab, event)}
+          >
+            {projectTabLabel(tab)}
+          </a>
+        {/each}
+      </nav>
+
+      <Tabs.Content value="overview" class={[detailTabPanelScrollClass, "flex flex-col gap-6"]}>
+        <section class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+          <div class="space-y-5">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h2 class="text-lg font-semibold">
+                  {$t(i18nKeys.console.projects.resourcesTitle)}
+                </h2>
+                <p class="mt-1 text-sm text-muted-foreground">
+                  {$t(i18nKeys.console.projects.resourcesDescription)}
+                </p>
+              </div>
+              <Button type="button" variant="outline" disabled>
+                {$t(i18nKeys.common.actions.viewAll)}
+                <ArrowRight class="size-4" />
+              </Button>
+            </div>
+
+            <div class="space-y-4">
+              {#each Array.from({ length: 2 }) as _, groupIndex}
+                <section class="space-y-2">
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="min-w-0">
+                      <Skeleton class="h-5 w-36" />
+                      <Skeleton class="mt-2 h-3 w-20" />
+                    </div>
+                    <Skeleton class="h-5 w-20 rounded-md" />
+                  </div>
+                  <div class="console-record-list">
+                    {#each Array.from({ length: groupIndex === 0 ? 2 : 1 }) as _}
+                      <div class="console-record-row">
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div class="min-w-0">
+                            <div class="flex min-w-0 flex-wrap items-center gap-2">
+                              <Skeleton class="h-4 w-40" />
+                              <Skeleton class="h-5 w-16 rounded-md" />
+                              <Skeleton class="h-5 w-20 rounded-md" />
+                            </div>
+                            <Skeleton class="mt-2 h-3 w-full max-w-sm" />
+                          </div>
+                          <div class="flex shrink-0 flex-wrap gap-2">
+                            <Button type="button" size="sm" variant="outline" disabled>
+                              <Play class="size-4" />
+                              {$t(i18nKeys.common.actions.createDeployment)}
+                            </Button>
+                            <Button type="button" size="sm" variant="outline" disabled>
+                              {$t(i18nKeys.common.actions.openResource)}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    {/each}
+                  </div>
+                </section>
+              {/each}
+            </div>
+          </div>
+
+          <aside class="space-y-4">
+            <section class="console-side-panel space-y-3">
+              <div>
+                <div class="flex items-center justify-between gap-3">
+                  <h2 class="text-sm font-semibold">
+                    {$t(i18nKeys.console.projects.publicAccessTitle)}
+                  </h2>
+                  <Skeleton class="h-4 w-8" />
+                </div>
+                <p class="mt-1 text-xs leading-5 text-muted-foreground">
+                  {$t(i18nKeys.console.projects.publicAccessDescription)}
+                </p>
+              </div>
+              <div class="console-record-list">
+                {#each Array.from({ length: 2 }) as _}
+                  <div class="console-record-row">
+                    <Skeleton class="h-4 w-40" />
+                    <Skeleton class="mt-2 h-3 w-56 max-w-full" />
+                  </div>
+                {/each}
+              </div>
+            </section>
+
+            <section class="console-side-panel space-y-3">
+              <h2 class="text-sm font-semibold">
+                {$t(i18nKeys.console.projects.latestDeploymentTitle)}
+              </h2>
+              <div class="console-record-row">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <Skeleton class="h-4 w-24" />
+                  <Skeleton class="h-5 w-24 rounded-md" />
+                </div>
+                <Skeleton class="mt-2 h-3 w-36" />
+                <Skeleton class="mt-2 h-3 w-28" />
+              </div>
+            </section>
+
+            <section class="console-side-panel space-y-3">
+              <h2 class="text-sm font-semibold">
+                {$t(i18nKeys.console.projects.attentionTitle)}
+              </h2>
+              <div class="space-y-2">
+                {#each Array.from({ length: 2 }) as _}
+                  <article class="rounded-md border border-border bg-background px-3 py-2">
+                    <div class="flex min-w-0 items-center justify-between gap-2">
+                      <div class="flex min-w-0 items-center gap-2">
+                        <span class="relative inline-flex size-2.5 shrink-0 rounded-full bg-muted-foreground" aria-hidden="true"></span>
+                        <Skeleton class="h-4 w-36" />
+                      </div>
+                      <Button type="button" size="icon" variant="ghost" disabled aria-label={$t(i18nKeys.common.actions.viewProgress)}>
+                        <ChevronDown class="size-3.5" />
+                      </Button>
+                    </div>
+                    <Skeleton class="mt-2 h-3 w-full" />
+                    <Skeleton class="mt-2 h-3 w-2/3" />
+                    <div class="mt-2">
+                      <Button type="button" size="sm" variant="outline" disabled>
+                        {$t(i18nKeys.common.actions.viewProgress)}
+                      </Button>
+                    </div>
+                  </article>
+                {/each}
+              </div>
+            </section>
+          </aside>
+        </section>
+      </Tabs.Content>
+    </Tabs.Root>
+  </div>
+{/snippet}
+
 <ConsoleShell
   title={project?.name ?? $t(i18nKeys.console.projects.pageTitle)}
   description={$t(i18nKeys.console.projects.detailDescription)}
@@ -1506,13 +1701,7 @@
   ]}
 >
   {#if pageLoading}
-    <div class="space-y-5">
-      <Skeleton class="h-36 w-full" />
-      <div class="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
-        <Skeleton class="h-96 w-full" />
-        <Skeleton class="h-96 w-full" />
-      </div>
-    </div>
+    {@render projectDetailLoadingSkeleton()}
   {:else if !project}
     <section class="space-y-5 py-2">
       <Badge class="w-fit" variant="outline">{$t(i18nKeys.errors.backend.notFound)}</Badge>
@@ -1942,8 +2131,8 @@
                         ]}
                         data-project-attention-progress-item
                       >
-                        <div class="flex min-w-0 items-start justify-between gap-2">
-                          <div class="min-w-0">
+                        <div class="min-w-0">
+                          <div class="flex min-w-0 items-center justify-between gap-2">
                             <div class="flex min-w-0 items-center gap-2">
                               <span
                                 class="relative flex size-2.5 shrink-0"
@@ -1968,53 +2157,54 @@
                               </span>
                               <p class="min-w-0 truncate text-sm font-medium">{item.title}</p>
                             </div>
-                            <p class="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
-                              {item.detail}
-                            </p>
+
+                            <DropdownMenu>
+                              <DropdownMenuTrigger
+                                class="group/dropdown-trigger inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                aria-label={$t(i18nKeys.common.actions.viewProgress)}
+                                title={$t(i18nKeys.common.actions.viewProgress)}
+                                data-project-attention-progress-trigger
+                              >
+                                <ChevronDown class="size-3.5 transition-transform group-data-[state=open]/dropdown-trigger:rotate-180" />
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" sideOffset={6} class="w-72">
+                                <DropdownMenuLabel class="truncate">{item.title}</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <div class="space-y-2 px-2 py-1.5 text-xs">
+                                  <div class="flex items-center justify-between gap-3">
+                                    <span class="text-muted-foreground">
+                                      {$t(i18nKeys.common.domain.status)}
+                                    </span>
+                                    <span class="font-medium">{projectAttentionStatusLabel(item)}</span>
+                                  </div>
+                                  <p class="leading-5 text-muted-foreground">{item.detail}</p>
+                                </div>
+                                <DropdownMenuSeparator />
+                                {#if item.href}
+                                  <DropdownMenuItem
+                                    onclick={() => {
+                                      if (item.href) void goto(item.href);
+                                    }}
+                                  >
+                                    <ArrowRight class="size-4" />
+                                    {$t(i18nKeys.common.actions.viewDeployment)}
+                                  </DropdownMenuItem>
+                                {:else}
+                                  <DropdownMenuItem
+                                    disabled={isProjectArchived}
+                                    onclick={() => openProjectAttentionAction(item)}
+                                  >
+                                    <RotateCcw class="size-4" />
+                                    {item.action}
+                                  </DropdownMenuItem>
+                                {/if}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
 
-                          <DropdownMenu>
-                            <DropdownMenuTrigger
-                              class="group/dropdown-trigger inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                              aria-label={$t(i18nKeys.common.actions.viewProgress)}
-                              title={$t(i18nKeys.common.actions.viewProgress)}
-                              data-project-attention-progress-trigger
-                            >
-                              <ChevronDown class="size-3.5 transition-transform group-data-[state=open]/dropdown-trigger:rotate-180" />
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" sideOffset={6} class="w-72">
-                              <DropdownMenuLabel class="truncate">{item.title}</DropdownMenuLabel>
-                              <DropdownMenuSeparator />
-                              <div class="space-y-2 px-2 py-1.5 text-xs">
-                                <div class="flex items-center justify-between gap-3">
-                                  <span class="text-muted-foreground">
-                                    {$t(i18nKeys.common.domain.status)}
-                                  </span>
-                                  <span class="font-medium">{projectAttentionStatusLabel(item)}</span>
-                                </div>
-                                <p class="leading-5 text-muted-foreground">{item.detail}</p>
-                              </div>
-                              <DropdownMenuSeparator />
-                              {#if item.href}
-                                <DropdownMenuItem
-                                  onclick={() => {
-                                    if (item.href) void goto(item.href);
-                                  }}
-                                >
-                                  <ArrowRight class="size-4" />
-                                  {$t(i18nKeys.common.actions.viewDeployment)}
-                                </DropdownMenuItem>
-                              {:else}
-                                <DropdownMenuItem
-                                  disabled={isProjectArchived}
-                                  onclick={() => openProjectAttentionAction(item)}
-                                >
-                                  <RotateCcw class="size-4" />
-                                  {item.action}
-                                </DropdownMenuItem>
-                              {/if}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          <p class="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
+                            {item.detail}
+                          </p>
                         </div>
 
                         <div class="mt-2">
