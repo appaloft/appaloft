@@ -1619,6 +1619,10 @@ export const i18nKeys = {
       lifecyclePreviewDeleteOption: "console:resources.lifecyclePreviewDeleteOption",
       lifecyclePreviewResourceNotice: "console:resources.lifecyclePreviewResourceNotice",
       lifecycleStatus: "console:resources.lifecycleStatus",
+      lifecycleRestoreOption: "console:resources.lifecycleRestoreOption",
+      restoreAction: "console:resources.restoreAction",
+      restoreFailed: "console:resources.restoreFailed",
+      restoreSucceeded: "console:resources.restoreSucceeded",
       composeProfileDescription: "console:resources.composeProfileDescription",
       composeProfileTitle: "console:resources.composeProfileTitle",
       composeServicesDescription: "console:resources.composeServicesDescription",
@@ -1859,10 +1863,6 @@ export const i18nKeys = {
       domainBindingsDescription: "console:resources.domainBindingsDescription",
       domainBindingsTitle: "console:resources.domainBindingsTitle",
       staticArtifactDefaultAccess: "console:resources.staticArtifactDefaultAccess",
-      staticArtifactDomainBindingsUnavailableDescription:
-        "console:resources.staticArtifactDomainBindingsUnavailableDescription",
-      staticArtifactDomainBindingsUnavailableTitle:
-        "console:resources.staticArtifactDomainBindingsUnavailableTitle",
       durableDomainAccess: "console:resources.durableDomainAccess",
       certificateExpiresAt: "console:resources.certificateExpiresAt",
       certificateImportCertificateChain: "console:resources.certificateImportCertificateChain",

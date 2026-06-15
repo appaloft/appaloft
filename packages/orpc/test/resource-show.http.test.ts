@@ -12,6 +12,7 @@ import {
   type ProductSessionAuthorizationPort,
   type Query,
   type QueryBus,
+  RestoreResourceCommand,
   ShowResourceQuery,
 } from "@appaloft/application";
 import { type ResourceDetail } from "@appaloft/contracts";
@@ -171,6 +172,40 @@ describe("resource show HTTP route", () => {
       includeLatestDeployment: true,
       includeAccessSummary: true,
       includeProfileDiagnostics: true,
+    });
+  });
+
+  test("[RES-PROFILE-ENTRY-020] dispatches RestoreResourceCommand through HTTP", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({ id: "res_web" } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const app = mountResourceShowRoutes({ commandBus, queryBus });
+
+    const response = await app.handle(
+      resourceShowRequest("http://localhost/api/resources/res_web/restore", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          resourceId: "res_web",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ id: "res_web" });
+    expect(capturedCommand).toBeInstanceOf(RestoreResourceCommand);
+    expect(capturedCommand).toMatchObject({
+      resourceId: "res_web",
     });
   });
 

@@ -1179,11 +1179,14 @@ describe("console page structure", () => {
     expect(resourceDetailPageSource).toContain("openResourceDomainBindingCreateDialog");
     expect(resourceDetailPageSource).toContain("setResourceDomainBindingCreateDialogOpen");
     expect(resourceDetailPageSource).toContain('modalIsOpen(page, "domain-binding")');
-    expect(resourceDomainBindingsSectionSource).toContain(
+    expect(resourceDomainBindingsSectionSource).not.toContain(
       "data-resource-static-artifact-domain-unavailable",
     );
-    expect(resourceDomainBindingsSectionSource).toContain(
+    expect(resourceDomainBindingsSectionSource).not.toContain(
       "staticArtifactDomainBindingsUnavailableTitle",
+    );
+    expect(resourceDomainBindingsSectionSource).not.toContain(
+      "staticArtifactDomainBindingsUnavailableDescription",
     );
     expect(resourceDomainBindingsSectionSource).not.toContain(
       "disabled={isResourceArchived || isServerlessStaticArtifactAccess}",
@@ -1345,10 +1348,15 @@ describe("console page structure", () => {
     expect(resourceLifecycleDialogSource).toContain(
       'selectedResourceLifecycleAction === "archive"',
     );
+    expect(resourceLifecycleDialogSource).toContain(
+      'selectedResourceLifecycleAction === "restore"',
+    );
     expect(resourceLifecycleDialogSource).toContain('selectedResourceLifecycleAction === "delete"');
     expect(resourceLifecycleDialogSource).toContain('selectResourceLifecycleAction("archive")');
+    expect(resourceLifecycleDialogSource).toContain('selectResourceLifecycleAction("restore")');
     expect(resourceLifecycleDialogSource).toContain('selectResourceLifecycleAction("delete")');
     expect(resourceLifecycleDialogSource).toContain("lifecycleArchiveOption");
+    expect(resourceLifecycleDialogSource).toContain("lifecycleRestoreOption");
     expect(resourceLifecycleDialogSource).toContain("lifecycleDeleteOption");
     expect(resourceLifecycleDialogSource).toContain("lifecyclePreviewDeleteOption");
     expect(resourceLifecycleDialogSource).toContain(
@@ -1357,12 +1365,12 @@ describe("console page structure", () => {
     expect(resourceLifecycleDialogSource).toContain(
       'class="box-border min-w-0 w-full space-y-5 overflow-x-hidden px-5 pb-5"',
     );
-    expect(resourceLifecycleDialogSource).toContain('class="grid min-w-0 gap-2 sm:grid-cols-2"');
+    expect(resourceLifecycleDialogSource).toContain('class="grid min-w-0 gap-2 sm:grid-cols-3"');
     expect(
       resourceLifecycleDialogSource.match(
         /class="h-auto min-w-0 w-full max-w-full items-start justify-start whitespace-normal px-3 py-3 text-left"/g,
       )?.length,
-    ).toBeGreaterThanOrEqual(2);
+    ).toBeGreaterThanOrEqual(3);
     expect(resourceLifecycleDialogSource).toContain('class="mt-0.5 size-4 shrink-0"');
     expect(resourceLifecycleDialogSource).toContain('class="min-w-0 flex-1"');
     expect(resourceLifecycleDialogSource).toContain(
@@ -1734,9 +1742,8 @@ describe("console page structure", () => {
     );
     expect(consoleLayoutCssSource).not.toContain(".console-server-detail-body");
     expect(consoleLayoutCssSource).not.toContain(".console-detail-tab-panel");
-    expect(serverDetailPageSource).toContain(
-      'class={[detailTabPanelScrollNoTopClass, "space-y-5"]}',
-    );
+    expect(serverDetailPageSource).toContain('class={[detailTabPanelScrollClass, "space-y-5"]}');
+    expect(serverDetailPageSource).not.toContain("detailTabPanelScrollNoTopClass");
     expect(serverDetailPageSource).toContain("class={detailTabPanelSubnavClass}");
     expect(serverDetailPageSource).toContain("detailSubnavLayoutClass");
     expect(serverDetailPageSource).not.toContain("console-detail-");

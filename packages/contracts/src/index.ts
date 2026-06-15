@@ -2988,6 +2988,14 @@ export const archiveResourceResponseSchema = z.object({
   id: z.string(),
 });
 
+export const restoreResourceInputSchema = z.object({
+  resourceId: z.string().min(1),
+});
+
+export const restoreResourceResponseSchema = z.object({
+  id: z.string(),
+});
+
 export const checkResourceDeleteSafetyInputSchema = z.object({
   resourceId: z.string().min(1),
 });
@@ -4246,23 +4254,33 @@ export const proxyConfigurationViewSchema = z.object({
   diagnostics: proxyConfigurationDiagnosticsSchema.optional(),
 });
 
-export const createDomainBindingInputSchema = z.object({
-  projectId: z.string().min(1),
-  environmentId: z.string().min(1),
-  resourceId: z.string().min(1),
-  serverId: z.string().min(1),
-  destinationId: z.string().min(1),
-  domainName: z.string().min(1),
-  pathPrefix: z.string().min(1).default("/"),
-  proxyKind: z.enum(["none", "traefik", "caddy"]),
-  tlsMode: z.enum(["auto", "disabled"]).default("auto"),
-  redirectTo: z.string().min(1).optional(),
-  redirectStatus: z
-    .union([z.literal(301), z.literal(302), z.literal(307), z.literal(308)])
-    .optional(),
-  certificatePolicy: z.enum(["auto", "manual", "disabled"]).optional(),
-  idempotencyKey: z.string().min(1).optional(),
-});
+export const createDomainBindingInputSchema = z
+  .object({
+    projectId: z.string().min(1),
+    environmentId: z.string().min(1),
+    resourceId: z.string().min(1),
+    serverId: z.string().min(1).optional(),
+    destinationId: z.string().min(1).optional(),
+    domainName: z.string().min(1),
+    pathPrefix: z.string().min(1).default("/"),
+    proxyKind: z.enum(["none", "traefik", "caddy"]),
+    tlsMode: z.enum(["auto", "disabled"]).default("auto"),
+    redirectTo: z.string().min(1).optional(),
+    redirectStatus: z
+      .union([z.literal(301), z.literal(302), z.literal(307), z.literal(308)])
+      .optional(),
+    certificatePolicy: z.enum(["auto", "manual", "disabled"]).optional(),
+    idempotencyKey: z.string().min(1).optional(),
+  })
+  .superRefine((value, context) => {
+    if ((value.serverId && !value.destinationId) || (!value.serverId && value.destinationId)) {
+      context.addIssue({
+        code: "custom",
+        path: value.serverId ? ["destinationId"] : ["serverId"],
+        message: "Domain binding server target requires both serverId and destinationId",
+      });
+    }
+  });
 
 export const createDomainBindingResponseSchema = z.object({
   id: z.string(),
@@ -6787,6 +6805,8 @@ export type ListStaticArtifactPublicationsResponse = z.infer<
 >;
 export type ArchiveResourceInput = z.infer<typeof archiveResourceInputSchema>;
 export type ArchiveResourceResponse = z.infer<typeof archiveResourceResponseSchema>;
+export type RestoreResourceInput = z.infer<typeof restoreResourceInputSchema>;
+export type RestoreResourceResponse = z.infer<typeof restoreResourceResponseSchema>;
 export type CheckResourceDeleteSafetyInput = z.infer<typeof checkResourceDeleteSafetyInputSchema>;
 export type ResourceDeleteBlocker = z.infer<typeof resourceDeleteBlockerSchema>;
 export type ResourceDeleteSafety = z.infer<typeof resourceDeleteSafetySchema>;

@@ -407,8 +407,8 @@ export interface DomainBindingsTable {
   project_id: string;
   environment_id: string;
   resource_id: string;
-  server_id: string;
-  destination_id: string;
+  server_id: string | null;
+  destination_id: string | null;
   domain_name: string;
   path_prefix: string;
   proxy_kind: string;

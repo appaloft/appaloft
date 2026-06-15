@@ -93,7 +93,7 @@ function domainBindingRequestedEvent(events: unknown[]): DomainEvent {
 }
 
 describe("CreateDomainBindingCommand input", () => {
-  test("DOMAIN-BINDING-VARIANT-001 rejects serverless static artifact bindings without server and destination", () => {
+  test("DOMAIN-BINDING-VARIANT-001 accepts resource-scoped bindings without server and destination", () => {
     const serverlessStaticArtifactInput = {
       projectId: "prj_static",
       environmentId: "env_static",
@@ -106,8 +106,9 @@ describe("CreateDomainBindingCommand input", () => {
 
     const command = CreateDomainBindingCommand.create(serverlessStaticArtifactInput);
 
-    expect(command.isErr()).toBe(true);
-    expect(command._unsafeUnwrapErr().code).toBe("validation_error");
+    expect(command.isOk()).toBe(true);
+    expect(command._unsafeUnwrap().serverId).toBeUndefined();
+    expect(command._unsafeUnwrap().destinationId).toBeUndefined();
   });
 });
 
@@ -253,6 +254,59 @@ async function seedRoutingContext(input?: {
 }
 
 describe("CreateDomainBindingUseCase", () => {
+  test("DOMAIN-BINDING-VARIANT-001 creates resource-scoped bindings for route-provider backed resources", async () => {
+    const {
+      context,
+      domainBindings,
+      eventBus,
+      processAttemptRecorder,
+      repositoryContext,
+      useCase,
+    } = await seedRoutingContext();
+
+    const result = await useCase.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      domainName: "static.example.com",
+      proxyKind: "traefik",
+      tlsMode: "auto",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const id = result._unsafeUnwrap().id;
+    const persisted = await domainBindings.findOne(
+      repositoryContext,
+      DomainBindingByIdSpec.create(DomainBindingId.rehydrate(id)),
+    );
+    const persistedState = persisted?.toState();
+    expect(persistedState?.serverId).toBeUndefined();
+    expect(persistedState?.destinationId).toBeUndefined();
+    expect(persistedState?.dnsObservation?.expectedTargets.map((target) => target.value)).toEqual([
+      "Route provider target for resource res_demo",
+    ]);
+
+    const event = domainBindingRequestedEvent(eventBus.events);
+    expect(event.payload).toMatchObject({
+      domainBindingId: id,
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      domainName: "static.example.com",
+    });
+    expect(event.payload).not.toHaveProperty("serverId");
+    expect(event.payload).not.toHaveProperty("destinationId");
+    expect(processAttemptRecorder.records[0]).toMatchObject({
+      projectId: "prj_demo",
+      resourceId: "res_demo",
+      domainBindingId: id,
+      safeDetails: {
+        dnsExpectedTargets: "Route provider target for resource res_demo",
+      },
+    });
+    expect(processAttemptRecorder.records[0]).not.toHaveProperty("serverId");
+  });
+
   test("ROUTE-TLS-EVT-013 ROUTE-TLS-READMODEL-008 PROC-DELIVERY-001 accepts a binding and exposes pending DNS observation", async () => {
     const {
       context,

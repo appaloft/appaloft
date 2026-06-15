@@ -161,6 +161,7 @@ appaloft.resources.list -> resources.list GET /resources
 appaloft.resources.listDependencyBindings -> resources.list-dependency-bindings GET /resources/{resourceId}/dependency-bindings
 appaloft.resources.proxyConfiguration.preview -> resources.proxy-configuration.preview GET /resources/{resourceId}/proxy-configuration
 appaloft.resources.resetHealth -> resources.reset-health POST /resources/{resourceId}/health-policy/reset
+appaloft.resources.restore -> resources.restore POST /resources/{resourceId}/restore
 appaloft.resources.rotateDependencyBindingSecret -> resources.rotate-dependency-binding-secret POST /resources/{resourceId}/dependency-bindings/{bindingId}/secret-rotations
 appaloft.resources.runtime.restart -> resources.runtime.restart POST /resources/{resourceId}/runtime/restart
 appaloft.resources.runtime.start -> resources.runtime.start POST /resources/{resourceId}/runtime/start

@@ -4337,6 +4337,7 @@ describe.serial("console e2e with Bun.WebView", () => {
         const attention = document.querySelector('[data-home-attention-workqueue]');
         const rollup = document.querySelector('[data-home-deployment-rollup]');
         const activityGap = document.querySelector('[data-home-activity-read-model-gap]');
+        const resourceStatusCell = document.querySelector('[data-home-resource-status-cell]');
         const statusCells = Array.from(document.querySelectorAll('.nothing-status-cell'));
         return JSON.stringify({
           clientWidth: document.documentElement.clientWidth,
@@ -4347,6 +4348,8 @@ describe.serial("console e2e with Bun.WebView", () => {
           hasAttention: Boolean(attention),
           hasRollup: Boolean(rollup),
           hasActivityGap: Boolean(activityGap),
+          resourceStatusTagName: resourceStatusCell?.tagName.toLowerCase() ?? null,
+          resourceStatusHref: resourceStatusCell?.getAttribute('href') ?? null,
           statusCellCount: statusCells.length,
         });
       })()`),
@@ -4359,6 +4362,8 @@ describe.serial("console e2e with Bun.WebView", () => {
       hasAttention: boolean;
       hasRollup: boolean;
       hasActivityGap: boolean;
+      resourceStatusTagName: string | null;
+      resourceStatusHref: string | null;
       statusCellCount: number;
     };
     expect(homeWorkbenchLayout.hasHeading).toBe(true);
@@ -4367,6 +4372,8 @@ describe.serial("console e2e with Bun.WebView", () => {
     expect(homeWorkbenchLayout.hasAttention).toBe(true);
     expect(homeWorkbenchLayout.hasRollup).toBe(true);
     expect(homeWorkbenchLayout.hasActivityGap).toBe(true);
+    expect(homeWorkbenchLayout.resourceStatusTagName).toBe("div");
+    expect(homeWorkbenchLayout.resourceStatusHref).toBeNull();
     expect(homeWorkbenchLayout.statusCellCount).toBeGreaterThanOrEqual(4);
     expect(homeWorkbenchLayout.scrollWidth).toBeLessThanOrEqual(homeWorkbenchLayout.clientWidth);
 
