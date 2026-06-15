@@ -38,6 +38,7 @@ describe("QuickDeploySheet structure", () => {
 
   test("[QUICK-DEPLOY-UX-002B] keeps modal state URL-addressable inside QuickDeploySheet", () => {
     expect(quickDeploySheetSource).toContain("lockedProjectId");
+    expect(quickDeploySheetSource).toContain("onProgressDialogOpenChange");
     expect(quickDeploySheetSource).toContain('setSearchParam(params, "modal", stateModal)');
     expect(quickDeploySheetSource).toContain('statePath = "/"');
     expect(quickDeploySheetSource).toContain('stateBaseSearch = ""');
@@ -48,6 +49,20 @@ describe("QuickDeploySheet structure", () => {
       'setSearchParam(params, "projectMode", lockedProjectId ? "existing" : projectMode, "existing")',
     );
     expect(quickDeploySheetSource).toContain("selectedProjectId = lockedProjectId");
+  });
+
+  test("[QUICK-DEPLOY-BLUEPRINT-001] generates a fresh default Blueprint resource slug per install", () => {
+    expect(quickDeploySheetSource).toContain("function createBlueprintInstallResourceSlugPrefix()");
+    expect(quickDeploySheetSource).toContain(
+      "const nextResourceName = createQuickDeployGeneratedResourceName(baseName)",
+    );
+    expect(quickDeploySheetSource).toContain("generatedResourceName = nextResourceName");
+    expect(quickDeploySheetSource).toContain(
+      "target: blueprintInstallTarget(target, resourceSlugPrefix)",
+    );
+    expect(quickDeploySheetSource).not.toContain(
+      "resourceSlugPrefix:\n        selectedBlueprintSlug.trim()",
+    );
   });
 
   test("[QUICK-DEPLOY-UX-003] keeps the source picker readable at constrained console widths", () => {

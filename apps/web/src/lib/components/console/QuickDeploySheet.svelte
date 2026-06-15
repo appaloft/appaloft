@@ -609,6 +609,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     statePath = "/",
     stateBaseSearch = "",
     stateModal = "quick-deploy",
+    onProgressDialogOpenChange = undefined,
   }: {
     enabled?: boolean;
     lockedProjectId?: string;
@@ -616,6 +617,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     statePath?: string;
     stateBaseSearch?: string;
     stateModal?: string;
+    onProgressDialogOpenChange?: (open: boolean) => void;
   } = $props();
 
   const authSessionQuery = createQuery(() =>
@@ -849,6 +851,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     detail: string;
   } | null>(null);
   let workflowProgressDialogOpen = $state(false);
+  let lastNotifiedWorkflowProgressDialogOpen = false;
   let lastCreatedDeploymentId = $state("");
   let lastCreatedDeploymentOwner = $state<{
     projectId: string;
@@ -1967,6 +1970,15 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     }
     stopBlueprintOperatorWorkFollow();
     stopBlueprintOperatorWorkStatusPoll();
+  });
+
+  $effect(() => {
+    if (lastNotifiedWorkflowProgressDialogOpen === workflowProgressDialogOpen) {
+      return;
+    }
+
+    lastNotifiedWorkflowProgressDialogOpen = workflowProgressDialogOpen;
+    onProgressDialogOpenChange?.(workflowProgressDialogOpen);
   });
 
   $effect(() => {
@@ -4071,22 +4083,42 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     };
   }
 
+  function blueprintInstallResourceSlugBase(): string {
+    return (
+      selectedBlueprintSlug.trim() ||
+      normalizeQuickDeployGeneratedNameBase(
+        selectedBlueprintManifest?.id ||
+          selectedBlueprintManifest?.name ||
+          selectedBlueprintTitle.trim() ||
+          "remote-blueprint",
+      )
+    );
+  }
+
+  function createBlueprintInstallResourceSlugPrefix(): string {
+    const explicitResourceName =
+      resourceContextEnabled && resourceMode !== "existing" ? resourceName.trim() : "";
+    if (explicitResourceName) {
+      return normalizeQuickDeployGeneratedNameBase(explicitResourceName);
+    }
+
+    const baseName = blueprintInstallResourceSlugBase();
+    const nextResourceName = createQuickDeployGeneratedResourceName(baseName);
+    generatedResourceNameBase = baseName;
+    generatedResourceName = nextResourceName;
+    return nextResourceName;
+  }
+
   function blueprintInstallTarget(
     target: BlueprintResolvedInstallTarget,
+    resourceSlugPrefix: string,
   ): NonNullable<BlueprintInstallInput["target"]> {
     return {
       projectId: target.projectId,
       projectName: target.projectName,
       environmentId: target.environmentId,
       environmentName: target.environmentName,
-      resourceSlugPrefix:
-        selectedBlueprintSlug.trim() ||
-        normalizeQuickDeployGeneratedNameBase(
-          selectedBlueprintManifest?.id ||
-            selectedBlueprintManifest?.name ||
-            selectedBlueprintTitle.trim() ||
-            "remote-blueprint",
-        ),
+      resourceSlugPrefix,
       serverId: target.serverId,
     };
   }
@@ -4553,13 +4585,14 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       const serverId = await ensureBlueprintInstallServerId();
       await ensureQuickDeployServerRuntimeAvailable(serverId);
       const target = await ensureBlueprintInstallTarget(serverId);
+      const resourceSlugPrefix = createBlueprintInstallResourceSlugPrefix();
       const installInput: BlueprintInstallInput = {
         slug,
         ...(selectedBlueprintVariant ? { variant: selectedBlueprintVariant } : {}),
         profile: selectedBlueprintProfile.trim() || "production",
         parameters: blueprintInstallParameters(),
         dependencyProvisioning: blueprintDependencyProvisioningPayload(serverId),
-        target: blueprintInstallTarget(target),
+        target: blueprintInstallTarget(target, resourceSlugPrefix),
         ...(authIdentity ? { acceptedBy: authIdentity } : {}),
         idempotencyKey: blueprintInstallIdempotencyKey(slug),
         acknowledgements: [
