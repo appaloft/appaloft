@@ -3184,6 +3184,24 @@ export const generatedSdkOperations = [
     facadeDefault: true,
   },
   {
+    operationKey: "resources.restore",
+    operationGroup: "resources",
+    operationMethod: "restore",
+    facadePath: ["resources", "restore"],
+    operationId: "resources.restore",
+    kind: "command",
+    domain: "resources",
+    messageName: "RestoreResourceCommand",
+    route: {
+      method: "POST",
+      path: "/resources/{resourceId}/restore",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
     operationKey: "resources.rotate-dependency-binding-secret",
     operationGroup: "resources",
     operationMethod: "rotateDependencyBindingSecret",
@@ -5276,6 +5294,7 @@ export interface GeneratedAppaloftClient {
       readonly preview: AppaloftSdkFacadeMethod;
     };
     readonly resetHealth: AppaloftSdkFacadeMethod;
+    readonly restore: AppaloftSdkFacadeMethod;
     readonly rotateDependencyBindingSecret: AppaloftSdkFacadeMethod;
     readonly runtime: {
       readonly restart: AppaloftSdkFacadeMethod;
