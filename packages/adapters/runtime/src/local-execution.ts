@@ -106,7 +106,7 @@ import {
 
 type LogPhase = "detect" | "plan" | "package" | "deploy" | "verify" | "rollback";
 type LogLevel = "debug" | "info" | "warn" | "error";
-type LogSource = "appaloft" | "application";
+type LogSource = "appaloft" | "ssh" | "docker" | "application" | "provider" | "health" | "domain-event";
 
 const persistedOutputLineLimit = 50;
 
@@ -634,12 +634,13 @@ export class LocalExecutionBackend implements ExecutionBackend {
       level: LogLevel;
       stream: "stdout" | "stderr";
       persistedCount: number;
+      source?: LogSource;
     },
   ): number {
     void this.report(input.context, {
       deploymentId: input.deploymentId,
       phase: input.phase,
-      source: "application",
+      source: input.source ?? "application",
       level: input.level,
       message: input.line,
       stream: input.stream,
@@ -649,7 +650,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       return input.persistedCount;
     }
 
-    timeline.push(phaseLog(input.phase, input.line, input.level, "application"));
+    timeline.push(phaseLog(input.phase, input.line, input.level, input.source ?? "application"));
     return input.persistedCount + 1;
   }
 
@@ -694,6 +695,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       level: LogLevel;
       stream: "stdout" | "stderr";
       redactions?: readonly string[];
+      source?: LogSource;
     },
   ): void {
     let persistedCount = 0;
@@ -710,6 +712,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         level: classifyOutputLogLevel(line, input.level),
         stream: input.stream,
         persistedCount,
+        ...(input.source ? { source: input.source } : {}),
       });
     }
   }
@@ -780,6 +783,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       output: inspect.stdout,
       level: inspect.failed ? "warn" : "info",
       stream: "stdout",
+      source: "docker",
     });
     this.pushCommandOutput(timeline, {
       context: input.context,
@@ -788,6 +792,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       output: inspect.stderr,
       level: "warn",
       stream: "stderr",
+      source: "docker",
     });
 
     const logsMessage = `Capture Docker logs for ${input.containerName}`;
@@ -1703,18 +1708,20 @@ export class LocalExecutionBackend implements ExecutionBackend {
           context,
           deploymentId: state.id.value,
           phase: "package",
-          output: build.stdout,
-          level: "info",
-          stream: "stdout",
-        });
+        output: build.stdout,
+        level: "info",
+        stream: "stdout",
+        source: "docker",
+      });
         this.pushCommandOutput(timeline, {
           context,
           deploymentId: state.id.value,
           phase: "package",
-          output: build.stderr,
-          level: "warn",
-          stream: "stderr",
-        });
+        output: build.stderr,
+        level: "warn",
+        stream: "stderr",
+        source: "docker",
+      });
 
         if (build.failed || !image) {
           const message = "Docker image build failed";
@@ -2050,6 +2057,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         output: realizeStorageVolumes.stdout,
         level: "info",
         stream: "stdout",
+        source: "docker",
       });
       this.pushCommandOutput(timeline, {
         context,
@@ -2058,6 +2066,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         output: realizeStorageVolumes.stderr,
         level: "warn",
         stream: "stderr",
+        source: "docker",
       });
       if (realizeStorageVolumes.failed) {
         const message = "Docker storage volumes could not be realized";
@@ -2119,6 +2128,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       output: run.stdout,
       level: "info",
       stream: "stdout",
+      source: "docker",
     });
     this.pushCommandOutput(timeline, {
       context,
@@ -2127,6 +2137,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       output: run.stderr,
       level: "warn",
       stream: "stderr",
+      source: "docker",
     });
 
     if (run.failed) {
@@ -2217,6 +2228,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
           output: entry.stdout ?? "",
           level: "info",
           stream: "stdout",
+          source: "docker",
         });
         this.pushCommandOutput(timeline, {
           context,
@@ -2225,6 +2237,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
           output: entry.stderr ?? "",
           level: "warn",
           stream: "stderr",
+          source: "docker",
         });
       }
 
@@ -2710,6 +2723,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       output: composeOverride.stdout,
       level: "info",
       stream: "stdout",
+      source: "docker",
     });
     this.pushCommandOutput(timeline, {
       context,
@@ -2718,6 +2732,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       output: composeOverride.stderr,
       level: "warn",
       stream: "stderr",
+      source: "docker",
     });
     if (composeOverride.failed) {
       return ok({
@@ -2764,6 +2779,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       output: up.stdout,
       level: "info",
       stream: "stdout",
+      source: "docker",
     });
     this.pushCommandOutput(timeline, {
       context,
@@ -2772,6 +2788,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       output: up.stderr,
       level: "warn",
       stream: "stderr",
+      source: "docker",
     });
 
     if (up.failed) {
