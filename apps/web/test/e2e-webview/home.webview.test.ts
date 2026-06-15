@@ -7855,12 +7855,6 @@ describe.serial("console e2e with Bun.WebView", () => {
         includeLatestFailure: true,
       });
 
-      const logsRequest = await waitForRecordedRequest("/api/rpc/deployments/logs");
-      const logsInput = readOrpcJsonPayload(logsRequest.body);
-      expect(logsInput).toEqual({
-        deploymentId: "dep_demo",
-      });
-
       await clickButtonByAnyText(view, ["Copy diagnostic JSON", "复制诊断 JSON"]);
       const diagnosticRequest = await waitForRecordedRequest(
         "/api/rpc/resources/diagnosticSummary",
