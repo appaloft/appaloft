@@ -196,7 +196,7 @@ function deploymentRow(id: string, resourceId: string, serverId: string) {
       variables: [],
     },
     dependency_binding_references: [],
-    logs: [],
+    timeline: [],
     created_at: "2026-01-01T00:00:00.000Z",
     started_at: "2026-01-01T00:00:01.000Z",
     finished_at: "2026-01-01T00:00:04.000Z",

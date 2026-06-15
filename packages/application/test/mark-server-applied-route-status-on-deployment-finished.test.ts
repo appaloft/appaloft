@@ -276,7 +276,7 @@ function createDeployment(input: {
     ExecutionResult.rehydrate({
       exitCode: ExitCode.rehydrate(input.status === "succeeded" ? 0 : 1),
       status: ExecutionStatusValue.rehydrate(input.status),
-      logs: [],
+      timeline: [],
       retryable: input.retryable ?? false,
       ...(input.errorCode ? { errorCode: ErrorCodeText.rehydrate(input.errorCode) } : {}),
       ...(input.failurePhase || input.errorMessage

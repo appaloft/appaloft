@@ -75,7 +75,7 @@ function deploymentReadInfraError(deploymentId: string, error: unknown): DomainE
 }
 
 function toDeploymentDetailSummary(deployment: DeploymentSummary): DeploymentDetailSummary {
-  const { logs: _logs, ...summary } = deployment;
+  const { timeline: _logs, ...summary } = deployment;
   return {
     ...summary,
     environmentSnapshot: maskDeploymentEnvironmentSnapshot(summary.environmentSnapshot),
@@ -86,10 +86,10 @@ function latestFailureFromLogs(
   deployment: DeploymentSummary,
 ): DeploymentAttemptFailureSummary | undefined {
   const recentFailure =
-    [...deployment.logs]
+    [...deployment.timeline]
       .reverse()
       .find((entry) => entry.level === "error" || entry.level === "warn") ??
-    (deployment.status === "failed" ? deployment.logs.at(-1) : undefined);
+    (deployment.status === "failed" ? deployment.timeline.at(-1) : undefined);
 
   if (!recentFailure) {
     return undefined;
@@ -301,13 +301,13 @@ export class ShowDeploymentQueryService {
                 createdAt: deployment.createdAt,
                 ...(deployment.startedAt ? { startedAt: deployment.startedAt } : {}),
                 ...(deployment.finishedAt ? { finishedAt: deployment.finishedAt } : {}),
-                logCount: deployment.logCount,
+                timelineCount: deployment.timelineCount,
               },
             }
           : {}),
         ...(latestFailure ? { latestFailure } : {}),
         ...(recoverySummary ? { recoverySummary } : {}),
-        nextActions: ["logs", "resource-detail", "resource-health", "diagnostic-summary"],
+        nextActions: ["timeline", "resource-detail", "resource-health", "diagnostic-summary"],
         sectionErrors,
         generatedAt: this.clock.now(),
       });

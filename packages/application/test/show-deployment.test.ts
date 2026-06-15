@@ -14,9 +14,9 @@ import { createExecutionContext, type ExecutionContext, type toRepositoryContext
 import { ShowDeploymentQuery } from "../src/messages";
 import {
   type DeploymentDetail,
-  type DeploymentLogSummary,
   type DeploymentReadModel,
   type DeploymentSummary,
+  type DeploymentTimelineJournalSummary,
   type EnvironmentReadModel,
   type EnvironmentSummary,
   type ProjectReadModel,
@@ -167,7 +167,7 @@ class StaticDeploymentReadModel implements DeploymentReadModel {
 
   public listCalls = 0;
   public findOneCalls = 0;
-  public findLogsCalls = 0;
+  public findTimelineCalls = 0;
 
   constructor(private readonly deployments: DeploymentSummary[] = []) {}
 
@@ -197,12 +197,12 @@ class StaticDeploymentReadModel implements DeploymentReadModel {
     return null;
   }
 
-  async findLogs(
+  async findTimeline(
     _context: ReturnType<typeof toRepositoryContext>,
     id: string,
-  ): Promise<DeploymentLogSummary[]> {
-    this.findLogsCalls += 1;
-    return this.deployments.find((deployment) => deployment.id === id)?.logs ?? [];
+  ): Promise<DeploymentTimelineJournalSummary[]> {
+    this.findTimelineCalls += 1;
+    return this.deployments.find((deployment) => deployment.id === id)?.timeline ?? [];
   }
 }
 
@@ -340,7 +340,7 @@ function deploymentSummary(overrides?: Partial<DeploymentSummary>): DeploymentSu
         },
       ],
     },
-    logs: [
+    timeline: [
       {
         timestamp: "2026-01-01T00:00:06.000Z",
         source: "appaloft",
@@ -366,7 +366,7 @@ function deploymentSummary(overrides?: Partial<DeploymentSummary>): DeploymentSu
     createdAt: "2026-01-01T00:00:05.000Z",
     startedAt: "2026-01-01T00:00:06.000Z",
     finishedAt: "2026-01-01T00:00:09.000Z",
-    logCount: 3,
+    timelineCount: 3,
     ...overrides,
     target: {
       kind: "server-backed",
@@ -447,7 +447,7 @@ describe("ShowDeploymentQueryService", () => {
       destinationId: "dst_demo",
       status: "failed",
     });
-    expect("logs" in detail.deployment).toBe(false);
+    expect("timeline" in detail.deployment).toBe(false);
     expect(detail.relatedContext).toMatchObject({
       project: {
         id: "prj_demo",
@@ -480,7 +480,7 @@ describe("ShowDeploymentQueryService", () => {
       createdAt: "2026-01-01T00:00:05.000Z",
       startedAt: "2026-01-01T00:00:06.000Z",
       finishedAt: "2026-01-01T00:00:09.000Z",
-      logCount: 3,
+      timelineCount: 3,
     });
     expect(detail.snapshot).toMatchObject({
       runtimePlan: {
@@ -501,7 +501,7 @@ describe("ShowDeploymentQueryService", () => {
       message: "Health check failed",
     });
     expect(detail.nextActions).toEqual([
-      "logs",
+      "timeline",
       "resource-detail",
       "resource-health",
       "diagnostic-summary",

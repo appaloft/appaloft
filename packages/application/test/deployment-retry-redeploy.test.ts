@@ -77,14 +77,14 @@ class SuccessfulExecutionBackend implements ExecutionBackend {
         status: ExecutionStatusValue.rehydrate("succeeded"),
         exitCode: ExitCode.rehydrate(0),
         retryable: false,
-        logs: [],
+        timeline: [],
       }),
     );
     return ok({ deployment });
   }
 
   async cancel(): ReturnType<ExecutionBackend["cancel"]> {
-    return ok({ logs: [] });
+    return ok({ timeline: [] });
   }
 
   async rollback(): ReturnType<ExecutionBackend["rollback"]> {
@@ -108,7 +108,7 @@ class FailingExecutionBackend implements ExecutionBackend {
   }
 
   async cancel(): ReturnType<ExecutionBackend["cancel"]> {
-    return ok({ logs: [] });
+    return ok({ timeline: [] });
   }
 
   async rollback(): ReturnType<ExecutionBackend["rollback"]> {
@@ -207,7 +207,7 @@ function sourceDeployment(status: "failed" | "succeeded" | "running") {
       variables: [],
     }),
     dependencyBindingReferences: [],
-    logs: [],
+    timeline: [],
     createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
     ...(status === "running"
       ? { startedAt: StartedAt.rehydrate("2026-01-01T00:00:02.000Z") }

@@ -63,7 +63,7 @@ runtime truth.
 ## Accepted Result
 
 The command returns accepted async work with a new deployment attempt id. Completion or failure is
-observed through `deployments.show`, `deployments.stream-events`, logs, and future readiness reads.
+observed through `deployments.show`, `deployments.timeline`, and future readiness reads.
 
 ## Events
 

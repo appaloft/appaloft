@@ -30,7 +30,7 @@ import {
 import { type DeploymentDependencyBindingReferenceState } from "./dependency-binding-snapshot-reference";
 import {
   type AccessRouteExpectation,
-  type DeploymentLogEntry,
+  type DeploymentTimelineJournalEntry,
   type ExecutionResult,
   RollbackPlan,
   type RuntimePlan,
@@ -270,7 +270,7 @@ export interface BaseDeploymentState {
   runtimePlan: RuntimePlan;
   environmentSnapshot: EnvironmentSnapshot;
   dependencyBindingReferences: DeploymentDependencyBindingReferenceState[];
-  logs: DeploymentLogEntry[];
+  timeline: DeploymentTimelineJournalEntry[];
   createdAt: CreatedAt;
   startedAt?: StartedAt;
   finishedAt?: FinishedAt;
@@ -361,7 +361,7 @@ export class Deployment extends AggregateRoot<DeploymentState> {
         runtimePlan: input.runtimePlan,
         environmentSnapshot: input.environmentSnapshot,
         dependencyBindingReferences: [...(input.dependencyBindingReferences ?? [])],
-        logs: [],
+        timeline: [],
         createdAt: input.createdAt,
         triggerKind: input.triggerKind ?? DeploymentTriggerKindValue.createDefault(),
         ...(input.sourceDeploymentId ? { sourceDeploymentId: input.sourceDeploymentId } : {}),
@@ -393,7 +393,7 @@ export class Deployment extends AggregateRoot<DeploymentState> {
       ...deploymentTargetStateFields(target),
       triggerKind: state.triggerKind ?? DeploymentTriggerKindValue.createDefault(),
       dependencyBindingReferences: [...(state.dependencyBindingReferences ?? [])],
-      logs: [...state.logs],
+      timeline: [...state.timeline],
     });
   }
 
@@ -449,12 +449,12 @@ export class Deployment extends AggregateRoot<DeploymentState> {
 
   cancel(
     at: FinishedAt,
-    logs: DeploymentLogEntry[] = [],
+    timeline: DeploymentTimelineJournalEntry[] = [],
     input?: { supersededByDeploymentId?: DeploymentId },
   ): Result<void> {
     return this.state.status.cancel().map((nextStatus) => {
       this.state.status = nextStatus;
-      this.appendLogs(logs);
+      this.appendTimeline(timeline);
       this.state.finishedAt = at;
       if (input?.supersededByDeploymentId) {
         this.state.supersededByDeploymentId = input.supersededByDeploymentId;
@@ -475,13 +475,13 @@ export class Deployment extends AggregateRoot<DeploymentState> {
     });
   }
 
-  appendLogs(logs: DeploymentLogEntry[]): void {
-    this.state.logs.push(...logs);
+  appendTimeline(entries: DeploymentTimelineJournalEntry[]): void {
+    this.state.timeline.push(...entries);
   }
 
   applyExecutionResult(at: FinishedAt, result: ExecutionResult): Result<void> {
     const resultState = result.toState();
-    this.appendLogs(resultState.logs);
+    this.appendTimeline(resultState.timeline);
     this.state.finishedAt = at;
     return this.state.status.applyExecutionResult(resultState.status).andThen((nextStatus) => {
       this.state.status = nextStatus;
@@ -616,7 +616,7 @@ export class Deployment extends AggregateRoot<DeploymentState> {
       ...this.state,
       ...deploymentTargetStateFields(this.state.target),
       dependencyBindingReferences: [...this.state.dependencyBindingReferences],
-      logs: [...this.state.logs],
+      timeline: [...this.state.timeline],
     };
   }
 

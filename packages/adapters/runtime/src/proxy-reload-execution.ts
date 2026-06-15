@@ -17,12 +17,12 @@ export interface ProxyReloadExecutionLog {
 
 export interface ProxyReloadExecutionSucceeded {
   status: "succeeded";
-  logs: ProxyReloadExecutionLog[];
+  timeline: ProxyReloadExecutionLog[];
 }
 
 export interface ProxyReloadExecutionFailed {
   status: "failed";
-  logs: ProxyReloadExecutionLog[];
+  timeline: ProxyReloadExecutionLog[];
   stepName: string;
   message: string;
   errorCode: "proxy_reload_failed";
@@ -39,15 +39,15 @@ export async function executeProxyReloadPlan(input: {
   plan: ProxyReloadPlan;
   runCommand: (step: ProxyReloadStepPlan) => Promise<ProxyReloadCommandResult>;
 }): Promise<ProxyReloadExecutionResult> {
-  const logs: ProxyReloadExecutionLog[] = [];
+  const timeline: ProxyReloadExecutionLog[] = [];
 
   if (!input.plan.required) {
-    return { status: "succeeded", logs };
+    return { status: "succeeded", timeline };
   }
 
   for (const step of input.plan.steps) {
     if (step.mode === "automatic") {
-      logs.push({
+      timeline.push({
         stepName: step.name,
         mode: step.mode,
         message: step.successMessage,
@@ -57,14 +57,14 @@ export async function executeProxyReloadPlan(input: {
 
     if (!step.command) {
       const message = step.failureMessage ?? `${input.plan.displayName} proxy reload command missing`;
-      logs.push({
+      timeline.push({
         stepName: step.name,
         mode: step.mode,
         message,
       });
       return {
         status: "failed",
-        logs,
+        timeline,
         stepName: step.name,
         message,
         errorCode: "proxy_reload_failed",
@@ -73,7 +73,7 @@ export async function executeProxyReloadPlan(input: {
     }
 
     const result = await input.runCommand(step);
-    logs.push({
+    timeline.push({
       stepName: step.name,
       mode: step.mode,
       message: result.failed
@@ -86,7 +86,7 @@ export async function executeProxyReloadPlan(input: {
     if (result.failed) {
       return {
         status: "failed",
-        logs,
+        timeline,
         stepName: step.name,
         message: step.failureMessage ?? `${input.plan.displayName} proxy reload failed`,
         errorCode: "proxy_reload_failed",
@@ -97,5 +97,5 @@ export async function executeProxyReloadPlan(input: {
     }
   }
 
-  return { status: "succeeded", logs };
+  return { status: "succeeded", timeline };
 }

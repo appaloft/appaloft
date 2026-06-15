@@ -72,9 +72,9 @@ import {
   type DeleteServerCommandInput,
   type DeleteSourceLinkCommandInput,
   type DeleteSshCredentialCommandInput,
-  type DeploymentLogsQueryInput,
   type DeploymentPlanQueryInput,
   type DeploymentRecoveryReadinessQueryInput,
+  type DeploymentTimelineQueryInput,
   type DiffEnvironmentsQueryInput,
   type EnvironmentEffectivePrecedenceQueryInput,
   type ExpireTerminalSessionsCommandInput,
@@ -124,7 +124,6 @@ import {
   type PrepareServerRuntimeCommandInput,
   type PromoteEnvironmentCommandInput,
   type ProvisionDependencyResourceCommandInput,
-  type PruneDeploymentLogsCommandInput,
   type PruneDeploymentsCommandInput,
   type PruneServerCapacityCommandInput,
   type PruneSourceEventsCommandInput,
@@ -212,7 +211,7 @@ import {
   type ShowTerminalSessionQueryInput,
   type StartResourceRuntimeCommandInput,
   type StopResourceRuntimeCommandInput,
-  type StreamDeploymentEventsQueryInput,
+  type StreamDeploymentTimelineQueryInput,
   type StreamOperatorWorkEventsQueryInput,
   type SwitchCurrentOrganizationCommandInput,
   type TestDraftServerConnectivityCommandInput,
@@ -287,13 +286,12 @@ import {
   type DeleteStorageVolumeResponse,
   type DependencyResourceProvisioningPlanResponse,
   type DependencyResourceResponse,
-  type DeploymentEventStreamEnvelope,
-  type DeploymentEventStreamResponse,
-  type DeploymentEventStreamStreamResponse,
-  type DeploymentLogsResponse,
   type DeploymentPlanResponse,
   type DeploymentProgressEvent,
   type DeploymentRecoveryReadinessResponse,
+  type DeploymentTimelineEnvelope,
+  type DeploymentTimelineResponse,
+  type DeploymentTimelineStreamResponse,
   type DetachResourceStorageInput,
   type DetachResourceStorageResponse,
   type DiffEnvironmentResponse,
@@ -349,7 +347,6 @@ import {
   type PrepareServerRuntimeResponse,
   type PromoteEnvironmentResponse,
   type ProxyConfigurationView,
-  type PruneDeploymentLogsResponse,
   type PruneDeploymentsResponse,
   type PruneServerCapacityResponse,
   type PruneSourceEventsResponse,
@@ -1796,28 +1793,16 @@ export type AppaloftOrpcClientContract = {
       AsyncIteratorClass<DeploymentProgressEvent, CreateDeploymentResponse, void>,
       AppaloftClientError
     >;
-    logs: Client<
+    timeline: Client<
       AppaloftClientContext,
-      DeploymentLogsQueryInput,
-      DeploymentLogsResponse,
+      DeploymentTimelineQueryInput,
+      DeploymentTimelineResponse,
       AppaloftClientError
     >;
-    pruneLogs: Client<
+    timelineStream: Client<
       AppaloftClientContext,
-      PruneDeploymentLogsCommandInput,
-      PruneDeploymentLogsResponse,
-      AppaloftClientError
-    >;
-    events: Client<
-      AppaloftClientContext,
-      StreamDeploymentEventsQueryInput,
-      DeploymentEventStreamResponse,
-      AppaloftClientError
-    >;
-    eventsStream: Client<
-      AppaloftClientContext,
-      StreamDeploymentEventsQueryInput,
-      AsyncIteratorClass<DeploymentEventStreamEnvelope, DeploymentEventStreamStreamResponse, void>,
+      StreamDeploymentTimelineQueryInput,
+      AsyncIteratorClass<DeploymentTimelineEnvelope, DeploymentTimelineStreamResponse, void>,
       AppaloftClientError
     >;
   };

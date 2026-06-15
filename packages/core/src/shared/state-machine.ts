@@ -1,10 +1,10 @@
 import {
   buildStrategyKinds,
   configScopes,
-  deploymentLogSources,
   deploymentStatuses,
   deploymentTargetCredentialKinds,
   deploymentTargetLifecycleStatuses,
+  deploymentTimelineSources,
   deployTokenStatuses,
   destinationKinds,
   edgeProxyKinds,
@@ -37,10 +37,10 @@ import { ScalarValueObject } from "./value-object";
 export {
   buildStrategyKinds,
   configScopes,
-  deploymentLogSources,
   deploymentStatuses,
   deploymentTargetCredentialKinds,
   deploymentTargetLifecycleStatuses,
+  deploymentTimelineSources,
   deployTokenStatuses,
   destinationKinds,
   edgeProxyKinds,
@@ -1565,31 +1565,33 @@ export class LogLevelValue extends EnumValueObject<(typeof logLevels)[number]> {
   }
 }
 
-const deploymentLogSourceBrand: unique symbol = Symbol("DeploymentLogSourceValue");
-export class DeploymentLogSourceValue extends EnumValueObject<
-  (typeof deploymentLogSources)[number]
+const deploymentTimelineSourceBrand: unique symbol = Symbol("DeploymentTimelineSourceValue");
+export class DeploymentTimelineSourceValue extends EnumValueObject<
+  (typeof deploymentTimelineSources)[number]
 > {
-  private [deploymentLogSourceBrand]!: void;
+  private [deploymentTimelineSourceBrand]!: void;
 
-  private constructor(value: (typeof deploymentLogSources)[number]) {
+  private constructor(value: (typeof deploymentTimelineSources)[number]) {
     super(value);
   }
 
-  static create(value: string): Result<DeploymentLogSourceValue> {
+  static create(value: string): Result<DeploymentTimelineSourceValue> {
     return createEnumValue(
       value,
-      deploymentLogSources,
-      "Deployment log source",
-      (validated) => new DeploymentLogSourceValue(validated),
+      deploymentTimelineSources,
+      "Deployment timeline source",
+      (validated) => new DeploymentTimelineSourceValue(validated),
     );
   }
 
-  static appaloft(): DeploymentLogSourceValue {
-    return new DeploymentLogSourceValue("appaloft");
+  static appaloft(): DeploymentTimelineSourceValue {
+    return new DeploymentTimelineSourceValue("appaloft");
   }
 
-  static rehydrate(value: (typeof deploymentLogSources)[number]): DeploymentLogSourceValue {
-    return new DeploymentLogSourceValue(value);
+  static rehydrate(
+    value: (typeof deploymentTimelineSources)[number],
+  ): DeploymentTimelineSourceValue {
+    return new DeploymentTimelineSourceValue(value);
   }
 }
 

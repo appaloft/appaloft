@@ -169,7 +169,7 @@ function deploymentSummary(
       precedence: [],
       variables: [],
     },
-    logs: [],
+    timeline: [],
     createdAt: "2026-05-05T00:00:00.000Z",
     logCount: 0,
   };
@@ -216,7 +216,7 @@ describe("HermeticScheduledTaskRuntimePort", () => {
       exitCode: 0,
       startedAt: "2026-05-05T00:30:00.000Z",
       finishedAt: "2026-05-05T00:30:00.000Z",
-      logs: [
+      timeline: [
         {
           timestamp: "2026-05-05T00:30:00.000Z",
           stream: "stdout",
@@ -258,7 +258,7 @@ describe("HermeticScheduledTaskRuntimePort", () => {
       exitCode: 1,
       startedAt: "2026-05-05T00:30:00.000Z",
       finishedAt: "2026-05-05T00:30:00.000Z",
-      logs: [
+      timeline: [
         {
           timestamp: "2026-05-05T00:30:00.000Z",
           stream: "stdout",
@@ -431,7 +431,7 @@ describe("RuntimeTargetScheduledTaskRuntimePort", () => {
       exitCode: 0,
       startedAt: "2026-05-05T00:30:00.000Z",
       finishedAt: "2026-05-05T00:30:00.000Z",
-      logs: [
+      timeline: [
         {
           timestamp: "2026-05-05T00:30:00.000Z",
           stream: "stdout",
@@ -481,7 +481,7 @@ describe("RuntimeTargetScheduledTaskRuntimePort", () => {
     expect(result._unsafeUnwrap()).toMatchObject({
       status: "succeeded",
       exitCode: 0,
-      logs: [
+      timeline: [
         {
           timestamp: "2026-05-05T00:30:00.000Z",
           stream: "stdout",
@@ -548,7 +548,7 @@ describe("RuntimeTargetScheduledTaskRuntimePort", () => {
     expect(result._unsafeUnwrap()).toMatchObject({
       status: "succeeded",
       exitCode: 0,
-      logs: [
+      timeline: [
         {
           timestamp: "2026-05-05T00:30:00.000Z",
           stream: "stdout",
@@ -612,7 +612,7 @@ describe("RuntimeTargetScheduledTaskRuntimePort", () => {
     expect(result._unsafeUnwrap()).toMatchObject({
       status: "succeeded",
       exitCode: 0,
-      logs: [
+      timeline: [
         {
           timestamp: "2026-05-05T00:30:00.000Z",
           stream: "stdout",
@@ -679,7 +679,7 @@ describe("RuntimeTargetScheduledTaskRuntimePort", () => {
     expect(result._unsafeUnwrap()).toMatchObject({
       status: "succeeded",
       exitCode: 0,
-      logs: [
+      timeline: [
         {
           timestamp: "2026-05-05T00:30:00.000Z",
           stream: "stdout",

@@ -31,10 +31,10 @@ import {
   type DependencyResourceSecretStore,
   type DependencyResourceSecretStoreInput,
   type DependencyResourceSummary,
-  type DeploymentLogSummary,
   type DeploymentReadModel,
   type DeploymentRepository,
   type DeploymentSummary,
+  type DeploymentTimelineJournalSummary,
   type DestinationRepository,
   type DomainBindingReadModel,
   type DomainBindingRepository,
@@ -3097,14 +3097,14 @@ export class MemoryDeploymentReadModel implements DeploymentReadModel {
           ...(deployment.supersededByDeploymentId
             ? { supersededByDeploymentId: deployment.supersededByDeploymentId.value }
             : {}),
-          logs: deployment.logs.map((log) => ({
+          timeline: deployment.timeline.map((log) => ({
             timestamp: log.timestamp,
-            source: log.source as DeploymentLogSummary["source"],
-            phase: log.phase as DeploymentLogSummary["phase"],
-            level: log.level as DeploymentLogSummary["level"],
+            source: log.source as DeploymentTimelineJournalSummary["source"],
+            phase: log.phase as DeploymentTimelineJournalSummary["phase"],
+            level: log.level as DeploymentTimelineJournalSummary["level"],
             message: log.message,
           })),
-          logCount: deployment.logs.length,
+          timelineCount: deployment.timeline.length,
         };
       });
   }
@@ -3136,13 +3136,16 @@ export class MemoryDeploymentReadModel implements DeploymentReadModel {
     return null;
   }
 
-  async findLogs(context: RepositoryContext, id: string): Promise<DeploymentLogSummary[]> {
+  async findTimeline(
+    context: RepositoryContext,
+    id: string,
+  ): Promise<DeploymentTimelineJournalSummary[]> {
     void context;
-    return (this.repository.items.get(id)?.toState().logs ?? []).map((log) => ({
+    return (this.repository.items.get(id)?.toState().timeline ?? []).map((log) => ({
       timestamp: log.timestamp,
-      source: log.source as DeploymentLogSummary["source"],
-      phase: log.phase as DeploymentLogSummary["phase"],
-      level: log.level as DeploymentLogSummary["level"],
+      source: log.source as DeploymentTimelineJournalSummary["source"],
+      phase: log.phase as DeploymentTimelineJournalSummary["phase"],
+      level: log.level as DeploymentTimelineJournalSummary["level"],
       message: log.message,
     }));
   }

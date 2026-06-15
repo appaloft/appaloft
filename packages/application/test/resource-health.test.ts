@@ -34,9 +34,9 @@ import { createExecutionContext, type ExecutionContext, type toRepositoryContext
 import { ResourceHealthQuery } from "../src/messages";
 import {
   type DefaultAccessDomainProvider,
-  type DeploymentLogSummary,
   type DeploymentReadModel,
   type DeploymentSummary,
+  type DeploymentTimelineJournalSummary,
   type DestinationRepository,
   type DomainBindingReadModel,
   type DomainBindingSummary,
@@ -112,7 +112,7 @@ class StaticDeploymentReadModel implements DeploymentReadModel {
       );
   }
 
-  async findLogs(): Promise<DeploymentLogSummary[]> {
+  async findTimeline(): Promise<DeploymentTimelineJournalSummary[]> {
     return [];
   }
 
@@ -324,11 +324,11 @@ function deploymentSummary(overrides?: Partial<DeploymentSummary>): DeploymentSu
       precedence: ["defaults", "environment", "deployment"],
       variables: [],
     },
-    logs: [],
+    timeline: [],
     createdAt: "2026-01-01T00:00:00.000Z",
     startedAt: "2026-01-01T00:00:01.000Z",
     finishedAt: "2026-01-01T00:00:04.000Z",
-    logCount: 0,
+    timelineCount: 0,
     ...overrides,
     target: {
       kind: "server-backed",
@@ -382,11 +382,11 @@ function staticArtifactDeploymentSummary(): DeploymentSummary {
       precedence: ["environment"],
       variables: [],
     },
-    logs: [],
+    timeline: [],
     createdAt: "2026-06-08T01:56:55.000Z",
     startedAt: "2026-06-08T01:56:55.000Z",
     finishedAt: "2026-06-08T01:56:55.000Z",
-    logCount: 0,
+    timelineCount: 0,
   };
 }
 

@@ -421,6 +421,12 @@ export const publicDocsHelpTopics = {
     surfaces: ["web", "cli", "http-api", "mcp"],
     relatedOperation: "deployments.create",
     aliases: ["deploy", "deployment", "verify", "rollback", "部署", "回滚"],
+    specReferences: [
+      "docs/queries/deployments.timeline.md",
+      "docs/testing/deployment-timeline-journal-test-matrix.md",
+      "docs/specs/095-deployment-timeline-journal/spec.md",
+      "docs/decisions/ADR-084-deployment-timeline-journal-boundary.md",
+    ],
   },
   "deployment.source": {
     id: "deployment.source",
@@ -1823,7 +1829,7 @@ export const publicDocsHelpTopics = {
     id: "observability.runtime-logs",
     title: "Runtime logs",
     description:
-      "How to inspect runtime and deployment logs, capture redacted runtime log archive snapshots, and prune old embedded deployment log entries or retained archive snapshots from user-facing entrypoints.",
+      "How to inspect runtime logs and deployment timeline entries, capture redacted runtime log archive snapshots, and prune retained archive snapshots from user-facing entrypoints.",
     page: {
       "zh-CN": "observe/logs-health",
       "en-US": "en/observe/logs-health",
@@ -1837,16 +1843,16 @@ export const publicDocsHelpTopics = {
     relatedOperation: "resources.runtime-logs",
     specReferences: [
       "docs/queries/resources.runtime-logs.md",
-      "docs/commands/deployments.logs.prune.md",
+      "docs/queries/deployments.timeline.md",
       "docs/specs/059-resource-runtime-log-archive-retention/spec.md",
       "docs/testing/resource-runtime-logs-test-matrix.md",
-      "docs/testing/deployment-log-retention-test-matrix.md",
+      "docs/testing/deployment-timeline-journal-test-matrix.md",
       "docs/testing/resource-runtime-log-archive-retention-test-matrix.md",
-      "docs/specs/058-deployment-log-retention/spec.md",
-      "docs/decisions/ADR-052-deployment-log-retention-policy.md",
+      "docs/specs/095-deployment-timeline-journal/spec.md",
+      "docs/decisions/ADR-084-deployment-timeline-journal-boundary.md",
       "docs/decisions/ADR-053-resource-runtime-log-archive-retention-boundary.md",
     ],
-    aliases: ["logs", "runtime logs", "deployment logs", "log archives", "日志"],
+    aliases: ["logs", "runtime logs", "deployment timeline", "log archives", "日志"],
   },
   "observability.health-summary": {
     id: "observability.health-summary",
@@ -3849,14 +3855,13 @@ export const publicDocsOperationCoverage = [
     status: "documented",
     topicId: "deployment.recovery-readiness",
   },
-  { operationKey: "deployments.logs", status: "documented", topicId: "observability.runtime-logs" },
   {
-    operationKey: "deployments.logs.prune",
+    operationKey: "deployments.timeline",
     status: "documented",
-    topicId: "observability.runtime-logs",
+    topicId: "deployment.lifecycle",
   },
   {
-    operationKey: "deployments.stream-events",
+    operationKey: "deployments.timeline.stream",
     status: "documented",
     topicId: "deployment.lifecycle",
   },

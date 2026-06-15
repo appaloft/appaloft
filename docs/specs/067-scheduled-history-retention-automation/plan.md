@@ -13,7 +13,7 @@
 - Local specs:
   - `docs/specs/056-audit-event-retention-policy/spec.md`
   - `docs/specs/057-provider-job-log-retention/spec.md`
-  - `docs/specs/058-deployment-log-retention/spec.md`
+  - `docs/specs/095-deployment-timeline-journal/spec.md`
   - `docs/specs/059-resource-runtime-log-archive-retention/spec.md`
   - `docs/specs/060-durable-process-delivery-baseline/spec.md`
   - `docs/specs/065-domain-event-stream-retention/spec.md`

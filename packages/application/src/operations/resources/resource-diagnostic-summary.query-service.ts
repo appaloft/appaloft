@@ -4,9 +4,9 @@ import { inject, injectable } from "tsyringe";
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
 import {
   type Clock,
-  type DeploymentLogSummary,
   type DeploymentReadModel,
   type DeploymentSummary,
+  type DeploymentTimelineJournalSummary,
   type DiagnosticsPort,
   type DomainBindingReadModel,
   type DomainBindingSummary,
@@ -353,7 +353,7 @@ export class ResourceDiagnosticSummaryQueryService {
     const deployment = deploymentResult.value;
     const redactions = redactionsFromDeployment(deployment);
     const sourceErrors: ResourceDiagnosticSourceError[] = [];
-    const deploymentLogs = await this.buildDeploymentLogSection(
+    const deploymentTimeline = await this.buildDeploymentTimelineSection(
       context,
       query,
       deployment,
@@ -389,13 +389,13 @@ export class ResourceDiagnosticSummaryQueryService {
       ...(deployment ? { deployment: this.buildDeployment(deployment, redactions) } : {}),
       access,
       proxy,
-      deploymentLogs,
+      deploymentTimeline,
       runtimeLogs,
       system,
       sourceErrors,
       redaction: {
         policy: "deployment-environment-secrets",
-        masked: [...deploymentLogs.lines, ...runtimeLogs.lines].some((line) => line.masked),
+        masked: [...deploymentTimeline.lines, ...runtimeLogs.lines].some((line) => line.masked),
         maskedValueCount: redactions.length,
       },
     };
@@ -542,7 +542,7 @@ export class ResourceDiagnosticSummaryQueryService {
     deployment: DeploymentSummary,
     redactions: readonly string[],
   ): ResourceDiagnosticDeployment {
-    const lastErrorLog = [...deployment.logs].reverse().find((log) => log.level === "error");
+    const lastErrorLog = [...deployment.timeline].reverse().find((log) => log.level === "error");
 
     return {
       id: deployment.id,
@@ -556,7 +556,7 @@ export class ResourceDiagnosticSummaryQueryService {
       createdAt: deployment.createdAt,
       ...(deployment.startedAt ? { startedAt: deployment.startedAt } : {}),
       ...(deployment.finishedAt ? { finishedAt: deployment.finishedAt } : {}),
-      logCount: deployment.logCount,
+      timelineCount: deployment.timelineCount,
       ...(lastErrorLog
         ? {
             lastError: {
@@ -798,21 +798,21 @@ export class ResourceDiagnosticSummaryQueryService {
     };
   }
 
-  private async buildDeploymentLogSection(
+  private async buildDeploymentTimelineSection(
     context: ExecutionContext,
     query: ResourceDiagnosticSummaryQuery,
     deployment: DeploymentSummary | undefined,
     redactions: readonly string[],
     sourceErrors: ResourceDiagnosticSourceError[],
   ): Promise<ResourceDiagnosticLogSection> {
-    if (!query.includeDeploymentLogTail) {
+    if (!query.includeDeploymentTimelineTail) {
       return this.emptyLogSection("not-requested", query.tailLines);
     }
 
     if (!deployment) {
       sourceErrors.push(
         sourceError({
-          source: "deployment-logs",
+          source: "deployment-timeline",
           code: "deployment_logs_unavailable",
           category: "user",
           phase: "deployment-log-tail",
@@ -828,7 +828,7 @@ export class ResourceDiagnosticSummaryQueryService {
     }
 
     try {
-      const logs = await this.deploymentReadModel.findLogs(
+      const logs = await this.deploymentReadModel.findTimeline(
         toRepositoryContext(context),
         deployment.id,
       );
@@ -837,7 +837,7 @@ export class ResourceDiagnosticSummaryQueryService {
         timestampInObservationWindow(line.timestamp, observationWindow),
       );
       const tail = query.tailLines === 0 ? [] : filteredLogs.slice(-query.tailLines);
-      const lines = tail.map((line) => this.deploymentLogLine(line, redactions));
+      const lines = tail.map((line) => this.deploymentTimelineLine(line, redactions));
 
       return {
         status: lines.length > 0 ? "available" : "empty",
@@ -848,7 +848,7 @@ export class ResourceDiagnosticSummaryQueryService {
     } catch {
       sourceErrors.push(
         sourceError({
-          source: "deployment-logs",
+          source: "deployment-timeline",
           code: "deployment_logs_unavailable",
           category: "infra",
           phase: "deployment-log-tail",
@@ -856,7 +856,7 @@ export class ResourceDiagnosticSummaryQueryService {
           redactions,
           relatedEntityId: deployment.id,
           relatedState: deployment.status,
-          message: "Deployment logs could not be loaded",
+          message: "Deployment timeline could not be loaded",
         }),
       );
       return this.emptyLogSection("unavailable", query.tailLines, {
@@ -1012,8 +1012,8 @@ export class ResourceDiagnosticSummaryQueryService {
     };
   }
 
-  private deploymentLogLine(
-    line: DeploymentLogSummary,
+  private deploymentTimelineLine(
+    line: DeploymentTimelineJournalSummary,
     redactions: readonly string[],
   ): ResourceDiagnosticLogLine {
     const message = redactText(line.message, redactions);

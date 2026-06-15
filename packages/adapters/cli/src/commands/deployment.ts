@@ -6,19 +6,18 @@ import {
   CleanupPreviewCommand,
   CreateDeploymentCommand,
   type CreateDeploymentCommandInput,
-  DeploymentLogsQuery,
   DeploymentPlanQuery,
   DeploymentRecoveryReadinessQuery,
   type DeploymentSummary,
+  DeploymentTimelineQuery,
   ListDeploymentsQuery,
-  PruneDeploymentLogsCommand,
   PruneDeploymentsCommand,
   publicPreviewUrlsFromDeploymentSummary,
   RedeployDeploymentCommand,
   RetryDeploymentCommand,
   RollbackDeploymentCommand,
   ShowDeploymentQuery,
-  StreamDeploymentEventsQuery,
+  StreamDeploymentTimelineQuery,
 } from "@appaloft/application";
 import { createQuickDeployGeneratedResourceName } from "@appaloft/contracts";
 import {
@@ -51,7 +50,7 @@ import {
   resultToEffect,
   runCommand,
   runDeploymentCommandResult,
-  runDeploymentEventStreamQuery,
+  runDeploymentTimelineQuery,
   runQuery,
 } from "../runtime.js";
 import {
@@ -148,8 +147,8 @@ const acknowledgeResourceProfileDriftOption = Options.boolean(
   "acknowledge-resource-profile-drift",
 ).pipe(Options.withDefault(false));
 const appLogLinesOption = Options.text("app-log-lines").pipe(Options.withDefault("3"));
-const followEventsOption = Options.boolean("follow").pipe(Options.withDefault(false));
-const deploymentEventsJsonOption = Options.boolean("json").pipe(Options.withDefault(false));
+const followTimelineOption = Options.boolean("follow").pipe(Options.withDefault(false));
+const deploymentTimelineJsonOption = Options.boolean("json").pipe(Options.withDefault(false));
 const deploymentCursorOption = Options.text("cursor").pipe(Options.optional);
 const deploymentHistoryLimitOption = Options.text("history-limit").pipe(Options.withDefault("100"));
 const includeHistoryOption = Options.boolean("include-history").pipe(Options.withDefault(true));
@@ -1045,16 +1044,16 @@ const synchronousDeploymentPollIntervalMs = 250;
 const synchronousDeploymentTimeoutMs = 15 * 60 * 1000;
 
 function deploymentFailureLogTailDetails(deployment: DeploymentSummary) {
-  const logs = deployment.logs ?? [];
-  if (logs.length === 0) {
+  const timeline = deployment.timeline ?? [];
+  if (timeline.length === 0) {
     return {};
   }
 
-  const diagnosticLogs = logs.filter((log) => log.level === "error" || log.level === "warn");
-  const selectedLogs = (diagnosticLogs.length > 0 ? diagnosticLogs : logs).slice(-8);
+  const diagnosticLogs = timeline.filter((log) => log.level === "error" || log.level === "warn");
+  const selectedLogs = (diagnosticLogs.length > 0 ? diagnosticLogs : timeline).slice(-8);
 
   return {
-    failureLogCount: logs.length,
+    failureLogCount: timeline.length,
     failureLogTail: selectedLogs.map((log) =>
       [
         log.timestamp,
@@ -2017,34 +2016,14 @@ export const logsCommand = EffectCommand.make(
   {
     deploymentId: deploymentIdArg,
   },
-  ({ deploymentId }) => runQuery(DeploymentLogsQuery.create({ deploymentId })),
-).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentLogs));
-
-const pruneDeploymentLogsCommand = EffectCommand.make(
-  "prune",
-  {
-    before: Options.text("before"),
-    deployment: Options.text("deployment").pipe(Options.optional),
-    resource: resourceOption,
-    server: serverOption,
-    dryRun: dryRunOption,
-  },
-  ({ before, deployment, dryRun, resource, server }) =>
-    runCommand(
-      PruneDeploymentLogsCommand.create({
-        before,
-        ...(optionalValue(deployment) ? { deploymentId: optionalValue(deployment) } : {}),
-        ...(optionalValue(resource) ? { resourceId: optionalValue(resource) } : {}),
-        ...(optionalValue(server) ? { serverId: optionalValue(server) } : {}),
-        dryRun,
+  ({ deploymentId }) =>
+    runQuery(
+      DeploymentTimelineQuery.create({
+        deploymentId,
+        kinds: ["output", "container-log", "command", "diagnostic"],
       }),
     ),
-).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentLogsPrune));
-
-const deploymentLogsMaintenanceCommand = EffectCommand.make("logs").pipe(
-  EffectCommand.withDescription(cliCommandDescriptions.deploymentLogs),
-  EffectCommand.withSubcommands([pruneDeploymentLogsCommand]),
-);
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentTimeline));
 
 const listDeploymentsCommand = EffectCommand.make(
   "list",
@@ -2224,31 +2203,46 @@ const pruneDeploymentsCommand = EffectCommand.make(
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentPrune));
 
-const streamDeploymentEventsCommand = EffectCommand.make(
-  "events",
+const deploymentTimelineCommand = EffectCommand.make(
+  "timeline",
   {
     deploymentId: deploymentIdArg,
     cursor: deploymentCursorOption,
-    follow: followEventsOption,
+    follow: followTimelineOption,
     historyLimit: deploymentHistoryLimitOption,
     includeHistory: includeHistoryOption,
-    json: deploymentEventsJsonOption,
+    json: deploymentTimelineJsonOption,
     untilTerminal: untilTerminalOption,
   },
   ({ cursor, deploymentId, follow, historyLimit, includeHistory, json, untilTerminal }) => {
     void json;
-    return runDeploymentEventStreamQuery(
-      StreamDeploymentEventsQuery.create({
+    const normalizedCursor = optionalValue(cursor);
+    const limit = Number(historyLimit);
+
+    if (!follow) {
+      void includeHistory;
+      void untilTerminal;
+      return runQuery(
+        DeploymentTimelineQuery.create({
+          deploymentId,
+          limit,
+          ...(normalizedCursor ? { cursor: normalizedCursor } : {}),
+        }),
+      );
+    }
+
+    return runDeploymentTimelineQuery(
+      StreamDeploymentTimelineQuery.create({
         deploymentId,
         follow,
         includeHistory,
-        historyLimit: Number(historyLimit),
+        limit,
         untilTerminal,
-        ...(optionalValue(cursor) ? { cursor: optionalValue(cursor) } : {}),
+        ...(normalizedCursor ? { cursor: normalizedCursor } : {}),
       }),
     );
   },
-).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentEvents));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentTimeline));
 
 export const deploymentsCommand = EffectCommand.make("deployments").pipe(
   EffectCommand.withDescription(cliCommandDescriptions.deployments),
@@ -2263,8 +2257,8 @@ export const deploymentsCommand = EffectCommand.make("deployments").pipe(
     cancelDeploymentCommand,
     archiveDeploymentCommand,
     pruneDeploymentsCommand,
-    deploymentLogsMaintenanceCommand,
-    streamDeploymentEventsCommand,
+    logsCommand,
+    deploymentTimelineCommand,
   ]),
 );
 

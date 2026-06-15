@@ -302,7 +302,6 @@ export class ConfigMaintenanceWorkerStatusReader implements MaintenanceWorkerSta
         ],
         operationKeys: [
           "audit-events.prune",
-          "deployments.logs.prune",
           "domain-events.prune",
           "operator-work.prune",
           "provider-job-logs.prune",

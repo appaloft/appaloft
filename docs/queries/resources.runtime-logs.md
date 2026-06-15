@@ -19,7 +19,7 @@ instance.
 
 It is not:
 
-- `deployments.logs`;
+- `deployments.timeline`;
 - a deployment progress stream;
 - a Docker-specific API;
 - a command that mutates resource or deployment state;
@@ -214,7 +214,7 @@ adapter implementations behind the same port.
 Runtime application log archival, search, and retention are still out of scope for this query.
 ADR-053 positions future archive behavior as explicit Appaloft-owned bounded redacted snapshots
 derived from this query, with retention/prune applying only to those archive records.
-`deployments.logs` remains the separate deployment-attempt log operation.
+`deployments.timeline` remains the separate deployment-attempt observation operation.
 
 ## Open Questions
 

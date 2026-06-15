@@ -12,9 +12,9 @@ import {
   ShowResourceRuntimeLogArchiveQuery,
 } from "../src/messages";
 import {
-  type DeploymentLogSummary,
   type DeploymentReadModel,
   type DeploymentSummary,
+  type DeploymentTimelineJournalSummary,
   type ResourceReadModel,
   type ResourceRuntimeLogArchiveCreateInput,
   type ResourceRuntimeLogArchiveDetail,
@@ -82,7 +82,7 @@ class StaticDeploymentReadModel implements DeploymentReadModel {
       );
   }
 
-  async findLogs(): Promise<DeploymentLogSummary[]> {
+  async findTimeline(): Promise<DeploymentTimelineJournalSummary[]> {
     return [];
   }
 
@@ -274,11 +274,11 @@ function deploymentSummary(overrides: Partial<DeploymentSummary> = {}): Deployme
         },
       ],
     },
-    logs: [],
+    timeline: [],
     createdAt: "2026-01-01T00:00:00.000Z",
     startedAt: "2026-01-01T00:00:01.000Z",
     finishedAt: "2026-01-01T00:00:02.000Z",
-    logCount: 0,
+    timelineCount: 0,
     ...overrides,
     target: {
       kind: "server-backed",
@@ -370,7 +370,7 @@ describe("resource runtime log archives", () => {
 
     expect(result.isOk()).toBe(true);
     expect(result._unsafeUnwrap()).toMatchObject({
-      schemaVersion: "resources.runtime-logs.archive/v1",
+      schemaVersion: "resources.runtime-timeline.archive/v1",
       archive: {
         archiveId: "rla_000001",
         resourceId: "res_web",

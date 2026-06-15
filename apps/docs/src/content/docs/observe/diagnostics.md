@@ -264,7 +264,7 @@ CLI 示例：
 ```bash title="复制支持安全的诊断摘要"
 appaloft resource diagnose res_web \
   --deployment dep_123 \
-  --deployment-logs \
+  --deployment-timeline \
   --runtime-logs \
   --tail 50
 ```

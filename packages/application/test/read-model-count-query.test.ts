@@ -60,7 +60,7 @@ describe("read model count queries", () => {
       count: async () => 7,
       list: async () => failList(),
       findOne: async () => null,
-      findLogs: async () => [],
+      findTimeline: async () => [],
     };
 
     const projectCount = await new CountProjectsQueryService(projects).execute(context);
@@ -103,7 +103,7 @@ describe("read model count queries", () => {
       },
       list: async () => failList(),
       findOne: async () => null,
-      findLogs: async () => [],
+      findTimeline: async () => [],
     };
 
     await new CountDeploymentsQueryService(deployments).execute(

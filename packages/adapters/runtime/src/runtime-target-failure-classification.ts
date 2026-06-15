@@ -74,9 +74,9 @@ export function classifyRuntimeTargetCapacityFailureFromText(
 }
 
 export function classifyRuntimeTargetCapacityFailure(
-  logs: readonly RuntimeTargetCapacityFailureLog[],
+  timeline: readonly RuntimeTargetCapacityFailureLog[],
 ): RuntimeTargetCapacityFailureClassification | undefined {
-  for (const log of logs) {
+  for (const log of timeline) {
     const classification = classifyRuntimeTargetCapacityFailureFromText(log.message);
     if (classification) {
       const phase = capacityFailurePhaseForLogPhase(log.phase);
@@ -122,7 +122,7 @@ export function runtimeTargetCapacityFailureMetadata(input: {
 }
 
 export function runtimeTargetCapacityAwareFailureFields(input: {
-  logs: readonly RuntimeTargetCapacityFailureLog[];
+  timeline: readonly RuntimeTargetCapacityFailureLog[];
   errorCode: string;
   metadata?: Record<string, string>;
   serverId: string;
@@ -130,7 +130,7 @@ export function runtimeTargetCapacityAwareFailureFields(input: {
   errorCode: string;
   metadata?: Record<string, string>;
 } {
-  const capacityFailure = classifyRuntimeTargetCapacityFailure(input.logs);
+  const capacityFailure = classifyRuntimeTargetCapacityFailure(input.timeline);
   const metadata =
     input.metadata || capacityFailure
       ? {

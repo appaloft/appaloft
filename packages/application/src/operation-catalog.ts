@@ -64,17 +64,16 @@ import { cancelDeploymentCommandInputSchema } from "./operations/deployments/can
 import { cleanupPreviewCommandInputSchema } from "./operations/deployments/cleanup-preview.command";
 import { countDeploymentsQueryInputSchema } from "./operations/deployments/count-deployments.query";
 import { createDeploymentCommandInputSchema } from "./operations/deployments/create-deployment.command";
-import { deploymentLogsQueryInputSchema } from "./operations/deployments/deployment-logs.query";
 import { deploymentPlanQueryInputSchema } from "./operations/deployments/deployment-plan.query";
 import { deploymentRecoveryReadinessQueryInputSchema } from "./operations/deployments/deployment-recovery-readiness.query";
+import { deploymentTimelineQueryInputSchema } from "./operations/deployments/deployment-timeline.query";
 import { listDeploymentsQueryInputSchema } from "./operations/deployments/list-deployments.query";
-import { pruneDeploymentLogsCommandInputSchema } from "./operations/deployments/prune-deployment-logs.command";
 import { pruneDeploymentsCommandInputSchema } from "./operations/deployments/prune-deployments.command";
 import { redeployDeploymentCommandInputSchema } from "./operations/deployments/redeploy-deployment.command";
 import { retryDeploymentCommandInputSchema } from "./operations/deployments/retry-deployment.command";
 import { rollbackDeploymentCommandInputSchema } from "./operations/deployments/rollback-deployment.command";
 import { showDeploymentQueryInputSchema } from "./operations/deployments/show-deployment.query";
-import { streamDeploymentEventsQueryInputSchema } from "./operations/deployments/stream-deployment-events.query";
+import { streamDeploymentTimelineQueryInputSchema } from "./operations/deployments/stream-deployment-timeline.query";
 import { checkDomainBindingDeleteSafetyQueryInputSchema } from "./operations/domain-bindings/check-domain-binding-delete-safety.query";
 import { configureDomainBindingRouteCommandInputSchema } from "./operations/domain-bindings/configure-domain-binding-route.command";
 import { confirmDomainBindingOwnershipCommandInputSchema } from "./operations/domain-bindings/confirm-domain-binding-ownership.command";
@@ -3206,46 +3205,31 @@ export const operationCatalog = [
     },
   },
   {
-    key: "deployments.logs",
+    key: "deployments.timeline",
     kind: "query",
     domain: "deployments",
-    messageName: "DeploymentLogsQuery",
-    handlerName: "DeploymentLogsQueryHandler",
-    serviceName: "DeploymentLogsQueryService",
-    inputSchema: deploymentLogsQueryInputSchema,
-    serviceToken: tokens.logsQueryService,
+    messageName: "DeploymentTimelineQuery",
+    handlerName: "DeploymentTimelineQueryHandler",
+    serviceName: "DeploymentTimelineQueryService",
+    inputSchema: deploymentTimelineQueryInputSchema,
+    serviceToken: tokens.deploymentTimelineQueryService,
     transports: {
-      cli: "appaloft logs <deploymentId>",
-      orpc: { method: "GET", path: "/api/deployments/{deploymentId}/logs" },
+      cli: "appaloft deployments timeline <deploymentId>",
+      orpc: { method: "GET", path: "/api/deployments/{deploymentId}/timeline" },
     },
   },
   {
-    key: "deployments.logs.prune",
-    kind: "command",
-    domain: "deployments",
-    messageName: "PruneDeploymentLogsCommand",
-    handlerName: "PruneDeploymentLogsCommandHandler",
-    serviceName: "PruneDeploymentLogsUseCase",
-    inputSchema: pruneDeploymentLogsCommandInputSchema,
-    serviceToken: tokens.pruneDeploymentLogsUseCase,
-    transports: {
-      cli: "appaloft deployments logs prune --before <iso>",
-      orpc: { method: "POST", path: "/api/deployments/logs/prune" },
-    },
-  },
-  {
-    key: "deployments.stream-events",
+    key: "deployments.timeline.stream",
     kind: "query",
     domain: "deployments",
-    messageName: "StreamDeploymentEventsQuery",
-    handlerName: "StreamDeploymentEventsQueryHandler",
-    serviceName: "StreamDeploymentEventsQueryService",
-    inputSchema: streamDeploymentEventsQueryInputSchema,
-    serviceToken: tokens.streamDeploymentEventsQueryService,
+    messageName: "StreamDeploymentTimelineQuery",
+    handlerName: "StreamDeploymentTimelineQueryHandler",
+    serviceName: "DeploymentTimelineQueryService",
+    inputSchema: streamDeploymentTimelineQueryInputSchema,
+    serviceToken: tokens.deploymentTimelineQueryService,
     transports: {
-      cli: "appaloft deployments events <deploymentId>",
-      orpc: { method: "GET", path: "/api/deployments/{deploymentId}/events" },
-      orpcStream: { method: "GET", path: "/api/deployments/{deploymentId}/events/stream" },
+      cli: "appaloft deployments timeline <deploymentId> --follow",
+      orpcStream: { method: "GET", path: "/api/deployments/{deploymentId}/timeline/stream" },
     },
   },
   {

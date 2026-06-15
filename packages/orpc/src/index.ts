@@ -157,12 +157,11 @@ import {
   DeleteSourceLinkCommand,
   DeleteSshCredentialCommand,
   DeleteStorageVolumeCommand,
-  type DeploymentEventStreamEnvelope,
-  DeploymentLogsQuery,
   DeploymentPlanQuery,
   type DeploymentProgressEvent,
   type DeploymentProgressObserver,
   DeploymentRecoveryReadinessQuery,
+  DeploymentTimelineQuery,
   DetachResourceStorageCommand,
   DiffEnvironmentsQuery,
   DoctorQuery,
@@ -182,9 +181,9 @@ import {
   deleteSourceLinkCommandInputSchema,
   deleteSshCredentialCommandInputSchema,
   deleteStorageVolumeCommandInputSchema,
-  deploymentLogsQueryInputSchema,
   deploymentPlanQueryInputSchema,
   deploymentRecoveryReadinessQueryInputSchema,
+  deploymentTimelineQueryInputSchema,
   detachResourceStorageCommandInputSchema,
   diffEnvironmentsQueryInputSchema,
   EnvironmentEffectivePrecedenceQuery,
@@ -333,7 +332,6 @@ import {
   ProvisionDependencyResourceCommand,
   PruneAuditEventArchivesCommand,
   PruneAuditEventsCommand,
-  PruneDeploymentLogsCommand,
   PruneDeploymentsCommand,
   PruneDomainEventsCommand,
   PruneOperatorWorkCommand,
@@ -351,7 +349,6 @@ import {
   provisionDependencyResourceCommandInputSchema,
   pruneAuditEventArchivesCommandInputSchema,
   pruneAuditEventsCommandInputSchema,
-  pruneDeploymentLogsCommandInputSchema,
   pruneDeploymentsCommandInputSchema,
   pruneDomainEventsCommandInputSchema,
   pruneOperatorWorkCommandInputSchema,
@@ -509,9 +506,9 @@ import {
   StartResourceRuntimeCommand,
   type StaticArtifactPublicationSummary,
   StopResourceRuntimeCommand,
-  StreamDeploymentEventsQuery,
-  type StreamDeploymentEventsQueryInput,
-  type StreamDeploymentEventsResult,
+  StreamDeploymentTimelineQuery,
+  type StreamDeploymentTimelineQueryInput,
+  type StreamDeploymentTimelineResult,
   StreamOperatorWorkEventsQuery,
   type StreamOperatorWorkEventsQueryInput,
   type StreamOperatorWorkEventsResult,
@@ -559,7 +556,7 @@ import {
   showTerminalSessionQueryInputSchema,
   startResourceRuntimeCommandInputSchema,
   stopResourceRuntimeCommandInputSchema,
-  streamDeploymentEventsQueryInputSchema,
+  streamDeploymentTimelineQueryInputSchema,
   streamOperatorWorkEventsQueryInputSchema,
   switchCurrentOrganizationCommandInputSchema,
   TestServerConnectivityCommand,
@@ -651,13 +648,12 @@ import {
   deleteStorageVolumeResponseSchema,
   dependencyResourceProvisioningPlanResponseSchema,
   dependencyResourceResponseSchema,
-  deploymentEventStreamEnvelopeSchema,
-  deploymentEventStreamResponseSchema,
-  deploymentEventStreamStreamResponseSchema,
-  deploymentLogsResponseSchema,
   deploymentPlanResponseSchema,
   deploymentProgressEventSchema,
   deploymentRecoveryReadinessResponseSchema,
+  deploymentTimelineEnvelopeSchema,
+  deploymentTimelineResponseSchema,
+  deploymentTimelineStreamResponseSchema,
   detachResourceStorageResponseSchema,
   diffEnvironmentResponseSchema,
   doctorResponseSchema,
@@ -722,7 +718,6 @@ import {
   proxyConfigurationViewSchema,
   pruneAuditEventArchivesResponseSchema,
   pruneAuditEventsResponseSchema,
-  pruneDeploymentLogsResponseSchema,
   pruneDeploymentsResponseSchema,
   pruneDomainEventsResponseSchema,
   pruneOperatorWorkResponseSchema,
@@ -1631,9 +1626,12 @@ export const apiRouteDescriptions = {
     "Compares two environment configuration sets.",
     "environment.diff-promote",
   ),
-  deploymentLogs: routeDescription("Reads deployment logs.", "observability.runtime-logs"),
-  pruneDeploymentLogs: routeDescription(
-    "Dry-runs or prunes old embedded deployment log entries without deleting deployment rows.",
+  deploymentTimeline: routeDescription(
+    "Reads deployment timeline entries across deployment, command, runtime output, and diagnostics.",
+    "observability.runtime-logs",
+  ),
+  deploymentTimelineStream: routeDescription(
+    "Streams deployment timeline entries from the same journal used by deployment detail.",
     "observability.runtime-logs",
   ),
   resourceRuntimeLogs: routeDescription(
@@ -2693,14 +2691,18 @@ function createResourceRuntimeLogStream(
   })();
 }
 
-function createDeploymentEventStream(
+function createDeploymentTimelineStream(
   context: AppaloftOrpcRequestContext,
-  input: StreamDeploymentEventsQueryInput,
-): AsyncGenerator<DeploymentEventStreamEnvelope, { deploymentId: string }, void> {
-  return (async function* streamDeploymentEvents() {
-    const result: StreamDeploymentEventsResult = await executeQuery(
+  input: StreamDeploymentTimelineQueryInput,
+): AsyncGenerator<
+  import("@appaloft/contracts").DeploymentTimelineEnvelope,
+  { deploymentId: string },
+  void
+> {
+  return (async function* streamDeploymentTimeline() {
+    const result: StreamDeploymentTimelineResult = await executeQuery(
       context,
-      StreamDeploymentEventsQuery.create({
+      StreamDeploymentTimelineQuery.create({
         ...input,
         follow: true,
       }),
@@ -5296,30 +5298,6 @@ export const createDeploymentStreamProcedure = base
   .output(eventIterator(deploymentProgressEventSchema, createDeploymentResponseSchema))
   .handler(({ input, context }) => createDeploymentStream(context, input));
 
-export const deploymentLogsProcedure = base
-  .route({
-    method: "GET",
-    path: "/deployments/{deploymentId}/logs",
-    description: apiRouteDescriptions.deploymentLogs,
-    successStatus: 200,
-  })
-  .input(deploymentLogsQueryInputSchema)
-  .output(deploymentLogsResponseSchema)
-  .handler(async ({ input, context }) => executeQuery(context, DeploymentLogsQuery.create(input)));
-
-export const pruneDeploymentLogsProcedure = base
-  .route({
-    method: "POST",
-    path: "/deployments/logs/prune",
-    description: apiRouteDescriptions.pruneDeploymentLogs,
-    successStatus: 200,
-  })
-  .input(pruneDeploymentLogsCommandInputSchema)
-  .output(pruneDeploymentLogsResponseSchema)
-  .handler(async ({ input, context }) =>
-    executeCommand(context, PruneDeploymentLogsCommand.create(input)),
-  );
-
 export const pruneDeploymentsProcedure = base
   .route({
     method: "POST",
@@ -5333,47 +5311,29 @@ export const pruneDeploymentsProcedure = base
     executeCommand(context, PruneDeploymentsCommand.create(input)),
   );
 
-export const deploymentEventReplayProcedure = base
+export const deploymentTimelineProcedure = base
   .route({
     method: "GET",
-    path: "/deployments/{deploymentId}/events",
+    path: "/deployments/{deploymentId}/timeline",
+    description: apiRouteDescriptions.deploymentTimeline,
     successStatus: 200,
   })
-  .input(streamDeploymentEventsQueryInputSchema)
-  .output(deploymentEventStreamResponseSchema)
-  .handler(async ({ input, context }) => {
-    const result: StreamDeploymentEventsResult = await executeQuery(
-      context,
-      StreamDeploymentEventsQuery.create({
-        ...input,
-        follow: false,
-      }),
-    );
+  .input(deploymentTimelineQueryInputSchema)
+  .output(deploymentTimelineResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, DeploymentTimelineQuery.create(input)),
+  );
 
-    if (result.mode !== "bounded") {
-      throw new ORPCError("INTERNAL_SERVER_ERROR", {
-        message: "Deployment event query returned a stream for a bounded request",
-        status: 500,
-      });
-    }
-
-    return {
-      deploymentId: result.deploymentId,
-      envelopes: result.envelopes,
-    };
-  });
-
-export const deploymentEventStreamProcedure = base
+export const deploymentTimelineStreamProcedure = base
   .route({
     method: "GET",
-    path: "/deployments/{deploymentId}/events/stream",
+    path: "/deployments/{deploymentId}/timeline/stream",
+    description: apiRouteDescriptions.deploymentTimelineStream,
     successStatus: 200,
   })
-  .input(streamDeploymentEventsQueryInputSchema)
-  .output(
-    eventIterator(deploymentEventStreamEnvelopeSchema, deploymentEventStreamStreamResponseSchema),
-  )
-  .handler(({ input, context }) => createDeploymentEventStream(context, input));
+  .input(streamDeploymentTimelineQueryInputSchema)
+  .output(eventIterator(deploymentTimelineEnvelopeSchema, deploymentTimelineStreamResponseSchema))
+  .handler(({ input, context }) => createDeploymentTimelineStream(context, input));
 
 export const resourceRuntimeLogsProcedure = base
   .route({
@@ -6584,10 +6544,8 @@ export const appaloftOrpcRouter = {
     show: showDeploymentProcedure,
     recoveryReadiness: deploymentRecoveryReadinessProcedure,
     createStream: createDeploymentStreamProcedure,
-    logs: deploymentLogsProcedure,
-    pruneLogs: pruneDeploymentLogsProcedure,
-    events: deploymentEventReplayProcedure,
-    eventsStream: deploymentEventStreamProcedure,
+    timeline: deploymentTimelineProcedure,
+    timelineStream: deploymentTimelineStreamProcedure,
   },
   operatorWork: {
     list: listOperatorWorkProcedure,
@@ -9171,10 +9129,8 @@ export function mountAppaloftOrpcRoutes(
     "/api/deployments/:deploymentId/recovery-readiness",
     "/api/deployments/stream",
     "/api/deployments/prune",
-    "/api/deployments/logs/prune",
-    "/api/deployments/:deploymentId/logs",
-    "/api/deployments/:deploymentId/events",
-    "/api/deployments/:deploymentId/events/stream",
+    "/api/deployments/:deploymentId/timeline",
+    "/api/deployments/:deploymentId/timeline/stream",
     "/api/source-events",
     "/api/source-events/prune",
     "/api/source-events/:sourceEventId",

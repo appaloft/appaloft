@@ -9,6 +9,7 @@ import {
 import {
   type DeploymentByIdSpec,
   type DeploymentSelectionSpecVisitor,
+  type DeploymentTimelineJournalSource,
   type LatestDeploymentSpec,
   type LatestRuntimeOwningDeploymentSpec,
 } from "@appaloft/core";
@@ -21,7 +22,7 @@ import {
   resolveRepositoryContextOrganizationId,
   resolveRepositoryExecutor,
   type SerializedDeploymentDependencyBindingReference,
-  type SerializedDeploymentLog,
+  type SerializedDeploymentTimelineEntry,
   type SerializedEnvironmentSnapshot,
   type SerializedRuntimePlan,
 } from "./shared";
@@ -81,8 +82,19 @@ function sourceCommitShaFromRuntimePlan(runtimePlan: SerializedRuntimePlan): str
   );
 }
 
-function deploymentLogSource(source: unknown): "appaloft" | "application" {
-  return source === "application" ? "application" : "appaloft";
+function deploymentTimelineSource(source: unknown): DeploymentTimelineJournalSource {
+  switch (source) {
+    case "appaloft":
+    case "ssh":
+    case "docker":
+    case "application":
+    case "provider":
+    case "health":
+    case "domain-event":
+      return source;
+    default:
+      return "appaloft";
+  }
 }
 
 function dependencyBindingReferenceKind(
@@ -106,7 +118,7 @@ function toDeploymentSummary(
   const environmentSnapshot = row.environment_snapshot as unknown as SerializedEnvironmentSnapshot;
   const dependencyBindingReferences = (row.dependency_binding_references ??
     []) as unknown as SerializedDeploymentDependencyBindingReference[];
-  const logs = (row.logs ?? []) as unknown as SerializedDeploymentLog[];
+  const timeline = (row.timeline ?? []) as unknown as SerializedDeploymentTimelineEntry[];
   const sourceCommitSha = sourceCommitShaFromRuntimePlan(runtimePlan);
   const target = deploymentSummaryTargetFromRow(row);
 
@@ -269,14 +281,14 @@ function toDeploymentSummary(
         ...(reference.snapshotReadinessReason ? { reason: reference.snapshotReadinessReason } : {}),
       },
     })),
-    logs: logs.map((entry) => ({
+    timeline: timeline.map((entry) => ({
       timestamp: entry.timestamp,
-      source: deploymentLogSource(entry.source),
+      source: deploymentTimelineSource(entry.source),
       phase: entry.phase,
       level: entry.level,
       message: entry.message,
     })),
-    logCount: Array.isArray(row.logs) ? row.logs.length : 0,
+    timelineCount: Array.isArray(row.timeline) ? row.timeline.length : 0,
     createdAt: normalizeTimestamp(row.created_at) ?? row.created_at,
     ...(startedAt ? { startedAt } : {}),
     ...(finishedAt ? { finishedAt } : {}),
@@ -484,10 +496,10 @@ export class PgDeploymentReadModel implements DeploymentReadModel {
     );
   }
 
-  async findLogs(context: RepositoryContext, id: string) {
+  async findTimeline(context: RepositoryContext, id: string) {
     const executor = resolveRepositoryExecutor(this.db, context);
     return context.tracer.startActiveSpan(
-      createReadModelSpanName("deployment", "find_logs"),
+      createReadModelSpanName("deployment", "find_timeline"),
       {
         attributes: {
           [appaloftTraceAttributes.readModelName]: "deployment",
@@ -496,16 +508,18 @@ export class PgDeploymentReadModel implements DeploymentReadModel {
       async () => {
         const row = await executor
           .selectFrom("deployments")
-          .select(["logs"])
+          .select(["timeline"])
           .where("id", "=", id)
           .executeTakeFirst();
-        return ((row?.logs ?? []) as unknown as SerializedDeploymentLog[]).map((entry) => ({
-          timestamp: entry.timestamp,
-          source: deploymentLogSource(entry.source),
-          phase: entry.phase,
-          level: entry.level,
-          message: entry.message,
-        }));
+        return ((row?.timeline ?? []) as unknown as SerializedDeploymentTimelineEntry[]).map(
+          (entry) => ({
+            timestamp: entry.timestamp,
+            source: deploymentTimelineSource(entry.source),
+            phase: entry.phase,
+            level: entry.level,
+            message: entry.message,
+          }),
+        );
       },
     );
   }

@@ -2928,7 +2928,7 @@
               observationTo: resourceRuntimeMonitoringObservationHandoff.to,
             }
           : {}),
-        includeDeploymentLogTail: true,
+        includeDeploymentTimelineTail: true,
         includeRuntimeLogTail: true,
         includeProxyConfiguration: true,
         tailLines: 20,

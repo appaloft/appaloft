@@ -252,7 +252,7 @@ describe("route intent/status contract", () => {
         status: "available",
         configurationIncluded: false,
       },
-      deploymentLogs: {
+      deploymentTimeline: {
         status: "not-requested",
         tailLimit: 0,
         lineCount: 0,

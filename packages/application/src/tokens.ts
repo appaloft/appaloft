@@ -29,7 +29,6 @@ export const tokens = {
   durableWorkHandlerRegistry: Symbol.for("appaloft.durable_work_handler_registry"),
   deploymentProgressRecorder: Symbol.for("appaloft.deployment_progress_recorder"),
   deploymentProgressReporter: Symbol.for("appaloft.deployment_progress_reporter"),
-  deploymentEventObserver: Symbol.for("appaloft.deployment_event_observer"),
   sourceLinkRepository: Symbol.for("appaloft.source_link_repository"),
   sourceLinkReadModel: Symbol.for("appaloft.source_link_read_model"),
   sourceLinkQueryService: Symbol.for("appaloft.source_link_query_service"),
@@ -160,7 +159,7 @@ export const tokens = {
   domainEventStreamObservationReader: Symbol.for("appaloft.domain_event_stream_observation_reader"),
   domainEventStreamRecorder: Symbol.for("appaloft.domain_event_stream_recorder"),
   domainEventStreamRetentionStore: Symbol.for("appaloft.domain_event_stream_retention_store"),
-  deploymentLogRetentionStore: Symbol.for("appaloft.deployment_log_retention_store"),
+  deploymentTimelineObserver: Symbol.for("appaloft.deployment_timeline_observer"),
   deploymentAttemptRetentionStore: Symbol.for("appaloft.deployment_attempt_retention_store"),
   resourceRuntimeControlAttemptRetentionStore: Symbol.for(
     "appaloft.resource_runtime_control_attempt_retention_store",
@@ -227,7 +226,6 @@ export const tokens = {
   ),
   pruneProviderJobLogsUseCase: Symbol.for("appaloft.prune_provider_job_logs_use_case"),
   pruneDomainEventsUseCase: Symbol.for("appaloft.prune_domain_events_use_case"),
-  pruneDeploymentLogsUseCase: Symbol.for("appaloft.prune_deployment_logs_use_case"),
   configureRetentionDefaultsUseCase: Symbol.for("appaloft.configure_retention_defaults_use_case"),
   listRetentionDefaultsQueryService: Symbol.for("appaloft.list_retention_defaults_query_service"),
   showRetentionDefaultQueryService: Symbol.for("appaloft.show_retention_default_query_service"),
@@ -610,8 +608,7 @@ export const tokens = {
   deploymentRecoveryReadinessQueryService: Symbol.for(
     "appaloft.deployment_recovery_readiness_query_service",
   ),
-  streamDeploymentEventsQueryService: Symbol.for("appaloft.stream_deployment_events_query_service"),
-  logsQueryService: Symbol.for("appaloft.logs_query_service"),
+  deploymentTimelineQueryService: Symbol.for("appaloft.deployment_timeline_query_service"),
   operatorWorkQueryService: Symbol.for("appaloft.operator_work_query_service"),
   streamOperatorWorkEventsQueryService: Symbol.for(
     "appaloft.stream_operator_work_events_query_service",

@@ -172,8 +172,8 @@ function deploymentSummary(overrides: Partial<DeploymentSummary> = {}): Deployme
     },
     createdAt: "2026-01-01T00:00:00.000Z",
     finishedAt: "2026-01-01T00:01:00.000Z",
-    logs: [],
-    logCount: 0,
+    timeline: [],
+    timelineCount: 0,
     ...overrides,
     target: {
       kind: "server-backed",
@@ -205,7 +205,7 @@ class StaticDeploymentReadModel implements DeploymentReadModel {
     return null;
   }
 
-  async findLogs(): Promise<[]> {
+  async findTimeline(): Promise<[]> {
     return [];
   }
 }

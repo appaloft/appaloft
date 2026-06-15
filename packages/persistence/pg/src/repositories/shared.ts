@@ -41,9 +41,6 @@ import {
   DeploymentDependencyBindingSnapshotReadinessValue,
   DeploymentDependencyRuntimeSecretRef,
   DeploymentId,
-  DeploymentLogEntry,
-  type DeploymentLogEntry as DeploymentLogEntryType,
-  DeploymentLogSourceValue,
   DeploymentPhaseValue,
   DeploymentStatusValue,
   DeploymentTargetCredentialKindValue,
@@ -54,6 +51,10 @@ import {
   DeploymentTargetName,
   DeploymentTargetUsername,
   DeploymentTargetVariant,
+  DeploymentTimelineJournalEntry,
+  type DeploymentTimelineJournalEntry as DeploymentTimelineJournalEntryType,
+  type DeploymentTimelineJournalSource,
+  DeploymentTimelineSourceValue,
   DeploymentTriggerKindValue,
   DescriptionText,
   DestinationId,
@@ -399,9 +400,9 @@ export interface SerializedEnvironmentSnapshot extends Record<string, unknown> {
   variables: SerializedEnvironmentSnapshotVariable[];
 }
 
-export interface SerializedDeploymentLog extends Record<string, unknown> {
+export interface SerializedDeploymentTimelineEntry extends Record<string, unknown> {
   timestamp: string;
-  source?: "appaloft" | "application";
+  source?: DeploymentTimelineJournalSource;
   phase: DeploymentPhaseInput;
   level: LogLevelInput;
   message: string;
@@ -956,9 +957,11 @@ export function rehydrateEnvironmentSnapshot(raw: unknown): EnvironmentConfigSna
   });
 }
 
-export function serializeDeploymentLogs(logs: DeploymentLogEntryType[]): SerializedDeploymentLog[] {
-  return logs.map((log) => {
-    const state = log.toState();
+export function serializeDeploymentTimeline(
+  timeline: DeploymentTimelineJournalEntryType[],
+): SerializedDeploymentTimelineEntry[] {
+  return timeline.map((entry) => {
+    const state = entry.toState();
     return {
       timestamp: state.timestamp.value,
       source: state.source.value,
@@ -1020,11 +1023,11 @@ export function rehydrateDeploymentDependencyBindingReferences(
   });
 }
 
-export function rehydrateDeploymentLogs(raw: unknown): DeploymentLogEntry[] {
-  return ((raw as SerializedDeploymentLog[] | null | undefined) ?? []).map((entry) =>
-    DeploymentLogEntry.rehydrate({
+export function rehydrateDeploymentTimeline(raw: unknown): DeploymentTimelineJournalEntry[] {
+  return ((raw as SerializedDeploymentTimelineEntry[] | null | undefined) ?? []).map((entry) =>
+    DeploymentTimelineJournalEntry.rehydrate({
       timestamp: OccurredAt.rehydrate(entry.timestamp),
-      source: DeploymentLogSourceValue.rehydrate(entry.source ?? "appaloft"),
+      source: DeploymentTimelineSourceValue.rehydrate(entry.source ?? "appaloft"),
       phase: DeploymentPhaseValue.rehydrate(entry.phase as DeploymentPhaseInput),
       level: LogLevelValue.rehydrate(entry.level as LogLevelInput),
       message: MessageText.rehydrate(entry.message),
@@ -1852,7 +1855,7 @@ export function rehydrateDeploymentRow(row: Selectable<Database["deployments"]>)
     dependencyBindingReferences: rehydrateDeploymentDependencyBindingReferences(
       row.dependency_binding_references,
     ),
-    logs: rehydrateDeploymentLogs(row.logs),
+    timeline: rehydrateDeploymentTimeline(row.timeline),
     createdAt: CreatedAt.rehydrate(normalizeTimestamp(row.created_at) ?? row.created_at),
     triggerKind: DeploymentTriggerKindValue.rehydrate(
       row.trigger_kind as DeploymentTriggerKindInput,

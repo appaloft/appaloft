@@ -51,8 +51,8 @@ import {
   type DefaultAccessDomainPolicyRepository,
   DefaultAccessDomainRuntimePlanResolver,
   type DependencyResourceBackupPolicyRepository,
-  DeploymentLogProgressRecorder,
   type DeploymentProgressReporter,
+  DeploymentTimelineProgressRecorder,
   type DomainEventStreamRecorder,
   EmptyRemoteStateWorkReadModel,
   type EventBus,
@@ -141,7 +141,6 @@ import {
   PgDependencyResourceRepository,
   PgDependencyResourceSecretStore,
   PgDeploymentAttemptRetentionStore,
-  PgDeploymentLogRetentionStore,
   PgDeploymentReadModel,
   PgDeploymentRepository,
   PgDeployTokenReadModel,
@@ -904,7 +903,7 @@ export function registerRuntimeDependencies(
   container.register(tokens.deploymentProgressRecorder, {
     useFactory: instanceCachingFactory(
       (dependencyContainer) =>
-        new DeploymentLogProgressRecorder(
+        new DeploymentTimelineProgressRecorder(
           dependencyContainer.resolve(tokens.deploymentRepository),
           dependencyContainer.resolve(tokens.logger),
         ),
@@ -1292,9 +1291,6 @@ export function registerRuntimeDependencies(
     useFactory: instanceCachingFactory(
       () => new PgDomainEventStreamRetentionStore(input.database.db),
     ),
-  });
-  container.register(tokens.deploymentLogRetentionStore, {
-    useFactory: instanceCachingFactory(() => new PgDeploymentLogRetentionStore(input.database.db)),
   });
   container.register(tokens.resourceRuntimeLogArchiveStore, {
     useFactory: instanceCachingFactory(

@@ -64,7 +64,7 @@ type CancelDeploymentResult = {
 ```
 
 The canceled attempt remains visible through `deployments.show`, `deployments.list`,
-`deployments.logs`, and `deployments.stream-events`.
+`deployments.timeline`, and `deployments.timeline.stream`.
 
 ## Entrypoints
 

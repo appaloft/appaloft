@@ -772,24 +772,24 @@ describe("public docs operation coverage", () => {
     expect(topic.description).toContain("without deleting deployments");
   });
 
-  test("[DEP-LOG-PRUNE-004] deployment log retention records docs coverage", () => {
-    const coverage = getPublicDocsOperationCoverage("deployments.logs.prune");
-    const topic = publicDocsHelpTopics["observability.runtime-logs"];
+  test("[DEP-TIMELINE-006] deployment timeline records docs coverage", () => {
+    const coverage = getPublicDocsOperationCoverage("deployments.timeline");
+    const topic = publicDocsHelpTopics["deployment.lifecycle"];
 
     expect(coverage).toMatchObject({
-      operationKey: "deployments.logs.prune",
+      operationKey: "deployments.timeline",
       status: "documented",
-      topicId: "observability.runtime-logs",
+      topicId: "deployment.lifecycle",
     });
     expect(topic.specReferences).toEqual(
       expect.arrayContaining([
-        "docs/commands/deployments.logs.prune.md",
-        "docs/testing/deployment-log-retention-test-matrix.md",
-        "docs/specs/058-deployment-log-retention/spec.md",
-        "docs/decisions/ADR-052-deployment-log-retention-policy.md",
+        "docs/queries/deployments.timeline.md",
+        "docs/testing/deployment-timeline-journal-test-matrix.md",
+        "docs/specs/095-deployment-timeline-journal/spec.md",
+        "docs/decisions/ADR-084-deployment-timeline-journal-boundary.md",
       ]),
     );
-    expect(topic.description).toContain("prune old embedded deployment log entries");
+    expect(topic.description).toContain("Detect, plan, execute, verify, and rollback");
   });
 
   test("[SYSTEM-DIAG-DOCS-001] system diagnostics operations record safe docs coverage", async () => {

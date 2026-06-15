@@ -155,7 +155,7 @@ function createSucceededDeployment(input?: {
     ExecutionResult.rehydrate({
       exitCode: ExitCode.rehydrate(0),
       status: ExecutionStatusValue.rehydrate("succeeded"),
-      logs: [],
+      timeline: [],
       retryable: false,
       errorCode: ErrorCodeText.rehydrate("none"),
     }),
@@ -235,8 +235,8 @@ function createDeploymentSummary(input?: {
       precedence: ["environment"],
       variables: [],
     },
-    logs: [],
-    logCount: 0,
+    timeline: [],
+    timelineCount: 0,
     createdAt: input?.createdAt ?? "2026-04-21T00:00:00.000Z",
     startedAt: input?.startedAt ?? "2026-04-21T00:02:00.000Z",
     finishedAt: input?.finishedAt ?? "2026-04-21T00:03:00.000Z",
@@ -331,13 +331,13 @@ class CapturingServerAppliedRouteStateRepository implements ServerAppliedRouteSt
 class CapturingExecutionBackend implements ExecutionBackend {
   readonly canceledDeploymentIds: string[] = [];
 
-  constructor(private readonly cancelResult: Result<{ logs: [] }> = ok({ logs: [] })) {}
+  constructor(private readonly cancelResult: Result<{ timeline: [] }> = ok({ timeline: [] })) {}
 
   async execute(): Promise<Result<{ deployment: Deployment }>> {
     throw new Error("Unexpected execute call");
   }
 
-  async cancel(_context: unknown, deployment: Deployment): Promise<Result<{ logs: [] }>> {
+  async cancel(_context: unknown, deployment: Deployment): Promise<Result<{ timeline: [] }>> {
     this.canceledDeploymentIds.push(deployment.toState().id.value);
     return this.cancelResult;
   }
@@ -458,7 +458,7 @@ class MemoryDeploymentReadModel implements DeploymentReadModel {
     return null;
   }
 
-  async findLogs(): Promise<Awaited<ReturnType<DeploymentReadModel["findLogs"]>>> {
+  async findTimeline(): Promise<Awaited<ReturnType<DeploymentReadModel["findTimeline"]>>> {
     return [];
   }
 }

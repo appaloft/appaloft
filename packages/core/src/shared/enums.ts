@@ -212,9 +212,17 @@ export const logLevels = ["debug", "info", "warn", "error"] as const;
 
 export type LogLevel = (typeof logLevels)[number];
 
-export const deploymentLogSources = ["appaloft", "application"] as const;
+export const deploymentTimelineSources = [
+  "appaloft",
+  "ssh",
+  "docker",
+  "application",
+  "provider",
+  "health",
+  "domain-event",
+] as const;
 
-export type DeploymentLogSource = (typeof deploymentLogSources)[number];
+export type DeploymentTimelineJournalSource = (typeof deploymentTimelineSources)[number];
 
 export const deployTokenStatuses = ["active", "revoked"] as const;
 

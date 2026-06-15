@@ -7,9 +7,9 @@ import { createExecutionContext, type ExecutionContext, type toRepositoryContext
 import { ResourceDiagnosticSummaryQuery } from "../src/messages";
 import {
   type DefaultAccessDomainProvider,
-  type DeploymentLogSummary,
   type DeploymentReadModel,
   type DeploymentSummary,
+  type DeploymentTimelineJournalSummary,
   type DestinationRepository,
   type DiagnosticsPort,
   type DomainBindingReadModel,
@@ -70,7 +70,7 @@ class StaticDeploymentReadModel implements DeploymentReadModel {
 
   constructor(
     private readonly deployments: DeploymentSummary[],
-    private readonly deploymentLogs: DeploymentLogSummary[] = [],
+    private readonly deploymentTimeline: DeploymentTimelineJournalSummary[] = [],
   ) {}
 
   async list(
@@ -87,8 +87,8 @@ class StaticDeploymentReadModel implements DeploymentReadModel {
       );
   }
 
-  async findLogs(): Promise<DeploymentLogSummary[]> {
-    return this.deploymentLogs;
+  async findTimeline(): Promise<DeploymentTimelineJournalSummary[]> {
+    return this.deploymentTimeline;
   }
 
   async findOne(): Promise<DeploymentSummary | null> {
@@ -478,7 +478,7 @@ function deploymentSummary(overrides?: Partial<DeploymentSummary>): DeploymentSu
         },
       ],
     },
-    logs: [
+    timeline: [
       {
         timestamp: "2026-01-01T00:00:03.000Z",
         source: "application",
@@ -490,7 +490,7 @@ function deploymentSummary(overrides?: Partial<DeploymentSummary>): DeploymentSu
     createdAt: "2026-01-01T00:00:00.000Z",
     startedAt: "2026-01-01T00:00:01.000Z",
     finishedAt: "2026-01-01T00:00:04.000Z",
-    logCount: 1,
+    timelineCount: 1,
     ...overrides,
     target: {
       kind: "server-backed",
@@ -523,7 +523,7 @@ function runtimeLogLine(
 function createService(input?: {
   resources?: ResourceSummary[];
   deployments?: DeploymentSummary[];
-  deploymentLogs?: DeploymentLogSummary[];
+  deploymentTimeline?: DeploymentTimelineJournalSummary[];
   domainBindings?: DomainBindingSummary[];
   runtimeLogEvents?: ResourceRuntimeLogEvent[];
   edgeProxyProviderRegistry?: EdgeProxyProviderRegistry;
@@ -531,7 +531,7 @@ function createService(input?: {
   const resourceReadModel = new StaticResourceReadModel(input?.resources ?? [resourceSummary()]);
   const deploymentReadModel = new StaticDeploymentReadModel(
     input?.deployments ?? [deploymentSummary()],
-    input?.deploymentLogs ?? deploymentSummary().logs,
+    input?.deploymentTimeline ?? deploymentSummary().timeline,
   );
   const domainBindingReadModel = new StaticDomainBindingReadModel(input?.domainBindings ?? []);
   const listResourcesQueryService = new ListResourcesQueryService(
@@ -584,7 +584,7 @@ describe("ResourceDiagnosticSummaryQueryService", () => {
     const { service } = createService();
     const query = ResourceDiagnosticSummaryQuery.create({
       resourceId: "res_web",
-      includeDeploymentLogTail: true,
+      includeDeploymentTimelineTail: true,
       includeRuntimeLogTail: true,
       includeProxyConfiguration: false,
       tailLines: 20,
@@ -600,7 +600,7 @@ describe("ResourceDiagnosticSummaryQueryService", () => {
     });
     expect(summary.access.status).toBe("available");
     expect(summary.proxy.providerKey).toBe("traefik");
-    expect(summary.deploymentLogs.lines[0]?.message).toContain("********");
+    expect(summary.deploymentTimeline.lines[0]?.message).toContain("********");
     expect(summary.runtimeLogs.lines[0]?.message).toContain("********");
     expect(summary.copy.json).toContain('"resourceId": "res_web"');
     expect(summary.copy.json).toContain('"deploymentId": "dep_web"');
@@ -612,7 +612,7 @@ describe("ResourceDiagnosticSummaryQueryService", () => {
   test("[RT-MON-005][RES-DIAG-QRY-020] applies an observation window to diagnostic log evidence", async () => {
     const context = createTestContext();
     const { runtimeLogReader, service } = createService({
-      deploymentLogs: [
+      deploymentTimeline: [
         {
           timestamp: "2025-12-31T23:59:00.000Z",
           source: "application",
@@ -639,7 +639,7 @@ describe("ResourceDiagnosticSummaryQueryService", () => {
     });
     const query = ResourceDiagnosticSummaryQuery.create({
       resourceId: "res_web",
-      includeDeploymentLogTail: true,
+      includeDeploymentTimelineTail: true,
       includeRuntimeLogTail: true,
       includeProxyConfiguration: false,
       observationFrom: "2026-01-01T00:00:00.000Z",
@@ -659,7 +659,7 @@ describe("ResourceDiagnosticSummaryQueryService", () => {
       from: "2026-01-01T00:00:00.000Z",
       to: "2026-01-01T00:01:00.000Z",
     });
-    expect(summary.deploymentLogs.lines.map((line) => line.message)).toEqual([
+    expect(summary.deploymentTimeline.lines.map((line) => line.message)).toEqual([
       "inside deployment window ********",
     ]);
     expect(summary.runtimeLogs.lines.map((line) => line.message)).toEqual([
@@ -695,7 +695,7 @@ describe("ResourceDiagnosticSummaryQueryService", () => {
     });
     const query = ResourceDiagnosticSummaryQuery.create({
       resourceId: "res_web",
-      includeDeploymentLogTail: false,
+      includeDeploymentTimelineTail: false,
       includeRuntimeLogTail: false,
       includeProxyConfiguration: false,
       tailLines: 10,
@@ -749,7 +749,7 @@ describe("ResourceDiagnosticSummaryQueryService", () => {
     });
     const query = ResourceDiagnosticSummaryQuery.create({
       resourceId: "res_web",
-      includeDeploymentLogTail: false,
+      includeDeploymentTimelineTail: false,
       includeRuntimeLogTail: false,
       includeProxyConfiguration: false,
       tailLines: 10,
@@ -849,7 +849,7 @@ describe("ResourceDiagnosticSummaryQueryService", () => {
     });
     const query = ResourceDiagnosticSummaryQuery.create({
       resourceId: "res_web",
-      includeDeploymentLogTail: false,
+      includeDeploymentTimelineTail: false,
       includeRuntimeLogTail: false,
       includeProxyConfiguration: false,
       tailLines: 10,
@@ -895,7 +895,7 @@ describe("ResourceDiagnosticSummaryQueryService", () => {
     });
     const query = ResourceDiagnosticSummaryQuery.create({
       resourceId: "res_web",
-      includeDeploymentLogTail: false,
+      includeDeploymentTimelineTail: false,
       includeRuntimeLogTail: false,
       includeProxyConfiguration: true,
       tailLines: 10,
@@ -978,7 +978,7 @@ describe("ResourceDiagnosticSummaryQueryService", () => {
     });
     const query = ResourceDiagnosticSummaryQuery.create({
       resourceId: "res_web",
-      includeDeploymentLogTail: false,
+      includeDeploymentTimelineTail: false,
       includeRuntimeLogTail: false,
       includeProxyConfiguration: false,
       tailLines: 10,
@@ -1032,7 +1032,7 @@ describe("ResourceDiagnosticSummaryQueryService", () => {
     });
     const query = ResourceDiagnosticSummaryQuery.create({
       resourceId: "res_web",
-      includeDeploymentLogTail: false,
+      includeDeploymentTimelineTail: false,
       includeRuntimeLogTail: false,
       includeProxyConfiguration: false,
       tailLines: 10,
@@ -1112,7 +1112,7 @@ describe("ResourceDiagnosticSummaryQueryService", () => {
     });
     const query = ResourceDiagnosticSummaryQuery.create({
       resourceId: "res_web",
-      includeDeploymentLogTail: false,
+      includeDeploymentTimelineTail: false,
       includeRuntimeLogTail: false,
       includeProxyConfiguration: true,
       tailLines: 10,
@@ -1135,7 +1135,7 @@ describe("ResourceDiagnosticSummaryQueryService", () => {
     expect(summary.copy.json).toContain('"appaloftCertificateManaged": false');
   });
 
-  test("[HEALTH-ACCESS-002] keeps missing access and unrequested runtime logs as section state", async () => {
+  test("[HEALTH-ACCESS-002] keeps missing access and unrequested runtime timeline as section state", async () => {
     const context = createTestContext();
     const resourceWithoutAccess = resourceSummary();
     delete resourceWithoutAccess.accessSummary;
@@ -1144,7 +1144,7 @@ describe("ResourceDiagnosticSummaryQueryService", () => {
     });
     const query = ResourceDiagnosticSummaryQuery.create({
       resourceId: "res_web",
-      includeDeploymentLogTail: true,
+      includeDeploymentTimelineTail: true,
       includeRuntimeLogTail: false,
       tailLines: 10,
     })._unsafeUnwrap();
@@ -1185,7 +1185,7 @@ describe("ResourceDiagnosticSummaryQueryService", () => {
     });
     const query = ResourceDiagnosticSummaryQuery.create({
       resourceId: "res_web",
-      includeDeploymentLogTail: true,
+      includeDeploymentTimelineTail: true,
       includeRuntimeLogTail: true,
       includeProxyConfiguration: true,
       tailLines: 20,

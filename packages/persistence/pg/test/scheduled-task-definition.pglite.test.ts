@@ -576,8 +576,8 @@ describe("scheduled task definition persistence", () => {
     }
   });
 
-  test("[SCHED-TASK-LOGS-001] reads run-scoped logs without exposing raw secret values", async () => {
-    const dataDir = mkdtempSync(join(tmpdir(), "appaloft-scheduled-task-run-logs-"));
+  test("[SCHED-TASK-LOGS-001] reads run-scoped timeline without exposing raw secret values", async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), "appaloft-scheduled-task-run-timeline-"));
     const {
       createDatabase,
       createMigrator,
@@ -684,7 +684,7 @@ describe("scheduled task definition persistence", () => {
         },
       ]);
 
-      const logs = await logReadModel.read(context, {
+      const timeline = await logReadModel.read(context, {
         runId: "str_manual",
         taskId: "tsk_backup",
         resourceId: "res_api",
@@ -692,7 +692,7 @@ describe("scheduled task definition persistence", () => {
       });
 
       expect(recorded.isOk()).toBe(true);
-      expect(logs).toEqual({
+      expect(timeline).toEqual({
         runId: "str_manual",
         taskId: "tsk_backup",
         resourceId: "res_api",

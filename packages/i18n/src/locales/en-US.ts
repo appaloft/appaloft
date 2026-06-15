@@ -585,8 +585,6 @@ export const enUS = {
       listDescription:
         "Show source, status, project, and environment by time. Open details for the runtime plan.",
       listTitle: "Deployment list",
-      logsDescription: "{{count}} logs",
-      logsTitle: "Logs",
       metadataTitle: "Metadata",
       needsAttention: "Needs attention",
       latestDescription: "Quickly verify the project, environment, server, and source binding.",
@@ -603,7 +601,6 @@ export const enUS = {
       openAccessUrl: "Open URL",
       openResourceLogs: "Open resource logs",
       overviewTab: "Overview",
-      logsTab: "Logs",
       snapshotTab: "Environment snapshot",
       timelineTab: "Timeline",
       packagingMode: "Packaging mode",

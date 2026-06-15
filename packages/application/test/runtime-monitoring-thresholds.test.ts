@@ -282,7 +282,7 @@ describe("runtime monitoring thresholds boundary", () => {
         "open-runtime-monitoring",
         "inspect-runtime-usage",
         "inspect-capacity",
-        "review-runtime-logs",
+        "review-runtime-timeline",
         "review-deployment-events",
       ],
     });

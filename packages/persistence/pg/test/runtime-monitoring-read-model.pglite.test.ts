@@ -120,7 +120,7 @@ async function seedBaseRows(db: Kysely<Database>): Promise<void> {
       runtime_plan: {},
       environment_snapshot: {},
       dependency_binding_references: [],
-      logs: [],
+      timeline: [],
       created_at: "2026-01-01T00:00:00.000Z",
       started_at: "2026-01-01T00:00:05.000Z",
       finished_at: "2026-01-01T00:00:25.000Z",

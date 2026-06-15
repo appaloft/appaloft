@@ -1292,7 +1292,7 @@ describe("quick deploy workflow", () => {
         commands: {
           showWork: "appaloft work show dw_deployment_dep_1",
           listByDeployment: "appaloft work list --deployment-id dep_1",
-          followDeploymentEvents: "appaloft deployments events dep_1 --follow",
+          followDeploymentTimeline: "appaloft deployments timeline dep_1 --follow",
         },
       },
       commands: {

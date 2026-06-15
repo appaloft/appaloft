@@ -125,7 +125,7 @@ function logEntries(input: {
   stream: "stdout" | "stderr";
   timestamp: string;
   redactions: readonly string[];
-}): ScheduledTaskRuntimeExecutionResult["logs"] {
+}): ScheduledTaskRuntimeExecutionResult["timeline"] {
   return (input.text ?? "")
     .split(/\r?\n/)
     .filter((line) => line.length > 0)
@@ -402,7 +402,7 @@ export class HermeticScheduledTaskRuntimePort implements ScheduledTaskRuntimePor
         environment,
       });
       const finishedAt = this.now();
-      const logs = [
+      const timeline = [
         ...logEntries({
           text: runnerResult.stdout,
           stream: "stdout",
@@ -422,7 +422,7 @@ export class HermeticScheduledTaskRuntimePort implements ScheduledTaskRuntimePor
         exitCode: runnerResult.exitCode,
         startedAt,
         finishedAt,
-        logs,
+        timeline,
         ...(runnerResult.exitCode === 0
           ? {}
           : {
@@ -563,7 +563,7 @@ export class RuntimeTargetScheduledTaskRuntimePort implements ScheduledTaskRunti
       });
       const finishedAt = this.now();
       const exitCode = result.exitCode ?? (result.timedOut ? 124 : 1);
-      const logs = [
+      const timeline = [
         ...logEntries({
           text: result.stdout,
           stream: "stdout",
@@ -583,7 +583,7 @@ export class RuntimeTargetScheduledTaskRuntimePort implements ScheduledTaskRunti
         exitCode,
         startedAt,
         finishedAt,
-        logs,
+        timeline,
         ...(exitCode === 0 && !result.error
           ? {}
           : {

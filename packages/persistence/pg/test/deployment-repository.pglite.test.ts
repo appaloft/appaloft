@@ -219,7 +219,7 @@ function createDeploymentRecord(input: {
           exitCode: ExitCode.rehydrate(0),
           status: ExecutionStatusValue.rehydrate("succeeded"),
           retryable: false,
-          logs: [],
+          timeline: [],
           ...(input.executionMetadata ? { metadata: input.executionMetadata } : {}),
         }),
       )
@@ -462,7 +462,7 @@ describe("pglite deployment repository", () => {
     await database.db
       .updateTable("deployments")
       .set({
-        logs: [
+        timeline: [
           {
             timestamp: "2026-01-01T00:00:04.000Z",
             source: "yundu",
@@ -479,8 +479,8 @@ describe("pglite deployment repository", () => {
       context,
       DeploymentByIdSpec.create(DeploymentId.rehydrate("dep_active")),
     );
-    expect(legacySummary?.logs[0]?.source).toBe("appaloft");
-    const legacyLogs = await deploymentReadModel.findLogs(context, "dep_active");
+    expect(legacySummary?.timeline[0]?.source).toBe("appaloft");
+    const legacyLogs = await deploymentReadModel.findTimeline(context, "dep_active");
     expect(legacyLogs[0]?.source).toBe("appaloft");
 
     await database.close();

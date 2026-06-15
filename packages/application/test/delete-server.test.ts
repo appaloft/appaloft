@@ -28,9 +28,9 @@ import {
 
 import {
   createExecutionContext,
-  type DeploymentLogSummary,
   type DeploymentReadModel,
   type DeploymentSummary,
+  type DeploymentTimelineJournalSummary,
   type DomainBindingReadModel,
   type DomainBindingSummary,
   type ServerDeletionBlocker,
@@ -92,7 +92,7 @@ class EmptyDeploymentReadModel implements DeploymentReadModel {
     return null;
   }
 
-  async findLogs(): Promise<DeploymentLogSummary[]> {
+  async findTimeline(): Promise<DeploymentTimelineJournalSummary[]> {
     return [];
   }
 }

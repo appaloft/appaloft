@@ -57,16 +57,16 @@ describe("TypeScript SDK generator", () => {
     expect(
       operations.find(
         (operation) =>
-          operation.operationKey === "deployments.stream-events" && operation.streaming,
+          operation.operationKey === "deployments.timeline.stream" && operation.streaming,
       ),
     ).toMatchObject({
       operationGroup: "deployments",
-      operationMethod: "streamEvents",
-      facadePath: ["deployments", "streamEvents"],
+      operationMethod: "timelineStream",
+      facadePath: ["deployments", "timeline", "stream"],
       facadeDefault: true,
       route: {
         method: "GET",
-        path: "/deployments/{deploymentId}/events/stream",
+        path: "/deployments/{deploymentId}/timeline/stream",
       },
     });
 
@@ -90,9 +90,10 @@ describe("TypeScript SDK generator", () => {
       "provisioning",
       "plan",
     ]);
-    expect(operationFacadePathFromKey("deployments.stream-events")).toEqual([
+    expect(operationFacadePathFromKey("deployments.timeline.stream")).toEqual([
       "deployments",
-      "streamEvents",
+      "timeline",
+      "stream",
     ]);
     expect(operationFacadePathFromKey("audit-events.legal-holds.release")).toEqual([
       "auditEvents",
