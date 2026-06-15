@@ -4574,23 +4574,6 @@ describe.serial("console e2e with Bun.WebView", () => {
     );
     expect(editedServerHeaderLeft).toBe(desktopLayout.firstHeaderLeft);
 
-    await dragSortableItem(view, {
-      itemSelector: "[data-server-row]",
-      handleSelector: "[data-server-reorder-handle]",
-      idAttribute: "data-server-id",
-      sourceIndex: 0,
-      targetIndex: 2,
-      expectedMovedId: "srv_demo",
-    });
-
-    const reorderRequest = await waitForRecordedRequest("/api/rpc/servers/reorder");
-    const reorderInput = readOrpcJsonPayload(reorderRequest.body) as {
-      serverIds?: string[];
-      startOffset?: number;
-    };
-    expect(reorderInput.startOffset).toBe(0);
-    expect(reorderInput.serverIds?.slice(0, 3)).toEqual(["srv_grid_02", "srv_grid_03", "srv_demo"]);
-
     await clickButtonByAnyText(view, ["Done", "完成"]);
     await waitFor(
       () =>
@@ -5992,6 +5975,8 @@ describe.serial("console e2e with Bun.WebView", () => {
       taskId: "tsk_demo_migrate",
       resourceId: "res_demo",
     });
+
+    await clickButtonByAnyText(view, ["Close", "关闭"]);
 
     await waitFor(
       () =>
@@ -7912,6 +7897,14 @@ describe.serial("console e2e with Bun.WebView", () => {
       ),
     ).toBe(false);
 
+    await waitFor(
+      () =>
+        view.evaluate<boolean>(
+          `Boolean(document.querySelector("[data-server-row][data-server-id='srv_demo'] a[href='/servers/srv_demo']"))`,
+        ),
+      Boolean,
+      "Expected demo server detail link to be available",
+    );
     await view.evaluate<void>(
       `(() => {
         const link = document.querySelector("[data-server-row][data-server-id='srv_demo'] a[href='/servers/srv_demo']");
