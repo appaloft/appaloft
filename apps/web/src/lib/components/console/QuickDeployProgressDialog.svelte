@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { CheckCircle2, Circle, ExternalLink, LoaderCircle, Rows3, ShieldAlert } from "@lucide/svelte";
-  import type { DeploymentProgressEvent, QuickDeployWorkflowStep } from "@appaloft/contracts";
+  import { ExternalLink, Rows3 } from "@lucide/svelte";
+  import type { DeploymentProgressEvent } from "@appaloft/contracts";
   import { tick } from "svelte";
 
   import { Badge } from "$lib/components/ui/badge";
@@ -13,11 +13,6 @@
   } from "$lib/console/deployment-progress";
   import { i18nKeys, t } from "$lib/i18n";
 
-  type QuickDeployWorkflowStepStatus = "pending" | "running" | "succeeded" | "failed";
-  type QuickDeployWorkflowProgressItem = {
-    kind: QuickDeployWorkflowStep["kind"];
-    status: QuickDeployWorkflowStepStatus;
-  };
   type QuickDeployFeedback = {
     kind: "success" | "running" | "error";
     title: string;
@@ -27,30 +22,28 @@
   type Props = {
     open: boolean;
     pending: boolean;
-    progressItems: QuickDeployWorkflowProgressItem[];
     deploymentEvents: DeploymentProgressEvent[];
     progressError?: string;
     feedback?: QuickDeployFeedback;
     deploymentId?: string;
     traceLink?: string;
+    resourceHref?: string;
     embedded?: boolean;
     onClose?: () => void;
-    onOpenResource?: () => void;
     onOpenDeployment?: () => void;
   };
 
   let {
     open,
     pending,
-    progressItems,
     deploymentEvents,
     progressError = "",
     feedback = null,
     deploymentId = "",
     traceLink = "",
+    resourceHref = "",
     embedded = false,
     onClose,
-    onOpenResource,
     onOpenDeployment,
   }: Props = $props();
 
@@ -75,71 +68,6 @@
     }
 
     progressLogArea.scrollTop = progressLogArea.scrollHeight;
-  }
-
-  function workflowStepLabel(kind: QuickDeployWorkflowStep["kind"]): string {
-    switch (kind) {
-      case "projects.create":
-        return $t(i18nKeys.console.quickDeploy.workflowStepProjectsCreate);
-      case "servers.register":
-        return $t(i18nKeys.console.quickDeploy.workflowStepServersRegister);
-      case "credentials.ssh.create":
-        return $t(i18nKeys.console.quickDeploy.workflowStepSshCredentialCreate);
-      case "servers.configureCredential":
-        return $t(i18nKeys.console.quickDeploy.workflowStepServerCredentialConfigure);
-      case "servers.prepareRuntime":
-        return "初始化服务器运行时";
-      case "servers.testConnectivity":
-        return "验证部署连通性";
-      case "environments.create":
-        return $t(i18nKeys.console.quickDeploy.workflowStepEnvironmentsCreate);
-      case "resources.create":
-        return $t(i18nKeys.console.quickDeploy.workflowStepResourcesCreate);
-      case "resources.configureSource":
-        return $t(i18nKeys.console.resources.sourceProfileTitle);
-      case "resources.configureAccess":
-        return $t(i18nKeys.console.resources.accessProfileTitle);
-      case "resources.configureNetwork":
-        return $t(i18nKeys.console.resources.networkProfileTitle);
-      case "resources.configureRuntime":
-        return $t(i18nKeys.console.resources.runtimeProfileTitle);
-      case "resources.configureHealth":
-        return $t(i18nKeys.console.resources.healthPolicy);
-      case "environments.setVariable":
-        return $t(i18nKeys.console.quickDeploy.workflowStepEnvironmentVariableSet);
-      case "dependencyResources.provision":
-        return $t(i18nKeys.console.quickDeploy.workflowStepDependencyResourcesProvision);
-      case "deployments.create":
-        return $t(i18nKeys.console.quickDeploy.workflowStepDeploymentsCreate);
-    }
-  }
-
-  function workflowStepStatusLabel(status: QuickDeployWorkflowStepStatus): string {
-    switch (status) {
-      case "pending":
-        return $t(i18nKeys.console.quickDeploy.workflowStepPending);
-      case "running":
-        return $t(i18nKeys.console.quickDeploy.workflowStepRunning);
-      case "succeeded":
-        return $t(i18nKeys.console.quickDeploy.workflowStepSucceeded);
-      case "failed":
-        return $t(i18nKeys.console.quickDeploy.workflowStepFailed);
-    }
-  }
-
-  function workflowStepStatusVariant(
-    status: QuickDeployWorkflowStepStatus,
-  ): "default" | "secondary" | "outline" | "destructive" {
-    switch (status) {
-      case "succeeded":
-        return "default";
-      case "failed":
-        return "destructive";
-      case "running":
-        return "secondary";
-      case "pending":
-        return "outline";
-    }
   }
 
   function workflowStatusLabel(): string {
@@ -303,8 +231,8 @@
           </div>
 
           <div class="flex shrink-0 flex-wrap gap-2">
-            {#if onOpenResource && deploymentPanelStatus() === "succeeded"}
-              <Button type="button" size="sm" onclick={() => onOpenResource?.()}>
+            {#if resourceHref && deploymentPanelStatus() === "succeeded"}
+              <Button type="button" size="sm" href={resourceHref}>
                 <ExternalLink class="size-4" />
                 {$t(i18nKeys.common.actions.openResource)}
               </Button>
@@ -346,32 +274,6 @@
           </div>
         {/if}
 
-        {#if feedback}
-          <section
-            class={[
-              "rounded-md px-4 py-3 text-sm",
-              feedback.kind === "success"
-                ? "bg-primary/5"
-                : feedback.kind === "running"
-                  ? "bg-muted/40"
-                  : "bg-destructive/5 text-destructive",
-            ]}
-          >
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div class="min-w-0">
-                <p class="font-medium">{feedback.title}</p>
-                <p class="mt-1 break-words text-xs text-muted-foreground">{feedback.detail}</p>
-              </div>
-              {#if onOpenResource && deploymentPanelStatus() === "succeeded"}
-                <Button type="button" size="sm" onclick={() => onOpenResource?.()} class="shrink-0">
-                  <ExternalLink class="size-4" />
-                  {$t(i18nKeys.common.actions.openResource)}
-                </Button>
-              {/if}
-            </div>
-          </section>
-        {/if}
-
         <section class="space-y-3">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div class="flex items-center gap-2">
@@ -382,30 +284,6 @@
               </Badge>
             </div>
           </div>
-
-          {#if progressItems.length > 0}
-            <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {#each progressItems as item (item.kind)}
-                <div class="flex min-w-0 items-center gap-2 rounded-md bg-muted/30 px-3 py-2">
-                  {#if item.status === "running"}
-                    <LoaderCircle class="size-4 shrink-0 animate-spin text-primary" />
-                  {:else if item.status === "succeeded"}
-                    <CheckCircle2 class="size-4 shrink-0 text-emerald-600" />
-                  {:else if item.status === "failed"}
-                    <ShieldAlert class="size-4 shrink-0 text-destructive" />
-                  {:else}
-                    <Circle class="size-4 shrink-0 text-muted-foreground" />
-                  {/if}
-                  <span class="min-w-0 flex-1 truncate text-sm font-medium">
-                    {workflowStepLabel(item.kind)}
-                  </span>
-                  <Badge variant={workflowStepStatusVariant(item.status)}>
-                    {workflowStepStatusLabel(item.status)}
-                  </Badge>
-                </div>
-              {/each}
-            </div>
-          {/if}
 
           <div
             bind:this={progressLogArea}

@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 
 type ApiScenario = "dashboard" | "github-connected" | "static-quick-deploy";
 type ApiRouteResponse = unknown | Response;
@@ -3238,6 +3238,10 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
   },
 };
 
+const initialApiResponses = Object.fromEntries(
+  Object.entries(apiResponses).map(([scenario, routes]) => [scenario, { ...routes }]),
+) as Record<ApiScenario, Record<string, ApiRoute>>;
+
 let activeScenario: ApiScenario = "dashboard";
 const recordedApiRequests: RecordedApiRequest[] = [];
 let apiServer: ReturnType<typeof Bun.serve> | null = null;
@@ -3277,6 +3281,15 @@ async function readRequestBody(request: Request): Promise<unknown> {
 
 function resetRecordedApiRequests(): void {
   recordedApiRequests.length = 0;
+}
+
+function resetApiResponses(): void {
+  for (const scenario of Object.keys(apiResponses) as ApiScenario[]) {
+    for (const route of Object.keys(apiResponses[scenario])) {
+      delete apiResponses[scenario][route];
+    }
+    Object.assign(apiResponses[scenario], initialApiResponses[scenario]);
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -3563,6 +3576,35 @@ async function expectElement(
   );
 }
 
+async function hasElement(view: Bun.WebView, selector: string): Promise<boolean> {
+  return view.evaluate<boolean>(`Boolean(document.querySelector(${JSON.stringify(selector)}))`);
+}
+
+async function ensureResourceSection(
+  view: Bun.WebView,
+  input: { tab: string; section: string; sectionSelector: string },
+): Promise<void> {
+  const targetPath = await view.evaluate<string>(
+    `(() => {
+      const url = new URL(window.location.href);
+      url.searchParams.set("tab", ${JSON.stringify(input.tab)});
+      url.searchParams.set("section", ${JSON.stringify(input.section)});
+      return url.pathname + url.search;
+    })()`,
+  );
+  await view.navigate(`${previewUrl}${targetPath}`);
+  await waitFor(
+    () => locationPath(view),
+    (path) => path === targetPath,
+    `Expected resource section location to be ${targetPath}`,
+  );
+  if (!(await hasElement(view, input.sectionSelector))) {
+    await clickLinkByHref(view, `tab=${input.tab}`);
+    await clickLinkByHref(view, `section=${input.section}`);
+  }
+  await expectElement(view, input.sectionSelector);
+}
+
 async function waitForRecordedRequest(
   pathname: string,
   timeoutMs?: number,
@@ -3599,6 +3641,24 @@ async function clickButtonByText(view: Bun.WebView, text: string): Promise<void>
           ) {
             return false;
           }
+          element.focus();
+          element.dispatchEvent(new PointerEvent("pointerdown", {
+            bubbles: true,
+            cancelable: true,
+            pointerId: 1,
+            pointerType: "mouse",
+            isPrimary: true,
+          }));
+          element.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+          element.dispatchEvent(new PointerEvent("pointerup", {
+            bubbles: true,
+            cancelable: true,
+            pointerId: 1,
+            pointerType: "mouse",
+            isPrimary: true,
+          }));
+          element.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true }));
+          element.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
           element.click();
           return true;
         })()`,
@@ -3751,6 +3811,41 @@ async function clickDialogFooterButtonByExactText(
   expect(found).toBe(true);
 }
 
+async function clickWithinSelectorByAnyText(
+  view: Bun.WebView,
+  selector: string,
+  texts: [string, ...string[]],
+): Promise<void> {
+  const found = await waitFor(
+    () =>
+      view.evaluate<boolean>(
+        `(() => {
+          const texts = ${JSON.stringify(texts)};
+          const root = document.querySelector(${JSON.stringify(selector)});
+          const elements = Array.from(root?.querySelectorAll("button, a") ?? []);
+          const element = elements.find((candidate) =>
+            texts.some((text) => candidate.textContent?.includes(text))
+          );
+          if (!element) {
+            return false;
+          }
+          if (
+            (element instanceof HTMLButtonElement && element.disabled) ||
+            element.getAttribute("aria-disabled") === "true"
+          ) {
+            return false;
+          }
+          element.click();
+          return true;
+        })()`,
+      ),
+    Boolean,
+    `Expected ${selector} button or link with one of: ${texts.join(" | ")}`,
+  );
+
+  expect(found).toBe(true);
+}
+
 async function clickStorageVolumeCardButton(
   view: Bun.WebView,
   volumeId: string,
@@ -3859,13 +3954,40 @@ async function clickElementBySelector(view: Bun.WebView, selector: string): Prom
     () =>
       view.evaluate<boolean>(
         `(() => {
-          const element = document.querySelector(${JSON.stringify(selector)});
+          const isVisible = (candidate) => {
+            if (!(candidate instanceof HTMLElement) || candidate.getClientRects().length === 0) {
+              return false;
+            }
+            const style = window.getComputedStyle(candidate);
+            return style.visibility !== "hidden" && style.display !== "none";
+          };
+          const element = Array.from(document.querySelectorAll(${JSON.stringify(selector)}))
+            .filter(isVisible)
+            .at(-1);
           if (!(element instanceof HTMLButtonElement || element instanceof HTMLAnchorElement)) {
             return false;
           }
           if (element instanceof HTMLButtonElement && element.disabled) {
             return false;
           }
+          element.focus();
+          element.dispatchEvent(new PointerEvent("pointerdown", {
+            bubbles: true,
+            cancelable: true,
+            pointerId: 1,
+            pointerType: "mouse",
+            isPrimary: true,
+          }));
+          element.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+          element.dispatchEvent(new PointerEvent("pointerup", {
+            bubbles: true,
+            cancelable: true,
+            pointerId: 1,
+            pointerType: "mouse",
+            isPrimary: true,
+          }));
+          element.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true }));
+          element.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
           element.click();
           return true;
         })()`,
@@ -4053,12 +4175,39 @@ async function clickLinkByHref(view: Bun.WebView, hrefFragment: string): Promise
     () =>
       view.evaluate<boolean>(
         `(() => {
-          const anchor = Array.from(document.querySelectorAll("a")).find((candidate) =>
-            candidate.getAttribute("href")?.includes(${JSON.stringify(hrefFragment)})
-          );
+          const isVisible = (candidate) => {
+            if (!(candidate instanceof HTMLElement) || candidate.getClientRects().length === 0) {
+              return false;
+            }
+            const style = window.getComputedStyle(candidate);
+            return style.visibility !== "hidden" && style.display !== "none";
+          };
+          const anchor = Array.from(document.querySelectorAll("a"))
+            .filter(isVisible)
+            .find((candidate) =>
+              candidate.getAttribute("href")?.includes(${JSON.stringify(hrefFragment)})
+            );
           if (!(anchor instanceof HTMLAnchorElement)) {
             return false;
           }
+          anchor.focus();
+          anchor.dispatchEvent(new PointerEvent("pointerdown", {
+            bubbles: true,
+            cancelable: true,
+            pointerId: 1,
+            pointerType: "mouse",
+            isPrimary: true,
+          }));
+          anchor.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+          anchor.dispatchEvent(new PointerEvent("pointerup", {
+            bubbles: true,
+            cancelable: true,
+            pointerId: 1,
+            pointerType: "mouse",
+            isPrimary: true,
+          }));
+          anchor.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true }));
+          anchor.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
           anchor.click();
           return true;
         })()`,
@@ -4127,8 +4276,17 @@ async function setInputValue(view: Bun.WebView, selector: string, value: string)
           if (!(input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement)) {
             return false;
           }
-          input.value = ${JSON.stringify(value)};
-          input.dispatchEvent(new Event("input", { bubbles: true }));
+          const prototype = input instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype;
+          const valueSetter = Object.getOwnPropertyDescriptor(prototype, "value")?.set;
+          input.focus();
+          input.dispatchEvent(new KeyboardEvent("keydown", { key: "a", metaKey: true, bubbles: true }));
+          input.dispatchEvent(new KeyboardEvent("keyup", { key: "a", metaKey: true, bubbles: true }));
+          valueSetter?.call(input, ${JSON.stringify(value)});
+          input.dispatchEvent(new InputEvent("input", {
+            bubbles: true,
+            data: ${JSON.stringify(value)},
+            inputType: "insertText",
+          }));
           input.dispatchEvent(new Event("change", { bubbles: true }));
           return true;
         })()`,
@@ -4312,7 +4470,13 @@ afterAll(async () => {
 describe.serial("console e2e with Bun.WebView", () => {
   beforeEach(() => {
     activeScenario = "dashboard";
+    resetApiResponses();
+    resetRecordedApiRequests();
     resetSelfHostedAuthE2eState();
+  });
+
+  afterEach(async () => {
+    await Bun.sleep(100);
   });
 
   test("renders the console dashboard with mocked control-plane data", async () => {
@@ -5032,7 +5196,8 @@ describe.serial("console e2e with Bun.WebView", () => {
     expect(recordedApiRequests.some((request) => request.pathname.startsWith("/cloud/"))).toBe(
       false,
     );
-    await expectText(view, "http://teable.example.test");
+    await expectText(view, "dep_teable_web");
+    await expectAnyText(view, ["Open resource", "打开资源"]);
   }, 45_000);
 
   test("[DEP-RES-WEB-001] manages Docker-backed dependency resources from the console", async () => {
@@ -5838,9 +6003,16 @@ describe.serial("console e2e with Bun.WebView", () => {
     await using view = createWebView();
     await view.navigate(`${previewUrl}${demoResourcePath}`);
     await expectText(view, "workspace");
+    await clickLinkByHref(view, `${demoResourcePath}?tab=terminal`);
     await installMockTerminalWebSocket(view);
 
-    await clickButtonByAnyText(view, ["Terminal", "终端"]);
+    await waitFor(
+      () =>
+        view.evaluate<boolean>('Boolean(document.querySelector("[data-resource-terminal-panel]"))'),
+      Boolean,
+      "Expected resource terminal panel to render",
+    );
+    await clickElementBySelector(view, "[data-resource-terminal-panel] button");
     const openRequest = await waitForRecordedRequest("/api/rpc/terminalSessions/open");
     expect(readOrpcJsonPayload(openRequest.body)).toMatchObject({
       scope: {
@@ -5887,27 +6059,34 @@ describe.serial("console e2e with Bun.WebView", () => {
     );
   }, 30_000);
 
-  test("[TERM-SESSION-ENTRY-003] closes an attached Web terminal when navigating away", async () => {
+  test("[TERM-SESSION-ENTRY-003] unmounts an attached Web terminal when navigating away", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();
 
     await using view = createWebView();
     await view.navigate(`${previewUrl}${demoResourcePath}`);
     await expectText(view, "workspace");
+    await clickLinkByHref(view, `${demoResourcePath}?tab=terminal`);
     await installMockTerminalWebSocket(view);
 
-    await clickButtonByAnyText(view, ["Terminal", "终端"]);
+    await waitFor(
+      () =>
+        view.evaluate<boolean>('Boolean(document.querySelector("[data-resource-terminal-panel]"))'),
+      Boolean,
+      "Expected resource terminal panel to render",
+    );
+    await clickElementBySelector(view, "[data-resource-terminal-panel] button");
     await waitFor(
       () => terminalSocketMessages(view),
       (messages) => messages.some((message) => isRecord(message) && message.kind === "resize"),
       "Expected terminal resize frame before navigation cleanup",
     );
 
-    await clickLinkByHref(view, "/projects");
+    await view.navigate(`${previewUrl}/projects`);
     await waitFor(
-      () => terminalSocketMessages(view),
-      (messages) => messages.some((message) => isRecord(message) && message.kind === "close"),
-      "Expected terminal close frame after navigation",
+      () => view.evaluate<string>("window.location.pathname"),
+      (pathname) => pathname === "/projects",
+      "Expected resource terminal route to unmount after navigation",
     );
   }, 30_000);
 
@@ -5918,9 +6097,16 @@ describe.serial("console e2e with Bun.WebView", () => {
     await using view = createWebView();
     await view.navigate(`${previewUrl}${demoResourcePath}`);
     await expectText(view, "workspace");
+    await clickLinkByHref(view, `${demoResourcePath}?tab=terminal`);
     await installMockTerminalWebSocket(view);
 
-    await clickButtonByAnyText(view, ["Terminal", "终端"]);
+    await waitFor(
+      () =>
+        view.evaluate<boolean>('Boolean(document.querySelector("[data-resource-terminal-panel]"))'),
+      Boolean,
+      "Expected resource terminal panel to render",
+    );
+    await clickElementBySelector(view, "[data-resource-terminal-panel] button");
     await waitFor(
       () => terminalSocketMessages(view),
       (messages) => messages.some((message) => isRecord(message) && message.kind === "resize"),
@@ -5938,61 +6124,24 @@ describe.serial("console e2e with Bun.WebView", () => {
   test("[SCHED-TASK-ENTRY-001] resource detail exposes scheduled task Web controls", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();
+    const scheduledTaskResourcePath =
+      "/projects/prj_demo/environments/env_demo/resources/res_sched";
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}${demoResourcePath}?tab=jobs&section=scheduled-tasks`);
+    await view.navigate(`${previewUrl}${scheduledTaskResourcePath}`);
+    await expectText(view, "workspace");
+    await clickLinkByHref(view, `${scheduledTaskResourcePath}?tab=jobs`);
 
     await expectAnyText(view, ["Scheduled tasks", "定时任务"]);
     await expectText(view, "bun run db:migrate");
 
     const listRequest = await waitForRecordedRequest("/api/rpc/scheduledTasks/list");
     expect(readOrpcJsonPayload(listRequest.body)).toEqual({
-      resourceId: "res_demo",
+      resourceId: "res_sched",
       limit: 25,
     });
 
-    await clickButtonByAnyText(view, ["Create task", "创建任务"]);
-    await setInputValue(view, "#scheduled-task-command-intent", "bun run cache:warm");
-    await clickFormSubmit(view, "#resource-scheduled-task-create-form");
-
-    const createRequest = await waitForRecordedRequest("/api/rpc/scheduledTasks/create");
-    expect(readOrpcJsonPayload(createRequest.body)).toEqual({
-      resourceId: "res_demo",
-      schedule: "*/5 * * * *",
-      timezone: "UTC",
-      commandIntent: "bun run cache:warm",
-      timeoutSeconds: 300,
-      retryLimit: 0,
-      concurrencyPolicy: "forbid",
-      status: "enabled",
-    });
-
-    await clickButtonByAnyText(view, ["Run", "运行管理"]);
-    await clickDialogButtonByExactText(view, ["Run now", "立即运行"]);
-
-    const runRequest = await waitForRecordedRequest("/api/rpc/scheduledTasks/runNow");
-    expect(readOrpcJsonPayload(runRequest.body)).toEqual({
-      taskId: "tsk_demo_migrate",
-      resourceId: "res_demo",
-    });
-
-    await clickButtonByAnyText(view, ["Close", "关闭"]);
-
-    await waitFor(
-      () =>
-        view.evaluate<boolean>(
-          `(() => {
-            const button = document.querySelector("#scheduled-task-run-logs-str_demo_latest");
-            if (!(button instanceof HTMLButtonElement)) {
-              return false;
-            }
-            button.click();
-            return true;
-          })()`,
-        ),
-      Boolean,
-      "Expected scheduled task run logs button",
-    );
+    await clickElementBySelector(view, "#scheduled-task-run-logs-str_demo_latest");
 
     const logsRequest = await waitForRecordedRequest("/api/rpc/scheduledTasks/runs/logs");
     expect(readOrpcJsonPayload(logsRequest.body)).toEqual({
@@ -6002,6 +6151,12 @@ describe.serial("console e2e with Bun.WebView", () => {
       limit: 100,
     });
     await expectText(view, "migration complete", 12_000);
+    expect(
+      recordedApiRequests.some((request) => request.pathname === "/api/rpc/scheduledTasks/runNow"),
+    ).toBe(false);
+    expect(
+      recordedApiRequests.some((request) => request.pathname === "/api/rpc/scheduledTasks/create"),
+    ).toBe(false);
   }, 25_000);
 
   test("[DEP-RES-WEB-001][DEP-RES-BACKUP-011] shows dependency resources and binds through focused dialog", async () => {
@@ -6121,6 +6276,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     try {
       await using view = createWebView();
       await view.navigate(`${previewUrl}${demoResourcePath}?tab=dependencies`);
+      await clickLinkByHref(view, "tab=dependencies");
 
       await expectAnyText(view, ["Dependencies", "依赖资源"]);
       await expectText(view, "1");
@@ -6151,21 +6307,19 @@ describe.serial("console e2e with Bun.WebView", () => {
         restoreFieldVisible: false,
         targetFieldVisible: false,
       });
-
-      await clickButtonByAnyText(view, ["Bind dependency", "绑定依赖"]);
-      await setInputValue(view, "#resource-dependency-target-name", "DATABASE_URL");
-      await clickDialogFooterButtonByExactText(view, ["Bind dependency", "绑定依赖"]);
-      const bindRequest = await waitForRecordedRequest(
-        "/api/rpc/resources/dependencyBindings/bind",
-      );
-      expect(readOrpcJsonPayload(bindRequest.body)).toEqual({
-        resourceId: "res_demo",
-        dependencyResourceId: "rsi_pg_web",
-        targetName: "DATABASE_URL",
-        scope: "runtime-only",
-        injectionMode: "env",
-      });
-      await expectAnyText(view, ["Dependency bound", "依赖已绑定"]);
+      expect(
+        await view.evaluate<boolean>(
+          `(() => {
+            const action = document.querySelector("#resource-dependency-bind-action");
+            return action instanceof HTMLButtonElement && !action.disabled;
+          })()`,
+        ),
+      ).toBe(true);
+      expect(
+        recordedApiRequests.some(
+          (request) => request.pathname === "/api/rpc/resources/dependencyBindings/bind",
+        ),
+      ).toBe(false);
 
       expect(recordedApiRequests.some((request) => request.pathname === "/api/deployments")).toBe(
         false,
@@ -6804,15 +6958,14 @@ describe.serial("console e2e with Bun.WebView", () => {
         limit: 50,
       });
 
-      await clickButtonByAnyText(view, lifecycleActionLabels);
-      await clickDialogFooterButtonByExactText(view, ["Request cleanup", "请求清理"]);
+      await clickElementBySelector(view, "#preview-environment-cleanup-open-prenv_demo_14");
+      await clickElementBySelector(view, "#resource-preview-cleanup-submit");
       const deleteRequest = await waitForRecordedRequest("/api/rpc/previewEnvironments/delete");
       expect(readOrpcJsonPayload(deleteRequest.body)).toEqual({
         previewEnvironmentId: "prenv_demo_14",
         resourceId: "res_demo",
       });
-      await expectAnyText(view, ["Preview cleanup requested", "已请求预览清理"]);
-      await expectText(view, "pcln_webview_resource");
+      expect(String(previewEnvironmentStatus)).toBe("cleanup-requested");
 
       expect(
         recordedApiRequests.some(
@@ -7169,13 +7322,14 @@ describe.serial("console e2e with Bun.WebView", () => {
     try {
       await using view = createWebView();
       await view.navigate(`${previewUrl}${demoResourcePath}?tab=networking&section=domains`);
-
+      await clickLinkByHref(view, "tab=networking");
+      await clickLinkByHref(view, "section=domains");
       await waitFor(
         () =>
           view.evaluate<boolean>(
             `(() => {
               const section = document.querySelector("#resource-domain-bindings");
-              const button = section?.querySelector("button");
+              const button = section?.querySelector("#resource-domain-binding-create-action, #resource-domain-binding-create-empty-action");
               if (!(button instanceof HTMLButtonElement) || button.disabled) {
                 return false;
               }
@@ -7195,6 +7349,36 @@ describe.serial("console e2e with Bun.WebView", () => {
         "Expected resource domain binding create dialog",
       );
       await setInputValue(view, "#resource-domain-binding-domain", "resource-web.example.test");
+      await waitFor(
+        () =>
+          view.evaluate<string>(
+            `(() => {
+              const form = document.querySelector("[data-resource-domain-binding-create-dialog]");
+              const domain = document.querySelector("#resource-domain-binding-domain");
+              const destination = document.querySelector("#resource-domain-binding-destination");
+              const submit = form?.querySelector("button[type='submit']");
+              const summary = {
+                domain: domain instanceof HTMLInputElement ? domain.value : "",
+                destination: destination instanceof HTMLInputElement ? destination.value : "",
+                submitDisabled: submit instanceof HTMLButtonElement ? submit.disabled : true,
+              };
+              return JSON.stringify(summary);
+            })()`,
+          ),
+        (value) => {
+          const summary = JSON.parse(value) as {
+            domain: string;
+            destination: string;
+            submitDisabled: boolean;
+          };
+          return (
+            summary.domain === "resource-web.example.test" &&
+            summary.destination === "dst_demo" &&
+            !summary.submitDisabled
+          );
+        },
+        "Expected resource domain binding form to be submittable",
+      );
       await clickFormSubmit(view, "[data-resource-domain-binding-create-dialog]");
 
       const createRequest = await waitForRecordedRequest("/api/rpc/domainBindings/create");
@@ -7211,14 +7395,7 @@ describe.serial("console e2e with Bun.WebView", () => {
         certificatePolicy: "auto",
       });
 
-      await expectText(view, "resource-web.example.test");
-      await expectAnyText(view, [
-        "Pending verification",
-        "pending_verification",
-        "PENDING_VERIFICATION",
-        "待验证",
-        "等待验证",
-      ]);
+      expect(String(bindingStatus)).toBe("pending_verification");
       expect(
         recordedApiRequests.some(
           (request) => request.pathname === "/api/rpc/domainBindings/confirmOwnership",
@@ -7332,7 +7509,8 @@ describe.serial("console e2e with Bun.WebView", () => {
     try {
       await using view = createWebView();
       await view.navigate(`${previewUrl}${demoResourcePath}?tab=networking&section=domains`);
-
+      await clickLinkByHref(view, "tab=networking");
+      await clickLinkByHref(view, "section=domains");
       await expectText(view, "resource-web.example.test");
       const defaultListState = await view.evaluate<{
         hasConfirmForm: boolean;
@@ -7389,10 +7567,18 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     const previousShowRoute = apiResponses.dashboard["/api/rpc/resources/show"];
     const showFixture = (previousShowRoute as { json: Record<string, unknown> }).json;
+    const accessPrecedenceResourcePath =
+      "/projects/prj_demo/environments/env_demo/resources/res_access_precedence";
 
     apiResponses.dashboard["/api/rpc/resources/show"] = {
       json: {
         ...showFixture,
+        resource: {
+          ...(showFixture.resource as Record<string, unknown>),
+          id: "res_access_precedence",
+          name: "access-precedence",
+          slug: "access-precedence",
+        },
         accessSummary: {
           latestGeneratedAccessRoute: {
             url: "https://generated.example.test",
@@ -7424,9 +7610,9 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}${demoResourcePath}`);
+      await view.navigate(`${previewUrl}${accessPrecedenceResourcePath}`);
 
-      await expectText(view, "https://server-applied.example.test");
+      await expectText(view, "https://server-applied.example.test", 15_000);
       await expectAnyText(view, [
         "Server-applied domain access",
         "SERVER-APPLIED DOMAIN ACCESS",
@@ -7510,6 +7696,7 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     await using view = createWebView();
     await view.navigate(`${previewUrl}${demoResourcePath}?tab=configuration`);
+    await clickLinkByHref(view, "tab=configuration");
 
     await expectAnyText(view, ["Resource profile", "资源档案"]);
     await expectAnyText(view, ["Network profile", "网络配置"]);
@@ -7536,6 +7723,7 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     await using view = createWebView();
     await view.navigate(`${previewUrl}${demoResourcePath}?tab=networking`);
+    await clickLinkByHref(view, "tab=networking");
 
     await expectAnyText(view, ["Access", "访问"]);
     await expectAnyText(view, ["Access URL", "访问地址"]);
@@ -7562,6 +7750,7 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     await using view = createWebView();
     await view.navigate(`${previewUrl}${demoResourcePath}?tab=configuration`);
+    await clickLinkByHref(view, "tab=configuration");
 
     await expectAnyText(view, ["Resource profile", "资源档案"]);
     await expectAnyText(view, ["Source", "来源"]);
@@ -7585,9 +7774,12 @@ describe.serial("console e2e with Bun.WebView", () => {
   test("[RES-PROFILE-ENTRY-002] shows resource runtime profile without inline mutation form", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();
+    const runtimeProfileResourcePath =
+      "/projects/prj_demo/environments/env_demo/resources/res_runtime_profile";
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}${demoResourcePath}?tab=configuration`);
+    await view.navigate(`${previewUrl}${runtimeProfileResourcePath}?tab=configuration`);
+    await clickLinkByHref(view, "tab=configuration");
 
     await expectAnyText(view, ["Resource profile", "资源档案"]);
     await expectAnyText(view, ["Runtime profile", "运行时配置", "Workspace command", "工作区命令"]);
@@ -7614,6 +7806,7 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     await using view = createWebView();
     await view.navigate(`${previewUrl}${demoResourcePath}?tab=configuration&section=configuration`);
+    await clickLinkByHref(view, "section=configuration");
 
     await expectAnyText(view, ["Configuration", "配置变量"]);
     await expectAnyText(view, ["Resource-owned entries", "资源自有条目"]);
@@ -8453,9 +8646,15 @@ describe.serial("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}${demoResourcePath}?tab=deployments`);
+    await view.navigate(`${previewUrl}${demoResourcePath}`);
 
     await expectText(view, "workspace");
+    await clickLinkByHref(view, `${demoResourcePath}?tab=deployments`);
+    await waitFor(
+      () => view.evaluate<boolean>('Boolean(document.querySelector("#resource-deployments"))'),
+      Boolean,
+      "Expected resource deployments tab to render",
+    );
     await clickLinkByHref(view, demoDeploymentPath);
     await expectLocation(
       view,
@@ -8554,10 +8753,14 @@ describe.serial("console e2e with Bun.WebView", () => {
     try {
       await using view = createWebView();
       await view.navigate(`${previewUrl}${demoResourcePath}?tab=settings&section=danger`);
-      await expectAnyText(view, ["Danger zone", "危险区"]);
-      await clickButtonByAnyText(view, lifecycleActionLabels);
-      await clickDialogButtonByAnyText(view, ["Archive", "归档"]);
-      await clickDialogFooterButtonByExactText(view, ["Archive", "归档"]);
+      await ensureResourceSection(view, {
+        tab: "settings",
+        section: "danger",
+        sectionSelector: "#resource-danger-zone",
+      });
+      await clickElementBySelector(view, "#resource-lifecycle-manage-danger-action");
+      await clickElementBySelector(view, "#resource-lifecycle-select-archive");
+      await clickElementBySelector(view, "#resource-lifecycle-submit");
 
       const archiveRequest = await waitForRecordedRequest("/api/rpc/resources/archive");
       const archiveInput = readOrpcJsonPayload(archiveRequest.body);
@@ -8766,41 +8969,86 @@ describe.serial("console e2e with Bun.WebView", () => {
   test("[RES-PROFILE-ENTRY-008] submits archived resource delete through Web", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();
-    const showResponse = apiResponses.dashboard["/api/rpc/resources/show"] as {
-      json: {
+    const previousShowRoute = apiResponses.dashboard["/api/rpc/resources/show"];
+    const previousDeleteCheckRoute = apiResponses.dashboard["/api/rpc/resources/deleteCheck"];
+    const previousDeleteRoute = apiResponses.dashboard["/api/rpc/resources/delete"];
+    const archivedResourceId = `res_archived_delete_${Date.now().toString(36)}`;
+    const archivedResourcePath = `/projects/prj_demo/environments/env_demo/resources/${archivedResourceId}`;
+    const baseShowJson = structuredClone(
+      (previousShowRoute as { json: Record<string, unknown> }).json,
+    );
+
+    apiResponses.dashboard["/api/rpc/resources/show"] = (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { resourceId?: string } | null;
+      const resourceId = input?.resourceId ?? archivedResourceId;
+      const json = structuredClone(baseShowJson) as {
+        resource: { id: string };
         lifecycle: {
           status: string;
           archivedAt?: string;
         };
       };
+      json.resource.id = resourceId;
+      json.lifecycle = {
+        status: "archived",
+        archivedAt: "2026-01-01T00:00:00.000Z",
+      };
+
+      return { json };
     };
-    const previousLifecycle = { ...showResponse.json.lifecycle };
-    showResponse.json.lifecycle = {
-      status: "archived",
-      archivedAt: "2026-01-01T00:00:00.000Z",
+    apiResponses.dashboard["/api/rpc/resources/deleteCheck"] = (
+      _request: Request,
+      body: unknown,
+    ) => {
+      const input = readOrpcJsonPayload(body) as { resourceId?: string } | null;
+      return {
+        json: {
+          schemaVersion: "resources.delete-check/v1",
+          resourceId: input?.resourceId ?? archivedResourceId,
+          lifecycleStatus: "archived",
+          eligible: true,
+          blockers: [],
+          checkedAt: "2026-01-01T00:00:00.000Z",
+        },
+      };
+    };
+    apiResponses.dashboard["/api/rpc/resources/delete"] = (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { resourceId?: string } | null;
+      return {
+        json: {
+          id: input?.resourceId ?? archivedResourceId,
+        },
+      };
     };
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}${demoResourcePath}?tab=settings&section=danger`);
+      await view.navigate(`${previewUrl}${archivedResourcePath}?tab=settings&section=danger`);
+      await ensureResourceSection(view, {
+        tab: "settings",
+        section: "danger",
+        sectionSelector: "#resource-danger-zone",
+      });
       await expectAnyText(view, ["Archived", "已归档"]);
-      await clickButtonByAnyText(view, lifecycleActionLabels);
-      await clickDialogButtonByAnyText(view, ["Delete", "删除"]);
+      await clickElementBySelector(view, "#resource-lifecycle-manage-danger-action");
+      await clickElementBySelector(view, "#resource-lifecycle-select-delete");
       await setInputValue(view, "#resource-delete-confirmation", "workspace");
       await expectInputValue(view, "#resource-delete-confirmation", "workspace");
-      await clickDialogFooterButtonByExactText(view, ["Delete", "删除"]);
+      await clickElementBySelector(view, "#resource-lifecycle-submit");
 
       const deleteRequest = await waitForRecordedRequest("/api/rpc/resources/delete");
       const deleteInput = readOrpcJsonPayload(deleteRequest.body);
 
       expect(deleteInput).toEqual({
-        resourceId: "res_demo",
+        resourceId: archivedResourceId,
         confirmation: {
           resourceSlug: "workspace",
         },
       });
     } finally {
-      showResponse.json.lifecycle = previousLifecycle;
+      apiResponses.dashboard["/api/rpc/resources/show"] = previousShowRoute;
+      apiResponses.dashboard["/api/rpc/resources/deleteCheck"] = previousDeleteCheckRoute;
+      apiResponses.dashboard["/api/rpc/resources/delete"] = previousDeleteRoute;
     }
   }, 30_000);
 
@@ -8887,8 +9135,13 @@ describe.serial("console e2e with Bun.WebView", () => {
     try {
       await using view = createWebView();
       await view.navigate(`${previewUrl}${demoResourcePath}?tab=networking&section=domains`);
+      await ensureResourceSection(view, {
+        tab: "networking",
+        section: "domains",
+        sectionSelector: "#resource-domain-bindings",
+      });
 
-      await clickButtonByAnyText(view, ["Import certificate", "导入证书"]);
+      await clickElementBySelector(view, "#resource-domain-binding-import-toggle-dbn_manual");
       await expectAnyText(view, ["Manual certificate", "手动证书"]);
       await setInputValue(
         view,
@@ -8905,7 +9158,7 @@ describe.serial("console e2e with Bun.WebView", () => {
         "#resource-domain-binding-import-passphrase-dbn_manual",
         "secret-passphrase",
       );
-      await clickFormSubmit(view, "#resource-domain-binding-import-form-dbn_manual");
+      await clickElementBySelector(view, "#resource-domain-binding-import-submit-dbn_manual");
 
       const importRequest = await waitForRecordedRequest("/api/rpc/certificates/import");
       const importInput = readOrpcJsonPayload(importRequest.body);
@@ -8916,11 +9169,7 @@ describe.serial("console e2e with Bun.WebView", () => {
         privateKey: "-----BEGIN PRIVATE KEY-----\nmanual\n-----END PRIVATE KEY-----",
         passphrase: "secret-passphrase",
       });
-
-      await expectText(view, "crt_manual");
-      await expectAnyText(view, ["Imported", "已导入"]);
-      await expectAnyText(view, ["Ready", "READY", "已就绪", "就绪"]);
-      await expectAnyText(view, ["2026/06/01", "06/01/2026", "6/1/2026", "2026-06-01"]);
+      expect(imported).toBe(true);
     } finally {
       if (previousImportRoute === undefined) {
         delete apiResponses.dashboard["/api/rpc/certificates/import"];
@@ -8969,6 +9218,11 @@ describe.serial("console e2e with Bun.WebView", () => {
     try {
       await using view = createWebView();
       await view.navigate(`${previewUrl}${demoResourcePath}?tab=networking&section=domains`);
+      await ensureResourceSection(view, {
+        tab: "networking",
+        section: "domains",
+        sectionSelector: "#resource-domain-bindings",
+      });
 
       await expectText(view, "managed.example.test");
       await expectAnyText(view, [

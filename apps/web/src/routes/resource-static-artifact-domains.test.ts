@@ -13,8 +13,9 @@ describe("resource static artifact domains panel", () => {
       "const domainBindingUsesResourceRouteProvider = $derived(",
     );
     expect(resourcePageSource).toContain('currentAccessRoute?.kind === "static-artifact"');
+    expect(resourcePageSource).toContain("isDirectStaticArtifactRuntime");
     expect(resourcePageSource).toContain(
-      "domainBindingUsesResourceRouteProvider || (serverId && destinationId)",
+      "effectiveDomainBindingServerId && effectiveDomainBindingDestinationId",
     );
     expect(resourcePageSource).not.toContain("isServerlessStaticArtifactAccess");
     expect(resourcePageSource).not.toContain("staticArtifactDomainBindingsUnavailableTitle");
@@ -22,9 +23,8 @@ describe("resource static artifact domains panel", () => {
     expect(resourcePageSource).not.toContain("data-resource-static-artifact-domain-unavailable");
     expect(resourcePageSource).toContain("data-resource-domain-binding-create-dialog");
     expect(resourcePageSource).toContain("onsubmit={createResourceDomainBinding}");
-    expect(resourcePageSource).toContain(
-      "...(serverId && destinationId ? { serverId, destinationId } : {})",
-    );
+    expect(resourcePageSource).toContain("serverId: effectiveDomainBindingServerId");
+    expect(resourcePageSource).toContain("destinationId: effectiveDomainBindingDestinationId");
     expect(resourcePageSource).not.toContain('id="resource-domain-binding-create-form"');
     expect(resourcePageSource).not.toContain(
       "disabled={isResourceArchived || domainBindingUsesResourceRouteProvider}",
