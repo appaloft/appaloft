@@ -586,6 +586,7 @@
   let projectFormProjectId = $state("");
   let projectName = $state("");
   let quickDeployDialogOpen = $state(false);
+  let quickDeployProgressDialogOpen = $state(false);
   let projectRenameDialogOpen = $state(false);
   let environmentCreateDialogOpen = $state(false);
   let environmentRenameDialogOpen = $state(false);
@@ -1349,6 +1350,9 @@
 
   function setQuickDeployDialogOpen(open: boolean): void {
     quickDeployDialogOpen = open;
+    if (!open) {
+      quickDeployProgressDialogOpen = false;
+    }
     if (open) {
       void setModalOpen(page, "quick-deploy", open);
       return;
@@ -2889,20 +2893,32 @@
     </div>
 
     <Dialog.Root bind:open={quickDeployDialogOpen} onOpenChange={setQuickDeployDialogOpen}>
-      <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-7xl">
-        <Dialog.Header>
-          <Dialog.Title>{$t(i18nKeys.common.actions.quickDeploy)}</Dialog.Title>
-          <Dialog.Description>
-            {$t(i18nKeys.console.projects.detailDescription)}
-          </Dialog.Description>
-        </Dialog.Header>
-        <div class="max-h-[calc(100vh-12rem)] overflow-y-auto px-5 pb-5">
+      <Dialog.Content
+        closeLabel={$t(i18nKeys.common.actions.close)}
+        class={quickDeployProgressDialogOpen ? "max-w-4xl" : "max-w-7xl"}
+      >
+        {#if !quickDeployProgressDialogOpen}
+          <Dialog.Header>
+            <Dialog.Title>{$t(i18nKeys.common.actions.quickDeploy)}</Dialog.Title>
+            <Dialog.Description>
+              {$t(i18nKeys.console.projects.detailDescription)}
+            </Dialog.Description>
+          </Dialog.Header>
+        {/if}
+        <div
+          class={quickDeployProgressDialogOpen
+            ? "px-4 pb-4 pt-4"
+            : "max-h-[calc(100vh-12rem)] overflow-y-auto px-5 pb-5"}
+        >
           <QuickDeploySheet
             lockedProjectId={project.id}
             lockedProjectName={project.name}
             statePath={page.url.pathname}
             stateBaseSearch={projectModalBaseSearch()}
             stateModal="quick-deploy"
+            onProgressDialogOpenChange={(open) => {
+              quickDeployProgressDialogOpen = open;
+            }}
           />
         </div>
       </Dialog.Content>

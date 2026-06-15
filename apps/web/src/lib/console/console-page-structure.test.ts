@@ -502,6 +502,19 @@ describe("console page structure", () => {
     expect(componentOpenTagsOutsideDialog(projectDetailPageSource, "QuickDeploySheet")).toEqual([]);
   });
 
+  test("[CONSOLE-DISPLAY-STATE-IA-000C2] keeps Quick Deploy progress dialogs compact", () => {
+    expect(consoleShellSource).toContain("quickDeployProgressDialogOpen");
+    expect(projectDetailPageSource).toContain("quickDeployProgressDialogOpen");
+    expect(consoleShellSource).toContain(
+      'class={quickDeployProgressDialogOpen ? "max-w-4xl" : "max-w-7xl"}',
+    );
+    expect(projectDetailPageSource).toContain(
+      'class={quickDeployProgressDialogOpen ? "max-w-4xl" : "max-w-7xl"}',
+    );
+    expect(consoleShellSource).toContain("onProgressDialogOpenChange={(open) =>");
+    expect(projectDetailPageSource).toContain("onProgressDialogOpenChange={(open) =>");
+  });
+
   test("[CONSOLE-DISPLAY-STATE-IA-000D] keeps console component forms inside dialogs or explicit form components", () => {
     const formComponentNames = new Set([
       "ProjectCreateForm.svelte",
@@ -830,7 +843,7 @@ describe("console page structure", () => {
     expect(consoleStatePanelSource).toContain(
       '<Button type="button" size="sm" disabled={actionDisabled} onclick={actionOnclick}>',
     );
-    expect(consoleShellSource).toContain('class="max-w-7xl"');
+    expect(consoleShellSource).toContain('"max-w-7xl"');
     expect(consoleShellSource).toContain("max-h-[calc(100vh-12rem)]");
     expect(consoleUtilsSource).not.toContain("projectQuickDeployHref");
     expect(consoleUtilsSource).not.toContain("resourceNewDeploymentHref");

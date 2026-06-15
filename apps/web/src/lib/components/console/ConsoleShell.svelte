@@ -118,6 +118,7 @@
   let colorMode = $state<"light" | "dark">("light");
   let colorModeReady = $state(false);
   let quickDeployDialogOpen = $state(false);
+  let quickDeployProgressDialogOpen = $state(false);
   let sidebarOpen = $state(
     browser ? readBrowserConsoleSidebarOpen(window) : defaultConsoleSidebarOpen,
   );
@@ -292,6 +293,9 @@
 
   function setQuickDeployDialogOpen(open: boolean): void {
     quickDeployDialogOpen = open;
+    if (!open) {
+      quickDeployProgressDialogOpen = false;
+    }
     void setModalOpen(page, "quick-deploy", open);
   }
 </script>
@@ -616,15 +620,30 @@
 
 {#if quickDeployModalEnabled && quickDeployDialogOpen}
   <Dialog.Root open={true} onOpenChange={setQuickDeployDialogOpen}>
-    <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-7xl">
-      <Dialog.Header>
-        <Dialog.Title>{$t(i18nKeys.common.actions.quickDeploy)}</Dialog.Title>
-        <Dialog.Description>
-          {$t(i18nKeys.console.deployments.description)}
-        </Dialog.Description>
-      </Dialog.Header>
-      <div class="max-h-[calc(100vh-12rem)] overflow-y-auto px-5 pb-5">
-        <QuickDeploySheet statePath={page.url.pathname} stateModal="quick-deploy" />
+    <Dialog.Content
+      closeLabel={$t(i18nKeys.common.actions.close)}
+      class={quickDeployProgressDialogOpen ? "max-w-4xl" : "max-w-7xl"}
+    >
+      {#if !quickDeployProgressDialogOpen}
+        <Dialog.Header>
+          <Dialog.Title>{$t(i18nKeys.common.actions.quickDeploy)}</Dialog.Title>
+          <Dialog.Description>
+            {$t(i18nKeys.console.deployments.description)}
+          </Dialog.Description>
+        </Dialog.Header>
+      {/if}
+      <div
+        class={quickDeployProgressDialogOpen
+          ? "px-4 pb-4 pt-4"
+          : "max-h-[calc(100vh-12rem)] overflow-y-auto px-5 pb-5"}
+      >
+        <QuickDeploySheet
+          statePath={page.url.pathname}
+          stateModal="quick-deploy"
+          onProgressDialogOpenChange={(open) => {
+            quickDeployProgressDialogOpen = open;
+          }}
+        />
       </div>
     </Dialog.Content>
   </Dialog.Root>
