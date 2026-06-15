@@ -1257,9 +1257,7 @@
   const isServerlessStaticArtifactDeployment = $derived(
     latestDeployment?.target.kind === "serverless-static-artifact",
   );
-  const isDirectStaticArtifactRuntime = $derived(
-    isServerlessStaticArtifactAccess || isServerlessStaticArtifactDeployment,
-  );
+  const isDirectStaticArtifactRuntime = $derived(isServerlessStaticArtifactDeployment);
   $effect(() => {
     resourceSupportsServerBackedRuntimeSurfaces = !resource || !isDirectStaticArtifactRuntime;
   });
@@ -1271,17 +1269,14 @@
     ),
   );
   const shouldShowServerField = $derived(
-    !isDirectStaticArtifactRuntime &&
-      !domainBindingUsesResourceRouteProvider &&
-      !latestDeployment?.serverId,
+    !domainBindingUsesResourceRouteProvider && !latestDeployment?.serverId,
   );
   const shouldShowDestinationField = $derived(
-    !isDirectStaticArtifactRuntime && !domainBindingUsesResourceRouteProvider && !defaultDestinationId,
+    !domainBindingUsesResourceRouteProvider && !defaultDestinationId,
   );
   const canCreateBinding = $derived(
     Boolean(
-      !isDirectStaticArtifactRuntime &&
-        resource &&
+      resource &&
         domainName.trim() &&
         pathPrefix.trim() &&
         proxyKind !== "none" &&
@@ -1794,7 +1789,7 @@
   }
 
   function prepareResourceDomainBindingCreateDialog(): void {
-    if (!resource || isResourceArchived || isDirectStaticArtifactRuntime) {
+    if (!resource || isResourceArchived) {
       return;
     }
 
@@ -1816,7 +1811,7 @@
   }
 
   function openResourceDomainBindingCreateDialog(): void {
-    if (!resource || isResourceArchived || isDirectStaticArtifactRuntime) {
+    if (!resource || isResourceArchived) {
       return;
     }
 
@@ -7237,33 +7232,19 @@
                       </div>
                       <div class="flex shrink-0 flex-wrap items-center gap-2">
                         <Badge variant="outline">{resourceDomainBindings.length}</Badge>
-                        {#if !isDirectStaticArtifactRuntime}
-                          <Button
-                            type="button"
-                            size="sm"
-                            disabled={isResourceArchived}
-                            onclick={openResourceDomainBindingCreateDialog}
-                          >
-                            <Plus class="size-4" />
-                            {$t(i18nKeys.console.domainBindings.createTitle)}
-                          </Button>
-                        {/if}
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={isResourceArchived}
+                          onclick={openResourceDomainBindingCreateDialog}
+                        >
+                          <Plus class="size-4" />
+                          {$t(i18nKeys.console.domainBindings.createTitle)}
+                        </Button>
                       </div>
                     </div>
 
-                    {#if isDirectStaticArtifactRuntime}
-                      <div
-                        class="rounded-md border border-dashed bg-muted/25 px-4 py-6"
-                        data-resource-static-artifact-domain-unavailable
-                      >
-                        <p class="text-sm font-medium">
-                          {$t(i18nKeys.console.resources.staticArtifactDomainBindingsUnavailableTitle)}
-                        </p>
-                        <p class="mt-2 text-sm leading-6 text-muted-foreground">
-                          {$t(i18nKeys.console.resources.staticArtifactDomainBindingsUnavailableDescription)}
-                        </p>
-                      </div>
-                    {:else if resourceDomainBindings.length === 0}
+                    {#if resourceDomainBindings.length === 0}
                       <div class="rounded-md border border-dashed bg-muted/25 px-4 py-6">
                         <p class="text-sm text-muted-foreground">
                           {$t(i18nKeys.console.domainBindings.emptyBody)}
