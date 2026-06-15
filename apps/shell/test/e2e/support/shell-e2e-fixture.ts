@@ -286,7 +286,7 @@ export async function waitForDeploymentTimeline(
   let lastResult: CliResult | undefined;
 
   while (Date.now() - startedAt < timeoutMs) {
-    const result = runShellCli(["timeline", deploymentId], options);
+    const result = runShellCli(["deployments", "timeline", deploymentId], options);
     lastResult = result;
 
     if (result.exitCode === 0 && expected.every((message) => result.stdout.includes(message))) {
