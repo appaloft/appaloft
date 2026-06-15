@@ -1179,11 +1179,14 @@ describe("console page structure", () => {
     expect(resourceDetailPageSource).toContain("openResourceDomainBindingCreateDialog");
     expect(resourceDetailPageSource).toContain("setResourceDomainBindingCreateDialogOpen");
     expect(resourceDetailPageSource).toContain('modalIsOpen(page, "domain-binding")');
-    expect(resourceDomainBindingsSectionSource).toContain(
+    expect(resourceDomainBindingsSectionSource).not.toContain(
       "data-resource-static-artifact-domain-unavailable",
     );
-    expect(resourceDomainBindingsSectionSource).toContain(
+    expect(resourceDomainBindingsSectionSource).not.toContain(
       "staticArtifactDomainBindingsUnavailableTitle",
+    );
+    expect(resourceDomainBindingsSectionSource).not.toContain(
+      "staticArtifactDomainBindingsUnavailableDescription",
     );
     expect(resourceDomainBindingsSectionSource).not.toContain(
       "disabled={isResourceArchived || isServerlessStaticArtifactAccess}",

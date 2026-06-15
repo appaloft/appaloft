@@ -8,8 +8,8 @@ export const createDomainBindingCommandInputSchema = z
     projectId: nonEmptyTrimmedString("Project id"),
     environmentId: nonEmptyTrimmedString("Environment id"),
     resourceId: nonEmptyTrimmedString("Resource id"),
-    serverId: nonEmptyTrimmedString("Server id"),
-    destinationId: nonEmptyTrimmedString("Destination id"),
+    serverId: nonEmptyTrimmedString("Server id").optional(),
+    destinationId: nonEmptyTrimmedString("Destination id").optional(),
     domainName: nonEmptyTrimmedString("Domain name"),
     pathPrefix: nonEmptyTrimmedString("Path prefix").default("/"),
     proxyKind: z.enum(edgeProxyKinds),
@@ -22,6 +22,14 @@ export const createDomainBindingCommandInputSchema = z
     idempotencyKey: nonEmptyTrimmedString("Idempotency key").optional(),
   })
   .superRefine((value, context) => {
+    if ((value.serverId && !value.destinationId) || (!value.serverId && value.destinationId)) {
+      context.addIssue({
+        code: "custom",
+        path: value.serverId ? ["destinationId"] : ["serverId"],
+        message: "Domain binding server target requires both serverId and destinationId",
+      });
+    }
+
     if (value.redirectStatus && !value.redirectTo) {
       context.addIssue({
         code: "custom",
