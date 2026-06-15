@@ -1402,7 +1402,7 @@
                   </div>
                 </nav>
               </aside>
-              <div class={[detailSubnavContentClass, "md:pt-0"]}>
+              <div class={detailSubnavContentClass}>
                 {#if activeRuntimeSection === "monitor"}
                   <RuntimeMonitorPanel
                     scope={serverRuntimeScope}
@@ -1700,7 +1700,7 @@
                   </div>
                 </nav>
               </aside>
-              <div class={[detailSubnavContentClass, "md:pt-0"]}>
+              <div class={detailSubnavContentClass}>
         {#if activeSettingsSection === "credentials"}
         {#if storedSshCredentialId}
           <div class="console-panel p-4">
@@ -1855,6 +1855,73 @@
                 </div>
               </div>
             {/if}
+          </div>
+        {:else}
+          <div class="console-panel p-4" data-server-settings-credential-summary>
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div class="min-w-0 space-y-1">
+                <div class="flex items-center gap-2">
+                  <h2 class="text-sm font-semibold">
+                    {$t(i18nKeys.console.servers.credentialReusableUnavailableTitle)}
+                  </h2>
+                  <DocsHelpLink
+                    href={webDocsHrefs.serverSshCredential}
+                    ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                  />
+                </div>
+                <p class="text-sm text-muted-foreground">
+                  {$t(i18nKeys.console.servers.credentialReusableUnavailableBody)}
+                </p>
+              </div>
+              <Badge variant="outline">{$t(i18nKeys.common.status.notConfigured)}</Badge>
+            </div>
+
+            <dl class="mt-5 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
+              <div class="console-subtle-panel px-4 py-3">
+                <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {$t(i18nKeys.console.serverForm.sshCredentialTitle)}
+                </dt>
+                <dd class="mt-2 truncate font-medium">
+                  {server.credential?.kind === "local-ssh-agent"
+                    ? $t(i18nKeys.console.serverForm.localSshAgent)
+                    : (server.credential?.credentialName ??
+                      server.credential?.username ??
+                      $t(i18nKeys.common.status.notConfigured))}
+                </dd>
+              </div>
+              <div class="console-subtle-panel px-4 py-3">
+                <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {$t(i18nKeys.console.servers.credentialDefaultUsername)}
+                </dt>
+                <dd class="mt-2 truncate font-medium">
+                  {server.credential?.username ?? $t(i18nKeys.common.status.notConfigured)}
+                </dd>
+              </div>
+              <div class="console-subtle-panel px-4 py-3">
+                <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {$t(i18nKeys.console.servers.credentialPrivateKeyConfigured)}
+                </dt>
+                <dd class="mt-2">
+                  <Badge variant={server.credential?.privateKeyConfigured ? "secondary" : "outline"}>
+                    {server.credential?.privateKeyConfigured
+                      ? $t(i18nKeys.common.status.configured)
+                      : $t(i18nKeys.common.status.notConfigured)}
+                  </Badge>
+                </dd>
+              </div>
+              <div class="console-subtle-panel px-4 py-3">
+                <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {$t(i18nKeys.console.servers.credentialPublicKeyConfigured)}
+                </dt>
+                <dd class="mt-2">
+                  <Badge variant={server.credential?.publicKeyConfigured ? "secondary" : "outline"}>
+                    {server.credential?.publicKeyConfigured
+                      ? $t(i18nKeys.common.status.configured)
+                      : $t(i18nKeys.common.status.notConfigured)}
+                  </Badge>
+                </dd>
+              </div>
+            </dl>
           </div>
         {/if}
         {:else if activeSettingsSection === "general"}

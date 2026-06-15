@@ -1761,6 +1761,8 @@ describe("console page structure", () => {
     expect(serverDetailPageSource).not.toContain("detailTabPanelScrollNoTopClass");
     expect(serverDetailPageSource).toContain("class={detailTabPanelSubnavClass}");
     expect(serverDetailPageSource).toContain("detailSubnavLayoutClass");
+    expect(serverDetailPageSource).toContain("class={detailSubnavContentClass}");
+    expect(serverDetailPageSource).not.toContain("md:pt-0");
     expect(serverDetailPageSource).not.toContain("console-detail-");
     expect(serverDetailPageSource).not.toContain("console-subnav-");
     expect(serverDetailPageSource).toContain('value="runtime"');
@@ -1866,6 +1868,8 @@ describe("console page structure", () => {
     );
 
     expect(settingsDisplaySurface).toContain("data-server-settings-general");
+    expect(settingsDisplaySurface).toContain("data-server-settings-credential-summary");
+    expect(settingsDisplaySurface).toContain("credentialReusableUnavailableTitle");
     expect(settingsDisplaySurface).toContain("openServerRenameDialog");
     expect(settingsDisplaySurface).toContain("openServerLifecycleDialog");
     expect(settingsDisplaySurface).toContain("lifecycleManageAction");
