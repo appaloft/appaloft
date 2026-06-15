@@ -31,6 +31,7 @@ export * from "./operations/resources/resource-health-history.query";
 export * from "./operations/resources/resource-proxy-configuration-preview.query";
 export * from "./operations/resources/resource-runtime-logs.query";
 export * from "./operations/resources/restart-resource-runtime.command";
+export * from "./operations/resources/restore-resource.command";
 export * from "./operations/resources/rotate-resource-dependency-binding-secret.command";
 export * from "./operations/resources/rotate-resource-secret-reference.command";
 export * from "./operations/resources/set-resource-variable.command";

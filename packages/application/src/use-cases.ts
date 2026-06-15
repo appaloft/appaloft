@@ -194,6 +194,7 @@ export * from "./operations/resources/resource-runtime-control.use-case";
 export * from "./operations/resources/resource-runtime-logs.query-service";
 export * from "./operations/resources/resource-secret-reference.query-service";
 export * from "./operations/resources/resource-secret-reference.use-cases";
+export * from "./operations/resources/restore-resource.use-case";
 export * from "./operations/resources/rotate-resource-dependency-binding-secret.use-case";
 export * from "./operations/resources/set-resource-variable.use-case";
 export * from "./operations/resources/show-resource.query-service";

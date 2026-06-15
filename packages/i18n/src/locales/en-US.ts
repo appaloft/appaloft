@@ -1802,6 +1802,8 @@ export const enUS = {
         "Block future profile edits and deployment entry points while preserving deployments, logs, routes, and bindings.",
       lifecycleDeleteOption:
         "Delete the resource boundary only after the resource is archived. Audit and external records remain with their owners.",
+      lifecycleRestoreOption:
+        "Reopen profile edits and deployment entry points without changing existing deployments, logs, routes, or bindings.",
       lifecycleDescription:
         "Review the resource lifecycle state, then open one focused governance flow for the intended operation.",
       lifecycleDialogDescription:
@@ -1813,6 +1815,9 @@ export const enUS = {
       lifecyclePreviewResourceNotice:
         "Preview resources can enter cleanup directly without a separate archive step.",
       lifecycleStatus: "Lifecycle status",
+      restoreAction: "Restore",
+      restoreFailed: "Resource was not restored",
+      restoreSucceeded: "Resource restored",
       composeProfileDescription:
         "Compose resources group multiple services and choose a target service for traffic.",
       composeProfileTitle: "Compose stack",

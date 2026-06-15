@@ -1628,6 +1628,35 @@ export class Resource extends AggregateRoot<ResourceState> {
     return ok({ changed: true });
   }
 
+  restore(input: { restoredAt: UpdatedAt }): Result<{ changed: boolean }> {
+    if (this.state.lifecycleStatus.isActive()) {
+      return ok({ changed: false });
+    }
+
+    const lifecycleStatus = this.state.lifecycleStatus.restore();
+    if (lifecycleStatus.isErr()) {
+      return err(lifecycleStatus.error);
+    }
+
+    const previousArchivedAt = this.state.archivedAt;
+    const previousArchiveReason = this.state.archiveReason;
+    this.state.lifecycleStatus = lifecycleStatus.value;
+    delete this.state.archivedAt;
+    delete this.state.archiveReason;
+
+    this.recordDomainEvent("resource-restored", input.restoredAt, {
+      resourceId: this.state.id.value,
+      projectId: this.state.projectId.value,
+      environmentId: this.state.environmentId.value,
+      resourceSlug: this.state.slug.value,
+      restoredAt: input.restoredAt.value,
+      ...(previousArchivedAt ? { previousArchivedAt: previousArchivedAt.value } : {}),
+      ...(previousArchiveReason ? { previousArchiveReason: previousArchiveReason.value } : {}),
+    });
+
+    return ok({ changed: true });
+  }
+
   delete(input: { deletedAt: DeletedAt }): Result<{ changed: boolean }> {
     if (this.state.lifecycleStatus.isDeleted()) {
       return ok({ changed: false });

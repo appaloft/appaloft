@@ -65,6 +65,7 @@
     ResourceDependencyBindingSummary,
     ResourceStorageAttachmentSummary,
     ResourceSummary,
+    RestoreResourceInput,
     RuntimeUsageScope,
     ScheduledTaskDefinitionSummary,
     ScheduledTaskRunLogEntry,
@@ -260,7 +261,7 @@
     | "scheduled-tasks"
     | "source-events"
     | "danger";
-  type ResourceLifecycleAction = "archive" | "delete";
+  type ResourceLifecycleAction = "archive" | "restore" | "delete";
   type ResourceVariableKind = SetResourceVariableInput["kind"];
   type ResourceVariableExposure = SetResourceVariableInput["exposure"];
   const resourceDetailTabs = [
@@ -2476,6 +2477,33 @@
       };
     },
   }));
+  let restoreFeedback = $state<{
+    kind: "success" | "error";
+    title: string;
+    detail: string;
+  } | null>(null);
+  const restoreResourceMutation = createMutation(() => ({
+    mutationFn: (input: RestoreResourceInput) => orpcClient.resources.restore(input),
+    onSuccess: (result) => {
+      restoreFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.restoreSucceeded),
+        detail: result.id,
+      };
+      void queryClient.invalidateQueries({ queryKey: ["resources"] });
+      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
+      void queryClient.invalidateQueries({
+        queryKey: ["resources", "health", resourceId, "detail"],
+      });
+    },
+    onError: (error) => {
+      restoreFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.restoreFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
   let deleteFeedback = $state<{
     kind: "success" | "error";
     title: string;
@@ -2945,6 +2973,7 @@
     selectedResourceLifecycleAction = null;
     resourceDeleteConfirmation = "";
     archiveFeedback = null;
+    restoreFeedback = null;
     deleteFeedback = null;
     resourceLifecycleDialogOpen = true;
   }
@@ -2963,6 +2992,9 @@
     if (action === "archive" && (isResourceArchived || isPreviewEnvironmentResource)) {
       return;
     }
+    if (action === "restore" && (!isResourceArchived || isPreviewEnvironmentResource)) {
+      return;
+    }
     if (action === "delete" && !isPreviewEnvironmentResource && !isResourceArchived) {
       return;
     }
@@ -2973,6 +3005,7 @@
     selectedResourceLifecycleAction = action;
     resourceDeleteConfirmation = "";
     archiveFeedback = null;
+    restoreFeedback = null;
     deleteFeedback = null;
   }
 
@@ -2984,6 +3017,18 @@
     archiveFeedback = null;
     closeResourceLifecycleDialog();
     archiveResourceMutation.mutate({
+      resourceId: resource.id,
+    });
+  }
+
+  function restoreResource(): void {
+    if (!resource || !isResourceArchived || restoreResourceMutation.isPending) {
+      return;
+    }
+
+    restoreFeedback = null;
+    closeResourceLifecycleDialog();
+    restoreResourceMutation.mutate({
       resourceId: resource.id,
     });
   }
@@ -3021,6 +3066,7 @@
 
     const confirmationResourceSlug = resourceDeleteConfirmation;
     archiveFeedback = null;
+    restoreFeedback = null;
     deleteFeedback = null;
     closeResourceLifecycleDialog();
     deletePreviewResourceMutation.mutate({
@@ -9588,6 +9634,8 @@
               event.preventDefault();
               if (selectedResourceLifecycleAction === "archive") {
                 archiveResource();
+              } else if (selectedResourceLifecycleAction === "restore") {
+                restoreResource();
               } else if (isPreviewEnvironmentResource) {
                 deletePreviewResource();
               } else {
@@ -9606,7 +9654,7 @@
               </p>
             </div>
 
-            <div class="grid min-w-0 gap-2 sm:grid-cols-2">
+            <div class="grid min-w-0 gap-2 sm:grid-cols-3">
               {#if !isPreviewEnvironmentResource}
                 <Button
                   type="button"
@@ -9622,6 +9670,25 @@
                     </span>
                     <span class="block break-words text-xs font-normal leading-snug opacity-80">
                       {$t(i18nKeys.console.resources.lifecycleArchiveOption)}
+                    </span>
+                  </span>
+                </Button>
+              {/if}
+              {#if !isPreviewEnvironmentResource}
+                <Button
+                  type="button"
+                  variant={selectedResourceLifecycleAction === "restore" ? "default" : "outline"}
+                  class="h-auto min-w-0 w-full max-w-full items-start justify-start whitespace-normal px-3 py-3 text-left"
+                  disabled={!isResourceArchived || restoreResourceMutation.isPending}
+                  onclick={() => selectResourceLifecycleAction("restore")}
+                >
+                  <RotateCw class="mt-0.5 size-4 shrink-0" />
+                  <span class="min-w-0 flex-1">
+                    <span class="block font-medium">
+                      {$t(i18nKeys.console.resources.restoreAction)}
+                    </span>
+                    <span class="block break-words text-xs font-normal leading-snug opacity-80">
+                      {$t(i18nKeys.console.resources.lifecycleRestoreOption)}
                     </span>
                   </span>
                 </Button>
@@ -9705,6 +9772,12 @@
                 <p class="mt-1 break-all text-xs">{archiveFeedback.detail}</p>
               </div>
             {/if}
+            {#if restoreFeedback?.kind === "error"}
+              <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                <p class="font-medium">{restoreFeedback.title}</p>
+                <p class="mt-1 break-all text-xs">{restoreFeedback.detail}</p>
+              </div>
+            {/if}
             {#if deleteFeedback?.kind === "error"}
               <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
                 <p class="font-medium">{deleteFeedback.title}</p>
@@ -9729,6 +9802,8 @@
                 disabled={!selectedResourceLifecycleAction ||
                   (selectedResourceLifecycleAction === "archive" &&
                     (isResourceArchived || archiveResourceMutation.isPending)) ||
+                  (selectedResourceLifecycleAction === "restore" &&
+                    (!isResourceArchived || restoreResourceMutation.isPending)) ||
                   (selectedResourceLifecycleAction === "delete" &&
                     (resourceDeleteConfirmation.trim() !== resource.slug ||
                       (!isPreviewEnvironmentResource && !isResourceArchived) ||
@@ -9742,6 +9817,11 @@
                   {archiveResourceMutation.isPending
                     ? $t(i18nKeys.common.actions.saving)
                     : $t(i18nKeys.console.resources.archiveAction)}
+                {:else if selectedResourceLifecycleAction === "restore"}
+                  <RotateCw class="size-4" />
+                  {restoreResourceMutation.isPending
+                    ? $t(i18nKeys.common.actions.saving)
+                    : $t(i18nKeys.console.resources.restoreAction)}
                 {:else if selectedResourceLifecycleAction === "delete"}
                   <Trash2 class="size-4" />
                   {deleteResourceMutation.isPending || deletePreviewResourceMutation.isPending

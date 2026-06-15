@@ -405,6 +405,7 @@ import {
   RestartResourceRuntimeCommand,
   RestoreDependencyResourceBackupCommand,
   RestoreProjectCommand,
+  RestoreResourceCommand,
   RestoreStorageVolumeBackupCommand,
   RetryCertificateCommand,
   RetryDeploymentCommand,
@@ -447,6 +448,7 @@ import {
   restartResourceRuntimeCommandInputSchema,
   restoreDependencyResourceBackupCommandInputSchema,
   restoreProjectCommandInputSchema,
+  restoreResourceCommandInputSchema,
   restoreStorageVolumeBackupCommandInputSchema,
   retryCertificateCommandInputSchema,
   retryDeploymentCommandInputSchema,
@@ -754,6 +756,7 @@ import {
   resourceRuntimeLogsStreamResponseSchema,
   restartResourceRuntimeResponseSchema,
   restoreProjectResponseSchema,
+  restoreResourceResponseSchema,
   restoreStorageVolumeBackupResponseSchema,
   retryCertificateResponseSchema,
   retryDeploymentResponseSchema,
@@ -4007,6 +4010,18 @@ export const archiveResourceProcedure = base
     executeCommand(context, ArchiveResourceCommand.create(input)),
   );
 
+export const restoreResourceProcedure = base
+  .route({
+    method: "POST",
+    path: "/resources/{resourceId}/restore",
+    successStatus: 200,
+  })
+  .input(restoreResourceCommandInputSchema)
+  .output(restoreResourceResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RestoreResourceCommand.create(input)),
+  );
+
 export const checkResourceDeleteSafetyProcedure = base
   .route({
     method: "GET",
@@ -6419,6 +6434,7 @@ export const appaloftOrpcRouter = {
     show: showResourceProcedure,
     create: createResourceProcedure,
     archive: archiveResourceProcedure,
+    restore: restoreResourceProcedure,
     deleteCheck: checkResourceDeleteSafetyProcedure,
     delete: deleteResourceProcedure,
     configureHealth: configureResourceHealthProcedure,
@@ -9084,6 +9100,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/resources/:resourceId/delete-check",
     "/api/resources/:resourceId/effective-config",
     "/api/resources/:resourceId/archive",
+    "/api/resources/:resourceId/restore",
     "/api/resources/:resourceId/redeploy",
     "/api/resources/:resourceId/source",
     "/api/resources/:resourceId/health",
