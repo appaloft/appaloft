@@ -250,6 +250,7 @@ export * from "./operations/resources/resource-runtime-control-attempt-retention
 export * from "./operations/resources/resource-runtime-log-archives.schema";
 export * from "./operations/resources/resource-runtime-logs.schema";
 export * from "./operations/resources/resource-secret-reference.schema";
+export * from "./operations/resources/restore-resource.schema";
 export * from "./operations/resources/rotate-resource-dependency-binding-secret.schema";
 export * from "./operations/resources/set-resource-variable.schema";
 export * from "./operations/resources/show-resource.schema";

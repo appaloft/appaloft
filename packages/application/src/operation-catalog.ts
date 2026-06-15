@@ -176,6 +176,7 @@ import {
   showResourceRuntimeLogArchiveQueryInputSchema,
 } from "./operations/resources/resource-runtime-log-archives.schema";
 import { resourceRuntimeLogsQueryInputSchema } from "./operations/resources/resource-runtime-logs.query";
+import { restoreResourceCommandInputSchema } from "./operations/resources/restore-resource.command";
 import { rotateResourceDependencyBindingSecretCommandInputSchema } from "./operations/resources/rotate-resource-dependency-binding-secret.command";
 import { rotateResourceSecretReferenceCommandInputSchema } from "./operations/resources/rotate-resource-secret-reference.command";
 import { setResourceVariableCommandInputSchema } from "./operations/resources/set-resource-variable.command";
@@ -1634,6 +1635,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft resource archive <resourceId>",
       orpc: { method: "POST", path: "/api/resources/{resourceId}/archive" },
+    },
+  },
+  {
+    key: "resources.restore",
+    kind: "command",
+    domain: "resources",
+    messageName: "RestoreResourceCommand",
+    handlerName: "RestoreResourceCommandHandler",
+    serviceName: "RestoreResourceUseCase",
+    inputSchema: restoreResourceCommandInputSchema,
+    serviceToken: tokens.restoreResourceUseCase,
+    transports: {
+      cli: "appaloft resource restore <resourceId>",
+      orpc: { method: "POST", path: "/api/resources/{resourceId}/restore" },
     },
   },
   {

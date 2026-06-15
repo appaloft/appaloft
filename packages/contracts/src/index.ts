@@ -2989,6 +2989,14 @@ export const archiveResourceResponseSchema = z.object({
   id: z.string(),
 });
 
+export const restoreResourceInputSchema = z.object({
+  resourceId: z.string().min(1),
+});
+
+export const restoreResourceResponseSchema = z.object({
+  id: z.string(),
+});
+
 export const checkResourceDeleteSafetyInputSchema = z.object({
   resourceId: z.string().min(1),
 });
@@ -6782,6 +6790,8 @@ export type ListStaticArtifactPublicationsResponse = z.infer<
 >;
 export type ArchiveResourceInput = z.infer<typeof archiveResourceInputSchema>;
 export type ArchiveResourceResponse = z.infer<typeof archiveResourceResponseSchema>;
+export type RestoreResourceInput = z.infer<typeof restoreResourceInputSchema>;
+export type RestoreResourceResponse = z.infer<typeof restoreResourceResponseSchema>;
 export type CheckResourceDeleteSafetyInput = z.infer<typeof checkResourceDeleteSafetyInputSchema>;
 export type ResourceDeleteBlocker = z.infer<typeof resourceDeleteBlockerSchema>;
 export type ResourceDeleteSafety = z.infer<typeof resourceDeleteSafetySchema>;

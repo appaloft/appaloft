@@ -39,6 +39,7 @@ export * from "./operations/resources/resource-proxy-configuration-preview.handl
 export * from "./operations/resources/resource-runtime-control.use-case";
 export * from "./operations/resources/resource-runtime-logs.handler";
 export * from "./operations/resources/restart-resource-runtime.handler";
+export * from "./operations/resources/restore-resource.handler";
 export * from "./operations/resources/rotate-resource-dependency-binding-secret.handler";
 export * from "./operations/resources/rotate-resource-dependency-binding-secret.use-case";
 export * from "./operations/resources/rotate-resource-secret-reference.handler";
