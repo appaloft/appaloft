@@ -98,7 +98,7 @@ async function recordImportedCertificateAttempt(input: {
   expiresAt: string;
   projectId: string;
   resourceId: string;
-  serverId: string;
+  serverId?: string;
 }): Promise<void> {
   const result = await input.recorder.record(input.repositoryContext, {
     id: input.attemptId,
@@ -112,7 +112,7 @@ async function recordImportedCertificateAttempt(input: {
     step: "issued",
     projectId: input.projectId,
     resourceId: input.resourceId,
-    serverId: input.serverId,
+    ...(input.serverId ? { serverId: input.serverId } : {}),
     domainBindingId: input.domainBindingId,
     certificateId: input.certificateId,
     startedAt: input.importedAt,
@@ -213,7 +213,7 @@ export class ImportCertificateUseCase {
             projectId: domainBindingState.projectId.value,
             environmentId: domainBindingState.environmentId.value,
             resourceId: domainBindingState.resourceId.value,
-            serverId: domainBindingState.serverId.value,
+            ...(domainBindingState.serverId ? { serverId: domainBindingState.serverId.value } : {}),
             domainBindingId: domainBindingState.id.value,
           },
           contextAttributes: {
@@ -384,7 +384,7 @@ export class ImportCertificateUseCase {
         expiresAt: expiresAt.value,
         projectId: domainBindingState.projectId.value,
         resourceId: domainBindingState.resourceId.value,
-        serverId: domainBindingState.serverId.value,
+        ...(domainBindingState.serverId ? { serverId: domainBindingState.serverId.value } : {}),
       });
       await publishDomainEventsAndReturn(context, eventBus, logger, certificate, undefined);
 

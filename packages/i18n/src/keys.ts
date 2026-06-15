@@ -1862,10 +1862,6 @@ export const i18nKeys = {
       domainBindingsDescription: "console:resources.domainBindingsDescription",
       domainBindingsTitle: "console:resources.domainBindingsTitle",
       staticArtifactDefaultAccess: "console:resources.staticArtifactDefaultAccess",
-      staticArtifactDomainBindingsUnavailableDescription:
-        "console:resources.staticArtifactDomainBindingsUnavailableDescription",
-      staticArtifactDomainBindingsUnavailableTitle:
-        "console:resources.staticArtifactDomainBindingsUnavailableTitle",
       durableDomainAccess: "console:resources.durableDomainAccess",
       certificateExpiresAt: "console:resources.certificateExpiresAt",
       certificateImportCertificateChain: "console:resources.certificateImportCertificateChain",

@@ -1628,8 +1628,8 @@ Terminal session lifecycle boundary:
 
 Business meaning:
 - runtime plan access routes are deployment snapshots, not durable domain ownership state
-- a `DomainBinding` is durable routing/domain ownership state for a project, environment,
-  resource, destination, and deployment target
+- a `DomainBinding` is durable routing/domain ownership state for a project, environment, and
+  resource, with optional server/destination target hints when the route is server-backed
 - DNS observation/verification, certificate issuance, renewal, and domain readiness progress outside
   `deployments.create`
 
@@ -1659,8 +1659,8 @@ Current boundary:
 - `domain-bindings.create` creates durable binding state, persists the first manual verification
   attempt, records initial DNS observation metadata, publishes `domain-binding-requested`, and
   returns accepted `ok({ id })`. Initial ownership verification attempts are also projected into
-  `operator-work.*` through safe process-attempt rows with DomainBinding, Resource, server, and DNS
-  expectation metadata
+  `operator-work.*` through safe process-attempt rows with DomainBinding, Resource, optional server
+  target, and DNS expectation metadata
 - `domain-bindings.confirm-ownership` confirms the current verification attempt, defaults to
   Appaloft-observed DNS evidence before moving the binding to `bound`, supports explicit manual
   override, publishes `domain-bound`, and returns `ok({ id, verificationAttemptId })`

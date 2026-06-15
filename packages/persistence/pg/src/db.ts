@@ -96,6 +96,7 @@ import { resourceStorageAttachmentBackupMetadataMigration } from "./migrations/0
 import { projectDisplayOrderMigration } from "./migrations/088_project_display_order";
 import { serverDisplayOrderMigration } from "./migrations/089_server_display_order";
 import { durableWorkerHeartbeatLeasesMigration } from "./migrations/090_durable_worker_heartbeat_leases";
+import { domainBindingResourceTargetsMigration } from "./migrations/091_domain_binding_resource_targets";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -284,6 +285,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "088_project_display_order": projectDisplayOrderMigration,
       "089_server_display_order": serverDisplayOrderMigration,
       "090_durable_worker_heartbeat_leases": durableWorkerHeartbeatLeasesMigration,
+      "091_domain_binding_resource_targets": domainBindingResourceTargetsMigration,
     };
   }
 }
