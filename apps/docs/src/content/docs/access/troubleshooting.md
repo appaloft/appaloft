@@ -32,14 +32,14 @@ sidebar:
 - `appaloft resource proxy-config <resourceId>`：查看代理计划或 provider-rendered 配置里是否有
   对应 host/path/target，适合判断 route missing、stale 或 failed。
 - `appaloft resource logs <resourceId>`：查看应用 stdout/stderr，判断启动命令、端口、配置和运行时异常。
-- `appaloft logs <deploymentId>`：查看某次部署 attempt 的执行日志；它是部署历史，不等同于当前路由状态。
+- `appaloft deployments timeline <deploymentId>`：查看某次部署 attempt 的执行日志；它是部署历史，不等同于当前路由状态。
 - `appaloft resource diagnose <resourceId>`：复制安全诊断摘要，把 access、proxy、health、runtime logs、
-  deployment logs 和推荐动作放在同一个 payload 里。
+  deployment timeline entries 和推荐动作放在同一个 payload 里。
 
 Web console、CLI 和 HTTP API 使用同一组 operation contract。Web 上的资源详情、健康、代理配置、
 日志和诊断复制入口对应的 API 分别是 `/api/resources/{resourceId}`、
 `/api/resources/{resourceId}/health`、`/api/resources/{resourceId}/proxy-configuration`、
-`/api/resources/{resourceId}/runtime-logs`、`/api/resources/{resourceId}/diagnostic-summary`，部署日志
+`/api/resources/{resourceId}/runtime-logs`、`/api/resources/{resourceId}/diagnostic-summary`，部署时间线条目
 对应 `/api/deployments/{deploymentId}/logs`。
 
 <h2 id="access-dns-failures">DNS 失败</h2>

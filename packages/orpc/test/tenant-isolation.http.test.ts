@@ -1134,7 +1134,7 @@ async function seedTenantAuxiliaryRecords(db: Kysely<Database>) {
         id: "rdf_alpha_tenant",
         scope: "organization",
         organization_id: "org_alpha",
-        category: "deployment-logs",
+        category: "provider-job-logs",
         retention_days: 14,
         dry_run_scheduling_enabled: true,
         destructive_scheduling_enabled: false,
@@ -1147,7 +1147,7 @@ async function seedTenantAuxiliaryRecords(db: Kysely<Database>) {
         id: "rdf_beta_tenant",
         scope: "organization",
         organization_id: "org_beta",
-        category: "deployment-logs",
+        category: "provider-job-logs",
         retention_days: 7,
         dry_run_scheduling_enabled: true,
         destructive_scheduling_enabled: false,
@@ -1206,7 +1206,7 @@ function deploymentRow(input: {
       precedence: ["environment"],
       variables: [],
     },
-    logs: [],
+    timeline: [],
     created_at: "2026-01-01T00:00:00.000Z",
     started_at: "2026-01-01T00:00:00.000Z",
     finished_at: "2026-01-01T00:01:00.000Z",
@@ -1730,7 +1730,7 @@ describe("tenant isolation over product HTTP routes", () => {
         (
           (await getJson(
             app,
-            "/api/retention-defaults/deployment-logs?scope=organization&organizationId=org_alpha",
+            "/api/retention-defaults/provider-job-logs?scope=organization&organizationId=org_alpha",
             "alphaOwner",
           )) as { policy: { id: string } | null }
         ).policy?.id,
@@ -2225,7 +2225,7 @@ describe("tenant isolation over product HTTP routes", () => {
         (
           (await getJson(
             app,
-            "/api/retention-defaults/deployment-logs?scope=organization&organizationId=org_beta",
+            "/api/retention-defaults/provider-job-logs?scope=organization&organizationId=org_beta",
             "alphaOwner",
           )) as { policy: unknown | null }
         ).policy,

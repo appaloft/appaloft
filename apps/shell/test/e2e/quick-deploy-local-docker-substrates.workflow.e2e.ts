@@ -12,8 +12,8 @@ import {
   reservePort,
   runDocker,
   runShellCli,
-  waitForDeploymentLogs,
   waitForDeploymentSucceeded,
+  waitForDeploymentTimeline,
 } from "./support/shell-e2e-fixture";
 
 const dockerfileFixtureDir = fixturePath("docker-express-hello");
@@ -119,20 +119,22 @@ describe("quick deploy local Docker substrate e2e", () => {
       dockerfileDeploymentId = parseJson<{ id: string }>(dockerfileDeployment.stdout).id;
       await waitForDeploymentSucceeded(dockerfileDeploymentId, workspace.cliOptions);
 
-      const dockerfileLogs = await waitForDeploymentLogs(
+      const dockerfileTimeline = await waitForDeploymentTimeline(
         dockerfileDeploymentId,
         workspace.cliOptions,
         ["Using local docker-container execution", "Container is reachable"],
         { label: "Dockerfile deployment" },
       );
-      expect(dockerfileLogs.stdout).toContain("Using local docker-container execution");
-      expect(dockerfileLogs.stdout).toContain("Container is reachable");
+      expect(dockerfileTimeline.stdout).toContain("Using local docker-container execution");
+      expect(dockerfileTimeline.stdout).toContain("Container is reachable");
       const dockerfileHealthUrl =
         /Container is reachable at (http:\/\/127\.0\.0\.1:\d+\/health)/u.exec(
-          dockerfileLogs.stdout,
+          dockerfileTimeline.stdout,
         )?.[1];
       if (!dockerfileHealthUrl) {
-        throw new Error(`Could not find Dockerfile health URL in logs:\n${dockerfileLogs.stdout}`);
+        throw new Error(
+          `Could not find Dockerfile health URL in timeline:\n${dockerfileTimeline.stdout}`,
+        );
       }
       await waitForHealth(dockerfileHealthUrl);
 
@@ -163,20 +165,22 @@ describe("quick deploy local Docker substrate e2e", () => {
       prebuiltDeploymentId = parseJson<{ id: string }>(prebuiltDeployment.stdout).id;
       await waitForDeploymentSucceeded(prebuiltDeploymentId, workspace.cliOptions);
 
-      const prebuiltLogs = await waitForDeploymentLogs(
+      const prebuiltTimeline = await waitForDeploymentTimeline(
         prebuiltDeploymentId,
         workspace.cliOptions,
         ["Using local docker-container execution", "Container is reachable"],
         { label: "prebuilt image deployment" },
       );
-      expect(prebuiltLogs.stdout).toContain("Using local docker-container execution");
-      expect(prebuiltLogs.stdout).toContain("Container is reachable");
+      expect(prebuiltTimeline.stdout).toContain("Using local docker-container execution");
+      expect(prebuiltTimeline.stdout).toContain("Container is reachable");
       const prebuiltHealthUrl =
         /Container is reachable at (http:\/\/127\.0\.0\.1:\d+\/health)/u.exec(
-          prebuiltLogs.stdout,
+          prebuiltTimeline.stdout,
         )?.[1];
       if (!prebuiltHealthUrl) {
-        throw new Error(`Could not find prebuilt health URL in logs:\n${prebuiltLogs.stdout}`);
+        throw new Error(
+          `Could not find prebuilt health URL in timeline:\n${prebuiltTimeline.stdout}`,
+        );
       }
       await waitForHealth(prebuiltHealthUrl);
 
@@ -207,16 +211,16 @@ describe("quick deploy local Docker substrate e2e", () => {
       composeDeploymentId = parseJson<{ id: string }>(composeDeployment.stdout).id;
       await waitForDeploymentSucceeded(composeDeploymentId, workspace.cliOptions);
 
-      const composeLogs = await waitForDeploymentLogs(
+      const composeTimeline = await waitForDeploymentTimeline(
         composeDeploymentId,
         workspace.cliOptions,
         ["Using local docker-compose-stack execution", "Compose stack started successfully"],
         { label: "Docker Compose deployment" },
       );
-      expect(composeLogs.stdout).toContain("Using local docker-compose-stack execution");
-      expect(composeLogs.stdout).toContain("Compose stack started successfully");
-      expect(composeLogs.stdout).toContain("docker-compose.yml");
-      expect(composeLogs.stdout).toContain(fixturePath("docker-compose-hello"));
+      expect(composeTimeline.stdout).toContain("Using local docker-compose-stack execution");
+      expect(composeTimeline.stdout).toContain("Compose stack started successfully");
+      expect(composeTimeline.stdout).toContain("docker-compose.yml");
+      expect(composeTimeline.stdout).toContain(fixturePath("docker-compose-hello"));
 
       const deployments = runShellCli(["deployments", "list"], workspace.cliOptions);
       expectCliSuccess(deployments, "list deployments");

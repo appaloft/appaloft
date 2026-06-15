@@ -21,7 +21,7 @@ unguarded event stream rows are deleted.
 The canonical first retained store is the Appaloft-owned retained event observation store selected
 by ADR-059. It is expected to be backed by a dedicated `domain_event_stream_records` persistence
 boundary plus prune watermark metadata for pruned-cursor gap detection. The command must not treat
-embedded `deployments.logs` entries, audit rows, process attempts, provider/runtime logs, or the
+deployment timeline entries, audit rows, process attempts, provider/runtime logs, or the
 runtime event bus as its retained event stream store.
 
 ## Input Model

@@ -14,7 +14,6 @@ export * from "./dependency-resource-repository";
 export * from "./dependency-resource-secret-store";
 export * from "./deploy-token-repository";
 export * from "./deployment-attempt-retention-store";
-export * from "./deployment-log-retention-store";
 export * from "./deployment-read-model";
 export * from "./deployment-repository";
 export * from "./destination-repository";

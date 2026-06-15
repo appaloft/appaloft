@@ -221,7 +221,7 @@ function deploymentDetailFixture(input: {
       createdAt: "2026-01-01T00:00:00.000Z",
       startedAt: "2026-01-01T00:00:01.000Z",
       finishedAt: "2026-01-01T00:00:03.000Z",
-      logCount: 2,
+      timelineCount: 2,
     },
     status: {
       current: status,
@@ -294,7 +294,7 @@ function deploymentDetailFixture(input: {
       createdAt: "2026-01-01T00:00:00.000Z",
       startedAt: "2026-01-01T00:00:01.000Z",
       finishedAt: "2026-01-01T00:00:03.000Z",
-      logCount: 2,
+      timelineCount: 2,
     },
     nextActions: ["logs", "resource-detail", "resource-health", "diagnostic-summary"],
     sectionErrors: input.sectionErrors ?? [],
@@ -339,116 +339,88 @@ function serverFixture(index: number): ServerFixture {
   };
 }
 
-function deploymentLogsFixture(deploymentId: string) {
-  return {
-    deploymentId,
-    logs: [
-      {
-        timestamp: "2026-01-01T00:00:01.000Z",
-        source: "appaloft",
-        level: "info",
-        phase: "plan",
-        message: `Planning deployment ${deploymentId}`,
-      },
-      {
-        timestamp: "2026-01-01T00:00:03.000Z",
-        source: "application",
-        level: "info",
-        phase: "verify",
-        message: `Application is ready for ${deploymentId}`,
-      },
-    ],
-  };
-}
-
-function deploymentEventReplayFixture(
+function deploymentTimelineFixture(
   deploymentId: string,
   status: "running" | "succeeded" = "succeeded",
 ) {
-  const envelopes = [
+  const entries = [
     {
-      schemaVersion: "deployments.stream-events/v1",
-      kind: "event" as const,
-      event: {
-        deploymentId,
-        sequence: 1,
-        cursor: `${deploymentId}:1`,
-        emittedAt: "2026-01-01T00:00:01.000Z",
-        source: "progress-projection" as const,
-        eventType: "deployment-requested",
-        phase: "detect" as const,
-        summary: "Deployment requested",
-      },
+      deploymentId,
+      sequence: 1,
+      cursor: `${deploymentId}:1`,
+      occurredAt: "2026-01-01T00:00:01.000Z",
+      source: "appaloft" as const,
+      kind: "lifecycle" as const,
+      phase: "detect" as const,
+      level: "info" as const,
+      message: "Deployment requested",
     },
     {
-      schemaVersion: "deployments.stream-events/v1",
-      kind: "event" as const,
-      event: {
-        deploymentId,
-        sequence: 2,
-        cursor: `${deploymentId}:2`,
-        emittedAt: "2026-01-01T00:00:02.000Z",
-        source: "progress-projection" as const,
-        eventType: "build-requested",
-        phase: "plan" as const,
-        summary: "Build requested",
-      },
+      deploymentId,
+      sequence: 2,
+      cursor: `${deploymentId}:2`,
+      occurredAt: "2026-01-01T00:00:02.000Z",
+      source: "appaloft" as const,
+      kind: "step" as const,
+      phase: "plan" as const,
+      level: "info" as const,
+      message: "Build requested",
     },
   ];
 
   if (status === "running") {
     return {
+      schemaVersion: "deployments.timeline/v1" as const,
       deploymentId,
-      envelopes,
+      entries,
+      nextCursor: `${deploymentId}:2`,
+      hasMore: false,
     };
   }
 
   return {
+    schemaVersion: "deployments.timeline/v1" as const,
     deploymentId,
-    envelopes: [
-      ...envelopes,
+    entries: [
+      ...entries,
       {
-        schemaVersion: "deployments.stream-events/v1",
-        kind: "event" as const,
-        event: {
-          deploymentId,
-          sequence: 3,
-          cursor: `${deploymentId}:3`,
-          emittedAt: "2026-01-01T00:00:03.000Z",
-          source: "domain-event" as const,
-          eventType: "deployment-succeeded",
-          phase: "verify" as const,
-          summary: "Deployment succeeded",
-        },
-      },
-      {
-        schemaVersion: "deployments.stream-events/v1",
-        kind: "closed" as const,
-        reason: "completed" as const,
-        cursor: `${deploymentId}:3`,
-      },
-    ],
-  };
-}
-
-function deploymentEventStreamFixture(deploymentId: string): Response {
-  const envelopes = [
-    {
-      schemaVersion: "deployments.stream-events/v1",
-      kind: "event",
-      event: {
         deploymentId,
         sequence: 3,
         cursor: `${deploymentId}:3`,
-        emittedAt: "2026-01-01T00:00:03.000Z",
-        source: "domain-event",
-        eventType: "deployment-succeeded",
+        occurredAt: "2026-01-01T00:00:03.000Z",
+        source: "appaloft" as const,
+        kind: "status" as const,
+        phase: "verify" as const,
+        level: "info" as const,
+        status: "succeeded",
+        message: "Deployment succeeded",
+      },
+    ],
+    nextCursor: `${deploymentId}:3`,
+    hasMore: false,
+  };
+}
+
+function deploymentTimelineStreamFixture(deploymentId: string): Response {
+  const envelopes = [
+    {
+      schemaVersion: "deployments.timeline/v1",
+      kind: "event",
+      entry: {
+        deploymentId,
+        sequence: 3,
+        cursor: `${deploymentId}:3`,
+        occurredAt: "2026-01-01T00:00:03.000Z",
+        source: "appaloft",
+        kind: "status",
         phase: "verify",
-        summary: "Deployment succeeded",
+        level: "info",
+        status: "succeeded",
+        message: "Deployment succeeded",
       },
     },
     {
-      schemaVersion: "deployments.stream-events/v1",
+      schemaVersion: "deployments.timeline/v1",
       kind: "closed",
       reason: "completed",
       cursor: `${deploymentId}:3`,
@@ -2777,8 +2749,8 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
               ],
               variables: [],
             },
-            logs: [],
-            logCount: 0,
+            timeline: [],
+            timelineCount: 0,
             createdAt: "2026-01-01T00:00:00.000Z",
           },
         ],
@@ -2825,18 +2797,18 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
     "/api/rpc/deployments/logs": (_request: Request, body: unknown) => {
       const input = readOrpcJsonPayload(body) as { deploymentId?: string } | null;
       return {
-        json: deploymentLogsFixture(input?.deploymentId ?? "dep_demo"),
+        json: deploymentTimelineFixture(input?.deploymentId ?? "dep_demo"),
       };
     },
-    "/api/rpc/deployments/events": (_request: Request, body: unknown) => {
+    "/api/rpc/deployments/timeline": (_request: Request, body: unknown) => {
       const input = readOrpcJsonPayload(body) as { deploymentId?: string } | null;
       return {
-        json: deploymentEventReplayFixture(input?.deploymentId ?? "dep_demo"),
+        json: deploymentTimelineFixture(input?.deploymentId ?? "dep_demo"),
       };
     },
-    "/api/rpc/deployments/eventsStream": (_request: Request, body: unknown) => {
+    "/api/rpc/deployments/timelineStream": (_request: Request, body: unknown) => {
       const input = readOrpcJsonPayload(body) as { deploymentId?: string } | null;
-      return deploymentEventStreamFixture(input?.deploymentId ?? "dep_demo");
+      return deploymentTimelineStreamFixture(input?.deploymentId ?? "dep_demo");
     },
     "/api/rpc/deployments/recoveryReadiness": (_request: Request, body: unknown) => {
       const input = readOrpcJsonPayload(body) as { deploymentId?: string } | null;
@@ -3190,7 +3162,7 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
             routeCount: 0,
             sectionCount: 0,
           },
-          deploymentLogs: {
+          deploymentTimeline: {
             status: "not-requested",
             tailLimit: 20,
             lineCount: 0,
@@ -3244,18 +3216,18 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
     "/api/rpc/deployments/logs": (_request: Request, body: unknown) => {
       const input = readOrpcJsonPayload(body) as { deploymentId?: string } | null;
       return {
-        json: deploymentLogsFixture(input?.deploymentId ?? "dep_static"),
+        json: deploymentTimelineFixture(input?.deploymentId ?? "dep_static"),
       };
     },
-    "/api/rpc/deployments/events": (_request: Request, body: unknown) => {
+    "/api/rpc/deployments/timeline": (_request: Request, body: unknown) => {
       const input = readOrpcJsonPayload(body) as { deploymentId?: string } | null;
       return {
-        json: deploymentEventReplayFixture(input?.deploymentId ?? "dep_static"),
+        json: deploymentTimelineFixture(input?.deploymentId ?? "dep_static"),
       };
     },
-    "/api/rpc/deployments/eventsStream": (_request: Request, body: unknown) => {
+    "/api/rpc/deployments/timelineStream": (_request: Request, body: unknown) => {
       const input = readOrpcJsonPayload(body) as { deploymentId?: string } | null;
-      return deploymentEventStreamFixture(input?.deploymentId ?? "dep_static");
+      return deploymentTimelineStreamFixture(input?.deploymentId ?? "dep_static");
     },
     "/api/rpc/deployments/recoveryReadiness": (_request: Request, body: unknown) => {
       const input = readOrpcJsonPayload(body) as { deploymentId?: string } | null;
@@ -5788,7 +5760,7 @@ describe.serial("console e2e with Bun.WebView", () => {
           routeCount: 1,
           sectionCount: 0,
         },
-        deploymentLogs: {
+        deploymentTimeline: {
           status: "not-requested",
           tailLimit: 20,
           lineCount: 0,
@@ -5845,7 +5817,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       expect(readOrpcJsonPayload(diagnosticRequest.body)).toEqual({
         resourceId: "res_demo",
         deploymentId: "dep_demo",
-        includeDeploymentLogTail: true,
+        includeDeploymentTimelineTail: true,
         includeRuntimeLogTail: true,
         includeProxyConfiguration: true,
         tailLines: 20,
@@ -7755,7 +7727,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     ).toBe(false);
   }, 30_000);
 
-  test("[DEP-SHOW-ENTRY-001] loads deployment detail through deployments.show and deployments.logs", async () => {
+  test("[DEP-SHOW-ENTRY-001] loads deployment detail through deployments.show and deployments.timeline", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();
 
@@ -7801,7 +7773,7 @@ describe.serial("console e2e with Bun.WebView", () => {
           routeCount: 0,
           sectionCount: 0,
         },
-        deploymentLogs: {
+        deploymentTimeline: {
           status: "not-requested",
           tailLimit: 20,
           lineCount: 0,
@@ -7889,7 +7861,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       expect(readOrpcJsonPayload(diagnosticRequest.body)).toEqual({
         resourceId: "res_demo",
         deploymentId: "dep_demo",
-        includeDeploymentLogTail: true,
+        includeDeploymentTimelineTail: true,
         includeRuntimeLogTail: true,
         includeProxyConfiguration: true,
         tailLines: 20,
@@ -8511,13 +8483,13 @@ describe.serial("console e2e with Bun.WebView", () => {
     });
   }, 30_000);
 
-  test("[DEP-EVENTS-ENTRY-005] replays and follows deployment events on the detail timeline", async () => {
+  test("[DEP-TIMELINE-ENTRY-005] replays and follows the deployment timeline", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();
 
     const previousShowRoute = apiResponses.dashboard["/api/rpc/deployments/show"];
-    const previousReplayRoute = apiResponses.dashboard["/api/rpc/deployments/events"];
-    const previousStreamRoute = apiResponses.dashboard["/api/rpc/deployments/eventsStream"];
+    const previousReplayRoute = apiResponses.dashboard["/api/rpc/deployments/timeline"];
+    const previousStreamRoute = apiResponses.dashboard["/api/rpc/deployments/timelineStream"];
 
     apiResponses.dashboard["/api/rpc/deployments/show"] = () => ({
       json: deploymentDetailFixture({
@@ -8532,11 +8504,11 @@ describe.serial("console e2e with Bun.WebView", () => {
         status: "running",
       }),
     });
-    apiResponses.dashboard["/api/rpc/deployments/events"] = () => ({
-      json: deploymentEventReplayFixture("dep_demo", "running"),
+    apiResponses.dashboard["/api/rpc/deployments/timeline"] = () => ({
+      json: deploymentTimelineFixture("dep_demo", "running"),
     });
-    apiResponses.dashboard["/api/rpc/deployments/eventsStream"] = () =>
-      deploymentEventStreamFixture("dep_demo");
+    apiResponses.dashboard["/api/rpc/deployments/timelineStream"] = () =>
+      deploymentTimelineStreamFixture("dep_demo");
 
     try {
       await using view = createWebView();
@@ -8546,7 +8518,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       await expectText(view, "Deployment requested", 15_000);
       await expectText(view, "Build requested", 15_000);
 
-      const replayRequest = await waitForRecordedRequest("/api/rpc/deployments/events");
+      const replayRequest = await waitForRecordedRequest("/api/rpc/deployments/timeline");
       expect(replayRequest.method).toBe("POST");
       expect(readOrpcJsonPayload(replayRequest.body)).toEqual({
         deploymentId: "dep_demo",
@@ -8556,7 +8528,7 @@ describe.serial("console e2e with Bun.WebView", () => {
         untilTerminal: true,
       });
 
-      const streamRequest = await waitForRecordedRequest("/api/rpc/deployments/eventsStream");
+      const streamRequest = await waitForRecordedRequest("/api/rpc/deployments/timelineStream");
       expect(streamRequest.method).toBe("POST");
       expect(readOrpcJsonPayload(streamRequest.body)).toEqual({
         deploymentId: "dep_demo",
@@ -8573,8 +8545,8 @@ describe.serial("console e2e with Bun.WebView", () => {
       await expectAnyText(view, ["Deployment snapshot", "当时的部署信息"]);
     } finally {
       apiResponses.dashboard["/api/rpc/deployments/show"] = previousShowRoute;
-      apiResponses.dashboard["/api/rpc/deployments/events"] = previousReplayRoute;
-      apiResponses.dashboard["/api/rpc/deployments/eventsStream"] = previousStreamRoute;
+      apiResponses.dashboard["/api/rpc/deployments/timeline"] = previousReplayRoute;
+      apiResponses.dashboard["/api/rpc/deployments/timelineStream"] = previousStreamRoute;
     }
   }, 30_000);
 

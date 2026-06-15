@@ -754,8 +754,8 @@ describe("console page structure", () => {
     expect(resourceSourceEventsSource).not.toContain("deploymentMutation");
 
     expect(deploymentDetailPageSource).toContain("data-deployment-attempt-timeline");
-    expect(deploymentDetailPageSource).toContain("orpcClient.deployments.events");
-    expect(deploymentDetailPageSource).toContain("orpcClient.deployments.eventsStream");
+    expect(deploymentDetailPageSource).toContain("orpcClient.deployments.timeline");
+    expect(deploymentDetailPageSource).toContain("orpcClient.deployments.timelineStream");
     expect(deploymentDetailPageSource).not.toContain("orpcClient.activity");
     expect(deploymentDetailPageSource).not.toContain("data-deployment-activity");
     const deploymentTimelineSource = sourceBetween(
@@ -1537,13 +1537,10 @@ describe("console page structure", () => {
     expect(deploymentDetailPageSource).toContain(
       "resourceTerminalHref(deploymentResourceRef, deployment?.id)",
     );
-    expect(deploymentDetailPageSource).toContain("const deploymentLogsHref = $derived");
-    expect(deploymentDetailPageSource).toContain('deploymentTabHref("logs")');
+    expect(deploymentDetailPageSource).toContain("const deploymentTimelineHref = $derived");
+    expect(deploymentDetailPageSource).not.toContain('deploymentTabHref("logs")');
     expect(deploymentDetailPageSource).toContain('deploymentTabHref("timeline")');
     expect(deploymentDetailPageSource).toContain('deploymentTabHref("snapshot")');
-    expect(deploymentDetailPageSource).toContain(
-      "grid-cols-[4.75rem_minmax(0,1fr)] gap-x-2 gap-y-1 leading-5 md:grid-cols-[4.75rem_5rem_3.5rem_5rem_minmax(0,1fr)]",
-    );
     expect(deploymentDetailPageSource).toContain(
       "grid-cols-[4.75rem_minmax(0,1fr)] gap-x-2 gap-y-1 leading-5 md:grid-cols-[4.75rem_6rem_3.5rem_minmax(0,1fr)]",
     );
@@ -1578,7 +1575,7 @@ describe("console page structure", () => {
     const deploymentOverviewSource = sourceBetween(
       deploymentDetailPageSource,
       'value="overview"',
-      'value="logs"',
+      'value="timeline"',
     );
     expect(deploymentOverviewSource).toContain("data-deployment-attempt-observation");
     expect(deploymentOverviewSource).toContain("data-deployment-current-resource-observation");

@@ -86,9 +86,9 @@ function createDeployment(input: {
       precedence: [],
       variables: [],
     },
-    logs: [],
+    timeline: [],
     createdAt,
-    logCount: 0,
+    timelineCount: 0,
   };
 }
 
@@ -173,7 +173,7 @@ class StaticDeploymentReadModel implements DeploymentReadModel {
     return null;
   }
 
-  async findLogs(): Promise<[]> {
+  async findTimeline(): Promise<[]> {
     return [];
   }
 }

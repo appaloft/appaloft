@@ -67,8 +67,6 @@ appaloft.deployments.cleanupPreview -> deployments.cleanup-preview POST /deploym
 appaloft.deployments.count -> deployments.count GET /deployments/count
 appaloft.deployments.create -> deployments.create POST /deployments
 appaloft.deployments.list -> deployments.list GET /deployments
-appaloft.deployments.logs -> deployments.logs GET /deployments/{deploymentId}/logs
-appaloft.deployments.logs.prune -> deployments.logs.prune POST /deployments/logs/prune
 appaloft.deployments.plan -> deployments.plan GET /deployments/plan
 appaloft.deployments.prune -> deployments.prune POST /deployments/prune
 appaloft.deployments.recoveryReadiness -> deployments.recovery-readiness GET /deployments/{deploymentId}/recovery-readiness
@@ -76,7 +74,8 @@ appaloft.deployments.redeploy -> deployments.redeploy POST /resources/{resourceI
 appaloft.deployments.retry -> deployments.retry POST /deployments/{deploymentId}/retry
 appaloft.deployments.rollback -> deployments.rollback POST /deployments/{deploymentId}/rollback
 appaloft.deployments.show -> deployments.show GET /deployments/{deploymentId}
-appaloft.deployments.streamEvents -> deployments.stream-events GET /deployments/{deploymentId}/events/stream stream
+appaloft.deployments.timeline -> deployments.timeline GET /deployments/{deploymentId}/timeline
+appaloft.deployments.timeline.stream -> deployments.timeline.stream GET /deployments/{deploymentId}/timeline/stream stream
 appaloft.domainBindings.configureRoute -> domain-bindings.configure-route POST /domain-bindings/{domainBindingId}/route
 appaloft.domainBindings.confirmOwnership -> domain-bindings.confirm-ownership POST /domain-bindings/{domainBindingId}/ownership-confirmations
 appaloft.domainBindings.create -> domain-bindings.create POST /domain-bindings
@@ -151,6 +150,7 @@ appaloft.resources.configureSource -> resources.configure-source POST /resources
 appaloft.resources.count -> resources.count GET /resources/count
 appaloft.resources.create -> resources.create POST /resources
 appaloft.resources.delete -> resources.delete DELETE /resources/{resourceId}
+appaloft.resources.deleteCheck -> resources.delete-check GET /resources/{resourceId}/delete-check
 appaloft.resources.detachStorage -> resources.detach-storage DELETE /resources/{resourceId}/storage-attachments/{attachmentId}
 appaloft.resources.diagnosticSummary -> resources.diagnostic-summary GET /resources/{resourceId}/diagnostic-summary
 appaloft.resources.effectiveConfig -> resources.effective-config GET /resources/{resourceId}/effective-config
@@ -214,6 +214,7 @@ appaloft.servers.list -> servers.list GET /servers
 appaloft.servers.prepareRuntime -> servers.prepare-runtime POST /servers/{serverId}/runtime/prepare
 appaloft.servers.register -> servers.register POST /servers
 appaloft.servers.rename -> servers.rename POST /servers/{serverId}/rename
+appaloft.servers.reorder -> servers.reorder POST /servers/reorder
 appaloft.servers.show -> servers.show GET /servers/{serverId}
 appaloft.servers.testConnectivity -> servers.test-connectivity POST /servers/{serverId}/connectivity-tests
 appaloft.servers.testDraftConnectivity -> servers.test-draft-connectivity POST /servers/connectivity-tests

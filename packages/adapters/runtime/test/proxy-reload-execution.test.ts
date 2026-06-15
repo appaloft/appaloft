@@ -42,7 +42,7 @@ describe("executeProxyReloadPlan", () => {
 
     expect(result.status).toBe("succeeded");
     expect(commands).toEqual(["printf reload-ok"]);
-    expect(result.logs.map((entry) => entry.message)).toContain("Test proxy reload completed");
+    expect(result.timeline.map((entry) => entry.message)).toContain("Test proxy reload completed");
   });
 
   test("EDGE-PROXY-RELOAD-003 fails when a provider-produced command reload step fails", async () => {
@@ -80,7 +80,7 @@ describe("executeProxyReloadPlan", () => {
 
     expect(result.status).toBe("succeeded");
     expect(commands).toEqual([]);
-    expect(result.logs).toEqual([
+    expect(result.timeline).toEqual([
       expect.objectContaining({
         stepName: "test-reload",
         mode: "automatic",

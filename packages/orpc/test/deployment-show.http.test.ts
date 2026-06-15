@@ -9,6 +9,7 @@ import {
   type ExecutionContext,
   type ExecutionContextFactory,
   ListDeploymentsQuery,
+  type ProductSessionAuthorizationPort,
   type Query,
   type QueryBus,
   ShowDeploymentQuery,
@@ -33,8 +34,34 @@ class TestExecutionContextFactory implements ExecutionContextFactory {
       entrypoint: input.entrypoint,
       locale: input.locale,
       actor: input.actor,
+      principal: input.principal,
     });
   }
+}
+
+const productSessionAuthorizationPort: ProductSessionAuthorizationPort = {
+  authorizeProductSession: async (_context, input) =>
+    ok({
+      actor: {
+        kind: "user",
+        id: "usr_deployment_show",
+        label: "deployment-show@example.test",
+      },
+      email: "deployment-show@example.test",
+      organizationId: input.organizationId ?? "org_deployment_show_test",
+      role: input.requiredRole,
+      userId: "usr_deployment_show",
+    }),
+};
+
+function deploymentShowRequest(url: string, init: RequestInit = {}): Request {
+  const headers = new Headers(init.headers);
+  headers.set("cookie", headers.get("cookie") ?? "better-auth.session_token=deployment-show-test");
+
+  return new Request(url, {
+    ...init,
+    headers,
+  });
 }
 
 function deploymentDetail(): ShowDeploymentResponse {
@@ -47,6 +74,11 @@ function deploymentDetail(): ShowDeploymentResponse {
       resourceId: "res_web",
       serverId: "srv_demo",
       destinationId: "dst_demo",
+      target: {
+        kind: "server-backed",
+        serverId: "srv_demo",
+        destinationId: "dst_demo",
+      },
       status: "failed",
       runtimePlan: {
         id: "rplan_demo",
@@ -80,7 +112,7 @@ function deploymentDetail(): ShowDeploymentResponse {
       createdAt: "2026-01-01T00:00:05.000Z",
       startedAt: "2026-01-01T00:00:06.000Z",
       finishedAt: "2026-01-01T00:00:09.000Z",
-      logCount: 3,
+      timelineCount: 3,
     },
     status: {
       current: "failed",
@@ -151,7 +183,7 @@ function deploymentDetail(): ShowDeploymentResponse {
       createdAt: "2026-01-01T00:00:05.000Z",
       startedAt: "2026-01-01T00:00:06.000Z",
       finishedAt: "2026-01-01T00:00:09.000Z",
-      logCount: 3,
+      timelineCount: 3,
     },
     latestFailure: {
       timestamp: "2026-01-01T00:00:09.000Z",
@@ -160,7 +192,7 @@ function deploymentDetail(): ShowDeploymentResponse {
       level: "error",
       message: "Health check failed",
     },
-    nextActions: ["logs", "resource-detail", "resource-health", "diagnostic-summary"],
+    nextActions: ["timeline", "resource-detail", "resource-health", "diagnostic-summary"],
     sectionErrors: [],
     generatedAt: "2026-01-01T00:00:10.000Z",
   };
@@ -183,17 +215,20 @@ describe("deployment show HTTP route", () => {
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
       logger: new NoopLogger(),
+      productSessionAuthorizationPort,
       queryBus,
     });
 
     const response = await app.handle(
-      new Request("http://localhost/api/deployments/dep_demo", {
+      deploymentShowRequest("http://localhost/api/deployments/dep_demo", {
         method: "GET",
       }),
     );
 
-    expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({
+    const body = await response.text();
+    expect(response.status, body).toBe(200);
+    const payload = JSON.parse(body);
+    expect(payload).toMatchObject({
       schemaVersion: "deployments.show/v1",
       deployment: {
         id: "dep_demo",
@@ -225,11 +260,12 @@ describe("deployment show HTTP route", () => {
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
       logger: new NoopLogger(),
+      productSessionAuthorizationPort,
       queryBus,
     });
 
     const response = await app.handle(
-      new Request("http://localhost/api/deployments?includeArchived=false", {
+      deploymentShowRequest("http://localhost/api/deployments?includeArchived=false", {
         method: "GET",
       }),
     );

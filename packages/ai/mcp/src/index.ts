@@ -570,7 +570,7 @@ function highValueToolSummary(): JsonObject[] {
     "deployments.plan",
     "deployments.create",
     "deployments.show",
-    "deployments.logs",
+    "deployments.timeline",
     "deployments.recovery-readiness",
     "deployments.retry",
     "deployments.redeploy",

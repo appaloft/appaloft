@@ -150,16 +150,16 @@ Use this order:
    `accepts-blueprint-application-bundle`, `reviews-dependency-resource-bindings`, and
    `preserves-user-owned-configuration`; then follow any returned parent work id through
    `appaloft work events <workId> --follow --json` or `appaloft work watch <workId> --json`; follow
-   any returned deployment id through `appaloft deployments events <deploymentId> --follow --json`,
+   any returned deployment id through `appaloft deployments timeline <deploymentId> --follow --json`,
    deployment detail, and deployment logs.
 
 ## Progress Streams
 
 Progress monitoring is part of deployment, not an optional afterthought.
 
-- Use `appaloft deployments events <deploymentId> --follow --json` for a single deployment
+- Use `appaloft deployments timeline <deploymentId> --follow --json` for a single deployment
   attempt. It is the user-level deployment event stream and remains paired with
-  `appaloft logs <deploymentId>` for deployment logs. For remote CLI profiles, the CLI should open
+  `appaloft deployments timeline <deploymentId>` for bounded deployment timeline/log review. For remote CLI profiles, the CLI should open
   the control-plane stream route when it is available; bounded JSON polling is only a compatibility
   fallback for older control planes that do not expose streaming.
 - Use `appaloft work events <workId> --follow --json` or
@@ -221,8 +221,8 @@ deployment, or runtime state:
 ## Follow-Up Commands
 
 - `appaloft deployments show <deploymentId>`
-- `appaloft logs <deploymentId>`
-- `appaloft deployments events <deploymentId> --follow --json`
+- `appaloft deployments timeline <deploymentId>`
+- `appaloft deployments timeline <deploymentId> --follow --json`
 - `appaloft work events <workId> --follow --json`
 - `appaloft work watch <workId> --json`
 - `appaloft work show <workId>`

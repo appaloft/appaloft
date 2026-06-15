@@ -18,7 +18,6 @@ const scopes: ReadonlySet<RetentionDefaultScope> = new Set(["organization", "sys
 
 const categories: ReadonlySet<RetentionDefaultCategory> = new Set([
   "audit-rows",
-  "deployment-logs",
   "domain-event-streams",
   "process-attempts",
   "provider-job-logs",

@@ -2,7 +2,7 @@ import {
   type Deployment,
   DeploymentByIdSpec,
   DeploymentId,
-  type DeploymentLogEntry,
+  type DeploymentTimelineJournalEntry,
   domainError,
   err,
   ok,
@@ -239,15 +239,17 @@ export class DeploymentDurableWorkHandler implements DurableWorkHandler {
       return ok(deployment);
     }
 
-    const existingLogs = deployment.toState().logs;
+    const existingLogs = deployment.toState().timeline;
     const missingLogs = latest
       .toState()
-      .logs.filter(
+      .timeline.filter(
         (latestLog) =>
-          !existingLogs.some((existingLog) => sameDeploymentLogEntry(existingLog, latestLog)),
+          !existingLogs.some((existingLog) =>
+            sameDeploymentTimelineJournalEntry(existingLog, latestLog),
+          ),
       );
     if (missingLogs.length > 0) {
-      deployment.appendLogs(missingLogs);
+      deployment.appendTimeline(missingLogs);
     }
 
     return ok(deployment);
@@ -288,7 +290,10 @@ export class DeploymentDurableWorkHandler implements DurableWorkHandler {
   }
 }
 
-function sameDeploymentLogEntry(left: DeploymentLogEntry, right: DeploymentLogEntry): boolean {
+function sameDeploymentTimelineJournalEntry(
+  left: DeploymentTimelineJournalEntry,
+  right: DeploymentTimelineJournalEntry,
+): boolean {
   if (
     left.source === right.source &&
     left.phase === right.phase &&

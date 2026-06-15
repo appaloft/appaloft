@@ -278,7 +278,7 @@ CLI example:
 ```bash title="Copy support-safe diagnostics"
 appaloft resource diagnose res_web \
   --deployment dep_123 \
-  --deployment-logs \
+  --deployment-timeline \
   --runtime-logs \
   --tail 50
 ```

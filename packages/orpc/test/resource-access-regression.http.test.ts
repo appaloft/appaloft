@@ -432,7 +432,7 @@ function createApp() {
             routeCount: 3,
             sectionCount: 1,
           },
-          deploymentLogs: {
+          deploymentTimeline: {
             status: "not-requested",
             tailLimit: 10,
             lineCount: 0,

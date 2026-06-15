@@ -1328,44 +1328,6 @@ export const generatedSdkOperations = [
     facadeDefault: true,
   },
   {
-    operationKey: "deployments.logs",
-    operationGroup: "deployments",
-    operationMethod: "logs",
-    facadePath: ["deployments", "logs"],
-    operationId: "deployments.logs",
-    kind: "query",
-    domain: "deployments",
-    messageName: "DeploymentLogsQuery",
-    route: {
-      method: "GET",
-      path: "/deployments/{deploymentId}/logs",
-    },
-    docsHref: "/docs/observe/logs-health/#observe-runtime-logs",
-    authPolicy: "product-session",
-    errorFamily: "structured-platform-error",
-    streaming: false,
-    facadeDefault: true,
-  },
-  {
-    operationKey: "deployments.logs.prune",
-    operationGroup: "deployments",
-    operationMethod: "logsPrune",
-    facadePath: ["deployments", "logs", "prune"],
-    operationId: "deployments.pruneLogs",
-    kind: "command",
-    domain: "deployments",
-    messageName: "PruneDeploymentLogsCommand",
-    route: {
-      method: "POST",
-      path: "/deployments/logs/prune",
-    },
-    docsHref: "/docs/observe/logs-health/#observe-runtime-logs",
-    authPolicy: "product-session",
-    errorFamily: "structured-platform-error",
-    streaming: false,
-    facadeDefault: true,
-  },
-  {
     operationKey: "deployments.plan",
     operationGroup: "deployments",
     operationMethod: "plan",
@@ -1499,38 +1461,36 @@ export const generatedSdkOperations = [
     facadeDefault: true,
   },
   {
-    operationKey: "deployments.stream-events",
+    operationKey: "deployments.timeline",
     operationGroup: "deployments",
-    operationMethod: "streamEvents",
-    facadePath: ["deployments", "streamEvents"],
-    operationId: "deployments.events",
+    operationMethod: "timeline",
+    facadePath: ["deployments", "timeline"],
+    operationId: "deployments.timeline",
     kind: "query",
     domain: "deployments",
-    messageName: "StreamDeploymentEventsQuery",
+    messageName: "DeploymentTimelineQuery",
     route: {
       method: "GET",
-      path: "/deployments/{deploymentId}/events",
+      path: "/deployments/{deploymentId}/timeline",
     },
-    docsHref: "/docs/deploy/lifecycle/#deployment-lifecycle",
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
-    facadeDefault: false,
+    facadeDefault: true,
   },
   {
-    operationKey: "deployments.stream-events",
+    operationKey: "deployments.timeline.stream",
     operationGroup: "deployments",
-    operationMethod: "streamEvents",
-    facadePath: ["deployments", "streamEvents"],
-    operationId: "deployments.eventsStream",
+    operationMethod: "timelineStream",
+    facadePath: ["deployments", "timeline", "stream"],
+    operationId: "deployments.timelineStream",
     kind: "query",
     domain: "deployments",
-    messageName: "StreamDeploymentEventsQuery",
+    messageName: "StreamDeploymentTimelineQuery",
     route: {
       method: "GET",
-      path: "/deployments/{deploymentId}/events/stream",
+      path: "/deployments/{deploymentId}/timeline/stream",
     },
-    docsHref: "/docs/deploy/lifecycle/#deployment-lifecycle",
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: true,
@@ -5145,9 +5105,6 @@ export interface GeneratedAppaloftClient {
     readonly count: AppaloftSdkFacadeMethod;
     readonly create: AppaloftSdkFacadeMethod;
     readonly list: AppaloftSdkFacadeMethod;
-    readonly logs: AppaloftSdkFacadeMethod & {
-      readonly prune: AppaloftSdkFacadeMethod;
-    };
     readonly plan: AppaloftSdkFacadeMethod;
     readonly prune: AppaloftSdkFacadeMethod;
     readonly recoveryReadiness: AppaloftSdkFacadeMethod;
@@ -5155,7 +5112,9 @@ export interface GeneratedAppaloftClient {
     readonly retry: AppaloftSdkFacadeMethod;
     readonly rollback: AppaloftSdkFacadeMethod;
     readonly show: AppaloftSdkFacadeMethod;
-    readonly streamEvents: AppaloftSdkFacadeMethod;
+    readonly timeline: AppaloftSdkFacadeMethod & {
+      readonly stream: AppaloftSdkFacadeMethod;
+    };
   };
   readonly deployTokens: {
     readonly create: AppaloftSdkFacadeMethod;

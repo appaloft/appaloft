@@ -17,8 +17,8 @@ import {
   toRepositoryContext,
 } from "@appaloft/application";
 import {
-  DeploymentLogEntry,
-  DeploymentLogSourceValue,
+  DeploymentTimelineJournalEntry,
+  DeploymentTimelineSourceValue,
   DeploymentPhaseValue,
   DeploymentTargetByIdSpec,
   DeploymentTargetId,
@@ -140,10 +140,10 @@ function phaseLog(
   message: string,
   level: LogLevel = "info",
   source: LogSource = "appaloft",
-): DeploymentLogEntry {
-  return DeploymentLogEntry.rehydrate({
+): DeploymentTimelineJournalEntry {
+  return DeploymentTimelineJournalEntry.rehydrate({
     timestamp: OccurredAt.rehydrate(new Date().toISOString()),
-    source: DeploymentLogSourceValue.rehydrate(source),
+    source: DeploymentTimelineSourceValue.rehydrate(source),
     phase: DeploymentPhaseValue.rehydrate(phase),
     level: LogLevelValue.rehydrate(level),
     message: MessageText.rehydrate(message),
@@ -893,7 +893,7 @@ export class SshExecutionBackend implements ExecutionBackend {
   }
 
   private pushCommandOutput(
-    logs: DeploymentLogEntry[],
+    timeline: DeploymentTimelineJournalEntry[],
     input: {
       context: ExecutionContext;
       deploymentId: string;
@@ -918,12 +918,12 @@ export class SshExecutionBackend implements ExecutionBackend {
         message: line,
         stream: input.stream,
       });
-      logs.push(phaseLog(input.phase, line, level, "application"));
+      timeline.push(phaseLog(input.phase, line, level, "application"));
     }
   }
 
   private pushStreamingCommandOutput(
-    logs: DeploymentLogEntry[],
+    timeline: DeploymentTimelineJournalEntry[],
     input: {
       context: ExecutionContext;
       deploymentId: string;
@@ -946,7 +946,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       message: input.line,
       stream: input.stream,
     });
-    logs.push(phaseLog(input.phase, input.line, input.level, "application"));
+    timeline.push(phaseLog(input.phase, input.line, input.level, "application"));
     return input.persistedCount + 1;
   }
 
@@ -982,7 +982,7 @@ export class SshExecutionBackend implements ExecutionBackend {
   }
 
   private createStreamingOutputSink(
-    logs: DeploymentLogEntry[],
+    timeline: DeploymentTimelineJournalEntry[],
     input: {
       context: ExecutionContext;
       deploymentId: string;
@@ -994,7 +994,7 @@ export class SshExecutionBackend implements ExecutionBackend {
 
     return (line, level, stream) => {
       if (stream === "stdout") {
-        stdoutCount = this.pushStreamingCommandOutput(logs, {
+        stdoutCount = this.pushStreamingCommandOutput(timeline, {
           context: input.context,
           deploymentId: input.deploymentId,
           phase: input.phase,
@@ -1006,7 +1006,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         return;
       }
 
-      stderrCount = this.pushStreamingCommandOutput(logs, {
+      stderrCount = this.pushStreamingCommandOutput(timeline, {
         context: input.context,
         deploymentId: input.deploymentId,
         phase: input.phase,
@@ -1021,14 +1021,14 @@ export class SshExecutionBackend implements ExecutionBackend {
   private applyFailure(
     deployment: Deployment,
     input: {
-      logs: DeploymentLogEntry[];
+      timeline: DeploymentTimelineJournalEntry[];
       errorCode: string;
       retryable?: boolean;
       metadata?: Record<string, string>;
     },
   ): Deployment {
     const failureFields = runtimeTargetCapacityAwareFailureFields({
-      logs: input.logs,
+      timeline: input.timeline,
       errorCode: input.errorCode,
       ...(input.metadata ? { metadata: input.metadata } : {}),
       serverId: requireServerBackedDeploymentState(
@@ -1041,7 +1041,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       ExecutionResult.rehydrate({
         exitCode: ExitCode.rehydrate(1),
         status: ExecutionStatusValue.rehydrate("failed"),
-        logs: input.logs,
+        timeline: input.timeline,
         retryable: input.retryable ?? false,
         errorCode: ErrorCodeText.rehydrate(failureFields.errorCode),
         ...(failureFields.metadata ? { metadata: failureFields.metadata } : {}),
@@ -1051,7 +1051,7 @@ export class SshExecutionBackend implements ExecutionBackend {
   }
 
   private async pushRemoteDockerContainerDiagnostics(
-    logs: DeploymentLogEntry[],
+    timeline: DeploymentTimelineJournalEntry[],
     input: {
       context: ExecutionContext;
       deploymentId: string;
@@ -1064,7 +1064,7 @@ export class SshExecutionBackend implements ExecutionBackend {
     const format =
       "status={{.State.Status}} exitCode={{.State.ExitCode}} error={{.State.Error}} oomKilled={{.State.OOMKilled}} finishedAt={{.State.FinishedAt}}";
     const inspectMessage = `Inspect SSH Docker container ${input.containerName}`;
-    logs.push(phaseLog("verify", inspectMessage));
+    timeline.push(phaseLog("verify", inspectMessage));
     await this.report(input.context, {
       deploymentId: input.deploymentId,
       phase: "verify",
@@ -1078,7 +1078,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       cwd: input.runtimeDir,
       env: input.env,
     });
-    this.pushCommandOutput(logs, {
+    this.pushCommandOutput(timeline, {
       context: input.context,
       deploymentId: input.deploymentId,
       phase: "verify",
@@ -1086,7 +1086,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       level: inspect.failed ? "warn" : "info",
       stream: "stdout",
     });
-    this.pushCommandOutput(logs, {
+    this.pushCommandOutput(timeline, {
       context: input.context,
       deploymentId: input.deploymentId,
       phase: "verify",
@@ -1096,7 +1096,7 @@ export class SshExecutionBackend implements ExecutionBackend {
     });
 
     const logsMessage = `Capture SSH Docker logs for ${input.containerName}`;
-    logs.push(phaseLog("verify", logsMessage));
+    timeline.push(phaseLog("verify", logsMessage));
     await this.report(input.context, {
       deploymentId: input.deploymentId,
       phase: "verify",
@@ -1110,7 +1110,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       cwd: input.runtimeDir,
       env: input.env,
     });
-    this.pushCommandOutput(logs, {
+    this.pushCommandOutput(timeline, {
       context: input.context,
       deploymentId: input.deploymentId,
       phase: "verify",
@@ -1118,7 +1118,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       level: "info",
       stream: "stdout",
     });
-    this.pushCommandOutput(logs, {
+    this.pushCommandOutput(timeline, {
       context: input.context,
       deploymentId: input.deploymentId,
       phase: "verify",
@@ -1128,7 +1128,7 @@ export class SshExecutionBackend implements ExecutionBackend {
     });
 
     if (inspect.failed && !inspect.stdout && !inspect.stderr) {
-      logs.push(
+      timeline.push(
         phaseLog(
           "verify",
           `SSH Docker inspect did not return diagnostics for ${input.containerName}`,
@@ -1138,7 +1138,7 @@ export class SshExecutionBackend implements ExecutionBackend {
     }
 
     if (dockerLogs.failed && !dockerLogs.stdout && !dockerLogs.stderr) {
-      logs.push(
+      timeline.push(
         phaseLog(
           "verify",
           `SSH Docker logs did not return application output for ${input.containerName}`,
@@ -1273,7 +1273,7 @@ export class SshExecutionBackend implements ExecutionBackend {
     env: NodeJS.ProcessEnv;
     redactions: readonly string[];
     image: string;
-    logs: DeploymentLogEntry[];
+    timeline: DeploymentTimelineJournalEntry[];
   }): Promise<
     | { status: "not-required"; metadata: Record<string, string> }
     | { status: "resolved"; metadata: Record<string, string> }
@@ -1284,7 +1284,7 @@ export class SshExecutionBackend implements ExecutionBackend {
     }
 
     const message = `Pull and resolve SSH Docker image digest for ${input.image}`;
-    input.logs.push(phaseLog("deploy", message));
+    input.timeline.push(phaseLog("deploy", message));
     await this.report(input.context, {
       deploymentId: input.deploymentId,
       phase: "deploy",
@@ -1299,7 +1299,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       env: input.env,
       redactions: input.redactions,
     });
-    this.pushCommandOutput(input.logs, {
+    this.pushCommandOutput(input.timeline, {
       context: input.context,
       deploymentId: input.deploymentId,
       phase: "deploy",
@@ -1307,7 +1307,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       level: inspect.failed ? "warn" : "info",
       stream: "stdout",
     });
-    this.pushCommandOutput(input.logs, {
+    this.pushCommandOutput(input.timeline, {
       context: input.context,
       deploymentId: input.deploymentId,
       phase: "deploy",
@@ -1333,7 +1333,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       };
     }
 
-    input.logs.push(phaseLog("deploy", `Resolved SSH Docker image digest ${digest}`));
+    input.timeline.push(phaseLog("deploy", `Resolved SSH Docker image digest ${digest}`));
     return {
       status: "resolved",
       metadata: {
@@ -1395,7 +1395,7 @@ export class SshExecutionBackend implements ExecutionBackend {
   private async prepareSshSource(
     context: ExecutionContext,
     deployment: Deployment,
-    logs: DeploymentLogEntry[],
+    timeline: DeploymentTimelineJournalEntry[],
     input: {
       runtimeDir: string;
       remoteRoot: string;
@@ -1429,11 +1429,11 @@ export class SshExecutionBackend implements ExecutionBackend {
     if (isRemoteGitSourceKind(source.kind)) {
       if (source.kind === "git-public" && hasUrlCredentials(source.locator)) {
         const message = "Public git source cannot include embedded credentials";
-        logs.push(phaseLog("package", message, "error"));
+        timeline.push(phaseLog("package", message, "error"));
         return {
           prepared: false,
           deployment: this.applyFailure(deployment, {
-            logs,
+            timeline,
             errorCode: "git_public_credentials_not_allowed",
             retryable: false,
             metadata: {
@@ -1452,11 +1452,11 @@ export class SshExecutionBackend implements ExecutionBackend {
       if (source.kind === "git-github-app") {
         if (!isGitHubHttpsLocator(source.locator)) {
           const message = "GitHub App source requires a GitHub HTTPS repository URL";
-          logs.push(phaseLog("package", message, "error"));
+          timeline.push(phaseLog("package", message, "error"));
           return {
             prepared: false,
             deployment: this.applyFailure(deployment, {
-              logs,
+              timeline,
               errorCode: "github_app_source_requires_github_https",
               retryable: false,
               metadata: {
@@ -1472,11 +1472,11 @@ export class SshExecutionBackend implements ExecutionBackend {
         );
         if (!accessToken) {
           const message = "GitHub App source requires a connected GitHub access token";
-          logs.push(phaseLog("package", message, "error"));
+          timeline.push(phaseLog("package", message, "error"));
           return {
             prepared: false,
             deployment: this.applyFailure(deployment, {
-              logs,
+              timeline,
               errorCode: "github_app_access_token_missing",
               retryable: false,
               metadata: {
@@ -1498,11 +1498,11 @@ export class SshExecutionBackend implements ExecutionBackend {
         const deployKeyPath = source.metadata?.deployKeyPath;
         if (!deployKeyPath) {
           const message = "Deploy key source requires deployKeyPath metadata";
-          logs.push(phaseLog("package", message, "error"));
+          timeline.push(phaseLog("package", message, "error"));
           return {
             prepared: false,
             deployment: this.applyFailure(deployment, {
-              logs,
+              timeline,
               errorCode: "git_deploy_key_missing",
               retryable: false,
               metadata: {
@@ -1530,7 +1530,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         redactions.push(deployKeyPrivateKey, normalizedKey, encodedKey);
       }
 
-      logs.push(
+      timeline.push(
         phaseLog("package", `Clone git source on ${input.target.host}:${remoteSourceRoot}`),
       );
       await this.report(context, {
@@ -1559,7 +1559,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         redactions,
         onOutput: (line, level, stream) => {
           if (stream === "stdout") {
-            cloneStdoutCount = this.pushStreamingCommandOutput(logs, {
+            cloneStdoutCount = this.pushStreamingCommandOutput(timeline, {
               context,
               deploymentId: state.id.value,
               phase: "package",
@@ -1571,7 +1571,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             return;
           }
 
-          cloneStderrCount = this.pushStreamingCommandOutput(logs, {
+          cloneStderrCount = this.pushStreamingCommandOutput(timeline, {
             context,
             deploymentId: state.id.value,
             phase: "package",
@@ -1587,11 +1587,11 @@ export class SshExecutionBackend implements ExecutionBackend {
         const message = clone.reason
           ? `Remote git clone failed: ${clone.reason}`
           : `Remote git clone failed with exit code ${clone.exitCode}`;
-        logs.push(phaseLog("package", message, "error"));
+        timeline.push(phaseLog("package", message, "error"));
         return {
           prepared: false,
           deployment: this.applyFailure(deployment, {
-            logs,
+            timeline,
             errorCode: "remote_git_clone_failed",
             retryable: true,
             metadata: {
@@ -1606,7 +1606,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         workdir: remoteSourceRoot,
         tokenizedGithubHttpsPrefix,
       });
-      logs.push(phaseLog("package", `Initialize git submodules on ${input.target.host}`));
+      timeline.push(phaseLog("package", `Initialize git submodules on ${input.target.host}`));
       await this.report(context, {
         deploymentId: state.id.value,
         phase: "package",
@@ -1623,7 +1623,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         redactions,
         onOutput: (line, level, stream) => {
           if (stream === "stdout") {
-            submoduleStdoutCount = this.pushStreamingCommandOutput(logs, {
+            submoduleStdoutCount = this.pushStreamingCommandOutput(timeline, {
               context,
               deploymentId: state.id.value,
               phase: "package",
@@ -1635,7 +1635,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             return;
           }
 
-          submoduleStderrCount = this.pushStreamingCommandOutput(logs, {
+          submoduleStderrCount = this.pushStreamingCommandOutput(timeline, {
             context,
             deploymentId: state.id.value,
             phase: "package",
@@ -1651,11 +1651,11 @@ export class SshExecutionBackend implements ExecutionBackend {
         const message = submodule.reason
           ? `Remote git submodule update failed: ${submodule.reason}`
           : `Remote git submodule update failed with exit code ${submodule.exitCode}`;
-        logs.push(phaseLog("package", message, "error"));
+        timeline.push(phaseLog("package", message, "error"));
         return {
           prepared: false,
           deployment: this.applyFailure(deployment, {
-            logs,
+            timeline,
             errorCode: "remote_git_submodule_update_failed",
             retryable: true,
             metadata: {
@@ -1680,11 +1680,11 @@ export class SshExecutionBackend implements ExecutionBackend {
             ? `Remote git commit resolution failed: ${commit.reason}`
             : `Remote git commit resolution failed with exit code ${commit.exitCode}`
           : "Remote git commit resolution returned an invalid object id";
-        logs.push(phaseLog("package", message, "error"));
+        timeline.push(phaseLog("package", message, "error"));
         return {
           prepared: false,
           deployment: this.applyFailure(deployment, {
-            logs,
+            timeline,
             errorCode: "remote_git_commit_resolution_failed",
             retryable: true,
             metadata: {
@@ -1697,7 +1697,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       }
 
       const commitMessage = `Resolved git commit ${shortGitCommitSha(commitSha)}`;
-      logs.push(phaseLog("package", commitMessage));
+      timeline.push(phaseLog("package", commitMessage));
       await this.report(context, {
         deploymentId: state.id.value,
         phase: "package",
@@ -1734,11 +1734,11 @@ export class SshExecutionBackend implements ExecutionBackend {
       const content = source.metadata?.content;
       if (!content) {
         const message = `${source.kind} source requires inline content metadata`;
-        logs.push(phaseLog("package", message, "error"));
+        timeline.push(phaseLog("package", message, "error"));
         return {
           prepared: false,
           deployment: this.applyFailure(deployment, {
-            logs,
+            timeline,
             errorCode: "inline_source_content_missing",
             retryable: false,
             metadata: {
@@ -1754,7 +1754,7 @@ export class SshExecutionBackend implements ExecutionBackend {
           ? (source.metadata?.dockerfilePath ?? "Dockerfile")
           : (source.metadata?.composeFilePath ?? "docker-compose.yml");
       const remoteTargetFile = `${remoteSourceRoot}/${targetFile}`;
-      logs.push(phaseLog("package", `Write ${source.kind} source to ${remoteTargetFile}`));
+      timeline.push(phaseLog("package", `Write ${source.kind} source to ${remoteTargetFile}`));
       await this.report(context, {
         deploymentId: state.id.value,
         phase: "package",
@@ -1782,11 +1782,11 @@ export class SshExecutionBackend implements ExecutionBackend {
         const message = writeInlineSource.reason
           ? `Inline source write failed: ${writeInlineSource.reason}`
           : `Inline source write failed with exit code ${writeInlineSource.exitCode}`;
-        logs.push(phaseLog("package", message, "error"));
+        timeline.push(phaseLog("package", message, "error"));
         return {
           prepared: false,
           deployment: this.applyFailure(deployment, {
-            logs,
+            timeline,
             errorCode: "inline_source_write_failed",
             retryable: true,
             metadata: {
@@ -1820,11 +1820,11 @@ export class SshExecutionBackend implements ExecutionBackend {
 
     if (!isLocalWorkspaceSourceKind(source.kind)) {
       const message = `SSH source kind is not supported: ${source.kind}`;
-      logs.push(phaseLog("package", message, "error"));
+      timeline.push(phaseLog("package", message, "error"));
       return {
         prepared: false,
         deployment: this.applyFailure(deployment, {
-          logs,
+          timeline,
           errorCode: "ssh_source_kind_unsupported",
           retryable: false,
           metadata: {
@@ -1842,11 +1842,11 @@ export class SshExecutionBackend implements ExecutionBackend {
 
     if (!existsSync(localWorkdir)) {
       const message = `Source working directory does not exist: ${localWorkdir}`;
-      logs.push(phaseLog("package", message, "error"));
+      timeline.push(phaseLog("package", message, "error"));
       return {
         prepared: false,
         deployment: this.applyFailure(deployment, {
-          logs,
+          timeline,
           errorCode: "source_workdir_missing",
           retryable: false,
           metadata: {
@@ -1856,7 +1856,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       };
     }
 
-    logs.push(
+    timeline.push(
       phaseLog("package", `Upload source workspace to ${input.target.host}:${remoteWorkdir}`),
     );
     await this.report(context, {
@@ -1878,7 +1878,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       cwd: input.runtimeDir,
       env: input.env,
     });
-    this.pushCommandOutput(logs, {
+    this.pushCommandOutput(timeline, {
       context,
       deploymentId: state.id.value,
       phase: "package",
@@ -1891,7 +1891,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       const message = upload.reason
         ? `Source upload failed: ${upload.reason}`
         : `Source upload failed with exit code ${upload.exitCode}`;
-      logs.push(phaseLog("package", message, "error"));
+      timeline.push(phaseLog("package", message, "error"));
       await this.runRemoteCommand({
         target: input.target,
         command: `rm -rf ${shellQuote(remoteWorkdir)}`,
@@ -1901,7 +1901,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       return {
         prepared: false,
         deployment: this.applyFailure(deployment, {
-          logs,
+          timeline,
           errorCode: "ssh_source_upload_failed",
           retryable: true,
           metadata: {
@@ -1975,12 +1975,12 @@ export class SshExecutionBackend implements ExecutionBackend {
       return err(packageEnv.error);
     }
     const { env, redactions } = packageEnv.value;
-    const logs: DeploymentLogEntry[] = [
+    const timeline: DeploymentTimelineJournalEntry[] = [
       phaseLog("plan", `Using SSH docker-container execution on ${target.host}:${target.port}`),
     ];
 
     try {
-      const prepared = await this.prepareSshSource(context, deployment, logs, {
+      const prepared = await this.prepareSshSource(context, deployment, timeline, {
         runtimeDir,
         remoteRoot,
         target,
@@ -2001,10 +2001,10 @@ export class SshExecutionBackend implements ExecutionBackend {
 
       if (dockerVersion.failed) {
         const message = "Docker is not available on the SSH target";
-        logs.push(phaseLog("package", message, "error"));
+        timeline.push(phaseLog("package", message, "error"));
         return ok({
           deployment: this.applyFailure(deployment, {
-            logs,
+            timeline,
             errorCode: "ssh_docker_unavailable",
             retryable: false,
             metadata: {
@@ -2055,10 +2055,10 @@ export class SshExecutionBackend implements ExecutionBackend {
             });
             if (!dockerBuild) {
               const message = "Start command is required for workspace image generation";
-              logs.push(phaseLog("package", message, "error"));
+              timeline.push(phaseLog("package", message, "error"));
               return ok({
                 deployment: this.applyFailure(deployment, {
-                  logs,
+                  timeline,
                   errorCode: "workspace_start_command_missing",
                   retryable: false,
                   metadata: {
@@ -2092,10 +2092,10 @@ export class SshExecutionBackend implements ExecutionBackend {
 
             if (writeDockerBuildAssets.failed) {
               const message = "SSH workspace Docker build asset write failed";
-              logs.push(phaseLog("package", message, "error"));
+              timeline.push(phaseLog("package", message, "error"));
               return ok({
                 deployment: this.applyFailure(deployment, {
-                  logs,
+                  timeline,
                   errorCode: "ssh_workspace_dockerfile_write_failed",
                   retryable: true,
                   metadata: {
@@ -2106,7 +2106,7 @@ export class SshExecutionBackend implements ExecutionBackend {
               });
             }
 
-            logs.push(phaseLog("package", `Generated workspace Dockerfile at ${dockerfilePath}`));
+            timeline.push(phaseLog("package", `Generated workspace Dockerfile at ${dockerfilePath}`));
           }
 
           if (state.runtimePlan.buildStrategy === "static-artifact") {
@@ -2118,10 +2118,10 @@ export class SshExecutionBackend implements ExecutionBackend {
             });
             if (!dockerBuild) {
               const message = "Static publish directory is required for static image generation";
-              logs.push(phaseLog("package", message, "error"));
+              timeline.push(phaseLog("package", message, "error"));
               return ok({
                 deployment: this.applyFailure(deployment, {
-                  logs,
+                  timeline,
                   errorCode: "static_dockerfile_generation_failed",
                   retryable: false,
                   metadata: {
@@ -2155,10 +2155,10 @@ export class SshExecutionBackend implements ExecutionBackend {
 
             if (writeDockerBuildAssets.failed) {
               const message = "SSH static Docker build asset write failed";
-              logs.push(phaseLog("package", message, "error"));
+              timeline.push(phaseLog("package", message, "error"));
               return ok({
                 deployment: this.applyFailure(deployment, {
-                  logs,
+                  timeline,
                   errorCode: "ssh_static_dockerfile_write_failed",
                   retryable: true,
                   metadata: {
@@ -2169,7 +2169,7 @@ export class SshExecutionBackend implements ExecutionBackend {
               });
             }
 
-            logs.push(
+            timeline.push(
               phaseLog("package", `Generated static site Dockerfile at ${dockerfilePath}`),
             );
           }
@@ -2186,7 +2186,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             }),
             { quote: shellQuote },
           );
-          logs.push(phaseLog("package", `Build Docker image ${image} on SSH target`));
+          timeline.push(phaseLog("package", `Build Docker image ${image} on SSH target`));
           await this.report(context, {
             deploymentId: state.id.value,
             phase: "package",
@@ -2202,7 +2202,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             env,
             onOutput: (line, level, stream) => {
               if (stream === "stdout") {
-                buildStdoutCount = this.pushStreamingCommandOutput(logs, {
+                buildStdoutCount = this.pushStreamingCommandOutput(timeline, {
                   context,
                   deploymentId: state.id.value,
                   phase: "package",
@@ -2214,7 +2214,7 @@ export class SshExecutionBackend implements ExecutionBackend {
                 return;
               }
 
-              buildStderrCount = this.pushStreamingCommandOutput(logs, {
+              buildStderrCount = this.pushStreamingCommandOutput(timeline, {
                 context,
                 deploymentId: state.id.value,
                 phase: "package",
@@ -2228,10 +2228,10 @@ export class SshExecutionBackend implements ExecutionBackend {
 
           if (build.failed) {
             const message = "SSH Docker image build failed";
-            logs.push(phaseLog("package", message, "error"));
+            timeline.push(phaseLog("package", message, "error"));
             return ok({
               deployment: this.applyFailure(deployment, {
-                logs,
+                timeline,
                 errorCode: "ssh_docker_build_failed",
                 retryable: true,
                 metadata: {
@@ -2277,10 +2277,10 @@ export class SshExecutionBackend implements ExecutionBackend {
         : ok(null);
       if (proxyBootstrapResult.isErr()) {
         const message = "Edge proxy provider could not render an ensure plan";
-        logs.push(phaseLog("deploy", message, "error"));
+        timeline.push(phaseLog("deploy", message, "error"));
         return ok({
           deployment: this.applyFailure(deployment, {
-            logs,
+            timeline,
             errorCode: proxyBootstrapResult.error.code,
             retryable: proxyBootstrapResult.error.retryable,
             metadata: {
@@ -2295,7 +2295,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       const proxyBootstrap = proxyBootstrapResult.value;
       if (proxyBootstrap) {
         const proxyMessage = `Ensure ${proxyBootstrap.displayName} edge proxy on Docker network ${proxyBootstrap.networkName}`;
-        logs.push(phaseLog("deploy", proxyMessage));
+        timeline.push(phaseLog("deploy", proxyMessage));
         await this.report(context, {
           deploymentId: state.id.value,
           phase: "deploy",
@@ -2308,7 +2308,7 @@ export class SshExecutionBackend implements ExecutionBackend {
           command: proxyBootstrap.networkCommand,
           cwd: runtimeDir,
           env,
-          onOutput: this.createStreamingOutputSink(logs, {
+          onOutput: this.createStreamingOutputSink(timeline, {
             context,
             deploymentId: state.id.value,
             phase: "deploy",
@@ -2320,7 +2320,7 @@ export class SshExecutionBackend implements ExecutionBackend {
           command: proxyBootstrap.containerCommand,
           cwd: runtimeDir,
           env,
-          onOutput: this.createStreamingOutputSink(logs, {
+          onOutput: this.createStreamingOutputSink(timeline, {
             context,
             deploymentId: state.id.value,
             phase: "deploy",
@@ -2338,10 +2338,10 @@ export class SshExecutionBackend implements ExecutionBackend {
             proxyKind: proxyBootstrap.proxyKind,
           });
           const message = failure.message;
-          logs.push(phaseLog("deploy", message, "error"));
+          timeline.push(phaseLog("deploy", message, "error"));
           return ok({
             deployment: this.applyFailure(deployment, {
-              logs,
+              timeline,
               errorCode: failure.errorCode,
               retryable: failure.retryable,
               metadata: {
@@ -2354,7 +2354,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         }
 
         const readyMessage = `${proxyBootstrap.displayName} edge proxy is ready`;
-        logs.push(phaseLog("deploy", readyMessage));
+        timeline.push(phaseLog("deploy", readyMessage));
         await this.report(context, {
           deploymentId: state.id.value,
           phase: "deploy",
@@ -2378,10 +2378,10 @@ export class SshExecutionBackend implements ExecutionBackend {
         : ok(null);
       if (proxyRoutePlanResult.isErr()) {
         const message = "Edge proxy route configuration could not be rendered";
-        logs.push(phaseLog("deploy", message, "error"));
+        timeline.push(phaseLog("deploy", message, "error"));
         return ok({
           deployment: this.applyFailure(deployment, {
-            logs,
+            timeline,
             errorCode: proxyRoutePlanResult.error.code,
             retryable: proxyRoutePlanResult.error.retryable,
             metadata: {
@@ -2421,10 +2421,10 @@ export class SshExecutionBackend implements ExecutionBackend {
       const storageMounts = dockerStorageMountsFromRuntimeMetadata(state.runtimePlan.execution.metadata);
       if (storageMounts.isErr()) {
         const message = "Storage mounts could not be rendered for SSH Docker";
-        logs.push(phaseLog("deploy", message, "error"));
+        timeline.push(phaseLog("deploy", message, "error"));
         return ok({
           deployment: this.applyFailure(deployment, {
-            logs,
+            timeline,
             errorCode: storageMounts.error.code,
             retryable: storageMounts.error.retryable,
             metadata: {
@@ -2441,10 +2441,10 @@ export class SshExecutionBackend implements ExecutionBackend {
       );
       if (storageVolumeRealizations.isErr()) {
         const message = "Storage volume realization could not be rendered for SSH Docker";
-        logs.push(phaseLog("deploy", message, "error"));
+        timeline.push(phaseLog("deploy", message, "error"));
         return ok({
           deployment: this.applyFailure(deployment, {
-            logs,
+            timeline,
             errorCode: storageVolumeRealizations.error.code,
             retryable: storageVolumeRealizations.error.retryable,
             metadata: {
@@ -2461,14 +2461,14 @@ export class SshExecutionBackend implements ExecutionBackend {
         quote: shellQuote,
       });
       if (realizeStorageVolumesCommand.length > 0) {
-        logs.push(phaseLog("deploy", "Realize SSH Docker storage volumes with Appaloft ownership labels"));
+        timeline.push(phaseLog("deploy", "Realize SSH Docker storage volumes with Appaloft ownership labels"));
         const realizeStorageVolumes = await this.runRemoteCommandStreaming({
           target,
           command: realizeStorageVolumesCommand,
           cwd: runtimeDir,
           env: runtimeExecutionEnv,
           redactions: runtimeRedactions,
-          onOutput: this.createStreamingOutputSink(logs, {
+          onOutput: this.createStreamingOutputSink(timeline, {
             context,
             deploymentId: state.id.value,
             phase: "deploy",
@@ -2476,10 +2476,10 @@ export class SshExecutionBackend implements ExecutionBackend {
         });
         if (realizeStorageVolumes.failed) {
           const message = "SSH Docker storage volumes could not be realized";
-          logs.push(phaseLog("deploy", message, "error"));
+          timeline.push(phaseLog("deploy", message, "error"));
           return ok({
             deployment: this.applyFailure(deployment, {
-              logs,
+              timeline,
               errorCode: "ssh_docker_storage_volume_realization_failed",
               retryable: true,
               metadata: {
@@ -2540,13 +2540,13 @@ export class SshExecutionBackend implements ExecutionBackend {
         env: runtimeExecutionEnv,
         redactions: runtimeRedactions,
         image,
-        logs,
+        timeline,
       });
       if (imageVersionMetadataResult.status === "failed") {
-        logs.push(phaseLog("deploy", imageVersionMetadataResult.message, "error"));
+        timeline.push(phaseLog("deploy", imageVersionMetadataResult.message, "error"));
         return ok({
           deployment: this.applyFailure(deployment, {
-            logs,
+            timeline,
             errorCode: "ssh_docker_image_digest_resolution_failed",
             retryable: imageVersionMetadataResult.retryable,
             metadata: {
@@ -2562,21 +2562,21 @@ export class SshExecutionBackend implements ExecutionBackend {
       }
       const dockerImageVersionMetadata = imageVersionMetadataResult.metadata;
       if (usesDirectHostPort && supersededDeploymentIds.length > 0) {
-        logs.push(
+        timeline.push(
           phaseLog(
             "deploy",
             `Release existing SSH containers for resource ${state.resourceId.value}`,
           ),
         );
       }
-      logs.push(phaseLog("deploy", `Start SSH container ${containerName}`));
+      timeline.push(phaseLog("deploy", `Start SSH container ${containerName}`));
       const run = await this.runRemoteCommandStreaming({
         target,
         command: runCommand,
         cwd: runtimeDir,
         env: runtimeExecutionEnv,
         redactions: runtimeRedactions,
-        onOutput: this.createStreamingOutputSink(logs, {
+        onOutput: this.createStreamingOutputSink(timeline, {
           context,
           deploymentId: state.id.value,
           phase: "deploy",
@@ -2585,10 +2585,10 @@ export class SshExecutionBackend implements ExecutionBackend {
 
       if (run.failed) {
         const message = "SSH Docker container failed to start";
-        logs.push(phaseLog("deploy", message, "error"));
+        timeline.push(phaseLog("deploy", message, "error"));
         return ok({
           deployment: this.applyFailure(deployment, {
-            logs,
+            timeline,
             errorCode: "ssh_docker_run_failed",
             retryable: true,
             metadata: {
@@ -2616,10 +2616,10 @@ export class SshExecutionBackend implements ExecutionBackend {
         : ok(null);
       if (proxyReloadPlanResult.isErr()) {
         const message = "SSH edge proxy reload plan could not be rendered";
-        logs.push(phaseLog("deploy", message, "error"));
+        timeline.push(phaseLog("deploy", message, "error"));
         return ok({
           deployment: this.applyFailure(deployment, {
-            logs,
+            timeline,
             errorCode: proxyReloadPlanResult.error.code,
             retryable: proxyReloadPlanResult.error.retryable,
             metadata: {
@@ -2652,9 +2652,9 @@ export class SshExecutionBackend implements ExecutionBackend {
             }),
         });
 
-        for (const entry of reload.logs) {
-          logs.push(phaseLog("deploy", entry.message, entry.stderr ? "warn" : "info"));
-          this.pushCommandOutput(logs, {
+        for (const entry of reload.timeline) {
+          timeline.push(phaseLog("deploy", entry.message, entry.stderr ? "warn" : "info"));
+          this.pushCommandOutput(timeline, {
             context,
             deploymentId: state.id.value,
             phase: "deploy",
@@ -2662,7 +2662,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             level: "info",
             stream: "stdout",
           });
-          this.pushCommandOutput(logs, {
+          this.pushCommandOutput(timeline, {
             context,
             deploymentId: state.id.value,
             phase: "deploy",
@@ -2682,8 +2682,8 @@ export class SshExecutionBackend implements ExecutionBackend {
           });
           return ok({
             deployment: this.applyFailure(deployment, {
-              logs: [
-                ...logs,
+              timeline: [
+                ...timeline,
                 phaseLog("deploy", reload.message, "error"),
               ],
               errorCode: reload.errorCode,
@@ -2722,7 +2722,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       const publishedHostPort = parseDockerPublishedHostPort(publishedPortResult.stdout);
 
       if (publishedPortResult.failed || publishedHostPort === undefined) {
-        await this.pushRemoteDockerContainerDiagnostics(logs, {
+        await this.pushRemoteDockerContainerDiagnostics(timeline, {
           context,
           deploymentId: state.id.value,
           target,
@@ -2737,10 +2737,10 @@ export class SshExecutionBackend implements ExecutionBackend {
           env,
         });
         const message = `SSH Docker published port could not be resolved for ${containerName}`;
-        logs.push(phaseLog("verify", message, "error"));
+        timeline.push(phaseLog("verify", message, "error"));
         return ok({
           deployment: this.applyFailure(deployment, {
-            logs,
+            timeline,
             errorCode: "ssh_docker_published_port_resolution_failed",
             retryable: true,
             metadata: {
@@ -2778,14 +2778,14 @@ export class SshExecutionBackend implements ExecutionBackend {
         const containerNetworkIp = parseDockerContainerNetworkIp(networkIp.stdout);
         if (!networkIp.failed && containerNetworkIp) {
           internalUrl = `http://${containerNetworkIp}:${port}${healthPath}`;
-          logs.push(
+          timeline.push(
             phaseLog(
               "verify",
               `Use SSH Docker network ${proxyNetworkName} address for internal health check`,
             ),
           );
         } else {
-          logs.push(
+          timeline.push(
             phaseLog(
               "verify",
               `SSH Docker network address was not available; falling back to published port ${publishedHostPort}`,
@@ -2819,14 +2819,14 @@ export class SshExecutionBackend implements ExecutionBackend {
           status: "succeeded",
           message: "Health check disabled for resource",
         });
-        logs.push(phaseLog("verify", "Health check disabled for resource"));
+        timeline.push(phaseLog("verify", "Health check disabled for resource"));
         deployment.applyExecutionResult(
           FinishedAt.rehydrate(new Date().toISOString()),
           ExecutionResult.rehydrate({
             exitCode: ExitCode.rehydrate(0),
             status: ExecutionStatusValue.rehydrate("succeeded"),
             retryable: false,
-            logs,
+            timeline,
             metadata: {
               host: target.host,
               image,
@@ -2856,7 +2856,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             cwd: runtimeDir,
             env,
           });
-          this.pushCommandOutput(logs, {
+          this.pushCommandOutput(timeline, {
             context,
             deploymentId: state.id.value,
             phase: "verify",
@@ -2864,7 +2864,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             level: internalHealth.ok ? "info" : "warn",
             stream: "stdout",
           });
-          this.pushCommandOutput(logs, {
+          this.pushCommandOutput(timeline, {
             context,
             deploymentId: state.id.value,
             phase: "verify",
@@ -2874,7 +2874,7 @@ export class SshExecutionBackend implements ExecutionBackend {
           });
 
           if (!internalHealth.ok) {
-            await this.pushRemoteDockerContainerDiagnostics(logs, {
+            await this.pushRemoteDockerContainerDiagnostics(timeline, {
               context,
               deploymentId: state.id.value,
               target,
@@ -2891,10 +2891,10 @@ export class SshExecutionBackend implements ExecutionBackend {
             const message = `SSH internal container health check failed for ${internalUrl}${
               internalHealth.reason ? `: ${internalHealth.reason}` : ""
             }`;
-            logs.push(phaseLog("verify", message, "error"));
+            timeline.push(phaseLog("verify", message, "error"));
             return ok({
               deployment: this.applyFailure(deployment, {
-                logs,
+                timeline,
                 errorCode: "ssh_internal_health_check_failed",
                 retryable: true,
                 metadata: {
@@ -2911,7 +2911,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             });
           }
 
-          logs.push(
+          timeline.push(
             phaseLog("verify", `SSH container is reachable internally at ${internalUrl}`),
           );
           continue;
@@ -2926,7 +2926,7 @@ export class SshExecutionBackend implements ExecutionBackend {
               cwd: runtimeDir,
               env,
             });
-            logs.push(
+            timeline.push(
               phaseLog(
                 "deploy",
                 cleanup.failed
@@ -2939,10 +2939,10 @@ export class SshExecutionBackend implements ExecutionBackend {
 
           if (publicRouteHealthChecks.length === 0) {
             const message = "SSH public route health check requested without access routes";
-            logs.push(phaseLog("verify", message, "error"));
+            timeline.push(phaseLog("verify", message, "error"));
             return ok({
               deployment: this.applyFailure(deployment, {
-                logs,
+                timeline,
                 errorCode: "ssh_public_route_missing",
                 retryable: false,
                 metadata: {
@@ -2977,7 +2977,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             });
 
             if (!publicHealth.ok) {
-              await this.pushRemoteDockerContainerDiagnostics(logs, {
+              await this.pushRemoteDockerContainerDiagnostics(timeline, {
                 context,
                 deploymentId: state.id.value,
                 target,
@@ -2995,10 +2995,10 @@ export class SshExecutionBackend implements ExecutionBackend {
                 publicHealth.reason ? `: ${publicHealth.reason}` : ""
               }`;
               const errorCode = publicRouteHealthErrorCode(publicHealth);
-              logs.push(phaseLog("verify", message, "error"));
+              timeline.push(phaseLog("verify", message, "error"));
               return ok({
                 deployment: this.applyFailure(deployment, {
-                  logs,
+                  timeline,
                   errorCode,
                   retryable: true,
                   metadata: {
@@ -3020,7 +3020,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             }
 
             if (publicHealth.tlsVerification === "untrusted") {
-              logs.push(
+              timeline.push(
                 phaseLog(
                   "verify",
                   `SSH public route is reachable at ${publicUrl} with untrusted TLS; certificate readiness remains separate`,
@@ -3028,7 +3028,7 @@ export class SshExecutionBackend implements ExecutionBackend {
                 ),
               );
             } else {
-              logs.push(phaseLog("verify", `SSH public route is reachable at ${publicUrl}`));
+              timeline.push(phaseLog("verify", `SSH public route is reachable at ${publicUrl}`));
             }
           }
         }
@@ -3044,7 +3044,7 @@ export class SshExecutionBackend implements ExecutionBackend {
           cwd: runtimeDir,
           env,
         });
-        logs.push(
+        timeline.push(
           phaseLog(
             "deploy",
             cleanup.failed
@@ -3062,7 +3062,7 @@ export class SshExecutionBackend implements ExecutionBackend {
           exitCode: ExitCode.rehydrate(0),
           status: ExecutionStatusValue.rehydrate("succeeded"),
           retryable: false,
-          logs,
+          timeline,
           metadata: {
             host: target.host,
             image,
@@ -3088,7 +3088,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       }
       return ok({
         deployment: this.applyFailure(deployment, {
-          logs: [
+          timeline: [
             phaseLog(
               "deploy",
               error instanceof Error ? error.message : "Unknown SSH execution error",
@@ -3107,7 +3107,7 @@ export class SshExecutionBackend implements ExecutionBackend {
   private async prepareRemoteGeneratedServiceGraphCompose(input: {
     context: ExecutionContext;
     deployment: Deployment;
-    logs: DeploymentLogEntry[];
+    timeline: DeploymentTimelineJournalEntry[];
     runtimeDir: string;
     target: SshTarget;
     env: NodeJS.ProcessEnv;
@@ -3128,11 +3128,11 @@ export class SshExecutionBackend implements ExecutionBackend {
       const replicas = replicatedWorkloadReplicasFromMetadata(state.runtimePlan.execution.metadata);
       if (!serviceName || !replicas) {
         const message = "Replicated workload metadata is incomplete";
-        input.logs.push(phaseLog("package", message, "error"));
+        input.timeline.push(phaseLog("package", message, "error"));
         return ok({
           prepared: false,
           deployment: this.applyFailure(input.deployment, {
-            logs: input.logs,
+            timeline: input.timeline,
             errorCode: "ssh_replicated_workload_metadata_missing",
             retryable: false,
             metadata: {
@@ -3199,11 +3199,11 @@ export class SshExecutionBackend implements ExecutionBackend {
 
       if (writeReplicatedWorkloadFiles.failed) {
         const message = "SSH replicated workload asset write failed";
-        input.logs.push(phaseLog("package", message, "error"));
+        input.timeline.push(phaseLog("package", message, "error"));
         return ok({
           prepared: false,
           deployment: this.applyFailure(input.deployment, {
-            logs: input.logs,
+            timeline: input.timeline,
             errorCode: "ssh_replicated_workload_compose_write_failed",
             retryable: true,
             metadata: {
@@ -3215,7 +3215,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         });
       }
 
-      input.logs.push(
+      input.timeline.push(
         phaseLog("package", `Generated replicated workload compose file ${replicatedComposeFile}`),
       );
       await this.report(input.context, {
@@ -3236,11 +3236,11 @@ export class SshExecutionBackend implements ExecutionBackend {
     const services = serviceGraphComposeServicesFromMetadata(state.runtimePlan.execution.metadata);
     if (services.length === 0) {
       const message = "Repository service graph metadata is missing services";
-      input.logs.push(phaseLog("package", message, "error"));
+      input.timeline.push(phaseLog("package", message, "error"));
       return ok({
         prepared: false,
         deployment: this.applyFailure(input.deployment, {
-          logs: input.logs,
+          timeline: input.timeline,
           errorCode: "ssh_service_graph_metadata_missing",
           retryable: false,
           metadata: {
@@ -3260,11 +3260,11 @@ export class SshExecutionBackend implements ExecutionBackend {
     });
     if (!dockerBuild) {
       const message = "Start command is required for workspace service graph image generation";
-      input.logs.push(phaseLog("package", message, "error"));
+      input.timeline.push(phaseLog("package", message, "error"));
       return ok({
         prepared: false,
         deployment: this.applyFailure(input.deployment, {
-          logs: input.logs,
+          timeline: input.timeline,
           errorCode: "workspace_start_command_missing",
           retryable: false,
           metadata: {
@@ -3314,11 +3314,11 @@ export class SshExecutionBackend implements ExecutionBackend {
 
     if (writeServiceGraphFiles.failed) {
       const message = "SSH repository service graph asset write failed";
-      input.logs.push(phaseLog("package", message, "error"));
+      input.timeline.push(phaseLog("package", message, "error"));
       return ok({
         prepared: false,
         deployment: this.applyFailure(input.deployment, {
-          logs: input.logs,
+          timeline: input.timeline,
           errorCode: "ssh_service_graph_compose_write_failed",
           retryable: true,
           metadata: {
@@ -3331,7 +3331,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       });
     }
 
-    input.logs.push(
+    input.timeline.push(
       phaseLog("package", `Generated repository service graph compose file ${composeFile}`),
     );
     await this.report(input.context, {
@@ -3369,7 +3369,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       return err(packageEnv.error);
     }
     const { env, redactions } = packageEnv.value;
-    const logs: DeploymentLogEntry[] = [
+    const timeline: DeploymentTimelineJournalEntry[] = [
       phaseLog(
         "plan",
         `Using SSH docker-compose-stack execution on ${target.host}:${target.port}`,
@@ -3377,7 +3377,7 @@ export class SshExecutionBackend implements ExecutionBackend {
     ];
 
     try {
-      const prepared = await this.prepareSshSource(context, deployment, logs, {
+      const prepared = await this.prepareSshSource(context, deployment, timeline, {
         runtimeDir,
         remoteRoot,
         target,
@@ -3405,10 +3405,10 @@ export class SshExecutionBackend implements ExecutionBackend {
 
       if (dockerVersion.failed) {
         const message = "Docker is not available on the SSH target";
-        logs.push(phaseLog("package", message, "error"));
+        timeline.push(phaseLog("package", message, "error"));
         return ok({
           deployment: this.applyFailure(deployment, {
-            logs,
+            timeline,
             errorCode: "ssh_docker_unavailable",
             retryable: false,
             metadata: {
@@ -3425,7 +3425,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         cwd: runtimeDir,
         env,
         redactions,
-        onOutput: this.createStreamingOutputSink(logs, {
+        onOutput: this.createStreamingOutputSink(timeline, {
           context,
           deploymentId: state.id.value,
           phase: "package",
@@ -3433,10 +3433,10 @@ export class SshExecutionBackend implements ExecutionBackend {
       });
       if (dockerComposeReady.failed) {
         const message = "Docker Compose is not available on the SSH target";
-        logs.push(phaseLog("package", message, "error"));
+        timeline.push(phaseLog("package", message, "error"));
         return ok({
           deployment: this.applyFailure(deployment, {
-            logs,
+            timeline,
             errorCode: "ssh_docker_compose_unavailable",
             retryable: false,
             metadata: {
@@ -3477,7 +3477,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       const generatedCompose = await this.prepareRemoteGeneratedServiceGraphCompose({
         context,
         deployment,
-        logs,
+        timeline,
         runtimeDir,
         target,
         env,
@@ -3506,10 +3506,10 @@ export class SshExecutionBackend implements ExecutionBackend {
       const storageMounts = dockerStorageMountsFromRuntimeMetadata(state.runtimePlan.execution.metadata);
       if (storageMounts.isErr()) {
         const message = "Storage mounts could not be rendered for SSH Docker Compose";
-        logs.push(phaseLog("deploy", message, "error"));
+        timeline.push(phaseLog("deploy", message, "error"));
         return ok({
           deployment: this.applyFailure(deployment, {
-            logs,
+            timeline,
             errorCode: storageMounts.error.code,
             retryable: storageMounts.error.retryable,
             metadata: {
@@ -3529,10 +3529,10 @@ export class SshExecutionBackend implements ExecutionBackend {
       );
       if (storageVolumeRealizations.isErr()) {
         const message = "Storage volume realization could not be rendered for SSH Docker Compose";
-        logs.push(phaseLog("deploy", message, "error"));
+        timeline.push(phaseLog("deploy", message, "error"));
         return ok({
           deployment: this.applyFailure(deployment, {
-            logs,
+            timeline,
             errorCode: storageVolumeRealizations.error.code,
             retryable: storageVolumeRealizations.error.retryable,
             metadata: {
@@ -3560,10 +3560,10 @@ export class SshExecutionBackend implements ExecutionBackend {
       });
       if (writeRuntimeEnvFile.failed) {
         const message = "SSH Docker Compose runtime environment write failed";
-        logs.push(phaseLog("deploy", message, "error"));
+        timeline.push(phaseLog("deploy", message, "error"));
         return ok({
           deployment: this.applyFailure(deployment, {
-            logs,
+            timeline,
             errorCode: "ssh_docker_compose_runtime_env_write_failed",
             retryable: true,
             metadata: {
@@ -3577,7 +3577,7 @@ export class SshExecutionBackend implements ExecutionBackend {
           }),
         });
       }
-      logs.push(phaseLog("deploy", "Generate Appaloft compose ownership labels override"));
+      timeline.push(phaseLog("deploy", "Generate Appaloft compose ownership labels override"));
       const composeOverride = await this.runRemoteCommandStreaming({
         target,
         command: withRemoteRuntimeEnvironmentFile({
@@ -3594,7 +3594,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         cwd: runtimeDir,
         env: runtimeEnv.value.env,
         redactions: runtimeEnv.value.redactions,
-        onOutput: this.createStreamingOutputSink(logs, {
+        onOutput: this.createStreamingOutputSink(timeline, {
           context,
           deploymentId: state.id.value,
           phase: "deploy",
@@ -3603,7 +3603,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       if (composeOverride.failed) {
         return ok({
           deployment: this.applyFailure(deployment, {
-            logs,
+            timeline,
             errorCode: "ssh_docker_compose_label_override_failed",
             retryable: false,
             metadata: {
@@ -3628,7 +3628,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         }),
         { quote: shellQuote },
       );
-      logs.push(phaseLog("deploy", `Run docker compose on SSH target with ${remoteComposeFile}`));
+      timeline.push(phaseLog("deploy", `Run docker compose on SSH target with ${remoteComposeFile}`));
       await this.report(context, {
         deploymentId: state.id.value,
         phase: "deploy",
@@ -3645,7 +3645,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         cwd: runtimeDir,
         env: runtimeEnv.value.env,
         redactions: runtimeEnv.value.redactions,
-        onOutput: this.createStreamingOutputSink(logs, {
+        onOutput: this.createStreamingOutputSink(timeline, {
           context,
           deploymentId: state.id.value,
           phase: "deploy",
@@ -3654,10 +3654,10 @@ export class SshExecutionBackend implements ExecutionBackend {
 
       if (up.failed) {
         const message = "SSH Docker Compose deployment failed";
-        logs.push(phaseLog("deploy", message, "error"));
+        timeline.push(phaseLog("deploy", message, "error"));
         return ok({
           deployment: this.applyFailure(deployment, {
-            logs,
+            timeline,
             errorCode: "ssh_docker_compose_failed",
             retryable: true,
             metadata: {
@@ -3673,14 +3673,14 @@ export class SshExecutionBackend implements ExecutionBackend {
         });
       }
 
-      logs.push(phaseLog("verify", `SSH compose stack started from ${remoteComposeFile}`));
+      timeline.push(phaseLog("verify", `SSH compose stack started from ${remoteComposeFile}`));
       deployment.applyExecutionResult(
         FinishedAt.rehydrate(new Date().toISOString()),
         ExecutionResult.rehydrate({
           exitCode: ExitCode.rehydrate(0),
           status: ExecutionStatusValue.rehydrate("succeeded"),
           retryable: false,
-          logs,
+          timeline,
           metadata: {
             host: target.host,
             remoteWorkdir,
@@ -3703,7 +3703,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       }
       return ok({
         deployment: this.applyFailure(deployment, {
-          logs: [
+          timeline: [
             phaseLog(
               "deploy",
               error instanceof Error ? error.message : "Unknown SSH Docker Compose execution error",
@@ -3722,7 +3722,7 @@ export class SshExecutionBackend implements ExecutionBackend {
   async cancel(
     context: ExecutionContext,
     deployment: Deployment,
-  ): Promise<Result<{ logs: DeploymentLogEntry[] }>> {
+  ): Promise<Result<{ timeline: DeploymentTimelineJournalEntry[] }>> {
     const state = deployment.toState();
     const metadata = state.runtimePlan.execution.metadata ?? {};
     const runtimeDir = this.runtimeDirectory(state.id.value);
@@ -3730,7 +3730,7 @@ export class SshExecutionBackend implements ExecutionBackend {
 
     const targetResult = await this.targetFor(context, deployment, runtimeDir);
     if (targetResult.isErr()) {
-      return targetResult.map(() => ({ logs: [] }));
+      return targetResult.map(() => ({ timeline: [] }));
     }
 
     const target = targetResult._unsafeUnwrap();
@@ -3751,7 +3751,7 @@ export class SshExecutionBackend implements ExecutionBackend {
     const containerName = metadata.containerName ?? runtimeInstanceNames.containerName;
     const remoteRoot = this.remoteRuntimeDirectory(state.id.value);
     const remoteWorkdir = metadata.remoteWorkdir ?? remoteSourceWorkdir(remoteRoot, state.runtimePlan.source.metadata);
-    const logs: DeploymentLogEntry[] = [];
+    const timeline: DeploymentTimelineJournalEntry[] = [];
 
     try {
       if (state.runtimePlan.execution.kind === "docker-container") {
@@ -3812,7 +3812,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             }),
           );
         }
-        logs.push(
+        timeline.push(
           phaseLog("deploy", `Removed SSH preview source workspace ${remoteArtifactRoot}`),
         );
       }
@@ -3824,7 +3824,7 @@ export class SshExecutionBackend implements ExecutionBackend {
           env,
           redactions,
         });
-        logs.push(phaseLog("deploy", `Removed SSH preview image ${artifactCleanup.imageName}`));
+        timeline.push(phaseLog("deploy", `Removed SSH preview image ${artifactCleanup.imageName}`));
       }
       const sourceFingerprint = previewSourceFingerprintFromMetadata(metadata);
       if (sourceFingerprint) {
@@ -3850,7 +3850,7 @@ export class SshExecutionBackend implements ExecutionBackend {
           );
         }
         if (siblingArtifactCleanup.stdout.trim().length > 0) {
-          logs.push(
+          timeline.push(
             phaseLog("deploy", "Removed SSH preview sibling artifacts for source fingerprint"),
           );
         }
@@ -3860,7 +3860,7 @@ export class SshExecutionBackend implements ExecutionBackend {
     }
 
     const composeFile = metadata.composeFile ?? state.runtimePlan.execution.composeFile;
-    logs.unshift(
+    timeline.unshift(
       phaseLog(
         "deploy",
         state.runtimePlan.execution.kind === "docker-container"
@@ -3877,7 +3877,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       message: "SSH deployment cancellation completed",
     });
 
-    return ok({ logs });
+    return ok({ timeline });
   }
 
   async rollback(
@@ -3897,7 +3897,7 @@ export class SshExecutionBackend implements ExecutionBackend {
     }
 
     const target = targetResult._unsafeUnwrap();
-    const logs: DeploymentLogEntry[] = [];
+    const timeline: DeploymentTimelineJournalEntry[] = [];
     const runtimeEnv = await resolveDependencyRuntimeEnvironment({
       context,
       deployment,
@@ -3949,7 +3949,7 @@ export class SshExecutionBackend implements ExecutionBackend {
     }
 
     const composeFile = metadata.composeFile ?? state.runtimePlan.execution.composeFile;
-    logs.push(
+    timeline.push(
       phaseLog(
         "rollback",
         metadata.containerName
@@ -3967,7 +3967,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         exitCode: ExitCode.rehydrate(0),
         status: ExecutionStatusValue.rehydrate("rolled-back"),
         retryable: false,
-        logs,
+        timeline,
       }),
     );
     await this.report(context, {

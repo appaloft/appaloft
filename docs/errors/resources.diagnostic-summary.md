@@ -80,7 +80,7 @@ type ResourceDiagnosticSourceError = {
     | "access"
     | "edge-access"
     | "proxy"
-    | "deployment-logs"
+    | "deployment-timeline"
     | "runtime-logs"
     | "system"
     | "copy";
@@ -112,7 +112,7 @@ Typical source errors:
 | `edge-access` | `resource_access_unknown` | `diagnostic-page-render` | Recent edge request failed, but the edge provider could not classify the failure safely. |
 | `proxy` | `proxy_provider_unavailable` | `proxy-summary` | The required edge proxy provider is not registered or not available. |
 | `proxy` | `proxy_configuration_render_failed` | `proxy-summary` | Provider failed to render a safe read-only configuration view. |
-| `deployment-logs` | `deployment_logs_unavailable` | `deployment-log-tail` | Deployment-attempt logs cannot be loaded or are missing. |
+| `deployment-timeline` | `deployment_logs_unavailable` | `deployment-log-tail` | Deployment-attempt logs cannot be loaded or are missing. |
 | `runtime-logs` | `resource_runtime_logs_unavailable` | `runtime-log-tail` | No observable runtime instance or placement metadata exists. |
 | `runtime-logs` | `resource_runtime_logs_not_configured` | `runtime-log-tail` | Runtime backend has no registered log reader. |
 | `system` | `system_context_unavailable` | `system-context` | Safe backend/desktop/local context could not be loaded. |

@@ -95,7 +95,7 @@ The HTTP API should return paginated logs, health summary, and structured status
 After a deployment, an agent should use logs and health summaries as the follow-up entrypoints
 instead of sending the user to raw server logs. Recommended commands:
 
-- `appaloft logs <deploymentId>`;
+- `appaloft deployments timeline <deploymentId>`;
 - `appaloft resource diagnose <resourceId>`;
 - `appaloft deployments recovery-readiness <deploymentId>`.
 

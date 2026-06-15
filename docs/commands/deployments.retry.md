@@ -59,7 +59,7 @@ the value returned by `deployments.recovery-readiness` so the command can reject
 ## Accepted Result
 
 The command returns accepted async work with a new deployment attempt id. Completion or failure is
-observed through `deployments.show`, `deployments.stream-events`, logs, and future readiness reads.
+observed through `deployments.show`, `deployments.timeline`, and future readiness reads.
 
 Accepted retry execution is also mirrored into the durable process attempt journal for
 `operator-work.*` visibility with Deployment, Resource, server, runtime plan, target backend, and

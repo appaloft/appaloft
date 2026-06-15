@@ -504,7 +504,7 @@ async function waitForSmokeRoute(input: {
       `Smoke edge route did not return ${input.expectedText} from ${input.host}.`,
       lastOutput ? `Last curl output:\n${lastOutput}` : "",
       proxyLogs.stdout || proxyLogs.stderr
-        ? `Traefik logs:\n${proxyLogs.stdout}${proxyLogs.stderr}`
+        ? `Traefik timeline:\n${proxyLogs.stdout}${proxyLogs.stderr}`
         : "",
     ]
       .filter(Boolean)
@@ -612,7 +612,7 @@ async function prepareAuthenticatedRegistryImage(input: {
     rmSync(authDir, { force: true, recursive: true });
     const message = error instanceof Error ? error.message : "Authenticated registry setup failed";
     throw new Error(
-      [message, sanitizedRegistryLogs ? `Registry logs:\n${sanitizedRegistryLogs}` : ""]
+      [message, sanitizedRegistryLogs ? `Registry timeline:\n${sanitizedRegistryLogs}` : ""]
         .filter(Boolean)
         .join("\n"),
     );
@@ -800,7 +800,7 @@ describe("DockerSwarmExecutionBackend", () => {
 
     const deployment = result._unsafeUnwrap().deployment.toState();
     const serialized = JSON.stringify({
-      logs: deployment.logs,
+      timeline: deployment.timeline,
       metadata: deployment.runtimePlan.execution.metadata,
     });
     expect(serialized).not.toContain(secretValue);
@@ -825,7 +825,7 @@ describe("DockerSwarmExecutionBackend", () => {
       phase: "dependency-runtime-secret-resolution",
       errorCode: "dependency_runtime_injection_blocked",
     });
-    expect(JSON.stringify(deployment.logs)).not.toContain("appaloft://dependency-resources");
+    expect(JSON.stringify(deployment.timeline)).not.toContain("appaloft://dependency-resources");
   });
 
   test("[SWARM-TARGET-CLEAN-001] executes fake Swarm cleanup through cancel using scoped labels", async () => {
@@ -947,7 +947,7 @@ describe("DockerSwarmExecutionBackend", () => {
     expect(result.isOk()).toBe(true);
     const deployment = result._unsafeUnwrap().deployment.toState();
     const serialized = JSON.stringify({
-      logs: deployment.logs,
+      timeline: deployment.timeline,
       metadata: deployment.runtimePlan.execution.metadata,
     });
 
@@ -1041,7 +1041,7 @@ describe("DockerSwarmExecutionBackend", () => {
           throw new Error(
             JSON.stringify(
               {
-                logs: state.logs,
+                timeline: state.timeline,
                 metadata: state.runtimePlan.execution.metadata,
               },
               null,
@@ -1148,7 +1148,7 @@ describe("DockerSwarmExecutionBackend", () => {
           throw new Error(
             JSON.stringify(
               {
-                logs: state.logs,
+                timeline: state.timeline,
                 metadata: state.runtimePlan.execution.metadata,
               },
               null,
@@ -1197,7 +1197,7 @@ describe("DockerSwarmExecutionBackend", () => {
             throw new Error(
               JSON.stringify(
                 {
-                  logs: privateState.logs,
+                  timeline: privateState.timeline,
                   metadata: privateState.runtimePlan.execution.metadata,
                 },
                 null,
@@ -1207,7 +1207,7 @@ describe("DockerSwarmExecutionBackend", () => {
           }
           expect(privateState.status.value).toBe("succeeded");
           const privateSerialized = JSON.stringify({
-            logs: privateState.logs,
+            timeline: privateState.timeline,
             metadata: privateState.runtimePlan.execution.metadata,
           });
           expect(privateSerialized).not.toContain(registryPassword);

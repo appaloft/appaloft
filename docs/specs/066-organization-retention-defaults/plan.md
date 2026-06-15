@@ -13,7 +13,7 @@
   - `docs/commands/audit-events.prune.md`
   - `docs/commands/domain-events.prune.md`
   - `docs/commands/provider-job-logs.prune.md`
-  - `docs/commands/deployments.logs.prune.md`
+  - ``
   - `docs/specs/061-scheduled-runtime-prune-automation/spec.md`
 - Test matrix: `docs/testing/organization-retention-defaults-test-matrix.md`
 

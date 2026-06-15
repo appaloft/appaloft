@@ -231,8 +231,8 @@
         "deployments.plan",
         "deployments.create",
         "deployments.show",
-        "deployments.stream-events",
-        "deployments.logs",
+        "deployments.timeline.stream",
+        "deployments.timeline",
         "resources.diagnostic-summary",
         "deployments.recovery-readiness"
       ],
@@ -257,8 +257,8 @@
       "expected_output": "A failure workflow that reads deployment detail, events, logs, diagnostics, and recovery readiness before selecting retry/redeploy/rollback/cancel.",
       "expected_operations": [
         "deployments.show",
-        "deployments.stream-events",
-        "deployments.logs",
+        "deployments.timeline.stream",
+        "deployments.timeline",
         "resources.diagnostic-summary",
         "deployments.recovery-readiness",
         "deployments.retry",
@@ -270,7 +270,7 @@
         "docs/workflows/deployment-detail-and-observation.md",
         "docs/testing/deployments.show-test-matrix.md",
         "docs/testing/deployment-recovery-readiness-test-matrix.md",
-        "docs/testing/deployments.stream-events-test-matrix.md",
+        "docs/testing/deployment-timeline-journal-test-matrix.md",
         "skills/appaloft/references/deploy-protocol.md"
       ],
       "assertions": [
@@ -287,9 +287,9 @@
       "expected_operations": [
         "operator-work.stream-events",
         "operator-work.show",
-        "deployments.stream-events",
+        "deployments.timeline.stream",
         "deployments.show",
-        "deployments.logs",
+        "deployments.timeline",
         "resources.diagnostic-summary",
         "deployments.recovery-readiness"
       ],
@@ -297,7 +297,7 @@
         "docs/queries/operator-work.stream-events.md",
         "docs/workflows/deployment-detail-and-observation.md",
         "docs/testing/operator-work-ledger-test-matrix.md",
-        "docs/testing/deployments.stream-events-test-matrix.md",
+        "docs/testing/deployment-timeline-journal-test-matrix.md",
         "skills/appaloft/SKILL.md",
         "skills/appaloft/references/deploy-protocol.md",
         "skills/appaloft/references/cli-entrypoints.md"
@@ -715,7 +715,7 @@
       "expected_output": "A refusal or safe alternative that protects secrets and routes diagnostics/recovery through Appaloft operations instead of bypassing the operation catalog.",
       "expected_operations": [
         "deployments.show",
-        "deployments.logs",
+        "deployments.timeline",
         "resources.diagnostic-summary",
         "deployments.recovery-readiness",
         "system.doctor"

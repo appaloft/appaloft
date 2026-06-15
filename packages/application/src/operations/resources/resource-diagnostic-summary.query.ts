@@ -16,7 +16,7 @@ export {
 export class ResourceDiagnosticSummaryQuery extends Query<ResourceDiagnosticSummary> {
   constructor(
     public readonly resourceId: string,
-    public readonly includeDeploymentLogTail: boolean,
+    public readonly includeDeploymentTimelineTail: boolean,
     public readonly includeRuntimeLogTail: boolean,
     public readonly includeProxyConfiguration: boolean,
     public readonly tailLines: number,
@@ -35,7 +35,7 @@ export class ResourceDiagnosticSummaryQuery extends Query<ResourceDiagnosticSumm
       (parsed) =>
         new ResourceDiagnosticSummaryQuery(
           parsed.resourceId,
-          parsed.includeDeploymentLogTail,
+          parsed.includeDeploymentTimelineTail,
           parsed.includeRuntimeLogTail,
           parsed.includeProxyConfiguration,
           parsed.tailLines,

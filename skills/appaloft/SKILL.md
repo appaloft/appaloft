@@ -59,7 +59,7 @@ surface available in the session.
 - First deployment: inspect source safely, create or select project/server/environment/resource,
   plan when useful, deploy, watch progress, and return URL plus diagnostics.
 - Deployment progress observation is a core deploy step. For one deployment attempt, follow
-  `appaloft deployments events <deploymentId> --follow --json` and use deployment logs for log
+  `appaloft deployments timeline <deploymentId> --follow --json` and use deployment timeline entries for log
   lines. For a parent durable work item that coordinates multiple resources or child deployments,
   follow `appaloft work events <workId> --follow --json` or
   `appaloft work watch <workId> --json`. Remote CLI profiles should use the control-plane stream

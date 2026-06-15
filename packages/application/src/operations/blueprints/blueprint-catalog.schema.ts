@@ -178,7 +178,7 @@ export interface BlueprintInstallMonitoringResponse {
   readonly commands?: {
     readonly showWork?: string;
     readonly listByDeployment?: string;
-    readonly followDeploymentEvents?: string;
+    readonly followDeploymentTimeline?: string;
   };
 }
 
@@ -202,8 +202,8 @@ const blueprintInstallMonitoringResponseSchema = z
       .object({
         showWork: nonEmptyTrimmedString("Show operator work command").optional(),
         listByDeployment: nonEmptyTrimmedString("List operator work command").optional(),
-        followDeploymentEvents: nonEmptyTrimmedString(
-          "Follow deployment events command",
+        followDeploymentTimeline: nonEmptyTrimmedString(
+          "Follow deployment timeline command",
         ).optional(),
       })
       .passthrough()

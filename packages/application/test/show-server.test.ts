@@ -15,9 +15,9 @@ import {
 } from "../src/execution-context";
 import { ShowServerQuery } from "../src/messages";
 import {
-  type DeploymentLogSummary,
   type DeploymentReadModel,
   type DeploymentSummary,
+  type DeploymentTimelineJournalSummary,
   type DomainBindingReadModel,
   type DomainBindingSummary,
   type ServerReadModel,
@@ -79,7 +79,7 @@ class StaticDeploymentReadModel implements DeploymentReadModel {
     return null;
   }
 
-  async findLogs(): Promise<DeploymentLogSummary[]> {
+  async findTimeline(): Promise<DeploymentTimelineJournalSummary[]> {
     return [];
   }
 }
@@ -140,8 +140,8 @@ function deploymentSummary(overrides?: Partial<DeploymentSummary>): DeploymentSu
     destinationId: "dst_primary",
     status: "succeeded",
     createdAt: "2026-01-01T00:00:03.000Z",
-    logs: [],
-    logCount: 0,
+    timeline: [],
+    timelineCount: 0,
     runtimePlan: {} as DeploymentSummary["runtimePlan"],
     environmentSnapshot: {} as DeploymentSummary["environmentSnapshot"],
     ...overrides,

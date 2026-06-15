@@ -148,7 +148,7 @@ function deployment(input?: {
       variables: input?.variables ?? [],
     }),
     dependencyBindingReferences: [],
-    logs: [],
+    timeline: [],
     createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
     startedAt: StartedAt.rehydrate("2026-01-01T00:00:02.000Z"),
     ...(status === "succeeded"

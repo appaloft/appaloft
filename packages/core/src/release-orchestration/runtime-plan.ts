@@ -20,8 +20,8 @@ import { err, ok, type Result } from "../shared/result";
 import {
   type BuildStrategyKindValue,
   type buildStrategyKinds,
-  DeploymentLogSourceValue,
   type DeploymentPhaseValue,
+  DeploymentTimelineSourceValue,
   type EdgeProxyKindValue,
   type ExecutionStatusValue,
   type ExecutionStrategyKindValue,
@@ -316,23 +316,26 @@ export interface RuntimePlanState {
   generatedAt: GeneratedAt;
 }
 
-export interface DeploymentLogEntryState {
+export interface DeploymentTimelineJournalEntryState {
   timestamp: OccurredAt;
-  source: DeploymentLogSourceValue;
+  source: DeploymentTimelineSourceValue;
   phase: DeploymentPhaseValue;
   level: LogLevelValue;
   message: MessageText;
 }
 
-type DeploymentLogEntryRehydrateState = Omit<DeploymentLogEntryState, "source"> & {
-  source?: DeploymentLogSourceValue;
+type DeploymentTimelineJournalEntryRehydrateState = Omit<
+  DeploymentTimelineJournalEntryState,
+  "source"
+> & {
+  source?: DeploymentTimelineSourceValue;
 };
 
 export interface ExecutionResultState {
   status: ExecutionStatusValue;
   exitCode: ExitCode;
   retryable: boolean;
-  logs: DeploymentLogEntry[];
+  timeline: DeploymentTimelineJournalEntry[];
   errorCode?: ErrorCodeText;
   metadata?: Record<string, string>;
 }
@@ -1292,19 +1295,23 @@ export class RuntimePlan extends ValueObject<RuntimePlanState> {
   }
 }
 
-export class DeploymentLogEntry extends ValueObject<DeploymentLogEntryState> {
-  private constructor(state: DeploymentLogEntryState) {
+export class DeploymentTimelineJournalEntry extends ValueObject<DeploymentTimelineJournalEntryState> {
+  private constructor(state: DeploymentTimelineJournalEntryState) {
     super(state);
   }
 
-  static create(input: DeploymentLogEntryState): Result<DeploymentLogEntry> {
-    return ok(new DeploymentLogEntry(input));
+  static create(
+    input: DeploymentTimelineJournalEntryState,
+  ): Result<DeploymentTimelineJournalEntry> {
+    return ok(new DeploymentTimelineJournalEntry(input));
   }
 
-  static rehydrate(state: DeploymentLogEntryRehydrateState): DeploymentLogEntry {
-    return new DeploymentLogEntry({
+  static rehydrate(
+    state: DeploymentTimelineJournalEntryRehydrateState,
+  ): DeploymentTimelineJournalEntry {
+    return new DeploymentTimelineJournalEntry({
       ...state,
-      source: state.source ?? DeploymentLogSourceValue.appaloft(),
+      source: state.source ?? DeploymentTimelineSourceValue.appaloft(),
     });
   }
 
@@ -1328,7 +1335,7 @@ export class DeploymentLogEntry extends ValueObject<DeploymentLogEntryState> {
     return this.state.message.value;
   }
 
-  toState(): DeploymentLogEntryState {
+  toState(): DeploymentTimelineJournalEntryState {
     return { ...this.state };
   }
 }
@@ -1347,7 +1354,7 @@ export class ExecutionResult extends ValueObject<ExecutionResultState> {
       status: state.status,
       exitCode: state.exitCode,
       retryable: state.retryable,
-      logs: [...state.logs],
+      timeline: [...state.timeline],
       ...(state.errorCode ? { errorCode: state.errorCode } : {}),
       ...(state.metadata ? { metadata: { ...state.metadata } } : {}),
     });
@@ -1365,8 +1372,8 @@ export class ExecutionResult extends ValueObject<ExecutionResultState> {
     return this.state.retryable;
   }
 
-  get logs(): DeploymentLogEntry[] {
-    return [...this.state.logs];
+  get timeline(): DeploymentTimelineJournalEntry[] {
+    return [...this.state.timeline];
   }
 
   get errorCode(): string | undefined {
@@ -1382,7 +1389,7 @@ export class ExecutionResult extends ValueObject<ExecutionResultState> {
       status: this.state.status,
       exitCode: this.state.exitCode,
       retryable: this.state.retryable,
-      logs: [...this.state.logs],
+      timeline: [...this.state.timeline],
       ...(this.state.errorCode ? { errorCode: this.state.errorCode } : {}),
       ...(this.state.metadata ? { metadata: { ...this.state.metadata } } : {}),
     };

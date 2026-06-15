@@ -1416,22 +1416,30 @@ describe("CLI remote control-plane client", () => {
     expect(listed.stdout).toContain("srv_remote");
   });
 
-  test("[CONTROL-PLANE-CLI-013] remote bounded deployment events adapt the SDK response for CLI rendering", async () => {
+  test("[CONTROL-PLANE-CLI-013] remote bounded deployment timeline adapts the SDK response for CLI rendering", async () => {
     const requests: Request[] = [];
     const program = createRemoteCliProgram({
       version: "0.12.5-test",
       profile: profile("local"),
       fetch: createControlPlaneFetch(requests, {
-        "/api/deployments/dep_remote/events": jsonResponse({
+        "/api/deployments/dep_remote/timeline": jsonResponse({
+          schemaVersion: "deployments.timeline/v1",
           deploymentId: "dep_remote",
-          envelopes: [
+          entries: [
             {
-              schemaVersion: "deployments.stream-events/v1",
-              kind: "closed",
-              reason: "terminal-status",
+              deploymentId: "dep_remote",
+              sequence: 1,
               cursor: "dep_remote:1",
+              occurredAt: "2026-05-17T00:00:00.000Z",
+              source: "appaloft",
+              kind: "status",
+              level: "info",
+              entryType: "terminal-status",
+              message: "Terminal status reached",
             },
           ],
+          nextCursor: "dep_remote:1",
+          hasMore: false,
         }),
       }),
       now: () => "2026-05-17T00:00:00.000Z",
@@ -1442,7 +1450,7 @@ describe("CLI remote control-plane client", () => {
         "node",
         "appaloft",
         "deployments",
-        "events",
+        "timeline",
         "dep_remote",
         "--include-history",
         "--until-terminal",
@@ -1454,7 +1462,7 @@ describe("CLI remote control-plane client", () => {
       [
         "GET /api/version",
         "GET /api/organizations/current-context",
-        "GET /api/deployments/dep_remote/events",
+        "GET /api/deployments/dep_remote/timeline",
       ],
     );
     expect(output.stdout).toContain("dep_remote");
@@ -1593,29 +1601,30 @@ describe("CLI remote control-plane client", () => {
     expect(output.stdout).toContain("completed");
   });
 
-  test("[DEP-EVENTS-CLI-004] remote deployment events follow opens the stream route", async () => {
+  test("[DEP-TIMELINE-CLI-004] remote deployment timeline follow opens the stream route", async () => {
     const requests: Request[] = [];
     const program = createRemoteCliProgram({
       version: "0.12.5-test",
       profile: profile("local"),
       fetch: createControlPlaneFetch(requests, {
-        "/api/deployments/dep_remote/events/stream": sseResponse([
+        "/api/deployments/dep_remote/timeline/stream": sseResponse([
           {
-            schemaVersion: "deployments.stream-events/v1",
-            kind: "event",
-            event: {
+            schemaVersion: "deployments.timeline/v1",
+            kind: "entry",
+            entry: {
               deploymentId: "dep_remote",
               sequence: 1,
               cursor: "dep_remote:1",
               emittedAt: "2026-05-17T00:00:00.000Z",
-              source: "domain-event",
-              eventType: "deployment-succeeded",
+              source: "appaloft",
+              entryType: "deployment-succeeded",
+              kind: "status",
               status: "succeeded",
               summary: "Deployment succeeded",
             },
           },
           {
-            schemaVersion: "deployments.stream-events/v1",
+            schemaVersion: "deployments.timeline/v1",
             kind: "closed",
             reason: "terminal-status",
             cursor: "dep_remote:1",
@@ -1630,7 +1639,7 @@ describe("CLI remote control-plane client", () => {
         "node",
         "appaloft",
         "deployments",
-        "events",
+        "timeline",
         "dep_remote",
         "--follow",
         "--json",
@@ -1641,7 +1650,7 @@ describe("CLI remote control-plane client", () => {
       [
         "GET /api/version",
         "GET /api/organizations/current-context",
-        "GET /api/deployments/dep_remote/events/stream",
+        "GET /api/deployments/dep_remote/timeline/stream",
       ],
     );
     expect(new URL(requests[2]?.url ?? "http://localhost").searchParams.get("follow")).toBe("true");

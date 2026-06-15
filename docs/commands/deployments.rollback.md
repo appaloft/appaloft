@@ -70,7 +70,7 @@ lineage, and rollback candidate lineage metadata.
 
 Rollback execution still runs inline through the rollback use case after admission/start state is
 persisted. It is not claimed or completed by a process-attempt worker yet. Completion or failure is
-observed through `deployments.show`, `deployments.stream-events`, logs, operator work, and future
+observed through `deployments.show`, `deployments.timeline`, operator work, and future
 readiness reads.
 
 ## Events

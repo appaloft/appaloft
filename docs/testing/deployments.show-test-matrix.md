@@ -82,7 +82,7 @@ Then:
 | Test ID | Preferred automation | Case | Required assertion |
 | --- | --- | --- | --- |
 | DEP-SHOW-OWN-001 | integration | Health remains resource-owned | `deployments.show` does not expose current resource health as the main deployment status contract and does not replace `resources.health`. |
-| DEP-SHOW-OWN-002 | integration | Logs remain separate query | `deployments.show` does not include unbounded full logs and keeps `deployments.logs` as the detailed attempt-log boundary. |
+| DEP-SHOW-OWN-002 | integration | Timeline remains separate query | `deployments.show` does not include unbounded full observation history and keeps `deployments.timeline` as the detailed attempt-observation boundary. |
 | DEP-SHOW-OWN-003 | integration | No hidden write actions | Response next-actions never expose retry, cancel, redeploy, rollback, or cleanup as active operations unless those commands are public again. |
 | DEP-SHOW-OWN-004 | integration | Progress stream stays transport-scoped | Detail query may summarize timeline but does not require or become a live create-time progress transport. |
 
@@ -90,7 +90,7 @@ Then:
 
 | Test ID | Preferred automation | Entrypoint | Case | Expected behavior |
 | --- | --- | --- | --- | --- |
-| DEP-SHOW-ENTRY-001 | e2e-preferred | Web deployment detail | User opens `/deployments/{id}` | Page resolves `deployments.show` for overview/timeline/snapshot and keeps logs on `deployments.logs`. |
+| DEP-SHOW-ENTRY-001 | e2e-preferred | Web deployment detail | User opens `/deployments/{id}` | Page resolves `deployments.show` for overview/snapshot and uses `deployments.timeline` for the attempt timeline. |
 | DEP-SHOW-ENTRY-002 | e2e-preferred | Web resource history | User clicks a deployment row from resource history | Navigation reaches deployment detail backed by `deployments.show`; resource page remains owner of Quick Deploy/current health. |
 | DEP-SHOW-ENTRY-003 | e2e-preferred | CLI | `appaloft deployments show <deploymentId> --json` | Prints canonical `DeploymentDetail` JSON from the query result. |
 | DEP-SHOW-ENTRY-004 | e2e-preferred | API/oRPC | HTTP query | Reuses the shared query schema and returns `deployments.show/v1`. |
@@ -109,8 +109,9 @@ Executable coverage now exists for the active `deployments.show` slice:
   partial section-error rendering, and Quick Deploy success-path navigation to the shared deployment
   detail route.
 
-`deployments.logs` remains the separate detailed attempt-log boundary and is intentionally verified
-through the deployment detail Web flow rather than folded into the `deployments.show` response.
+`deployments.timeline` remains the separate detailed attempt-observation boundary and is
+intentionally verified through the deployment detail Web flow rather than folded into the
+`deployments.show` response.
 
 ## Open Questions
 

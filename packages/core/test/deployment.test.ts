@@ -103,7 +103,7 @@ function deployment(input: {
     runtimePlan: runtimePlan(),
     environmentSnapshot: snapshot(),
     dependencyBindingReferences: [],
-    logs: [],
+    timeline: [],
     createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
     triggerKind: DeploymentTriggerKindValue.createDefault(),
     ...(input.supersededByDeploymentId
@@ -212,7 +212,7 @@ describe("Deployment", () => {
       status: ExecutionStatusValue.rehydrate("failed"),
       exitCode: ExitCode.rehydrate(1),
       retryable: true,
-      logs: [],
+      timeline: [],
       metadata: { phase: "execute" },
     });
     deployment.applyExecutionResult(FinishedAt.rehydrate("2026-01-01T00:00:04.000Z"), result);
@@ -245,7 +245,7 @@ describe("Deployment", () => {
       status: ExecutionStatusValue.rehydrate("succeeded"),
       exitCode: ExitCode.rehydrate(0),
       retryable: false,
-      logs: [],
+      timeline: [],
       metadata: { imageDigest: digest },
     });
     const applied = deployment.applyExecutionResult(

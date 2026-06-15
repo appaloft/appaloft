@@ -11,9 +11,9 @@ import {
 } from "../src";
 import { ResourceRuntimeLogsQuery } from "../src/messages";
 import {
-  type DeploymentLogSummary,
   type DeploymentReadModel,
   type DeploymentSummary,
+  type DeploymentTimelineJournalSummary,
   type ResourceReadModel,
   type ResourceRuntimeLogContext,
   type ResourceRuntimeLogEvent,
@@ -61,7 +61,7 @@ class StaticDeploymentReadModel implements DeploymentReadModel {
       );
   }
 
-  async findLogs(): Promise<DeploymentLogSummary[]> {
+  async findTimeline(): Promise<DeploymentTimelineJournalSummary[]> {
     return [];
   }
 
@@ -300,11 +300,11 @@ function deploymentSummary(overrides?: Partial<DeploymentSummary>): DeploymentSu
         },
       ],
     },
-    logs: [],
+    timeline: [],
     createdAt: "2026-01-01T00:00:00.000Z",
     startedAt: "2026-01-01T00:00:01.000Z",
     finishedAt: "2026-01-01T00:00:02.000Z",
-    logCount: 0,
+    timelineCount: 0,
     ...overrides,
     target: {
       kind: "server-backed",
@@ -377,7 +377,7 @@ function createService(input?: {
 }
 
 describe("ResourceRuntimeLogsQueryService", () => {
-  test("returns bounded runtime logs through the injected reader and masks secret values", async () => {
+  test("returns bounded runtime timeline through the injected reader and masks secret values", async () => {
     const context = createTestContext();
     const { reader, service } = createService();
     const query = ResourceRuntimeLogsQuery.create({
@@ -567,7 +567,7 @@ describe("ResourceRuntimeLogsQueryService", () => {
     expect(result._unsafeUnwrapErr().code).toBe("resource_runtime_logs_context_mismatch");
   });
 
-  test("reports runtime logs unavailable when the resource has no deployments", async () => {
+  test("reports runtime timeline unavailable when the resource has no deployments", async () => {
     const context = createTestContext();
     const { service } = createService({
       deployments: [],
