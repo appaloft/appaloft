@@ -76,7 +76,7 @@ async function recordInitialDomainVerificationAttempt(input: {
   verificationAttemptId: string;
   projectId: string;
   resourceId: string;
-  serverId: string;
+  serverId?: string;
   domainName: string;
   proxyKind: string;
   tlsMode: string;
@@ -97,7 +97,7 @@ async function recordInitialDomainVerificationAttempt(input: {
     step: "verification-requested",
     projectId: input.projectId,
     resourceId: input.resourceId,
-    serverId: input.serverId,
+    ...(input.serverId ? { serverId: input.serverId } : {}),
     domainBindingId: input.domainBindingId,
     startedAt: input.createdAt,
     updatedAt: input.createdAt,
@@ -175,8 +175,12 @@ export class CreateDomainBindingUseCase {
       const projectId = yield* ProjectId.create(input.projectId);
       const environmentId = yield* EnvironmentId.create(input.environmentId);
       const resourceId = yield* ResourceId.create(input.resourceId);
-      const serverId = yield* DeploymentTargetId.create(input.serverId);
-      const destinationId = yield* DestinationId.create(input.destinationId);
+      const serverId = input.serverId
+        ? yield* DeploymentTargetId.create(input.serverId)
+        : undefined;
+      const destinationId = input.destinationId
+        ? yield* DestinationId.create(input.destinationId)
+        : undefined;
       const domainName = yield* PublicDomainName.create(input.domainName);
       const pathPrefix = yield* RoutePathPrefix.create(input.pathPrefix ?? "/");
       const proxyKind = yield* EdgeProxyKindValue.create(input.proxyKind);
@@ -253,7 +257,7 @@ export class CreateDomainBindingUseCase {
           resourceId: resourceId.value,
         });
       }
-      if (!resource.canDeployToDestination(destinationId)) {
+      if (destinationId && !resource.canDeployToDestination(destinationId)) {
         return contextMismatch("Resource default destination does not match binding destination", {
           resourceId: resourceId.value,
           destinationId: destinationId.value,
@@ -261,27 +265,32 @@ export class CreateDomainBindingUseCase {
         });
       }
 
-      const server = await serverRepository.findOne(
-        repositoryContext,
-        DeploymentTargetByIdSpec.create(serverId),
-      );
-      if (!server) {
-        return err(domainError.notFound("Server", serverId.value));
-      }
-      const serverState = server.toState();
+      let dnsExpectedTargetValue = `Route provider target for resource ${resourceId.value}`;
+      if (serverId && destinationId) {
+        const server = await serverRepository.findOne(
+          repositoryContext,
+          DeploymentTargetByIdSpec.create(serverId),
+        );
+        if (!server) {
+          return err(domainError.notFound("Server", serverId.value));
+        }
+        const serverState = server.toState();
 
-      const destination = await destinationRepository.findOne(
-        repositoryContext,
-        DestinationByIdSpec.create(destinationId),
-      );
-      if (!destination) {
-        return err(domainError.notFound("Destination", destinationId.value));
-      }
-      if (!destination.belongsToServer(serverId)) {
-        return contextMismatch("Destination does not belong to server", {
-          serverId: serverId.value,
-          destinationId: destinationId.value,
-        });
+        const destination = await destinationRepository.findOne(
+          repositoryContext,
+          DestinationByIdSpec.create(destinationId),
+        );
+        if (!destination) {
+          return err(domainError.notFound("Destination", destinationId.value));
+        }
+        if (!destination.belongsToServer(serverId)) {
+          return contextMismatch("Destination does not belong to server", {
+            serverId: serverId.value,
+            destinationId: destinationId.value,
+          });
+        }
+
+        dnsExpectedTargetValue = serverState.host.value;
       }
 
       if (createDomainBindingOperation) {
@@ -297,8 +306,8 @@ export class CreateDomainBindingUseCase {
             projectId: projectId.value,
             environmentId: environmentId.value,
             resourceId: resourceId.value,
-            serverId: serverId.value,
-            destinationId: destinationId.value,
+            ...(serverId ? { serverId: serverId.value } : {}),
+            ...(destinationId ? { destinationId: destinationId.value } : {}),
           },
         });
         if (checked.isErr()) {
@@ -374,15 +383,15 @@ export class CreateDomainBindingUseCase {
       const verificationExpectedTarget = yield* MessageText.create(
         `Manual verification required for ${domainName.value}`,
       );
-      const dnsExpectedTarget = yield* MessageText.create(serverState.host.value);
+      const dnsExpectedTarget = yield* MessageText.create(dnsExpectedTargetValue);
 
       const domainBinding = yield* DomainBinding.create({
         id: domainBindingId,
         projectId,
         environmentId,
         resourceId,
-        serverId,
-        destinationId,
+        ...(serverId ? { serverId } : {}),
+        ...(destinationId ? { destinationId } : {}),
         domainName,
         pathPrefix,
         proxyKind,
@@ -413,7 +422,7 @@ export class CreateDomainBindingUseCase {
         verificationAttemptId: verificationAttemptId.value,
         projectId: projectId.value,
         resourceId: resourceId.value,
-        serverId: serverId.value,
+        ...(serverId ? { serverId: serverId.value } : {}),
         domainName: domainName.value,
         proxyKind: proxyKind.value,
         tlsMode: tlsMode.value,
