@@ -58,6 +58,13 @@ describe("operations workbench home", () => {
     );
   });
 
+  test("[HOME-WORKBENCH-002B] keeps project resource totals as a non-navigating status card", () => {
+    expect(homePageSource).toContain("data-home-resource-status-cell");
+    expect(homePageSource).toContain("resourceCountQuery.isPending");
+    expect(homePageSource).toContain("resourceTotal");
+    expect(homePageSource).not.toContain('href="/resources" class="nothing-status-cell"');
+  });
+
   test("[HOME-WORKBENCH-003] derives attention from deployment and access state", () => {
     expect(homePageSource).toContain(
       'type HomeAttentionReason = "failed" | "running" | "no-access" | "no-deployment"',
