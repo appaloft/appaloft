@@ -35,6 +35,7 @@
     ArchiveResourceInput,
     AttachResourceStorageInput,
     CertificateSummary,
+    CheckResourceDeleteSafetyResponse,
     CleanupStorageVolumeRuntimeResponse,
     ConfigureResourceAutoDeployInput,
     ConfigureResourceAccessInput,
@@ -349,6 +350,17 @@
       staleTime: 5_000,
     }),
   );
+  const resourceDeleteSafetyQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["resources", "delete-check", resourceId],
+      queryFn: () =>
+        orpcClient.resources.deleteCheck({
+          resourceId,
+        }),
+      enabled: browser && resourceId.length > 0,
+      staleTime: 5_000,
+    }),
+  );
   const resourceHealthQuery = createQuery(() =>
     queryOptions({
       queryKey: ["resources", "health", resourceId, "detail"],
@@ -636,6 +648,17 @@
       })),
   );
   const isPreviewEnvironmentResource = $derived(environment?.kind === "preview");
+  const resourceDeleteSafety = $derived<CheckResourceDeleteSafetyResponse | null>(
+    resourceDeleteSafetyQuery.data ?? null,
+  );
+  const resourceDeleteBlockers = $derived(resourceDeleteSafety?.blockers ?? []);
+  const resourceDeleteEligible = $derived(
+    isPreviewEnvironmentResource || resourceDeleteSafety?.eligible === true,
+  );
+  const resourceDeleteSafetyLoading = $derived(
+    !isPreviewEnvironmentResource &&
+      (resourceDeleteSafetyQuery.isPending || resourceDeleteSafetyQuery.isFetching),
+  );
   const latestDeployment = $derived(
     resource ? deployments.find((deployment) => deployment.resourceId === resource.id) : null,
   );
@@ -1591,6 +1614,7 @@
       };
       void queryClient.invalidateQueries({ queryKey: ["resources"] });
       void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
+      void queryClient.invalidateQueries({ queryKey: ["resources", "delete-check", resourceId] });
       void queryClient.invalidateQueries({
         queryKey: ["resources", "health", resourceId, "detail"],
       });
@@ -2012,6 +2036,7 @@
       selectedRuntimeControlOperation = null;
       void queryClient.invalidateQueries({ queryKey: ["resources"] });
       void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
+      void queryClient.invalidateQueries({ queryKey: ["resources", "delete-check", resourceId] });
       void queryClient.invalidateQueries({
         queryKey: ["resources", "health", resourceId, "detail"],
       });
@@ -2036,6 +2061,7 @@
       selectedRuntimeControlOperation = null;
       void queryClient.invalidateQueries({ queryKey: ["resources"] });
       void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
+      void queryClient.invalidateQueries({ queryKey: ["resources", "delete-check", resourceId] });
       void queryClient.invalidateQueries({
         queryKey: ["resources", "health", resourceId, "detail"],
       });
@@ -2474,7 +2500,7 @@
       deleteFeedback = {
         kind: "error",
         title: $t(i18nKeys.console.resources.deleteFailed),
-        detail: readErrorMessage(error),
+        detail: resourceDeleteBlockerErrorDetail(error),
       };
     },
   }));
@@ -2509,12 +2535,41 @@
       deleteFeedback = {
         kind: "error",
         title: $t(i18nKeys.console.resources.deleteFailed),
-        detail: readErrorMessage(error),
+        detail: resourceDeleteBlockerErrorDetail(error),
       };
     },
   }));
 
   let defaultedResourceId = $state("");
+
+  function resourceDeleteBlockerSummary(
+    safety: CheckResourceDeleteSafetyResponse | null,
+  ): string | null {
+    if (!safety || safety.blockers.length === 0) {
+      return null;
+    }
+
+    return safety.blockers
+      .map((blocker) => {
+        const suffix = [
+          typeof blocker.count === "number" ? `${blocker.count}` : "",
+          blocker.relatedEntityType,
+          blocker.relatedEntityId,
+        ]
+          .filter(Boolean)
+          .join(" · ");
+
+        return suffix ? `${blocker.kind} (${suffix})` : blocker.kind;
+      })
+      .join(", ");
+  }
+
+  function resourceDeleteBlockerErrorDetail(error: unknown): string {
+    const message = readErrorMessage(error);
+    const blockerSummary = resourceDeleteBlockerSummary(resourceDeleteSafety);
+
+    return blockerSummary ? `${message}: ${blockerSummary}` : message;
+  }
 
   function appendRuntimeLogLine(line: ResourceRuntimeLogLine): void {
     runtimeLogs = [...runtimeLogs, line].slice(-500);
@@ -2911,6 +2966,9 @@
     if (action === "delete" && !isPreviewEnvironmentResource && !isResourceArchived) {
       return;
     }
+    if (action === "delete" && !resourceDeleteEligible) {
+      return;
+    }
 
     selectedResourceLifecycleAction = action;
     resourceDeleteConfirmation = "";
@@ -2931,7 +2989,13 @@
   }
 
   function deleteResource(): void {
-    if (!resource || !isResourceArchived || deleteResourceMutation.isPending) {
+    if (
+      !resource ||
+      !isResourceArchived ||
+      !resourceDeleteEligible ||
+      resourceDeleteSafetyLoading ||
+      deleteResourceMutation.isPending
+    ) {
       return;
     }
 
@@ -8111,6 +8175,41 @@
                       {/if}
                     </div>
 
+                    {#if resourceDeleteSafetyLoading}
+                      <div class="rounded-md border bg-background px-3 py-2 text-sm text-muted-foreground">
+                        {$t(i18nKeys.console.resources.deleteCheckLoading)}
+                      </div>
+                    {:else if !isPreviewEnvironmentResource && resourceDeleteSafetyQuery.error}
+                      <div class="rounded-md border border-destructive/30 bg-background px-3 py-2 text-sm text-destructive">
+                        {readErrorMessage(resourceDeleteSafetyQuery.error)}
+                      </div>
+                    {:else if !isPreviewEnvironmentResource && resourceDeleteBlockers.length > 0}
+                      <div class="rounded-md border border-destructive/30 bg-background px-3 py-2 text-sm text-destructive">
+                        <p class="font-medium">
+                          {$t(i18nKeys.console.resources.deleteBlockedTitle)}
+                        </p>
+                        <p class="mt-1 text-xs text-muted-foreground">
+                          {$t(i18nKeys.console.resources.deleteBlockedDescription)}
+                        </p>
+                        <ul class="mt-2 space-y-1 text-xs">
+                          {#each resourceDeleteBlockers as blocker}
+                            <li class="break-all font-mono">
+                              {blocker.kind}
+                              {#if typeof blocker.count === "number"}
+                                · {blocker.count}
+                              {/if}
+                              {#if blocker.relatedEntityType}
+                                · {blocker.relatedEntityType}
+                              {/if}
+                              {#if blocker.relatedEntityId}
+                                · {blocker.relatedEntityId}
+                              {/if}
+                            </li>
+                          {/each}
+                        </ul>
+                      </div>
+                    {/if}
+
                     <Button
                       type="button"
                       variant="outline"
@@ -9543,7 +9642,10 @@
                 variant={selectedResourceLifecycleAction === "delete" ? "destructive" : "outline"}
                 class="h-auto min-w-0 w-full max-w-full items-start justify-start whitespace-normal px-3 py-3 text-left"
                 disabled={!isPreviewEnvironmentResource &&
-                  (!isResourceArchived || deleteResourceMutation.isPending)}
+                  (!isResourceArchived ||
+                    !resourceDeleteEligible ||
+                    resourceDeleteSafetyLoading ||
+                    deleteResourceMutation.isPending)}
                 onclick={() => selectResourceLifecycleAction("delete")}
               >
                 <Trash2 class="mt-0.5 size-4 shrink-0" />
@@ -9572,6 +9674,40 @@
                   placeholder={resource.slug}
                 />
               </label>
+              {#if resourceDeleteSafetyLoading}
+                <div class="rounded-md border bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+                  {$t(i18nKeys.console.resources.deleteCheckLoading)}
+                </div>
+              {:else if !isPreviewEnvironmentResource && resourceDeleteSafetyQuery.error}
+                <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                  {readErrorMessage(resourceDeleteSafetyQuery.error)}
+                </div>
+              {:else if !isPreviewEnvironmentResource && resourceDeleteBlockers.length > 0}
+                <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                  <p class="font-medium">
+                    {$t(i18nKeys.console.resources.deleteBlockedTitle)}
+                  </p>
+                  <p class="mt-1 text-xs text-muted-foreground">
+                    {$t(i18nKeys.console.resources.deleteBlockedDescription)}
+                  </p>
+                  <ul class="mt-2 space-y-1 text-xs">
+                    {#each resourceDeleteBlockers as blocker}
+                      <li class="break-all font-mono">
+                        {blocker.kind}
+                        {#if typeof blocker.count === "number"}
+                          · {blocker.count}
+                        {/if}
+                        {#if blocker.relatedEntityType}
+                          · {blocker.relatedEntityType}
+                        {/if}
+                        {#if blocker.relatedEntityId}
+                          · {blocker.relatedEntityId}
+                        {/if}
+                      </li>
+                    {/each}
+                  </ul>
+                </div>
+              {/if}
             {/if}
 
             {#if archiveFeedback?.kind === "error"}
@@ -9607,6 +9743,8 @@
                   (selectedResourceLifecycleAction === "delete" &&
                     (resourceDeleteConfirmation.trim() !== resource.slug ||
                       (!isPreviewEnvironmentResource && !isResourceArchived) ||
+                      (!isPreviewEnvironmentResource && !resourceDeleteEligible) ||
+                      (!isPreviewEnvironmentResource && resourceDeleteSafetyLoading) ||
                       deleteResourceMutation.isPending ||
                       deletePreviewResourceMutation.isPending))}
               >

@@ -185,12 +185,13 @@ deployment, or runtime state:
    still active.
 3. Archive and delete seed-owned resources through
    `appaloft resource archive <resourceId>` and
+   `appaloft resource delete-check <resourceId>` before
    `appaloft resource delete <resourceId> --confirm-slug <slug>`.
 4. Archive visible seed-owned deployments through
    `appaloft deployments archive <deploymentId> --confirm <deploymentId>` when they are not removed
    by resource/project cleanup.
-5. If resource or project deletion is still blocked by `deployment-history`, prune only the exact
-   seed-owned scope. Run dry-runs first, then prune retained records and archived deployments:
+5. If project deletion is still blocked by `deployment-history`, prune only the exact seed-owned
+   scope. Run dry-runs first, then prune retained records and archived deployments:
    `appaloft deployments logs prune --resource <resourceId> --before <iso> --dry-run`,
    `appaloft resource runtime-control-attempts prune --resource <resourceId> --before <iso> --dry-run`,
    `appaloft provider-job-log prune --resource <resourceId> --before <iso> --dry-run`,

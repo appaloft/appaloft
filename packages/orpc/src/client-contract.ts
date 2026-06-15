@@ -15,6 +15,7 @@ import {
   type ChangeOrganizationProfileCommandInput,
   type CheckDomainBindingDeleteSafetyQueryInput,
   type CheckProjectDeleteSafetyQueryInput,
+  type CheckResourceDeleteSafetyQueryInput,
   type CheckServerDeleteSafetyQueryInput,
   type CleanupPreviewCommandInput,
   type CloneEnvironmentCommandInput,
@@ -235,6 +236,7 @@ import {
   type ChangeOrganizationMemberRoleResponse,
   type CheckDomainBindingDeleteSafetyResponse,
   type CheckProjectDeleteSafetyResponse,
+  type CheckResourceDeleteSafetyResponse,
   type CheckServerDeleteSafetyResponse,
   type CleanupPreviewResponse,
   type CleanupStorageVolumeRuntimeInput,
@@ -1084,6 +1086,12 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       ArchiveResourceCommandInput,
       ArchiveResourceResponse,
+      AppaloftClientError
+    >;
+    deleteCheck: Client<
+      AppaloftClientContext,
+      CheckResourceDeleteSafetyQueryInput,
+      CheckResourceDeleteSafetyResponse,
       AppaloftClientError
     >;
     delete: Client<

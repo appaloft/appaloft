@@ -24,6 +24,7 @@ It is not a single command. Every user-visible mutation must dispatch one explic
 - `resources.attach-storage`
 - `resources.detach-storage`
 - `resources.archive`
+- `resources.delete-check`
 - `resources.delete`
 
 Every user-visible full detail read must dispatch `resources.show`.
@@ -62,6 +63,7 @@ This workflow inherits:
 - [resources.effective-config Query Spec](../queries/resources.effective-config.md)
 - [Storage Volume Lifecycle Workflow](./storage-volume-lifecycle.md)
 - [resources.archive Command Spec](../commands/resources.archive.md)
+- [resources.delete-check Query Spec](../queries/resources.delete-check.md)
 - [resources.delete Command Spec](../commands/resources.delete.md)
 - [Resource Profile Drift Visibility](../specs/011-resource-profile-drift-visibility/spec.md)
 - [Resource Profile Lifecycle Test Matrix](../testing/resource-profile-lifecycle-test-matrix.md)
@@ -118,6 +120,7 @@ cleanup.
 | Bind dependency resource | `resources.bind-dependency` | ResourceBinding metadata | Dependency resource lifecycle, current runtime, historical deployment snapshots |
 | Unbind dependency resource | `resources.unbind-dependency` | ResourceBinding lifecycle/tombstone | Dependency resource deletion, current runtime, historical deployment snapshots |
 | Retire resource | `resources.archive` | Resource lifecycle status | Runtime stop, route/domain/certificate/source-link cleanup |
+| Check delete safety | `resources.delete-check` | Nothing | Resource lifecycle, blockers, or cleanup side effects |
 | Remove unused archived resource from active state | `resources.delete` | Archived unreferenced resource identity | Cascading cleanup of blockers |
 
 ## Entry Flow
@@ -245,6 +248,7 @@ Delete:
 ```text
 resources.show(resourceId)
   -> resources.archive(resourceId) when needed
+  -> resources.delete-check(resourceId)
   -> resources.delete(resourceId, confirmation.resourceSlug)
   -> resources.list(project/environment filter)
 ```
@@ -270,6 +274,8 @@ Archived resources:
 - reject `resources.unset-variable`;
 - reject `resources.attach-storage`;
 - reject `resources.detach-storage`;
+- may be passed to `resources.delete-check` to report safe deletion eligibility and blocker
+  categories;
 - may be passed to `resources.delete` after deletion guards pass.
 
 `resources.archive` is synchronous lifecycle-state mutation. Command success means archived state
@@ -372,9 +378,9 @@ network and access profiles, but they keep their own commands and lifecycle even
 
 | Entrypoint | Required behavior |
 | --- | --- |
-| Web | Resource detail is owner-scoped. Each source/runtime/network/access/health/configuration/storage section dispatches the matching operation and refetches `resources.show`, `resources.effective-config`, or the relevant observation query. Editors must make the future deployment boundary visible: saving them persists durable resource profile or override state for future deployment admission, verification, route planning, or deployment snapshot materialization; it does not create deployments, rewrite historical deployment snapshots, immediately restart current runtime, bind domains, issue certificates, apply proxy routes, or provision/delete provider-native volumes. |
-| CLI | Each operation has its own `appaloft resource ...` subcommand. No `appaloft resource update` generic mutation. `appaloft resource secrets ...` manages explicit secret references and returns masked read output. `appaloft resource import-variables <resourceId> --content <dotenv>` imports pasted `.env` content and masks secret values in output. `appaloft resource show --json` may expose drift diagnostics, and config deploy must report blocking entry-profile drift with the explicit command to run. |
-| oRPC / HTTP | Each operation has its own route using the application command/query schema. No parallel transport-only input shape. `POST /api/resources/{resourceId}/secrets`, `POST /api/resources/{resourceId}/secrets/{key}`, `DELETE /api/resources/{resourceId}/secrets/{key}`, `GET /api/resources/{resourceId}/secrets`, and `GET /api/resources/{resourceId}/secrets/{key}` dispatch `resources.secrets.*`. `POST /api/resources/{resourceId}/variables/import` dispatches `resources.import-variables`. `POST /api/resources/{resourceId}/storage-attachments` dispatches `resources.attach-storage`; `DELETE /api/resources/{resourceId}/storage-attachments/{attachmentId}` dispatches `resources.detach-storage`. `GET /api/resources/{resourceId}` carries drift diagnostics and storage attachment summaries through `resources.show` rather than a new resource query. |
+| Web | Resource detail is owner-scoped. Each source/runtime/network/access/health/configuration/storage section dispatches the matching operation and refetches `resources.show`, `resources.effective-config`, or the relevant observation query. The dangerous delete UI reads `resources.delete-check` before enabling `resources.delete` for archived resources and shows safe blocker categories when deletion is blocked. Editors must make the future deployment boundary visible: saving them persists durable resource profile or override state for future deployment admission, verification, route planning, or deployment snapshot materialization; it does not create deployments, rewrite historical deployment snapshots, immediately restart current runtime, bind domains, issue certificates, apply proxy routes, or provision/delete provider-native volumes. |
+| CLI | Each operation has its own `appaloft resource ...` subcommand. No `appaloft resource update` generic mutation. `appaloft resource delete-check <resourceId>` reports archived resource delete eligibility without mutation. `appaloft resource secrets ...` manages explicit secret references and returns masked read output. `appaloft resource import-variables <resourceId> --content <dotenv>` imports pasted `.env` content and masks secret values in output. `appaloft resource show --json` may expose drift diagnostics, and config deploy must report blocking entry-profile drift with the explicit command to run. |
+| oRPC / HTTP | Each operation has its own route using the application command/query schema. No parallel transport-only input shape. `POST /api/resources/{resourceId}/secrets`, `POST /api/resources/{resourceId}/secrets/{key}`, `DELETE /api/resources/{resourceId}/secrets/{key}`, `GET /api/resources/{resourceId}/secrets`, and `GET /api/resources/{resourceId}/secrets/{key}` dispatch `resources.secrets.*`. `POST /api/resources/{resourceId}/variables/import` dispatches `resources.import-variables`. `POST /api/resources/{resourceId}/storage-attachments` dispatches `resources.attach-storage`; `DELETE /api/resources/{resourceId}/storage-attachments/{attachmentId}` dispatches `resources.detach-storage`. `GET /api/resources/{resourceId}/delete-check` dispatches `resources.delete-check`. `GET /api/resources/{resourceId}` carries drift diagnostics and storage attachment summaries through `resources.show` rather than a new resource query. |
 | Automation / MCP | Future tools map one-to-one to operation keys. Tools must not combine unrelated source/runtime/network/archive/delete behavior. Future MCP drift visibility should reuse `resources.show` diagnostics and suggested operation keys. |
 
 ## Current Implementation Notes And Migration Gaps
@@ -384,17 +390,18 @@ Current implementation has active resource create/list, `resources.show`,
 `resources.reset-health`,
 `resources.configure-network`, `resources.configure-access`, `resources.set-variable`,
 `resources.secrets.create/rotate/delete/list/show`, `resources.unset-variable`,
-`resources.effective-config`, `resources.archive`, and `resources.delete` surfaces. The Web
-resource detail page dispatches `resources.show` for durable
+`resources.effective-config`, `resources.archive`, `resources.delete-check`, and
+`resources.delete` surfaces. The Web resource detail page dispatches `resources.show` for durable
 profile data, dispatches source/runtime/network/access/health/configuration forms through separate
-commands, and dispatches archive/delete through dedicated lifecycle actions. Resource detail renders
-the future deployment boundary so operators can distinguish durable resource-level profile edits
-from deployment creation, redeploy, restart, domain binding, certificate issuance, route apply, or
-historical snapshot mutation.
+commands, checks delete safety before destructive delete, and dispatches archive/delete through
+dedicated lifecycle actions. Resource detail renders the future deployment boundary so operators can
+distinguish durable resource-level profile edits from deployment creation, redeploy, restart,
+domain binding, certificate issuance, route apply, or historical snapshot mutation.
 
 Archived-resource guards are active for source/runtime/network/access/health mutations and deployment
-admission. `resources.delete` may delete only archived resources with matching slug confirmation
-and no retained blockers. Each future Code Round must update `CORE_OPERATIONS.md` and
+admission. `resources.delete-check` reports active-resource or retained-state blockers without
+mutation; `resources.delete` may delete only archived resources with matching slug confirmation and
+no retained blockers. Each future Code Round must update `CORE_OPERATIONS.md` and
 `operation-catalog.ts` in the same change that exposes the operation.
 
 Resource storage attachment operations are proposed by

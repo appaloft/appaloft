@@ -2,6 +2,7 @@ export * from "./operations/resources/archive-resource.command";
 export * from "./operations/resources/archive-resource-runtime-logs.command";
 export * from "./operations/resources/attach-resource-storage.command";
 export * from "./operations/resources/bind-resource-dependency.command";
+export * from "./operations/resources/check-resource-delete-safety.query";
 export * from "./operations/resources/configure-resource-access.command";
 export * from "./operations/resources/configure-resource-auto-deploy.command";
 export * from "./operations/resources/configure-resource-health.command";

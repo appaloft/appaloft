@@ -430,6 +430,10 @@ export const cliCommandDescriptions = {
   resourceList: withDocs("List resources", "resource.concept"),
   resourceShow: withDocs("Show resource profile and diagnostics", "resource.profile-drift"),
   resourceArchive: withDocs("Archive a resource", "resource.concept"),
+  resourceDeleteCheck: withDocs(
+    "Check whether an archived resource can be deleted",
+    "resource.concept",
+  ),
   resourceDelete: withDocs("Delete an archived resource", "resource.concept"),
   resourceTerminal: withDocs("Open a resource terminal session", "server.terminal-session"),
   resourceLogs: withDocs("Show resource runtime logs", "observability.runtime-logs"),

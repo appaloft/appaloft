@@ -4,6 +4,8 @@ export * from "./operations/resources/attach-resource-storage.handler";
 export * from "./operations/resources/attach-resource-storage.use-case";
 export * from "./operations/resources/bind-resource-dependency.handler";
 export * from "./operations/resources/bind-resource-dependency.use-case";
+export * from "./operations/resources/check-resource-delete-safety.handler";
+export * from "./operations/resources/check-resource-delete-safety.query-service";
 export * from "./operations/resources/configure-resource-access.handler";
 export * from "./operations/resources/configure-resource-auto-deploy.handler";
 export * from "./operations/resources/configure-resource-auto-deploy.use-case";

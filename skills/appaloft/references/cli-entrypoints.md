@@ -101,6 +101,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft resource show <resourceId>` - `resources.show`
 - `appaloft resource create` - `resources.create`
 - `appaloft resource archive <resourceId>` - `resources.archive`
+- `appaloft resource delete-check <resourceId>` - `resources.delete-check`
 - `appaloft resource delete <resourceId> --confirm-slug <slug>` - `resources.delete`
 - `appaloft resource configure-health <resourceId>` - `resources.configure-health`
 - `appaloft resource reset-health <resourceId>` - `resources.reset-health`

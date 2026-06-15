@@ -165,6 +165,7 @@ export * from "./operations/resources/archive-resource-runtime-logs.use-case";
 export * from "./operations/resources/attach-resource-storage.use-case";
 export * from "./operations/resources/automatic-route-context-lookup.service";
 export * from "./operations/resources/bind-resource-dependency.use-case";
+export * from "./operations/resources/check-resource-delete-safety.query-service";
 export * from "./operations/resources/configure-resource-access.use-case";
 export * from "./operations/resources/configure-resource-auto-deploy.use-case";
 export * from "./operations/resources/configure-resource-health.use-case";

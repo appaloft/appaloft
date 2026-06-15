@@ -234,6 +234,12 @@ export const publicDocsHelpTopics = {
     surfaces: ["web", "cli", "http-api", "mcp"],
     relatedOperation: "resources.create",
     aliases: ["resource", "app", "service", "资源"],
+    specReferences: [
+      "docs/workflows/resource-profile-lifecycle.md",
+      "docs/queries/resources.delete-check.md",
+      "docs/commands/resources.delete.md",
+      "docs/testing/resource-profile-lifecycle-test-matrix.md",
+    ],
   },
   "project.lifecycle": {
     id: "project.lifecycle",
@@ -3124,6 +3130,7 @@ export const publicDocsOperationCoverage = [
   { operationKey: "resources.show", status: "documented", topicId: "resource.concept" },
   { operationKey: "resources.create", status: "documented", topicId: "resource.concept" },
   { operationKey: "resources.archive", status: "documented", topicId: "resource.concept" },
+  { operationKey: "resources.delete-check", status: "documented", topicId: "resource.concept" },
   { operationKey: "resources.delete", status: "documented", topicId: "resource.concept" },
   {
     operationKey: "resources.configure-health",

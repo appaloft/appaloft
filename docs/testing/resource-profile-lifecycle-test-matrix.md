@@ -18,6 +18,7 @@ This matrix covers the active resource profile lifecycle operations:
 - `resources.unset-variable`
 - `resources.effective-config`
 - `resources.archive`
+- `resources.delete-check`
 - `resources.delete`
 
 It also verifies that existing `resources.configure-health` remains the dedicated health mutation
@@ -41,6 +42,7 @@ generic `resources.update`.
 - [resources.unset-variable Command Spec](../commands/resources.unset-variable.md)
 - [resources.effective-config Query Spec](../queries/resources.effective-config.md)
 - [resources.archive Command Spec](../commands/resources.archive.md)
+- [resources.delete-check Query Spec](../queries/resources.delete-check.md)
 - [resources.delete Command Spec](../commands/resources.delete.md)
 - [resources.configure-health Command Spec](../commands/resources.configure-health.md)
 - [Resource Profile Drift Visibility](../specs/011-resource-profile-drift-visibility/spec.md)
@@ -128,13 +130,16 @@ generic `resources.update`.
 | RES-PROFILE-DELETE-001 | `resources.delete` | Command use case | Archived resource has no blockers and matching slug confirmation. | Transitions/tombstones resource as deleted, publishes `resource-deleted`, returns `ok({ id })`. |
 | RES-PROFILE-DELETE-002 | `resources.delete` | Command use case | Active resource. | Rejects with `resource_delete_blocked`, `lifecycleStatus = "active"`, `deletionBlockers` includes `active-resource`, and no event. |
 | RES-PROFILE-DELETE-003 | `resources.delete` | Command use case | Confirmation slug mismatch. | Rejects with `validation_error`, `phase = resource-deletion-guard`, and no mutation. |
-| RES-PROFILE-DELETE-004 | `resources.delete` | Command use case | Archived resource has deployment history. | Rejects with `resource_delete_blocked`, `deletionBlockers` includes `deployment-history`, and no event. |
+| RES-PROFILE-DELETE-004 | `resources.delete` | Command use case | Archived resource has deployment history but no retained deletion blockers. | Delete succeeds and deployment history remains owned by deployment/audit retention. |
 | RES-PROFILE-DELETE-005 | `resources.delete` | Command use case | Archived resource has domain, certificate, access route, or proxy route state. | Rejects with `resource_delete_blocked` and safe blocker details. |
 | RES-PROFILE-DELETE-006 | `resources.delete` | Command use case | Archived resource has source link, dependency binding, terminal session, runtime-log retention, or audit retention. | Rejects with `resource_delete_blocked` and safe blocker details. |
 | DMBH-BINDING-001 | `ResourceBinding` | Core domain unit | Binding scope and injection mode vary across build-only/runtime-reference and allowed combinations. | `ResourceBinding` owns scope/injection coherence; public behavior is unchanged. |
 | RES-PROFILE-DELETE-007 | `resources.delete` | Command use case | Already deleted tombstone is retried. | Returns idempotent `ok({ id })` without duplicate state effect or duplicate event when tombstone can be resolved. |
 | RES-PROFILE-DELETE-008 | `resources.show` / `resources.list` | Read model | Deleted resource queried by normal active read paths. | `resources.show` returns `not_found`; list omits the resource. |
 | RES-PROFILE-DELETE-009 | `resource-deleted` | Event payload | Delete succeeds. | Event includes resource ids, `resourceSlug`, deleted timestamp, and no secrets, logs, certificate material, or provider configs. |
+| RES-PROFILE-DELETE-CHECK-001 | `resources.delete-check` | Query service | Active resource. | Returns `eligible = false`, `lifecycleStatus = "active"`, and `blockers` includes `active-resource`. |
+| RES-PROFILE-DELETE-CHECK-002 | `resources.delete-check` | Query service | Archived resource has retained blockers. | Returns `eligible = false` with safe blocker kind/count/type/id details and no mutation. |
+| RES-PROFILE-DELETE-CHECK-003 | `resources.delete-check` | Query service | Archived resource has no retained blockers. | Returns `eligible = true`, empty blockers, and no mutation. |
 | RES-PROFILE-ENTRY-001 | Web | Entrypoint | Resource detail page loads durable profile. | Dispatches `resources.show`; does not synthesize full detail from list-only data. |
 | RES-PROFILE-ENTRY-002 | Web | Entrypoint | Source/runtime/network/access/health/config/archive/delete actions submitted independently. | Each form/action dispatches its matching command and refetches detail/health/effective-config/list. |
 | RES-PROFILE-ENTRY-003 | CLI | Entrypoint | Resource profile commands are listed. | CLI exposes separate source/runtime/network/access/health/config/import/archive/delete subcommands and no generic `resource update`. |
@@ -142,7 +147,7 @@ generic `resources.update`.
 | RES-PROFILE-ENTRY-005 | Operation catalog | Catalog | Public exposure in Code Round. | Each active operation appears in `CORE_OPERATIONS.md` and `operation-catalog.ts` in the same change. |
 | RES-PROFILE-ENTRY-006 | CLI | Entrypoint | Delete command submitted with `--confirm-slug`. | Dispatches `DeleteResourceCommand` through `CommandBus`; no generic delete/update helper bypass. |
 | RES-PROFILE-ENTRY-007 | HTTP/oRPC | Entrypoint | Delete route submitted with command schema. | Dispatches `DeleteResourceCommand`; a follow-up `resources.show` for the deleted resource returns `not_found`. |
-| RES-PROFILE-ENTRY-008 | Web | Entrypoint | Archived resource delete action submitted after typed slug confirmation. | Dispatches `resources.delete`, invalidates resources/detail/list state, and does not hide cleanup side effects. |
+| RES-PROFILE-ENTRY-008 | Web | Entrypoint | Archived resource delete action submitted after typed slug confirmation. | Reads `resources.delete-check`, disables delete while ineligible, shows safe blocker categories, dispatches `resources.delete` only when eligible, invalidates resources/detail/list/delete-check state, and does not hide cleanup side effects. |
 | RES-PROFILE-ENTRY-009 | HTTP/oRPC | Entrypoint | Access profile route submitted with command schema. | Dispatches `ConfigureResourceAccessCommand`; a follow-up `resources.show` returns the access profile. |
 | RES-PROFILE-ENTRY-010 | CLI | Entrypoint | Access profile command submitted. | Dispatches `ConfigureResourceAccessCommand` through `CommandBus`; no generic resource update helper bypass. |
 | RES-PROFILE-ENTRY-011 | Web | Entrypoint | Resource detail access settings submitted. | Dispatches `resources.configure-access`, invalidates resource detail/list state, and does not bind domains or apply proxy routes. |
@@ -152,6 +157,8 @@ generic `resources.update`.
 | RES-PROFILE-ENTRY-015 | CLI | Entrypoint | Resource `.env` import submitted. | Dispatches `ImportResourceVariablesCommand` through `CommandBus`; no CLI-only parser bypasses the application schema. |
 | RES-PROFILE-ENTRY-016 | HTTP/oRPC | Entrypoint | Resource `.env` import route submitted. | Dispatches `ImportResourceVariablesCommand` through `CommandBus` using the command schema. |
 | RES-PROFILE-ENTRY-017 | Web | Entrypoint | Resource detail `.env` import form submitted. | Dispatches `resources.import-variables` through the shared oRPC command schema, supports explicit secret/plain key classification, invalidates `resources.effective-config`, and does not echo raw secret values. |
+| RES-PROFILE-ENTRY-018 | HTTP/oRPC | Entrypoint | Resource delete-check route requested. | Dispatches `CheckResourceDeleteSafetyQuery` through `QueryBus` using the shared query schema. |
+| RES-PROFILE-ENTRY-019 | CLI | Entrypoint | Resource delete-check command submitted. | Dispatches `CheckResourceDeleteSafetyQuery` through `QueryBus`; no CLI-only blocker calculation. |
 | RES-PROFILE-ERROR-001 | Error mapping | Contract | Persistence failure before command success. | Returns `infra_error`, `phase = resource-persistence`. |
 | RES-PROFILE-ERROR-002 | Error mapping | Contract | Event publication/outbox failure before command success. | Returns `infra_error`, `phase = event-publication`. |
 | RES-PROFILE-ERROR-003 | Error mapping | Contract | Event consumer projection failure. | Records `phase = event-consumption` and does not reinterpret command success. |
@@ -207,7 +214,8 @@ Automated coverage now exists for:
 - `RES-PROFILE-ARCHIVE-001`, `RES-PROFILE-ARCHIVE-002`, `RES-PROFILE-ARCHIVE-003`, and
   `RES-PROFILE-ARCHIVE-005` in `packages/application/test/archive-resource.test.ts`;
 - `RES-PROFILE-ARCHIVE-004` in `packages/application/test/create-deployment.test.ts`;
-- `RES-PROFILE-DELETE-001` through `RES-PROFILE-DELETE-008` in
+- `RES-PROFILE-DELETE-001` through `RES-PROFILE-DELETE-008` and
+  `RES-PROFILE-DELETE-CHECK-001` through `RES-PROFILE-DELETE-CHECK-003` in
   `packages/application/test/delete-resource.test.ts`;
 - PG audit-retention blocker coverage for `RES-PROFILE-DELETE-006` in
   `packages/persistence/pg/test/pglite.integration.test.ts`;
@@ -225,10 +233,13 @@ Automated coverage now exists for:
   `packages/orpc/test/resource-archive.http.test.ts`;
 - HTTP/oRPC dispatch for `resources.delete` in
   `packages/orpc/test/resource-delete.http.test.ts`;
+- HTTP/oRPC dispatch for `resources.delete-check` in
+  `packages/orpc/test/resource-show.http.test.ts`;
 - CLI dispatch for `resources.configure-runtime` in
   `packages/adapters/cli/test/resource-command.test.ts`;
 - CLI dispatch for `resources.archive` in `packages/adapters/cli/test/resource-command.test.ts`;
-- CLI dispatch for `resources.delete` in `packages/adapters/cli/test/resource-command.test.ts`;
+- CLI dispatch for `resources.delete` and `resources.delete-check` in
+  `packages/adapters/cli/test/resource-command.test.ts`;
 - Web detail dispatch for `resources.show` in `apps/web/test/e2e-webview/home.webview.test.ts`;
 - Web source, runtime, network, access, configuration set/import, archive, and delete submissions in
   `apps/web/test/e2e-webview/home.webview.test.ts`.
@@ -239,9 +250,9 @@ Automated coverage now exists for:
   `RES-PROFILE-ENTRY-014` in `apps/web/test/e2e-webview/home.webview.test.ts`.
 - Web `.env` import submission for `RES-PROFILE-ENTRY-017` and `RES-PROFILE-CONFIG-013` in
   `apps/web/test/e2e-webview/home.webview.test.ts`.
-- CLI dispatch coverage for source/runtime/network/access/health/config/archive/delete profile
+- CLI dispatch coverage for source/runtime/network/access/health/config/archive/delete/delete-check profile
   commands in `packages/adapters/cli/test/resource-command.test.ts` under `RES-PROFILE-ENTRY-003`,
-  `RES-PROFILE-ENTRY-006`, and `RES-PROFILE-ENTRY-010`.
+  `RES-PROFILE-ENTRY-006`, `RES-PROFILE-ENTRY-010`, and `RES-PROFILE-ENTRY-019`.
 
 `DMBH-RES-001` is covered in `packages/core/test/resource.test.ts` as part of
 [Domain Model Behavior Hardening](../specs/022-domain-model-behavior-hardening/spec.md). It is a

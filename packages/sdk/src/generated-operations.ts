@@ -2975,6 +2975,25 @@ export const generatedSdkOperations = [
     facadeDefault: true,
   },
   {
+    operationKey: "resources.delete-check",
+    operationGroup: "resources",
+    operationMethod: "deleteCheck",
+    facadePath: ["resources", "deleteCheck"],
+    operationId: "resources.deleteCheck",
+    kind: "query",
+    domain: "resources",
+    messageName: "CheckResourceDeleteSafetyQuery",
+    route: {
+      method: "GET",
+      path: "/resources/{resourceId}/delete-check",
+    },
+    docsHref: "/docs/resources/projects/#concept-resource",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
     operationKey: "resources.detach-storage",
     operationGroup: "resources",
     operationMethod: "detachStorage",
@@ -4194,6 +4213,7 @@ export const generatedSdkOperations = [
     operationKey: "servers.reorder",
     operationGroup: "servers",
     operationMethod: "reorder",
+    facadePath: ["servers", "reorder"],
     operationId: "servers.reorder",
     kind: "command",
     domain: "servers",
@@ -4206,6 +4226,7 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
   },
   {
     operationKey: "servers.show",
@@ -5242,6 +5263,7 @@ export interface GeneratedAppaloftClient {
     readonly count: AppaloftSdkFacadeMethod;
     readonly create: AppaloftSdkFacadeMethod;
     readonly delete: AppaloftSdkFacadeMethod;
+    readonly deleteCheck: AppaloftSdkFacadeMethod;
     readonly detachStorage: AppaloftSdkFacadeMethod;
     readonly diagnosticSummary: AppaloftSdkFacadeMethod;
     readonly effectiveConfig: AppaloftSdkFacadeMethod;
@@ -5336,6 +5358,7 @@ export interface GeneratedAppaloftClient {
     readonly prepareRuntime: AppaloftSdkFacadeMethod;
     readonly register: AppaloftSdkFacadeMethod;
     readonly rename: AppaloftSdkFacadeMethod;
+    readonly reorder: AppaloftSdkFacadeMethod;
     readonly show: AppaloftSdkFacadeMethod;
     readonly testConnectivity: AppaloftSdkFacadeMethod;
     readonly testDraftConnectivity: AppaloftSdkFacadeMethod;

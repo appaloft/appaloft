@@ -58,11 +58,6 @@ export class PgResourceDeletionBlockerReader implements ResourceDeletionBlockerR
             return ok([]);
           }
 
-          const deploymentRows = await executor
-            .selectFrom("deployments")
-            .select("id")
-            .where("resource_id", "=", input.resourceId)
-            .execute();
           const domainBindingRows = await executor
             .selectFrom("domain_bindings")
             .select("id")
@@ -102,7 +97,6 @@ export class PgResourceDeletionBlockerReader implements ResourceDeletionBlockerR
             .execute();
 
           const blockers = [
-            blockerFromRows("deployment-history", "deployment", deploymentRows),
             blockerFromRows("domain-binding", "domain-binding", domainBindingRows),
             blockerFromRows("certificate", "certificate", certificateRows),
             blockerFromRows("runtime-log-retention", "runtime-log-archive", runtimeLogRows),
