@@ -1317,11 +1317,7 @@
                 <Skeleton class="h-4 w-full" />
                 <Skeleton class="h-4 w-3/4" />
               </div>
-              <div class="grid gap-2 sm:grid-cols-3">
-                <Button type="button" variant="outline" class="justify-start" disabled>
-                  <FileText class="size-4" />
-                  {$t(i18nKeys.console.deployments.logsTab)}
-                </Button>
+              <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                 <Button type="button" variant="outline" class="justify-start" disabled>
                   <Clock3 class="size-4" />
                   {$t(i18nKeys.console.deployments.timelineTab)}
@@ -1329,6 +1325,10 @@
                 <Button type="button" variant="outline" class="justify-start" disabled>
                   <ListChecks class="size-4" />
                   {$t(i18nKeys.console.deployments.snapshotTab)}
+                </Button>
+                <Button type="button" variant="outline" class="justify-start" disabled>
+                  <Copy class="size-4" />
+                  {$t(i18nKeys.console.resources.diagnosticSummaryCopy)}
                 </Button>
               </div>
             </div>
