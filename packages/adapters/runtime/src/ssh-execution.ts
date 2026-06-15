@@ -111,7 +111,7 @@ import {
 
 type LogPhase = "detect" | "plan" | "package" | "deploy" | "verify" | "rollback";
 type LogLevel = "debug" | "info" | "warn" | "error";
-type LogSource = "appaloft" | "application";
+type LogSource = "appaloft" | "ssh" | "docker" | "application" | "provider" | "health" | "domain-event";
 
 function composeScaleFromRuntimeMetadata(
   metadata: Record<string, string> | undefined,
@@ -902,6 +902,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       level: LogLevel;
       stream: "stdout" | "stderr";
       redactions?: readonly string[];
+      source?: LogSource;
     },
   ): void {
     for (const line of redactSecrets(input.output, input.redactions)
@@ -913,12 +914,12 @@ export class SshExecutionBackend implements ExecutionBackend {
       void this.report(input.context, {
         deploymentId: input.deploymentId,
         phase: input.phase,
-        source: "application",
+        source: input.source ?? "application",
         level,
         message: line,
         stream: input.stream,
       });
-      timeline.push(phaseLog(input.phase, line, level, "application"));
+      timeline.push(phaseLog(input.phase, line, level, input.source ?? "application"));
     }
   }
 
@@ -932,6 +933,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       level: LogLevel;
       stream: "stdout" | "stderr";
       persistedCount: number;
+      source?: LogSource;
     },
   ): number {
     if (input.persistedCount >= 50) {
@@ -941,12 +943,12 @@ export class SshExecutionBackend implements ExecutionBackend {
     void this.report(input.context, {
       deploymentId: input.deploymentId,
       phase: input.phase,
-      source: "application",
+      source: input.source ?? "application",
       level: input.level,
       message: input.line,
       stream: input.stream,
     });
-    timeline.push(phaseLog(input.phase, input.line, input.level, "application"));
+    timeline.push(phaseLog(input.phase, input.line, input.level, input.source ?? "application"));
     return input.persistedCount + 1;
   }
 
@@ -987,6 +989,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       context: ExecutionContext;
       deploymentId: string;
       phase: LogPhase;
+      source?: LogSource;
     },
   ): (line: string, level: LogLevel, stream: "stdout" | "stderr") => void {
     let stdoutCount = 0;
@@ -1002,6 +1005,7 @@ export class SshExecutionBackend implements ExecutionBackend {
           level,
           stream,
           persistedCount: stdoutCount,
+          ...(input.source ? { source: input.source } : {}),
         });
         return;
       }
@@ -1014,6 +1018,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         level,
         stream,
         persistedCount: stderrCount,
+        ...(input.source ? { source: input.source } : {}),
       });
     };
   }
@@ -1085,6 +1090,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       output: inspect.stdout,
       level: inspect.failed ? "warn" : "info",
       stream: "stdout",
+      source: "docker",
     });
     this.pushCommandOutput(timeline, {
       context: input.context,
@@ -1093,6 +1099,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       output: inspect.stderr,
       level: "warn",
       stream: "stderr",
+      source: "docker",
     });
 
     const logsMessage = `Capture SSH Docker logs for ${input.containerName}`;
@@ -1306,6 +1313,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       output: inspect.stdout,
       level: inspect.failed ? "warn" : "info",
       stream: "stdout",
+      source: "docker",
     });
     this.pushCommandOutput(input.timeline, {
       context: input.context,
@@ -1314,6 +1322,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       output: inspect.stderr,
       level: "warn",
       stream: "stderr",
+      source: "docker",
     });
 
     if (inspect.failed) {
@@ -2312,6 +2321,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             context,
             deploymentId: state.id.value,
             phase: "deploy",
+            source: "docker",
           }),
         });
 
@@ -2580,6 +2590,7 @@ export class SshExecutionBackend implements ExecutionBackend {
           context,
           deploymentId: state.id.value,
           phase: "deploy",
+          source: "docker",
         }),
       });
 
@@ -2661,6 +2672,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             output: entry.stdout ?? "",
             level: "info",
             stream: "stdout",
+            source: "docker",
           });
           this.pushCommandOutput(timeline, {
             context,
@@ -2669,6 +2681,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             output: entry.stderr ?? "",
             level: "warn",
             stream: "stderr",
+            source: "docker",
           });
         }
 
