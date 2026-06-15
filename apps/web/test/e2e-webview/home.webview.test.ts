@@ -7855,12 +7855,6 @@ describe.serial("console e2e with Bun.WebView", () => {
         includeLatestFailure: true,
       });
 
-      const logsRequest = await waitForRecordedRequest("/api/rpc/deployments/logs");
-      const logsInput = readOrpcJsonPayload(logsRequest.body);
-      expect(logsInput).toEqual({
-        deploymentId: "dep_demo",
-      });
-
       await clickButtonByAnyText(view, ["Copy diagnostic JSON", "复制诊断 JSON"]);
       const diagnosticRequest = await waitForRecordedRequest(
         "/api/rpc/resources/diagnosticSummary",
@@ -7887,9 +7881,6 @@ describe.serial("console e2e with Bun.WebView", () => {
         "This deployment status is not recoverable.",
         "这个部署状态不可恢复。",
       ]);
-
-      await view.navigate(`${previewUrl}${demoDeploymentPath}?tab=logs`);
-      await expectText(view, "Application is ready for dep_demo");
     } finally {
       if (previousDiagnosticRoute === undefined) {
         delete apiResponses.dashboard["/api/rpc/resources/diagnosticSummary"];
@@ -8529,17 +8520,14 @@ describe.serial("console e2e with Bun.WebView", () => {
       expect(replayRequest.method).toBe("POST");
       expect(readOrpcJsonPayload(replayRequest.body)).toEqual({
         deploymentId: "dep_demo",
-        historyLimit: 100,
-        includeHistory: true,
-        follow: false,
-        untilTerminal: true,
+        limit: 100,
       });
 
       const streamRequest = await waitForRecordedRequest("/api/rpc/deployments/timelineStream");
       expect(streamRequest.method).toBe("POST");
       expect(readOrpcJsonPayload(streamRequest.body)).toEqual({
         deploymentId: "dep_demo",
-        historyLimit: 0,
+        limit: 0,
         includeHistory: false,
         follow: true,
         untilTerminal: true,

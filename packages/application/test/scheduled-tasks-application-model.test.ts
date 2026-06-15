@@ -55,7 +55,8 @@ describe("scheduled task application model", () => {
       handlerName: "ScheduledTaskRunLogsQueryHandler",
       serviceName: "ScheduledTaskRunLogsQueryService",
       transports: {
-        orpc: { method: "GET", path: "/api/scheduled-task-runs/{runId}/timeline" },
+        cli: "appaloft scheduled-task runs logs <runId>",
+        orpc: { method: "GET", path: "/api/scheduled-task-runs/{runId}/logs" },
       },
     });
   });
