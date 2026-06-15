@@ -2518,6 +2518,33 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
         id: "res_demo",
       },
     },
+    "/api/rpc/resources/deleteCheck": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { resourceId?: string } | null;
+      const showResponse = apiResponses.dashboard["/api/rpc/resources/show"] as {
+        json?: {
+          lifecycle?: {
+            status?: string;
+          };
+        };
+      };
+      const lifecycleStatus =
+        showResponse.json?.lifecycle?.status === "archived" ? "archived" : "active";
+      const blockers =
+        lifecycleStatus === "active"
+          ? [{ kind: "active-resource", relatedEntityId: input?.resourceId ?? "res_demo" }]
+          : [];
+
+      return {
+        json: {
+          schemaVersion: "resources.delete-check/v1",
+          resourceId: input?.resourceId ?? "res_demo",
+          lifecycleStatus,
+          eligible: blockers.length === 0,
+          blockers,
+          checkedAt: "2026-01-01T00:00:00.000Z",
+        },
+      };
+    },
     "/api/rpc/environments/archive": {
       json: {
         id: "env_demo",
@@ -5598,12 +5625,18 @@ describe.serial("console e2e with Bun.WebView", () => {
     const resourceNavigationState = JSON.parse(
       await view.evaluate<string>(`JSON.stringify((() => {
         const demoResourcePath = ${JSON.stringify(demoResourcePath)};
+        const navLinks = (node) => Array.from(node?.querySelectorAll("a") ?? [])
+          .map((anchor) => new URL(anchor.href).pathname + new URL(anchor.href).search);
         const resourceLinks = Array.from(document.querySelectorAll("a"))
           .map((anchor) => new URL(anchor.href).pathname + new URL(anchor.href).search)
           .filter((href) => href.startsWith(demoResourcePath));
-        const tabNav = document.querySelector(".console-detail-tabs");
-        const tabLinks = Array.from(tabNav?.querySelectorAll("a") ?? [])
-          .map((anchor) => new URL(anchor.href).pathname + new URL(anchor.href).search);
+        const tabNav = Array.from(document.querySelectorAll("nav")).find((nav) => {
+          const links = navLinks(nav);
+          return links.includes(demoResourcePath + "?tab=logs")
+            && links.includes(demoResourcePath + "?tab=terminal")
+            && links.includes(demoResourcePath + "?tab=configuration");
+        });
+        const tabLinks = navLinks(tabNav);
 
         return {
           hasSettingsLink: resourceLinks.some((href) => href.includes("tab=settings")),
@@ -5631,7 +5664,21 @@ describe.serial("console e2e with Bun.WebView", () => {
     await view.navigate(`${previewUrl}${demoResourcePath}?tab=configuration`);
     await expectAnyText(view, ["Resource profile", "资源档案"]);
     await waitFor(
-      () => view.evaluate<boolean>("Boolean(document.querySelector('.console-subnav'))"),
+      () =>
+        view.evaluate<boolean>(`(() => {
+          const demoResourcePath = ${JSON.stringify(demoResourcePath)};
+          const expectedLinks = [
+            demoResourcePath + "?tab=configuration",
+            demoResourcePath + "?tab=configuration&section=configuration",
+            demoResourcePath + "?tab=configuration&section=auto-deploy",
+            demoResourcePath + "?tab=configuration&section=health",
+          ];
+          return Array.from(document.querySelectorAll("nav")).some((nav) => {
+            const links = Array.from(nav.querySelectorAll("a"))
+              .map((anchor) => new URL(anchor.href).pathname + new URL(anchor.href).search);
+            return expectedLinks.every((href) => links.includes(href));
+          });
+        })()`),
       Boolean,
       "Expected configuration tab to render secondary navigation",
     );
@@ -5642,10 +5689,17 @@ describe.serial("console e2e with Bun.WebView", () => {
     const mobileNavigationState = JSON.parse(
       await mobileView.evaluate<string>(`JSON.stringify((() => {
         const demoResourcePath = ${JSON.stringify(demoResourcePath)};
+        const navLinks = (node) => Array.from(node?.querySelectorAll("a") ?? [])
+          .map((anchor) => new URL(anchor.href).pathname + new URL(anchor.href).search);
         const resourceLinks = Array.from(document.querySelectorAll("a"))
           .map((anchor) => new URL(anchor.href).pathname + new URL(anchor.href).search)
           .filter((href) => href.startsWith(demoResourcePath));
-        const tabNav = document.querySelector(".console-detail-tabs");
+        const tabNav = Array.from(document.querySelectorAll("nav")).find((nav) => {
+          const links = navLinks(nav);
+          return links.includes(demoResourcePath + "?tab=logs")
+            && links.includes(demoResourcePath + "?tab=terminal")
+            && links.includes(demoResourcePath + "?tab=configuration");
+        });
         return {
           bodyOverflows: document.documentElement.scrollWidth > window.innerWidth + 1,
           hasSettingsLink: resourceLinks.some((href) => href.includes("tab=settings")),
