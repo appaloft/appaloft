@@ -1939,9 +1939,6 @@ export const zhCN = {
       domainBindingsDescription: "这些是当前资源的自定义域名绑定。默认生成访问地址显示在访问区域。",
       domainBindingsTitle: "自定义域名",
       staticArtifactDefaultAccess: "默认访问地址",
-      staticArtifactDomainBindingsUnavailableDescription:
-        "这个静态上传由生成的静态访问地址提供服务。自定义域名需要专用的静态域名支持；当前基于服务器的域名绑定流程不能绑定没有服务器和目标的资源。",
-      staticArtifactDomainBindingsUnavailableTitle: "这个静态上传暂不支持自定义域名",
       durableDomainAccess: "持久域名访问",
       certificateExpiresAt: "过期时间",
       certificateImportCertificateChain: "证书链",

@@ -2077,10 +2077,6 @@ export const enUS = {
         "These are custom domain bindings for the current resource. Default generated access appears in the access area.",
       domainBindingsTitle: "Custom domains",
       staticArtifactDefaultAccess: "Default access",
-      staticArtifactDomainBindingsUnavailableDescription:
-        "This static upload is served by a generated static artifact address. Custom domains require a static artifact domain provider; the current server-backed domain binding flow cannot bind a resource without a server and destination.",
-      staticArtifactDomainBindingsUnavailableTitle:
-        "Custom domains are not available for this static upload yet",
       durableDomainAccess: "Durable domain access",
       certificateExpiresAt: "Expires",
       certificateImportCertificateChain: "Certificate chain",

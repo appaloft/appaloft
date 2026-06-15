@@ -395,8 +395,8 @@ export interface DomainBindingState {
   projectId: ProjectId;
   environmentId: EnvironmentId;
   resourceId: ResourceId;
-  serverId: DeploymentTargetId;
-  destinationId: DestinationId;
+  serverId?: DeploymentTargetId;
+  destinationId?: DestinationId;
   domainName: PublicDomainName;
   pathPrefix: RoutePathPrefix;
   proxyKind: EdgeProxyKindValue;
@@ -451,8 +451,8 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
     projectId: ProjectId;
     environmentId: EnvironmentId;
     resourceId: ResourceId;
-    serverId: DeploymentTargetId;
-    destinationId: DestinationId;
+    serverId?: DeploymentTargetId;
+    destinationId?: DestinationId;
     domainName: PublicDomainName;
     pathPrefix: RoutePathPrefix;
     proxyKind: EdgeProxyKindValue;
@@ -508,8 +508,8 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
       projectId: input.projectId,
       environmentId: input.environmentId,
       resourceId: input.resourceId,
-      serverId: input.serverId,
-      destinationId: input.destinationId,
+      ...(input.serverId ? { serverId: input.serverId } : {}),
+      ...(input.destinationId ? { destinationId: input.destinationId } : {}),
       domainName: input.domainName,
       pathPrefix: input.pathPrefix,
       proxyKind: input.proxyKind,
@@ -546,8 +546,8 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
       projectId: input.projectId.value,
       environmentId: input.environmentId.value,
       resourceId: input.resourceId.value,
-      serverId: input.serverId.value,
-      destinationId: input.destinationId.value,
+      ...(input.serverId ? { serverId: input.serverId.value } : {}),
+      ...(input.destinationId ? { destinationId: input.destinationId.value } : {}),
       domainName: input.domainName.value,
       pathPrefix: input.pathPrefix.value,
       proxyKind: input.proxyKind.value,
@@ -875,8 +875,8 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
       projectId: this.state.projectId.value,
       environmentId: this.state.environmentId.value,
       resourceId: this.state.resourceId.value,
-      serverId: this.state.serverId.value,
-      destinationId: this.state.destinationId.value,
+      ...(this.state.serverId ? { serverId: this.state.serverId.value } : {}),
+      ...(this.state.destinationId ? { destinationId: this.state.destinationId.value } : {}),
       proxyKind: this.state.proxyKind.value,
       tlsMode: this.state.tlsMode.value,
       certificatePolicy: this.state.certificatePolicy.value,
@@ -918,8 +918,8 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
       projectId: this.state.projectId.value,
       environmentId: this.state.environmentId.value,
       resourceId: this.state.resourceId.value,
-      serverId: this.state.serverId.value,
-      destinationId: this.state.destinationId.value,
+      ...(this.state.serverId ? { serverId: this.state.serverId.value } : {}),
+      ...(this.state.destinationId ? { destinationId: this.state.destinationId.value } : {}),
       proxyKind: this.state.proxyKind.value,
       tlsMode: this.state.tlsMode.value,
       certificatePolicy: this.state.certificatePolicy.value,
@@ -971,8 +971,8 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
       projectId: this.state.projectId.value,
       environmentId: this.state.environmentId.value,
       resourceId: this.state.resourceId.value,
-      serverId: this.state.serverId.value,
-      destinationId: this.state.destinationId.value,
+      ...(this.state.serverId ? { serverId: this.state.serverId.value } : {}),
+      ...(this.state.destinationId ? { destinationId: this.state.destinationId.value } : {}),
       deploymentId: input.deploymentId.value,
       failedAt: input.failedAt.value,
       errorCode: input.errorCode.value,
@@ -1045,8 +1045,8 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
       projectId: this.state.projectId.value,
       environmentId: this.state.environmentId.value,
       resourceId: this.state.resourceId.value,
-      serverId: this.state.serverId.value,
-      destinationId: this.state.destinationId.value,
+      ...(this.state.serverId ? { serverId: this.state.serverId.value } : {}),
+      ...(this.state.destinationId ? { destinationId: this.state.destinationId.value } : {}),
       ...(this.state.redirectTo
         ? {
             redirectTo: this.state.redirectTo.value,
@@ -1115,8 +1115,8 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
       projectId: this.state.projectId.value,
       environmentId: this.state.environmentId.value,
       resourceId: this.state.resourceId.value,
-      serverId: this.state.serverId.value,
-      destinationId: this.state.destinationId.value,
+      ...(this.state.serverId ? { serverId: this.state.serverId.value } : {}),
+      ...(this.state.destinationId ? { destinationId: this.state.destinationId.value } : {}),
       verificationAttemptId: input.verificationAttemptId.value,
       retryAt: input.retryAt.value,
       ...(input.correlationId ? { correlationId: input.correlationId } : {}),
@@ -1144,8 +1144,8 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
       projectId: this.state.projectId.value,
       environmentId: this.state.environmentId.value,
       resourceId: this.state.resourceId.value,
-      serverId: this.state.serverId.value,
-      destinationId: this.state.destinationId.value,
+      ...(this.state.serverId ? { serverId: this.state.serverId.value } : {}),
+      ...(this.state.destinationId ? { destinationId: this.state.destinationId.value } : {}),
       deletedAt: input.deletedAt.value,
       ...(input.correlationId ? { correlationId: input.correlationId } : {}),
       ...(input.causationId ? { causationId: input.causationId } : {}),

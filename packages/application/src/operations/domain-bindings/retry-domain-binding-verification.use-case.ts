@@ -51,7 +51,7 @@ async function recordDomainVerificationRetryAttempt(input: {
   verificationAttemptId: string;
   projectId: string;
   resourceId: string;
-  serverId: string;
+  serverId?: string;
   domainName: string;
   proxyKind: string;
   tlsMode: string;
@@ -72,7 +72,7 @@ async function recordDomainVerificationRetryAttempt(input: {
     step: "verification-retried",
     projectId: input.projectId,
     resourceId: input.resourceId,
-    serverId: input.serverId,
+    ...(input.serverId ? { serverId: input.serverId } : {}),
     domainBindingId: input.domainBindingId,
     startedAt: input.retriedAt,
     updatedAt: input.retriedAt,
@@ -172,7 +172,7 @@ export class RetryDomainBindingVerificationUseCase {
         verificationAttemptId: retryResult.verificationAttemptId.value,
         projectId: retriedState.projectId.value,
         resourceId: retriedState.resourceId.value,
-        serverId: retriedState.serverId.value,
+        ...(retriedState.serverId ? { serverId: retriedState.serverId.value } : {}),
         domainName: retriedState.domainName.value,
         proxyKind: retriedState.proxyKind.value,
         tlsMode: retriedState.tlsMode.value,

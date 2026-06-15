@@ -1243,27 +1243,25 @@
 
     return currentAccessRoute?.route ?? null;
   });
-  const isServerlessStaticArtifactAccess = $derived(
+  const domainBindingUsesResourceRouteProvider = $derived(
     currentAccessRoute?.kind === "static-artifact" &&
       !latestDeployment?.serverId &&
       !defaultDestinationId,
   );
   const shouldShowServerField = $derived(
-    !isServerlessStaticArtifactAccess && !latestDeployment?.serverId,
+    !domainBindingUsesResourceRouteProvider && !latestDeployment?.serverId,
   );
   const shouldShowDestinationField = $derived(
-    !isServerlessStaticArtifactAccess && !defaultDestinationId,
+    !domainBindingUsesResourceRouteProvider && !defaultDestinationId,
   );
   const canCreateBinding = $derived(
     Boolean(
-      !isServerlessStaticArtifactAccess &&
-        resource &&
-        serverId &&
-        destinationId &&
+      resource &&
         domainName.trim() &&
         pathPrefix.trim() &&
         proxyKind !== "none" &&
-        (routeMode === "serve" || redirectTo),
+        (routeMode === "serve" || redirectTo) &&
+        (domainBindingUsesResourceRouteProvider || (serverId && destinationId)),
     ),
   );
   const canImportCertificate = $derived(
@@ -1771,12 +1769,14 @@
   }
 
   function prepareResourceDomainBindingCreateDialog(): void {
-    if (!resource || isResourceArchived || isServerlessStaticArtifactAccess) {
+    if (!resource || isResourceArchived) {
       return;
     }
 
-    serverId = (latestDeployment?.serverId ?? serverId) || (servers[0]?.id ?? "");
-    destinationId = defaultDestinationId || destinationId;
+    serverId = domainBindingUsesResourceRouteProvider
+      ? ""
+      : (latestDeployment?.serverId ?? serverId) || (servers[0]?.id ?? "");
+    destinationId = domainBindingUsesResourceRouteProvider ? "" : defaultDestinationId || destinationId;
     domainName = "";
     pathPrefix = "/";
     proxyKind = "traefik";
@@ -1791,7 +1791,7 @@
   }
 
   function openResourceDomainBindingCreateDialog(): void {
-    if (!resource || isResourceArchived || isServerlessStaticArtifactAccess) {
+    if (!resource || isResourceArchived) {
       return;
     }
 
@@ -3528,8 +3528,7 @@
       projectId: resource.projectId,
       environmentId: resource.environmentId,
       resourceId: resource.id,
-      serverId,
-      destinationId,
+      ...(serverId && destinationId ? { serverId, destinationId } : {}),
       domainName: domainName.trim(),
       pathPrefix: pathPrefix.trim() || "/",
       proxyKind,
@@ -6984,33 +6983,19 @@
                       </div>
                       <div class="flex shrink-0 flex-wrap items-center gap-2">
                         <Badge variant="outline">{resourceDomainBindings.length}</Badge>
-                        {#if !isServerlessStaticArtifactAccess}
-                          <Button
-                            type="button"
-                            size="sm"
-                            disabled={isResourceArchived}
-                            onclick={openResourceDomainBindingCreateDialog}
-                          >
-                            <Plus class="size-4" />
-                            {$t(i18nKeys.console.domainBindings.createTitle)}
-                          </Button>
-                        {/if}
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={isResourceArchived}
+                          onclick={openResourceDomainBindingCreateDialog}
+                        >
+                          <Plus class="size-4" />
+                          {$t(i18nKeys.console.domainBindings.createTitle)}
+                        </Button>
                       </div>
                     </div>
 
-                    {#if isServerlessStaticArtifactAccess}
-                      <div
-                        class="rounded-md border border-dashed bg-muted/25 px-4 py-6"
-                        data-resource-static-artifact-domain-unavailable
-                      >
-                        <p class="text-sm font-medium">
-                          {$t(i18nKeys.console.resources.staticArtifactDomainBindingsUnavailableTitle)}
-                        </p>
-                        <p class="mt-2 text-sm leading-6 text-muted-foreground">
-                          {$t(i18nKeys.console.resources.staticArtifactDomainBindingsUnavailableDescription)}
-                        </p>
-                      </div>
-                    {:else if resourceDomainBindings.length === 0}
+                    {#if resourceDomainBindings.length === 0}
                       <div class="rounded-md border border-dashed bg-muted/25 px-4 py-6">
                         <p class="text-sm text-muted-foreground">
                           {$t(i18nKeys.console.domainBindings.emptyBody)}
@@ -8728,37 +8713,39 @@
                 </section>
 
                 <section class="grid gap-4 rounded-md border bg-background p-4 sm:grid-cols-2">
-                  <label class="space-y-1.5 text-sm font-medium">
-                    <span>{$t(i18nKeys.common.domain.server)}</span>
-                    <Select.Root bind:value={serverId} type="single" disabled={!shouldShowServerField}>
-                      <Select.Trigger class="w-full">
-                        {selectedServer?.name ?? serverId ?? $t(i18nKeys.console.domainBindings.noServerOptions)}
-                      </Select.Trigger>
-                      <Select.Content>
-                        {#each servers as server (server.id)}
-                          <Select.Item value={server.id}>{server.name}</Select.Item>
-                        {/each}
-                      </Select.Content>
-                    </Select.Root>
-                  </label>
+                  {#if !domainBindingUsesResourceRouteProvider}
+                    <label class="space-y-1.5 text-sm font-medium">
+                      <span>{$t(i18nKeys.common.domain.server)}</span>
+                      <Select.Root bind:value={serverId} type="single" disabled={!shouldShowServerField}>
+                        <Select.Trigger class="w-full">
+                          {selectedServer?.name ?? serverId ?? $t(i18nKeys.console.domainBindings.noServerOptions)}
+                        </Select.Trigger>
+                        <Select.Content>
+                          {#each servers as server (server.id)}
+                            <Select.Item value={server.id}>{server.name}</Select.Item>
+                          {/each}
+                        </Select.Content>
+                      </Select.Root>
+                    </label>
 
-                  <label class="space-y-1.5 text-sm font-medium" for="resource-domain-binding-destination">
-                    <span>{$t(i18nKeys.common.domain.destination)}</span>
-                    <Input
-                      id="resource-domain-binding-destination"
-                      bind:value={destinationId}
-                      autocomplete="off"
-                      disabled={!shouldShowDestinationField}
-                      placeholder={$t(i18nKeys.console.domainBindings.formDestinationPlaceholder)}
-                    />
-                    <span class="block text-xs leading-5 text-muted-foreground">
-                      {defaultDestinationId
-                        ? $t(i18nKeys.console.domainBindings.selectedResourceDestination, {
-                            destinationId: defaultDestinationId,
-                          })
-                        : $t(i18nKeys.console.domainBindings.destinationHelp)}
-                    </span>
-                  </label>
+                    <label class="space-y-1.5 text-sm font-medium" for="resource-domain-binding-destination">
+                      <span>{$t(i18nKeys.common.domain.destination)}</span>
+                      <Input
+                        id="resource-domain-binding-destination"
+                        bind:value={destinationId}
+                        autocomplete="off"
+                        disabled={!shouldShowDestinationField}
+                        placeholder={$t(i18nKeys.console.domainBindings.formDestinationPlaceholder)}
+                      />
+                      <span class="block text-xs leading-5 text-muted-foreground">
+                        {defaultDestinationId
+                          ? $t(i18nKeys.console.domainBindings.selectedResourceDestination, {
+                              destinationId: defaultDestinationId,
+                            })
+                          : $t(i18nKeys.console.domainBindings.destinationHelp)}
+                      </span>
+                    </label>
+                  {/if}
 
                   <label class="space-y-1.5 text-sm font-medium">
                     <span>{$t(i18nKeys.common.domain.proxy)}</span>
@@ -8836,14 +8823,16 @@
                       </p>
                     </dd>
                   </div>
-                  <div class="grid grid-cols-[6rem_minmax(0,1fr)] gap-3 py-3">
-                    <dt class="text-muted-foreground">{$t(i18nKeys.common.domain.server)}</dt>
-                    <dd class="truncate font-medium">{(selectedServer?.name ?? serverId) || "-"}</dd>
-                  </div>
-                  <div class="grid grid-cols-[6rem_minmax(0,1fr)] gap-3 py-3">
-                    <dt class="text-muted-foreground">{$t(i18nKeys.common.domain.destination)}</dt>
-                    <dd class="truncate font-medium">{destinationId || "-"}</dd>
-                  </div>
+                  {#if !domainBindingUsesResourceRouteProvider}
+                    <div class="grid grid-cols-[6rem_minmax(0,1fr)] gap-3 py-3">
+                      <dt class="text-muted-foreground">{$t(i18nKeys.common.domain.server)}</dt>
+                      <dd class="truncate font-medium">{(selectedServer?.name ?? serverId) || "-"}</dd>
+                    </div>
+                    <div class="grid grid-cols-[6rem_minmax(0,1fr)] gap-3 py-3">
+                      <dt class="text-muted-foreground">{$t(i18nKeys.common.domain.destination)}</dt>
+                      <dd class="truncate font-medium">{destinationId || "-"}</dd>
+                    </div>
+                  {/if}
                 </dl>
               </aside>
             </div>
