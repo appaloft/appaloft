@@ -274,6 +274,20 @@ function sourceBetween(source: string, startMarker: string, endMarker: string): 
   return source.slice(startIndex, endIndex);
 }
 
+function sourceBetweenLast(source: string, startMarker: string, endMarker: string): string {
+  const startIndex = source.lastIndexOf(startMarker);
+  if (startIndex < 0) {
+    throw new Error(`Missing source marker: ${startMarker}`);
+  }
+
+  const endIndex = source.indexOf(endMarker, startIndex);
+  if (endIndex < 0) {
+    throw new Error(`Missing source marker: ${endMarker}`);
+  }
+
+  return source.slice(startIndex, endIndex);
+}
+
 function assertDisplaySurfaceIsFormFree(source: string): void {
   expect(source).not.toContain("<form");
   expect(source).not.toContain("<Input");
@@ -1626,9 +1640,10 @@ describe("console page structure", () => {
       deploymentOverviewSource.indexOf("data-deployment-attempt-observation"),
       deploymentOverviewSource.indexOf("data-deployment-current-resource-observation"),
     );
-    const deploymentCurrentResourceHandoffSource = deploymentOverviewSource.slice(
-      deploymentOverviewSource.indexOf("data-deployment-current-resource-handoff"),
-      deploymentOverviewSource.indexOf("data-deployment-attempt-observation"),
+    const deploymentCurrentResourceHandoffSource = sourceBetweenLast(
+      deploymentOverviewSource,
+      "data-deployment-current-resource-handoff",
+      "data-deployment-attempt-observation",
     );
     const deploymentCurrentResourceObservationSource = deploymentOverviewSource.slice(
       deploymentOverviewSource.indexOf("data-deployment-current-resource-observation"),
