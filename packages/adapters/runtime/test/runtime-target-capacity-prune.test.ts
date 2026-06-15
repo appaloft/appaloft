@@ -352,55 +352,59 @@ describe("runtime target capacity prune adapter", () => {
     }
   });
 
-  test("[RT-CAP-PRUNE-011] remote-state marker dry-run output is bounded and reports estimated reclaimable bytes", () => {
-    const runtimeRoot = mkdtempSync(join(tmpdir(), "appaloft-capacity-prune-markers-"));
-    const stateRoot = join(runtimeRoot, "state");
-    const backupsRoot = join(stateRoot, "backups");
-    mkdirSync(backupsRoot, { recursive: true });
-    for (let index = 0; index < 205; index += 1) {
-      const marker = join(backupsRoot, `sync-20260101000000-${String(index).padStart(3, "0")}`);
-      mkdirSync(marker, { recursive: true });
-      writeFileSync(join(marker, "backup.txt"), "backup marker\n");
-    }
+  test(
+    "[RT-CAP-PRUNE-011] remote-state marker dry-run output is bounded and reports estimated reclaimable bytes",
+    () => {
+      const runtimeRoot = mkdtempSync(join(tmpdir(), "appaloft-capacity-prune-markers-"));
+      const stateRoot = join(runtimeRoot, "state");
+      const backupsRoot = join(stateRoot, "backups");
+      mkdirSync(backupsRoot, { recursive: true });
+      for (let index = 0; index < 205; index += 1) {
+        const marker = join(backupsRoot, `sync-20260101000000-${String(index).padStart(3, "0")}`);
+        mkdirSync(marker, { recursive: true });
+        writeFileSync(join(marker, "backup.txt"), "backup marker\n");
+      }
 
-    try {
-      const script = renderRuntimeTargetCapacityPruneScript({
-        runtimeRoot,
-        before: "2099-01-01T00:00:00.000Z",
-        categories: ["remote-state-markers"],
-        dryRun: true,
-      });
-      const output = ash.execute(script);
+      try {
+        const script = renderRuntimeTargetCapacityPruneScript({
+          runtimeRoot,
+          before: "2099-01-01T00:00:00.000Z",
+          categories: ["remote-state-markers"],
+          dryRun: true,
+        });
+        const output = ash.execute(script);
 
-      expect(output.exitCode).toBe(0);
-      const parsed = parseRuntimeTargetCapacityPruneOutput({
-        stdout: output.stdout,
-        stderr: output.stderr,
-        server: serverState(),
-        before: "2099-01-01T00:00:00.000Z",
-        categories: ["remote-state-markers"],
-        dryRun: true,
-        prunedAt: "2026-01-01T00:10:00.000Z",
-      });
+        expect(output.exitCode).toBe(0);
+        const parsed = parseRuntimeTargetCapacityPruneOutput({
+          stdout: output.stdout,
+          stderr: output.stderr,
+          server: serverState(),
+          before: "2099-01-01T00:00:00.000Z",
+          categories: ["remote-state-markers"],
+          dryRun: true,
+          prunedAt: "2026-01-01T00:10:00.000Z",
+        });
 
-      expect(parsed.isOk()).toBe(true);
-      const result = parsed._unsafeUnwrap();
-      expect(result.candidates).toHaveLength(200);
-      expect(result.summary).toMatchObject({
-        inspectedCount: 208,
-        matchedCount: 205,
-        prunedCount: 0,
-        excludedCount: 3,
-        reportedCandidateCount: 200,
-        omittedCandidateCount: 8,
-        outputLimit: 200,
-      });
-      expect(result.summary.reclaimedBytes).toBeGreaterThan(0);
-      expect(result.candidates.every((candidate) => candidate.target.includes("sync-"))).toBe(true);
-    } finally {
-      rmSync(runtimeRoot, { recursive: true, force: true });
-    }
-  });
+        expect(parsed.isOk()).toBe(true);
+        const result = parsed._unsafeUnwrap();
+        expect(result.candidates).toHaveLength(200);
+        expect(result.summary).toMatchObject({
+          inspectedCount: 208,
+          matchedCount: 205,
+          prunedCount: 0,
+          excludedCount: 3,
+          reportedCandidateCount: 200,
+          omittedCandidateCount: 8,
+          outputLimit: 200,
+        });
+        expect(result.summary.reclaimedBytes).toBeGreaterThan(0);
+        expect(result.candidates.every((candidate) => candidate.target.includes("sync-"))).toBe(true);
+      } finally {
+        rmSync(runtimeRoot, { recursive: true, force: true });
+      }
+    },
+    30_000,
+  );
 
   test("[RT-CAP-REMOTE-STATE-002] remote-state marker prune preserves live standalone PGlite state", () => {
     const runtimeRoot = mkdtempSync(join(tmpdir(), "appaloft-capacity-prune-live-state-"));

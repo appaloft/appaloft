@@ -1,8 +1,7 @@
 export const detailPageClass =
   "flex min-h-0 min-w-0 flex-col md:h-[calc(100svh-3.5rem-3rem)] md:overflow-visible";
 
-export const detailHeaderClass =
-  "-mx-4 shrink-0 border-b px-4 pb-3 md:-mx-6 md:px-6";
+export const detailHeaderClass = "-mx-4 shrink-0 border-b px-4 pb-3 md:-mx-6 md:px-6";
 
 export const detailBodyClass = "flex min-h-0 min-w-0 flex-col md:flex-1";
 
@@ -24,7 +23,8 @@ export const detailTabPanelSubnavClass =
 export const subnavLayoutClass =
   "grid -m-4 min-h-[calc(100svh-3.5rem)] md:-m-6 md:grid-cols-[16rem_minmax(0,1fr)]";
 
-export const detailSubnavLayoutClass = "grid -m-4 min-h-[calc(100svh-3.5rem)] md:m-0 md:h-full md:min-h-0 md:overflow-hidden";
+export const detailSubnavLayoutClass =
+  "grid -m-4 min-h-[calc(100svh-3.5rem)] md:m-0 md:h-full md:min-h-0 md:overflow-hidden";
 
 export const subnavClass =
   "min-w-0 border-b border-sidebar-border bg-sidebar text-sidebar-foreground md:border-b-0 md:border-r";

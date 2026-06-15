@@ -30,7 +30,9 @@ const settingsNavSource = readFileSync(
 describe("archived project surfaces", () => {
   test("[PROJ-LIFE-WEB-DEFAULT-001] default project surfaces rely on backend active-only list semantics", () => {
     expect(homePageSource).toContain("orpcClient.projects.list({ limit: homeProjectListLimit })");
-    expect(projectsPageSource).toContain("createConsoleQueries(browser, { projects: false })");
+    expect(projectsPageSource).toMatch(
+      /createConsoleQueries\(browser,\s*\{[\s\S]*projects:\s*false[\s\S]*\}\)/,
+    );
     expect(projectsPageSource).toContain(
       "orpcClient.projects.list({ limit: projectPageSize, offset: projectOffset })",
     );
