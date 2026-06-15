@@ -14,10 +14,19 @@ import {
   tokens,
   toRepositoryContext,
 } from "@appaloft/application";
-import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
+import {
+  DeploymentByIdSpec,
+  DeploymentId,
+  type DomainError,
+  domainError,
+  err,
+  ok,
+  type Result,
+} from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 
 const schemaVersion = "deployments.timeline/v1";
+const persistentRefreshIntervalMs = 2_000;
 
 type BufferedProgressEvent = {
   context: ExecutionContext;
@@ -28,6 +37,7 @@ type DeploymentTimelineStreamState = {
   abortReason?: "cancelled";
   closed: boolean;
   events: BufferedProgressEvent[];
+  lastDeliveredAt?: string;
   lastCursor?: string;
   nextSequence: number;
   wake: (() => void) | undefined;
@@ -106,11 +116,28 @@ function timelineKindFromProgress(event: DeploymentProgressEvent): DeploymentTim
 }
 
 function timelineSourceFromProgress(event: DeploymentProgressEvent): DeploymentTimelineSource {
-  if (event.source === "application") {
-    return "application";
+  return event.source;
+}
+
+function timelineKindFromJournalSource(source: DeploymentTimelineSource): DeploymentTimelineKind {
+  if (
+    source === "application" ||
+    source === "docker" ||
+    source === "ssh" ||
+    source === "provider"
+  ) {
+    return "output";
   }
 
-  return "appaloft";
+  if (source === "health") {
+    return "health-check";
+  }
+
+  if (source === "domain-event") {
+    return "status";
+  }
+
+  return "lifecycle";
 }
 
 function isTerminalDeploymentStatus(status: string | undefined): boolean {
@@ -120,6 +147,14 @@ function isTerminalDeploymentStatus(status: string | undefined): boolean {
     status === "canceled" ||
     status === "rolled-back"
   );
+}
+
+function isTerminalProgressEvent(event: DeploymentProgressEvent): boolean {
+  if (event.status === "failed") {
+    return true;
+  }
+
+  return event.phase === "verify" && event.status === "succeeded";
 }
 
 function createDeploymentTimelineStream(input: {
@@ -168,6 +203,16 @@ function entryEnvelope(entry: DeploymentTimelineEntry): DeploymentTimelineEnvelo
     kind: "entry",
     entry,
   };
+}
+
+function entryMatchesRequest(
+  entry: DeploymentTimelineEntry,
+  request: DeploymentTimelineObservationRequest,
+): boolean {
+  return (
+    (!request.kinds || request.kinds.includes(entry.kind)) &&
+    (!request.sources || request.sources.includes(entry.source))
+  );
 }
 
 @injectable()
@@ -221,22 +266,32 @@ export class ShellDeploymentTimelineObserver implements DeploymentTimelineObserv
     signal.addEventListener("abort", onAbort, { once: true });
 
     try {
-      const historicalLogs = await this.deploymentReadModel.findTimeline(
-        repositoryContext,
-        deploymentId,
-      );
-      const historicalEntries: DeploymentTimelineEntry[] = historicalLogs.map((log, index) => ({
-        deploymentId,
-        sequence: index + 1,
-        cursor: timelineCursor(deploymentId, index + 1),
-        occurredAt: log.timestamp,
-        source: log.source === "application" ? "application" : "appaloft",
-        kind: log.source === "application" ? "output" : "lifecycle",
-        phase: log.phase,
-        level: log.level,
-        message: log.message,
-        ...(log.level === "error" ? { status: "failed" } : {}),
-      }));
+      const loadHistoricalEntries = async (): Promise<DeploymentTimelineEntry[]> => {
+        const historicalLogs = await this.deploymentReadModel.findTimeline(
+          repositoryContext,
+          deploymentId,
+        );
+        return historicalLogs.map((log, index) => ({
+          deploymentId,
+          sequence: index + 1,
+          cursor: timelineCursor(deploymentId, index + 1),
+          occurredAt: log.timestamp,
+          source: log.source,
+          kind: timelineKindFromJournalSource(log.source),
+          phase: log.phase,
+          level: log.level,
+          message: log.message,
+          ...(log.level === "error" ? { status: "failed" } : {}),
+        }));
+      };
+      const loadDeploymentStatus = async (): Promise<string | undefined> => {
+        const currentDeployment = await this.deploymentReadModel.findOne(
+          repositoryContext,
+          DeploymentByIdSpec.create(DeploymentId.rehydrate(deploymentId)),
+        );
+        return currentDeployment?.status;
+      };
+      const historicalEntries = await loadHistoricalEntries();
 
       const cursorSequence = parsedCursor.value;
       if (cursorSequence && cursorSequence > historicalEntries.length) {
@@ -246,12 +301,9 @@ export class ShellDeploymentTimelineObserver implements DeploymentTimelineObserv
       state.nextSequence = historicalEntries.length + 1;
       let replayEntries: DeploymentTimelineEntry[] = [];
       if (request.includeHistory) {
-        const filteredEntries = historicalEntries.filter((entry) => {
-          return (
-            (!request.kinds || request.kinds.includes(entry.kind)) &&
-            (!request.sources || request.sources.includes(entry.source))
-          );
-        });
+        const filteredEntries = historicalEntries.filter((entry) =>
+          entryMatchesRequest(entry, request),
+        );
 
         if (cursorSequence) {
           replayEntries = filteredEntries.slice(cursorSequence, cursorSequence + request.limit);
@@ -261,9 +313,13 @@ export class ShellDeploymentTimelineObserver implements DeploymentTimelineObserv
       }
 
       const lastHistoricalEntry = historicalEntries.at(-1);
-      const deploymentAlreadyTerminal =
-        isTerminalDeploymentStatus(observationContext.deployment.status) ||
-        isTerminalDeploymentStatus(lastHistoricalEntry?.status);
+      const lastHistoricalTimestamp = lastHistoricalEntry?.occurredAt;
+      if (lastHistoricalTimestamp) {
+        state.lastDeliveredAt = lastHistoricalTimestamp;
+      }
+      const deploymentAlreadyTerminal = isTerminalDeploymentStatus(
+        observationContext.deployment.status,
+      );
 
       const stream = createDeploymentTimelineStream({
         close: () => {
@@ -280,6 +336,7 @@ export class ShellDeploymentTimelineObserver implements DeploymentTimelineObserv
           try {
             for (const entry of replayEntries) {
               state.lastCursor = entry.cursor;
+              state.lastDeliveredAt = entry.occurredAt;
               yield entryEnvelope(entry);
             }
 
@@ -294,6 +351,13 @@ export class ShellDeploymentTimelineObserver implements DeploymentTimelineObserv
             while (!state.closed) {
               const nextBuffered = state.events.shift();
               if (nextBuffered) {
+                if (
+                  state.lastDeliveredAt &&
+                  nextBuffered.event.timestamp <= state.lastDeliveredAt
+                ) {
+                  continue;
+                }
+
                 const entry: DeploymentTimelineEntry = {
                   deploymentId,
                   sequence: state.nextSequence,
@@ -310,15 +374,13 @@ export class ShellDeploymentTimelineObserver implements DeploymentTimelineObserv
                 };
                 state.nextSequence += 1;
                 state.lastCursor = entry.cursor;
+                state.lastDeliveredAt = entry.occurredAt;
 
-                if (
-                  (!request.kinds || request.kinds.includes(entry.kind)) &&
-                  (!request.sources || request.sources.includes(entry.source))
-                ) {
+                if (entryMatchesRequest(entry, request)) {
                   yield entryEnvelope(entry);
                 }
 
-                if (request.untilTerminal && isTerminalDeploymentStatus(entry.status)) {
+                if (request.untilTerminal && isTerminalProgressEvent(nextBuffered.event)) {
                   yield closedEnvelope("completed", state.lastCursor);
                   return;
                 }
@@ -332,11 +394,43 @@ export class ShellDeploymentTimelineObserver implements DeploymentTimelineObserv
               }
 
               await new Promise<void>((resolve) => {
+                const timeout = setTimeout(resolve, persistentRefreshIntervalMs);
                 state.wake = resolve;
+                state.wake = () => {
+                  clearTimeout(timeout);
+                  resolve();
+                };
                 if (state.closed || state.events.length > 0) {
                   notify();
                 }
               });
+
+              if (state.closed || state.events.length > 0) {
+                continue;
+              }
+
+              const refreshedEntries = await loadHistoricalEntries();
+              for (const entry of refreshedEntries) {
+                if (state.lastDeliveredAt && entry.occurredAt <= state.lastDeliveredAt) {
+                  continue;
+                }
+
+                state.nextSequence = Math.max(state.nextSequence, entry.sequence + 1);
+                state.lastCursor = entry.cursor;
+                state.lastDeliveredAt = entry.occurredAt;
+
+                if (entryMatchesRequest(entry, request)) {
+                  yield entryEnvelope(entry);
+                }
+              }
+
+              if (
+                request.untilTerminal &&
+                isTerminalDeploymentStatus(await loadDeploymentStatus())
+              ) {
+                yield closedEnvelope("completed", state.lastCursor ?? request.cursor);
+                return;
+              }
             }
 
             yield closedEnvelope("source-ended", state.lastCursor ?? request.cursor);
