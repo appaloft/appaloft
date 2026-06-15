@@ -3331,8 +3331,8 @@ describe("console page structure", () => {
     expect(projectLifecycleDialogSource).toContain("lifecycleRestoreOption");
     expect(projectLifecycleDialogSource).toContain("lifecycleDeleteOption");
     expect(projectLifecycleDialogSource).toContain("onclick={submitProjectLifecycleAction}");
-    expect(projectDeleteSafetyQuerySource).toContain("projectLifecycleDialogOpen");
     expect(projectDeleteSafetyQuerySource).toContain("isProjectArchived");
+    expect(projectDeleteSafetyQuerySource).toContain("projectDetailQuery.isSuccess");
     expect(projectDeleteSafetyQuerySource).not.toContain(
       "enabled: browser && projectId.length > 0",
     );

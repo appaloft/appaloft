@@ -378,14 +378,16 @@ const capacityPruneCommand = EffectCommand.make(
     serverId: serverIdArg,
     before: Options.text("before"),
     category: Options.choice("category", runtimeTargetPruneCategories).pipe(Options.repeated),
+    target: Options.text("target").pipe(Options.optional),
     dryRun: Options.boolean("dry-run").pipe(Options.withDefault(true)),
   },
-  ({ serverId, before, category, dryRun }) =>
+  ({ serverId, before, category, target, dryRun }) =>
     runCommand(
       PruneServerCapacityCommand.create({
         serverId,
         before,
         categories: category.length > 0 ? [...category] : undefined,
+        target: optionalValue(target),
         dryRun,
       }),
     ),

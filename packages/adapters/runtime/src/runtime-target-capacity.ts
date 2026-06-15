@@ -197,6 +197,7 @@ export function renderRuntimeTargetCapacityPruneScript(input: {
   sourceWorkspaceRoot?: string;
   before: string;
   categories: string[];
+  target?: string;
   dryRun: boolean;
 }): AshScript {
   const runtimeRoot = input.runtimeRoot.replace(/\/+$/, "");
@@ -211,6 +212,7 @@ export function renderRuntimeTargetCapacityPruneScript(input: {
     ${ash.env("APPALOFT_SOURCE_WORKSPACE_ROOT", sourceWorkspaceRoot)}
     ${ash.env("APPALOFT_PRUNE_BEFORE", input.before)}
     ${ash.env("APPALOFT_PRUNE_CATEGORIES", categories)}
+    ${ash.env("APPALOFT_PRUNE_TARGET_FILTER", input.target ?? "")}
     ${ash.env("APPALOFT_PRUNE_DRY_RUN", input.dryRun ? "1" : "0")}
     ${ash.raw(String.raw`
     if [ -z "$APPALOFT_PRUNE_CANDIDATE_LIMIT" ]; then APPALOFT_PRUNE_CANDIDATE_LIMIT=200; fi
@@ -233,6 +235,13 @@ export function renderRuntimeTargetCapacityPruneScript(input: {
         *) return 1 ;;
       esac
     }
+    matches_prune_target() {
+      candidate_id="$1"; candidate_target="$2"
+      [ -z "$APPALOFT_PRUNE_TARGET_FILTER" ] && return 0
+      [ "$candidate_id" = "$APPALOFT_PRUNE_TARGET_FILTER" ] && return 0
+      [ "$candidate_target" = "$APPALOFT_PRUNE_TARGET_FILTER" ] && return 0
+      return 1
+    }
     older_than_cutoff() {
       candidate_time="$1"
       [ -n "$candidate_time" ] || return 1
@@ -240,6 +249,7 @@ export function renderRuntimeTargetCapacityPruneScript(input: {
     }
     emit_candidate() {
       category="$1"; id="$2"; target="$3"; updated_at="$4"; size_bytes="$5"; action="$6"; reason="$7"
+      matches_prune_target "$id" "$target" || return 0
       case "$size_bytes" in ''|*[!0-9]*) normalized_size=0 ;; *) normalized_size="$size_bytes" ;; esac
       APPALOFT_PRUNE_INSPECTED=$((APPALOFT_PRUNE_INSPECTED + 1))
       case "$action" in
@@ -263,6 +273,7 @@ export function renderRuntimeTargetCapacityPruneScript(input: {
         while IFS='	' read -r cid cname cstatus; do
           [ -n "$cid" ] || continue
           ccreated=$(docker inspect -f '{{.Created}}' "$cid" 2>/dev/null)
+          matches_prune_target "$cid" "$cname" || continue
           case "$cstatus" in
             Up*) emit_candidate stopped-containers "$cid" "$cname" "$ccreated" "0" skipped active-runtime ;;
             *)
@@ -285,7 +296,9 @@ export function renderRuntimeTargetCapacityPruneScript(input: {
     fi
     if has_category docker-build-cache; then
       if command -v docker >/dev/null 2>&1; then
-        if [ "$APPALOFT_PRUNE_DRY_RUN" = "1" ]; then
+        if ! matches_prune_target docker-build-cache docker-build-cache; then
+          :
+        elif [ "$APPALOFT_PRUNE_DRY_RUN" = "1" ]; then
           emit_candidate docker-build-cache docker-build-cache docker-build-cache "$APPALOFT_PRUNE_BEFORE" "0" matched ""
         else
           docker builder prune --force --filter "until=$APPALOFT_PRUNE_BEFORE" >/dev/null 2>&1
@@ -297,7 +310,9 @@ export function renderRuntimeTargetCapacityPruneScript(input: {
     fi
     if has_category unused-images; then
       if command -v docker >/dev/null 2>&1; then
-        if [ "$APPALOFT_PRUNE_DRY_RUN" = "1" ]; then
+        if ! matches_prune_target docker-unused-images docker-unused-images; then
+          :
+        elif [ "$APPALOFT_PRUNE_DRY_RUN" = "1" ]; then
           emit_candidate unused-images docker-unused-images docker-unused-images "$APPALOFT_PRUNE_BEFORE" "0" matched ""
         else
           docker image prune --force --filter "until=$APPALOFT_PRUNE_BEFORE" >/dev/null 2>&1
@@ -321,6 +336,7 @@ export function renderRuntimeTargetCapacityPruneScript(input: {
           category=source-workspaces
           case "$name" in *preview*|prv_*|preview_*) category=preview-workspaces ;; esac
           has_category "$category" || continue
+          matches_prune_target "$name" "$workspace" || continue
           updated_at=$(date -r "$workspace" -u +%Y-%m-%dT%H:%M:%S.000Z 2>/dev/null)
           size_bytes=$(du -sk "$workspace" 2>/dev/null | awk '{print $1 * 1024}')
           case "$size_bytes" in ''|*[!0-9]*) size_bytes=0 ;; esac
@@ -347,6 +363,7 @@ export function renderRuntimeTargetCapacityPruneScript(input: {
         [ -e "$marker" ] || return 0
         marker_name=$(basename "$marker")
         marker_id="$marker_kind"_"$marker_name"
+        matches_prune_target "$marker_id" "$marker" || return 0
         case "$marker" in
           "$APPALOFT_STATE_ROOT"/journals/*.json|"$APPALOFT_STATE_ROOT"/backups/*|"$APPALOFT_STATE_ROOT"/recovery/*.json|"$APPALOFT_STATE_ROOT"/locks/recovered/*) ;;
           *) emit_candidate remote-state-markers "$marker_id" "$marker" "" "0" skipped safety-evidence-missing; return 0 ;;
@@ -1077,6 +1094,7 @@ export class RuntimeTargetCapacityPrunerAdapter implements RuntimeTargetCapacity
       runtimeRoot: providerKey === "generic-ssh" ? this.remoteRuntimeRoot : this.localRuntimeRoot,
       before: input.before,
       categories: input.categories,
+      ...(input.target ? { target: input.target } : {}),
       dryRun: input.dryRun,
     });
     const result =

@@ -1004,6 +1004,7 @@
   let scheduledTaskRunLogs = $state<ScheduledTaskRunLogEntry[]>([]);
   let scheduledTaskRunLogsLoading = $state(false);
   let scheduledTaskRunLogsError = $state<string | null>(null);
+  let scheduledTaskRunLogsRequestId = 0;
   let runtimeFormResourceId = $state("");
   let runtimeStrategy = $state<RuntimePlanStrategy>("auto");
   let runtimeInstallCommand = $state("");
@@ -1949,7 +1950,11 @@
         title: $t(i18nKeys.console.resources.scheduledTaskRunAccepted),
         detail: result.run.runId,
       };
+      scheduledTaskRunLogsRequestId += 1;
       selectedScheduledTaskRunId = result.run.runId;
+      scheduledTaskRunLogs = [];
+      scheduledTaskRunLogsError = null;
+      scheduledTaskRunLogsLoading = false;
       void invalidateScheduledTaskQueries();
     },
     onError: (error) => {
@@ -3651,6 +3656,8 @@
       return;
     }
 
+    const requestId = scheduledTaskRunLogsRequestId + 1;
+    scheduledTaskRunLogsRequestId = requestId;
     selectedScheduledTaskRunId = run.runId;
     scheduledTaskRunLogsLoading = true;
     scheduledTaskRunLogsError = null;
@@ -3663,21 +3670,22 @@
         limit: 100,
       });
 
-      if (selectedScheduledTaskRunId === run.runId) {
+      if (scheduledTaskRunLogsRequestId === requestId && selectedScheduledTaskRunId === run.runId) {
         scheduledTaskRunLogs = result.entries;
       }
     } catch (error) {
-      if (selectedScheduledTaskRunId === run.runId) {
+      if (scheduledTaskRunLogsRequestId === requestId && selectedScheduledTaskRunId === run.runId) {
         scheduledTaskRunLogsError = readErrorMessage(error);
       }
     } finally {
-      if (selectedScheduledTaskRunId === run.runId) {
+      if (scheduledTaskRunLogsRequestId === requestId) {
         scheduledTaskRunLogsLoading = false;
       }
     }
   }
 
   function clearScheduledTaskRunLogs(): void {
+    scheduledTaskRunLogsRequestId += 1;
     selectedScheduledTaskRunId = "";
     scheduledTaskRunLogs = [];
     scheduledTaskRunLogsError = null;

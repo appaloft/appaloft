@@ -48,6 +48,7 @@ import {
   type DefaultAccessDomainPolicyRepository,
   DefaultAccessDomainRuntimePlanResolver,
   type DependencyResourceBackupPolicyRepository,
+  DeploymentLogProgressRecorder,
   type DeploymentProgressReporter,
   type DomainEventStreamRecorder,
   EmptyRemoteStateWorkReadModel,
@@ -891,6 +892,15 @@ export function registerRuntimeDependencies(
     ),
   });
   container.registerInstance(tokens.deploymentProgressReporter, input.deploymentProgressReporter);
+  container.register(tokens.deploymentProgressRecorder, {
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new DeploymentLogProgressRecorder(
+          dependencyContainer.resolve(tokens.deploymentRepository),
+          dependencyContainer.resolve(tokens.logger),
+        ),
+    ),
+  });
   container.registerInstance(
     tokens.maintenanceWorkerStatusReader,
     new ConfigMaintenanceWorkerStatusReader(input.config),
@@ -1576,6 +1586,7 @@ export function registerRuntimeDependencies(
         localBackend: new LocalExecutionBackend(
           join(input.config.dataDir, "runtime"),
           dependencyContainer.resolve(tokens.logger),
+          dependencyContainer.resolve(tokens.deploymentProgressRecorder),
           dependencyContainer.resolve(tokens.deploymentProgressReporter),
           dependencyContainer.resolve(tokens.integrationAuthPort),
           dependencyContainer.resolve(tokens.edgeProxyProviderRegistry),
@@ -1586,6 +1597,7 @@ export function registerRuntimeDependencies(
         sshBackend: new SshExecutionBackend(
           join(input.config.dataDir, "runtime"),
           dependencyContainer.resolve(tokens.logger),
+          dependencyContainer.resolve(tokens.deploymentProgressRecorder),
           dependencyContainer.resolve(tokens.deploymentProgressReporter),
           dependencyContainer.resolve(tokens.integrationAuthPort),
           dependencyContainer.resolve(tokens.serverRepository),
@@ -1620,6 +1632,7 @@ export function registerRuntimeDependencies(
         new RoutingExecutionBackend(
           dependencyContainer.resolve(tokens.runtimeTargetBackendRegistry),
           new InMemoryExecutionBackend(
+            dependencyContainer.resolve(tokens.deploymentProgressRecorder),
             dependencyContainer.resolve(tokens.deploymentProgressReporter),
           ),
         ),

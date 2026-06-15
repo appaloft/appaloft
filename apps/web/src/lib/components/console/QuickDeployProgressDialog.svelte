@@ -28,6 +28,7 @@
     feedback?: QuickDeployFeedback;
     deploymentId?: string;
     traceLink?: string;
+    embedded?: boolean;
     onClose?: () => void;
     onOpenDeployment?: () => void;
   };
@@ -41,6 +42,7 @@
     feedback = null,
     deploymentId = "",
     traceLink = "",
+    embedded = false,
     onClose,
     onOpenDeployment,
   }: Props = $props();
@@ -168,12 +170,21 @@
 </script>
 
 {#if open}
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-background/80 px-4 py-6 backdrop-blur-sm">
+  <div
+    class={[
+      embedded
+        ? "w-full"
+        : "fixed inset-0 z-50 flex items-center justify-center bg-background/80 px-4 py-6 backdrop-blur-sm",
+    ]}
+  >
     <div
       aria-labelledby="quick-deploy-progress-title"
       aria-modal="true"
       role="dialog"
-      class="flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-lg border bg-background shadow-xl"
+      class={[
+        "flex w-full max-w-5xl flex-col overflow-hidden rounded-lg border bg-background",
+        embedded ? "mx-auto max-h-[78vh] shadow-none" : "max-h-[88vh] shadow-xl",
+      ]}
     >
       <header class="border-b px-5 py-4">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">

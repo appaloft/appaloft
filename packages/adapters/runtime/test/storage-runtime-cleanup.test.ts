@@ -201,7 +201,7 @@ describe("storage runtime cleanup adapter", () => {
     expect(script).toMatchSnapshot();
     expect(script).toContain("APPALOFT_STORAGE_CLEANUP_V1");
     expect(script).toContain('docker volume rm "$APPALOFT_DOCKER_VOLUME_NAME"');
-    expect(script).toContain('docker ps -q --filter "volume=$APPALOFT_DOCKER_VOLUME_NAME"');
+    expect(script).toContain('docker ps -aq --filter "volume=$APPALOFT_DOCKER_VOLUME_NAME"');
     expect(script).toContain('{{ index .Labels "appaloft.storage-volume-id" }}');
     expect(script).toContain("ownership-unproven");
     expect(script).not.toContain("docker volume prune");
@@ -360,6 +360,7 @@ describe("storage runtime cleanup adapter", () => {
     }));
 
     expect(script.indexOf("ownership-unproven")).toBeLessThan(script.indexOf("active_container="));
+    expect(script).toContain('docker ps -aq --filter "volume=$APPALOFT_DOCKER_VOLUME_NAME"');
     expect(script).toContain('[ "$volume_storage_id" != "$APPALOFT_STORAGE_VOLUME_ID" ]');
     expect(script).toContain('[ "$volume_managed" != "true" ]');
   });

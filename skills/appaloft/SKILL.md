@@ -62,12 +62,10 @@ surface available in the session.
   `appaloft deployments events <deploymentId> --follow --json` and use deployment logs for log
   lines. For a parent durable work item that coordinates multiple resources or child deployments,
   follow `appaloft work events <workId> --follow --json` or
-  `appaloft work watch <workId> --json`. Remote CLI profiles use bounded JSON polling when the
-  control plane does not expose a direct SSE stream to the CLI, so these watch commands remain the
-  preferred AI-facing progress mechanism. Treat `work show` as a snapshot, not a live log, except
-  when operating an older CLI/control plane that still returns `control_plane_unsupported` for
-  remote watch; in that compatibility case, poll `work show`/`work list` explicitly and report the
-  watch capability gap.
+  `appaloft work watch <workId> --json`. Remote CLI profiles should use the control-plane stream
+  route for follow/watch commands when the route is available; treat `work show` as a snapshot, not
+  a live log. If an older CLI/control plane still returns `control_plane_unsupported` for remote
+  watch, poll `work show`/`work list` explicitly and report the watch capability gap.
 - Blueprint catalog deployment: use `appaloft blueprint list/show/plan-install` for neutral catalog
   discovery and dry-run planning, then use the Blueprint quick-deploy entrypoint when the source is
   an official or extension-provided Blueprint such as PocketBase. Do not invent a separate
@@ -93,6 +91,29 @@ surface available in the session.
   access/variables/dependencies/storage, then redeploy or restart only when needed.
 - Recover a failed deployment: read deployment detail, logs, resource diagnostics, and recovery
   readiness before retry/redeploy/rollback.
+- Clean up a real deployment smoke: use Appaloft lifecycle commands, not direct database, Docker,
+  SSH, or provider mutation. Identify the exact project/resource/deployment/server ids from the
+  run output or manifest; stop runtime with `appaloft resource runtime stop <resourceId>` when a
+  deployed resource is still running; archive/delete resources with
+  `appaloft resource archive <resourceId>` then
+  `appaloft resource delete <resourceId> --confirm-slug <slug>`; archive project-owned
+  deployments with `appaloft deployments archive <deploymentId> --confirm <deploymentId>` when
+  they remain visible; if resource/project deletion is blocked by `deployment-history`, run scoped
+  dry-run prunes for deployment logs, runtime-control attempts, provider job logs, log archives, and
+  archived deployments before executing the same prunes for the exact seed-owned resource; run
+  `appaloft project delete-check <projectId>`, archive the project, then delete it only when blockers
+  are clear. Keep shared or injected test servers for reuse unless the
+  user explicitly asks to deactivate/delete the server record. For storage volumes, detach any
+  resource attachments through Appaloft first, use
+  `appaloft storage volume cleanup-runtime <storageVolumeId> --server <serverId> --before <iso>`
+  for runtime realizations, then delete the volume through Appaloft if it is seed-owned. After
+  cleanup, use `appaloft server test <serverId>` and `appaloft server capacity inspect <serverId>`
+  first when Appaloft owns the SSH credential; if a specific stopped container or runtime artifact
+  is suspected, run `appaloft server capacity prune <serverId> --before <iso> --target <id-or-target> --dry-run true`
+  before executing the same command with `--dry-run false`. Direct read-only
+  SSH/Docker inspection may be used only to verify no orphan containers, networks, or volumes
+  remain. If orphans are found, add/fix the corresponding Appaloft cleanup command rather than
+  deleting them manually.
 - Add access: use default access policy, domain binding, certificate, and route configuration
   operations rather than editing proxy/provider state by hand.
 - Manage backing services: use dependency-resource provision/import/backup/restore and resource

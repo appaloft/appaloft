@@ -1,6 +1,7 @@
 import {
   type DeploymentProgressEvent,
   type OperatorWorkEventStreamEnvelope,
+  type OperatorWorkItem,
   type OperatorWorkObservedEvent,
 } from "@appaloft/contracts";
 
@@ -78,8 +79,40 @@ const blueprintInstallTerminalFailureStatuses = new Set([
   "dead-lettered",
 ]);
 
+type OperatorWorkDisplaySource = Pick<
+  OperatorWorkItem,
+  | "id"
+  | "kind"
+  | "status"
+  | "operationKey"
+  | "phase"
+  | "step"
+  | "deploymentId"
+  | "updatedAt"
+  | "finishedAt"
+  | "errorCode"
+  | "safeDetails"
+>;
+
+export type OperatorWorkReadableFailure = {
+  title: string;
+  detail: string;
+  recovery: string;
+  code: string;
+  phase: string;
+  operation: string;
+};
+
 function uniqueStrings(values: readonly (string | undefined)[]): string[] {
   return [...new Set(values.filter((value): value is string => Boolean(value?.trim())))];
+}
+
+function safeDetailString(
+  details: Record<string, string | number | boolean | null> | undefined,
+  key: string,
+): string {
+  const value = details?.[key];
+  return typeof value === "string" && value.trim() ? value : "";
 }
 
 function firstComponentDeploymentId(snapshot: BlueprintInstallProgressSnapshot): string {
@@ -186,11 +219,80 @@ function operatorWorkPhase(event: OperatorWorkObservedEvent): DeploymentProgress
   }
 }
 
+function operatorWorkItemProgressPhase(
+  work: OperatorWorkDisplaySource,
+): DeploymentProgressEvent["phase"] {
+  const failurePhase = safeDetailString(work.safeDetails, "failure_phase") || work.phase || "";
+  const normalizedPhase = failurePhase.toLowerCase();
+
+  if (normalizedPhase.includes("rollback")) {
+    return "rollback";
+  }
+
+  if (
+    normalizedPhase.includes("readback") ||
+    normalizedPhase.includes("verify") ||
+    normalizedPhase.includes("health")
+  ) {
+    return "verify";
+  }
+
+  if (normalizedPhase.includes("deploy") || normalizedPhase.includes("execution")) {
+    return "deploy";
+  }
+
+  if (normalizedPhase.includes("admission") || normalizedPhase.includes("resource")) {
+    return "plan";
+  }
+
+  return work.status === "failed" || work.status === "dead-lettered" ? "verify" : "deploy";
+}
+
+function operatorWorkDisplayStatus(
+  status: OperatorWorkItem["status"],
+): DeploymentProgressEvent["status"] {
+  switch (status) {
+    case "succeeded":
+      return "succeeded";
+    case "failed":
+    case "canceled":
+    case "dead-lettered":
+      return "failed";
+    default:
+      return "running";
+  }
+}
+
 function operatorWorkLevel(event: OperatorWorkObservedEvent): DeploymentProgressEvent["level"] {
   return operatorWorkStatus(event) === "failed" ? "error" : "info";
 }
 
 function operatorWorkMessage(event: OperatorWorkObservedEvent): string {
+  const readableFailure = operatorWorkReadableFailure({
+    id: event.workId,
+    kind: event.workKind,
+    status: event.status,
+    operationKey: event.operationKey,
+    phase: event.phase,
+    step: event.step,
+    updatedAt: event.emittedAt,
+    finishedAt: event.emittedAt,
+    errorCode: event.errorCode,
+    safeDetails: event.safeDetails,
+  });
+  if (operatorWorkStatus(event) === "failed") {
+    return [
+      readableFailure.title,
+      readableFailure.detail,
+      readableFailure.recovery,
+      readableFailure.phase ? `阶段: ${readableFailure.phase}` : undefined,
+      readableFailure.operation ? `操作: ${readableFailure.operation}` : undefined,
+      readableFailure.code ? `错误: ${readableFailure.code}` : undefined,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }
+
   const parts = [
     event.message,
     event.step ? `step: ${event.step}` : undefined,
@@ -199,6 +301,87 @@ function operatorWorkMessage(event: OperatorWorkObservedEvent): string {
   ].filter(Boolean);
 
   return parts.join(" · ") || `Deployment task ${event.kind}`;
+}
+
+export function operatorWorkReadableFailure(
+  work: OperatorWorkDisplaySource,
+): OperatorWorkReadableFailure {
+  const code =
+    safeDetailString(work.safeDetails, "failure_code") ||
+    safeDetailString(work.safeDetails, "code") ||
+    work.errorCode ||
+    (work.status === "failed" || work.status === "dead-lettered" ? work.status : "");
+  const phase =
+    safeDetailString(work.safeDetails, "failure_phase") || work.phase || work.step || "";
+  const operation = safeDetailString(work.safeDetails, "failure_operation") || work.operationKey;
+
+  if (code === "resource_slug_conflict") {
+    return {
+      title: "资源名称冲突",
+      detail: "资源名称已经被占用，创建资源时失败。",
+      recovery: "请换一个资源名称，或选择复用已有资源后重新安装。",
+      code,
+      phase,
+      operation,
+    };
+  }
+
+  if (phase === "deploy-component-readback") {
+    return {
+      title: "部署结果回读失败",
+      detail: "部署任务已经结束，但 Appaloft 没有读到成功的资源状态。",
+      recovery: "请打开资源诊断或重新部署；如果 Supabase/控制面不可用，不要绕过，需要先修复连接。",
+      code: code || "execution_failed",
+      phase,
+      operation,
+    };
+  }
+
+  return {
+    title: work.kind === "blueprint-install" ? "蓝图安装失败" : "后台任务失败",
+    detail: code ? `失败原因: ${code}` : "后台任务进入失败状态。",
+    recovery:
+      work.status === "dead-lettered"
+        ? "任务已进入死信状态，需要检查失败原因后手动恢复或重试。"
+        : "请查看失败阶段和操作后修正配置，再重新尝试。",
+    code,
+    phase,
+    operation,
+  };
+}
+
+export function operatorWorkItemToProgressEvent(
+  work: OperatorWorkDisplaySource,
+): DeploymentProgressEvent {
+  const status = operatorWorkDisplayStatus(work.status);
+  const readableFailure = operatorWorkReadableFailure(work);
+  const failed = status === "failed";
+
+  return {
+    timestamp: work.finishedAt ?? work.updatedAt,
+    source: "appaloft",
+    phase: operatorWorkItemProgressPhase(work),
+    level: failed ? "error" : "info",
+    message: failed
+      ? [
+          readableFailure.title,
+          readableFailure.detail,
+          readableFailure.recovery,
+          readableFailure.phase ? `阶段: ${readableFailure.phase}` : undefined,
+          readableFailure.operation ? `操作: ${readableFailure.operation}` : undefined,
+          readableFailure.code ? `错误: ${readableFailure.code}` : undefined,
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      : `部署任务${work.status === "succeeded" ? "已完成" : "正在执行"}${work.step ? ` · ${work.step}` : ""}`,
+    status,
+    ...(work.deploymentId ? { deploymentId: work.deploymentId } : {}),
+    step: {
+      current: failed || status === "succeeded" ? 1 : 0,
+      total: failed || status === "succeeded" ? 1 : 2,
+      label: work.step ?? work.phase ?? work.status,
+    },
+  };
 }
 
 function operatorWorkSafeDetailMessageParts(

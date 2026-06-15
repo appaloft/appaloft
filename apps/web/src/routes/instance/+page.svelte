@@ -33,6 +33,7 @@
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import * as Dialog from "$lib/components/ui/dialog";
+  import { operatorWorkReadableFailure } from "$lib/console/blueprint-install-progress";
   import { webDocsHrefs } from "$lib/console/docs-help";
   import { instanceSettingsItems } from "$lib/console/settings-nav";
   import { formatTime } from "$lib/console/utils";
@@ -286,6 +287,9 @@
   );
   const operatorWorkItems = $derived(operatorWorkQuery.data?.items ?? []);
   const selectedOperatorWork = $derived(selectedOperatorWorkQuery.data?.item ?? null);
+  const selectedOperatorWorkReadableFailure = $derived(
+    selectedOperatorWork ? operatorWorkReadableFailure(selectedOperatorWork) : null,
+  );
   const selectedOperatorWorkEvents = $derived(selectedOperatorWorkQuery.data?.events ?? []);
   const enabledMaintenanceWorkerCount = $derived(
     maintenanceWorkers.filter((worker) => worker.enabled).length,
@@ -1228,6 +1232,23 @@ server-config-deploy: true`);
                         <p class="font-medium">
                           {$t(i18nKeys.console.instance.workerWorkFailureSummary)}
                         </p>
+                        {#if selectedOperatorWorkReadableFailure && (selectedOperatorWork.status === "failed" || selectedOperatorWork.status === "dead-lettered" || selectedOperatorWork.status === "canceled")}
+                          <div class="mt-3 rounded-md border border-destructive/25 bg-destructive/5 px-3 py-2">
+                            <p class="text-sm font-semibold text-destructive">{selectedOperatorWorkReadableFailure.title}</p>
+                            <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                              {selectedOperatorWorkReadableFailure.detail} {selectedOperatorWorkReadableFailure.recovery}
+                            </p>
+                            <p class="mt-2 break-words font-mono text-xs text-muted-foreground">
+                              {selectedOperatorWorkReadableFailure.phase || selectedOperatorWork.phase || selectedOperatorWork.step || selectedOperatorWork.status}
+                              {#if selectedOperatorWorkReadableFailure.code}
+                                · {selectedOperatorWorkReadableFailure.code}
+                              {/if}
+                              {#if selectedOperatorWorkReadableFailure.operation}
+                                · {selectedOperatorWorkReadableFailure.operation}
+                              {/if}
+                            </p>
+                          </div>
+                        {/if}
                         <dl class="mt-3 space-y-2">
                           {#if selectedOperatorWork.errorCode}
                             <div>

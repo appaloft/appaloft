@@ -15,6 +15,7 @@ import {
   findControlPlaneOperation,
   performControlPlaneHandshake,
   requestControlPlaneOperation,
+  requestControlPlaneStreamOperation,
 } from "./control-plane-client.js";
 import { type CliControlPlaneProfile } from "./control-plane-profile.js";
 import { type CliProgram, CliRuntime, type CliTerminalIO, printCliError } from "./runtime.js";
@@ -279,31 +280,6 @@ function adaptBoundedStreamResult(operationKey: string, value: unknown): unknown
   return value;
 }
 
-function lastEnvelopeCursor(envelopes: readonly unknown[]): string | undefined {
-  for (const envelope of [...envelopes].reverse()) {
-    if (!isRecord(envelope)) continue;
-    const cursor = readOptionalString(envelope, "cursor");
-    if (cursor) return cursor;
-  }
-  return undefined;
-}
-
-function hasTerminalEnvelope(envelopes: readonly unknown[]): boolean {
-  return envelopes.some((envelope) => {
-    if (!isRecord(envelope)) return false;
-    return envelope.kind === "closed" || envelope.kind === "error";
-  });
-}
-
-function pollIntervalMsFromPayload(payload: Record<string, unknown>): number {
-  const value = payload.pollIntervalMs;
-  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 1000;
-}
-
-async function sleep(ms: number): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 async function dispatchRemoteFollowMessage<TResult>(input: {
   readonly operation: CliControlPlaneOperation;
   readonly request: AppaloftSdkFacadeInput;
@@ -311,49 +287,36 @@ async function dispatchRemoteFollowMessage<TResult>(input: {
   readonly profile: CliControlPlaneProfile;
   readonly fetch?: AppaloftSdkFetch;
 }): Promise<Result<TResult>> {
-  const pollIntervalMs = pollIntervalMsFromPayload(input.payload);
-  const untilTerminal = input.payload.untilTerminal !== false;
-  const envelopes: unknown[] = [];
-  let cursor = typeof input.payload.cursor === "string" ? input.payload.cursor : undefined;
-
-  while (true) {
-    const query = {
-      ...(input.request.query ?? {}),
-      follow: false,
-      ...(cursor ? { cursor } : {}),
-    };
-    const result = await requestControlPlaneOperation({
-      profile: input.profile,
-      operationKey: input.operation.operationKey,
-      ...(input.request.pathParams ? { pathParams: input.request.pathParams } : {}),
-      query,
-      ...(input.request.body === undefined ? {} : { body: input.request.body }),
-      ...(input.fetch ? { fetch: input.fetch } : {}),
-      phase: "remote-operation-dispatch",
-    });
-    if (result.isErr()) {
-      return err(result.error);
-    }
-
-    const adapted = adaptBoundedStreamResult(input.operation.operationKey, result.value);
-    if (!isRecord(adapted) || !Array.isArray(adapted.envelopes)) {
-      return ok(adapted as TResult);
-    }
-
-    envelopes.push(...adapted.envelopes);
-    const nextCursor = lastEnvelopeCursor(adapted.envelopes);
-    if (nextCursor) cursor = nextCursor;
-
-    if (hasTerminalEnvelope(adapted.envelopes)) {
-      return ok({ ...adapted, envelopes } as TResult);
-    }
-
-    if (!untilTerminal) {
-      return ok({ ...adapted, envelopes } as TResult);
-    }
-
-    await sleep(pollIntervalMs);
+  const result = await requestControlPlaneStreamOperation({
+    profile: input.profile,
+    operationKey: input.operation.operationKey,
+    ...(input.request.pathParams ? { pathParams: input.request.pathParams } : {}),
+    ...(input.request.query ? { query: input.request.query } : {}),
+    ...(input.request.body === undefined ? {} : { body: input.request.body }),
+    ...(input.fetch ? { fetch: input.fetch } : {}),
+    phase: "remote-operation-dispatch",
+  });
+  if (result.isErr()) {
+    return err(result.error);
   }
+
+  if (input.operation.operationKey === "deployments.stream-events") {
+    return ok({
+      mode: "stream",
+      deploymentId: readOptionalString(input.request.pathParams ?? {}, "deploymentId") ?? "",
+      stream: result.value,
+    } as TResult);
+  }
+
+  if (input.operation.operationKey === "operator-work.stream-events") {
+    return ok({
+      mode: "stream",
+      workId: readOptionalString(input.request.pathParams ?? {}, "workId") ?? "",
+      stream: result.value,
+    } as TResult);
+  }
+
+  return ok(result.value as TResult);
 }
 
 async function dispatchRemoteMessage<TResult>(input: {

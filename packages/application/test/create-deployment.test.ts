@@ -138,6 +138,7 @@ import {
   PassThroughMutationCoordinator,
   SequenceIdGenerator,
 } from "@appaloft/testkit";
+import { DeploymentLogProgressRecorder } from "../src/deployment-progress-recorder";
 import {
   type DurableWorkClaimInput,
   type DurableWorkClaimResult,
@@ -168,6 +169,7 @@ import {
   type DeploymentConfigReader,
   type DeploymentConfigSnapshot,
   type DeploymentContextDefaultsPolicy,
+  type DeploymentProgressRecorder,
   type DeploymentProgressReporter,
   type DomainRouteBindingCandidate,
   type DomainRouteBindingReader,
@@ -416,6 +418,49 @@ class DeferredExecutionBackend extends HermeticExecutionBackend {
     context: ExecutionContext,
     deployment: Deployment,
   ): Promise<Result<{ deployment: Deployment }>> {
+    this.started.resolve(deployment);
+    await this.release.promise;
+    const result = await super.execute(context, deployment);
+    this.completed.resolve();
+    return result;
+  }
+}
+
+class DurableProgressDeferredExecutionBackend extends HermeticExecutionBackend {
+  readonly started = deferred<Deployment>();
+  readonly release = deferred<void>();
+  readonly completed = deferred<void>();
+  readonly reported = deferred<void>();
+
+  constructor(private readonly progressRecorder: () => DeploymentProgressRecorder) {
+    super();
+  }
+
+  override async execute(
+    context: ExecutionContext,
+    deployment: Deployment,
+  ): Promise<Result<{ deployment: Deployment }>> {
+    const deploymentId = deployment.toState().id.value;
+    const recorded = await this.progressRecorder().record(context, {
+      timestamp: "2026-01-01T00:02:30.000Z",
+      deploymentId,
+      source: "appaloft",
+      phase: "deploy",
+      level: "info",
+      status: "running",
+      message: "Runtime container was started",
+      step: {
+        current: 4,
+        total: 5,
+        label: "Start runtime",
+      },
+    });
+    if (recorded.isErr()) {
+      this.reported.reject(recorded.error);
+    } else {
+      this.reported.resolve();
+    }
+
     this.started.resolve(deployment);
     await this.release.promise;
     const result = await super.execute(context, deployment);
@@ -1778,6 +1823,93 @@ describe("CreateDeploymentUseCase", () => {
       status: "succeeded",
       operationKey: "deployments.create",
     });
+  });
+
+  test("[PROC-DELIVERY-WORKER-022] preserves durable progress logs when worker completion persists", async () => {
+    const durableWork = new RecordingDurableWorkAdapter();
+    let progressRecorder: DeploymentProgressRecorder | undefined;
+    const executionBackend = new DurableProgressDeferredExecutionBackend(() => {
+      if (!progressRecorder) {
+        throw new Error("progress recorder was not configured");
+      }
+      return progressRecorder;
+    });
+    const processAttemptRecorder = new RecordingProcessAttemptRecorder();
+    const {
+      clock,
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      deployments,
+      eventBus,
+      logger,
+      repositoryContext,
+    } = await createDeploymentFixture(undefined, {
+      durableWorkQueueAdapter: durableWork,
+      executionBackend,
+      processAttemptRecorder,
+    });
+    progressRecorder = new DeploymentLogProgressRecorder(deployments, logger);
+    const accepted = await createDeploymentUseCase.execute(context, {
+      ...createDeploymentInput,
+      executionMode: "detached",
+    });
+    expect(accepted.isOk()).toBe(true);
+    if (accepted.isErr()) throw new Error(accepted.error.message);
+
+    const handler = new DeploymentDurableWorkHandler(
+      deployments,
+      new DeploymentLifecycleService(clock),
+      executionBackend,
+      eventBus,
+      logger,
+      processAttemptRecorder,
+    );
+    const drained = drainDurableWorkOnce(
+      context,
+      durableWork,
+      {
+        resolve(item) {
+          return item.kind === "deployment" ? handler : undefined;
+        },
+      },
+      {
+        worker: {
+          workerId: "deployment-worker-1",
+          workerGroup: "deployment-worker",
+          slot: 1,
+        },
+        now: "2026-01-01T00:00:00.000Z",
+        leaseDurationMs: 300000,
+      },
+    );
+
+    await executionBackend.reported.promise;
+    const running = await deployments.findOne(
+      repositoryContext,
+      DeploymentByIdSpec.create(DeploymentId.rehydrate(accepted.value.id)),
+    );
+    expect(running?.toState().status.value).toBe("running");
+    expect(running?.toState().logs.map((log) => log.message)).toContain(
+      "Runtime container was started",
+    );
+
+    executionBackend.release.resolve();
+    const drainedResult = await drained;
+    expect(drainedResult.isOk()).toBe(true);
+    if (drainedResult.isErr()) throw new Error(drainedResult.error.message);
+
+    const completed = await deployments.findOne(
+      repositoryContext,
+      DeploymentByIdSpec.create(DeploymentId.rehydrate(accepted.value.id)),
+    );
+    expect(completed?.toState().status.value).toBe("succeeded");
+    expect(completed?.toState().logs.map((log) => log.message)).toContain(
+      "Runtime container was started",
+    );
+    expect(completed?.toState().logs.map((log) => log.message)).toContain(
+      "Hermetic execution backend applied runtime plan",
+    );
   });
 
   test("[PROC-DELIVERY-WORKER-026] keeps default deployment execution synchronous with durable work enabled", async () => {
