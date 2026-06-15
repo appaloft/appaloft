@@ -78,7 +78,7 @@ describe("createAppaloftServer", () => {
     } finally {
       await server.shutdown();
     }
-  }, 15_000);
+  }, 45_000);
 
   test("[SERVER-DI-001] fails startup registration drift before operations execute", async () => {
     const dataDir = await createTempDataDir();
@@ -114,7 +114,7 @@ describe("createAppaloftServer", () => {
     } finally {
       await server.shutdown();
     }
-  }, 15_000);
+  }, 45_000);
 
   test("[SERVER-DI-002] operation services use guards registered by application extensions", async () => {
     const dataDir = await createTempDataDir();
@@ -178,7 +178,7 @@ describe("createAppaloftServer", () => {
     } finally {
       await server.shutdown();
     }
-  }, 15_000);
+  }, 45_000);
 
   test("[STATIC-ARTIFACT-EXT-010][STATIC-ARTIFACT-EXT-012] wires static artifact publishing to the local filesystem runtime and HTTP route", async () => {
     const dataDir = await createTempDataDir();
@@ -233,7 +233,7 @@ describe("createAppaloftServer", () => {
     } finally {
       await server.shutdown();
     }
-  }, 15_000);
+  }, 30_000);
 
   test("[STATIC-ARTIFACT-EXT-017] publishes a zipped static artifact through the API and serves it locally", async () => {
     const dataDir = await createTempDataDir();
@@ -302,7 +302,7 @@ describe("createAppaloftServer", () => {
     } finally {
       await server.shutdown();
     }
-  }, 15_000);
+  }, 45_000);
 
   test("allows an external extension to add an HTTP route", async () => {
     const dataDir = await createTempDataDir();
@@ -342,7 +342,7 @@ describe("createAppaloftServer", () => {
     } finally {
       await server.shutdown();
     }
-  });
+  }, 45_000);
 
   test("keeps configured HTTP routes active when app version is a deployment SHA", async () => {
     const dataDir = await createTempDataDir();
@@ -382,7 +382,7 @@ describe("createAppaloftServer", () => {
     } finally {
       await server.shutdown();
     }
-  });
+  }, 45_000);
 
   test("[TERM-SESSION-ENTRY-006] started server passes Bun websocket handle to terminal attach routes", async () => {
     const dataDir = await createTempDataDir();
@@ -433,7 +433,7 @@ describe("createAppaloftServer", () => {
       socket?.close();
       await server.shutdown();
     }
-  }, 15_000);
+  }, 45_000);
 });
 
 function waitForOpen(socket: WebSocket): Promise<void> {

@@ -18,7 +18,7 @@ describe("streaming process", () => {
       resolved = true;
     });
 
-    await Bun.sleep(50);
+    await waitFor(() => lines.length > 0);
 
     expect(resolved).toBe(false);
     expect(lines).toEqual(["first"]);
@@ -29,3 +29,14 @@ describe("streaming process", () => {
     expect(lines).toEqual(["first", "second"]);
   });
 });
+
+async function waitFor(predicate: () => boolean): Promise<void> {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < 1_000) {
+    if (predicate()) {
+      return;
+    }
+    await Bun.sleep(10);
+  }
+  throw new Error("Timed out waiting for condition");
+}
