@@ -90,6 +90,25 @@ function routeUrl(input: {
   return `${input.scheme}://${input.hostname}${path}`;
 }
 
+function defaultOpenPathPrefixForRoute(
+  metadata: Record<string, string>,
+  routePathPrefix: string,
+): string {
+  const candidate = metadata["access.defaultOpenPathPrefix"]?.trim();
+  if (!candidate?.startsWith("/")) {
+    return routePathPrefix;
+  }
+
+  if (routePathPrefix === "/") {
+    return candidate;
+  }
+
+  const routePath = routePathPrefix.endsWith("/") ? routePathPrefix : `${routePathPrefix}/`;
+  return candidate === routePathPrefix || candidate.startsWith(routePath)
+    ? candidate
+    : routePathPrefix;
+}
+
 function proxyRouteStatusFor(
   deploymentStatus: DeploymentStatus,
 ): NonNullable<ResourceAccessSummary["proxyRouteStatus"]> {
@@ -222,9 +241,10 @@ export function projectResourceAccessSummary(
     if (hostname) {
       const scheme =
         metadata["access.scheme"] === "https" || route.tlsMode === "auto" ? "https" : "http";
+      const urlPathPrefix = defaultOpenPathPrefixForRoute(metadata, route.pathPrefix);
 
       summary.latestGeneratedAccessRoute = {
-        url: routeUrl({ hostname, scheme, pathPrefix: route.pathPrefix }),
+        url: routeUrl({ hostname, scheme, pathPrefix: urlPathPrefix }),
         hostname,
         scheme,
         ...(metadata["access.providerKey"] ? { providerKey: metadata["access.providerKey"] } : {}),

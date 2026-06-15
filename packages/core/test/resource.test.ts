@@ -200,6 +200,43 @@ describe("Resource", () => {
     }
   });
 
+  test("[DMBH-RES-001] Resource carries a source default open path into access metadata", () => {
+    const resource = Resource.create({
+      ...baseInput,
+      kind: ResourceKindValue.rehydrate("application"),
+      sourceBinding: {
+        kind: SourceKindValue.rehydrate("docker-image"),
+        locator: SourceLocator.rehydrate("ghcr.io/example/app:latest"),
+        displayName: DisplayNameText.rehydrate("Example app"),
+        metadata: {
+          "access.defaultOpenPathPrefix": "/_/",
+        },
+      },
+      runtimeProfile: {
+        strategy: RuntimePlanStrategyValue.rehydrate("prebuilt-image"),
+      },
+      networkProfile: {
+        internalPort: PortNumber.rehydrate(8090),
+        upstreamProtocol: ResourceNetworkProtocolValue.rehydrate("http"),
+        exposureMode: ResourceExposureModeValue.rehydrate("reverse-proxy"),
+      },
+      accessProfile: {
+        generatedAccessMode: ResourceGeneratedAccessModeValue.rehydrate("inherit"),
+        pathPrefix: RoutePathPrefix.rehydrate("/"),
+      },
+    })._unsafeUnwrap();
+
+    const profile = resource.resolveDeploymentProfile({ operationName: "deployments.create" });
+
+    expect(profile.isOk()).toBe(true);
+    if (profile.isOk()) {
+      expect(profile.value.accessContext?.pathPrefix).toBe("/");
+      expect(profile.value.accessRouteMetadata).toEqual({
+        "access.defaultOpenPathPrefix": "/_/",
+      });
+    }
+  });
+
   test("[DMBH-RES-001] Resource rejects missing source binding and missing internal port through domain behavior", () => {
     const resource = Resource.create({
       ...baseInput,
