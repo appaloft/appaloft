@@ -15,7 +15,7 @@
       case "healthy":
         return "bg-emerald-600";
       case "loading":
-        return "animate-pulse bg-muted-foreground/60";
+        return "animate-pulse bg-sky-500";
       case "degraded":
       case "starting":
         return "bg-amber-500";
