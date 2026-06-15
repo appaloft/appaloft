@@ -2511,6 +2511,8 @@ export const i18nKeys = {
       credentialMaterialSummary: "console:servers.credentialMaterialSummary",
       credentialPrivateKeyConfigured: "console:servers.credentialPrivateKeyConfigured",
       credentialPublicKeyConfigured: "console:servers.credentialPublicKeyConfigured",
+      credentialReusableUnavailableBody: "console:servers.credentialReusableUnavailableBody",
+      credentialReusableUnavailableTitle: "console:servers.credentialReusableUnavailableTitle",
       credentialUsageActive: "console:servers.credentialUsageActive",
       credentialUsageEmptyBody: "console:servers.credentialUsageEmptyBody",
       credentialUsageEmptyTitle: "console:servers.credentialUsageEmptyTitle",
