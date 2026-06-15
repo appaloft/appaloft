@@ -63,7 +63,7 @@ import {
   type ResourceName,
   type ResourceServiceName,
   ResourceSlug,
-  type RoutePathPrefix,
+  RoutePathPrefix,
   type RuntimeNameText,
 } from "../shared/text-values";
 import { ScalarValueObject } from "../shared/value-object";
@@ -197,7 +197,26 @@ export interface ResourceDeploymentProfile {
   upstreamProtocol?: ResourceNetworkProtocol;
   accessContext?: ResourceDeploymentAccessContext;
   runtimeMetadata?: Record<string, string>;
+  accessRouteMetadata?: Record<string, string>;
   storageMounts?: ResourceDeploymentStorageMount[];
+}
+
+function sourceAccessRouteMetadata(
+  sourceBinding: ResourceSourceBindingState | undefined,
+): Record<string, string> | undefined {
+  const defaultOpenPathPrefix = sourceBinding?.metadata?.["access.defaultOpenPathPrefix"]?.trim();
+  if (!defaultOpenPathPrefix) {
+    return undefined;
+  }
+
+  const pathPrefix = RoutePathPrefix.create(defaultOpenPathPrefix);
+  if (pathPrefix.isErr()) {
+    return undefined;
+  }
+
+  return {
+    "access.defaultOpenPathPrefix": pathPrefix.value.value,
+  };
 }
 
 export interface ResourceDeploymentSourceDescriptor {
@@ -1474,6 +1493,7 @@ export class Resource extends AggregateRoot<ResourceState> {
     const runtimeProfile = this.state.runtimeProfile;
     const networkProfile = this.state.networkProfile;
     const accessProfile = this.state.accessProfile;
+    const sourceAccessMetadata = sourceAccessRouteMetadata(this.state.sourceBinding);
     const internalPort = networkProfile?.internalPort.value;
     const method = runtimeProfile?.strategy.value ?? "auto";
 
@@ -1511,6 +1531,7 @@ export class Resource extends AggregateRoot<ResourceState> {
       ...(runtimeProfile?.runtimeName
         ? { runtimeMetadata: { "resource.runtimeName": runtimeProfile.runtimeName.value } }
         : {}),
+      ...(sourceAccessMetadata ? { accessRouteMetadata: sourceAccessMetadata } : {}),
       ...(runtimeProfile?.publishDirectory
         ? { publishDirectory: runtimeProfile.publishDirectory.value }
         : {}),
