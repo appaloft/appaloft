@@ -370,7 +370,7 @@ describe("resource runtime log archives", () => {
 
     expect(result.isOk()).toBe(true);
     expect(result._unsafeUnwrap()).toMatchObject({
-      schemaVersion: "resources.runtime-timeline.archive/v1",
+      schemaVersion: "resources.runtime-logs.archive/v1",
       archive: {
         archiveId: "rla_000001",
         resourceId: "res_web",
@@ -380,6 +380,20 @@ describe("resource runtime log archives", () => {
         runtimeKind: "host-process",
         capturedAt: "2026-01-01T00:10:00.000Z",
         lineCount: 1,
+        retentionStatus: "retained",
+        lines: [
+          {
+            deploymentId: "dep_web",
+            masked: true,
+            message: "server started with TOKEN=********",
+            resourceId: "res_web",
+            runtimeKind: "host-process",
+            sequence: 1,
+            serviceName: "web",
+            stream: "stdout",
+            timestamp: "2026-01-01T00:00:03.000Z",
+          },
+        ],
         reason: "support review",
       },
     });
