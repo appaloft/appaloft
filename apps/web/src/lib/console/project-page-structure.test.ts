@@ -109,6 +109,8 @@ describe("project detail page structure", () => {
     expect(projectSource).toContain("data-project-attention-progress-item");
     expect(projectSource).toContain("data-project-attention-progress-trigger");
     expect(projectSource).toContain("data-project-attention-status-signal");
+    expect(projectSource).toContain("data-project-resource-install-failures");
+    expect(projectSource).toContain("failedProjectBlueprintInstallItems");
     expect(projectSource).toContain("DropdownMenuContent");
     expect(projectSource).toContain("projectAttentionStatusLabel");
     expect(projectSource).toContain("key: `operator-work-${work.id}`");
@@ -118,10 +120,16 @@ describe("project detail page structure", () => {
     expect(quickDeployProgressDialogSource).not.toContain("work {operatorWorkId}");
     expect(quickDeployProgressDialogSource).not.toContain("onOpenOperatorWork");
     expect(quickDeployProgressDialogSource).not.toContain("disabled={pending}");
+    expect(quickDeployProgressDialogSource).toContain("embedded?: boolean");
+    expect(quickDeploySheetSource).toContain("embedded");
     expect(quickDeploySheetSource).toContain("readBlueprintInstallProgressSummary");
+    expect(quickDeploySheetSource).toContain("startBlueprintOperatorWorkStatusPoll");
+    expect(quickDeploySheetSource).toContain("orpcClient.operatorWork.show");
     expect(quickDeploySheetSource).toContain("Promise.race");
     expect(quickDeploySheetSource).toContain('installSummary.terminalStatus !== "failed"');
     expect(operationProgressPanelSource).toContain("{#if requestId}");
+    expect(operationProgressPanelSource).toContain("Intl.DateTimeFormat");
+    expect(operationProgressPanelSource).toContain("new Date(timestamp)");
     expect(deploymentStatusBadgeSource).toContain("data-deployment-running-signal");
     expect(deploymentStatusBadgeSource).toContain("bg-amber-50");
   });

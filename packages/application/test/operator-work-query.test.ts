@@ -1195,6 +1195,15 @@ describe("operator work query service", () => {
     await result.value.stream.close();
 
     expect(envelopes.map((envelope) => envelope.kind)).toEqual(["accepted", "failed", "closed"]);
+    expect(JSON.stringify(envelopes[0])).not.toContain("component_deploy_failed");
+    expect(envelopes[1]).toMatchObject({
+      kind: "failed",
+      event: {
+        errorCode: "component_deploy_failed",
+        errorCategory: "async-processing",
+        retriable: true,
+      },
+    });
     expect(envelopes.at(-1)).toMatchObject({
       schemaVersion: "operator-work.stream-events/v1",
       kind: "closed",

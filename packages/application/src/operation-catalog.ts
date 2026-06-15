@@ -1380,7 +1380,7 @@ export const operationCatalog = [
     inputSchema: pruneServerCapacityCommandInputSchema,
     serviceToken: tokens.pruneServerCapacityUseCase,
     transports: {
-      cli: "appaloft server capacity prune <serverId> --before <iso>",
+      cli: "appaloft server capacity prune <serverId> --before <iso> [--target <id-or-target>]",
       orpc: { method: "POST", path: "/api/servers/{serverId}/capacity/prune" },
     },
   },

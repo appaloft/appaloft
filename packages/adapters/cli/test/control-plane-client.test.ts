@@ -26,6 +26,17 @@ function jsonResponse(value: unknown, status = 200): Response {
   });
 }
 
+function sseResponse(envelopes: readonly unknown[]): Response {
+  return new Response(
+    envelopes.map((envelope) => `data: ${JSON.stringify(envelope)}\n\n`).join(""),
+    {
+      headers: {
+        "content-type": "text/event-stream",
+      },
+    },
+  );
+}
+
 function captureOutput() {
   let stdout = "";
   let stderr = "";
@@ -1533,44 +1544,27 @@ describe("CLI remote control-plane client", () => {
     expect(output.stdout).toContain("completed");
   });
 
-  test("[OP-WORK-CLI-017] remote work watch polls bounded events until a terminal envelope", async () => {
+  test("[OP-WORK-CLI-017] remote work watch opens the stream route until a terminal envelope", async () => {
     const requests: Request[] = [];
-    const eventResponses = [
-      jsonResponse({
-        workId: "wrk_remote",
-        envelopes: [
+    const program = createRemoteCliProgram({
+      version: "0.12.5-test",
+      profile: profile("local"),
+      fetch: createControlPlaneFetch(requests, {
+        "/api/operator-work/wrk_remote/events/stream": sseResponse([
           {
             schemaVersion: "operator-work.stream-events/v1",
             kind: "progress",
             status: "running",
             cursor: "wrk_remote:1",
           },
-        ],
-      }),
-      jsonResponse({
-        workId: "wrk_remote",
-        envelopes: [
           {
             schemaVersion: "operator-work.stream-events/v1",
             kind: "closed",
             reason: "completed",
             cursor: "wrk_remote:2",
           },
-        ],
+        ]),
       }),
-    ];
-    const defaultFetch = createControlPlaneFetch([], {});
-    const program = createRemoteCliProgram({
-      version: "0.12.5-test",
-      profile: profile("local"),
-      fetch: async (request) => {
-        requests.push(request);
-        const url = new URL(request.url);
-        if (url.pathname === "/api/operator-work/wrk_remote/events") {
-          return eventResponses.shift() ?? eventResponses[0]!;
-        }
-        return defaultFetch(request);
-      },
       now: () => "2026-05-17T00:00:00.000Z",
     });
 
@@ -1591,37 +1585,42 @@ describe("CLI remote control-plane client", () => {
       [
         "GET /api/version",
         "GET /api/organizations/current-context",
-        "GET /api/operator-work/wrk_remote/events",
-        "GET /api/operator-work/wrk_remote/events",
+        "GET /api/operator-work/wrk_remote/events/stream",
       ],
     );
-    expect(new URL(requests[2]?.url ?? "http://localhost").searchParams.get("follow")).toBe(
-      "false",
-    );
-    expect(new URL(requests[3]?.url ?? "http://localhost").searchParams.get("cursor")).toBe(
-      "wrk_remote:1",
-    );
+    expect(new URL(requests[2]?.url ?? "http://localhost").searchParams.get("follow")).toBe("true");
     expect(output.stdout).toContain("running");
     expect(output.stdout).toContain("completed");
   });
 
-  test("[DEP-EVENTS-CLI-004] remote deployment events follow uses the bounded JSON route", async () => {
+  test("[DEP-EVENTS-CLI-004] remote deployment events follow opens the stream route", async () => {
     const requests: Request[] = [];
     const program = createRemoteCliProgram({
       version: "0.12.5-test",
       profile: profile("local"),
       fetch: createControlPlaneFetch(requests, {
-        "/api/deployments/dep_remote/events": jsonResponse({
-          deploymentId: "dep_remote",
-          envelopes: [
-            {
-              schemaVersion: "deployments.stream-events/v1",
-              kind: "closed",
-              reason: "terminal-status",
+        "/api/deployments/dep_remote/events/stream": sseResponse([
+          {
+            schemaVersion: "deployments.stream-events/v1",
+            kind: "event",
+            event: {
+              deploymentId: "dep_remote",
+              sequence: 1,
               cursor: "dep_remote:1",
+              emittedAt: "2026-05-17T00:00:00.000Z",
+              source: "domain-event",
+              eventType: "deployment-succeeded",
+              status: "succeeded",
+              summary: "Deployment succeeded",
             },
-          ],
-        }),
+          },
+          {
+            schemaVersion: "deployments.stream-events/v1",
+            kind: "closed",
+            reason: "terminal-status",
+            cursor: "dep_remote:1",
+          },
+        ]),
       }),
       now: () => "2026-05-17T00:00:00.000Z",
     });
@@ -1642,13 +1641,12 @@ describe("CLI remote control-plane client", () => {
       [
         "GET /api/version",
         "GET /api/organizations/current-context",
-        "GET /api/deployments/dep_remote/events",
+        "GET /api/deployments/dep_remote/events/stream",
       ],
     );
-    expect(new URL(requests[2]?.url ?? "http://localhost").searchParams.get("follow")).toBe(
-      "false",
-    );
+    expect(new URL(requests[2]?.url ?? "http://localhost").searchParams.get("follow")).toBe("true");
     expect(output.stdout).toContain("dep_remote");
+    expect(output.stdout).toContain("deployment-succeeded");
     expect(output.stdout).toContain("terminal-status");
   });
 

@@ -3,7 +3,9 @@ import "reflect-metadata";
 import { describe, expect, test } from "bun:test";
 import {
   BuildStrategyKindValue,
+  ConfigKey,
   ConfigScopeValue,
+  ConfigValueText,
   CreatedAt,
   Deployment,
   DeploymentId,
@@ -37,6 +39,8 @@ import {
   SourceLocator,
   StartedAt,
   TargetKindValue,
+  VariableExposureValue,
+  VariableKindValue,
 } from "@appaloft/core";
 import {
   CapturedEventBus,
@@ -121,7 +125,11 @@ function runtimePlan() {
   });
 }
 
-function deployment(input?: { id?: string; status?: "running" | "succeeded" }) {
+function deployment(input?: {
+  id?: string;
+  status?: "running" | "succeeded";
+  variables?: Parameters<typeof EnvironmentConfigSnapshot.rehydrate>[0]["variables"];
+}) {
   const status = input?.status ?? "succeeded";
   return Deployment.rehydrate({
     id: DeploymentId.rehydrate(input?.id ?? "dep_archive"),
@@ -137,7 +145,7 @@ function deployment(input?: { id?: string; status?: "running" | "succeeded" }) {
       environmentId: EnvironmentId.rehydrate("env_demo"),
       createdAt: GeneratedAt.rehydrate("2026-01-01T00:00:00.000Z"),
       precedence: [ConfigScopeValue.rehydrate("environment")],
-      variables: [],
+      variables: input?.variables ?? [],
     }),
     dependencyBindingReferences: [],
     logs: [],
@@ -207,6 +215,68 @@ describe("deployment archive and prune", () => {
     expect(all.items.find((item) => item.id === "dep_archive")?.archivedAt).toBe(
       "2026-01-01T00:01:00.000Z",
     );
+  });
+
+  test("[DEP-LIST-SECRET-001] masks secret values on deployment list readback", async () => {
+    const repository = new MemoryDeploymentRepository();
+    const context = createExecutionContext({
+      requestId: "req_list_deployment_secret_test",
+      entrypoint: "system",
+    });
+    await repository.insertOne({} as RepositoryContext, deployment({ id: "dep_secret" }), {
+      accept: () => ({}) as never,
+    });
+    await repository.insertOne(
+      {} as RepositoryContext,
+      deployment({
+        id: "dep_visible_secret",
+        variables: [
+          {
+            key: ConfigKey.rehydrate("PUBLIC_ORIGIN"),
+            value: ConfigValueText.rehydrate("https://web.demo.example.com"),
+            kind: VariableKindValue.rehydrate("plain-config"),
+            exposure: VariableExposureValue.rehydrate("runtime"),
+            scope: ConfigScopeValue.rehydrate("resource"),
+            isSecret: false,
+          },
+          {
+            key: ConfigKey.rehydrate("SECRET_KEY"),
+            value: ConfigValueText.rehydrate("raw-secret-value-that-must-not-leak"),
+            kind: VariableKindValue.rehydrate("secret"),
+            exposure: VariableExposureValue.rehydrate("runtime"),
+            scope: ConfigScopeValue.rehydrate("resource"),
+            isSecret: true,
+          },
+        ],
+      }),
+      {
+        accept: () => ({}) as never,
+      },
+    );
+
+    const listService = new ListDeploymentsQueryService(new MemoryDeploymentReadModel(repository));
+    const result = await listService.execute(context, { includeArchived: true });
+    const secretDeployment = result.items.find((item) => item.id === "dep_visible_secret");
+
+    expect(JSON.stringify(result)).not.toContain("raw-secret-value-that-must-not-leak");
+    expect(secretDeployment?.environmentSnapshot.variables).toEqual([
+      {
+        key: "PUBLIC_ORIGIN",
+        value: "https://web.demo.example.com",
+        kind: "plain-config",
+        exposure: "runtime",
+        scope: "resource",
+        isSecret: false,
+      },
+      {
+        key: "SECRET_KEY",
+        value: "********",
+        kind: "secret",
+        exposure: "runtime",
+        scope: "resource",
+        isSecret: true,
+      },
+    ]);
   });
 
   test("[DEP-ARCHIVE-002] rejects non-terminal deployment archive", async () => {

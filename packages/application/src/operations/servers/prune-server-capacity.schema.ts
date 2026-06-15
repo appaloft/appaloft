@@ -25,6 +25,7 @@ export const pruneServerCapacityCommandInputSchema = z.object({
     .array(runtimeTargetPruneCategorySchema)
     .min(1)
     .default([...defaultRuntimeTargetPruneCategories]),
+  target: nonEmptyTrimmedString("Runtime prune candidate target").optional(),
   dryRun: z.boolean().default(true),
 });
 

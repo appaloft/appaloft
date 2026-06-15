@@ -1,6 +1,8 @@
 import {
+  type Deployment,
   DeploymentByIdSpec,
   DeploymentId,
+  type DeploymentLogEntry,
   domainError,
   err,
   ok,
@@ -168,7 +170,19 @@ export class DeploymentDurableWorkHandler implements DurableWorkHandler {
         return err(failureResult.error);
       }
 
-      const persisted = await this.persistAndPublish(context, repositoryContext, deployment);
+      const persistableDeployment = await this.mergeLatestProgressLogs(
+        repositoryContext,
+        deployment,
+      );
+      if (persistableDeployment.isErr()) {
+        return err(persistableDeployment.error);
+      }
+
+      const persisted = await this.persistAndPublish(
+        context,
+        repositoryContext,
+        persistableDeployment.value,
+      );
       if (persisted.isErr()) {
         return err(persisted.error);
       }
@@ -186,10 +200,18 @@ export class DeploymentDurableWorkHandler implements DurableWorkHandler {
       });
     }
 
+    const persistableDeployment = await this.mergeLatestProgressLogs(
+      repositoryContext,
+      executionResult.value.deployment,
+    );
+    if (persistableDeployment.isErr()) {
+      return err(persistableDeployment.error);
+    }
+
     const persisted = await this.persistAndPublish(
       context,
       repositoryContext,
-      executionResult.value.deployment,
+      persistableDeployment.value,
     );
     if (persisted.isErr()) {
       return err(persisted.error);
@@ -203,6 +225,32 @@ export class DeploymentDurableWorkHandler implements DurableWorkHandler {
         deploymentId,
       },
     });
+  }
+
+  private async mergeLatestProgressLogs(
+    repositoryContext: RepositoryContext,
+    deployment: Deployment,
+  ): Promise<Result<Deployment>> {
+    const latest = await this.deploymentRepository.findOne(
+      repositoryContext,
+      DeploymentByIdSpec.create(deployment.toState().id),
+    );
+    if (!latest) {
+      return ok(deployment);
+    }
+
+    const existingLogs = deployment.toState().logs;
+    const missingLogs = latest
+      .toState()
+      .logs.filter(
+        (latestLog) =>
+          !existingLogs.some((existingLog) => sameDeploymentLogEntry(existingLog, latestLog)),
+      );
+    if (missingLogs.length > 0) {
+      deployment.appendLogs(missingLogs);
+    }
+
+    return ok(deployment);
   }
 
   private async persistAndPublish(
@@ -238,4 +286,31 @@ export class DeploymentDurableWorkHandler implements DurableWorkHandler {
       ? "deployments.redeploy"
       : "deployments.create";
   }
+}
+
+function sameDeploymentLogEntry(left: DeploymentLogEntry, right: DeploymentLogEntry): boolean {
+  if (
+    left.source === right.source &&
+    left.phase === right.phase &&
+    left.level === right.level &&
+    left.message === right.message
+  ) {
+    return sameOrAdjacentTimestamp(left.timestamp, right.timestamp);
+  }
+
+  return false;
+}
+
+function sameOrAdjacentTimestamp(left: string, right: string): boolean {
+  if (left === right) {
+    return true;
+  }
+
+  const leftTime = Date.parse(left);
+  const rightTime = Date.parse(right);
+  return (
+    Number.isFinite(leftTime) &&
+    Number.isFinite(rightTime) &&
+    Math.abs(leftTime - rightTime) <= 1000
+  );
 }

@@ -85,6 +85,7 @@ export class PruneServerCapacityUseCase {
         server: server.toState(),
         before: input.before,
         categories: input.categories,
+        ...(input.target ? { target: input.target } : {}),
         dryRun: input.dryRun,
       });
 

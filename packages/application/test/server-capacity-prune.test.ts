@@ -285,6 +285,36 @@ describe("servers.capacity.prune", () => {
     expect(pruner.inputs[1]?.categories).toEqual(["docker-build-cache", "unused-images"]);
   });
 
+  test("[RT-CAP-PRUNE-012] target filter is passed to the runtime pruner but not retained in audit payload", async () => {
+    const pruner = new FakeCapacityPruner();
+    const auditRecorder = new MemoryAuditEventRecorder();
+    const useCase = createUseCase({ pruner, auditRecorder });
+    const context = createExecutionContext({
+      requestId: "req_server_capacity_prune_target_filter_test",
+      entrypoint: "system",
+    });
+    const command = unwrap(
+      PruneServerCapacityCommand.create({
+        serverId: "srv_primary",
+        before: "2026-01-01T00:05:00.000Z",
+        categories: ["stopped-containers"],
+        target: "appaloft-dep_123",
+        dryRun: false,
+      }),
+    );
+
+    const result = await useCase.execute(context, command.input);
+
+    expect(result.isOk()).toBe(true);
+    expect(pruner.inputs[0]).toMatchObject({
+      target: "appaloft-dep_123",
+      dryRun: false,
+      categories: ["stopped-containers"],
+    });
+    expect(auditRecorder.records).toHaveLength(1);
+    expect(auditRecorder.records[0]?.payload).not.toHaveProperty("target");
+  });
+
   test("[RT-CAP-PRUNE-010] remote-state marker prune category requires explicit opt-in", async () => {
     const pruner = new FakeCapacityPruner();
     const useCase = createUseCase({ pruner });

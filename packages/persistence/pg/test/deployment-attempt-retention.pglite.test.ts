@@ -128,6 +128,8 @@ async function seedDeployment(
   input: {
     id: string;
     archivedAt?: string | null;
+    supersedesDeploymentId?: string | null;
+    supersededByDeploymentId?: string | null;
   },
 ): Promise<void> {
   await db
@@ -177,8 +179,8 @@ async function seedDeployment(
       source_deployment_id: null,
       rollback_candidate_deployment_id: null,
       rollback_of_deployment_id: null,
-      supersedes_deployment_id: null,
-      superseded_by_deployment_id: null,
+      supersedes_deployment_id: input.supersedesDeploymentId ?? null,
+      superseded_by_deployment_id: input.supersededByDeploymentId ?? null,
       archived_at: input.archivedAt ?? null,
     })
     .execute();
@@ -303,6 +305,56 @@ describe("deployment attempt retention persistence", () => {
 
       expect(rows.map((row) => row.id)).toEqual(["dep_fresh", "dep_guarded"]);
       expect(providerLogs.map((row) => row.id)).toEqual(["pjl_guarded"]);
+    } finally {
+      await database.close();
+      rmSync(dataDir, { recursive: true, force: true });
+    }
+  });
+
+  test("[DEP-PRUNE-003] prunes internally linked archived deployment chains together", async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), "appaloft-deployment-attempt-retention-chain-"));
+    const { createDatabase, createMigrator, PgDeploymentAttemptRetentionStore } = await import(
+      "../src"
+    );
+    const database = await createDatabase({
+      driver: "pglite",
+      pgliteDataDir: dataDir,
+    });
+
+    try {
+      const migrationResult = await createMigrator(database.db).migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      await seedBaseRows(database.db);
+      await seedDeployment(database.db, {
+        id: "dep_previous",
+        archivedAt: "2026-01-01T00:01:00.000Z",
+        supersededByDeploymentId: "dep_current",
+      });
+      await seedDeployment(database.db, {
+        id: "dep_current",
+        archivedAt: "2026-01-01T00:02:00.000Z",
+        supersedesDeploymentId: "dep_previous",
+      });
+
+      const store = new PgDeploymentAttemptRetentionStore(database.db);
+      const result = await store.prune(repositoryContext(), {
+        before: "2026-01-01T00:05:00.000Z",
+        dryRun: false,
+        resourceId: "res_web",
+      });
+
+      expect(result.isOk()).toBe(true);
+      expect(result._unsafeUnwrap()).toEqual({
+        matchedCount: 2,
+        guardedCount: 0,
+        prunedCount: 2,
+        affectedDeploymentIds: ["dep_previous", "dep_current"],
+        guardedDeploymentIds: [],
+      });
+
+      const rows = await database.db.selectFrom("deployments").select("id").execute();
+      expect(rows).toEqual([]);
     } finally {
       await database.close();
       rmSync(dataDir, { recursive: true, force: true });

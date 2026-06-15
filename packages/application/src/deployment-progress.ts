@@ -3,6 +3,7 @@ import { type ExecutionContext } from "./execution-context";
 import {
   type DeploymentProgressEvent,
   type DeploymentProgressPhase,
+  type DeploymentProgressRecorder,
   type DeploymentProgressReporter,
   type DeploymentProgressStatus,
 } from "./ports";
@@ -41,7 +42,24 @@ export function reportDeploymentProgress(
     };
   },
 ): void {
-  const event: DeploymentProgressEvent = {
+  reporter.report(context, createDeploymentProgressEvent(input));
+}
+
+export function createDeploymentProgressEvent(input: {
+  phase: DeploymentProgressPhase;
+  message: string;
+  deploymentId?: string;
+  level?: LogLevel;
+  source?: DeploymentLogSource;
+  status?: DeploymentProgressStatus;
+  stream?: "stdout" | "stderr";
+  step?: {
+    current: number;
+    total: number;
+    label: string;
+  };
+}): DeploymentProgressEvent {
+  return {
     timestamp: new Date().toISOString(),
     source: input.source ?? "appaloft",
     phase: input.phase,
@@ -52,6 +70,15 @@ export function reportDeploymentProgress(
     ...(input.stream ? { stream: input.stream } : {}),
     step: input.step ?? deploymentProgressSteps[input.phase],
   };
+}
 
+export async function recordDeploymentProgress(
+  recorder: DeploymentProgressRecorder,
+  reporter: DeploymentProgressReporter,
+  context: ExecutionContext,
+  input: Parameters<typeof createDeploymentProgressEvent>[0],
+): Promise<void> {
+  const event = createDeploymentProgressEvent(input);
+  await recorder.record(context, event);
   reporter.report(context, event);
 }
