@@ -2280,6 +2280,13 @@ export const enUS = {
       runtimeLogsUnavailableBody:
         "Runtime logs will appear here after a deployment records application output. This resource does not have readable runtime logs yet.",
       runtimeLogsUnavailableTitle: "No runtime logs yet",
+      staticArtifactMonitoringUnavailableBody:
+        "This static site is served directly from a static artifact address, so there is no server runtime to sample for CPU, memory, disk, or process control. Static sites deployed to an SSH target still show runtime monitoring.",
+      staticArtifactRuntimeLogsUnavailableBody:
+        "This static site is served directly from a static artifact address and has no application process output to read. Use deployment records and the access URL to inspect publish results; static sites deployed to an SSH target still keep runtime logs.",
+      staticArtifactRuntimeUnavailableTitle: "Static delivery has no server runtime",
+      staticArtifactTerminalUnavailableBody:
+        "This static site has no server workspace to enter. Resource terminal becomes available again when the site is deployed to an SSH target through a server-backed deployment.",
       runtimeTab: "Runtime",
       runtimeProfileFormDescription:
         "Change the durable runtime planning profile used by future deployments.",
