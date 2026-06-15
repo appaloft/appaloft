@@ -24,6 +24,7 @@ import {
   deploymentTimelineProgressEvents,
   deploymentTimelineProgressStatus,
   latestDeploymentTimelineCursor,
+  progressSourceLabel,
 } from "./deployment-progress";
 
 class MockEventSource {
@@ -115,6 +116,22 @@ describe("deployment progress helpers", () => {
           sequence: 2,
           cursor: "dep_demo:2",
           occurredAt: "2026-01-01T00:00:03.000Z",
+          source: "docker",
+          kind: "output",
+          phase: "deploy",
+          level: "info",
+          message: "Pulled image layer",
+          stream: "stdout",
+        },
+      },
+      {
+        schemaVersion: "deployments.timeline/v1",
+        kind: "entry",
+        entry: {
+          deploymentId: "dep_demo",
+          sequence: 3,
+          cursor: "dep_demo:3",
+          occurredAt: "2026-01-01T00:00:04.000Z",
           source: "domain-event",
           kind: "status",
           phase: "verify",
@@ -127,26 +144,36 @@ describe("deployment progress helpers", () => {
         schemaVersion: "deployments.timeline/v1",
         kind: "closed",
         reason: "completed",
-        cursor: "dep_demo:2",
+        cursor: "dep_demo:3",
       },
     ];
 
     const progressEvents = deploymentTimelineProgressEvents(envelopes);
 
-    expect(progressEvents).toHaveLength(2);
+    expect(progressEvents).toHaveLength(3);
     expect(progressEvents[0]).toMatchObject({
       deploymentId: "dep_demo",
+      source: "appaloft",
       phase: "detect",
       message: "Deployment requested",
       status: "running",
     } satisfies Partial<DeploymentProgressEvent>);
     expect(progressEvents[1]).toMatchObject({
       deploymentId: "dep_demo",
+      source: "docker",
+      phase: "deploy",
+      message: "Pulled image layer",
+      stream: "stdout",
+    } satisfies Partial<DeploymentProgressEvent>);
+    expect(progressSourceLabel(progressEvents[1] as DeploymentProgressEvent)).toBe("docker:stdout");
+    expect(progressEvents[2]).toMatchObject({
+      deploymentId: "dep_demo",
+      source: "domain-event",
       phase: "verify",
       message: "Deployment succeeded",
       status: "succeeded",
     } satisfies Partial<DeploymentProgressEvent>);
-    expect(latestDeploymentTimelineCursor(envelopes)).toBe("dep_demo:2");
+    expect(latestDeploymentTimelineCursor(envelopes)).toBe("dep_demo:3");
     expect(deploymentTimelineProgressStatus(envelopes, "running")).toBe("succeeded");
   });
 

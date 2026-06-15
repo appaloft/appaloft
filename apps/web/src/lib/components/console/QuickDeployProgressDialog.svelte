@@ -1,11 +1,16 @@
 <script lang="ts">
-  import { CheckCircle2, Circle, ExternalLink, LoaderCircle, ShieldAlert } from "@lucide/svelte";
+  import { CheckCircle2, Circle, ExternalLink, LoaderCircle, Rows3, ShieldAlert } from "@lucide/svelte";
   import type { DeploymentProgressEvent, QuickDeployWorkflowStep } from "@appaloft/contracts";
+  import { tick } from "svelte";
 
-  import OperationProgressPanel from "$lib/components/console/OperationProgressPanel.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
-  import type { DeploymentProgressDialogStatus } from "$lib/console/deployment-progress";
+  import {
+    groupDeploymentProgressEvents,
+    progressSourceLabel,
+    progressStatusVariant,
+    type DeploymentProgressDialogStatus,
+  } from "$lib/console/deployment-progress";
   import { i18nKeys, t } from "$lib/i18n";
 
   type QuickDeployWorkflowStepStatus = "pending" | "running" | "succeeded" | "failed";
@@ -30,6 +35,7 @@
     traceLink?: string;
     embedded?: boolean;
     onClose?: () => void;
+    onOpenResource?: () => void;
     onOpenDeployment?: () => void;
   };
 
@@ -44,8 +50,32 @@
     traceLink = "",
     embedded = false,
     onClose,
+    onOpenResource,
     onOpenDeployment,
   }: Props = $props();
+
+  const sections = $derived(groupDeploymentProgressEvents(deploymentEvents));
+  let progressLogArea = $state<HTMLDivElement | undefined>();
+
+  $effect(() => {
+    const scrollKey = `${deploymentEvents.length}:${deploymentPanelStatus()}:${progressError}`;
+
+    if (!progressLogArea || scrollKey.length === 0) {
+      return;
+    }
+
+    void scrollProgressToBottom();
+  });
+
+  async function scrollProgressToBottom(): Promise<void> {
+    await tick();
+
+    if (!progressLogArea) {
+      return;
+    }
+
+    progressLogArea.scrollTop = progressLogArea.scrollHeight;
+  }
 
   function workflowStepLabel(kind: QuickDeployWorkflowStep["kind"]): string {
     switch (kind) {
@@ -167,6 +197,68 @@
 
     return "idle";
   }
+
+  function resolvedDeploymentPanelStatus(): DeploymentProgressEvent["status"] | undefined {
+    const status = deploymentPanelStatus();
+    return status === "idle" ? undefined : status;
+  }
+
+  function phaseLabel(phase: DeploymentProgressEvent["phase"]): string {
+    switch (phase) {
+      case "detect":
+        return $t(i18nKeys.console.deployments.progressPhaseDetect);
+      case "plan":
+        return $t(i18nKeys.console.deployments.progressPhasePlan);
+      case "package":
+        return $t(i18nKeys.console.deployments.progressPhasePackage);
+      case "deploy":
+        return $t(i18nKeys.console.deployments.progressPhaseDeploy);
+      case "verify":
+        return $t(i18nKeys.console.deployments.progressPhaseVerify);
+      case "rollback":
+        return $t(i18nKeys.console.deployments.progressPhaseRollback);
+    }
+  }
+
+  function progressStatusLabel(status?: DeploymentProgressEvent["status"]): string {
+    switch (status) {
+      case "running":
+        return $t(i18nKeys.console.deployments.progressStatusRunning);
+      case "succeeded":
+        return $t(i18nKeys.console.deployments.progressStatusSucceeded);
+      case "failed":
+        return $t(i18nKeys.common.status.failed);
+      default:
+        return $t(i18nKeys.console.deployments.progressStatusLog);
+    }
+  }
+
+  function levelClass(level: DeploymentProgressEvent["level"]): string {
+    switch (level) {
+      case "error":
+        return "text-destructive";
+      case "warn":
+        return "text-amber-700 dark:text-amber-300";
+      case "debug":
+        return "text-muted-foreground";
+      case "info":
+        return "text-foreground";
+    }
+  }
+
+  function timeLabel(timestamp: string): string {
+    const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) {
+      return timestamp.slice(11, 19) || "--:--:--";
+    }
+
+    return new Intl.DateTimeFormat(undefined, {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    }).format(date);
+  }
 </script>
 
 {#if open}
@@ -182,7 +274,7 @@
       aria-modal="true"
       role="dialog"
       class={[
-        "flex w-full max-w-5xl flex-col overflow-hidden rounded-lg border bg-background",
+        "flex w-full max-w-5xl flex-col overflow-hidden rounded-lg bg-background",
         embedded ? "mx-auto max-h-[78vh] shadow-none" : "max-h-[88vh] shadow-xl",
       ]}
     >
@@ -211,6 +303,12 @@
           </div>
 
           <div class="flex shrink-0 flex-wrap gap-2">
+            {#if onOpenResource && deploymentPanelStatus() === "succeeded"}
+              <Button type="button" size="sm" onclick={() => onOpenResource?.()}>
+                <ExternalLink class="size-4" />
+                {$t(i18nKeys.common.actions.openResource)}
+              </Button>
+            {/if}
             {#if traceLink}
               <Button
                 type="button"
@@ -242,75 +340,106 @@
       </header>
 
       <div class="min-h-0 flex-1 space-y-4 overflow-auto p-5">
-        <section class="rounded-md border bg-muted/10 p-4">
-          <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(14rem,18rem)]">
-            <div class="console-record-list">
-              {#if progressItems.length === 0}
-                <div class="console-record-row flex items-center gap-2">
-                  <LoaderCircle class="size-4 animate-spin text-primary" />
-                  <span class="text-sm text-muted-foreground">
-                    {$t(i18nKeys.console.deployments.progressWaiting)}
-                  </span>
-                </div>
-              {:else}
-                {#each progressItems as item (item.kind)}
-                  <div class="console-record-row flex items-center justify-between gap-3">
-                    <div class="flex min-w-0 items-center gap-2">
-                      {#if item.status === "running"}
-                        <LoaderCircle class="size-4 shrink-0 animate-spin text-primary" />
-                      {:else if item.status === "succeeded"}
-                        <CheckCircle2 class="size-4 shrink-0 text-emerald-600" />
-                      {:else if item.status === "failed"}
-                        <ShieldAlert class="size-4 shrink-0 text-destructive" />
-                      {:else}
-                        <Circle class="size-4 shrink-0 text-muted-foreground" />
-                      {/if}
-                      <span class="truncate text-sm font-medium">{workflowStepLabel(item.kind)}</span>
-                    </div>
-                    <Badge variant={workflowStepStatusVariant(item.status)}>
-                      {workflowStepStatusLabel(item.status)}
-                    </Badge>
-                  </div>
-                {/each}
+        {#if progressError}
+          <div class="rounded-md border border-destructive/25 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            {progressError}
+          </div>
+        {/if}
+
+        {#if feedback}
+          <section
+            class={[
+              "rounded-md px-4 py-3 text-sm",
+              feedback.kind === "success"
+                ? "bg-primary/5"
+                : feedback.kind === "running"
+                  ? "bg-muted/40"
+                  : "bg-destructive/5 text-destructive",
+            ]}
+          >
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div class="min-w-0">
+                <p class="font-medium">{feedback.title}</p>
+                <p class="mt-1 break-words text-xs text-muted-foreground">{feedback.detail}</p>
+              </div>
+              {#if onOpenResource && deploymentPanelStatus() === "succeeded"}
+                <Button type="button" size="sm" onclick={() => onOpenResource?.()} class="shrink-0">
+                  <ExternalLink class="size-4" />
+                  {$t(i18nKeys.common.actions.openResource)}
+                </Button>
               {/if}
             </div>
+          </section>
+        {/if}
 
-            <div class="space-y-3">
-              {#if progressError}
-                <div class="rounded-md border border-destructive/25 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-                  {progressError}
-                </div>
-              {/if}
-
-              {#if feedback}
-                <div
-                  class={[
-                    "rounded-md border px-3 py-2 text-sm",
-                    feedback.kind === "success"
-                      ? "border-primary/25 bg-primary/5"
-                      : feedback.kind === "running"
-                        ? "border-border bg-background"
-                        : "border-destructive/25 bg-destructive/5 text-destructive",
-                  ]}
-                >
-                  <p class="font-medium">{feedback.title}</p>
-                  <p class="mt-1 break-words text-xs text-muted-foreground">{feedback.detail}</p>
-                </div>
-              {/if}
+        <section class="space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+              <Rows3 class="size-4 text-muted-foreground" />
+              <h3 class="text-sm font-semibold">{$t(i18nKeys.console.deployments.progressStatusLog)}</h3>
+              <Badge variant={progressStatusVariant(resolvedDeploymentPanelStatus())}>
+                {progressStatusLabel(resolvedDeploymentPanelStatus())}
+              </Badge>
             </div>
           </div>
-        </section>
 
-        <OperationProgressPanel
-          status={deploymentPanelStatus()}
-          events={deploymentEvents}
-          streamError={progressError}
-          {deploymentId}
-          {traceLink}
-          title={$t(i18nKeys.console.deployments.progressTitle)}
-          description={$t(i18nKeys.console.deployments.progressDescription)}
-          {onOpenDeployment}
-        />
+          {#if progressItems.length > 0}
+            <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {#each progressItems as item (item.kind)}
+                <div class="flex min-w-0 items-center gap-2 rounded-md bg-muted/30 px-3 py-2">
+                  {#if item.status === "running"}
+                    <LoaderCircle class="size-4 shrink-0 animate-spin text-primary" />
+                  {:else if item.status === "succeeded"}
+                    <CheckCircle2 class="size-4 shrink-0 text-emerald-600" />
+                  {:else if item.status === "failed"}
+                    <ShieldAlert class="size-4 shrink-0 text-destructive" />
+                  {:else}
+                    <Circle class="size-4 shrink-0 text-muted-foreground" />
+                  {/if}
+                  <span class="min-w-0 flex-1 truncate text-sm font-medium">
+                    {workflowStepLabel(item.kind)}
+                  </span>
+                  <Badge variant={workflowStepStatusVariant(item.status)}>
+                    {workflowStepStatusLabel(item.status)}
+                  </Badge>
+                </div>
+              {/each}
+            </div>
+          {/if}
+
+          <div
+            bind:this={progressLogArea}
+            class="max-h-[46vh] min-h-72 overflow-auto rounded-md bg-muted/20 p-3 font-mono text-xs"
+          >
+            {#if sections.length === 0}
+              <p class="text-muted-foreground">{$t(i18nKeys.console.deployments.progressWaiting)}</p>
+            {:else}
+              <div class="space-y-4">
+                {#each sections as section (section.phase)}
+                  <div class="space-y-2">
+                    <div class="flex flex-wrap items-center gap-2 text-muted-foreground">
+                      <span>{phaseLabel(section.phase)}</span>
+                      <span>·</span>
+                      <span>{progressStatusLabel(section.status)}</span>
+                    </div>
+                    <div class="space-y-1">
+                      {#each section.events as event, index (`${event.timestamp}-${section.phase}-${index}`)}
+                        <div class="grid gap-2 leading-5 sm:grid-cols-[4.75rem_6rem_3.5rem_minmax(0,1fr)]">
+                          <span class="text-muted-foreground">{timeLabel(event.timestamp)}</span>
+                          <span class="text-primary">{progressSourceLabel(event)}</span>
+                          <span class={levelClass(event.level)}>{event.level}</span>
+                          <span class={["min-w-0 break-words", levelClass(event.level)]}>
+                            {event.message}
+                          </span>
+                        </div>
+                      {/each}
+                    </div>
+                  </div>
+                {/each}
+              </div>
+            {/if}
+          </div>
+        </section>
       </div>
     </div>
   </div>

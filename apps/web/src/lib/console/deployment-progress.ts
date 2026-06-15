@@ -388,7 +388,7 @@ export function deploymentTimelineProgressEvents(
     return [
       {
         timestamp: envelope.entry.occurredAt,
-        source: envelope.entry.source === "application" ? "application" : "appaloft",
+        source: envelope.entry.source,
         phase,
         level: envelope.entry.level,
         message: envelope.entry.message,
@@ -515,7 +515,7 @@ export function progressStatusVariant(
 }
 
 export function progressSourceLabel(event: DeploymentProgressEvent): string {
-  const source = event.source === "application" ? "app" : "appaloft";
+  const source = event.source === "application" ? "app" : event.source;
   return event.stream ? `${source}:${event.stream}` : source;
 }
 

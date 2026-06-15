@@ -125,7 +125,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     sshServerProviderKey,
     type DraftServerConnectivityInput,
   } from "$lib/console/server-registration";
-  import { deploymentDetailHref, readSessionIdentity } from "$lib/console/utils";
+  import { deploymentDetailHref, readSessionIdentity, resourceDetailHref } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
   import { orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
@@ -3766,6 +3766,18 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     });
   }
 
+  function lastCreatedResourceHref(): string {
+    if (!selectedProjectId || !selectedEnvironmentId || !selectedResourceId) {
+      return "";
+    }
+
+    return resourceDetailHref({
+      id: selectedResourceId,
+      projectId: selectedProjectId,
+      environmentId: selectedEnvironmentId,
+    });
+  }
+
   function testDraftServerConnectivity(input: DraftServerConnectivityInput) {
     return orpcClient.servers.testDraftConnectivity(input);
   }
@@ -7087,6 +7099,12 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   embedded
   onClose={() => {
     workflowProgressDialogOpen = false;
+  }}
+  onOpenResource={() => {
+    const href = lastCreatedResourceHref();
+    if (href) {
+      void goto(href);
+    }
   }}
   onOpenDeployment={() => {
     void goto(lastCreatedDeploymentHref());
