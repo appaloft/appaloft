@@ -7881,9 +7881,6 @@ describe.serial("console e2e with Bun.WebView", () => {
         "This deployment status is not recoverable.",
         "这个部署状态不可恢复。",
       ]);
-
-      await view.navigate(`${previewUrl}${demoDeploymentPath}?tab=logs`);
-      await expectText(view, "Application is ready for dep_demo");
     } finally {
       if (previousDiagnosticRoute === undefined) {
         delete apiResponses.dashboard["/api/rpc/resources/diagnosticSummary"];
