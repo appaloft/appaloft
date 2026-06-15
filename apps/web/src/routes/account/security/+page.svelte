@@ -15,6 +15,16 @@
   import { Input } from "$lib/components/ui/input";
   import * as InputOTP from "$lib/components/ui/input-otp";
   import { REGEXP_ONLY_DIGITS } from "$lib/components/ui/input-otp";
+  import {
+    subnavClass,
+    subnavContentClass,
+    subnavItemClass,
+    subnavItemIconClass,
+    subnavItemTitleClass,
+    subnavKickerClass,
+    subnavLayoutClass,
+    subnavListClass,
+  } from "$lib/console/layout-classes";
   import { accountSettingsItems } from "$lib/console/settings-nav";
   import { i18nKeys, localeHeaders, t } from "$lib/i18n";
   import { queryClient } from "$lib/query-client";
@@ -334,20 +344,20 @@
     { label: $t(i18nKeys.console.authAccountSecurity.introTitle) },
   ]}
 >
-  <div class="console-subnav-layout">
-    <aside class="console-subnav">
-      <p class="console-subnav-kicker">
+  <div class={subnavLayoutClass}>
+    <aside class={subnavClass}>
+      <p class={subnavKickerClass}>
         {$t(i18nKeys.console.authAccountSecurity.introTitle)}
       </p>
-      <nav class="console-subnav-list" aria-label={$t(i18nKeys.console.authAccountSecurity.introTitle)}>
+      <nav class={subnavListClass} aria-label={$t(i18nKeys.console.authAccountSecurity.introTitle)}>
         <a
           href={accountSecuritySectionHref("password")}
           onclick={(event) => selectAccountSecuritySection("password", event)}
           aria-current={activeSection === "password" ? "page" : undefined}
-          class="console-subnav-item"
+          class={subnavItemClass}
         >
-          <KeyRound class="console-subnav-item-icon" />
-          <span class="console-subnav-item-title">
+          <KeyRound class={subnavItemIconClass} />
+          <span class={subnavItemTitleClass}>
             {passwordState === "not-set"
               ? $t(i18nKeys.console.authAccountSecurity.setPasswordTitle)
               : $t(i18nKeys.console.authAccountSecurity.changePasswordTitle)}
@@ -358,17 +368,17 @@
           href={accountSecuritySectionHref("email")}
           onclick={(event) => selectAccountSecuritySection("email", event)}
           aria-current={activeSection === "email" ? "page" : undefined}
-          class="console-subnav-item"
+          class={subnavItemClass}
         >
-          <MailCheck class="console-subnav-item-icon" />
-          <span class="console-subnav-item-title">
+          <MailCheck class={subnavItemIconClass} />
+          <span class={subnavItemTitleClass}>
             {$t(i18nKeys.console.authAccountSecurity.changeEmailTitle)}
           </span>
         </a>
       </nav>
     </aside>
 
-    <div class="console-subnav-content">
+    <div class={subnavContentClass}>
       {#if feedback && !passwordDialogOpen && !emailDialogOpen}
         <div class="rounded-[calc(var(--radius-lg)-2px)] border border-primary/30 bg-primary/5 p-4 text-sm">
           {feedback}

@@ -47,6 +47,20 @@
   import * as Tabs from "$lib/components/ui/tabs";
   import { webDocsHrefs } from "$lib/console/docs-help";
   import {
+    detailBodyClass,
+    detailHeaderClass,
+    detailPageClass,
+    detailSubnavClass,
+    detailSubnavContentClass,
+    detailSubnavLayoutClass,
+    detailTabClass,
+    detailTabPanelScrollNoTopClass,
+    detailTabPanelSubnavClass,
+    detailTabsClass,
+    subnavItemClass,
+    subnavListClass,
+  } from "$lib/console/layout-classes";
+  import {
     runtimeMonitoringRollupQueryOptions,
     runtimeMonitoringSamplesQueryOptions,
     runtimeMonitoringThresholdsQueryOptions,
@@ -960,8 +974,8 @@
       </div>
     </section>
   {:else}
-    <div class="console-detail-page">
-      <section class="console-detail-header">
+    <div class={detailPageClass}>
+      <section class={detailHeaderClass}>
         <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div class="max-w-3xl space-y-3">
             <div class="flex flex-wrap items-center gap-2">
@@ -1001,15 +1015,15 @@
         </div>
       </section>
 
-      <Tabs.Root value={activeTab} class="console-detail-body console-server-detail-body">
+      <Tabs.Root value={activeTab} class={detailBodyClass}>
           <nav
             aria-label={$t(i18nKeys.console.servers.pageTitle)}
-            class="console-detail-tabs"
+            class={detailTabsClass}
           >
             {#each serverDetailTabs as tab (tab)}
               <a
                 href={serverTabHref(tab)}
-                class="console-detail-tab"
+                class={detailTabClass}
                 aria-current={activeTab === tab ? "page" : undefined}
                 onclick={(event) => selectServerTab(tab, event)}
               >
@@ -1020,7 +1034,7 @@
 
           <Tabs.Content
             value="overview"
-            class="console-detail-tab-panel console-detail-tab-panel-scroll space-y-5"
+            class={[detailTabPanelScrollNoTopClass, "space-y-5"]}
             data-server-overview-display-surface
           >
         <div class="console-metric-strip sm:grid-cols-2 xl:grid-cols-5">
@@ -1188,15 +1202,15 @@
 
           <Tabs.Content
             value="runtime"
-            class="console-detail-tab-panel console-detail-tab-panel-subnav"
+            class={detailTabPanelSubnavClass}
           >
-            <div class="console-subnav-layout console-detail-subnav-layout md:grid-cols-[13rem_minmax(0,1fr)]">
-              <aside class="console-subnav">
+            <div class={[detailSubnavLayoutClass, "md:grid-cols-[13rem_minmax(0,1fr)]"]}>
+              <aside class={detailSubnavClass}>
                 <nav class="min-w-0" aria-label={$t(i18nKeys.console.servers.runtimeTab)}>
-                  <div class="console-subnav-list">
+                  <div class={subnavListClass}>
                     {#each serverRuntimeSections as section (section)}
                       <a
-                        class="console-subnav-item min-h-10 text-sm"
+                        class={[subnavItemClass, "min-h-10 text-sm"]}
                         href={serverSectionHref("runtime", section)}
                         aria-current={activeRuntimeSection === section ? "page" : undefined}
                         onclick={(event) => selectServerRuntimeSection(section, event)}
@@ -1207,7 +1221,7 @@
                   </div>
                 </nav>
               </aside>
-              <div class="console-subnav-content">
+              <div class={[detailSubnavContentClass, "md:pt-0"]}>
                 {#if activeRuntimeSection === "monitor"}
                   <RuntimeMonitorPanel
                     scope={serverRuntimeScope}
@@ -1258,7 +1272,7 @@
 
           <Tabs.Content
             value="capacity"
-            class="console-detail-tab-panel console-detail-tab-panel-scroll space-y-5"
+            class={[detailTabPanelScrollNoTopClass, "space-y-5"]}
           >
         <section class="console-panel p-4">
           <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -1485,16 +1499,16 @@
 
           <Tabs.Content
             value="settings"
-            class="console-detail-tab-panel console-detail-tab-panel-subnav"
+            class={detailTabPanelSubnavClass}
             data-server-settings-display-surface
           >
-            <div class="console-subnav-layout console-detail-subnav-layout md:grid-cols-[13rem_minmax(0,1fr)]">
-              <aside class="console-subnav">
+            <div class={[detailSubnavLayoutClass, "md:grid-cols-[13rem_minmax(0,1fr)]"]}>
+              <aside class={detailSubnavClass}>
                 <nav class="min-w-0" aria-label={$t(i18nKeys.console.servers.settingsTab)}>
-                  <div class="console-subnav-list">
+                  <div class={subnavListClass}>
                     {#each serverSettingsSections as section (section)}
                       <a
-                        class="console-subnav-item min-h-10 text-sm"
+                        class={[subnavItemClass, "min-h-10 text-sm"]}
                         href={serverSectionHref("settings", section)}
                         aria-current={activeSettingsSection === section ? "page" : undefined}
                         onclick={(event) => selectServerSettingsSection(section, event)}
@@ -1505,7 +1519,7 @@
                   </div>
                 </nav>
               </aside>
-              <div class="console-subnav-content">
+              <div class={[detailSubnavContentClass, "md:pt-0"]}>
         {#if activeSettingsSection === "credentials"}
         {#if storedSshCredentialId}
           <div class="console-panel p-4">
@@ -1808,7 +1822,7 @@
 
           <Tabs.Content
             value="connectivity"
-            class="console-detail-tab-panel console-detail-tab-panel-scroll"
+            class={detailTabPanelScrollNoTopClass}
           >
             <section class="space-y-4">
               <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1899,7 +1913,7 @@
 
           <Tabs.Content
             value="deployments"
-            class="console-detail-tab-panel console-detail-tab-panel-scroll"
+            class={detailTabPanelScrollNoTopClass}
           >
             <section class="space-y-4">
               <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

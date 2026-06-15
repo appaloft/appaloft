@@ -67,6 +67,14 @@
   import * as Tabs from "$lib/components/ui/tabs";
   import { selectCurrentResourceAccessRoute } from "$lib/console/resource-access-route";
   import { webDocsHrefs } from "$lib/console/docs-help";
+  import {
+    detailBodyClass,
+    detailHeaderClass,
+    detailPageClass,
+    detailTabClass,
+    detailTabPanelScrollClass,
+    detailTabsClass,
+  } from "$lib/console/layout-classes";
   import { modalIsOpen, setModalOpen } from "$lib/console/url-modal";
   import { createConsoleQueries } from "$lib/console/queries";
   import { runtimeMonitoringRollupQueryOptions } from "$lib/console/runtime-usage-query";
@@ -1477,8 +1485,8 @@
       </div>
     </section>
   {:else}
-    <div class="console-detail-page">
-      <section class="console-detail-header">
+    <div class={detailPageClass}>
+      <section class={detailHeaderClass}>
         <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div class="max-w-3xl space-y-3">
             <div class="flex flex-wrap items-center gap-2">
@@ -1591,15 +1599,15 @@
         </section>
       </section>
 
-      <Tabs.Root value={activeProjectTab} class="console-detail-body">
+      <Tabs.Root value={activeProjectTab} class={detailBodyClass}>
         <nav
           aria-label={$t(i18nKeys.console.projects.pageTitle)}
-          class="console-detail-tabs"
+          class={detailTabsClass}
         >
           {#each projectDetailTabs as tab (tab)}
             <a
               href={projectTabHref(tab)}
-              class="console-detail-tab"
+              class={detailTabClass}
               aria-current={activeProjectTab === tab ? "page" : undefined}
               onclick={(event) => selectProjectTab(tab, event)}
             >
@@ -1610,7 +1618,7 @@
 
         <Tabs.Content
           value="overview"
-          class="console-detail-tab-panel console-detail-tab-panel-scroll mt-0 flex flex-col gap-6"
+          class={[detailTabPanelScrollClass, "flex flex-col gap-6"]}
         >
           <section class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
             <div class="space-y-5">
@@ -2148,7 +2156,7 @@
 
         <Tabs.Content
           value="resources"
-          class="console-detail-tab-panel console-detail-tab-panel-scroll mt-0"
+          class={detailTabPanelScrollClass}
         >
           <section class="space-y-4">
             <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
@@ -2228,7 +2236,7 @@
 
         <Tabs.Content
           value="previews"
-          class="console-detail-tab-panel console-detail-tab-panel-scroll mt-0"
+          class={detailTabPanelScrollClass}
         >
           <section class="space-y-6">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -2401,7 +2409,7 @@
 
         <Tabs.Content
           value="environments"
-          class="console-detail-tab-panel console-detail-tab-panel-scroll mt-0"
+          class={detailTabPanelScrollClass}
         >
           <section class="space-y-4">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -2533,7 +2541,7 @@
 
         <Tabs.Content
           value="deployments"
-          class="console-detail-tab-panel console-detail-tab-panel-scroll mt-0"
+          class={detailTabPanelScrollClass}
         >
           <section class="space-y-4">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -2616,7 +2624,7 @@
 
         <Tabs.Content
           value="activity"
-          class="console-detail-tab-panel console-detail-tab-panel-scroll mt-0"
+          class={detailTabPanelScrollClass}
           data-project-activity-display-surface
         >
           <section class="console-panel space-y-5 p-5">
@@ -2655,7 +2663,7 @@
 
         <Tabs.Content
           value="settings"
-          class="console-detail-tab-panel console-detail-tab-panel-scroll mt-0"
+          class={detailTabPanelScrollClass}
         >
           <section class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
             <div class="space-y-4">

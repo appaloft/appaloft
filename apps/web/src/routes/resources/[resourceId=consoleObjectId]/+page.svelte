@@ -108,6 +108,21 @@
     type DeploymentProgressDialogStatus,
   } from "$lib/console/deployment-progress";
   import { webDocsHrefs } from "$lib/console/docs-help";
+  import {
+    detailBodyClass,
+    detailHeaderClass,
+    detailPageClass,
+    detailSubnavClass,
+    detailSubnavContentClass,
+    detailSubnavLayoutClass,
+    detailTabClass,
+    detailTabPanelScrollClass,
+    detailTabPanelSubnavClass,
+    detailTabsClass,
+    subnavItemClass,
+    subnavItemTitleClass,
+    subnavListClass,
+  } from "$lib/console/layout-classes";
   import { createConsoleQueries } from "$lib/console/queries";
   import { modalIsOpen, setModalOpen } from "$lib/console/url-modal";
   import {
@@ -5373,19 +5388,25 @@
 </svelte:head>
 
 {#snippet resourceSectionNavigation()}
-  <aside class="console-subnav">
+  <aside class={detailSubnavClass}>
     <nav class="min-w-0" aria-label={resourceTabLabel(activeTab)}>
-      <div role="tablist" class="console-subnav-list flex min-w-0 overflow-x-auto lg:grid lg:overflow-visible">
+      <div
+        role="tablist"
+        class={[subnavListClass, "flex min-w-0 overflow-x-auto lg:grid lg:overflow-visible"]}
+      >
         {#each resourceSectionsForTab(activeTab) as section (section)}
           <a
             href={resourceSectionHref(section)}
             role="tab"
             aria-selected={activeResourceSection === section}
             aria-current={activeResourceSection === section ? "page" : undefined}
-            class="console-subnav-item min-h-10 flex-none whitespace-nowrap lg:flex lg:w-full lg:whitespace-normal"
+            class={[
+              subnavItemClass,
+              "min-h-10 flex-none whitespace-nowrap lg:flex lg:w-full lg:whitespace-normal",
+            ]}
             onclick={(event) => selectResourceDetailSection(section, event)}
           >
-            <span class="console-subnav-item-title">{resourceSectionLabel(section)}</span>
+            <span class={[subnavItemTitleClass, "lg:whitespace-normal"]}>{resourceSectionLabel(section)}</span>
           </a>
         {/each}
       </div>
@@ -5618,8 +5639,8 @@
       </div>
     </section>
   {:else}
-    <div class="console-detail-page">
-      <section class="console-detail-header">
+    <div class={detailPageClass}>
+      <section class={detailHeaderClass}>
         <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div class="min-w-0 space-y-2">
             <div class="flex flex-wrap items-center gap-2">
@@ -5740,18 +5761,15 @@
         </div>
       </section>
 
-      <div class="console-detail-body">
+      <div class={detailBodyClass}>
         <nav
           aria-label={$t(i18nKeys.console.resources.overviewTitle)}
-          class="console-detail-tabs"
+          class={detailTabsClass}
         >
           {#each resourceDetailTabs as tab (tab)}
             <a
               href={resourceTabHref(tab)}
-              class={[
-                "console-detail-tab",
-                activeTab === tab ? "border-foreground text-foreground" : "",
-              ]}
+              class={detailTabClass}
               aria-current={activeTab === tab ? "page" : undefined}
               onclick={(event) => selectResourceTab(tab, event)}
             >
@@ -5761,7 +5779,7 @@
         </nav>
 
         {#if activeTab === "deployments"}
-          <div class="console-detail-tab-panel console-detail-tab-panel-scroll">
+          <div class={detailTabPanelScrollClass}>
 
           <section id="resource-deployments" class="space-y-4">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -5816,8 +5834,8 @@
           </section>
         </div>
         {:else if activeTab === "jobs"}
-          <div class="console-detail-tab-panel console-detail-tab-panel-subnav">
-            <div class="console-subnav-layout console-detail-subnav-layout">
+          <div class={detailTabPanelSubnavClass}>
+            <div class={[detailSubnavLayoutClass, "md:grid-cols-[12rem_minmax(0,1fr)]"]}>
               {@render resourceSectionNavigation()}
 
               {#if activeResourceSection === "scheduled-tasks"}
@@ -6221,7 +6239,7 @@
             </div>
           </div>
         {:else if activeTab === "previews"}
-          <div class="console-detail-tab-panel console-detail-tab-panel-scroll">
+          <div class={detailTabPanelScrollClass}>
             <section id="resource-preview-environments" class="space-y-5">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div class="min-w-0">
@@ -6394,7 +6412,7 @@
             </section>
           </div>
         {:else if activeTab === "overview"}
-          <div class="console-detail-tab-panel console-detail-tab-panel-scroll">
+          <div class={detailTabPanelScrollClass}>
             <section id="resource-overview" class="space-y-5">
               <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div class="min-w-0">
@@ -6670,8 +6688,8 @@
             </section>
           </div>
         {:else if activeTab === "networking" || activeTab === "configuration" || activeTab === "dependencies" || activeTab === "settings"}
-          <div class="console-detail-tab-panel console-detail-tab-panel-subnav">
-            <div class="console-subnav-layout console-detail-subnav-layout">
+          <div class={detailTabPanelSubnavClass}>
+            <div class={[detailSubnavLayoutClass, "md:grid-cols-[12rem_minmax(0,1fr)]"]}>
               {@render resourceSectionNavigation()}
 
               <div class="space-y-8 p-5">
@@ -8108,7 +8126,7 @@
             </div>
         </div>
         {:else if activeTab === "monitor"}
-          <div class="console-detail-tab-panel console-detail-tab-panel-scroll">
+          <div class={detailTabPanelScrollClass}>
             <div class="space-y-8">
               {#if showResourceServerRuntimeFallback}
                 <p class="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
@@ -8154,7 +8172,7 @@
             </div>
           </div>
         {:else if activeTab === "terminal"}
-          <div class="console-detail-tab-panel console-detail-tab-panel-scroll">
+          <div class={detailTabPanelScrollClass}>
             <section class="space-y-3" data-resource-terminal-panel>
               {#if terminalDeploymentId}
                 <TerminalSessionPanel
@@ -8198,7 +8216,7 @@
             </section>
           </div>
         {:else if activeTab === "logs"}
-          <div class="console-detail-tab-panel console-detail-tab-panel-scroll">
+          <div class={detailTabPanelScrollClass}>
             {@render resourceRuntimeLogsPanel()}
           </div>
         {/if}
