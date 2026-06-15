@@ -2989,6 +2989,43 @@ export const archiveResourceResponseSchema = z.object({
   id: z.string(),
 });
 
+export const checkResourceDeleteSafetyInputSchema = z.object({
+  resourceId: z.string().min(1),
+});
+
+export const resourceDeleteBlockerKindSchema = z.enum([
+  "active-resource",
+  "runtime-instance",
+  "domain-binding",
+  "certificate",
+  "source-link",
+  "dependency-binding",
+  "terminal-session",
+  "runtime-log-retention",
+  "audit-retention",
+  "generated-access-route",
+  "server-applied-route",
+  "proxy-route",
+]);
+
+export const resourceDeleteBlockerSchema = z.object({
+  kind: resourceDeleteBlockerKindSchema,
+  relatedEntityId: z.string().optional(),
+  relatedEntityType: z.string().optional(),
+  count: z.number().int().nonnegative().optional(),
+});
+
+export const resourceDeleteSafetySchema = z.object({
+  schemaVersion: z.literal("resources.delete-check/v1"),
+  resourceId: z.string(),
+  lifecycleStatus: z.enum(["active", "archived"]),
+  eligible: z.boolean(),
+  blockers: z.array(resourceDeleteBlockerSchema),
+  checkedAt: z.string(),
+});
+
+export const checkResourceDeleteSafetyResponseSchema = resourceDeleteSafetySchema;
+
 export const deleteResourceInputSchema = z.object({
   resourceId: z.string().min(1),
   confirmation: z.object({
@@ -6745,6 +6782,12 @@ export type ListStaticArtifactPublicationsResponse = z.infer<
 >;
 export type ArchiveResourceInput = z.infer<typeof archiveResourceInputSchema>;
 export type ArchiveResourceResponse = z.infer<typeof archiveResourceResponseSchema>;
+export type CheckResourceDeleteSafetyInput = z.infer<typeof checkResourceDeleteSafetyInputSchema>;
+export type ResourceDeleteBlocker = z.infer<typeof resourceDeleteBlockerSchema>;
+export type ResourceDeleteSafety = z.infer<typeof resourceDeleteSafetySchema>;
+export type CheckResourceDeleteSafetyResponse = z.infer<
+  typeof checkResourceDeleteSafetyResponseSchema
+>;
 export type DeleteResourceInput = z.infer<typeof deleteResourceInputSchema>;
 export type DeleteResourceResponse = z.infer<typeof deleteResourceResponseSchema>;
 export type ConfigureResourceHealthInput = z.infer<typeof configureResourceHealthInputSchema>;

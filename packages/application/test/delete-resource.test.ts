@@ -36,9 +36,9 @@ import {
 } from "@appaloft/testkit";
 
 import { createExecutionContext, type ResourceDeletionBlocker, toRepositoryContext } from "../src";
-import { DeleteResourceCommand } from "../src/messages";
+import { CheckResourceDeleteSafetyQuery, DeleteResourceCommand } from "../src/messages";
 import { type ResourceDeletionBlockerReader } from "../src/ports";
-import { DeleteResourceUseCase } from "../src/use-cases";
+import { CheckResourceDeleteSafetyQueryService, DeleteResourceUseCase } from "../src/use-cases";
 
 function resourceFixture(): Resource {
   return Resource.rehydrate({
@@ -161,6 +161,88 @@ describe("DeleteResourceCommand", () => {
 });
 
 describe("DeleteResourceUseCase", () => {
+  test("[RES-PROFILE-DELETE-CHECK-001] active resource delete-check returns active-resource blocker", async () => {
+    const { context, resources } = await createHarness({ resource: resourceFixture() });
+    const service = new CheckResourceDeleteSafetyQueryService(
+      resources,
+      new FixedDeletionBlockerReader(),
+      new FixedClock("2026-01-01T00:00:10.000Z"),
+    );
+
+    const result = await service.execute(context, new CheckResourceDeleteSafetyQuery("res_web"));
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      schemaVersion: "resources.delete-check/v1",
+      resourceId: "res_web",
+      lifecycleStatus: "active",
+      eligible: false,
+      blockers: [
+        {
+          kind: "active-resource",
+          relatedEntityId: "res_web",
+          relatedEntityType: "resource",
+          count: 1,
+        },
+      ],
+      checkedAt: "2026-01-01T00:00:10.000Z",
+    });
+  });
+
+  test("[RES-PROFILE-DELETE-CHECK-002] archived resource delete-check reports retained blockers", async () => {
+    const { context, resources } = await createHarness();
+    const service = new CheckResourceDeleteSafetyQueryService(
+      resources,
+      new FixedDeletionBlockerReader([
+        {
+          kind: "server-applied-route",
+          relatedEntityId: "route_set_1",
+          relatedEntityType: "server-applied-route",
+          count: 1,
+        },
+      ]),
+      new FixedClock("2026-01-01T00:00:10.000Z"),
+    );
+
+    const result = await service.execute(context, new CheckResourceDeleteSafetyQuery("res_web"));
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      schemaVersion: "resources.delete-check/v1",
+      resourceId: "res_web",
+      lifecycleStatus: "archived",
+      eligible: false,
+      blockers: [
+        {
+          kind: "server-applied-route",
+          relatedEntityId: "route_set_1",
+          relatedEntityType: "server-applied-route",
+          count: 1,
+        },
+      ],
+    });
+  });
+
+  test("[RES-PROFILE-DELETE-CHECK-003] archived resource delete-check is eligible without retained blockers", async () => {
+    const { context, resources } = await createHarness();
+    const service = new CheckResourceDeleteSafetyQueryService(
+      resources,
+      new FixedDeletionBlockerReader(),
+      new FixedClock("2026-01-01T00:00:10.000Z"),
+    );
+
+    const result = await service.execute(context, new CheckResourceDeleteSafetyQuery("res_web"));
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      schemaVersion: "resources.delete-check/v1",
+      resourceId: "res_web",
+      lifecycleStatus: "archived",
+      eligible: true,
+      blockers: [],
+    });
+  });
+
   test("[RES-PROFILE-DELETE-001] deletes an archived resource and publishes resource-deleted", async () => {
     const { context, eventBus, repositoryContext, resources, useCase } = await createHarness();
 
@@ -242,17 +324,8 @@ describe("DeleteResourceUseCase", () => {
     expect(eventBus.events).toHaveLength(0);
   });
 
-  test("[RES-PROFILE-DELETE-004] reports deployment history blockers", async () => {
-    const { context, eventBus, useCase } = await createHarness({
-      blockers: [
-        {
-          kind: "deployment-history",
-          relatedEntityId: "dep_1",
-          relatedEntityType: "deployment",
-          count: 2,
-        },
-      ],
-    });
+  test("[RES-PROFILE-DELETE-004] deletes archived resources even when deployment history exists", async () => {
+    const { context, eventBus, repositoryContext, resources, useCase } = await createHarness();
 
     const result = await useCase.execute(context, {
       resourceId: "res_web",
@@ -261,18 +334,13 @@ describe("DeleteResourceUseCase", () => {
       },
     });
 
-    expect(result.isErr()).toBe(true);
-    expect(result._unsafeUnwrapErr()).toMatchObject({
-      code: "resource_delete_blocked",
-      details: {
-        phase: "resource-deletion-guard",
-        deletionBlockers: ["deployment-history"],
-        relatedEntityId: "dep_1",
-        relatedEntityType: "deployment",
-        blockerCount: 2,
-      },
-    });
-    expect(eventBus.events).toHaveLength(0);
+    expect(result.isOk()).toBe(true);
+    const persisted = await resources.findOne(
+      repositoryContext,
+      ResourceByIdSpec.create(ResourceId.rehydrate("res_web")),
+    );
+    expect(persisted?.toState().lifecycleStatus.value).toBe("deleted");
+    expect(deletedEvent(eventBus.events).aggregateId).toBe("res_web");
   });
 
   test("[RES-PROFILE-DELETE-005] reports domain, certificate, and route blockers", async () => {

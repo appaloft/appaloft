@@ -1676,6 +1676,9 @@ export const zhCN = {
       deleteConfirmPrompt: "请输入资源 slug 来确认删除。",
       deleteFailed: "资源删除失败",
       deleteSucceeded: "资源已删除",
+      deleteBlockedDescription: "先清理这些保留引用，才能删除这个已归档资源。",
+      deleteBlockedTitle: "删除被阻止",
+      deleteCheckLoading: "正在检查删除安全性...",
       dangerZoneDescription:
         "归档和删除与普通资源配置分开处理。除预览资源外，删除前需要先归档，并输入资源 slug 确认。",
       dangerZoneTitle: "危险区",

@@ -139,6 +139,7 @@ import { pruneProviderJobLogsCommandInputSchema } from "./operations/provider-jo
 import { archiveResourceCommandInputSchema } from "./operations/resources/archive-resource.command";
 import { attachResourceStorageCommandInputSchema } from "./operations/resources/attach-resource-storage.command";
 import { bindResourceDependencyCommandInputSchema } from "./operations/resources/bind-resource-dependency.command";
+import { checkResourceDeleteSafetyQueryInputSchema } from "./operations/resources/check-resource-delete-safety.query";
 import { configureResourceAccessCommandInputSchema } from "./operations/resources/configure-resource-access.command";
 import { configureResourceAutoDeployCommandInputSchema } from "./operations/resources/configure-resource-auto-deploy.command";
 import { configureResourceHealthCommandInputSchema } from "./operations/resources/configure-resource-health.command";
@@ -1633,6 +1634,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft resource archive <resourceId>",
       orpc: { method: "POST", path: "/api/resources/{resourceId}/archive" },
+    },
+  },
+  {
+    key: "resources.delete-check",
+    kind: "query",
+    domain: "resources",
+    messageName: "CheckResourceDeleteSafetyQuery",
+    handlerName: "CheckResourceDeleteSafetyQueryHandler",
+    serviceName: "CheckResourceDeleteSafetyQueryService",
+    inputSchema: checkResourceDeleteSafetyQueryInputSchema,
+    serviceToken: tokens.checkResourceDeleteSafetyQueryService,
+    transports: {
+      cli: "appaloft resource delete-check <resourceId>",
+      orpc: { method: "GET", path: "/api/resources/{resourceId}/delete-check" },
     },
   },
   {

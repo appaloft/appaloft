@@ -1335,7 +1335,7 @@ describe("pglite persistence integration", () => {
     }
   }, 15000);
 
-  test("[RES-PROFILE-DELETE-007] production resources retain deployment-history delete blockers", async () => {
+  test("[RES-PROFILE-DELETE-004] production resources do not treat deployment history as a delete blocker", async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-deployment-delete-blocker-"));
     const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
     const context = createRepositoryContext();
@@ -1371,12 +1371,7 @@ describe("pglite persistence integration", () => {
       });
 
       expect(result.isOk()).toBe(true);
-      expect(result._unsafeUnwrap()).toContainEqual({
-        kind: "deployment-history",
-        relatedEntityId: "dep_resource_delete_blocker",
-        relatedEntityType: "deployment",
-        count: 1,
-      });
+      expect(result._unsafeUnwrap()).toEqual([]);
     } finally {
       await closeDatabase?.();
       rmSync(workspaceDir, { recursive: true, force: true });

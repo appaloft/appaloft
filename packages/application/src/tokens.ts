@@ -166,6 +166,9 @@ export const tokens = {
     "appaloft.resource_runtime_control_attempt_retention_store",
   ),
   resourceRuntimeLogArchiveStore: Symbol.for("appaloft.resource_runtime_log_archive_store"),
+  checkResourceDeleteSafetyQueryService: Symbol.for(
+    "appaloft.check_resource_delete_safety_query_service",
+  ),
   retentionDefaultRepository: Symbol.for("appaloft.retention_default_repository"),
   previewLifecycleService: Symbol.for("appaloft.preview_lifecycle_service"),
   previewFeedbackService: Symbol.for("appaloft.preview_feedback_service"),

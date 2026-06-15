@@ -53,6 +53,8 @@ import {
   CheckInstanceUpgradeQueryService,
   CheckProjectDeleteSafetyQueryHandler,
   CheckProjectDeleteSafetyQueryService,
+  CheckResourceDeleteSafetyQueryHandler,
+  CheckResourceDeleteSafetyQueryService,
   CheckServerDeleteSafetyQueryHandler,
   CheckServerDeleteSafetyQueryService,
   CleanupPreviewCommandHandler,
@@ -2393,6 +2395,7 @@ export function registerApplicationServices(
   container.registerSingleton(CheckInstanceUpgradeQueryHandler);
   container.registerSingleton(ApplyInstanceUpgradeCommandHandler);
   container.registerSingleton(CheckDomainBindingDeleteSafetyQueryHandler);
+  container.registerSingleton(CheckResourceDeleteSafetyQueryHandler);
   container.registerSingleton(CheckServerDeleteSafetyQueryHandler);
   container.registerSingleton(CleanupPreviewCommandHandler);
   container.registerSingleton(ConfigureDefaultAccessDomainPolicyCommandHandler);
@@ -2758,6 +2761,10 @@ export function registerApplicationServices(
   );
   container.registerSingleton(tokens.createResourceUseCase, CreateResourceUseCase);
   container.registerSingleton(tokens.archiveResourceUseCase, ArchiveResourceUseCase);
+  container.registerSingleton(
+    tokens.checkResourceDeleteSafetyQueryService,
+    CheckResourceDeleteSafetyQueryService,
+  );
   container.registerSingleton(tokens.deleteResourceUseCase, DeleteResourceUseCase);
   container.registerSingleton(tokens.attachResourceStorageUseCase, AttachResourceStorageUseCase);
   container.registerSingleton(tokens.detachResourceStorageUseCase, DetachResourceStorageUseCase);
