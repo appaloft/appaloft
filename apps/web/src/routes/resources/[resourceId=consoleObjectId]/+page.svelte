@@ -309,6 +309,7 @@
     certificatesQuery,
   } = createConsoleQueries(browser);
   const resourceId = $derived(page.params.resourceId ?? "");
+  let resourceSupportsServerBackedRuntimeSurfaces = $state(true);
   const activeTab = $derived(
     parseResourceDetailTab(page.url.searchParams.get("tab")),
   );
@@ -319,7 +320,10 @@
     activeTab === "monitor",
   );
   const resourceRuntimeMonitorEnabled = $derived(
-    browser && resourceId.length > 0 && resourceRuntimeMonitorActive,
+    browser &&
+      resourceId.length > 0 &&
+      resourceRuntimeMonitorActive &&
+      resourceSupportsServerBackedRuntimeSurfaces,
   );
   const resourceSourceEventsEnabled = $derived(
     browser &&
@@ -334,7 +338,8 @@
     browser &&
       resourceId.length > 0 &&
       activeTab === "jobs" &&
-      activeResourceSection === "scheduled-tasks",
+      activeResourceSection === "scheduled-tasks" &&
+      resourceSupportsServerBackedRuntimeSurfaces,
   );
   let storageBackupVolumeId = $state("");
   const resourceDetailQuery = createQuery(() =>
@@ -1249,15 +1254,34 @@
       !latestDeployment?.serverId &&
       !defaultDestinationId,
   );
+  const isServerlessStaticArtifactDeployment = $derived(
+    latestDeployment?.target.kind === "serverless-static-artifact",
+  );
+  const isDirectStaticArtifactRuntime = $derived(
+    isServerlessStaticArtifactAccess || isServerlessStaticArtifactDeployment,
+  );
+  $effect(() => {
+    resourceSupportsServerBackedRuntimeSurfaces = !resource || !isDirectStaticArtifactRuntime;
+  });
+  const visibleResourceDetailTabs = $derived(
+    resourceDetailTabs.filter(
+      (tab) =>
+        resourceSupportsServerBackedRuntimeSurfaces ||
+        (tab !== "monitor" && tab !== "logs" && tab !== "terminal" && tab !== "jobs"),
+    ),
+  );
   const shouldShowServerField = $derived(
-    !domainBindingUsesResourceRouteProvider && !latestDeployment?.serverId,
+    !isDirectStaticArtifactRuntime &&
+      !domainBindingUsesResourceRouteProvider &&
+      !latestDeployment?.serverId,
   );
   const shouldShowDestinationField = $derived(
-    !domainBindingUsesResourceRouteProvider && !defaultDestinationId,
+    !isDirectStaticArtifactRuntime && !domainBindingUsesResourceRouteProvider && !defaultDestinationId,
   );
   const canCreateBinding = $derived(
     Boolean(
-      resource &&
+      !isDirectStaticArtifactRuntime &&
+        resource &&
         domainName.trim() &&
         pathPrefix.trim() &&
         proxyKind !== "none" &&
@@ -1770,7 +1794,7 @@
   }
 
   function prepareResourceDomainBindingCreateDialog(): void {
-    if (!resource || isResourceArchived) {
+    if (!resource || isResourceArchived || isDirectStaticArtifactRuntime) {
       return;
     }
 
@@ -1792,7 +1816,7 @@
   }
 
   function openResourceDomainBindingCreateDialog(): void {
-    if (!resource || isResourceArchived) {
+    if (!resource || isResourceArchived || isDirectStaticArtifactRuntime) {
       return;
     }
 
@@ -2785,7 +2809,13 @@
   }
 
   function startRuntimeLogFollow(): void {
-    if (!browser || !resource || runtimeLogsFollowing || runtimeLogsLoading) {
+    if (
+      !browser ||
+      !resource ||
+      !resourceSupportsServerBackedRuntimeSurfaces ||
+      runtimeLogsFollowing ||
+      runtimeLogsLoading
+    ) {
       return;
     }
 
@@ -2805,7 +2835,7 @@
   }
 
   function refreshRuntimeLogs(): void {
-    if (!resource) {
+    if (!resource || !resourceSupportsServerBackedRuntimeSurfaces) {
       return;
     }
 
@@ -3490,6 +3520,8 @@
     const currentResourceId = resource?.id ?? "";
     const currentTab = activeTab;
     const currentObservationHandoff = resourceRuntimeMonitoringObservationHandoff;
+    const currentResourceSupportsServerBackedRuntimeSurfaces =
+      resourceSupportsServerBackedRuntimeSurfaces;
 
     if (!browser) {
       return;
@@ -3506,6 +3538,15 @@
       }
 
       if (currentTab !== "logs") {
+        runtimeLogsLoading = false;
+        return;
+      }
+
+      if (!currentResourceSupportsServerBackedRuntimeSurfaces) {
+        runtimeLogs = [];
+        runtimeLogsError = null;
+        runtimeLogsUnavailable = true;
+        runtimeLogResourceId = currentResourceId;
         runtimeLogsLoading = false;
         return;
       }
@@ -4569,7 +4610,7 @@
       case "dependencies":
         return resourceDependenciesSections;
       case "jobs":
-        return resourceJobsSections;
+        return resourceSupportsServerBackedRuntimeSurfaces ? resourceJobsSections : ["source-events"];
       case "settings":
         return resourceSettingsSections;
       case "overview":
@@ -5650,10 +5691,18 @@
           data-resource-runtime-logs-unavailable-state
         >
           <p class="text-sm font-medium">
-            {$t(i18nKeys.console.resources.runtimeLogsUnavailableTitle)}
+            {$t(
+              resourceSupportsServerBackedRuntimeSurfaces
+                ? i18nKeys.console.resources.runtimeLogsUnavailableTitle
+                : i18nKeys.console.resources.staticArtifactRuntimeUnavailableTitle,
+            )}
           </p>
           <p class="mt-1 text-sm leading-6 text-muted-foreground">
-            {$t(i18nKeys.console.resources.runtimeLogsUnavailableBody)}
+            {$t(
+              resourceSupportsServerBackedRuntimeSurfaces
+                ? i18nKeys.console.resources.runtimeLogsUnavailableBody
+                : i18nKeys.console.resources.staticArtifactRuntimeLogsUnavailableBody,
+            )}
           </p>
         </div>
       {:else if runtimeLogsError}
@@ -6027,7 +6076,7 @@
           aria-label={$t(i18nKeys.console.resources.overviewTitle)}
           class={detailTabsClass}
         >
-          {#each resourceDetailTabs as tab (tab)}
+          {#each visibleResourceDetailTabs as tab (tab)}
             <a
               href={resourceTabHref(tab)}
               class={detailTabClass}
@@ -6802,7 +6851,7 @@
                     </Button>
                   </div>
                   <div class="mt-4 grid gap-3 sm:grid-cols-2">
-                    <div class="rounded-md bg-muted/25 px-3 py-2">
+                    <div class="rounded-md border border-border bg-muted/25 px-3 py-2">
                       <p class="text-xs text-muted-foreground">
                         {$t(i18nKeys.console.resources.healthRuntime)}
                       </p>
@@ -6810,7 +6859,7 @@
                         {resourceHealthSectionStatusLabel(resourceHealth?.runtime.lifecycle)}
                       </p>
                     </div>
-                    <div class="rounded-md bg-muted/25 px-3 py-2">
+                    <div class="rounded-md border border-border bg-muted/25 px-3 py-2">
                       <p class="text-xs text-muted-foreground">
                         {$t(i18nKeys.console.resources.healthPolicy)}
                       </p>
@@ -6889,10 +6938,17 @@
                       <Globe2 class="size-4" />
                       {$t(i18nKeys.console.projects.manageAccessAction)}
                     </Button>
-                    <Button href={resourceTabHref("logs")} variant="outline">
-                      <Terminal class="size-4" />
-                      {$t(i18nKeys.console.resources.runtimeLogsTitle)}
-                    </Button>
+                    {#if resourceSupportsServerBackedRuntimeSurfaces}
+                      <Button href={resourceTabHref("logs")} variant="outline">
+                        <Terminal class="size-4" />
+                        {$t(i18nKeys.console.resources.runtimeLogsTitle)}
+                      </Button>
+                    {:else}
+                      <Button href={resourceTabHref("deployments")} variant="outline">
+                        <Archive class="size-4" />
+                        {resourceTabLabel("deployments")}
+                      </Button>
+                    {/if}
                   </div>
                 </section>
               </div>
@@ -6912,19 +6968,19 @@
                   </Button>
                 </div>
                 <dl class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                  <div class="rounded-md bg-muted/25 px-3 py-2">
+                  <div class="rounded-md border border-border bg-muted/25 px-3 py-2">
                     <dt class="text-xs text-muted-foreground">
                       {$t(i18nKeys.common.domain.source)}
                     </dt>
                     <dd class="mt-1 truncate text-sm font-medium">{resourceSourceSummary()}</dd>
                   </div>
-                  <div class="rounded-md bg-muted/25 px-3 py-2">
+                  <div class="rounded-md border border-border bg-muted/25 px-3 py-2">
                     <dt class="text-xs text-muted-foreground">
                       {$t(i18nKeys.console.resources.runtimeProfileTitle)}
                     </dt>
                     <dd class="mt-1 truncate text-sm font-medium">{resourceRuntimeSummary()}</dd>
                   </div>
-                  <div class="rounded-md bg-muted/25 px-3 py-2 sm:col-span-2">
+                  <div class="rounded-md border border-border bg-muted/25 px-3 py-2 sm:col-span-2">
                     <dt class="text-xs text-muted-foreground">
                       {$t(i18nKeys.console.resources.networkProfileTitle)}
                     </dt>
@@ -7181,19 +7237,33 @@
                       </div>
                       <div class="flex shrink-0 flex-wrap items-center gap-2">
                         <Badge variant="outline">{resourceDomainBindings.length}</Badge>
-                        <Button
-                          type="button"
-                          size="sm"
-                          disabled={isResourceArchived}
-                          onclick={openResourceDomainBindingCreateDialog}
-                        >
-                          <Plus class="size-4" />
-                          {$t(i18nKeys.console.domainBindings.createTitle)}
-                        </Button>
+                        {#if !isDirectStaticArtifactRuntime}
+                          <Button
+                            type="button"
+                            size="sm"
+                            disabled={isResourceArchived}
+                            onclick={openResourceDomainBindingCreateDialog}
+                          >
+                            <Plus class="size-4" />
+                            {$t(i18nKeys.console.domainBindings.createTitle)}
+                          </Button>
+                        {/if}
                       </div>
                     </div>
 
-                    {#if resourceDomainBindings.length === 0}
+                    {#if isDirectStaticArtifactRuntime}
+                      <div
+                        class="rounded-md border border-dashed bg-muted/25 px-4 py-6"
+                        data-resource-static-artifact-domain-unavailable
+                      >
+                        <p class="text-sm font-medium">
+                          {$t(i18nKeys.console.resources.staticArtifactDomainBindingsUnavailableTitle)}
+                        </p>
+                        <p class="mt-2 text-sm leading-6 text-muted-foreground">
+                          {$t(i18nKeys.console.resources.staticArtifactDomainBindingsUnavailableDescription)}
+                        </p>
+                      </div>
+                    {:else if resourceDomainBindings.length === 0}
                       <div class="rounded-md border border-dashed bg-muted/25 px-4 py-6">
                         <p class="text-sm text-muted-foreground">
                           {$t(i18nKeys.console.domainBindings.emptyBody)}
@@ -8410,6 +8480,28 @@
         {:else if activeTab === "monitor"}
           <div class={detailTabPanelScrollClass}>
             <div class="space-y-8">
+              {#if !resourceSupportsServerBackedRuntimeSurfaces}
+                <section class="rounded-md border border-dashed bg-muted/25 px-4 py-6">
+                  <p class="text-sm font-medium">
+                    {$t(i18nKeys.console.resources.staticArtifactRuntimeUnavailableTitle)}
+                  </p>
+                  <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                    {$t(i18nKeys.console.resources.staticArtifactMonitoringUnavailableBody)}
+                  </p>
+                  <div class="mt-4 flex flex-wrap gap-2">
+                    <Button href={resourceTabHref("deployments")} variant="outline">
+                      {resourceTabLabel("deployments")}
+                      <ArrowRight class="size-4" />
+                    </Button>
+                    {#if primaryAccessHref}
+                      <Button href={primaryAccessHref} target="_blank" rel="noreferrer" variant="outline">
+                        <Globe2 class="size-4" />
+                        {$t(i18nKeys.console.deployments.openAccessUrl)}
+                      </Button>
+                    {/if}
+                  </div>
+                </section>
+              {:else}
               {#if showResourceServerRuntimeFallback}
                 <p class="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
                   {$t(i18nKeys.console.runtimeUsage.resourceServerFallbackNotice)}
@@ -8451,12 +8543,31 @@
                 cleanupHref={resourceSectionHref("storage")}
               />
               {@render resourceRuntimeControlPanel()}
+              {/if}
             </div>
           </div>
         {:else if activeTab === "terminal"}
           <div class={detailTabPanelScrollClass}>
             <section class="space-y-3" data-resource-terminal-panel>
-              {#if terminalDeploymentId}
+              {#if !resourceSupportsServerBackedRuntimeSurfaces}
+                <div
+                  class="rounded-md border border-dashed bg-card px-4 py-6"
+                  data-resource-terminal-unavailable-state
+                >
+                  <p class="text-sm font-medium">
+                    {$t(i18nKeys.console.resources.staticArtifactRuntimeUnavailableTitle)}
+                  </p>
+                  <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                    {$t(i18nKeys.console.resources.staticArtifactTerminalUnavailableBody)}
+                  </p>
+                  <div class="mt-4 flex flex-wrap gap-2">
+                    <Button href={resourceTabHref("deployments")} variant="outline">
+                      {resourceTabLabel("deployments")}
+                      <ArrowRight class="size-4" />
+                    </Button>
+                  </div>
+                </div>
+              {:else if terminalDeploymentId}
                 <TerminalSessionPanel
                   title={$t(i18nKeys.console.terminal.resourceTitle)}
                   description={$t(i18nKeys.console.terminal.resourceDescription)}

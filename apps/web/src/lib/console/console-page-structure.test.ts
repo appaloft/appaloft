@@ -1064,6 +1064,13 @@ describe("console page structure", () => {
     expect(resourceDetailTabsSource).toContain('"logs"');
     expect(resourceDetailTabsSource).toContain('"terminal"');
     expect(resourceDetailTabsSource).toContain('"previews"');
+    expect(resourceDetailPageSource).toContain("latestDeployment?.target.kind === \"serverless-static-artifact\"");
+    expect(resourceDetailPageSource).toContain("const visibleResourceDetailTabs = $derived");
+    expect(resourceDetailPageSource).toContain(
+      'tab !== "monitor" && tab !== "logs" && tab !== "terminal" && tab !== "jobs"',
+    );
+    expect(resourceDetailPageSource).toContain("resourceSupportsServerBackedRuntimeSurfaces");
+    expect(resourceDetailPageSource).toContain("!resource || !isDirectStaticArtifactRuntime");
     expect(resourceJobsSectionsSource).toContain('"scheduled-tasks"');
     expect(resourceJobsSectionsSource).toContain('"source-events"');
     expect(resourceJobsSectionsSource).not.toContain('"previews"');
@@ -1091,6 +1098,16 @@ describe("console page structure", () => {
       "const resourceEffectiveConfigQuery = createQuery",
       "const resourceSourceEventsQuery = createQuery",
     );
+    const resourceScheduledTasksEnabledSource = sourceBetween(
+      resourceDetailPageSource,
+      "const resourceScheduledTasksEnabled = $derived",
+      "let storageBackupVolumeId",
+    );
+    const resourceRuntimeLogsEffectSource = sourceBetween(
+      resourceDetailPageSource,
+      "$effect(() => {\n    const currentResourceId = resource?.id ?? \"\";\n    const currentTab = activeTab;",
+      "  onDestroy(() => {",
+    );
     for (const coreResourceQuerySource of [
       resourceDetailQuerySource,
       resourceHealthQuerySource,
@@ -1101,6 +1118,18 @@ describe("console page structure", () => {
       expect(coreResourceQuerySource).not.toContain("enabled: resourcePreviewsEnabled");
       expect(coreResourceQuerySource).not.toContain("enabled: resourceScheduledTasksEnabled");
     }
+    expect(resourceScheduledTasksEnabledSource).toContain("resourceSupportsServerBackedRuntimeSurfaces");
+    expect(resourceDetailPageSource).toContain(
+      "resourceRuntimeMonitorActive &&\n      resourceSupportsServerBackedRuntimeSurfaces",
+    );
+    expect(resourceRuntimeLogsEffectSource).toContain(
+      "currentResourceSupportsServerBackedRuntimeSurfaces",
+    );
+    expect(resourceRuntimeLogsEffectSource).toContain(
+      "if (!currentResourceSupportsServerBackedRuntimeSurfaces)",
+    );
+    expect(resourceRuntimeLogsPanelSource).toContain("staticArtifactRuntimeUnavailableTitle");
+    expect(resourceRuntimeLogsPanelSource).toContain("staticArtifactRuntimeLogsUnavailableBody");
     expect(resourceDetailPageSource).toContain(
       "<Dialog.Root bind:open={scheduledTaskCreateDialogOpen}",
     );

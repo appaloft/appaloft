@@ -2044,6 +2044,14 @@ export const i18nKeys = {
       runtimeLogsTitle: "console:resources.runtimeLogsTitle",
       runtimeLogsUnavailableBody: "console:resources.runtimeLogsUnavailableBody",
       runtimeLogsUnavailableTitle: "console:resources.runtimeLogsUnavailableTitle",
+      staticArtifactMonitoringUnavailableBody:
+        "console:resources.staticArtifactMonitoringUnavailableBody",
+      staticArtifactRuntimeLogsUnavailableBody:
+        "console:resources.staticArtifactRuntimeLogsUnavailableBody",
+      staticArtifactRuntimeUnavailableTitle:
+        "console:resources.staticArtifactRuntimeUnavailableTitle",
+      staticArtifactTerminalUnavailableBody:
+        "console:resources.staticArtifactTerminalUnavailableBody",
       runtimeTab: "console:resources.runtimeTab",
       runtimeProfileFormDescription: "console:resources.runtimeProfileFormDescription",
       runtimeProfileSaveFailed: "console:resources.runtimeProfileSaveFailed",

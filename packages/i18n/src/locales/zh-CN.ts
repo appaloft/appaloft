@@ -2127,6 +2127,13 @@ export const zhCN = {
       runtimeLogsUnavailableBody:
         "部署完成并记录运行时输出后，日志会显示在这里。当前资源还没有可读取的运行日志。",
       runtimeLogsUnavailableTitle: "还没有运行日志",
+      staticArtifactMonitoringUnavailableBody:
+        "这个静态站点由静态产物地址直接分发，没有可采集 CPU、内存、磁盘或进程控制的服务器运行时。部署到 SSH 目标的静态站点仍会显示运行时监控。",
+      staticArtifactRuntimeLogsUnavailableBody:
+        "这个静态站点由静态产物地址直接分发，没有应用进程输出可读取。需要排查发布结果时请查看部署记录和访问地址；部署到 SSH 目标的静态站点仍会保留运行时日志。",
+      staticArtifactRuntimeUnavailableTitle: "静态分发没有服务器运行时",
+      staticArtifactTerminalUnavailableBody:
+        "这个静态站点没有可进入的服务器工作目录。部署到 SSH 目标时，资源终端会根据最新 server-backed 部署恢复可用。",
       runtimeTab: "运行态",
       runtimeProfileFormDescription: "修改后续部署使用的持久运行时规划配置。",
       runtimeProfileSaveFailed: "运行时配置保存失败",
