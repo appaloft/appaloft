@@ -1799,6 +1799,8 @@ export const enUS = {
         "Block future profile edits and deployment entry points while preserving deployments, logs, routes, and bindings.",
       lifecycleDeleteOption:
         "Delete the resource boundary only after the resource is archived. Audit and external records remain with their owners.",
+      lifecycleRestoreOption:
+        "Reopen profile edits and deployment entry points without changing existing deployments, logs, routes, or bindings.",
       lifecycleDescription:
         "Review the resource lifecycle state, then open one focused governance flow for the intended operation.",
       lifecycleDialogDescription:
@@ -1810,6 +1812,9 @@ export const enUS = {
       lifecyclePreviewResourceNotice:
         "Preview resources can enter cleanup directly without a separate archive step.",
       lifecycleStatus: "Lifecycle status",
+      restoreAction: "Restore",
+      restoreFailed: "Resource was not restored",
+      restoreSucceeded: "Resource restored",
       composeProfileDescription:
         "Compose resources group multiple services and choose a target service for traffic.",
       composeProfileTitle: "Compose stack",
@@ -2074,10 +2079,6 @@ export const enUS = {
         "These are custom domain bindings for the current resource. Default generated access appears in the access area.",
       domainBindingsTitle: "Custom domains",
       staticArtifactDefaultAccess: "Default access",
-      staticArtifactDomainBindingsUnavailableDescription:
-        "This static upload is served by a generated static artifact address. Custom domains require a static artifact domain provider; the current server-backed domain binding flow cannot bind a resource without a server and destination.",
-      staticArtifactDomainBindingsUnavailableTitle:
-        "Custom domains are not available for this static upload yet",
       durableDomainAccess: "Durable domain access",
       certificateExpiresAt: "Expires",
       certificateImportCertificateChain: "Certificate chain",

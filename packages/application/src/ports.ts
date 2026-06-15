@@ -5981,8 +5981,8 @@ export interface DomainBindingSummary {
   projectId: string;
   environmentId: string;
   resourceId: string;
-  serverId: string;
-  destinationId: string;
+  serverId?: string;
+  destinationId?: string;
   domainName: string;
   pathPrefix: string;
   proxyKind: EdgeProxyKind;

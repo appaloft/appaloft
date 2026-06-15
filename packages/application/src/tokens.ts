@@ -351,6 +351,7 @@ export const tokens = {
   ),
   createResourceUseCase: Symbol.for("appaloft.create_resource_use_case"),
   archiveResourceUseCase: Symbol.for("appaloft.archive_resource_use_case"),
+  restoreResourceUseCase: Symbol.for("appaloft.restore_resource_use_case"),
   deleteResourceUseCase: Symbol.for("appaloft.delete_resource_use_case"),
   configureResourceAutoDeployUseCase: Symbol.for(
     "appaloft.configure_resource_auto_deploy_use_case",

@@ -23,8 +23,8 @@ The command contract is:
 - accepted requests persist the expected public DNS target and initial DNS observation state when
   the target can be derived safely;
 - accepted requests mirror the initial ownership verification attempt into the durable process
-  attempt journal for `operator-work.*` visibility with safe DomainBinding, Resource, server, and
-  domain/DNS expectation metadata;
+  attempt journal for `operator-work.*` visibility with safe DomainBinding, Resource, optional
+  server target, and domain/DNS expectation metadata;
 - accepted requests publish `domain-binding-requested`;
 - DNS/proxy/certificate readiness progresses asynchronously.
 
@@ -58,7 +58,7 @@ It is not:
 
 `domain-bindings.create` is a standalone command, but the binding owner is resource-scoped. Web, CLI, API, automation, and future MCP tools must all dispatch the same command semantics.
 
-Web must provide a resource-scoped affordance from the resource detail page so a user can bind a domain while looking at the resource that will receive traffic. That affordance preloads the current resource's project, environment, resource, and destination context when available, but it must still submit the same `domain-bindings.create` input model.
+Web must provide a resource-scoped affordance from the resource detail page so a user can bind a domain while looking at the resource that will receive traffic. That affordance preloads the current resource's project, environment, resource, and route target context when available, but it must still submit the same `domain-bindings.create` input model.
 
 The standalone domain bindings page may remain as a cross-resource management and creation surface. It must not define different ownership, validation, or lifecycle rules from the resource-scoped surface.
 
@@ -78,8 +78,8 @@ command.
 | `projectId` | Required | Project that owns the domain binding. |
 | `environmentId` | Required | Environment scope for the binding. |
 | `resourceId` | Required | Resource that receives traffic for this binding. |
-| `serverId` | Required | Deployment target/server that will serve the route. |
-| `destinationId` | Required | Destination on the server for route placement. |
+| `serverId` | Optional with `destinationId` | Deployment target/server route placement hint for server-backed resources. |
+| `destinationId` | Optional with `serverId` | Destination route placement hint for server-backed resources. |
 | `domainName` | Required | Public DNS hostname. Must not include scheme, path, or port. |
 | `pathPrefix` | Optional | Route path prefix. Defaults to `/`. |
 | `edgeProxyProviderKey` | Optional | Opaque provider key. When omitted, the binding uses the target/server's resolved edge proxy provider. |
@@ -91,13 +91,17 @@ command.
 
 ## Admission Flow
 
+`serverId` and `destinationId` are a matched pair when supplied. Resource-backed route providers
+may omit both fields and let the application resolve the durable route target from the resource
+placement policy, generated-access provider, or Cloud/private composition.
+
 The command must:
 
 1. Validate command input.
 2. Normalize and validate `domainName`.
 3. Validate `pathPrefix`, optional edge proxy provider key, and `tlsMode`.
-4. Resolve project, environment, resource, server, and destination.
-5. Reject cross-project/environment/destination mismatches.
+4. Resolve project, environment, resource, and any supplied server/destination target hints.
+5. Reject cross-project/environment/destination mismatches when server target hints are supplied.
 6. Reject duplicate active bindings for the same normalized `domainName`, `pathPrefix`, and environment/resource scope.
 7. When `redirectTo` is supplied, reject missing redirect targets, self redirects, and redirect chains; the target must be an existing served binding in the same project/environment/resource/path owner scope.
 8. Reject durable bindings when the target resolves to no edge proxy provider or to a provider that does not support durable domain routes.

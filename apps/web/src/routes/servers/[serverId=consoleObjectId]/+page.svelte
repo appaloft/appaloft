@@ -54,7 +54,7 @@
     detailSubnavContentClass,
     detailSubnavLayoutClass,
     detailTabClass,
-    detailTabPanelScrollNoTopClass,
+    detailTabPanelScrollClass,
     detailTabPanelSubnavClass,
     detailTabsClass,
     subnavItemClass,
@@ -1034,7 +1034,7 @@
 
           <Tabs.Content
             value="overview"
-            class={[detailTabPanelScrollNoTopClass, "space-y-5"]}
+            class={[detailTabPanelScrollClass, "space-y-5"]}
             data-server-overview-display-surface
           >
         <div class="console-metric-strip sm:grid-cols-2 xl:grid-cols-5">
@@ -1272,7 +1272,7 @@
 
           <Tabs.Content
             value="capacity"
-            class={[detailTabPanelScrollNoTopClass, "space-y-5"]}
+            class={[detailTabPanelScrollClass, "space-y-5"]}
           >
         <section class="console-panel p-4">
           <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -1822,7 +1822,7 @@
 
           <Tabs.Content
             value="connectivity"
-            class={detailTabPanelScrollNoTopClass}
+            class={detailTabPanelScrollClass}
           >
             <section class="space-y-4">
               <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1913,7 +1913,7 @@
 
           <Tabs.Content
             value="deployments"
-            class={detailTabPanelScrollNoTopClass}
+            class={detailTabPanelScrollClass}
           >
             <section class="space-y-4">
               <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

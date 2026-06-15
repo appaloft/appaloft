@@ -67,7 +67,7 @@ async function recordCertificateAttemptAccepted(input: {
   requestedAt: string;
   projectId: string;
   resourceId: string;
-  serverId: string;
+  serverId?: string;
 }): Promise<void> {
   const result = await input.recorder.record(input.repositoryContext, {
     id: input.attemptId,
@@ -81,7 +81,7 @@ async function recordCertificateAttemptAccepted(input: {
     step: "requested",
     projectId: input.projectId,
     resourceId: input.resourceId,
-    serverId: input.serverId,
+    ...(input.serverId ? { serverId: input.serverId } : {}),
     domainBindingId: input.domainBindingId,
     certificateId: input.certificateId,
     startedAt: input.requestedAt,
@@ -265,7 +265,7 @@ export class IssueOrRenewCertificateUseCase {
         requestedAt: requestedAt.value,
         projectId: domainBindingState.projectId.value,
         resourceId: domainBindingState.resourceId.value,
-        serverId: domainBindingState.serverId.value,
+        ...(domainBindingState.serverId ? { serverId: domainBindingState.serverId.value } : {}),
       });
       await publishDomainEventsAndReturn(context, eventBus, logger, certificate, undefined);
 

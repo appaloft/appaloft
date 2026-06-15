@@ -158,6 +158,7 @@ import {
   type RestartResourceRuntimeCommandInput,
   type RestoreDependencyResourceBackupCommandInput,
   type RestoreProjectCommandInput,
+  type RestoreResourceCommandInput,
   type RestoreStorageVolumeBackupCommandInput,
   type RetryCertificateCommandInput,
   type RetryDeploymentCommandInput,
@@ -375,6 +376,7 @@ import {
   type ResourceRuntimeLogsStreamResponse,
   type RestartResourceRuntimeResponse,
   type RestoreProjectResponse,
+  type RestoreResourceResponse,
   type RestoreStorageVolumeBackupResponse,
   type RetryCertificateResponse,
   type RetryDeploymentResponse,
@@ -1083,6 +1085,12 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       ArchiveResourceCommandInput,
       ArchiveResourceResponse,
+      AppaloftClientError
+    >;
+    restore: Client<
+      AppaloftClientContext,
+      RestoreResourceCommandInput,
+      RestoreResourceResponse,
       AppaloftClientError
     >;
     deleteCheck: Client<

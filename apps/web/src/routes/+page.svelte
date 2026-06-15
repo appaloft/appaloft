@@ -420,7 +420,7 @@
             {/if}
             <small>{$t(i18nKeys.console.home.failedDeploymentsTitle)}</small>
           </a>
-          <a href="/resources" class="nothing-status-cell">
+          <div class="nothing-status-cell" data-home-resource-status-cell>
             <span>{$t(i18nKeys.common.domain.resources)}</span>
             {#if resourceCountQuery.isPending}
               <Skeleton class="h-7 w-10" />
@@ -428,7 +428,7 @@
               <strong>{resourceTotal}</strong>
             {/if}
             <small>{$t(i18nKeys.console.home.resourcePreviewLabel)}</small>
-          </a>
+          </div>
           <a href="/servers" class="nothing-status-cell">
             <span>{$t(i18nKeys.common.domain.servers)}</span>
             {#if serverCountQuery.isPending}
@@ -1101,8 +1101,8 @@
   .nothing-deployment-row:focus-visible,
   .nothing-deployment-rollup-row:hover,
   .nothing-deployment-rollup-row:focus-visible,
-  .nothing-status-cell:hover,
-  .nothing-status-cell:focus-visible,
+  a.nothing-status-cell:hover,
+  a.nothing-status-cell:focus-visible,
   .nothing-next-row:hover,
   .nothing-next-row:focus-visible {
     background: color-mix(in oklch, var(--primary) 3%, transparent);
@@ -1110,7 +1110,7 @@
 
   .nothing-deployment-row:focus-visible,
   .nothing-deployment-rollup-row:focus-visible,
-  .nothing-status-cell:focus-visible,
+  a.nothing-status-cell:focus-visible,
   .nothing-next-row:focus-visible,
   .nothing-side-link:focus-visible {
     outline: 2px solid var(--ring);

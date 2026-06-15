@@ -2467,8 +2467,10 @@ export class MemoryDomainBindingReadModel implements DomainBindingReadModel {
           projectId: domainBinding.projectId.value,
           environmentId: domainBinding.environmentId.value,
           resourceId: domainBinding.resourceId.value,
-          serverId: domainBinding.serverId.value,
-          destinationId: domainBinding.destinationId.value,
+          ...(domainBinding.serverId ? { serverId: domainBinding.serverId.value } : {}),
+          ...(domainBinding.destinationId
+            ? { destinationId: domainBinding.destinationId.value }
+            : {}),
           domainName: domainBinding.domainName.value,
           pathPrefix: domainBinding.pathPrefix.value,
           proxyKind: domainBinding.proxyKind.value,
@@ -2538,8 +2540,8 @@ export class MemoryDomainRouteBindingReader implements DomainRouteBindingReader 
       .filter((domainBinding) => domainBinding.projectId.value === input.projectId)
       .filter((domainBinding) => domainBinding.environmentId.value === input.environmentId)
       .filter((domainBinding) => domainBinding.resourceId.value === input.resourceId)
-      .filter((domainBinding) => domainBinding.serverId.value === input.serverId)
-      .filter((domainBinding) => domainBinding.destinationId.value === input.destinationId)
+      .filter((domainBinding) => domainBinding.serverId?.value === input.serverId)
+      .filter((domainBinding) => domainBinding.destinationId?.value === input.destinationId)
       .filter(
         (domainBinding) =>
           domainBinding.status.value === "bound" ||
@@ -2592,8 +2594,8 @@ export class MemoryDomainRouteFailureCandidateReader implements DomainRouteFailu
         state.projectId.equals(deployment.projectId) &&
         state.environmentId.equals(deployment.environmentId) &&
         state.resourceId.equals(deployment.resourceId) &&
-        state.serverId.equals(deployment.serverId) &&
-        state.destinationId.equals(deployment.destinationId) &&
+        state.serverId?.equals(deployment.serverId) &&
+        state.destinationId?.equals(deployment.destinationId) &&
         (state.status.value === "bound" ||
           state.status.value === "certificate_pending" ||
           state.status.value === "ready" ||
