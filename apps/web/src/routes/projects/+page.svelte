@@ -2,7 +2,7 @@
   import { browser } from "$app/environment";
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
-  import { ArrowRight, Check, FolderOpen, GripVertical, Pencil, Plus, ShieldCheck } from "@lucide/svelte";
+  import { ArrowRight, Check, FolderOpen, GripVertical, Pencil, Plus, Rocket, ShieldCheck } from "@lucide/svelte";
   import type { CreateProjectResponse, ProjectSummary } from "@appaloft/contracts";
   import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
   import Sortable from "sortablejs";
@@ -12,7 +12,6 @@
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
   import ProjectCreateForm from "$lib/components/console/ProjectCreateForm.svelte";
-  import ResourceHealthDot from "$lib/components/console/ResourceHealthDot.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import * as Dialog from "$lib/components/ui/dialog";
@@ -119,7 +118,17 @@
   }
 
   const { authSessionQuery, environmentsQuery, resourcesQuery, deploymentsQuery } =
-    createConsoleQueries(browser, { projects: false });
+    createConsoleQueries(browser, {
+      health: false,
+      readiness: false,
+      version: false,
+      projects: false,
+      servers: false,
+      previewEnvironments: false,
+      domainBindings: false,
+      certificates: false,
+      providers: false,
+    });
   const projectsQuery = createQuery(() =>
     queryOptions({
       queryKey: ["projects", { limit: projectPageSize, offset: projectOffset }],
@@ -480,7 +489,7 @@
                   </span>
                   <span class="flex min-w-0 items-center gap-2">
                     {#if latestResource}
-                      <ResourceHealthDot resourceId={latestResource.id} class="shrink-0" />
+                      <Rocket class="size-3.5 shrink-0 text-muted-foreground/70" />
                       <span class="truncate">
                         {latestResource.name}
                         {#if latestDeployment}
