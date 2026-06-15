@@ -5692,6 +5692,164 @@
   </section>
 {/snippet}
 
+{#snippet resourceDetailLoadingSkeleton()}
+  <div class={detailPageClass} data-resource-detail-loading-skeleton>
+    <section class={detailHeaderClass}>
+      <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+        <div class="min-w-0 space-y-2">
+          <div class="flex flex-wrap items-center gap-2">
+            <Skeleton class="h-8 w-72 max-w-full" />
+            <Skeleton class="h-5 w-20 rounded-md" />
+          </div>
+          <Skeleton class="h-4 w-full max-w-2xl" />
+          <Skeleton class="h-4 w-3/5 max-w-xl" />
+        </div>
+
+        <div class="flex shrink-0 flex-wrap gap-2">
+          <Button type="button" variant="outline" size="lg" disabled>
+            <ResourceStatusDot status="loading" />
+            <span>{$t(i18nKeys.console.resources.healthTitle)}</span>
+            <span class="text-muted-foreground">{$t(i18nKeys.common.status.loading)}</span>
+          </Button>
+          <Button type="button" disabled>
+            <Play class="size-4" />
+            {$t(i18nKeys.common.actions.createDeployment)}
+          </Button>
+        </div>
+      </div>
+    </section>
+
+    <div class={detailBodyClass}>
+      <nav aria-label={$t(i18nKeys.console.resources.overviewTitle)} class={detailTabsClass}>
+        {#each resourceDetailTabs as tab (tab)}
+          <a
+            href={resourceTabHref(tab)}
+            class={detailTabClass}
+            aria-current={activeTab === tab ? "page" : undefined}
+            onclick={(event) => selectResourceTab(tab, event)}
+          >
+            {resourceTabLabel(tab)}
+          </a>
+        {/each}
+      </nav>
+
+      {#if activeTab === "deployments"}
+        <div class={detailTabPanelScrollClass}>
+          <section id="resource-deployments" class="space-y-4">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h2 class="text-lg font-semibold">
+                  {$t(i18nKeys.console.resources.deploymentsTitle)}
+                </h2>
+                <p class="mt-1 text-sm text-muted-foreground">
+                  {$t(i18nKeys.console.resources.deploymentsDescription)}
+                </p>
+              </div>
+              <Button type="button" disabled>
+                <Play class="size-4" />
+                {$t(i18nKeys.common.actions.createDeployment)}
+              </Button>
+            </div>
+            <div class="rounded-md border bg-background">
+              {#each Array.from({ length: 4 }) as _}
+                <div class="flex flex-col gap-2 border-b px-4 py-3 last:border-b-0 sm:flex-row sm:items-center sm:justify-between">
+                  <div class="min-w-0">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <Skeleton class="h-5 w-28 rounded-md" />
+                      <Skeleton class="h-5 w-20 rounded-md" />
+                    </div>
+                    <Skeleton class="mt-2 h-3 w-56 max-w-full" />
+                  </div>
+                  <Skeleton class="h-8 w-24 rounded-md" />
+                </div>
+              {/each}
+            </div>
+          </section>
+        </div>
+      {:else}
+        <div class={detailTabPanelScrollClass}>
+          <section id="resource-overview" class="space-y-5">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div class="min-w-0">
+                <h2 class="text-lg font-semibold">
+                  {$t(i18nKeys.console.resources.overviewTitle)}
+                </h2>
+                <p class="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
+                  {$t(i18nKeys.console.resources.overviewDescription)}
+                </p>
+              </div>
+              <Button type="button" variant="outline" disabled>
+                <Globe2 class="size-4" />
+                {$t(i18nKeys.console.deployments.openAccessUrl)}
+              </Button>
+            </div>
+
+            <div class="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(20rem,0.9fr)]">
+              <section class="rounded-md border bg-background p-4">
+                <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div class="min-w-0 space-y-2">
+                    <p class="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                      <Link2 class="size-4" />
+                      {$t(i18nKeys.console.resources.overviewCurrentAccess)}
+                    </p>
+                    <Skeleton class="h-7 w-full max-w-lg" />
+                    <div class="flex flex-wrap items-center gap-2">
+                      <Skeleton class="h-5 w-24 rounded-md" />
+                      <Skeleton class="h-5 w-20 rounded-md" />
+                    </div>
+                  </div>
+                  <Button type="button" variant="outline" disabled>
+                    <Copy class="size-4" />
+                    {$t(i18nKeys.console.resources.copyAccessUrl)}
+                  </Button>
+                </div>
+              </section>
+
+              <section class="rounded-md border bg-background p-4">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div class="min-w-0">
+                    <p class="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                      <Gauge class="size-4" />
+                      {$t(i18nKeys.console.resources.overviewCurrentHealth)}
+                    </p>
+                    <p class="mt-2 flex items-center gap-2 text-lg font-semibold">
+                      <ResourceStatusDot status="loading" />
+                      {$t(i18nKeys.common.status.loading)}
+                    </p>
+                    <Skeleton class="mt-2 h-3 w-40" />
+                  </div>
+                  <Button type="button" size="sm" variant="outline" disabled>
+                    <RefreshCw class="size-4" />
+                    {$t(i18nKeys.console.resources.healthRefresh)}
+                  </Button>
+                </div>
+                <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                  {#each Array.from({ length: 4 }) as _}
+                    <div class="rounded-md bg-muted/25 px-3 py-2">
+                      <Skeleton class="h-3 w-24" />
+                      <Skeleton class="mt-2 h-4 w-20" />
+                    </div>
+                  {/each}
+                </div>
+              </section>
+            </div>
+
+            <div class="grid gap-4 xl:grid-cols-3">
+              {#each Array.from({ length: 3 }) as _}
+                <section class="console-subtle-panel p-4">
+                  <Skeleton class="h-5 w-36" />
+                  <Skeleton class="mt-2 h-4 w-full" />
+                  <Skeleton class="mt-2 h-4 w-3/4" />
+                </section>
+              {/each}
+            </div>
+          </section>
+        </div>
+      {/if}
+    </div>
+  </div>
+{/snippet}
+
 <ConsoleShell
   title={resource?.name ?? $t(i18nKeys.console.resources.pageTitle)}
   description={$t(i18nKeys.console.resources.detailDescription)}
@@ -5722,13 +5880,7 @@
   ]}
 >
   {#if pageLoading}
-    <div class="space-y-5">
-      <Skeleton class="h-40 w-full" />
-      <div class="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
-        <Skeleton class="h-80 w-full" />
-        <Skeleton class="h-80 w-full" />
-      </div>
-    </div>
+    {@render resourceDetailLoadingSkeleton()}
   {:else if !resource}
     <section class="space-y-5 py-2">
       <Badge class="w-fit" variant="outline">{$t(i18nKeys.errors.backend.notFound)}</Badge>
