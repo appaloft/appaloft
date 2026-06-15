@@ -243,6 +243,16 @@ describe("dependency resource Web console surface", () => {
     expect(projectsPageSource).toContain("onOpenChange={setProjectCreateDialogOpen}");
     expect(projectsPageSource).toContain("ConsoleEmptyState");
     expect(projectsPageSource).toContain("onCreated={openCreatedProject}");
+    expect(projectsPageSource).toContain("health: false");
+    expect(projectsPageSource).toContain("readiness: false");
+    expect(projectsPageSource).toContain("version: false");
+    expect(projectsPageSource).toContain("servers: false");
+    expect(projectsPageSource).toContain("previewEnvironments: false");
+    expect(projectsPageSource).toContain("domainBindings: false");
+    expect(projectsPageSource).toContain("certificates: false");
+    expect(projectsPageSource).toContain("providers: false");
+    expect(projectsPageSource).not.toContain("ResourceHealthDot");
+    expect(projectsPageSource).not.toContain("orpcClient.resources.health");
     expect(serversPageSource).toContain(
       'import ServerCreateForm from "$lib/components/console/ServerCreateForm.svelte"',
     );
