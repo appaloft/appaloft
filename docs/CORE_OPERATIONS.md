@@ -362,6 +362,7 @@ Implemented operations:
 | Import resource variables | Command | `resources.import-variables` | `ImportResourceVariablesCommand` | `ImportResourceVariablesCommandInput` | `appaloft resource import-variables <resourceId> --content <dotenv>` | `POST /api/resources/{resourceId}/variables/import` |
 | Unset resource variable | Command | `resources.unset-variable` | `UnsetResourceVariableCommand` | `UnsetResourceVariableCommandInput` | `appaloft resource unset-variable <resourceId> <key>` | `DELETE /api/resources/{resourceId}/variables/{key}` |
 | Archive resource | Command | `resources.archive` | `ArchiveResourceCommand` | `ArchiveResourceCommandInput` | `appaloft resource archive <resourceId>` | `POST /api/resources/{resourceId}/archive` |
+| Check resource delete safety | Query | `resources.delete-check` | `CheckResourceDeleteSafetyQuery` | `CheckResourceDeleteSafetyQueryInput` | `appaloft resource delete-check <resourceId>` | `GET /api/resources/{resourceId}/delete-check` |
 | Delete resource | Command | `resources.delete` | `DeleteResourceCommand` | `DeleteResourceCommandInput` | `appaloft resource delete <resourceId> --confirm-slug <slug>` | `DELETE /api/resources/{resourceId}` |
 | List resources | Product-session member query | `resources.list` | `ListResourcesQuery` | `ListResourcesQueryInput` | `appaloft resource list` | `GET /api/resources` |
 | Count resources | Product-session member query | `resources.count` | `CountResourcesQuery` | `CountResourcesQueryInput` | `appaloft resource count` | `GET /api/resources/count` |
@@ -815,6 +816,9 @@ Current boundary:
   state to `archived`, publishes `resource-archived` on the first transition, and blocks future
   profile mutations and deployments without stopping runtime or deleting retained history,
   domains, logs, diagnostics, or source links.
+- resource delete safety is resource-owned through `resources.delete-check`; it returns the same
+  retained blockers used by `resources.delete` without mutating lifecycle state. Deployment history
+  is retained by deployment/audit ownership and is not by itself a resource delete blocker.
 - resource delete is resource-owned through `resources.delete`; the command moves an archived,
   unreferenced resource to deleted/tombstone lifecycle state after typed slug confirmation and
   deletion blocker checks, publishes `resource-deleted` on the first transition, and omits deleted

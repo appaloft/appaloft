@@ -14,6 +14,7 @@ describe("dependency resource Web console surface", () => {
       serverCreateFormSource,
       projectsPageSource,
       serversPageSource,
+      resourceStatusDotSource,
     ] = await Promise.all([
       readFile(
         new URL(
@@ -35,6 +36,7 @@ describe("dependency resource Web console surface", () => {
       readFile(new URL("../components/console/ServerCreateForm.svelte", import.meta.url), "utf8"),
       readFile(new URL("../../routes/projects/+page.svelte", import.meta.url), "utf8"),
       readFile(new URL("../../routes/servers/+page.svelte", import.meta.url), "utf8"),
+      readFile(new URL("../components/console/ResourceStatusDot.svelte", import.meta.url), "utf8"),
     ]);
 
     expect(resourcePageSource).toContain("orpcClient.dependencyResources.list");
@@ -243,6 +245,18 @@ describe("dependency resource Web console surface", () => {
     expect(projectsPageSource).toContain("onOpenChange={setProjectCreateDialogOpen}");
     expect(projectsPageSource).toContain("ConsoleEmptyState");
     expect(projectsPageSource).toContain("onCreated={openCreatedProject}");
+    expect(projectsPageSource).toContain("health: false");
+    expect(projectsPageSource).toContain("readiness: false");
+    expect(projectsPageSource).toContain("version: false");
+    expect(projectsPageSource).toContain("servers: false");
+    expect(projectsPageSource).toContain("previewEnvironments: false");
+    expect(projectsPageSource).toContain("domainBindings: false");
+    expect(projectsPageSource).toContain("certificates: false");
+    expect(projectsPageSource).toContain("providers: false");
+    expect(projectsPageSource).toContain("ResourceHealthDot");
+    expect(projectsPageSource).not.toContain("orpcClient.resources.health");
+    expect(resourceStatusDotSource).toContain('case "loading":');
+    expect(resourceStatusDotSource).toContain("animate-pulse bg-sky-500");
     expect(serversPageSource).toContain(
       'import ServerCreateForm from "$lib/components/console/ServerCreateForm.svelte"',
     );

@@ -107,6 +107,42 @@ describe("projectResourceAccessSummary", () => {
     });
   });
 
+  test("projects generated access URL with a default open path while preserving proxy prefix", () => {
+    const summary = projectResourceAccessSummary([
+      {
+        id: "dep_pocketbase",
+        status: "succeeded",
+        createdAt: "2026-06-15T00:00:00.000Z",
+        runtimePlan: {
+          execution: {
+            accessRoutes: [
+              {
+                proxyKind: "traefik",
+                domains: ["pocketbase.example.test"],
+                pathPrefix: "/",
+                tlsMode: "disabled",
+                targetPort: 8090,
+              },
+            ],
+            metadata: {
+              "access.routeSource": "generated-default",
+              "access.hostname": "pocketbase.example.test",
+              "access.providerKey": "test-provider",
+              "access.scheme": "http",
+              "access.defaultOpenPathPrefix": "/_/",
+            },
+          },
+        },
+      },
+    ]);
+
+    expect(summary?.latestGeneratedAccessRoute).toMatchObject({
+      url: "http://pocketbase.example.test/_/",
+      pathPrefix: "/",
+      proxyKind: "traefik",
+    });
+  });
+
   test("[ROUTE-TLS-READMODEL-002] projects ready durable domain route without replacing generated access", () => {
     const summary = projectResourceAccessSummary(
       [

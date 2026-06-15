@@ -42,6 +42,7 @@ This command inherits:
 - [ADR-013: Project Resource Navigation And Deployment Ownership](../decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md)
 - [ADR-026: Aggregate Mutation Command Boundary](../decisions/ADR-026-aggregate-mutation-command-boundary.md)
 - [resources.archive Command Spec](./resources.archive.md)
+- [resources.delete-check Query Spec](../queries/resources.delete-check.md)
 - [resources.show Query Spec](../queries/resources.show.md)
 - [resource-deleted Event Spec](../events/resource-deleted.md)
 - [Resource Profile Lifecycle Workflow](../workflows/resource-profile-lifecycle.md)
@@ -130,7 +131,6 @@ Canonical blocker kinds:
 ```ts
 type ResourceDeletionBlockerKind =
   | "active-resource"
-  | "deployment-history"
   | "runtime-instance"
   | "domain-binding"
   | "certificate"
@@ -147,8 +147,6 @@ type ResourceDeletionBlockerKind =
 A blocker exists when any retained record, state, or external-facing route would make deletion
 ambiguous or unsafe:
 
-- `deployment-history`: any deployment attempt, deployment snapshot, deployment log projection, or
-  rollback candidate references the resource.
 - `runtime-instance`: any current or retained runtime instance record references the resource.
 - `domain-binding`: any durable domain binding references the resource.
 - `certificate`: any certificate or issuance/renewal attempt is tied to a resource-owned domain
@@ -214,12 +212,13 @@ future MCP tools must remain intention-revealing and must not expose `resources.
 ## Resource-Specific Rules
 
 Delete is intentionally narrower than archive. Most real deployed resources should be archived,
-not deleted, because deployment history, domain/TLS state, source links, runtime state, and support
-context are product data.
+not deleted, because domain/TLS state, source links, runtime state, retained logs, and support
+context are product data. Deployment history is retained by deployment/audit ownership and does not
+block deletion by itself.
 
 The command must never perform implicit cleanup of runtime containers, proxy routes, domains,
-certificates, source links, dependency resources, logs, or deployment records. Each cleanup path
-needs its own explicit command or workflow before deletion can pass guards.
+certificates, source links, dependency resources, or logs. Each cleanup path needs its own explicit
+command or workflow before deletion can pass guards.
 
 ## Error Contract
 
@@ -243,6 +242,7 @@ All errors use [Resource Lifecycle Error Spec](../errors/resources.lifecycle.md)
 | Web | Resource detail destructive action dispatches this command only for archived resources after typed slug confirmation. | Active |
 | CLI | `appaloft resource delete <resourceId> --confirm-slug <slug> [--json]`. | Active |
 | oRPC / HTTP | `DELETE /api/resources/{resourceId}` using the command schema; JSON body carries `confirmation.resourceSlug`. | Active |
+| Delete safety query | `resources.delete-check` reports the same safe blocker categories before mutation. | Active |
 | Repository config files | Not applicable. Repository config cannot request destructive control-plane lifecycle deletion. | Not applicable |
 | Automation / MCP | Future command/tool over the same operation key. | Future |
 
@@ -258,12 +258,11 @@ Canonical event spec:
 Resource deletion is active in `CORE_OPERATIONS.md`, `operation-catalog.ts`, application slices,
 HTTP/oRPC, CLI, Web, Resource repository tombstone state, and normal read-model omission.
 
-The v1 PG deletion blocker reader covers retained deployments, durable domain bindings,
-certificates tied through domain bindings, active dependency bindings, retained runtime log
-archives, audit logs whose `aggregate_id` is the resource id, and source links whose
-`source_links.resource_id` is the resource id. Terminal-session and external runtime-task blocker
-detection remain extension points on the same `ResourceDeletionBlockerReader` port where no durable
-PG table exists yet.
+The v1 PG deletion blocker reader covers durable domain bindings, certificates tied through domain
+bindings, active dependency bindings, retained runtime log archives, audit logs whose `aggregate_id`
+is the resource id, and source links whose `source_links.resource_id` is the resource id.
+Terminal-session and external runtime-task blocker detection remain extension points on the same
+`ResourceDeletionBlockerReader` port where no durable PG table exists yet.
 
 Server-applied route blocker closure is implemented through the `server_applied_route_states`
 durable table and PG adapter. Rows whose `resource_id` matches the target resource report

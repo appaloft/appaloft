@@ -1791,6 +1791,10 @@ export const enUS = {
       deleteConfirmPrompt: "Type the resource slug to confirm deletion.",
       deleteFailed: "Resource was not deleted",
       deleteSucceeded: "Resource deleted",
+      deleteBlockedDescription:
+        "Clear these retained references before deleting this archived resource.",
+      deleteBlockedTitle: "Deletion is blocked",
+      deleteCheckLoading: "Checking deletion safety...",
       dangerZoneDescription:
         "Archive and delete are isolated from normal resource configuration. Deletion requires the resource slug and is only available after the resource is archived, except for preview resources.",
       dangerZoneTitle: "Danger zone",
@@ -2473,6 +2477,16 @@ export const enUS = {
       domainBindingsAfterDeploy: "Bind on the resource detail page after deployment.",
       environmentKind: "Environment kind",
       firstVariable: "First variable",
+      variableAdd: "Add variable",
+      variableApplyParsedEnv: "Apply {{count}} variables",
+      variableEnvMode: "Paste .env",
+      variableEnvPasteHint:
+        "Paste .env content here. Empty lines and # comments are ignored. Parsed variables are stored as secrets by default.",
+      variableEnvPlaceholder: "DATABASE_URL=postgres://...\nREDIS_URL=redis://...",
+      variableNameLabel: "Environment variable name",
+      variableRemove: "Remove variable",
+      variableRowsMode: "Enter one by one",
+      variableValueLabel: "Environment variable value",
       cloneUrl: "Clone URL",
       composeManifest: "Compose manifest",
       composeManifestPlaceholder: "./deploy/docker-compose.yml",

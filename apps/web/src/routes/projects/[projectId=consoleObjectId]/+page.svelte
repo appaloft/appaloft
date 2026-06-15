@@ -44,6 +44,7 @@
   import { capabilities, capabilityKey, type CapabilityQuery } from "$lib/capabilities";
   import CapabilityGate from "$lib/components/console/CapabilityGate.svelte";
   import DeploymentTable from "$lib/components/console/DeploymentTable.svelte";
+  import DeploymentStatusBadge from "$lib/components/console/DeploymentStatusBadge.svelte";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
   import EnvironmentCreateForm from "$lib/components/console/EnvironmentCreateForm.svelte";
@@ -66,6 +67,20 @@
   import * as Tabs from "$lib/components/ui/tabs";
   import { selectCurrentResourceAccessRoute } from "$lib/console/resource-access-route";
   import { webDocsHrefs } from "$lib/console/docs-help";
+  import {
+    detailBodyClass,
+    detailHeaderClass,
+    detailPageClass,
+    detailSubnavClass,
+    detailSubnavContentClass,
+    detailSubnavLayoutClass,
+    detailTabClass,
+    detailTabPanelSubnavClass,
+    detailTabPanelScrollClass,
+    detailTabsClass,
+    subnavItemClass,
+    subnavListClass,
+  } from "$lib/console/layout-classes";
   import { modalIsOpen, setModalOpen } from "$lib/console/url-modal";
   import { createConsoleQueries } from "$lib/console/queries";
   import { runtimeMonitoringRollupQueryOptions } from "$lib/console/runtime-usage-query";
@@ -101,6 +116,7 @@
     | "previews"
     | "activity"
     | "settings";
+  type ProjectSettingsSection = "general" | "danger";
   const projectDetailTabs = [
     "overview",
     "resources",
@@ -110,6 +126,7 @@
     "activity",
     "settings",
   ] as const;
+  const projectSettingsSections = ["general", "danger"] as const;
   type ProjectAttentionItem = {
     key: string;
     kind:
@@ -152,6 +169,9 @@
 
   const projectId = $derived(page.params.projectId ?? "");
   const activeProjectTab = $derived(parseProjectDetailTab(page.url.searchParams.get("tab")));
+  const activeProjectSettingsSection = $derived(
+    parseProjectSettingsSection(page.url.searchParams.get("section")),
+  );
   let projectLifecycleDialogOpen = $state(false);
   const projectDetailQuery = createQuery(() =>
     queryOptions({
@@ -1251,6 +1271,12 @@
       : "overview";
   }
 
+  function parseProjectSettingsSection(value: string | null): ProjectSettingsSection {
+    return projectSettingsSections.includes(value as ProjectSettingsSection)
+      ? (value as ProjectSettingsSection)
+      : "general";
+  }
+
   function projectTabHref(tab: ProjectDetailTab): string {
     const params = new URLSearchParams();
 
@@ -1258,6 +1284,18 @@
       params.delete("tab");
     } else {
       params.set("tab", tab);
+    }
+
+    const search = params.toString();
+    return `${page.url.pathname}${search ? `?${search}` : ""}`;
+  }
+
+  function projectSettingsSectionHref(section: ProjectSettingsSection): string {
+    const params = new URLSearchParams();
+    params.set("tab", "settings");
+
+    if (section !== "general") {
+      params.set("section", section);
     }
 
     const search = params.toString();
@@ -1303,6 +1341,11 @@
   function selectProjectTab(tab: ProjectDetailTab, event: MouseEvent): void {
     event.preventDefault();
     void goto(projectTabHref(tab), { noScroll: true, keepFocus: true });
+  }
+
+  function selectProjectSettingsSection(section: ProjectSettingsSection, event: MouseEvent): void {
+    event.preventDefault();
+    void goto(projectSettingsSectionHref(section), { noScroll: true, keepFocus: true });
   }
 
   function setQuickDeployDialogOpen(open: boolean): void {
@@ -1416,6 +1459,15 @@
     }
   }
 
+  function projectSettingsSectionLabel(section: ProjectSettingsSection): string {
+    switch (section) {
+      case "general":
+        return $t(i18nKeys.console.projects.generalSettingsTitle);
+      case "danger":
+        return $t(i18nKeys.console.projects.dangerZoneTitle);
+    }
+  }
+
   function previewEnvironmentStatusLabelKey(status: PreviewEnvironmentStatus) {
     if (status === "cleanup-requested") {
       return i18nKeys.console.previewEnvironments.statusCleanupRequested;
@@ -1480,8 +1532,8 @@
       </div>
     </section>
   {:else}
-    <div class="console-detail-page">
-      <section class="console-detail-header">
+    <div class={detailPageClass}>
+      <section class={detailHeaderClass}>
         <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div class="max-w-3xl space-y-3">
             <div class="flex flex-wrap items-center gap-2">
@@ -1594,15 +1646,15 @@
         </section>
       </section>
 
-      <Tabs.Root value={activeProjectTab} class="console-detail-body">
+      <Tabs.Root value={activeProjectTab} class={detailBodyClass}>
         <nav
           aria-label={$t(i18nKeys.console.projects.pageTitle)}
-          class="console-detail-tabs"
+          class={detailTabsClass}
         >
           {#each projectDetailTabs as tab (tab)}
             <a
               href={projectTabHref(tab)}
-              class="console-detail-tab"
+              class={detailTabClass}
               aria-current={activeProjectTab === tab ? "page" : undefined}
               onclick={(event) => selectProjectTab(tab, event)}
             >
@@ -1613,7 +1665,7 @@
 
         <Tabs.Content
           value="overview"
-          class="console-detail-tab-panel console-detail-tab-panel-scroll mt-0 flex flex-col gap-6 pt-0"
+          class={[detailTabPanelScrollClass, "flex flex-col gap-6"]}
         >
           <section class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
             <div class="space-y-5">
@@ -1717,9 +1769,9 @@
                                     {resource.name}
                                   </a>
                                   <Badge variant="secondary">{resource.kind}</Badge>
-                                  <Badge variant="outline">
-                                    {resource.lastDeploymentStatus ?? latestDeployment?.status ?? $t(i18nKeys.console.projects.noDeploymentShort)}
-                                  </Badge>
+                                  <DeploymentStatusBadge
+                                    status={resource.lastDeploymentStatus ?? latestDeployment?.status}
+                                  />
                                 </div>
                                 <p class="mt-1 truncate text-xs text-muted-foreground">
                                   {currentAccessRoute?.route.url ?? $t(i18nKeys.console.projects.noPublicAccess)}
@@ -2151,7 +2203,7 @@
 
         <Tabs.Content
           value="resources"
-          class="console-detail-tab-panel console-detail-tab-panel-scroll mt-0 pt-0"
+          class={detailTabPanelScrollClass}
         >
           <section class="space-y-4">
             <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
@@ -2231,7 +2283,7 @@
 
         <Tabs.Content
           value="previews"
-          class="console-detail-tab-panel console-detail-tab-panel-scroll mt-0 pt-0"
+          class={detailTabPanelScrollClass}
         >
           <section class="space-y-6">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -2404,7 +2456,7 @@
 
         <Tabs.Content
           value="environments"
-          class="console-detail-tab-panel console-detail-tab-panel-scroll mt-0 pt-0"
+          class={detailTabPanelScrollClass}
         >
           <section class="space-y-4">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -2536,7 +2588,7 @@
 
         <Tabs.Content
           value="deployments"
-          class="console-detail-tab-panel console-detail-tab-panel-scroll mt-0 pt-0"
+          class={detailTabPanelScrollClass}
         >
           <section class="space-y-4">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -2619,7 +2671,7 @@
 
         <Tabs.Content
           value="activity"
-          class="console-detail-tab-panel console-detail-tab-panel-scroll mt-0 pt-0"
+          class={detailTabPanelScrollClass}
           data-project-activity-display-surface
         >
           <section class="console-panel space-y-5 p-5">
@@ -2658,162 +2710,184 @@
 
         <Tabs.Content
           value="settings"
-          class="console-detail-tab-panel console-detail-tab-panel-scroll mt-0 pt-0"
+          class={detailTabPanelSubnavClass}
+          data-project-settings-display-surface
         >
-          <section class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
-            <div class="space-y-4">
-              <section class="console-panel space-y-4 p-5">
-                <div class="space-y-1">
-                  <div class="flex items-center gap-2">
-                    <h2 class="text-lg font-semibold">
-                      {$t(i18nKeys.console.projects.generalSettingsTitle)}
-                    </h2>
-                    <DocsHelpLink
-                      href={webDocsHrefs.projectLifecycle}
-                      ariaLabel={$t(i18nKeys.common.actions.openDocumentation)}
-                    />
-                  </div>
-                  <p class="text-sm text-muted-foreground">
-                    {$t(i18nKeys.console.projects.settingsDescription)}
-                  </p>
-                </div>
-
-                {#if lifecycleFeedback}
-                  <div
-                    class={`rounded-md border px-3 py-2 text-sm ${
-                      lifecycleFeedback.kind === "success"
-                        ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                        : "border-destructive/20 bg-destructive/5 text-destructive"
-                    }`}
-                  >
-                    <p class="font-medium">{lifecycleFeedback.title}</p>
-                    <p class="mt-1 opacity-80">{lifecycleFeedback.detail}</p>
-                  </div>
-                {/if}
-
-                <dl class="grid gap-4 sm:grid-cols-2">
-                  <div class="rounded-md border bg-background p-3">
-                    <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      {$t(i18nKeys.console.projects.renameLabel)}
-                    </dt>
-                    <dd class="mt-1 truncate text-sm font-medium">{project.name}</dd>
-                  </div>
-                  <div class="rounded-md border bg-background p-3">
-                    <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      {$t(i18nKeys.console.projects.settingsSlugLabel)}
-                    </dt>
-                    <dd class="mt-1 truncate font-mono text-sm">{project.slug}</dd>
-                  </div>
-                  <div class="rounded-md border bg-background p-3 sm:col-span-2">
-                    <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      ID
-                    </dt>
-                    <dd class="mt-1 break-all font-mono text-sm">{project.id}</dd>
-                  </div>
-                  <div class="rounded-md border bg-background p-3 sm:col-span-2">
-                    <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      {$t(i18nKeys.console.projects.settingsDescriptionLabel)}
-                    </dt>
-                    <dd class="mt-1 text-sm">
-                      {project.description ?? $t(i18nKeys.console.projects.noDescription)}
-                    </dd>
-                  </div>
-                </dl>
-
-                <CapabilityGate
-                  operationKey="projects.rename"
-                  resourceRefs={{ projectId: project.id }}
-                >
-                  {#snippet children({ disabled })}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={disabled || isProjectArchived}
-                      onclick={openProjectRenameDialog}
+          <div class={[detailSubnavLayoutClass, "md:grid-cols-[13rem_minmax(0,1fr)]"]}>
+            <aside class={detailSubnavClass}>
+              <nav class="min-w-0" aria-label={$t(i18nKeys.console.projects.settingsTitle)}>
+                <div class={subnavListClass}>
+                  {#each projectSettingsSections as section (section)}
+                    <a
+                      class={[subnavItemClass, "min-h-10"]}
+                      href={projectSettingsSectionHref(section)}
+                      aria-current={activeProjectSettingsSection === section ? "page" : undefined}
+                      onclick={(event) => selectProjectSettingsSection(section, event)}
                     >
-                      <Pencil class="size-4" />
-                      {$t(i18nKeys.console.projects.settingsEditProjectAction)}
-                    </Button>
-                  {/snippet}
-                </CapabilityGate>
-              </section>
-
-              <section class="console-panel space-y-4 p-5">
-                <div class="space-y-1">
-                  <h2 class="text-lg font-semibold">{$t(i18nKeys.console.projects.lifecycleTitle)}</h2>
-                  <p class="text-sm text-muted-foreground">
-                    {$t(i18nKeys.console.projects.settingsLifecycleDescription)}
-                  </p>
+                      <span class="min-w-0 truncate">{projectSettingsSectionLabel(section)}</span>
+                    </a>
+                  {/each}
                 </div>
-                <div class="flex flex-wrap items-center gap-2">
-                  <Badge variant={isProjectArchived ? "destructive" : "secondary"}>
-                    {isProjectArchived
-                      ? $t(i18nKeys.console.projects.archived)
-                      : $t(i18nKeys.console.projects.active)}
-                  </Badge>
-                  {#if project.archivedAt}
-                    <span class="text-sm text-muted-foreground">
-                      {$t(i18nKeys.console.projects.archivedAt)} · {formatTime(project.archivedAt)}
-                    </span>
-                  {/if}
-                </div>
-              </section>
-            </div>
-
-            <aside
-              class="console-side-panel space-y-4 border-destructive/25 bg-destructive/5"
-              data-project-danger-display-surface
-            >
-              <div class="space-y-1">
-                <h2 class="text-sm font-semibold text-destructive">
-                  {$t(i18nKeys.console.projects.dangerZoneTitle)}
-                </h2>
-                <p class="text-sm leading-6 text-muted-foreground">
-                  {$t(i18nKeys.console.projects.dangerZoneDescription)}
-                </p>
-              </div>
-
-              {#if isProjectArchived}
-                <div class="rounded-md border border-destructive/20 bg-background px-3 py-2 text-sm text-destructive">
-                  {$t(i18nKeys.console.projects.archiveNotice)}
-                </div>
-              {/if}
-
-              <div class="rounded-md border bg-background px-3 py-2 text-sm">
-                <p class="font-medium">
-                  {isProjectArchived
-                    ? $t(i18nKeys.console.projects.archived)
-                    : $t(i18nKeys.console.projects.active)}
-                </p>
-                {#if project.archivedAt}
-                  <p class="mt-1 text-muted-foreground">
-                    {$t(i18nKeys.console.projects.archivedAt)} · {formatTime(project.archivedAt)}
-                  </p>
-                {:else}
-                  <p class="mt-1 text-muted-foreground">
-                    {$t(i18nKeys.console.projects.settingsLifecycleDescription)}
-                  </p>
-                {/if}
-                {#if projectDeleteBlockerCount > 0}
-                  <p class="mt-2 text-destructive">
-                    {$t(i18nKeys.console.projects.deleteBlocked, {
-                      count: projectDeleteBlockerCount,
-                    })}
-                  </p>
-                {/if}
-              </div>
-
-              <Button
-                type="button"
-                variant="outline"
-                class="w-full justify-start"
-                onclick={openProjectLifecycleDialog}
-              >
-                <Archive class="size-4" />
-                {$t(i18nKeys.console.projects.lifecycleManageAction)}
-              </Button>
+              </nav>
             </aside>
-          </section>
+
+            <div class={detailSubnavContentClass}>
+              {#if activeProjectSettingsSection === "general"}
+                <section class="space-y-4" data-project-settings-general>
+                  <section class="console-panel space-y-4 p-5">
+                    <div class="space-y-1">
+                      <div class="flex items-center gap-2">
+                        <h2 class="text-lg font-semibold">
+                          {$t(i18nKeys.console.projects.generalSettingsTitle)}
+                        </h2>
+                        <DocsHelpLink
+                          href={webDocsHrefs.projectLifecycle}
+                          ariaLabel={$t(i18nKeys.common.actions.openDocumentation)}
+                        />
+                      </div>
+                      <p class="text-sm text-muted-foreground">
+                        {$t(i18nKeys.console.projects.settingsDescription)}
+                      </p>
+                    </div>
+
+                    {#if lifecycleFeedback}
+                      <div
+                        class={`rounded-md border px-3 py-2 text-sm ${
+                          lifecycleFeedback.kind === "success"
+                            ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                            : "border-destructive/20 bg-destructive/5 text-destructive"
+                        }`}
+                      >
+                        <p class="font-medium">{lifecycleFeedback.title}</p>
+                        <p class="mt-1 opacity-80">{lifecycleFeedback.detail}</p>
+                      </div>
+                    {/if}
+
+                    <dl class="grid gap-4 sm:grid-cols-2">
+                      <div class="rounded-md border bg-background p-3">
+                        <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          {$t(i18nKeys.console.projects.renameLabel)}
+                        </dt>
+                        <dd class="mt-1 truncate text-sm font-medium">{project.name}</dd>
+                      </div>
+                      <div class="rounded-md border bg-background p-3">
+                        <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          {$t(i18nKeys.console.projects.settingsSlugLabel)}
+                        </dt>
+                        <dd class="mt-1 truncate font-mono text-sm">{project.slug}</dd>
+                      </div>
+                      <div class="rounded-md border bg-background p-3 sm:col-span-2">
+                        <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          ID
+                        </dt>
+                        <dd class="mt-1 break-all font-mono text-sm">{project.id}</dd>
+                      </div>
+                      <div class="rounded-md border bg-background p-3 sm:col-span-2">
+                        <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          {$t(i18nKeys.console.projects.settingsDescriptionLabel)}
+                        </dt>
+                        <dd class="mt-1 text-sm">
+                          {project.description ?? $t(i18nKeys.console.projects.noDescription)}
+                        </dd>
+                      </div>
+                    </dl>
+
+                    <CapabilityGate
+                      operationKey="projects.rename"
+                      resourceRefs={{ projectId: project.id }}
+                    >
+                      {#snippet children({ disabled })}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={disabled || isProjectArchived}
+                          onclick={openProjectRenameDialog}
+                        >
+                          <Pencil class="size-4" />
+                          {$t(i18nKeys.console.projects.settingsEditProjectAction)}
+                        </Button>
+                      {/snippet}
+                    </CapabilityGate>
+                  </section>
+
+                  <section class="console-panel space-y-4 p-5">
+                    <div class="space-y-1">
+                      <h2 class="text-lg font-semibold">{$t(i18nKeys.console.projects.lifecycleTitle)}</h2>
+                      <p class="text-sm text-muted-foreground">
+                        {$t(i18nKeys.console.projects.settingsLifecycleDescription)}
+                      </p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                      <Badge variant={isProjectArchived ? "destructive" : "secondary"}>
+                        {isProjectArchived
+                          ? $t(i18nKeys.console.projects.archived)
+                          : $t(i18nKeys.console.projects.active)}
+                      </Badge>
+                      {#if project.archivedAt}
+                        <span class="text-sm text-muted-foreground">
+                          {$t(i18nKeys.console.projects.archivedAt)} · {formatTime(project.archivedAt)}
+                        </span>
+                      {/if}
+                    </div>
+                  </section>
+                </section>
+              {:else if activeProjectSettingsSection === "danger"}
+                <section
+                  class="console-panel space-y-4 border-destructive/25 bg-destructive/5 p-5"
+                  data-project-danger-display-surface
+                >
+                  <div class="space-y-1">
+                    <h2 class="text-lg font-semibold text-destructive">
+                      {$t(i18nKeys.console.projects.dangerZoneTitle)}
+                    </h2>
+                    <p class="text-sm leading-6 text-muted-foreground">
+                      {$t(i18nKeys.console.projects.dangerZoneDescription)}
+                    </p>
+                  </div>
+
+                  {#if isProjectArchived}
+                    <div class="rounded-md border border-destructive/20 bg-background px-3 py-2 text-sm text-destructive">
+                      {$t(i18nKeys.console.projects.archiveNotice)}
+                    </div>
+                  {/if}
+
+                  <div class="rounded-md border bg-background px-3 py-2 text-sm">
+                    <p class="font-medium">
+                      {isProjectArchived
+                        ? $t(i18nKeys.console.projects.archived)
+                        : $t(i18nKeys.console.projects.active)}
+                    </p>
+                    {#if project.archivedAt}
+                      <p class="mt-1 text-muted-foreground">
+                        {$t(i18nKeys.console.projects.archivedAt)} · {formatTime(project.archivedAt)}
+                      </p>
+                    {:else}
+                      <p class="mt-1 text-muted-foreground">
+                        {$t(i18nKeys.console.projects.settingsLifecycleDescription)}
+                      </p>
+                    {/if}
+                    {#if projectDeleteBlockerCount > 0}
+                      <p class="mt-2 text-destructive">
+                        {$t(i18nKeys.console.projects.deleteBlocked, {
+                          count: projectDeleteBlockerCount,
+                        })}
+                      </p>
+                    {/if}
+                  </div>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    class="w-full justify-start sm:w-fit"
+                    onclick={openProjectLifecycleDialog}
+                  >
+                    <Archive class="size-4" />
+                    {$t(i18nKeys.console.projects.lifecycleManageAction)}
+                  </Button>
+                </section>
+              {/if}
+            </div>
+          </div>
         </Tabs.Content>
       </Tabs.Root>
     </div>

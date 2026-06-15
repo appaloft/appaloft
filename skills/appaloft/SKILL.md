@@ -96,11 +96,13 @@ surface available in the session.
   run output or manifest; stop runtime with `appaloft resource runtime stop <resourceId>` when a
   deployed resource is still running; archive/delete resources with
   `appaloft resource archive <resourceId>` then
-  `appaloft resource delete <resourceId> --confirm-slug <slug>`; archive project-owned
-  deployments with `appaloft deployments archive <deploymentId> --confirm <deploymentId>` when
-  they remain visible; if resource/project deletion is blocked by `deployment-history`, run scoped
-  dry-run prunes for deployment logs, runtime-control attempts, provider job logs, log archives, and
-  archived deployments before executing the same prunes for the exact seed-owned resource; run
+  `appaloft resource delete-check <resourceId>` and
+  `appaloft resource delete <resourceId> --confirm-slug <slug>` only when the check is eligible;
+  archive project-owned deployments with
+  `appaloft deployments archive <deploymentId> --confirm <deploymentId>` when they remain visible;
+  if project deletion is blocked by `deployment-history`, run scoped dry-run prunes for deployment
+  logs, runtime-control attempts, provider job logs, log archives, and archived deployments before
+  executing the same prunes for the exact seed-owned resource; run
   `appaloft project delete-check <projectId>`, archive the project, then delete it only when blockers
   are clear. Keep shared or injected test servers for reuse unless the
   user explicitly asks to deactivate/delete the server record. For storage volumes, detach any

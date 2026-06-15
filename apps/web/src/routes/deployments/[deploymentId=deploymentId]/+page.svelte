@@ -41,6 +41,14 @@
   import { Skeleton } from "$lib/components/ui/skeleton";
   import * as Tabs from "$lib/components/ui/tabs";
   import {
+    detailBodyClass,
+    detailHeaderClass,
+    detailPageClass,
+    detailTabClass,
+    detailTabPanelScrollClass,
+    detailTabsClass,
+  } from "$lib/console/layout-classes";
+  import {
     deploymentEventProgressEvents,
     deploymentEventProgressStatus,
     groupDeploymentProgressEvents,
@@ -1208,8 +1216,8 @@
     </section>
   {:else}
     {@const sourceVersion = sourceVersionForDeployment(deployment)}
-    <div class="console-detail-page">
-      <section class="console-detail-header">
+    <div class={detailPageClass}>
+      <section class={detailHeaderClass}>
         <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div class="max-w-3xl space-y-3">
             <div class="flex flex-wrap items-center gap-2">
@@ -1255,15 +1263,15 @@
 
       </section>
 
-      <Tabs.Root value={activeTab} class="console-detail-body">
+      <Tabs.Root value={activeTab} class={detailBodyClass}>
         <nav
           aria-label={$t(i18nKeys.console.deployments.pageTitle)}
-          class="console-detail-tabs"
+          class={detailTabsClass}
         >
           {#each deploymentDetailTabs as tab (tab)}
             <a
               href={deploymentTabHref(tab)}
-              class="console-detail-tab"
+              class={detailTabClass}
               aria-current={activeTab === tab ? "page" : undefined}
               onclick={(event) => selectDeploymentTab(tab, event)}
             >
@@ -1274,7 +1282,7 @@
 
         <Tabs.Content
           value="overview"
-          class="console-detail-tab-panel console-detail-tab-panel-scroll space-y-5"
+          class={[detailTabPanelScrollClass, "space-y-5"]}
         >
           {#if diagnosticSummaryError || diagnosticSummaryCopyFallback}
             <section class="console-panel space-y-3 p-4">
@@ -1698,7 +1706,7 @@
 
         <Tabs.Content
           value="logs"
-          class="console-detail-tab-panel console-detail-tab-panel-scroll space-y-4"
+          class={[detailTabPanelScrollClass, "space-y-4"]}
         >
           <section class="space-y-4">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -1768,7 +1776,7 @@
 
         <Tabs.Content
           value="timeline"
-          class="console-detail-tab-panel console-detail-tab-panel-scroll space-y-4"
+          class={[detailTabPanelScrollClass, "space-y-4"]}
           data-deployment-attempt-timeline
         >
           <section class="console-panel p-4">
@@ -1877,7 +1885,7 @@
 
         <Tabs.Content
           value="snapshot"
-          class="console-detail-tab-panel console-detail-tab-panel-scroll space-y-4"
+          class={[detailTabPanelScrollClass, "space-y-4"]}
         >
           <section class="console-panel p-4">
             <h2 class="text-lg font-semibold">{$t(i18nKeys.console.deployments.snapshotTitle)}</h2>

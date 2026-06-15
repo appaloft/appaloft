@@ -1,0 +1,51 @@
+export const detailPageClass =
+  "flex min-h-0 min-w-0 flex-col md:h-[calc(100svh-3.5rem-3rem)] md:overflow-visible";
+
+export const detailHeaderClass = "-mx-4 shrink-0 border-b px-4 pb-3 md:-mx-6 md:px-6";
+
+export const detailBodyClass = "flex min-h-0 min-w-0 flex-col md:flex-1";
+
+export const detailTabsClass =
+  "-mx-4 flex min-w-0 shrink-0 gap-6 overflow-x-auto border-b px-4 scroll-px-4 md:-mx-6 md:px-6 md:scroll-px-6";
+
+export const detailTabClass =
+  "flex h-11 flex-none items-center border-b-2 border-transparent text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground aria-[current=page]:border-foreground aria-[current=page]:text-foreground data-[state=active]:border-foreground data-[state=active]:text-foreground";
+
+export const detailTabPanelScrollClass =
+  "mt-0 min-w-0 pt-5 md:min-h-0 md:flex-1 md:overflow-x-hidden md:overflow-y-auto md:pb-1";
+
+export const detailTabPanelScrollNoTopClass =
+  "mt-0 min-w-0 md:min-h-0 md:flex-1 md:overflow-x-hidden md:overflow-y-auto md:pb-1";
+
+export const detailTabPanelSubnavClass =
+  "mt-0 min-w-0 overflow-hidden md:min-h-0 md:w-[calc(100%+3rem)] md:flex-1 md:-mx-6";
+
+export const subnavLayoutClass =
+  "grid -m-4 min-h-[calc(100svh-3.5rem)] md:-m-6 md:grid-cols-[16rem_minmax(0,1fr)]";
+
+export const detailSubnavLayoutClass =
+  "grid -m-4 min-h-[calc(100svh-3.5rem)] md:m-0 md:h-full md:min-h-0 md:overflow-hidden";
+
+export const subnavClass =
+  "min-w-0 border-b border-sidebar-border bg-sidebar text-sidebar-foreground md:border-b-0 md:border-r";
+
+export const detailSubnavClass =
+  "min-w-0 border-b border-sidebar-border bg-sidebar text-sidebar-foreground md:min-h-0 md:overflow-x-hidden md:overflow-y-auto md:border-b-0 md:border-r";
+
+export const subnavKickerClass =
+  "m-0 border-b border-sidebar-border px-3.5 pb-2.5 pt-3 text-xs font-semibold leading-4 text-muted-foreground";
+
+export const subnavListClass = "grid gap-0";
+
+export const subnavItemClass =
+  "group relative flex min-w-0 items-center gap-2 rounded-none px-3.5 py-2.5 text-left text-sm font-medium text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:bg-sidebar-accent aria-[current=page]:text-sidebar-accent-foreground aria-[current=page]:before:absolute aria-[current=page]:before:inset-y-0 aria-[current=page]:before:left-0 aria-[current=page]:before:w-0.5 aria-[current=page]:before:bg-primary aria-[current=page]:before:content-['']";
+
+export const subnavItemIconClass =
+  "size-4 shrink-0 text-muted-foreground group-hover:text-sidebar-accent-foreground group-aria-[current=page]:text-primary";
+
+export const subnavItemTitleClass = "block min-w-0 truncate text-sm font-medium leading-5";
+
+export const subnavContentClass = "min-w-0 p-4 md:p-6";
+
+export const detailSubnavContentClass =
+  "min-w-0 p-4 md:min-h-0 md:overflow-x-hidden md:overflow-y-auto md:p-6";

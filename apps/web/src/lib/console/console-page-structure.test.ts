@@ -933,10 +933,10 @@ describe("console page structure", () => {
 
   test("[RESOURCE-DETAIL-IA-001B] keeps default resource pages display-first", () => {
     const resourceDetailBodySource = resourceDetailPageSource.slice(
-      resourceDetailPageSource.indexOf('<div class="console-detail-body">'),
+      resourceDetailPageSource.indexOf("<div class={detailBodyClass}>"),
       resourceDetailPageSource.indexOf(
         "<Dialog.Root",
-        resourceDetailPageSource.indexOf('<div class="console-detail-body">'),
+        resourceDetailPageSource.indexOf("<div class={detailBodyClass}>"),
       ),
     );
 
@@ -952,6 +952,17 @@ describe("console page structure", () => {
     expect(resourceDetailBodySource).toContain("{@render resourceRuntimeControlPanel()}");
     expect(resourceDetailPageSource).toContain("onclick={openRuntimeControlDialog}");
     expect(resourceDetailPageSource).not.toContain("onclick={() => openRuntimeControlDialog");
+    const latestDeploymentSummarySource = sourceBetween(
+      resourceDetailPageSource,
+      "data-resource-latest-deployment-summary",
+      "{:else}",
+    );
+    expect(latestDeploymentSummarySource.match(/border border-border/g)?.length).toBe(3);
+    expect(latestDeploymentSummarySource).toContain(
+      "<DeploymentStatusBadge status={latestDeployment.status} />",
+    );
+    expect(latestDeploymentSummarySource).not.toContain("border-destructive");
+    expect(latestDeploymentSummarySource).not.toContain("border-red");
   });
 
   test("[RESOURCE-DETAIL-IA-001C] keeps monitor, logs, terminal, and job creation at the right layer", () => {
@@ -1499,19 +1510,21 @@ describe("console page structure", () => {
     expect(deploymentDetailPageSource).toContain("currentResourceObservationTitle");
     expect(deploymentDetailPageSource).toContain("data-deployment-header-owner-actions");
     expect(deploymentDetailPageSource).toContain("data-deployment-observation-actions");
-    expect(deploymentDetailPageSource).toContain('<div class="console-detail-page">');
+    expect(deploymentDetailPageSource).toContain('from "$lib/console/layout-classes"');
+    expect(deploymentDetailPageSource).toContain("<div class={detailPageClass}>");
     expect(deploymentDetailPageSource).toContain(
-      '<Tabs.Root value={activeTab} class="console-detail-body">',
+      "<Tabs.Root value={activeTab} class={detailBodyClass}>",
     );
     expect(deploymentDetailPageSource).toContain(
-      'class="console-detail-tab-panel console-detail-tab-panel-scroll space-y-5"',
+      'class={[detailTabPanelScrollClass, "space-y-5"]}',
     );
     expect(deploymentDetailPageSource).not.toContain('<div class="space-y-8">');
     expect(deploymentDetailPageSource).not.toContain(
       '<Tabs.Root value={activeTab} class="space-y-5">',
     );
-    expect(deploymentDetailPageSource).toContain('class="console-detail-tabs"');
-    expect(deploymentDetailPageSource).toContain('class="console-detail-tab"');
+    expect(deploymentDetailPageSource).toContain("class={detailTabsClass}");
+    expect(deploymentDetailPageSource).toContain("class={detailTabClass}");
+    expect(deploymentDetailPageSource).not.toContain("console-detail-");
     expect(deploymentDetailPageSource).toContain(
       'aria-current={activeTab === tab ? "page" : undefined}',
     );
@@ -1714,31 +1727,23 @@ describe("console page structure", () => {
     expect(serverDetailPageSource).toContain(
       'const serverSettingsSections = ["general", "credentials", "danger"]',
     );
-    expect(serverDetailPageSource).toContain('class="console-detail-tabs"');
-    expect(serverDetailPageSource).toContain('class="console-detail-tab"');
-    expect(serverDetailPageSource).toContain('<div class="console-detail-page">');
-    expect(serverDetailPageSource).toContain("console-detail-header");
+    expect(serverDetailPageSource).toContain('from "$lib/console/layout-classes"');
+    expect(serverDetailPageSource).toContain("class={detailTabsClass}");
+    expect(serverDetailPageSource).toContain("class={detailTabClass}");
+    expect(serverDetailPageSource).toContain("<div class={detailPageClass}>");
+    expect(serverDetailPageSource).toContain("class={detailHeaderClass}");
     expect(serverDetailPageSource).toContain(
-      '<Tabs.Root value={activeTab} class="console-detail-body console-server-detail-body">',
+      "<Tabs.Root value={activeTab} class={detailBodyClass}>",
     );
-    expect(consoleLayoutCssSource).toContain(
-      ".console-server-detail-body > .console-detail-tab-panel",
-    );
-    expect(consoleLayoutCssSource).toContain("margin-top: 0;");
-    expect(consoleLayoutCssSource).toContain(
-      ".console-server-detail-body > .console-detail-tab-panel-scroll",
-    );
-    expect(consoleLayoutCssSource).toContain(
-      ".console-server-detail-body .console-detail-subnav-layout > .console-subnav-content",
-    );
-    expect(consoleLayoutCssSource).toContain("padding-top: 0;");
+    expect(consoleLayoutCssSource).not.toContain(".console-server-detail-body");
+    expect(consoleLayoutCssSource).not.toContain(".console-detail-tab-panel");
     expect(serverDetailPageSource).toContain(
-      'class="console-detail-tab-panel console-detail-tab-panel-scroll space-y-5"',
+      'class={[detailTabPanelScrollNoTopClass, "space-y-5"]}',
     );
-    expect(serverDetailPageSource).toContain(
-      'class="console-detail-tab-panel console-detail-tab-panel-subnav"',
-    );
-    expect(serverDetailPageSource).toContain("console-subnav-layout console-detail-subnav-layout");
+    expect(serverDetailPageSource).toContain("class={detailTabPanelSubnavClass}");
+    expect(serverDetailPageSource).toContain("detailSubnavLayoutClass");
+    expect(serverDetailPageSource).not.toContain("console-detail-");
+    expect(serverDetailPageSource).not.toContain("console-subnav-");
     expect(serverDetailPageSource).toContain('value="runtime"');
     expect(serverDetailPageSource).toContain('value="settings"');
     expect(serverDetailPageSource).not.toContain("<Tabs.List");
@@ -1759,8 +1764,8 @@ describe("console page structure", () => {
     );
     const serverHeaderSource = sourceBetween(
       serverDetailPageSource,
-      '<section class="console-detail-header">',
-      '<Tabs.Root value={activeTab} class="console-detail-body console-server-detail-body">',
+      "<section class={detailHeaderClass}>",
+      "<Tabs.Root value={activeTab} class={detailBodyClass}>",
     );
 
     expect(serverOverviewSource).toContain("data-server-overview-operational-surfaces");
@@ -1795,8 +1800,8 @@ describe("console page structure", () => {
   test("[SERVER-DETAIL-IA-001C] keeps connectivity tests on the connectivity surface", () => {
     const serverHeaderSource = sourceBetween(
       serverDetailPageSource,
-      '<section class="console-detail-header">',
-      '<Tabs.Root value={activeTab} class="console-detail-body console-server-detail-body">',
+      "<section class={detailHeaderClass}>",
+      "<Tabs.Root value={activeTab} class={detailBodyClass}>",
     );
     const serverConnectivityTabSource = sourceBetween(
       serverDetailPageSource,
@@ -2478,8 +2483,10 @@ describe("console page structure", () => {
     expect(installedApplicationDetailPageSource).toContain(
       "function selectInstalledApplicationTab",
     );
-    expect(installedApplicationDetailPageSource).toContain('class="console-detail-tabs"');
-    expect(installedApplicationDetailPageSource).toContain('class="console-detail-tab"');
+    expect(installedApplicationDetailPageSource).toContain('from "$lib/console/layout-classes"');
+    expect(installedApplicationDetailPageSource).toContain("class={detailTabsClass}");
+    expect(installedApplicationDetailPageSource).toContain("class={detailTabClass}");
+    expect(installedApplicationDetailPageSource).not.toContain("console-detail-");
     expect(installedApplicationDetailPageSource).toContain(
       'aria-current={activeTab === tab.value ? "page" : undefined}',
     );

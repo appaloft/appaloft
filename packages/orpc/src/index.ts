@@ -35,6 +35,7 @@ import {
   ChangeOrganizationProfileCommand,
   CheckDomainBindingDeleteSafetyQuery,
   CheckProjectDeleteSafetyQuery,
+  CheckResourceDeleteSafetyQuery,
   CheckServerDeleteSafetyQuery,
   CleanupPreviewCommand,
   CleanupStorageVolumeRuntimeCommand,
@@ -93,6 +94,7 @@ import {
   changeOrganizationProfileCommandInputSchema,
   checkDomainBindingDeleteSafetyQueryInputSchema,
   checkProjectDeleteSafetyQueryInputSchema,
+  checkResourceDeleteSafetyQueryInputSchema,
   checkServerDeleteSafetyQueryInputSchema,
   cleanupPreviewCommandInputSchema,
   cleanupStorageVolumeRuntimeCommandInputSchema,
@@ -598,6 +600,7 @@ import {
   changeOrganizationMemberRoleResponseSchema,
   checkDomainBindingDeleteSafetyResponseSchema,
   checkProjectDeleteSafetyResponseSchema,
+  checkResourceDeleteSafetyResponseSchema,
   checkServerDeleteSafetyResponseSchema,
   cleanupPreviewResponseSchema,
   cleanupStorageVolumeRuntimeResponseSchema,
@@ -4004,6 +4007,18 @@ export const archiveResourceProcedure = base
     executeCommand(context, ArchiveResourceCommand.create(input)),
   );
 
+export const checkResourceDeleteSafetyProcedure = base
+  .route({
+    method: "GET",
+    path: "/resources/{resourceId}/delete-check",
+    successStatus: 200,
+  })
+  .input(checkResourceDeleteSafetyQueryInputSchema)
+  .output(checkResourceDeleteSafetyResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, CheckResourceDeleteSafetyQuery.create(input)),
+  );
+
 export const deleteResourceProcedure = base
   .route({
     method: "DELETE",
@@ -6404,6 +6419,7 @@ export const appaloftOrpcRouter = {
     show: showResourceProcedure,
     create: createResourceProcedure,
     archive: archiveResourceProcedure,
+    deleteCheck: checkResourceDeleteSafetyProcedure,
     delete: deleteResourceProcedure,
     configureHealth: configureResourceHealthProcedure,
     resetHealth: resetResourceHealthProcedure,
@@ -9065,6 +9081,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/environments/:environmentId/diff/:otherEnvironmentId",
     "/api/resources",
     "/api/resources/:resourceId",
+    "/api/resources/:resourceId/delete-check",
     "/api/resources/:resourceId/effective-config",
     "/api/resources/:resourceId/archive",
     "/api/resources/:resourceId/redeploy",

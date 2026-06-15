@@ -17,25 +17,25 @@ import {
   type AppLogger,
   type Clock,
   type EventBus,
-  type ResourceDeletionBlocker,
-  type ResourceDeletionBlockerKind,
+  type ResourceDeleteBlocker,
   type ResourceDeletionBlockerReader,
   type ResourceRepository,
 } from "../../ports";
 import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
 import { type DeleteResourceCommandInput } from "./delete-resource.command";
-
-function uniqueBlockerKinds(blockers: ResourceDeletionBlocker[]): ResourceDeletionBlockerKind[] {
-  return [...new Set(blockers.map((blocker) => blocker.kind))];
-}
+import {
+  activeResourceDeleteBlocker,
+  buildResourceDeleteBlockers,
+  uniqueResourceDeleteBlockerKinds,
+} from "./resource-delete-safety";
 
 function deletionBlockedError(input: {
   resourceId: string;
   lifecycleStatus: "active" | "archived";
-  blockers: ResourceDeletionBlocker[];
+  blockers: ResourceDeleteBlocker[];
 }) {
-  const blockerKinds = uniqueBlockerKinds(input.blockers);
+  const blockerKinds = uniqueResourceDeleteBlockerKinds(input.blockers);
   return domainError.resourceDeleteBlocked("Resource deletion is blocked by retained state", {
     phase: "resource-deletion-guard",
     resourceId: input.resourceId,
@@ -109,14 +109,7 @@ export class DeleteResourceUseCase {
           deletionBlockedError({
             resourceId: resourceId.value,
             lifecycleStatus: "active",
-            blockers: [
-              {
-                kind: "active-resource",
-                relatedEntityId: resourceId.value,
-                relatedEntityType: "resource",
-                count: 1,
-              },
-            ],
+            blockers: [activeResourceDeleteBlocker(resourceId.value)],
           }),
         );
       }
@@ -135,12 +128,17 @@ export class DeleteResourceUseCase {
       const blockers = yield* await deletionBlockerReader.findBlockers(repositoryContext, {
         resourceId: resourceId.value,
       });
-      if (blockers.length > 0) {
+      const deleteBlockers = buildResourceDeleteBlockers({
+        resourceId: resourceId.value,
+        lifecycleStatus: "archived",
+        retainedBlockers: blockers,
+      });
+      if (deleteBlockers.length > 0) {
         return err(
           deletionBlockedError({
             resourceId: resourceId.value,
             lifecycleStatus: "archived",
-            blockers,
+            blockers: deleteBlockers,
           }),
         );
       }

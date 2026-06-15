@@ -27,17 +27,15 @@ describe("project detail page structure", () => {
     expect(projectSource).toContain("projectAttentionItems");
     expect(projectSource).toContain("projectNextAction");
     expect(projectSource).toContain("nonEmptyProjectResourceGroups");
+    expect(projectSource).toContain("DeploymentStatusBadge");
     expect(projectSource).toContain("i18nKeys.console.projects.healthSummaryGap");
-    expect(projectSource).toContain('<div class="console-detail-page">');
-    expect(projectSource).toContain(
-      '<Tabs.Root value={activeProjectTab} class="console-detail-body">',
-    );
-    expect(projectSource).toContain("console-detail-tab-panel console-detail-tab-panel-scroll");
-    expect(
-      projectSource.match(
-        /console-detail-tab-panel console-detail-tab-panel-scroll[^"]*mt-0[^"]*pt-0/g,
-      )?.length,
-    ).toBe(7);
+    expect(projectSource).toContain('from "$lib/console/layout-classes"');
+    expect(projectSource).toContain("<div class={detailPageClass}>");
+    expect(projectSource).toContain("<Tabs.Root value={activeProjectTab} class={detailBodyClass}>");
+    expect(projectSource).toContain("detailTabPanelScrollClass");
+    expect(projectSource.match(/detailTabPanelScrollClass/g)?.length).toBeGreaterThanOrEqual(7);
+    expect(projectSource).not.toContain("console-detail-");
+    expect(projectSource).not.toContain("pt-0");
     expect(projectSource).not.toContain('<div class="space-y-0">');
     expect(projectSource).not.toContain('<Tabs.Root value={activeProjectTab} class="space-y-6">');
     expect(projectSource).toContain("EnvironmentCreateForm");
@@ -53,14 +51,39 @@ describe("project detail page structure", () => {
     expect(projectSource).toContain("environmentCloneDialogOpen");
     expect(projectSource).toContain("i18nKeys.console.projects.activityGapTitle");
     expect(projectSource).toContain("i18nKeys.console.projects.dangerZoneTitle");
+    expect(projectSource).toContain('type ProjectSettingsSection = "general" | "danger"');
+    expect(projectSource).toContain(
+      'const projectSettingsSections = ["general", "danger"] as const',
+    );
+    expect(projectSource).toContain(
+      'parseProjectSettingsSection(page.url.searchParams.get("section"))',
+    );
+    expect(projectSource).toContain("projectSettingsSectionHref(section)");
+    expect(projectSource).toContain("selectProjectSettingsSection(section, event)");
+    expect(projectSource).toContain("data-project-settings-display-surface");
+    expect(projectSource).toContain("data-project-settings-general");
+    expect(projectSource).toContain("detailTabPanelSubnavClass");
+    expect(projectSource).toContain("detailSubnavLayoutClass");
+    expect(projectSource).toContain("detailSubnavClass");
+    expect(projectSource).toContain("subnavListClass");
+    expect(projectSource).toContain("subnavItemClass");
+    expect(projectSource).toContain("detailSubnavContentClass");
+    expect(projectSource.indexOf("data-project-settings-general")).toBeLessThan(
+      projectSource.indexOf("data-project-danger-display-surface"),
+    );
+    expect(projectSource).toContain('{#if activeProjectSettingsSection === "general"}');
+    expect(projectSource).toContain('{:else if activeProjectSettingsSection === "danger"}');
     expect(projectSource.indexOf('value="overview"')).toBeLessThan(
       projectSource.indexOf("i18nKeys.console.runtimeUsage.monitorTitle"),
     );
-    expect(projectSource.indexOf("i18nKeys.console.projects.dangerZoneTitle")).toBeGreaterThan(
+    expect(projectSource.indexOf("data-project-danger-display-surface")).toBeGreaterThan(
       projectSource.indexOf('value="settings"'),
     );
     expect(projectSource).not.toContain(`id={\`environment-rename-form-\${environment.id}\`}`);
     expect(projectSource).not.toContain(`id={\`environment-clone-form-\${environment.id}\`}`);
+    expect(projectSource).not.toContain(
+      "{resource.lastDeploymentStatus ?? latestDeployment?.status ?? $t(i18nKeys.console.projects.noDeploymentShort)}",
+    );
     expect(i18nKeysSource).toContain('activityTitle: "console:projects.activityTitle"');
     expect(i18nKeysSource).toContain('healthSummaryGap: "console:projects.healthSummaryGap"');
     expect(englishLocaleSource).toContain(

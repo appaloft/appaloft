@@ -35,6 +35,7 @@
     ArchiveResourceInput,
     AttachResourceStorageInput,
     CertificateSummary,
+    CheckResourceDeleteSafetyResponse,
     CleanupStorageVolumeRuntimeResponse,
     ConfigureResourceAutoDeployInput,
     ConfigureResourceAccessInput,
@@ -108,6 +109,21 @@
     type DeploymentProgressDialogStatus,
   } from "$lib/console/deployment-progress";
   import { webDocsHrefs } from "$lib/console/docs-help";
+  import {
+    detailBodyClass,
+    detailHeaderClass,
+    detailPageClass,
+    detailSubnavClass,
+    detailSubnavContentClass,
+    detailSubnavLayoutClass,
+    detailTabClass,
+    detailTabPanelScrollClass,
+    detailTabPanelSubnavClass,
+    detailTabsClass,
+    subnavItemClass,
+    subnavItemTitleClass,
+    subnavListClass,
+  } from "$lib/console/layout-classes";
   import { createConsoleQueries } from "$lib/console/queries";
   import { modalIsOpen, setModalOpen } from "$lib/console/url-modal";
   import {
@@ -329,6 +345,17 @@
           includeLatestDeployment: true,
           includeAccessSummary: true,
           includeProfileDiagnostics: true,
+        }),
+      enabled: browser && resourceId.length > 0,
+      staleTime: 5_000,
+    }),
+  );
+  const resourceDeleteSafetyQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["resources", "delete-check", resourceId],
+      queryFn: () =>
+        orpcClient.resources.deleteCheck({
+          resourceId,
         }),
       enabled: browser && resourceId.length > 0,
       staleTime: 5_000,
@@ -621,6 +648,17 @@
       })),
   );
   const isPreviewEnvironmentResource = $derived(environment?.kind === "preview");
+  const resourceDeleteSafety = $derived<CheckResourceDeleteSafetyResponse | null>(
+    resourceDeleteSafetyQuery.data ?? null,
+  );
+  const resourceDeleteBlockers = $derived(resourceDeleteSafety?.blockers ?? []);
+  const resourceDeleteEligible = $derived(
+    isPreviewEnvironmentResource || resourceDeleteSafety?.eligible === true,
+  );
+  const resourceDeleteSafetyLoading = $derived(
+    !isPreviewEnvironmentResource &&
+      (resourceDeleteSafetyQuery.isPending || resourceDeleteSafetyQuery.isFetching),
+  );
   const latestDeployment = $derived(
     resource ? deployments.find((deployment) => deployment.resourceId === resource.id) : null,
   );
@@ -1576,6 +1614,7 @@
       };
       void queryClient.invalidateQueries({ queryKey: ["resources"] });
       void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
+      void queryClient.invalidateQueries({ queryKey: ["resources", "delete-check", resourceId] });
       void queryClient.invalidateQueries({
         queryKey: ["resources", "health", resourceId, "detail"],
       });
@@ -1997,6 +2036,7 @@
       selectedRuntimeControlOperation = null;
       void queryClient.invalidateQueries({ queryKey: ["resources"] });
       void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
+      void queryClient.invalidateQueries({ queryKey: ["resources", "delete-check", resourceId] });
       void queryClient.invalidateQueries({
         queryKey: ["resources", "health", resourceId, "detail"],
       });
@@ -2021,6 +2061,7 @@
       selectedRuntimeControlOperation = null;
       void queryClient.invalidateQueries({ queryKey: ["resources"] });
       void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
+      void queryClient.invalidateQueries({ queryKey: ["resources", "delete-check", resourceId] });
       void queryClient.invalidateQueries({
         queryKey: ["resources", "health", resourceId, "detail"],
       });
@@ -2459,7 +2500,7 @@
       deleteFeedback = {
         kind: "error",
         title: $t(i18nKeys.console.resources.deleteFailed),
-        detail: readErrorMessage(error),
+        detail: resourceDeleteBlockerErrorDetail(error),
       };
     },
   }));
@@ -2494,12 +2535,41 @@
       deleteFeedback = {
         kind: "error",
         title: $t(i18nKeys.console.resources.deleteFailed),
-        detail: readErrorMessage(error),
+        detail: resourceDeleteBlockerErrorDetail(error),
       };
     },
   }));
 
   let defaultedResourceId = $state("");
+
+  function resourceDeleteBlockerSummary(
+    safety: CheckResourceDeleteSafetyResponse | null,
+  ): string | null {
+    if (!safety || safety.blockers.length === 0) {
+      return null;
+    }
+
+    return safety.blockers
+      .map((blocker) => {
+        const suffix = [
+          typeof blocker.count === "number" ? `${blocker.count}` : "",
+          blocker.relatedEntityType,
+          blocker.relatedEntityId,
+        ]
+          .filter(Boolean)
+          .join(" · ");
+
+        return suffix ? `${blocker.kind} (${suffix})` : blocker.kind;
+      })
+      .join(", ");
+  }
+
+  function resourceDeleteBlockerErrorDetail(error: unknown): string {
+    const message = readErrorMessage(error);
+    const blockerSummary = resourceDeleteBlockerSummary(resourceDeleteSafety);
+
+    return blockerSummary ? `${message}: ${blockerSummary}` : message;
+  }
 
   function appendRuntimeLogLine(line: ResourceRuntimeLogLine): void {
     runtimeLogs = [...runtimeLogs, line].slice(-500);
@@ -2896,6 +2966,9 @@
     if (action === "delete" && !isPreviewEnvironmentResource && !isResourceArchived) {
       return;
     }
+    if (action === "delete" && !resourceDeleteEligible) {
+      return;
+    }
 
     selectedResourceLifecycleAction = action;
     resourceDeleteConfirmation = "";
@@ -2916,7 +2989,13 @@
   }
 
   function deleteResource(): void {
-    if (!resource || !isResourceArchived || deleteResourceMutation.isPending) {
+    if (
+      !resource ||
+      !isResourceArchived ||
+      !resourceDeleteEligible ||
+      resourceDeleteSafetyLoading ||
+      deleteResourceMutation.isPending
+    ) {
       return;
     }
 
@@ -5373,19 +5452,25 @@
 </svelte:head>
 
 {#snippet resourceSectionNavigation()}
-  <aside class="console-subnav">
+  <aside class={detailSubnavClass}>
     <nav class="min-w-0" aria-label={resourceTabLabel(activeTab)}>
-      <div role="tablist" class="console-subnav-list flex min-w-0 overflow-x-auto lg:grid lg:overflow-visible">
+      <div
+        role="tablist"
+        class={[subnavListClass, "flex min-w-0 overflow-x-auto lg:grid lg:overflow-visible"]}
+      >
         {#each resourceSectionsForTab(activeTab) as section (section)}
           <a
             href={resourceSectionHref(section)}
             role="tab"
             aria-selected={activeResourceSection === section}
             aria-current={activeResourceSection === section ? "page" : undefined}
-            class="console-subnav-item min-h-10 flex-none whitespace-nowrap lg:flex lg:w-full lg:whitespace-normal"
+            class={[
+              subnavItemClass,
+              "min-h-10 flex-none whitespace-nowrap lg:flex lg:w-full lg:whitespace-normal",
+            ]}
             onclick={(event) => selectResourceDetailSection(section, event)}
           >
-            <span class="console-subnav-item-title">{resourceSectionLabel(section)}</span>
+            <span class={[subnavItemTitleClass, "lg:whitespace-normal"]}>{resourceSectionLabel(section)}</span>
           </a>
         {/each}
       </div>
@@ -5618,8 +5703,8 @@
       </div>
     </section>
   {:else}
-    <div class="console-detail-page">
-      <section class="console-detail-header">
+    <div class={detailPageClass}>
+      <section class={detailHeaderClass}>
         <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div class="min-w-0 space-y-2">
             <div class="flex flex-wrap items-center gap-2">
@@ -5740,18 +5825,15 @@
         </div>
       </section>
 
-      <div class="console-detail-body">
+      <div class={detailBodyClass}>
         <nav
           aria-label={$t(i18nKeys.console.resources.overviewTitle)}
-          class="console-detail-tabs"
+          class={detailTabsClass}
         >
           {#each resourceDetailTabs as tab (tab)}
             <a
               href={resourceTabHref(tab)}
-              class={[
-                "console-detail-tab",
-                activeTab === tab ? "border-foreground text-foreground" : "",
-              ]}
+              class={detailTabClass}
               aria-current={activeTab === tab ? "page" : undefined}
               onclick={(event) => selectResourceTab(tab, event)}
             >
@@ -5761,7 +5843,7 @@
         </nav>
 
         {#if activeTab === "deployments"}
-          <div class="console-detail-tab-panel console-detail-tab-panel-scroll">
+          <div class={detailTabPanelScrollClass}>
 
           <section id="resource-deployments" class="space-y-4">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -5816,8 +5898,8 @@
           </section>
         </div>
         {:else if activeTab === "jobs"}
-          <div class="console-detail-tab-panel console-detail-tab-panel-subnav">
-            <div class="console-subnav-layout console-detail-subnav-layout">
+          <div class={detailTabPanelSubnavClass}>
+            <div class={[detailSubnavLayoutClass, "md:grid-cols-[12rem_minmax(0,1fr)]"]}>
               {@render resourceSectionNavigation()}
 
               {#if activeResourceSection === "scheduled-tasks"}
@@ -6221,7 +6303,7 @@
             </div>
           </div>
         {:else if activeTab === "previews"}
-          <div class="console-detail-tab-panel console-detail-tab-panel-scroll">
+          <div class={detailTabPanelScrollClass}>
             <section id="resource-preview-environments" class="space-y-5">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div class="min-w-0">
@@ -6394,7 +6476,7 @@
             </section>
           </div>
         {:else if activeTab === "overview"}
-          <div class="console-detail-tab-panel console-detail-tab-panel-scroll">
+          <div class={detailTabPanelScrollClass}>
             <section id="resource-overview" class="space-y-5">
               <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div class="min-w-0">
@@ -6559,8 +6641,11 @@
                     </Button>
                   </div>
                   {#if latestDeployment}
-                    <div class="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_10rem_12rem]">
-                      <div class="min-w-0 rounded-md bg-muted/25 px-3 py-2">
+                    <div
+                      class="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_10rem_12rem]"
+                      data-resource-latest-deployment-summary
+                    >
+                      <div class="min-w-0 rounded-md border border-border bg-muted/25 px-3 py-2">
                         <p class="text-xs text-muted-foreground">
                           {$t(i18nKeys.common.domain.deployment)}
                         </p>
@@ -6571,7 +6656,7 @@
                           {latestDeployment.id}
                         </a>
                       </div>
-                      <div class="rounded-md bg-muted/25 px-3 py-2">
+                      <div class="rounded-md border border-border bg-muted/25 px-3 py-2">
                         <p class="text-xs text-muted-foreground">
                           {$t(i18nKeys.common.domain.status)}
                         </p>
@@ -6579,7 +6664,7 @@
                           <DeploymentStatusBadge status={latestDeployment.status} />
                         </div>
                       </div>
-                      <div class="rounded-md bg-muted/25 px-3 py-2">
+                      <div class="rounded-md border border-border bg-muted/25 px-3 py-2">
                         <p class="text-xs text-muted-foreground">
                           {$t(i18nKeys.common.domain.time)}
                         </p>
@@ -6667,8 +6752,8 @@
             </section>
           </div>
         {:else if activeTab === "networking" || activeTab === "configuration" || activeTab === "dependencies" || activeTab === "settings"}
-          <div class="console-detail-tab-panel console-detail-tab-panel-subnav">
-            <div class="console-subnav-layout console-detail-subnav-layout">
+          <div class={detailTabPanelSubnavClass}>
+            <div class={[detailSubnavLayoutClass, "md:grid-cols-[12rem_minmax(0,1fr)]"]}>
               {@render resourceSectionNavigation()}
 
               <div class="space-y-8 p-5">
@@ -8090,6 +8175,41 @@
                       {/if}
                     </div>
 
+                    {#if resourceDeleteSafetyLoading}
+                      <div class="rounded-md border bg-background px-3 py-2 text-sm text-muted-foreground">
+                        {$t(i18nKeys.console.resources.deleteCheckLoading)}
+                      </div>
+                    {:else if !isPreviewEnvironmentResource && resourceDeleteSafetyQuery.error}
+                      <div class="rounded-md border border-destructive/30 bg-background px-3 py-2 text-sm text-destructive">
+                        {readErrorMessage(resourceDeleteSafetyQuery.error)}
+                      </div>
+                    {:else if !isPreviewEnvironmentResource && resourceDeleteBlockers.length > 0}
+                      <div class="rounded-md border border-destructive/30 bg-background px-3 py-2 text-sm text-destructive">
+                        <p class="font-medium">
+                          {$t(i18nKeys.console.resources.deleteBlockedTitle)}
+                        </p>
+                        <p class="mt-1 text-xs text-muted-foreground">
+                          {$t(i18nKeys.console.resources.deleteBlockedDescription)}
+                        </p>
+                        <ul class="mt-2 space-y-1 text-xs">
+                          {#each resourceDeleteBlockers as blocker}
+                            <li class="break-all font-mono">
+                              {blocker.kind}
+                              {#if typeof blocker.count === "number"}
+                                · {blocker.count}
+                              {/if}
+                              {#if blocker.relatedEntityType}
+                                · {blocker.relatedEntityType}
+                              {/if}
+                              {#if blocker.relatedEntityId}
+                                · {blocker.relatedEntityId}
+                              {/if}
+                            </li>
+                          {/each}
+                        </ul>
+                      </div>
+                    {/if}
+
                     <Button
                       type="button"
                       variant="outline"
@@ -8105,7 +8225,7 @@
             </div>
         </div>
         {:else if activeTab === "monitor"}
-          <div class="console-detail-tab-panel console-detail-tab-panel-scroll">
+          <div class={detailTabPanelScrollClass}>
             <div class="space-y-8">
               {#if showResourceServerRuntimeFallback}
                 <p class="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
@@ -8151,7 +8271,7 @@
             </div>
           </div>
         {:else if activeTab === "terminal"}
-          <div class="console-detail-tab-panel console-detail-tab-panel-scroll">
+          <div class={detailTabPanelScrollClass}>
             <section class="space-y-3" data-resource-terminal-panel>
               {#if terminalDeploymentId}
                 <TerminalSessionPanel
@@ -8195,7 +8315,7 @@
             </section>
           </div>
         {:else if activeTab === "logs"}
-          <div class="console-detail-tab-panel console-detail-tab-panel-scroll">
+          <div class={detailTabPanelScrollClass}>
             {@render resourceRuntimeLogsPanel()}
           </div>
         {/if}
@@ -9522,7 +9642,10 @@
                 variant={selectedResourceLifecycleAction === "delete" ? "destructive" : "outline"}
                 class="h-auto min-w-0 w-full max-w-full items-start justify-start whitespace-normal px-3 py-3 text-left"
                 disabled={!isPreviewEnvironmentResource &&
-                  (!isResourceArchived || deleteResourceMutation.isPending)}
+                  (!isResourceArchived ||
+                    !resourceDeleteEligible ||
+                    resourceDeleteSafetyLoading ||
+                    deleteResourceMutation.isPending)}
                 onclick={() => selectResourceLifecycleAction("delete")}
               >
                 <Trash2 class="mt-0.5 size-4 shrink-0" />
@@ -9551,6 +9674,40 @@
                   placeholder={resource.slug}
                 />
               </label>
+              {#if resourceDeleteSafetyLoading}
+                <div class="rounded-md border bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+                  {$t(i18nKeys.console.resources.deleteCheckLoading)}
+                </div>
+              {:else if !isPreviewEnvironmentResource && resourceDeleteSafetyQuery.error}
+                <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                  {readErrorMessage(resourceDeleteSafetyQuery.error)}
+                </div>
+              {:else if !isPreviewEnvironmentResource && resourceDeleteBlockers.length > 0}
+                <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                  <p class="font-medium">
+                    {$t(i18nKeys.console.resources.deleteBlockedTitle)}
+                  </p>
+                  <p class="mt-1 text-xs text-muted-foreground">
+                    {$t(i18nKeys.console.resources.deleteBlockedDescription)}
+                  </p>
+                  <ul class="mt-2 space-y-1 text-xs">
+                    {#each resourceDeleteBlockers as blocker}
+                      <li class="break-all font-mono">
+                        {blocker.kind}
+                        {#if typeof blocker.count === "number"}
+                          · {blocker.count}
+                        {/if}
+                        {#if blocker.relatedEntityType}
+                          · {blocker.relatedEntityType}
+                        {/if}
+                        {#if blocker.relatedEntityId}
+                          · {blocker.relatedEntityId}
+                        {/if}
+                      </li>
+                    {/each}
+                  </ul>
+                </div>
+              {/if}
             {/if}
 
             {#if archiveFeedback?.kind === "error"}
@@ -9586,6 +9743,8 @@
                   (selectedResourceLifecycleAction === "delete" &&
                     (resourceDeleteConfirmation.trim() !== resource.slug ||
                       (!isPreviewEnvironmentResource && !isResourceArchived) ||
+                      (!isPreviewEnvironmentResource && !resourceDeleteEligible) ||
+                      (!isPreviewEnvironmentResource && resourceDeleteSafetyLoading) ||
                       deleteResourceMutation.isPending ||
                       deletePreviewResourceMutation.isPending))}
               >

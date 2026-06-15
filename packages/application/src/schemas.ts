@@ -225,6 +225,7 @@ export * from "./operations/projects/show-project.schema";
 export * from "./operations/provider-job-logs/provider-job-logs.schema";
 export * from "./operations/resources/archive-resource.schema";
 export * from "./operations/resources/bind-resource-dependency.schema";
+export * from "./operations/resources/check-resource-delete-safety.schema";
 export * from "./operations/resources/configure-resource-access.schema";
 export * from "./operations/resources/configure-resource-auto-deploy.schema";
 export * from "./operations/resources/configure-resource-health.schema";

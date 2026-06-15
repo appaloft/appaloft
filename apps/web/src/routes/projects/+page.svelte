@@ -119,7 +119,17 @@
   }
 
   const { authSessionQuery, environmentsQuery, resourcesQuery, deploymentsQuery } =
-    createConsoleQueries(browser, { projects: false });
+    createConsoleQueries(browser, {
+      health: false,
+      readiness: false,
+      version: false,
+      projects: false,
+      servers: false,
+      previewEnvironments: false,
+      domainBindings: false,
+      certificates: false,
+      providers: false,
+    });
   const projectsQuery = createQuery(() =>
     queryOptions({
       queryKey: ["projects", { limit: projectPageSize, offset: projectOffset }],

@@ -3,6 +3,7 @@ import {
   ArchiveResourceRuntimeLogsCommand,
   AttachResourceStorageCommand,
   BindResourceDependencyCommand,
+  CheckResourceDeleteSafetyQuery,
   ConfigureResourceAccessCommand,
   ConfigureResourceAutoDeployCommand,
   type ConfigureResourceAutoDeployCommandInput,
@@ -651,6 +652,18 @@ const deleteCommand = EffectCommand.make(
     );
   },
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceDelete));
+
+const deleteCheckCommand = EffectCommand.make(
+  "delete-check",
+  {
+    resourceId: resourceIdArg,
+    json: jsonOption,
+  },
+  ({ json, resourceId }) => {
+    void json;
+    return runQuery(CheckResourceDeleteSafetyQuery.create({ resourceId }));
+  },
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceDeleteCheck));
 
 const setVariableCommand = EffectCommand.make(
   "set-variable",
@@ -1351,6 +1364,7 @@ export const resourceCommand = EffectCommand.make("resource").pipe(
     showCommand,
     effectiveConfigCommand,
     archiveCommand,
+    deleteCheckCommand,
     deleteCommand,
     setVariableCommand,
     secretsCommand,

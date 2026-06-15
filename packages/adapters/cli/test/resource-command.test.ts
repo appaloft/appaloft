@@ -1407,4 +1407,19 @@ describe("CLI resource commands", () => {
       },
     });
   });
+
+  test("[RES-PROFILE-ENTRY-019] resource delete-check dispatches the application query", async () => {
+    const { program, queries } = await createCommandCaptureHarness(
+      "req_cli_resource_delete_check_test",
+    );
+    const { CheckResourceDeleteSafetyQuery } = await import("@appaloft/application");
+
+    await parseCli(program, ["node", "appaloft", "resource", "delete-check", "res_demo"]);
+
+    expect(queries).toHaveLength(1);
+    expect(queries[0]).toBeInstanceOf(CheckResourceDeleteSafetyQuery);
+    expect(queries[0]).toMatchObject({
+      resourceId: "res_demo",
+    });
+  });
 });

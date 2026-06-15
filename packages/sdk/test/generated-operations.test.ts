@@ -52,6 +52,23 @@ describe("generated SDK operation metadata", () => {
     });
   });
 
+  test("[RES-PROFILE-DELETE-CHECK-001][TS-SDK-GEN-001] exposes resource delete-check metadata", () => {
+    expect(
+      generatedSdkOperations.find(
+        (operation) => operation.operationKey === "resources.delete-check",
+      ),
+    ).toMatchObject({
+      operationGroup: "resources",
+      operationMethod: "deleteCheck",
+      kind: "query",
+      route: {
+        method: "GET",
+        path: "/resources/{resourceId}/delete-check",
+      },
+      docsHref: "/docs/resources/projects/#concept-resource",
+    });
+  });
+
   test("[PROJ-LIFE-RESTORE-001][TS-SDK-GEN-001] exposes project restore metadata", () => {
     expect(
       generatedSdkOperations.find((operation) => operation.operationKey === "projects.restore"),

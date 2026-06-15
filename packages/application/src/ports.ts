@@ -876,7 +876,6 @@ export interface DependencyResourceDeleteSafetyReader {
 
 export type ResourceDeletionBlockerKind =
   | "active-resource"
-  | "deployment-history"
   | "runtime-instance"
   | "domain-binding"
   | "certificate"
@@ -894,6 +893,24 @@ export interface ResourceDeletionBlocker {
   relatedEntityId?: string;
   relatedEntityType?: string;
   count?: number;
+}
+
+export type ResourceDeleteBlockerKind = ResourceDeletionBlockerKind;
+
+export interface ResourceDeleteBlocker {
+  kind: ResourceDeleteBlockerKind;
+  relatedEntityId?: string;
+  relatedEntityType?: string;
+  count?: number;
+}
+
+export interface ResourceDeleteSafety {
+  schemaVersion: "resources.delete-check/v1";
+  resourceId: string;
+  lifecycleStatus: "active" | "archived";
+  eligible: boolean;
+  blockers: ResourceDeleteBlocker[];
+  checkedAt: string;
 }
 
 export interface ResourceDeletionBlockerReader {
