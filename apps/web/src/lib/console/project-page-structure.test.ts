@@ -29,15 +29,14 @@ describe("project detail page structure", () => {
     expect(projectSource).toContain("nonEmptyProjectResourceGroups");
     expect(projectSource).toContain("DeploymentStatusBadge");
     expect(projectSource).toContain("i18nKeys.console.projects.healthSummaryGap");
-    expect(projectSource).toContain('<div class="console-detail-page">');
+    expect(projectSource).toContain('from "$lib/console/layout-classes"');
+    expect(projectSource).toContain("<div class={detailPageClass}>");
     expect(projectSource).toContain(
-      '<Tabs.Root value={activeProjectTab} class="console-detail-body">',
+      "<Tabs.Root value={activeProjectTab} class={detailBodyClass}>",
     );
-    expect(projectSource).toContain("console-detail-tab-panel console-detail-tab-panel-scroll");
-    expect(
-      projectSource.match(/console-detail-tab-panel console-detail-tab-panel-scroll[^"]*mt-0/g)
-        ?.length,
-    ).toBe(7);
+    expect(projectSource).toContain("detailTabPanelScrollClass");
+    expect(projectSource.match(/detailTabPanelScrollClass/g)?.length).toBeGreaterThanOrEqual(7);
+    expect(projectSource).not.toContain("console-detail-");
     expect(projectSource).not.toContain("pt-0");
     expect(projectSource).not.toContain('<div class="space-y-0">');
     expect(projectSource).not.toContain('<Tabs.Root value={activeProjectTab} class="space-y-6">');

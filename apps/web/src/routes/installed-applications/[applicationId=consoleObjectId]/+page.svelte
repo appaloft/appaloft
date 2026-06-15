@@ -20,6 +20,13 @@
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import { Skeleton } from "$lib/components/ui/skeleton";
+  import {
+    detailHeaderClass,
+    detailPageClass,
+    detailTabClass,
+    detailTabPanelScrollClass,
+    detailTabsClass,
+  } from "$lib/console/layout-classes";
   import { deploymentDetailHref, formatTime, projectDetailHref, resourceDetailHref } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
 
@@ -268,8 +275,8 @@
       </div>
     </section>
   {:else}
-    <div class="console-detail-page mx-auto w-full max-w-7xl space-y-0" data-installed-application-display-surface>
-      <section class="console-detail-header" data-installed-application-overview>
+    <div class={[detailPageClass, "mx-auto w-full max-w-7xl space-y-0"]} data-installed-application-display-surface>
+      <section class={detailHeaderClass} data-installed-application-overview>
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div class="min-w-0 space-y-2">
             <div class="flex flex-wrap items-center gap-2">
@@ -315,12 +322,12 @@
         </div>
       </section>
 
-      <nav class="console-detail-tabs" aria-label={$t(i18nKeys.console.installedApplications.tabAriaLabel)}>
+      <nav class={detailTabsClass} aria-label={$t(i18nKeys.console.installedApplications.tabAriaLabel)}>
         {#each installedApplicationTabs as tab (tab.value)}
           <a
             href={installedApplicationTabHref(tab.value)}
             onclick={(event) => selectInstalledApplicationTab(tab.value, event)}
-            class="console-detail-tab"
+            class={detailTabClass}
             aria-current={activeTab === tab.value ? "page" : undefined}
           >
             {$t(tab.labelKey)}
@@ -328,7 +335,7 @@
         {/each}
       </nav>
 
-      <div class="console-detail-tab-panel console-detail-tab-panel-scroll">
+      <div class={detailTabPanelScrollClass}>
         {#if activeTab === "overview"}
           <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
             <div class="min-w-0 space-y-5">
