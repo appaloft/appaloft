@@ -98,7 +98,7 @@
   import ResourceStatusDot from "$lib/components/console/ResourceStatusDot.svelte";
   import TerminalSessionPanel from "$lib/components/console/TerminalSessionPanel.svelte";
   import { Badge } from "$lib/components/ui/badge";
-  import { Button } from "$lib/components/ui/button";
+  import { Button, buttonVariants } from "$lib/components/ui/button";
   import * as Dialog from "$lib/components/ui/dialog";
   import { Input } from "$lib/components/ui/input";
   import * as Popover from "$lib/components/ui/popover";
@@ -923,6 +923,7 @@
   let deploymentDialogInitializedForResourceId = $state("");
   let domainBindingCreateDialogOpen = $state(false);
   let domainBindingDialogInitializedForResourceId = $state("");
+  let domainBindingDialogOpenedLocally = $state(false);
   let serverId = $state("");
   let destinationId = $state("");
   let domainName = $state("");
@@ -1205,7 +1206,6 @@
   let resourceDeleteConfirmation = $state("");
 
   const selectedDeploymentServer = $derived(findServer(servers, deploymentServerId));
-  const selectedServer = $derived(findServer(servers, serverId));
   const deploymentSource = $derived(
     latestDeployment?.runtimePlan.source ?? resourceDetail?.source ?? null,
   );
@@ -1274,21 +1274,27 @@
   const shouldShowDestinationField = $derived(
     !domainBindingUsesResourceRouteProvider && !defaultDestinationId,
   );
+  const effectiveDomainBindingServerId = $derived(
+    domainBindingUsesResourceRouteProvider
+      ? ""
+      : serverId || latestDeployment?.serverId || servers[0]?.id || "",
+  );
+  const effectiveDomainBindingDestinationId = $derived(
+    domainBindingUsesResourceRouteProvider ? "" : destinationId || defaultDestinationId,
+  );
+  const selectedServer = $derived(findServer(servers, effectiveDomainBindingServerId));
   const canCreateBinding = $derived(
     Boolean(
       resource &&
-        domainName.trim() &&
-        pathPrefix.trim() &&
         proxyKind !== "none" &&
         (routeMode === "serve" || redirectTo) &&
-        (domainBindingUsesResourceRouteProvider || (serverId && destinationId)),
+        (domainBindingUsesResourceRouteProvider ||
+          (effectiveDomainBindingServerId && effectiveDomainBindingDestinationId)),
     ),
   );
   const canImportCertificate = $derived(
     Boolean(
       importBindingId &&
-        importCertificateChain.trim() &&
-        importPrivateKey.trim() &&
         resourceDomainBindings.some(
           (binding) => binding.id === importBindingId && binding.certificatePolicy === "manual",
         ),
@@ -1815,6 +1821,8 @@
       return;
     }
 
+    domainBindingDialogOpenedLocally = true;
+    prepareResourceDomainBindingCreateDialog();
     void setModalOpen(page, "domain-binding", true);
   }
 
@@ -1829,6 +1837,7 @@
 
     domainBindingCreateDialogOpen = false;
     domainBindingDialogInitializedForResourceId = "";
+    domainBindingDialogOpenedLocally = false;
     if (modalIsOpen(page, "domain-binding")) {
       void setModalOpen(page, "domain-binding", false);
     }
@@ -2990,12 +2999,12 @@
     }
   }
 
-  function openResourceLifecycleDialog(): void {
+  function openResourceLifecycleDialog(defaultAction: ResourceLifecycleAction | null = null): void {
     if (!browser || !resource) {
       return;
     }
 
-    selectedResourceLifecycleAction = null;
+    selectedResourceLifecycleAction = defaultAction;
     resourceDeleteConfirmation = "";
     archiveFeedback = null;
     restoreFeedback = null;
@@ -3058,10 +3067,12 @@
     });
   }
 
-  function deleteResource(): void {
+  function deleteResource(confirmationResourceSlug = resourceDeleteConfirmation): void {
+    const normalizedConfirmationResourceSlug = confirmationResourceSlug.trim();
     if (
       !resource ||
       !isResourceArchived ||
+      normalizedConfirmationResourceSlug !== resource.slug ||
       !resourceDeleteEligible ||
       resourceDeleteSafetyLoading ||
       deleteResourceMutation.isPending
@@ -3069,13 +3080,12 @@
       return;
     }
 
-    const confirmationResourceSlug = resourceDeleteConfirmation;
     deleteFeedback = null;
     closeResourceLifecycleDialog();
     deleteResourceMutation.mutate({
       resourceId: resource.id,
       confirmation: {
-        resourceSlug: confirmationResourceSlug,
+        resourceSlug: normalizedConfirmationResourceSlug,
       },
     });
   }
@@ -3149,6 +3159,7 @@
     }
 
     if (modalIsOpen(page, "domain-binding")) {
+      domainBindingDialogOpenedLocally = false;
       if (
         !domainBindingCreateDialogOpen ||
         domainBindingDialogInitializedForResourceId !== resource.id
@@ -3158,7 +3169,7 @@
       return;
     }
 
-    if (domainBindingCreateDialogOpen) {
+    if (domainBindingCreateDialogOpen && !domainBindingDialogOpenedLocally) {
       domainBindingCreateDialogOpen = false;
       domainBindingDialogInitializedForResourceId = "";
     }
@@ -3601,7 +3612,20 @@
   function createResourceDomainBinding(event: SubmitEvent): void {
     event.preventDefault();
 
-    if (!resource || !canCreateBinding || createDomainBindingMutation.isPending) {
+    const formData =
+      event.currentTarget instanceof HTMLFormElement
+        ? new FormData(event.currentTarget)
+        : null;
+    const submittedDomainName = String(formData?.get("domainName") ?? domainName).trim();
+    const submittedPathPrefix = String(formData?.get("pathPrefix") ?? pathPrefix).trim() || "/";
+
+    if (
+      !resource ||
+      !submittedDomainName ||
+      !submittedPathPrefix ||
+      !canCreateBinding ||
+      createDomainBindingMutation.isPending
+    ) {
       return;
     }
 
@@ -3610,9 +3634,14 @@
       projectId: resource.projectId,
       environmentId: resource.environmentId,
       resourceId: resource.id,
-      ...(serverId && destinationId ? { serverId, destinationId } : {}),
-      domainName: domainName.trim(),
-      pathPrefix: pathPrefix.trim() || "/",
+      ...(effectiveDomainBindingServerId && effectiveDomainBindingDestinationId
+        ? {
+            serverId: effectiveDomainBindingServerId,
+            destinationId: effectiveDomainBindingDestinationId,
+          }
+        : {}),
+      domainName: submittedDomainName,
+      pathPrefix: submittedPathPrefix,
       proxyKind,
       tlsMode,
       ...(routeMode === "redirect"
@@ -4529,10 +4558,21 @@
   function importCertificateForBinding(binding: DomainBindingSummary, event: SubmitEvent): void {
     event.preventDefault();
 
+    const form = event.currentTarget;
+    if (!(form instanceof HTMLFormElement)) {
+      return;
+    }
+    const formData = new FormData(form);
+    const certificateChain = String(formData.get("certificateChain") ?? "").trim();
+    const privateKey = String(formData.get("privateKey") ?? "").trim();
+    const passphrase = String(formData.get("passphrase") ?? "").trim();
+
     if (
       binding.certificatePolicy !== "manual" ||
       importBindingId !== binding.id ||
       !canImportCertificate ||
+      !certificateChain ||
+      !privateKey ||
       importCertificateMutation.isPending
     ) {
       return;
@@ -4541,9 +4581,9 @@
     importFeedback = null;
     importCertificateMutation.mutate({
       domainBindingId: binding.id,
-      certificateChain: importCertificateChain.trim(),
-      privateKey: importPrivateKey.trim(),
-      ...(importPassphrase.trim() ? { passphrase: importPassphrase } : {}),
+      certificateChain,
+      privateKey,
+      ...(passphrase ? { passphrase } : {}),
     });
   }
 
@@ -5541,6 +5581,7 @@
       >
         {#each resourceSectionsForTab(activeTab) as section (section)}
           <a
+            id={`resource-section-${section}`}
             href={resourceSectionHref(section)}
             role="tab"
             aria-selected={activeResourceSection === section}
@@ -5767,6 +5808,7 @@
       <nav aria-label={$t(i18nKeys.console.resources.overviewTitle)} class={detailTabsClass}>
         {#each resourceDetailTabs as tab (tab)}
           <a
+            id={`resource-tab-${tab}`}
             href={resourceTabHref(tab)}
             class={detailTabClass}
             aria-current={activeTab === tab ? "page" : undefined}
@@ -6260,6 +6302,7 @@
 
                           <div class="flex flex-wrap gap-2 lg:justify-end">
                             <Button
+                              id={`scheduled-task-run-manage-${task.taskId}`}
                               type="button"
                               size="sm"
                               variant="outline"
@@ -6696,6 +6739,7 @@
                           </Button>
                         {/if}
                         <Button
+                          id={`preview-environment-cleanup-open-${previewEnvironment.previewEnvironmentId}`}
                           type="button"
                           size="sm"
                           variant="outline"
@@ -7115,9 +7159,12 @@
                           {/if}
                         </div>
                         <Button
+                          id="resource-lifecycle-manage-action"
                           type="button"
                           variant="outline"
-                          onclick={openResourceLifecycleDialog}
+                          onclick={() => {
+                            openResourceLifecycleDialog();
+                          }}
                         >
                           <Archive class="size-4" />
                           {$t(i18nKeys.console.resources.lifecycleManageAction)}
@@ -7233,9 +7280,10 @@
                       <div class="flex shrink-0 flex-wrap items-center gap-2">
                         <Badge variant="outline">{resourceDomainBindings.length}</Badge>
                         <Button
+                          id="resource-domain-binding-create-action"
                           type="button"
                           size="sm"
-                          disabled={isResourceArchived}
+                          disabled={!resource || isResourceArchived}
                           onclick={openResourceDomainBindingCreateDialog}
                         >
                           <Plus class="size-4" />
@@ -7250,10 +7298,11 @@
                           {$t(i18nKeys.console.domainBindings.emptyBody)}
                         </p>
                         <Button
+                          id="resource-domain-binding-create-empty-action"
                           type="button"
                           size="sm"
                           class="mt-4"
-                          disabled={isResourceArchived}
+                          disabled={!resource || isResourceArchived}
                           onclick={openResourceDomainBindingCreateDialog}
                         >
                           <Plus class="size-4" />
@@ -8049,7 +8098,12 @@
                           type="button"
                           variant="outline"
                           disabled={isResourceArchived || bindableDependencyResources.length === 0}
-                          onclick={openDependencyBindDialog}
+                          onpointerdown={() => {
+                            openDependencyBindDialog();
+                          }}
+                          onclick={() => {
+                            openDependencyBindDialog();
+                          }}
                         >
                           <Link2 class="size-4" />
                           {$t(i18nKeys.console.resources.dependencyBindAction)}
@@ -8136,15 +8190,15 @@
                         </div>
                         <div class="flex flex-wrap items-center gap-2">
                           <Badge variant="outline">{dependencyResources.length}</Badge>
-                          <Button
+                          <button
+                            id="resource-dependency-bind-action"
                             type="button"
-                            variant="outline"
-                            size="sm"
+                            class={buttonVariants({ variant: "outline", size: "sm" })}
                             disabled={isResourceArchived || bindableDependencyResources.length === 0}
                             onclick={openDependencyBindDialog}
                           >
                             {$t(i18nKeys.console.resources.dependencyBindAction)}
-                          </Button>
+                          </button>
                           <Button href="/dependency-resources" variant="outline" size="sm">
                             {$t(i18nKeys.common.actions.viewDetails)}
                           </Button>
@@ -8445,10 +8499,13 @@
                     {/if}
 
                     <Button
+                      id="resource-lifecycle-manage-danger-action"
                       type="button"
                       variant="outline"
                       class="w-full justify-start"
-                      onclick={openResourceLifecycleDialog}
+                      onclick={() => {
+                        openResourceLifecycleDialog(isResourceArchived ? "delete" : "archive");
+                      }}
                     >
                       <Archive class="size-4" />
                       {$t(i18nKeys.console.resources.lifecycleManageAction)}
@@ -8936,8 +8993,10 @@
                     <span>{$t(i18nKeys.common.domain.domainName)}</span>
                     <Input
                       id="resource-domain-binding-domain"
+                      name="domainName"
                       bind:value={domainName}
                       autocomplete="off"
+                      required
                       placeholder={$t(i18nKeys.console.domainBindings.formDomainPlaceholder)}
                     />
                   </label>
@@ -8946,8 +9005,10 @@
                     <span>{$t(i18nKeys.common.domain.pathPrefix)}</span>
                     <Input
                       id="resource-domain-binding-path-prefix"
+                      name="pathPrefix"
                       bind:value={pathPrefix}
                       autocomplete="off"
+                      required
                       placeholder="/"
                     />
                   </label>
@@ -9008,7 +9069,9 @@
                       <span>{$t(i18nKeys.common.domain.server)}</span>
                       <Select.Root bind:value={serverId} type="single" disabled={!shouldShowServerField}>
                         <Select.Trigger class="w-full">
-                          {selectedServer?.name ?? serverId ?? $t(i18nKeys.console.domainBindings.noServerOptions)}
+                          {selectedServer?.name ||
+                            effectiveDomainBindingServerId ||
+                            $t(i18nKeys.console.domainBindings.noServerOptions)}
                         </Select.Trigger>
                         <Select.Content>
                           {#each servers as server (server.id)}
@@ -9116,11 +9179,13 @@
                   {#if !domainBindingUsesResourceRouteProvider}
                     <div class="grid grid-cols-[6rem_minmax(0,1fr)] gap-3 py-3">
                       <dt class="text-muted-foreground">{$t(i18nKeys.common.domain.server)}</dt>
-                      <dd class="truncate font-medium">{(selectedServer?.name ?? serverId) || "-"}</dd>
+                      <dd class="truncate font-medium">
+                        {(selectedServer?.name ?? effectiveDomainBindingServerId) || "-"}
+                      </dd>
                     </div>
                     <div class="grid grid-cols-[6rem_minmax(0,1fr)] gap-3 py-3">
                       <dt class="text-muted-foreground">{$t(i18nKeys.common.domain.destination)}</dt>
-                      <dd class="truncate font-medium">{destinationId || "-"}</dd>
+                      <dd class="truncate font-medium">{effectiveDomainBindingDestinationId || "-"}</dd>
                     </div>
                   {/if}
                 </dl>
@@ -9182,24 +9247,29 @@
                 <span>{$t(i18nKeys.console.resources.certificateImportCertificateChain)}</span>
                 <Textarea
                   id={`resource-domain-binding-import-certificate-chain-${selectedImportBinding.id}`}
+                  name="certificateChain"
                   bind:value={importCertificateChain}
                   class="min-h-28 font-mono text-xs"
                   placeholder={$t(i18nKeys.console.resources.certificateImportCertificateChainPlaceholder)}
+                  required
                 />
               </label>
               <label class="space-y-1.5 text-sm font-medium" for={`resource-domain-binding-import-private-key-${selectedImportBinding.id}`}>
                 <span>{$t(i18nKeys.console.resources.certificateImportPrivateKey)}</span>
                 <Textarea
                   id={`resource-domain-binding-import-private-key-${selectedImportBinding.id}`}
+                  name="privateKey"
                   bind:value={importPrivateKey}
                   class="min-h-28 font-mono text-xs"
                   placeholder={$t(i18nKeys.console.resources.certificateImportPrivateKeyPlaceholder)}
+                  required
                 />
               </label>
               <label class="space-y-1.5 text-sm font-medium" for={`resource-domain-binding-import-passphrase-${selectedImportBinding.id}`}>
                 <span>{$t(i18nKeys.console.resources.certificateImportPassphrase)}</span>
                 <Input
                   id={`resource-domain-binding-import-passphrase-${selectedImportBinding.id}`}
+                  name="passphrase"
                   bind:value={importPassphrase}
                   autocomplete="off"
                   placeholder={$t(i18nKeys.console.resources.certificateImportPassphrasePlaceholder)}
@@ -9214,6 +9284,7 @@
                   {$t(i18nKeys.common.actions.cancel)}
                 </Button>
                 <Button
+                  id={`resource-domain-binding-import-submit-${selectedImportBinding.id}`}
                   type="submit"
                   disabled={!canImportCertificate || importCertificateMutation.isPending}
                 >
@@ -9481,6 +9552,7 @@
                 {$t(i18nKeys.common.actions.cancel)}
               </Button>
               <Button
+                id="resource-preview-cleanup-submit"
                 type="button"
                 variant="destructive"
                 disabled={cleanupPreviewEnvironmentMutation.isPending}
@@ -9619,6 +9691,7 @@
 
             <div class="flex flex-wrap justify-end gap-2">
               <Button
+                id="scheduled-task-create-cancel"
                 type="button"
                 variant="outline"
                 onclick={() => {
@@ -9628,6 +9701,7 @@
                 {$t(i18nKeys.common.actions.cancel)}
               </Button>
               <Button
+                id="scheduled-task-create-submit"
                 type="submit"
                 disabled={!canCreateScheduledTask || createScheduledTaskMutation.isPending}
               >
@@ -9775,6 +9849,7 @@
               </div>
               <div class="grid gap-2 sm:grid-cols-2">
                 <Button
+                  id={`scheduled-task-run-now-${task.taskId}`}
                   type="button"
                   variant="outline"
                   disabled={
@@ -9876,6 +9951,11 @@
             class="box-border min-w-0 w-full space-y-5 overflow-x-hidden px-5 pb-5"
             onsubmit={(event) => {
               event.preventDefault();
+              const form = event.currentTarget;
+              const confirmationResourceSlug =
+                form instanceof HTMLFormElement
+                  ? String(new FormData(form).get("resourceSlug") ?? "").trim()
+                  : resourceDeleteConfirmation.trim();
               if (selectedResourceLifecycleAction === "archive") {
                 archiveResource();
               } else if (selectedResourceLifecycleAction === "restore") {
@@ -9883,7 +9963,7 @@
               } else if (isPreviewEnvironmentResource) {
                 deletePreviewResource();
               } else {
-                deleteResource();
+                deleteResource(confirmationResourceSlug);
               }
             }}
             data-resource-lifecycle-dialog
@@ -9901,6 +9981,7 @@
             <div class="grid min-w-0 gap-2 sm:grid-cols-3">
               {#if !isPreviewEnvironmentResource}
                 <Button
+                  id="resource-lifecycle-select-archive"
                   type="button"
                   variant={selectedResourceLifecycleAction === "archive" ? "destructive" : "outline"}
                   class="h-auto min-w-0 w-full max-w-full items-start justify-start whitespace-normal px-3 py-3 text-left"
@@ -9920,6 +10001,7 @@
               {/if}
               {#if !isPreviewEnvironmentResource}
                 <Button
+                  id="resource-lifecycle-select-restore"
                   type="button"
                   variant={selectedResourceLifecycleAction === "restore" ? "default" : "outline"}
                   class="h-auto min-w-0 w-full max-w-full items-start justify-start whitespace-normal px-3 py-3 text-left"
@@ -9938,6 +10020,7 @@
                 </Button>
               {/if}
               <Button
+                id="resource-lifecycle-select-delete"
                 type="button"
                 variant={selectedResourceLifecycleAction === "delete" ? "destructive" : "outline"}
                 class="h-auto min-w-0 w-full max-w-full items-start justify-start whitespace-normal px-3 py-3 text-left"
@@ -9969,9 +10052,11 @@
                 <span>{$t(i18nKeys.console.resources.deleteConfirmPrompt)}</span>
                 <Input
                   id="resource-delete-confirmation"
+                  name="resourceSlug"
                   bind:value={resourceDeleteConfirmation}
                   autocomplete="off"
                   placeholder={resource.slug}
+                  required
                 />
               </label>
               {#if resourceDeleteSafetyLoading}
@@ -10038,6 +10123,7 @@
                 {$t(i18nKeys.common.actions.cancel)}
               </Button>
               <Button
+                id="resource-lifecycle-submit"
                 type="submit"
                 variant={selectedResourceLifecycleAction === "archive" ||
                   selectedResourceLifecycleAction === "delete"
@@ -10049,8 +10135,7 @@
                   (selectedResourceLifecycleAction === "restore" &&
                     (!isResourceArchived || restoreResourceMutation.isPending)) ||
                   (selectedResourceLifecycleAction === "delete" &&
-                    (resourceDeleteConfirmation.trim() !== resource.slug ||
-                      (!isPreviewEnvironmentResource && !isResourceArchived) ||
+                    ((!isPreviewEnvironmentResource && !isResourceArchived) ||
                       (!isPreviewEnvironmentResource && !resourceDeleteEligible) ||
                       (!isPreviewEnvironmentResource && resourceDeleteSafetyLoading) ||
                       deleteResourceMutation.isPending ||

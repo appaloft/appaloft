@@ -1,3 +1,4 @@
+import "../../../application/node_modules/reflect-metadata/Reflect.js";
 import { mkdtempSync, rmSync } from "node:fs";
 import { describe, expect, test } from "bun:test";
 import {
@@ -67,7 +68,13 @@ import {
   ok,
   type Result,
 } from "@appaloft/core";
-import { type DependencyResourceSecretStore, type ExecutionContext } from "@appaloft/application";
+import {
+  type DependencyResourceSecretStore,
+  type DeploymentProgressEvent,
+  type DeploymentProgressRecorder,
+  type DeploymentProgressReporter,
+  type ExecutionContext,
+} from "@appaloft/application";
 import {
   DockerSwarmExecutionBackend,
   DockerSwarmShellCommandRunner,
@@ -87,6 +94,26 @@ class RecordingSwarmCommandRunner implements DockerSwarmCommandRunner {
   ): Promise<Result<DockerSwarmCommandRunnerResult>> {
     this.calls.push(input);
     return ok({ exitCode: 0, stdout: "ok" });
+  }
+}
+
+class MemoryDeploymentProgressRecorder implements DeploymentProgressRecorder {
+  readonly events: DeploymentProgressEvent[] = [];
+
+  async record(
+    _context: ExecutionContext,
+    event: DeploymentProgressEvent,
+  ): Promise<Result<void>> {
+    this.events.push(event);
+    return ok(undefined);
+  }
+}
+
+class MemoryDeploymentProgressReporter implements DeploymentProgressReporter {
+  readonly events: DeploymentProgressEvent[] = [];
+
+  report(_context: ExecutionContext, event: DeploymentProgressEvent): void {
+    this.events.push(event);
   }
 }
 
@@ -708,6 +735,60 @@ describe("DockerSwarmExecutionBackend", () => {
       "swarm.serviceName": "appaloft-res-api-dst-prod-dep-swarm-backend_web",
       "swarm.applyPlanSchemaVersion": "docker-swarm.apply-plan/v1",
     });
+  });
+
+  test("[SWARM-TARGET-APPLY-001] records Swarm command progress into the deployment timeline", async () => {
+    const runner = new RecordingSwarmCommandRunner();
+    const recorder = new MemoryDeploymentProgressRecorder();
+    const reporter = new MemoryDeploymentProgressReporter();
+    const backend = new DockerSwarmExecutionBackend(
+      runner,
+      undefined,
+      {},
+      undefined,
+      recorder,
+      reporter,
+    );
+
+    const result = await backend.execute(createContext(), runningDeployment());
+
+    expect(result.isOk()).toBe(true);
+    const timeline = result._unsafeUnwrap().deployment.toState().timeline;
+    expect(timeline).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: "docker",
+          phase: "deploy",
+          message: expect.stringContaining("docker service create"),
+        }),
+        expect.objectContaining({
+          source: "docker",
+          phase: "verify",
+          message: expect.stringContaining("docker service ps"),
+        }),
+        expect.objectContaining({
+          source: "docker",
+          message: "ok",
+        }),
+      ]),
+    );
+    expect(recorder.events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          deploymentId: "dep_swarm_backend",
+          source: "docker",
+          phase: "deploy",
+          message: expect.stringContaining("docker service create"),
+        }),
+        expect.objectContaining({
+          deploymentId: "dep_swarm_backend",
+          source: "docker",
+          phase: "verify",
+          message: expect.stringContaining("docker service ps"),
+        }),
+      ]),
+    );
+    expect(reporter.events).toHaveLength(recorder.events.length);
   });
 
   test("[STOR-REALIZE-003][SWARM-TARGET-APPLY-001] executes fake Swarm Compose stack apply commands with storage mounts", async () => {

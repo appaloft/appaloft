@@ -1064,7 +1064,9 @@ describe("console page structure", () => {
     expect(resourceDetailTabsSource).toContain('"logs"');
     expect(resourceDetailTabsSource).toContain('"terminal"');
     expect(resourceDetailTabsSource).toContain('"previews"');
-    expect(resourceDetailPageSource).toContain("latestDeployment?.target.kind === \"serverless-static-artifact\"");
+    expect(resourceDetailPageSource).toContain(
+      'latestDeployment?.target.kind === "serverless-static-artifact"',
+    );
     expect(resourceDetailPageSource).toContain("const visibleResourceDetailTabs = $derived");
     expect(resourceDetailPageSource).toContain(
       'tab !== "monitor" && tab !== "logs" && tab !== "terminal" && tab !== "jobs"',
@@ -1105,7 +1107,7 @@ describe("console page structure", () => {
     );
     const resourceRuntimeLogsEffectSource = sourceBetween(
       resourceDetailPageSource,
-      "$effect(() => {\n    const currentResourceId = resource?.id ?? \"\";\n    const currentTab = activeTab;",
+      '$effect(() => {\n    const currentResourceId = resource?.id ?? "";\n    const currentTab = activeTab;',
       "  onDestroy(() => {",
     );
     for (const coreResourceQuerySource of [
@@ -1118,7 +1120,9 @@ describe("console page structure", () => {
       expect(coreResourceQuerySource).not.toContain("enabled: resourcePreviewsEnabled");
       expect(coreResourceQuerySource).not.toContain("enabled: resourceScheduledTasksEnabled");
     }
-    expect(resourceScheduledTasksEnabledSource).toContain("resourceSupportsServerBackedRuntimeSurfaces");
+    expect(resourceScheduledTasksEnabledSource).toContain(
+      "resourceSupportsServerBackedRuntimeSurfaces",
+    );
     expect(resourceDetailPageSource).toContain(
       "resourceRuntimeMonitorActive &&\n      resourceSupportsServerBackedRuntimeSurfaces",
     );
@@ -1447,9 +1451,10 @@ describe("console page structure", () => {
       'class="block break-words text-xs font-normal leading-snug opacity-80"',
     );
     expect(resourceLifecycleDialogSource).toContain("<Input");
-    expect(resourceLifecycleDialogSource).toContain(
-      "resourceDeleteConfirmation.trim() !== resource.slug",
+    expect(resourceDetailPageSource).toContain(
+      "normalizedConfirmationResourceSlug !== resource.slug",
     );
+    expect(resourceLifecycleDialogSource).toContain('name="resourceSlug"');
     expect(resourceDetailPageSource).not.toContain("requestConsoleConfirm");
     expect(resourceDetailPageSource).not.toContain("requestConsolePrompt");
   });
