@@ -987,7 +987,7 @@
 
       <Tabs.Content
         value="overview"
-        class={[detailTabPanelScrollNoTopClass, "space-y-5"]}
+        class={[detailTabPanelScrollClass, "space-y-5"]}
         data-server-overview-display-surface
       >
         <div class="console-metric-strip sm:grid-cols-2 xl:grid-cols-5">
