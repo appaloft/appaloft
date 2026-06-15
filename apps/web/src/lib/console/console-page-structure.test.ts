@@ -693,6 +693,33 @@ describe("console page structure", () => {
     );
   });
 
+  test("[PROJECT-INSTALL-IA-003] keeps terminal install failures out of project overview health", () => {
+    expect(projectDetailPageSource).toContain("activeProjectOperatorWorkItems");
+    expect(projectDetailPageSource).not.toContain("failedProjectBlueprintInstallItems");
+    expect(projectDetailPageSource).not.toContain("data-project-resource-install-failures");
+    expect(projectDetailPageSource).not.toContain("最近的资源安装没有完成");
+
+    const activeOperatorWorkFilterSource = sourceBetween(
+      projectDetailPageSource,
+      "const activeProjectOperatorWorkItems = $derived",
+      "const projectRuntimeMonitoringScope = $derived",
+    );
+    expect(activeOperatorWorkFilterSource).toContain('item.kind === "blueprint-install"');
+    expect(activeOperatorWorkFilterSource).toContain('item.status === "running"');
+    expect(activeOperatorWorkFilterSource).toContain('item.status === "pending"');
+    expect(activeOperatorWorkFilterSource).toContain('item.status === "retry-scheduled"');
+    expect(activeOperatorWorkFilterSource).not.toContain('item.status === "failed"');
+    expect(activeOperatorWorkFilterSource).not.toContain('item.status === "dead-lettered"');
+
+    const projectAttentionSource = sourceBetween(
+      projectDetailPageSource,
+      "const projectAttentionItems = $derived.by<ProjectAttentionItem[]>",
+      "for (const deployment of failedProjectDeployments",
+    );
+    expect(projectAttentionSource).toContain("activeProjectOperatorWorkItems.slice(0, 2)");
+    expect(projectAttentionSource).not.toContain("actionableProjectOperatorWorkItems");
+  });
+
   test("[ACTIVITY-READ-MODEL-IA-001] marks home and project activity as explicit read-model gaps", () => {
     expect(homePageSource).toContain("data-home-deployment-rollup");
     expect(homePageSource).toContain("data-home-activity-read-model-gap");

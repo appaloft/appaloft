@@ -352,20 +352,13 @@
     ),
   );
   const projectOperatorWorkItems = $derived(projectOperatorWorkQuery.data?.items ?? []);
-  const actionableProjectOperatorWorkItems = $derived(
+  const activeProjectOperatorWorkItems = $derived(
     projectOperatorWorkItems.filter(
       (item) =>
         item.kind === "blueprint-install" &&
-        (item.status === "failed" ||
-          item.status === "dead-lettered" ||
-          item.status === "running" ||
+        (item.status === "running" ||
           item.status === "pending" ||
           item.status === "retry-scheduled"),
-    ),
-  );
-  const failedProjectBlueprintInstallItems = $derived(
-    actionableProjectOperatorWorkItems.filter(
-      (item) => item.status === "failed" || item.status === "dead-lettered",
     ),
   );
   const projectRuntimeMonitoringScope = $derived({
@@ -461,7 +454,7 @@
   );
   const projectAttentionItems = $derived.by<ProjectAttentionItem[]>(() => {
     const items: ProjectAttentionItem[] = [];
-    for (const work of actionableProjectOperatorWorkItems.slice(0, 2)) {
+    for (const work of activeProjectOperatorWorkItems.slice(0, 2)) {
       const readableFailure = operatorWorkReadableFailure(work);
       items.push({
         key: `operator-work-${work.id}`,
@@ -1872,63 +1865,6 @@
                   <ArrowRight class="size-4" />
                 </Button>
               </div>
-
-              {#if failedProjectBlueprintInstallItems.length > 0}
-                <section
-                  class="rounded-md border border-destructive/30 bg-destructive/5 p-3"
-                  data-project-resource-install-failures
-                >
-                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div class="min-w-0">
-                      <h3 class="text-sm font-semibold text-destructive">安装失败</h3>
-                      <p class="mt-1 text-xs leading-5 text-muted-foreground">
-                        最近的资源安装没有完成，修正原因后可以重新部署。
-                      </p>
-                    </div>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onclick={() => {
-                        void queryClient.invalidateQueries({ queryKey: ["operator-work", "project", projectId] });
-                      }}
-                    >
-                      <RotateCcw class="size-4" />
-                      {$t(i18nKeys.console.projects.attentionOperatorWorkRefreshAction)}
-                    </Button>
-                  </div>
-                  <div class="console-record-list mt-3">
-                    {#each failedProjectBlueprintInstallItems.slice(0, 3) as work (work.id)}
-                      {@const readableFailure = operatorWorkReadableFailure(work)}
-                      <article class="console-record-row">
-                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                          <div class="min-w-0">
-                            <div class="flex min-w-0 flex-wrap items-center gap-2">
-                              <span class="truncate text-sm font-medium">{readableFailure.title}</span>
-                              <Badge variant="destructive">
-                                {$t(i18nKeys.common.status.failed)}
-                              </Badge>
-                            </div>
-                            <p class="mt-1 text-xs leading-5 text-muted-foreground">
-                              {readableFailure.detail} {readableFailure.recovery}
-                            </p>
-                            <p class="mt-1 truncate font-mono text-xs text-muted-foreground">
-                              {readableFailure.phase || work.phase || work.step || work.status}
-                              {#if readableFailure.code}
-                                · {readableFailure.code}
-                              {/if}
-                              {#if readableFailure.operation}
-                                · {readableFailure.operation}
-                              {/if}
-                              · {formatTime(work.updatedAt)}
-                            </p>
-                          </div>
-                        </div>
-                      </article>
-                    {/each}
-                  </div>
-                </section>
-              {/if}
 
               {#if projectResources.length > 0}
                 <div class="space-y-4">
