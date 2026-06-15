@@ -2617,6 +2617,9 @@ export const zhCN = {
       credentialMaterialSummary: "凭据材料",
       credentialPrivateKeyConfigured: "已保存私钥",
       credentialPublicKeyConfigured: "公钥元数据",
+      credentialReusableUnavailableBody:
+        "当前服务器没有绑定已保存的 SSH 凭据 ID；可能使用一次性私钥、SSH agent，或尚未保存凭据。连接测试和部署仍会使用服务器概要中的凭据状态。",
+      credentialReusableUnavailableTitle: "没有可复用凭据详情",
       credentialUsageActive: "{{count}} 个活跃",
       credentialUsageEmptyBody: "查询返回 0 个活跃或已停用的服务器引用。",
       credentialUsageEmptyTitle: "当前没有服务器使用这个凭据",

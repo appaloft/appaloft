@@ -2804,6 +2804,9 @@ export const enUS = {
       credentialMaterialSummary: "Credential material",
       credentialPrivateKeyConfigured: "Private key stored",
       credentialPublicKeyConfigured: "Public key metadata",
+      credentialReusableUnavailableBody:
+        "This server is not attached to a saved SSH credential id. It may use a one-time private key, SSH agent, or an unsaved credential. Connectivity tests and deployments still use the credential state in the server summary.",
+      credentialReusableUnavailableTitle: "No reusable credential detail",
       credentialUsageActive: "{{count}} active",
       credentialUsageEmptyBody: "The query returned zero active or inactive server references.",
       credentialUsageEmptyTitle: "No servers currently use this credential",
