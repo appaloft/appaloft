@@ -19,8 +19,8 @@ This query is for operator/support observation of long-running Appaloft work tha
 work id, such as parent workflow work. It does not replace:
 
 - `operator-work.show`, which remains the snapshot detail query;
-- `deployments.stream-events`, which remains the deployment lifecycle/log-adjacent event stream;
-- `deployments.logs` or `resources.runtime-logs`, which remain log surfaces.
+- `deployments.timeline`, which remains the deployment lifecycle observation surface;
+- `resources.runtime-logs`, which remains the resource runtime log surface.
 
 ## Input
 

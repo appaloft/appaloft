@@ -10,8 +10,8 @@
   - `docs/errors/model.md`
   - `docs/errors/neverthrow-conventions.md`
 - Local specs:
-  - `docs/queries/deployments.stream-events.md`
-  - `docs/errors/deployments.stream-events.md`
+  - `docs/queries/deployments.timeline.md`
+  - `docs/errors/deployments.timeline.md`
   - `docs/commands/domain-events.prune.md`
 - Test matrix: `docs/testing/domain-event-stream-retention-test-matrix.md`
 

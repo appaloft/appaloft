@@ -101,11 +101,6 @@ export const cliCommandDescriptions = {
     "Select the active Appaloft control-plane profile",
     "cli.remote-control-plane-login",
   ),
-  deploymentLogs: withDocs("Show deployment logs", "observability.runtime-logs"),
-  deploymentLogsPrune: withDocs(
-    "Dry-run or prune old embedded deployment log entries",
-    "observability.runtime-logs",
-  ),
   deploymentList: withDocs("List deployments", "deployment.lifecycle"),
   deploymentShow: withDocs("Show deployment detail", "deployment.lifecycle"),
   deploymentRecoveryReadiness: withDocs(
@@ -136,10 +131,7 @@ export const cliCommandDescriptions = {
     "Dry-run or prune archived deployment attempts",
     "deployment.recovery-readiness",
   ),
-  deploymentEvents: withDocs(
-    "Replay or follow deployment lifecycle events",
-    "deployment.lifecycle",
-  ),
+  deploymentTimeline: withDocs("Replay or follow the deployment timeline", "deployment.lifecycle"),
   deployments: withDocs("Deployment queries", "deployment.lifecycle"),
   preview: withDocs("Preview deployment commands", "deployment.preview-cleanup"),
   previewCleanup: withDocs("Clean up a preview deployment context", "deployment.preview-cleanup"),

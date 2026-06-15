@@ -32,16 +32,16 @@ status across readable surfaces:
   host/path/target entries, which is useful for route missing, stale, or failed states.
 - `appaloft resource logs <resourceId>`: inspect application stdout/stderr for startup command,
   port, configuration, and runtime errors.
-- `appaloft logs <deploymentId>`: inspect one deployment attempt's execution logs. These are
+- `appaloft deployments timeline <deploymentId>`: inspect one deployment attempt's execution logs. These are
   deployment history, not current route state.
 - `appaloft resource diagnose <resourceId>`: copy a safe diagnostic summary that combines access,
-  proxy, health, runtime logs, deployment logs, and recommended actions.
+  proxy, health, runtime logs, deployment timeline entries, and recommended actions.
 
 The Web console, CLI, and HTTP API use the same operation contracts. The Web resource detail,
 health, proxy configuration, logs, and diagnostic copy affordances map to
 `/api/resources/{resourceId}`, `/api/resources/{resourceId}/health`,
 `/api/resources/{resourceId}/proxy-configuration`, `/api/resources/{resourceId}/runtime-logs`, and
-`/api/resources/{resourceId}/diagnostic-summary`; deployment logs map to
+`/api/resources/{resourceId}/diagnostic-summary`; deployment timeline entries map to
 `/api/deployments/{deploymentId}/logs`.
 
 <h2 id="access-dns-failures">DNS failures</h2>

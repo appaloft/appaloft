@@ -32,7 +32,7 @@ type RemoteOperationMessage = AppCommand<unknown> | AppQuery<unknown>;
 
 const webhookSignatureOnlyOperations = new Set(["source-events.ingest"]);
 const remoteFollowOperationKeys = new Set([
-  "deployments.stream-events",
+  "deployments.timeline.stream",
   "operator-work.stream-events",
 ]);
 const unsupportedRemoteFollowOperationKeys = new Set(["resources.runtime-logs"]);
@@ -250,7 +250,7 @@ function adaptBoundedStreamResult(operationKey: string, value: unknown): unknown
     return value;
   }
 
-  if (operationKey === "deployments.stream-events" && Array.isArray(value.envelopes)) {
+  if (operationKey === "deployments.timeline.stream" && Array.isArray(value.envelopes)) {
     return {
       mode: "bounded",
       deploymentId: readOptionalString(value, "deploymentId") ?? "",
@@ -300,7 +300,7 @@ async function dispatchRemoteFollowMessage<TResult>(input: {
     return err(result.error);
   }
 
-  if (input.operation.operationKey === "deployments.stream-events") {
+  if (input.operation.operationKey === "deployments.timeline.stream") {
     return ok({
       mode: "stream",
       deploymentId: readOptionalString(input.request.pathParams ?? {}, "deploymentId") ?? "",

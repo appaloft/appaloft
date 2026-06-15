@@ -204,7 +204,7 @@ const diagnosticTailOption = Options.text("tail").pipe(Options.withDefault("20")
 const diagnosticObservationFromOption = Options.text("from").pipe(Options.optional);
 const diagnosticObservationToOption = Options.text("to").pipe(Options.optional);
 const diagnosticSummaryOption = Options.boolean("summary").pipe(Options.withDefault(false));
-const includeDeploymentLogsOption = Options.boolean("deployment-logs").pipe(
+const includeDeploymentTimelineOption = Options.boolean("deployment-timeline").pipe(
   Options.withDefault(true),
 );
 const includeRuntimeLogsOption = Options.boolean("runtime-logs").pipe(Options.withDefault(false));
@@ -874,7 +874,7 @@ const diagnoseCommand = EffectCommand.make(
   {
     resourceId: resourceIdArg,
     deployment: deploymentOption,
-    deploymentLogs: includeDeploymentLogsOption,
+    deploymentTimeline: includeDeploymentTimelineOption,
     runtimeLogs: includeRuntimeLogsOption,
     proxyConfiguration: includeProxyConfigurationOption,
     tail: diagnosticTailOption,
@@ -885,7 +885,7 @@ const diagnoseCommand = EffectCommand.make(
   },
   ({
     deployment,
-    deploymentLogs,
+    deploymentTimeline,
     from,
     json,
     proxyConfiguration,
@@ -900,7 +900,7 @@ const diagnoseCommand = EffectCommand.make(
       ResourceDiagnosticSummaryQuery.create({
         resourceId,
         deploymentId: optionalValue(deployment),
-        includeDeploymentLogTail: deploymentLogs,
+        includeDeploymentTimelineTail: deploymentTimeline,
         includeRuntimeLogTail: runtimeLogs,
         includeProxyConfiguration: proxyConfiguration,
         tailLines: Number(tail),

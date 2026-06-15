@@ -782,7 +782,7 @@ describe("CLI resource commands", () => {
       "res_demo",
       "--deployment",
       "dep_demo",
-      "--deployment-logs",
+      "--deployment-timeline",
       "--runtime-logs",
       "--proxy-configuration",
       "--tail",
@@ -798,7 +798,7 @@ describe("CLI resource commands", () => {
     expect(queries[0]).toMatchObject({
       resourceId: "res_demo",
       deploymentId: "dep_demo",
-      includeDeploymentLogTail: true,
+      includeDeploymentTimelineTail: true,
       includeRuntimeLogTail: true,
       includeProxyConfiguration: true,
       tailLines: 7,
@@ -849,7 +849,7 @@ describe("CLI resource commands", () => {
               serverId: "srv_demo",
               destinationId: "dst_demo",
               createdAt: "2026-01-01T00:00:00.000Z",
-              logCount: 2,
+              timelineCount: 2,
             },
             access: {
               status: "failed",
@@ -865,7 +865,7 @@ describe("CLI resource commands", () => {
               routeCount: 1,
               sectionCount: 0,
             },
-            deploymentLogs: {
+            deploymentTimeline: {
               status: "available",
               tailLimit: 20,
               lineCount: 2,
@@ -1225,7 +1225,7 @@ describe("CLI resource commands", () => {
               routeCount: 3,
               sectionCount: 0,
             },
-            deploymentLogs: { status: "not-requested", tailLimit: 20, lineCount: 0, lines: [] },
+            deploymentTimeline: { status: "not-requested", tailLimit: 20, lineCount: 0, lines: [] },
             runtimeLogs: { status: "not-requested", tailLimit: 20, lineCount: 0, lines: [] },
             system: { entrypoint: "cli", requestId: "req_cli_access_regression_test" },
             sourceErrors: [],

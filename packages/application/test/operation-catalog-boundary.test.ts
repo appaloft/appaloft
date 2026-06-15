@@ -73,8 +73,8 @@ describe("operation catalog aggregate mutation boundary", () => {
       "deployments.show",
       "deployments.plan",
       "deployments.recovery-readiness",
-      "deployments.logs",
-      "deployments.stream-events",
+      "deployments.timeline",
+      "deployments.timeline.stream",
       "operator-work.stream-events",
     ];
     const catalogEntries: readonly OperationCatalogEntry[] = operationCatalog;
@@ -88,7 +88,7 @@ describe("operation catalog aggregate mutation boundary", () => {
       expect(entry, key).toBeDefined();
       expect(entry?.inputSchema, key).toBeDefined();
       expect(entry?.transports.cli, key).toBeTruthy();
-      expect(entry?.transports.orpc, key).toBeDefined();
+      expect(entry?.transports.orpc ?? entry?.transports.orpcStream, key).toBeDefined();
     }
   });
 
@@ -136,8 +136,8 @@ describe("operation catalog aggregate mutation boundary", () => {
       "source-events.prune",
       "deployments.list",
       "deployments.show",
-      "deployments.logs",
-      "deployments.stream-events",
+      "deployments.timeline",
+      "deployments.timeline.stream",
       "deployments.recovery-readiness",
       "deployments.rollback",
       "deployments.cancel",
@@ -154,7 +154,7 @@ describe("operation catalog aggregate mutation boundary", () => {
       expect(entry, key).toBeDefined();
       expect(entry?.inputSchema, key).toBeDefined();
       expect(entry?.transports.cli, key).toBeTruthy();
-      expect(entry?.transports.orpc, key).toBeDefined();
+      expect(entry?.transports.orpc ?? entry?.transports.orpcStream, key).toBeDefined();
     }
   });
 
@@ -447,11 +447,11 @@ describe("operation catalog aggregate mutation boundary", () => {
     expect(thresholdShowEntry?.inputSchema).toBeDefined();
   });
 
-  test("[RT-MON-005] logs events health and diagnostics stay outside runtime monitoring operations", () => {
+  test("[RT-MON-005] timeline events health and diagnostics stay outside runtime monitoring operations", () => {
     const independentObservationOperations = [
       "resources.runtime-logs",
-      "deployments.logs",
-      "deployments.stream-events",
+      "deployments.timeline",
+      "deployments.timeline.stream",
       "resources.health",
       "resources.health-history",
       "resources.diagnostic-summary",
@@ -469,7 +469,7 @@ describe("operation catalog aggregate mutation boundary", () => {
     );
     expect(
       runtimeMonitoringEntries.filter((entry) =>
-        /\b(logs?|events?|health|diagnostics?|proxy)\b/i.test(
+        /\b(timeline?|events?|health|diagnostics?|proxy)\b/i.test(
           [entry.key, entry.messageName, entry.serviceName, entry.transports.cli].join(" "),
         ),
       ),

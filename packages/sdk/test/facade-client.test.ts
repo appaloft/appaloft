@@ -81,58 +81,40 @@ const operations = [
     streaming: false,
   },
   {
-    operationKey: "deployments.stream-events",
+    operationKey: "deployments.timeline",
     operationGroup: "deployments",
-    operationMethod: "streamEvents",
-    facadePath: ["deployments", "streamEvents"],
+    operationMethod: "timeline",
+    facadePath: ["deployments", "timeline"],
     facadeDefault: true,
-    operationId: "deployments.eventsStream",
+    operationId: "deployments.timeline",
     kind: "query",
     domain: "deployments",
-    messageName: "StreamDeploymentEventsQuery",
+    messageName: "DeploymentTimelineQuery",
     route: {
       method: "GET",
-      path: "/deployments/{deploymentId}/events/stream",
+      path: "/deployments/{deploymentId}/timeline",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+  },
+  {
+    operationKey: "deployments.timeline.stream",
+    operationGroup: "deployments",
+    operationMethod: "timelineStream",
+    facadePath: ["deployments", "timeline", "stream"],
+    facadeDefault: true,
+    operationId: "deployments.timeline.stream",
+    kind: "query",
+    domain: "deployments",
+    messageName: "StreamDeploymentTimelineQuery",
+    route: {
+      method: "GET",
+      path: "/deployments/{deploymentId}/timeline/stream",
     },
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: true,
-  },
-  {
-    operationKey: "deployments.logs",
-    operationGroup: "deployments",
-    operationMethod: "logs",
-    facadePath: ["deployments", "logs"],
-    facadeDefault: true,
-    operationId: "deployments.logs",
-    kind: "query",
-    domain: "deployments",
-    messageName: "ListDeploymentLogsQuery",
-    route: {
-      method: "GET",
-      path: "/deployments/{deploymentId}/logs",
-    },
-    authPolicy: "product-session",
-    errorFamily: "structured-platform-error",
-    streaming: false,
-  },
-  {
-    operationKey: "deployments.logs.prune",
-    operationGroup: "deployments",
-    operationMethod: "logsPrune",
-    facadePath: ["deployments", "logs", "prune"],
-    facadeDefault: true,
-    operationId: "deployments.logs.prune",
-    kind: "command",
-    domain: "deployments",
-    messageName: "PruneDeploymentLogsCommand",
-    route: {
-      method: "POST",
-      path: "/deployments/logs/prune",
-    },
-    authPolicy: "product-session",
-    errorFamily: "structured-platform-error",
-    streaming: false,
   },
 ] as const satisfies readonly SdkOperationDescriptor[];
 
@@ -148,9 +130,8 @@ interface RepresentativeFacade {
     };
   };
   readonly deployments: {
-    readonly streamEvents: AppaloftSdkFacadeMethod;
-    readonly logs: AppaloftSdkFacadeMethod & {
-      readonly prune: AppaloftSdkFacadeMethod;
+    readonly timeline: AppaloftSdkFacadeMethod & {
+      readonly stream: AppaloftSdkFacadeMethod;
     };
   };
 }
@@ -246,7 +227,7 @@ describe("Appaloft typed facade client", () => {
 
     const envelopes: unknown[] = [];
 
-    for await (const envelope of appaloft.deployments.streamEvents({
+    for await (const envelope of appaloft.deployments.timeline.stream({
       deploymentId: "dep_demo",
     })) {
       envelopes.push(envelope);
@@ -268,14 +249,20 @@ describe("Appaloft typed facade client", () => {
       operations,
     ) as unknown as RepresentativeFacade;
 
-    await appaloft.deployments.logs({ deploymentId: "dep_demo", tail: 100 });
-    await appaloft.deployments.logs.prune({ olderThanDays: 30 });
+    await appaloft.deployments.timeline({ deploymentId: "dep_demo", limit: 100 });
+    for await (const _envelope of appaloft.deployments.timeline.stream({
+      deploymentId: "dep_demo",
+      follow: true,
+    })) {
+      break;
+    }
 
     expect(capturedRequests[0]?.url).toBe(
-      "https://appaloft.example/api/deployments/dep_demo/logs?tail=100",
+      "https://appaloft.example/api/deployments/dep_demo/timeline?limit=100",
     );
-    expect(capturedRequests[1]?.url).toBe("https://appaloft.example/api/deployments/logs/prune");
-    expect(await capturedRequests[1]?.text()).toBe('{"olderThanDays":30}');
+    expect(capturedRequests[1]?.url).toBe(
+      "https://appaloft.example/api/deployments/dep_demo/timeline/stream?follow=true",
+    );
   });
 
   test("[TS-SDK-FACADE-001] createAppaloftClient exposes generated operations", () => {
@@ -286,6 +273,7 @@ describe("Appaloft typed facade client", () => {
 
     expect(typeof appaloft.projects.create).toBe("function");
     expect(typeof appaloft.dependencyResources.provisioning.plan).toBe("function");
-    expect(typeof appaloft.deployments.streamEvents).toBe("function");
+    expect(typeof appaloft.deployments.timeline).toBe("function");
+    expect(typeof appaloft.deployments.timeline.stream).toBe("function");
   });
 });

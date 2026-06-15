@@ -967,9 +967,8 @@ Implemented operations:
 | Cancel active deployment attempt | Command | `deployments.cancel` | `CancelDeploymentCommand` | `CancelDeploymentCommandInput` | `appaloft deployments cancel <deploymentId> --confirm <deploymentId>` | `POST /api/deployments/{deploymentId}/cancel` |
 | Archive deployment attempt | Command | `deployments.archive` | `ArchiveDeploymentCommand` | `ArchiveDeploymentCommandInput` | `appaloft deployments archive <deploymentId> --confirm <deploymentId>` | `POST /api/deployments/{deploymentId}/archive` |
 | Prune archived deployment attempts | Command | `deployments.prune` | `PruneDeploymentsCommand` | `PruneDeploymentsCommandInput` | `appaloft deployments prune --before <iso>` | `POST /api/deployments/prune` |
-| Read deployment logs | Query | `deployments.logs` | `DeploymentLogsQuery` | `DeploymentLogsQueryInput` | `appaloft logs <deploymentId>` | `GET /api/deployments/{deploymentId}/logs` |
-| Prune deployment logs | Command | `deployments.logs.prune` | `PruneDeploymentLogsCommand` | `PruneDeploymentLogsCommandInput` | `appaloft deployments logs prune --before <iso>` | `POST /api/deployments/logs/prune` |
-| Stream deployment events | Query | `deployments.stream-events` | `StreamDeploymentEventsQuery` | `StreamDeploymentEventsQueryInput` | `appaloft deployments events <deploymentId>` | `GET /api/deployments/{deploymentId}/events` and `GET /api/deployments/{deploymentId}/events/stream` |
+| Read deployment timeline | Query | `deployments.timeline` | `DeploymentTimelineQuery` | `DeploymentTimelineQueryInput` | `appaloft deployments timeline <deploymentId>` | `GET /api/deployments/{deploymentId}/timeline` |
+| Stream deployment timeline | Query | `deployments.timeline.stream` | `StreamDeploymentTimelineQuery` | `StreamDeploymentTimelineQueryInput` | `appaloft deployments timeline <deploymentId> --follow` | `GET /api/deployments/{deploymentId}/timeline/stream` |
 
 Current boundary:
 - `deployments.create` is the only general deployment-attempt admission command for the v1
@@ -1012,21 +1011,14 @@ Current boundary:
   that belong to resource profile commands.
 - `deployments.show` is the active immutable-attempt deployment detail surface. It returns
   deployment context, historical snapshot, safe dependency binding references copied at admission
-  time, timeline, and safe related context while keeping deployment logs on `deployments.logs` and
-  current health on `resources.health`.
-- `deployments.stream-events` is the read-only replay/follow observation surface for one accepted
-  deployment attempt. It does not replace immutable detail on `deployments.show`, full attempt
-  logs on `deployments.logs`, or reintroduce `deployments.reattach` as a write command.
-  Reconnect/gap/CLI hardening is tracked by
-  [Deployment Observation And Recovery Hardening](./specs/071-deployment-observation-and-recovery/spec.md)
-  as `0.12.x` patch work before the `1.0.0-rc` gate.
-- `deployments.logs.prune` is a narrow embedded deployment log retention mutation. It dry-runs by
-  default, requires a cutoff, optionally narrows by deployment id, resource id, or server id, and
-  removes only matching entries from Deployment row `logs` when destructive mode is explicit. It
-  does not delete deployment rows, change deployment status, rewrite runtime plans, mutate resource
-  runtime logs, provider job logs, audit rows, event streams, outbox/inbox records, process
-  attempts, snapshots, runtime artifacts, source workspaces, build cache, resources, servers,
-  routes, or business state.
+  time, timeline summary, and safe related context while keeping full observation history on
+  `deployments.timeline` and current health on `resources.health`.
+- `deployments.timeline` and `deployments.timeline.stream` are the read-only replay/follow
+  observation surfaces for one accepted deployment attempt. They are backed by the Deployment
+  Timeline Journal selected in
+  [ADR-084: Deployment Timeline Journal Boundary](./decisions/ADR-084-deployment-timeline-journal-boundary.md).
+  Log views filter timeline entries instead of reading a separate legacy deployment-log surface, and
+  reconnect stays read-only instead of reintroducing `deployments.reattach` as a write command.
 - `deployments.archive` is a narrow attempt-history lifecycle mutation. It requires exact
   deployment id confirmation, accepts only terminal attempts, records `archivedAt`, hides archived
   attempts from default `deployments.list`, and does not delete logs, events, runtime artifacts,

@@ -269,7 +269,7 @@ export async function waitForDeploymentSucceeded(
   );
 }
 
-export async function waitForDeploymentLogs(
+export async function waitForDeploymentTimeline(
   deploymentId: string,
   options: ShellCliOptions,
   expectedMessages: string | string[],
@@ -286,7 +286,7 @@ export async function waitForDeploymentLogs(
   let lastResult: CliResult | undefined;
 
   while (Date.now() - startedAt < timeoutMs) {
-    const result = runShellCli(["logs", deploymentId], options);
+    const result = runShellCli(["timeline", deploymentId], options);
     lastResult = result;
 
     if (result.exitCode === 0 && expected.every((message) => result.stdout.includes(message))) {
@@ -297,7 +297,7 @@ export async function waitForDeploymentLogs(
   }
 
   throw new Error(
-    `Timed out waiting for ${config.label ?? deploymentId} logs to contain ${expected.map((message) => JSON.stringify(message)).join(", ")}\nstdout:\n${lastResult?.stdout ?? ""}\nstderr:\n${lastResult?.stderr ?? ""}`,
+    `Timed out waiting for ${config.label ?? deploymentId} timeline to contain ${expected.map((message) => JSON.stringify(message)).join(", ")}\nstdout:\n${lastResult?.stdout ?? ""}\nstderr:\n${lastResult?.stderr ?? ""}`,
   );
 }
 

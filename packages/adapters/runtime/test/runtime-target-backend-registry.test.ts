@@ -8,7 +8,7 @@ import {
 import {
   ok,
   type Deployment,
-  type DeploymentLogEntry,
+  type DeploymentTimelineJournalEntry,
   type Result,
   type RollbackPlan,
   type TargetKind,
@@ -75,9 +75,9 @@ class RecordingExecutionBackend implements ExecutionBackend {
   async cancel(
     _context: Parameters<ExecutionBackend["cancel"]>[0],
     _deployment: Deployment,
-  ): Promise<Result<{ logs: DeploymentLogEntry[] }>> {
+  ): Promise<Result<{ timeline: DeploymentTimelineJournalEntry[] }>> {
     this.calls.push(`${this.name}:cancel`);
-    return ok({ logs: [] });
+    return ok({ timeline: [] });
   }
 
   async rollback(

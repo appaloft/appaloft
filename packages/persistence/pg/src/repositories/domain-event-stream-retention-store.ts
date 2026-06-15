@@ -1,12 +1,5 @@
 import { createHash } from "node:crypto";
 import {
-  type DeploymentEventStream,
-  type DeploymentEventStreamEnvelope,
-  type DeploymentObservedEventSource,
-  type DeploymentObservedEventType,
-  type DomainEventStreamObservationReader,
-  type DomainEventStreamObservationReplayResult,
-  type DomainEventStreamObservationRequest,
   type DomainEventStreamPruneInput,
   type DomainEventStreamPruneStoreResult,
   type DomainEventStreamRecorder,
@@ -25,16 +18,17 @@ type DomainEventStreamRecordRow = Pick<
   "id" | "stream_scope" | "stream_id" | "cursor" | "event_type" | "guard_reason"
 >;
 
-type DeploymentEventStreamRecordRow = Pick<
-  Selectable<Database["domain_event_stream_records"]>,
-  "id" | "cursor" | "occurred_at" | "event_type" | "source_kind" | "summary" | "payload"
->;
-
 type DomainEventStreamPruneQuery = SelectQueryBuilder<
   Database,
   "domain_event_stream_records",
   DomainEventStreamRecordRow
 >;
+
+type RetainedDeploymentDomainEventType =
+  | "deployment-started"
+  | "deployment-succeeded"
+  | "deployment-failed"
+  | "deployment-progress";
 
 function payloadRecord(payload: unknown): Record<string, unknown> {
   return payload && typeof payload === "object" && !Array.isArray(payload)
@@ -48,7 +42,7 @@ function deploymentIdFromDomainEvent(event: DomainEventStreamRecordInput["event"
 
 function observedEventTypeFromDomainEvent(
   event: DomainEventStreamRecordInput["event"],
-): DeploymentObservedEventType | undefined {
+): RetainedDeploymentDomainEventType | undefined {
   if (event.type === "deployment.started") {
     return "deployment-started";
   }
@@ -64,7 +58,7 @@ function observedEventTypeFromDomainEvent(
 
 function statusFromDomainEvent(
   event: DomainEventStreamRecordInput["event"],
-  observedEventType: DeploymentObservedEventType,
+  observedEventType: RetainedDeploymentDomainEventType,
 ): string {
   const payload = payloadRecord(event.payload);
   const status = payload.status;
@@ -90,7 +84,7 @@ function statusFromDomainEvent(
 
 function summaryFromDomainEvent(
   event: DomainEventStreamRecordInput["event"],
-  observedEventType: DeploymentObservedEventType,
+  observedEventType: RetainedDeploymentDomainEventType,
 ): string {
   const payload = payloadRecord(event.payload);
   const errorMessage = payload.errorMessage;
@@ -175,195 +169,8 @@ function summarizeRows(
   };
 }
 
-function timestampToIso(value: string | Date): string {
-  return value instanceof Date ? value.toISOString() : value;
-}
-
-function deploymentEventStreamGapEnvelope(
-  cursor: string,
-  lastSequence?: number,
-): DeploymentEventStreamEnvelope {
-  return {
-    schemaVersion: "deployments.stream-events/v1",
-    kind: "gap",
-    gap: {
-      code: "deployment_event_stream_gap",
-      phase: "event-replay",
-      retriable: true,
-      cursor,
-      ...(lastSequence ? { lastSequence } : {}),
-      recommendedAction: "restart-stream",
-    },
-  };
-}
-
-function deploymentEventCursorInvalidError(deploymentId: string, cursor: string) {
-  return {
-    ...domainError.validation("Deployment event cursor is invalid", {
-      queryName: "deployments.stream-events",
-      phase: "cursor-resolution",
-      deploymentId,
-      cursor,
-    }),
-    code: "deployment_event_cursor_invalid",
-  };
-}
-
-function deploymentEventStreamUnavailableError(reason: unknown) {
-  return {
-    ...domainError.infra("Deployment event stream is unavailable", {
-      queryName: "deployments.stream-events",
-      phase: "event-source-load",
-      adapter: "persistence.pg",
-      reason: reason instanceof Error ? reason.message : "unknown",
-    }),
-    code: "deployment_event_stream_unavailable",
-  };
-}
-
-function normalizedObservedEventSource(sourceKind: string): DeploymentObservedEventSource {
-  if (
-    sourceKind === "domain-event" ||
-    sourceKind === "process-observation" ||
-    sourceKind === "progress-projection"
-  ) {
-    return sourceKind;
-  }
-
-  return "domain-event";
-}
-
-function normalizedObservedEventType(eventType: string): DeploymentObservedEventType {
-  if (
-    eventType === "deployment-requested" ||
-    eventType === "build-requested" ||
-    eventType === "deployment-started" ||
-    eventType === "deployment-succeeded" ||
-    eventType === "deployment-failed" ||
-    eventType === "deployment-progress"
-  ) {
-    return eventType;
-  }
-
-  return "deployment-progress";
-}
-
-function positivePayloadSequence(payload: Record<string, unknown>): number | undefined {
-  const value = payload.sequence;
-
-  return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : undefined;
-}
-
-function statusFromPayload(payload: Record<string, unknown>): string | undefined {
-  return typeof payload.status === "string" && payload.status.trim() ? payload.status : undefined;
-}
-
-function phaseFromPayload(
-  payload: Record<string, unknown>,
-): "detect" | "plan" | "package" | "deploy" | "verify" | "rollback" | undefined {
-  const value = payload.phase;
-
-  if (
-    value === "detect" ||
-    value === "plan" ||
-    value === "package" ||
-    value === "deploy" ||
-    value === "verify" ||
-    value === "rollback"
-  ) {
-    return value;
-  }
-
-  return undefined;
-}
-
-function retainedRowToEnvelope(
-  deploymentId: string,
-  row: DeploymentEventStreamRecordRow,
-  index: number,
-): DeploymentEventStreamEnvelope {
-  const sequence = positivePayloadSequence(row.payload) ?? index + 1;
-  const status = statusFromPayload(row.payload);
-  const phase = phaseFromPayload(row.payload);
-
-  return {
-    schemaVersion: "deployments.stream-events/v1",
-    kind: "event",
-    event: {
-      deploymentId,
-      sequence,
-      cursor: row.cursor,
-      emittedAt: timestampToIso(row.occurred_at),
-      source: normalizedObservedEventSource(row.source_kind),
-      eventType: normalizedObservedEventType(row.event_type),
-      ...(phase ? { phase } : {}),
-      ...(status ? { status } : {}),
-      ...(status === "failed" ? { retriable: true } : {}),
-      ...(row.summary ? { summary: row.summary } : {}),
-    },
-  };
-}
-
-function closedEnvelope(
-  reason: "completed" | "cancelled" | "source-ended",
-  cursor: string | undefined,
-): DeploymentEventStreamEnvelope {
-  return {
-    schemaVersion: "deployments.stream-events/v1",
-    kind: "closed",
-    reason,
-    ...(cursor ? { cursor } : {}),
-  };
-}
-
-function isTerminalEventEnvelope(envelope: DeploymentEventStreamEnvelope): boolean {
-  if (envelope.kind !== "event") {
-    return false;
-  }
-
-  return (
-    envelope.event.eventType === "deployment-succeeded" ||
-    envelope.event.eventType === "deployment-failed" ||
-    envelope.event.status === "succeeded" ||
-    envelope.event.status === "failed" ||
-    envelope.event.status === "canceled" ||
-    envelope.event.status === "rolled-back"
-  );
-}
-
-function retainedDeploymentEventStream(input: {
-  iterate: () => AsyncGenerator<DeploymentEventStreamEnvelope, void, void>;
-  close: () => void;
-}): DeploymentEventStream {
-  let closed = false;
-
-  return {
-    async close(): Promise<void> {
-      if (closed) {
-        return;
-      }
-
-      closed = true;
-      input.close();
-    },
-    async *[Symbol.asyncIterator](): AsyncIterator<DeploymentEventStreamEnvelope> {
-      try {
-        yield* input.iterate();
-      } finally {
-        if (!closed) {
-          closed = true;
-          input.close();
-        }
-      }
-    },
-  };
-}
-
 export class PgDomainEventStreamRetentionStore
-  implements
-    DomainEventStreamRetentionStore,
-    DomainEventStreamObservationReader,
-    DomainEventStreamRecorder
+  implements DomainEventStreamRetentionStore, DomainEventStreamRecorder
 {
   constructor(private readonly db: Kysely<Database>) {}
 
@@ -423,272 +230,6 @@ export class PgDomainEventStreamRetentionStore
           reason: error instanceof Error ? error.message : "unknown",
         }),
       );
-    }
-  }
-
-  async replayDeploymentEvents(
-    context: RepositoryContext,
-    request: DomainEventStreamObservationRequest,
-  ): Promise<Result<DomainEventStreamObservationReplayResult>> {
-    const executor = resolveRepositoryExecutor(this.db, context);
-
-    try {
-      const rows = await executor
-        .selectFrom("domain_event_stream_records")
-        .select(["id", "cursor", "occurred_at", "event_type", "source_kind", "summary", "payload"])
-        .where("stream_scope", "=", "deployment")
-        .where("stream_id", "=", request.deploymentId)
-        .orderBy("occurred_at", "asc")
-        .orderBy("id", "asc")
-        .execute();
-      const watermark = await executor
-        .selectFrom("domain_event_stream_prune_watermarks")
-        .select(["last_pruned_cursor"])
-        .where("stream_scope", "=", "deployment")
-        .where("stream_id", "=", request.deploymentId)
-        .executeTakeFirst();
-
-      if (rows.length === 0 && !watermark) {
-        return ok({ available: false });
-      }
-
-      if (request.cursor) {
-        const cursorIndex = rows.findIndex((row) => row.cursor === request.cursor);
-
-        if (cursorIndex === -1) {
-          if (watermark?.last_pruned_cursor === request.cursor) {
-            return ok({
-              available: true,
-              envelopes: [deploymentEventStreamGapEnvelope(request.cursor)],
-            });
-          }
-
-          return err(deploymentEventCursorInvalidError(request.deploymentId, request.cursor));
-        }
-
-        const replayRows = request.includeHistory
-          ? rows.slice(cursorIndex + 1, cursorIndex + 1 + request.historyLimit)
-          : [];
-        const envelopes = replayRows.map((row, index) =>
-          retainedRowToEnvelope(request.deploymentId, row, cursorIndex + 1 + index),
-        );
-        const lastCursor = replayRows.at(-1)?.cursor ?? request.cursor;
-
-        return ok({
-          available: true,
-          envelopes: [
-            ...envelopes,
-            closedEnvelope(request.untilTerminal ? "completed" : "source-ended", lastCursor),
-          ],
-        });
-      }
-
-      const replayRows = request.includeHistory
-        ? rows.slice(Math.max(rows.length - request.historyLimit, 0))
-        : [];
-      const firstIndex = rows.length - replayRows.length;
-      const envelopes = replayRows.map((row, index) =>
-        retainedRowToEnvelope(request.deploymentId, row, firstIndex + index),
-      );
-      const lastCursor = replayRows.at(-1)?.cursor;
-
-      return ok({
-        available: true,
-        envelopes: [
-          ...envelopes,
-          closedEnvelope(request.untilTerminal ? "completed" : "source-ended", lastCursor),
-        ],
-      });
-    } catch (error) {
-      return err(deploymentEventStreamUnavailableError(error));
-    }
-  }
-
-  async openDeploymentEventStream(
-    context: RepositoryContext,
-    request: DomainEventStreamObservationRequest,
-    signal: AbortSignal,
-  ): Promise<Result<DomainEventStreamObservationReplayResult | DeploymentEventStream>> {
-    const executor = resolveRepositoryExecutor(this.db, context);
-
-    try {
-      const initialRows = await executor
-        .selectFrom("domain_event_stream_records")
-        .select(["id", "cursor", "occurred_at", "event_type", "source_kind", "summary", "payload"])
-        .where("stream_scope", "=", "deployment")
-        .where("stream_id", "=", request.deploymentId)
-        .orderBy("occurred_at", "asc")
-        .orderBy("id", "asc")
-        .execute();
-      const watermark = await executor
-        .selectFrom("domain_event_stream_prune_watermarks")
-        .select(["last_pruned_cursor"])
-        .where("stream_scope", "=", "deployment")
-        .where("stream_id", "=", request.deploymentId)
-        .executeTakeFirst();
-
-      if (initialRows.length === 0 && !watermark) {
-        return ok({ available: false });
-      }
-
-      if (request.cursor) {
-        const cursorIndex = initialRows.findIndex((row) => row.cursor === request.cursor);
-        if (cursorIndex === -1) {
-          if (watermark?.last_pruned_cursor === request.cursor) {
-            const gapStream = retainedDeploymentEventStream({
-              close: () => undefined,
-              iterate: async function* (): AsyncGenerator<
-                DeploymentEventStreamEnvelope,
-                void,
-                void
-              > {
-                yield deploymentEventStreamGapEnvelope(request.cursor ?? "");
-              },
-            });
-
-            return ok(gapStream);
-          }
-
-          return err(deploymentEventCursorInvalidError(request.deploymentId, request.cursor));
-        }
-      }
-
-      const cursorIndex = request.cursor
-        ? initialRows.findIndex((row) => row.cursor === request.cursor)
-        : -1;
-      const replayRows = request.includeHistory
-        ? request.cursor
-          ? initialRows.slice(cursorIndex + 1, cursorIndex + 1 + request.historyLimit)
-          : initialRows.slice(Math.max(initialRows.length - request.historyLimit, 0))
-        : [];
-      const firstReplayIndex = request.cursor
-        ? cursorIndex + 1
-        : initialRows.length - replayRows.length;
-      let lastCursor = replayRows.at(-1)?.cursor;
-      let nextSequence = firstReplayIndex + replayRows.length + 1;
-
-      if (!lastCursor) {
-        lastCursor =
-          request.cursor ?? (!request.includeHistory ? initialRows.at(-1)?.cursor : undefined);
-        nextSequence = initialRows.length + 1;
-      }
-
-      let closed = false;
-      const stream = retainedDeploymentEventStream({
-        close: () => {
-          closed = true;
-        },
-        iterate: async function* (): AsyncGenerator<DeploymentEventStreamEnvelope, void, void> {
-          for (const [index, row] of replayRows.entries()) {
-            if (closed) {
-              return;
-            }
-
-            const envelope = retainedRowToEnvelope(
-              request.deploymentId,
-              row,
-              firstReplayIndex + index,
-            );
-            if (envelope.kind === "event") {
-              lastCursor = envelope.event.cursor;
-              nextSequence = envelope.event.sequence + 1;
-            }
-
-            yield envelope;
-
-            if (request.untilTerminal && isTerminalEventEnvelope(envelope)) {
-              yield closedEnvelope("completed", lastCursor);
-              return;
-            }
-          }
-
-          while (!closed) {
-            if (signal.aborted) {
-              yield closedEnvelope("cancelled", lastCursor ?? request.cursor);
-              return;
-            }
-
-            try {
-              const rows = await executor
-                .selectFrom("domain_event_stream_records")
-                .select([
-                  "id",
-                  "cursor",
-                  "occurred_at",
-                  "event_type",
-                  "source_kind",
-                  "summary",
-                  "payload",
-                ])
-                .where("stream_scope", "=", "deployment")
-                .where("stream_id", "=", request.deploymentId)
-                .orderBy("occurred_at", "asc")
-                .orderBy("id", "asc")
-                .execute();
-              const liveCursorIndex = lastCursor
-                ? rows.findIndex((row) => row.cursor === lastCursor)
-                : -1;
-              if (lastCursor && liveCursorIndex === -1) {
-                yield deploymentEventStreamGapEnvelope(lastCursor);
-                return;
-              }
-
-              const candidateRows = lastCursor ? rows.slice(liveCursorIndex + 1) : rows;
-
-              if (candidateRows.length > 0) {
-                for (const row of candidateRows) {
-                  if (closed) {
-                    return;
-                  }
-
-                  const envelope = retainedRowToEnvelope(
-                    request.deploymentId,
-                    row,
-                    nextSequence - 1,
-                  );
-                  if (envelope.kind === "event") {
-                    nextSequence = envelope.event.sequence + 1;
-                    lastCursor = envelope.event.cursor;
-                  }
-
-                  yield envelope;
-
-                  if (request.untilTerminal && isTerminalEventEnvelope(envelope)) {
-                    yield closedEnvelope("completed", lastCursor);
-                    return;
-                  }
-                }
-
-                continue;
-              }
-            } catch (error) {
-              yield {
-                schemaVersion: "deployments.stream-events/v1",
-                kind: "error",
-                error: {
-                  ...deploymentEventStreamUnavailableError(error),
-                  code: "deployment_event_follow_failed",
-                  details: {
-                    queryName: "deployments.stream-events",
-                    phase: "live-follow",
-                    deploymentId: request.deploymentId,
-                    reason: error instanceof Error ? error.message : "unknown",
-                  },
-                },
-              };
-              return;
-            }
-
-            await new Promise<void>((resolve) => setTimeout(resolve, 250));
-          }
-
-          yield closedEnvelope("source-ended", lastCursor ?? request.cursor);
-        },
-      });
-
-      return ok(stream);
-    } catch (error) {
-      return err(deploymentEventStreamUnavailableError(error));
     }
   }
 

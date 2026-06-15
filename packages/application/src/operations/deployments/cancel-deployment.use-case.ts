@@ -152,9 +152,9 @@ export class CancelDeploymentUseCase {
 
           const cancelLogs = deployment.requiresRuntimeCancellationForManualCancel()
             ? yield* await executionBackend.cancel(context, deployment)
-            : { logs: [] };
+            : { timeline: [] };
 
-          yield* deploymentLifecycleService.cancel(deployment, cancelLogs.logs);
+          yield* deploymentLifecycleService.cancel(deployment, cancelLogs.timeline);
           const cancelPersistResult = await deploymentRepository.updateOne(
             repositoryContext,
             deployment,

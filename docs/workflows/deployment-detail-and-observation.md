@@ -10,8 +10,9 @@ The workflow is:
 ```text
 deployment history or deep link
   -> deployments.show
-  -> deployments.stream-events for replay/follow timeline observation
-  -> deployments.logs for full attempt logs
+  -> deployments.timeline for bounded journal replay
+  -> deployments.timeline.stream for live follow/reconnect
+  -> log view as a filter over timeline entries
   -> optional create-time progress display for the original deployment command request
   -> optional resource health / diagnostic summary follow-up
 ```
@@ -19,8 +20,9 @@ deployment history or deep link
 The workflow must keep these boundaries explicit:
 
 - deployment attempt detail belongs to `deployments.show`;
-- deployment attempt event replay/follow belongs to `deployments.stream-events`;
-- deployment attempt logs belong to `deployments.logs`;
+- deployment attempt observation belongs to `deployments.timeline` and
+  `deployments.timeline.stream`;
+- deployment attempt logs are a filtered view over timeline entries;
 - current resource health belongs to `resources.health`;
 - support/debug copy belongs to `resources.diagnostic-summary`;
 - runtime application logs belong to `resources.runtime-logs`.
@@ -32,7 +34,9 @@ This workflow inherits:
 - [ADR-013: Project Resource Navigation And Deployment Ownership](../decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md)
 - [ADR-016: Deployment Command Surface Reset](../decisions/ADR-016-deployment-command-surface-reset.md)
 - [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
+- [ADR-084: Deployment Timeline Journal Boundary](../decisions/ADR-084-deployment-timeline-journal-boundary.md)
 - [deployments.show Query Spec](../queries/deployments.show.md)
+- [deployments.timeline Query Spec](../queries/deployments.timeline.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
 - [resources.health Query Spec](../queries/resources.health.md)
 - [resources.diagnostic-summary Query Spec](../queries/resources.diagnostic-summary.md)
@@ -70,7 +74,7 @@ Deployment detail owns:
 - immutable attempt context;
 - attempt lifecycle/timeline summary;
 - attempt-specific route snapshot/history;
-- attempt-specific logs;
+- attempt-specific timeline/log views;
 - navigation to related resource/project/environment/server context.
 
 ## Main Flow
@@ -83,9 +87,10 @@ Deployment detail owns:
    - immutable attempt snapshot;
    - related resource/project/environment/server context;
    - latest failure/progress summary when present.
-4. The timeline/watch surface resolves `deployments.stream-events` for bounded replay and optional
-   live follow.
-5. The logs tab or companion action resolves `deployments.logs`.
+4. The timeline/watch surface resolves `deployments.timeline` for bounded replay and
+   `deployments.timeline.stream` for optional live follow.
+5. The logs tab or companion action filters the same timeline journal entries to output/log-like
+   kinds.
 6. The user may navigate to:
    - resource detail for current health and access;
    - diagnostic summary for support/debug context;
@@ -111,21 +116,22 @@ The page must label these separately.
 
 ## Progress And Timeline Rules
 
-The create-time progress stream remains tied to `deployments.create`.
+The create-time progress stream remains tied to `deployments.create` until an accepted deployment
+id exists.
 
-`deployments.stream-events` is the active standalone observation boundary for replay/follow timeline
-behavior. Deployment detail and watch-style entrypoints use this query after acceptance instead of
-depending on the original command transport staying open.
+`deployments.timeline` and `deployments.timeline.stream` are the active standalone observation
+boundaries for replay/follow timeline behavior. Deployment detail and watch-style entrypoints use
+the journal after acceptance instead of depending on the original command transport staying open.
 
 `deployments.show` should therefore keep immutable detail and recent summary, while
-`deployments.stream-events` owns replay/follow semantics and cursor-based reconnect.
+`deployments.timeline` owns replay/follow semantics and cursor-based reconnect.
 
 ## Allowed And Forbidden Affordances
 
 Allowed on deployment detail:
 
-- open timeline/watch tab backed by `deployments.stream-events`;
-- open logs tab;
+- open timeline/watch tab backed by `deployments.timeline` and `deployments.timeline.stream`;
+- open logs tab backed by timeline filters;
 - copy deployment id or related context ids;
 - deep-link to resource detail;
 - open diagnostic summary with `resourceId` and optional `deploymentId`;
@@ -143,16 +149,16 @@ Forbidden until later specs reintroduce them:
 
 | Entrypoint | Contract |
 | --- | --- |
-| Web deployment detail page | Uses `deployments.show` for overview/snapshot, `deployments.stream-events` for timeline/watch behavior, `deployments.logs` for logs, and companion resource queries for current state. |
-| CLI detail command | Prints canonical deployment detail JSON or concise human summary from `deployments.show`; CLI watch mode uses `deployments.stream-events`; logs remain separate. |
-| HTTP/oRPC | Returns `DeploymentDetail` from the shared detail query, exposes `deployments.stream-events` as the standalone observation stream, and keeps logs as a separate endpoint. |
-| Quick Deploy completion | May deep-link to deployment detail after acceptance and hand off watch behavior to `deployments.stream-events`; it must not depend forever on the original create-time transport. |
+| Web deployment detail page | Uses `deployments.show` for overview/snapshot and `deployments.timeline` plus `deployments.timeline.stream` for timeline/watch/log views. |
+| CLI detail command | Prints canonical deployment detail JSON or concise human summary from `deployments.show`; CLI watch/log modes use timeline queries with filters. |
+| HTTP/oRPC | Returns `DeploymentDetail` from the shared detail query and exposes timeline read/follow as the standalone observation stream. |
+| Quick Deploy completion | May deep-link to deployment detail after acceptance and hand off watch behavior to `deployments.timeline.stream`; it must not depend forever on the original create-time transport. |
 
 ## Current Implementation Notes And Migration Gaps
 
-Current Web deployment detail reads `deployments.show` for the primary detail contract, reads
-timeline replay/follow through `deployments.stream-events`, keeps attempt logs on
-`deployments.logs`, and shows recovery readiness/actions through the ADR-034 recovery boundary.
+ADR-084 selects the Deployment Timeline Journal as the target state. Current code still needs a
+Code Round to replace legacy `deployments.stream-events` and `deployments.logs` calls with
+timeline queries.
 Public active-attempt cancellation is separately governed by `deployments.cancel`.
 
 Create-time progress remains a request-local affordance for `deployments.create`; it is no longer

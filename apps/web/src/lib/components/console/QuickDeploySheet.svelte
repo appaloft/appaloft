@@ -3692,7 +3692,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       const summary = await orpcClient.resources.diagnosticSummary({
         resourceId: selectedResourceId,
         deploymentId: lastCreatedDeploymentId,
-        includeDeploymentLogTail: true,
+        includeDeploymentTimelineTail: true,
         includeRuntimeLogTail: true,
         includeProxyConfiguration: true,
         tailLines: 20,

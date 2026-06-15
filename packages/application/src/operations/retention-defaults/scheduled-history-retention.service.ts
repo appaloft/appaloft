@@ -17,7 +17,6 @@ import {
 } from "../../ports";
 import { tokens } from "../../tokens";
 import { PruneAuditEventsCommand } from "../audit-events/prune-audit-events.command";
-import { PruneDeploymentLogsCommand } from "../deployments/prune-deployment-logs.command";
 import { PruneDomainEventsCommand } from "../domain-events/prune-domain-events.command";
 import { PruneOperatorWorkCommand } from "../operator-work/prune-operator-work.command";
 import { PruneProviderJobLogsCommand } from "../provider-job-logs/prune-provider-job-logs.command";
@@ -75,10 +74,6 @@ const scheduledHistoryRetentionCommands: Partial<
   "audit-rows": {
     operationKey: "audit-events.prune",
     create: (input) => PruneAuditEventsCommand.create(input),
-  },
-  "deployment-logs": {
-    operationKey: "deployments.logs.prune",
-    create: (input) => PruneDeploymentLogsCommand.create(input),
   },
   "domain-event-streams": {
     operationKey: "domain-events.prune",

@@ -14,11 +14,11 @@ import {
   CreatedAt,
   Deployment,
   DeploymentId,
-  DeploymentLogEntry,
   DeploymentPhaseValue,
   DeploymentTargetDescriptor,
   DeploymentTargetId,
   DeploymentTargetName,
+  DeploymentTimelineJournalEntry,
   Destination,
   DestinationId,
   DestinationKindValue,
@@ -254,8 +254,8 @@ describe("postgres persistence integration", () => {
         exitCode: ExitCode.rehydrate(0),
         status: ExecutionStatusValue.rehydrate("succeeded"),
         retryable: false,
-        logs: [
-          DeploymentLogEntry.rehydrate({
+        timeline: [
+          DeploymentTimelineJournalEntry.rehydrate({
             timestamp: OccurredAt.rehydrate("2026-01-01T00:02:03.000Z"),
             phase: DeploymentPhaseValue.rehydrate("verify"),
             level: LogLevelValue.rehydrate("info"),
@@ -296,7 +296,7 @@ describe("postgres persistence integration", () => {
         isSecret: true,
       }),
     ]);
-    expect(deployments[0]?.logCount).toBe(1);
+    expect(deployments[0]?.timelineCount).toBe(1);
 
     await database.close();
   });

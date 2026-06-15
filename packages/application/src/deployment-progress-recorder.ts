@@ -1,9 +1,9 @@
 import {
   DeploymentByIdSpec,
   DeploymentId,
-  DeploymentLogEntry,
-  DeploymentLogSourceValue,
   DeploymentPhaseValue,
+  DeploymentTimelineJournalEntry,
+  DeploymentTimelineSourceValue,
   domainError,
   err,
   LogLevelValue,
@@ -28,7 +28,7 @@ export class NoopDeploymentProgressRecorder implements DeploymentProgressRecorde
   }
 }
 
-export class DeploymentLogProgressRecorder implements DeploymentProgressRecorder {
+export class DeploymentTimelineProgressRecorder implements DeploymentProgressRecorder {
   constructor(
     private readonly deploymentRepository: DeploymentRepository,
     private readonly logger?: AppLogger,
@@ -50,16 +50,16 @@ export class DeploymentLogProgressRecorder implements DeploymentProgressRecorder
       return err(domainError.notFound("deployment", event.deploymentId));
     }
 
-    const entry = DeploymentLogEntry.rehydrate({
+    const entry = DeploymentTimelineJournalEntry.rehydrate({
       timestamp: OccurredAt.rehydrate(event.timestamp),
-      source: DeploymentLogSourceValue.rehydrate(event.source),
+      source: DeploymentTimelineSourceValue.rehydrate(event.source),
       phase: DeploymentPhaseValue.rehydrate(event.phase),
       level: LogLevelValue.rehydrate(event.level),
       message: MessageText.rehydrate(event.message),
     });
     const entryState = entry.toState();
 
-    const alreadyRecorded = deployment.toState().logs.some((candidate) => {
+    const alreadyRecorded = deployment.toState().timeline.some((candidate) => {
       return (
         candidate.timestamp === entry.timestamp &&
         candidate.source === entry.source &&
@@ -73,7 +73,7 @@ export class DeploymentLogProgressRecorder implements DeploymentProgressRecorder
       return ok(undefined);
     }
 
-    deployment.appendLogs([entry]);
+    deployment.appendTimeline([entry]);
     const updateResult = await this.deploymentRepository.updateOne(
       repositoryContext,
       deployment,

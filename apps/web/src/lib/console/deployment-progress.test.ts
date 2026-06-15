@@ -1,29 +1,29 @@
 import {
   type CreateDeploymentInput,
-  type DeploymentEventStreamEnvelope,
   type DeploymentProgressEvent,
+  type DeploymentTimelineEnvelope,
 } from "@appaloft/contracts";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-const { eventsMock, eventsStreamMock } = vi.hoisted(() => ({
-  eventsMock: vi.fn(),
-  eventsStreamMock: vi.fn(),
+const { timelineMock, timelineStreamMock } = vi.hoisted(() => ({
+  timelineMock: vi.fn(),
+  timelineStreamMock: vi.fn(),
 }));
 
 vi.mock("$lib/orpc", () => ({
   orpcClient: {
     deployments: {
-      events: eventsMock,
-      eventsStream: eventsStreamMock,
+      timeline: timelineMock,
+      timelineStream: timelineStreamMock,
     },
   },
 }));
 
 import {
   createDeploymentWithProgress,
-  deploymentEventProgressEvents,
-  deploymentEventProgressStatus,
-  latestDeploymentEventCursor,
+  deploymentTimelineProgressEvents,
+  deploymentTimelineProgressStatus,
+  latestDeploymentTimelineCursor,
 } from "./deployment-progress";
 
 class MockEventSource {
@@ -79,55 +79,59 @@ describe("deployment progress helpers", () => {
     MockEventSource.instances.length = 0;
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
-    eventsMock.mockReset();
-    eventsStreamMock.mockReset();
+    timelineMock.mockReset();
+    timelineStreamMock.mockReset();
   });
 
   test("maps deployment event envelopes into progress events and status", () => {
-    const envelopes: DeploymentEventStreamEnvelope[] = [
+    const envelopes: DeploymentTimelineEnvelope[] = [
       {
-        schemaVersion: "deployments.stream-events/v1",
-        kind: "event",
-        event: {
+        schemaVersion: "deployments.timeline/v1",
+        kind: "entry",
+        entry: {
           deploymentId: "dep_demo",
           sequence: 1,
           cursor: "dep_demo:1",
-          emittedAt: "2026-01-01T00:00:01.000Z",
-          source: "progress-projection",
-          eventType: "deployment-requested",
+          occurredAt: "2026-01-01T00:00:01.000Z",
+          source: "appaloft",
+          kind: "lifecycle",
           phase: "detect",
-          summary: "Deployment requested",
+          level: "info",
+          message: "Deployment requested",
+          status: "running",
         },
       },
       {
-        schemaVersion: "deployments.stream-events/v1",
+        schemaVersion: "deployments.timeline/v1",
         kind: "heartbeat",
         at: "2026-01-01T00:00:02.000Z",
         cursor: "dep_demo:1",
       },
       {
-        schemaVersion: "deployments.stream-events/v1",
-        kind: "event",
-        event: {
+        schemaVersion: "deployments.timeline/v1",
+        kind: "entry",
+        entry: {
           deploymentId: "dep_demo",
           sequence: 2,
           cursor: "dep_demo:2",
-          emittedAt: "2026-01-01T00:00:03.000Z",
+          occurredAt: "2026-01-01T00:00:03.000Z",
           source: "domain-event",
-          eventType: "deployment-succeeded",
+          kind: "status",
           phase: "verify",
-          summary: "Deployment succeeded",
+          level: "info",
+          message: "Deployment succeeded",
+          status: "succeeded",
         },
       },
       {
-        schemaVersion: "deployments.stream-events/v1",
+        schemaVersion: "deployments.timeline/v1",
         kind: "closed",
         reason: "completed",
         cursor: "dep_demo:2",
       },
     ];
 
-    const progressEvents = deploymentEventProgressEvents(envelopes);
+    const progressEvents = deploymentTimelineProgressEvents(envelopes);
 
     expect(progressEvents).toHaveLength(2);
     expect(progressEvents[0]).toMatchObject({
@@ -142,8 +146,8 @@ describe("deployment progress helpers", () => {
       message: "Deployment succeeded",
       status: "succeeded",
     } satisfies Partial<DeploymentProgressEvent>);
-    expect(latestDeploymentEventCursor(envelopes)).toBe("dep_demo:2");
-    expect(deploymentEventProgressStatus(envelopes, "running")).toBe("succeeded");
+    expect(latestDeploymentTimelineCursor(envelopes)).toBe("dep_demo:2");
+    expect(deploymentTimelineProgressStatus(envelopes, "running")).toBe("succeeded");
   });
 
   test("hands off to deployment event replay and follow after create-time acceptance", async () => {
@@ -153,62 +157,62 @@ describe("deployment progress helpers", () => {
     const fetchMock = vi.fn(() => createResponse.promise);
     vi.stubGlobal("fetch", fetchMock);
 
-    eventsMock.mockResolvedValue({
+    timelineMock.mockResolvedValue({
+      schemaVersion: "deployments.timeline/v1",
       deploymentId: "dep_demo",
-      envelopes: [
+      hasMore: false,
+      entries: [
         {
-          schemaVersion: "deployments.stream-events/v1",
-          kind: "event",
-          event: {
-            deploymentId: "dep_demo",
-            sequence: 1,
-            cursor: "dep_demo:1",
-            emittedAt: "2026-01-01T00:00:01.000Z",
-            source: "progress-projection",
-            eventType: "deployment-requested",
-            phase: "detect",
-            summary: "Deployment requested",
-          },
+          deploymentId: "dep_demo",
+          sequence: 1,
+          cursor: "dep_demo:1",
+          occurredAt: "2026-01-01T00:00:01.000Z",
+          source: "appaloft",
+          kind: "lifecycle",
+          phase: "detect",
+          level: "info",
+          message: "Deployment requested",
+          status: "running",
         },
         {
-          schemaVersion: "deployments.stream-events/v1",
-          kind: "event",
-          event: {
-            deploymentId: "dep_demo",
-            sequence: 2,
-            cursor: "dep_demo:2",
-            emittedAt: "2026-01-01T00:00:02.000Z",
-            source: "progress-projection",
-            eventType: "build-requested",
-            phase: "plan",
-            summary: "Build requested",
-          },
+          deploymentId: "dep_demo",
+          sequence: 2,
+          cursor: "dep_demo:2",
+          occurredAt: "2026-01-01T00:00:02.000Z",
+          source: "appaloft",
+          kind: "step",
+          phase: "plan",
+          level: "info",
+          message: "Build requested",
+          status: "running",
         },
       ],
     });
 
-    eventsStreamMock.mockResolvedValue(
+    timelineStreamMock.mockResolvedValue(
       (async function* () {
         yield {
-          schemaVersion: "deployments.stream-events/v1",
-          kind: "event",
-          event: {
+          schemaVersion: "deployments.timeline/v1",
+          kind: "entry",
+          entry: {
             deploymentId: "dep_demo",
             sequence: 3,
             cursor: "dep_demo:3",
-            emittedAt: "2026-01-01T00:00:03.000Z",
+            occurredAt: "2026-01-01T00:00:03.000Z",
             source: "domain-event",
-            eventType: "deployment-succeeded",
+            kind: "status",
             phase: "verify",
-            summary: "Deployment succeeded",
+            level: "info",
+            message: "Deployment succeeded",
+            status: "succeeded",
           },
-        } satisfies DeploymentEventStreamEnvelope;
+        } satisfies DeploymentTimelineEnvelope;
         yield {
-          schemaVersion: "deployments.stream-events/v1",
+          schemaVersion: "deployments.timeline/v1",
           kind: "closed",
           reason: "completed",
           cursor: "dep_demo:3",
-        } satisfies DeploymentEventStreamEnvelope;
+        } satisfies DeploymentTimelineEnvelope;
       })(),
     );
 
@@ -268,16 +272,13 @@ describe("deployment progress helpers", () => {
     await expect(resultPromise).resolves.toEqual({ id: "dep_demo" });
     expect(traceLinkSpy).toHaveBeenCalledWith("http://localhost:16686/trace/abc123");
 
-    expect(eventsMock).toHaveBeenCalledWith({
+    expect(timelineMock).toHaveBeenCalledWith({
       deploymentId: "dep_demo",
-      historyLimit: 100,
-      includeHistory: true,
-      follow: false,
-      untilTerminal: true,
+      limit: 100,
     });
-    expect(eventsStreamMock).toHaveBeenCalledWith({
+    expect(timelineStreamMock).toHaveBeenCalledWith({
       deploymentId: "dep_demo",
-      historyLimit: 0,
+      limit: 0,
       includeHistory: false,
       follow: true,
       untilTerminal: true,

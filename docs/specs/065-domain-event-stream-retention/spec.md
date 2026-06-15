@@ -69,9 +69,9 @@ history, process delivery state, logs, snapshots, runtime artifacts, or business
   as the canonical first retention target.
 - Published deployment domain events are recorded into retained event observation rows after the
   owning deployment event is published from durable application state.
-- `deployments.stream-events` prefers retained observation rows for bounded replay, pruned-cursor
-  gap detection, and follow-mode cursor continuation. The legacy embedded deployment-log and live
-  progress observer path remains a fallback for streams without retained rows.
+- Domain-event retention no longer owns deployment observation. ADR-084 selects the Deployment
+  Timeline Journal as the source for deployment replay/follow behavior. Retained domain-event rows
+  remain available for domain-event retention, pruning, and diagnostics.
 - Organization retention defaults and scheduled history retention automation are separate
   implemented Phase 9 slices. ADR-054 defines durable process attempts as the current
   outbox/inbox-equivalent baseline, so accepted background-work retention is covered by
@@ -80,7 +80,7 @@ history, process delivery state, logs, snapshots, runtime artifacts, or business
 
 ## Open Questions And Deferred Gaps
 
-- Historical embedded deployment logs are not backfilled into retained stream rows in this slice;
-  streams without retained rows continue using the legacy observer fallback.
-- Future read surfaces beyond `deployments.stream-events` must document their retained event
-  observation source before consuming the store.
+- Historical embedded deployment logs are not backfilled. The deployment timeline Code Round may
+  drop old embedded log data and old deployment event observation rows.
+- Future read surfaces must document whether they consume retained domain events directly or
+  consume Deployment Timeline Journal entries.

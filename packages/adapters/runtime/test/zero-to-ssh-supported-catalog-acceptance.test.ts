@@ -20,7 +20,7 @@ import {
   SourcePackageManagerValue,
   SourceRuntimeFamilyValue,
   type Deployment,
-  type DeploymentLogEntry,
+  type DeploymentTimelineJournalEntry,
   type Result,
   type RollbackPlan,
   type SourceApplicationShape,
@@ -219,8 +219,8 @@ class HermeticExecutionBackend implements ExecutionBackend {
   async cancel(
     _context: Parameters<ExecutionBackend["cancel"]>[0],
     _deployment: Deployment,
-  ): Promise<Result<{ logs: DeploymentLogEntry[] }>> {
-    return ok({ logs: [] });
+  ): Promise<Result<{ timeline: DeploymentTimelineJournalEntry[] }>> {
+    return ok({ timeline: [] });
   }
 
   async rollback(
@@ -921,7 +921,7 @@ describe("Zero-to-SSH supported catalog acceptance harness", () => {
           port: descriptor.profileDraft.network.internalPort,
           source: "resource-health-observation",
         },
-        logs: {
+        timeline: {
           capability: "runtime.logs",
           source: "resources.runtime-logs",
         },
@@ -932,7 +932,7 @@ describe("Zero-to-SSH supported catalog acceptance harness", () => {
       };
 
       expect(observation.health.port).toBe(preview.network.internalPort);
-      expect(observation.logs.capability).toBe("runtime.logs");
+      expect(observation.timeline.capability).toBe("runtime.logs");
       expect(observation.access.source).toBe("resource-access-summary");
     });
   }

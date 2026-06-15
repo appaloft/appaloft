@@ -1,8 +1,8 @@
 import {
   type Deployment,
   type DeploymentId,
-  DeploymentLogEntry,
   DeploymentPhaseValue,
+  DeploymentTimelineJournalEntry,
   type DomainError,
   ErrorCodeText,
   ExecutionResult,
@@ -75,13 +75,13 @@ export class DeploymentLifecycleService {
   cancelForSupersede(
     deployment: Deployment,
     supersededByDeploymentId: DeploymentId,
-    logs: DeploymentLogEntry[] = [],
+    timeline: DeploymentTimelineJournalEntry[] = [],
   ): Result<void> {
     const { clock } = this;
 
     return safeTry(function* () {
       const finishedAt = yield* FinishedAt.create(clock.now());
-      const cancelResult = deployment.cancel(finishedAt, logs, {
+      const cancelResult = deployment.cancel(finishedAt, timeline, {
         supersededByDeploymentId,
       });
       yield* cancelResult;
@@ -100,12 +100,12 @@ export class DeploymentLifecycleService {
     });
   }
 
-  cancel(deployment: Deployment, logs: DeploymentLogEntry[] = []): Result<void> {
+  cancel(deployment: Deployment, timeline: DeploymentTimelineJournalEntry[] = []): Result<void> {
     const { clock } = this;
 
     return safeTry(function* () {
       const finishedAt = yield* FinishedAt.create(clock.now());
-      const cancelResult = deployment.cancel(finishedAt, logs);
+      const cancelResult = deployment.cancel(finishedAt, timeline);
       yield* cancelResult;
       return ok(undefined);
     });
@@ -124,8 +124,8 @@ export class DeploymentLifecycleService {
         exitCode: ExitCode.rehydrate(1),
         retryable: error.retryable,
         errorCode: ErrorCodeText.rehydrate(error.code),
-        logs: [
-          DeploymentLogEntry.rehydrate({
+        timeline: [
+          DeploymentTimelineJournalEntry.rehydrate({
             timestamp: OccurredAt.rehydrate(clock.now()),
             phase: DeploymentPhaseValue.rehydrate(logPhaseForFailurePhase(phase)),
             level: LogLevelValue.rehydrate("error"),

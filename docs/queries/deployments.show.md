@@ -20,7 +20,7 @@ It is read-only. It must not:
 - create, retry, redeploy, cancel, clean up, or roll back deployments;
 - mutate resources, source links, routes, domains, certificates, or server state;
 - replace `resources.health` as the source of current resource health;
-- replace `deployments.logs` as the full attempt-log query;
+- replace `deployments.timeline` as the full attempt observation query;
 - turn the create-time progress stream into a hidden business command.
 
 ```ts
@@ -166,7 +166,7 @@ It must not:
 Current resource health remains `resources.health`.
 Current public access summary remains resource-scoped through `ResourceAccessSummary` and
 resource/detail queries.
-Detailed attempt logs remain `deployments.logs`.
+Full attempt observation remains `deployments.timeline`.
 
 Dependency binding snapshot references remain deployment-attempt-owned history. They must not be
 recomputed from current `ResourceBinding` state during `deployments.show`, and they must not expose
@@ -215,9 +215,8 @@ It must not:
 `deployments.show` is active in the operation catalog, CLI, HTTP/oRPC, and Web deployment detail
 path.
 
-Timeline/watch behavior remains intentionally separate from this query and is governed by accepted
-candidate `deployments.stream-events`. `deployments.logs` remains the separate attempt-log
-operation.
+Timeline replay/follow behavior remains intentionally separate from this query and is governed by
+`deployments.timeline` and `deployments.timeline.stream`.
 
 Deployment recovery readiness is active under ADR-034. `deployments.show` keeps recovery write
 actions out of `nextActions`; when `includeRecoverySummary` is requested, its compact recovery
@@ -231,5 +230,5 @@ reference.
 
 ## Open Questions
 
-- Should `deployments.show` keep only a recent summary once `deployments.stream-events` becomes
+- Should `deployments.show` keep only a recent summary once `deployments.timeline.stream` becomes
   active, or should it continue exposing a bounded recent timeline section for overview screens?

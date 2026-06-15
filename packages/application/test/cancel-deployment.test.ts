@@ -7,11 +7,11 @@ import {
   CreatedAt,
   Deployment,
   DeploymentId,
-  DeploymentLogEntry,
   DeploymentPhaseValue,
   DeploymentStatusValue,
   DeploymentTargetDescriptor,
   DeploymentTargetId,
+  DeploymentTimelineJournalEntry,
   DeploymentTriggerKindValue,
   DestinationId,
   DetectSummary,
@@ -62,11 +62,11 @@ class RecordingExecutionBackend implements ExecutionBackend {
   async cancel(
     _context: ExecutionContext,
     deployment: Deployment,
-  ): Promise<Result<{ logs: DeploymentLogEntry[] }>> {
+  ): Promise<Result<{ timeline: DeploymentTimelineJournalEntry[] }>> {
     this.canceledDeploymentIds.push(deployment.toState().id.value);
     return ok({
-      logs: [
-        DeploymentLogEntry.rehydrate({
+      timeline: [
+        DeploymentTimelineJournalEntry.rehydrate({
           timestamp: OccurredAt.rehydrate("2026-01-01T00:00:15.000Z"),
           phase: DeploymentPhaseValue.rehydrate("deploy"),
           level: LogLevelValue.rehydrate("warn"),
@@ -123,7 +123,7 @@ function deployment(status: "planned" | "running" | "succeeded") {
       variables: [],
     }),
     dependencyBindingReferences: [],
-    logs: [],
+    timeline: [],
     createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
     ...(status === "running" ? { startedAt: StartedAt.rehydrate("2026-01-01T00:00:02.000Z") } : {}),
     triggerKind: DeploymentTriggerKindValue.createDefault(),
@@ -176,7 +176,7 @@ describe("CancelDeploymentUseCase", () => {
     const stored = repository.items.get("dep_cancel")?.toState();
     expect(stored?.status.value).toBe("canceled");
     expect(stored?.finishedAt?.value).toBe("2026-01-01T00:00:15.000Z");
-    expect(stored?.logs.map((log) => log.toState().message.value)).toContain(
+    expect(stored?.timeline.map((log) => log.toState().message.value)).toContain(
       "Runtime cancellation requested",
     );
     expect(eventBus.events.map((event) => (event as { type: string }).type)).toEqual([

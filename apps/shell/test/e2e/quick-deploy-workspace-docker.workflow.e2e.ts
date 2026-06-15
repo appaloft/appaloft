@@ -13,8 +13,8 @@ import {
   runDocker,
   runShellCli,
   usesExternalServer,
-  waitForDeploymentLogs,
   waitForDeploymentSucceeded,
+  waitForDeploymentTimeline,
 } from "./support/shell-e2e-fixture";
 
 const fixtureDir = fixturePath("workspace-http-app");
@@ -111,19 +111,19 @@ describe("quick deploy workspace Docker workflow e2e", () => {
       deploymentId = parseJson<{ id: string }>(deployment.stdout).id;
       await waitForDeploymentSucceeded(deploymentId, workspace.cliOptions);
 
-      const logs = await waitForDeploymentLogs(
+      const timeline = await waitForDeploymentTimeline(
         deploymentId,
         workspace.cliOptions,
         ["Generated workspace Dockerfile", "Container is reachable"],
         { label: "workspace Docker deployment" },
       );
-      expect(logs.stdout).toContain("Generated workspace Dockerfile");
-      expect(logs.stdout).toContain("Container is reachable");
+      expect(timeline.stdout).toContain("Generated workspace Dockerfile");
+      expect(timeline.stdout).toContain("Container is reachable");
       const runtimeUrl = /Container is reachable at (http:\/\/127\.0\.0\.1:\d+\/health)/u.exec(
-        logs.stdout,
+        timeline.stdout,
       )?.[1];
       if (!runtimeUrl) {
-        throw new Error(`Could not find runtime health URL in logs:\n${logs.stdout}`);
+        throw new Error(`Could not find runtime health URL in timeline:\n${timeline.stdout}`);
       }
 
       await waitForHealth(runtimeUrl);
@@ -165,7 +165,7 @@ describe("quick deploy workspace Docker workflow e2e", () => {
         ]),
       );
 
-      expect(logs.stdout).toContain("docker build");
+      expect(timeline.stdout).toContain("docker build");
     } finally {
       cleanupLocalDockerDeployment(deploymentId);
       cleanupWorkspace(workspace.workspaceDir);

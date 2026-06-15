@@ -26,8 +26,8 @@ import {
   type ResourceAccessFailureRendererTarget,
 } from "@appaloft/application";
 import {
-  DeploymentLogEntry,
-  DeploymentLogSourceValue,
+  DeploymentTimelineJournalEntry,
+  DeploymentTimelineSourceValue,
   DeploymentPhaseValue,
   domainError,
   ErrorCodeText,
@@ -124,10 +124,10 @@ function phaseLog(
   message: string,
   level: LogLevel = "info",
   source: LogSource = "appaloft",
-): DeploymentLogEntry {
-  return DeploymentLogEntry.rehydrate({
+): DeploymentTimelineJournalEntry {
+  return DeploymentTimelineJournalEntry.rehydrate({
     timestamp: OccurredAt.rehydrate(new Date().toISOString()),
-    source: DeploymentLogSourceValue.rehydrate(source),
+    source: DeploymentTimelineSourceValue.rehydrate(source),
     phase: DeploymentPhaseValue.rehydrate(phase),
     level: LogLevelValue.rehydrate(level),
     message: MessageText.rehydrate(message),
@@ -625,7 +625,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
   }
 
   private pushOutputLog(
-    logs: DeploymentLogEntry[],
+    timeline: DeploymentTimelineJournalEntry[],
     input: {
       context: ExecutionContext;
       deploymentId: string;
@@ -649,7 +649,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       return input.persistedCount;
     }
 
-    logs.push(phaseLog(input.phase, input.line, input.level, "application"));
+    timeline.push(phaseLog(input.phase, input.line, input.level, "application"));
     return input.persistedCount + 1;
   }
 
@@ -685,7 +685,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
   }
 
   private pushCommandOutput(
-    logs: DeploymentLogEntry[],
+    timeline: DeploymentTimelineJournalEntry[],
     input: {
       context: ExecutionContext;
       deploymentId: string;
@@ -702,7 +702,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       .split(/\r?\n/)
       .map((outputLine) => outputLine.trim())
       .filter((outputLine) => outputLine.length > 0)) {
-      persistedCount = this.pushOutputLog(logs, {
+      persistedCount = this.pushOutputLog(timeline, {
         context: input.context,
         deploymentId: input.deploymentId,
         phase: input.phase,
@@ -717,14 +717,14 @@ export class LocalExecutionBackend implements ExecutionBackend {
   private applyFailure(
     deployment: Deployment,
     input: {
-      logs: DeploymentLogEntry[];
+      timeline: DeploymentTimelineJournalEntry[];
       errorCode: string;
       retryable?: boolean;
       metadata?: Record<string, string>;
     },
   ): { deployment: Deployment } {
     const failureFields = runtimeTargetCapacityAwareFailureFields({
-      logs: input.logs,
+      timeline: input.timeline,
       errorCode: input.errorCode,
       ...(input.metadata ? { metadata: input.metadata } : {}),
       serverId: requireServerBackedDeploymentState(
@@ -737,7 +737,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       ExecutionResult.rehydrate({
         exitCode: ExitCode.rehydrate(1),
         status: ExecutionStatusValue.rehydrate("failed"),
-        logs: input.logs,
+        timeline: input.timeline,
         retryable: input.retryable ?? false,
         errorCode: ErrorCodeText.rehydrate(failureFields.errorCode),
         ...(failureFields.metadata ? { metadata: failureFields.metadata } : {}),
@@ -748,7 +748,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
   }
 
   private async pushDockerContainerDiagnostics(
-    logs: DeploymentLogEntry[],
+    timeline: DeploymentTimelineJournalEntry[],
     input: {
       context: ExecutionContext;
       deploymentId: string;
@@ -760,7 +760,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     const format =
       "status={{.State.Status}} exitCode={{.State.ExitCode}} error={{.State.Error}} oomKilled={{.State.OOMKilled}} finishedAt={{.State.FinishedAt}}";
     const inspectMessage = `Inspect Docker container ${input.containerName}`;
-    logs.push(phaseLog("verify", inspectMessage));
+    timeline.push(phaseLog("verify", inspectMessage));
     await this.report(input.context, {
       deploymentId: input.deploymentId,
       phase: "verify",
@@ -773,7 +773,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       cwd: input.workdir,
       env: input.env,
     });
-    this.pushCommandOutput(logs, {
+    this.pushCommandOutput(timeline, {
       context: input.context,
       deploymentId: input.deploymentId,
       phase: "verify",
@@ -781,7 +781,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       level: inspect.failed ? "warn" : "info",
       stream: "stdout",
     });
-    this.pushCommandOutput(logs, {
+    this.pushCommandOutput(timeline, {
       context: input.context,
       deploymentId: input.deploymentId,
       phase: "verify",
@@ -791,7 +791,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     });
 
     const logsMessage = `Capture Docker logs for ${input.containerName}`;
-    logs.push(phaseLog("verify", logsMessage));
+    timeline.push(phaseLog("verify", logsMessage));
     await this.report(input.context, {
       deploymentId: input.deploymentId,
       phase: "verify",
@@ -804,7 +804,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       cwd: input.workdir,
       env: input.env,
     });
-    this.pushCommandOutput(logs, {
+    this.pushCommandOutput(timeline, {
       context: input.context,
       deploymentId: input.deploymentId,
       phase: "verify",
@@ -812,7 +812,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       level: "info",
       stream: "stdout",
     });
-    this.pushCommandOutput(logs, {
+    this.pushCommandOutput(timeline, {
       context: input.context,
       deploymentId: input.deploymentId,
       phase: "verify",
@@ -822,7 +822,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     });
 
     if (inspect.failed && !inspect.stdout && !inspect.stderr) {
-      logs.push(
+      timeline.push(
         phaseLog(
           "verify",
           `Docker inspect did not return diagnostics for ${input.containerName}`,
@@ -832,7 +832,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     }
 
     if (dockerLogs.failed && !dockerLogs.stdout && !dockerLogs.stderr) {
-      logs.push(
+      timeline.push(
         phaseLog(
           "verify",
           `Docker logs did not return application output for ${input.containerName}`,
@@ -849,7 +849,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
   private async prepareLocalSource(
     context: ExecutionContext,
     deployment: Deployment,
-    logs: DeploymentLogEntry[],
+    timeline: DeploymentTimelineJournalEntry[],
     input: {
       runtimeDir: string;
       env: NodeJS.ProcessEnv;
@@ -884,11 +884,11 @@ export class LocalExecutionBackend implements ExecutionBackend {
       const content = source.metadata?.content;
       if (!content) {
         const message = `${source.kind} source requires inline content metadata`;
-        logs.push(phaseLog("package", message, "error"));
+        timeline.push(phaseLog("package", message, "error"));
         return {
           prepared: false,
           deployment: this.applyFailure(deployment, {
-            logs,
+            timeline,
             errorCode: "inline_source_content_missing",
             retryable: false,
             metadata: {
@@ -949,7 +949,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       ...(tokenizedGithubHttpsPrefix ? [tokenizedGithubHttpsPrefix] : []),
     ];
 
-    logs.push(phaseLog("package", `Clone remote git source into ${sourceDir}`));
+    timeline.push(phaseLog("package", `Clone remote git source into ${sourceDir}`));
     await this.report(context, {
       deploymentId: state.id.value,
       phase: "package",
@@ -972,7 +972,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       env: input.env,
       redactions,
     });
-    this.pushCommandOutput(logs, {
+    this.pushCommandOutput(timeline, {
       context,
       deploymentId: state.id.value,
       phase: "package",
@@ -981,7 +981,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       stream: "stdout",
       redactions,
     });
-    this.pushCommandOutput(logs, {
+    this.pushCommandOutput(timeline, {
       context,
       deploymentId: state.id.value,
       phase: "package",
@@ -995,7 +995,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       const message = clone.reason
         ? `Remote git clone failed: ${clone.reason}`
         : `Remote git clone failed with exit code ${clone.exitCode}`;
-      logs.push(phaseLog("package", message, "error"));
+      timeline.push(phaseLog("package", message, "error"));
       await this.report(context, {
         deploymentId: state.id.value,
         phase: "package",
@@ -1007,7 +1007,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       return {
         prepared: false,
         deployment: this.applyFailure(deployment, {
-          logs,
+          timeline,
           errorCode: "remote_git_clone_failed",
           retryable: true,
           metadata: {
@@ -1018,7 +1018,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       };
     }
 
-    logs.push(phaseLog("package", `Initialize git submodules in ${sourceDir}`));
+    timeline.push(phaseLog("package", `Initialize git submodules in ${sourceDir}`));
     await this.report(context, {
       deploymentId: state.id.value,
       phase: "package",
@@ -1035,7 +1035,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       env: input.env,
       redactions,
     });
-    this.pushCommandOutput(logs, {
+    this.pushCommandOutput(timeline, {
       context,
       deploymentId: state.id.value,
       phase: "package",
@@ -1044,7 +1044,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       stream: "stdout",
       redactions,
     });
-    this.pushCommandOutput(logs, {
+    this.pushCommandOutput(timeline, {
       context,
       deploymentId: state.id.value,
       phase: "package",
@@ -1058,7 +1058,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       const message = submodule.reason
         ? `Remote git submodule update failed: ${submodule.reason}`
         : `Remote git submodule update failed with exit code ${submodule.exitCode}`;
-      logs.push(phaseLog("package", message, "error"));
+      timeline.push(phaseLog("package", message, "error"));
       await this.report(context, {
         deploymentId: state.id.value,
         phase: "package",
@@ -1070,7 +1070,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       return {
         prepared: false,
         deployment: this.applyFailure(deployment, {
-          logs,
+          timeline,
           errorCode: "remote_git_submodule_update_failed",
           retryable: true,
           metadata: {
@@ -1095,7 +1095,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
           ? `Remote git commit resolution failed: ${commit.reason}`
           : `Remote git commit resolution failed with exit code ${commit.exitCode}`
         : "Remote git commit resolution returned an invalid object id";
-      logs.push(phaseLog("package", message, "error"));
+      timeline.push(phaseLog("package", message, "error"));
       await this.report(context, {
         deploymentId: state.id.value,
         phase: "package",
@@ -1107,7 +1107,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       return {
         prepared: false,
         deployment: this.applyFailure(deployment, {
-          logs,
+          timeline,
           errorCode: "remote_git_commit_resolution_failed",
           retryable: true,
           metadata: {
@@ -1120,7 +1120,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     }
 
     const commitMessage = `Resolved git commit ${shortGitCommitSha(commitSha)}`;
-    logs.push(phaseLog("package", commitMessage));
+    timeline.push(phaseLog("package", commitMessage));
     await this.report(context, {
       deploymentId: state.id.value,
       phase: "package",
@@ -1169,10 +1169,10 @@ export class LocalExecutionBackend implements ExecutionBackend {
       return err(packageEnv.error);
     }
     const { env, redactions } = packageEnv.value;
-    const logs: DeploymentLogEntry[] = [
+    const timeline: DeploymentTimelineJournalEntry[] = [
       phaseLog("plan", "Using local host-process execution"),
     ];
-    const preparedSource = await this.prepareLocalSource(context, deployment, logs, {
+    const preparedSource = await this.prepareLocalSource(context, deployment, timeline, {
       runtimeDir,
       env,
       fallbackWorkdir: normalizeWorkingDirectory(
@@ -1185,7 +1185,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     }
 
     const workdir = preparedSource.workdir;
-    logs.push(phaseLog("plan", `Host process working directory: ${workdir}`));
+    timeline.push(phaseLog("plan", `Host process working directory: ${workdir}`));
     const hasWorkspacePreparation = Boolean(
       state.runtimePlan.execution.installCommand || state.runtimePlan.execution.buildCommand,
     );
@@ -1199,7 +1199,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         return true;
       }
 
-      logs.push(phaseLog(phase, `${label}: ${command}`));
+      timeline.push(phaseLog(phase, `${label}: ${command}`));
       await this.report(context, {
         deploymentId: state.id.value,
         phase,
@@ -1213,7 +1213,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         env,
         redactions,
         onOutput: (line, level, stream) => {
-          persistedCount = this.pushOutputLog(logs, {
+          persistedCount = this.pushOutputLog(timeline, {
             context,
             deploymentId: state.id.value,
             phase,
@@ -1241,7 +1241,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         result.reason
           ? `${label} failed: ${result.reason}`
           : `${label} failed with exit code ${result.exitCode}`;
-      logs.push(phaseLog(phase, message, "error"));
+      timeline.push(phaseLog(phase, message, "error"));
       await this.report(context, {
         deploymentId: state.id.value,
         phase,
@@ -1255,7 +1255,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     if (!(await maybeRun("package", state.runtimePlan.execution.installCommand, "Install command"))) {
       return ok({
         deployment: this.applyFailure(deployment, {
-          logs,
+          timeline,
           errorCode: "local_install_failed",
           metadata: {
             workdir,
@@ -1267,7 +1267,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     if (!(await maybeRun("package", state.runtimePlan.execution.buildCommand, "Build command"))) {
       return ok({
         deployment: this.applyFailure(deployment, {
-          logs,
+          timeline,
           errorCode: "local_build_failed",
           metadata: {
             workdir,
@@ -1297,8 +1297,8 @@ export class LocalExecutionBackend implements ExecutionBackend {
       });
       return ok({
         deployment: this.applyFailure(deployment, {
-          logs: [
-            ...logs,
+          timeline: [
+            ...timeline,
             phaseLog("deploy", message, "error"),
           ],
           errorCode: "missing_start_command",
@@ -1309,7 +1309,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       });
     }
 
-    logs.push(phaseLog("deploy", `Start command: ${startCommand}`));
+    timeline.push(phaseLog("deploy", `Start command: ${startCommand}`));
     const runtimeEnv = await resolveDependencyRuntimeEnvironment({
       context,
       deployment,
@@ -1329,10 +1329,10 @@ export class LocalExecutionBackend implements ExecutionBackend {
     });
     const logTailer = new AppLogTailer(logPath, (line) => {
       const redactedLine = redactSecrets(line, startRedactions);
-      const persistedCount = logs.filter(
+      const persistedCount = timeline.filter(
         (log) => log.source === "application" && log.phase === "deploy",
       ).length;
-      this.pushOutputLog(logs, {
+      this.pushOutputLog(timeline, {
         context,
         deploymentId: state.id.value,
         phase: "deploy",
@@ -1374,14 +1374,14 @@ export class LocalExecutionBackend implements ExecutionBackend {
         status: "succeeded",
         message: "Health check disabled for resource",
       });
-      logs.push(phaseLog("verify", "Health check disabled for resource"));
+      timeline.push(phaseLog("verify", "Health check disabled for resource"));
       deployment.applyExecutionResult(
         FinishedAt.rehydrate(new Date().toISOString()),
         ExecutionResult.rehydrate({
           exitCode: ExitCode.rehydrate(0),
           status: ExecutionStatusValue.rehydrate("succeeded"),
           retryable: false,
-          logs,
+          timeline,
           metadata: {
             workdir,
             port: String(port),
@@ -1414,8 +1414,8 @@ export class LocalExecutionBackend implements ExecutionBackend {
       });
       return ok({
         deployment: this.applyFailure(deployment, {
-          logs: [
-            ...logs,
+          timeline: [
+            ...timeline,
             phaseLog("verify", message, "error"),
           ],
           errorCode: "local_health_check_failed",
@@ -1432,7 +1432,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     }
 
     const message = `Application is reachable at ${url}`;
-    logs.push(phaseLog("verify", message));
+    timeline.push(phaseLog("verify", message));
     await this.report(context, {
       deploymentId: state.id.value,
       phase: "verify",
@@ -1443,7 +1443,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       exitCode: ExitCode.rehydrate(0),
       status: ExecutionStatusValue.rehydrate("succeeded"),
       retryable: false,
-      logs,
+      timeline,
       metadata: {
         workdir,
         logPath,
@@ -1482,10 +1482,10 @@ export class LocalExecutionBackend implements ExecutionBackend {
       return err(packageEnv.error);
     }
     const { env } = packageEnv.value;
-    const logs: DeploymentLogEntry[] = [
+    const timeline: DeploymentTimelineJournalEntry[] = [
       phaseLog("plan", "Using local docker-container execution"),
     ];
-    const preparedSource = await this.prepareLocalSource(context, deployment, logs, {
+    const preparedSource = await this.prepareLocalSource(context, deployment, timeline, {
       runtimeDir,
       env,
       fallbackWorkdir: normalizeWorkingDirectory(
@@ -1498,7 +1498,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     }
 
     const workdir = preparedSource.workdir;
-    logs.push(phaseLog("plan", `Docker working directory: ${workdir}`));
+    timeline.push(phaseLog("plan", `Docker working directory: ${workdir}`));
     await this.report(context, {
       deploymentId: state.id.value,
       phase: "package",
@@ -1523,8 +1523,8 @@ export class LocalExecutionBackend implements ExecutionBackend {
       });
       return ok({
         deployment: this.applyFailure(deployment, {
-          logs: [
-            ...logs,
+          timeline: [
+            ...timeline,
             phaseLog("deploy", message, "error"),
           ],
           errorCode: "docker_unavailable",
@@ -1578,8 +1578,8 @@ export class LocalExecutionBackend implements ExecutionBackend {
             });
             return ok({
               deployment: this.applyFailure(deployment, {
-                logs: [
-                  ...logs,
+                timeline: [
+                  ...timeline,
                   phaseLog("package", message, "error"),
                 ],
                 errorCode: "workspace_start_command_missing",
@@ -1606,8 +1606,8 @@ export class LocalExecutionBackend implements ExecutionBackend {
             });
             return ok({
               deployment: this.applyFailure(deployment, {
-                logs: [
-                  ...logs,
+                timeline: [
+                  ...timeline,
                   phaseLog("package", message, "error"),
                 ],
                 errorCode: "workspace_docker_asset_write_failed",
@@ -1616,7 +1616,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
             });
           }
 
-          logs.push(phaseLog("package", `Generated workspace Dockerfile at ${dockerfilePath}`));
+          timeline.push(phaseLog("package", `Generated workspace Dockerfile at ${dockerfilePath}`));
         }
 
         if (state.runtimePlan.buildStrategy === "static-artifact") {
@@ -1637,8 +1637,8 @@ export class LocalExecutionBackend implements ExecutionBackend {
             });
             return ok({
               deployment: this.applyFailure(deployment, {
-                logs: [
-                  ...logs,
+                timeline: [
+                  ...timeline,
                   phaseLog("package", message, "error"),
                 ],
                 errorCode: "static_dockerfile_generation_failed",
@@ -1665,8 +1665,8 @@ export class LocalExecutionBackend implements ExecutionBackend {
             });
             return ok({
               deployment: this.applyFailure(deployment, {
-                logs: [
-                  ...logs,
+                timeline: [
+                  ...timeline,
                   phaseLog("package", message, "error"),
                 ],
                 errorCode: "static_docker_asset_write_failed",
@@ -1675,7 +1675,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
             });
           }
 
-          logs.push(phaseLog("package", `Generated static site Dockerfile at ${dockerfilePath}`));
+          timeline.push(phaseLog("package", `Generated static site Dockerfile at ${dockerfilePath}`));
         }
 
         const buildCommand = renderRuntimeCommandString(
@@ -1687,7 +1687,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
           }),
           { quote: shellQuote },
         );
-        logs.push(phaseLog("package", buildCommand));
+        timeline.push(phaseLog("package", buildCommand));
         await this.report(context, {
           deploymentId: state.id.value,
           phase: "package",
@@ -1699,7 +1699,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
           cwd: workdir,
           env,
         });
-        this.pushCommandOutput(logs, {
+        this.pushCommandOutput(timeline, {
           context,
           deploymentId: state.id.value,
           phase: "package",
@@ -1707,7 +1707,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
           level: "info",
           stream: "stdout",
         });
-        this.pushCommandOutput(logs, {
+        this.pushCommandOutput(timeline, {
           context,
           deploymentId: state.id.value,
           phase: "package",
@@ -1721,12 +1721,12 @@ export class LocalExecutionBackend implements ExecutionBackend {
           const failureSummary = summarizeCommandFailureOutput(build);
           const failureLogs = failureSummary
             ? [
-                ...logs,
+                ...timeline,
                 phaseLog("package", `${message}: ${failureSummary}`, "error", "application"),
                 phaseLog("package", message, "error"),
               ]
             : [
-                ...logs,
+                ...timeline,
                 phaseLog("package", message, "error"),
               ];
           await this.report(context, {
@@ -1738,7 +1738,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
           });
           return ok({
             deployment: this.applyFailure(deployment, {
-              logs: failureLogs,
+              timeline: failureLogs,
               errorCode: "docker_build_failed",
               metadata: {
                 dockerBuildExitCode: String(build.exitCode),
@@ -1765,8 +1765,8 @@ export class LocalExecutionBackend implements ExecutionBackend {
       });
       return ok({
         deployment: this.applyFailure(deployment, {
-          logs: [
-            ...logs,
+          timeline: [
+            ...timeline,
             phaseLog("package", message, "error"),
           ],
           errorCode: "missing_docker_image",
@@ -1802,10 +1802,10 @@ export class LocalExecutionBackend implements ExecutionBackend {
       : ok(null);
     if (proxyBootstrapResult.isErr()) {
       const message = "Edge proxy provider could not render an ensure plan";
-      logs.push(phaseLog("deploy", message, "error"));
+      timeline.push(phaseLog("deploy", message, "error"));
       return ok({
         deployment: this.applyFailure(deployment, {
-          logs,
+          timeline,
           errorCode: proxyBootstrapResult.error.code,
           retryable: proxyBootstrapResult.error.retryable,
           metadata: {
@@ -1818,7 +1818,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     const proxyBootstrap = proxyBootstrapResult.value;
     if (proxyBootstrap) {
       const proxyMessage = `Ensure ${proxyBootstrap.displayName} edge proxy on Docker network ${proxyBootstrap.networkName}`;
-      logs.push(phaseLog("deploy", proxyMessage));
+      timeline.push(phaseLog("deploy", proxyMessage));
       await this.report(context, {
         deploymentId: state.id.value,
         phase: "deploy",
@@ -1831,7 +1831,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         cwd: workdir,
         env,
       });
-      this.pushCommandOutput(logs, {
+      this.pushCommandOutput(timeline, {
         context,
         deploymentId: state.id.value,
         phase: "deploy",
@@ -1839,7 +1839,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         level: "info",
         stream: "stdout",
       });
-      this.pushCommandOutput(logs, {
+      this.pushCommandOutput(timeline, {
         context,
         deploymentId: state.id.value,
         phase: "deploy",
@@ -1853,7 +1853,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         cwd: workdir,
         env,
       });
-      this.pushCommandOutput(logs, {
+      this.pushCommandOutput(timeline, {
         context,
         deploymentId: state.id.value,
         phase: "deploy",
@@ -1861,7 +1861,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         level: "info",
         stream: "stdout",
       });
-      this.pushCommandOutput(logs, {
+      this.pushCommandOutput(timeline, {
         context,
         deploymentId: state.id.value,
         phase: "deploy",
@@ -1890,8 +1890,8 @@ export class LocalExecutionBackend implements ExecutionBackend {
         });
         return ok({
           deployment: this.applyFailure(deployment, {
-            logs: [
-              ...logs,
+            timeline: [
+              ...timeline,
               phaseLog("deploy", message, "error"),
             ],
             errorCode: failure.errorCode,
@@ -1905,7 +1905,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       }
 
       const readyMessage = `${proxyBootstrap.displayName} edge proxy is ready`;
-      logs.push(phaseLog("deploy", readyMessage));
+      timeline.push(phaseLog("deploy", readyMessage));
       await this.report(context, {
         deploymentId: state.id.value,
         phase: "deploy",
@@ -1940,7 +1940,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         cwd: workdir,
         env,
       });
-      logs.push(
+      timeline.push(
         phaseLog("deploy", `Release existing containers for resource ${state.resourceId.value}`),
       );
     }
@@ -1960,10 +1960,10 @@ export class LocalExecutionBackend implements ExecutionBackend {
       : ok(null);
     if (proxyRoutePlanResult.isErr()) {
       const message = "Edge proxy route configuration could not be rendered";
-      logs.push(phaseLog("deploy", message, "error"));
+      timeline.push(phaseLog("deploy", message, "error"));
       return ok({
         deployment: this.applyFailure(deployment, {
-          logs,
+          timeline,
           errorCode: proxyRoutePlanResult.error.code,
           retryable: proxyRoutePlanResult.error.retryable,
           metadata: {
@@ -2000,10 +2000,10 @@ export class LocalExecutionBackend implements ExecutionBackend {
     const storageMounts = dockerStorageMountsFromRuntimeMetadata(state.runtimePlan.execution.metadata);
     if (storageMounts.isErr()) {
       const message = "Storage mounts could not be rendered for Docker";
-      logs.push(phaseLog("deploy", message, "error"));
+      timeline.push(phaseLog("deploy", message, "error"));
       return ok({
         deployment: this.applyFailure(deployment, {
-          logs,
+          timeline,
           errorCode: storageMounts.error.code,
           retryable: storageMounts.error.retryable,
           metadata: {
@@ -2018,10 +2018,10 @@ export class LocalExecutionBackend implements ExecutionBackend {
     );
     if (storageVolumeRealizations.isErr()) {
       const message = "Storage volume realization could not be rendered for Docker";
-      logs.push(phaseLog("deploy", message, "error"));
+      timeline.push(phaseLog("deploy", message, "error"));
       return ok({
         deployment: this.applyFailure(deployment, {
-          logs,
+          timeline,
           errorCode: storageVolumeRealizations.error.code,
           retryable: storageVolumeRealizations.error.retryable,
           metadata: {
@@ -2036,14 +2036,14 @@ export class LocalExecutionBackend implements ExecutionBackend {
       quote: shellQuote,
     });
     if (realizeStorageVolumesCommand.length > 0) {
-      logs.push(phaseLog("deploy", "Realize Docker storage volumes with Appaloft ownership labels"));
+      timeline.push(phaseLog("deploy", "Realize Docker storage volumes with Appaloft ownership labels"));
       const realizeStorageVolumes = await runShellCommand({
         command: realizeStorageVolumesCommand,
         cwd: workdir,
         env: runtimeExecutionEnv,
         redactions,
       });
-      this.pushCommandOutput(logs, {
+      this.pushCommandOutput(timeline, {
         context,
         deploymentId: state.id.value,
         phase: "deploy",
@@ -2051,7 +2051,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         level: "info",
         stream: "stdout",
       });
-      this.pushCommandOutput(logs, {
+      this.pushCommandOutput(timeline, {
         context,
         deploymentId: state.id.value,
         phase: "deploy",
@@ -2061,10 +2061,10 @@ export class LocalExecutionBackend implements ExecutionBackend {
       });
       if (realizeStorageVolumes.failed) {
         const message = "Docker storage volumes could not be realized";
-        logs.push(phaseLog("deploy", message, "error"));
+        timeline.push(phaseLog("deploy", message, "error"));
         return ok({
           deployment: this.applyFailure(deployment, {
-            logs,
+            timeline,
             errorCode: "docker_storage_volume_realization_failed",
             retryable: true,
             metadata: {
@@ -2094,7 +2094,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       ],
     });
     const runCommand = renderRuntimeCommandString(runCommandSpec, { quote: shellQuote });
-    logs.push(
+    timeline.push(
       phaseLog(
         "deploy",
         renderRuntimeCommandString(runCommandSpec, { quote: shellQuote, mode: "display" }),
@@ -2112,7 +2112,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       env: runtimeExecutionEnv,
       redactions,
     });
-    this.pushCommandOutput(logs, {
+    this.pushCommandOutput(timeline, {
       context,
       deploymentId: state.id.value,
       phase: "deploy",
@@ -2120,7 +2120,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       level: "info",
       stream: "stdout",
     });
-    this.pushCommandOutput(logs, {
+    this.pushCommandOutput(timeline, {
       context,
       deploymentId: state.id.value,
       phase: "deploy",
@@ -2140,8 +2140,8 @@ export class LocalExecutionBackend implements ExecutionBackend {
       });
       return ok({
         deployment: this.applyFailure(deployment, {
-          logs: [
-            ...logs,
+          timeline: [
+            ...timeline,
             phaseLog("deploy", message, "error"),
           ],
           errorCode: "docker_run_failed",
@@ -2176,10 +2176,10 @@ export class LocalExecutionBackend implements ExecutionBackend {
       : ok(null);
     if (proxyReloadPlanResult.isErr()) {
       const message = "Edge proxy reload plan could not be rendered";
-      logs.push(phaseLog("deploy", message, "error"));
+      timeline.push(phaseLog("deploy", message, "error"));
       return ok({
         deployment: this.applyFailure(deployment, {
-          logs,
+          timeline,
           errorCode: proxyReloadPlanResult.error.code,
           retryable: proxyReloadPlanResult.error.retryable,
           metadata: {
@@ -2208,9 +2208,9 @@ export class LocalExecutionBackend implements ExecutionBackend {
           }),
       });
 
-      for (const entry of reload.logs) {
-        logs.push(phaseLog("deploy", entry.message, entry.stderr ? "warn" : "info"));
-        this.pushCommandOutput(logs, {
+      for (const entry of reload.timeline) {
+        timeline.push(phaseLog("deploy", entry.message, entry.stderr ? "warn" : "info"));
+        this.pushCommandOutput(timeline, {
           context,
           deploymentId: state.id.value,
           phase: "deploy",
@@ -2218,7 +2218,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
           level: "info",
           stream: "stdout",
         });
-        this.pushCommandOutput(logs, {
+        this.pushCommandOutput(timeline, {
           context,
           deploymentId: state.id.value,
           phase: "deploy",
@@ -2238,8 +2238,8 @@ export class LocalExecutionBackend implements ExecutionBackend {
         });
         return ok({
           deployment: this.applyFailure(deployment, {
-            logs: [
-              ...logs,
+            timeline: [
+              ...timeline,
               phaseLog("deploy", reload.message, "error"),
             ],
             errorCode: reload.errorCode,
@@ -2276,7 +2276,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     const publishedHostPort = parseDockerPublishedHostPort(publishedPortResult.stdout);
 
     if (publishedPortResult.failed || publishedHostPort === undefined) {
-      await this.pushDockerContainerDiagnostics(logs, {
+      await this.pushDockerContainerDiagnostics(timeline, {
         context,
         deploymentId: state.id.value,
         workdir,
@@ -2298,8 +2298,8 @@ export class LocalExecutionBackend implements ExecutionBackend {
       });
       return ok({
         deployment: this.applyFailure(deployment, {
-          logs: [
-            ...logs,
+          timeline: [
+            ...timeline,
             phaseLog("verify", message, "error"),
           ],
           errorCode: "docker_published_port_resolution_failed",
@@ -2323,14 +2323,14 @@ export class LocalExecutionBackend implements ExecutionBackend {
         status: "succeeded",
         message: "Health check disabled for resource",
       });
-      logs.push(phaseLog("verify", "Health check disabled for resource"));
+      timeline.push(phaseLog("verify", "Health check disabled for resource"));
       deployment.applyExecutionResult(
         FinishedAt.rehydrate(new Date().toISOString()),
         ExecutionResult.rehydrate({
           exitCode: ExitCode.rehydrate(0),
           status: ExecutionStatusValue.rehydrate("succeeded"),
           retryable: false,
-          logs,
+          timeline,
           metadata: {
             image,
             containerName,
@@ -2351,7 +2351,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     const health = await waitForHealth(url, healthOptions);
 
     if (!health.ok) {
-      await this.pushDockerContainerDiagnostics(logs, {
+      await this.pushDockerContainerDiagnostics(timeline, {
         context,
         deploymentId: state.id.value,
         workdir,
@@ -2373,8 +2373,8 @@ export class LocalExecutionBackend implements ExecutionBackend {
       });
       return ok({
         deployment: this.applyFailure(deployment, {
-          logs: [
-            ...logs,
+          timeline: [
+            ...timeline,
             phaseLog("verify", message, "error"),
           ],
           errorCode: "docker_health_check_failed",
@@ -2392,7 +2392,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     }
 
     const message = `Container is reachable at ${url}`;
-    logs.push(phaseLog("verify", message));
+    timeline.push(phaseLog("verify", message));
     await this.report(context, {
       deploymentId: state.id.value,
       phase: "verify",
@@ -2407,7 +2407,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         cwd: workdir,
         env,
       });
-      logs.push(
+      timeline.push(
         phaseLog(
           "deploy",
           cleanup.failed
@@ -2421,7 +2421,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       exitCode: ExitCode.rehydrate(0),
       status: ExecutionStatusValue.rehydrate("succeeded"),
       retryable: false,
-      logs,
+      timeline,
       metadata: {
         image,
         containerName,
@@ -2437,7 +2437,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
   private async prepareGeneratedServiceGraphCompose(input: {
     context: ExecutionContext;
     deployment: Deployment;
-    logs: DeploymentLogEntry[];
+    timeline: DeploymentTimelineJournalEntry[];
     workdir: string;
     image: string;
     environment?: Record<string, string>;
@@ -2453,7 +2453,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       const replicas = replicatedWorkloadReplicasFromMetadata(state.runtimePlan.execution.metadata);
       if (!serviceName || !replicas) {
         const message = "Replicated workload metadata is incomplete";
-        input.logs.push(phaseLog("package", message, "error"));
+        input.timeline.push(phaseLog("package", message, "error"));
         return ok({ composeFile: replicatedComposeFile });
       }
 
@@ -2493,7 +2493,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         }),
       );
 
-      input.logs.push(phaseLog("package", `Generated replicated workload compose file ${replicatedComposeFile}`));
+      input.timeline.push(phaseLog("package", `Generated replicated workload compose file ${replicatedComposeFile}`));
       await this.report(input.context, {
         deploymentId: state.id.value,
         phase: "package",
@@ -2512,7 +2512,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     const services = serviceGraphComposeServicesFromMetadata(state.runtimePlan.execution.metadata);
     if (services.length === 0) {
       const message = "Repository service graph metadata is missing services";
-      input.logs.push(phaseLog("package", message, "error"));
+      input.timeline.push(phaseLog("package", message, "error"));
       return ok({
         composeFile,
       });
@@ -2555,7 +2555,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       }),
     );
 
-    input.logs.push(phaseLog("package", `Generated repository service graph compose file ${composeFile}`));
+    input.timeline.push(phaseLog("package", `Generated repository service graph compose file ${composeFile}`));
     await this.report(input.context, {
       deploymentId: state.id.value,
       phase: "package",
@@ -2583,10 +2583,10 @@ export class LocalExecutionBackend implements ExecutionBackend {
       return err(packageEnv.error);
     }
     const { env } = packageEnv.value;
-    const logs: DeploymentLogEntry[] = [
+    const timeline: DeploymentTimelineJournalEntry[] = [
       phaseLog("plan", "Using local docker-compose-stack execution"),
     ];
-    const preparedSource = await this.prepareLocalSource(context, deployment, logs, {
+    const preparedSource = await this.prepareLocalSource(context, deployment, timeline, {
       runtimeDir,
       env,
       fallbackWorkdir: normalizeWorkingDirectory(
@@ -2629,7 +2629,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     const generatedCompose = await this.prepareGeneratedServiceGraphCompose({
       context,
       deployment,
-      logs,
+      timeline,
       workdir,
       image: runtimeInstanceNames.imageName,
       environment: runtimeEnvPlaceholders,
@@ -2645,17 +2645,17 @@ export class LocalExecutionBackend implements ExecutionBackend {
         ? resolve(workdir, "docker-compose.yml")
         : (state.runtimePlan.execution.composeFile ?? state.runtimePlan.source.locator));
     const composeOwnershipOverrideFile = resolve(workdir, ".appaloft.compose.labels.override.yml");
-    logs.push(phaseLog("plan", `Compose working directory: ${workdir}`));
+    timeline.push(phaseLog("plan", `Compose working directory: ${workdir}`));
     const composeOwnershipLabels = dockerLabelsFromAssignments(
       appaloftDockerContainerLabelsForDeployment(state),
     );
     const storageMounts = dockerStorageMountsFromRuntimeMetadata(state.runtimePlan.execution.metadata);
     if (storageMounts.isErr()) {
       const message = "Storage mounts could not be rendered for Docker Compose";
-      logs.push(phaseLog("deploy", message, "error"));
+      timeline.push(phaseLog("deploy", message, "error"));
       return ok({
         deployment: this.applyFailure(deployment, {
-          logs,
+          timeline,
           errorCode: storageMounts.error.code,
           retryable: storageMounts.error.retryable,
           metadata: {
@@ -2673,10 +2673,10 @@ export class LocalExecutionBackend implements ExecutionBackend {
     );
     if (storageVolumeRealizations.isErr()) {
       const message = "Storage volume realization could not be rendered for Docker Compose";
-      logs.push(phaseLog("deploy", message, "error"));
+      timeline.push(phaseLog("deploy", message, "error"));
       return ok({
         deployment: this.applyFailure(deployment, {
-          logs,
+          timeline,
           errorCode: storageVolumeRealizations.error.code,
           retryable: storageVolumeRealizations.error.retryable,
           metadata: {
@@ -2689,7 +2689,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         }).deployment,
       });
     }
-    logs.push(phaseLog("deploy", "Generate Appaloft compose ownership labels override"));
+    timeline.push(phaseLog("deploy", "Generate Appaloft compose ownership labels override"));
     const composeOverride = await runShellCommand({
       command: renderComposeOwnershipLabelOverrideScript({
         composeFile,
@@ -2703,7 +2703,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       env: runtimeEnv.value.env,
       redactions: runtimeEnv.value.redactions,
     });
-    this.pushCommandOutput(logs, {
+    this.pushCommandOutput(timeline, {
       context,
       deploymentId: state.id.value,
       phase: "deploy",
@@ -2711,7 +2711,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       level: "info",
       stream: "stdout",
     });
-    this.pushCommandOutput(logs, {
+    this.pushCommandOutput(timeline, {
       context,
       deploymentId: state.id.value,
       phase: "deploy",
@@ -2722,7 +2722,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     if (composeOverride.failed) {
       return ok({
         deployment: this.applyFailure(deployment, {
-          logs,
+          timeline,
           errorCode: "docker_compose_label_override_failed",
           retryable: false,
           metadata: {
@@ -2743,7 +2743,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       }),
       { quote: shellQuote },
     );
-    logs.push(phaseLog("deploy", upCommand));
+    timeline.push(phaseLog("deploy", upCommand));
     await this.report(context, {
       deploymentId: state.id.value,
       phase: "deploy",
@@ -2757,7 +2757,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       env: runtimeEnv.value.env,
       redactions: runtimeEnv.value.redactions,
     });
-    this.pushCommandOutput(logs, {
+    this.pushCommandOutput(timeline, {
       context,
       deploymentId: state.id.value,
       phase: "deploy",
@@ -2765,7 +2765,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       level: "info",
       stream: "stdout",
     });
-    this.pushCommandOutput(logs, {
+    this.pushCommandOutput(timeline, {
       context,
       deploymentId: state.id.value,
       phase: "deploy",
@@ -2785,8 +2785,8 @@ export class LocalExecutionBackend implements ExecutionBackend {
       });
       return ok({
         deployment: this.applyFailure(deployment, {
-          logs: [
-            ...logs,
+          timeline: [
+            ...timeline,
             phaseLog("deploy", message, "error"),
           ],
           errorCode: "docker_compose_failed",
@@ -2809,7 +2809,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       message: "Compose stack started",
     });
     const message = "Compose stack started successfully";
-    logs.push(phaseLog("verify", message));
+    timeline.push(phaseLog("verify", message));
     await this.report(context, {
       deploymentId: state.id.value,
       phase: "verify",
@@ -2820,7 +2820,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       exitCode: ExitCode.rehydrate(0),
       status: ExecutionStatusValue.rehydrate("succeeded"),
       retryable: false,
-      logs,
+      timeline,
       metadata: {
         composeFile,
         composeProjectName: runtimeInstanceNames.composeProjectName,
@@ -2868,7 +2868,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       }
       return ok({
         deployment: this.applyFailure(deployment, {
-          logs: [
+          timeline: [
             phaseLog(
               "deploy",
               error instanceof Error ? error.message : "Unknown local execution error",
@@ -2885,7 +2885,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
   async cancel(
     context: ExecutionContext,
     deployment: Deployment,
-  ): Promise<Result<{ logs: DeploymentLogEntry[] }>> {
+  ): Promise<Result<{ timeline: DeploymentTimelineJournalEntry[] }>> {
     const state = deployment.toState();
     const metadata = state.runtimePlan.execution.metadata ?? {};
     const runtimeDir = this.runtimeDirectory(state.id.value);
@@ -2902,7 +2902,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     const workdir =
       state.runtimePlan.execution.workingDirectory ??
       normalizeWorkingDirectory(state.runtimePlan.source.locator);
-    const logs: DeploymentLogEntry[] = [];
+    const timeline: DeploymentTimelineJournalEntry[] = [];
     const runtimeInstanceNames = deriveRuntimeInstanceNames({
       deploymentId: state.id.value,
       metadata: state.runtimePlan.execution.metadata,
@@ -2911,7 +2911,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     switch (state.runtimePlan.execution.kind) {
       case "host-process":
         killProcess(metadata.pid);
-        logs.push(
+        timeline.push(
           phaseLog(
             "deploy",
             metadata.pid ? `Stopped process ${metadata.pid}` : "No process id recorded",
@@ -2925,7 +2925,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
           cwd: workdir,
           env,
         });
-        logs.push(phaseLog("deploy", `Removed container ${containerName}`));
+        timeline.push(phaseLog("deploy", `Removed container ${containerName}`));
         break;
       }
       case "docker-compose-stack":
@@ -2941,7 +2941,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
               env,
             });
           }
-          logs.push(
+          timeline.push(
             phaseLog(
               "deploy",
               composeFile
@@ -2965,7 +2965,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     try {
       if (artifactCleanup.localSourceDir) {
         rmSync(artifactCleanup.localSourceDir, { recursive: true, force: true });
-        logs.push(
+        timeline.push(
           phaseLog("deploy", `Removed preview source workspace ${artifactCleanup.localSourceDir}`),
         );
       }
@@ -2985,7 +2985,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         cwd: workdir,
         env,
       });
-      logs.push(phaseLog("deploy", `Removed preview image ${artifactCleanup.imageName}`));
+      timeline.push(phaseLog("deploy", `Removed preview image ${artifactCleanup.imageName}`));
     }
 
     await this.report(context, {
@@ -2995,7 +2995,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       message: "Local deployment cancellation completed",
     });
 
-    return ok({ logs });
+    return ok({ timeline });
   }
 
   async rollback(
@@ -3018,7 +3018,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     const { env } = runtimeEnv.value;
     const workdir =
       state.runtimePlan.execution.workingDirectory ?? normalizeWorkingDirectory(state.runtimePlan.source.locator);
-    const logs: DeploymentLogEntry[] = [];
+    const timeline: DeploymentTimelineJournalEntry[] = [];
     const runtimeInstanceNames = deriveRuntimeInstanceNames({
       deploymentId: state.id.value,
       metadata: state.runtimePlan.execution.metadata,
@@ -3034,7 +3034,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       switch (state.runtimePlan.execution.kind) {
         case "host-process":
           killProcess(metadata.pid);
-          logs.push(
+          timeline.push(
             phaseLog(
               "rollback",
               metadata.pid ? `Stopped process ${metadata.pid}` : "No process id recorded",
@@ -3047,7 +3047,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
             cwd: workdir,
             env,
           });
-          logs.push(
+          timeline.push(
             phaseLog(
               "rollback",
               metadata.containerName
@@ -3069,7 +3069,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
                 env,
               });
             }
-            logs.push(
+            timeline.push(
               phaseLog(
                 "rollback",
                 composeFile
@@ -3085,7 +3085,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         exitCode: ExitCode.rehydrate(0),
         status: ExecutionStatusValue.rehydrate("rolled-back"),
         retryable: false,
-        logs,
+        timeline,
       }));
       await this.report(context, {
         deploymentId: state.id.value,
@@ -3105,7 +3105,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       });
       return ok({
         deployment: this.applyFailure(deployment, {
-          logs: [
+          timeline: [
             phaseLog(
               "rollback",
               error instanceof Error ? error.message : "Unknown rollback error",

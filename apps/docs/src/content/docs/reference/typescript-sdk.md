@@ -16,7 +16,7 @@ searchAliases:
 relatedOperations:
   - projects.create
   - organizations.current-context
-  - deployments.stream-events
+  - deployments.timeline.stream
 sidebar:
   label: "TypeScript SDK"
   order: 11

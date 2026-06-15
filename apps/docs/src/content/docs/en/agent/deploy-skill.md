@@ -90,7 +90,7 @@ Return a compact outcome:
 - access URL, or why it is not available yet;
 - deployment id and resource id;
 - current lifecycle status;
-- `appaloft logs <deploymentId>`;
+- `appaloft deployments timeline <deploymentId>`;
 - `appaloft resource diagnose <resourceId>`;
 - `appaloft deployments recovery-readiness <deploymentId>`.
 

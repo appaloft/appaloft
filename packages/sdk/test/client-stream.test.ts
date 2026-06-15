@@ -3,16 +3,16 @@ import { describe, expect, test } from "bun:test";
 import { createAppaloftSdkClient, type SdkOperationDescriptor } from "../src/internal";
 
 const streamOperation: SdkOperationDescriptor = {
-  operationKey: "deployments.stream-events",
+  operationKey: "deployments.timeline.stream",
   operationGroup: "deployments",
-  operationMethod: "streamEvents",
-  operationId: "deployments.events.stream",
+  operationMethod: "timelineStream",
+  operationId: "deployments.timeline.stream",
   kind: "query",
   domain: "deployments",
-  messageName: "StreamDeploymentEventsQuery",
+  messageName: "StreamDeploymentTimelineQuery",
   route: {
     method: "GET",
-    path: "/deployments/{deploymentId}/events/stream",
+    path: "/deployments/{deploymentId}/timeline/stream",
   },
   authPolicy: "product-session",
   errorFamily: "structured-platform-error",
@@ -23,7 +23,7 @@ const nonStreamOperation: SdkOperationDescriptor = {
   ...streamOperation,
   route: {
     method: "GET",
-    path: "/deployments/{deploymentId}/events",
+    path: "/deployments/{deploymentId}/timeline",
   },
   streaming: false,
 };
@@ -52,9 +52,9 @@ describe("Appaloft SDK streaming helpers", () => {
       fetch: async () =>
         new Response(
           [
-            'data: {"schemaVersion":"deployments.stream-events/v1","kind":"heartbeat","at":"2026-01-01T00:00:00.000Z"}',
+            'data: {"schemaVersion":"deployments.timeline/v1","kind":"heartbeat","at":"2026-01-01T00:00:00.000Z"}',
             "",
-            'data: {"schemaVersion":"deployments.stream-events/v1","kind":"closed","reason":"completed","cursor":"dep_demo:1"}',
+            'data: {"schemaVersion":"deployments.timeline/v1","kind":"closed","reason":"completed","cursor":"dep_demo:1"}',
             "",
           ].join("\n"),
           {
@@ -78,12 +78,12 @@ describe("Appaloft SDK streaming helpers", () => {
 
     expect(envelopes).toEqual([
       {
-        schemaVersion: "deployments.stream-events/v1",
+        schemaVersion: "deployments.timeline/v1",
         kind: "heartbeat",
         at: "2026-01-01T00:00:00.000Z",
       },
       {
-        schemaVersion: "deployments.stream-events/v1",
+        schemaVersion: "deployments.timeline/v1",
         kind: "closed",
         reason: "completed",
         cursor: "dep_demo:1",
@@ -150,7 +150,7 @@ describe("Appaloft SDK streaming helpers", () => {
           deploymentId: "dep_demo",
         },
       }),
-    ).toThrow("Operation deployments.stream-events is not marked as streaming");
+    ).toThrow("Operation deployments.timeline.stream is not marked as streaming");
   });
 
   test("[TS-SDK-STREAM-001] wires cancellation through AbortSignal", async () => {

@@ -64,7 +64,7 @@ class StaticDeploymentReadModel implements DeploymentReadModel {
     return null;
   }
 
-  async findLogs(): Promise<DeploymentSummary["logs"]> {
+  async findTimeline(): Promise<DeploymentSummary["timeline"]> {
     return [];
   }
 }
@@ -265,7 +265,7 @@ function deploymentSummary(overrides: Partial<DeploymentSummary> = {}): Deployme
       precedence: ["defaults", "environment", "deployment"],
       variables: [],
     },
-    logs: [
+    timeline: [
       {
         timestamp: "2026-01-01T00:00:08.000Z",
         source: "appaloft",
@@ -277,7 +277,7 @@ function deploymentSummary(overrides: Partial<DeploymentSummary> = {}): Deployme
     createdAt: "2026-01-01T00:00:01.000Z",
     startedAt: "2026-01-01T00:00:02.000Z",
     finishedAt: "2026-01-01T00:00:09.000Z",
-    logCount: 1,
+    timelineCount: 1,
     ...overrides,
     target: {
       kind: "server-backed",
@@ -554,7 +554,7 @@ describe("operator work query service", () => {
     expect(JSON.stringify(result)).not.toContain("SECRET_KEY");
   });
 
-  test("[PROC-DELIVERY-WORKER-025] shows durable work events as safe progress logs", async () => {
+  test("[PROC-DELIVERY-WORKER-025] shows durable work events as safe progress timeline", async () => {
     const service = createService({
       deployments: [],
       servers: [],

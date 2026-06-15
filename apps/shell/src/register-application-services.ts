@@ -179,12 +179,13 @@ import {
   DeploymentContextResolver,
   DeploymentFactory,
   DeploymentLifecycleService,
-  DeploymentLogsQueryService,
   DeploymentPlanQueryHandler,
   DeploymentPlanQueryService,
   DeploymentRecoveryReadinessQueryHandler,
   DeploymentRecoveryReadinessQueryService,
   DeploymentSnapshotFactory,
+  DeploymentTimelineQueryHandler,
+  DeploymentTimelineQueryService,
   DetachResourceStorageCommandHandler,
   DetachResourceStorageUseCase,
   DiffEnvironmentsQueryService,
@@ -315,8 +316,6 @@ import {
   PruneAuditEventArchivesUseCase,
   PruneAuditEventsCommandHandler,
   PruneAuditEventsUseCase,
-  PruneDeploymentLogsCommandHandler,
-  PruneDeploymentLogsUseCase,
   PruneDeploymentsCommandHandler,
   PruneDeploymentsUseCase,
   PruneDomainEventsCommandHandler,
@@ -504,8 +503,7 @@ import {
   SourceLinkQueryService,
   StartResourceRuntimeCommandHandler,
   StopResourceRuntimeCommandHandler,
-  StreamDeploymentEventsQueryHandler,
-  StreamDeploymentEventsQueryService,
+  StreamDeploymentTimelineQueryHandler,
   StreamOperatorWorkEventsQueryHandler,
   StreamOperatorWorkEventsQueryService,
   SwitchCurrentOrganizationCommandHandler,
@@ -525,7 +523,7 @@ import {
 } from "@appaloft/application";
 import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
 import { type DependencyContainer, instanceCachingFactory } from "tsyringe";
-import { ShellDeploymentEventObserver } from "./deployment-event-observer";
+import { ShellDeploymentTimelineObserver } from "./deployment-timeline-observer";
 import { PublicDnsDomainOwnershipVerifier } from "./domain-ownership-verifier";
 import { DockerBackedManagedDependencyProvider } from "./managed-dependency-providers";
 import { ShellPreviewEnvironmentCleaner } from "./preview-environment-cleaner";
@@ -1672,6 +1670,8 @@ export function registerApplicationServices(
   container.registerSingleton(CancelDeploymentCommandHandler);
   container.registerSingleton(ArchiveDeploymentCommandHandler);
   container.registerSingleton(PruneDeploymentsCommandHandler);
+  container.registerSingleton(DeploymentTimelineQueryHandler);
+  container.registerSingleton(StreamDeploymentTimelineQueryHandler);
   container.registerSingleton(StopResourceRuntimeCommandHandler);
   container.registerSingleton(StartResourceRuntimeCommandHandler);
   container.registerSingleton(RestartResourceRuntimeCommandHandler);
@@ -1680,7 +1680,6 @@ export function registerApplicationServices(
   container.registerSingleton(ShowResourceRuntimeLogArchiveQueryHandler);
   container.registerSingleton(PruneResourceRuntimeLogArchivesCommandHandler);
   container.registerSingleton(PruneResourceRuntimeControlAttemptsCommandHandler);
-  container.registerSingleton(StreamDeploymentEventsQueryHandler);
   container.registerSingleton(ImportCertificateCommandHandler);
   container.registerSingleton(IssueOrRenewCertificateCommandHandler);
   container.registerSingleton(RetryCertificateCommandHandler);
@@ -1715,7 +1714,6 @@ export function registerApplicationServices(
   container.registerSingleton(PruneAuditEventsCommandHandler);
   container.registerSingleton(ConfigureAuditEventLegalHoldCommandHandler);
   container.registerSingleton(ReleaseAuditEventLegalHoldCommandHandler);
-  container.registerSingleton(PruneDeploymentLogsCommandHandler);
   container.registerSingleton(PruneDomainEventsCommandHandler);
   container.registerSingleton(PruneProviderJobLogsCommandHandler);
   container.registerSingleton(ConfigureRetentionDefaultsCommandHandler);
@@ -2181,7 +2179,6 @@ export function registerApplicationServices(
     ShowAuditEventLegalHoldQueryService,
   );
   container.registerSingleton(tokens.pruneDeploymentsUseCase, PruneDeploymentsUseCase);
-  container.registerSingleton(tokens.pruneDeploymentLogsUseCase, PruneDeploymentLogsUseCase);
   container.registerSingleton(tokens.pruneDomainEventsUseCase, PruneDomainEventsUseCase);
   container.registerSingleton(tokens.pruneProviderJobLogsUseCase, PruneProviderJobLogsUseCase);
   container.registerSingleton(
@@ -2455,11 +2452,10 @@ export function registerApplicationServices(
     StreamOperatorWorkEventsQueryService,
   );
   container.registerSingleton(
-    tokens.streamDeploymentEventsQueryService,
-    StreamDeploymentEventsQueryService,
+    tokens.deploymentTimelineQueryService,
+    DeploymentTimelineQueryService,
   );
-  container.registerSingleton(tokens.logsQueryService, DeploymentLogsQueryService);
-  container.registerSingleton(tokens.deploymentEventObserver, ShellDeploymentEventObserver);
+  container.registerSingleton(tokens.deploymentTimelineObserver, ShellDeploymentTimelineObserver);
   container.registerSingleton(
     tokens.resourceDiagnosticSummaryQueryService,
     ResourceDiagnosticSummaryQueryService,

@@ -136,7 +136,7 @@ describe("deployment plan preview contract", () => {
           variables: [],
         },
         dependencyBindingReferences: dependencyBindings.references,
-        logCount: 0,
+        timelineCount: 0,
         createdAt: "2026-05-05T00:00:00.000Z",
       },
       status: {

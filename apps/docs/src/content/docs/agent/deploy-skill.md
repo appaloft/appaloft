@@ -71,7 +71,7 @@ Agent 应返回一份短结果：
 - access URL，或说明它还不可用；
 - deployment id 和 resource id；
 - 当前 lifecycle status；
-- `appaloft logs <deploymentId>`；
+- `appaloft deployments timeline <deploymentId>`；
 - `appaloft resource diagnose <resourceId>`；
 - `appaloft deployments recovery-readiness <deploymentId>`。
 

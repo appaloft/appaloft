@@ -1,4 +1,4 @@
-import { type DeploymentLogSource, type LogLevel } from "@appaloft/core";
+import { type DeploymentTimelineJournalSource, type LogLevel } from "@appaloft/core";
 import { type ExecutionContext } from "./execution-context";
 import {
   type DeploymentProgressEvent,
@@ -32,7 +32,7 @@ export function reportDeploymentProgress(
     message: string;
     deploymentId?: string;
     level?: LogLevel;
-    source?: DeploymentLogSource;
+    source?: DeploymentTimelineJournalSource;
     status?: DeploymentProgressStatus;
     stream?: "stdout" | "stderr";
     step?: {
@@ -50,7 +50,7 @@ export function createDeploymentProgressEvent(input: {
   message: string;
   deploymentId?: string;
   level?: LogLevel;
-  source?: DeploymentLogSource;
+  source?: DeploymentTimelineJournalSource;
   status?: DeploymentProgressStatus;
   stream?: "stdout" | "stderr";
   step?: {

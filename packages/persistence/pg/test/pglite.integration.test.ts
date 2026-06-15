@@ -44,11 +44,11 @@ import {
   CreatedAt,
   Deployment,
   DeploymentId,
-  DeploymentLogEntry,
   DeploymentPhaseValue,
   DeploymentTargetDescriptor,
   DeploymentTargetId,
   DeploymentTargetName,
+  DeploymentTimelineJournalEntry,
   Destination,
   DestinationId,
   DestinationKindValue,
@@ -861,7 +861,7 @@ async function insertDeploymentSnapshot(
         precedence: ["defaults", "environment", "deployment"],
         variables: [],
       },
-      logs: [],
+      timeline: [],
       created_at: input.createdAt,
       started_at: input.createdAt,
       finished_at: input.createdAt,
@@ -1113,8 +1113,8 @@ describe("pglite persistence integration", () => {
           exitCode: ExitCode.rehydrate(0),
           status: ExecutionStatusValue.rehydrate("succeeded"),
           retryable: false,
-          logs: [
-            DeploymentLogEntry.rehydrate({
+          timeline: [
+            DeploymentTimelineJournalEntry.rehydrate({
               timestamp: OccurredAt.rehydrate("2026-01-01T00:02:03.000Z"),
               phase: DeploymentPhaseValue.rehydrate("verify"),
               level: LogLevelValue.rehydrate("info"),
@@ -1183,7 +1183,7 @@ describe("pglite persistence integration", () => {
       ]);
       expect(deployments[0]?.environmentSnapshot.id).toBe(`snap_${suffix}`);
       expect(deployments[0]?.sourceCommitSha).toBe("57ea0764b8f0a491fd1d30bedc5cbe281744b36c");
-      expect(deployments[0]?.logCount).toBe(1);
+      expect(deployments[0]?.timelineCount).toBe(1);
 
       await reopened.close();
     } finally {
@@ -2620,7 +2620,7 @@ describe("pglite persistence integration", () => {
 
       const diagnosticQuery = ResourceDiagnosticSummaryQuery.create({
         resourceId: target.resourceId,
-        includeDeploymentLogTail: false,
+        includeDeploymentTimelineTail: false,
         includeRuntimeLogTail: false,
         includeProxyConfiguration: false,
         tailLines: 10,
@@ -2875,7 +2875,7 @@ describe("pglite persistence integration", () => {
 
       const diagnosticQuery = ResourceDiagnosticSummaryQuery.create({
         resourceId: target.resourceId,
-        includeDeploymentLogTail: false,
+        includeDeploymentTimelineTail: false,
         includeRuntimeLogTail: false,
         includeProxyConfiguration: false,
         tailLines: 10,

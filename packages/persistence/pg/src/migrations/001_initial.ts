@@ -137,7 +137,7 @@ export const initialMigration = {
       .addColumn("status", "text", (column) => column.notNull())
       .addColumn("runtime_plan", "jsonb", (column) => column.notNull())
       .addColumn("environment_snapshot", "jsonb", (column) => column.notNull())
-      .addColumn("logs", "jsonb", (column) => column.notNull().defaultTo("[]"))
+      .addColumn("timeline", "jsonb", (column) => column.notNull().defaultTo("[]"))
       .addColumn("created_at", "timestamptz", (column) => column.notNull())
       .addColumn("started_at", "timestamptz")
       .addColumn("finished_at", "timestamptz")

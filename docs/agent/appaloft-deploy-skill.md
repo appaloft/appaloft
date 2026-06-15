@@ -137,8 +137,8 @@ context. Treat ids as bootstrap/advanced override/debug inputs, not the normal u
 ## Outcome Packet
 
 Progress monitoring is part of the deploy protocol. For one deployment attempt, follow
-`appaloft deployments events <deploymentId> --follow --json` and use
-`appaloft logs <deploymentId>` for logs. For a parent durable work item that coordinates multiple
+`appaloft deployments timeline <deploymentId> --follow --json` and use
+`appaloft deployments timeline <deploymentId>` for bounded timeline/log review. For a parent durable work item that coordinates multiple
 resources or child deployments, follow `appaloft work events <workId> --follow --json` or
 `appaloft work watch <workId> --json`; use `appaloft work show <workId>` only as a snapshot/detail
 read.
@@ -151,7 +151,7 @@ At the end, report a compact outcome:
 - resource id;
 - lifecycle status;
 - progress stream command used;
-- `appaloft logs <deploymentId>`;
+- `appaloft deployments timeline <deploymentId>`;
 - `appaloft resource diagnose <resourceId>`;
 - `appaloft deployments recovery-readiness <deploymentId>`.
 

@@ -22,9 +22,9 @@ import {
 } from "../src/messages";
 import {
   AllowAllOperationGuardPort,
-  type DeploymentLogSummary,
   type DeploymentReadModel,
   type DeploymentSummary,
+  type DeploymentTimelineJournalSummary,
   type IdGenerator,
   type OperationCheckRequest,
   type OperationGuardDecision,
@@ -129,7 +129,7 @@ class StaticDeploymentReadModel implements DeploymentReadModel {
     return null;
   }
 
-  async findLogs(): Promise<DeploymentLogSummary[]> {
+  async findTimeline(): Promise<DeploymentTimelineJournalSummary[]> {
     return [];
   }
 }
@@ -326,11 +326,11 @@ function deploymentSummary(overrides: Partial<DeploymentSummary> = {}): Deployme
       precedence: ["defaults", "environment", "deployment"],
       variables: [],
     },
-    logs: [],
+    timeline: [],
     createdAt: "2026-01-01T00:00:00.000Z",
     startedAt: "2026-01-01T00:00:01.000Z",
     finishedAt: "2026-01-01T00:00:02.000Z",
-    logCount: 0,
+    timelineCount: 0,
     ...overrides,
     target: {
       kind: "server-backed",

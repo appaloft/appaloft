@@ -129,7 +129,7 @@ Tests must assert:
 ## Current Implementation Notes And Migration Gaps
 
 Current deployment detail pages depend on `deployments.list`, related resource/project/server
-queries, and `deployments.logs`. They therefore do not yet expose a dedicated deployment-detail
+queries, and `deployments.timeline`. They therefore do not yet expose a dedicated deployment-detail
 error surface.
 
 When `deployments.show` is implemented, the first slice may initially populate section errors for
