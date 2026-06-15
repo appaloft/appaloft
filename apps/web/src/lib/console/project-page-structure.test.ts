@@ -128,8 +128,8 @@ describe("project detail page structure", () => {
     expect(projectSource).toContain("data-project-attention-progress-item");
     expect(projectSource).toContain("data-project-attention-progress-trigger");
     expect(projectSource).toContain("data-project-attention-status-signal");
-    expect(projectSource).toContain("data-project-resource-install-failures");
-    expect(projectSource).toContain("failedProjectBlueprintInstallItems");
+    expect(projectSource).not.toContain("data-project-resource-install-failures");
+    expect(projectSource).not.toContain("failedProjectBlueprintInstallItems");
     expect(projectSource).toContain("DropdownMenuContent");
     expect(projectSource).toContain("projectAttentionStatusLabel");
     expect(projectSource).toContain("key: `operator-work-${work.id}`");
@@ -145,7 +145,7 @@ describe("project detail page structure", () => {
     expect(quickDeploySheetSource).toContain("startBlueprintOperatorWorkStatusPoll");
     expect(quickDeploySheetSource).toContain("orpcClient.operatorWork.show");
     expect(quickDeploySheetSource).toContain("Promise.race");
-    expect(quickDeploySheetSource).toContain('installSummary.terminalStatus !== "failed"');
+    expect(quickDeploySheetSource).toContain('installSummary.terminalStatus === "running"');
     expect(operationProgressPanelSource).toContain("{#if requestId}");
     expect(operationProgressPanelSource).toContain("Intl.DateTimeFormat");
     expect(operationProgressPanelSource).toContain("new Date(timestamp)");

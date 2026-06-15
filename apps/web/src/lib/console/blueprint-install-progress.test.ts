@@ -59,7 +59,7 @@ describe("Blueprint install progress helpers", () => {
     });
   });
 
-  test("[CLOUD-BLUEPRINT-QD-031] maps operator work events into progress rows", () => {
+  test("[CLOUD-BLUEPRINT-QD-031] keeps internal operator work events out of progress rows", () => {
     const progressEvents = operatorWorkEnvelopeProgressEvents([
       {
         schemaVersion: "operator-work.stream-events/v1",
@@ -106,12 +106,6 @@ describe("Blueprint install progress helpers", () => {
 
     expect(progressEvents).toMatchObject([
       {
-        phase: "detect",
-        status: "running",
-        level: "info",
-        message: "Blueprint install accepted · step: queued",
-      },
-      {
         phase: "verify",
         status: "failed",
         level: "error",
@@ -119,8 +113,8 @@ describe("Blueprint install progress helpers", () => {
           "资源名称冲突 · 资源名称已经被占用，创建资源时失败。 · 请换一个资源名称，或选择复用已有资源后重新安装。 · 阶段: resource-admission · 操作: CreateResourceCommand · 错误: resource_slug_conflict",
       },
     ]);
-    expect(progressEvents[1]?.message).not.toContain("worker:");
-    expect(progressEvents[1]?.message).not.toContain("appaloft-cloud-production-worker-replica-2");
+    expect(progressEvents[0]?.message).not.toContain("worker:");
+    expect(progressEvents[0]?.message).not.toContain("appaloft-cloud-production-worker-replica-2");
   });
 
   test("[CLOUD-BLUEPRINT-QD-034] maps operator work show terminal failure into user-facing progress", () => {

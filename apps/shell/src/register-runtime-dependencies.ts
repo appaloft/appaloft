@@ -1616,6 +1616,8 @@ export function registerRuntimeDependencies(
                     : {}),
                 },
                 dependencyContainer.resolve(tokens.dependencyResourceSecretStore),
+                dependencyContainer.resolve(tokens.deploymentProgressRecorder),
+                dependencyContainer.resolve(tokens.deploymentProgressReporter),
               ),
             }
           : {}),

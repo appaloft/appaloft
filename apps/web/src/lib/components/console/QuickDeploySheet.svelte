@@ -4252,6 +4252,21 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     };
   }
 
+  function recordBlueprintInstallResourceOwner(
+    target: BlueprintResolvedInstallTarget,
+    resourceId: string | undefined,
+  ) {
+    if (!resourceId) {
+      return;
+    }
+
+    lastCreatedDeploymentOwner = {
+      projectId: target.projectId,
+      environmentId: target.environmentId,
+      resourceId,
+    };
+  }
+
   function blueprintInstallIdempotencyKey(slug: string): string {
     const suffix =
       browser && typeof crypto.randomUUID === "function"
@@ -4749,14 +4764,16 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       lastAccessUrl = installSummary.accessUrl;
       lastCreatedDeploymentId = installSummary.deploymentId;
       selectedResourceId = installSummary.resourceId || selectedResourceId;
+      recordBlueprintInstallResourceOwner(target, installSummary.resourceId);
 
       installSummary = await observeBlueprintInstallProgressAfterAcceptance(installSummary);
       lastOperatorWorkId = installSummary.operatorWorkId || lastOperatorWorkId;
       lastAccessUrl = installSummary.accessUrl || lastAccessUrl;
       lastCreatedDeploymentId = installSummary.deploymentId || lastCreatedDeploymentId;
       selectedResourceId = installSummary.resourceId || selectedResourceId;
+      recordBlueprintInstallResourceOwner(target, installSummary.resourceId);
 
-      if (lastCreatedDeploymentId && installSummary.terminalStatus !== "failed") {
+      if (lastCreatedDeploymentId && installSummary.terminalStatus === "running") {
         await observeDeploymentProgressAfterAcceptance(
           lastCreatedDeploymentId,
           appendWorkflowDeploymentProgressEvent,
@@ -7090,21 +7107,15 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
 <QuickDeployProgressDialog
   open={workflowProgressDialogOpen}
   pending={deployPending}
-  progressItems={workflowProgressItems}
   deploymentEvents={workflowDeploymentProgressEvents}
   progressError={workflowProgressError}
   feedback={deployFeedback}
   deploymentId={lastCreatedDeploymentId}
   traceLink={workflowDeploymentTraceLink}
+  resourceHref={lastCreatedResourceHref()}
   embedded
   onClose={() => {
     workflowProgressDialogOpen = false;
-  }}
-  onOpenResource={() => {
-    const href = lastCreatedResourceHref();
-    if (href) {
-      void goto(href);
-    }
   }}
   onOpenDeployment={() => {
     void goto(lastCreatedDeploymentHref());

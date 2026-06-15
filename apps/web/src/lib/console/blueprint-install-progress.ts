@@ -478,6 +478,21 @@ export function operatorWorkEnvelopeProgressEvents(
   envelopes: readonly OperatorWorkEventStreamEnvelope[],
 ): DeploymentProgressEvent[] {
   return envelopes.flatMap((envelope) =>
-    "event" in envelope ? [operatorWorkEventToProgressEvent(envelope.event)] : [],
+    "event" in envelope && shouldShowOperatorWorkProgressEvent(envelope.event)
+      ? [operatorWorkEventToProgressEvent(envelope.event)]
+      : [],
+  );
+}
+
+function shouldShowOperatorWorkProgressEvent(event: OperatorWorkObservedEvent): boolean {
+  if (event.deploymentId) {
+    return true;
+  }
+
+  return (
+    event.kind === "failed" ||
+    event.kind === "canceled" ||
+    event.kind === "dead-lettered" ||
+    event.status === "failed"
   );
 }

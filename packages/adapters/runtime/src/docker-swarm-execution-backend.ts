@@ -15,11 +15,16 @@ import {
   ok,
   redactScheduledTaskSecretText,
   type Deployment,
+  type DeploymentTimelineJournalSource,
   type RollbackPlan,
   type Result,
 } from "@appaloft/core";
 import {
+  createDeploymentProgressEvent,
   type DependencyResourceSecretStore,
+  deploymentProgressSteps,
+  type DeploymentProgressRecorder,
+  type DeploymentProgressReporter,
   type ExecutionContext,
   type ResourceAccessFailureRendererTarget,
   type RuntimeTargetBackend,
@@ -81,10 +86,11 @@ function phaseLog(
   phase: SwarmExecutionPhase,
   message: string,
   level: SwarmLogLevel = "info",
+  source: DeploymentTimelineJournalSource = "appaloft",
 ): DeploymentTimelineJournalEntry {
   return DeploymentTimelineJournalEntry.rehydrate({
     timestamp: OccurredAt.rehydrate(new Date().toISOString()),
-    source: DeploymentTimelineSourceValue.rehydrate("appaloft"),
+    source: DeploymentTimelineSourceValue.rehydrate(source),
     phase: DeploymentPhaseValue.rehydrate(phase),
     level: LogLevelValue.rehydrate(level),
     message: MessageText.rehydrate(message),
@@ -246,6 +252,8 @@ export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
     ],
     private readonly options: DockerSwarmExecutionBackendOptions = {},
     private readonly dependencyResourceSecretStore?: DependencyResourceSecretStore,
+    private readonly progressRecorder?: DeploymentProgressRecorder,
+    private readonly progressReporter?: DeploymentProgressReporter,
   ) {
     this.descriptor = {
       key: "docker-swarm",
@@ -327,13 +335,31 @@ export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
       dependencyTargetNames: runtimeEnv.dependencyTargetNames,
     });
     for (const step of [...dependencySecretSteps, ...applyPlanResult.value.steps]) {
+      const phase = this.phaseForStep(step.step);
+      await this.pushTimeline(timeline, context, identity.deploymentId, {
+        phase,
+        message: step.displayCommand,
+        source: "docker",
+      });
       const result = await this.runStep(step);
-      timeline.push(phaseLog(step.step === "verify-candidate-service" ? "verify" : "deploy", step.step));
+
+      if (result.isOk()) {
+        await this.pushCommandOutput(timeline, {
+          context,
+          deploymentId: identity.deploymentId,
+          phase,
+          result: result.value,
+          redactions,
+        });
+      }
 
       if (result.isErr()) {
         const message = safeFailureMessage(result.error.message, redactions);
-        const failurePhase = step.step === "verify-candidate-service" ? "verify" : "deploy";
-        timeline.push(phaseLog(failurePhase, message, "error"));
+        await this.pushTimeline(timeline, context, identity.deploymentId, {
+          phase,
+          message,
+          level: "error",
+        });
         await this.cleanupFailedCandidate(deployment, timeline, redactions);
         return applyExecutionResult(
           deployment,
@@ -352,8 +378,11 @@ export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
           result.value.stderr ?? `Docker Swarm command failed at ${step.step}`,
           redactions,
         );
-        const failurePhase = step.step === "verify-candidate-service" ? "verify" : "deploy";
-        timeline.push(phaseLog(failurePhase, message, "error"));
+        await this.pushTimeline(timeline, context, identity.deploymentId, {
+          phase,
+          message,
+          level: "error",
+        });
         await this.cleanupFailedCandidate(deployment, timeline, redactions);
         return applyExecutionResult(
           deployment,
@@ -441,6 +470,74 @@ export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
       command: step.command,
       displayCommand: step.displayCommand,
     });
+  }
+
+  private phaseForStep(step: string): SwarmExecutionPhase {
+    return step === "verify-candidate-service" ? "verify" : "deploy";
+  }
+
+  private async pushTimeline(
+    timeline: DeploymentTimelineJournalEntry[],
+    context: ExecutionContext,
+    deploymentId: string,
+    input: {
+      phase: SwarmExecutionPhase;
+      message: string;
+      level?: SwarmLogLevel;
+      source?: DeploymentTimelineJournalSource;
+      stream?: "stdout" | "stderr";
+    },
+  ): Promise<void> {
+    const entry = phaseLog(input.phase, input.message, input.level, input.source);
+    timeline.push(entry);
+
+    if (!this.progressRecorder || !this.progressReporter) {
+      return;
+    }
+
+    const event = createDeploymentProgressEvent({
+      deploymentId,
+      phase: input.phase,
+      message: input.message,
+      ...(input.level ? { level: input.level } : {}),
+      ...(input.source ? { source: input.source } : {}),
+      ...(input.stream ? { stream: input.stream } : {}),
+      step: deploymentProgressSteps[input.phase],
+    });
+    await this.progressRecorder.record(context, event).catch(() => undefined);
+    this.progressReporter.report(context, event);
+  }
+
+  private async pushCommandOutput(
+    timeline: DeploymentTimelineJournalEntry[],
+    input: {
+      context: ExecutionContext;
+      deploymentId: string;
+      phase: SwarmExecutionPhase;
+      result: DockerSwarmCommandRunnerResult;
+      redactions: readonly string[];
+    },
+  ): Promise<void> {
+    const outputs = [
+      { stream: "stdout" as const, text: input.result.stdout, level: "info" as const },
+      { stream: "stderr" as const, text: input.result.stderr, level: "warn" as const },
+    ];
+
+    for (const output of outputs) {
+      const lines = safeFailureMessage(output.text ?? "", input.redactions)
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0);
+      for (const line of lines) {
+        await this.pushTimeline(timeline, input.context, input.deploymentId, {
+          phase: input.phase,
+          message: line,
+          level: output.level,
+          source: "docker",
+          stream: output.stream,
+        });
+      }
+    }
   }
 
   private renderDependencySecretMaterializationSteps(input: {
