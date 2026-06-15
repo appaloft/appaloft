@@ -2217,6 +2217,33 @@ describe("console page structure", () => {
     );
   });
 
+  test("[SERVER-COLLECTION-IA-003] keeps loading and readiness treatment aligned with server rows", () => {
+    const serversDisplaySurface = sourceBetween(
+      serversPageSource,
+      "<ConsoleResourceCanvas data-servers-display-surface>",
+      "</ConsoleResourceCanvas>",
+    );
+    const serverLoadingSource = sourceBetween(
+      serversDisplaySurface,
+      "data-server-list-skeleton",
+      "{:else if visibleServers.length === 0}",
+    );
+    const serverReadinessSource = sourceBetween(
+      serversDisplaySurface,
+      "data-server-row-readiness",
+      "data-server-row-ownership",
+    );
+
+    expect(serversDisplaySurface).toContain("data-server-list-skeleton");
+    expect(serverLoadingSource).toContain("lg:grid-cols-[minmax(16rem,1fr)_auto]");
+    expect(serverLoadingSource).toContain("sm:grid-cols-3");
+    expect(serverLoadingSource).toContain("lg:grid-cols-4");
+    expect(serverReadinessSource).toContain("connectivitySurfaceDescription");
+    expect(serversPageSource).toContain('case "active":\n        return "secondary";');
+    expect(serversPageSource).toContain('case "ready":\n        return "secondary";');
+    expect(serversPageSource).toContain('case "available":\n        return "secondary";');
+  });
+
   test("[GOVERNANCE-COLLECTION-IA-002] keeps dependency restore, policy, and delete forms behind dialogs", () => {
     expect(dependencyResourcesPageSource).toContain("dependencyResourcesLoading");
     expect(dependencyResourcesPageSource).toContain("dependencyResourceEnrichmentLoading");
