@@ -362,6 +362,7 @@ Implemented operations:
 | Import resource variables | Command | `resources.import-variables` | `ImportResourceVariablesCommand` | `ImportResourceVariablesCommandInput` | `appaloft resource import-variables <resourceId> --content <dotenv>` | `POST /api/resources/{resourceId}/variables/import` |
 | Unset resource variable | Command | `resources.unset-variable` | `UnsetResourceVariableCommand` | `UnsetResourceVariableCommandInput` | `appaloft resource unset-variable <resourceId> <key>` | `DELETE /api/resources/{resourceId}/variables/{key}` |
 | Archive resource | Command | `resources.archive` | `ArchiveResourceCommand` | `ArchiveResourceCommandInput` | `appaloft resource archive <resourceId>` | `POST /api/resources/{resourceId}/archive` |
+| Restore resource | Command | `resources.restore` | `RestoreResourceCommand` | `RestoreResourceCommandInput` | `appaloft resource restore <resourceId>` | `POST /api/resources/{resourceId}/restore` |
 | Check resource delete safety | Query | `resources.delete-check` | `CheckResourceDeleteSafetyQuery` | `CheckResourceDeleteSafetyQueryInput` | `appaloft resource delete-check <resourceId>` | `GET /api/resources/{resourceId}/delete-check` |
 | Delete resource | Command | `resources.delete` | `DeleteResourceCommand` | `DeleteResourceCommandInput` | `appaloft resource delete <resourceId> --confirm-slug <slug>` | `DELETE /api/resources/{resourceId}` |
 | List resources | Product-session member query | `resources.list` | `ListResourcesQuery` | `ListResourcesQueryInput` | `appaloft resource list` | `GET /api/resources` |

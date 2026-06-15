@@ -24,6 +24,7 @@ It is not a single command. Every user-visible mutation must dispatch one explic
 - `resources.attach-storage`
 - `resources.detach-storage`
 - `resources.archive`
+- `resources.restore`
 - `resources.delete-check`
 - `resources.delete`
 
@@ -63,6 +64,7 @@ This workflow inherits:
 - [resources.effective-config Query Spec](../queries/resources.effective-config.md)
 - [Storage Volume Lifecycle Workflow](./storage-volume-lifecycle.md)
 - [resources.archive Command Spec](../commands/resources.archive.md)
+- [resources.restore Command Spec](../commands/resources.restore.md)
 - [resources.delete-check Query Spec](../queries/resources.delete-check.md)
 - [resources.delete Command Spec](../commands/resources.delete.md)
 - [Resource Profile Drift Visibility](../specs/011-resource-profile-drift-visibility/spec.md)
@@ -120,6 +122,7 @@ cleanup.
 | Bind dependency resource | `resources.bind-dependency` | ResourceBinding metadata | Dependency resource lifecycle, current runtime, historical deployment snapshots |
 | Unbind dependency resource | `resources.unbind-dependency` | ResourceBinding lifecycle/tombstone | Dependency resource deletion, current runtime, historical deployment snapshots |
 | Retire resource | `resources.archive` | Resource lifecycle status | Runtime stop, route/domain/certificate/source-link cleanup |
+| Restore archived resource | `resources.restore` | Resource lifecycle status | Current runtime, historical deployment snapshots, retained routes or bindings |
 | Check delete safety | `resources.delete-check` | Nothing | Resource lifecycle, blockers, or cleanup side effects |
 | Remove unused archived resource from active state | `resources.delete` | Archived unreferenced resource identity | Cascading cleanup of blockers |
 

@@ -151,6 +151,7 @@ appaloft.resources.configureSource -> resources.configure-source POST /resources
 appaloft.resources.count -> resources.count GET /resources/count
 appaloft.resources.create -> resources.create POST /resources
 appaloft.resources.delete -> resources.delete DELETE /resources/{resourceId}
+appaloft.resources.deleteCheck -> resources.delete-check GET /resources/{resourceId}/delete-check
 appaloft.resources.detachStorage -> resources.detach-storage DELETE /resources/{resourceId}/storage-attachments/{attachmentId}
 appaloft.resources.diagnosticSummary -> resources.diagnostic-summary GET /resources/{resourceId}/diagnostic-summary
 appaloft.resources.effectiveConfig -> resources.effective-config GET /resources/{resourceId}/effective-config
@@ -161,6 +162,7 @@ appaloft.resources.list -> resources.list GET /resources
 appaloft.resources.listDependencyBindings -> resources.list-dependency-bindings GET /resources/{resourceId}/dependency-bindings
 appaloft.resources.proxyConfiguration.preview -> resources.proxy-configuration.preview GET /resources/{resourceId}/proxy-configuration
 appaloft.resources.resetHealth -> resources.reset-health POST /resources/{resourceId}/health-policy/reset
+appaloft.resources.restore -> resources.restore POST /resources/{resourceId}/restore
 appaloft.resources.rotateDependencyBindingSecret -> resources.rotate-dependency-binding-secret POST /resources/{resourceId}/dependency-bindings/{bindingId}/secret-rotations
 appaloft.resources.runtime.restart -> resources.runtime.restart POST /resources/{resourceId}/runtime/restart
 appaloft.resources.runtime.start -> resources.runtime.start POST /resources/{resourceId}/runtime/start
@@ -214,6 +216,7 @@ appaloft.servers.list -> servers.list GET /servers
 appaloft.servers.prepareRuntime -> servers.prepare-runtime POST /servers/{serverId}/runtime/prepare
 appaloft.servers.register -> servers.register POST /servers
 appaloft.servers.rename -> servers.rename POST /servers/{serverId}/rename
+appaloft.servers.reorder -> servers.reorder POST /servers/reorder
 appaloft.servers.show -> servers.show GET /servers/{serverId}
 appaloft.servers.testConnectivity -> servers.test-connectivity POST /servers/{serverId}/connectivity-tests
 appaloft.servers.testDraftConnectivity -> servers.test-draft-connectivity POST /servers/connectivity-tests

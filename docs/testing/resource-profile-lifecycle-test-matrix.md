@@ -18,6 +18,7 @@ This matrix covers the active resource profile lifecycle operations:
 - `resources.unset-variable`
 - `resources.effective-config`
 - `resources.archive`
+- `resources.restore`
 - `resources.delete-check`
 - `resources.delete`
 
@@ -42,6 +43,7 @@ generic `resources.update`.
 - [resources.unset-variable Command Spec](../commands/resources.unset-variable.md)
 - [resources.effective-config Query Spec](../queries/resources.effective-config.md)
 - [resources.archive Command Spec](../commands/resources.archive.md)
+- [resources.restore Command Spec](../commands/resources.restore.md)
 - [resources.delete-check Query Spec](../queries/resources.delete-check.md)
 - [resources.delete Command Spec](../commands/resources.delete.md)
 - [resources.configure-health Command Spec](../commands/resources.configure-health.md)
@@ -127,6 +129,9 @@ generic `resources.update`.
 | RES-PROFILE-ARCHIVE-003 | `resources.archive` | Command use case | Resource has deployment history or runtime logs. | Archive succeeds and retains history; no cleanup side effects. |
 | RES-PROFILE-ARCHIVE-004 | `deployments.create` | Command guard | Archived resource selected for deployment. | Rejects with structured lifecycle error. |
 | RES-PROFILE-ARCHIVE-005 | `resource-archived` | Event payload | Archive has safe reason. | Event includes resource ids, `resourceSlug`, archived timestamp, and normalized reason; excludes secrets and logs. |
+| RES-PROFILE-RESTORE-001 | `resources.restore` | Command use case | Archived resource restored. | Persists active lifecycle, clears archive metadata, preserves profile state, publishes `resource-restored`, and returns `ok({ id })`. |
+| RES-PROFILE-RESTORE-002 | `resources.restore` | Command use case | Already active resource. | Returns idempotent `ok({ id })` without duplicate state effect or duplicate event. |
+| RES-PROFILE-RESTORE-003 | `resources.restore` | Command use case | Deleted resource. | Rejects with the lifecycle state-machine invariant and no event. |
 | RES-PROFILE-DELETE-001 | `resources.delete` | Command use case | Archived resource has no blockers and matching slug confirmation. | Transitions/tombstones resource as deleted, publishes `resource-deleted`, returns `ok({ id })`. |
 | RES-PROFILE-DELETE-002 | `resources.delete` | Command use case | Active resource. | Rejects with `resource_delete_blocked`, `lifecycleStatus = "active"`, `deletionBlockers` includes `active-resource`, and no event. |
 | RES-PROFILE-DELETE-003 | `resources.delete` | Command use case | Confirmation slug mismatch. | Rejects with `validation_error`, `phase = resource-deletion-guard`, and no mutation. |
@@ -214,6 +219,9 @@ Automated coverage now exists for:
 - `RES-PROFILE-ARCHIVE-001`, `RES-PROFILE-ARCHIVE-002`, `RES-PROFILE-ARCHIVE-003`, and
   `RES-PROFILE-ARCHIVE-005` in `packages/application/test/archive-resource.test.ts`;
 - `RES-PROFILE-ARCHIVE-004` in `packages/application/test/create-deployment.test.ts`;
+- `RES-PROFILE-RESTORE-001` through `RES-PROFILE-RESTORE-003` in
+  `packages/application/test/restore-resource.test.ts`;
+- `RES-PROFILE-ENTRY-020` in `packages/orpc/test/resource-show.http.test.ts`;
 - `RES-PROFILE-DELETE-001` through `RES-PROFILE-DELETE-008` and
   `RES-PROFILE-DELETE-CHECK-001` through `RES-PROFILE-DELETE-CHECK-003` in
   `packages/application/test/delete-resource.test.ts`;

@@ -434,6 +434,8 @@ import {
   RestoreDependencyResourceBackupUseCase,
   RestoreProjectCommandHandler,
   RestoreProjectUseCase,
+  RestoreResourceCommandHandler,
+  RestoreResourceUseCase,
   RestoreStorageVolumeBackupCommandHandler,
   RestoreStorageVolumeBackupUseCase,
   RetryCertificateCommandHandler,
@@ -2441,6 +2443,7 @@ export function registerApplicationServices(
   container.registerSingleton(ImportResourceVariablesCommandHandler);
   container.registerSingleton(UnsetResourceVariableCommandHandler);
   container.registerSingleton(ArchiveResourceCommandHandler);
+  container.registerSingleton(RestoreResourceCommandHandler);
   container.registerSingleton(DeleteResourceCommandHandler);
   container.registerSingleton(DeactivateServerCommandHandler);
   container.registerSingleton(DeleteServerCommandHandler);
@@ -2761,6 +2764,7 @@ export function registerApplicationServices(
   );
   container.registerSingleton(tokens.createResourceUseCase, CreateResourceUseCase);
   container.registerSingleton(tokens.archiveResourceUseCase, ArchiveResourceUseCase);
+  container.registerSingleton(tokens.restoreResourceUseCase, RestoreResourceUseCase);
   container.registerSingleton(
     tokens.checkResourceDeleteSafetyQueryService,
     CheckResourceDeleteSafetyQueryService,
