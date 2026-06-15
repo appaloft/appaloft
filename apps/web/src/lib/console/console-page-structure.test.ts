@@ -1746,8 +1746,9 @@ describe("console page structure", () => {
     expect(consoleLayoutCssSource).not.toContain(".console-server-detail-body");
     expect(consoleLayoutCssSource).not.toContain(".console-detail-tab-panel");
     expect(serverDetailPageSource).toContain(
-      'class={[detailTabPanelScrollNoTopClass, "space-y-5"]}',
+      'class={[detailTabPanelScrollClass, "space-y-5"]}',
     );
+    expect(serverDetailPageSource).not.toContain("detailTabPanelScrollNoTopClass");
     expect(serverDetailPageSource).toContain("class={detailTabPanelSubnavClass}");
     expect(serverDetailPageSource).toContain("detailSubnavLayoutClass");
     expect(serverDetailPageSource).not.toContain("console-detail-");
