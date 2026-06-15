@@ -943,18 +943,199 @@
   <title>{server?.name ?? $t(i18nKeys.console.servers.pageTitle)} · Appaloft</title>
 </svelte:head>
 
+{#snippet serverDetailLoadingSkeleton()}
+  <div class={detailPageClass} data-server-detail-loading-skeleton>
+    <section class={detailHeaderClass}>
+      <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+        <div class="max-w-3xl space-y-3">
+          <div class="flex flex-wrap items-center gap-2">
+            <Badge class="console-page-kicker" variant="outline">{$t(i18nKeys.common.domain.server)}</Badge>
+            <Skeleton class="h-5 w-24 rounded-md" />
+            <Skeleton class="h-5 w-20 rounded-md" />
+          </div>
+          <div class="space-y-2">
+            <Skeleton class="h-8 w-72 max-w-full" />
+            <Skeleton class="h-4 w-48" />
+          </div>
+          <p class="inline-flex items-center gap-2 text-xs text-muted-foreground">
+            {$t(i18nKeys.common.domain.createdAt)} · <Skeleton class="h-3 w-32" />
+          </p>
+        </div>
+
+        <div class="flex flex-wrap gap-2">
+          <Button href="/servers" variant="outline">
+            <ArrowLeft class="size-4" />
+            {$t(i18nKeys.common.actions.backToServers)}
+          </Button>
+        </div>
+      </div>
+    </section>
+
+    <Tabs.Root value={activeTab} class={detailBodyClass}>
+      <nav aria-label={$t(i18nKeys.console.servers.pageTitle)} class={detailTabsClass}>
+        {#each serverDetailTabs as tab (tab)}
+          <a
+            href={serverTabHref(tab)}
+            class={detailTabClass}
+            aria-current={activeTab === tab ? "page" : undefined}
+            onclick={(event) => selectServerTab(tab, event)}
+          >
+            {serverTabLabel(tab)}
+          </a>
+        {/each}
+      </nav>
+
+      <Tabs.Content
+        value="overview"
+        class={[detailTabPanelScrollClass, "space-y-5"]}
+        data-server-overview-display-surface
+      >
+        <div class="console-metric-strip sm:grid-cols-2 xl:grid-cols-5">
+          <div>
+            <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <Network class="size-4" />
+              {$t(i18nKeys.common.domain.provider)}
+            </p>
+            <Skeleton class="mt-2 h-4 w-28 max-w-full" />
+          </div>
+          <div>
+            <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <Server class="size-4" />
+              {$t(i18nKeys.common.domain.host)}
+            </p>
+            <Skeleton class="mt-2 h-4 w-36 max-w-full" />
+          </div>
+          <div>
+            <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <CircleDashed class="size-4" />
+              {$t(i18nKeys.common.domain.port)}
+            </p>
+            <Skeleton class="mt-2 h-4 w-16" />
+          </div>
+          <div>
+            <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <KeyRound class="size-4" />
+              {$t(i18nKeys.console.serverForm.sshCredentialTitle)}
+            </p>
+            <Skeleton class="mt-2 h-4 w-32 max-w-full" />
+          </div>
+          <div>
+            <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <CircleDashed class="size-4" />
+              {$t(i18nKeys.common.domain.proxy)}
+            </p>
+            <div class="mt-2 flex min-w-0 items-center gap-2">
+              <Skeleton class="h-4 w-20" />
+              <Skeleton class="h-5 w-24 rounded-md" />
+            </div>
+          </div>
+        </div>
+
+        <div class="console-metric-strip sm:grid-cols-3">
+          <div>
+            <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <Boxes class="size-4" />
+              {$t(i18nKeys.common.domain.resources)}
+            </p>
+            <Skeleton class="mt-2 h-4 w-10" />
+          </div>
+          <div>
+            <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <Activity class="size-4" />
+              {$t(i18nKeys.common.domain.deployments)}
+            </p>
+            <Skeleton class="mt-2 h-4 w-10" />
+          </div>
+          <div>
+            <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <Globe2 class="size-4" />
+              {$t(i18nKeys.common.domain.domainBindings)}
+            </p>
+            <Skeleton class="mt-2 h-4 w-10" />
+          </div>
+        </div>
+
+        <section class="grid gap-4 xl:grid-cols-4" data-server-overview-operational-surfaces>
+          <div class="console-subtle-panel flex min-w-0 flex-col gap-3 p-4">
+            <div class="space-y-1">
+              <h2 class="flex items-center gap-2 text-sm font-semibold">
+                <Gauge class="size-4 text-muted-foreground" />
+                {$t(i18nKeys.console.servers.runtimeSurfaceTitle)}
+              </h2>
+              <p class="text-sm leading-6 text-muted-foreground">
+                {$t(i18nKeys.console.servers.runtimeSurfaceDescription)}
+              </p>
+            </div>
+            <div class="mt-auto flex flex-wrap gap-2">
+              <Button type="button" size="sm" variant="outline" disabled>
+                {$t(i18nKeys.console.runtimeUsage.monitorTab)}
+              </Button>
+              <Button type="button" size="sm" variant="outline" disabled>
+                <Terminal class="size-3.5" />
+                {$t(i18nKeys.common.actions.openTerminal)}
+              </Button>
+            </div>
+          </div>
+
+          <div class="console-subtle-panel flex min-w-0 flex-col gap-3 p-4">
+            <div class="space-y-1">
+              <h2 class="flex items-center gap-2 text-sm font-semibold">
+                <Gauge class="size-4 text-muted-foreground" />
+                {$t(i18nKeys.console.servers.capacitySurfaceTitle)}
+              </h2>
+              <p class="text-sm leading-6 text-muted-foreground">
+                {$t(i18nKeys.console.servers.capacitySurfaceDescription)}
+              </p>
+            </div>
+            <Button type="button" class="mt-auto w-fit" size="sm" variant="outline" disabled>
+              {$t(i18nKeys.console.servers.capacityTab)}
+            </Button>
+          </div>
+
+          <div class="console-subtle-panel flex min-w-0 flex-col gap-3 p-4">
+            <div class="space-y-1">
+              <h2 class="flex items-center gap-2 text-sm font-semibold">
+                <Activity class="size-4 text-muted-foreground" />
+                {$t(i18nKeys.console.servers.connectivitySurfaceTitle)}
+              </h2>
+              <p class="text-sm leading-6 text-muted-foreground">
+                {$t(i18nKeys.console.servers.connectivitySurfaceDescription)}
+              </p>
+            </div>
+            <Button type="button" class="mt-auto w-fit" size="sm" variant="outline" disabled>
+              {$t(i18nKeys.console.servers.connectivityTab)}
+            </Button>
+          </div>
+
+          <div class="console-subtle-panel flex min-w-0 flex-col gap-3 p-4">
+            <div class="space-y-1">
+              <h2 class="flex items-center gap-2 text-sm font-semibold">
+                <Boxes class="size-4 text-muted-foreground" />
+                {$t(i18nKeys.console.servers.deploymentsSurfaceTitle)}
+              </h2>
+              <p class="text-sm leading-6 text-muted-foreground">
+                {$t(i18nKeys.console.servers.deploymentsSurfaceDescription)}
+              </p>
+            </div>
+            <div class="mt-auto flex items-center justify-between gap-3">
+              <Skeleton class="h-5 w-8 rounded-md" />
+              <Button type="button" size="sm" variant="outline" disabled>
+                {$t(i18nKeys.common.actions.openDeployments)}
+              </Button>
+            </div>
+          </div>
+        </section>
+      </Tabs.Content>
+    </Tabs.Root>
+  </div>
+{/snippet}
+
 <ConsoleShell
   title={server?.name ?? $t(i18nKeys.console.servers.pageTitle)}
   description={$t(i18nKeys.console.servers.detailDescription)}
 >
   {#if pageLoading}
-    <div class="space-y-5">
-      <Skeleton class="h-36 w-full" />
-      <div class="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
-        <Skeleton class="h-72 w-full" />
-        <Skeleton class="h-72 w-full" />
-      </div>
-    </div>
+    {@render serverDetailLoadingSkeleton()}
   {:else if !server}
     <section class="console-panel space-y-5 p-5">
       <Badge class="console-page-kicker" variant="outline">{$t(i18nKeys.errors.backend.notFound)}</Badge>
