@@ -260,7 +260,7 @@
   ): "default" | "secondary" | "outline" | "destructive" {
     switch (status) {
       case "active":
-        return "default";
+        return "secondary";
       case "inactive":
         return "outline";
     }
@@ -286,7 +286,7 @@
   ): "default" | "secondary" | "outline" | "destructive" {
     switch (status) {
       case "ready":
-        return "default";
+        return "secondary";
       case "failed":
         return "destructive";
       case "starting":
@@ -320,7 +320,7 @@
 
     switch (status.status) {
       case "available":
-        return "default";
+        return "secondary";
       case "unavailable":
         return "destructive";
     }
@@ -395,68 +395,120 @@
   title={$t(i18nKeys.console.servers.pageTitle)}
   description={$t(i18nKeys.console.servers.description)}
 >
-  {#if pageLoading}
-    <div class="space-y-5">
-      <section class="space-y-3">
-        <Skeleton class="h-5 w-36" />
-        <Skeleton class="h-4 w-80" />
-      </section>
-      <div class="space-y-3">
-        {#each Array.from({ length: 4 }) as _, index (index)}
-          <Skeleton class="h-12 w-full" />
-        {/each}
-      </div>
-    </div>
-  {:else}
-    <ConsoleResourceCanvas data-servers-display-surface>
-      <section class="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
-        <div class="max-w-2xl space-y-2">
-          <div class="flex items-center gap-2">
-            <h1 class="text-2xl font-semibold">{$t(i18nKeys.console.servers.focusTitle)}</h1>
-            <DocsHelpLink
-              href={webDocsHrefs.serverDeploymentTarget}
-              ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-            />
-          </div>
-          <p class="text-sm leading-6 text-muted-foreground">
-            {$t(i18nKeys.console.servers.focusDescription)}
-          </p>
+  <ConsoleResourceCanvas data-servers-display-surface>
+    <section class="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+      <div class="max-w-2xl space-y-2">
+        <div class="flex items-center gap-2">
+          <h1 class="text-2xl font-semibold">{$t(i18nKeys.console.servers.focusTitle)}</h1>
+          <DocsHelpLink
+            href={webDocsHrefs.serverDeploymentTarget}
+            ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+          />
         </div>
-        {#if visibleServers.length > 0}
-          <div class="flex shrink-0 flex-wrap items-center gap-2 self-start">
-            <Button type="button" onclick={openServerCreateDialog}>
-              <Plus class="size-4" />
-              {$t(i18nKeys.common.actions.createServer)}
-            </Button>
-            <Button
-              type="button"
-              variant={serverSortMode ? "selected" : "outline"}
-              disabled={reorderServersMutation.isPending}
-              onclick={() => setServerSortMode(!serverSortMode)}
-              data-server-sort-toggle
-            >
-              {#if serverSortMode}
-                <Check class="size-4" />
-                {$t(i18nKeys.common.actions.done)}
-              {:else}
-                <Pencil class="size-4" />
-                {$t(i18nKeys.common.actions.edit)}
-              {/if}
-            </Button>
-          </div>
-        {/if}
-      </section>
+        <p class="text-sm leading-6 text-muted-foreground">
+          {$t(i18nKeys.console.servers.focusDescription)}
+        </p>
+      </div>
+      {#if !pageLoading && visibleServers.length > 0}
+        <div class="flex shrink-0 flex-wrap items-center gap-2 self-start">
+          <Button type="button" onclick={openServerCreateDialog}>
+            <Plus class="size-4" />
+            {$t(i18nKeys.common.actions.createServer)}
+          </Button>
+          <Button
+            type="button"
+            variant={serverSortMode ? "selected" : "outline"}
+            disabled={reorderServersMutation.isPending}
+            onclick={() => setServerSortMode(!serverSortMode)}
+            data-server-sort-toggle
+          >
+            {#if serverSortMode}
+              <Check class="size-4" />
+              {$t(i18nKeys.common.actions.done)}
+            {:else}
+              <Pencil class="size-4" />
+              {$t(i18nKeys.common.actions.edit)}
+            {/if}
+          </Button>
+        </div>
+      {/if}
+    </section>
 
-      {#if visibleServers.length === 0}
-        <ConsoleEmptyState
-          tone="server"
-          title={$t(i18nKeys.console.servers.emptyTitle)}
-          description={$t(i18nKeys.console.servers.emptyBody)}
-          actionLabel={$t(i18nKeys.common.actions.createServer)}
-          learnMoreHref={webDocsHrefs.serverDeploymentTarget}
-          onAction={openServerCreateDialog}
-        />
-      {:else}
+    {#if pageLoading}
+      <section class="space-y-3" data-server-list-skeleton>
+        <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div class="space-y-2">
+            <Skeleton class="h-5 w-32" />
+            <Skeleton class="h-4 w-64 max-w-full" />
+          </div>
+          <Skeleton class="h-4 w-28" />
+        </div>
+
+        <div class="grid gap-3">
+          {#each Array.from({ length: 3 }) as _, index (index)}
+            <article
+              class="rounded-md border bg-card p-4 shadow-sm lg:grid lg:grid-cols-[minmax(16rem,1fr)_auto] lg:items-start lg:gap-x-4"
+            >
+              <div class="min-w-0">
+                <div class="flex min-w-0 items-start gap-3">
+                  <div class="min-w-0 space-y-2">
+                    <div class="flex min-w-0 items-center gap-2">
+                      <Skeleton class="size-4 shrink-0 rounded-sm" />
+                      <Skeleton class="h-5 w-36" />
+                      <Skeleton class="h-5 w-14 rounded-sm" />
+                    </div>
+                    <Skeleton class="h-4 w-48 max-w-full" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="mt-4 grid min-w-0 gap-2 sm:grid-cols-3 lg:col-span-2">
+                {#each Array.from({ length: 3 }) as _, cardIndex (`${index}-${cardIndex}`)}
+                  <div class="grid min-w-0 gap-2 rounded-md border bg-background/60 px-3 py-2">
+                    <div class="flex min-w-0 items-center justify-between gap-3">
+                      <div class="inline-flex min-w-0 items-center gap-2">
+                        <Skeleton class="size-3.5 shrink-0 rounded-sm" />
+                        <Skeleton class="h-4 w-20" />
+                      </div>
+                      <Skeleton class="h-5 w-14 rounded-sm" />
+                    </div>
+                    <Skeleton class="h-4 w-full" />
+                  </div>
+                {/each}
+              </div>
+
+              <div
+                class="mt-3 grid min-w-0 gap-x-4 gap-y-2 border-t pt-3 sm:grid-cols-2 lg:col-span-2 lg:grid-cols-4"
+              >
+                {#each Array.from({ length: 4 }) as _, metaIndex (`${index}-${metaIndex}`)}
+                  <div class="inline-flex min-w-0 items-center gap-2">
+                    <Skeleton class="size-3.5 shrink-0 rounded-sm" />
+                    <Skeleton class="h-4 w-28" />
+                  </div>
+                {/each}
+              </div>
+
+              <div
+                class="mt-3 flex flex-wrap items-center justify-end gap-2 border-t pt-3 lg:col-start-2 lg:row-start-1 lg:mt-0 lg:border-t-0 lg:pt-0"
+              >
+                <Skeleton class="h-8 w-20 rounded-md" />
+                <Skeleton class="h-8 w-24 rounded-md" />
+                <Skeleton class="h-8 w-24 rounded-md" />
+              </div>
+            </article>
+          {/each}
+        </div>
+      </section>
+    {:else if visibleServers.length === 0}
+      <ConsoleEmptyState
+        tone="server"
+        title={$t(i18nKeys.console.servers.emptyTitle)}
+        description={$t(i18nKeys.console.servers.emptyBody)}
+        actionLabel={$t(i18nKeys.common.actions.createServer)}
+        learnMoreHref={webDocsHrefs.serverDeploymentTarget}
+        onAction={openServerCreateDialog}
+      />
+    {:else}
         <section class="space-y-3">
           <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>
@@ -568,11 +620,14 @@
                         {runtimeAvailabilityLabel(server.runtimeAvailability)}
                       </Badge>
                     </div>
-                    {#if server.runtimeAvailability?.message}
-                      <p class="line-clamp-2 text-xs leading-5 text-muted-foreground" title={server.runtimeAvailability.message}>
-                        {server.runtimeAvailability.message}
-                      </p>
-                    {/if}
+                    <p
+                      class="line-clamp-2 text-xs leading-5 text-muted-foreground"
+                      title={server.runtimeAvailability?.message ??
+                        $t(i18nKeys.console.servers.connectivitySurfaceDescription)}
+                    >
+                      {server.runtimeAvailability?.message ??
+                        $t(i18nKeys.console.servers.connectivitySurfaceDescription)}
+                    </p>
                   </div>
 
                   <div
@@ -673,26 +728,25 @@
             {/each}
           </div>
         </section>
-      {/if}
-    </ConsoleResourceCanvas>
+    {/if}
+  </ConsoleResourceCanvas>
 
-    <Dialog.Root bind:open={serverCreateDialogOpen} onOpenChange={setServerCreateDialogOpen}>
-      <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-5xl">
-        <Dialog.Header>
-          <Dialog.Title>{$t(i18nKeys.console.servers.createFormTitle)}</Dialog.Title>
-          <Dialog.Description>
-            {$t(i18nKeys.console.servers.createFormDescription)}
-          </Dialog.Description>
-        </Dialog.Header>
-        <div class="px-5 pb-5">
-          <ServerCreateForm
-            idPrefix="servers-page-create"
-            onCreated={openCreatedServer}
-          />
-        </div>
-      </Dialog.Content>
-    </Dialog.Root>
-  {/if}
+  <Dialog.Root bind:open={serverCreateDialogOpen} onOpenChange={setServerCreateDialogOpen}>
+    <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-5xl">
+      <Dialog.Header>
+        <Dialog.Title>{$t(i18nKeys.console.servers.createFormTitle)}</Dialog.Title>
+        <Dialog.Description>
+          {$t(i18nKeys.console.servers.createFormDescription)}
+        </Dialog.Description>
+      </Dialog.Header>
+      <div class="px-5 pb-5">
+        <ServerCreateForm
+          idPrefix="servers-page-create"
+          onCreated={openCreatedServer}
+        />
+      </div>
+    </Dialog.Content>
+  </Dialog.Root>
 </ConsoleShell>
 
 <style>
