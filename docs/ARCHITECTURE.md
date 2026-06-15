@@ -167,6 +167,22 @@ local Blueprints without a hosted catalog. See
 - infrastructure endpoints such as `health`, `readiness`, and `version` are adapter concerns and
   intentionally sit outside that business operation catalog
 
+## Public Neutral Source Of Truth
+
+Public Appaloft owns provider-neutral domain language, extension points, operation catalog entries,
+CLI/API/Web contracts, provider ports, fake provider contracts, and public specs for behavior that
+Community, self-hosted, hosted, or private distributions can all use. A feature is public-neutral
+when it describes Appaloft concepts such as deployments, resources, dependency resources, source
+connections, DNS record intent, provider-assisted SSH onboarding, access routing, storage, or
+operation surfaces without depending on a hosted commercial policy.
+
+Hosted or private distributions may decorate those public concepts with their own provider
+availability, official app defaults, billing policy, credential store, tenant policy, go-live
+gates, or commercial workflows. Those distribution-specific facts must not become the canonical
+public model. When a downstream distribution needs a new Appaloft capability, the neutral spec and
+extension point belong in this public repository first; distribution repositories should then add
+only their overlay, adapter composition, policies, and source-of-truth references.
+
 ## Provider vs Strategy vs Integration vs Plugin
 
 - Provider:
