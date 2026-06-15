@@ -261,7 +261,7 @@ describe("runtime usage console readback", () => {
       "observationTo: resourceRuntimeMonitoringObservationHandoff.to",
     );
 
-    expect(samplesSpec).toContain("runtime logs, deployment timeline");
+    expect(samplesSpec).toContain("runtime logs, deployment logs, request payloads");
     expect(samplesSpec).toContain("not be persisted in monitoring samples");
     expect(rollupSpec).toContain("must not copy log lines into rollup output");
   });
