@@ -129,7 +129,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   } from "$lib/console/server-registration";
   import { deploymentDetailHref, readSessionIdentity, resourceDetailHref } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
-  import { orpcClient } from "$lib/orpc";
+  import { orpc, orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
 
   type SourceKind =
@@ -717,34 +717,28 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     }),
   );
   const projectsQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["projects", { limit: defaultConsoleListLimit }],
-      queryFn: () => orpcClient.projects.list({ limit: defaultConsoleListLimit }),
+    orpc.projects.list.queryOptions({
+      input: { limit: defaultConsoleListLimit },
       enabled: browser && enabled,
     }),
   );
   const serversQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["servers", { limit: defaultConsoleListLimit, runtimeAvailability: "all" }],
-      queryFn: () =>
-        orpcClient.servers.list({
-          limit: defaultConsoleListLimit,
-          runtimeAvailability: "all",
-        }),
+    orpc.servers.list.queryOptions({
+      input: {
+        limit: defaultConsoleListLimit,
+        runtimeAvailability: "all",
+      },
       enabled: browser && enabled,
     }),
   );
   const environmentsQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["environments", { limit: defaultConsoleListLimit }],
-      queryFn: () => orpcClient.environments.list({ limit: defaultConsoleListLimit }),
+    orpc.environments.list.queryOptions({
+      input: { limit: defaultConsoleListLimit },
       enabled: browser && enabled,
     }),
   );
   const integrationsQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["integrations"],
-      queryFn: () => orpcClient.integrations.list(),
+    orpc.integrations.list.queryOptions({
       enabled: browser && enabled,
     }),
   );
@@ -1023,28 +1017,20 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       orpcClient.staticArtifacts.publishArchive(input),
   }));
   const resourcesQuery = createQuery(() =>
-    queryOptions({
-      queryKey: [
-        "resources",
-        selectedProjectId,
-        environmentContextEnabled ? selectedEnvironmentId : "",
-        { limit: defaultConsoleListLimit },
-      ],
-      queryFn: () =>
-        orpcClient.resources.list({
-          ...(selectedProjectId ? { projectId: selectedProjectId } : {}),
-          ...(environmentContextEnabled && selectedEnvironmentId
-            ? { environmentId: selectedEnvironmentId }
-            : {}),
-          limit: defaultConsoleListLimit,
-        }),
+    orpc.resources.list.queryOptions({
+      input: {
+        ...(selectedProjectId ? { projectId: selectedProjectId } : {}),
+        ...(environmentContextEnabled && selectedEnvironmentId
+          ? { environmentId: selectedEnvironmentId }
+          : {}),
+        limit: defaultConsoleListLimit,
+      },
       enabled: browser && enabled,
     }),
   );
   const sshCredentialsQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["credentials", "ssh", { limit: defaultConsoleListLimit }],
-      queryFn: () => orpcClient.credentials.ssh.list({ limit: defaultConsoleListLimit }),
+    orpc.credentials.ssh.list.queryOptions({
+      input: { limit: defaultConsoleListLimit },
       enabled: browser && enabled,
     }),
   );
@@ -1072,9 +1058,8 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     githubIntegration?.configuration?.diagnostics ?? [],
   );
   const githubAppConnectionQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["integrations", "github", "app-connection"],
-      queryFn: () => orpcClient.integrations.github.appConnection.show({}),
+    orpc.integrations.github.appConnection.show.queryOptions({
+      input: {},
       enabled:
         browser &&
         enabled &&
@@ -2029,18 +2014,10 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   });
 
   const githubRepositoriesQuery = createQuery(() =>
-    queryOptions({
-      queryKey: [
-        "integrations",
-        "github",
-        githubConnectionMode?.key ?? "user-oauth",
-        "repositories",
-        githubRepositorySearch.trim(),
-      ],
-      queryFn: () =>
-        orpcClient.integrations.github.repositories.list({
-          ...(githubRepositorySearch.trim() ? { search: githubRepositorySearch.trim() } : {}),
-        }),
+    orpc.integrations.github.repositories.list.queryOptions({
+      input: {
+        ...(githubRepositorySearch.trim() ? { search: githubRepositorySearch.trim() } : {}),
+      },
       enabled:
         browser &&
         enabled &&
@@ -3819,12 +3796,12 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
 
   async function refreshWorkspaceData(): Promise<void> {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["projects"] }),
-      queryClient.invalidateQueries({ queryKey: ["servers"] }),
-      queryClient.invalidateQueries({ queryKey: ["environments"] }),
-      queryClient.invalidateQueries({ queryKey: ["resources"] }),
-      queryClient.invalidateQueries({ queryKey: ["dependency-resources"] }),
-      queryClient.invalidateQueries({ queryKey: ["deployments"] }),
+      queryClient.invalidateQueries({ queryKey: orpc.projects.key({ type: "query" }) }),
+      queryClient.invalidateQueries({ queryKey: orpc.servers.key({ type: "query" }) }),
+      queryClient.invalidateQueries({ queryKey: orpc.environments.key({ type: "query" }) }),
+      queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) }),
+      queryClient.invalidateQueries({ queryKey: orpc.dependencyResources.key({ type: "query" }) }),
+      queryClient.invalidateQueries({ queryKey: orpc.deployments.key({ type: "query" }) }),
     ]);
   }
 
@@ -5013,8 +4990,8 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       }
 
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["dependency-resources"] }),
-        queryClient.invalidateQueries({ queryKey: ["resources"] }),
+        queryClient.invalidateQueries({ queryKey: orpc.dependencyResources.key({ type: "query" }) }),
+        queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) }),
       ]);
 
       return {

@@ -29,12 +29,14 @@ const settingsNavSource = readFileSync(
 
 describe("archived project surfaces", () => {
   test("[PROJ-LIFE-WEB-DEFAULT-001] default project surfaces rely on backend active-only list semantics", () => {
-    expect(homePageSource).toContain("orpcClient.projects.list({ limit: homeProjectListLimit })");
+    expect(homePageSource).toContain("orpc.projects.list.queryOptions({");
+    expect(homePageSource).toContain("input: { limit: homeProjectListLimit }");
     expect(projectsPageSource).toMatch(
       /createConsoleQueries\(browser,\s*\{[\s\S]*projects:\s*false[\s\S]*\}\)/,
     );
+    expect(projectsPageSource).toContain("orpc.projects.list.queryOptions({");
     expect(projectsPageSource).toContain(
-      "orpcClient.projects.list({ limit: projectPageSize, offset: projectOffset })",
+      "input: { limit: projectPageSize, offset: projectOffset }",
     );
     expect(consoleShellSource).toContain("projectsQuery.data?.items ?? []");
     expect(homePageSource).not.toContain('lifecycleStatus === "archived"');
@@ -51,9 +53,8 @@ describe("archived project surfaces", () => {
     expect(organizationArchivedProjectsRouteSource).toContain(
       '<OrganizationPage section="archived-projects" />',
     );
-    expect(organizationPageSource).toContain(
-      'orpcClient.projects.list({ lifecycleStatus: "archived", limit: 100 })',
-    );
+    expect(organizationPageSource).toContain("orpc.projects.list.queryOptions({");
+    expect(organizationPageSource).toContain('input: { lifecycleStatus: "archived", limit: 100 }');
     expect(organizationPageSource).toContain('activeSection === "archived-projects"');
   });
 });

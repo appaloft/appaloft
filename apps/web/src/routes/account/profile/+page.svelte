@@ -12,7 +12,7 @@
   import { accountSettingsItems } from "$lib/console/settings-nav";
   import { formatTime } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
-  import { orpcClient } from "$lib/orpc";
+  import { orpc, orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
 
   let displayName = $state("");
@@ -22,9 +22,8 @@
   let operationError = $state("");
 
   const profileQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["account", "profile"],
-      queryFn: () => orpcClient.account.showProfile({}),
+    orpc.account.showProfile.queryOptions({
+      input: {},
       enabled: browser,
       retry: 0,
     }),
@@ -50,7 +49,7 @@
     onSuccess: () => {
       operationError = "";
       operationNotice = $t(i18nKeys.console.accountSettings.profileSaved);
-      void queryClient.invalidateQueries({ queryKey: ["account", "profile"] });
+      void queryClient.invalidateQueries({ queryKey: orpc.account.showProfile.key({ input: {} }) });
       profileEditDialogOpen = false;
     },
     onError: (error) => {

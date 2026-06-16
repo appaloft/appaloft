@@ -243,7 +243,7 @@ describe("console docs help links", () => {
       "serverTerminalSession",
     );
     expect(sourceByPath["routes/servers/[serverId=consoleObjectId]/+page.svelte"]).toContain(
-      "orpcClient.servers.deleteCheck",
+      "orpc.servers.deleteCheck.queryOptions",
     );
     expect(sourceByPath["routes/servers/[serverId=consoleObjectId]/+page.svelte"]).toContain(
       "orpcClient.servers.delete",
@@ -255,7 +255,7 @@ describe("console docs help links", () => {
       "runtimeTargetCapacity",
     );
     expect(sourceByPath["routes/servers/[serverId=consoleObjectId]/+page.svelte"]).toContain(
-      "orpcClient.servers.capacity.inspect",
+      "orpc.servers.capacity.inspect.queryOptions",
     );
     expect(sourceByPath["routes/servers/[serverId=consoleObjectId]/+page.svelte"]).toContain(
       "lifecycleDialogTitle",

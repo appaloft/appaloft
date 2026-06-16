@@ -3,7 +3,7 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import { onDestroy, untrack } from "svelte";
-  import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
+  import { createMutation, createQuery } from "@tanstack/svelte-query";
   import {
     ArrowLeft,
     ArrowRight,
@@ -162,7 +162,7 @@
     resourcePreviewEnvironmentDetailHref,
   } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
-  import { orpcClient } from "$lib/orpc";
+  import { orpc, orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
 
   type RuntimeLogClientStream = {
@@ -343,99 +343,83 @@
   );
   let storageBackupVolumeId = $state("");
   const resourceDetailQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["resources", "show", resourceId],
-      queryFn: () =>
-        orpcClient.resources.show({
-          resourceId,
-          includeLatestDeployment: true,
-          includeAccessSummary: true,
-          includeProfileDiagnostics: true,
-        }),
+    orpc.resources.show.queryOptions({
+      input: {
+        resourceId,
+        includeLatestDeployment: true,
+        includeAccessSummary: true,
+        includeProfileDiagnostics: true,
+      },
       enabled: browser && resourceId.length > 0,
       staleTime: 5_000,
     }),
   );
   const resourceDeleteSafetyQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["resources", "delete-check", resourceId],
-      queryFn: () =>
-        orpcClient.resources.deleteCheck({
-          resourceId,
-        }),
+    orpc.resources.deleteCheck.queryOptions({
+      input: {
+        resourceId,
+      },
       enabled: browser && resourceId.length > 0,
       staleTime: 5_000,
     }),
   );
   const resourceHealthQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["resources", "health", resourceId, "detail"],
-      queryFn: () =>
-        orpcClient.resources.health({
-          resourceId,
-          mode: "live",
-          includeChecks: true,
-          includePublicAccessProbe: true,
-        }),
+    orpc.resources.health.queryOptions({
+      input: {
+        resourceId,
+        mode: "live",
+        includeChecks: true,
+        includePublicAccessProbe: true,
+      },
       enabled: browser && resourceId.length > 0,
       staleTime: 5_000,
     }),
   );
   const resourceEffectiveConfigQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["resources", "effective-config", resourceId],
-      queryFn: () =>
-        orpcClient.resources.effectiveConfig({
-          resourceId,
-        }),
+    orpc.resources.effectiveConfig.queryOptions({
+      input: {
+        resourceId,
+      },
       enabled: browser && resourceId.length > 0,
       staleTime: 5_000,
     }),
   );
   const resourceSourceEventsQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["source-events", "resource", resourceId],
-      queryFn: () =>
-        orpcClient.sourceEvents.list({
-          resourceId,
-          limit: 25,
-        }),
+    orpc.sourceEvents.list.queryOptions({
+      input: {
+        resourceId,
+        limit: 25,
+      },
       enabled: resourceSourceEventsEnabled,
       staleTime: 5_000,
     }),
   );
   const resourcePreviewEnvironmentsQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["preview-environments", "resource", resourceId],
-      queryFn: () =>
-        orpcClient.previewEnvironments.list({
-          resourceId,
-          limit: 50,
-        }),
+    orpc.previewEnvironments.list.queryOptions({
+      input: {
+        resourceId,
+        limit: 50,
+      },
       enabled: resourcePreviewsEnabled,
       staleTime: 5_000,
     }),
   );
   const scheduledTasksQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["scheduled-tasks", "resource", resourceId],
-      queryFn: () =>
-        orpcClient.scheduledTasks.list({
-          resourceId,
-          limit: 25,
-        }),
+    orpc.scheduledTasks.list.queryOptions({
+      input: {
+        resourceId,
+        limit: 25,
+      },
       enabled: resourceScheduledTasksEnabled,
       staleTime: 5_000,
     }),
   );
   const scheduledTaskRunsQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["scheduled-task-runs", "resource", resourceId],
-      queryFn: () =>
-        orpcClient.scheduledTasks.runs.list({
-          resourceId,
-          limit: 25,
-        }),
+    orpc.scheduledTasks.runs.list.queryOptions({
+      input: {
+        resourceId,
+        limit: 25,
+      },
       enabled: browser && resourceId.length > 0,
       staleTime: 5_000,
     }),
@@ -568,57 +552,39 @@
     void capabilities.fetch(resourceCapabilityQueries);
   });
   const storageVolumesQuery = createQuery(() =>
-    queryOptions({
-      queryKey: [
-        "storage-volumes",
-        "resource-attach",
-        resourceProjectId,
-        resourceEnvironmentId,
-      ],
-      queryFn: () =>
-        orpcClient.storageVolumes.list({
-          projectId: resourceProjectId,
-          environmentId: resourceEnvironmentId,
-        }),
+    orpc.storageVolumes.list.queryOptions({
+      input: {
+        projectId: resourceProjectId,
+        environmentId: resourceEnvironmentId,
+      },
       enabled: browser && resourceProjectId.length > 0 && resourceEnvironmentId.length > 0,
       staleTime: 5_000,
     }),
   );
   const dependencyResourcesQuery = createQuery(() =>
-    queryOptions({
-      queryKey: [
-        "dependency-resources",
-        "resource-bind",
-        resourceProjectId,
-        resourceEnvironmentId,
-      ],
-      queryFn: () =>
-        orpcClient.dependencyResources.list({
-          projectId: resourceProjectId,
-          environmentId: resourceEnvironmentId,
-        }),
+    orpc.dependencyResources.list.queryOptions({
+      input: {
+        projectId: resourceProjectId,
+        environmentId: resourceEnvironmentId,
+      },
       enabled: browser && resourceProjectId.length > 0 && resourceEnvironmentId.length > 0,
       staleTime: 5_000,
     }),
   );
   const resourceDependencyBindingsQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["resource-dependency-bindings", resourceId],
-      queryFn: () =>
-        orpcClient.resources.dependencyBindings.list({
-          resourceId,
-        }),
+    orpc.resources.dependencyBindings.list.queryOptions({
+      input: {
+        resourceId,
+      },
       enabled: browser && resourceId.length > 0,
       staleTime: 5_000,
     }),
   );
   const storageVolumeBackupsQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["storage-volume-backups", storageBackupVolumeId],
-      queryFn: () =>
-        orpcClient.storageVolumes.backups.list({
-          storageVolumeId: storageBackupVolumeId,
-        }),
+    orpc.storageVolumes.backups.list.queryOptions({
+      input: {
+        storageVolumeId: storageBackupVolumeId,
+      },
       enabled: browser && storageBackupVolumeId.length > 0,
       staleTime: 5_000,
     }),
@@ -1530,8 +1496,8 @@
       domainName = "";
       redirectTo = "";
       setResourceDomainBindingCreateDialogOpen(false);
-      void queryClient.invalidateQueries({ queryKey: ["domain-bindings"] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
+      void queryClient.invalidateQueries({ queryKey: orpc.domainBindings.key({ type: "query" }) });
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
     },
     onError: (error) => {
       createFeedback = {
@@ -1550,8 +1516,8 @@
         title: $t(i18nKeys.console.domainBindings.confirmOwnershipSuccessTitle),
         detail: $t(i18nKeys.common.status.bound),
       };
-      void queryClient.invalidateQueries({ queryKey: ["domain-bindings"] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
+      void queryClient.invalidateQueries({ queryKey: orpc.domainBindings.key({ type: "query" }) });
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
     },
     onError: (error) => {
       createFeedback = {
@@ -1571,10 +1537,9 @@
         detail: result.certificateId,
       };
       closeCertificateImportDialog();
-      void queryClient.invalidateQueries({ queryKey: ["resources"] });
-      void queryClient.invalidateQueries({ queryKey: ["domain-bindings"] });
-      void queryClient.invalidateQueries({ queryKey: ["certificates"] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
+      void queryClient.invalidateQueries({ queryKey: orpc.domainBindings.key({ type: "query" }) });
+      void queryClient.invalidateQueries({ queryKey: orpc.certificates.key({ type: "query" }) });
     },
     onError: (error, variables) => {
       importFeedback = {
@@ -1594,8 +1559,8 @@
         title: $t(i18nKeys.console.resources.certificateRetrySuccessTitle),
         detail: result.attemptId,
       };
-      void queryClient.invalidateQueries({ queryKey: ["certificates"] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
+      void queryClient.invalidateQueries({ queryKey: orpc.certificates.key({ type: "query" }) });
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
     },
     onError: (error, variables) => {
       certificateActionFeedback = {
@@ -1615,9 +1580,9 @@
         title: $t(i18nKeys.console.resources.certificateRevokeSuccessTitle),
         detail: result.certificateId,
       };
-      void queryClient.invalidateQueries({ queryKey: ["certificates"] });
-      void queryClient.invalidateQueries({ queryKey: ["domain-bindings"] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
+      void queryClient.invalidateQueries({ queryKey: orpc.certificates.key({ type: "query" }) });
+      void queryClient.invalidateQueries({ queryKey: orpc.domainBindings.key({ type: "query" }) });
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
     },
     onError: (error, variables) => {
       certificateActionFeedback = {
@@ -1636,12 +1601,7 @@
         title: $t(i18nKeys.console.resources.healthPolicySaved),
         detail: result.id,
       };
-      void queryClient.invalidateQueries({ queryKey: ["resources"] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "delete-check", resourceId] });
-      void queryClient.invalidateQueries({
-        queryKey: ["resources", "health", resourceId, "detail"],
-      });
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
     },
     onError: (error) => {
       healthFeedback = {
@@ -1660,8 +1620,7 @@
         title: $t(i18nKeys.console.resources.sourceProfileSaved),
         detail: result.id,
       };
-      void queryClient.invalidateQueries({ queryKey: ["resources"] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
     },
     onError: (error) => {
       sourceFeedback = {
@@ -1680,8 +1639,7 @@
         detail: result.sourceFingerprint,
       };
       sourceLinkDialogOpen = false;
-      void queryClient.invalidateQueries({ queryKey: ["resources"] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
     },
     onError: (error) => {
       sourceLinkFeedback = {
@@ -1700,9 +1658,8 @@
         title: $t(i18nKeys.console.resources.autoDeploySaved),
         detail: autoDeployStatusLabel(result.status),
       };
-      void queryClient.invalidateQueries({ queryKey: ["resources"] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
-      void queryClient.invalidateQueries({ queryKey: ["source-events", "resource", resourceId] });
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
+      void queryClient.invalidateQueries({ queryKey: orpc.sourceEvents.key({ type: "query" }) });
     },
     onError: (error) => {
       autoDeployFeedback = {
@@ -1721,9 +1678,8 @@
         title: $t(i18nKeys.console.previewEnvironments.cleanupSucceeded),
         detail: result.attemptId,
       };
-      void queryClient.invalidateQueries({ queryKey: ["preview-environments"] });
       void queryClient.invalidateQueries({
-        queryKey: ["preview-environments", "resource", resourceId],
+        queryKey: orpc.previewEnvironments.key({ type: "query" }),
       });
     },
     onError: (error) => {
@@ -1750,9 +1706,8 @@
 
   async function refreshResourceDeploymentData(): Promise<void> {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["resources"] }),
-      queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] }),
-      queryClient.invalidateQueries({ queryKey: ["deployments"] }),
+      queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) }),
+      queryClient.invalidateQueries({ queryKey: orpc.deployments.key({ type: "query" }) }),
     ]);
   }
 
@@ -2042,9 +1997,8 @@
         title: $t(i18nKeys.console.resources.runtimeProfileSaved),
         detail: result.id,
       };
-      void queryClient.invalidateQueries({ queryKey: ["resources"] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
-    },
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
+          },
     onError: (error) => {
       runtimeFeedback = {
         kind: "error",
@@ -2063,13 +2017,8 @@
       };
       runtimeControlDialogOpen = false;
       selectedRuntimeControlOperation = null;
-      void queryClient.invalidateQueries({ queryKey: ["resources"] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "delete-check", resourceId] });
-      void queryClient.invalidateQueries({
-        queryKey: ["resources", "health", resourceId, "detail"],
-      });
-    },
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
+                      },
     onError: (error) => {
       runtimeControlFeedback = {
         kind: "error",
@@ -2088,13 +2037,8 @@
       };
       runtimeControlDialogOpen = false;
       selectedRuntimeControlOperation = null;
-      void queryClient.invalidateQueries({ queryKey: ["resources"] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "delete-check", resourceId] });
-      void queryClient.invalidateQueries({
-        queryKey: ["resources", "health", resourceId, "detail"],
-      });
-    },
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
+                      },
     onError: (error) => {
       runtimeControlFeedback = {
         kind: "error",
@@ -2113,12 +2057,8 @@
       };
       runtimeControlDialogOpen = false;
       selectedRuntimeControlOperation = null;
-      void queryClient.invalidateQueries({ queryKey: ["resources"] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
-      void queryClient.invalidateQueries({
-        queryKey: ["resources", "health", resourceId, "detail"],
-      });
-    },
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
+                },
     onError: (error) => {
       runtimeControlFeedback = {
         kind: "error",
@@ -2136,12 +2076,8 @@
         title: $t(i18nKeys.console.resources.networkProfileSaved),
         detail: result.id,
       };
-      void queryClient.invalidateQueries({ queryKey: ["resources"] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
-      void queryClient.invalidateQueries({
-        queryKey: ["resources", "health", resourceId, "detail"],
-      });
-      if (resource) {
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
+                  if (resource) {
         void loadProxyConfiguration(resource.id);
       }
     },
@@ -2162,12 +2098,8 @@
         title: $t(i18nKeys.console.resources.accessProfileSaved),
         detail: result.id,
       };
-      void queryClient.invalidateQueries({ queryKey: ["resources"] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
-      void queryClient.invalidateQueries({
-        queryKey: ["resources", "health", resourceId, "detail"],
-      });
-      if (resource) {
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
+                  if (resource) {
         void loadProxyConfiguration(resource.id);
       }
     },
@@ -2189,7 +2121,7 @@
       };
       configValue = "";
       void queryClient.invalidateQueries({
-        queryKey: ["resources", "effective-config", resourceId],
+        queryKey: orpc.resources.effectiveConfig.key({ input: { resourceId } }),
       });
     },
     onError: (error) => {
@@ -2212,7 +2144,7 @@
       };
       configImportContent = "";
       void queryClient.invalidateQueries({
-        queryKey: ["resources", "effective-config", resourceId],
+        queryKey: orpc.resources.effectiveConfig.key({ input: { resourceId } }),
       });
     },
     onError: (error) => {
@@ -2233,7 +2165,7 @@
         detail: variables.key,
       };
       void queryClient.invalidateQueries({
-        queryKey: ["resources", "effective-config", resourceId],
+        queryKey: orpc.resources.effectiveConfig.key({ input: { resourceId } }),
       });
     },
     onError: (error) => {
@@ -2491,12 +2423,8 @@
         title: $t(i18nKeys.console.resources.archiveSucceeded),
         detail: result.id,
       };
-      void queryClient.invalidateQueries({ queryKey: ["resources"] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
-      void queryClient.invalidateQueries({
-        queryKey: ["resources", "health", resourceId, "detail"],
-      });
-    },
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
+                },
     onError: (error) => {
       archiveFeedback = {
         kind: "error",
@@ -2518,12 +2446,8 @@
         title: $t(i18nKeys.console.resources.restoreSucceeded),
         detail: result.id,
       };
-      void queryClient.invalidateQueries({ queryKey: ["resources"] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
-      void queryClient.invalidateQueries({
-        queryKey: ["resources", "health", resourceId, "detail"],
-      });
-    },
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
+                },
     onError: (error) => {
       restoreFeedback = {
         kind: "error",
@@ -2545,12 +2469,8 @@
         title: $t(i18nKeys.console.resources.deleteSucceeded),
         detail: result.id,
       };
-      void queryClient.invalidateQueries({ queryKey: ["resources"] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
-      void queryClient.invalidateQueries({
-        queryKey: ["resources", "health", resourceId, "detail"],
-      });
-      void goto(project ? projectDetailHref(project.id) : "/projects");
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
+                  void goto(project ? projectDetailHref(project.id) : "/projects");
     },
     onError: (error) => {
       deleteFeedback = {
@@ -2580,12 +2500,8 @@
         title: $t(i18nKeys.console.resources.deleteSucceeded),
         detail: result.id,
       };
-      void queryClient.invalidateQueries({ queryKey: ["resources"] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
-      void queryClient.invalidateQueries({
-        queryKey: ["resources", "health", resourceId, "detail"],
-      });
-      void goto(project ? projectDetailHref(project.id) : "/projects");
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
+                  void goto(project ? projectDetailHref(project.id) : "/projects");
     },
     onError: (error) => {
       deleteFeedback = {
@@ -3711,32 +3627,31 @@
 
   async function invalidateScheduledTaskQueries(): Promise<void> {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["scheduled-tasks", "resource", resourceId] }),
-      queryClient.invalidateQueries({ queryKey: ["scheduled-task-runs", "resource", resourceId] }),
+      queryClient.invalidateQueries({ queryKey: orpc.scheduledTasks.key({ type: "query" }) }),
+      queryClient.invalidateQueries({ queryKey: orpc.scheduledTasks.runs.key({ type: "query" }) }),
     ]);
   }
 
   async function invalidateStorageAttachmentQueries(): Promise<void> {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["resources"] }),
-      queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] }),
-      queryClient.invalidateQueries({ queryKey: ["storage-volumes"] }),
+      queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) }),
+      queryClient.invalidateQueries({ queryKey: orpc.storageVolumes.key({ type: "query" }) }),
     ]);
   }
 
   async function invalidateStorageBackupQueries(): Promise<void> {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["storage-volume-backups"] }),
-      queryClient.invalidateQueries({ queryKey: ["storage-volumes"] }),
-      queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] }),
+      queryClient.invalidateQueries({ queryKey: orpc.storageVolumes.backups.key({ type: "query" }) }),
+      queryClient.invalidateQueries({ queryKey: orpc.storageVolumes.key({ type: "query" }) }),
     ]);
   }
 
   async function invalidateDependencyQueries(): Promise<void> {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["dependency-resources"] }),
-      queryClient.invalidateQueries({ queryKey: ["resource-dependency-bindings", resourceId] }),
-      queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] }),
+      queryClient.invalidateQueries({ queryKey: orpc.dependencyResources.key({ type: "query" }) }),
+      queryClient.invalidateQueries({
+        queryKey: orpc.resources.dependencyBindings.key({ type: "query" }),
+      }),
     ]);
   }
 

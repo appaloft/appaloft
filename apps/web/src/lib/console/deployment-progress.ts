@@ -405,64 +405,32 @@ export function deploymentTimelineProgressEvents(
   });
 }
 
-type MaybeWrappedDeploymentTimelineResponse =
-  | DeploymentTimelineResponse
-  | {
-      json?: DeploymentTimelineResponse | null;
-    }
-  | null
-  | undefined;
-
-type MaybeWrappedDeploymentTimelineEnvelope =
-  | DeploymentTimelineEnvelope
-  | {
-      json?: DeploymentTimelineEnvelope | null;
-    }
-  | null
-  | undefined;
-
-export function normalizeDeploymentTimelineResponse(
-  response: MaybeWrappedDeploymentTimelineResponse,
-): DeploymentTimelineResponse | null {
-  if (!response || typeof response !== "object") {
-    return null;
-  }
-
-  if ("schemaVersion" in response && response.schemaVersion === "deployments.timeline/v1") {
-    return response as DeploymentTimelineResponse;
-  }
-
-  const wrapped = "json" in response ? response.json : null;
-  if (wrapped?.schemaVersion === "deployments.timeline/v1") {
-    return wrapped;
-  }
-
-  return null;
-}
-
-export function normalizeDeploymentTimelineEnvelope(
-  envelope: MaybeWrappedDeploymentTimelineEnvelope,
-): DeploymentTimelineEnvelope | null {
-  if (!envelope || typeof envelope !== "object") {
-    return null;
-  }
-
-  if ("schemaVersion" in envelope && envelope.schemaVersion === "deployments.timeline/v1") {
-    return envelope as DeploymentTimelineEnvelope;
-  }
-
-  const wrapped = "json" in envelope ? envelope.json : null;
-  if (wrapped?.schemaVersion === "deployments.timeline/v1") {
-    return wrapped;
-  }
-
-  return null;
-}
-
 export function deploymentTimelineEntries(
-  response: MaybeWrappedDeploymentTimelineResponse,
+  response: DeploymentTimelineResponse | null | undefined,
 ): DeploymentTimelineResponse["entries"] {
-  return normalizeDeploymentTimelineResponse(response)?.entries ?? [];
+  if (!response) {
+    return [];
+  }
+
+  if (response.schemaVersion !== "deployments.timeline/v1") {
+    throw new Error("Expected deployments.timeline/v1 response");
+  }
+
+  return response.entries;
+}
+
+export function deploymentTimelineEnvelope(
+  envelope: DeploymentTimelineEnvelope | null | undefined,
+): DeploymentTimelineEnvelope | null {
+  if (!envelope) {
+    return null;
+  }
+
+  if (envelope.schemaVersion !== "deployments.timeline/v1") {
+    throw new Error("Expected deployments.timeline/v1 envelope");
+  }
+
+  return envelope;
 }
 
 export function deploymentTimelineProgressStatus(
@@ -620,7 +588,7 @@ export async function observeDeploymentProgressAfterAcceptance(
       let result = await stream.next();
 
       while (!result.done) {
-        const envelope = normalizeDeploymentTimelineEnvelope(result.value);
+        const envelope = deploymentTimelineEnvelope(result.value);
         if (!envelope) {
           result = await stream.next();
           continue;

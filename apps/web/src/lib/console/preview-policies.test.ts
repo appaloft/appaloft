@@ -8,7 +8,7 @@ describe("preview policies console page", () => {
       readFile(new URL("../components/console/ConsoleShell.svelte", import.meta.url), "utf8"),
     ]);
 
-    expect(pageSource).toContain("orpcClient.previewPolicies.show");
+    expect(pageSource).toContain("orpc.previewPolicies.show.queryOptions");
     expect(pageSource).toContain("orpcClient.previewPolicies.configure");
     expect(pageSource).toContain("i18nKeys.console.previewPolicies.pageTitle");
     expect(pageSource).toContain("productGradePreviews");

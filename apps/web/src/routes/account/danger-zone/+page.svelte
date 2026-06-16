@@ -10,7 +10,7 @@
   import { readErrorMessage } from "$lib/api/client";
   import { accountSettingsItems } from "$lib/console/settings-nav";
   import { i18nKeys, t } from "$lib/i18n";
-  import { orpcClient } from "$lib/orpc";
+  import { orpc, orpcClient } from "$lib/orpc";
 
   let confirmationUserId = $state("");
   let deleteAccountDialogOpen = $state(false);
@@ -18,9 +18,8 @@
   let operationError = $state("");
 
   const profileQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["account", "profile"],
-      queryFn: () => orpcClient.account.showProfile({}),
+    orpc.account.showProfile.queryOptions({
+      input: {},
       enabled: browser,
       retry: 0,
     }),
