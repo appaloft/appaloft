@@ -63,11 +63,10 @@ describe("console list query limits", () => {
   test("shared console inventory queries send bounded list requests", async () => {
     const source = await readFile(new URL("./queries.ts", import.meta.url), "utf8");
 
-    expect(source).toContain("orpcClient.domainBindings.list({ limit: defaultConsoleListLimit })");
-    expect(source).toContain("orpcClient.certificates.list({ limit: defaultConsoleListLimit })");
-    expect(source).toContain(
-      "orpcClient.previewEnvironments.list({ limit: defaultConsoleListLimit })",
-    );
+    expect(source).toContain("orpc.domainBindings.list.queryOptions({");
+    expect(source).toContain("orpc.certificates.list.queryOptions({");
+    expect(source).toContain("orpc.previewEnvironments.list.queryOptions({");
+    expect(source).toContain("input: { limit: defaultConsoleListLimit }");
   });
 
   test("domain bindings page disables unrelated inventory queries", async () => {

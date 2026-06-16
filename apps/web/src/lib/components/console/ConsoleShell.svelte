@@ -62,7 +62,7 @@
     readBrowserConsoleSidebarOpen,
   } from "$lib/console/sidebar-state";
   import { modalIsOpen, setModalOpen } from "$lib/console/url-modal";
-  import { orpcClient } from "$lib/orpc";
+  import { orpc, orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
   import { projectDetailHref } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
@@ -149,9 +149,8 @@
     }),
   );
   const organizationContextQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["organizations", "current-context"],
-      queryFn: () => orpcClient.organizations.currentContext({}),
+    orpc.organizations.currentContext.queryOptions({
+      input: {},
       enabled: browser,
       retry: 0,
       staleTime: 30_000,

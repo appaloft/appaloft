@@ -8,7 +8,7 @@
   import { Input } from "$lib/components/ui/input";
   import { Textarea } from "$lib/components/ui/textarea";
   import { i18nKeys, t } from "$lib/i18n";
-  import { orpcClient } from "$lib/orpc";
+  import { orpc, orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
 
   type Feedback = {
@@ -49,7 +49,7 @@
       };
       projectName = "";
       projectDescription = "";
-      void queryClient.invalidateQueries({ queryKey: ["projects"] });
+      void queryClient.invalidateQueries({ queryKey: orpc.projects.key({ type: "query" }) });
       onCreated?.(result);
     },
     onError: (error) => {

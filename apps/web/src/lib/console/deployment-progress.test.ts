@@ -23,10 +23,10 @@ vi.mock("$lib/orpc", () => ({
 import {
   createDeploymentWithProgress,
   deploymentTimelineEntries,
+  deploymentTimelineEnvelope,
   deploymentTimelineProgressEvents,
   deploymentTimelineProgressStatus,
   latestDeploymentTimelineCursor,
-  normalizeDeploymentTimelineEnvelope,
   observeDeploymentProgressAfterAcceptance,
   progressSourceLabel,
 } from "./deployment-progress";
@@ -181,7 +181,7 @@ describe("deployment progress helpers", () => {
     expect(deploymentTimelineProgressStatus(envelopes, "running")).toBe("succeeded");
   });
 
-  test("[DEP-TIMELINE-WEB-001] reads ORPC-wrapped deployment timeline responses", () => {
+  test("[DEP-TIMELINE-WEB-001] rejects raw ORPC envelope timeline responses at the UI boundary", () => {
     const response = {
       json: {
         schemaVersion: "deployments.timeline/v1",
@@ -203,10 +203,12 @@ describe("deployment progress helpers", () => {
       },
     } satisfies { json: DeploymentTimelineResponse };
 
-    expect(deploymentTimelineEntries(response)).toEqual(response.json.entries);
+    expect(() =>
+      deploymentTimelineEntries(response as unknown as DeploymentTimelineResponse),
+    ).toThrow("Expected deployments.timeline/v1 response");
   });
 
-  test("[DEP-TIMELINE-WEB-002] reads ORPC-wrapped deployment timeline stream envelopes", () => {
+  test("[DEP-TIMELINE-WEB-002] rejects raw ORPC envelope timeline stream values at the UI boundary", () => {
     const envelope = {
       json: {
         schemaVersion: "deployments.timeline/v1",
@@ -225,7 +227,9 @@ describe("deployment progress helpers", () => {
       },
     } satisfies { json: DeploymentTimelineEnvelope };
 
-    expect(normalizeDeploymentTimelineEnvelope(envelope)).toEqual(envelope.json);
+    expect(() =>
+      deploymentTimelineEnvelope(envelope as unknown as DeploymentTimelineEnvelope),
+    ).toThrow("Expected deployments.timeline/v1 envelope");
     expect(deploymentTimelineProgressEvents([envelope.json])).toMatchObject([
       {
         deploymentId: "dep_demo",
@@ -278,31 +282,27 @@ describe("deployment progress helpers", () => {
     timelineStreamMock.mockResolvedValue(
       (async function* () {
         yield {
-          json: {
-            schemaVersion: "deployments.timeline/v1",
-            kind: "entry",
-            entry: {
-              deploymentId: "dep_demo",
-              sequence: 3,
-              cursor: "dep_demo:3",
-              occurredAt: "2026-01-01T00:00:03.000Z",
-              source: "domain-event",
-              kind: "status",
-              phase: "verify",
-              level: "info",
-              message: "Deployment succeeded",
-              status: "succeeded",
-            },
-          },
-        } satisfies { json: DeploymentTimelineEnvelope };
-        yield {
-          json: {
-            schemaVersion: "deployments.timeline/v1",
-            kind: "closed",
-            reason: "completed",
+          schemaVersion: "deployments.timeline/v1",
+          kind: "entry",
+          entry: {
+            deploymentId: "dep_demo",
+            sequence: 3,
             cursor: "dep_demo:3",
+            occurredAt: "2026-01-01T00:00:03.000Z",
+            source: "domain-event",
+            kind: "status",
+            phase: "verify",
+            level: "info",
+            message: "Deployment succeeded",
+            status: "succeeded",
           },
-        } satisfies { json: DeploymentTimelineEnvelope };
+        } satisfies DeploymentTimelineEnvelope;
+        yield {
+          schemaVersion: "deployments.timeline/v1",
+          kind: "closed",
+          reason: "completed",
+          cursor: "dep_demo:3",
+        } satisfies DeploymentTimelineEnvelope;
       })(),
     );
 
@@ -383,36 +383,34 @@ describe("deployment progress helpers", () => {
 
   test("[QUICK-DEPLOY-TIMELINE-001] replays terminal deployment timeline without opening follow stream", async () => {
     timelineMock.mockResolvedValue({
-      json: {
-        schemaVersion: "deployments.timeline/v1",
-        deploymentId: "dep_demo",
-        hasMore: false,
-        entries: [
-          {
-            deploymentId: "dep_demo",
-            sequence: 1,
-            cursor: "dep_demo:1",
-            occurredAt: "2026-01-01T00:00:01.000Z",
-            source: "docker",
-            kind: "output",
-            phase: "deploy",
-            level: "info",
-            message: "latest: Pulling from muchobien/pocketbase",
-          },
-          {
-            deploymentId: "dep_demo",
-            sequence: 2,
-            cursor: "dep_demo:2",
-            occurredAt: "2026-01-01T00:00:02.000Z",
-            source: "appaloft",
-            kind: "status",
-            phase: "verify",
-            level: "info",
-            message: "Deployment succeeded",
-            status: "succeeded",
-          },
-        ],
-      },
+      schemaVersion: "deployments.timeline/v1",
+      deploymentId: "dep_demo",
+      hasMore: false,
+      entries: [
+        {
+          deploymentId: "dep_demo",
+          sequence: 1,
+          cursor: "dep_demo:1",
+          occurredAt: "2026-01-01T00:00:01.000Z",
+          source: "docker",
+          kind: "output",
+          phase: "deploy",
+          level: "info",
+          message: "latest: Pulling from muchobien/pocketbase",
+        },
+        {
+          deploymentId: "dep_demo",
+          sequence: 2,
+          cursor: "dep_demo:2",
+          occurredAt: "2026-01-01T00:00:02.000Z",
+          source: "appaloft",
+          kind: "status",
+          phase: "verify",
+          level: "info",
+          message: "Deployment succeeded",
+          status: "succeeded",
+        },
+      ],
     });
 
     const progressEvents: DeploymentProgressEvent[] = [];

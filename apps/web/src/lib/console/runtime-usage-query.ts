@@ -1,15 +1,5 @@
-import {
-  type InspectRuntimeUsageResponse,
-  type RuntimeMonitoringRollupResponse,
-  type RuntimeMonitoringSamplesResponse,
-  type RuntimeMonitoringThresholdsResponse,
-  type RuntimeUsageScope,
-} from "@appaloft/contracts";
-import { queryOptions } from "@tanstack/svelte-query";
-
-import { orpcClient } from "$lib/orpc";
-
-import { runtimeMonitoringScopeQueryKey, runtimeUsageQueryKey } from "./runtime-usage";
+import { type RuntimeUsageScope } from "@appaloft/contracts";
+import { orpc } from "$lib/orpc";
 
 export const runtimeMonitoringRefreshIntervalMs = 15_000;
 
@@ -64,15 +54,13 @@ function recentRetainedSampleWindow(timeRange: RuntimeMonitoringTimeRangeId): {
 }
 
 export function runtimeUsageQueryOptions(scope: RuntimeUsageScope, enabled: boolean) {
-  return queryOptions<InspectRuntimeUsageResponse>({
-    queryKey: runtimeUsageQueryKey(scope),
-    queryFn: () =>
-      orpcClient.runtimeUsage.inspect({
-        scope,
-        mode: "current",
-        includeArtifacts: true,
-        includeWarnings: true,
-      }),
+  return orpc.runtimeUsage.inspect.queryOptions({
+    input: {
+      scope,
+      mode: "current",
+      includeArtifacts: true,
+      includeWarnings: true,
+    },
     enabled,
     staleTime: 2_000,
   });
@@ -83,15 +71,13 @@ export function runtimeMonitoringSamplesQueryOptions(
   enabled: boolean,
   timeRange: RuntimeMonitoringTimeRangeId = "1h",
 ) {
-  return queryOptions<RuntimeMonitoringSamplesResponse>({
-    queryKey: [...runtimeMonitoringScopeQueryKey("runtime-monitoring-samples", scope), timeRange],
-    queryFn: () =>
-      orpcClient.runtimeMonitoring.samples({
-        scope,
-        window: recentRetainedSampleWindow(timeRange),
-        signals: ["cpu", "memory", "disk"],
-        limit: runtimeMonitoringSampleLimit(timeRange),
-      }),
+  return orpc.runtimeMonitoring.samples.queryOptions({
+    input: {
+      scope,
+      window: recentRetainedSampleWindow(timeRange),
+      signals: ["cpu", "memory", "disk"],
+      limit: runtimeMonitoringSampleLimit(timeRange),
+    },
     enabled,
     staleTime: 10_000,
     refetchInterval: runtimeMonitoringRefreshIntervalMs,
@@ -103,16 +89,14 @@ export function runtimeMonitoringRollupQueryOptions(
   enabled: boolean,
   timeRange: RuntimeMonitoringTimeRangeId = "1h",
 ) {
-  return queryOptions<RuntimeMonitoringRollupResponse>({
-    queryKey: [...runtimeMonitoringScopeQueryKey("runtime-monitoring-rollup", scope), timeRange],
-    queryFn: () =>
-      orpcClient.runtimeMonitoring.rollup({
-        scope,
-        window: recentRetainedSampleWindow(timeRange),
-        bucket: runtimeMonitoringBucket(timeRange),
-        signals: ["cpu", "memory", "disk"],
-        includeDeploymentMarkers: true,
-      }),
+  return orpc.runtimeMonitoring.rollup.queryOptions({
+    input: {
+      scope,
+      window: recentRetainedSampleWindow(timeRange),
+      bucket: runtimeMonitoringBucket(timeRange),
+      signals: ["cpu", "memory", "disk"],
+      includeDeploymentMarkers: true,
+    },
     enabled,
     staleTime: 10_000,
     refetchInterval: runtimeMonitoringRefreshIntervalMs,
@@ -123,12 +107,10 @@ export function runtimeMonitoringThresholdsQueryOptions(
   scope: RuntimeUsageScope,
   enabled: boolean,
 ) {
-  return queryOptions<RuntimeMonitoringThresholdsResponse>({
-    queryKey: runtimeMonitoringScopeQueryKey("runtime-monitoring-thresholds", scope),
-    queryFn: () =>
-      orpcClient.runtimeMonitoring.thresholdShow({
-        scope,
-      }),
+  return orpc.runtimeMonitoring.thresholdShow.queryOptions({
+    input: {
+      scope,
+    },
     enabled,
     staleTime: 30_000,
     refetchInterval: 60_000,

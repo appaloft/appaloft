@@ -105,7 +105,7 @@
   } from "$lib/console/utils";
   import { operatorWorkReadableFailure } from "$lib/console/blueprint-install-progress";
   import { i18nKeys, t } from "$lib/i18n";
-  import { orpcClient } from "$lib/orpc";
+  import { orpc, orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
 
   type ProjectDetailTab =
@@ -174,51 +174,39 @@
   );
   let projectLifecycleDialogOpen = $state(false);
   const projectDetailQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["projects", "show", projectId],
-      queryFn: () => orpcClient.projects.show({ projectId }),
+    orpc.projects.show.queryOptions({
+      input: { projectId },
       enabled: browser && projectId.length > 0,
       staleTime: 5_000,
     }),
   );
   const projectPreviewEnvironmentsQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["preview-environments", "project", projectId, { limit: 50 }],
-      queryFn: () =>
-        orpcClient.previewEnvironments.list({
-          projectId,
-          limit: 50,
-        }),
+    orpc.previewEnvironments.list.queryOptions({
+      input: {
+        projectId,
+        limit: 50,
+      },
       enabled: browser && projectId.length > 0 && activeProjectTab === "previews",
       staleTime: 5_000,
     }),
   );
   const projectPreviewResourcesQuery = createQuery(() =>
-    queryOptions({
-      queryKey: [
-        "resources",
-        "project-preview",
+    orpc.resources.list.queryOptions({
+      input: {
         projectId,
-        { includePreviewResources: true, limit: 100 },
-      ],
-      queryFn: () =>
-        orpcClient.resources.list({
-          projectId,
-          includePreviewResources: true,
-          limit: 100,
-        }),
+        includePreviewResources: true,
+        limit: 100,
+      },
       enabled: browser && projectId.length > 0 && activeProjectTab === "previews",
       staleTime: 5_000,
     }),
   );
   const projectOperatorWorkQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["operator-work", "project", projectId, { limit: 25 }],
-      queryFn: () =>
-        orpcClient.operatorWork.list({
-          projectId,
-          limit: 25,
-        }),
+    orpc.operatorWork.list.queryOptions({
+      input: {
+        projectId,
+        limit: 25,
+      },
       enabled: browser && projectId.length > 0,
       staleTime: 2_000,
       refetchInterval: 5_000,
@@ -246,9 +234,8 @@
   );
   const isProjectArchived = $derived(project?.lifecycleStatus === "archived");
   const projectDeleteSafetyQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["projects", "delete-check", projectId],
-      queryFn: () => orpcClient.projects.deleteCheck({ projectId }),
+    orpc.projects.deleteCheck.queryOptions({
+      input: { projectId },
       enabled: browser && isProjectArchived && projectId.length > 0 && projectDetailQuery.isSuccess,
       staleTime: 5_000,
     }),
@@ -692,6 +679,16 @@
         );
     }
   });
+
+  function invalidateProjectQueries(): void {
+    void queryClient.invalidateQueries({ queryKey: orpc.projects.key({ type: "query" }) });
+  }
+
+  function invalidateEnvironmentAndProjectQueries(): void {
+    void queryClient.invalidateQueries({ queryKey: orpc.environments.key({ type: "query" }) });
+    invalidateProjectQueries();
+  }
+
   const renameProjectMutation = createMutation(() => ({
     mutationFn: (input: RenameProjectInput) => orpcClient.projects.rename(input),
     onSuccess: (result) => {
@@ -700,9 +697,7 @@
         title: $t(i18nKeys.console.projects.renameSucceeded),
         detail: result.id,
       };
-      void queryClient.invalidateQueries({ queryKey: ["projects"] });
-      void queryClient.invalidateQueries({ queryKey: ["projects", "show", result.id] });
-      void queryClient.invalidateQueries({ queryKey: ["projects", "delete-check", result.id] });
+      invalidateProjectQueries();
       projectRenameDialogOpen = false;
     },
     onError: (error) => {
@@ -721,9 +716,7 @@
         title: $t(i18nKeys.console.projects.archiveSucceeded),
         detail: result.id,
       };
-      void queryClient.invalidateQueries({ queryKey: ["projects"] });
-      void queryClient.invalidateQueries({ queryKey: ["projects", "show", result.id] });
-      void queryClient.invalidateQueries({ queryKey: ["projects", "delete-check", result.id] });
+      invalidateProjectQueries();
       setProjectLifecycleDialogOpen(false);
     },
     onError: (error) => {
@@ -742,9 +735,7 @@
         title: $t(i18nKeys.console.projects.restoreSucceeded),
         detail: result.id,
       };
-      void queryClient.invalidateQueries({ queryKey: ["projects"] });
-      void queryClient.invalidateQueries({ queryKey: ["projects", "show", result.id] });
-      void queryClient.invalidateQueries({ queryKey: ["projects", "delete-check", result.id] });
+      invalidateProjectQueries();
       setProjectLifecycleDialogOpen(false);
     },
     onError: (error) => {
@@ -764,7 +755,7 @@
         title: $t(i18nKeys.console.projects.deleteSucceeded),
         detail: result.id,
       };
-      void queryClient.invalidateQueries({ queryKey: ["projects"] });
+      invalidateProjectQueries();
       setProjectLifecycleDialogOpen(false);
       window.location.href = "/projects";
     },
@@ -774,9 +765,7 @@
         title: $t(i18nKeys.console.projects.deleteFailed),
         detail: readErrorMessage(error),
       };
-      if (project) {
-        void queryClient.invalidateQueries({ queryKey: ["projects", "delete-check", project.id] });
-      }
+      invalidateProjectQueries();
     },
   }));
   const archiveEnvironmentMutation = createMutation(() => ({
@@ -787,12 +776,8 @@
         title: $t(i18nKeys.console.projects.environmentArchiveSucceeded),
         detail: result.id,
       };
-      void queryClient.invalidateQueries({ queryKey: ["environments"] });
-      void queryClient.invalidateQueries({ queryKey: ["projects"] });
+      invalidateEnvironmentAndProjectQueries();
       setEnvironmentLifecycleDialogOpen(false);
-      if (project) {
-        void queryClient.invalidateQueries({ queryKey: ["projects", "show", project.id] });
-      }
     },
     onError: (error) => {
       lifecycleFeedback = {
@@ -813,12 +798,8 @@
       cloneEnvironmentNames = {};
       environmentCloneDialogOpen = false;
       selectedEnvironmentId = "";
-      void queryClient.invalidateQueries({ queryKey: ["environments"] });
-      void queryClient.invalidateQueries({ queryKey: ["projects"] });
+      invalidateEnvironmentAndProjectQueries();
       setEnvironmentLifecycleDialogOpen(false);
-      if (project) {
-        void queryClient.invalidateQueries({ queryKey: ["projects", "show", project.id] });
-      }
     },
     onError: (error) => {
       lifecycleFeedback = {
@@ -839,12 +820,8 @@
       renameEnvironmentNames = {};
       environmentRenameDialogOpen = false;
       selectedEnvironmentId = "";
-      void queryClient.invalidateQueries({ queryKey: ["environments"] });
-      void queryClient.invalidateQueries({ queryKey: ["projects"] });
+      invalidateEnvironmentAndProjectQueries();
       setEnvironmentLifecycleDialogOpen(false);
-      if (project) {
-        void queryClient.invalidateQueries({ queryKey: ["projects", "show", project.id] });
-      }
     },
     onError: (error) => {
       lifecycleFeedback = {
@@ -862,11 +839,7 @@
         title: $t(i18nKeys.console.projects.environmentLockSucceeded),
         detail: result.id,
       };
-      void queryClient.invalidateQueries({ queryKey: ["environments"] });
-      void queryClient.invalidateQueries({ queryKey: ["projects"] });
-      if (project) {
-        void queryClient.invalidateQueries({ queryKey: ["projects", "show", project.id] });
-      }
+      invalidateEnvironmentAndProjectQueries();
     },
     onError: (error) => {
       lifecycleFeedback = {
@@ -884,11 +857,7 @@
         title: $t(i18nKeys.console.projects.environmentUnlockSucceeded),
         detail: result.id,
       };
-      void queryClient.invalidateQueries({ queryKey: ["environments"] });
-      void queryClient.invalidateQueries({ queryKey: ["projects"] });
-      if (project) {
-        void queryClient.invalidateQueries({ queryKey: ["projects", "show", project.id] });
-      }
+      invalidateEnvironmentAndProjectQueries();
     },
     onError: (error) => {
       lifecycleFeedback = {
@@ -1402,7 +1371,7 @@
 
   function openProjectAttentionAction(item: ProjectAttentionItem): void {
     if (item.intent === "operator-work-refresh") {
-      void queryClient.invalidateQueries({ queryKey: ["operator-work", "project", projectId] });
+      void queryClient.invalidateQueries({ queryKey: orpc.operatorWork.key({ type: "query" }) });
       return;
     }
 

@@ -39,7 +39,7 @@
   import { modalIsOpen, setModalOpen } from "$lib/console/url-modal";
   import { formatTime, projectDetailHref } from "$lib/console/utils";
   import { readErrorMessage, request } from "$lib/api/client";
-  import { orpcClient } from "$lib/orpc";
+  import { orpc, orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
   import { i18nKeys, t } from "$lib/i18n";
 
@@ -98,9 +98,8 @@
   let { section = null }: Props = $props();
 
   const contextQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["organizations", "current-context"],
-      queryFn: () => orpcClient.organizations.currentContext({}),
+    orpc.organizations.currentContext.queryOptions({
+      input: {},
       enabled: browser,
       retry: 0,
       staleTime: 30_000,
@@ -166,53 +165,38 @@
   const shouldLoadArchivedProjects = $derived(activeSection === "archived-projects");
 
   const membersQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["organizations", currentOrganizationId, "members"],
-      queryFn: () =>
-        currentOrganizationId
-          ? orpcClient.organizations.listMembers({ organizationId: currentOrganizationId, limit: 100 })
-          : { items: [] },
+    orpc.organizations.listMembers.queryOptions({
+      input: { organizationId: currentOrganizationId, limit: 100 },
       enabled: browser && Boolean(currentOrganizationId) && canListMembers && shouldLoadMembers,
     }),
   );
 
   const invitationsQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["organizations", currentOrganizationId, "invitations"],
-      queryFn: () =>
-        currentOrganizationId
-          ? orpcClient.organizations.listInvitations({
-              organizationId: currentOrganizationId,
-              limit: 100,
-            })
-          : { items: [] },
+    orpc.organizations.listInvitations.queryOptions({
+      input: {
+        organizationId: currentOrganizationId,
+        limit: 100,
+      },
       enabled: browser && Boolean(currentOrganizationId) && canListMembers && shouldLoadInvitations,
     }),
   );
 
   const deployTokensQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["deploy-tokens", currentOrganizationId],
-      queryFn: () =>
-        currentOrganizationId
-          ? orpcClient.deployTokens.list({ organizationId: currentOrganizationId, limit: 100 })
-          : { items: [] },
+    orpc.deployTokens.list.queryOptions({
+      input: { organizationId: currentOrganizationId, limit: 100 },
       enabled: browser && Boolean(currentOrganizationId) && canManageDeployTokens && shouldLoadDeployTokens,
     }),
   );
 
   const profileQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["organizations", currentOrganizationId, "profile"],
-      queryFn: () =>
-        orpcClient.organizations.showProfile({ organizationId: currentOrganizationId }),
+    orpc.organizations.showProfile.queryOptions({
+      input: { organizationId: currentOrganizationId },
       enabled: browser && Boolean(currentOrganizationId) && shouldLoadOrganizationProfile,
     }),
   );
   const archivedProjectsQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["projects", { lifecycleStatus: "archived", limit: 100 }],
-      queryFn: () => orpcClient.projects.list({ lifecycleStatus: "archived", limit: 100 }),
+    orpc.projects.list.queryOptions({
+      input: { lifecycleStatus: "archived", limit: 100 },
       enabled: browser && Boolean(currentOrganizationId) && shouldLoadArchivedProjects,
     }),
   );
@@ -230,7 +214,7 @@
       operationError = "";
       operationNotice = $t(i18nKeys.console.organization.inviteSucceeded);
       setInviteDialogOpen(false);
-      void queryClient.invalidateQueries({ queryKey: ["organizations", currentOrganizationId] });
+      void queryClient.invalidateQueries({ queryKey: orpc.organizations.key({ type: "query" }) });
     },
     onError: (error) => {
       operationNotice = "";
@@ -245,8 +229,8 @@
       createdTokenSecret = "";
       operationError = "";
       operationNotice = $t(i18nKeys.console.organization.switchSucceeded);
-      void queryClient.invalidateQueries({ queryKey: ["organizations"] });
-      void queryClient.invalidateQueries({ queryKey: ["deploy-tokens"] });
+      void queryClient.invalidateQueries({ queryKey: orpc.organizations.key({ type: "query" }) });
+      void queryClient.invalidateQueries({ queryKey: orpc.deployTokens.key({ type: "query" }) });
     },
     onError: (error) => {
       operationNotice = "";
@@ -266,7 +250,7 @@
       operationError = "";
       operationNotice = $t(i18nKeys.console.organization.profileSaved);
       organizationProfileDialogOpen = false;
-      void queryClient.invalidateQueries({ queryKey: ["organizations"] });
+      void queryClient.invalidateQueries({ queryKey: orpc.organizations.key({ type: "query" }) });
       void queryClient.invalidateQueries({
         queryKey: ["organizations", currentOrganizationId, "profile"],
       });
@@ -288,7 +272,7 @@
       deleteOrganizationDialogOpen = false;
       operationError = "";
       operationNotice = $t(i18nKeys.console.organization.organizationDeleted);
-      void queryClient.invalidateQueries({ queryKey: ["organizations"] });
+      void queryClient.invalidateQueries({ queryKey: orpc.organizations.key({ type: "query" }) });
       if (browser) {
         window.location.href = "/";
       }
@@ -312,7 +296,7 @@
       selectedMemberRoleMemberId = "";
       operationError = "";
       operationNotice = $t(i18nKeys.console.organization.roleUpdated);
-      void queryClient.invalidateQueries({ queryKey: ["organizations", currentOrganizationId] });
+      void queryClient.invalidateQueries({ queryKey: orpc.organizations.key({ type: "query" }) });
     },
     onError: (error) => {
       operationNotice = "";
@@ -327,7 +311,7 @@
       operationError = "";
       operationNotice = $t(i18nKeys.console.organization.memberRemoved);
       setMemberLifecycleDialogOpen(false);
-      void queryClient.invalidateQueries({ queryKey: ["organizations", currentOrganizationId] });
+      void queryClient.invalidateQueries({ queryKey: orpc.organizations.key({ type: "query" }) });
     },
     onError: (error) => {
       operationNotice = "";
@@ -342,7 +326,7 @@
       operationError = "";
       operationNotice = $t(i18nKeys.console.organization.memberRestored);
       setMemberLifecycleDialogOpen(false);
-      void queryClient.invalidateQueries({ queryKey: ["organizations", currentOrganizationId] });
+      void queryClient.invalidateQueries({ queryKey: orpc.organizations.key({ type: "query" }) });
     },
     onError: (error) => {
       operationNotice = "";
@@ -363,7 +347,7 @@
       selectedOwnerTransferMemberId = "";
       operationError = "";
       operationNotice = $t(i18nKeys.console.organization.transferOwnerSucceeded);
-      void queryClient.invalidateQueries({ queryKey: ["organizations"] });
+      void queryClient.invalidateQueries({ queryKey: orpc.organizations.key({ type: "query" }) });
     },
     onError: (error) => {
       operationNotice = "";
@@ -390,7 +374,7 @@
       operationError = "";
       operationNotice = $t(i18nKeys.console.organization.tokenCreated);
       setDeployTokenCreateDialogOpen(false);
-      void queryClient.invalidateQueries({ queryKey: ["deploy-tokens", currentOrganizationId] });
+      void queryClient.invalidateQueries({ queryKey: orpc.deployTokens.key({ type: "query" }) });
     },
     onError: (error) => {
       operationNotice = "";
@@ -410,7 +394,7 @@
       operationError = "";
       operationNotice = $t(i18nKeys.console.organization.tokenRotated);
       setDeployTokenLifecycleDialogOpen(false);
-      void queryClient.invalidateQueries({ queryKey: ["deploy-tokens", currentOrganizationId] });
+      void queryClient.invalidateQueries({ queryKey: orpc.deployTokens.key({ type: "query" }) });
     },
     onError: (error) => {
       operationNotice = "";
@@ -430,7 +414,7 @@
       operationError = "";
       operationNotice = $t(i18nKeys.console.organization.tokenRevoked);
       setDeployTokenLifecycleDialogOpen(false);
-      void queryClient.invalidateQueries({ queryKey: ["deploy-tokens", currentOrganizationId] });
+      void queryClient.invalidateQueries({ queryKey: orpc.deployTokens.key({ type: "query" }) });
     },
     onError: (error) => {
       operationNotice = "";

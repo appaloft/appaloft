@@ -21,7 +21,7 @@
   } from "$lib/console/server-registration";
   import { defaultConsoleListLimit } from "$lib/console/queries";
   import { i18nKeys, t } from "$lib/i18n";
-  import { orpcClient } from "$lib/orpc";
+  import { orpc, orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
 
   type Props = {
@@ -48,9 +48,8 @@
   let createdServerId = $state("");
 
   const sshCredentialsQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["credentials", "ssh", { limit: defaultConsoleListLimit }],
-      queryFn: () => orpcClient.credentials.ssh.list({ limit: defaultConsoleListLimit }),
+    orpc.credentials.ssh.list.queryOptions({
+      input: { limit: defaultConsoleListLimit },
       enabled: browser,
     }),
   );
@@ -112,8 +111,8 @@
 
       createdServerId = createdServer.id;
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["servers"] }),
-        queryClient.invalidateQueries({ queryKey: ["credentials", "ssh"] }),
+        queryClient.invalidateQueries({ queryKey: orpc.servers.key({ type: "query" }) }),
+        queryClient.invalidateQueries({ queryKey: orpc.credentials.ssh.key({ type: "query" }) }),
       ]);
       onCreated?.(createdServer);
     } catch (error) {

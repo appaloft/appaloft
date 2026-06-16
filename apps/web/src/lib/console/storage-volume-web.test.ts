@@ -19,14 +19,14 @@ describe("storage volume Web console surface", () => {
       ),
     ]);
 
-    expect(resourcePageSource).toContain("orpcClient.storageVolumes.list");
+    expect(resourcePageSource).toContain("orpc.storageVolumes.list.queryOptions");
     expect(resourcePageSource).toContain("orpcClient.storageVolumes.create");
     expect(resourcePageSource).toContain("orpcClient.storageVolumes.rename");
     expect(resourcePageSource).not.toContain("orpcClient.storageVolumes.delete");
     expect(resourcePageSource).toContain("orpcClient.storageVolumes.cleanupRuntime");
     expect(resourcePageSource).toContain("orpcClient.storageVolumes.backups.plan");
     expect(resourcePageSource).toContain("orpcClient.storageVolumes.backups.create");
-    expect(resourcePageSource).toContain("orpcClient.storageVolumes.backups.list");
+    expect(resourcePageSource).toContain("orpc.storageVolumes.backups.list.queryOptions");
     expect(resourcePageSource).toContain("orpcClient.storageVolumes.backups.restore");
     expect(resourcePageSource).toContain("orpcClient.storageVolumes.backups.prune");
     expect(resourcePageSource).toContain("orpcClient.resources.attachStorage");
