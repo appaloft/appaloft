@@ -150,6 +150,7 @@
     runtimeMonitoringObservationHandoffMatchesScope,
     runtimeMonitoringSampleFromUsage,
     runtimeMonitoringTimestampInObservationWindow,
+    type RuntimeMonitoringObservationHandoff,
   } from "$lib/console/runtime-usage";
   import {
     deploymentDetailHref,
@@ -774,20 +775,29 @@
   const resourceFallbackServerRuntimeUsageHasMonitorValues = $derived(
     runtimeUsageHasMonitorSignals(resourceFallbackServerRuntimeUsage),
   );
+  const resourceServerRuntimeFallbackLoading = $derived(
+    !resourceRuntimeUsageHasMonitorValues &&
+      resourceFallbackServerScope !== null &&
+      resourceFallbackServerRuntimeUsageQuery.isPending,
+  );
   const showResourceServerRuntimeFallback = $derived(
     !resourceRuntimeUsageHasMonitorValues && resourceFallbackServerRuntimeUsageHasMonitorValues,
   );
   const effectiveResourceRuntimeUsage = $derived(
-    showResourceServerRuntimeFallback ? resourceFallbackServerRuntimeUsage : resourceRuntimeUsage,
+    showResourceServerRuntimeFallback
+      ? resourceFallbackServerRuntimeUsage
+      : resourceServerRuntimeFallbackLoading
+        ? null
+        : resourceRuntimeUsage,
   );
   const effectiveResourceRuntimeUsageLoading = $derived(
     resourceRuntimeUsageQuery.isPending ||
-      (!resourceRuntimeUsageHasMonitorValues &&
-        resourceFallbackServerScope !== null &&
-        resourceFallbackServerRuntimeUsageQuery.isPending),
+      resourceServerRuntimeFallbackLoading,
   );
   const effectiveResourceRuntimeUsageError = $derived(
-    showResourceServerRuntimeFallback
+    resourceServerRuntimeFallbackLoading
+      ? ""
+      : showResourceServerRuntimeFallback
       ? resourceFallbackServerRuntimeUsageQuery.error
         ? readErrorMessage(resourceFallbackServerRuntimeUsageQuery.error)
         : ""
@@ -1055,6 +1065,7 @@
   let runtimeLogsFollowing = $state(false);
   let runtimeLogStream = $state<RuntimeLogClientStream | null>(null);
   let runtimeLogRequestGeneration = $state(0);
+  let runtimeLogsCacheKey = $state("");
   const runtimeLogsInObservationWindow = $derived(
     resourceRuntimeMonitoringObservationHandoff
       ? runtimeLogs.filter((line) =>
@@ -1075,6 +1086,8 @@
   let configImportExposure = $state<ResourceVariableExposure>("runtime");
   let configImportSecretKeys = $state("");
   let configImportPlainKeys = $state("");
+  let configEditorDialogOpen = $state(false);
+  let configEditorMode = $state<"single" | "env">("single");
   let configFeedback = $state<{
     kind: "success" | "error";
     title: string;
@@ -2120,6 +2133,7 @@
         detail: configKey.trim(),
       };
       configValue = "";
+      configEditorDialogOpen = false;
       void queryClient.invalidateQueries({
         queryKey: orpc.resources.effectiveConfig.key({ input: { resourceId } }),
       });
@@ -2143,6 +2157,7 @@
         }),
       };
       configImportContent = "";
+      configEditorDialogOpen = false;
       void queryClient.invalidateQueries({
         queryKey: orpc.resources.effectiveConfig.key({ input: { resourceId } }),
       });
@@ -2555,6 +2570,15 @@
     return isActiveRuntimeLogRequest(currentResourceId, generation) && runtimeLogsFollowing;
   }
 
+  function runtimeLogsKey(
+    currentResourceId: string,
+    handoff: RuntimeMonitoringObservationHandoff | null,
+  ): string {
+    return handoff
+      ? `${currentResourceId}:${handoff.from}:${handoff.to}`
+      : `${currentResourceId}:latest`;
+  }
+
   function readDomainErrorCode(error: unknown): string {
     if (!error || typeof error !== "object") {
       return "";
@@ -2643,10 +2667,14 @@
     void stream?.return?.().catch(() => undefined);
   }
 
-  async function loadRuntimeLogs(currentResourceId: string, since?: string): Promise<void> {
+  async function loadRuntimeLogs(
+    currentResourceId: string,
+    handoff: RuntimeMonitoringObservationHandoff | null,
+  ): Promise<void> {
     const generation = runtimeLogRequestGeneration + 1;
     runtimeLogRequestGeneration = generation;
     runtimeLogResourceId = currentResourceId;
+    runtimeLogsCacheKey = runtimeLogsKey(currentResourceId, handoff);
     runtimeLogsLoading = true;
     runtimeLogsError = null;
     runtimeLogsUnavailable = false;
@@ -2655,7 +2683,7 @@
       const result = await orpcClient.resources.logs({
         resourceId: currentResourceId,
         tailLines: 100,
-        ...(since ? { since } : {}),
+        ...(handoff ? { since: handoff.from } : {}),
         follow: false,
       });
 
@@ -2740,8 +2768,10 @@
     }
 
     const generation = runtimeLogRequestGeneration + 1;
+    const handoff = resourceRuntimeMonitoringObservationHandoff;
     runtimeLogRequestGeneration = generation;
     runtimeLogResourceId = resource.id;
+    runtimeLogsCacheKey = runtimeLogsKey(resource.id, handoff);
     runtimeLogsError = null;
     runtimeLogsUnavailable = false;
     runtimeLogsFollowing = true;
@@ -2750,7 +2780,7 @@
       resource.id,
       generation,
       tailLines,
-      resourceRuntimeMonitoringObservationHandoff?.from,
+      handoff?.from,
     );
   }
 
@@ -2760,7 +2790,7 @@
     }
 
     stopRuntimeLogFollow();
-    void loadRuntimeLogs(resource.id, resourceRuntimeMonitoringObservationHandoff?.from);
+    void loadRuntimeLogs(resource.id, resourceRuntimeMonitoringObservationHandoff);
   }
 
   async function loadProxyConfiguration(currentResourceId: string): Promise<void> {
@@ -3450,30 +3480,53 @@
     }
 
     untrack(() => {
-      stopRuntimeLogFollow();
-
       if (!currentResourceId) {
+        stopRuntimeLogFollow();
         runtimeLogs = [];
         runtimeLogResourceId = "";
+        runtimeLogsCacheKey = "";
         runtimeLogsLoading = false;
         return;
+      }
+
+      if (runtimeLogResourceId && runtimeLogResourceId !== currentResourceId) {
+        stopRuntimeLogFollow();
+        runtimeLogs = [];
+        runtimeLogsError = null;
+        runtimeLogsUnavailable = false;
+        runtimeLogsCacheKey = "";
       }
 
       if (currentTab !== "logs") {
-        runtimeLogsLoading = false;
         return;
       }
+
+      const currentRuntimeLogsCacheKey = runtimeLogsKey(
+        currentResourceId,
+        currentObservationHandoff,
+      );
 
       if (!currentResourceSupportsServerBackedRuntimeSurfaces) {
-        runtimeLogs = [];
-        runtimeLogsError = null;
-        runtimeLogsUnavailable = true;
-        runtimeLogResourceId = currentResourceId;
-        runtimeLogsLoading = false;
+        if (runtimeLogsCacheKey !== currentRuntimeLogsCacheKey) {
+          stopRuntimeLogFollow();
+          runtimeLogs = [];
+          runtimeLogsError = null;
+          runtimeLogsUnavailable = true;
+          runtimeLogResourceId = currentResourceId;
+          runtimeLogsCacheKey = currentRuntimeLogsCacheKey;
+          runtimeLogsLoading = false;
+        }
         return;
       }
 
-      void loadRuntimeLogs(currentResourceId, currentObservationHandoff?.from);
+      if (
+        runtimeLogsCacheKey === currentRuntimeLogsCacheKey &&
+        (runtimeLogs.length > 0 || runtimeLogsUnavailable || runtimeLogsError || runtimeLogsLoading || runtimeLogsFollowing)
+      ) {
+        return;
+      }
+
+      void loadRuntimeLogs(currentResourceId, currentObservationHandoff);
     });
   });
 
@@ -4142,6 +4195,12 @@
       secretKeys: parseImportKeyList(configImportSecretKeys),
       plainKeys: parseImportKeyList(configImportPlainKeys),
     });
+  }
+
+  function openResourceConfigurationEditor(mode: "single" | "env"): void {
+    configEditorMode = mode;
+    configFeedback = null;
+    configEditorDialogOpen = true;
   }
 
   function unsetResourceVariable(entry: ResourceConfigEntry): void {
@@ -6963,7 +7022,7 @@
             <div class={[detailSubnavLayoutClass, "md:grid-cols-[12rem_minmax(0,1fr)]"]}>
               {@render resourceSectionNavigation()}
 
-              <div class="space-y-8 p-5">
+              <div class={[detailSubnavContentClass, "space-y-8"]}>
                 {#if activeResourceSection === "general"}
                   <div id="resource-settings-general" class="space-y-4" data-resource-settings-general>
                     <section class="rounded-md border bg-background p-4" data-resource-settings-identity>
@@ -6984,7 +7043,7 @@
                       </div>
 
                       <dl class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                        <div class="rounded-md border border-border bg-muted/25 px-3 py-2">
                           <dt class="text-xs text-muted-foreground">
                             {$t(i18nKeys.common.domain.resource)}
                           </dt>
@@ -6995,7 +7054,7 @@
                             </p>
                           </dd>
                         </div>
-                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                        <div class="rounded-md border border-border bg-muted/25 px-3 py-2">
                           <dt class="text-xs text-muted-foreground">
                             {$t(i18nKeys.common.domain.project)}
                           </dt>
@@ -7003,7 +7062,7 @@
                             {project?.name ?? resource.projectId}
                           </dd>
                         </div>
-                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                        <div class="rounded-md border border-border bg-muted/25 px-3 py-2">
                           <dt class="text-xs text-muted-foreground">
                             {$t(i18nKeys.common.domain.environment)}
                           </dt>
@@ -7011,19 +7070,19 @@
                             {environment?.name ?? resource.environmentId}
                           </dd>
                         </div>
-                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                        <div class="rounded-md border border-border bg-muted/25 px-3 py-2">
                           <dt class="text-xs text-muted-foreground">
                             {$t(i18nKeys.common.domain.kind)}
                           </dt>
                           <dd class="mt-1 truncate text-sm font-medium">{resource.kind}</dd>
                         </div>
-                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                        <div class="rounded-md border border-border bg-muted/25 px-3 py-2">
                           <dt class="text-xs text-muted-foreground">
                             {$t(i18nKeys.common.domain.slug)}
                           </dt>
                           <dd class="mt-1 truncate font-mono text-sm font-medium">{resource.slug}</dd>
                         </div>
-                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                        <div class="rounded-md border border-border bg-muted/25 px-3 py-2">
                           <dt class="text-xs text-muted-foreground">
                             {$t(i18nKeys.common.domain.destination)}
                           </dt>
@@ -7031,7 +7090,7 @@
                             {defaultDestinationId || "-"}
                           </dd>
                         </div>
-                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                        <div class="rounded-md border border-border bg-muted/25 px-3 py-2">
                           <dt class="text-xs text-muted-foreground">
                             {$t(i18nKeys.common.domain.createdAt)}
                           </dt>
@@ -7039,7 +7098,7 @@
                             {formatTime(resource.createdAt)}
                           </dd>
                         </div>
-                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                        <div class="rounded-md border border-border bg-muted/25 px-3 py-2">
                           <dt class="text-xs text-muted-foreground">
                             {$t(i18nKeys.common.domain.status)}
                           </dt>
@@ -7522,7 +7581,7 @@
                         <Badge variant="outline">{resourceDetail?.generatedAt ? formatTime(resourceDetail.generatedAt) : "-"}</Badge>
                       </div>
                       <dl class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                        <div class="rounded-md border border-border bg-muted/25 px-3 py-2">
                           <dt class="flex items-center gap-1.5 text-xs text-muted-foreground">
                             {$t(i18nKeys.common.domain.source)}
                             <DocsHelpLink
@@ -7533,7 +7592,7 @@
                           </dt>
                           <dd class="mt-1 truncate text-sm font-medium">{resourceSourceSummary()}</dd>
                         </div>
-                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                        <div class="rounded-md border border-border bg-muted/25 px-3 py-2">
                           <dt class="flex items-center gap-1.5 text-xs text-muted-foreground">
                             {$t(i18nKeys.console.resources.runtimeProfileTitle)}
                             <DocsHelpLink
@@ -7544,7 +7603,7 @@
                           </dt>
                           <dd class="mt-1 truncate text-sm font-medium">{resourceRuntimeSummary()}</dd>
                         </div>
-                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                        <div class="rounded-md border border-border bg-muted/25 px-3 py-2">
                           <dt class="flex items-center gap-1.5 text-xs text-muted-foreground">
                             {$t(i18nKeys.console.resources.networkProfileTitle)}
                             <DocsHelpLink
@@ -7555,7 +7614,7 @@
                           </dt>
                           <dd class="mt-1 truncate text-sm font-medium">{resourceNetworkSummary()}</dd>
                         </div>
-                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                        <div class="rounded-md border border-border bg-muted/25 px-3 py-2">
                           <dt class="text-xs text-muted-foreground">
                             {$t(i18nKeys.console.resources.accessProfileTitle)}
                           </dt>
@@ -7708,6 +7767,59 @@
                             {/each}
                           </div>
                         {/if}
+                      </section>
+
+                      <section class="rounded-md border bg-background p-4" data-resource-config-editor>
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <h3 class="text-base font-semibold">
+                              {$t(i18nKeys.console.resources.configurationFormTitle)}
+                            </h3>
+                            <p class="mt-1 text-sm text-muted-foreground">
+                              {$t(i18nKeys.console.resources.configurationFormDescription)}
+                            </p>
+                          </div>
+                          <Badge variant="outline">
+                            {$t(i18nKeys.console.resources.configurationImportTitle)}
+                          </Badge>
+                        </div>
+
+                        {#if configFeedback}
+                          <div
+                            class={[
+                              "mt-4 rounded-md border px-3 py-2 text-sm",
+                              configFeedback.kind === "success"
+                                ? "border-primary/25 bg-primary/5"
+                                : "border-destructive/30 bg-destructive/5 text-destructive",
+                            ]}
+                          >
+                            <p class="font-medium">{configFeedback.title}</p>
+                            <p class="mt-1 break-all text-xs">{configFeedback.detail}</p>
+                          </div>
+                        {/if}
+
+                        <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            class="justify-start"
+                            disabled={isResourceArchived}
+                            onclick={() => openResourceConfigurationEditor("single")}
+                          >
+                            <Plus class="size-4" />
+                            {$t(i18nKeys.console.resources.configurationSetAction)}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            class="justify-start"
+                            disabled={isResourceArchived}
+                            onclick={() => openResourceConfigurationEditor("env")}
+                          >
+                            <Clipboard class="size-4" />
+                            {$t(i18nKeys.console.resources.configurationImportAction)}
+                          </Button>
+                        </div>
                       </section>
 
                       <section class="rounded-md border bg-background p-4">
@@ -8567,6 +8679,155 @@
           </div>
         {/if}
       </div>
+
+      <Dialog.Root bind:open={configEditorDialogOpen}>
+        <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-3xl">
+          <Dialog.Header>
+            <Dialog.Title>
+              {configEditorMode === "single"
+                ? $t(i18nKeys.console.resources.configurationFormTitle)
+                : $t(i18nKeys.console.resources.configurationImportTitle)}
+            </Dialog.Title>
+            <Dialog.Description>
+              {configEditorMode === "single"
+                ? $t(i18nKeys.console.resources.configurationFormDescription)
+                : $t(i18nKeys.console.resources.configurationImportDescription)}
+            </Dialog.Description>
+          </Dialog.Header>
+
+          {#if configEditorMode === "single"}
+            <form class="space-y-4 px-5 pb-5" onsubmit={setResourceVariable}>
+              <div class="grid gap-3 sm:grid-cols-2">
+                <label class="space-y-1.5 text-sm font-medium">
+                  <span>{$t(i18nKeys.common.domain.key)}</span>
+                  <Input bind:value={configKey} autocomplete="off" placeholder="APP_NAME" />
+                </label>
+                <label class="space-y-1.5 text-sm font-medium">
+                  <span>{$t(i18nKeys.common.domain.value)}</span>
+                  <Input bind:value={configValue} autocomplete="off" placeholder="pocketbase" />
+                </label>
+                <label class="space-y-1.5 text-sm font-medium">
+                  <span>{$t(i18nKeys.common.domain.kind)}</span>
+                  <Select.Root bind:value={configKind} type="single">
+                    <Select.Trigger class="w-full">
+                      {configKindLabel(configKind)}
+                    </Select.Trigger>
+                    <Select.Content>
+                      <Select.Item value="plain-config">
+                        {$t(i18nKeys.console.resources.configurationKindPlain)}
+                      </Select.Item>
+                      <Select.Item value="secret">
+                        {$t(i18nKeys.console.resources.configurationKindSecret)}
+                      </Select.Item>
+                      <Select.Item value="provider-specific">
+                        {$t(i18nKeys.console.resources.configurationKindProviderSpecific)}
+                      </Select.Item>
+                      <Select.Item value="deployment-strategy">
+                        {$t(i18nKeys.console.resources.configurationKindDeploymentStrategy)}
+                      </Select.Item>
+                    </Select.Content>
+                  </Select.Root>
+                </label>
+                <label class="space-y-1.5 text-sm font-medium">
+                  <span>{$t(i18nKeys.common.domain.exposure)}</span>
+                  <Select.Root bind:value={configExposure} type="single">
+                    <Select.Trigger class="w-full">
+                      {configExposureLabel(configExposure)}
+                    </Select.Trigger>
+                    <Select.Content>
+                      <Select.Item value="runtime">
+                        {$t(i18nKeys.console.resources.configurationExposureRuntime)}
+                      </Select.Item>
+                      <Select.Item value="build-time">
+                        {$t(i18nKeys.console.resources.configurationExposureBuildTime)}
+                      </Select.Item>
+                    </Select.Content>
+                  </Select.Root>
+                </label>
+              </div>
+              <label class="flex items-center gap-2 text-sm text-muted-foreground">
+                <input
+                  bind:checked={configSecret}
+                  type="checkbox"
+                  class="size-4 rounded border-border text-primary"
+                />
+                {$t(i18nKeys.console.resources.configurationKindSecret)}
+              </label>
+              {#if configFeedback?.kind === "error"}
+                <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                  <p class="font-medium">{configFeedback.title}</p>
+                  <p class="mt-1 break-all text-xs">{configFeedback.detail}</p>
+                </div>
+              {/if}
+              <Dialog.Footer class="px-0 pb-0">
+                <Button type="button" variant="outline" onclick={() => (configEditorDialogOpen = false)}>
+                  {$t(i18nKeys.common.actions.cancel)}
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={!canSetResourceVariable || setResourceVariableMutation.isPending}
+                >
+                  {$t(i18nKeys.console.resources.configurationSetAction)}
+                </Button>
+              </Dialog.Footer>
+            </form>
+          {:else}
+            <form class="space-y-4 px-5 pb-5" onsubmit={importResourceVariables}>
+              <label class="space-y-1.5 text-sm font-medium">
+                <span>{$t(i18nKeys.console.resources.configurationImportContent)}</span>
+                <Textarea
+                  bind:value={configImportContent}
+                  class="min-h-40 font-mono text-xs"
+                  placeholder={"APP_NAME=pocketbase\nPOCKETBASE_ADMIN_PASSWORD=..."}
+                />
+              </label>
+              <div class="grid gap-3 sm:grid-cols-3">
+                <label class="space-y-1.5 text-sm font-medium">
+                  <span>{$t(i18nKeys.common.domain.exposure)}</span>
+                  <Select.Root bind:value={configImportExposure} type="single">
+                    <Select.Trigger class="w-full">
+                      {configExposureLabel(configImportExposure)}
+                    </Select.Trigger>
+                    <Select.Content>
+                      <Select.Item value="runtime">
+                        {$t(i18nKeys.console.resources.configurationExposureRuntime)}
+                      </Select.Item>
+                      <Select.Item value="build-time">
+                        {$t(i18nKeys.console.resources.configurationExposureBuildTime)}
+                      </Select.Item>
+                    </Select.Content>
+                  </Select.Root>
+                </label>
+                <label class="space-y-1.5 text-sm font-medium">
+                  <span>{$t(i18nKeys.console.resources.configurationImportSecretKeys)}</span>
+                  <Input bind:value={configImportSecretKeys} autocomplete="off" placeholder="PASSWORD, TOKEN" />
+                </label>
+                <label class="space-y-1.5 text-sm font-medium">
+                  <span>{$t(i18nKeys.console.resources.configurationImportPlainKeys)}</span>
+                  <Input bind:value={configImportPlainKeys} autocomplete="off" placeholder="APP_NAME" />
+                </label>
+              </div>
+              {#if configFeedback?.kind === "error"}
+                <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                  <p class="font-medium">{configFeedback.title}</p>
+                  <p class="mt-1 break-all text-xs">{configFeedback.detail}</p>
+                </div>
+              {/if}
+              <Dialog.Footer class="px-0 pb-0">
+                <Button type="button" variant="outline" onclick={() => (configEditorDialogOpen = false)}>
+                  {$t(i18nKeys.common.actions.cancel)}
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={!canImportResourceVariables || importResourceVariablesMutation.isPending}
+                >
+                  {$t(i18nKeys.console.resources.configurationImportAction)}
+                </Button>
+              </Dialog.Footer>
+            </form>
+          {/if}
+        </Dialog.Content>
+      </Dialog.Root>
 
       <Dialog.Root bind:open={deploymentDialogOpen} onOpenChange={setResourceDeploymentDialogOpen}>
         <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-6xl">
