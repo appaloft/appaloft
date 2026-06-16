@@ -74,31 +74,39 @@ export const cliCommandDescriptions = {
   deploy: withDocs("Create a deployment", "deployment.source"),
   deploymentPlan: withDocs("Preview deployment plan without execution", "deployment.plan-preview"),
   controlPlaneLogin: withDocs(
-    "Login to an Appaloft control plane",
+    "Login to Appaloft and store a local CLI profile",
+    "cli.remote-control-plane-login",
+  ),
+  controlPlaneToken: withDocs(
+    "Manage noninteractive Appaloft token login",
+    "cli.remote-control-plane-login",
+  ),
+  controlPlaneTokenLogin: withDocs(
+    "Import a scoped Appaloft token into a local CLI profile",
     "cli.remote-control-plane-login",
   ),
   controlPlaneStatus: withDocs(
-    "Show local Appaloft control-plane profile status",
+    "Show local Appaloft CLI profile status",
     "cli.remote-control-plane-login",
   ),
   controlPlaneLogout: withDocs(
-    "Logout from an Appaloft control-plane profile",
+    "Logout from a local Appaloft CLI profile",
     "cli.remote-control-plane-login",
   ),
   controlPlaneContext: withDocs(
-    "Manage local Appaloft control-plane profiles",
+    "Manage local Appaloft CLI profiles",
     "cli.remote-control-plane-login",
   ),
   controlPlaneContextList: withDocs(
-    "List local Appaloft control-plane profiles",
+    "List local Appaloft CLI profiles",
     "cli.remote-control-plane-login",
   ),
   controlPlaneContextShow: withDocs(
-    "Show the active Appaloft control-plane profile",
+    "Show the active Appaloft CLI profile",
     "cli.remote-control-plane-login",
   ),
   controlPlaneContextUse: withDocs(
-    "Select the active Appaloft control-plane profile",
+    "Select the active Appaloft CLI profile",
     "cli.remote-control-plane-login",
   ),
   deploymentList: withDocs("List deployments", "deployment.lifecycle"),

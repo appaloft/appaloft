@@ -1832,9 +1832,10 @@ CLI:
 - when a local CLI profile selects a remote Appaloft Cloud or self-hosted control plane, the CLI may
   dispatch generated non-streaming operations through the typed remote API client instead of a local
   bus, but the operation key and input schema must remain the same as the HTTP/oRPC operation
-- `appaloft login`, `appaloft logout`, `appaloft auth status`, and `appaloft context *` manage local
-  uncommitted client state; they must not write secrets to `appaloft.yml`, create operation-catalog
-  aliases, or add control-plane fields to `deployments.create`
+- `appaloft login`, `appaloft auth token login`, `appaloft logout`, `appaloft auth status`, and
+  `appaloft context *` manage local uncommitted client state; they must not write secrets to
+  `appaloft.yml`, create operation-catalog aliases, or add control-plane fields to
+  `deployments.create`
 - top-level quick deploy/source-package, webhook-signature-only ingestion, terminal attach, and
   streaming/watch behavior remain separate governed entrypoint capabilities until their transport
   contracts are specified

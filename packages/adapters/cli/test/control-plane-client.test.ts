@@ -570,7 +570,7 @@ describe("CLI remote control-plane client", () => {
     });
   });
 
-  test("[CONTROL-PLANE-CLI-012] env credential login without --url defaults to the Appaloft Cloud profile", async () => {
+  test("[CONTROL-PLANE-CLI-012][CLOUD-AI-CLI-AUTH-002] env credential login without --url defaults to the Appaloft Cloud profile", async () => {
     const requests: Request[] = [];
     const store = new MemoryCliControlPlaneProfileStore();
     const output = captureOutput();
@@ -578,6 +578,7 @@ describe("CLI remote control-plane client", () => {
     const result = await runStandaloneControlPlaneCli({
       argv: ["node", "appaloft", "login", "--no-browser"],
       env: {
+        APPALOFT_AUTH_COOKIE: "better-auth.session_token=legacy-cookie",
         APPALOFT_TOKEN: "tok_cloud_secret_1234",
       },
       fetch: createControlPlaneFetch(requests, {
@@ -602,6 +603,10 @@ describe("CLI remote control-plane client", () => {
     expect(stored._unsafeUnwrap().profiles.cloud).toMatchObject({
       mode: "cloud",
       baseUrl: defaultPublicCloudControlPlaneUrl,
+      auth: {
+        kind: "bearer",
+        token: "tok_cloud_secret_1234",
+      },
     });
     expect(requests.map((request) => new URL(request.url).origin)).toEqual([
       defaultPublicCloudControlPlaneUrl,
@@ -611,6 +616,175 @@ describe("CLI remote control-plane client", () => {
     expect(rendered.stdout).toContain("***1234");
     expect(rendered.stdout).not.toContain("tok_cloud_secret_1234");
     expect(rendered.stderr).toBe("");
+  });
+
+  test("[CONTROL-PLANE-CLI-016][CLOUD-AI-CLI-AUTH-004] auth token login imports an env token without browser auth", async () => {
+    const requests: Request[] = [];
+    const store = new MemoryCliControlPlaneProfileStore();
+    const output = captureOutput();
+
+    const result = await runStandaloneControlPlaneCli({
+      argv: ["node", "appaloft", "auth", "token", "login"],
+      env: {
+        APPALOFT_TOKEN: "tok_agent_secret_2468",
+      },
+      fetch: createControlPlaneFetch(requests, {
+        "/api/version": jsonResponse({
+          name: "Appaloft Cloud",
+          version: "0.12.5-test",
+          apiVersion: "v1",
+          mode: "cloud",
+        }),
+      }),
+      now: () => "2026-05-17T00:00:00.000Z",
+      store,
+      stderr: output.stderr,
+      stdout: output.stdout,
+    });
+
+    const stored = await store.read();
+    const rendered = output.read();
+
+    expect(result).toEqual({ handled: true, exitCode: 0 });
+    expect(stored._unsafeUnwrap().activeProfile).toBe("cloud");
+    expect(stored._unsafeUnwrap().profiles.cloud).toMatchObject({
+      mode: "cloud",
+      baseUrl: defaultPublicCloudControlPlaneUrl,
+      auth: {
+        kind: "bearer",
+        token: "tok_agent_secret_2468",
+      },
+      currentOrganization: {
+        organizationId: "org_self_hosted",
+      },
+    });
+    expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual(
+      ["GET /api/version", "GET /api/organizations/current-context"],
+    );
+    expect(rendered.stdout).toContain("***2468");
+    expect(rendered.stdout).not.toContain("tok_agent_secret_2468");
+    expect(rendered.stderr).toBe("");
+  });
+
+  test("[CONTROL-PLANE-CLI-016][CLOUD-AI-CLI-AUTH-004] auth token login imports token material from a token file", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "appaloft-token-login-"));
+    const tokenPath = join(directory, "token.txt");
+    await writeFile(tokenPath, "tok_file_secret_1357\n", "utf8");
+    const requests: Request[] = [];
+    const store = new MemoryCliControlPlaneProfileStore();
+    const output = captureOutput();
+
+    const result = await runStandaloneControlPlaneCli({
+      argv: [
+        "node",
+        "appaloft",
+        "auth",
+        "token",
+        "login",
+        "--token-file",
+        tokenPath,
+        "--profile",
+        "agent-task",
+      ],
+      env: {},
+      fetch: createControlPlaneFetch(requests),
+      now: () => "2026-05-17T00:00:00.000Z",
+      store,
+      stderr: output.stderr,
+      stdout: output.stdout,
+    });
+
+    const stored = await store.read();
+    const rendered = output.read();
+
+    expect(result).toEqual({ handled: true, exitCode: 0 });
+    expect(stored._unsafeUnwrap().activeProfile).toBe("agent-task");
+    expect(stored._unsafeUnwrap().profiles["agent-task"]).toMatchObject({
+      auth: {
+        kind: "bearer",
+        token: "tok_file_secret_1357",
+      },
+    });
+    expect(rendered.stdout).toContain("***1357");
+    expect(rendered.stdout).not.toContain("tok_file_secret_1357");
+  });
+
+  test("[CONTROL-PLANE-CLI-016][CLOUD-AI-CLI-AUTH-004] auth token login imports token material from stdin", async () => {
+    const requests: Request[] = [];
+    const store = new MemoryCliControlPlaneProfileStore();
+    const output = captureOutput();
+
+    const result = await runStandaloneControlPlaneCli({
+      argv: ["node", "appaloft", "auth", "token", "login", "--stdin"],
+      env: {},
+      fetch: createControlPlaneFetch(requests),
+      now: () => "2026-05-17T00:00:00.000Z",
+      stdinText: "tok_stdin_secret_8642\n",
+      store,
+      stderr: output.stderr,
+      stdout: output.stdout,
+    });
+
+    const stored = await store.read();
+    const rendered = output.read();
+
+    expect(result).toEqual({ handled: true, exitCode: 0 });
+    expect(stored._unsafeUnwrap().profiles.cloud).toMatchObject({
+      auth: {
+        kind: "bearer",
+        token: "tok_stdin_secret_8642",
+      },
+    });
+    expect(rendered.stdout).toContain("***8642");
+    expect(rendered.stdout).not.toContain("tok_stdin_secret_8642");
+  });
+
+  test("[CONTROL-PLANE-CLI-016][CLOUD-AI-CLI-AUTH-004] auth token login rejects conflicting token sources", async () => {
+    const store = new MemoryCliControlPlaneProfileStore();
+    const output = captureOutput();
+
+    const result = await runStandaloneControlPlaneCli({
+      argv: [
+        "node",
+        "appaloft",
+        "auth",
+        "token",
+        "login",
+        "--stdin",
+        "--token-file",
+        "/tmp/appaloft-token",
+      ],
+      env: {},
+      store,
+      stderr: output.stderr,
+      stdout: output.stdout,
+    });
+
+    expect(result).toEqual({ handled: true, exitCode: 1 });
+    expect((await store.read())._unsafeUnwrap()).toEqual({ profiles: {} });
+    expect(output.read().stderr).toContain("Use either --stdin or --token-file, not both");
+  });
+
+  test("[CONTROL-PLANE-CLI-016][CLOUD-AI-CLI-AUTH-004] auth token login rejects empty explicit token material", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "appaloft-empty-token-login-"));
+    const tokenPath = join(directory, "token.txt");
+    await writeFile(tokenPath, "", "utf8");
+    const store = new MemoryCliControlPlaneProfileStore();
+    const output = captureOutput();
+
+    const result = await runStandaloneControlPlaneCli({
+      argv: ["node", "appaloft", "auth", "token", "login", "--token-file", tokenPath],
+      env: {
+        APPALOFT_TOKEN: "tok_env_should_not_be_used",
+      },
+      store,
+      stderr: output.stderr,
+      stdout: output.stdout,
+    });
+
+    expect(result).toEqual({ handled: true, exitCode: 1 });
+    expect((await store.read())._unsafeUnwrap()).toEqual({ profiles: {} });
+    expect(output.read().stderr).toContain("Token material is empty");
   });
 
   test("[CONTROL-PLANE-CLI-012] browser auth exchange prints URL and code then writes the Cloud profile after exchange and current-context verification", async () => {
