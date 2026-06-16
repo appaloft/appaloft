@@ -292,11 +292,20 @@
   }
 
   function setQuickDeployDialogOpen(open: boolean): void {
+    if (!open && quickDeployProgressDialogOpen) {
+      return;
+    }
+
     quickDeployDialogOpen = open;
     if (!open) {
       quickDeployProgressDialogOpen = false;
     }
     void setModalOpen(page, "quick-deploy", open);
+  }
+
+  function closeQuickDeployDialog(): void {
+    quickDeployProgressDialogOpen = false;
+    setQuickDeployDialogOpen(false);
   }
 </script>
 
@@ -622,7 +631,8 @@
   <Dialog.Root open={true} onOpenChange={setQuickDeployDialogOpen}>
     <Dialog.Content
       closeLabel={$t(i18nKeys.common.actions.close)}
-      class={quickDeployProgressDialogOpen ? "max-w-4xl" : "max-w-7xl"}
+      showCloseButton={!quickDeployProgressDialogOpen}
+      class={quickDeployProgressDialogOpen ? "max-w-6xl border-0 bg-transparent shadow-none" : "max-w-7xl"}
     >
       {#if !quickDeployProgressDialogOpen}
         <Dialog.Header>
@@ -640,6 +650,7 @@
         <QuickDeploySheet
           statePath={page.url.pathname}
           stateModal="quick-deploy"
+          onClose={closeQuickDeployDialog}
           onProgressDialogOpenChange={(open) => {
             quickDeployProgressDialogOpen = open;
           }}

@@ -694,6 +694,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     stateBaseSearch = "",
     stateModal = "quick-deploy",
     onProgressDialogOpenChange = undefined,
+    onClose = undefined,
   }: {
     enabled?: boolean;
     lockedProjectId?: string;
@@ -702,6 +703,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     stateBaseSearch?: string;
     stateModal?: string;
     onProgressDialogOpenChange?: (open: boolean) => void;
+    onClose?: () => void;
   } = $props();
 
   const authSessionQuery = createQuery(() =>
@@ -3608,6 +3610,13 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     workflowProgressError = "";
     workflowDeploymentProgressEvents = [];
     workflowDeploymentTraceLink = "";
+  }
+
+  function closeQuickDeploySurface(): void {
+    workflowProgressDialogOpen = false;
+    blueprintSelectorDialogOpen = false;
+    blueprintDetailDialogOpen = false;
+    onClose?.();
   }
 
   function resetDiagnosticSummaryCopy(): void {
@@ -7115,7 +7124,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   resourceHref={lastCreatedResourceHref()}
   embedded
   onClose={() => {
-    workflowProgressDialogOpen = false;
+    closeQuickDeploySurface();
   }}
   onOpenDeployment={() => {
     void goto(lastCreatedDeploymentHref());

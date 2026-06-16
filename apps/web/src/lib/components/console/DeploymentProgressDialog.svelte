@@ -49,7 +49,6 @@
             type="button"
             size="sm"
             variant="outline"
-            disabled={status === "running" && Boolean(requestId)}
             onclick={() => onClose?.()}
           >
             {$t(i18nKeys.common.actions.close)}

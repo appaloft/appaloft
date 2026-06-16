@@ -164,13 +164,13 @@
   function levelClass(level: DeploymentProgressEvent["level"]): string {
     switch (level) {
       case "error":
-        return "text-destructive";
+        return "text-red-300";
       case "warn":
-        return "text-amber-700 dark:text-amber-300";
+        return "text-amber-300";
       case "debug":
-        return "text-muted-foreground";
+        return "text-zinc-500";
       case "info":
-        return "text-foreground";
+        return "text-zinc-200";
     }
   }
 
@@ -287,15 +287,16 @@
 
           <div
             bind:this={progressLogArea}
-            class="max-h-[46vh] min-h-72 overflow-auto rounded-md bg-muted/20 p-3 font-mono text-xs"
+            data-deployment-progress-terminal
+            class="max-h-[50vh] min-h-72 overflow-auto rounded-md bg-zinc-950 p-4 font-mono text-xs text-zinc-100 shadow-inner ring-1 ring-zinc-800"
           >
             {#if sections.length === 0}
-              <p class="text-muted-foreground">{$t(i18nKeys.console.deployments.progressWaiting)}</p>
+              <p class="text-zinc-400">{$t(i18nKeys.console.deployments.progressWaiting)}</p>
             {:else}
               <div class="space-y-4">
                 {#each sections as section (section.phase)}
                   <div class="space-y-2">
-                    <div class="flex flex-wrap items-center gap-2 text-muted-foreground">
+                    <div class="flex flex-wrap items-center gap-2 text-zinc-400">
                       <span>{phaseLabel(section.phase)}</span>
                       <span>·</span>
                       <span>{progressStatusLabel(section.status)}</span>
@@ -303,8 +304,8 @@
                     <div class="space-y-1">
                       {#each section.events as event, index (`${event.timestamp}-${section.phase}-${index}`)}
                         <div class="grid gap-2 leading-5 sm:grid-cols-[4.75rem_6rem_3.5rem_minmax(0,1fr)]">
-                          <span class="text-muted-foreground">{timeLabel(event.timestamp)}</span>
-                          <span class="text-primary">{progressSourceLabel(event)}</span>
+                          <span class="text-zinc-500">{timeLabel(event.timestamp)}</span>
+                          <span class="text-sky-300">{progressSourceLabel(event)}</span>
                           <span class={levelClass(event.level)}>{event.level}</span>
                           <span class={["min-w-0 break-words", levelClass(event.level)]}>
                             {event.message}

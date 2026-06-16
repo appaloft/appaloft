@@ -1342,6 +1342,10 @@
   }
 
   function setQuickDeployDialogOpen(open: boolean): void {
+    if (!open && quickDeployProgressDialogOpen) {
+      return;
+    }
+
     quickDeployDialogOpen = open;
     if (!open) {
       quickDeployProgressDialogOpen = false;
@@ -1356,6 +1360,11 @@
       noScroll: true,
       replaceState: true,
     });
+  }
+
+  function closeQuickDeployDialog(): void {
+    quickDeployProgressDialogOpen = false;
+    setQuickDeployDialogOpen(false);
   }
 
   function openProjectQuickDeploy(): void {
@@ -3021,7 +3030,8 @@
     <Dialog.Root bind:open={quickDeployDialogOpen} onOpenChange={setQuickDeployDialogOpen}>
       <Dialog.Content
         closeLabel={$t(i18nKeys.common.actions.close)}
-        class={quickDeployProgressDialogOpen ? "max-w-4xl" : "max-w-7xl"}
+        showCloseButton={!quickDeployProgressDialogOpen}
+        class={quickDeployProgressDialogOpen ? "max-w-6xl border-0 bg-transparent shadow-none" : "max-w-7xl"}
       >
         {#if !quickDeployProgressDialogOpen}
           <Dialog.Header>
@@ -3042,6 +3052,7 @@
             statePath={page.url.pathname}
             stateBaseSearch={projectModalBaseSearch()}
             stateModal="quick-deploy"
+            onClose={closeQuickDeployDialog}
             onProgressDialogOpenChange={(open) => {
               quickDeployProgressDialogOpen = open;
             }}
