@@ -780,9 +780,7 @@ describe("console page structure", () => {
     expect(resourceDetailPageSource).not.toContain("data-resource-activity-read-model-gap");
     expect(resourceDetailPageSource).not.toContain("orpcClient.activity");
     expect(resourceDetailPageSource).not.toContain("activityQuery");
-    expect(resourceDetailPageSource).toContain(
-      'queryKey: ["source-events", "resource", resourceId]',
-    );
+    expect(resourceDetailPageSource).toContain("orpc.sourceEvents.list.queryOptions");
 
     const resourceSourceEventsSource = sourceBetween(
       resourceDetailPageSource,
@@ -797,7 +795,7 @@ describe("console page structure", () => {
     expect(resourceSourceEventsSource).not.toContain("deploymentMutation");
 
     expect(deploymentDetailPageSource).toContain("data-deployment-attempt-timeline");
-    expect(deploymentDetailPageSource).toContain("orpcClient.deployments.timeline");
+    expect(deploymentDetailPageSource).toContain("orpc.deployments.timeline.queryOptions");
     expect(deploymentDetailPageSource).toContain("orpcClient.deployments.timelineStream");
     expect(deploymentDetailPageSource).not.toContain("orpcClient.activity");
     expect(deploymentDetailPageSource).not.toContain("data-deployment-activity");
@@ -814,7 +812,8 @@ describe("console page structure", () => {
     expect(deploymentTimelineSource).not.toContain("resource activity");
 
     expect(instancePageSource).toContain("data-instance-worker-events-observation");
-    expect(instancePageSource).toContain('queryKey: ["operator-work", "instance-workers"');
+    expect(instancePageSource).toContain("orpc.operatorWork.list.queryOptions");
+    expect(instancePageSource).toContain("orpc.operatorWork.show.queryOptions");
     expect(instancePageSource).not.toContain("orpcClient.activity");
     expect(instancePageSource).not.toContain("data-instance-activity");
     const instanceWorkerEventsSource = sourceBetween(
@@ -3387,13 +3386,13 @@ describe("console page structure", () => {
     );
     const projectPreviewEnvironmentsQuerySource = sourceBetween(
       projectDetailPageSource,
-      'queryKey: ["preview-environments", "project", projectId',
-      'queryKey: [\n        "resources",\n        "project-preview"',
+      "orpc.previewEnvironments.list.queryOptions",
+      "orpc.resources.list.queryOptions",
     );
     const projectPreviewResourcesQuerySource = sourceBetween(
       projectDetailPageSource,
-      'queryKey: [\n        "resources",\n        "project-preview"',
-      'queryKey: ["operator-work", "project", projectId',
+      "orpc.resources.list.queryOptions",
+      "orpc.operatorWork.list.queryOptions",
     );
     const projectLifecycleDialogSource =
       projectDetailPageSource.match(
@@ -3401,7 +3400,7 @@ describe("console page structure", () => {
       )?.[0] ?? "";
     const projectDeleteSafetyQuerySource = sourceBetween(
       projectDetailPageSource,
-      'queryKey: ["projects", "delete-check", projectId]',
+      "orpc.projects.deleteCheck.queryOptions",
       "const projectDeleteSafety = $derived",
     );
     const environmentLifecycleDialogSource =

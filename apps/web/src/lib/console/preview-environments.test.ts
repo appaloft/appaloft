@@ -61,7 +61,7 @@ describe("preview environments console page", () => {
     );
     expect(pageSource).toContain("productGradePreviews");
     expect(pageSource).toContain("previewEnvironmentDetailHref");
-    expect(detailSource).toContain("orpcClient.previewEnvironments.show");
+    expect(detailSource).toContain("orpc.previewEnvironments.show.queryOptions");
     expect(detailSource).toContain("orpcClient.previewEnvironments.delete");
     expect(detailSource).toContain("resourceDetailHref");
     expect(detailSource).toContain("i18nKeys.console.previewEnvironments.cleanupAction");
@@ -90,7 +90,7 @@ describe("preview environments console page", () => {
     expect(projectSource).not.toContain('| "preview"');
     expect(projectSource).not.toContain('value="preview"');
     expect(projectSource).toContain("projectPreviewEnvironmentsQuery");
-    expect(projectSource).toContain("orpcClient.previewEnvironments.list");
+    expect(projectSource).toContain("orpc.previewEnvironments.list.queryOptions");
     expect(projectSource).toContain("projectId,");
     expect(projectSource).toContain("includePreviewResources: true");
     expect(projectSource).toContain("projectPreviewResources");
@@ -98,7 +98,7 @@ describe("preview environments console page", () => {
     expect(projectSource).toContain("resourcePreviewEnvironmentDetailHref");
     expect(projectSource).toContain("i18nKeys.console.projects.previewTitle");
     expect(querySource).toContain("previewEnvironmentsQuery");
-    expect(querySource).toContain("orpcClient.previewEnvironments.list");
+    expect(querySource).toContain("orpc.previewEnvironments.list.queryOptions");
     expect(shellSource).not.toContain('href: "/preview-environments"');
     expect(clientContractSource).toContain("previewEnvironments: {");
     expect(clientContractSource).toContain("ListPreviewEnvironmentsResponse");

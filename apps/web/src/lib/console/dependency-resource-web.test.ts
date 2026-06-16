@@ -39,7 +39,7 @@ describe("dependency resource Web console surface", () => {
       readFile(new URL("../components/console/ResourceStatusDot.svelte", import.meta.url), "utf8"),
     ]);
 
-    expect(resourcePageSource).toContain("orpcClient.dependencyResources.list");
+    expect(resourcePageSource).toContain("orpc.dependencyResources.list.queryOptions");
     expect(resourcePageSource).not.toContain("orpcClient.dependencyResources.provision");
     expect(resourcePageSource).not.toContain("orpcClient.dependencyResources.import");
     expect(resourcePageSource).not.toContain("orpcClient.dependencyResources.rename");
@@ -47,7 +47,7 @@ describe("dependency resource Web console surface", () => {
     expect(resourcePageSource).not.toContain("orpcClient.dependencyResources.createBackup");
     expect(resourcePageSource).not.toContain("orpcClient.dependencyResources.listBackups");
     expect(resourcePageSource).not.toContain("orpcClient.dependencyResources.restoreBackup");
-    expect(resourcePageSource).toContain("orpcClient.resources.dependencyBindings.list");
+    expect(resourcePageSource).toContain("orpc.resources.dependencyBindings.list.queryOptions");
     expect(resourcePageSource).toContain("orpcClient.resources.dependencyBindings.bind");
     expect(resourcePageSource).toContain("orpcClient.resources.dependencyBindings.unbind");
     expect(resourcePageSource).toContain("orpcClient.resources.dependencyBindings.rotateSecret");
@@ -116,7 +116,9 @@ describe("dependency resource Web console surface", () => {
       "orpcClient.dependencyResources.provisioning.accept",
     );
     expect(dependencyResourcePageSource).toContain("orpcClient.dependencyResources.createBackup");
-    expect(dependencyResourcePageSource).toContain("orpcClient.dependencyResources.listBackups");
+    expect(dependencyResourcePageSource).toContain(
+      "orpc.dependencyResources.listBackups.queryOptions",
+    );
     expect(dependencyResourcePageSource).toContain("orpcClient.dependencyResources.restoreBackup");
     expect(dependencyResourcePageSource).toContain(
       "orpcClient.dependencyResources.configureBackupPolicy",

@@ -3,7 +3,7 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import { onDestroy } from "svelte";
-  import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
+  import { createMutation, createQuery } from "@tanstack/svelte-query";
   import {
     ArrowLeft,
     Boxes,
@@ -74,7 +74,7 @@
   } from "$lib/console/utils";
   import { createConsoleQueries } from "$lib/console/queries";
   import { i18nKeys, t } from "$lib/i18n";
-  import { orpcClient } from "$lib/orpc";
+  import { orpc, orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
 
   type AccessRoute =
@@ -136,41 +136,35 @@
 
   const deploymentId = $derived(page.params.deploymentId ?? "");
   const deploymentDetailQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["deployments", "show", deploymentId],
-      queryFn: () =>
-        orpcClient.deployments.show({
-          deploymentId,
-          includeTimeline: true,
-          includeSnapshot: true,
-          includeRelatedContext: true,
-          includeLatestFailure: true,
-        }),
+    orpc.deployments.show.queryOptions({
+      input: {
+        deploymentId,
+        includeTimeline: true,
+        includeSnapshot: true,
+        includeRelatedContext: true,
+        includeLatestFailure: true,
+      },
       enabled: browser && deploymentId.length > 0,
       staleTime: 5_000,
     }),
   );
   const deploymentTimelineQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["deployments", "timeline", deploymentId],
-      queryFn: () =>
-        orpcClient.deployments.timeline({
-          deploymentId,
-          limit: 100,
-        }),
+    orpc.deployments.timeline.queryOptions({
+      input: {
+        deploymentId,
+        limit: 100,
+      },
       enabled: browser && deploymentId.length > 0,
       staleTime: 5_000,
     }),
   );
   const deploymentRecoveryReadinessQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["deployments", "recovery-readiness", deploymentId],
-      queryFn: () =>
-        orpcClient.deployments.recoveryReadiness({
+    orpc.deployments.recoveryReadiness.queryOptions({
+      input: {
           deploymentId,
           includeCandidates: true,
           maxCandidates: 3,
-        }),
+        },
       enabled: browser && deploymentId.length > 0,
       staleTime: 5_000,
     }),
@@ -491,11 +485,17 @@
     deploymentTimelineFollowError = "";
 
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["deployments"] }),
-      queryClient.invalidateQueries({ queryKey: ["deployments", "recovery-readiness", deploymentId] }),
-      queryClient.invalidateQueries({ queryKey: ["deployments", "show", acceptedDeploymentId] }),
+      queryClient.invalidateQueries({ queryKey: orpc.deployments.key({ type: "query" }) }),
       queryClient.invalidateQueries({
-        queryKey: ["deployments", "timeline", acceptedDeploymentId],
+        queryKey: orpc.deployments.recoveryReadiness.key({
+          input: { deploymentId, includeCandidates: true, maxCandidates: 3 },
+        }),
+      }),
+      queryClient.invalidateQueries({ queryKey: orpc.deployments.show.key() }),
+      queryClient.invalidateQueries({
+        queryKey: orpc.deployments.timeline.key({
+          input: { deploymentId: acceptedDeploymentId, limit: 100 },
+        }),
       }),
     ]);
 

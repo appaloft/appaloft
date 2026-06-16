@@ -1,9 +1,9 @@
 <script lang="ts">
   import { browser } from "$app/environment";
   import type { ResourceHealthOverall } from "@appaloft/contracts";
-  import { createQuery, queryOptions } from "@tanstack/svelte-query";
+  import { createQuery } from "@tanstack/svelte-query";
 
-  import { orpcClient } from "$lib/orpc";
+  import { orpc } from "$lib/orpc";
   import ResourceStatusDot from "./ResourceStatusDot.svelte";
 
   type ResourceHealthViewStatus = ResourceHealthOverall | "loading";
@@ -16,15 +16,13 @@
   let { resourceId, class: className = "" }: Props = $props();
 
   const healthQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["resources", "health", resourceId, "compact", "live"],
-      queryFn: () =>
-        orpcClient.resources.health({
-          resourceId,
-          mode: "live",
-          includeChecks: false,
-          includePublicAccessProbe: true,
-        }),
+    orpc.resources.health.queryOptions({
+      input: {
+        resourceId,
+        mode: "live",
+        includeChecks: false,
+        includePublicAccessProbe: true,
+      },
       enabled: browser && resourceId.length > 0,
       staleTime: 5_000,
     }),

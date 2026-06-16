@@ -38,7 +38,7 @@
   import { modalIsOpen, setModalOpen } from "$lib/console/url-modal";
   import { formatTime } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
-  import { orpcClient } from "$lib/orpc";
+  import { orpc, orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
 
   const serverPageSize = 12;
@@ -112,9 +112,8 @@
 
   const { authSessionQuery, deploymentsQuery } = createConsoleQueries(browser, { servers: false });
   const serversQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["servers", { limit: serverPageSize, offset: serverOffset }],
-      queryFn: () => orpcClient.servers.list({ limit: serverPageSize, offset: serverOffset }),
+    orpc.servers.list.queryOptions({
+      input: { limit: serverPageSize, offset: serverOffset },
       enabled: browser && canRunProductQueries(authSessionQuery.data),
     }),
   );
@@ -144,7 +143,7 @@
       }),
     onSuccess: () => {
       serverReorderError = "";
-      void queryClient.invalidateQueries({ queryKey: ["servers"] });
+      void queryClient.invalidateQueries({ queryKey: orpc.servers.key({ type: "query" }) });
     },
     onError: (error, variables) => {
       visibleServers = [...variables.rollbackServers];

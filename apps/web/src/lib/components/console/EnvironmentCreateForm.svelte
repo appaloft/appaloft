@@ -8,7 +8,7 @@
   import { Input } from "$lib/components/ui/input";
   import { environmentKinds, type EnvironmentKind } from "$lib/console/environment-form";
   import { i18nKeys, t } from "$lib/i18n";
-  import { orpcClient } from "$lib/orpc";
+  import { orpc, orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
 
   type Feedback = {
@@ -50,7 +50,7 @@
         title: $t(i18nKeys.console.projects.environmentCreateSucceeded),
         detail: result.id,
       };
-      void queryClient.invalidateQueries({ queryKey: ["environments"] });
+      void queryClient.invalidateQueries({ queryKey: orpc.environments.key({ type: "query" }) });
       onCreated?.(result);
     },
     onError: (error) => {

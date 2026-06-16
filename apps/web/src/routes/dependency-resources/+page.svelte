@@ -49,7 +49,7 @@
   import { modalIsOpen, setModalOpen } from "$lib/console/url-modal";
   import { formatTime } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
-  import { orpcClient } from "$lib/orpc";
+  import { orpc, orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
 
   type DependencyKind = DependencyResourceSummary["kind"];
@@ -146,9 +146,8 @@
     browser && canRunProductQueries(authSessionQuery.data),
   );
   const dependencyResourcesQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["dependency-resources", { limit: 100 }],
-      queryFn: () => orpcClient.dependencyResources.list({ limit: 100 }),
+    orpc.dependencyResources.list.queryOptions({
+      input: { limit: 100 },
       enabled: dependencyResourceQueriesEnabled,
       staleTime: 5_000,
     }),
@@ -236,23 +235,19 @@
     dependencyResources.find((resource) => resource.id === selectedDependencyResourceId) ?? null,
   );
   const selectedResourceBackupsQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["dependency-resources", selectedDependencyResourceId, "backups"],
-      queryFn: () =>
-        orpcClient.dependencyResources.listBackups({
-          dependencyResourceId: selectedDependencyResourceId,
-        }),
+    orpc.dependencyResources.listBackups.queryOptions({
+      input: {
+        dependencyResourceId: selectedDependencyResourceId,
+      },
       enabled: dependencyResourceQueriesEnabled && selectedDependencyResourceId.length > 0,
       staleTime: 5_000,
     }),
   );
   const backupPoliciesQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["dependency-resources", selectedDependencyResourceId, "backup-policies"],
-      queryFn: () =>
-        orpcClient.dependencyResources.listBackupPolicies({
-          dependencyResourceId: selectedDependencyResourceId,
-        }),
+    orpc.dependencyResources.listBackupPolicies.queryOptions({
+      input: {
+        dependencyResourceId: selectedDependencyResourceId,
+      },
       enabled: dependencyResourceQueriesEnabled && selectedDependencyResourceId.length > 0,
       staleTime: 5_000,
     }),
@@ -504,7 +499,7 @@
 
   function invalidateDependencyResourceQueries(): Promise<unknown> {
     return Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["dependency-resources"] }),
+      queryClient.invalidateQueries({ queryKey: orpc.dependencyResources.key({ type: "query" }) }),
       queryClient.invalidateQueries({
         queryKey: ["dependency-resources", selectedDependencyResourceId, "backups"],
       }),

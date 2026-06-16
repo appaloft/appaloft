@@ -32,8 +32,8 @@
     projectDetailHref,
   } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
-  import { orpcClient } from "$lib/orpc";
-  import { createQuery, queryOptions } from "@tanstack/svelte-query";
+  import { orpc } from "$lib/orpc";
+  import { createQuery } from "@tanstack/svelte-query";
   import type { TranslationKey } from "@appaloft/i18n";
 
   type HomeAttentionReason = "failed" | "running" | "no-access" | "no-deployment";
@@ -80,73 +80,64 @@
   ];
 
   const projectsQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["projects", "home", { limit: homeProjectListLimit }],
-      queryFn: () => orpcClient.projects.list({ limit: homeProjectListLimit }),
+    orpc.projects.list.queryOptions({
+      input: { limit: homeProjectListLimit },
       enabled: productQueryEnabled,
       staleTime: 5_000,
     }),
   );
   const resourcesQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["resources", "home", { limit: homeResourceListLimit }],
-      queryFn: () => orpcClient.resources.list({ limit: homeResourceListLimit }),
+    orpc.resources.list.queryOptions({
+      input: { limit: homeResourceListLimit },
       enabled: productQueryEnabled,
       staleTime: 5_000,
     }),
   );
   const environmentsQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["environments", "home", { limit: homeEnvironmentListLimit }],
-      queryFn: () => orpcClient.environments.list({ limit: homeEnvironmentListLimit }),
+    orpc.environments.list.queryOptions({
+      input: { limit: homeEnvironmentListLimit },
       enabled: productQueryEnabled,
       staleTime: 5_000,
     }),
   );
   const deploymentsQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["deployments", "home", { limit: homeDeploymentListLimit }],
-      queryFn: () => orpcClient.deployments.list({ limit: homeDeploymentListLimit }),
+    orpc.deployments.list.queryOptions({
+      input: { limit: homeDeploymentListLimit },
       enabled: productQueryEnabled,
       refetchInterval: 10_000,
     }),
   );
   const serverCountQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["servers", "home", "count"],
-      queryFn: () => orpcClient.servers.count({}),
+    orpc.servers.count.queryOptions({
+      input: {},
       enabled: productQueryEnabled,
       staleTime: 5_000,
     }),
   );
   const deploymentCountQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["deployments", "home", "count"],
-      queryFn: () => orpcClient.deployments.count({}),
+    orpc.deployments.count.queryOptions({
+      input: {},
       enabled: productQueryEnabled,
       refetchInterval: 10_000,
     }),
   );
   const activeDeploymentCountQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["deployments", "home", "count", { statuses: activeDeploymentStatuses }],
-      queryFn: () => orpcClient.deployments.count({ statuses: activeDeploymentStatuses }),
+    orpc.deployments.count.queryOptions({
+      input: { statuses: activeDeploymentStatuses },
       enabled: productQueryEnabled,
       refetchInterval: 10_000,
     }),
   );
   const failedDeploymentCountQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["deployments", "home", "count", { status: "failed" }],
-      queryFn: () => orpcClient.deployments.count({ status: "failed" }),
+    orpc.deployments.count.queryOptions({
+      input: { status: "failed" },
       enabled: productQueryEnabled,
       refetchInterval: 10_000,
     }),
   );
   const resourceCountQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["resources", "home", "count"],
-      queryFn: () => orpcClient.resources.count({}),
+    orpc.resources.count.queryOptions({
+      input: {},
       enabled: productQueryEnabled,
       staleTime: 5_000,
     }),
