@@ -67,6 +67,8 @@ Initial accepted command shapes:
 - `appaloft login [--url <url>] [--profile <name>] [--no-browser]`
 - `appaloft auth login [--url <url>] [--profile <name>] [--no-browser]` as a namespaced alias when useful for CLI
   organization
+- `appaloft auth token login [--stdin | --token-file <path>] [--url <url>] [--profile <name>]`
+  for noninteractive scoped token handoff without browser/user-code auth
 - `appaloft auth status [--profile <name>]`
 - `appaloft logout [--profile <name>]`
 - `appaloft auth logout [--profile <name>]` as a namespaced alias
@@ -95,9 +97,14 @@ Login must not:
 
 The implemented auth acquisition mechanisms are:
 
-- trusted local product-session cookie or bearer token input from environment variables for
-  noninteractive automation;
-- neutral CLI browser auth-session exchange against the selected control plane for human login.
+- bearer token input from `APPALOFT_TOKEN`, `APPALOFT_AUTHORIZATION`, stdin, or a user-controlled
+  token file for noninteractive automation and AI-agent handoff;
+- legacy trusted local product-session cookie compatibility for local operator diagnostics only;
+- neutral CLI browser auth-session exchange against the selected endpoint for human login.
+
+`APPALOFT_TOKEN` takes precedence over legacy cookie material. AI-agent guidance must not ask the
+agent to drive browser/user-code login, read cookies, or open token file contents. If no profile or
+env token exists, the agent asks the user for a scoped token handoff and lets the CLI import it.
 
 Browser auth-session exchange creates a short-lived session, prints `verificationUriComplete` and
 the user code, waits for explicit Enter before opening the browser when browser opening is allowed,

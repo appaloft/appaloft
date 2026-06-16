@@ -23,12 +23,14 @@ the npm package is actually published and verified in the user's environment.
 ## Surface Selection
 
 1. CLI: use when the agent has a trusted local shell and the user expects direct project, server,
-   or hosted Appaloft Cloud work. For product/control-plane tasks, check `appaloft auth status` or
-   `appaloft context show` first. If there is no active profile and the user did not select another
-   endpoint, run `appaloft login`; the CLI defaults to `https://app.appaloft.com`, opens or prints
-   the Cloud browser login URL, and writes a local `cloud` profile only after a trusted local
-   credential verifies. Pure SSH GitHub Actions still enter through the CLI wrapper by default with
-   `control-plane-mode: none` and SSH-server `ssh-pglite` state. Use
+   or hosted Appaloft Cloud work. For hosted or self-hosted Appaloft product tasks, check `appaloft auth status` or
+   `appaloft context show` first. If there is no active profile or `APPALOFT_TOKEN`, ask the user
+   to grant a scoped, expiring token through a trusted UI, secret manager, environment variable, or
+   CLI-approved handoff. Use `APPALOFT_TOKEN` for one-off noninteractive commands, or
+   `appaloft auth token login --stdin` / `--token-file <path>` to let the CLI verify the token and
+   write a local profile. Do not make the agent drive `appaloft login` browser/user-code auth;
+   browser login is for a human at their own terminal. Pure SSH GitHub Actions still enter through
+   the CLI wrapper by default with `control-plane-mode: none` and SSH-server `ssh-pglite` state. Use
    `references/cli-entrypoints.md` for exact commands and operation keys.
 2. HTTP/API: use when the agent is integrated beside an Appaloft control plane or when shell access
    is not the right boundary. Self-hosted Server Action uses this surface: `control-plane-url`
@@ -72,9 +74,10 @@ the npm package is actually published and verified in the user's environment.
 
 - The skill is an AI-facing content entrypoint, not a runtime adapter, provider, plugin, or new
   business surface.
-- Do not ask the user to paste product-session cookies, bearer tokens, deploy tokens, or browser
-  cookies into chat. Let the CLI read local env/profile state, or ask the user to run login in their
-  trusted shell.
+- Do not ask the user to paste product-session cookies, bearer tokens, deploy tokens, browser
+  cookies, or token file contents into chat. Let the CLI read local env/profile state, or ask the
+  user to grant a scoped token through a trusted handoff. `APPALOFT_AUTH_COOKIE` is not an agent
+  setup path.
 - Do not inspect Appaloft internals such as repositories, use cases, database state, Docker, SSH,
   provider SDKs, or proxy config directly when an Appaloft operation exists.
 - Do not add source, runtime, network, health, or access fields to `deployments.create`; configure
