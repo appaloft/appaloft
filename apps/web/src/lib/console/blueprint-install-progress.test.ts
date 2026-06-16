@@ -165,6 +165,66 @@ describe("Blueprint install progress helpers", () => {
     ]);
   });
 
+  test("[CLOUD-BLUEPRINT-QD-037] renders operator work progress messages without deployment ids", () => {
+    const progressEvents = operatorWorkEnvelopeProgressEvents([
+      {
+        schemaVersion: "operator-work.stream-events/v1",
+        kind: "progress",
+        event: {
+          workId: "dw_blueprint_install_cia_demo",
+          sequence: 3,
+          cursor: "dw_blueprint_install_cia_demo:3",
+          emittedAt: "2026-06-16T04:06:16.400Z",
+          kind: "progress",
+          status: "running",
+          operationKey: "blueprints.install",
+          workKind: "blueprint-install",
+          phase: "target-validation",
+          step: "target-validated",
+          message: "Project, environment, and server targets were validated.",
+          projectId: "prj_demo",
+          serverId: "srv_demo",
+        },
+      },
+      {
+        schemaVersion: "operator-work.stream-events/v1",
+        kind: "progress",
+        event: {
+          workId: "dw_blueprint_install_cia_demo",
+          sequence: 4,
+          cursor: "dw_blueprint_install_cia_demo:4",
+          emittedAt: "2026-06-16T04:06:16.439Z",
+          kind: "progress",
+          status: "running",
+          operationKey: "blueprints.install",
+          workKind: "blueprint-install",
+          phase: "create-resource",
+          step: "resource-create-started",
+          message: "Resource creation started for component pocketbase.",
+          projectId: "prj_demo",
+          serverId: "srv_demo",
+        },
+      },
+    ]);
+
+    expect(progressEvents).toMatchObject([
+      {
+        phase: "deploy",
+        status: "running",
+        level: "info",
+        message:
+          "Project, environment, and server targets were validated. · step: target-validated",
+      },
+      {
+        phase: "deploy",
+        status: "running",
+        level: "info",
+        message:
+          "Resource creation started for component pocketbase. · step: resource-create-started",
+      },
+    ]);
+  });
+
   test("[CLOUD-BLUEPRINT-QD-036] reads typed replayed operator work responses", () => {
     const response = {
       workId: "dw_blueprint_install_cia_demo",
