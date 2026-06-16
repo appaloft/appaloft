@@ -4,6 +4,7 @@ import {
   type DeploymentProgressEvent,
   type DeploymentSummary,
   type DeploymentTimelineEnvelope,
+  type DeploymentTimelineResponse,
 } from "@appaloft/contracts";
 
 import { API_BASE, readErrorMessage, requestWithMetadata } from "$lib/api/client";
@@ -404,6 +405,39 @@ export function deploymentTimelineProgressEvents(
   });
 }
 
+type MaybeWrappedDeploymentTimelineResponse =
+  | DeploymentTimelineResponse
+  | {
+      json?: DeploymentTimelineResponse | null;
+    }
+  | null
+  | undefined;
+
+export function normalizeDeploymentTimelineResponse(
+  response: MaybeWrappedDeploymentTimelineResponse,
+): DeploymentTimelineResponse | null {
+  if (!response || typeof response !== "object") {
+    return null;
+  }
+
+  if ("schemaVersion" in response && response.schemaVersion === "deployments.timeline/v1") {
+    return response as DeploymentTimelineResponse;
+  }
+
+  const wrapped = "json" in response ? response.json : null;
+  if (wrapped?.schemaVersion === "deployments.timeline/v1") {
+    return wrapped;
+  }
+
+  return null;
+}
+
+export function deploymentTimelineEntries(
+  response: MaybeWrappedDeploymentTimelineResponse,
+): DeploymentTimelineResponse["entries"] {
+  return normalizeDeploymentTimelineResponse(response)?.entries ?? [];
+}
+
 export function deploymentTimelineProgressStatus(
   envelopes: DeploymentTimelineEnvelope[],
   fallbackStatus: DeploymentSummary["status"] | null | undefined,
@@ -529,11 +563,13 @@ export async function observeDeploymentProgressAfterAcceptance(
       deploymentId,
       limit: 100,
     });
-    const replayEnvelopes: DeploymentTimelineEnvelope[] = replay.entries.map((entry) => ({
-      schemaVersion: "deployments.timeline/v1",
-      kind: "entry",
-      entry,
-    }));
+    const replayEnvelopes: DeploymentTimelineEnvelope[] = deploymentTimelineEntries(replay).map(
+      (entry) => ({
+        schemaVersion: "deployments.timeline/v1",
+        kind: "entry",
+        entry,
+      }),
+    );
 
     for (const event of deploymentTimelineProgressEvents(replayEnvelopes)) {
       onEvent(event);
