@@ -130,6 +130,15 @@ const dependencyResourcesPageSource = readFileSync(
   fileURLToPath(new URL("../../routes/dependency-resources/+page.svelte", import.meta.url)),
   "utf8",
 );
+const dependencyResourceDetailPageSource = readFileSync(
+  fileURLToPath(
+    new URL(
+      "../../routes/dependency-resources/[dependencyResourceId=consoleObjectId]/+page.svelte",
+      import.meta.url,
+    ),
+  ),
+  "utf8",
+);
 const domainBindingsPageSource = readFileSync(
   fileURLToPath(new URL("../../routes/domain-bindings/+page.svelte", import.meta.url)),
   "utf8",
@@ -1300,12 +1309,23 @@ describe("console page structure", () => {
       resourceDetailPageSource.match(
         /<Dialog\.Root bind:open={dependencyBindDialogOpen}[\s\S]*?data-resource-dependency-bind-dialog[\s\S]*?<\/Dialog\.Root>/,
       )?.[0] ?? "";
+    const dependencyUnbindDialogSource =
+      resourceDetailPageSource.match(
+        /<Dialog\.Root bind:open={dependencyUnbindDialogOpen}[\s\S]*?data-resource-dependency-unbind-dialog[\s\S]*?<\/Dialog\.Root>/,
+      )?.[0] ?? "";
 
     expect(resourceDetailPageSource).toContain("dependencyBindDialogOpen");
+    expect(resourceDetailPageSource).toContain("dependencyUnbindDialogOpen");
     expect(resourceDetailPageSource).toContain("openDependencyBindDialog");
+    expect(resourceDetailPageSource).toContain("openDependencyUnbindDialog");
     expect(resourceDetailPageSource).toContain("closeDependencyBindDialog");
+    expect(resourceDetailPageSource).toContain("closeDependencyUnbindDialog");
     expect(resourceDetailPageSource).toContain("data-resource-dependency-bind-dialog");
+    expect(resourceDetailPageSource).toContain("data-resource-dependency-unbind-dialog");
     expect(resourceDependencyBindingsSectionSource).toContain("onclick={openDependencyBindDialog}");
+    expect(resourceDependencyBindingsSectionSource).toContain(
+      "openDependencyUnbindDialog(binding)",
+    );
     expect(resourceDependencyBindingsSectionSource).not.toContain("<form");
     expect(resourceDependencyBindingsSectionSource).not.toContain("<Input");
     expect(resourceDependencyBindingsSectionSource).not.toContain("<Select.Root");
@@ -1317,6 +1337,9 @@ describe("console page structure", () => {
     expect(dependencyBindDialogSource).toContain("dependencyResourceOptionLabel");
     expect(dependencyBindDialogSource).toContain("dependencyRuntimeBadge");
     expect(dependencyBindDialogSource).toContain('type="submit"');
+    expect(dependencyUnbindDialogSource).toContain("unbindDependencyResource");
+    expect(dependencyUnbindDialogSource).toContain("selectedDependencyBindingForUnbind");
+    expect(dependencyUnbindDialogSource).toContain("dependencyUnbindWarning");
   });
 
   test("[RESOURCE-DETAIL-IA-002] keeps resource destructive actions behind intent dialogs", () => {
@@ -2317,8 +2340,8 @@ describe("console page structure", () => {
     expect(dependencyResourcesPageSource).toContain("dependencyResourceQueriesEnabled");
     expect(dependencyResourcesPageSource).toContain("canRunProductQueries(authSessionQuery.data)");
     expect(dependencyResourcesPageSource).toContain("enabled: dependencyResourceQueriesEnabled");
-    expect(dependencyResourcesPageSource).toContain(
-      "enabled: dependencyResourceQueriesEnabled && selectedDependencyResourceId.length > 0",
+    expect(dependencyResourceDetailPageSource).toContain(
+      "enabled: dependencyResourceQueriesEnabled && dependencyResourceId.length > 0",
     );
     expect(dependencyResourcesPageSource).not.toContain("enabled: browser,");
     expect(dependencyResourcesPageSource).not.toContain(
@@ -2330,30 +2353,25 @@ describe("console page structure", () => {
     expect(dependencyResourcesPageSource).toContain("i18nKeys.console.runtimeUsage.refreshNow");
     expect(dependencyResourcesPageSource).toContain("dependencyResourcesQuery.refetch()");
     expect(dependencyResourcesPageSource).not.toContain("const pageLoading = $derived");
-    expect(dependencyResourcesPageSource).toContain("backupCreateDialogOpen");
-    expect(dependencyResourcesPageSource).toContain("restoreBackupDialogOpen");
-    expect(dependencyResourcesPageSource).toContain("backupPolicyDialogOpen");
-    expect(dependencyResourcesPageSource).toContain("deleteDependencyResourceDialogOpen");
-    expect(dependencyResourcesPageSource).toContain(
-      "openBackupCreateDialog(selectedDependencyResource)",
-    );
-    expect(dependencyResourcesPageSource).toContain("openRestoreBackupDialog");
-    expect(dependencyResourcesPageSource).toContain("openBackupPolicyDialog");
-    expect(dependencyResourcesPageSource).toContain(
-      "openDeleteDependencyResourceDialog(selectedDependencyResource)",
-    );
-    expect(dependencyResourcesPageSource).toContain("confirmBackupResource");
-    expect(dependencyResourcesPageSource).toContain("confirmDeleteDependencyResource");
-    expect(dependencyResourcesPageSource).toContain(
+    expect(dependencyResourceDetailPageSource).toContain("backupCreateDialogOpen");
+    expect(dependencyResourceDetailPageSource).toContain("restoreBackupDialogOpen");
+    expect(dependencyResourceDetailPageSource).toContain("backupPolicyDialogOpen");
+    expect(dependencyResourceDetailPageSource).toContain("deleteDependencyResourceDialogOpen");
+    expect(dependencyResourceDetailPageSource).toContain("openRestoreBackupDialog");
+    expect(dependencyResourceDetailPageSource).toContain("openBackupPolicyDialog");
+    expect(dependencyResourceDetailPageSource).toContain("openDeleteDependencyResourceDialog");
+    expect(dependencyResourceDetailPageSource).toContain("confirmBackupResource");
+    expect(dependencyResourceDetailPageSource).toContain("confirmDeleteDependencyResource");
+    expect(dependencyResourceDetailPageSource).toContain(
       "data-dependency-resource-backup-create-dialog",
     );
-    expect(dependencyResourcesPageSource).toContain("restoreDialogTitle");
-    expect(dependencyResourcesPageSource).toContain("backupPolicyDialogTitle");
-    expect(dependencyResourcesPageSource).toContain("deleteDialogTitle");
-    expect(dependencyResourcesPageSource).toContain("deleteConfirmLabel");
-    expect(dependencyResourcesPageSource).toContain("deleteDependencyResourceConfirmation");
-    expect(dependencyResourcesPageSource).toContain("canDeleteSelectedDependencyResource");
-    expect(dependencyResourcesPageSource).toContain("backupPolicyManageAction");
+    expect(dependencyResourceDetailPageSource).toContain("restoreDialogTitle");
+    expect(dependencyResourceDetailPageSource).toContain("backupPolicyDialogTitle");
+    expect(dependencyResourceDetailPageSource).toContain("deleteDialogTitle");
+    expect(dependencyResourceDetailPageSource).toContain("deleteConfirmLabel");
+    expect(dependencyResourceDetailPageSource).toContain("deleteDependencyResourceConfirmation");
+    expect(dependencyResourceDetailPageSource).toContain("canDeleteSelectedDependencyResource");
+    expect(dependencyResourceDetailPageSource).toContain("backupPolicyManageAction");
     expect(dependencyResourcesPageSource).not.toContain("backupResource(resource)");
     expect(dependencyResourcesPageSource).not.toContain(
       "backupResource(selectedDependencyResource)",
@@ -2368,10 +2386,10 @@ describe("console page structure", () => {
       dependencyResourcesPageSource.match(
         /{#each filteredDependencyResources as resource[\s\S]*?<\/article>\s*{\/each}/,
       )?.[0] ?? "";
-    const dependencyResourceSidePanelSource = sourceBetween(
-      dependencyResourcesPageSource,
+    const dependencyResourceDetailDisplaySource = sourceBetween(
+      dependencyResourceDetailPageSource,
       "data-dependency-resource-detail-display-surface",
-      "</aside>",
+      "{#if selectedDependencyResource}",
     );
     expect(dependencyResourceListSource).not.toContain("dependency-resource-delete-action");
     expect(dependencyResourceListSource).not.toContain("deleteAction");
@@ -2385,42 +2403,44 @@ describe("console page structure", () => {
     );
     expect(dependencyResourceListSource).toContain("resource.bindingReadiness.status");
     expect(dependencyResourceListSource).toContain("resource.sourceMode");
-    expect(dependencyResourceSidePanelSource).toContain(
+    expect(dependencyResourcesPageSource).not.toContain(
       "data-dependency-resource-detail-display-surface",
     );
-    expect(dependencyResourceSidePanelSource).toContain(
+    expect(dependencyResourceDetailDisplaySource).toContain(
+      "data-dependency-resource-detail-display-surface",
+    );
+    expect(dependencyResourceDetailDisplaySource).toContain(
       "data-dependency-resource-identity-summary",
     );
-    expect(dependencyResourceSidePanelSource).toContain("data-dependency-resource-backup-summary");
-    expect(dependencyResourceSidePanelSource).toContain("data-dependency-resource-policy-summary");
-    expect(dependencyResourceSidePanelSource).toContain(
+    expect(dependencyResourceDetailDisplaySource).toContain(
+      "data-dependency-resource-backup-summary",
+    );
+    expect(dependencyResourceDetailDisplaySource).toContain(
+      "data-dependency-resource-policy-summary",
+    );
+    expect(dependencyResourceDetailDisplaySource).toContain(
       "data-dependency-resource-lifecycle-handoff",
     );
-    expect(dependencyResourceSidePanelSource).not.toContain("dangerZoneTitle");
-    expect(dependencyResourceSidePanelSource).not.toContain("deleteDialogTitle");
-    expect(dependencyResourceSidePanelSource).toContain("lifecycleDescription");
-    expect(dependencyResourceSidePanelSource).not.toContain("deleteDialogDescription");
-    expect(dependencyResourceSidePanelSource).toContain("lifecycleManageAction");
-    expect(dependencyResourceSidePanelSource).toContain("backupManageAction");
-    expect(dependencyResourceSidePanelSource).toContain("restoreManageAction");
-    expect(dependencyResourceSidePanelSource).not.toContain("restoreAction");
-    expect(dependencyResourceSidePanelSource).not.toContain(
+    expect(dependencyResourceDetailDisplaySource).not.toContain("dangerZoneTitle");
+    expect(dependencyResourceDetailDisplaySource).not.toContain("deleteDialogTitle");
+    expect(dependencyResourceDetailDisplaySource).toContain("lifecycleDescription");
+    expect(dependencyResourceDetailDisplaySource).not.toContain("deleteDialogDescription");
+    expect(dependencyResourceDetailDisplaySource).toContain("lifecycleManageAction");
+    expect(dependencyResourceDetailDisplaySource).toContain("backupManageAction");
+    expect(dependencyResourceDetailDisplaySource).toContain("restoreManageAction");
+    expect(dependencyResourceDetailDisplaySource).not.toContain("restoreAction");
+    expect(dependencyResourceDetailDisplaySource).not.toContain(
       "{$t(i18nKeys.console.dependencyResources.backup)}",
     );
-    expect(dependencyResourceSidePanelSource).not.toContain('variant="destructive"');
-    expect(dependencyResourceSidePanelSource).not.toContain("<form");
-    expect(dependencyResourceSidePanelSource).not.toContain("<Input");
-    expect(dependencyResourceSidePanelSource).not.toContain('type="submit"');
-    expect(dependencyResourceSidePanelSource).toContain(
-      "openBackupCreateDialog(selectedDependencyResource)",
-    );
-    expect(dependencyResourceSidePanelSource).toContain("openRestoreBackupDialog");
-    expect(dependencyResourceSidePanelSource).toContain("openBackupPolicyDialog");
-    expect(dependencyResourceSidePanelSource).toContain(
-      "openDeleteDependencyResourceDialog(selectedDependencyResource)",
-    );
+    expect(dependencyResourceDetailDisplaySource).not.toContain('variant="destructive"');
+    expect(dependencyResourceDetailDisplaySource).not.toContain("<form");
+    expect(dependencyResourceDetailDisplaySource).not.toContain("<Input");
+    expect(dependencyResourceDetailDisplaySource).not.toContain('type="submit"');
+    expect(dependencyResourceDetailDisplaySource).toContain("openRestoreBackupDialog");
+    expect(dependencyResourceDetailDisplaySource).toContain("openBackupPolicyDialog");
+    expect(dependencyResourceDetailDisplaySource).toContain("openDeleteDependencyResourceDialog");
     const dependencyResourceDeleteDialogSource =
-      dependencyResourcesPageSource.match(
+      dependencyResourceDetailPageSource.match(
         /<Dialog\.Root bind:open={deleteDependencyResourceDialogOpen}[\s\S]*?<\/Dialog\.Root>/,
       )?.[0] ?? "";
     expect(dependencyResourceDeleteDialogSource).toContain("deleteConfirmLabel");
@@ -2429,7 +2449,7 @@ describe("console page structure", () => {
     );
     expect(dependencyResourceDeleteDialogSource).toContain('variant="destructive"');
     expect(dependencyResourceDeleteDialogSource).toContain(
-      "disabled={!canDeleteSelectedDependencyResource}",
+      "disabled={!canDeleteSelectedDependencyResource || deleteDependencyResourceMutation.isPending}",
     );
   });
 

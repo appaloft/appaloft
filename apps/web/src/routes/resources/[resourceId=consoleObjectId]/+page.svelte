@@ -732,6 +732,9 @@
   const resourceStorageAttachments = $derived(resourceDetail?.storageAttachments ?? []);
   const dependencyResources = $derived(dependencyResourcesQuery.data?.items ?? []);
   const resourceDependencyBindings = $derived(resourceDependencyBindingsQuery.data?.items ?? []);
+  const selectedDependencyBindingForUnbind = $derived(
+    resourceDependencyBindings.find((binding) => binding.id === dependencyUnbindBindingId) ?? null,
+  );
   const storageVolumeBackups = $derived(storageVolumeBackupsQuery.data?.items ?? []);
   const bindableDependencyResources = $derived(
     dependencyResources.filter(
@@ -1138,6 +1141,8 @@
   let dependencyBindingResourceId = $state("");
   let dependencyBindingTargetName = $state("DATABASE_URL");
   let dependencyBindDialogOpen = $state(false);
+  let dependencyUnbindDialogOpen = $state(false);
+  let dependencyUnbindBindingId = $state("");
   let dependencyBindingSecretRefs = $state<Record<string, string>>({});
   let dependencyBindingSecretValues = $state<Record<string, string>>({});
   let dependencyBindingSecretRotationAcks = $state<Record<string, boolean>>({});
@@ -2395,7 +2400,10 @@
         title: $t(i18nKeys.console.resources.dependencyUnbindSucceeded),
         detail: result.id,
       };
+      dependencyUnbindDialogOpen = false;
+      dependencyUnbindBindingId = "";
       void invalidateDependencyQueries();
+      void resourceDeleteSafetyQuery.refetch();
     },
     onError: (error) => {
       dependencyFeedback = {
@@ -2531,9 +2539,18 @@
           .filter(Boolean)
           .join(" · ");
 
-        return suffix ? `${blocker.kind} (${suffix})` : blocker.kind;
+        const label = resourceDeleteBlockerLabel(blocker.kind);
+        return suffix ? `${label} (${suffix})` : label;
       })
       .join(", ");
+  }
+
+  function resourceDeleteBlockerLabel(kind: string): string {
+    if (kind === "dependency-binding") {
+      return $t(i18nKeys.console.resources.dependencyDeleteBlockedByBinding);
+    }
+
+    return kind;
   }
 
   function resourceDeleteBlockerErrorDetail(error: unknown): string {
@@ -4398,6 +4415,30 @@
   function closeDependencyBindDialog(): void {
     dependencyBindDialogOpen = false;
     dependencyFeedback = null;
+  }
+
+  function openDependencyUnbindDialog(binding: ResourceDependencyBindingSummary): void {
+    dependencyFeedback = null;
+    dependencyUnbindBindingId = binding.id;
+    dependencyUnbindDialogOpen = true;
+  }
+
+  function closeDependencyUnbindDialog(): void {
+    dependencyUnbindDialogOpen = false;
+    dependencyUnbindBindingId = "";
+    dependencyFeedback = null;
+  }
+
+  function unbindDependencyResource(): void {
+    if (!resource || !selectedDependencyBindingForUnbind || unbindResourceDependencyMutation.isPending) {
+      return;
+    }
+
+    dependencyFeedback = null;
+    unbindResourceDependencyMutation.mutate({
+      resourceId: resource.id,
+      bindingId: selectedDependencyBindingForUnbind.id,
+    });
   }
 
   function canRotateDependencyBindingSecret(bindingId: string): boolean {
@@ -8084,9 +8125,27 @@
                                   </div>
                                 </dl>
                               </div>
-                              <Badge variant={binding.snapshotReadiness.status === "blocked" ? "destructive" : "outline"}>
-                                {binding.snapshotReadiness.status}
-                              </Badge>
+                              <div class="flex flex-wrap items-center gap-2">
+                                <Badge
+                                  variant={binding.snapshotReadiness.status === "blocked"
+                                    ? "destructive"
+                                    : "outline"}
+                                >
+                                  {binding.snapshotReadiness.status}
+                                </Badge>
+                                {#if binding.status === "active"}
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={unbindResourceDependencyMutation.isPending}
+                                    onclick={() => openDependencyUnbindDialog(binding)}
+                                  >
+                                    <X class="size-4" />
+                                    {$t(i18nKeys.console.resources.dependencyUnbindAction)}
+                                  </Button>
+                                {/if}
+                              </div>
                             </div>
                           </article>
                         {/each}
@@ -8396,8 +8455,8 @@
                         </p>
                         <ul class="mt-2 space-y-1 text-xs">
                           {#each resourceDeleteBlockers as blocker}
-                            <li class="break-all font-mono">
-                              {blocker.kind}
+                            <li class="break-words">
+                              {resourceDeleteBlockerLabel(blocker.kind)}
                               {#if typeof blocker.count === "number"}
                                 · {blocker.count}
                               {/if}
@@ -9737,6 +9796,69 @@
         </Dialog.Content>
       </Dialog.Root>
 
+      <Dialog.Root bind:open={dependencyUnbindDialogOpen}>
+        <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-xl">
+          <Dialog.Header>
+            <Dialog.Title>{$t(i18nKeys.console.resources.dependencyUnbindTitle)}</Dialog.Title>
+            <Dialog.Description>
+              {$t(i18nKeys.console.resources.dependencyUnbindDescription)}
+            </Dialog.Description>
+          </Dialog.Header>
+
+          <section
+            class="space-y-4 px-5 pb-5"
+            data-resource-dependency-unbind-dialog
+          >
+            {#if selectedDependencyBindingForUnbind}
+              <div class="rounded-md border bg-background p-4 text-sm">
+                <div class="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline">
+                    {dependencyResourceKindLabel(selectedDependencyBindingForUnbind.kind)}
+                  </Badge>
+                  <Badge variant="secondary">{selectedDependencyBindingForUnbind.sourceMode}</Badge>
+                  <Badge variant="outline">{selectedDependencyBindingForUnbind.status}</Badge>
+                </div>
+                <p class="mt-3 font-medium">
+                  {selectedDependencyBindingForUnbind.dependencyResourceName ??
+                    selectedDependencyBindingForUnbind.dependencyResourceSlug ??
+                    selectedDependencyBindingForUnbind.dependencyResourceId}
+                </p>
+                <p class="mt-1 break-all font-mono text-xs text-muted-foreground">
+                  {selectedDependencyBindingForUnbind.target.targetName}
+                </p>
+              </div>
+              <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                {$t(i18nKeys.console.resources.dependencyUnbindWarning)}
+              </div>
+            {/if}
+
+            {#if dependencyFeedback?.kind === "error"}
+              <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                <p class="font-medium">{dependencyFeedback.title}</p>
+                <p class="mt-1 break-all text-xs">{dependencyFeedback.detail}</p>
+              </div>
+            {/if}
+
+            <Dialog.Footer class="px-0 pb-0">
+              <Button type="button" variant="outline" onclick={closeDependencyUnbindDialog}>
+                {$t(i18nKeys.common.actions.cancel)}
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={!selectedDependencyBindingForUnbind || unbindResourceDependencyMutation.isPending}
+                onclick={unbindDependencyResource}
+              >
+                <X class="size-4" />
+                {unbindResourceDependencyMutation.isPending
+                  ? $t(i18nKeys.common.actions.saving)
+                  : $t(i18nKeys.console.resources.dependencyUnbindAction)}
+              </Button>
+            </Dialog.Footer>
+          </section>
+        </Dialog.Content>
+      </Dialog.Root>
+
       <Dialog.Root bind:open={scheduledTaskManageDialogOpen}>
         <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)}>
           <Dialog.Header>
@@ -9992,8 +10114,8 @@
                   </p>
                   <ul class="mt-2 space-y-1 text-xs">
                     {#each resourceDeleteBlockers as blocker}
-                      <li class="break-all font-mono">
-                        {blocker.kind}
+                      <li class="break-words">
+                        {resourceDeleteBlockerLabel(blocker.kind)}
                         {#if typeof blocker.count === "number"}
                           · {blocker.count}
                         {/if}

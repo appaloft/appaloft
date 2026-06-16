@@ -444,11 +444,24 @@ export const enUS = {
       createSucceeded: "Dependency resource created",
       deleteAction: "Delete resource",
       deleteConfirmLabel: "Enter the dependency resource id to confirm deletion",
+      deleteBlockedBackup:
+        "Pending or retained backups still protect this resource. Resolve backup retention before deleting.",
+      deleteBlockedBackupRelationship:
+        "This resource requires backup retention. Disable or adjust retention before deleting.",
+      deleteBlockedDeploymentSnapshot:
+        "Historical deployment snapshots still reference this dependency resource.",
+      deleteBlockedProviderManagedUnsafe:
+        "Managed resources require provider cleanup. Remove bindings and retention policies, then retry when the resource is cleanup-ready.",
+      deleteBlockedResourceBinding:
+        "One or more resources still bind to it. Unbind it from the resource dependency settings first.",
+      deleteBlockedTitle: "Deletion is blocked",
+      deleteBlockedUnknown:
+        "An unknown delete-safety blocker is present. Refresh and inspect bindings and backups.",
       deleteDialogDescription:
         "Delete a dependency resource only after confirming bindings and retention policy. Provider data cleanup depends on backend safety checks.",
       deleteDialogTitle: "Delete dependency resource",
       deleteDialogWarning:
-        "This is a dangerous action. The default list shows state only; deletion must happen from this confirmation dialog.",
+        "Deletion removes the control-plane record; managed resources also run provider data cleanup.",
       dangerZoneDescription:
         "Deletion affects bindings, backups, and provider cleanup. Enter it only from the selected resource danger zone.",
       dangerZoneTitle: "Danger zone",
@@ -1995,6 +2008,8 @@ export const enUS = {
         "Active dependency bindings owned by this resource. Unbinding leaves the dependency resource and provider data intact.",
       dependencyBindingsEmpty: "This resource has no dependency bindings yet.",
       dependencyBindingsTitle: "Resource dependency bindings",
+      dependencyDeleteBlockedByBinding:
+        "This resource still owns dependency bindings. Remove them on the Dependencies tab before deleting the resource.",
       dependencyKind: "Dependency kind",
       dependencyKindPostgres: "Postgres",
       dependencyKindRedis: "Redis",
@@ -2053,8 +2068,13 @@ export const enUS = {
       dependencyTargetName: "Runtime variable",
       dependencyUnbindAction: "Unbind",
       dependencyUnbindConfirm: "Unbind dependency target {{targetName}}?",
+      dependencyUnbindDescription:
+        "Remove this resource's usage relationship with the dependency resource. The dependency resource, Postgres/Redis data, and provider instance remain intact.",
       dependencyUnbindFailed: "Dependency binding was not removed",
       dependencyUnbindSucceeded: "Dependency binding removed",
+      dependencyUnbindTitle: "Remove dependency binding",
+      dependencyUnbindWarning:
+        "Archived resources can remove bindings to finish deletion cleanup. This does not delete database or cache data.",
       copyAccessUrl: "Copy URL",
       dataProfileDescription:
         "Data resources focus on placement context and internal access boundaries.",
