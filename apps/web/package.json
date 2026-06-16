@@ -22,6 +22,7 @@
     "@appaloft/blueprint-marketplace-web": "workspace:*",
     "@appaloft/blueprints": "workspace:*",
     "@appaloft/contracts": "workspace:*",
+    "@appaloft/core": "workspace:*",
     "@appaloft/design": "workspace:*",
     "@appaloft/docs-registry": "workspace:*",
     "@appaloft/i18n": "workspace:*",
