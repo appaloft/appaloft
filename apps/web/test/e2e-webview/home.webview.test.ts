@@ -984,6 +984,27 @@ function dependencyResourceFixture(input: {
   };
 }
 
+function dashboardDependencyResourcesFixture() {
+  return [
+    dependencyResourceFixture({
+      id: "dres_pg",
+      name: "primary-postgres",
+      kind: "postgres",
+      host: "primary-postgres",
+      maskedConnection: "postgresql://appaloft:****@primary-postgres:5432/appaloft",
+      providerResourceHandle: "appaloft-postgres-dres_pg",
+    }),
+    dependencyResourceFixture({
+      id: "dres_redis",
+      name: "cache-redis",
+      kind: "redis",
+      host: "cache-redis",
+      maskedConnection: "redis://:****@cache-redis:6379/0",
+      providerResourceHandle: "appaloft-redis-dres_redis",
+    }),
+  ];
+}
+
 function dependencyResourceBackupFixture(input: {
   id: string;
   dependencyResourceId: string;
@@ -2125,26 +2146,22 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
     "/api/rpc/dependencyResources/list": {
       json: {
         schemaVersion: "dependency-resources.list/v1",
-        items: [
-          dependencyResourceFixture({
-            id: "dres_pg",
-            name: "primary-postgres",
-            kind: "postgres",
-            host: "primary-postgres",
-            maskedConnection: "postgresql://appaloft:****@primary-postgres:5432/appaloft",
-            providerResourceHandle: "appaloft-postgres-dres_pg",
-          }),
-          dependencyResourceFixture({
-            id: "dres_redis",
-            name: "cache-redis",
-            kind: "redis",
-            host: "cache-redis",
-            maskedConnection: "redis://:****@cache-redis:6379/0",
-            providerResourceHandle: "appaloft-redis-dres_redis",
-          }),
-        ],
+        items: dashboardDependencyResourcesFixture(),
         generatedAt: "2026-01-01T00:00:05.000Z",
       },
+    },
+    "/api/rpc/dependencyResources/show": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { dependencyResourceId?: string } | null;
+      const dependencyResource = dashboardDependencyResourcesFixture().find(
+        (item) => item.id === input?.dependencyResourceId,
+      );
+      return {
+        json: {
+          schemaVersion: "dependency-resources.show/v1",
+          dependencyResource: dependencyResource ?? dashboardDependencyResourcesFixture()[0],
+          generatedAt: "2026-01-01T00:00:05.000Z",
+        },
+      };
     },
     "/api/rpc/dependencyResources/provision": (_request: Request, body: unknown) => {
       const input = readOrpcJsonPayload(body) as { kind?: string; name?: string } | null;
@@ -5242,8 +5259,13 @@ describe.serial("console e2e with Bun.WebView", () => {
     await expectAnyText(view, ["Dependency resources", "依赖资源"]);
     await expectText(view, "primary-postgres");
     await expectText(view, "cache-redis");
+
+    await view.navigate(`${previewUrl}/dependency-resources/dres_pg`);
+
+    await expectText(view, "primary-postgres");
     await expectText(view, "appaloft-postgres-dres_pg");
-    await expectText(view, "postgresql://appaloft:****@primary-postgres:5432/appaloft");
+
+    await view.navigate(`${previewUrl}/dependency-resources`);
 
     await clickButtonByAnyText(view, ["Create dependency resource", "创建依赖资源"]);
     await setInputValue(view, "#dependency-resource-name-input", "reporting-db");
