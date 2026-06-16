@@ -8,6 +8,7 @@ describe("dependency resource Web console surface", () => {
     const [
       resourcePageSource,
       dependencyResourcePageSource,
+      dependencyResourceDetailPageSource,
       clientContractSource,
       projectCreateFormSource,
       environmentCreateFormSource,
@@ -24,6 +25,13 @@ describe("dependency resource Web console surface", () => {
         "utf8",
       ),
       readFile(new URL("../../routes/dependency-resources/+page.svelte", import.meta.url), "utf8"),
+      readFile(
+        new URL(
+          "../../routes/dependency-resources/[dependencyResourceId=consoleObjectId]/+page.svelte",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
       readFile(
         new URL("../../../../../packages/orpc/src/client-contract.ts", import.meta.url),
         "utf8",
@@ -51,6 +59,9 @@ describe("dependency resource Web console surface", () => {
     expect(resourcePageSource).toContain("orpcClient.resources.dependencyBindings.bind");
     expect(resourcePageSource).toContain("orpcClient.resources.dependencyBindings.unbind");
     expect(resourcePageSource).toContain("orpcClient.resources.dependencyBindings.rotateSecret");
+    expect(resourcePageSource).toContain("dependencyUnbindDialogOpen");
+    expect(resourcePageSource).toContain("resourceDeleteBlockerLabel");
+    expect(resourcePageSource).toContain("dependencyDeleteBlockedByBinding");
     expect(resourcePageSource).not.toContain("dependencyRenameNames");
     expect(resourcePageSource).not.toContain("dependencyImportConnectionUrl");
     expect(resourcePageSource).not.toContain("dependencyRestoreAcknowledgeDataOverwrite");
@@ -115,15 +126,19 @@ describe("dependency resource Web console surface", () => {
     expect(dependencyResourcePageSource).toContain(
       "orpcClient.dependencyResources.provisioning.accept",
     );
-    expect(dependencyResourcePageSource).toContain("orpcClient.dependencyResources.createBackup");
-    expect(dependencyResourcePageSource).toContain(
+    expect(dependencyResourceDetailPageSource).toContain(
+      "orpcClient.dependencyResources.createBackup",
+    );
+    expect(dependencyResourceDetailPageSource).toContain(
       "orpc.dependencyResources.listBackups.queryOptions",
     );
-    expect(dependencyResourcePageSource).toContain("orpcClient.dependencyResources.restoreBackup");
-    expect(dependencyResourcePageSource).toContain(
+    expect(dependencyResourceDetailPageSource).toContain(
+      "orpcClient.dependencyResources.restoreBackup",
+    );
+    expect(dependencyResourceDetailPageSource).toContain(
       "orpcClient.dependencyResources.configureBackupPolicy",
     );
-    expect(dependencyResourcePageSource).toContain("orpcClient.dependencyResources.delete");
+    expect(dependencyResourceDetailPageSource).toContain("orpcClient.dependencyResources.delete");
     expect(dependencyResourcePageSource).toContain(
       'import ProjectCreateForm from "$lib/components/console/ProjectCreateForm.svelte"',
     );
@@ -136,13 +151,12 @@ describe("dependency resource Web console surface", () => {
     expect(dependencyResourcePageSource).toContain("projectCreateDialogOpen");
     expect(dependencyResourcePageSource).toContain("environmentCreateDialogOpen");
     expect(dependencyResourcePageSource).toContain("serverCreateDialogOpen");
-    expect(dependencyResourcePageSource).toContain("backupCreateDialogOpen");
-    expect(dependencyResourcePageSource).toContain(
-      "openBackupCreateDialog(selectedDependencyResource)",
+    expect(dependencyResourceDetailPageSource).toContain("backupCreateDialogOpen");
+    expect(dependencyResourceDetailPageSource).toContain(
+      "data-dependency-resource-backup-create-dialog",
     );
-    expect(dependencyResourcePageSource).toContain("data-dependency-resource-backup-create-dialog");
-    expect(dependencyResourcePageSource).toContain("function confirmBackupResource(): void");
-    expect(dependencyResourcePageSource).toContain(
+    expect(dependencyResourceDetailPageSource).toContain("function confirmBackupResource(): void");
+    expect(dependencyResourceDetailPageSource).toContain(
       "createBackupMutation.mutate(selectedDependencyResource.id)",
     );
     expect(dependencyResourcePageSource).not.toContain("backupResource(resource)");
