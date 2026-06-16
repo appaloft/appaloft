@@ -201,6 +201,9 @@ describe("Blueprint marketplace console surface", () => {
     expect(quickDeploySource).toContain("orpcClient.blueprints.install");
     expect(quickDeploySource).toContain("orpcClient.blueprints.installation.show");
     expect(quickDeploySource).toContain("orpcClient.operatorWork.events");
+    expect(quickDeploySource).toContain("normalizeOperatorWorkEventStreamEnvelope");
+    expect(quickDeploySource).toContain("operatorWorkEventResponseEnvelopes");
+    expect(quickDeploySource).toContain("observeWorkflowDeploymentProgress");
     expect(quickDeploySource).toContain("summarizeBlueprintInstallProgress");
     expect(quickDeploySource).toContain("lastOperatorWorkId");
     expect(quickDeploySource).toContain("blueprintInstallAcceptedTitle");
