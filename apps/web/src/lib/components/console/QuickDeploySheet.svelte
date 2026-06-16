@@ -4773,10 +4773,10 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       selectedResourceId = installSummary.resourceId || selectedResourceId;
       recordBlueprintInstallResourceOwner(target, installSummary.resourceId);
 
-      if (lastCreatedDeploymentId && installSummary.terminalStatus === "running") {
+      if (lastCreatedDeploymentId) {
         await observeDeploymentProgressAfterAcceptance(
           lastCreatedDeploymentId,
-          appendWorkflowDeploymentProgressEvent,
+          appendWorkflowDeploymentProgressEventOnce,
           {
             onStreamError: (message) => {
               workflowProgressError = message;

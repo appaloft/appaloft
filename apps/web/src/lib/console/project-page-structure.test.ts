@@ -145,7 +145,9 @@ describe("project detail page structure", () => {
     expect(quickDeploySheetSource).toContain("startBlueprintOperatorWorkStatusPoll");
     expect(quickDeploySheetSource).toContain("orpcClient.operatorWork.show");
     expect(quickDeploySheetSource).toContain("Promise.race");
-    expect(quickDeploySheetSource).toContain('installSummary.terminalStatus === "running"');
+    expect(quickDeploySheetSource).toContain("if (lastCreatedDeploymentId)");
+    expect(quickDeploySheetSource).toContain("appendWorkflowDeploymentProgressEventOnce");
+    expect(quickDeploySheetSource).not.toContain('installSummary.terminalStatus === "running"');
     expect(operationProgressPanelSource).toContain("{#if requestId}");
     expect(operationProgressPanelSource).toContain("Intl.DateTimeFormat");
     expect(operationProgressPanelSource).toContain("new Date(timestamp)");

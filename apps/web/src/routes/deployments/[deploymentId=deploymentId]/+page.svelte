@@ -51,6 +51,7 @@
   import {
     deploymentTimelineProgressEvents,
     deploymentTimelineProgressStatus,
+    deploymentTimelineEntries,
     groupDeploymentProgressEvents,
     latestDeploymentTimelineCursor,
     mergeDeploymentTimelineEnvelopes,
@@ -205,9 +206,9 @@
   const listedDeployment = $derived(findDeployment(deployments, deploymentId));
   const headerDeployment = $derived(deployment ?? listedDeployment);
   const recoveryReadiness = $derived(deploymentRecoveryReadinessQuery.data ?? null);
-  const deploymentTimeline = $derived(deploymentTimelineQuery.data?.entries ?? []);
+  const deploymentTimeline = $derived(deploymentTimelineEntries(deploymentTimelineQuery.data));
   const replayDeploymentTimelineEnvelopes = $derived(
-    (deploymentTimelineQuery.data?.entries ?? []).map(
+    deploymentTimeline.map(
       (entry) =>
         ({
           schemaVersion: "deployments.timeline/v1",
