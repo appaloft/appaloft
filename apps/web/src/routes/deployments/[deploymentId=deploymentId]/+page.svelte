@@ -62,6 +62,11 @@
     type DeploymentProgressDialogStatus,
   } from "$lib/console/deployment-progress";
   import {
+    deploymentAccessUrls,
+    type DeploymentAccessUrl,
+    type DeploymentAccessUrlKind,
+  } from "$lib/console/deployment-access-url";
+  import {
     deploymentDetailHref,
     findDeployment,
     findEnvironment,
@@ -77,13 +82,8 @@
   import { orpc, orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
 
-  type AccessRoute =
-    NonNullable<DeploymentDetailSummary["runtimePlan"]["execution"]["accessRoutes"]>[number];
-  type AccessUrlKind = "deployment" | "domain" | "direct";
-  type AccessUrl = {
-    url: string;
-    kind: AccessUrlKind;
-  };
+  type AccessUrlKind = DeploymentAccessUrlKind;
+  type AccessUrl = DeploymentAccessUrl;
   type DeploymentDetailTab = "overview" | "timeline" | "snapshot";
   type DeploymentTimelineJournalEntry = DeploymentTimelineResponse["entries"][number];
   type DeploymentRecoveryAction = "retry" | "redeploy" | "rollback";
@@ -661,67 +661,6 @@
 
   function logTimeLabel(timestamp: string): string {
     return timestamp.slice(11, 19) || "--:--:--";
-  }
-
-  function normalizeAccessPath(pathPrefix: string): string {
-    if (!pathPrefix || pathPrefix === "/") {
-      return "/";
-    }
-
-    return pathPrefix.startsWith("/") ? pathPrefix : `/${pathPrefix}`;
-  }
-
-  function routeUrl(route: AccessRoute, executionPort: number | undefined, serverHost: string | undefined): AccessUrl[] {
-    const pathPrefix = normalizeAccessPath(route.pathPrefix);
-
-    if (route.domains.length > 0) {
-      const scheme = route.tlsMode === "auto" ? "https" : "http";
-      return route.domains.map((domain) => ({
-        url: `${scheme}://${domain}${pathPrefix}`,
-        kind: "domain" as const,
-      }));
-    }
-
-    const directPort = route.targetPort ?? executionPort;
-    if (route.proxyKind === "none" && serverHost && directPort) {
-      return [
-        {
-          url: `http://${serverHost}:${directPort}${pathPrefix}`,
-          kind: "direct",
-        },
-      ];
-    }
-
-    return [];
-  }
-
-  function addUniqueAccessUrl(urls: AccessUrl[], url: AccessUrl): AccessUrl[] {
-    if (urls.some((existingUrl) => existingUrl.url === url.url)) {
-      return urls;
-    }
-
-    return [...urls, url];
-  }
-
-  function deploymentAccessUrls(
-    deployment: DeploymentDetailSummary,
-    serverHost: string | undefined,
-  ): AccessUrl[] {
-    const metadata = deployment.runtimePlan.execution.metadata ?? {};
-    const metadataUrl = metadata.publicUrl ?? metadata.url;
-    let urls: AccessUrl[] = [];
-
-    for (const route of deployment.runtimePlan.execution.accessRoutes ?? []) {
-      for (const url of routeUrl(route, deployment.runtimePlan.execution.port, serverHost)) {
-        urls = addUniqueAccessUrl(urls, url);
-      }
-    }
-
-    if (typeof metadataUrl === "string" && metadataUrl) {
-      urls = addUniqueAccessUrl(urls, { url: metadataUrl, kind: "deployment" });
-    }
-
-    return urls;
   }
 
   function accessUrlKindLabel(kind: AccessUrlKind): string {
