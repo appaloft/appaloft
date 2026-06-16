@@ -2,7 +2,9 @@ import { describe, expect, test } from "vitest";
 
 import {
   type BlueprintInstallProgressSnapshot,
+  normalizeOperatorWorkEventStreamEnvelope,
   operatorWorkEnvelopeProgressEvents,
+  operatorWorkEventResponseEnvelopes,
   operatorWorkItemToProgressEvent,
   operatorWorkReadableFailure,
   summarizeBlueprintInstallProgress,
@@ -115,6 +117,91 @@ describe("Blueprint install progress helpers", () => {
     ]);
     expect(progressEvents[0]?.message).not.toContain("worker:");
     expect(progressEvents[0]?.message).not.toContain("appaloft-cloud-production-worker-replica-2");
+  });
+
+  test("[CLOUD-BLUEPRINT-QD-035] unwraps streamed operator work progress for quick deploy", () => {
+    const wrappedEnvelope = {
+      json: {
+        schemaVersion: "operator-work.stream-events/v1",
+        event: {
+          workId: "dw_blueprint_install_cia_demo",
+          sequence: 8,
+          cursor: "dw_blueprint_install_cia_demo:8",
+          emittedAt: "2026-06-16T02:02:17.198Z",
+          kind: "progress",
+          status: "running",
+          operationKey: "blueprints.install",
+          workKind: "blueprint-install",
+          phase: "deploy-component",
+          step: "deployment-started",
+          message: "Deployment started for component pocketbase.",
+          projectId: "prj_demo",
+          serverId: "srv_demo",
+          resourceId: "res_demo",
+          deploymentId: "dep_demo",
+        },
+      },
+    };
+
+    const envelope = normalizeOperatorWorkEventStreamEnvelope(wrappedEnvelope);
+    expect(envelope).toMatchObject({
+      schemaVersion: "operator-work.stream-events/v1",
+      kind: "progress",
+      event: {
+        deploymentId: "dep_demo",
+        message: "Deployment started for component pocketbase.",
+      },
+    });
+    expect(operatorWorkEnvelopeProgressEvents(envelope ? [envelope] : [])).toMatchObject([
+      {
+        deploymentId: "dep_demo",
+        phase: "deploy",
+        status: "running",
+        message: "Deployment started for component pocketbase. · step: deployment-started",
+      },
+    ]);
+  });
+
+  test("[CLOUD-BLUEPRINT-QD-036] unwraps replayed operator work responses", () => {
+    const response = {
+      json: {
+        workId: "dw_blueprint_install_cia_demo",
+        envelopes: [
+          {
+            json: {
+              schemaVersion: "operator-work.stream-events/v1",
+              kind: "succeeded",
+              event: {
+                workId: "dw_blueprint_install_cia_demo",
+                sequence: 10,
+                cursor: "dw_blueprint_install_cia_demo:10",
+                emittedAt: "2026-06-16T02:02:47.107Z",
+                kind: "succeeded",
+                status: "succeeded",
+                operationKey: "blueprints.install",
+                workKind: "blueprint-install",
+                phase: "install-execution",
+                step: "ready",
+                message: "Operator work completed.",
+                deploymentId: "dep_demo",
+              },
+            },
+          },
+        ],
+      },
+    };
+
+    expect(operatorWorkEventResponseEnvelopes(response)).toHaveLength(1);
+    expect(
+      operatorWorkEnvelopeProgressEvents(operatorWorkEventResponseEnvelopes(response)),
+    ).toMatchObject([
+      {
+        deploymentId: "dep_demo",
+        phase: "verify",
+        status: "succeeded",
+        message: "Operator work completed. · step: ready",
+      },
+    ]);
   });
 
   test("[CLOUD-BLUEPRINT-QD-034] maps operator work show terminal failure into user-facing progress", () => {
