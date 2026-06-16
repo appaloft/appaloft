@@ -1,4 +1,5 @@
-import { type Result } from "@appaloft/core";
+import { readFile } from "node:fs/promises";
+import { type DomainError, err, ok, type Result } from "@appaloft/core";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
 import { Effect } from "effect";
 import { type CliControlPlaneMode } from "../control-plane-profile.js";
@@ -6,6 +7,7 @@ import {
   controlPlaneStatus,
   loginControlPlane,
   logoutControlPlane,
+  tokenLoginControlPlane,
   useControlPlaneProfile,
 } from "../control-plane-service.js";
 import { optionalValue, print, resultToEffect } from "../runtime.js";
@@ -17,6 +19,8 @@ const urlOption = Options.text("url").pipe(Options.optional);
 const profileOption = Options.text("profile").pipe(Options.optional);
 const modeOption = Options.choice("mode", controlPlaneModes).pipe(Options.optional);
 const noBrowserOption = Options.boolean("no-browser").pipe(Options.withDefault(false));
+const stdinOption = Options.boolean("stdin").pipe(Options.withDefault(false));
+const tokenFileOption = Options.text("token-file").pipe(Options.optional);
 const profileArg = Args.text({ name: "profile" });
 
 function runControlPlaneTask<T>(task: Promise<Result<T>>) {
@@ -65,6 +69,69 @@ function loginInput(
   };
 }
 
+function commandValidationError(message: string): DomainError {
+  return {
+    code: "validation_error",
+    category: "user",
+    message,
+    retryable: false,
+    details: {
+      phase: "control-plane-cli-parse",
+    },
+  };
+}
+
+async function readStdinText(): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
+async function readTokenMaterial(input: {
+  readonly stdin: boolean;
+  readonly tokenFile?: string;
+}): Promise<Result<string | undefined>> {
+  if (input.stdin && input.tokenFile) {
+    return err(commandValidationError("Use either --stdin or --token-file, not both"));
+  }
+  if (input.tokenFile) {
+    return ok(await readFile(input.tokenFile, "utf8"));
+  }
+  if (input.stdin) {
+    return ok(await readStdinText());
+  }
+  return ok(undefined);
+}
+
+function tokenLoginTask(input: {
+  readonly url?: string;
+  readonly mode?: CliControlPlaneMode;
+  readonly profile?: string;
+  readonly stdin: boolean;
+  readonly tokenFile?: string;
+}) {
+  return Effect.gen(function* () {
+    const token = yield* resultToEffect(
+      yield* Effect.promise(() =>
+        readTokenMaterial({
+          stdin: input.stdin,
+          ...(input.tokenFile ? { tokenFile: input.tokenFile } : {}),
+        }),
+      ),
+    );
+    yield* runControlPlaneTask(
+      tokenLoginControlPlane({
+        ...(input.url ? { url: input.url } : {}),
+        ...(input.mode ? { mode: input.mode } : {}),
+        ...(input.profile ? { profile: input.profile } : {}),
+        ...(token === undefined ? {} : { token }),
+      }),
+    );
+  });
+}
+
 const authLoginCommand = EffectCommand.make(
   "login",
   {
@@ -78,6 +145,35 @@ const authLoginCommand = EffectCommand.make(
       loginInput(optionalValue(url), optionalValue(mode), noBrowser, optionalValue(profile)),
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.controlPlaneLogin));
+
+const authTokenLoginCommand = EffectCommand.make(
+  "login",
+  {
+    url: urlOption,
+    mode: modeOption,
+    profile: profileOption,
+    stdin: stdinOption,
+    tokenFile: tokenFileOption,
+  },
+  ({ mode, profile, stdin, tokenFile, url }) => {
+    const resolvedUrl = optionalValue(url);
+    const resolvedMode = optionalValue(mode);
+    const resolvedProfile = optionalValue(profile);
+    const resolvedTokenFile = optionalValue(tokenFile);
+    return tokenLoginTask({
+      ...(resolvedUrl ? { url: resolvedUrl } : {}),
+      ...(resolvedMode ? { mode: resolvedMode } : {}),
+      ...(resolvedProfile ? { profile: resolvedProfile } : {}),
+      stdin,
+      ...(resolvedTokenFile ? { tokenFile: resolvedTokenFile } : {}),
+    });
+  },
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.controlPlaneTokenLogin));
+
+const authTokenCommand = EffectCommand.make("token").pipe(
+  EffectCommand.withDescription(cliCommandDescriptions.controlPlaneToken),
+  EffectCommand.withSubcommands([authTokenLoginCommand]),
+);
 
 const authStatusCommand = EffectCommand.make(
   "status",
@@ -97,6 +193,7 @@ const authLogoutCommand = EffectCommand.make(
 
 export const authControlPlaneCommands = [
   authLoginCommand,
+  authTokenCommand,
   authStatusCommand,
   authLogoutCommand,
 ] as const;

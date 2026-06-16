@@ -418,11 +418,22 @@ export function deriveProfileName(url: string, mode: CliControlPlaneMode): strin
 export function readControlPlaneAuthFromEnvironment(
   env: CliControlPlaneEnvironment = process.env,
 ): Result<CliControlPlaneAuth> {
+  const bearer = readControlPlaneBearerTokenFromEnvironment(env);
+  if (bearer.isOk()) {
+    return bearer;
+  }
+
   const cookie = env.APPALOFT_AUTH_COOKIE?.trim();
   if (cookie) {
     return ok({ kind: "product-session", cookie });
   }
 
+  return err(bearer.error);
+}
+
+export function readControlPlaneBearerTokenFromEnvironment(
+  env: CliControlPlaneEnvironment = process.env,
+): Result<Extract<CliControlPlaneAuth, { readonly kind: "bearer" }>> {
   const authorization = env.APPALOFT_AUTHORIZATION?.trim();
   const token = env.APPALOFT_TOKEN?.trim() || authorization?.replace(/^Bearer\s+/i, "").trim();
   if (token) {
@@ -432,7 +443,7 @@ export function readControlPlaneAuthFromEnvironment(
   return err(
     controlPlaneProfileError(
       "control_plane_auth_missing",
-      "Set APPALOFT_AUTH_COOKIE or APPALOFT_TOKEN before logging in to a control plane",
+      "Set APPALOFT_TOKEN before running noninteractive Appaloft token login",
       {
         phase: "control-plane-auth",
       },

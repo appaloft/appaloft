@@ -52,6 +52,7 @@ export {
   dispatchRemoteProjectOperation,
   loginControlPlane,
   logoutControlPlane,
+  tokenLoginControlPlane,
   unsupportedRemoteProjectOperation,
   useControlPlaneProfile,
 } from "./control-plane-service.js";

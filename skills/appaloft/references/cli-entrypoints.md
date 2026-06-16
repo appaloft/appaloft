@@ -10,7 +10,12 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   catalog entries. Without `--url`, they default to the public Appaloft Cloud control plane at
   `https://app.appaloft.com`, print the Cloud browser login URL and user code, wait for explicit
   Enter before opening the browser when enabled, then write a local `cloud` profile only after a
-  trusted local credential verifies against the current organization context.
+  trusted local credential verifies against the current organization context. This is a human
+  interactive login path, not the default AI-agent auth handoff.
+- `appaloft auth token login [--stdin | --token-file <path>] [--url <url>] [--profile <name>]`
+  imports a scoped bearer token from CLI-approved input or `APPALOFT_TOKEN`, verifies the selected
+  endpoint and current organization context, then writes a redacted local profile. Do not pass raw
+  token material as an argv value.
 - `appaloft auth status`, `appaloft context show`, `appaloft context list`,
   `appaloft context use <profile>`, and `appaloft logout` only manage local CLI profile/context
   state. They must not create projects, resources, deployments, source links, or domain bindings.
@@ -101,6 +106,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft resource show <resourceId>` - `resources.show`
 - `appaloft resource create` - `resources.create`
 - `appaloft resource archive <resourceId>` - `resources.archive`
+- `appaloft resource restore <resourceId>` - `resources.restore`
 - `appaloft resource delete-check <resourceId>` - `resources.delete-check`
 - `appaloft resource delete <resourceId> --confirm-slug <slug>` - `resources.delete`
 - `appaloft resource configure-health <resourceId>` - `resources.configure-health`
