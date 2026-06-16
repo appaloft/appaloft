@@ -97,8 +97,8 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   } from "$lib/console/blueprint-marketplace-extension";
   import {
     latestOperatorWorkEventCursor,
-    normalizeOperatorWorkEventStreamEnvelope,
     operatorWorkEnvelopeProgressEvents,
+    operatorWorkEventStreamEnvelope,
     operatorWorkEventResponseEnvelopes,
     operatorWorkEventProgressStatus,
     operatorWorkItemToProgressEvent,
@@ -4493,7 +4493,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
         let result = await stream.next();
 
         while (!result.done && followEpoch === blueprintOperatorWorkFollowEpoch) {
-          const envelope = normalizeOperatorWorkEventStreamEnvelope(result.value);
+          const envelope = operatorWorkEventStreamEnvelope(result.value);
           if (!envelope) {
             result = await stream.next();
             continue;
