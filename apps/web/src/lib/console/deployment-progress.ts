@@ -413,6 +413,14 @@ type MaybeWrappedDeploymentTimelineResponse =
   | null
   | undefined;
 
+type MaybeWrappedDeploymentTimelineEnvelope =
+  | DeploymentTimelineEnvelope
+  | {
+      json?: DeploymentTimelineEnvelope | null;
+    }
+  | null
+  | undefined;
+
 export function normalizeDeploymentTimelineResponse(
   response: MaybeWrappedDeploymentTimelineResponse,
 ): DeploymentTimelineResponse | null {
@@ -425,6 +433,25 @@ export function normalizeDeploymentTimelineResponse(
   }
 
   const wrapped = "json" in response ? response.json : null;
+  if (wrapped?.schemaVersion === "deployments.timeline/v1") {
+    return wrapped;
+  }
+
+  return null;
+}
+
+export function normalizeDeploymentTimelineEnvelope(
+  envelope: MaybeWrappedDeploymentTimelineEnvelope,
+): DeploymentTimelineEnvelope | null {
+  if (!envelope || typeof envelope !== "object") {
+    return null;
+  }
+
+  if ("schemaVersion" in envelope && envelope.schemaVersion === "deployments.timeline/v1") {
+    return envelope as DeploymentTimelineEnvelope;
+  }
+
+  const wrapped = "json" in envelope ? envelope.json : null;
   if (wrapped?.schemaVersion === "deployments.timeline/v1") {
     return wrapped;
   }
@@ -593,7 +620,11 @@ export async function observeDeploymentProgressAfterAcceptance(
       let result = await stream.next();
 
       while (!result.done) {
-        const envelope = result.value;
+        const envelope = normalizeDeploymentTimelineEnvelope(result.value);
+        if (!envelope) {
+          result = await stream.next();
+          continue;
+        }
 
         switch (envelope.kind) {
           case "entry":

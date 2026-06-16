@@ -97,7 +97,9 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   } from "$lib/console/blueprint-marketplace-extension";
   import {
     latestOperatorWorkEventCursor,
+    normalizeOperatorWorkEventStreamEnvelope,
     operatorWorkEnvelopeProgressEvents,
+    operatorWorkEventResponseEnvelopes,
     operatorWorkEventProgressStatus,
     operatorWorkItemToProgressEvent,
     summarizeBlueprintInstallProgress,
@@ -813,6 +815,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   let deploymentCreateInFlight = $state(false);
   let blueprintInstallInFlight = $state(false);
   let workflowDeploymentProgressEvents = $state<DeploymentProgressEvent[]>([]);
+  let workflowDeploymentProgressPromises = new Map<string, Promise<void>>();
   let environmentName = $state(
     browser
       ? (page.url.searchParams.get("environmentName") ??
@@ -3609,6 +3612,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     workflowProgressItems = [];
     workflowProgressError = "";
     workflowDeploymentProgressEvents = [];
+    workflowDeploymentProgressPromises = new Map();
     workflowDeploymentTraceLink = "";
   }
 
@@ -3738,6 +3742,9 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   function appendWorkflowDeploymentProgressEvent(event: DeploymentProgressEvent): void {
     workflowDeploymentProgressEvents = [...workflowDeploymentProgressEvents, event];
     lastCreatedDeploymentId = event.deploymentId ?? lastCreatedDeploymentId;
+    if (lastOperatorWorkId && event.deploymentId) {
+      void observeWorkflowDeploymentProgress(event.deploymentId);
+    }
   }
 
   function appendWorkflowDeploymentProgressEventOnce(event: DeploymentProgressEvent): void {
@@ -3785,6 +3792,25 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       projectId: selectedProjectId,
       environmentId: selectedEnvironmentId,
     });
+  }
+
+  function observeWorkflowDeploymentProgress(deploymentId: string): Promise<void> {
+    const existing = workflowDeploymentProgressPromises.get(deploymentId);
+    if (existing) {
+      return existing;
+    }
+
+    const progress = observeDeploymentProgressAfterAcceptance(
+      deploymentId,
+      appendWorkflowDeploymentProgressEventOnce,
+      {
+        onStreamError: (message) => {
+          workflowProgressError = message;
+        },
+      },
+    );
+    workflowDeploymentProgressPromises.set(deploymentId, progress);
+    return progress;
   }
 
   function testDraftServerConnectivity(input: DraftServerConnectivityInput) {
@@ -4370,9 +4396,10 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       follow: false,
       untilTerminal: true,
     });
-    const progressEvents = operatorWorkEnvelopeProgressEvents(replay.envelopes);
+    const replayEnvelopes = operatorWorkEventResponseEnvelopes(replay);
+    const progressEvents = operatorWorkEnvelopeProgressEvents(replayEnvelopes);
     appendBlueprintInstallProgressEvents(progressEvents);
-    const status = operatorWorkEventProgressStatus(replay.envelopes);
+    const status = operatorWorkEventProgressStatus(replayEnvelopes);
     const lastProgressEvent = progressEvents.at(-1);
     updateBlueprintInstallFeedbackFromWorkEvent(lastProgressEvent ?? {
       timestamp: new Date().toISOString(),
@@ -4389,7 +4416,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     });
 
     return {
-      cursor: latestOperatorWorkEventCursor(replay.envelopes),
+      cursor: latestOperatorWorkEventCursor(replayEnvelopes),
       status,
       ...(lastProgressEvent?.message ? { message: lastProgressEvent.message } : {}),
     };
@@ -4489,7 +4516,11 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
         let result = await stream.next();
 
         while (!result.done && followEpoch === blueprintOperatorWorkFollowEpoch) {
-          const envelope = result.value;
+          const envelope = normalizeOperatorWorkEventStreamEnvelope(result.value);
+          if (!envelope) {
+            result = await stream.next();
+            continue;
+          }
 
           switch (envelope.kind) {
             case "accepted":
@@ -4783,15 +4814,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       recordBlueprintInstallResourceOwner(target, installSummary.resourceId);
 
       if (lastCreatedDeploymentId) {
-        await observeDeploymentProgressAfterAcceptance(
-          lastCreatedDeploymentId,
-          appendWorkflowDeploymentProgressEventOnce,
-          {
-            onStreamError: (message) => {
-              workflowProgressError = message;
-            },
-          },
-        );
+        await observeWorkflowDeploymentProgress(lastCreatedDeploymentId);
       }
 
       await refreshWorkspaceData();
