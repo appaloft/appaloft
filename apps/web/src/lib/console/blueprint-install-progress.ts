@@ -1,6 +1,7 @@
 import {
   type DeploymentProgressEvent,
   type OperatorWorkEventStreamEnvelope,
+  type OperatorWorkEventStreamResponse,
   type OperatorWorkItem,
   type OperatorWorkObservedEvent,
 } from "@appaloft/contracts";
@@ -122,94 +123,43 @@ export type OperatorWorkReadableFailure = {
   operation: string;
 };
 
-type MaybeWrappedOperatorWorkEventStreamResponse =
-  | {
-      envelopes?: readonly unknown[];
-    }
-  | {
-      json?: {
-        envelopes?: readonly unknown[];
-      } | null;
-    }
-  | null
-  | undefined;
-
-function unwrapOrpcJson(value: unknown): unknown {
-  if (!value || typeof value !== "object") {
-    return value;
-  }
-
-  return "json" in value ? (value as { json?: unknown }).json : value;
-}
-
 function isOperatorWorkEventStreamEnvelopeKind(
   kind: unknown,
 ): kind is OperatorWorkEventStreamEnvelope["kind"] {
   return typeof kind === "string" && operatorWorkEventStreamEnvelopeKinds.has(kind);
 }
 
-function isOperatorWorkEventStreamStatusKind(
-  kind: unknown,
-): kind is OperatorWorkObservedEvent["kind"] {
-  return typeof kind === "string" && operatorWorkEventStreamStatusKinds.has(kind);
-}
-
-export function normalizeOperatorWorkEventStreamEnvelope(
-  value: unknown,
+export function operatorWorkEventStreamEnvelope(
+  envelope: OperatorWorkEventStreamEnvelope | null | undefined,
 ): OperatorWorkEventStreamEnvelope | null {
-  const candidate = unwrapOrpcJson(value);
-
-  if (!candidate || typeof candidate !== "object") {
+  if (!envelope) {
     return null;
   }
 
-  if (
-    (candidate as { schemaVersion?: unknown }).schemaVersion !== "operator-work.stream-events/v1"
-  ) {
-    return null;
+  if (envelope.schemaVersion !== "operator-work.stream-events/v1") {
+    throw new Error("Expected operator-work.stream-events/v1 envelope");
   }
 
-  const kind = (candidate as { kind?: unknown }).kind;
-  if (isOperatorWorkEventStreamEnvelopeKind(kind)) {
-    return candidate as OperatorWorkEventStreamEnvelope;
+  if (!isOperatorWorkEventStreamEnvelopeKind(envelope.kind)) {
+    throw new Error("Expected operator work stream envelope kind");
   }
 
-  const event = (candidate as { event?: unknown }).event;
-  if (event && typeof event === "object") {
-    const eventKind = (event as { kind?: unknown }).kind;
-    if (isOperatorWorkEventStreamStatusKind(eventKind)) {
-      return {
-        ...(candidate as { schemaVersion: "operator-work.stream-events/v1" }),
-        kind: eventKind,
-        event: event as OperatorWorkObservedEvent,
-      };
-    }
-  }
-
-  return null;
+  return envelope;
 }
 
 export function operatorWorkEventStreamEnvelopes(
-  envelopes: readonly unknown[],
+  envelopes: readonly OperatorWorkEventStreamEnvelope[],
 ): OperatorWorkEventStreamEnvelope[] {
   return envelopes.flatMap((envelope) => {
-    const normalized = normalizeOperatorWorkEventStreamEnvelope(envelope);
+    const normalized = operatorWorkEventStreamEnvelope(envelope);
     return normalized ? [normalized] : [];
   });
 }
 
 export function operatorWorkEventResponseEnvelopes(
-  response: MaybeWrappedOperatorWorkEventStreamResponse,
+  response: OperatorWorkEventStreamResponse | null | undefined,
 ): OperatorWorkEventStreamEnvelope[] {
-  const candidate = unwrapOrpcJson(response);
-  const envelopes =
-    candidate &&
-    typeof candidate === "object" &&
-    Array.isArray((candidate as { envelopes?: unknown }).envelopes)
-      ? (candidate as { envelopes: unknown[] }).envelopes
-      : [];
-
-  return operatorWorkEventStreamEnvelopes(envelopes);
+  return operatorWorkEventStreamEnvelopes(response?.envelopes ?? []);
 }
 
 function uniqueStrings(values: readonly (string | undefined)[]): string[] {

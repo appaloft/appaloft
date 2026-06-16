@@ -1,10 +1,14 @@
+import {
+  type OperatorWorkEventStreamEnvelope,
+  type OperatorWorkEventStreamResponse,
+} from "@appaloft/contracts";
 import { describe, expect, test } from "vitest";
 
 import {
   type BlueprintInstallProgressSnapshot,
-  normalizeOperatorWorkEventStreamEnvelope,
   operatorWorkEnvelopeProgressEvents,
   operatorWorkEventResponseEnvelopes,
+  operatorWorkEventStreamEnvelope,
   operatorWorkItemToProgressEvent,
   operatorWorkReadableFailure,
   summarizeBlueprintInstallProgress,
@@ -119,31 +123,30 @@ describe("Blueprint install progress helpers", () => {
     expect(progressEvents[0]?.message).not.toContain("appaloft-cloud-production-worker-replica-2");
   });
 
-  test("[CLOUD-BLUEPRINT-QD-035] unwraps streamed operator work progress for quick deploy", () => {
-    const wrappedEnvelope = {
-      json: {
-        schemaVersion: "operator-work.stream-events/v1",
-        event: {
-          workId: "dw_blueprint_install_cia_demo",
-          sequence: 8,
-          cursor: "dw_blueprint_install_cia_demo:8",
-          emittedAt: "2026-06-16T02:02:17.198Z",
-          kind: "progress",
-          status: "running",
-          operationKey: "blueprints.install",
-          workKind: "blueprint-install",
-          phase: "deploy-component",
-          step: "deployment-started",
-          message: "Deployment started for component pocketbase.",
-          projectId: "prj_demo",
-          serverId: "srv_demo",
-          resourceId: "res_demo",
-          deploymentId: "dep_demo",
-        },
+  test("[CLOUD-BLUEPRINT-QD-035] reads typed streamed operator work progress for quick deploy", () => {
+    const streamEnvelope = {
+      schemaVersion: "operator-work.stream-events/v1",
+      kind: "progress",
+      event: {
+        workId: "dw_blueprint_install_cia_demo",
+        sequence: 8,
+        cursor: "dw_blueprint_install_cia_demo:8",
+        emittedAt: "2026-06-16T02:02:17.198Z",
+        kind: "progress",
+        status: "running",
+        operationKey: "blueprints.install",
+        workKind: "blueprint-install",
+        phase: "deploy-component",
+        step: "deployment-started",
+        message: "Deployment started for component pocketbase.",
+        projectId: "prj_demo",
+        serverId: "srv_demo",
+        resourceId: "res_demo",
+        deploymentId: "dep_demo",
       },
-    };
+    } satisfies OperatorWorkEventStreamEnvelope;
 
-    const envelope = normalizeOperatorWorkEventStreamEnvelope(wrappedEnvelope);
+    const envelope = operatorWorkEventStreamEnvelope(streamEnvelope);
     expect(envelope).toMatchObject({
       schemaVersion: "operator-work.stream-events/v1",
       kind: "progress",
@@ -162,34 +165,30 @@ describe("Blueprint install progress helpers", () => {
     ]);
   });
 
-  test("[CLOUD-BLUEPRINT-QD-036] unwraps replayed operator work responses", () => {
+  test("[CLOUD-BLUEPRINT-QD-036] reads typed replayed operator work responses", () => {
     const response = {
-      json: {
-        workId: "dw_blueprint_install_cia_demo",
-        envelopes: [
-          {
-            json: {
-              schemaVersion: "operator-work.stream-events/v1",
-              kind: "succeeded",
-              event: {
-                workId: "dw_blueprint_install_cia_demo",
-                sequence: 10,
-                cursor: "dw_blueprint_install_cia_demo:10",
-                emittedAt: "2026-06-16T02:02:47.107Z",
-                kind: "succeeded",
-                status: "succeeded",
-                operationKey: "blueprints.install",
-                workKind: "blueprint-install",
-                phase: "install-execution",
-                step: "ready",
-                message: "Operator work completed.",
-                deploymentId: "dep_demo",
-              },
-            },
+      workId: "dw_blueprint_install_cia_demo",
+      envelopes: [
+        {
+          schemaVersion: "operator-work.stream-events/v1",
+          kind: "succeeded",
+          event: {
+            workId: "dw_blueprint_install_cia_demo",
+            sequence: 10,
+            cursor: "dw_blueprint_install_cia_demo:10",
+            emittedAt: "2026-06-16T02:02:47.107Z",
+            kind: "succeeded",
+            status: "succeeded",
+            operationKey: "blueprints.install",
+            workKind: "blueprint-install",
+            phase: "install-execution",
+            step: "ready",
+            message: "Operator work completed.",
+            deploymentId: "dep_demo",
           },
-        ],
-      },
-    };
+        },
+      ],
+    } satisfies OperatorWorkEventStreamResponse;
 
     expect(operatorWorkEventResponseEnvelopes(response)).toHaveLength(1);
     expect(
