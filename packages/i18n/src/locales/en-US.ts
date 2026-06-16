@@ -1364,6 +1364,8 @@ export const enUS = {
       restoreSucceeded: "Project restored",
       deleteAction: "Delete",
       deleteBlocked: "Delete blocked by {{count}} retained record(s)",
+      deleteBlockedTitle: "Project deletion is blocked",
+      deleteCheckLoading: "Checking project delete safety...",
       deleteConfirmPrompt: "Type the project id to delete this archived project.",
       deleteDialogDescription:
         "Deletion is available only after the project is archived and delete safety passes. Type the project id to confirm.",
