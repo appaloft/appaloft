@@ -8737,6 +8737,112 @@ describe.serial("console e2e with Bun.WebView", () => {
     }
   }, 30_000);
 
+  test("[DEP-TIMELINE-WEB-001] renders completed deployment timeline replay entries", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    const previousShowRoute = apiResponses.dashboard["/api/rpc/deployments/show"];
+    const previousReplayRoute = apiResponses.dashboard["/api/rpc/deployments/timeline"];
+    const previousStreamRoute = apiResponses.dashboard["/api/rpc/deployments/timelineStream"];
+
+    apiResponses.dashboard["/api/rpc/deployments/show"] = () => ({
+      json: deploymentDetailFixture({
+        deploymentId: "dep_demo",
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        resourceId: "res_demo",
+        serverId: "srv_demo",
+        destinationId: "dst_demo",
+        sourceDisplayName: "PocketBase",
+        sourceLocator: "ghcr.io/muchobien/pocketbase:latest",
+        status: "succeeded",
+      }),
+    });
+    apiResponses.dashboard["/api/rpc/deployments/timeline"] = () => ({
+      json: {
+        schemaVersion: "deployments.timeline/v1",
+        deploymentId: "dep_demo",
+        hasMore: false,
+        nextCursor: "dep_demo:4",
+        entries: [
+          {
+            deploymentId: "dep_demo",
+            sequence: 1,
+            cursor: "dep_demo:1",
+            occurredAt: "2026-01-01T00:00:01.000Z",
+            source: "appaloft",
+            kind: "lifecycle",
+            phase: "plan",
+            level: "info",
+            message: "Using SSH docker-container execution on root@2.25.182.56:22",
+          },
+          {
+            deploymentId: "dep_demo",
+            sequence: 2,
+            cursor: "dep_demo:2",
+            occurredAt: "2026-01-01T00:00:02.000Z",
+            source: "docker",
+            kind: "output",
+            phase: "deploy",
+            level: "info",
+            message: "latest: Pulling from muchobien/pocketbase",
+          },
+          {
+            deploymentId: "dep_demo",
+            sequence: 3,
+            cursor: "dep_demo:3",
+            occurredAt: "2026-01-01T00:00:03.000Z",
+            source: "docker",
+            kind: "output",
+            phase: "deploy",
+            level: "info",
+            message: "Status: Image is up to date for ghcr.io/muchobien/pocketbase:latest",
+          },
+          {
+            deploymentId: "dep_demo",
+            sequence: 4,
+            cursor: "dep_demo:4",
+            occurredAt: "2026-01-01T00:00:04.000Z",
+            source: "appaloft",
+            kind: "status",
+            phase: "verify",
+            level: "info",
+            status: "succeeded",
+            message: "Deployment succeeded",
+          },
+        ],
+      },
+    });
+    apiResponses.dashboard["/api/rpc/deployments/timelineStream"] = () =>
+      deploymentTimelineStreamFixture("dep_demo");
+
+    try {
+      await using view = createWebView();
+      await view.navigate(`${previewUrl}${demoDeploymentPath}?tab=timeline`);
+
+      await expectAnyText(view, ["Timeline", "时间线"], 15_000);
+      await expectText(view, "Using SSH docker-container execution", 15_000);
+      await expectText(view, "latest: Pulling from muchobien/pocketbase", 15_000);
+      await expectText(view, "Status: Image is up to date", 15_000);
+      await expectText(view, "Deployment succeeded", 15_000);
+
+      const replayRequest = await waitForRecordedRequest("/api/rpc/deployments/timeline");
+      expect(readOrpcJsonPayload(replayRequest.body)).toEqual({
+        deploymentId: "dep_demo",
+        limit: 100,
+      });
+      expect(
+        recordedApiRequests.some(
+          (request) => request.pathname === "/api/rpc/deployments/timelineStream",
+        ),
+      ).toBe(false);
+    } finally {
+      apiResponses.dashboard["/api/rpc/deployments/show"] = previousShowRoute;
+      apiResponses.dashboard["/api/rpc/deployments/timeline"] = previousReplayRoute;
+      apiResponses.dashboard["/api/rpc/deployments/timelineStream"] = previousStreamRoute;
+    }
+  }, 30_000);
+
   test("[RES-PROFILE-ENTRY-002] submits resource archive through Web", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();
