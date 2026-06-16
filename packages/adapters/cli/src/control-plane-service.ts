@@ -26,6 +26,7 @@ import {
   normalizeControlPlaneUrl,
   profileView,
   readControlPlaneAuthFromEnvironment,
+  readControlPlaneBearerTokenFromEnvironment,
 } from "./control-plane-profile.js";
 
 export interface CliControlPlaneDependencies {
@@ -49,6 +50,13 @@ export interface CliControlPlaneLoginInput {
   readonly pollTimeoutMs?: number;
   readonly profile?: string;
   readonly signal?: AbortSignal;
+}
+
+export interface CliControlPlaneTokenLoginInput {
+  readonly url?: string;
+  readonly mode?: CliControlPlaneMode;
+  readonly profile?: string;
+  readonly token?: string;
 }
 
 export interface CliControlPlaneStatus {
@@ -388,11 +396,15 @@ async function acquireBrowserAuth(input: {
   }
 }
 
-export async function loginControlPlane(
-  input: CliControlPlaneLoginInput,
-  deps?: CliControlPlaneDependencies,
-): Promise<Result<CliControlPlaneLoginProfileView>> {
-  const resolved = dependencies(deps);
+function resolveLoginTarget(input: {
+  readonly url?: string;
+  readonly mode?: CliControlPlaneMode;
+  readonly profile?: string;
+}): Result<{
+  readonly mode: CliControlPlaneMode;
+  readonly normalizedUrl: string;
+  readonly profileName: string;
+}> {
   if (input.mode === "self-hosted" && !input.url) {
     return err(
       controlPlaneError(
@@ -408,7 +420,6 @@ export async function loginControlPlane(
   }
 
   const rawUrl = input.url ?? defaultPublicCloudControlPlaneUrl;
-
   const normalizedUrl = normalizeControlPlaneUrl(rawUrl);
   if (normalizedUrl.isErr()) {
     return err(normalizedUrl.error);
@@ -426,31 +437,10 @@ export async function loginControlPlane(
       ),
     );
   }
+
   const mode =
     input.mode ??
     (isDefaultPublicCloudControlPlaneUrl(normalizedUrl.value) ? "cloud" : "self-hosted");
-  const shouldOpenBrowser = input.openBrowser ?? (!input.url || mode === "cloud");
-  const environmentAuth = readControlPlaneAuthFromEnvironment(resolved.env);
-  const acquiredAuth: Result<AcquiredControlPlaneAuth> = environmentAuth.isOk()
-    ? ok({
-        auth: environmentAuth.value,
-      })
-    : await acquireBrowserAuth({
-        baseUrl: normalizedUrl.value,
-        confirmOpenBrowser: resolved.confirmOpenBrowser,
-        fetch: resolved.fetch,
-        monotonicNow: resolved.monotonicNow,
-        onLoginSession: resolved.onLoginSession,
-        openBrowser: resolved.openBrowser,
-        shouldOpenBrowser,
-        ...(input.signal ? { signal: input.signal } : {}),
-        sleep: resolved.sleep,
-        timeoutMs: input.pollTimeoutMs ?? 10 * 60 * 1000,
-      });
-  if (acquiredAuth.isErr()) {
-    return err(acquiredAuth.error);
-  }
-
   const profileName = validateProfileName(
     input.profile ?? deriveProfileName(normalizedUrl.value, mode),
   );
@@ -458,28 +448,43 @@ export async function loginControlPlane(
     return err(profileName.error);
   }
 
-  const checkedAt = resolved.now();
+  return ok({
+    mode,
+    normalizedUrl: normalizedUrl.value,
+    profileName: profileName.value,
+  });
+}
+
+async function writeVerifiedControlPlaneProfile(input: {
+  readonly auth: CliControlPlaneAuth;
+  readonly deps: Required<CliControlPlaneDependencies>;
+  readonly login?: CliControlPlaneLoginSessionView;
+  readonly mode: CliControlPlaneMode;
+  readonly normalizedUrl: string;
+  readonly profileName: string;
+}): Promise<Result<CliControlPlaneLoginProfileView>> {
+  const checkedAt = input.deps.now();
   const handshake = await performControlPlaneHandshake({
-    baseUrl: normalizedUrl.value,
-    auth: acquiredAuth.value.auth,
+    baseUrl: input.normalizedUrl,
+    auth: input.auth,
     checkedAt,
-    fetch: resolved.fetch,
+    fetch: input.deps.fetch,
   });
   if (handshake.isErr()) {
     return err(handshake.error);
   }
 
-  const storeData = await resolved.store.read();
+  const storeData = await input.deps.store.read();
   if (storeData.isErr()) {
     return err(storeData.error);
   }
 
-  const existing = storeData.value.profiles[profileName.value];
+  const existing = storeData.value.profiles[input.profileName];
   const profile: CliControlPlaneProfile = {
-    name: profileName.value,
-    mode,
-    baseUrl: normalizedUrl.value,
-    auth: acquiredAuth.value.auth,
+    name: input.profileName,
+    mode: input.mode,
+    baseUrl: input.normalizedUrl,
+    auth: input.auth,
     createdAt: existing?.createdAt ?? checkedAt,
     updatedAt: checkedAt,
     lastHandshake: handshake.value.handshake,
@@ -494,20 +499,97 @@ export async function loginControlPlane(
       [profile.name]: profile,
     },
   };
-  const written = await resolved.store.write(nextData);
+  const written = await input.deps.store.write(nextData);
   if (written.isErr()) {
     return err(written.error);
   }
 
   const view = profileView(profile, nextData.activeProfile);
   return ok(
-    acquiredAuth.value.output
+    input.login
       ? {
           ...view,
-          login: acquiredAuth.value.output,
+          login: input.login,
         }
       : view,
   );
+}
+
+export async function loginControlPlane(
+  input: CliControlPlaneLoginInput,
+  deps?: CliControlPlaneDependencies,
+): Promise<Result<CliControlPlaneLoginProfileView>> {
+  const resolved = dependencies(deps);
+  const target = resolveLoginTarget(input);
+  if (target.isErr()) {
+    return err(target.error);
+  }
+
+  const shouldOpenBrowser = input.openBrowser ?? (!input.url || target.value.mode === "cloud");
+  const environmentAuth = readControlPlaneAuthFromEnvironment(resolved.env);
+  const acquiredAuth: Result<AcquiredControlPlaneAuth> = environmentAuth.isOk()
+    ? ok({
+        auth: environmentAuth.value,
+      })
+    : await acquireBrowserAuth({
+        baseUrl: target.value.normalizedUrl,
+        confirmOpenBrowser: resolved.confirmOpenBrowser,
+        fetch: resolved.fetch,
+        monotonicNow: resolved.monotonicNow,
+        onLoginSession: resolved.onLoginSession,
+        openBrowser: resolved.openBrowser,
+        shouldOpenBrowser,
+        ...(input.signal ? { signal: input.signal } : {}),
+        sleep: resolved.sleep,
+        timeoutMs: input.pollTimeoutMs ?? 10 * 60 * 1000,
+      });
+  if (acquiredAuth.isErr()) {
+    return err(acquiredAuth.error);
+  }
+
+  return writeVerifiedControlPlaneProfile({
+    auth: acquiredAuth.value.auth,
+    deps: resolved,
+    ...(acquiredAuth.value.output ? { login: acquiredAuth.value.output } : {}),
+    mode: target.value.mode,
+    normalizedUrl: target.value.normalizedUrl,
+    profileName: target.value.profileName,
+  });
+}
+
+export async function tokenLoginControlPlane(
+  input: CliControlPlaneTokenLoginInput,
+  deps?: CliControlPlaneDependencies,
+): Promise<Result<CliControlPlaneLoginProfileView>> {
+  const resolved = dependencies(deps);
+  const target = resolveLoginTarget(input);
+  if (target.isErr()) {
+    return err(target.error);
+  }
+
+  const explicitToken = input.token === undefined ? undefined : input.token.trim();
+  if (input.token !== undefined && !explicitToken) {
+    return err(
+      controlPlaneError("validation_error", "user", "Token material is empty", false, {
+        phase: "control-plane-auth",
+      }),
+    );
+  }
+  const bearer =
+    explicitToken !== undefined
+      ? ok({ kind: "bearer" as const, token: explicitToken })
+      : readControlPlaneBearerTokenFromEnvironment(resolved.env);
+  if (bearer.isErr()) {
+    return err(bearer.error);
+  }
+
+  return writeVerifiedControlPlaneProfile({
+    auth: bearer.value,
+    deps: resolved,
+    mode: target.value.mode,
+    normalizedUrl: target.value.normalizedUrl,
+    profileName: target.value.profileName,
+  });
 }
 
 export async function logoutControlPlane(

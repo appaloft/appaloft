@@ -34,6 +34,12 @@ Appaloft console 或 ids；Self-hosted Server Action 通过 `control-plane-url` 
 Cloud 或 self-hosted control plane 拥有 preview policy、GitHub App webhook、comments/checks、
 cleanup retry、scheduler、audit 和 quota。
 
+需要 hosted Cloud 或 self-hosted Appaloft 上下文时，agent 应先检查 `appaloft auth status`、
+`appaloft context show` 和 `APPALOFT_TOKEN`。没有 active profile/token 时，不要默认让 agent
+打开浏览器、复制 user code 或读取 cookie；应让用户通过可信 UI、secret manager、环境变量或
+CLI-approved handoff 授权 scoped、可过期 token，然后使用 `APPALOFT_TOKEN` 或
+`appaloft auth token login --stdin` / `--token-file <path>` 让 CLI 自己验证并写入本机 profile。
+
 <h2 id="appaloft-skill-install">安装</h2>
 
 推荐安装完整 Appaloft skill：
@@ -111,7 +117,8 @@ Tool 输入 schema 来自同一套 command/query schema，调用仍进入 Appalo
 
 <h2 id="appaloft-skill-safety">安全边界</h2>
 
-- 不读取 `.env`、私钥、token 文件、云厂商凭据、deploy token、SSH material、cookie 或未脱敏 secret。
+- 不读取 `.env`、私钥、token 文件内容、云厂商凭据、deploy token、SSH material、cookie 或未脱敏 secret。
+- 不让用户把 product-session cookie、bearer token、deploy token、browser cookie 或 token 文件内容粘贴进 chat；token 只能通过 CLI/env/secret manager 等可信 handoff 进入。
 - 不绕过 Appaloft 直接操作 Docker、SSH、数据库、proxy 或 provider SDK。
 - 不创造 agent-only operation；所有行为必须映射到既有 CLI/API/Web/MCP operation。
 - 不假设产物上传到托管云；默认仍部署到用户选择的 BYOS 目标。
