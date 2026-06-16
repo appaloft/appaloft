@@ -1235,6 +1235,8 @@ export const i18nKeys = {
       restoreSucceeded: "console:projects.restoreSucceeded",
       deleteAction: "console:projects.deleteAction",
       deleteBlocked: "console:projects.deleteBlocked",
+      deleteBlockedTitle: "console:projects.deleteBlockedTitle",
+      deleteCheckLoading: "console:projects.deleteCheckLoading",
       deleteConfirmPrompt: "console:projects.deleteConfirmPrompt",
       deleteDialogDescription: "console:projects.deleteDialogDescription",
       deleteDialogTitle: "console:projects.deleteDialogTitle",

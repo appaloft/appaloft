@@ -3811,6 +3811,38 @@ async function clickDialogFooterButtonByExactText(
   expect(found).toBe(true);
 }
 
+async function fillInputBySelector(
+  view: Bun.WebView,
+  selector: string,
+  value: string,
+): Promise<void> {
+  const filled = await waitFor(
+    () =>
+      view.evaluate<boolean>(
+        `(() => {
+          const element = document.querySelector(${JSON.stringify(selector)});
+          if (!(element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement)) {
+            return false;
+          }
+          element.focus();
+          element.value = ${JSON.stringify(value)};
+          element.dispatchEvent(new InputEvent("input", {
+            bubbles: true,
+            cancelable: true,
+            inputType: "insertText",
+            data: ${JSON.stringify(value)},
+          }));
+          element.dispatchEvent(new Event("change", { bubbles: true, cancelable: true }));
+          return true;
+        })()`,
+      ),
+    Boolean,
+    `Expected an input matching selector: ${selector}`,
+  );
+
+  expect(filled).toBe(true);
+}
+
 async function clickWithinSelectorByAnyText(
   view: Bun.WebView,
   selector: string,
@@ -5713,9 +5745,17 @@ describe.serial("console e2e with Bun.WebView", () => {
           })()`,
         ),
       ).toBe(true);
-      expect(
-        recordedApiRequests.some((request) => request.pathname === "/api/rpc/projects/delete"),
-      ).toBe(false);
+
+      await clickButtonByAnyText(view, lifecycleActionLabels);
+      await clickDialogButtonByAnyText(view, ["Delete", "删除"]);
+      await fillInputBySelector(view, "#project-delete-confirmation", projectId);
+      await clickDialogFooterButtonByExactText(view, ["Delete", "删除"]);
+
+      const deleteRequest = await waitForRecordedRequest("/api/rpc/projects/delete", 20_000);
+      expect(readOrpcJsonPayload(deleteRequest.body)).toEqual({
+        projectId,
+        confirmation: { projectId },
+      });
     } finally {
       apiResponses.dashboard["/api/rpc/projects/list"] = previousListRoute;
       apiResponses.dashboard["/api/rpc/projects/show"] = previousShowRoute;

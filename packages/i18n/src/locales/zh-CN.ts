@@ -1285,6 +1285,8 @@ export const zhCN = {
       restoreSucceeded: "项目已恢复",
       deleteAction: "删除",
       deleteBlocked: "仍有 {{count}} 条保留记录阻止删除",
+      deleteBlockedTitle: "项目删除被阻止",
+      deleteCheckLoading: "正在检查项目删除安全性...",
       deleteConfirmPrompt: "输入项目 id 以删除这个已归档项目。",
       deleteDialogDescription:
         "删除只能在项目已归档且安全检查通过后执行。请输入项目 ID 完成强确认。",

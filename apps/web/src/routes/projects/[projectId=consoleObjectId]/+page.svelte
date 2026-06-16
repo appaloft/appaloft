@@ -26,6 +26,7 @@
   import type {
     ArchiveEnvironmentInput,
     ArchiveProjectInput,
+    CheckProjectDeleteSafetyResponse,
     CloneEnvironmentInput,
     DeleteProjectInput,
     LockEnvironmentInput,
@@ -154,6 +155,7 @@
   };
   type ProjectLifecycleAction = "archive" | "restore" | "delete";
   type EnvironmentLifecycleAction = "archive" | "lock" | "unlock";
+  type ProjectDeleteBlocker = CheckProjectDeleteSafetyResponse["blockers"][number];
 
   const { projectsQuery, environmentsQuery, resourcesQuery, deploymentsQuery } =
     createConsoleQueries(browser, {
@@ -241,7 +243,11 @@
     }),
   );
   const projectDeleteSafety = $derived(projectDeleteSafetyQuery.data ?? null);
-  const projectDeleteBlockerCount = $derived(projectDeleteSafety?.blockers.length ?? 0);
+  const projectDeleteBlockers = $derived<ProjectDeleteBlocker[]>(projectDeleteSafety?.blockers ?? []);
+  const projectDeleteBlockerCount = $derived(projectDeleteBlockers.length);
+  const projectDeleteSafetyLoading = $derived(
+    isProjectArchived && projectDeleteSafetyQuery.isPending,
+  );
   const canDeleteProject = $derived(
     Boolean(project) &&
       isProjectArchived &&
@@ -2976,6 +2982,30 @@
                           count: projectDeleteBlockerCount,
                         })}
                       </p>
+                      <ul class="mt-2 space-y-1 text-xs text-destructive">
+                        {#each projectDeleteBlockers as blocker}
+                          <li class="break-all font-mono">
+                            {blocker.kind}
+                            {#if typeof blocker.count === "number"}
+                              · {blocker.count}
+                            {/if}
+                            {#if blocker.relatedEntityType}
+                              · {blocker.relatedEntityType}
+                            {/if}
+                            {#if blocker.relatedEntityId}
+                              · {blocker.relatedEntityId}
+                            {/if}
+                          </li>
+                        {/each}
+                      </ul>
+                    {:else if projectDeleteSafetyLoading}
+                      <p class="mt-2 text-muted-foreground">
+                        {$t(i18nKeys.console.projects.deleteCheckLoading)}
+                      </p>
+                    {:else if projectDeleteSafetyQuery.error}
+                      <p class="mt-2 break-words text-destructive">
+                        {readErrorMessage(projectDeleteSafetyQuery.error)}
+                      </p>
                     {/if}
                   </div>
 
@@ -3052,12 +3082,12 @@
             </p>
           </div>
 
-          <div class="grid gap-2 sm:grid-cols-2">
+          <div class="grid gap-2">
             {#if isProjectArchived}
               <Button
                 type="button"
                 variant={selectedProjectLifecycleAction === "restore" ? "default" : "outline"}
-                class="h-auto justify-start px-3 py-3 text-left"
+                class="h-auto w-full items-start justify-start gap-3 overflow-hidden px-3 py-3 text-left whitespace-normal"
                 disabled={!canRestoreProjectByCapability || restoreProjectMutation.isPending}
                 onclick={() => {
                   selectedProjectLifecycleAction = "restore";
@@ -3066,11 +3096,11 @@
                 }}
               >
                 <RotateCcw class="size-4 shrink-0" />
-                <span class="min-w-0">
+                <span class="min-w-0 flex-1">
                   <span class="block font-medium">
                     {$t(i18nKeys.console.projects.restoreAction)}
                   </span>
-                  <span class="block text-xs font-normal opacity-80">
+                  <span class="block break-words text-xs leading-5 font-normal opacity-80">
                     {$t(i18nKeys.console.projects.lifecycleRestoreOption)}
                   </span>
                 </span>
@@ -3078,7 +3108,7 @@
               <Button
                 type="button"
                 variant={selectedProjectLifecycleAction === "delete" ? "destructive" : "outline"}
-                class="h-auto justify-start px-3 py-3 text-left"
+                class="h-auto w-full items-start justify-start gap-3 overflow-hidden px-3 py-3 text-left whitespace-normal"
                 disabled={!canDeleteProject || !canDeleteProjectByCapability ||
                   deleteProjectMutation.isPending}
                 title={projectDeleteBlockerCount > 0
@@ -3092,11 +3122,11 @@
                 }}
               >
                 <Trash2 class="size-4 shrink-0" />
-                <span class="min-w-0">
+                <span class="min-w-0 flex-1">
                   <span class="block font-medium">
                     {$t(i18nKeys.console.projects.deleteAction)}
                   </span>
-                  <span class="block text-xs font-normal opacity-80">
+                  <span class="block break-words text-xs leading-5 font-normal opacity-80">
                     {$t(i18nKeys.console.projects.lifecycleDeleteOption)}
                   </span>
                 </span>
@@ -3105,7 +3135,7 @@
               <Button
                 type="button"
                 variant={selectedProjectLifecycleAction === "archive" ? "destructive" : "outline"}
-                class="h-auto justify-start px-3 py-3 text-left"
+                class="h-auto w-full items-start justify-start gap-3 overflow-hidden px-3 py-3 text-left whitespace-normal"
                 disabled={!canArchiveProjectByCapability || archiveProjectMutation.isPending}
                 onclick={() => {
                   selectedProjectLifecycleAction = "archive";
@@ -3114,11 +3144,11 @@
                 }}
               >
                 <Archive class="size-4 shrink-0" />
-                <span class="min-w-0">
+                <span class="min-w-0 flex-1">
                   <span class="block font-medium">
                     {$t(i18nKeys.console.projects.archiveAction)}
                   </span>
-                  <span class="block text-xs font-normal opacity-80">
+                  <span class="block break-words text-xs leading-5 font-normal opacity-80">
                     {$t(i18nKeys.console.projects.lifecycleArchiveOption)}
                   </span>
                 </span>
@@ -3140,9 +3170,38 @@
             </label>
             {#if projectDeleteBlockerCount > 0}
               <div class="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-                {$t(i18nKeys.console.projects.deleteBlocked, {
-                  count: projectDeleteBlockerCount,
-                })}
+                <p class="font-medium">
+                  {$t(i18nKeys.console.projects.deleteBlockedTitle)}
+                </p>
+                <p class="mt-1 text-xs text-muted-foreground">
+                  {$t(i18nKeys.console.projects.deleteBlocked, {
+                    count: projectDeleteBlockerCount,
+                  })}
+                </p>
+                <ul class="mt-2 space-y-1 text-xs">
+                  {#each projectDeleteBlockers as blocker}
+                    <li class="break-all font-mono">
+                      {blocker.kind}
+                      {#if typeof blocker.count === "number"}
+                        · {blocker.count}
+                      {/if}
+                      {#if blocker.relatedEntityType}
+                        · {blocker.relatedEntityType}
+                      {/if}
+                      {#if blocker.relatedEntityId}
+                        · {blocker.relatedEntityId}
+                      {/if}
+                    </li>
+                  {/each}
+                </ul>
+              </div>
+            {:else if projectDeleteSafetyLoading}
+              <div class="rounded-md border bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+                {$t(i18nKeys.console.projects.deleteCheckLoading)}
+              </div>
+            {:else if projectDeleteSafetyQuery.error}
+              <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                {readErrorMessage(projectDeleteSafetyQuery.error)}
               </div>
             {/if}
           {/if}
