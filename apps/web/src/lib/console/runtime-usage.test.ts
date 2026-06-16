@@ -251,9 +251,9 @@ describe("runtime usage console readback", () => {
     expect(resourceSource).toContain("storageRuntimeCleanupObservationHandoffKey");
     expect(resourceSource).toContain("storageRuntimeCleanupBefore = observationHandoff.to");
     expect(resourceSource).toContain(
-      "void loadRuntimeLogs(currentResourceId, currentObservationHandoff?.from)",
+      "void loadRuntimeLogs(currentResourceId, currentObservationHandoff)",
     );
-    expect(resourceSource).toContain("resourceRuntimeMonitoringObservationHandoff?.from");
+    expect(resourceSource).toContain("since: handoff.from");
     expect(resourceSource).toContain(
       "observationFrom: resourceRuntimeMonitoringObservationHandoff.from",
     );
