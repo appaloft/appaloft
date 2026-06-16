@@ -25,6 +25,7 @@ import { ok, type Result } from "@appaloft/core";
 import { Elysia } from "elysia";
 
 import { mountAppaloftOrpcRoutes } from "../src";
+import { createAppaloftOrpcClient } from "../src/client";
 
 class NoopLogger implements AppLogger {
   debug(): void {}
@@ -291,6 +292,58 @@ describe("operator work HTTP routes", () => {
       follow: true,
       untilTerminal: true,
     });
+  });
+
+  test("[OP-WORK-ENTRY-003C] streams typed operator work envelopes through RPC client", async () => {
+    let capturedQuery: Query<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, _command: Command<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, query: Query<T>): Promise<Result<T>> => {
+        capturedQuery = query as Query<unknown>;
+        return ok({
+          mode: "bounded",
+          workId: "wrk_blueprint_install",
+          envelopes: operatorWorkEventReplay().envelopes,
+        } as T);
+      },
+    } as QueryBus;
+    const app = mountOperatorWorkRoutes({ commandBus, queryBus });
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (input, init) =>
+      app.handle(input instanceof Request ? input : new Request(input, init));
+
+    try {
+      const client = createAppaloftOrpcClient("http://localhost");
+      const stream = await client.operatorWork.eventsStream({
+        workId: "wrk_blueprint_install",
+        historyLimit: 25,
+        includeHistory: true,
+      });
+      const result = await stream.next();
+      await stream.return?.();
+
+      expect(result.done).toBe(false);
+      expect(result.value).toMatchObject({
+        schemaVersion: "operator-work.stream-events/v1",
+        kind: "progress",
+        event: {
+          kind: "progress",
+          message: "Deploying components.",
+        },
+      });
+      expect(capturedQuery).toBeInstanceOf(StreamOperatorWorkEventsQuery);
+      expect(capturedQuery).toMatchObject({
+        workId: "wrk_blueprint_install",
+        historyLimit: 25,
+        includeHistory: true,
+        follow: true,
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 
   test("[PROC-DELIVERY-009][OP-WORK-ENTRY-005] marks operator work recovered through HTTP command dispatch", async () => {

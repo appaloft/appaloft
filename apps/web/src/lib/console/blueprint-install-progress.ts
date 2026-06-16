@@ -548,6 +548,16 @@ function shouldShowOperatorWorkProgressEvent(event: OperatorWorkObservedEvent): 
     return true;
   }
 
+  if (
+    event.message &&
+    (event.kind === "running" ||
+      event.kind === "progress" ||
+      event.kind === "retry-scheduled" ||
+      event.kind === "succeeded")
+  ) {
+    return true;
+  }
+
   return (
     event.kind === "failed" ||
     event.kind === "canceled" ||
