@@ -44,6 +44,7 @@
     runtimeMonitoringThresholdSummary,
     runtimeMonitoringTopContributorItems,
     type RuntimeMonitoringThresholdConfigureInput,
+    type RuntimeMonitoringChartPoint,
     type RuntimeMonitoringSample,
     type RuntimeMonitoringSignalKey,
   } from "$lib/console/runtime-usage";
@@ -187,6 +188,9 @@
   function formatChartTooltipTime(value: string): string {
     return formatTime(value);
   }
+  function chartPointTitle(signal: { label: string }, point: RuntimeMonitoringChartPoint): string {
+    return `${signal.label} ${formatRuntimeMonitoringPercent(point.value) ?? point.value.toFixed(1)} · ${formatChartTooltipTime(point.observedAtIso)}`;
+  }
   function timeRangeLabel(value: RuntimeMonitoringTimeRangeId): string {
     switch (value) {
       case "15m":
@@ -223,7 +227,7 @@
     const max = data.at(-1)?.observedAt.getTime() ?? value.getTime();
     const width = 298;
     if (max <= min) {
-      return 42;
+      return 42 + width / 2;
     }
 
     return 42 + ((value.getTime() - min) / (max - min)) * width;
@@ -509,7 +513,7 @@
             </p>
           </div>
           <div class="mt-3 h-36 w-full">
-            {#if signal.data.length > 1}
+            {#if signal.data.length > 0}
               <svg
                 aria-label={`${signal.label} ${signal.value ?? ""}`}
                 class="h-full w-full overflow-visible font-sans text-[11px] tabular-nums"
@@ -523,6 +527,7 @@
                     ? ` · ${formatChartTooltipTime(signal.data.at(-1)?.observedAtIso ?? "")}`
                     : ""}
                 </title>
+                <line x1="42" x2="42" y1="20" y2="116" class="stroke-border" />
                 <line x1="42" x2="340" y1="20" y2="20" class="stroke-border" />
                 <line x1="42" x2="340" y1="68" y2="68" class="stroke-border" stroke-dasharray="3 4" />
                 <line x1="42" x2="340" y1="116" y2="116" class="stroke-border" />
@@ -536,15 +541,41 @@
                     {tick}%
                   </text>
                 {/each}
-                <path d={areaPath(signal.data)} fill={signal.fillColor} />
-                <path
-                  d={linePath(signal.data)}
-                  fill="none"
-                  stroke={signal.color}
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2.2"
-                />
+                {#if signal.data.length > 1}
+                  <path d={areaPath(signal.data)} fill={signal.fillColor} />
+                  <path
+                    d={linePath(signal.data)}
+                    fill="none"
+                    stroke={signal.color}
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2.2"
+                  />
+                {/if}
+                {#each signal.data as point (point.observedAtIso)}
+                  <g class="group">
+                    <title>{chartPointTitle(signal, point)}</title>
+                    <line
+                      x1={chartX(point.observedAt, signal.data)}
+                      x2={chartX(point.observedAt, signal.data)}
+                      y1="20"
+                      y2="116"
+                      class="stroke-muted-foreground/20 opacity-0 transition-opacity group-hover:opacity-100 group-focus:opacity-100"
+                      stroke-dasharray="3 4"
+                    />
+                    <circle
+                      cx={chartX(point.observedAt, signal.data)}
+                      cy={chartY(point.value)}
+                      r={signal.data.length === 1 ? "3.5" : "2.75"}
+                      fill={signal.color}
+                      stroke="white"
+                      stroke-width="1.5"
+                      class={signal.data.length === 1
+                        ? ""
+                        : "opacity-70 transition-opacity group-hover:opacity-100 group-focus:opacity-100"}
+                    />
+                  </g>
+                {/each}
                 {#each xTickPoints(signal.data) as tick (tick.label + tick.x)}
                   <text
                     x={tick.x}
