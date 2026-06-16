@@ -1,11 +1,10 @@
 <script lang="ts">
-  import { ExternalLink, Radio, Rows3 } from "@lucide/svelte";
+  import { ExternalLink, Rows3 } from "@lucide/svelte";
   import type { DeploymentProgressEvent } from "@appaloft/contracts";
   import { tick } from "svelte";
 
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
-  import { Skeleton } from "$lib/components/ui/skeleton";
   import {
     groupDeploymentProgressEvents,
     progressSourceLabel,
@@ -42,7 +41,6 @@
 
   const sections = $derived(groupDeploymentProgressEvents(events));
   const resolvedStatus = $derived(status === "idle" ? undefined : status);
-  const currentSection = $derived(sections.at(-1));
   let progressLogArea = $state<HTMLDivElement | undefined>();
 
   $effect(() => {
@@ -98,13 +96,13 @@
   function levelClass(level: DeploymentProgressEvent["level"]): string {
     switch (level) {
       case "error":
-        return "text-destructive";
+        return "text-red-300";
       case "warn":
-        return "text-amber-700 dark:text-amber-300";
+        return "text-amber-300";
       case "debug":
-        return "text-muted-foreground";
+        return "text-zinc-500";
       case "info":
-        return "text-foreground";
+        return "text-zinc-200";
     }
   }
 
@@ -169,64 +167,7 @@
     </div>
   </header>
 
-  <div class="grid min-h-0 gap-0 xl:grid-cols-[22rem_minmax(0,1fr)]">
-    <aside class="border-b bg-muted/10 p-5 xl:border-r xl:border-b-0">
-      <div class="flex items-start gap-3">
-        <div class="rounded-md border bg-background p-2 text-muted-foreground">
-          <Radio class={["size-4", status === "running" ? "animate-pulse text-primary" : ""]} />
-        </div>
-        <div class="min-w-0">
-          <p class="text-sm font-semibold">
-            {#if currentSection}
-              {phaseLabel(currentSection.phase)}
-            {:else}
-              {$t(i18nKeys.console.deployments.progressWaiting)}
-            {/if}
-          </p>
-          <p class="mt-1 text-sm leading-6 text-muted-foreground">
-            {currentSection?.step?.label ?? $t(i18nKeys.console.deployments.progressStepFallback)}
-          </p>
-        </div>
-      </div>
-
-      <div class="mt-5 space-y-3">
-        {#if sections.length === 0}
-          <div class="space-y-2">
-            <Skeleton class="h-8 w-full" />
-            <Skeleton class="h-8 w-4/5" />
-            <Skeleton class="h-8 w-3/5" />
-          </div>
-        {:else}
-          {#each sections as section (section.phase)}
-            <div class="grid grid-cols-[1rem_minmax(0,1fr)] gap-3">
-              <span
-                class={[
-                  "mt-1 size-2 rounded-full",
-                  section.status === "failed"
-                    ? "bg-destructive"
-                    : section.status === "succeeded"
-                      ? "bg-emerald-600"
-                      : "bg-primary",
-                ]}
-              ></span>
-              <div class="min-w-0">
-                <div class="flex min-w-0 items-center justify-between gap-2">
-                  <p class="truncate text-sm font-medium">{phaseLabel(section.phase)}</p>
-                  <Badge variant={progressStatusVariant(section.status)}>
-                    {progressStatusLabel(section.status)}
-                  </Badge>
-                </div>
-                <p class="mt-1 truncate text-xs text-muted-foreground">
-                  [{section.step?.current ?? "-"} / {section.step?.total ?? "-"}]
-                  {section.step?.label ?? $t(i18nKeys.console.deployments.progressStepFallback)}
-                </p>
-              </div>
-            </div>
-          {/each}
-        {/if}
-      </div>
-    </aside>
-
+  <div class="min-h-0">
     <div class="min-w-0 p-5">
       {#if streamError}
         <div class="mb-4 rounded-md border border-destructive/25 bg-destructive/5 px-3 py-2 text-sm text-destructive">
@@ -241,15 +182,16 @@
 
       <div
         bind:this={progressLogArea}
-        class="max-h-[42vh] min-h-56 overflow-auto rounded-md border bg-muted/20 p-3 font-mono text-xs"
+        data-deployment-progress-terminal
+        class="max-h-[50vh] min-h-72 overflow-auto rounded-md bg-zinc-950 p-4 font-mono text-xs text-zinc-100 shadow-inner ring-1 ring-zinc-800"
       >
         {#if sections.length === 0}
-          <p class="text-muted-foreground">{$t(i18nKeys.console.deployments.progressWaiting)}</p>
+          <p class="text-zinc-400">{$t(i18nKeys.console.deployments.progressWaiting)}</p>
         {:else}
           <div class="space-y-4">
             {#each sections as section (section.phase)}
               <div class="space-y-2">
-                <div class="flex flex-wrap items-center gap-2 text-muted-foreground">
+                <div class="flex flex-wrap items-center gap-2 text-zinc-400">
                   <span>{phaseLabel(section.phase)}</span>
                   <span>·</span>
                   <span>{progressStatusLabel(section.status)}</span>
@@ -257,8 +199,8 @@
                 <div class="space-y-1">
                   {#each section.events as event, index (`${event.timestamp}-${section.phase}-${index}`)}
                     <div class="grid gap-2 leading-5 sm:grid-cols-[4.75rem_6rem_3.5rem_minmax(0,1fr)]">
-                      <span class="text-muted-foreground">{timeLabel(event.timestamp)}</span>
-                      <span class="text-primary">{progressSourceLabel(event)}</span>
+                      <span class="text-zinc-500">{timeLabel(event.timestamp)}</span>
+                      <span class="text-sky-300">{progressSourceLabel(event)}</span>
                       <span class={levelClass(event.level)}>{event.level}</span>
                       <span class={["min-w-0 break-words", levelClass(event.level)]}>
                         {event.message}

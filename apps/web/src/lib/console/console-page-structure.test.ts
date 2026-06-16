@@ -519,12 +519,14 @@ describe("console page structure", () => {
   test("[CONSOLE-DISPLAY-STATE-IA-000C2] keeps Quick Deploy progress dialogs compact", () => {
     expect(consoleShellSource).toContain("quickDeployProgressDialogOpen");
     expect(projectDetailPageSource).toContain("quickDeployProgressDialogOpen");
-    expect(consoleShellSource).toContain(
-      'class={quickDeployProgressDialogOpen ? "max-w-4xl" : "max-w-7xl"}',
-    );
-    expect(projectDetailPageSource).toContain(
-      'class={quickDeployProgressDialogOpen ? "max-w-4xl" : "max-w-7xl"}',
-    );
+    expect(consoleShellSource).toContain("showCloseButton={!quickDeployProgressDialogOpen}");
+    expect(projectDetailPageSource).toContain("showCloseButton={!quickDeployProgressDialogOpen}");
+    expect(consoleShellSource).toContain("function closeQuickDeployDialog()");
+    expect(projectDetailPageSource).toContain("function closeQuickDeployDialog()");
+    expect(consoleShellSource).toContain("if (!open && quickDeployProgressDialogOpen)");
+    expect(projectDetailPageSource).toContain("if (!open && quickDeployProgressDialogOpen)");
+    expect(consoleShellSource).toContain("onClose={closeQuickDeployDialog}");
+    expect(projectDetailPageSource).toContain("onClose={closeQuickDeployDialog}");
     expect(consoleShellSource).toContain("onProgressDialogOpenChange={(open) =>");
     expect(projectDetailPageSource).toContain("onProgressDialogOpenChange={(open) =>");
   });
