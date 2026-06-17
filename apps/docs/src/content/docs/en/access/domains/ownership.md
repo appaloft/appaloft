@@ -10,6 +10,7 @@ searchAliases:
   - "dns verification"
   - "domain verify"
 relatedOperations:
+  - domain-bindings.dns-plan
   - domain-bindings.confirm-ownership
   - domain-bindings.retry-verification
 sidebar:

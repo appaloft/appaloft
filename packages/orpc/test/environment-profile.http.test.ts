@@ -177,7 +177,7 @@ describe("environment profile HTTP routes", () => {
     });
   });
 
-  test("[ENV-PROFILE-DUP-010] dispatches profile diff query through HTTP", async () => {
+  test("[ENV-PROFILE-DUP-008] dispatches profile diff query through HTTP", async () => {
     let capturedQuery: Query<unknown> | undefined;
     const app = mountAppaloftOrpcRoutes(new Elysia(), {
       commandBus: noopCommandBus(),
@@ -189,10 +189,10 @@ describe("environment profile HTTP routes", () => {
           capturedQuery = query as Query<unknown>;
           return ok({
             schemaVersion: "environments.diff-profile/v1",
-            sourceEnvironmentId: "env_production",
-            targetEnvironmentId: "env_staging",
+            sourceEnvironment: { id: "env_production", name: "Production" },
+            targetEnvironment: { id: "env_staging", name: "Staging" },
             entries: [],
-            pendingDecisions: [],
+            counts: { added: 0, removed: 0, changed: 0, unchanged: 0 },
             generatedAt: "2026-05-21T00:00:00.000Z",
           } as T);
         },
@@ -213,7 +213,7 @@ describe("environment profile HTTP routes", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
       schemaVersion: "environments.diff-profile/v1",
-      targetEnvironmentId: "env_staging",
+      targetEnvironment: { id: "env_staging" },
     });
     expect(capturedQuery).toBeInstanceOf(DiffEnvironmentProfileQuery);
     expect(capturedQuery).toMatchObject({
@@ -223,7 +223,7 @@ describe("environment profile HTTP routes", () => {
     });
   });
 
-  test("[ENV-PROFILE-DUP-011] dispatches profile sync command through HTTP", async () => {
+  test("[ENV-PROFILE-DUP-009] dispatches profile sync command through HTTP", async () => {
     let capturedCommand: Command<unknown> | undefined;
     const app = mountAppaloftOrpcRoutes(new Elysia(), {
       commandBus: {
@@ -233,7 +233,8 @@ describe("environment profile HTTP routes", () => {
             schemaVersion: "environments.sync-profile/v1",
             sourceEnvironmentId: "env_production",
             targetEnvironmentId: "env_staging",
-            copiedResources: [],
+            syncedResources: [],
+            skippedResources: [],
             deferredDecisions: [],
             warnings: [],
             generatedAt: "2026-05-21T00:00:00.000Z",

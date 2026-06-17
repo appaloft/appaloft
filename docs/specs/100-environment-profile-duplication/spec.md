@@ -3,8 +3,10 @@
 ## Status
 
 - Round: Code / Post-Implementation Sync
-- Artifact state: Phase 10 preview policy base-profile integration implemented; later Web staged
-  workflows and launch hardening remain planned.
+- Artifact state: Environment Profile query/command/API/CLI/SDK surfaces, preview policy
+  base-profile integration, neutral Console extension points, and request-capable hosted panel
+  support are implemented for this draft PR. First-party Community Web staged workflows remain a
+  deferred follow-up; Cloud owns the hosted Console staged workflow in the private readiness PR.
 - Governing decision: [ADR-085](../../decisions/ADR-085-environment-profile-duplication-boundary.md)
 
 ## Business Outcome
@@ -77,8 +79,10 @@ attempt.
   - `appaloft env diff-profile`;
   - `appaloft env sync-profile`.
 - Web/UI:
-  - Project Environment management should show Duplicate, Diff, and Sync as staged workflows with
-    required decisions before apply.
+  - Public Web exposes neutral owner-scoped Console extension points and request-capable hosted
+    panel support so distributions can provide staged workflows without copying public source.
+  - First-party Community Web Project Environment management for Duplicate, Diff, and Sync remains
+    a deferred follow-up; the Cloud distribution implements the hosted staged workflow privately.
 - Preview:
   - Product-grade preview policy may select an Environment Profile base through
     `environmentProfileBaseEnvironmentId`; preview lifecycle remains the owner of temporary
@@ -108,7 +112,6 @@ attempt.
 
 ## Open Questions
 
-- Whether the first Code Round should add only plan/diff read models before apply commands.
 - Whether `environments.clone` should remain indefinitely as variable-only or be deprecated after
   profile duplication reaches full entrypoint parity.
 - Whether storage data copy choices belong to the same apply command or a follow-up storage-volume

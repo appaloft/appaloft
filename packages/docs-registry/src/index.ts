@@ -450,6 +450,25 @@ export const publicDocsHelpTopics = {
     relatedOperation: "deployments.create",
     aliases: ["source", "pathOrSource", "repository", "docker image", "static site", "来源"],
   },
+  "integration.connections": {
+    id: "integration.connections",
+    title: "Connections and connectors",
+    description:
+      "How Appaloft connects source, DNS, infrastructure, notification, and future provider capabilities.",
+    page: {
+      "zh-CN": "integrations/connections",
+      "en-US": "en/integrations/connections",
+    },
+    anchor: "connections-model",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["web", "cli", "http-api", "mcp"],
+    relatedOperation: "connections.catalog.list",
+    aliases: ["connections", "connectors", "dns connector", "cloudflare dns", "连接"],
+    specReferences: ["docs/specs/099-appaloft-connections/spec.md"],
+  },
   "agent.deploy-skill": {
     id: "agent.deploy-skill",
     title: "Agent deploy skill",
@@ -3644,6 +3663,26 @@ export const publicDocsOperationCoverage = [
   },
   { operationKey: "environments.diff", status: "documented", topicId: "environment.diff-promote" },
   {
+    operationKey: "environments.plan-duplicate",
+    status: "documented",
+    topicId: "environment.diff-promote",
+  },
+  {
+    operationKey: "environments.duplicate-profile",
+    status: "documented",
+    topicId: "environment.diff-promote",
+  },
+  {
+    operationKey: "environments.diff-profile",
+    status: "documented",
+    topicId: "environment.diff-promote",
+  },
+  {
+    operationKey: "environments.sync-profile",
+    status: "documented",
+    topicId: "environment.diff-promote",
+  },
+  {
     operationKey: "environments.promote",
     status: "documented",
     topicId: "environment.diff-promote",
@@ -3926,6 +3965,11 @@ export const publicDocsOperationCoverage = [
     topicId: "domain.ownership-check",
   },
   {
+    operationKey: "domain-bindings.dns-plan",
+    status: "documented",
+    topicId: "domain.ownership-check",
+  },
+  {
     operationKey: "domain-bindings.list",
     status: "documented",
     topicId: "domain.custom-domain-binding",
@@ -3984,6 +4028,61 @@ export const publicDocsOperationCoverage = [
     operationKey: "system.github-app-connection.show",
     status: "documented",
     topicId: "deployment.source",
+  },
+  {
+    operationKey: "connections.categories.list",
+    status: "documented",
+    topicId: "integration.connections",
+  },
+  {
+    operationKey: "connections.catalog.list",
+    status: "documented",
+    topicId: "integration.connections",
+  },
+  {
+    operationKey: "connections.list",
+    status: "documented",
+    topicId: "integration.connections",
+  },
+  {
+    operationKey: "connections.show",
+    status: "documented",
+    topicId: "integration.connections",
+  },
+  {
+    operationKey: "connections.connect.start",
+    status: "documented",
+    topicId: "integration.connections",
+  },
+  {
+    operationKey: "connections.connect.callback",
+    status: "documented",
+    topicId: "integration.connections",
+  },
+  {
+    operationKey: "connections.revoke",
+    status: "documented",
+    topicId: "integration.connections",
+  },
+  {
+    operationKey: "connections.status.show",
+    status: "documented",
+    topicId: "integration.connections",
+  },
+  {
+    operationKey: "connections.capability.plan",
+    status: "documented",
+    topicId: "integration.connections",
+  },
+  {
+    operationKey: "connections.capability.accept",
+    status: "documented",
+    topicId: "integration.connections",
+  },
+  {
+    operationKey: "connections.capability.apply",
+    status: "documented",
+    topicId: "integration.connections",
   },
   {
     operationKey: "static-artifacts.publish",
