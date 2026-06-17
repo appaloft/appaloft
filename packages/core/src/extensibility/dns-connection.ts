@@ -50,6 +50,22 @@ export interface DnsRecordApplySnapshot {
   effects: DnsRecordActionEffectSnapshot[];
 }
 
+export interface DomainConnectSetupSnapshot {
+  providerKey: string;
+  zoneName: string;
+  hostname: string;
+  serviceId: string;
+  templateId: string;
+  redirectUrl: string;
+  state: string;
+  records: DnsRecordRequirementSnapshot[];
+}
+
+export interface DomainConnectApplySnapshot extends DomainConnectSetupSnapshot {
+  status: "applied" | "verified" | "skipped";
+  dnsRecords: DnsRecordApplySnapshot;
+}
+
 const dnsRecordKinds = ["A", "AAAA", "CNAME", "TXT"] as const satisfies readonly DnsRecordKind[];
 const dnsRecordPurposes = [
   "domain-routing",
@@ -313,6 +329,134 @@ export class DnsRecordPlan {
       ...(this.zoneNameValue ? { zoneName: this.zoneNameValue } : {}),
       records: this.recordsValue.map((record) => record.toJSON()),
       conflicts: this.conflicts(),
+    };
+  }
+}
+
+const domainConnectProviderKeyBrand: unique symbol = Symbol("DomainConnectProviderKey");
+export class DomainConnectProviderKey extends ScalarValueObject<string> {
+  private [domainConnectProviderKeyBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<DomainConnectProviderKey> {
+    return requiredText(value, "Domain Connect provider key").map(
+      (normalized) => new DomainConnectProviderKey(normalized.toLowerCase()),
+    );
+  }
+
+  static rehydrate(value: string): DomainConnectProviderKey {
+    return new DomainConnectProviderKey(value.trim().toLowerCase());
+  }
+}
+
+const domainConnectServiceIdBrand: unique symbol = Symbol("DomainConnectServiceId");
+export class DomainConnectServiceId extends ScalarValueObject<string> {
+  private [domainConnectServiceIdBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<DomainConnectServiceId> {
+    return requiredText(value, "Domain Connect service id").map(
+      (normalized) => new DomainConnectServiceId(normalized),
+    );
+  }
+
+  static rehydrate(value: string): DomainConnectServiceId {
+    return new DomainConnectServiceId(value.trim());
+  }
+}
+
+export class DomainConnectSetup {
+  private constructor(
+    private readonly providerKeyValue: DomainConnectProviderKey,
+    private readonly zoneNameValue: string,
+    private readonly hostnameValue: DnsRecordName,
+    private readonly serviceIdValue: DomainConnectServiceId,
+    private readonly templateIdValue: string,
+    private readonly redirectUrlValue: string,
+    private readonly stateValue: string,
+    private readonly recordsValue: DnsRecordRequirement[],
+  ) {}
+
+  static create(input: DomainConnectSetupSnapshot): Result<DomainConnectSetup> {
+    const providerKey = DomainConnectProviderKey.create(input.providerKey);
+    if (providerKey.isErr()) return err(providerKey.error);
+    const zoneName = requiredText(input.zoneName, "Domain Connect zone name");
+    if (zoneName.isErr()) return err(zoneName.error);
+    const hostname = DnsRecordName.create(input.hostname);
+    if (hostname.isErr()) return err(hostname.error);
+    const serviceId = DomainConnectServiceId.create(input.serviceId);
+    if (serviceId.isErr()) return err(serviceId.error);
+    const templateId = requiredText(input.templateId, "Domain Connect template id");
+    if (templateId.isErr()) return err(templateId.error);
+    const redirectUrl = requiredText(input.redirectUrl, "Domain Connect redirect URL");
+    if (redirectUrl.isErr()) return err(redirectUrl.error);
+    const state = requiredText(input.state, "Domain Connect state");
+    if (state.isErr()) return err(state.error);
+    const recordPlan = DnsRecordPlan.create({
+      zoneName: zoneName.value,
+      records: input.records,
+    });
+    if (recordPlan.isErr()) return err(recordPlan.error);
+
+    return ok(
+      new DomainConnectSetup(
+        providerKey.value,
+        zoneName.value.replace(/\.$/, "").toLowerCase(),
+        hostname.value,
+        serviceId.value,
+        templateId.value,
+        redirectUrl.value,
+        state.value,
+        recordPlan.value.records(),
+      ),
+    );
+  }
+
+  static rehydrate(input: DomainConnectSetupSnapshot): DomainConnectSetup {
+    return new DomainConnectSetup(
+      DomainConnectProviderKey.rehydrate(input.providerKey),
+      input.zoneName.replace(/\.$/, "").toLowerCase(),
+      DnsRecordName.rehydrate(input.hostname),
+      DomainConnectServiceId.rehydrate(input.serviceId),
+      input.templateId,
+      input.redirectUrl,
+      input.state,
+      input.records.map(DnsRecordRequirement.rehydrate),
+    );
+  }
+
+  summary(): string {
+    return `${this.providerKeyValue.value} Domain Connect setup for ${this.hostnameValue.value}.`;
+  }
+
+  title(): string {
+    return `Domain Connect ${this.hostnameValue.value}`;
+  }
+
+  description(): string {
+    return `Redirect user consent to ${this.providerKeyValue.value}; no reusable provider token is stored.`;
+  }
+
+  records(): DnsRecordRequirement[] {
+    return [...this.recordsValue];
+  }
+
+  toJSON(): DomainConnectSetupSnapshot {
+    return {
+      providerKey: this.providerKeyValue.value,
+      zoneName: this.zoneNameValue,
+      hostname: this.hostnameValue.value,
+      serviceId: this.serviceIdValue.value,
+      templateId: this.templateIdValue,
+      redirectUrl: this.redirectUrlValue,
+      state: this.stateValue,
+      records: this.recordsValue.map((record) => record.toJSON()),
     };
   }
 }

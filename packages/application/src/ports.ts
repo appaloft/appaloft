@@ -41,6 +41,8 @@ import {
   type DomainBindingMutationSpec,
   type DomainBindingSelectionSpec,
   type DomainBindingStatus,
+  type DomainConnectApplySnapshot,
+  type DomainConnectSetupSnapshot,
   type DomainError,
   type DomainErrorDetails,
   type DomainEvent,
@@ -9609,6 +9611,7 @@ export interface ConnectorCapabilityPlanPreview {
   providerPlan?: {
     kind: "dns-records" | string;
     dnsRecords?: DnsRecordPlanSnapshot;
+    domainConnectSetup?: DomainConnectSetupSnapshot;
     infrastructureServerProposal?: InfrastructureServerProposalSnapshot;
     notificationMessage?: NotificationMessageSnapshot;
   };
@@ -9641,6 +9644,7 @@ export interface ConnectorCapabilityApplyResult {
   providerResult?: {
     kind: "dns-records" | string;
     dnsRecords?: DnsRecordApplySnapshot;
+    domainConnectApply?: DomainConnectApplySnapshot;
     notificationDelivery?: NotificationMessageDeliverySnapshot;
   };
 }

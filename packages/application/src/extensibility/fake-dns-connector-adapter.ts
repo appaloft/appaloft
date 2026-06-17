@@ -4,6 +4,9 @@ import {
   DnsRecordPlan,
   type DnsRecordPurpose,
   type DnsRecordRequirementSnapshot,
+  type DomainConnectApplySnapshot,
+  DomainConnectSetup,
+  type DomainConnectSetupSnapshot,
   domainError,
   err,
   ok,
@@ -24,6 +27,12 @@ export interface FakeDnsConnectorProviderAdapterOptions {
   connectorKey: string;
   providerTitle: string;
   existingRecords?: readonly DnsRecordRequirementSnapshot[];
+  domainConnect?: {
+    providerKey?: string;
+    serviceId?: string;
+    templateId?: string;
+    consentBaseUrl?: string;
+  };
 }
 
 interface StoredDnsRecord {
@@ -211,15 +220,25 @@ export class FakeDnsConnectorProviderAdapter implements ConnectorProviderAdapter
   readonly connectorKey: string;
   private readonly providerTitle: string;
   private readonly recordStore: DnsConnectorProviderRecordStore;
+  private readonly domainConnectProviderKey: string;
+  private readonly domainConnectServiceId: string;
+  private readonly domainConnectTemplateId: string;
+  private readonly domainConnectConsentBaseUrl: string;
 
   constructor(options: FakeDnsConnectorProviderAdapterOptions) {
     this.connectorKey = options.connectorKey;
     this.providerTitle = options.providerTitle;
     this.recordStore = new InMemoryDnsConnectorProviderRecordStore(options.existingRecords);
+    this.domainConnectProviderKey = options.domainConnect?.providerKey ?? "cloudflare";
+    this.domainConnectServiceId = options.domainConnect?.serviceId ?? "appaloft";
+    this.domainConnectTemplateId = options.domainConnect?.templateId ?? "appaloft-domain";
+    this.domainConnectConsentBaseUrl =
+      options.domainConnect?.consentBaseUrl ??
+      "https://domainconnect.example.test/v2/domainTemplates/providers";
   }
 
   canPlan(capabilityKey: string): boolean {
-    return capabilityKey === "dns.records.plan";
+    return capabilityKey === "dns.records.plan" || capabilityKey === "dns.domain-connect.start";
   }
 
   async planCapability(
@@ -231,6 +250,12 @@ export class FakeDnsConnectorProviderAdapter implements ConnectorProviderAdapter
       return err(
         domainError.validation(`Connector ${this.connectorKey} cannot plan ${input.capabilityKey}`),
       );
+    }
+
+    if (input.capabilityKey === "dns.domain-connect.start") {
+      const setup = this.domainConnectSetup(input);
+      if (setup.isErr()) return err(setup.error);
+      return ok(this.toDomainConnectPreview(input, setup.value));
     }
 
     const parameters = parseDnsPlanParameters(input.parameters ?? {});
@@ -253,7 +278,8 @@ export class FakeDnsConnectorProviderAdapter implements ConnectorProviderAdapter
     return (
       capabilityKey === "dns.records.apply" ||
       capabilityKey === "dns.records.verify" ||
-      capabilityKey === "dns.records.cleanup"
+      capabilityKey === "dns.records.cleanup" ||
+      capabilityKey === "dns.domain-connect.complete"
     );
   }
 
@@ -268,6 +294,17 @@ export class FakeDnsConnectorProviderAdapter implements ConnectorProviderAdapter
           `Connector ${this.connectorKey} cannot apply ${input.capabilityKey}`,
         ),
       );
+    }
+
+    if (input.capabilityKey === "dns.domain-connect.complete") {
+      const setup = this.domainConnectSetup(input);
+      if (setup.isErr()) return err(setup.error);
+      const applied = await this.recordStore.applyRecords({
+        zoneName: setup.value.toJSON().zoneName,
+        records: setup.value.records().map((record) => record.toJSON()),
+      });
+      if (applied.isErr()) return err(applied.error);
+      return ok(this.toDomainConnectApplyResult(input, setup.value, applied.value));
     }
 
     const parameters = parseDnsPlanParameters(input.parameters ?? {});
@@ -326,6 +363,48 @@ export class FakeDnsConnectorProviderAdapter implements ConnectorProviderAdapter
     };
   }
 
+  private toDomainConnectPreview(
+    input: ConnectorCapabilityPlanInput,
+    setup: DomainConnectSetup,
+  ): ConnectorCapabilityPlanPreview {
+    const domainConnectSetup = setup.toJSON();
+    const planId = `domainconnect_${stableHash({
+      connectorKey: input.connectorKey,
+      capabilityKey: input.capabilityKey,
+      ownerRef: input.ownerRef,
+      domainConnectSetup,
+    })}`;
+
+    return {
+      planId,
+      connectorKey: input.connectorKey,
+      capabilityKey: input.capabilityKey,
+      riskLevel: "low",
+      requiresExplicitAcceptance: false,
+      summary: `${this.providerTitle}: ${setup.summary()}`,
+      effects: [
+        {
+          kind: "dns.domain-connect.redirect",
+          title: setup.title(),
+          description: setup.description(),
+        },
+        ...setup.records().map((record) => ({
+          kind: "dns.domain-connect.template-record",
+          title: record.title(),
+          description: record.description(),
+        })),
+      ],
+      cleanup: {
+        supported: false,
+        description: "Temporary Domain Connect setup stores no reusable provider token.",
+      },
+      providerPlan: {
+        kind: "domain-connect-setup",
+        domainConnectSetup,
+      },
+    };
+  }
+
   private toApplyResult(
     input: ConnectorCapabilityApplyInput,
     dnsRecords: DnsRecordApplySnapshot,
@@ -348,6 +427,92 @@ export class FakeDnsConnectorProviderAdapter implements ConnectorProviderAdapter
         dnsRecords,
       },
     };
+  }
+
+  private toDomainConnectApplyResult(
+    input: ConnectorCapabilityApplyInput,
+    setup: DomainConnectSetup,
+    dnsRecords: DnsRecordApplySnapshot,
+  ): ConnectorCapabilityApplyResult {
+    const setupSnapshot = setup.toJSON();
+    const domainConnectApply: DomainConnectApplySnapshot = {
+      ...setupSnapshot,
+      status: dnsRecords.status === "applied" ? "applied" : "verified",
+      dnsRecords,
+    };
+
+    return {
+      operationId: `domainconnectop_${stableHash({
+        connectorKey: input.connectorKey,
+        capabilityKey: input.capabilityKey,
+        ownerRef: input.ownerRef,
+        acceptedPlanId: input.acceptedPlanId,
+        domainConnectApply,
+      })}`,
+      connectorKey: input.connectorKey,
+      capabilityKey: input.capabilityKey,
+      status: dnsRecords.status,
+      summary: `${this.providerTitle}: Domain Connect completed for ${setupSnapshot.hostname}.`,
+      effects: [
+        {
+          kind: "dns.domain-connect.completed",
+          title: setup.title(),
+          description: "Provider consent completed and Appaloft verified the requested records.",
+        },
+        ...dnsRecords.effects,
+      ],
+      providerResult: {
+        kind: "domain-connect-apply",
+        dnsRecords,
+        domainConnectApply,
+      },
+    };
+  }
+
+  private domainConnectSetup(
+    input: ConnectorCapabilityPlanInput | ConnectorCapabilityApplyInput,
+  ): Result<DomainConnectSetup> {
+    const parameters = parseDnsPlanParameters(input.parameters ?? {});
+    if (parameters.isErr()) return err(parameters.error);
+    const zoneName = parameters.value.zoneName;
+    if (!zoneName) {
+      return err(domainError.validation("Domain Connect zoneName is required"));
+    }
+    const firstRecord = parameters.value.records[0];
+    if (!firstRecord) {
+      return err(domainError.validation("Domain Connect requires at least one DNS record"));
+    }
+    const serviceId = optionalString(input.parameters?.serviceId, this.domainConnectServiceId);
+    const templateId = optionalString(input.parameters?.templateId, this.domainConnectTemplateId);
+    const state = optionalString(
+      input.parameters?.state,
+      `dc_${stableHash({
+        connectorKey: input.connectorKey,
+        capabilityKey: input.capabilityKey,
+        ownerRef: input.ownerRef,
+        zoneName,
+        records: parameters.value.records,
+      })}`,
+    );
+    const setup: DomainConnectSetupSnapshot = {
+      providerKey: this.domainConnectProviderKey,
+      zoneName,
+      hostname: firstRecord.name,
+      serviceId,
+      templateId,
+      redirectUrl: domainConnectRedirectUrl({
+        baseUrl: this.domainConnectConsentBaseUrl,
+        providerKey: this.domainConnectProviderKey,
+        serviceId,
+        templateId,
+        zoneName,
+        hostname: firstRecord.name,
+        state,
+      }),
+      state,
+      records: parameters.value.records,
+    };
+    return DomainConnectSetup.create(setup);
   }
 }
 
@@ -423,6 +588,10 @@ function requiredString(value: unknown, label: string): Result<string> {
   return ok(value.trim());
 }
 
+function optionalString(value: unknown, fallback: string): string {
+  return typeof value === "string" && value.trim() ? value.trim() : fallback;
+}
+
 function optionalRecordType(value: unknown): Result<DnsRecordKind> {
   const normalized =
     typeof value === "string" && value.trim() ? value.trim().toUpperCase() : "CNAME";
@@ -477,6 +646,24 @@ function dnsActionSummary(capabilityKey: string, dnsRecords: DnsRecordApplySnaps
     return `${recordCount} ${recordLabel} verified${zoneSuffix}; ${dnsRecords.missingRecords.length} missing.`;
   }
   return `${recordCount} ${recordLabel} apply finished${zoneSuffix} with status ${dnsRecords.status}.`;
+}
+
+function domainConnectRedirectUrl(input: {
+  baseUrl: string;
+  providerKey: string;
+  serviceId: string;
+  templateId: string;
+  zoneName: string;
+  hostname: string;
+  state: string;
+}): string {
+  const baseUrl = input.baseUrl.replace(/\/$/, "");
+  const query = new URLSearchParams({
+    domain: input.zoneName,
+    host: input.hostname,
+    state: input.state,
+  });
+  return `${baseUrl}/${encodeURIComponent(input.providerKey)}/services/${encodeURIComponent(input.serviceId)}/templates/${encodeURIComponent(input.templateId)}/apply?${query.toString()}`;
 }
 
 function stableHash(value: unknown): string {

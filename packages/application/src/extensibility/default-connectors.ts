@@ -82,6 +82,16 @@ export function createDefaultConnectorDefinitions(
       providerKey: "cloudflare",
       capabilities: [
         {
+          key: "dns.domain-connect.start",
+          title: "Start temporary Domain Connect setup",
+          implemented: true,
+        },
+        {
+          key: "dns.domain-connect.complete",
+          title: "Complete temporary Domain Connect setup",
+          implemented: true,
+        },
+        {
           key: "dns.records.plan",
           title: "Plan DNS records",
           implemented: true,

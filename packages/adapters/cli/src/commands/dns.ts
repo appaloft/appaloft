@@ -53,6 +53,34 @@ const planCommand = EffectCommand.make(
   },
 ).pipe(EffectCommand.withDescription("Plan DNS records through a connector"));
 
+const connectCommand = EffectCommand.make(
+  "connect",
+  {
+    domain: domainArg,
+    provider: providerOption,
+    hostname: hostnameOption,
+    target: targetOption,
+    type: recordTypeOption,
+    purpose: purposeOption,
+    ttl: ttlOption,
+  },
+  ({ domain, provider, hostname, target, type, purpose, ttl }) =>
+    runQuery(
+      PlanConnectorCapabilityQuery.create({
+        connectorKey: `${provider}-dns`,
+        capabilityKey: "dns.domain-connect.start",
+        parameters: dnsParameters({
+          domain,
+          hostname: optionalValue(hostname),
+          target,
+          type,
+          purpose,
+          ttl: optionalValue(ttl),
+        }),
+      }),
+    ),
+).pipe(EffectCommand.withDescription("Start temporary Domain Connect DNS setup"));
+
 const applyCommand = EffectCommand.make(
   "apply",
   {
@@ -139,7 +167,13 @@ const cleanupCommand = EffectCommand.make(
 
 export const dnsCommand = EffectCommand.make("dns").pipe(
   EffectCommand.withDescription("Shortcut commands for DNS connector capabilities"),
-  EffectCommand.withSubcommands([planCommand, applyCommand, verifyCommand, cleanupCommand]),
+  EffectCommand.withSubcommands([
+    connectCommand,
+    planCommand,
+    applyCommand,
+    verifyCommand,
+    cleanupCommand,
+  ]),
 );
 
 function dnsParameters(input: {

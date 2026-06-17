@@ -12,7 +12,7 @@
 
 - [x] APP-CONN-001: add neutral catalog vocabulary test.
 - [x] APP-CONN-002: add category support-state test.
-- [ ] APP-CONN-003: add fake Domain Connect temporary flow test.
+- [x] APP-CONN-003: add fake Domain Connect temporary flow test.
 - [x] APP-CONN-004: add persistent DNS accepted-record plan test.
 - [x] APP-CONN-005: add DNS conflict fail-closed plan test.
 - [x] APP-CONN-006: add identity/source separation test.
@@ -41,7 +41,7 @@
 - [x] Add GitHub App source connection projection/compatibility.
 - [x] Add persistent DNS provider plan contract.
 - [x] Add persistent DNS apply/verify/cleanup provider contracts.
-- [ ] Add DNS temporary setup provider contract.
+- [x] Add DNS temporary setup provider contract.
 - [x] Add CLI and HTTP surfaces for catalog, connection lifecycle, DNS planning, DNS apply/verify/cleanup, and infrastructure proposal planning.
 - [ ] Add Web central/contextual surfaces.
 

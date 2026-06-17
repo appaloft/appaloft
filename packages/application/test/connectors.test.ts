@@ -371,6 +371,119 @@ describe("connector catalog", () => {
     expect(JSON.stringify(plan)).not.toContain("token");
   });
 
+  test("[APP-CONN-003][APP-CONN-016] starts temporary Domain Connect setup without storing provider tokens", async () => {
+    const registry = new InMemoryConnectorRegistry(
+      createDefaultConnectorDefinitions({
+        cloudflareDns: {
+          configured: true,
+        },
+      }),
+    );
+    const service = new PlanConnectorCapabilityQueryService(
+      registry,
+      new InMemoryConnectorProviderAdapterRegistry([
+        new FakeDnsConnectorProviderAdapter({
+          connectorKey: "cloudflare-dns",
+          providerTitle: "Cloudflare DNS",
+          domainConnect: {
+            consentBaseUrl: "https://domainconnect.test/providers",
+          },
+        }),
+      ]),
+    );
+
+    const result = await service.execute(createExecutionContext({ entrypoint: "system" }), {
+      connectorKey: "cloudflare-dns",
+      capabilityKey: "dns.domain-connect.start",
+      parameters: {
+        zoneName: "example.com",
+        hostname: "app.example.com",
+        target: "edge.appaloft.dev",
+        recordType: "CNAME",
+      },
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+    expect(plan.riskLevel).toBe("low");
+    expect(plan.requiresExplicitAcceptance).toBe(false);
+    expect(plan.providerPlan?.kind).toBe("domain-connect-setup");
+    expect(plan.providerPlan?.domainConnectSetup).toMatchObject({
+      providerKey: "cloudflare",
+      zoneName: "example.com",
+      hostname: "app.example.com",
+      serviceId: "appaloft",
+      templateId: "appaloft-domain",
+      records: [
+        {
+          name: "app.example.com",
+          type: "CNAME",
+          value: "edge.appaloft.dev",
+          purpose: "domain-routing",
+        },
+      ],
+    });
+    expect(plan.providerPlan?.domainConnectSetup?.redirectUrl).toContain(
+      "https://domainconnect.test/providers/cloudflare/services/appaloft/templates/appaloft-domain/apply",
+    );
+    expect(JSON.stringify(plan)).not.toContain("provider_token_value");
+    expect(JSON.stringify(plan)).not.toContain("secret");
+  });
+
+  test("[APP-CONN-003][APP-CONN-016] completes temporary Domain Connect setup through DNS readback", async () => {
+    const registry = new InMemoryConnectorRegistry(
+      createDefaultConnectorDefinitions({
+        cloudflareDns: {
+          configured: true,
+        },
+      }),
+    );
+    const adapter = new FakeDnsConnectorProviderAdapter({
+      connectorKey: "cloudflare-dns",
+      providerTitle: "Cloudflare DNS",
+    });
+    const service = new ApplyConnectorCapabilityUseCase(
+      registry,
+      new InMemoryConnectorProviderAdapterRegistry([adapter]),
+    );
+
+    const result = await service.execute(createExecutionContext({ entrypoint: "system" }), {
+      connectorKey: "cloudflare-dns",
+      capabilityKey: "dns.domain-connect.complete",
+      parameters: {
+        zoneName: "example.com",
+        hostname: "app.example.com",
+        target: "edge.appaloft.dev",
+        recordType: "CNAME",
+        state: "dc_state_test",
+      },
+    });
+
+    expect(result.isOk()).toBe(true);
+    const completed = result._unsafeUnwrap();
+    expect(completed.status).toBe("applied");
+    expect(completed.effects.map((effect) => effect.kind)).toContain(
+      "dns.domain-connect.completed",
+    );
+    expect(completed.providerResult?.kind).toBe("domain-connect-apply");
+    expect(completed.providerResult?.domainConnectApply).toMatchObject({
+      providerKey: "cloudflare",
+      zoneName: "example.com",
+      hostname: "app.example.com",
+      status: "applied",
+      state: "dc_state_test",
+    });
+    expect(completed.providerResult?.domainConnectApply?.dnsRecords.records).toEqual([
+      {
+        name: "app.example.com",
+        type: "CNAME",
+        value: "edge.appaloft.dev",
+        purpose: "domain-routing",
+      },
+    ]);
+    expect(JSON.stringify(completed)).not.toContain("token");
+  });
+
   test("[APP-CONN-005][APP-CONN-016] fake DNS provider reports conflicts without applying changes", async () => {
     const registry = new InMemoryConnectorRegistry(
       createDefaultConnectorDefinitions({
