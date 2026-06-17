@@ -2,6 +2,7 @@ export * from "./operations/environments/archive-environment.command";
 export * from "./operations/environments/clone-environment.command";
 export * from "./operations/environments/count-environments.query";
 export * from "./operations/environments/create-environment.command";
+export * from "./operations/environments/diff-environment-profile.query";
 export * from "./operations/environments/diff-environments.query";
 export * from "./operations/environments/duplicate-environment-profile.command";
 export * from "./operations/environments/environment-effective-precedence.query";

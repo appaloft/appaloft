@@ -2,6 +2,7 @@ import {
   ArchiveEnvironmentCommand,
   CloneEnvironmentCommand,
   CreateEnvironmentCommand,
+  DiffEnvironmentProfileQuery,
   DiffEnvironmentsQuery,
   DuplicateEnvironmentProfileCommand,
   type DuplicateEnvironmentProfileCommandInput,
@@ -216,6 +217,23 @@ const diffCommand = EffectCommand.make(
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.environmentDiff));
 
+const diffProfileCommand = EffectCommand.make(
+  "diff-profile",
+  {
+    environmentId: environmentIdArg,
+    targetEnvironmentId: Args.text({ name: "targetEnvironmentId" }),
+    includeUnchanged: Options.boolean("include-unchanged").pipe(Options.optional),
+  },
+  ({ environmentId, includeUnchanged, targetEnvironmentId }) =>
+    runQuery(
+      DiffEnvironmentProfileQuery.create({
+        environmentId,
+        targetEnvironmentId,
+        includeUnchanged: optionalValue(includeUnchanged),
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.environmentDiffProfile));
+
 const duplicatePlanCommand = EffectCommand.make(
   "plan",
   {
@@ -307,6 +325,7 @@ export const envCommand = EffectCommand.make("env").pipe(
     unsetCommand,
     effectivePrecedenceCommand,
     diffCommand,
+    diffProfileCommand,
     duplicateCommand,
     promoteCommand,
   ]),

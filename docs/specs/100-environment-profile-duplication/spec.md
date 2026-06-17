@@ -3,8 +3,8 @@
 ## Status
 
 - Round: Code / Post-Implementation Sync
-- Artifact state: Phase 7 storage data defer implemented; later diff/sync, Web, and preview
-  integration rows remain planned.
+- Artifact state: Phase 8 profile diff implemented; later sync, Web, and preview integration rows
+  remain planned.
 - Governing decision: [ADR-085](../../decisions/ADR-085-environment-profile-duplication-boundary.md)
 
 ## Business Outcome

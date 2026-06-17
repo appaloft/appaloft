@@ -5017,6 +5017,38 @@ export interface EnvironmentDuplicateProfileApplyResult {
   generatedAt: string;
 }
 
+export type EnvironmentProfileDiffSection =
+  | "variable"
+  | "resource"
+  | "dependency-binding"
+  | "route"
+  | "storage"
+  | "pending-decision";
+
+export type EnvironmentProfileDiffChange = "added" | "removed" | "changed" | "unchanged";
+
+export interface EnvironmentProfileDiffEntry<TValue = Record<string, unknown>> {
+  section: EnvironmentProfileDiffSection;
+  key: string;
+  change: EnvironmentProfileDiffChange;
+  source?: TValue;
+  target?: TValue;
+}
+
+export interface EnvironmentProfileDiffSummary {
+  schemaVersion: "environments.diff-profile/v1";
+  sourceEnvironment: EnvironmentSummary;
+  targetEnvironment: EnvironmentSummary;
+  entries: EnvironmentProfileDiffEntry[];
+  counts: {
+    added: number;
+    removed: number;
+    changed: number;
+    unchanged: number;
+  };
+  generatedAt: string;
+}
+
 export interface ServerBackedDeploymentSummaryTarget {
   kind: "server-backed";
   serverId: string;

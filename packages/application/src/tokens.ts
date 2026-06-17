@@ -564,6 +564,7 @@ export const tokens = {
   setEnvironmentVariableUseCase: Symbol.for("appaloft.set_environment_variable_use_case"),
   unsetEnvironmentVariableUseCase: Symbol.for("appaloft.unset_environment_variable_use_case"),
   diffEnvironmentsQueryService: Symbol.for("appaloft.diff_environments_query_service"),
+  diffEnvironmentProfileQueryService: Symbol.for("appaloft.diff_environment_profile_query_service"),
   planDuplicateEnvironmentQueryService: Symbol.for(
     "appaloft.plan_duplicate_environment_query_service",
   ),
