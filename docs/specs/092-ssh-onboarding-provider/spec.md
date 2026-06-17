@@ -30,8 +30,9 @@ implementation.
   external server before it becomes a generic SSH server in Appaloft.
 - **Target proposal**: provider-neutral, reviewable data returned by onboarding. It can prefill
   the generic SSH form but is not persisted as a server until the operator confirms it.
-- **Provider connection**: a safe reference to an external provider account, token, installation,
-  or consent record. It must not expose raw access tokens or provider secrets to public read models.
+- **Infrastructure connection**: a Connections model `Connection` in the `infrastructure` category,
+  such as `vultr-infrastructure`, that grants a concrete connector only its declared capabilities.
+  It must not expose raw access tokens or provider secrets to public read models.
 - **Bootstrap script**: provider user data or startup script used to prepare the server for SSH
   and container-based deployment. It must be rendered by an adapter and tracked as safe metadata,
   not stored as an operator-editable secret payload in the generic server record.
@@ -41,9 +42,9 @@ implementation.
 | ID | Scenario | Given | When | Then |
 | --- | --- | --- | --- | --- |
 | SSH-ONBOARD-001 | Server creation remains provider-neutral | An operator creates a server from the normal server form | The server is submitted | Appaloft persists `providerKey = "generic-ssh"` and does not ask the operator to choose Hetzner, Vultr, Alibaba, Tencent, ACME, or any other vendor as the server provider. |
-| SSH-ONBOARD-002 | Onboarding returns a reviewable target proposal | An onboarding adapter creates or imports a VPS | The adapter completes discovery and readiness checks | It returns name, host, SSH port, optional username hint, credential reference hint, target kind, provider connection reference, and safe diagnostics for the generic SSH form. |
+| SSH-ONBOARD-002 | Onboarding returns a reviewable target proposal | An onboarding adapter creates or imports a VPS | The adapter completes discovery and readiness checks | It returns name, host, SSH port, optional username hint, credential reference hint, target kind, infrastructure connection reference, and safe diagnostics for the generic SSH form. |
 | SSH-ONBOARD-003 | Proposal confirmation uses existing server registration | A target proposal is visible to the operator | The operator confirms it | The application saves the target through the same generic SSH registration command path as manual entry. |
-| SSH-ONBOARD-004 | Provider secrets never enter the generic server record | A provider token, OAuth token, API key, or account credential is needed for onboarding | The adapter calls the external provider | Secrets remain behind the provider connection boundary and are not copied into server state, target proposals, deployment snapshots, logs, diagnostics, URL parameters, or read models. |
+| SSH-ONBOARD-004 | Provider secrets never enter the generic server record | A provider token, OAuth token, API key, or account credential is needed for onboarding | The adapter calls the external provider | Secrets remain behind the infrastructure connection boundary and are not copied into server state, target proposals, deployment snapshots, logs, diagnostics, URL parameters, or read models. |
 | SSH-ONBOARD-005 | SSH private key ownership stays explicit | Onboarding needs SSH access | The adapter proposes credentials | It references an existing credential, creates a new credential through the credential boundary, or asks the operator to supply one; it does not embed private key material in the proposal. |
 | SSH-ONBOARD-006 | Bootstrap output stays safe | A provider supports startup scripts, cloud-init, app images, or instance templates | The adapter provisions the server | The proposal may include script id, image id/name, bootstrap version, and readiness diagnostics, but not raw provider responses, access tokens, private keys, or unredacted command output. |
 | SSH-ONBOARD-007 | Provider-specific lifecycle is separate from server lifecycle | A provider-created server is deleted, resized, reinstalled, billed, or suspended outside Appaloft | Appaloft reads the saved server | The saved server remains a generic SSH target; provider-native lifecycle status is observed through onboarding/provider diagnostics only when that adapter is explicitly configured. |
@@ -66,19 +67,18 @@ implementation.
 
 Future implementation should expose neutral public concepts such as:
 
-- `SshOnboardingProvider`
-- `SshOnboardingProviderRegistry`
-- `SshOnboardingConnectionRef`
+- `ConnectionCapability` values such as `infrastructure.server.propose`
+- `InfrastructureServerProposal`
+- `InfrastructureConnectionRef`
 - `SshOnboardingRequest`
 - `SshOnboardingTargetProposal`
 - `SshOnboardingDiagnostic`
-- `StartSshOnboardingCommand`
-- `InspectSshOnboardingReadinessQuery`
 - `ConfirmSshOnboardingTargetCommand`
 
 These names are proposed vocabulary, not an implementation mandate for this documentation-only
-slice. A later code round should create the smallest stable API that satisfies the acceptance
-criteria and fits the existing command/query and provider registry patterns.
+slice. A later code round should reuse the Appaloft Connections catalog, plan, and apply operations
+where possible, then create only the smallest SSH-specific confirmation API needed to save a
+reviewed proposal through the existing generic SSH registration path.
 
 Provider-specific concepts stay behind adapters:
 
@@ -94,7 +94,7 @@ Provider-specific concepts stay behind adapters:
 1. The operator starts from the generic SSH server area or a separate "create/import from provider"
    action.
 2. The adapter collects only the provider-specific inputs it owns, such as region, plan, image, SSH
-   key reference, or provider connection reference.
+   key reference, or infrastructure connection reference.
 3. The adapter creates or discovers the external server, attaches SSH authorization, and optionally
    applies bootstrap user data.
 4. The adapter polls readiness until the server has a public host and the configured SSH endpoint
@@ -109,7 +109,7 @@ Provider-specific concepts stay behind adapters:
 These examples describe possible adapter behavior without adding vendor commitments to public
 core:
 
-- A Hetzner adapter could use a provider connection to create a Cloud server with a selected
+- A Hetzner adapter could use an infrastructure connection to create a Cloud server with a selected
   location, server type, image, SSH key id, and cloud-init script, then return the new public IP as
   a generic SSH proposal.
 - A Vultr adapter could create an instance with a plan, region, OS image, SSH key id, and startup
@@ -122,15 +122,16 @@ core:
 - Treat all provider responses as untrusted adapter input until translated into the target proposal.
 - Redact provider tokens, SSH private keys, bootstrap secrets, and raw command output before logging.
 - Prefer credential references over copied key material.
-- Keep provider connection diagnostics safe for read models and support bundles.
+- Keep infrastructure connection diagnostics safe for read models and support bundles.
 - Require explicit operator confirmation before persisting a target proposal as a server.
 - Keep onboarding failures recoverable by returning diagnostics and preserving the manual generic
   SSH path.
 
 ## Follow-Up Rounds
 
-- Add a neutral application port and registry for SSH onboarding providers.
-- Add a provider connection storage boundary with safe diagnostics and secret references.
+- Reuse the Appaloft Connections provider adapter boundary for infrastructure server proposals.
+- Add an infrastructure connection readback boundary with safe diagnostics and secret references
+  where the existing Connections read model is not enough.
 - Add a generic SSH proposal review UI outside the manual server provider fields.
 - Add one real adapter, preferably for a provider with stable API support for SSH keys and startup
   scripts.

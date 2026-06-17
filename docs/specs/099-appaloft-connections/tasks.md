@@ -5,8 +5,10 @@
 - [x] APP-CONN-001: add public neutral spec.
 - [x] APP-CONN-001: add public neutral plan.
 - [x] APP-CONN-001: add public neutral task matrix.
-- [ ] Update external edge/DNS spec to reference future connection ids after operation design is accepted.
-- [ ] Update SSH onboarding provider spec to reference future infrastructure connections after operation design is accepted.
+- [x] Update external edge/DNS spec to reuse Connections lifecycle/capability operations after
+  operation design is accepted.
+- [x] Update SSH onboarding provider spec to reference infrastructure connections after operation
+  design is accepted.
 
 ## Test-First
 
