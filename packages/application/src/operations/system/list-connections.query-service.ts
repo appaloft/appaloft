@@ -9,6 +9,7 @@ import {
   type ConnectorConnectionStoreListInput,
 } from "../../ports";
 import { tokens } from "../../tokens";
+import { ownerScopeForConnectionList } from "./connection-tenant-scope";
 import { type ListConnectionsQueryInput } from "./list-connections.query";
 
 @injectable()
@@ -24,9 +25,13 @@ export class ListConnectionsQueryService {
     context: ExecutionContext,
     input: ListConnectionsQueryInput = {},
   ): Promise<{ items: ConnectionSnapshot[] }> {
+    const owner = ownerScopeForConnectionList(context, input.owner);
+    if (owner.isErr()) {
+      return { items: [] };
+    }
     const storeInput: ConnectorConnectionStoreListInput = {};
-    if (input.owner) {
-      storeInput.owner = input.owner;
+    if (owner.value) {
+      storeInput.owner = owner.value;
     }
     if (input.connectorKey) {
       storeInput.connectorKey = input.connectorKey;

@@ -191,6 +191,7 @@ function githubConnectionOwner(installation: GitHubAppInstallationRecord) {
   return {
     scope: "organization" as const,
     id: installation.tenantId,
+    tenantId: installation.tenantId,
   };
 }
 
