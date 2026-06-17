@@ -30,6 +30,7 @@
 - [x] APP-CONN-015: add Web extension metadata test after UI scope is accepted.
 - [x] APP-CONN-016: add fake DNS provider adapter contract tests.
 - [x] APP-CONN-017: add connection lifecycle tenant scope test.
+- [x] APP-CONN-018: document that category names are not connector keys.
 
 ## Implementation
 
@@ -52,6 +53,7 @@
 - [x] Add DNS temporary setup provider contract.
 - [x] Add CLI and HTTP surfaces for catalog, connection lifecycle, accepted capability plans, DNS planning, DNS apply/verify/cleanup, and infrastructure proposal planning.
 - [x] Add Web central/contextual extension metadata for Connections console pages.
+- [x] Add public docs page for neutral connection language and category/concrete connector naming.
 
 ## Verification
 
