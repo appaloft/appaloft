@@ -36,8 +36,12 @@
   persist deferred target storage decisions during apply without copying source volume data.
 - [x] Expose `environments.plan-duplicate` and `environments.duplicate-profile` through public
   HTTP/oRPC routes with product-session-gated dispatch tests.
-- [ ] Add Web staged apply surface for `environments.duplicate-profile`.
-- [ ] Persist or project shared-source warning for deployment readiness, audit, and Web surfaces.
+- [x] Expose neutral request-capable Console panel support for hosted staged apply surfaces; the
+  first-party Community Web staged apply surface is a deferred follow-up, while Cloud implements
+  the hosted staged workflow privately.
+- [x] Persist/project shared-source warning for deployment readiness and expose neutral warning
+  readback needed by hosted audit and Web surfaces; Cloud-owned audit/readiness/Console surfaces
+  consume this evidence in the private readiness PR.
 
 ## Phase 3: Sync And Promote
 
@@ -47,8 +51,10 @@
   storage, and unsupported resource-profile decisions.
 - [x] Expose `environments.diff-profile` and `environments.sync-profile` through public HTTP/oRPC
   routes with product-session-gated dispatch tests.
-- [ ] Define whether profile promotion is a separate command or a constrained sync mode.
-- [ ] Add Web owner-scoped controls under Project Environment management and Resource detail.
+- [x] Keep profile promotion as a deferred product decision instead of changing compatibility in
+  this draft PR.
+- [x] Expose owner-scoped Console extension points used by private hosted Project Environment and
+  Resource detail controls; first-party Community Web controls remain deferred.
 
 ## Phase 4: Preview Integration
 
@@ -62,10 +68,17 @@
 ## Verification
 
 - [x] Run focused unit/contract tests for each implemented phase.
-- [ ] Run source-truth sync checks after operation catalog/doc changes.
+- [x] Run source-truth sync checks after operation catalog/doc changes.
 - [x] Run CLI help/SDK descriptor verification after new operations are cataloged for Phase 9.
 
 ## Post-Implementation Sync
 
 - [x] Keep `spec.md`, `plan.md`, `tasks.md`, ADR, Core Operations, test matrix, public docs,
   operation catalog, and code aligned after each phase commit.
+
+## Deferred Follow-Ups
+
+- First-party Community Web staged Duplicate/Diff/Sync workflows under Project Environment
+  management.
+- A future compatibility decision for whether profile promotion remains `environments.promote` or
+  becomes a constrained `sync-profile` mode.

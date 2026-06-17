@@ -15,8 +15,13 @@ relatedOperations:
   - connections.catalog.list
   - connections.categories.list
   - connections.list
+  - connections.show
   - connections.connect.start
+  - connections.connect.callback
+  - connections.revoke
+  - connections.status.show
   - connections.capability.plan
+  - connections.capability.accept
   - connections.capability.apply
 sidebar:
   label: "Connections"
