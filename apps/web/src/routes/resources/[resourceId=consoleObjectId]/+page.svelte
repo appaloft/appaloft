@@ -44,6 +44,8 @@
     ConfigureResourceRuntimeInput,
     ConfigureResourceSourceInput,
     ConfirmDomainBindingOwnershipInput,
+    ConnectorCapabilityApplyResponse,
+    ConnectorCapabilityPlanResponse,
     CreateDeploymentInput,
     CreateDomainBindingInput,
     CreateStorageVolumeInput,
@@ -81,6 +83,7 @@
     StorageVolumeBackupPlanResponse,
     StorageVolumeBackupSummary,
     StorageVolumeSummary,
+    DnsRecordRequirement,
   } from "@appaloft/contracts";
 
   import { readErrorMessage } from "$lib/api/client";
@@ -921,6 +924,19 @@
     title: string;
     detail: string;
   } | null>(null);
+  let dnsConnectorDialogOpen = $state(false);
+  let dnsConnectorBindingId = $state("");
+  let dnsConnectorZoneName = $state("");
+  let dnsConnectorPlanPending = $state(false);
+  let dnsConnectorApplyPending = $state(false);
+  let dnsConnectorPlan = $state<ConnectorCapabilityPlanResponse | null>(null);
+  let dnsConnectorApplyResult = $state<ConnectorCapabilityApplyResponse | null>(null);
+  let dnsConnectorFeedback = $state<{
+    bindingId: string;
+    kind: "success" | "error";
+    title: string;
+    detail: string;
+  } | null>(null);
   let importFeedback = $state<{
     bindingId: string;
     kind: "success" | "error";
@@ -1496,6 +1512,26 @@
     bindableDependencyResources.find((dependency) => dependency.id === dependencyBindingResourceId) ??
       null,
   );
+  const selectedDnsConnectorBinding = $derived(
+    resourceDomainBindings.find((binding) => binding.id === dnsConnectorBindingId) ?? null,
+  );
+  const dnsConnectorRecords = $derived(
+    dnsConnectorPlan?.providerPlan?.dnsRecords?.records ?? [],
+  );
+  const dnsConnectorConflicts = $derived(
+    dnsConnectorPlan?.providerPlan?.dnsRecords?.conflicts ?? [],
+  );
+  const canApplyDnsConnectorPlan = $derived(
+    Boolean(
+      selectedDnsConnectorBinding &&
+        dnsConnectorPlan &&
+        dnsConnectorZoneName.trim() &&
+        dnsConnectorRecords.length > 0 &&
+        dnsConnectorConflicts.length === 0 &&
+        !dnsConnectorPlanPending &&
+        !dnsConnectorApplyPending,
+    ),
+  );
   const canBindDependencyResource = $derived(
     Boolean(
       resource &&
@@ -1814,6 +1850,135 @@
     domainBindingDialogOpenedLocally = false;
     if (modalIsOpen(page, "domain-binding")) {
       void setModalOpen(page, "domain-binding", false);
+    }
+  }
+
+  function inferDnsZoneName(domain: string): string {
+    const labels = domain
+      .trim()
+      .toLowerCase()
+      .replace(/\.$/, "")
+      .split(".")
+      .filter(Boolean);
+
+    if (labels.length <= 2) {
+      return labels.join(".");
+    }
+
+    return labels.slice(-2).join(".");
+  }
+
+  function openDnsConnectorDialog(binding: DomainBindingSummary): void {
+    if (isResourceArchived) {
+      return;
+    }
+
+    dnsConnectorBindingId = binding.id;
+    dnsConnectorZoneName = inferDnsZoneName(binding.domainName);
+    dnsConnectorPlan = null;
+    dnsConnectorApplyResult = null;
+    dnsConnectorFeedback = null;
+    dnsConnectorDialogOpen = true;
+    void refreshDnsConnectorPlan();
+  }
+
+  function setDnsConnectorDialogOpen(open: boolean): void {
+    dnsConnectorDialogOpen = open;
+    if (open) {
+      return;
+    }
+
+    dnsConnectorBindingId = "";
+    dnsConnectorZoneName = "";
+    dnsConnectorPlan = null;
+    dnsConnectorApplyResult = null;
+    dnsConnectorFeedback = null;
+  }
+
+  async function refreshDnsConnectorPlan(): Promise<void> {
+    const binding = selectedDnsConnectorBinding;
+    const zoneName = dnsConnectorZoneName.trim();
+    if (!binding || !zoneName || dnsConnectorPlanPending) {
+      return;
+    }
+
+    dnsConnectorPlanPending = true;
+    dnsConnectorApplyResult = null;
+    dnsConnectorFeedback = null;
+    try {
+      dnsConnectorPlan = await orpcClient.domainBindings.dnsPlan({
+        domainBindingId: binding.id,
+        connectorKey: "cloudflare-dns",
+        capabilityKey: "dns.records.apply",
+        zoneName,
+      });
+    } catch (error) {
+      dnsConnectorPlan = null;
+      dnsConnectorFeedback = {
+        bindingId: binding.id,
+        kind: "error",
+        title: $t(i18nKeys.console.domainBindings.dnsConnectorPlanErrorTitle),
+        detail: readErrorMessage(error),
+      };
+    } finally {
+      dnsConnectorPlanPending = false;
+    }
+  }
+
+  async function applyDnsConnectorPlan(): Promise<void> {
+    const binding = selectedDnsConnectorBinding;
+    const zoneName = dnsConnectorZoneName.trim();
+    const plan = dnsConnectorPlan;
+    const records = dnsConnectorRecords;
+    if (!binding || !plan || !zoneName || records.length === 0 || dnsConnectorApplyPending) {
+      return;
+    }
+
+    dnsConnectorApplyPending = true;
+    dnsConnectorFeedback = null;
+    try {
+      const ownerRef = {
+        scope: "resource" as const,
+        id: binding.resourceId,
+      };
+      const accepted = await orpcClient.connections.capability.accept({
+        planId: plan.planId,
+        connectorKey: plan.connectorKey,
+        capabilityKey: plan.capabilityKey,
+        ownerRef,
+        riskLevel: plan.riskLevel,
+        summary: plan.summary,
+        effects: plan.effects,
+        ...(plan.cleanup ? { cleanup: plan.cleanup } : {}),
+      });
+
+      dnsConnectorApplyResult = await orpcClient.connections.capability.apply({
+        connectorKey: plan.connectorKey,
+        capabilityKey: plan.capabilityKey,
+        ownerRef,
+        acceptedPlanId: accepted.acceptedPlanId,
+        parameters: {
+          zoneName,
+          records,
+        },
+      });
+      dnsConnectorFeedback = {
+        bindingId: binding.id,
+        kind: "success",
+        title: $t(i18nKeys.console.domainBindings.dnsConnectorApplySuccessTitle),
+        detail: dnsConnectorApplyResult.summary,
+      };
+      void queryClient.invalidateQueries({ queryKey: orpc.domainBindings.key({ type: "query" }) });
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
+    } catch (error) {
+      dnsConnectorFeedback = {
+        bindingId: binding.id,
+        kind: "error",
+        title: $t(i18nKeys.console.domainBindings.dnsConnectorApplyErrorTitle),
+        detail: readErrorMessage(error),
+      };
+    } finally {
+      dnsConnectorApplyPending = false;
     }
   }
 
@@ -4638,6 +4803,10 @@
     return `${protocol}://${binding.domainName}${path}`;
   }
 
+  function dnsRecordSummary(record: DnsRecordRequirement): string {
+    return `${record.type} ${record.name} -> ${record.value}`;
+  }
+
   function serverTerminalHref(serverId: string): string {
     return `/servers/${encodeURIComponent(serverId)}?tab=runtime&section=terminal`;
   }
@@ -7386,6 +7555,17 @@
                                     {/if}
                                   </div>
                                 {/if}
+                                <Button
+                                  id={`resource-domain-binding-dns-connector-${binding.id}`}
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={isResourceArchived}
+                                  onclick={() => openDnsConnectorDialog(binding)}
+                                >
+                                  <Globe2 class="size-4" />
+                                  {$t(i18nKeys.console.domainBindings.dnsConnectorConfigure)}
+                                </Button>
                               </div>
 
                               <div class="min-w-0 space-y-2 lg:w-64">
@@ -7451,6 +7631,19 @@
                                 {/if}
                               </div>
                             </div>
+                            {#if dnsConnectorFeedback?.bindingId === binding.id}
+                              <div
+                                class={[
+                                  "mt-3 rounded-md border px-3 py-2 text-xs",
+                                  dnsConnectorFeedback.kind === "success"
+                                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700"
+                                    : "border-destructive/30 bg-destructive/5 text-destructive",
+                                ]}
+                              >
+                                <p class="font-medium">{dnsConnectorFeedback.title}</p>
+                                <p class="mt-1 break-all">{dnsConnectorFeedback.detail}</p>
+                              </div>
+                            {/if}
                           </article>
                         {/each}
                       </div>
@@ -9437,6 +9630,159 @@
               </Button>
             </Dialog.Footer>
           </form>
+        </Dialog.Content>
+      </Dialog.Root>
+
+      <Dialog.Root
+        bind:open={dnsConnectorDialogOpen}
+        onOpenChange={setDnsConnectorDialogOpen}
+      >
+        <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-3xl">
+          <Dialog.Header>
+            <Dialog.Title>{$t(i18nKeys.console.domainBindings.dnsConnectorDialogTitle)}</Dialog.Title>
+            <Dialog.Description>
+              {$t(i18nKeys.console.domainBindings.dnsConnectorDialogDescription)}
+            </Dialog.Description>
+          </Dialog.Header>
+
+          {#if selectedDnsConnectorBinding}
+            <div class="max-h-[calc(100vh-12rem)] space-y-5 overflow-y-auto px-5 pb-5" data-resource-domain-binding-dns-dialog>
+              <section class="rounded-md border bg-muted/15 p-4">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                  <div class="min-w-0">
+                    <p class="break-all font-medium">{selectedDnsConnectorBinding.domainName}</p>
+                    <p class="mt-1 font-mono text-xs text-muted-foreground">
+                      {selectedDnsConnectorBinding.id}
+                    </p>
+                  </div>
+                  <Badge variant="outline">cloudflare-dns</Badge>
+                </div>
+                <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+                  <label class="min-w-0 flex-1 space-y-1.5 text-sm font-medium" for="resource-domain-binding-dns-zone">
+                    <span>{$t(i18nKeys.console.domainBindings.dnsConnectorZoneName)}</span>
+                    <Input
+                      id="resource-domain-binding-dns-zone"
+                      bind:value={dnsConnectorZoneName}
+                      autocomplete="off"
+                      placeholder="example.com"
+                    />
+                  </label>
+                  <Button
+                    id="resource-domain-binding-dns-plan-refresh"
+                    type="button"
+                    variant="outline"
+                    disabled={!dnsConnectorZoneName.trim() || dnsConnectorPlanPending || dnsConnectorApplyPending}
+                    onclick={refreshDnsConnectorPlan}
+                  >
+                    <RefreshCw class={["size-4", dnsConnectorPlanPending ? "animate-spin" : ""]} />
+                    {$t(i18nKeys.console.domainBindings.dnsConnectorRefreshPlan)}
+                  </Button>
+                </div>
+              </section>
+
+              {#if dnsConnectorPlanPending}
+                <Skeleton class="h-40 w-full" />
+              {:else if dnsConnectorPlan}
+                <section class="space-y-4 rounded-md border bg-background p-4">
+                  <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div class="min-w-0">
+                      <p class="text-sm font-semibold">
+                        {$t(i18nKeys.console.domainBindings.dnsConnectorPlanTitle)}
+                      </p>
+                      <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                        {dnsConnectorPlan.summary}
+                      </p>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                      <Badge variant="secondary">{dnsConnectorPlan.capabilityKey}</Badge>
+                      <Badge variant={dnsConnectorPlan.riskLevel === "high" ? "destructive" : "outline"}>
+                        {$t(i18nKeys.console.domainBindings.dnsConnectorRisk)}: {dnsConnectorPlan.riskLevel}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  {#if dnsConnectorRecords.length > 0}
+                    <div class="space-y-2">
+                      <p class="text-xs font-medium text-muted-foreground">
+                        {$t(i18nKeys.console.domainBindings.dnsConnectorRecords)}
+                      </p>
+                      <div class="space-y-2">
+                        {#each dnsConnectorRecords as record (`${record.type}:${record.name}:${record.value}`)}
+                          <div class="rounded-md bg-muted/25 px-3 py-2 text-xs">
+                            <p class="break-all font-medium">{dnsRecordSummary(record)}</p>
+                            <p class="mt-1 text-muted-foreground">
+                              TTL {record.ttl ?? "-"} · proxied {record.proxied === undefined ? "-" : String(record.proxied)} · {record.purpose}
+                            </p>
+                          </div>
+                        {/each}
+                      </div>
+                    </div>
+                  {:else}
+                    <div class="rounded-md border border-dashed bg-muted/15 px-3 py-2 text-sm text-muted-foreground">
+                      {$t(i18nKeys.console.domainBindings.dnsConnectorNoRecords)}
+                    </div>
+                  {/if}
+
+                  {#if dnsConnectorConflicts.length > 0}
+                    <div class="space-y-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">
+                      <p class="font-medium">
+                        {$t(i18nKeys.console.domainBindings.dnsConnectorConflicts)}
+                      </p>
+                      {#each dnsConnectorConflicts as conflict (`${conflict.name}:${conflict.reason}`)}
+                        <p class="break-all">
+                          {conflict.name}: {conflict.reason} ({conflict.existingType} {conflict.existingValue} -> {conflict.requestedType} {conflict.requestedValue})
+                        </p>
+                      {/each}
+                    </div>
+                  {/if}
+
+                  {#if dnsConnectorPlan.cleanup}
+                    <div class="rounded-md bg-muted/25 px-3 py-2 text-xs text-muted-foreground">
+                      <span class="font-medium text-foreground">
+                        {$t(i18nKeys.console.domainBindings.dnsConnectorCleanup)}:
+                      </span>
+                      {dnsConnectorPlan.cleanup.description ?? String(dnsConnectorPlan.cleanup.supported)}
+                    </div>
+                  {/if}
+
+                  {#if dnsConnectorApplyResult}
+                    <div class="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-700">
+                      <p class="font-medium">{dnsConnectorApplyResult.status}</p>
+                      <p class="mt-1 break-all">{dnsConnectorApplyResult.summary}</p>
+                    </div>
+                  {/if}
+                </section>
+              {/if}
+
+              {#if dnsConnectorFeedback?.bindingId === selectedDnsConnectorBinding.id && dnsConnectorFeedback.kind === "error"}
+                <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+                  <p class="font-medium">{dnsConnectorFeedback.title}</p>
+                  <p class="mt-1 break-all">{dnsConnectorFeedback.detail}</p>
+                </div>
+              {/if}
+
+              <Dialog.Footer class="px-0 pb-0">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onclick={() => setDnsConnectorDialogOpen(false)}
+                >
+                  {$t(i18nKeys.common.actions.cancel)}
+                </Button>
+                <Button
+                  id="resource-domain-binding-dns-apply"
+                  type="button"
+                  disabled={!canApplyDnsConnectorPlan}
+                  onclick={applyDnsConnectorPlan}
+                >
+                  <ShieldCheck class="size-4" />
+                  {dnsConnectorApplyPending
+                    ? $t(i18nKeys.console.domainBindings.dnsConnectorApplying)
+                    : $t(i18nKeys.console.domainBindings.dnsConnectorApply)}
+                </Button>
+              </Dialog.Footer>
+            </div>
+          {/if}
         </Dialog.Content>
       </Dialog.Root>
 

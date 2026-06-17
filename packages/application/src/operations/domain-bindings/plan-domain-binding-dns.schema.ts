@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 const domainBindingDnsCapabilitySchema = z
-  .enum(["dns.records.plan", "dns.domain-connect.start"])
+  .enum(["dns.records.plan", "dns.records.apply", "dns.domain-connect.start"])
   .default("dns.records.plan");
 
 const dnsRecordTypeSchema = z.enum(["A", "AAAA", "CNAME", "TXT"]);

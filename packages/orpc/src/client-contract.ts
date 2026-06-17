@@ -1,7 +1,9 @@
 import {
   type AcceptBlueprintInstallCommandInput,
   type AcceptBlueprintInstallCommandResponse,
+  type AcceptConnectorCapabilityPlanCommandInput,
   type AcceptDependencyResourceProvisioningPlanInput,
+  type ApplyConnectorCapabilityCommandInput,
   type ArchiveDeploymentCommandInput,
   type ArchiveEnvironmentCommandInput,
   type ArchiveProjectCommandInput,
@@ -20,6 +22,7 @@ import {
   type CleanupPreviewCommandInput,
   type CloneEnvironmentCommandInput,
   type CloseTerminalSessionCommandInput,
+  type CompleteConnectionCallbackCommandInput,
   type ConfigureDefaultAccessDomainPolicyCommandInput,
   type ConfigureDependencyResourceBackupPolicyCommandInput,
   type ConfigureDomainBindingRouteCommandInput,
@@ -36,6 +39,7 @@ import {
   type ConfigureServerCredentialCommandInput,
   type ConfigureServerEdgeProxyCommandInput,
   type ConfirmDomainBindingOwnershipCommandInput,
+  type ConnectorCapabilityPlanQueryInput,
   type CountDependencyResourcesQueryInput,
   type CountDeploymentsQueryInput,
   type CountEnvironmentsQueryInput,
@@ -92,6 +96,9 @@ import {
   type ListBlueprintsQueryInput,
   type ListBlueprintsResponse,
   type ListCertificatesQueryInput,
+  type ListConnectionsQueryInput,
+  type ListConnectorCategoriesQueryInput,
+  type ListConnectorsQueryInput,
   type ListDefaultAccessDomainPoliciesQueryInput,
   type ListDependencyResourceBackupPoliciesQueryInput,
   type ListDependencyResourceBackupsQueryInput,
@@ -121,6 +128,7 @@ import {
   type ListTerminalSessionsQueryInput,
   type LockEnvironmentCommandInput,
   type OpenTerminalSessionCommandInput,
+  type PlanDomainBindingDnsQueryInput,
   type PrepareServerRuntimeCommandInput,
   type PromoteEnvironmentCommandInput,
   type ProvisionDependencyResourceCommandInput,
@@ -165,6 +173,7 @@ import {
   type RetryDomainBindingVerificationCommandInput,
   type RevokeAccountSessionCommandInput,
   type RevokeCertificateCommandInput,
+  type RevokeConnectionCommandInput,
   type RevokeDeployTokenCommandInput,
   type RollbackDeploymentCommandInput,
   type RotateDeployTokenCommandInput,
@@ -183,6 +192,7 @@ import {
   type ShowBlueprintQueryInput,
   type ShowBlueprintResponse,
   type ShowCertificateQueryInput,
+  type ShowConnectionQueryInput,
   type ShowDefaultAccessDomainPolicyQueryInput,
   type ShowDependencyResourceBackupPolicyQueryInput,
   type ShowDependencyResourceBackupQueryInput,
@@ -209,6 +219,7 @@ import {
   type ShowSshCredentialQueryInput,
   type ShowStorageVolumeBackupQueryInput,
   type ShowTerminalSessionQueryInput,
+  type StartConnectionCommandInput,
   type StartResourceRuntimeCommandInput,
   type StopResourceRuntimeCommandInput,
   type StreamDeploymentTimelineQueryInput,
@@ -223,6 +234,7 @@ import {
   type UnsetResourceVariableCommandInput,
 } from "@appaloft/application/schemas";
 import {
+  type AcceptConnectorCapabilityPlanResponse,
   type AccountProfileResponse,
   type ArchiveDeploymentResponse,
   type ArchiveEnvironmentResponse,
@@ -243,6 +255,7 @@ import {
   type CleanupStorageVolumeRuntimeResponse,
   type CloneEnvironmentResponse,
   type CloseTerminalSessionResponse,
+  type CompleteConnectionCallbackResponse,
   type ConfigureDefaultAccessDomainPolicyResponse,
   type ConfigureDependencyResourceBackupPolicyResponse,
   type ConfigureDomainBindingRouteResponse,
@@ -257,6 +270,8 @@ import {
   type ConfigureScheduledRuntimePrunePolicyResponse,
   type ConfigureServerEdgeProxyResponse,
   type ConfirmDomainBindingOwnershipResponse,
+  type ConnectorCapabilityApplyResponse,
+  type ConnectorCapabilityPlanResponse,
   type CountResponse,
   type CreateDeploymentResponse,
   type CreateDeployTokenResponse,
@@ -308,6 +323,9 @@ import {
   type IssueOrRenewCertificateResponse,
   type ListAccountSessionsResponse,
   type ListCertificatesResponse,
+  type ListConnectionsResponse,
+  type ListConnectorCategoriesResponse,
+  type ListConnectorsResponse,
   type ListDefaultAccessDomainPoliciesResponse,
   type ListDependencyResourceBackupPoliciesResponse,
   type ListDependencyResourceBackupsResponse,
@@ -383,6 +401,7 @@ import {
   type RetryDomainBindingVerificationResponse,
   type RevokeAccountSessionResponse,
   type RevokeCertificateResponse,
+  type RevokeConnectionResponse,
   type RevokeDeployTokenResponse,
   type RollbackDeploymentResponse,
   type RotateDeployTokenResponse,
@@ -398,6 +417,7 @@ import {
   type SetProjectDescriptionResponse,
   type SetResourceVariableResponse,
   type ShowCertificateResponse,
+  type ShowConnectionResponse,
   type ShowDefaultAccessDomainPolicyResponse,
   type ShowDependencyResourceBackupPolicyResponse,
   type ShowDependencyResourceBackupResponse,
@@ -421,6 +441,7 @@ import {
   type ShowStorageVolumeInput,
   type ShowStorageVolumeResponse,
   type ShowTerminalSessionResponse,
+  type StartConnectionResponse,
   type StartResourceRuntimeResponse,
   type StopResourceRuntimeResponse,
   type StorageVolumeBackupPlanResponse,
@@ -1633,6 +1654,12 @@ export type AppaloftOrpcClientContract = {
       CreateDomainBindingResponse,
       AppaloftClientError
     >;
+    dnsPlan: Client<
+      AppaloftClientContext,
+      PlanDomainBindingDnsQueryInput,
+      ConnectorCapabilityPlanResponse,
+      AppaloftClientError
+    >;
     configureRoute: Client<
       AppaloftClientContext,
       ConfigureDomainBindingRouteCommandInput,
@@ -1663,6 +1690,84 @@ export type AppaloftOrpcClientContract = {
       RetryDomainBindingVerificationResponse,
       AppaloftClientError
     >;
+  };
+  connections: {
+    list: Client<
+      AppaloftClientContext,
+      ListConnectionsQueryInput,
+      ListConnectionsResponse,
+      AppaloftClientError
+    >;
+    show: Client<
+      AppaloftClientContext,
+      ShowConnectionQueryInput,
+      ShowConnectionResponse,
+      AppaloftClientError
+    >;
+    status: {
+      show: Client<
+        AppaloftClientContext,
+        ShowConnectionQueryInput,
+        ShowConnectionResponse,
+        AppaloftClientError
+      >;
+    };
+    connect: {
+      start: Client<
+        AppaloftClientContext,
+        StartConnectionCommandInput,
+        StartConnectionResponse,
+        AppaloftClientError
+      >;
+      callback: Client<
+        AppaloftClientContext,
+        CompleteConnectionCallbackCommandInput,
+        CompleteConnectionCallbackResponse,
+        AppaloftClientError
+      >;
+    };
+    revoke: Client<
+      AppaloftClientContext,
+      RevokeConnectionCommandInput,
+      RevokeConnectionResponse,
+      AppaloftClientError
+    >;
+    categories: {
+      list: Client<
+        AppaloftClientContext,
+        ListConnectorCategoriesQueryInput,
+        ListConnectorCategoriesResponse,
+        AppaloftClientError
+      >;
+    };
+    catalog: {
+      list: Client<
+        AppaloftClientContext,
+        ListConnectorsQueryInput,
+        ListConnectorsResponse,
+        AppaloftClientError
+      >;
+    };
+    capability: {
+      plan: Client<
+        AppaloftClientContext,
+        ConnectorCapabilityPlanQueryInput,
+        ConnectorCapabilityPlanResponse,
+        AppaloftClientError
+      >;
+      accept: Client<
+        AppaloftClientContext,
+        AcceptConnectorCapabilityPlanCommandInput,
+        AcceptConnectorCapabilityPlanResponse,
+        AppaloftClientError
+      >;
+      apply: Client<
+        AppaloftClientContext,
+        ApplyConnectorCapabilityCommandInput,
+        ConnectorCapabilityApplyResponse,
+        AppaloftClientError
+      >;
+    };
   };
   certificates: {
     list: Client<

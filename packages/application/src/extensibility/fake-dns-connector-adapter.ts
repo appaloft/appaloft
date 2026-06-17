@@ -265,7 +265,11 @@ export class FakeDnsConnectorProviderAdapter implements ConnectorProviderAdapter
   }
 
   canPlan(capabilityKey: string): boolean {
-    return capabilityKey === "dns.records.plan" || capabilityKey === "dns.domain-connect.start";
+    return (
+      capabilityKey === "dns.records.plan" ||
+      capabilityKey === "dns.records.apply" ||
+      capabilityKey === "dns.domain-connect.start"
+    );
   }
 
   async planCapability(

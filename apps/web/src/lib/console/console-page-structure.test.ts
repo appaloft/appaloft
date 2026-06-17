@@ -1267,8 +1267,15 @@ describe("console page structure", () => {
       )?.[0] ?? "";
 
     expect(resourceDetailPageSource).toContain("domainBindingCreateDialogOpen");
+    expect(resourceDetailPageSource).toContain("dnsConnectorDialogOpen");
     expect(resourceDetailPageSource).toContain("openResourceDomainBindingCreateDialog");
+    expect(resourceDetailPageSource).toContain("openDnsConnectorDialog(binding)");
     expect(resourceDetailPageSource).toContain("setResourceDomainBindingCreateDialogOpen");
+    expect(resourceDetailPageSource).toContain("setDnsConnectorDialogOpen");
+    expect(resourceDetailPageSource).toContain("orpcClient.domainBindings.dnsPlan");
+    expect(resourceDetailPageSource).toContain("orpcClient.connections.capability.accept");
+    expect(resourceDetailPageSource).toContain("orpcClient.connections.capability.apply");
+    expect(resourceDetailPageSource).toContain('capabilityKey: "dns.records.apply"');
     expect(resourceDetailPageSource).toContain('modalIsOpen(page, "domain-binding")');
     expect(resourceDomainBindingsSectionSource).not.toContain(
       "data-resource-static-artifact-domain-unavailable",
@@ -1284,6 +1291,9 @@ describe("console page structure", () => {
     );
     expect(resourceDomainBindingsSectionSource).toContain(
       "onclick={openResourceDomainBindingCreateDialog}",
+    );
+    expect(resourceDomainBindingsSectionSource).toContain(
+      "onclick={() => openDnsConnectorDialog(binding)}",
     );
     expect(resourceDomainBindingsSectionSource).not.toContain("<form");
     expect(resourceDomainBindingDialogSource).toContain("onsubmit={createResourceDomainBinding}");
@@ -1304,6 +1314,9 @@ describe("console page structure", () => {
     expect(resourceDomainBindingDialogSource).not.toContain(
       '<Select.Item value="nginx">nginx</Select.Item>',
     );
+    expect(resourceDetailPageSource).toContain("data-resource-domain-binding-dns-dialog");
+    expect(resourceDetailPageSource).toContain('id="resource-domain-binding-dns-zone"');
+    expect(resourceDetailPageSource).toContain('id="resource-domain-binding-dns-apply"');
   });
 
   test("[RESOURCE-DEPENDENCIES-IA-001] keeps dependency binding forms behind a focused dialog", () => {

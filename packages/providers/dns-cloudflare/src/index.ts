@@ -419,7 +419,7 @@ export class CloudflareDnsConnectorProviderAdapter implements ConnectorProviderA
   }
 
   canPlan(capabilityKey: string): boolean {
-    return capabilityKey === "dns.records.plan";
+    return capabilityKey === "dns.records.plan" || capabilityKey === "dns.records.apply";
   }
 
   async planCapability(
