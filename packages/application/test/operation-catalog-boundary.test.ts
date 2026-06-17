@@ -93,7 +93,11 @@ describe("operation catalog aggregate mutation boundary", () => {
   });
 
   test("[APP-CONN-014] connector catalog operations expose CLI and HTTP/oRPC transports", () => {
-    const connectorOperationKeys = ["connections.categories.list", "connections.catalog.list"];
+    const connectorOperationKeys = [
+      "connections.categories.list",
+      "connections.catalog.list",
+      "connections.capability.plan",
+    ];
     const entriesByKey = new Map<string, OperationCatalogEntry>(
       operationCatalog.map((entry) => [entry.key, entry]),
     );

@@ -13,8 +13,8 @@
 - [x] APP-CONN-001: add neutral catalog vocabulary test.
 - [x] APP-CONN-002: add category support-state test.
 - [ ] APP-CONN-003: add fake Domain Connect temporary flow test.
-- [ ] APP-CONN-004: add persistent DNS accepted-record apply test.
-- [ ] APP-CONN-005: add DNS conflict fail-closed test.
+- [x] APP-CONN-004: add persistent DNS accepted-record plan test.
+- [x] APP-CONN-005: add DNS conflict fail-closed plan test.
 - [x] APP-CONN-006: add identity/source separation test.
 - [x] APP-CONN-007: add GitHub App installation to source connection test.
 - [ ] APP-CONN-008: add provider app token expiry/redaction test.
@@ -25,7 +25,7 @@
 - [ ] APP-CONN-013: add tool/operation no-secret exposure test.
 - [x] APP-CONN-014: add CLI/HTTP operation parity tests.
 - [ ] APP-CONN-015: add Web flow test after UI scope is accepted.
-- [ ] APP-CONN-016: add fake provider adapter contract tests.
+- [x] APP-CONN-016: add fake DNS provider adapter contract tests.
 
 ## Implementation
 
@@ -33,16 +33,17 @@
 - [x] Add connector catalog and connection query/read model.
 - [x] Add operation catalog entries.
 - [x] Add application ports for provider adapters.
-- [ ] Add fake provider adapters before real providers.
+- [x] Add fake DNS provider adapter before real providers.
 - [x] Add GitHub App source connection projection/compatibility.
-- [ ] Add DNS temporary setup and persistent DNS provider contracts.
+- [x] Add persistent DNS provider plan contract.
+- [ ] Add DNS temporary setup and persistent DNS apply/verify/cleanup provider contracts.
 - [x] Add CLI and HTTP surfaces.
 - [ ] Add Web central/contextual surfaces.
 
 ## Verification
 
-- [ ] Run relevant unit/contract tests.
-- [ ] Run CLI operation tests.
-- [ ] Run HTTP/oRPC route tests.
-- [ ] Run source scan for raw provider secrets and hosted-only language in public contracts.
+- [x] Run relevant unit/contract tests.
+- [x] Run CLI operation tests.
+- [x] Run HTTP/oRPC route tests.
+- [x] Run source scan for raw provider secrets in production sources.
 - [ ] Run `git diff --check`.

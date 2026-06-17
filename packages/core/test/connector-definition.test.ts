@@ -6,6 +6,7 @@ import {
   ConnectorDefinition,
   CredentialGrantKindValue,
   connectionCategoryDefinitions,
+  DnsRecordPlan,
 } from "../src";
 
 describe("ConnectorDefinition", () => {
@@ -88,5 +89,39 @@ describe("ConnectorDefinition", () => {
       false,
     );
     expect(CredentialGrantKindValue.rehydrate("temporary-domain-connect").isTemporary()).toBe(true);
+  });
+
+  test("[APP-CONN-005] DNS record plans detect CNAME conflicts before apply", () => {
+    const plan = DnsRecordPlan.create({
+      zoneName: "example.com",
+      records: [
+        {
+          name: "app.example.com",
+          type: "CNAME",
+          value: "edge.appaloft.dev",
+          purpose: "domain-routing",
+        },
+      ],
+      existingRecords: [
+        {
+          name: "app.example.com",
+          type: "A",
+          value: "203.0.113.10",
+          purpose: "manual",
+        },
+      ],
+    })._unsafeUnwrap();
+
+    expect(plan.hasConflicts()).toBe(true);
+    expect(plan.conflicts()).toEqual([
+      {
+        name: "app.example.com",
+        requestedType: "CNAME",
+        existingType: "A",
+        reason: "cname-exclusive",
+        existingValue: "203.0.113.10",
+        requestedValue: "edge.appaloft.dev",
+      },
+    ]);
   });
 });

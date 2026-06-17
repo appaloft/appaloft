@@ -628,6 +628,9 @@ export const tokens = {
   providersQueryService: Symbol.for("appaloft.providers_query_service"),
   connectorsQueryService: Symbol.for("appaloft.connectors_query_service"),
   connectorCategoriesQueryService: Symbol.for("appaloft.connector_categories_query_service"),
+  connectorCapabilityPlanQueryService: Symbol.for(
+    "appaloft.connector_capability_plan_query_service",
+  ),
   integrationsQueryService: Symbol.for("appaloft.integrations_query_service"),
   pluginsQueryService: Symbol.for("appaloft.plugins_query_service"),
   doctorQueryService: Symbol.for("appaloft.doctor_query_service"),

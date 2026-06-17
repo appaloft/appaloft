@@ -118,6 +118,7 @@ import {
   configureServerCredentialCommandInputSchema,
   configureServerEdgeProxyCommandInputSchema,
   confirmDomainBindingOwnershipCommandInputSchema,
+  connectorCapabilityPlanInputSchema,
   countDependencyResourcesQueryInputSchema,
   countDeploymentsQueryInputSchema,
   countEnvironmentsQueryInputSchema,
@@ -328,6 +329,7 @@ import {
   type OperatorWorkEventStreamEnvelope,
   openTerminalSessionCommandInputSchema,
   operationCatalog,
+  PlanConnectorCapabilityQuery,
   PrepareServerRuntimeCommand,
   type ProductOrganizationRole,
   type ProductSessionAuthorizationPort,
@@ -623,6 +625,7 @@ import {
   configureScheduledRuntimePrunePolicyResponseSchema,
   configureServerEdgeProxyResponseSchema,
   confirmDomainBindingOwnershipResponseSchema,
+  connectorCapabilityPlanResponseSchema,
   countResponseSchema,
   createDeploymentResponseSchema,
   createDeployTokenResponseSchema,
@@ -6206,6 +6209,18 @@ export const listConnectorsProcedure = base
   .output(listConnectorsResponseSchema)
   .handler(async ({ input, context }) => executeQuery(context, ListConnectorsQuery.create(input)));
 
+export const planConnectorCapabilityProcedure = base
+  .route({
+    method: "POST",
+    path: "/connections/capabilities/plan",
+    successStatus: 200,
+  })
+  .input(connectorCapabilityPlanInputSchema)
+  .output(connectorCapabilityPlanResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, PlanConnectorCapabilityQuery.create(input)),
+  );
+
 export const listProvidersProcedure = base
   .route({
     method: "GET",
@@ -6634,6 +6649,9 @@ export const appaloftOrpcRouter = {
     },
     catalog: {
       list: listConnectorsProcedure,
+    },
+    capability: {
+      plan: planConnectorCapabilityProcedure,
     },
   },
   providers: {
@@ -9041,6 +9059,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/blueprints/installations/:applicationId",
     "/api/connections/categories",
     "/api/connections/catalog",
+    "/api/connections/capabilities/plan",
     "/api/projects",
     "/api/projects/:projectId",
     "/api/projects/:projectId/rename",

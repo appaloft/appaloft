@@ -10,4 +10,5 @@ export * from "./operations/system/list-github-repositories.query";
 export * from "./operations/system/list-integrations.query";
 export * from "./operations/system/list-plugins.query";
 export * from "./operations/system/list-providers.query";
+export * from "./operations/system/plan-connector-capability.query";
 export * from "./operations/system/upsert-github-app-installation.command";
