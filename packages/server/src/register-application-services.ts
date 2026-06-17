@@ -10,6 +10,8 @@ import {
   AcceptDependencyResourceProvisioningPlanUseCase,
   ApplyActionPreviewRouteCommandHandler,
   ApplyActionPreviewRouteUseCase,
+  ApplyConnectorCapabilityCommandHandler,
+  ApplyConnectorCapabilityUseCase,
   ApplyInstanceUpgradeCommandHandler,
   ApplyInstanceUpgradeUseCase,
   ArchiveDeploymentCommandHandler,
@@ -2404,6 +2406,7 @@ export function registerApplicationServices(
   container.registerSingleton(RevokeConnectionCommandHandler);
   container.registerSingleton(ListConnectorsQueryHandler);
   container.registerSingleton(PlanConnectorCapabilityQueryHandler);
+  container.registerSingleton(ApplyConnectorCapabilityCommandHandler);
   container.registerSingleton(ListBlueprintsQueryHandler);
   container.registerSingleton(ShowBlueprintQueryHandler);
   container.registerSingleton(CreateBlueprintInstallPlanQueryHandler);
@@ -3486,6 +3489,10 @@ export function registerApplicationServices(
   container.registerSingleton(
     tokens.connectorCapabilityPlanQueryService,
     PlanConnectorCapabilityQueryService,
+  );
+  container.registerSingleton(
+    tokens.connectorCapabilityApplyUseCase,
+    ApplyConnectorCapabilityUseCase,
   );
   container.registerSingleton(tokens.integrationsQueryService, ListIntegrationsQueryService);
   container.registerSingleton(tokens.blueprintCatalogQueryService, BlueprintCatalogQueryService);

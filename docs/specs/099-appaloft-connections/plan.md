@@ -27,7 +27,7 @@
 | --- | --- |
 | Operation catalog | Add neutral `connections.*` operations. |
 | CLI | Add `appaloft connections ...` and DNS convenience wrappers. |
-| HTTP/oRPC | Add route/handler equivalents for catalog, connect, callback, plan, accept, revoke, and status. |
+| HTTP/oRPC | Add route/handler equivalents for catalog, connect, callback, plan, apply, revoke, and status; durable accept remains a later accepted-plan store slice. |
 | Web | Add a central Connections area plus contextual DNS/source/server/notification entrypoints. |
 | Config | Use provider enablement and secret refs, not raw secret values. |
 | Future MCP/tools | Tools call operation catalog entries and never receive long-lived credentials. |

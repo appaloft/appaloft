@@ -251,6 +251,7 @@ import { renameStorageVolumeCommandInputSchema } from "./operations/storage-volu
 import { restoreStorageVolumeBackupCommandInputSchema } from "./operations/storage-volumes/restore-storage-volume-backup.command";
 import { showStorageVolumeQueryInputSchema } from "./operations/storage-volumes/show-storage-volume.query";
 import { showStorageVolumeBackupQueryInputSchema } from "./operations/storage-volumes/show-storage-volume-backup.query";
+import { applyConnectorCapabilityCommandInputSchema } from "./operations/system/apply-connector-capability.command";
 import { applyInstanceUpgradeCommandInputSchema } from "./operations/system/apply-instance-upgrade.command";
 import { checkInstanceUpgradeQueryInputSchema } from "./operations/system/check-instance-upgrade.query";
 import { completeConnectionCallbackCommandInputSchema } from "./operations/system/complete-connection-callback.command";
@@ -4198,6 +4199,23 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft connectors plan --connector <connector> --capability <capability>",
       orpc: { method: "POST", path: "/api/connections/capabilities/plan" },
+    },
+  },
+  {
+    key: "connections.capability.apply",
+    kind: "command",
+    domain: "connections",
+    messageName: "ApplyConnectorCapabilityCommand",
+    handlerName: "ApplyConnectorCapabilityCommandHandler",
+    serviceName: "ApplyConnectorCapabilityUseCase",
+    inputSchema: applyConnectorCapabilityCommandInputSchema,
+    serviceToken: tokens.connectorCapabilityApplyUseCase,
+    transportAccess: {
+      productSession: "public",
+    },
+    transports: {
+      cli: "appaloft connectors apply --connector <connector> --capability <capability>",
+      orpc: { method: "POST", path: "/api/connections/capabilities/apply" },
     },
   },
   {

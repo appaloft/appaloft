@@ -81,17 +81,17 @@ export function createDefaultConnectorDefinitions(
         {
           key: "dns.records.apply",
           title: "Apply accepted DNS records",
-          implemented: false,
+          implemented: true,
         },
         {
           key: "dns.records.verify",
           title: "Verify DNS readback",
-          implemented: false,
+          implemented: true,
         },
         {
           key: "dns.records.cleanup",
           title: "Clean up managed DNS records",
-          implemented: false,
+          implemented: true,
         },
       ],
       grantKinds: [

@@ -6565,6 +6565,23 @@ export const dnsRecordPlanSchema = z.object({
   conflicts: z.array(dnsRecordConflictSchema),
 });
 
+export const dnsRecordApplySchema = z.object({
+  zoneName: z.string().optional(),
+  status: z.enum(["applied", "verified", "cleaned-up", "conflict", "skipped"]),
+  records: z.array(dnsRecordRequirementSchema),
+  conflicts: z.array(dnsRecordConflictSchema),
+  missingRecords: z.array(dnsRecordRequirementSchema),
+  effects: z.array(
+    z.object({
+      kind: z.string(),
+      title: z.string(),
+      description: z.string().optional(),
+      providerRecordId: z.string().optional(),
+      managed: z.boolean().optional(),
+    }),
+  ),
+});
+
 export const connectorCapabilityPlanPreviewSchema = z.object({
   planId: z.string(),
   connectorKey: z.string(),
@@ -6589,6 +6606,29 @@ export const connectorCapabilityPlanPreviewSchema = z.object({
     .object({
       kind: z.string(),
       dnsRecords: dnsRecordPlanSchema.optional(),
+    })
+    .optional(),
+});
+
+export const connectorCapabilityApplyResultSchema = z.object({
+  operationId: z.string(),
+  connectorKey: z.string(),
+  capabilityKey: z.string(),
+  status: z.enum(["applied", "verified", "cleaned-up", "conflict", "skipped"]),
+  summary: z.string(),
+  effects: z.array(
+    z.object({
+      kind: z.string(),
+      title: z.string(),
+      description: z.string().optional(),
+      providerRecordId: z.string().optional(),
+      managed: z.boolean().optional(),
+    }),
+  ),
+  providerResult: z
+    .object({
+      kind: z.string(),
+      dnsRecords: dnsRecordApplySchema.optional(),
     })
     .optional(),
 });
@@ -6628,6 +6668,7 @@ export const revokeConnectionResponseSchema = z.object({
 });
 
 export const connectorCapabilityPlanResponseSchema = connectorCapabilityPlanPreviewSchema;
+export const connectorCapabilityApplyResponseSchema = connectorCapabilityApplyResultSchema;
 
 export const listProvidersResponseSchema = z.object({
   items: z.array(providerDescriptorSchema),
@@ -6801,7 +6842,9 @@ export type RevokeConnectionResponse = z.infer<typeof revokeConnectionResponseSc
 export type DnsRecordRequirement = z.infer<typeof dnsRecordRequirementSchema>;
 export type DnsRecordConflict = z.infer<typeof dnsRecordConflictSchema>;
 export type DnsRecordPlan = z.infer<typeof dnsRecordPlanSchema>;
+export type DnsRecordApply = z.infer<typeof dnsRecordApplySchema>;
 export type ConnectorCapabilityPlanPreview = z.infer<typeof connectorCapabilityPlanPreviewSchema>;
+export type ConnectorCapabilityApplyResult = z.infer<typeof connectorCapabilityApplyResultSchema>;
 export type PluginSummary = z.infer<typeof pluginSummarySchema>;
 export type SystemPluginWebExtension = z.infer<typeof systemPluginWebExtensionSchema>;
 export type MaintenanceWorkerActivation = z.infer<typeof maintenanceWorkerActivationSchema>;
@@ -7458,6 +7501,9 @@ export type ProxyConfigurationView = z.infer<typeof proxyConfigurationViewSchema
 export type ListConnectorCategoriesResponse = z.infer<typeof listConnectorCategoriesResponseSchema>;
 export type ListConnectorsResponse = z.infer<typeof listConnectorsResponseSchema>;
 export type ConnectorCapabilityPlanResponse = z.infer<typeof connectorCapabilityPlanResponseSchema>;
+export type ConnectorCapabilityApplyResponse = z.infer<
+  typeof connectorCapabilityApplyResponseSchema
+>;
 export type ListProvidersResponse = z.infer<typeof listProvidersResponseSchema>;
 export type ListIntegrationsResponse = z.infer<typeof listIntegrationsResponseSchema>;
 export type ListPluginsResponse = z.infer<typeof listPluginsResponseSchema>;

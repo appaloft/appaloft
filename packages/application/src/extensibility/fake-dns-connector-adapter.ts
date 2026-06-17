@@ -1,4 +1,5 @@
 import {
+  type DnsRecordApplySnapshot,
   type DnsRecordKind,
   DnsRecordPlan,
   type DnsRecordPurpose,
@@ -11,10 +12,12 @@ import {
 
 import { type ExecutionContext } from "../execution-context";
 import {
+  type ConnectorCapabilityApplyInput,
+  type ConnectorCapabilityApplyResult,
   type ConnectorCapabilityPlanInput,
   type ConnectorCapabilityPlanPreview,
   type ConnectorProviderAdapter,
-  type DnsConnectorProviderReadModel,
+  type DnsConnectorProviderRecordStore,
 } from "../ports";
 
 export interface FakeDnsConnectorProviderAdapterOptions {
@@ -23,27 +26,196 @@ export interface FakeDnsConnectorProviderAdapterOptions {
   existingRecords?: readonly DnsRecordRequirementSnapshot[];
 }
 
-export class InMemoryDnsConnectorProviderReadModel implements DnsConnectorProviderReadModel {
-  constructor(private readonly records: readonly DnsRecordRequirementSnapshot[] = []) {}
+interface StoredDnsRecord {
+  record: DnsRecordRequirementSnapshot;
+  providerRecordId: string;
+  managed: boolean;
+}
+
+export class InMemoryDnsConnectorProviderRecordStore implements DnsConnectorProviderRecordStore {
+  private readonly records: StoredDnsRecord[];
+
+  constructor(records: readonly DnsRecordRequirementSnapshot[] = []) {
+    this.records = records.map((record) => ({
+      record,
+      providerRecordId: providerRecordId(record),
+      managed: false,
+    }));
+  }
 
   async existingRecords(input: {
     zoneName?: string;
     records: readonly DnsRecordRequirementSnapshot[];
   }): Promise<Result<readonly DnsRecordRequirementSnapshot[]>> {
     void input;
-    return ok(this.records);
+    return ok(this.records.map((record) => record.record));
+  }
+
+  async applyRecords(input: {
+    zoneName?: string;
+    records: readonly DnsRecordRequirementSnapshot[];
+  }): Promise<Result<DnsRecordApplySnapshot>> {
+    const plan = DnsRecordPlan.create({
+      ...(input.zoneName ? { zoneName: input.zoneName } : {}),
+      records: [...input.records],
+      existingRecords: this.records.map((record) => record.record),
+    });
+    if (plan.isErr()) return err(plan.error);
+    const applicable = plan.value.ensureApplicable();
+    if (applicable.isErr()) return err(applicable.error);
+
+    const effects: DnsRecordApplySnapshot["effects"] = [];
+    for (const record of plan.value.records()) {
+      const snapshot = record.toJSON();
+      const existing = this.records.find((stored) => sameDnsRecord(stored.record, snapshot));
+      if (existing) {
+        effects.push({
+          kind: "dns.record.exists",
+          title: record.title(),
+          description: `${record.description()} already exists at the provider.`,
+          providerRecordId: existing.providerRecordId,
+          managed: existing.managed,
+        });
+        continue;
+      }
+
+      const stored = {
+        record: snapshot,
+        providerRecordId: providerRecordId(snapshot),
+        managed: true,
+      };
+      this.records.push(stored);
+      effects.push({
+        kind: "dns.record.upsert",
+        title: record.title(),
+        description: record.description(),
+        providerRecordId: stored.providerRecordId,
+        managed: true,
+      });
+    }
+
+    return ok({
+      ...(input.zoneName ? { zoneName: input.zoneName } : {}),
+      status: effects.some((effect) => effect.kind === "dns.record.upsert")
+        ? "applied"
+        : "verified",
+      records: plan.value.toJSON().records,
+      conflicts: [],
+      missingRecords: [],
+      effects,
+    });
+  }
+
+  async verifyRecords(input: {
+    zoneName?: string;
+    records: readonly DnsRecordRequirementSnapshot[];
+  }): Promise<Result<DnsRecordApplySnapshot>> {
+    const plan = DnsRecordPlan.create({
+      ...(input.zoneName ? { zoneName: input.zoneName } : {}),
+      records: [...input.records],
+      existingRecords: this.records.map((record) => record.record),
+    });
+    if (plan.isErr()) return err(plan.error);
+
+    const missing = plan.value.missingFrom(this.records.map((record) => record.record));
+    if (missing.isErr()) return err(missing.error);
+
+    const missingRecords = missing.value.map((record) => record.toJSON());
+    return ok({
+      ...(input.zoneName ? { zoneName: input.zoneName } : {}),
+      status: missingRecords.length === 0 ? "verified" : "conflict",
+      records: plan.value.toJSON().records,
+      conflicts: plan.value.conflicts(),
+      missingRecords,
+      effects: plan.value.records().map((record) => {
+        const snapshot = record.toJSON();
+        const existing = this.records.find((stored) => sameDnsRecord(stored.record, snapshot));
+        return {
+          kind: existing ? "dns.record.verified" : "dns.record.missing",
+          title: record.title(),
+          description: existing
+            ? `${record.description()} is present at the provider.`
+            : `${record.description()} is missing at the provider.`,
+          ...(existing
+            ? {
+                providerRecordId: existing.providerRecordId,
+                managed: existing.managed,
+              }
+            : {}),
+        };
+      }),
+    });
+  }
+
+  async cleanupRecords(input: {
+    zoneName?: string;
+    records: readonly DnsRecordRequirementSnapshot[];
+  }): Promise<Result<DnsRecordApplySnapshot>> {
+    const plan = DnsRecordPlan.create({
+      ...(input.zoneName ? { zoneName: input.zoneName } : {}),
+      records: [...input.records],
+      existingRecords: this.records.map((record) => record.record),
+    });
+    if (plan.isErr()) return err(plan.error);
+
+    const effects: DnsRecordApplySnapshot["effects"] = [];
+    for (const record of plan.value.records()) {
+      const snapshot = record.toJSON();
+      const index = this.records.findIndex((stored) => sameDnsRecord(stored.record, snapshot));
+      if (index === -1) {
+        effects.push({
+          kind: "dns.record.cleanup.missing",
+          title: record.title(),
+          description: `${record.description()} is not present at the provider.`,
+          managed: false,
+        });
+        continue;
+      }
+
+      const existing = this.records[index];
+      if (!existing?.managed) {
+        effects.push({
+          kind: "dns.record.cleanup.skipped",
+          title: record.title(),
+          description: `${record.description()} is not Appaloft-managed and was left untouched.`,
+          ...(existing?.providerRecordId ? { providerRecordId: existing.providerRecordId } : {}),
+          managed: false,
+        });
+        continue;
+      }
+
+      this.records.splice(index, 1);
+      effects.push({
+        kind: "dns.record.cleanup.deleted",
+        title: record.title(),
+        description: `${record.description()} was removed from the provider.`,
+        providerRecordId: existing.providerRecordId,
+        managed: true,
+      });
+    }
+
+    return ok({
+      ...(input.zoneName ? { zoneName: input.zoneName } : {}),
+      status: effects.some((effect) => effect.kind === "dns.record.cleanup.deleted")
+        ? "cleaned-up"
+        : "skipped",
+      records: plan.value.toJSON().records,
+      conflicts: plan.value.conflicts(),
+      missingRecords: [],
+      effects,
+    });
   }
 }
 
 export class FakeDnsConnectorProviderAdapter implements ConnectorProviderAdapter {
   readonly connectorKey: string;
   private readonly providerTitle: string;
-  private readonly readModel: DnsConnectorProviderReadModel;
+  private readonly recordStore: DnsConnectorProviderRecordStore;
 
   constructor(options: FakeDnsConnectorProviderAdapterOptions) {
     this.connectorKey = options.connectorKey;
     this.providerTitle = options.providerTitle;
-    this.readModel = new InMemoryDnsConnectorProviderReadModel(options.existingRecords);
+    this.recordStore = new InMemoryDnsConnectorProviderRecordStore(options.existingRecords);
   }
 
   canPlan(capabilityKey: string): boolean {
@@ -64,7 +236,7 @@ export class FakeDnsConnectorProviderAdapter implements ConnectorProviderAdapter
     const parameters = parseDnsPlanParameters(input.parameters ?? {});
     if (parameters.isErr()) return err(parameters.error);
 
-    const existingRecords = await this.readModel.existingRecords(parameters.value);
+    const existingRecords = await this.recordStore.existingRecords(parameters.value);
     if (existingRecords.isErr()) return err(existingRecords.error);
 
     const plan = DnsRecordPlan.create({
@@ -75,6 +247,41 @@ export class FakeDnsConnectorProviderAdapter implements ConnectorProviderAdapter
     if (plan.isErr()) return err(plan.error);
 
     return ok(this.toPreview(input, plan.value));
+  }
+
+  canApply(capabilityKey: string): boolean {
+    return (
+      capabilityKey === "dns.records.apply" ||
+      capabilityKey === "dns.records.verify" ||
+      capabilityKey === "dns.records.cleanup"
+    );
+  }
+
+  async applyCapability(
+    context: ExecutionContext,
+    input: ConnectorCapabilityApplyInput,
+  ): Promise<Result<ConnectorCapabilityApplyResult>> {
+    void context;
+    if (!this.canApply(input.capabilityKey)) {
+      return err(
+        domainError.validation(
+          `Connector ${this.connectorKey} cannot apply ${input.capabilityKey}`,
+        ),
+      );
+    }
+
+    const parameters = parseDnsPlanParameters(input.parameters ?? {});
+    if (parameters.isErr()) return err(parameters.error);
+
+    const dnsRecords =
+      input.capabilityKey === "dns.records.cleanup"
+        ? await this.recordStore.cleanupRecords(parameters.value)
+        : input.capabilityKey === "dns.records.verify"
+          ? await this.recordStore.verifyRecords(parameters.value)
+          : await this.recordStore.applyRecords(parameters.value);
+    if (dnsRecords.isErr()) return err(dnsRecords.error);
+
+    return ok(this.toApplyResult(input, dnsRecords.value));
   }
 
   private toPreview(
@@ -110,10 +317,33 @@ export class FakeDnsConnectorProviderAdapter implements ConnectorProviderAdapter
       ],
       cleanup: {
         supported: true,
-        description:
-          "Cleanup is limited to Appaloft-managed DNS records after apply support lands.",
+        description: "Cleanup is limited to Appaloft-managed DNS records.",
       },
       providerPlan: {
+        kind: "dns-records",
+        dnsRecords,
+      },
+    };
+  }
+
+  private toApplyResult(
+    input: ConnectorCapabilityApplyInput,
+    dnsRecords: DnsRecordApplySnapshot,
+  ): ConnectorCapabilityApplyResult {
+    return {
+      operationId: `dnsop_${stableHash({
+        connectorKey: input.connectorKey,
+        capabilityKey: input.capabilityKey,
+        ownerRef: input.ownerRef,
+        acceptedPlanId: input.acceptedPlanId,
+        dnsRecords,
+      })}`,
+      connectorKey: input.connectorKey,
+      capabilityKey: input.capabilityKey,
+      status: dnsRecords.status,
+      summary: `${this.providerTitle}: ${dnsActionSummary(input.capabilityKey, dnsRecords)}`,
+      effects: dnsRecords.effects,
+      providerResult: {
         kind: "dns-records",
         dnsRecords,
       },
@@ -218,6 +448,35 @@ function optionalPurpose(value: unknown): Result<DnsRecordPurpose> {
     return ok(normalized);
   }
   return err(domainError.validation(`Unsupported DNS record purpose ${normalized}`));
+}
+
+function sameDnsRecord(left: DnsRecordRequirementSnapshot, right: DnsRecordRequirementSnapshot) {
+  return (
+    left.name.replace(/\.$/, "").toLowerCase() === right.name.replace(/\.$/, "").toLowerCase() &&
+    left.type === right.type &&
+    left.value === right.value
+  );
+}
+
+function providerRecordId(record: DnsRecordRequirementSnapshot): string {
+  return `dnsrec_${stableHash({
+    name: record.name.replace(/\.$/, "").toLowerCase(),
+    type: record.type,
+    value: record.value,
+  })}`;
+}
+
+function dnsActionSummary(capabilityKey: string, dnsRecords: DnsRecordApplySnapshot): string {
+  const recordCount = dnsRecords.records.length;
+  const recordLabel = `DNS record${recordCount === 1 ? "" : "s"}`;
+  const zoneSuffix = dnsRecords.zoneName ? ` in ${dnsRecords.zoneName}` : "";
+  if (capabilityKey === "dns.records.cleanup") {
+    return `${recordCount} ${recordLabel} cleanup finished${zoneSuffix} with status ${dnsRecords.status}.`;
+  }
+  if (capabilityKey === "dns.records.verify") {
+    return `${recordCount} ${recordLabel} verified${zoneSuffix}; ${dnsRecords.missingRecords.length} missing.`;
+  }
+  return `${recordCount} ${recordLabel} apply finished${zoneSuffix} with status ${dnsRecords.status}.`;
 }
 
 function stableHash(value: unknown): string {

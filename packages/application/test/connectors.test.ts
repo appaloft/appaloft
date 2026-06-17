@@ -2,6 +2,7 @@ import "reflect-metadata";
 import { describe, expect, test } from "bun:test";
 
 import {
+  ApplyConnectorCapabilityUseCase,
   createDefaultConnectorDefinitions,
   createExecutionContext,
   FakeDnsConnectorProviderAdapter,
@@ -193,6 +194,189 @@ describe("connector catalog", () => {
     expect(plan.requiresExplicitAcceptance).toBe(true);
     expect(plan.providerPlan?.dnsRecords?.conflicts).toHaveLength(1);
     expect(plan.effects.map((effect) => effect.kind)).toContain("dns.record.conflict");
+  });
+
+  test("[APP-CONN-004][APP-CONN-014][APP-CONN-016] applies and verifies Cloudflare DNS records through a provider adapter", async () => {
+    const registry = new InMemoryConnectorRegistry(
+      createDefaultConnectorDefinitions({
+        cloudflareDns: {
+          configured: true,
+        },
+      }),
+    );
+    const adapter = new FakeDnsConnectorProviderAdapter({
+      connectorKey: "cloudflare-dns",
+      providerTitle: "Cloudflare DNS",
+    });
+    const service = new ApplyConnectorCapabilityUseCase(
+      registry,
+      new InMemoryConnectorProviderAdapterRegistry([adapter]),
+    );
+
+    const apply = await service.execute(createExecutionContext({ entrypoint: "system" }), {
+      connectorKey: "cloudflare-dns",
+      capabilityKey: "dns.records.apply",
+      acceptedPlanId: "dnsplan_test",
+      parameters: {
+        zoneName: "example.com",
+        hostname: "app.example.com",
+        target: "edge.appaloft.dev",
+        recordType: "CNAME",
+      },
+    });
+
+    expect(apply.isOk()).toBe(true);
+    const applied = apply._unsafeUnwrap();
+    expect(applied.status).toBe("applied");
+    expect(applied.effects.map((effect) => effect.kind)).toEqual(["dns.record.upsert"]);
+    expect(applied.providerResult?.dnsRecords?.records).toEqual([
+      {
+        name: "app.example.com",
+        type: "CNAME",
+        value: "edge.appaloft.dev",
+        purpose: "domain-routing",
+      },
+    ]);
+    expect(JSON.stringify(applied)).not.toContain("token");
+
+    const verify = await service.execute(createExecutionContext({ entrypoint: "system" }), {
+      connectorKey: "cloudflare-dns",
+      capabilityKey: "dns.records.verify",
+      parameters: {
+        zoneName: "example.com",
+        hostname: "app.example.com",
+        target: "edge.appaloft.dev",
+        recordType: "CNAME",
+      },
+    });
+
+    expect(verify.isOk()).toBe(true);
+    expect(verify._unsafeUnwrap().status).toBe("verified");
+    expect(verify._unsafeUnwrap().providerResult?.dnsRecords?.missingRecords).toEqual([]);
+  });
+
+  test("[APP-CONN-005][APP-CONN-016] DNS apply fails closed on provider conflict", async () => {
+    const registry = new InMemoryConnectorRegistry(
+      createDefaultConnectorDefinitions({
+        cloudflareDns: {
+          configured: true,
+        },
+      }),
+    );
+    const adapter = new FakeDnsConnectorProviderAdapter({
+      connectorKey: "cloudflare-dns",
+      providerTitle: "Cloudflare DNS",
+      existingRecords: [
+        {
+          name: "app.example.com",
+          type: "A",
+          value: "203.0.113.10",
+          purpose: "manual",
+        },
+      ],
+    });
+    const service = new ApplyConnectorCapabilityUseCase(
+      registry,
+      new InMemoryConnectorProviderAdapterRegistry([adapter]),
+    );
+
+    const apply = await service.execute(createExecutionContext({ entrypoint: "system" }), {
+      connectorKey: "cloudflare-dns",
+      capabilityKey: "dns.records.apply",
+      parameters: {
+        zoneName: "example.com",
+        hostname: "app.example.com",
+        target: "edge.appaloft.dev",
+        recordType: "CNAME",
+      },
+    });
+
+    expect(apply.isErr()).toBe(true);
+    expect(apply._unsafeUnwrapErr().code).toBe("conflict");
+
+    const verify = await service.execute(createExecutionContext({ entrypoint: "system" }), {
+      connectorKey: "cloudflare-dns",
+      capabilityKey: "dns.records.verify",
+      parameters: {
+        zoneName: "example.com",
+        hostname: "app.example.com",
+        target: "edge.appaloft.dev",
+        recordType: "CNAME",
+      },
+    });
+
+    expect(verify.isOk()).toBe(true);
+    expect(verify._unsafeUnwrap().status).toBe("conflict");
+    expect(verify._unsafeUnwrap().providerResult?.dnsRecords?.missingRecords).toHaveLength(1);
+  });
+
+  test("[APP-CONN-004][APP-CONN-016] DNS cleanup removes only Appaloft-managed records", async () => {
+    const registry = new InMemoryConnectorRegistry(
+      createDefaultConnectorDefinitions({
+        cloudflareDns: {
+          configured: true,
+        },
+      }),
+    );
+    const adapter = new FakeDnsConnectorProviderAdapter({
+      connectorKey: "cloudflare-dns",
+      providerTitle: "Cloudflare DNS",
+      existingRecords: [
+        {
+          name: "manual.example.com",
+          type: "CNAME",
+          value: "edge.appaloft.dev",
+          purpose: "manual",
+        },
+      ],
+    });
+    const service = new ApplyConnectorCapabilityUseCase(
+      registry,
+      new InMemoryConnectorProviderAdapterRegistry([adapter]),
+    );
+
+    await service.execute(createExecutionContext({ entrypoint: "system" }), {
+      connectorKey: "cloudflare-dns",
+      capabilityKey: "dns.records.apply",
+      parameters: {
+        zoneName: "example.com",
+        hostname: "app.example.com",
+        target: "edge.appaloft.dev",
+        recordType: "CNAME",
+      },
+    });
+
+    const cleanupManaged = await service.execute(createExecutionContext({ entrypoint: "system" }), {
+      connectorKey: "cloudflare-dns",
+      capabilityKey: "dns.records.cleanup",
+      parameters: {
+        zoneName: "example.com",
+        hostname: "app.example.com",
+        target: "edge.appaloft.dev",
+        recordType: "CNAME",
+      },
+    });
+    const cleanupManual = await service.execute(createExecutionContext({ entrypoint: "system" }), {
+      connectorKey: "cloudflare-dns",
+      capabilityKey: "dns.records.cleanup",
+      parameters: {
+        zoneName: "example.com",
+        hostname: "manual.example.com",
+        target: "edge.appaloft.dev",
+        recordType: "CNAME",
+      },
+    });
+
+    expect(cleanupManaged.isOk()).toBe(true);
+    expect(cleanupManaged._unsafeUnwrap().status).toBe("cleaned-up");
+    expect(cleanupManaged._unsafeUnwrap().effects.map((effect) => effect.kind)).toEqual([
+      "dns.record.cleanup.deleted",
+    ]);
+    expect(cleanupManual.isOk()).toBe(true);
+    expect(cleanupManual._unsafeUnwrap().status).toBe("skipped");
+    expect(cleanupManual._unsafeUnwrap().effects.map((effect) => effect.kind)).toEqual([
+      "dns.record.cleanup.skipped",
+    ]);
   });
 
   test("[APP-CONN-014][APP-CONN-013] starts, lists, shows, and redacts connection instances", async () => {

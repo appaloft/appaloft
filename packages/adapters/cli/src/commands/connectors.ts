@@ -1,4 +1,5 @@
 import {
+  ApplyConnectorCapabilityCommand,
   CompleteConnectionCallbackCommand,
   ListConnectionsQuery,
   ListConnectorCategoriesQuery,
@@ -30,6 +31,7 @@ const includeUnavailableOption = Options.boolean("include-unavailable").pipe(
 const connectorOption = Options.text("connector");
 const capabilityOption = Options.text("capability");
 const parametersJsonOption = Options.text("parameters-json").pipe(Options.optional);
+const acceptedPlanIdOption = Options.text("accepted-plan-id").pipe(Options.optional);
 const connectorArg = Args.text({ name: "connector" });
 const connectionIdArg = Args.text({ name: "connectionId" });
 const ownerScopeOption = Options.choice("owner-scope", [
@@ -120,6 +122,30 @@ const planCommand = EffectCommand.make(
     ),
 ).pipe(EffectCommand.withDescription("Plan a connector capability without applying changes"));
 
+const applyCommand = EffectCommand.make(
+  "apply",
+  {
+    connector: connectorOption,
+    capability: capabilityOption,
+    parametersJson: parametersJsonOption,
+    acceptedPlanId: acceptedPlanIdOption,
+    ownerScope: ownerScopeOption,
+    ownerId: ownerIdOption,
+  },
+  ({ connector, capability, parametersJson, acceptedPlanId, ownerScope, ownerId }) =>
+    runCommand(
+      parseParametersJson(optionalValue(parametersJson)).andThen((parameters) =>
+        ApplyConnectorCapabilityCommand.create({
+          connectorKey: connector,
+          capabilityKey: capability,
+          ownerRef: ownerRef(optionalValue(ownerScope), optionalValue(ownerId)),
+          acceptedPlanId: optionalValue(acceptedPlanId),
+          ...(parameters ? { parameters } : {}),
+        }),
+      ),
+    ),
+).pipe(EffectCommand.withDescription("Apply, verify, or clean up a connector capability"));
+
 const connectCommand = EffectCommand.make(
   "connect",
   {
@@ -196,6 +222,7 @@ export const connectorsCommand = EffectCommand.make("connectors").pipe(
     callbackCommand,
     revokeCommand,
     planCommand,
+    applyCommand,
   ]),
 );
 

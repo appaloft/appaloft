@@ -1,7 +1,10 @@
-import { PlanConnectorCapabilityQuery } from "@appaloft/application";
+import {
+  ApplyConnectorCapabilityCommand,
+  PlanConnectorCapabilityQuery,
+} from "@appaloft/application";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
 
-import { optionalValue, runQuery } from "../runtime.js";
+import { optionalValue, runCommand, runQuery } from "../runtime.js";
 
 const providerOption = Options.choice("provider", ["cloudflare"]).pipe(
   Options.withDefault("cloudflare"),
@@ -50,7 +53,109 @@ const planCommand = EffectCommand.make(
   },
 ).pipe(EffectCommand.withDescription("Plan DNS records through a connector"));
 
+const applyCommand = EffectCommand.make(
+  "apply",
+  {
+    domain: domainArg,
+    provider: providerOption,
+    hostname: hostnameOption,
+    target: targetOption,
+    type: recordTypeOption,
+    purpose: purposeOption,
+    ttl: ttlOption,
+  },
+  ({ domain, provider, hostname, target, type, purpose, ttl }) =>
+    runCommand(
+      ApplyConnectorCapabilityCommand.create({
+        connectorKey: `${provider}-dns`,
+        capabilityKey: "dns.records.apply",
+        parameters: dnsParameters({
+          domain,
+          hostname: optionalValue(hostname),
+          target,
+          type,
+          purpose,
+          ttl: optionalValue(ttl),
+        }),
+      }),
+    ),
+).pipe(EffectCommand.withDescription("Apply DNS records through a connector"));
+
+const verifyCommand = EffectCommand.make(
+  "verify",
+  {
+    domain: domainArg,
+    provider: providerOption,
+    hostname: hostnameOption,
+    target: targetOption,
+    type: recordTypeOption,
+    purpose: purposeOption,
+    ttl: ttlOption,
+  },
+  ({ domain, provider, hostname, target, type, purpose, ttl }) =>
+    runCommand(
+      ApplyConnectorCapabilityCommand.create({
+        connectorKey: `${provider}-dns`,
+        capabilityKey: "dns.records.verify",
+        parameters: dnsParameters({
+          domain,
+          hostname: optionalValue(hostname),
+          target,
+          type,
+          purpose,
+          ttl: optionalValue(ttl),
+        }),
+      }),
+    ),
+).pipe(EffectCommand.withDescription("Verify DNS records through a connector"));
+
+const cleanupCommand = EffectCommand.make(
+  "cleanup",
+  {
+    domain: domainArg,
+    provider: providerOption,
+    hostname: hostnameOption,
+    target: targetOption,
+    type: recordTypeOption,
+    purpose: purposeOption,
+    ttl: ttlOption,
+  },
+  ({ domain, provider, hostname, target, type, purpose, ttl }) =>
+    runCommand(
+      ApplyConnectorCapabilityCommand.create({
+        connectorKey: `${provider}-dns`,
+        capabilityKey: "dns.records.cleanup",
+        parameters: dnsParameters({
+          domain,
+          hostname: optionalValue(hostname),
+          target,
+          type,
+          purpose,
+          ttl: optionalValue(ttl),
+        }),
+      }),
+    ),
+).pipe(EffectCommand.withDescription("Clean up Appaloft-managed DNS records through a connector"));
+
 export const dnsCommand = EffectCommand.make("dns").pipe(
-  EffectCommand.withDescription("DNS connector operations"),
-  EffectCommand.withSubcommands([planCommand]),
+  EffectCommand.withDescription("Shortcut commands for DNS connector capabilities"),
+  EffectCommand.withSubcommands([planCommand, applyCommand, verifyCommand, cleanupCommand]),
 );
+
+function dnsParameters(input: {
+  domain: string;
+  hostname: string | undefined;
+  target: string;
+  type: "A" | "AAAA" | "CNAME" | "TXT";
+  purpose: "domain-routing" | "domain-verification" | "certificate-validation" | "manual";
+  ttl: number | undefined;
+}): Record<string, unknown> {
+  return {
+    zoneName: input.domain,
+    hostname: input.hostname ?? input.domain,
+    target: input.target,
+    recordType: input.type,
+    purpose: input.purpose,
+    ...(input.ttl !== undefined ? { ttl: input.ttl } : {}),
+  };
+}

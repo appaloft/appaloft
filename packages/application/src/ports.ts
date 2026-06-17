@@ -33,6 +33,7 @@ import {
   type DestinationKind,
   type DestinationMutationSpec,
   type DestinationSelectionSpec,
+  type DnsRecordApplySnapshot,
   type DnsRecordConflictSnapshot,
   type DnsRecordPlanSnapshot,
   type DnsRecordRequirementSnapshot,
@@ -9608,6 +9609,36 @@ export interface ConnectorCapabilityPlanPreview {
   };
 }
 
+export interface ConnectorCapabilityApplyInput {
+  connectorKey: string;
+  capabilityKey: string;
+  ownerRef?: {
+    scope: "account" | "organization" | "project" | "environment" | "resource" | "operator";
+    id: string;
+  };
+  acceptedPlanId?: string;
+  parameters?: Record<string, unknown>;
+}
+
+export interface ConnectorCapabilityApplyResult {
+  operationId: string;
+  connectorKey: string;
+  capabilityKey: string;
+  status: "applied" | "verified" | "cleaned-up" | "conflict" | "skipped";
+  summary: string;
+  effects: {
+    kind: string;
+    title: string;
+    description?: string;
+    providerRecordId?: string;
+    managed?: boolean;
+  }[];
+  providerResult?: {
+    kind: "dns-records" | string;
+    dnsRecords?: DnsRecordApplySnapshot;
+  };
+}
+
 export interface ConnectorProviderAdapter {
   readonly connectorKey: string;
   canPlan(capabilityKey: string): boolean;
@@ -9615,6 +9646,11 @@ export interface ConnectorProviderAdapter {
     context: ExecutionContext,
     input: ConnectorCapabilityPlanInput,
   ): Promise<Result<ConnectorCapabilityPlanPreview>>;
+  canApply(capabilityKey: string): boolean;
+  applyCapability(
+    context: ExecutionContext,
+    input: ConnectorCapabilityApplyInput,
+  ): Promise<Result<ConnectorCapabilityApplyResult>>;
 }
 
 export interface ConnectorProviderAdapterRegistry {
@@ -9634,7 +9670,27 @@ export interface DnsConnectorProviderReadModel {
   }): Promise<Result<readonly DnsRecordRequirementSnapshot[]>>;
 }
 
-export type { DnsRecordConflictSnapshot, DnsRecordPlanSnapshot, DnsRecordRequirementSnapshot };
+export interface DnsConnectorProviderRecordStore extends DnsConnectorProviderReadModel {
+  applyRecords(input: {
+    zoneName?: string;
+    records: readonly DnsRecordRequirementSnapshot[];
+  }): Promise<Result<DnsRecordApplySnapshot>>;
+  verifyRecords(input: {
+    zoneName?: string;
+    records: readonly DnsRecordRequirementSnapshot[];
+  }): Promise<Result<DnsRecordApplySnapshot>>;
+  cleanupRecords(input: {
+    zoneName?: string;
+    records: readonly DnsRecordRequirementSnapshot[];
+  }): Promise<Result<DnsRecordApplySnapshot>>;
+}
+
+export type {
+  DnsRecordApplySnapshot,
+  DnsRecordConflictSnapshot,
+  DnsRecordPlanSnapshot,
+  DnsRecordRequirementSnapshot,
+};
 
 export interface IntegrationAuthPort {
   getProviderAccessToken(context: ExecutionContext, providerKey: "github"): Promise<string | null>;

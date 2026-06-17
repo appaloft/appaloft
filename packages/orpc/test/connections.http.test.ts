@@ -2,6 +2,7 @@ import "../../application/node_modules/reflect-metadata/Reflect.js";
 
 import { describe, expect, test } from "bun:test";
 import {
+  ApplyConnectorCapabilityCommand,
   type Command,
   type CommandBus,
   CompleteConnectionCallbackCommand,
@@ -227,6 +228,92 @@ describe("connections HTTP routes", () => {
       },
     });
     expect(capturedQuery).toBeInstanceOf(PlanConnectorCapabilityQuery);
+  });
+
+  test("[APP-CONN-014][APP-CONN-016] applies connector capabilities through HTTP/oRPC", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      commandBus: commandBusFor((command) => {
+        capturedCommand = command;
+        return {
+          operationId: "dnsop_test",
+          connectorKey: "cloudflare-dns",
+          capabilityKey: "dns.records.apply",
+          status: "applied",
+          summary:
+            "Cloudflare DNS: 1 DNS record apply finished in example.com with status applied.",
+          effects: [
+            {
+              kind: "dns.record.upsert",
+              title: "CNAME app.example.com",
+              description: "CNAME app.example.com -> edge.appaloft.dev",
+              providerRecordId: "dnsrec_test",
+              managed: true,
+            },
+          ],
+          providerResult: {
+            kind: "dns-records",
+            dnsRecords: {
+              zoneName: "example.com",
+              status: "applied",
+              records: [
+                {
+                  name: "app.example.com",
+                  type: "CNAME",
+                  value: "edge.appaloft.dev",
+                  purpose: "domain-routing",
+                },
+              ],
+              conflicts: [],
+              missingRecords: [],
+              effects: [
+                {
+                  kind: "dns.record.upsert",
+                  title: "CNAME app.example.com",
+                  description: "CNAME app.example.com -> edge.appaloft.dev",
+                  providerRecordId: "dnsrec_test",
+                  managed: true,
+                },
+              ],
+            },
+          },
+        };
+      }),
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus: queryBusFor(() => ({})),
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/connections/capabilities/apply", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          connectorKey: "cloudflare-dns",
+          capabilityKey: "dns.records.apply",
+          acceptedPlanId: "dnsplan_test",
+          parameters: {
+            zoneName: "example.com",
+            hostname: "app.example.com",
+            target: "edge.appaloft.dev",
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      operationId: "dnsop_test",
+      connectorKey: "cloudflare-dns",
+      capabilityKey: "dns.records.apply",
+      status: "applied",
+      providerResult: {
+        kind: "dns-records",
+      },
+    });
+    expect(capturedCommand).toBeInstanceOf(ApplyConnectorCapabilityCommand);
   });
 
   test("[APP-CONN-014][APP-CONN-013] lists and shows connection instances through HTTP/oRPC", async () => {
