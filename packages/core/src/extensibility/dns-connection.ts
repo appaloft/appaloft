@@ -33,6 +33,23 @@ export interface DnsRecordPlanSnapshot {
   conflicts: DnsRecordConflictSnapshot[];
 }
 
+export interface DnsRecordActionEffectSnapshot {
+  kind: string;
+  title: string;
+  description?: string;
+  providerRecordId?: string;
+  managed?: boolean;
+}
+
+export interface DnsRecordApplySnapshot {
+  zoneName?: string;
+  status: "applied" | "verified" | "cleaned-up" | "conflict" | "skipped";
+  records: DnsRecordRequirementSnapshot[];
+  conflicts: DnsRecordConflictSnapshot[];
+  missingRecords: DnsRecordRequirementSnapshot[];
+  effects: DnsRecordActionEffectSnapshot[];
+}
+
 const dnsRecordKinds = ["A", "AAAA", "CNAME", "TXT"] as const satisfies readonly DnsRecordKind[];
 const dnsRecordPurposes = [
   "domain-routing",
@@ -252,6 +269,34 @@ export class DnsRecordPlan {
 
   conflicts(): DnsRecordConflictSnapshot[] {
     return [...this.conflictsValue];
+  }
+
+  ensureApplicable(): Result<DnsRecordPlan> {
+    if (this.hasConflicts()) {
+      return err(
+        domainError.conflict("DNS records cannot be applied while conflicts exist", {
+          conflictCount: this.conflictsValue.length,
+        }),
+      );
+    }
+    return ok(this);
+  }
+
+  missingFrom(
+    existingRecordInputs: DnsRecordRequirementSnapshot[],
+  ): Result<DnsRecordRequirement[]> {
+    const existingRecords: DnsRecordRequirement[] = [];
+    for (const recordInput of existingRecordInputs) {
+      const record = DnsRecordRequirement.create(recordInput);
+      if (record.isErr()) return err(record.error);
+      existingRecords.push(record.value);
+    }
+
+    return ok(
+      this.recordsValue.filter(
+        (record) => !existingRecords.some((existing) => record.sameRecord(existing)),
+      ),
+    );
   }
 
   summary(): string {

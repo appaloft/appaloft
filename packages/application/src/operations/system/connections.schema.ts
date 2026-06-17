@@ -85,6 +85,16 @@ export const revokeConnectionCommandInputSchema = z
   })
   .strict();
 
+export const applyConnectorCapabilityCommandInputSchema = z
+  .object({
+    connectorKey: z.string().min(1),
+    capabilityKey: z.string().min(1),
+    ownerRef: connectionOwnerInputSchema.optional(),
+    acceptedPlanId: z.string().min(1).optional(),
+    parameters: z.record(z.string(), z.unknown()).optional(),
+  })
+  .strict();
+
 export type ListConnectionsQueryInput = z.infer<typeof listConnectionsQueryInputSchema>;
 export type ShowConnectionQueryInput = z.infer<typeof showConnectionQueryInputSchema>;
 export type StartConnectionCommandInput = z.infer<typeof startConnectionCommandInputSchema>;
@@ -92,3 +102,6 @@ export type CompleteConnectionCallbackCommandInput = z.infer<
   typeof completeConnectionCallbackCommandInputSchema
 >;
 export type RevokeConnectionCommandInput = z.infer<typeof revokeConnectionCommandInputSchema>;
+export type ApplyConnectorCapabilityCommandInput = z.infer<
+  typeof applyConnectorCapabilityCommandInputSchema
+>;

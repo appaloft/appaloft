@@ -636,6 +636,7 @@ export const tokens = {
   connectorCapabilityPlanQueryService: Symbol.for(
     "appaloft.connector_capability_plan_query_service",
   ),
+  connectorCapabilityApplyUseCase: Symbol.for("appaloft.connector_capability_apply_use_case"),
   integrationsQueryService: Symbol.for("appaloft.integrations_query_service"),
   pluginsQueryService: Symbol.for("appaloft.plugins_query_service"),
   doctorQueryService: Symbol.for("appaloft.doctor_query_service"),

@@ -7,6 +7,7 @@ import {
   type ActionDeployTokenWorkflow,
   type AppLogger,
   ApplyActionPreviewRouteCommand,
+  ApplyConnectorCapabilityCommand,
   ArchiveDeploymentCommand,
   ArchiveEnvironmentCommand,
   ArchiveProjectCommand,
@@ -16,6 +17,7 @@ import {
   type AuthBootstrapStatus,
   acceptBlueprintInstallCommandInputSchema,
   acceptDependencyResourceProvisioningPlanInputSchema,
+  applyConnectorCapabilityCommandInputSchema,
   archiveDeploymentCommandInputSchema,
   archiveEnvironmentCommandInputSchema,
   archiveProjectCommandInputSchema,
@@ -636,6 +638,7 @@ import {
   configureScheduledRuntimePrunePolicyResponseSchema,
   configureServerEdgeProxyResponseSchema,
   confirmDomainBindingOwnershipResponseSchema,
+  connectorCapabilityApplyResponseSchema,
   connectorCapabilityPlanResponseSchema,
   countResponseSchema,
   createDeploymentResponseSchema,
@@ -6302,6 +6305,18 @@ export const planConnectorCapabilityProcedure = base
     executeQuery(context, PlanConnectorCapabilityQuery.create(input)),
   );
 
+export const applyConnectorCapabilityProcedure = base
+  .route({
+    method: "POST",
+    path: "/connections/capabilities/apply",
+    successStatus: 200,
+  })
+  .input(applyConnectorCapabilityCommandInputSchema)
+  .output(connectorCapabilityApplyResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ApplyConnectorCapabilityCommand.create(input)),
+  );
+
 export const listProvidersProcedure = base
   .route({
     method: "GET",
@@ -6743,6 +6758,7 @@ export const appaloftOrpcRouter = {
     },
     capability: {
       plan: planConnectorCapabilityProcedure,
+      apply: applyConnectorCapabilityProcedure,
     },
   },
   providers: {
@@ -9157,6 +9173,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/connections/connect/start",
     "/api/connections/connect/callback",
     "/api/connections/capabilities/plan",
+    "/api/connections/capabilities/apply",
     "/api/projects",
     "/api/projects/:projectId",
     "/api/projects/:projectId/rename",

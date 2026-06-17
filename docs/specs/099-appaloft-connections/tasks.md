@@ -37,8 +37,9 @@
 - [x] Add fake DNS provider adapter before real providers.
 - [x] Add GitHub App source connection projection/compatibility.
 - [x] Add persistent DNS provider plan contract.
-- [ ] Add DNS temporary setup and persistent DNS apply/verify/cleanup provider contracts.
-- [x] Add CLI and HTTP surfaces for catalog, connection lifecycle, and DNS planning.
+- [x] Add persistent DNS apply/verify/cleanup provider contracts.
+- [ ] Add DNS temporary setup provider contract.
+- [x] Add CLI and HTTP surfaces for catalog, connection lifecycle, DNS planning, and DNS apply/verify/cleanup.
 - [ ] Add Web central/contextual surfaces.
 
 ## Verification

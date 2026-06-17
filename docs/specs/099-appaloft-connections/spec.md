@@ -91,23 +91,33 @@ Candidate operation names for a later code round:
 - `connections.connect.callback`
 - `connections.revoke`
 - `connections.capability.plan`
-- `connections.capability.accept`
+- `connections.capability.apply`
+- Future durable accepted-plan store: `connections.capability.accept`
 - `connections.status.show`
 
 Candidate CLI forms:
 
 ```text
-appaloft connections catalog
-appaloft connections categories
-appaloft connections list
-appaloft connections show <connectionId>
-appaloft connections connect <provider> --category <category>
-appaloft connections revoke <connectionId>
-appaloft connections plan <connectionId> --capability <key> --json
-appaloft connections accept <planId> --json
+appaloft connectors catalog
+appaloft connectors categories
+appaloft connectors list
+appaloft connectors show <connectionId>
+appaloft connectors connect <connector>
+appaloft connectors revoke <connectionId>
+appaloft connectors plan --connector <connector> --capability <key> --parameters-json <json>
+appaloft connectors apply --connector <connector> --capability <key> --parameters-json <json>
+```
+
+DNS convenience aliases may exist for ergonomics, but they must translate into the same connector
+capability commands. DNS is a connector category, not a sibling model to `Connection` or
+`ConnectorDefinition`.
+
+```text
 appaloft dns connect <domain>
 appaloft dns plan <domain> --hostname <host> --target <target> --json
-appaloft dns apply <planId> --json
+appaloft dns apply <domain> --hostname <host> --target <target>
+appaloft dns verify <domain> --hostname <host> --target <target>
+appaloft dns cleanup <domain> --hostname <host> --target <target>
 ```
 
 Candidate HTTP routes may be shaped as REST/oRPC equivalents of the same operations. Exact transport
