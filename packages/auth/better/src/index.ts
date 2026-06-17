@@ -93,6 +93,22 @@ export interface AuthProviderStatus {
   reason?: string;
 }
 
+export interface AuthPublicProviderStatus {
+  key: AuthProviderKey;
+  title: string;
+  configured: boolean;
+  deferred: boolean;
+  connectPath?: string;
+  reason?: string;
+}
+
+export interface AuthPublicConfig {
+  schemaVersion: "appaloft.auth.public-config/v1";
+  enabled: boolean;
+  provider: "none" | "better-auth";
+  providers: AuthPublicProviderStatus[];
+}
+
 export interface AuthSessionStatus {
   accountSecurity: AppaloftBetterAuthAccountSecurityStatus;
   accountRecovery: AppaloftBetterAuthAccountRecoveryStatus;
@@ -118,6 +134,7 @@ export interface AuthRuntime
     AccountSettingsPort,
     OrganizationTeamManagementPort,
     ProductSessionAuthorizationPort {
+  getPublicConfig(): AuthPublicConfig;
   getSessionStatus(request: Request): Promise<AuthSessionStatus>;
   getProviderAccessToken(request: Request, providerKey: "github"): Promise<string | null>;
   issueCliProductSessionCookie(request: Request): Promise<string | null>;
@@ -240,6 +257,23 @@ export class BetterAuthRuntime implements AuthRuntime {
     this.organizationAdmission = config.organizationAdmission;
     this.oidcConfigured = providers.oidc;
     this.auth = createAppaloftBetterAuth(config);
+  }
+
+  getPublicConfig(): AuthPublicConfig {
+    if (!this.config.enabled) {
+      return disabledPublicAuthConfig();
+    }
+
+    return {
+      schemaVersion: "appaloft.auth.public-config/v1",
+      enabled: true,
+      provider: "better-auth",
+      providers: publicProviderStatuses({
+        github: this.githubConfigured,
+        google: this.googleConfigured,
+        oidc: this.oidcConfigured,
+      }),
+    };
   }
 
   async getSessionStatus(request: Request): Promise<AuthSessionStatus> {
@@ -2327,6 +2361,32 @@ function providerStatuses(
       connected: connectedProviders.has(key),
     }),
   );
+}
+
+function publicProviderStatuses(configured: Record<AuthProviderKey, boolean>) {
+  return (["github", "google", "oidc"] as const).map((key) => {
+    const connectPath = key === "oidc" ? "/api/auth/sign-in/oauth2" : "/api/auth/sign-in/social";
+    return {
+      key,
+      title: providerTitle(key),
+      configured: configured[key],
+      deferred: true,
+      ...(configured[key] ? { connectPath } : { reason: providerNotConfiguredReason(key) }),
+    };
+  });
+}
+
+function disabledPublicAuthConfig(): AuthPublicConfig {
+  return {
+    schemaVersion: "appaloft.auth.public-config/v1",
+    enabled: false,
+    provider: "none",
+    providers: publicProviderStatuses({
+      github: false,
+      google: false,
+      oidc: false,
+    }),
+  };
 }
 
 function loginMethodsForRuntime(configured: Record<AuthProviderKey, boolean>) {
