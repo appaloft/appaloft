@@ -13,6 +13,7 @@ export const connectionOwnerInputSchema = z
   .object({
     scope: ownerScopeSchema,
     id: z.string().min(1),
+    tenantId: z.string().min(1).optional(),
   })
   .strict();
 

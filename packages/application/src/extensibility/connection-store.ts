@@ -9,7 +9,11 @@ function ownerMatches(
   if (!owner) {
     return true;
   }
-  return snapshot.owner.scope === owner.scope && snapshot.owner.id === owner.id;
+  return (
+    snapshot.owner.scope === owner.scope &&
+    snapshot.owner.id === owner.id &&
+    (!owner.tenantId || snapshot.owner.tenantId === owner.tenantId)
+  );
 }
 
 export class InMemoryConnectorConnectionStore implements ConnectorConnectionStore {
