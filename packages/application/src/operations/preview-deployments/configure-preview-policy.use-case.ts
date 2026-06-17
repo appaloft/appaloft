@@ -47,6 +47,11 @@ export class ConfigurePreviewPolicyUseCase {
         ...(input.policy.previewTtlHours !== undefined
           ? { previewTtlHours: input.policy.previewTtlHours }
           : {}),
+        ...(input.policy.environmentProfileBaseEnvironmentId
+          ? {
+              environmentProfileBaseEnvironmentId: input.policy.environmentProfileBaseEnvironmentId,
+            }
+          : {}),
       },
       updatedAt: this.clock.now(),
       ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),

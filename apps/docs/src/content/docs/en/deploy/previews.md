@@ -188,6 +188,9 @@ That product line uses signed GitHub webhooks, preview policy, fork and secret p
 You can declare the Resource preview policy in `appaloft.yaml` with `preview.pullRequest.policy`.
 Apply that config from trusted default-branch, Web, CLI, API, or control-plane context. PR preview
 deploys do not let the PR branch mutate the policy that decides whether previews are admitted.
+That policy may include `environmentProfileBaseEnvironmentId` when previews should derive from a
+safe Environment Profile base; this stays policy/read-model context and does not add fields to
+`deployments.create`.
 
 A preview environment is a temporary derived runtime environment under the selected Resource, not a long-lived Resource peer. The Resource detail preview area shows that Resource's pull request previews, expiry, source fingerprint, and cleanup state. The global preview environment page is only a cross-project troubleshooting rollup; normal inspection and cleanup should start from the Resource.
 

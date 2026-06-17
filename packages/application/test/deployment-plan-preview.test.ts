@@ -70,6 +70,7 @@ import {
   FixedClock,
   MemoryDependencyResourceRepository,
   MemoryDestinationRepository,
+  MemoryEnvironmentProfileDecisionStore,
   MemoryEnvironmentRepository,
   MemoryProjectRepository,
   MemoryResourceDependencyBindingReadModel,
@@ -203,7 +204,11 @@ function context(): ExecutionContext {
   });
 }
 
-async function createHarness(input?: { blockedBinding?: boolean; unresolvedSecret?: boolean }) {
+async function createHarness(input?: {
+  blockedBinding?: boolean;
+  unresolvedSecret?: boolean;
+  pendingProfileDecision?: boolean;
+}) {
   const testContext = context();
   const repositoryContext = toRepositoryContext(testContext);
   const clock = new FixedClock("2026-01-01T00:00:00.000Z");
@@ -215,6 +220,7 @@ async function createHarness(input?: { blockedBinding?: boolean; unresolvedSecre
   const resources = new MemoryResourceRepository();
   const dependencyResources = new MemoryDependencyResourceRepository();
   const dependencyResourceSecretStore = new FakeDependencyResourceSecretStore();
+  const environmentProfileDecisions = new MemoryEnvironmentProfileDecisionStore();
   const dependencyBindings = new MemoryResourceDependencyBindingRepository();
   const baseBindingReadModel = new MemoryResourceDependencyBindingReadModel(
     dependencyBindings,
@@ -345,6 +351,18 @@ async function createHarness(input?: { blockedBinding?: boolean; unresolvedSecre
     binding,
     UpsertResourceBindingSpec.fromResourceBinding(binding),
   );
+  if (input?.pendingProfileDecision) {
+    await environmentProfileDecisions.recordPending(repositoryContext, {
+      id: "epd_env_demo_res_demo_dependency-binding_rbind_pg",
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      kind: "dependency-binding",
+      sourceId: "rbind_pg",
+      reason: "Dependency binding was deferred and must be resolved before deployment.",
+      createdAt: clock.now(),
+    });
+  }
 
   return {
     context: testContext,
@@ -359,6 +377,7 @@ async function createHarness(input?: { blockedBinding?: boolean; unresolvedSecre
       undefined,
       bindingReadModel,
       dependencyResourceSecretStore,
+      environmentProfileDecisions,
     ),
     query: DeploymentPlanQuery.create({
       projectId: "prj_demo",
@@ -424,7 +443,8 @@ describe("DeploymentPlanQueryService", () => {
 
     const preview = unwrap(await harness.service.execute(harness.context, harness.query));
 
-    expect(preview.readiness.status).toBe("ready");
+    expect(preview.readiness.status).toBe("blocked");
+    expect(preview.readiness.reasonCodes).toContain("dependency-runtime-injection-blocked");
     expect(preview.dependencyBindings).toMatchObject({
       status: "blocked",
       references: [
@@ -443,12 +463,38 @@ describe("DeploymentPlanQueryService", () => {
     });
   });
 
+  test("[ENV-PROFILE-DUP-005] reports pending environment profile decisions as deployment blockers", async () => {
+    const harness = await createHarness({ pendingProfileDecision: true });
+
+    const preview = unwrap(await harness.service.execute(harness.context, harness.query));
+
+    expect(preview.readiness).toMatchObject({
+      status: "blocked",
+      ready: false,
+      reasonCodes: ["environment-profile-decision-pending"],
+    });
+    expect(preview.unsupportedReasons).toEqual([
+      expect.objectContaining({
+        code: "environment-profile-decision-pending",
+        phase: "environment-profile-decision-admission",
+        relatedEntityId: "epd_env_demo_res_demo_dependency-binding_rbind_pg",
+      }),
+    ]);
+    expect(preview.nextActions).toEqual([
+      expect.objectContaining({
+        targetOperation: "environments.duplicate-profile",
+        blockedReasonCode: "environment-profile-decision-pending",
+      }),
+    ]);
+  });
+
   test("[DEP-BIND-SECRET-RESOLVE-004] reports unresolved Appaloft-owned dependency runtime refs as blocked", async () => {
     const harness = await createHarness({ unresolvedSecret: true });
 
     const preview = unwrap(await harness.service.execute(harness.context, harness.query));
 
-    expect(preview.readiness.status).toBe("ready");
+    expect(preview.readiness.status).toBe("blocked");
+    expect(preview.readiness.reasonCodes).toContain("dependency-runtime-injection-blocked");
     expect(preview.dependencyBindings).toMatchObject({
       status: "blocked",
       references: [

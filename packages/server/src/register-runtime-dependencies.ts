@@ -160,6 +160,7 @@ import {
   PgDomainRouteFailureCandidateReader,
   PgDurableWorkerHeartbeatStore,
   PgDurableWorkLedger,
+  PgEnvironmentProfileDecisionRepository,
   PgEnvironmentReadModel,
   PgEnvironmentRepository,
   PgGitHubAppInstallationRepository,
@@ -1207,6 +1208,11 @@ export function registerRuntimeDependencies(
       () => new PgResourceDependencyBindingRepository(input.database.db),
     ),
   });
+  container.register(tokens.environmentProfileDecisionRepository, {
+    useFactory: instanceCachingFactory(
+      () => new PgEnvironmentProfileDecisionRepository(input.database.db),
+    ),
+  });
   container.register(tokens.deployTokenRepository, {
     useFactory: instanceCachingFactory(() => new PgDeployTokenRepository(input.database.db)),
   });
@@ -1494,6 +1500,11 @@ export function registerRuntimeDependencies(
   container.register(tokens.resourceDependencyBindingReadModel, {
     useFactory: instanceCachingFactory(
       () => new PgResourceDependencyBindingReadModel(input.database.db),
+    ),
+  });
+  container.register(tokens.environmentProfileDecisionReadModel, {
+    useFactory: instanceCachingFactory(
+      () => new PgEnvironmentProfileDecisionRepository(input.database.db),
     ),
   });
   container.register(tokens.storageVolumeReadModel, {

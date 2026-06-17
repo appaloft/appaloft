@@ -91,9 +91,11 @@ appaloft.environments.clone -> environments.clone POST /environments/{environmen
 appaloft.environments.count -> environments.count GET /environments/count
 appaloft.environments.create -> environments.create POST /environments
 appaloft.environments.diff -> environments.diff GET /environments/{environmentId}/diff/{otherEnvironmentId}
+appaloft.environments.duplicateProfile -> environments.duplicate-profile POST /environments/{environmentId}/duplicate-profile
 appaloft.environments.effectivePrecedence -> environments.effective-precedence GET /environments/{environmentId}/effective-precedence
 appaloft.environments.list -> environments.list GET /environments
 appaloft.environments.lock -> environments.lock POST /environments/{environmentId}/lock
+appaloft.environments.planDuplicate -> environments.plan-duplicate GET /environments/{environmentId}/duplicate-plan
 appaloft.environments.promote -> environments.promote POST /environments/{environmentId}/promote
 appaloft.environments.rename -> environments.rename POST /environments/{environmentId}/rename
 appaloft.environments.setVariable -> environments.set-variable POST /environments/{environmentId}/variables

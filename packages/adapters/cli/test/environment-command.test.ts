@@ -138,6 +138,68 @@ describe("CLI environment commands", () => {
     });
   });
 
+  test("[ENV-PROFILE-DUP-004] environment duplicate apply dispatches reviewed decisions", async () => {
+    ensureReflectMetadata();
+    const { DuplicateEnvironmentProfileCommand, createExecutionContext } = await import(
+      "@appaloft/application"
+    );
+    const { createCliProgram } = await import("../src");
+    const commands: AppCommand<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, command: AppCommand<T>) => {
+        commands.push(command as AppCommand<unknown>);
+        return ok({ id: "env_staging" } as T);
+      },
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, _query: AppQuery<T>) => ok({} as T),
+    } as unknown as QueryBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) =>
+        createExecutionContext({
+          ...input,
+          requestId: "req_cli_environment_duplicate_apply_test",
+        }),
+    };
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory,
+    });
+
+    const writeStdout = process.stdout.write;
+    try {
+      process.stdout.write = (() => true) as typeof process.stdout.write;
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "env",
+        "duplicate",
+        "apply",
+        "env_production",
+        "--name",
+        "staging",
+        "--kind",
+        "staging",
+        "--dependency-decisions",
+        JSON.stringify([{ dependencyResourceId: "rsi_pg", decision: "defer" }]),
+      ]);
+    } finally {
+      process.stdout.write = writeStdout;
+    }
+
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toBeInstanceOf(DuplicateEnvironmentProfileCommand);
+    expect(commands[0]).toMatchObject({
+      environmentId: "env_production",
+      targetName: "staging",
+      targetKind: "staging",
+      dependencyDecisions: [{ dependencyResourceId: "rsi_pg", decision: "defer" }],
+    });
+  });
+
   test("[ENV-LIFE-ENTRY-003] environment archive dispatches the application command", async () => {
     ensureReflectMetadata();
     const { ArchiveEnvironmentCommand, createExecutionContext } = await import(
@@ -359,6 +421,237 @@ describe("CLI environment commands", () => {
     expect(queries[0]).toBeInstanceOf(EnvironmentEffectivePrecedenceQuery);
     expect(queries[0]).toMatchObject({
       environmentId: "env_production",
+    });
+  });
+
+  test("[ENV-PROFILE-DUP-001] environment duplicate plan dispatches the application query", async () => {
+    ensureReflectMetadata();
+    const { PlanDuplicateEnvironmentQuery, createExecutionContext } = await import(
+      "@appaloft/application"
+    );
+    const { createCliProgram } = await import("../src");
+    const queries: AppQuery<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, _command: AppCommand<T>) => ok({} as T),
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, query: AppQuery<T>) => {
+        queries.push(query as AppQuery<unknown>);
+        return ok({
+          schemaVersion: "environments.duplicate-plan/v1",
+          sourceEnvironment: {
+            id: "env_production",
+            projectId: "prj_demo",
+            name: "production",
+            kind: "production",
+            lifecycleStatus: "active",
+            createdAt: "2026-01-01T00:00:00.000Z",
+            maskedVariables: [],
+          },
+          target: {
+            projectId: "prj_demo",
+            name: "staging",
+            conflict: false,
+          },
+          variableCandidates: [],
+          resourceCandidates: [],
+          dependencyCandidates: [],
+          dependencyBindingCandidates: [],
+          domainRouteCandidates: [],
+          storageDecisionCandidates: [],
+          warnings: [],
+          generatedAt: "2026-01-01T00:00:00.000Z",
+        } as T);
+      },
+    } as unknown as QueryBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) =>
+        createExecutionContext({
+          ...input,
+          requestId: "req_cli_environment_duplicate_plan_test",
+        }),
+    };
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory,
+    });
+
+    const writeStdout = process.stdout.write;
+    try {
+      process.stdout.write = (() => true) as typeof process.stdout.write;
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "env",
+        "duplicate",
+        "plan",
+        "env_production",
+        "--name",
+        "staging",
+        "--project",
+        "prj_demo",
+        "--target",
+        "env_staging",
+      ]);
+    } finally {
+      process.stdout.write = writeStdout;
+    }
+
+    expect(queries).toHaveLength(1);
+    expect(queries[0]).toBeInstanceOf(PlanDuplicateEnvironmentQuery);
+    expect(queries[0]).toMatchObject({
+      environmentId: "env_production",
+      targetName: "staging",
+      targetProjectId: "prj_demo",
+      targetEnvironmentId: "env_staging",
+    });
+  });
+
+  test("[ENV-PROFILE-DUP-008] environment diff-profile dispatches the application query", async () => {
+    ensureReflectMetadata();
+    const { DiffEnvironmentProfileQuery, createExecutionContext } = await import(
+      "@appaloft/application"
+    );
+    const { createCliProgram } = await import("../src");
+    const queries: AppQuery<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, _command: AppCommand<T>) => ok({} as T),
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, query: AppQuery<T>) => {
+        queries.push(query as AppQuery<unknown>);
+        return ok({
+          schemaVersion: "environments.diff-profile/v1",
+          sourceEnvironment: {
+            id: "env_production",
+            projectId: "prj_demo",
+            name: "production",
+            kind: "production",
+            lifecycleStatus: "active",
+            createdAt: "2026-01-01T00:00:00.000Z",
+            maskedVariables: [],
+          },
+          targetEnvironment: {
+            id: "env_staging",
+            projectId: "prj_demo",
+            name: "staging",
+            kind: "staging",
+            lifecycleStatus: "active",
+            createdAt: "2026-01-01T00:00:00.000Z",
+            maskedVariables: [],
+          },
+          entries: [],
+          counts: { added: 0, removed: 0, changed: 0, unchanged: 0 },
+          generatedAt: "2026-01-01T00:00:00.000Z",
+        } as T);
+      },
+    } as unknown as QueryBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) =>
+        createExecutionContext({
+          ...input,
+          requestId: "req_cli_environment_diff_profile_test",
+        }),
+    };
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory,
+    });
+
+    const writeStdout = process.stdout.write;
+    try {
+      process.stdout.write = (() => true) as typeof process.stdout.write;
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "env",
+        "diff-profile",
+        "env_production",
+        "env_staging",
+        "--include-unchanged",
+      ]);
+    } finally {
+      process.stdout.write = writeStdout;
+    }
+
+    expect(queries).toHaveLength(1);
+    expect(queries[0]).toBeInstanceOf(DiffEnvironmentProfileQuery);
+    expect(queries[0]).toMatchObject({
+      environmentId: "env_production",
+      targetEnvironmentId: "env_staging",
+      includeUnchanged: true,
+    });
+  });
+
+  test("[ENV-PROFILE-DUP-009] environment sync-profile dispatches selected resources", async () => {
+    ensureReflectMetadata();
+    const { SyncEnvironmentProfileCommand, createExecutionContext } = await import(
+      "@appaloft/application"
+    );
+    const { createCliProgram } = await import("../src");
+    const commands: AppCommand<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, command: AppCommand<T>) => {
+        commands.push(command as AppCommand<unknown>);
+        return ok({
+          schemaVersion: "environments.sync-profile/v1",
+          sourceEnvironmentId: "env_production",
+          targetEnvironmentId: "env_staging",
+          syncedResources: [],
+          skippedResources: [],
+          deferredDecisions: [],
+          warnings: [],
+          generatedAt: "2026-01-01T00:00:00.000Z",
+        } as T);
+      },
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, _query: AppQuery<T>) => ok({} as T),
+    } as unknown as QueryBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) =>
+        createExecutionContext({
+          ...input,
+          requestId: "req_cli_environment_sync_profile_test",
+        }),
+    };
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory,
+    });
+
+    const writeStdout = process.stdout.write;
+    try {
+      process.stdout.write = (() => true) as typeof process.stdout.write;
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "env",
+        "sync-profile",
+        "env_production",
+        "env_staging",
+        "--resource-ids",
+        "res_worker,res_api",
+      ]);
+    } finally {
+      process.stdout.write = writeStdout;
+    }
+
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toBeInstanceOf(SyncEnvironmentProfileCommand);
+    expect(commands[0]).toMatchObject({
+      environmentId: "env_production",
+      targetEnvironmentId: "env_staging",
+      resourceIds: ["res_worker", "res_api"],
     });
   });
 });

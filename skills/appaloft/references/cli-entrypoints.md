@@ -196,10 +196,14 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft env unlock <environmentId>` - `environments.unlock`
 - `appaloft env archive <environmentId>` - `environments.archive`
 - `appaloft env clone <environmentId> --name <targetName>` - `environments.clone`
+- `appaloft env duplicate apply <environmentId> --name <targetName>` - `environments.duplicate-profile`
 - `appaloft env set <environmentId> <key> <value>` - `environments.set-variable`
 - `appaloft env unset <environmentId> <key>` - `environments.unset-variable`
 - `appaloft env effective-precedence <environmentId>` - `environments.effective-precedence`
 - `appaloft env diff <environmentId> <otherEnvironmentId>` - `environments.diff`
+- `appaloft env duplicate plan <environmentId> --name <targetName>` - `environments.plan-duplicate`
+- `appaloft env diff-profile <environmentId> <targetEnvironmentId>` - `environments.diff-profile`
+- `appaloft env sync-profile <environmentId> <targetEnvironmentId> --resource-ids <ids>` - `environments.sync-profile`
 - `appaloft env promote <environmentId> <targetName>` - `environments.promote`
 - `appaloft preview cleanup [path-or-source] --preview pull-request --preview-id pr-123` - `deployments.cleanup-preview`
 - `appaloft deploy [path-or-source] [--config appaloft.yml] [--env KEY=VALUE] [--secret KEY=ci-env:NAME] [--preview pull-request]` - `deployments.create`
@@ -263,6 +267,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft domain-binding confirm-ownership <domainBindingId> [--verification-mode dns|manual]` - `domain-bindings.confirm-ownership`
 - `appaloft domain-binding list` - `domain-bindings.list`
 - `appaloft domain-binding show <domainBindingId>` - `domain-bindings.show`
+- `appaloft domain-binding dns-plan <domainBindingId> [--connector cloudflare-dns]` - `domain-bindings.dns-plan`
 - `appaloft domain-binding configure-route <domainBindingId>` - `domain-bindings.configure-route`
 - `appaloft domain-binding delete-check <domainBindingId>` - `domain-bindings.delete-check`
 - `appaloft domain-binding delete <domainBindingId> --confirm <domainBindingId>` - `domain-bindings.delete`
@@ -281,6 +286,17 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft upgrade apply` - `system.instance-upgrade.apply`
 - `appaloft db status` - `system.db-status`
 - `appaloft db migrate` - `system.db-migrate`
+- `appaloft connectors categories` - `connections.categories.list`
+- `appaloft connectors catalog` - `connections.catalog.list`
+- `appaloft connectors list` - `connections.list`
+- `appaloft connectors show <connectionId>` - `connections.show`
+- `appaloft connectors connect <connector>` - `connections.connect.start`
+- `appaloft connectors callback <connectionId>` - `connections.connect.callback`
+- `appaloft connectors revoke <connectionId>` - `connections.revoke`
+- `appaloft connectors status <connectionId>` - `connections.status.show`
+- `appaloft connectors plan --connector <connector> --capability <capability>` - `connections.capability.plan`
+- `appaloft connectors accept --connector <connector> --capability <capability> --plan-id <planId>` - `connections.capability.accept`
+- `appaloft connectors apply --connector <connector> --capability <capability>` - `connections.capability.apply`
 
 ## Blueprint Install Input Notes
 

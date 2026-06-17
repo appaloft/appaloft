@@ -625,6 +625,204 @@ export const generatedSdkOperations = [
     facadeDefault: true,
   },
   {
+    operationKey: "connections.capability.accept",
+    operationGroup: "connections",
+    operationMethod: "capabilityAccept",
+    facadePath: ["connections", "capability", "accept"],
+    operationId: "connections.capability.accept",
+    kind: "command",
+    domain: "connections",
+    messageName: "AcceptConnectorCapabilityPlanCommand",
+    route: {
+      method: "POST",
+      path: "/connections/capabilities/accept",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "connections.capability.apply",
+    operationGroup: "connections",
+    operationMethod: "capabilityApply",
+    facadePath: ["connections", "capability", "apply"],
+    operationId: "connections.capability.apply",
+    kind: "command",
+    domain: "connections",
+    messageName: "ApplyConnectorCapabilityCommand",
+    route: {
+      method: "POST",
+      path: "/connections/capabilities/apply",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "connections.capability.plan",
+    operationGroup: "connections",
+    operationMethod: "capabilityPlan",
+    facadePath: ["connections", "capability", "plan"],
+    operationId: "connections.capability.plan",
+    kind: "query",
+    domain: "connections",
+    messageName: "PlanConnectorCapabilityQuery",
+    route: {
+      method: "POST",
+      path: "/connections/capabilities/plan",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "connections.catalog.list",
+    operationGroup: "connections",
+    operationMethod: "catalogList",
+    facadePath: ["connections", "catalog", "list"],
+    operationId: "connections.catalog.list",
+    kind: "query",
+    domain: "connections",
+    messageName: "ListConnectorsQuery",
+    route: {
+      method: "GET",
+      path: "/connections/catalog",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "connections.categories.list",
+    operationGroup: "connections",
+    operationMethod: "categoriesList",
+    facadePath: ["connections", "categories", "list"],
+    operationId: "connections.categories.list",
+    kind: "query",
+    domain: "connections",
+    messageName: "ListConnectorCategoriesQuery",
+    route: {
+      method: "GET",
+      path: "/connections/categories",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "connections.connect.callback",
+    operationGroup: "connections",
+    operationMethod: "connectCallback",
+    facadePath: ["connections", "connect", "callback"],
+    operationId: "connections.connect.callback",
+    kind: "command",
+    domain: "connections",
+    messageName: "CompleteConnectionCallbackCommand",
+    route: {
+      method: "POST",
+      path: "/connections/connect/callback",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "connections.connect.start",
+    operationGroup: "connections",
+    operationMethod: "connectStart",
+    facadePath: ["connections", "connect", "start"],
+    operationId: "connections.connect.start",
+    kind: "command",
+    domain: "connections",
+    messageName: "StartConnectionCommand",
+    route: {
+      method: "POST",
+      path: "/connections/connect/start",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "connections.list",
+    operationGroup: "connections",
+    operationMethod: "list",
+    facadePath: ["connections", "list"],
+    operationId: "connections.list",
+    kind: "query",
+    domain: "connections",
+    messageName: "ListConnectionsQuery",
+    route: {
+      method: "GET",
+      path: "/connections",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "connections.revoke",
+    operationGroup: "connections",
+    operationMethod: "revoke",
+    facadePath: ["connections", "revoke"],
+    operationId: "connections.revoke",
+    kind: "command",
+    domain: "connections",
+    messageName: "RevokeConnectionCommand",
+    route: {
+      method: "POST",
+      path: "/connections/{connectionId}/revoke",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "connections.show",
+    operationGroup: "connections",
+    operationMethod: "show",
+    facadePath: ["connections", "show"],
+    operationId: "connections.show",
+    kind: "query",
+    domain: "connections",
+    messageName: "ShowConnectionQuery",
+    route: {
+      method: "GET",
+      path: "/connections/{connectionId}",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "connections.status.show",
+    operationGroup: "connections",
+    operationMethod: "statusShow",
+    facadePath: ["connections", "status", "show"],
+    operationId: "connections.status.show",
+    kind: "query",
+    domain: "connections",
+    messageName: "ShowConnectionQuery",
+    route: {
+      method: "GET",
+      path: "/connections/{connectionId}/status",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
     operationKey: "credentials.create-ssh",
     operationGroup: "credentials",
     operationMethod: "createSsh",
@@ -1473,6 +1671,7 @@ export const generatedSdkOperations = [
       method: "GET",
       path: "/deployments/{deploymentId}/timeline",
     },
+    docsHref: "/docs/deploy/lifecycle/#deployment-lifecycle",
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -1491,6 +1690,7 @@ export const generatedSdkOperations = [
       method: "GET",
       path: "/deployments/{deploymentId}/timeline/stream",
     },
+    docsHref: "/docs/deploy/lifecycle/#deployment-lifecycle",
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: true,
@@ -1586,6 +1786,24 @@ export const generatedSdkOperations = [
       path: "/domain-bindings/{domainBindingId}/delete-check",
     },
     docsHref: "/docs/access/domains/custom-domains/#domain-binding-purpose",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "domain-bindings.dns-plan",
+    operationGroup: "domain-bindings",
+    operationMethod: "dnsPlan",
+    facadePath: ["domainBindings", "dnsPlan"],
+    operationId: "domainBindings.dnsPlan",
+    kind: "query",
+    domain: "domain-bindings",
+    messageName: "PlanDomainBindingDnsQuery",
+    route: {
+      method: "POST",
+      path: "/domain-bindings/{domainBindingId}/dns-plan",
+    },
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -1783,6 +2001,42 @@ export const generatedSdkOperations = [
     facadeDefault: true,
   },
   {
+    operationKey: "environments.diff-profile",
+    operationGroup: "environments",
+    operationMethod: "diffProfile",
+    facadePath: ["environments", "diffProfile"],
+    operationId: "environments.diffProfile",
+    kind: "query",
+    domain: "environments",
+    messageName: "DiffEnvironmentProfileQuery",
+    route: {
+      method: "GET",
+      path: "/environments/{environmentId}/diff-profile/{targetEnvironmentId}",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "environments.duplicate-profile",
+    operationGroup: "environments",
+    operationMethod: "duplicateProfile",
+    facadePath: ["environments", "duplicateProfile"],
+    operationId: "environments.duplicateProfile",
+    kind: "command",
+    domain: "environments",
+    messageName: "DuplicateEnvironmentProfileCommand",
+    route: {
+      method: "POST",
+      path: "/environments/{environmentId}/duplicate-profile",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
     operationKey: "environments.effective-precedence",
     operationGroup: "environments",
     operationMethod: "effectivePrecedence",
@@ -1834,6 +2088,24 @@ export const generatedSdkOperations = [
       path: "/environments/{environmentId}/lock",
     },
     docsHref: "/docs/environments/model/#environment-lifecycle",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "environments.plan-duplicate",
+    operationGroup: "environments",
+    operationMethod: "planDuplicate",
+    facadePath: ["environments", "planDuplicate"],
+    operationId: "environments.planDuplicate",
+    kind: "query",
+    domain: "environments",
+    messageName: "PlanDuplicateEnvironmentQuery",
+    route: {
+      method: "GET",
+      path: "/environments/{environmentId}/duplicate-plan",
+    },
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -1910,6 +2182,24 @@ export const generatedSdkOperations = [
       path: "/environments/{environmentId}",
     },
     docsHref: "/docs/environments/model/#concept-environment",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "environments.sync-profile",
+    operationGroup: "environments",
+    operationMethod: "syncProfile",
+    facadePath: ["environments", "syncProfile"],
+    operationId: "environments.syncProfile",
+    kind: "command",
+    domain: "environments",
+    messageName: "SyncEnvironmentProfileCommand",
+    route: {
+      method: "POST",
+      path: "/environments/{environmentId}/sync-profile/{targetEnvironmentId}",
+    },
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -3156,6 +3446,7 @@ export const generatedSdkOperations = [
       method: "POST",
       path: "/resources/{resourceId}/restore",
     },
+    docsHref: "/docs/resources/projects/#concept-resource",
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -5081,6 +5372,29 @@ export interface GeneratedAppaloftClient {
     readonly revoke: AppaloftSdkFacadeMethod;
     readonly show: AppaloftSdkFacadeMethod;
   };
+  readonly connections: {
+    readonly capability: {
+      readonly accept: AppaloftSdkFacadeMethod;
+      readonly apply: AppaloftSdkFacadeMethod;
+      readonly plan: AppaloftSdkFacadeMethod;
+    };
+    readonly catalog: {
+      readonly list: AppaloftSdkFacadeMethod;
+    };
+    readonly categories: {
+      readonly list: AppaloftSdkFacadeMethod;
+    };
+    readonly connect: {
+      readonly callback: AppaloftSdkFacadeMethod;
+      readonly start: AppaloftSdkFacadeMethod;
+    };
+    readonly list: AppaloftSdkFacadeMethod;
+    readonly revoke: AppaloftSdkFacadeMethod;
+    readonly show: AppaloftSdkFacadeMethod;
+    readonly status: {
+      readonly show: AppaloftSdkFacadeMethod;
+    };
+  };
   readonly credentials: {
     readonly createSsh: AppaloftSdkFacadeMethod;
     readonly deleteSsh: AppaloftSdkFacadeMethod;
@@ -5147,6 +5461,7 @@ export interface GeneratedAppaloftClient {
     readonly create: AppaloftSdkFacadeMethod;
     readonly delete: AppaloftSdkFacadeMethod;
     readonly deleteCheck: AppaloftSdkFacadeMethod;
+    readonly dnsPlan: AppaloftSdkFacadeMethod;
     readonly list: AppaloftSdkFacadeMethod;
     readonly retryVerification: AppaloftSdkFacadeMethod;
     readonly show: AppaloftSdkFacadeMethod;
@@ -5163,13 +5478,17 @@ export interface GeneratedAppaloftClient {
     readonly count: AppaloftSdkFacadeMethod;
     readonly create: AppaloftSdkFacadeMethod;
     readonly diff: AppaloftSdkFacadeMethod;
+    readonly diffProfile: AppaloftSdkFacadeMethod;
+    readonly duplicateProfile: AppaloftSdkFacadeMethod;
     readonly effectivePrecedence: AppaloftSdkFacadeMethod;
     readonly list: AppaloftSdkFacadeMethod;
     readonly lock: AppaloftSdkFacadeMethod;
+    readonly planDuplicate: AppaloftSdkFacadeMethod;
     readonly promote: AppaloftSdkFacadeMethod;
     readonly rename: AppaloftSdkFacadeMethod;
     readonly setVariable: AppaloftSdkFacadeMethod;
     readonly show: AppaloftSdkFacadeMethod;
+    readonly syncProfile: AppaloftSdkFacadeMethod;
     readonly unlock: AppaloftSdkFacadeMethod;
     readonly unsetVariable: AppaloftSdkFacadeMethod;
   };
