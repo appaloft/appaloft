@@ -80,6 +80,7 @@ import { confirmDomainBindingOwnershipCommandInputSchema } from "./operations/do
 import { createDomainBindingCommandInputSchema } from "./operations/domain-bindings/create-domain-binding.command";
 import { deleteDomainBindingCommandInputSchema } from "./operations/domain-bindings/delete-domain-binding.command";
 import { listDomainBindingsQueryInputSchema } from "./operations/domain-bindings/list-domain-bindings.query";
+import { planDomainBindingDnsQueryInputSchema } from "./operations/domain-bindings/plan-domain-binding-dns.query";
 import { retryDomainBindingVerificationCommandInputSchema } from "./operations/domain-bindings/retry-domain-binding-verification.command";
 import { showDomainBindingQueryInputSchema } from "./operations/domain-bindings/show-domain-binding.query";
 import { pruneDomainEventsCommandInputSchema } from "./operations/domain-events/prune-domain-events.command";
@@ -255,10 +256,19 @@ import { renameStorageVolumeCommandInputSchema } from "./operations/storage-volu
 import { restoreStorageVolumeBackupCommandInputSchema } from "./operations/storage-volumes/restore-storage-volume-backup.command";
 import { showStorageVolumeQueryInputSchema } from "./operations/storage-volumes/show-storage-volume.query";
 import { showStorageVolumeBackupQueryInputSchema } from "./operations/storage-volumes/show-storage-volume-backup.query";
+import { acceptConnectorCapabilityPlanCommandInputSchema } from "./operations/system/accept-connector-capability-plan.command";
+import { applyConnectorCapabilityCommandInputSchema } from "./operations/system/apply-connector-capability.command";
 import { applyInstanceUpgradeCommandInputSchema } from "./operations/system/apply-instance-upgrade.command";
 import { checkInstanceUpgradeQueryInputSchema } from "./operations/system/check-instance-upgrade.query";
+import { completeConnectionCallbackCommandInputSchema } from "./operations/system/complete-connection-callback.command";
 import { githubAppConnectionQueryInputSchema } from "./operations/system/github-app-connection.query";
+import { listConnectionsQueryInputSchema } from "./operations/system/list-connections.query";
+import { listConnectorsQueryInputSchema } from "./operations/system/list-connectors.query";
 import { listGitHubRepositoriesQueryInputSchema } from "./operations/system/list-github-repositories.query";
+import { connectorCapabilityPlanInputSchema } from "./operations/system/plan-connector-capability.query";
+import { revokeConnectionCommandInputSchema } from "./operations/system/revoke-connection.command";
+import { showConnectionQueryInputSchema } from "./operations/system/show-connection.query";
+import { startConnectionCommandInputSchema } from "./operations/system/start-connection.command";
 import { closeTerminalSessionCommandInputSchema } from "./operations/terminal-sessions/close-terminal-session.command";
 import { expireTerminalSessionsCommandInputSchema } from "./operations/terminal-sessions/expire-terminal-sessions.command";
 import { listTerminalSessionsQueryInputSchema } from "./operations/terminal-sessions/list-terminal-sessions.query";
@@ -301,6 +311,7 @@ type OperationDomain =
   | "source-events"
   | "source-links"
   | "static-artifacts"
+  | "connections"
   | "system"
   | "terminal-sessions";
 
@@ -3956,6 +3967,20 @@ export const operationCatalog = [
     },
   },
   {
+    key: "domain-bindings.dns-plan",
+    kind: "query",
+    domain: "domain-bindings",
+    messageName: "PlanDomainBindingDnsQuery",
+    handlerName: "PlanDomainBindingDnsQueryHandler",
+    serviceName: "PlanDomainBindingDnsQueryService",
+    inputSchema: planDomainBindingDnsQueryInputSchema,
+    serviceToken: tokens.planDomainBindingDnsQueryService,
+    transports: {
+      cli: "appaloft domain-binding dns-plan <domainBindingId> [--connector cloudflare-dns]",
+      orpc: { method: "POST", path: "/api/domain-bindings/{domainBindingId}/dns-plan" },
+    },
+  },
+  {
     key: "domain-bindings.configure-route",
     kind: "command",
     domain: "domain-bindings",
@@ -4107,6 +4132,192 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft certificate delete <certificateId> --confirm <certificateId>",
       orpc: { method: "DELETE", path: "/api/certificates/{certificateId}" },
+    },
+  },
+  {
+    key: "connections.categories.list",
+    kind: "query",
+    domain: "connections",
+    messageName: "ListConnectorCategoriesQuery",
+    handlerName: "ListConnectorCategoriesQueryHandler",
+    serviceName: "ListConnectorCategoriesQueryService",
+    serviceToken: tokens.connectorCategoriesQueryService,
+    transportAccess: {
+      productSession: "public",
+    },
+    transports: {
+      cli: "appaloft connectors categories",
+      orpc: { method: "GET", path: "/api/connections/categories" },
+    },
+  },
+  {
+    key: "connections.catalog.list",
+    kind: "query",
+    domain: "connections",
+    messageName: "ListConnectorsQuery",
+    handlerName: "ListConnectorsQueryHandler",
+    serviceName: "ListConnectorsQueryService",
+    inputSchema: listConnectorsQueryInputSchema,
+    serviceToken: tokens.connectorsQueryService,
+    transportAccess: {
+      productSession: "public",
+    },
+    transports: {
+      cli: "appaloft connectors catalog",
+      orpc: { method: "GET", path: "/api/connections/catalog" },
+    },
+  },
+  {
+    key: "connections.list",
+    kind: "query",
+    domain: "connections",
+    messageName: "ListConnectionsQuery",
+    handlerName: "ListConnectionsQueryHandler",
+    serviceName: "ListConnectionsQueryService",
+    inputSchema: listConnectionsQueryInputSchema,
+    serviceToken: tokens.connectionsQueryService,
+    transportAccess: {
+      productSession: "public",
+    },
+    transports: {
+      cli: "appaloft connectors list",
+      orpc: { method: "GET", path: "/api/connections" },
+    },
+  },
+  {
+    key: "connections.show",
+    kind: "query",
+    domain: "connections",
+    messageName: "ShowConnectionQuery",
+    handlerName: "ShowConnectionQueryHandler",
+    serviceName: "ShowConnectionQueryService",
+    inputSchema: showConnectionQueryInputSchema,
+    serviceToken: tokens.connectionQueryService,
+    transportAccess: {
+      productSession: "public",
+    },
+    transports: {
+      cli: "appaloft connectors show <connectionId>",
+      orpc: { method: "GET", path: "/api/connections/{connectionId}" },
+    },
+  },
+  {
+    key: "connections.connect.start",
+    kind: "command",
+    domain: "connections",
+    messageName: "StartConnectionCommand",
+    handlerName: "StartConnectionCommandHandler",
+    serviceName: "StartConnectionUseCase",
+    inputSchema: startConnectionCommandInputSchema,
+    serviceToken: tokens.startConnectionUseCase,
+    transportAccess: {
+      productSession: "public",
+    },
+    transports: {
+      cli: "appaloft connectors connect <connector>",
+      orpc: { method: "POST", path: "/api/connections/connect/start" },
+    },
+  },
+  {
+    key: "connections.connect.callback",
+    kind: "command",
+    domain: "connections",
+    messageName: "CompleteConnectionCallbackCommand",
+    handlerName: "CompleteConnectionCallbackCommandHandler",
+    serviceName: "CompleteConnectionCallbackUseCase",
+    inputSchema: completeConnectionCallbackCommandInputSchema,
+    serviceToken: tokens.completeConnectionCallbackUseCase,
+    transportAccess: {
+      productSession: "public",
+    },
+    transports: {
+      cli: "appaloft connectors callback <connectionId>",
+      orpc: { method: "POST", path: "/api/connections/connect/callback" },
+    },
+  },
+  {
+    key: "connections.revoke",
+    kind: "command",
+    domain: "connections",
+    messageName: "RevokeConnectionCommand",
+    handlerName: "RevokeConnectionCommandHandler",
+    serviceName: "RevokeConnectionUseCase",
+    inputSchema: revokeConnectionCommandInputSchema,
+    serviceToken: tokens.revokeConnectionUseCase,
+    transportAccess: {
+      productSession: "public",
+    },
+    transports: {
+      cli: "appaloft connectors revoke <connectionId>",
+      orpc: { method: "POST", path: "/api/connections/{connectionId}/revoke" },
+    },
+  },
+  {
+    key: "connections.status.show",
+    kind: "query",
+    domain: "connections",
+    messageName: "ShowConnectionQuery",
+    handlerName: "ShowConnectionQueryHandler",
+    serviceName: "ShowConnectionQueryService",
+    inputSchema: showConnectionQueryInputSchema,
+    serviceToken: tokens.connectionQueryService,
+    transportAccess: {
+      productSession: "public",
+    },
+    transports: {
+      cli: "appaloft connectors status <connectionId>",
+      orpc: { method: "GET", path: "/api/connections/{connectionId}/status" },
+    },
+  },
+  {
+    key: "connections.capability.plan",
+    kind: "query",
+    domain: "connections",
+    messageName: "PlanConnectorCapabilityQuery",
+    handlerName: "PlanConnectorCapabilityQueryHandler",
+    serviceName: "PlanConnectorCapabilityQueryService",
+    inputSchema: connectorCapabilityPlanInputSchema,
+    serviceToken: tokens.connectorCapabilityPlanQueryService,
+    transportAccess: {
+      productSession: "public",
+    },
+    transports: {
+      cli: "appaloft connectors plan --connector <connector> --capability <capability>",
+      orpc: { method: "POST", path: "/api/connections/capabilities/plan" },
+    },
+  },
+  {
+    key: "connections.capability.accept",
+    kind: "command",
+    domain: "connections",
+    messageName: "AcceptConnectorCapabilityPlanCommand",
+    handlerName: "AcceptConnectorCapabilityPlanCommandHandler",
+    serviceName: "AcceptConnectorCapabilityPlanUseCase",
+    inputSchema: acceptConnectorCapabilityPlanCommandInputSchema,
+    serviceToken: tokens.acceptConnectorCapabilityPlanUseCase,
+    transportAccess: {
+      productSession: "public",
+    },
+    transports: {
+      cli: "appaloft connectors accept --connector <connector> --capability <capability> --plan-id <planId>",
+      orpc: { method: "POST", path: "/api/connections/capabilities/accept" },
+    },
+  },
+  {
+    key: "connections.capability.apply",
+    kind: "command",
+    domain: "connections",
+    messageName: "ApplyConnectorCapabilityCommand",
+    handlerName: "ApplyConnectorCapabilityCommandHandler",
+    serviceName: "ApplyConnectorCapabilityUseCase",
+    inputSchema: applyConnectorCapabilityCommandInputSchema,
+    serviceToken: tokens.connectorCapabilityApplyUseCase,
+    transportAccess: {
+      productSession: "public",
+    },
+    transports: {
+      cli: "appaloft connectors apply --connector <connector> --capability <capability>",
+      orpc: { method: "POST", path: "/api/connections/capabilities/apply" },
     },
   },
   {

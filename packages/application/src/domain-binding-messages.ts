@@ -4,5 +4,6 @@ export * from "./operations/domain-bindings/confirm-domain-binding-ownership.com
 export * from "./operations/domain-bindings/create-domain-binding.command";
 export * from "./operations/domain-bindings/delete-domain-binding.command";
 export * from "./operations/domain-bindings/list-domain-bindings.query";
+export * from "./operations/domain-bindings/plan-domain-binding-dns.query";
 export * from "./operations/domain-bindings/retry-domain-binding-verification.command";
 export * from "./operations/domain-bindings/show-domain-binding.query";

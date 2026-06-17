@@ -1642,6 +1642,7 @@ Implemented operations:
 | Show default access domain policy | Query | `default-access-domain-policies.show` | `ShowDefaultAccessDomainPolicyQuery` | `ShowDefaultAccessDomainPolicyQueryInput` | `appaloft default-access show --scope system\|deployment-target [--server <serverId>]` | `GET /api/default-access-domain-policies/show` |
 | Create domain binding | Command | `domain-bindings.create` | `CreateDomainBindingCommand` | `CreateDomainBindingCommandInput` | `appaloft domain-binding create <domainName> [--redirect-to <domain>] [--redirect-status 301\|302\|307\|308]` | `POST /api/domain-bindings` |
 | Show domain binding | Query | `domain-bindings.show` | `ShowDomainBindingQuery` | `ShowDomainBindingQueryInput` | `appaloft domain-binding show <domainBindingId>` | `GET /api/domain-bindings/{domainBindingId}` |
+| Plan domain binding DNS category connector records | Query | `domain-bindings.dns-plan` | `PlanDomainBindingDnsQuery` | `PlanDomainBindingDnsQueryInput` | `appaloft domain-binding dns-plan <domainBindingId> [--connector cloudflare-dns]` | `POST /api/domain-bindings/{domainBindingId}/dns-plan` |
 | Configure domain binding route behavior | Command | `domain-bindings.configure-route` | `ConfigureDomainBindingRouteCommand` | `ConfigureDomainBindingRouteCommandInput` | `appaloft domain-binding configure-route <domainBindingId> [--redirect-to <domain>] [--redirect-status 301\|302\|307\|308]` | `POST /api/domain-bindings/{domainBindingId}/route` |
 | Confirm domain binding ownership | Command | `domain-bindings.confirm-ownership` | `ConfirmDomainBindingOwnershipCommand` | `ConfirmDomainBindingOwnershipCommandInput` | `appaloft domain-binding confirm-ownership <domainBindingId> [--verification-mode dns\|manual]` | `POST /api/domain-bindings/{domainBindingId}/ownership-confirmations` |
 | List domain bindings | Query | `domain-bindings.list` | `ListDomainBindingsQuery` | `ListDomainBindingsQueryInput` | `appaloft domain-binding list` | `GET /api/domain-bindings` |
@@ -1751,6 +1752,12 @@ Current boundary:
   binding records and their verification status
 - `domain-bindings.show` reads one binding with generated access fallback, selected route/access
   diagnostic context, proxy readiness, delete safety, and read-only certificate readiness context
+- `domain-bindings.dns-plan` is a domain-binding workflow alias over the connector capability
+  planner. It derives DNS records from the binding's expected DNS targets, delegates to a concrete
+  DNS category connector such as `cloudflare-dns`, returns a plan, and does not apply provider
+  changes or introduce DNS as a sibling model to `Connection` or `ConnectorDefinition`.
+- DNS apply must use the shared connector `connections.capability.accept` and
+  `connections.capability.apply` flow with an accepted-plan id when provider mutation is required.
 - `domain-bindings.configure-route` is the explicit route-behavior update operation for switching
   between serving traffic and redirecting to an existing served canonical binding in the same
   owner/path scope; generic `domain-bindings.update` remains forbidden

@@ -27,6 +27,11 @@ describe("self-hosted auth bootstrap Web surfaces", () => {
       new URL("../../routes/reset-password/+page.svelte", import.meta.url),
       "utf8",
     );
+    const authPublicConfigSource = await readFile(
+      new URL("../../lib/auth-public-config.ts", import.meta.url),
+      "utf8",
+    );
+    const appHtmlSource = await readFile(new URL("../../app.html", import.meta.url), "utf8");
     const accountSecurityPageSource = await readFile(
       new URL("../../routes/account/security/+page.svelte", import.meta.url),
       "utf8",
@@ -47,11 +52,17 @@ describe("self-hosted auth bootstrap Web surfaces", () => {
     expect(loginPageSource).not.toContain("/bootstrap/auth/first-admin");
     expect(loginPageSource).not.toContain("createAdmin");
     expect(loginPageSource).toContain("/api/auth/session");
+    expect(loginPageSource).toContain("$lib/auth-public-config");
+    expect(loginPageSource).toContain("isPublicGitHubAuthConfigured()");
+    expect(loginPageSource).not.toContain("authSessionQuery.data?.providers");
     expect(loginPageSource).toContain("signInWithGithub");
     expect(loginPageSource).toContain("/forgot-password");
     expect(loginPageSource).toContain("authAccountRecovery.forgotLink");
     expect(signupPageSource).not.toContain("/bootstrap/auth/first-admin");
     expect(signupPageSource).toContain("/api/auth/session");
+    expect(signupPageSource).toContain("$lib/auth-public-config");
+    expect(signupPageSource).toContain("isPublicGitHubAuthConfigured()");
+    expect(signupPageSource).not.toContain("authSessionQuery.data?.providers");
     expect(signupPageSource).toContain("signUpWithGithub");
     expect(signupPageSource).toContain("/api/auth/sign-up/email");
     expect(signupPageSource).toContain("/api/auth/organization/create");
@@ -107,5 +118,28 @@ describe("self-hosted auth bootstrap Web surfaces", () => {
     expect(consoleShellSource).not.toContain('navigateTo("/account/security")');
     expect(firstAdminPageSource).toContain("status?.bootstrapRequired === false");
     expect(firstAdminPageSource).toContain("goto(loginUrl)");
+    expect(authPublicConfigSource).toContain("__APPALOFT_PUBLIC_CONFIG__");
+    expect(authPublicConfigSource).toContain("VITE_APPALOFT_GITHUB_AUTH_ENABLED");
+    expect(authPublicConfigSource).toContain("isPublicGitHubAuthConfigured");
+    expect(appHtmlSource).toContain("/api/auth/public-config.js");
+  });
+
+  test("[PRODUCT-AUTH-PUBLIC-CONFIG-001] auth entry pages render provider affordances from public runtime config", async () => {
+    const [loginPageSource, signupPageSource, authPublicConfigSource] = await Promise.all([
+      readFile(new URL("../../routes/login/+page.svelte", import.meta.url), "utf8"),
+      readFile(new URL("../../routes/sign-up/+page.svelte", import.meta.url), "utf8"),
+      readFile(new URL("../../lib/auth-public-config.ts", import.meta.url), "utf8"),
+    ]);
+
+    expect(loginPageSource).toContain("const githubConfigured = isPublicGitHubAuthConfigured();");
+    expect(signupPageSource).toContain("const githubConfigured = isPublicGitHubAuthConfigured();");
+    expect(loginPageSource).not.toContain(
+      'providers.find((provider) => provider.key === "github")',
+    );
+    expect(signupPageSource).not.toContain(
+      'providers.find((provider) => provider.key === "github")',
+    );
+    expect(authPublicConfigSource).toContain("window.__APPALOFT_PUBLIC_CONFIG__?.auth");
+    expect(authPublicConfigSource).toContain("configured: githubConfigured");
   });
 });

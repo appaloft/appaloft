@@ -481,6 +481,13 @@
         "@appaloft/core": "workspace:*",
       },
     },
+    "packages/providers/dns-cloudflare": {
+      "name": "@appaloft/provider-dns-cloudflare",
+      "dependencies": {
+        "@appaloft/application": "workspace:*",
+        "@appaloft/core": "workspace:*",
+      },
+    },
     "packages/providers/edge-proxy-caddy": {
       "name": "@appaloft/provider-edge-proxy-caddy",
       "dependencies": {
@@ -501,10 +508,24 @@
         "@appaloft/provider-core": "workspace:*",
       },
     },
+    "packages/providers/infrastructure-vultr": {
+      "name": "@appaloft/provider-infrastructure-vultr",
+      "dependencies": {
+        "@appaloft/application": "workspace:*",
+        "@appaloft/core": "workspace:*",
+      },
+    },
     "packages/providers/local-shell": {
       "name": "@appaloft/provider-local-shell",
       "dependencies": {
         "@appaloft/provider-core": "workspace:*",
+      },
+    },
+    "packages/providers/notification-slack": {
+      "name": "@appaloft/provider-notification-slack",
+      "dependencies": {
+        "@appaloft/application": "workspace:*",
+        "@appaloft/core": "workspace:*",
       },
     },
     "packages/sdk": {
@@ -696,13 +717,19 @@
 
     "@appaloft/provider-default-access-domain-sslip": ["@appaloft/provider-default-access-domain-sslip@workspace:packages/providers/default-access-domain-sslip"],
 
+    "@appaloft/provider-dns-cloudflare": ["@appaloft/provider-dns-cloudflare@workspace:packages/providers/dns-cloudflare"],
+
     "@appaloft/provider-edge-proxy-caddy": ["@appaloft/provider-edge-proxy-caddy@workspace:packages/providers/edge-proxy-caddy"],
 
     "@appaloft/provider-edge-proxy-traefik": ["@appaloft/provider-edge-proxy-traefik@workspace:packages/providers/edge-proxy-traefik"],
 
     "@appaloft/provider-generic-ssh": ["@appaloft/provider-generic-ssh@workspace:packages/providers/generic-ssh"],
 
+    "@appaloft/provider-infrastructure-vultr": ["@appaloft/provider-infrastructure-vultr@workspace:packages/providers/infrastructure-vultr"],
+
     "@appaloft/provider-local-shell": ["@appaloft/provider-local-shell@workspace:packages/providers/local-shell"],
+
+    "@appaloft/provider-notification-slack": ["@appaloft/provider-notification-slack@workspace:packages/providers/notification-slack"],
 
     "@appaloft/sdk": ["@appaloft/sdk@workspace:packages/sdk"],
 

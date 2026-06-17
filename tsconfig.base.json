@@ -52,6 +52,13 @@
         "./packages/providers/default-access-domain-sslip/src/index.ts"
       ],
       "@appaloft/provider-certificate-acme": ["./packages/providers/certificate-acme/src/index.ts"],
+      "@appaloft/provider-dns-cloudflare": ["./packages/providers/dns-cloudflare/src/index.ts"],
+      "@appaloft/provider-infrastructure-vultr": [
+        "./packages/providers/infrastructure-vultr/src/index.ts"
+      ],
+      "@appaloft/provider-notification-slack": [
+        "./packages/providers/notification-slack/src/index.ts"
+      ],
       "@appaloft/provider-edge-proxy-caddy": ["./packages/providers/edge-proxy-caddy/src/index.ts"],
       "@appaloft/provider-edge-proxy-traefik": [
         "./packages/providers/edge-proxy-traefik/src/index.ts"

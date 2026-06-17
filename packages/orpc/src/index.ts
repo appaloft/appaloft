@@ -1,5 +1,6 @@
 import {
   AcceptBlueprintInstallCommand,
+  AcceptConnectorCapabilityPlanCommand,
   AcceptDependencyResourceProvisioningPlanCommand,
   type ActionDeployTokenAuthorizationPort,
   type ActionDeployTokenRequestedScope,
@@ -7,6 +8,7 @@ import {
   type ActionDeployTokenWorkflow,
   type AppLogger,
   ApplyActionPreviewRouteCommand,
+  ApplyConnectorCapabilityCommand,
   ArchiveDeploymentCommand,
   ArchiveEnvironmentCommand,
   ArchiveProjectCommand,
@@ -15,7 +17,9 @@ import {
   AttachResourceStorageCommand,
   type AuthBootstrapStatus,
   acceptBlueprintInstallCommandInputSchema,
+  acceptConnectorCapabilityPlanCommandInputSchema,
   acceptDependencyResourceProvisioningPlanInputSchema,
+  applyConnectorCapabilityCommandInputSchema,
   archiveDeploymentCommandInputSchema,
   archiveEnvironmentCommandInputSchema,
   archiveProjectCommandInputSchema,
@@ -43,6 +47,7 @@ import {
   CloseTerminalSessionCommand,
   type Command,
   type CommandBus,
+  CompleteConnectionCallbackCommand,
   ConfigureAuditEventLegalHoldCommand,
   ConfigureDefaultAccessDomainPolicyCommand,
   ConfigureDependencyResourceBackupPolicyCommand,
@@ -100,6 +105,7 @@ import {
   cleanupStorageVolumeRuntimeCommandInputSchema,
   cloneEnvironmentCommandInputSchema,
   closeTerminalSessionCommandInputSchema,
+  completeConnectionCallbackCommandInputSchema,
   configureAuditEventLegalHoldCommandInputSchema,
   configureDefaultAccessDomainPolicyCommandInputSchema,
   configureDependencyResourceBackupPolicyCommandInputSchema,
@@ -118,6 +124,7 @@ import {
   configureServerCredentialCommandInputSchema,
   configureServerEdgeProxyCommandInputSchema,
   confirmDomainBindingOwnershipCommandInputSchema,
+  connectorCapabilityPlanInputSchema,
   countDependencyResourcesQueryInputSchema,
   countDeploymentsQueryInputSchema,
   countEnvironmentsQueryInputSchema,
@@ -242,6 +249,9 @@ import {
   ListAuditEventsQuery,
   ListBlueprintsQuery,
   ListCertificatesQuery,
+  ListConnectionsQuery,
+  ListConnectorCategoriesQuery,
+  ListConnectorsQuery,
   ListDefaultAccessDomainPoliciesQuery,
   ListDependencyResourceBackupPoliciesQuery,
   ListDependencyResourceBackupsQuery,
@@ -285,6 +295,8 @@ import {
   listAuditEventLegalHoldsQueryInputSchema,
   listAuditEventsQueryInputSchema,
   listCertificatesQueryInputSchema,
+  listConnectionsQueryInputSchema,
+  listConnectorsQueryInputSchema,
   listDefaultAccessDomainPoliciesQueryInputSchema,
   listDependencyResourceBackupPoliciesQueryInputSchema,
   listDependencyResourceBackupsQueryInputSchema,
@@ -329,6 +341,8 @@ import {
   type OperatorWorkEventStreamEnvelope,
   openTerminalSessionCommandInputSchema,
   operationCatalog,
+  PlanConnectorCapabilityQuery,
+  PlanDomainBindingDnsQuery,
   PlanDuplicateEnvironmentQuery,
   PrepareServerRuntimeCommand,
   type ProductOrganizationRole,
@@ -349,6 +363,7 @@ import {
   PublishStaticArtifactArchiveCommand,
   PublishStaticArtifactCommand,
   PublishStaticArtifactPayloadCommand,
+  planDomainBindingDnsQueryInputSchema,
   planDuplicateEnvironmentQueryInputSchema,
   prepareServerRuntimeCommandInputSchema,
   promoteEnvironmentCommandInputSchema,
@@ -416,6 +431,7 @@ import {
   RetryOperatorWorkCommand,
   RevokeAccountSessionCommand,
   RevokeCertificateCommand,
+  RevokeConnectionCommand,
   RevokeDeployTokenCommand,
   RollbackDeploymentCommand,
   RotateDeployTokenCommand,
@@ -459,6 +475,7 @@ import {
   retryOperatorWorkCommandInputSchema,
   revokeAccountSessionCommandInputSchema,
   revokeCertificateCommandInputSchema,
+  revokeConnectionCommandInputSchema,
   revokeDeployTokenCommandInputSchema,
   rollbackDeploymentCommandInputSchema,
   rotateDeployTokenCommandInputSchema,
@@ -478,6 +495,7 @@ import {
   ShowBlueprintInstallationQuery,
   ShowBlueprintQuery,
   ShowCertificateQuery,
+  ShowConnectionQuery,
   ShowDefaultAccessDomainPolicyQuery,
   ShowDependencyResourceBackupPolicyQuery,
   ShowDependencyResourceBackupQuery,
@@ -509,6 +527,7 @@ import {
   ShowStorageVolumeQuery,
   ShowTerminalSessionQuery,
   type SourceEventVerificationPort,
+  StartConnectionCommand,
   StartResourceRuntimeCommand,
   type StaticArtifactPublicationSummary,
   StopResourceRuntimeCommand,
@@ -531,6 +550,7 @@ import {
   showBlueprintInstallationQueryInputSchema,
   showBlueprintQueryInputSchema,
   showCertificateQueryInputSchema,
+  showConnectionQueryInputSchema,
   showDefaultAccessDomainPolicyQueryInputSchema,
   showDependencyResourceBackupPolicyQueryInputSchema,
   showDependencyResourceBackupQueryInputSchema,
@@ -561,6 +581,7 @@ import {
   showStorageVolumeBackupQueryInputSchema,
   showStorageVolumeQueryInputSchema,
   showTerminalSessionQueryInputSchema,
+  startConnectionCommandInputSchema,
   startResourceRuntimeCommandInputSchema,
   stopResourceRuntimeCommandInputSchema,
   streamDeploymentTimelineQueryInputSchema,
@@ -591,6 +612,7 @@ import {
   showBlueprintResponseSchema,
 } from "@appaloft/application/schemas";
 import {
+  acceptConnectorCapabilityPlanResponseSchema,
   accountProfileResponseSchema,
   archiveDeploymentResponseSchema,
   archiveEnvironmentResponseSchema,
@@ -613,6 +635,7 @@ import {
   cleanupStorageVolumeRuntimeResponseSchema,
   cloneEnvironmentResponseSchema,
   closeTerminalSessionResponseSchema,
+  completeConnectionCallbackResponseSchema,
   configureDefaultAccessDomainPolicyResponseSchema,
   configureDependencyResourceBackupPolicyResponseSchema,
   configureDomainBindingRouteResponseSchema,
@@ -628,6 +651,8 @@ import {
   configureScheduledRuntimePrunePolicyResponseSchema,
   configureServerEdgeProxyResponseSchema,
   confirmDomainBindingOwnershipResponseSchema,
+  connectorCapabilityApplyResponseSchema,
+  connectorCapabilityPlanResponseSchema,
   countResponseSchema,
   createDeploymentResponseSchema,
   createDeployTokenResponseSchema,
@@ -683,6 +708,9 @@ import {
   listAuditEventLegalHoldsResponseSchema,
   listAuditEventsResponseSchema,
   listCertificatesResponseSchema,
+  listConnectionsResponseSchema,
+  listConnectorCategoriesResponseSchema,
+  listConnectorsResponseSchema,
   listDefaultAccessDomainPoliciesResponseSchema,
   listDependencyResourceBackupPoliciesResponseSchema,
   listDependencyResourceBackupsResponseSchema,
@@ -767,6 +795,7 @@ import {
   retryOperatorWorkResponseSchema,
   revokeAccountSessionResponseSchema,
   revokeCertificateResponseSchema,
+  revokeConnectionResponseSchema,
   revokeDeployTokenResponseSchema,
   rollbackDeploymentResponseSchema,
   rotateDeployTokenResponseSchema,
@@ -785,6 +814,7 @@ import {
   showAuditEventLegalHoldResponseSchema,
   showAuditEventResponseSchema,
   showCertificateResponseSchema,
+  showConnectionResponseSchema,
   showDefaultAccessDomainPolicyResponseSchema,
   showDependencyResourceBackupPolicyResponseSchema,
   showDependencyResourceBackupResponseSchema,
@@ -809,6 +839,7 @@ import {
   showStorageVolumeBackupResponseSchema,
   showStorageVolumeResponseSchema,
   showTerminalSessionResponseSchema,
+  startConnectionResponseSchema,
   startResourceRuntimeResponseSchema,
   stopResourceRuntimeResponseSchema,
   storageVolumeBackupPlanResponseSchema,
@@ -1584,6 +1615,10 @@ export const apiRouteDescriptions = {
   ),
   showDomainBinding: routeDescription(
     "Reads custom domain binding ownership, route readiness, proxy readiness, diagnostics, and certificate readiness.",
+    "domain.custom-domain-binding",
+  ),
+  planDomainBindingDns: routeDescription(
+    "Plans DNS category connector records from a custom domain binding without applying provider changes.",
     "domain.custom-domain-binding",
   ),
   configureDomainBindingRoute: routeDescription(
@@ -4412,6 +4447,19 @@ export const showDomainBindingProcedure = base
     executeQuery(context, ShowDomainBindingQuery.create(input)),
   );
 
+export const planDomainBindingDnsProcedure = base
+  .route({
+    method: "POST",
+    path: "/domain-bindings/{domainBindingId}/dns-plan",
+    description: apiRouteDescriptions.planDomainBindingDns,
+    successStatus: 200,
+  })
+  .input(planDomainBindingDnsQueryInputSchema)
+  .output(connectorCapabilityPlanResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, PlanDomainBindingDnsQuery.create(input)),
+  );
+
 export const configureDomainBindingRouteProcedure = base
   .route({
     method: "POST",
@@ -6290,6 +6338,127 @@ export const expireTerminalSessionsProcedure = base
     executeCommand(context, ExpireTerminalSessionsCommand.create(input)),
   );
 
+export const listConnectorCategoriesProcedure = base
+  .route({
+    method: "GET",
+    path: "/connections/categories",
+    successStatus: 200,
+  })
+  .output(listConnectorCategoriesResponseSchema)
+  .handler(async ({ context }) => executeQuery(context, ListConnectorCategoriesQuery.create()));
+
+export const listConnectorsProcedure = base
+  .route({
+    method: "GET",
+    path: "/connections/catalog",
+    successStatus: 200,
+  })
+  .input(listConnectorsQueryInputSchema)
+  .output(listConnectorsResponseSchema)
+  .handler(async ({ input, context }) => executeQuery(context, ListConnectorsQuery.create(input)));
+
+export const listConnectionsProcedure = base
+  .route({
+    method: "GET",
+    path: "/connections",
+    successStatus: 200,
+  })
+  .input(listConnectionsQueryInputSchema)
+  .output(listConnectionsResponseSchema)
+  .handler(async ({ input, context }) => executeQuery(context, ListConnectionsQuery.create(input)));
+
+export const showConnectionProcedure = base
+  .route({
+    method: "GET",
+    path: "/connections/{connectionId}",
+    successStatus: 200,
+  })
+  .input(showConnectionQueryInputSchema)
+  .output(showConnectionResponseSchema)
+  .handler(async ({ input, context }) => executeQuery(context, ShowConnectionQuery.create(input)));
+
+export const showConnectionStatusProcedure = base
+  .route({
+    method: "GET",
+    path: "/connections/{connectionId}/status",
+    successStatus: 200,
+  })
+  .input(showConnectionQueryInputSchema)
+  .output(showConnectionResponseSchema)
+  .handler(async ({ input, context }) => executeQuery(context, ShowConnectionQuery.create(input)));
+
+export const startConnectionProcedure = base
+  .route({
+    method: "POST",
+    path: "/connections/connect/start",
+    successStatus: 201,
+  })
+  .input(startConnectionCommandInputSchema)
+  .output(startConnectionResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, StartConnectionCommand.create(input)),
+  );
+
+export const completeConnectionCallbackProcedure = base
+  .route({
+    method: "POST",
+    path: "/connections/connect/callback",
+    successStatus: 200,
+  })
+  .input(completeConnectionCallbackCommandInputSchema)
+  .output(completeConnectionCallbackResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, CompleteConnectionCallbackCommand.create(input)),
+  );
+
+export const revokeConnectionProcedure = base
+  .route({
+    method: "POST",
+    path: "/connections/{connectionId}/revoke",
+    successStatus: 200,
+  })
+  .input(revokeConnectionCommandInputSchema)
+  .output(revokeConnectionResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RevokeConnectionCommand.create(input)),
+  );
+
+export const planConnectorCapabilityProcedure = base
+  .route({
+    method: "POST",
+    path: "/connections/capabilities/plan",
+    successStatus: 200,
+  })
+  .input(connectorCapabilityPlanInputSchema)
+  .output(connectorCapabilityPlanResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, PlanConnectorCapabilityQuery.create(input)),
+  );
+
+export const acceptConnectorCapabilityPlanProcedure = base
+  .route({
+    method: "POST",
+    path: "/connections/capabilities/accept",
+    successStatus: 200,
+  })
+  .input(acceptConnectorCapabilityPlanCommandInputSchema)
+  .output(acceptConnectorCapabilityPlanResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, AcceptConnectorCapabilityPlanCommand.create(input)),
+  );
+
+export const applyConnectorCapabilityProcedure = base
+  .route({
+    method: "POST",
+    path: "/connections/capabilities/apply",
+    successStatus: 200,
+  })
+  .input(applyConnectorCapabilityCommandInputSchema)
+  .output(connectorCapabilityApplyResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ApplyConnectorCapabilityCommand.create(input)),
+  );
+
 export const listProvidersProcedure = base
   .route({
     method: "GET",
@@ -6625,6 +6794,7 @@ export const appaloftOrpcRouter = {
   domainBindings: {
     list: listDomainBindingsProcedure,
     show: showDomainBindingProcedure,
+    dnsPlan: planDomainBindingDnsProcedure,
     create: createDomainBindingProcedure,
     configureRoute: configureDomainBindingRouteProcedure,
     confirmOwnership: confirmDomainBindingOwnershipProcedure,
@@ -6715,6 +6885,29 @@ export const appaloftOrpcRouter = {
     list: listPreviewEnvironmentsProcedure,
     show: showPreviewEnvironmentProcedure,
     delete: deletePreviewEnvironmentProcedure,
+  },
+  connections: {
+    list: listConnectionsProcedure,
+    show: showConnectionProcedure,
+    status: {
+      show: showConnectionStatusProcedure,
+    },
+    connect: {
+      start: startConnectionProcedure,
+      callback: completeConnectionCallbackProcedure,
+    },
+    revoke: revokeConnectionProcedure,
+    categories: {
+      list: listConnectorCategoriesProcedure,
+    },
+    catalog: {
+      list: listConnectorsProcedure,
+    },
+    capability: {
+      plan: planConnectorCapabilityProcedure,
+      accept: acceptConnectorCapabilityPlanProcedure,
+      apply: applyConnectorCapabilityProcedure,
+    },
   },
   providers: {
     list: listProvidersProcedure,
@@ -9119,6 +9312,17 @@ export function mountAppaloftOrpcRoutes(
     "/api/blueprints/:slug/install-plan",
     "/api/blueprints/:slug/install",
     "/api/blueprints/installations/:applicationId",
+    "/api/connections/categories",
+    "/api/connections/catalog",
+    "/api/connections",
+    "/api/connections/:connectionId",
+    "/api/connections/:connectionId/status",
+    "/api/connections/:connectionId/revoke",
+    "/api/connections/connect/start",
+    "/api/connections/connect/callback",
+    "/api/connections/capabilities/plan",
+    "/api/connections/capabilities/accept",
+    "/api/connections/capabilities/apply",
     "/api/projects",
     "/api/projects/:projectId",
     "/api/projects/:projectId/rename",
@@ -9224,6 +9428,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/terminal-sessions/:sessionId/close",
     "/api/domain-bindings",
     "/api/domain-bindings/:domainBindingId",
+    "/api/domain-bindings/:domainBindingId/dns-plan",
     "/api/domain-bindings/:domainBindingId/route",
     "/api/domain-bindings/:domainBindingId/ownership-confirmations",
     "/api/domain-bindings/:domainBindingId/delete-check",

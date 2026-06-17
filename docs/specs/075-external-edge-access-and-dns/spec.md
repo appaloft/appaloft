@@ -40,7 +40,7 @@ Deployment boundaries.
 | --- | --- | --- |
 | External edge access | Provider-backed public access configuration outside the selected Appaloft deployment target. | Runtime Topology / integration boundary |
 | External edge provider | A concrete infrastructure adapter that can manage provider-side DNS, proxied routing, cache policy, TLS mode, tunnel/origin routing, observation, and purge where its capabilities allow. | Provider package |
-| Edge provider connection | Appaloft-owned credential/connection metadata for one provider account, zone, project, or equivalent provider scope. | Future integration state |
+| Edge provider connection | A Connections model `Connection` in the `dns` category, or a future external-edge category if an ADR accepts non-DNS edge capabilities. It carries safe credential/scope metadata for one provider account, zone, project, or equivalent provider scope. | Connections / future integration state |
 | Edge delivery policy | Provider-neutral cache, proxy, origin, TLS, and purge intent that Appaloft may apply to a managed domain route. | Runtime Topology |
 | DNS record intent | Provider-neutral record intent required for Appaloft-managed access, verification, or certificate challenge. | Runtime Topology / provider boundary |
 | DNS observation | Read-only observed external DNS state used for readiness, diagnostics, and drift. | Read model / diagnostics |
@@ -60,7 +60,7 @@ The first formal ownership model should be:
 | Resource upstream endpoint | `ResourceNetworkProfile` |
 | Target-local edge proxy intent/readiness | `DeploymentTarget` |
 | Target-local proxy route rendering/application | `EdgeProxyProvider` and runtime target adapters |
-| External provider credential/zone/capability metadata | Future `EdgeProviderConnection` state |
+| External provider credential/zone/capability metadata | Connections `Connection` readback for the concrete connector, such as `cloudflare-dns`; future edge-specific state only after an ADR accepts non-DNS edge capabilities |
 | Provider-neutral cache/proxy/origin/TLS/purge intent | Future `EdgeDeliveryPolicy` value object or policy aggregate if independent lifecycle requires it |
 | Required DNS records for an Appaloft-managed route | `DnsRecordIntent` value objects derived from DomainBinding/policy/verification workflows |
 | Observed DNS/provider state | Read models and diagnostics |
@@ -94,8 +94,8 @@ Forbidden DNS scope:
   required by an accepted Appaloft route, verification, or certificate workflow;
 - no provider-specific DNS fields in core aggregate state;
 - no implicit DNS mutation from `deployments.create`;
-- no hidden takeover of a domain or zone without an explicit DomainBinding/provider-connection
-  command and visible verification/readiness state;
+- no hidden takeover of a domain or zone without an explicit DomainBinding workflow and a visible
+  Connections `Connection` or temporary Domain Connect consent/readiness state;
 - no deletion of unmanaged user records;
 - no silent rewrite of records that Appaloft did not create or adopt through an accepted workflow.
 
@@ -103,7 +103,8 @@ Forbidden DNS scope:
 
 Allowed first-slice edge delivery scope:
 
-- provider connection and masked credential/capability readback;
+- Connections catalog/connection readback for the selected DNS or future edge connector, including
+  masked credential/capability state;
 - zone or equivalent provider scope selection for Appaloft-managed domain routes;
 - provider-neutral route planning for hostname, path prefix, origin, proxy mode, TLS mode, cache
   policy, and purge behavior;
@@ -133,23 +134,31 @@ Forbidden first-slice edge delivery scope:
 
 Future public operations must be intention-revealing and must not reuse generic update verbs.
 
-Candidate operation names for a later Spec Round:
+Provider connection lifecycle must reuse the accepted Connections operations and concrete connector
+capabilities instead of introducing a second connection model:
 
-- `edge-provider-connections.create`
-- `edge-provider-connections.list`
-- `edge-provider-connections.show`
-- `edge-provider-connections.rotate-credential`
-- `edge-provider-connections.delete-check`
-- `edge-provider-connections.delete`
+- `connections.catalog.list`
+- `connections.categories.list`
+- `connections.list`
+- `connections.show`
+- `connections.connect.start`
+- `connections.connect.callback`
+- `connections.revoke`
+- `connections.capability.plan`
+- `connections.capability.accept`
+- `connections.capability.apply`
+
+Domain-bound external edge work still needs future operation names after ADR review:
+
 - `domain-bindings.configure-edge-delivery`
 - `domain-bindings.edge-delivery.show`
 - `domain-bindings.edge-delivery.verify`
 - `domain-bindings.edge-delivery.purge-cache`
 - `resources.edge-configuration.preview`
 
-These are candidate names only. They must not be treated as implemented until they appear in
-`CORE_OPERATIONS.md`, `packages/application/src/operation-catalog.ts`, CLI, HTTP/oRPC, Web,
-public docs, and tests.
+The `connections.*` entries are governed by the Appaloft Connections spec. Domain-bound names are
+candidate names only and must not be treated as implemented until they appear in `CORE_OPERATIONS.md`,
+`packages/application/src/operation-catalog.ts`, CLI, HTTP/oRPC, Web, public docs, and tests.
 
 `deployments.create` must remain ids-only. Deployment execution may consume resolved external edge
 route snapshots, but callers must not submit provider DNS, CDN, cache, proxy, or TLS fields through
@@ -197,7 +206,7 @@ redaction and classification.
 
 | ID | Scenario | Given | When | Then |
 | --- | --- | --- | --- | --- |
-| EXT-EDGE-001 | Connect external edge provider | An operator has a provider account or zone they want Appaloft to manage for access routes | They create an edge provider connection | Appaloft stores only masked credential references and safe provider scope/capability metadata, then exposes safe readback without raw secrets. |
+| EXT-EDGE-001 | Connect external edge provider | An operator has a provider account or zone they want Appaloft to manage for access routes | They create or select a Connections `Connection` for the concrete DNS or future edge connector | Appaloft stores only masked credential references and safe provider scope/capability metadata, then exposes safe readback without raw secrets. |
 | EXT-EDGE-002 | Configure managed edge delivery for a domain binding | A DomainBinding exists and its resource has a reverse-proxy-compatible network profile | The operator configures edge delivery | Appaloft records provider-neutral cache/proxy/origin/TLS/purge intent without changing deployment admission input. |
 | EXT-EDGE-003 | Apply DNS and edge route | A managed DomainBinding is eligible for edge delivery | A route realization workflow runs | Appaloft applies only Appaloft-owned DNS/provider route changes, verifies readiness, and records safe applied snapshot metadata. |
 | EXT-EDGE-004 | DNS observation and diagnostics | A route is not reachable | The operator reads diagnostics | Appaloft reports safe provider-neutral DNS/proxy/TLS/origin/cache state and next actions without exposing provider raw payloads. |
@@ -236,10 +245,11 @@ redaction and classification.
 Before Code Round, this behavior requires a new accepted ADR or an explicit update to the routing,
 domain, TLS, default access, and edge proxy ADR set. The ADR must decide:
 
-- whether `EdgeProviderConnection` is an aggregate, application state, or integration state;
+- whether Connections `Connection` readback is sufficient or non-DNS external edge requires an
+  additional aggregate, application state, or integration state;
 - whether `EdgeDeliveryPolicy` is owned by `DomainBinding`, a separate policy aggregate, or
-  provider connection scoped defaults;
-- how provider credential custody, rotation, usage visibility, and deletion safety work;
+  connection-scoped defaults;
+- how connection credential custody, rotation, usage visibility, and deletion safety work;
 - how DNS record adoption and unmanaged-record protection work;
 - how route snapshots participate in deployment rollback and domain binding deletion;
 - what async process attempt and retry ownership applies to apply/verify/purge workflows.

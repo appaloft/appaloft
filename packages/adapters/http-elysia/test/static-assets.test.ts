@@ -15,7 +15,7 @@ import {
   type QueryBus,
 } from "@appaloft/application";
 import { resolveConfig } from "@appaloft/config";
-import { type AuthSessionResponse } from "@appaloft/contracts";
+import { type AuthPublicConfig, type AuthSessionResponse } from "@appaloft/contracts";
 import { ok } from "@appaloft/core";
 import { createHttpApp } from "../src";
 
@@ -39,6 +39,7 @@ async function createTempDir(): Promise<string> {
 }
 
 function createTestApp(input?: {
+  authPublicConfig?: AuthPublicConfig;
   authSessionStatus?: AuthSessionResponse;
   authBootstrapStatus?: AuthBootstrapStatus;
   docsStaticDir?: string;
@@ -102,6 +103,21 @@ function createTestApp(input?: {
                   productRole: "owner" as const,
                 },
               }),
+            getPublicConfig: () =>
+              input.authPublicConfig ?? {
+                schemaVersion: "appaloft.auth.public-config/v1",
+                enabled: input.authSessionStatus?.enabled ?? false,
+                provider: input.authSessionStatus?.provider ?? "none",
+                providers:
+                  input.authSessionStatus?.providers.map((provider) => ({
+                    key: provider.key,
+                    title: provider.title,
+                    configured: provider.configured,
+                    deferred: provider.deferred,
+                    ...(provider.connectPath ? { connectPath: provider.connectPath } : {}),
+                    ...(provider.reason ? { reason: provider.reason } : {}),
+                  })) ?? [],
+              },
             getProviderAccessToken: async () => null,
             getSessionStatus: async (request: Request) => {
               input.onAuthSessionStatus?.(request);
@@ -171,6 +187,77 @@ describe("HTTP static assets", () => {
         "content-type,x-request-id",
       );
     });
+  });
+
+  test("[PRODUCT-AUTH-PUBLIC-CONFIG-001] serves provider availability without session state", async () => {
+    const authChecks: string[] = [];
+    const app = createTestApp({
+      authPublicConfig: {
+        schemaVersion: "appaloft.auth.public-config/v1",
+        enabled: true,
+        provider: "better-auth",
+        providers: [
+          {
+            key: "github",
+            title: "GitHub",
+            configured: true,
+            deferred: true,
+            connectPath: "/api/auth/sign-in/social",
+          },
+        ],
+      },
+      authSessionStatus: {
+        accountSecurity: {
+          enabled: true,
+          passwordState: "unknown",
+        },
+        accountRecovery: {
+          enabled: false,
+        },
+        enabled: true,
+        emailVerification: {
+          enabled: false,
+          otpEnabled: false,
+          required: false,
+        },
+        provider: "better-auth",
+        loginRequired: true,
+        deferredAuth: true,
+        session: null,
+        providers: [],
+      },
+      onAuthSessionStatus: (request) => authChecks.push(new URL(request.url).pathname),
+    });
+
+    await withServer(app, async (baseUrl) => {
+      const configResponse = await fetch(`${baseUrl}/api/auth/public-config`);
+      expect(configResponse.status).toBe(200);
+      expect(configResponse.headers.get("cache-control")).toBe("no-store");
+      await expect(configResponse.json()).resolves.toMatchObject({
+        schemaVersion: "appaloft.auth.public-config/v1",
+        enabled: true,
+        provider: "better-auth",
+        providers: [
+          {
+            key: "github",
+            configured: true,
+            connectPath: "/api/auth/sign-in/social",
+          },
+        ],
+      });
+
+      const scriptResponse = await fetch(`${baseUrl}/api/auth/public-config.js`);
+      expect(scriptResponse.status).toBe(200);
+      expect(scriptResponse.headers.get("content-type")).toContain("application/javascript");
+      const script = await scriptResponse.text();
+      expect(script).toContain("window.__APPALOFT_PUBLIC_CONFIG__");
+      expect(script).toContain('"schemaVersion":"appaloft.auth.public-config/v1"');
+      expect(script).toContain('"github"');
+      expect(script).toContain('"configured":true');
+      expect(script).not.toContain("clientSecret");
+    });
+
+    expect(authChecks).toEqual([]);
   });
 
   test("[FIRST-ADMIN-NAV-001] redirects console navigation to first-admin before serving SPA", async () => {
