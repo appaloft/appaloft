@@ -18,7 +18,6 @@ export class StartConnectionCommandHandler
   ) {}
 
   handle(context: ExecutionContext, command: StartConnectionCommand) {
-    void context;
-    return this.useCase.execute(command.input);
+    return this.useCase.execute(context, command.input);
   }
 }

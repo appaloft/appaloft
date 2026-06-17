@@ -29,12 +29,14 @@
 - [x] APP-CONN-014: add CLI/HTTP operation parity tests.
 - [x] APP-CONN-015: add Web extension metadata test after UI scope is accepted.
 - [x] APP-CONN-016: add fake DNS provider adapter contract tests.
+- [x] APP-CONN-017: add connection lifecycle tenant scope test.
 
 ## Implementation
 
 - [x] Add neutral connection model and value objects.
 - [x] Add connector catalog and connection query/read model.
 - [x] Add connection instance start/list/show/callback/revoke/status lifecycle operations.
+- [x] Add tenant-scoped connection lifecycle guard for multi-tenant execution contexts.
 - [x] Add operation catalog entries.
 - [x] Add application ports for provider adapters.
 - [x] Add fake DNS provider adapter before real providers.

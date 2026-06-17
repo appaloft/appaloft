@@ -18,7 +18,6 @@ export class RevokeConnectionCommandHandler
   ) {}
 
   handle(context: ExecutionContext, command: RevokeConnectionCommand) {
-    void context;
-    return this.useCase.execute({ connectionId: command.connectionId });
+    return this.useCase.execute(context, { connectionId: command.connectionId });
   }
 }

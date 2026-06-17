@@ -18,7 +18,6 @@ export class CompleteConnectionCallbackCommandHandler
   ) {}
 
   handle(context: ExecutionContext, command: CompleteConnectionCallbackCommand) {
-    void context;
-    return this.useCase.execute(command.input);
+    return this.useCase.execute(context, command.input);
   }
 }
