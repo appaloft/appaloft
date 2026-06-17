@@ -726,6 +726,11 @@ export const enUS = {
       planSteps: "Plan steps",
       precedence: "Precedence",
       progressDeploymentLabel: "deployment",
+      progressColumnLevel: "Level",
+      progressColumnMessage: "Message",
+      progressColumnPhase: "Phase",
+      progressColumnSource: "Source",
+      progressColumnTime: "Time",
       progressDescription:
         "Shows deployment phases, Appaloft logs, and application output from the same progress stream as the CLI.",
       progressParseError: "Could not parse deployment progress.",

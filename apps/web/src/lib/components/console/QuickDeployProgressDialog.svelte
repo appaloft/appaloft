@@ -1,13 +1,12 @@
 <script lang="ts">
-  import { ExternalLink, Rows3 } from "@lucide/svelte";
+  import { Check, Copy, ExternalLink, LoaderCircle, Rows3 } from "@lucide/svelte";
   import type { DeploymentProgressEvent } from "@appaloft/contracts";
-  import { tick } from "svelte";
+  import { onDestroy } from "svelte";
 
+  import DeploymentProgressTerminal from "$lib/components/console/DeploymentProgressTerminal.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import {
-    groupDeploymentProgressEvents,
-    progressSourceLabel,
     progressStatusVariant,
     type DeploymentProgressDialogStatus,
   } from "$lib/console/deployment-progress";
@@ -49,41 +48,34 @@
     onOpenDeployment,
   }: Props = $props();
 
-  const sections = $derived(groupDeploymentProgressEvents(deploymentEvents));
-  let progressLogArea = $state<HTMLDivElement | undefined>();
-
-  $effect(() => {
-    const scrollKey = `${deploymentEvents.length}:${deploymentPanelStatus()}:${progressError}`;
-
-    if (!progressLogArea || scrollKey.length === 0) {
-      return;
-    }
-
-    void scrollProgressToBottom();
-  });
-
-  async function scrollProgressToBottom(): Promise<void> {
-    await tick();
-
-    if (!progressLogArea) {
-      return;
-    }
-
-    progressLogArea.scrollTop = progressLogArea.scrollHeight;
-  }
+  let accessUrlCopyState = $state<"idle" | "copied" | "failed">("idle");
+  let accessUrlCopyResetTimeout: ReturnType<typeof setTimeout> | undefined;
+  const panelStatus = $derived(deploymentPanelStatus());
+  const deploymentSucceeded = $derived(panelStatus === "succeeded");
+  const accessUrlCopyLabel = $derived(
+    accessUrlCopyState === "copied"
+      ? $t(i18nKeys.console.deployments.accessUrlCopied)
+      : accessUrlCopyState === "failed"
+        ? $t(i18nKeys.console.deployments.accessUrlCopyFailed)
+        : $t(i18nKeys.console.deployments.copyAccessUrl),
+  );
+  const confettiPieces = Array.from({ length: 24 }, (_, index) => ({
+    delay: `${(index % 8) * 0.07}s`,
+    left: `${8 + ((index * 37) % 84)}%`,
+    rotation: `${(index * 29) % 180}deg`,
+    color: ["#4f7cff", "#35d39b", "#ffd166", "#ef476f", "#38bdf8"][index % 5],
+  }));
 
   function workflowStatusLabel(): string {
-    const status = deploymentPanelStatus();
-
-    if (status === "running") {
+    if (panelStatus === "running") {
       return $t(i18nKeys.console.deployments.progressStatusRunning);
     }
 
-    if (status === "succeeded") {
+    if (panelStatus === "succeeded") {
       return $t(i18nKeys.console.deployments.progressStatusSucceeded);
     }
 
-    if (status === "failed") {
+    if (panelStatus === "failed") {
       return $t(i18nKeys.common.status.failed);
     }
 
@@ -91,17 +83,15 @@
   }
 
   function workflowStatusVariant(): "default" | "secondary" | "outline" | "destructive" {
-    const status = deploymentPanelStatus();
-
-    if (status === "succeeded") {
+    if (panelStatus === "succeeded") {
       return "default";
     }
 
-    if (status === "running") {
+    if (panelStatus === "running") {
       return "secondary";
     }
 
-    if (status === "failed") {
+    if (panelStatus === "failed") {
       return "destructive";
     }
 
@@ -150,25 +140,7 @@
   }
 
   function resolvedDeploymentPanelStatus(): DeploymentProgressEvent["status"] | undefined {
-    const status = deploymentPanelStatus();
-    return status === "idle" ? undefined : status;
-  }
-
-  function phaseLabel(phase: DeploymentProgressEvent["phase"]): string {
-    switch (phase) {
-      case "detect":
-        return $t(i18nKeys.console.deployments.progressPhaseDetect);
-      case "plan":
-        return $t(i18nKeys.console.deployments.progressPhasePlan);
-      case "package":
-        return $t(i18nKeys.console.deployments.progressPhasePackage);
-      case "deploy":
-        return $t(i18nKeys.console.deployments.progressPhaseDeploy);
-      case "verify":
-        return $t(i18nKeys.console.deployments.progressPhaseVerify);
-      case "rollback":
-        return $t(i18nKeys.console.deployments.progressPhaseRollback);
-    }
+    return panelStatus === "idle" ? undefined : panelStatus;
   }
 
   function progressStatusLabel(status?: DeploymentProgressEvent["status"]): string {
@@ -184,32 +156,36 @@
     }
   }
 
-  function levelClass(level: DeploymentProgressEvent["level"]): string {
-    switch (level) {
-      case "error":
-        return "text-red-300";
-      case "warn":
-        return "text-amber-300";
-      case "debug":
-        return "text-zinc-500";
-      case "info":
-        return "text-zinc-200";
+  function updateAccessUrlCopyState(state: typeof accessUrlCopyState): void {
+    accessUrlCopyState = state;
+
+    if (accessUrlCopyResetTimeout) {
+      clearTimeout(accessUrlCopyResetTimeout);
+    }
+
+    accessUrlCopyResetTimeout = setTimeout(() => {
+      accessUrlCopyState = "idle";
+    }, 2200);
+  }
+
+  async function handleCopyAccessUrl(): Promise<void> {
+    if (!accessUrl) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(accessUrl);
+      updateAccessUrlCopyState("copied");
+    } catch {
+      updateAccessUrlCopyState("failed");
     }
   }
 
-  function timeLabel(timestamp: string): string {
-    const date = new Date(timestamp);
-    if (Number.isNaN(date.getTime())) {
-      return timestamp.slice(11, 19) || "--:--:--";
+  onDestroy(() => {
+    if (accessUrlCopyResetTimeout) {
+      clearTimeout(accessUrlCopyResetTimeout);
     }
-
-    return new Intl.DateTimeFormat(undefined, {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: false,
-    }).format(date);
-  }
+  });
 </script>
 
 {#if open}
@@ -225,10 +201,20 @@
       aria-modal="true"
       role="dialog"
       class={[
-        "flex w-full max-w-5xl flex-col overflow-hidden rounded-lg bg-background",
+        "relative flex w-full max-w-5xl flex-col overflow-hidden rounded-lg bg-background",
         embedded ? "mx-auto max-h-[78vh] shadow-none" : "max-h-[88vh] shadow-xl",
       ]}
     >
+      {#if deploymentSucceeded}
+        <div class="pointer-events-none absolute inset-x-0 top-0 h-28 overflow-hidden" aria-hidden="true">
+          {#each confettiPieces as piece}
+            <span
+              class="quick-deploy-confetti"
+              style={`--confetti-left: ${piece.left}; --confetti-delay: ${piece.delay}; --confetti-rotation: ${piece.rotation}; --confetti-color: ${piece.color};`}
+            ></span>
+          {/each}
+        </div>
+      {/if}
       <header class="border-b px-5 py-4">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div class="min-w-0 flex-1 space-y-2">
@@ -250,32 +236,14 @@
                   {$t(i18nKeys.console.deployments.progressTraceLabel)} {traceLink}
                 </span>
               {/if}
-              {#if accessUrl && deploymentPanelStatus() === "succeeded"}
-                <span class="max-w-full truncate">
-                  {$t(i18nKeys.console.resources.accessUrlTitle)} {accessUrl}
-                </span>
-              {/if}
             </div>
           </div>
 
           <div class="flex shrink-0 flex-wrap gap-2 sm:ml-auto sm:justify-end">
-            {#if resourceHref && deploymentPanelStatus() === "succeeded"}
+            {#if resourceHref && deploymentSucceeded}
               <Button type="button" size="sm" href={resourceHref}>
                 <ExternalLink class="size-4" />
                 {$t(i18nKeys.common.actions.openResource)}
-              </Button>
-            {/if}
-            {#if accessUrl && deploymentPanelStatus() === "succeeded"}
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                href={accessUrl}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <ExternalLink class="size-4" />
-                {$t(i18nKeys.console.resources.openGeneratedAccess)}
               </Button>
             {/if}
             {#if traceLink}
@@ -291,7 +259,7 @@
                 {$t(i18nKeys.console.deployments.progressTraceAction)}
               </Button>
             {/if}
-            {#if deploymentId && onOpenDeployment}
+            {#if deploymentId && onOpenDeployment && deploymentSucceeded}
               <Button type="button" size="sm" variant="outline" onclick={() => onOpenDeployment?.()}>
                 {$t(i18nKeys.common.actions.viewDeployment)}
               </Button>
@@ -315,52 +283,93 @@
           </div>
         {/if}
 
+        {#if deploymentSucceeded && accessUrl}
+          <section
+            class="rounded-lg border border-primary/20 bg-primary/5 px-4 py-5 text-center shadow-sm"
+            data-quick-deploy-success-access-url
+          >
+            <p class="text-xs font-semibold uppercase tracking-normal text-primary/80">
+              {$t(i18nKeys.console.deployments.accessUrlTitle)}
+            </p>
+            <a
+              href={accessUrl}
+              target="_blank"
+              rel="noreferrer"
+              class="mx-auto mt-2 block max-w-3xl break-all text-base font-semibold text-primary underline-offset-4 hover:underline sm:text-lg"
+            >
+              {accessUrl}
+            </a>
+            <div class="mt-4 flex flex-wrap justify-center gap-2">
+              <Button type="button" href={accessUrl} target="_blank" rel="noreferrer">
+                <ExternalLink class="size-4" />
+                {$t(i18nKeys.console.deployments.openAccessUrl)}
+              </Button>
+              <Button type="button" variant="outline" onclick={handleCopyAccessUrl}>
+                {#if accessUrlCopyState === "copied"}
+                  <Check class="size-4" />
+                {:else}
+                  <Copy class="size-4" />
+                {/if}
+                {accessUrlCopyLabel}
+              </Button>
+            </div>
+          </section>
+        {/if}
+
         <section class="space-y-3">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div class="flex items-center gap-2">
               <Rows3 class="size-4 text-muted-foreground" />
               <h3 class="text-sm font-semibold">{$t(i18nKeys.console.deployments.progressStatusLog)}</h3>
+              {#if panelStatus === "running"}
+                <LoaderCircle class="size-4 animate-spin text-primary" />
+              {/if}
               <Badge variant={progressStatusVariant(resolvedDeploymentPanelStatus())}>
                 {progressStatusLabel(resolvedDeploymentPanelStatus())}
               </Badge>
             </div>
           </div>
 
-          <div
-            bind:this={progressLogArea}
-            data-deployment-progress-terminal
-            class="max-h-[50vh] min-h-72 overflow-auto rounded-md bg-zinc-950 p-4 font-mono text-xs text-zinc-100 shadow-inner ring-1 ring-zinc-800"
-          >
-            {#if sections.length === 0}
-              <p class="text-zinc-400">{$t(i18nKeys.console.deployments.progressWaiting)}</p>
-            {:else}
-              <div class="space-y-4">
-                {#each sections as section (section.phase)}
-                  <div class="space-y-2">
-                    <div class="flex flex-wrap items-center gap-2 text-zinc-400">
-                      <span>{phaseLabel(section.phase)}</span>
-                      <span>·</span>
-                      <span>{progressStatusLabel(section.status)}</span>
-                    </div>
-                    <div class="space-y-1">
-                      {#each section.events as event, index (`${event.timestamp}-${section.phase}-${index}`)}
-                        <div class="grid gap-2 leading-5 sm:grid-cols-[4.75rem_6rem_3.5rem_minmax(0,1fr)]">
-                          <span class="text-zinc-500">{timeLabel(event.timestamp)}</span>
-                          <span class="text-sky-300">{progressSourceLabel(event)}</span>
-                          <span class={levelClass(event.level)}>{event.level}</span>
-                          <span class={["min-w-0 break-words", levelClass(event.level)]}>
-                            {event.message}
-                          </span>
-                        </div>
-                      {/each}
-                    </div>
-                  </div>
-                {/each}
-              </div>
-            {/if}
-          </div>
+          <DeploymentProgressTerminal events={deploymentEvents} status={panelStatus} />
         </section>
       </div>
     </div>
   </div>
 {/if}
+
+<style>
+  .quick-deploy-confetti {
+    position: absolute;
+    top: -0.75rem;
+    left: var(--confetti-left);
+    width: 0.45rem;
+    height: 0.7rem;
+    border-radius: 0.125rem;
+    background: var(--confetti-color);
+    transform: rotate(var(--confetti-rotation));
+    animation: quick-deploy-confetti-fall 1.45s ease-out var(--confetti-delay) both;
+  }
+
+  @keyframes quick-deploy-confetti-fall {
+    0% {
+      opacity: 0;
+      transform: translate3d(0, -0.75rem, 0) rotate(var(--confetti-rotation)) scale(0.85);
+    }
+
+    15% {
+      opacity: 1;
+    }
+
+    100% {
+      opacity: 0;
+      transform: translate3d(0, 7rem, 0) rotate(calc(var(--confetti-rotation) + 180deg)) scale(1);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .quick-deploy-confetti {
+      animation: none;
+      display: none;
+    }
+  }
+</style>

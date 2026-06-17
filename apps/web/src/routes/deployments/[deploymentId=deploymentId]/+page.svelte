@@ -33,6 +33,7 @@
 
   import { readErrorMessage } from "$lib/api/client";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
+  import DeploymentProgressTerminal from "$lib/components/console/DeploymentProgressTerminal.svelte";
   import DeploymentStatusBadge from "$lib/components/console/DeploymentStatusBadge.svelte";
   import DeploymentProgressDialog from "$lib/components/console/DeploymentProgressDialog.svelte";
   import { Badge } from "$lib/components/ui/badge";
@@ -56,7 +57,6 @@
     latestDeploymentTimelineCursor,
     mergeDeploymentTimelineEnvelopes,
     observeDeploymentProgressAfterAcceptance,
-    progressSourceLabel,
     progressStatusVariant,
     type DeploymentProgressDialogStatus,
   } from "$lib/console/deployment-progress";
@@ -704,27 +704,6 @@
     }
   }
 
-  function logLevelClass(level: DeploymentTimelineJournalEntry["level"]): string {
-    switch (level) {
-      case "error":
-        return "text-red-300";
-      case "warn":
-        return "text-amber-200";
-      case "debug":
-        return "text-zinc-500";
-      case "info":
-        return "text-zinc-200";
-    }
-  }
-
-  function logSourceLabel(log: DeploymentTimelineJournalEntry): string {
-    return log.source === "application" ? "app" : log.source;
-  }
-
-  function logTimeLabel(timestamp: string): string {
-    return timestamp.slice(11, 19) || "--:--:--";
-  }
-
   function accessUrlKindLabel(kind: AccessUrlKind): string {
     switch (kind) {
       case "deployment":
@@ -1087,23 +1066,6 @@
         return $t(i18nKeys.common.status.failed);
       default:
         return $t(i18nKeys.console.deployments.progressStatusLog);
-    }
-  }
-
-  function progressPhaseLabel(phase: DeploymentProgressEvent["phase"]): string {
-    switch (phase) {
-      case "detect":
-        return $t(i18nKeys.console.deployments.progressPhaseDetect);
-      case "plan":
-        return $t(i18nKeys.console.deployments.progressPhasePlan);
-      case "package":
-        return $t(i18nKeys.console.deployments.progressPhasePackage);
-      case "deploy":
-        return $t(i18nKeys.console.deployments.progressPhaseDeploy);
-      case "verify":
-        return $t(i18nKeys.console.deployments.progressPhaseVerify);
-      case "rollback":
-        return $t(i18nKeys.console.deployments.progressPhaseRollback);
     }
   }
 
@@ -2029,33 +1991,13 @@
               </div>
             </div>
 
-            <div class="mt-4 max-h-[42rem] overflow-auto rounded-md border border-zinc-800 bg-zinc-950 px-4 py-3 font-mono text-xs text-zinc-200 shadow-inner">
-              {#if deploymentProgressEvents.length === 0}
-                <p class="text-zinc-500">{$t(i18nKeys.console.deployments.progressWaiting)}</p>
-              {:else}
-                <div class="space-y-1">
-                  {#each deploymentProgressEvents as event, index (`${event.timestamp}-${event.phase}-${index}`)}
-                    <div class="grid grid-cols-[4.75rem_minmax(0,1fr)] gap-x-2 gap-y-1 leading-5 md:grid-cols-[4.75rem_5rem_6rem_3.5rem_minmax(0,1fr)]">
-                      <span class="text-zinc-600">{logTimeLabel(event.timestamp)}</span>
-                      <span class="text-zinc-400">{progressPhaseLabel(event.phase)}</span>
-                      <span class={event.source === "application" ? "text-sky-300" : "text-emerald-300"}>
-                        {progressSourceLabel(event)}
-                      </span>
-                      <span class={logLevelClass(event.level)}>{event.level}</span>
-                      <span
-                        class={`col-span-2 min-w-0 break-words md:col-span-1 ${logLevelClass(event.level)} ${event.source === "application" ? "md:pl-3" : ""}`}
-                      >
-                        {event.source === "application" ? "└ " : ""}
-                        {event.message}
-                        {#if event.status}
-                          <span class="text-zinc-600"> · {progressStatusLabel(event.status)}</span>
-                        {/if}
-                      </span>
-                    </div>
-                  {/each}
-                </div>
-              {/if}
-            </div>
+            <DeploymentProgressTerminal
+              events={deploymentProgressEvents}
+              status={deploymentProgressDialogStatus}
+              maxHeightClass="max-h-[42rem]"
+              minHeightClass="min-h-24"
+              class="mt-4 border border-zinc-800"
+            />
           </section>
         </Tabs.Content>
 
