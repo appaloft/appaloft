@@ -3,8 +3,8 @@
 ## Status
 
 - Round: Code / Post-Implementation Sync
-- Artifact state: Phase 9 selected resource-shape sync implemented; later Web and preview integration rows
-  remain planned.
+- Artifact state: Phase 10 preview policy base-profile integration implemented; later Web staged
+  workflows and launch hardening remain planned.
 - Governing decision: [ADR-085](../../decisions/ADR-085-environment-profile-duplication-boundary.md)
 
 ## Business Outcome
@@ -35,6 +35,7 @@ attempt.
 | Defer Binding | Leave a required binding unresolved and block deployment admission until resolved. | Dependency binding decision | defer |
 | Profile Diff | Read model comparing environment shape, decisions, and unresolved target values. | Query side | diff-profile |
 | Profile Sync | Apply selected shape changes from one environment into another through staged decisions. | Workflow | sync-profile |
+| Preview Profile Base | Environment Profile source selected by product-grade preview policy for a derived PR preview environment. | Preview lifecycle | base Environment Profile |
 
 ## Scenarios And Acceptance Criteria
 
@@ -50,6 +51,7 @@ attempt.
 | ENV-PROFILE-DUP-008 | Profile diff explains drift safely | Two environments differ in resources, runtime profile, variables, dependencies, or routes | `environments.diff-profile` runs | The result shows added/changed/removed shape and decision differences while masking secret values. |
 | ENV-PROFILE-DUP-009 | Profile sync applies selected shape only | Staging lacks a worker resource added in production | `environments.sync-profile` applies only that selected change | The worker shape is staged/applied without overwriting unrelated target-only dependency or secret decisions. |
 | ENV-PROFILE-DUP-010 | Existing clone behavior remains explicit | User calls legacy `environments.clone` | The command runs | It remains variable-only and docs direct full environment duplication to the profile workflow. |
+| ENV-PROFILE-DUP-011 | PR preview derives from a base profile without replacing preview lifecycle | Product-grade preview policy selects a base Environment Profile | A verified PR preview source event is admitted | The existing preview lifecycle creates/updates the derived preview environment and dispatches ids-only deployment while policy decisions record the safe base environment id; fork previews with secret scopes remain blocked before dispatch unless policy explicitly permits safe no-secret previews. |
 
 ## Domain Ownership
 
@@ -77,6 +79,10 @@ attempt.
 - Web/UI:
   - Project Environment management should show Duplicate, Diff, and Sync as staged workflows with
     required decisions before apply.
+- Preview:
+  - Product-grade preview policy may select an Environment Profile base through
+    `environmentProfileBaseEnvironmentId`; preview lifecycle remains the owner of temporary
+    preview environment identity, feedback, and cleanup, and `deployments.create` remains ids-only.
 - Config:
   - Repository config may provide safe profile defaults, but it must not select project/resource
     identity, provider credentials, raw secrets, or production domains.
@@ -97,8 +103,8 @@ attempt.
 - No hosted account policy, provider-account selection, plan limits, or
   distribution-specific admission policy in public Appaloft.
 - No automatic data migration or backup restore without an explicit dependency/storage decision.
-- No replacement of product-grade preview environments; preview should consume profile duplication
-  later as a derived temporary environment flow.
+- No replacement of product-grade preview environments; preview consumes the base profile as
+  policy/read-model context while retaining the existing derived temporary environment lifecycle.
 
 ## Open Questions
 

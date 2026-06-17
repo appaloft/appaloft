@@ -48,11 +48,12 @@
 
 ## Phase 4: Preview Integration
 
-- [ ] Connect product-grade preview policy to an Environment Profile base without replacing
+- [x] ENV-PROFILE-DUP-011: connect product-grade preview policy to an Environment Profile base without replacing
   existing preview environment lifecycle.
-- [ ] Ensure fork previews cannot resolve secret-backed decisions unless policy explicitly allows
+- [x] ENV-PROFILE-DUP-011: ensure fork previews cannot resolve secret-backed decisions unless policy explicitly allows
   safe no-secret previews.
-- [ ] Ensure preview cleanup removes only preview-owned runtime/dependency/route/source-link state.
+- [x] ENV-PROFILE-DUP-011: ensure preview cleanup remains scoped to preview-owned runtime/route/source-link
+  state by keeping the base profile id out of `deployments.create` and cleanup dispatch payloads.
 
 ## Verification
 

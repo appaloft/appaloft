@@ -667,6 +667,7 @@ export interface PreviewPoliciesTable {
   secret_backed_previews: boolean;
   max_active_previews: number | null;
   preview_ttl_hours: number | null;
+  environment_profile_base_environment_id: string | null;
   last_idempotency_key: string | null;
   updated_at: UpdatableTimestampColumn;
 }
@@ -693,6 +694,7 @@ export interface PreviewPolicyDecisionsTable {
   deployment_eligible: boolean;
   reason_code: string | null;
   max_active_previews: number | null;
+  environment_profile_base_environment_id: string | null;
   preview_environment_id: string | null;
   preview_expires_at: NullableUpdatableTimestampColumn;
   deployment_id: string | null;

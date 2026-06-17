@@ -8593,6 +8593,7 @@ export interface PreviewPolicySettings {
   secretBackedPreviews: boolean;
   maxActivePreviews?: number;
   previewTtlHours?: number;
+  environmentProfileBaseEnvironmentId?: string;
 }
 
 export interface PreviewPolicyRecord {
@@ -8642,6 +8643,7 @@ export interface PreviewPolicyDecisionProjection {
   evaluatedAt: string;
   reasonCode?: PreviewPolicyDecisionReasonCode;
   maxActivePreviews?: number;
+  environmentProfileBaseEnvironmentId?: string;
   previewEnvironmentId?: string;
   previewExpiresAt?: string;
   deploymentId?: string;

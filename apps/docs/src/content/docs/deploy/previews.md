@@ -161,6 +161,8 @@ Product-grade preview 是由 Appaloft Cloud 或 self-hosted control plane 拥有
 
 这个产品线使用 signed GitHub webhooks、preview policy、fork/secret policy、preview environment list/show/delete、comments/checks/status feedback、cleanup retries、quotas、audit，以及 managed domain follow-up。即便如此，控制平面选择或创建 preview context 之后，真正部署仍必须通过 ids-only `deployments.create`。
 
+`preview.pullRequest.policy` 可以声明 `environmentProfileBaseEnvironmentId`，让 preview 从一个安全的 Environment Profile base 派生；这个值只作为 policy/read-model context，不会加入 `deployments.create`。
+
 Preview environment 是所选 Resource 下面的临时派生运行环境，不是和主要 Resource 平级的长期资源。Resource detail 的预览区域显示这个 Resource 的 pull request 预览、过期时间、source fingerprint 和清理状态。全局 preview environment 页面只作为跨项目排查 rollup；日常查看和清理应优先从 Resource 进入。
 
 如果 GitHub close event、provider callback 或 workflow cleanup 没有可靠触发，控制面仍保留补偿路径：关闭 PR 的 webhook 会按 preview source scope 触发清理；Resource 预览区域和 preview detail 可以手动请求 `preview-environments.delete`；cleanup 本身是幂等的，并且 retryable 的 runtime、route、source-link、provider metadata 或 feedback 失败会留下安全 retry/manual-review 状态。

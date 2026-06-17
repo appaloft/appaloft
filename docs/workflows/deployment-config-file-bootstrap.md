@@ -432,6 +432,7 @@ preview:
       secretBackedPreviews: true
       maxActivePreviews: 5
       previewTtlHours: 72
+      environmentProfileBaseEnvironmentId: env_staging
 ```
 
 Preview policy declarations configure a Resource-scoped policy through
@@ -439,6 +440,7 @@ Preview policy declarations configure a Resource-scoped policy through
 used first so an already matching configured Resource policy can be reused. Pull request preview
 deploys must not mutate preview policy from the PR branch; they ignore this declaration for policy
 mutation and continue applying preview profile/env/dependency/storage workflow steps. Config may
+select a safe `environmentProfileBaseEnvironmentId` for product-grade preview policy, but may
 not include GitHub App installation ids, webhook secrets, feedback tokens, provider accounts,
 credentials, tenants, organization ids, project/global scope selectors, raw secret values, or
 cleanup credentials.

@@ -172,6 +172,7 @@ describe("preview policy operations", () => {
         sameRepositoryPreviews: true,
         forkPreviews: "without-secrets",
         secretBackedPreviews: false,
+        environmentProfileBaseEnvironmentId: "env_profile_staging",
       },
       idempotencyKey: "idem_preview_policy_1",
     })._unsafeUnwrap();
@@ -206,6 +207,7 @@ describe("preview policy operations", () => {
           sameRepositoryPreviews: true,
           forkPreviews: "without-secrets",
           secretBackedPreviews: false,
+          environmentProfileBaseEnvironmentId: "env_profile_staging",
         },
         updatedAt: "2026-05-06T02:00:00.000Z",
       },

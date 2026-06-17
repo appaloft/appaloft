@@ -62,6 +62,8 @@
   - dependency decisions create new, bind existing, reuse source with acknowledgement, or defer;
   - deferred decisions block deployment admission;
   - diff/sync masks secrets and preserves target-only decisions.
+  - preview policy can select a base Environment Profile while fork/secret safety, ids-only
+    deployment admission, and preview-owned cleanup remain intact.
 - Acceptance/e2e:
   - API/CLI route parity after operation catalog entries exist;
   - Web staged workflow after UI implementation starts.

@@ -27,7 +27,7 @@ admission, and durable cleanup retry state.
 
 | Layer | Required coverage |
 | --- | --- |
-| Policy/application | Preview policy show/configure admission, fork policy, secret policy, quota/expiry, and blocked/ignored reasons. |
+| Policy/application | Preview policy show/configure admission, fork policy, secret policy, quota/expiry, Environment Profile base selection, and blocked/ignored reasons. |
 | Source event integration | GitHub App webhook verification, provider-neutral pull request event normalization, dedupe, and safe redaction. |
 | Preview environment state | Create/update/list/show/delete state, parent Resource ownership, source-link identity, deployment references, feedback status, cleanup status, and audit. |
 | Deployment dispatch | Product-grade previews call `deployments.create` with ids only and coordinate runtime mutation by the existing resource-runtime scope. |
@@ -42,6 +42,7 @@ admission, and durable cleanup retry state.
 | PG-PREVIEW-POLICY-001 | application | Same-repository PR allowed | GitHub App pull request event is verified; effective policy allows same-repository preview deploys | Preview lifecycle creates or updates a preview environment and dispatches one ids-only deployment attempt | None |
 | PG-PREVIEW-POLICY-002 | application | Fork PR secret policy blocks deploy | Pull request source repository is a fork and policy does not allow secret-backed fork previews | No deployment is created; read model records blocked/ignored status with safe fork-policy details and no secret lookup | `permission` or `application`, phase `preview-policy-evaluation` |
 | PG-PREVIEW-POLICY-003 | application | Quota and expiry policy | Active preview count, age, or resource quota exceeds policy | New preview is blocked or existing preview cleanup is scheduled according to policy; read models expose reason and next action | `conflict` or `application`, phase `preview-policy-evaluation` |
+| PG-PREVIEW-POLICY-004 | application | Environment Profile base policy | Preview policy selects `environmentProfileBaseEnvironmentId` | Policy decisions persist only the safe base environment id, then the existing preview lifecycle creates/updates preview environment state and dispatches ids-only deployment; fork+secret previews stay blocked before dispatch | `permission` or `application`, phase `preview-policy-evaluation` |
 | PG-PREVIEW-EVENT-001 | integration | GitHub App event verification and normalization | GitHub App webhook includes valid signature, installation, repository, PR number, head SHA, base ref, and actor facts | Transport dispatches provider-neutral source facts; raw body, signature, token, and provider payload are not persisted | `validation_error` or `permission`, phase `preview-webhook-verification` for invalid input |
 | PG-PREVIEW-EVENT-002 | integration | Duplicate provider event idempotency | GitHub redelivers the same PR synchronize event | Existing event/preview result is returned or projected; no duplicate environment, deployment, feedback, or cleanup attempt is created | None |
 | PG-PREVIEW-ENV-001 | integration | Preview environment create/update | Policy allows the PR and no current preview environment exists for the preview scope | A durable preview environment is created as a temporary derived runtime surface under the parent Resource, with project/environment/resource/server context, source fingerprint, PR identity, expiry, and audit metadata | None |
@@ -78,6 +79,16 @@ from policy TTL when no explicit expiry is provided. It also covers TTL-driven c
 through the existing preview cleanup service, skips future or already cleanup-requested previews,
 and the disabled-by-default shell runner executes under the durable `preview-lifecycle`
 coordination scope.
+`PG-PREVIEW-POLICY-004` has application, CLI/config contract, and Postgres/PGlite coverage in
+`packages/application/test/product-grade-preview-policy.test.ts`,
+`packages/application/test/preview-policy-operations.test.ts`,
+`packages/adapters/cli/test/preview-policy-command.test.ts`,
+`packages/deployment-config/test/appaloft-config.test.ts`, and
+`packages/persistence/pg/test/preview-policy.pglite.test.ts`. The coverage proves
+`environmentProfileBaseEnvironmentId` round-trips through preview policy configure/show and
+repository config, records only the safe base environment id in policy decisions, keeps
+fork+secret preview events blocked before dispatch, and does not add profile fields to
+`deployments.create` or cleanup dispatch payloads.
 `PG-PREVIEW-EVENT-001` has initial integration-boundary coverage in
 `packages/integrations/github/test/github-webhook.test.ts`. The coverage proves signed GitHub
 `pull_request` payloads normalize to safe preview facts, invalid signatures reject before
