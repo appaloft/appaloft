@@ -859,6 +859,96 @@ describe("connector catalog", () => {
     expect(verify._unsafeUnwrap().providerResult?.dnsRecords?.missingRecords).toHaveLength(1);
   });
 
+  test("[APP-CONN-016] fake DNS provider simulates retryable provider rate limits", async () => {
+    const registry = new InMemoryConnectorRegistry(
+      createDefaultConnectorDefinitions({
+        cloudflareDns: {
+          configured: true,
+        },
+      }),
+    );
+    const service = new PlanConnectorCapabilityQueryService(
+      registry,
+      new InMemoryConnectorProviderAdapterRegistry([
+        new FakeDnsConnectorProviderAdapter({
+          connectorKey: "cloudflare-dns",
+          providerTitle: "Cloudflare DNS",
+          failureMode: "rate-limit",
+        }),
+      ]),
+    );
+
+    const result = await service.execute(createExecutionContext({ entrypoint: "system" }), {
+      connectorKey: "cloudflare-dns",
+      capabilityKey: "dns.records.plan",
+      parameters: {
+        zoneName: "example.com",
+        hostname: "app.example.com",
+        target: "edge.appaloft.dev",
+        recordType: "CNAME",
+      },
+    });
+
+    expect(result.isErr()).toBe(true);
+    const error = result._unsafeUnwrapErr();
+    expect(error).toMatchObject({
+      code: "connector_provider_rate_limited",
+      category: "retryable",
+      retryable: true,
+      details: {
+        providerKind: "dns",
+        operation: "read",
+        failureMode: "rate-limit",
+      },
+    });
+    expect(JSON.stringify(error)).not.toContain("token");
+  });
+
+  test("[APP-CONN-016] fake DNS provider simulates revoked provider credentials", async () => {
+    const registry = new InMemoryConnectorRegistry(
+      createDefaultConnectorDefinitions({
+        cloudflareDns: {
+          configured: true,
+        },
+      }),
+    );
+    const service = new ApplyConnectorCapabilityUseCase(
+      registry,
+      new InMemoryConnectorProviderAdapterRegistry([
+        new FakeDnsConnectorProviderAdapter({
+          connectorKey: "cloudflare-dns",
+          providerTitle: "Cloudflare DNS",
+          failureMode: "revoked-credential",
+        }),
+      ]),
+    );
+
+    const result = await service.execute(createExecutionContext({ entrypoint: "system" }), {
+      connectorKey: "cloudflare-dns",
+      capabilityKey: "dns.records.apply",
+      parameters: {
+        zoneName: "example.com",
+        hostname: "app.example.com",
+        target: "edge.appaloft.dev",
+        recordType: "CNAME",
+      },
+    });
+
+    expect(result.isErr()).toBe(true);
+    const error = result._unsafeUnwrapErr();
+    expect(error).toMatchObject({
+      code: "connector_provider_credential_revoked",
+      category: "provider",
+      retryable: false,
+      details: {
+        providerKind: "dns",
+        operation: "apply",
+        failureMode: "revoked-credential",
+      },
+    });
+    expect(JSON.stringify(error)).not.toContain("edge.appaloft.dev");
+  });
+
   test("[APP-CONN-004][APP-CONN-016] DNS cleanup removes only Appaloft-managed records", async () => {
     const registry = new InMemoryConnectorRegistry(
       createDefaultConnectorDefinitions({

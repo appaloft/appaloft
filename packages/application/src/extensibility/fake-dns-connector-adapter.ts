@@ -7,6 +7,7 @@ import {
   type DomainConnectApplySnapshot,
   DomainConnectSetup,
   type DomainConnectSetupSnapshot,
+  type DomainError,
   domainError,
   err,
   ok,
@@ -27,6 +28,7 @@ export interface FakeDnsConnectorProviderAdapterOptions {
   connectorKey: string;
   providerTitle: string;
   existingRecords?: readonly DnsRecordRequirementSnapshot[];
+  failureMode?: FakeDnsConnectorProviderFailureMode;
   domainConnect?: {
     providerKey?: string;
     serviceId?: string;
@@ -34,6 +36,11 @@ export interface FakeDnsConnectorProviderAdapterOptions {
     consentBaseUrl?: string;
   };
 }
+
+export type FakeDnsConnectorProviderFailureMode =
+  | "provider-error"
+  | "rate-limit"
+  | "revoked-credential";
 
 interface StoredDnsRecord {
   record: DnsRecordRequirementSnapshot;
@@ -43,13 +50,18 @@ interface StoredDnsRecord {
 
 export class InMemoryDnsConnectorProviderRecordStore implements DnsConnectorProviderRecordStore {
   private readonly records: StoredDnsRecord[];
+  private readonly failureMode: FakeDnsConnectorProviderFailureMode | undefined;
 
-  constructor(records: readonly DnsRecordRequirementSnapshot[] = []) {
+  constructor(
+    records: readonly DnsRecordRequirementSnapshot[] = [],
+    options: { failureMode?: FakeDnsConnectorProviderFailureMode } = {},
+  ) {
     this.records = records.map((record) => ({
       record,
       providerRecordId: providerRecordId(record),
       managed: false,
     }));
+    this.failureMode = options.failureMode;
   }
 
   async existingRecords(input: {
@@ -57,6 +69,8 @@ export class InMemoryDnsConnectorProviderRecordStore implements DnsConnectorProv
     records: readonly DnsRecordRequirementSnapshot[];
   }): Promise<Result<readonly DnsRecordRequirementSnapshot[]>> {
     void input;
+    const failure = this.providerFailure("read");
+    if (failure) return err(failure);
     return ok(this.records.map((record) => record.record));
   }
 
@@ -64,6 +78,8 @@ export class InMemoryDnsConnectorProviderRecordStore implements DnsConnectorProv
     zoneName?: string;
     records: readonly DnsRecordRequirementSnapshot[];
   }): Promise<Result<DnsRecordApplySnapshot>> {
+    const failure = this.providerFailure("apply");
+    if (failure) return err(failure);
     const plan = DnsRecordPlan.create({
       ...(input.zoneName ? { zoneName: input.zoneName } : {}),
       records: [...input.records],
@@ -119,6 +135,8 @@ export class InMemoryDnsConnectorProviderRecordStore implements DnsConnectorProv
     zoneName?: string;
     records: readonly DnsRecordRequirementSnapshot[];
   }): Promise<Result<DnsRecordApplySnapshot>> {
+    const failure = this.providerFailure("verify");
+    if (failure) return err(failure);
     const plan = DnsRecordPlan.create({
       ...(input.zoneName ? { zoneName: input.zoneName } : {}),
       records: [...input.records],
@@ -160,6 +178,8 @@ export class InMemoryDnsConnectorProviderRecordStore implements DnsConnectorProv
     zoneName?: string;
     records: readonly DnsRecordRequirementSnapshot[];
   }): Promise<Result<DnsRecordApplySnapshot>> {
+    const failure = this.providerFailure("cleanup");
+    if (failure) return err(failure);
     const plan = DnsRecordPlan.create({
       ...(input.zoneName ? { zoneName: input.zoneName } : {}),
       records: [...input.records],
@@ -214,6 +234,11 @@ export class InMemoryDnsConnectorProviderRecordStore implements DnsConnectorProv
       effects,
     });
   }
+
+  private providerFailure(operation: string): DomainError | null {
+    if (!this.failureMode) return null;
+    return fakeDnsProviderFailure(this.failureMode, operation);
+  }
 }
 
 export class FakeDnsConnectorProviderAdapter implements ConnectorProviderAdapter {
@@ -228,7 +253,9 @@ export class FakeDnsConnectorProviderAdapter implements ConnectorProviderAdapter
   constructor(options: FakeDnsConnectorProviderAdapterOptions) {
     this.connectorKey = options.connectorKey;
     this.providerTitle = options.providerTitle;
-    this.recordStore = new InMemoryDnsConnectorProviderRecordStore(options.existingRecords);
+    this.recordStore = new InMemoryDnsConnectorProviderRecordStore(options.existingRecords, {
+      ...(options.failureMode ? { failureMode: options.failureMode } : {}),
+    });
     this.domainConnectProviderKey = options.domainConnect?.providerKey ?? "cloudflare";
     this.domainConnectServiceId = options.domainConnect?.serviceId ?? "appaloft";
     this.domainConnectTemplateId = options.domainConnect?.templateId ?? "appaloft-domain";
@@ -633,6 +660,49 @@ function providerRecordId(record: DnsRecordRequirementSnapshot): string {
     type: record.type,
     value: record.value,
   })}`;
+}
+
+function fakeDnsProviderFailure(
+  mode: FakeDnsConnectorProviderFailureMode,
+  operation: string,
+): DomainError {
+  if (mode === "rate-limit") {
+    return {
+      code: "connector_provider_rate_limited",
+      category: "retryable",
+      message: `Fake DNS provider rate-limited ${operation}.`,
+      retryable: true,
+      details: {
+        providerKind: "dns",
+        operation,
+        failureMode: mode,
+      },
+    };
+  }
+  if (mode === "revoked-credential") {
+    return {
+      code: "connector_provider_credential_revoked",
+      category: "provider",
+      message: `Fake DNS provider rejected ${operation} because the credential is revoked.`,
+      retryable: false,
+      details: {
+        providerKind: "dns",
+        operation,
+        failureMode: mode,
+      },
+    };
+  }
+  return {
+    code: "connector_provider_error",
+    category: "provider",
+    message: `Fake DNS provider failed ${operation}.`,
+    retryable: true,
+    details: {
+      providerKind: "dns",
+      operation,
+      failureMode: mode,
+    },
+  };
 }
 
 function dnsActionSummary(capabilityKey: string, dnsRecords: DnsRecordApplySnapshot): string {
