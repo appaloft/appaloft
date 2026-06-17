@@ -56,6 +56,9 @@
       "@appaloft/provider-infrastructure-vultr": [
         "./packages/providers/infrastructure-vultr/src/index.ts"
       ],
+      "@appaloft/provider-notification-slack": [
+        "./packages/providers/notification-slack/src/index.ts"
+      ],
       "@appaloft/provider-edge-proxy-caddy": ["./packages/providers/edge-proxy-caddy/src/index.ts"],
       "@appaloft/provider-edge-proxy-traefik": [
         "./packages/providers/edge-proxy-traefik/src/index.ts"

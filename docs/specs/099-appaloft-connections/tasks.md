@@ -41,6 +41,7 @@
 - [x] Add fake infrastructure provider adapter before real providers.
 - [x] Add real Vultr infrastructure proposal adapter with mocked HTTP contract tests.
 - [x] Add fake notification provider adapter before real providers.
+- [x] Add real Slack notification webhook adapter with mocked HTTP contract tests.
 - [x] Add GitHub App source connection projection/compatibility.
 - [x] Add persistent DNS provider plan contract.
 - [x] Add persistent DNS apply/verify/cleanup provider contracts.
