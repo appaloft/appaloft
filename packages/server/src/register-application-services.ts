@@ -202,6 +202,8 @@ import {
   DiffEnvironmentsQueryService,
   DoctorQueryService,
   type DomainBindingReadModel,
+  DuplicateEnvironmentProfileCommandHandler,
+  DuplicateEnvironmentProfileUseCase,
   EnvironmentEffectivePrecedenceQueryHandler,
   EnvironmentEffectivePrecedenceQueryService,
   EvaluateDeploymentOverlayCommandHandler,
@@ -2376,6 +2378,7 @@ export function registerApplicationServices(
   container.registerSingleton(DeleteProjectCommandHandler);
   container.registerSingleton(ArchiveEnvironmentCommandHandler);
   container.registerSingleton(CloneEnvironmentCommandHandler);
+  container.registerSingleton(DuplicateEnvironmentProfileCommandHandler);
   container.registerSingleton(RenameEnvironmentCommandHandler);
   container.registerSingleton(LockEnvironmentCommandHandler);
   container.registerSingleton(UnlockEnvironmentCommandHandler);
@@ -3261,6 +3264,10 @@ export function registerApplicationServices(
   container.registerSingleton(tokens.bootstrapServerProxyUseCase, BootstrapServerProxyUseCase);
   container.registerSingleton(tokens.archiveEnvironmentUseCase, ArchiveEnvironmentUseCase);
   container.registerSingleton(tokens.cloneEnvironmentUseCase, CloneEnvironmentUseCase);
+  container.registerSingleton(
+    tokens.duplicateEnvironmentProfileUseCase,
+    DuplicateEnvironmentProfileUseCase,
+  );
   container.registerSingleton(tokens.countEnvironmentsQueryService, CountEnvironmentsQueryService);
   container.registerSingleton(tokens.renameEnvironmentUseCase, RenameEnvironmentUseCase);
   container.registerSingleton(tokens.lockEnvironmentUseCase, LockEnvironmentUseCase);

@@ -105,6 +105,7 @@ export * from "./operations/environments/clone-environment.use-case";
 export * from "./operations/environments/count-environments.query-service";
 export * from "./operations/environments/create-environment.use-case";
 export * from "./operations/environments/diff-environments.query-service";
+export * from "./operations/environments/duplicate-environment-profile.use-case";
 export * from "./operations/environments/environment-effective-precedence.query-service";
 export * from "./operations/environments/list-environments.query-service";
 export * from "./operations/environments/lock-environment.use-case";

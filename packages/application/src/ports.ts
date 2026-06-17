@@ -4880,6 +4880,44 @@ export interface EnvironmentDuplicatePlanSummary {
   generatedAt: string;
 }
 
+export type EnvironmentDuplicateResourceDecision = "copy-shape" | "defer";
+
+export type EnvironmentDuplicateDependencyApplyDecision =
+  EnvironmentDuplicateDependencyDecisionHint;
+
+export interface EnvironmentDuplicateCopiedResourceSummary {
+  sourceResourceId: string;
+  targetResourceId: string;
+  name: string;
+  slug: string;
+}
+
+export interface EnvironmentDuplicateDeferredDecisionSummary {
+  kind:
+    | "resource"
+    | "dependency"
+    | "dependency-binding"
+    | "route"
+    | "storage"
+    | "resource-variable"
+    | "access-profile"
+    | "auto-deploy-policy"
+    | "runtime-health-check";
+  sourceId: string;
+  decision?: string;
+  reason: string;
+}
+
+export interface EnvironmentDuplicateProfileApplyResult {
+  schemaVersion: "environments.duplicate-profile/v1";
+  sourceEnvironmentId: string;
+  targetEnvironmentId: string;
+  copiedResources: EnvironmentDuplicateCopiedResourceSummary[];
+  deferredDecisions: EnvironmentDuplicateDeferredDecisionSummary[];
+  warnings: EnvironmentDuplicatePlanWarning[];
+  generatedAt: string;
+}
+
 export interface ServerBackedDeploymentSummaryTarget {
   kind: "server-backed";
   serverId: string;

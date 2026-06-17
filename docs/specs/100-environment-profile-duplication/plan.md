@@ -39,8 +39,10 @@
   - UI must be staged and decision-first.
 - Persistence/migration impact:
   - Phase 1 can compute plans on demand;
-  - later phases may persist accepted plans, decision journals, and idempotency keys if apply
-    becomes long-running.
+  - Phase 2 starts as a synchronous apply command that dispatches existing child commands and
+    returns deferred decisions;
+  - later phases may persist accepted plans, decision journals, deployment blockers, and
+    idempotency keys if provider-backed apply becomes long-running.
 
 ## Roadmap And Compatibility
 
