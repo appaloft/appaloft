@@ -4,6 +4,8 @@
   import { page } from "$app/state";
   import { onDestroy, untrack } from "svelte";
   import { createMutation, createQuery } from "@tanstack/svelte-query";
+  import type { IconModule as BrandIconModule } from "@thesvg/icons";
+  import cloudflareIcon from "@thesvg/icons/cloudflare";
   import {
     ArrowLeft,
     ArrowRight,
@@ -251,6 +253,10 @@
   type RelinkSourceLinkInput = Parameters<typeof orpcClient.sourceLinks.relink>[0];
   type DomainRouteMode = "serve" | "redirect";
   type RedirectStatusText = "301" | "302" | "307" | "308";
+  type ConnectorBrandIcon = {
+    title: string;
+    svg: string;
+  };
   type ResourceDetailSection =
     | "access"
     | "general"
@@ -269,6 +275,11 @@
   type ResourceLifecycleAction = "archive" | "restore" | "delete";
   type ResourceVariableKind = SetResourceVariableInput["kind"];
   type ResourceVariableExposure = SetResourceVariableInput["exposure"];
+  function brandIcon(icon: BrandIconModule, variant = "default"): ConnectorBrandIcon {
+    return { title: icon.title, svg: icon.variants[variant] ?? icon.svg };
+  }
+
+  const cloudflareConnectorIcon = brandIcon(cloudflareIcon);
   const resourceDetailTabs = [
     "overview",
     "deployments",
@@ -9655,7 +9666,16 @@
                       {selectedDnsConnectorBinding.id}
                     </p>
                   </div>
-                  <Badge variant="outline">cloudflare-dns</Badge>
+                  <Badge variant="outline" class="gap-1.5">
+                    <span
+                      class="inline-flex h-4 w-5 items-center justify-center [&_svg]:h-3.5 [&_svg]:w-5"
+                      aria-hidden="true"
+                      title={cloudflareConnectorIcon.title}
+                    >
+                      {@html cloudflareConnectorIcon.svg}
+                    </span>
+                    <span>Cloudflare DNS</span>
+                  </Badge>
                 </div>
                 <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
                   <label class="min-w-0 flex-1 space-y-1.5 text-sm font-medium" for="resource-domain-binding-dns-zone">

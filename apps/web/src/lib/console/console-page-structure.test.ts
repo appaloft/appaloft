@@ -1276,6 +1276,9 @@ describe("console page structure", () => {
     expect(resourceDetailPageSource).toContain("orpcClient.connections.capability.accept");
     expect(resourceDetailPageSource).toContain("orpcClient.connections.capability.apply");
     expect(resourceDetailPageSource).toContain('capabilityKey: "dns.records.apply"');
+    expect(resourceDetailPageSource).toContain('from "@thesvg/icons/cloudflare"');
+    expect(resourceDetailPageSource).toContain("cloudflareConnectorIcon.svg");
+    expect(resourceDetailPageSource).toContain("<span>Cloudflare DNS</span>");
     expect(resourceDetailPageSource).toContain('modalIsOpen(page, "domain-binding")');
     expect(resourceDomainBindingsSectionSource).not.toContain(
       "data-resource-static-artifact-domain-unavailable",
