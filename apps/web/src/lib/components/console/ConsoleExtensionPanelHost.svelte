@@ -1,7 +1,7 @@
 <script lang="ts">
   import { browser } from "$app/environment";
   import { page } from "$app/state";
-  import { AlertTriangle, ArrowUpRight } from "@lucide/svelte";
+  import { AlertTriangle, ArrowUpRight, ChevronDown, ChevronUp } from "@lucide/svelte";
   import { createQuery, queryOptions } from "@tanstack/svelte-query";
 
   import { readErrorMessage, request } from "$lib/api/client";
@@ -22,6 +22,9 @@
     title: string;
     description?: string;
     badge?: string;
+    collapsedByDefault?: boolean;
+    expandLabel?: string;
+    collapseLabel?: string;
     actions?: ConsolePageAction[];
     sections: ConsolePageSection[];
   };
@@ -115,6 +118,7 @@
   }: Props = $props();
   let pendingActionKey = $state<string | null>(null);
   let actionErrorMessage = $state("");
+  let expandedPanelKeys = $state<Record<string, boolean>>({});
 
   const webExtensionsQuery = createQuery(() =>
     queryOptions({
@@ -226,6 +230,23 @@
     return `${item?.title ?? "panel"}:${action.method ?? "POST"}:${action.endpoint}:${action.label}`;
   }
 
+  function panelKey(result: ConsolePanelDocumentResult): string {
+    return result.extension.key;
+  }
+
+  function isPanelExpanded(result: ConsolePanelDocumentResult): boolean {
+    const key = panelKey(result);
+    return !result.document.collapsedByDefault || expandedPanelKeys[key] === true;
+  }
+
+  function togglePanel(result: ConsolePanelDocumentResult): void {
+    const key = panelKey(result);
+    expandedPanelKeys = {
+      ...expandedPanelKeys,
+      [key]: !isPanelExpanded(result),
+    };
+  }
+
   async function runRequestAction(
     action: ConsolePageRequestAction,
     item?: ConsolePagePanelItem,
@@ -305,9 +326,9 @@
               <p class="text-sm leading-6 text-muted-foreground">{document.description}</p>
             {/if}
           </div>
-          {#if document.actions?.length}
+          {#if document.actions?.length || document.collapsedByDefault}
             <div class="flex shrink-0 flex-wrap gap-2">
-              {#each document.actions as action (action.href)}
+              {#each document.actions ?? [] as action (action.href)}
                 <Button
                   href={action.href}
                   target={action.external ? "_blank" : undefined}
@@ -321,80 +342,95 @@
                   {/if}
                 </Button>
               {/each}
+              {#if document.collapsedByDefault && document.sections.length > 0}
+                {@const expanded = isPanelExpanded(result)}
+                <Button type="button" variant="outline" size="sm" onclick={() => togglePanel(result)}>
+                  {expanded
+                    ? (document.collapseLabel ?? $t(i18nKeys.common.actions.close))
+                    : (document.expandLabel ?? $t(i18nKeys.common.actions.view))}
+                  {#if expanded}
+                    <ChevronUp class="size-4" />
+                  {:else}
+                    <ChevronDown class="size-4" />
+                  {/if}
+                </Button>
+              {/if}
             </div>
           {/if}
         </div>
 
-        {#each document.sections as section, sectionIndex (`${section.kind}-${sectionIndex}`)}
-          {#if section.kind === "callouts"}
-            <div class="space-y-2">
-              {#each section.items as item (item.title)}
-                <article class={["rounded-md border px-3 py-2", panelToneClass(item.tone)]}>
-                  <p class={["text-sm font-medium", toneClass(item.tone)]}>{item.title}</p>
-                  {#if item.description}
-                    <p class="mt-1 text-sm leading-6 text-muted-foreground">{item.description}</p>
-                  {/if}
-                </article>
-              {/each}
-            </div>
-          {:else if section.kind === "panel-grid"}
-            <div class="space-y-3">
-              {#if section.title || section.description}
-                <div class="space-y-1">
-                  {#if section.title}
-                    <h3 class="text-sm font-semibold">{section.title}</h3>
-                  {/if}
-                  {#if section.description}
-                    <p class="text-sm leading-6 text-muted-foreground">{section.description}</p>
-                  {/if}
-                </div>
-              {/if}
-              <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {#if isPanelExpanded(result)}
+          {#each document.sections as section, sectionIndex (`${section.kind}-${sectionIndex}`)}
+            {#if section.kind === "callouts"}
+              <div class="space-y-2">
                 {#each section.items as item (item.title)}
-                  <article class={["rounded-md border bg-background p-4", panelToneClass(item.tone)]}>
-                    <h4 class="text-sm font-semibold">{item.title}</h4>
+                  <article class={["rounded-md border px-3 py-2", panelToneClass(item.tone)]}>
+                    <p class={["text-sm font-medium", toneClass(item.tone)]}>{item.title}</p>
                     {#if item.description}
                       <p class="mt-1 text-sm leading-6 text-muted-foreground">{item.description}</p>
-                    {/if}
-                    {#if item.rows?.length}
-                      <dl class="mt-3 space-y-2">
-                        {#each item.rows as row (row.label)}
-                          <div class="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                            <dt class="text-xs text-muted-foreground">{row.label}</dt>
-                            <dd class={["break-all text-sm font-medium", toneClass(row.tone)]}>{row.value}</dd>
-                          </div>
-                        {/each}
-                      </dl>
-                    {/if}
-                    {#if item.actions?.length}
-                      <div class="mt-4 flex flex-wrap gap-2">
-                        {#each item.actions as action (requestActionKey(action, item))}
-                          <Button
-                            type="button"
-                            variant={action.variant === "primary" ? "default" : "outline"}
-                            size="sm"
-                            disabled={Boolean(action.disabled) ||
-                              pendingActionKey === requestActionKey(action, item)}
-                            onclick={() => runRequestAction(action, item)}
-                          >
-                            {pendingActionKey === requestActionKey(action, item)
-                              ? $t(i18nKeys.common.status.loading)
-                              : action.label}
-                          </Button>
-                        {/each}
-                      </div>
-                      {#each item.actions as action (requestActionKey(action, item))}
-                        {#if action.disabled && action.disabledReason}
-                          <p class="mt-2 text-xs text-muted-foreground">{action.disabledReason}</p>
-                        {/if}
-                      {/each}
                     {/if}
                   </article>
                 {/each}
               </div>
-            </div>
-          {/if}
-        {/each}
+            {:else if section.kind === "panel-grid"}
+              <div class="space-y-3">
+                {#if section.title || section.description}
+                  <div class="space-y-1">
+                    {#if section.title}
+                      <h3 class="text-sm font-semibold">{section.title}</h3>
+                    {/if}
+                    {#if section.description}
+                      <p class="text-sm leading-6 text-muted-foreground">{section.description}</p>
+                    {/if}
+                  </div>
+                {/if}
+                <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {#each section.items as item (item.title)}
+                    <article class={["rounded-md border bg-background p-4", panelToneClass(item.tone)]}>
+                      <h4 class="text-sm font-semibold">{item.title}</h4>
+                      {#if item.description}
+                        <p class="mt-1 text-sm leading-6 text-muted-foreground">{item.description}</p>
+                      {/if}
+                      {#if item.rows?.length}
+                        <dl class="mt-3 space-y-2">
+                          {#each item.rows as row (row.label)}
+                            <div class="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                              <dt class="text-xs text-muted-foreground">{row.label}</dt>
+                              <dd class={["break-all text-sm font-medium", toneClass(row.tone)]}>{row.value}</dd>
+                            </div>
+                          {/each}
+                        </dl>
+                      {/if}
+                      {#if item.actions?.length}
+                        <div class="mt-4 flex flex-wrap gap-2">
+                          {#each item.actions as action (requestActionKey(action, item))}
+                            <Button
+                              type="button"
+                              variant={action.variant === "primary" ? "default" : "outline"}
+                              size="sm"
+                              disabled={Boolean(action.disabled) ||
+                                pendingActionKey === requestActionKey(action, item)}
+                              onclick={() => runRequestAction(action, item)}
+                            >
+                              {pendingActionKey === requestActionKey(action, item)
+                                ? $t(i18nKeys.common.status.loading)
+                                : action.label}
+                            </Button>
+                          {/each}
+                        </div>
+                        {#each item.actions as action (requestActionKey(action, item))}
+                          {#if action.disabled && action.disabledReason}
+                            <p class="mt-2 text-xs text-muted-foreground">{action.disabledReason}</p>
+                          {/if}
+                        {/each}
+                      {/if}
+                    </article>
+                  {/each}
+                </div>
+              </div>
+            {/if}
+          {/each}
+        {/if}
       </section>
     {/each}
   </div>
