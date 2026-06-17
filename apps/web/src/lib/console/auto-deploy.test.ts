@@ -124,6 +124,8 @@ describe("resource auto-deploy console settings", () => {
     expect(source).toContain("autoDeployGenericWebhookSecretRef");
     expect(source).toContain("acknowledge-source-binding");
     expect(source).toContain("sourceAutoDeploySetup");
-    expect(source).toContain("sourceAutoDeploySignatures");
+    expect(source).not.toMatch(
+      /autoDeployTitle[\s\S]*?sourceAutoDeploySignatures[\s\S]*?autoDeployDescription/,
+    );
   });
 });

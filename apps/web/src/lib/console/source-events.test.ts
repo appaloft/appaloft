@@ -46,7 +46,11 @@ describe("source event console diagnostics", () => {
     expect(sourceEventsQuerySource).not.toContain("enabled: browser && resourceId.length > 0,");
     expect(source).toContain("sourceEventVisibleOutcomes");
     expect(source).toContain("sourceAutoDeployDedupe");
-    expect(source).toContain("sourceAutoDeployIgnoredEvents");
-    expect(source).toContain("sourceAutoDeployRecovery");
+    expect(source).not.toMatch(
+      /sourceEventsTitle[\s\S]*?sourceAutoDeployIgnoredEvents[\s\S]*?sourceEventsDescription/,
+    );
+    expect(source).not.toMatch(
+      /sourceEventsTitle[\s\S]*?sourceAutoDeployRecovery[\s\S]*?sourceEventsDescription/,
+    );
   });
 });
