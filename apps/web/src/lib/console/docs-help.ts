@@ -1,4 +1,5 @@
 import { publicDocsBasePath, resolvePublicDocsHelpHref } from "@appaloft/docs-registry";
+import { i18nKeys, type TranslationKey } from "@appaloft/i18n";
 
 export const webDocsHrefs = {
   docsHome: `${publicDocsBasePath}/`,
@@ -54,3 +55,65 @@ export const webDocsHrefs = {
 } as const;
 
 export const quickDeploySourceHelpHref = webDocsHrefs.deploymentSource;
+
+export const webDocsTooltipKeys = {
+  docsHome: i18nKeys.console.docsHelp.docsHome,
+  firstAdminBootstrap: i18nKeys.console.docsHelp.firstAdminBootstrap,
+  organizationTeamManagement: i18nKeys.console.docsHelp.organizationTeamManagement,
+  deploymentLifecycle: i18nKeys.console.docsHelp.deploymentLifecycle,
+  deploymentPlanPreview: i18nKeys.console.docsHelp.deploymentPlanPreview,
+  productGradePreviews: i18nKeys.console.docsHelp.productGradePreviews,
+  deploymentSource: i18nKeys.console.docsHelp.deploymentSource,
+  appaloftSkill: i18nKeys.console.docsHelp.appaloftSkill,
+  appaloftMcpServer: i18nKeys.console.docsHelp.appaloftMcpServer,
+  serverDeploymentTarget: i18nKeys.console.docsHelp.serverDeploymentTarget,
+  serverDockerSwarmTarget: i18nKeys.console.docsHelp.serverDockerSwarmTarget,
+  serverSshCredential: i18nKeys.console.docsHelp.serverSshCredential,
+  serverConnectivityTest: i18nKeys.console.docsHelp.serverConnectivityTest,
+  serverProxyReadiness: i18nKeys.console.docsHelp.serverProxyReadiness,
+  serverTerminalSession: i18nKeys.console.docsHelp.serverTerminalSession,
+  maintenanceWorkerActivation: i18nKeys.console.docsHelp.maintenanceWorkerActivation,
+  projectLifecycle: i18nKeys.console.docsHelp.projectLifecycle,
+  defaultAccessPolicy: i18nKeys.console.docsHelp.defaultAccessPolicy,
+  resourceConcept: i18nKeys.console.docsHelp.resourceConcept,
+  resourceSourceProfile: i18nKeys.console.docsHelp.resourceSourceProfile,
+  resourceRuntimeProfile: i18nKeys.console.docsHelp.resourceRuntimeProfile,
+  resourceProfileDrift: i18nKeys.console.docsHelp.resourceProfileDrift,
+  resourceRuntimeControls: i18nKeys.console.docsHelp.resourceRuntimeControls,
+  resourceHealthProfile: i18nKeys.console.docsHelp.resourceHealthProfile,
+  resourceNetworkProfile: i18nKeys.console.docsHelp.resourceNetworkProfile,
+  resourceAccessProfile: i18nKeys.console.docsHelp.resourceAccessProfile,
+  storageVolumeLifecycle: i18nKeys.console.docsHelp.storageVolumeLifecycle,
+  dependencyResourceLifecycle: i18nKeys.console.docsHelp.dependencyResourceLifecycle,
+  dependencyBackupRestore: i18nKeys.console.docsHelp.dependencyBackupRestore,
+  dependencyRuntimeInjection: i18nKeys.console.docsHelp.dependencyRuntimeInjection,
+  environmentConcept: i18nKeys.console.docsHelp.environmentConcept,
+  environmentLifecycle: i18nKeys.console.docsHelp.environmentLifecycle,
+  environmentVariablePrecedence: i18nKeys.console.docsHelp.environmentVariablePrecedence,
+  domainGeneratedAccessRoute: i18nKeys.console.docsHelp.domainGeneratedAccessRoute,
+  domainCustomDomainBinding: i18nKeys.console.docsHelp.domainCustomDomainBinding,
+  domainOwnershipCheck: i18nKeys.console.docsHelp.domainOwnershipCheck,
+  certificateReadiness: i18nKeys.console.docsHelp.certificateReadiness,
+  observabilityRuntimeLogs: i18nKeys.console.docsHelp.observabilityRuntimeLogs,
+  observabilityHealthSummary: i18nKeys.console.docsHelp.observabilityHealthSummary,
+  diagnosticsSafeSupportPayload: i18nKeys.console.docsHelp.diagnosticsSafeSupportPayload,
+  runtimeUsageInspect: i18nKeys.console.docsHelp.runtimeUsageInspect,
+  runtimeTargetCapacity: i18nKeys.console.docsHelp.runtimeTargetCapacity,
+  sourceAutoDeploySetup: i18nKeys.console.docsHelp.sourceAutoDeploySetup,
+  sourceAutoDeploySignatures: i18nKeys.console.docsHelp.sourceAutoDeploySignatures,
+  sourceAutoDeployDedupe: i18nKeys.console.docsHelp.sourceAutoDeployDedupe,
+  sourceAutoDeployIgnoredEvents: i18nKeys.console.docsHelp.sourceAutoDeployIgnoredEvents,
+  sourceAutoDeployRecovery: i18nKeys.console.docsHelp.sourceAutoDeployRecovery,
+  scheduledTaskLifecycle: i18nKeys.console.docsHelp.scheduledTaskLifecycle,
+} satisfies Record<keyof typeof webDocsHrefs, TranslationKey>;
+
+const webDocsTooltipKeysByHref = new Map<string, TranslationKey>(
+  Object.entries(webDocsHrefs).map(([key, href]) => [
+    href,
+    webDocsTooltipKeys[key as keyof typeof webDocsHrefs],
+  ]),
+);
+
+export function docsHelpTooltipKeyForHref(href: string): TranslationKey | undefined {
+  return webDocsTooltipKeysByHref.get(href);
+}
