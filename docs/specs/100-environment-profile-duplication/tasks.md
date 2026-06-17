@@ -30,8 +30,9 @@
   neutral `BindResourceDependencyCommand` for copied resource bindings.
 - [x] ENV-PROFILE-DUP-005: persist/project unresolved dependency binding decisions, surface them
   in `deployments.plan`, and block `deployments.create` before runtime/provider side effects.
-- [ ] ENV-PROFILE-DUP-006 / ENV-PROFILE-DUP-007: implement route regeneration/defer and storage
-  requirement decisions.
+- [x] ENV-PROFILE-DUP-006: classify source custom domain routes in duplicate plan and persist
+  deferred target route decisions during apply without copying production domains.
+- [ ] ENV-PROFILE-DUP-007: implement storage requirement decisions.
 - [ ] Add Web staged apply surface for `environments.duplicate-profile`.
 - [ ] Persist or project shared-source warning for deployment readiness, audit, and Web surfaces.
 

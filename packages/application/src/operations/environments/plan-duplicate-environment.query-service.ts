@@ -17,7 +17,10 @@ import {
   type Clock,
   type DependencyResourceReadModel,
   type DependencyResourceSummary,
+  type DomainBindingReadModel,
+  type DomainBindingSummary,
   type EnvironmentDuplicateDependencyCandidate,
+  type EnvironmentDuplicateDomainRouteCandidate,
   type EnvironmentDuplicatePlanSummary,
   type EnvironmentDuplicateResourceCandidate,
   type EnvironmentDuplicateVariableCandidate,
@@ -42,6 +45,8 @@ export class PlanDuplicateEnvironmentQueryService {
     private readonly resourceDependencyBindingReadModel: ResourceDependencyBindingReadModel,
     @inject(tokens.clock)
     private readonly clock: Clock,
+    @inject(tokens.domainBindingReadModel, { isOptional: true })
+    private readonly domainBindingReadModel?: DomainBindingReadModel,
   ) {}
 
   async execute(
@@ -94,6 +99,15 @@ export class PlanDuplicateEnvironmentQueryService {
           return err(dependencyBindingsResult.error);
         }
         const dependencyBindings = dependencyBindingsResult.value;
+        const domainRoutes = this.domainBindingReadModel
+          ? await collectDomainRoutes(
+              this.domainBindingReadModel,
+              repositoryContext,
+              sourceEnvironment.projectId,
+              sourceEnvironment.id,
+              resources.map((resource) => resource.id),
+            )
+          : [];
 
         const targetConflict =
           Boolean(existingTargetByName) && existingTargetByName?.id !== input.targetEnvironmentId;
@@ -163,12 +177,34 @@ export class PlanDuplicateEnvironmentQueryService {
             target: binding.target,
             decisionHint: "rebind-after-dependency-decision" as const,
           })),
+          domainRouteCandidates: domainRoutes.map(toDomainRouteCandidate),
           warnings,
           generatedAt: this.clock.now(),
         });
       }.bind(this),
     );
   }
+}
+
+async function collectDomainRoutes(
+  readModel: DomainBindingReadModel,
+  context: ReturnType<typeof toRepositoryContext>,
+  projectId: string,
+  environmentId: string,
+  resourceIds: string[],
+): Promise<DomainBindingSummary[]> {
+  const routes: DomainBindingSummary[] = [];
+  for (const resourceId of resourceIds) {
+    routes.push(
+      ...(await readModel.list(context, {
+        projectId,
+        environmentId,
+        resourceId,
+        limit: 500,
+      })),
+    );
+  }
+  return routes;
 }
 
 async function collectDependencyBindings(
@@ -185,6 +221,26 @@ async function collectDependencyBindings(
     bindings.push(...result.value.filter((binding) => binding.status === "active"));
   }
   return ok(bindings);
+}
+
+function toDomainRouteCandidate(
+  binding: DomainBindingSummary,
+): EnvironmentDuplicateDomainRouteCandidate {
+  return {
+    domainBindingId: binding.id,
+    resourceId: binding.resourceId,
+    domainName: binding.domainName,
+    pathPrefix: binding.pathPrefix,
+    proxyKind: binding.proxyKind,
+    tlsMode: binding.tlsMode,
+    ...(binding.redirectTo ? { redirectTo: binding.redirectTo } : {}),
+    ...(binding.redirectStatus ? { redirectStatus: binding.redirectStatus } : {}),
+    status: binding.status,
+    decisionHint: "defer",
+    reasons: [
+      "Custom domains are environment-specific and must not be copied into the target environment without an explicit route decision.",
+    ],
+  };
 }
 
 function toDependencyCandidate(

@@ -27,6 +27,7 @@ import {
   type CommandBus,
   CreateResourceCommand,
   createExecutionContext,
+  type DomainBindingReadModel,
   type EnvironmentReadModel,
   ProvisionDependencyResourceCommand,
   type ResourceReadModel,
@@ -221,8 +222,45 @@ const bindingReadModel = {
   },
 } satisfies ResourceDependencyBindingReadModel;
 
+const sourceDomainBinding = {
+  id: "dom_prod_web",
+  projectId: "prj_demo",
+  environmentId: "env_prod",
+  resourceId: "res_web",
+  serverId: "srv_demo",
+  destinationId: "dst_demo",
+  domainName: "www.example.com",
+  pathPrefix: "/",
+  proxyKind: "traefik",
+  tlsMode: "auto",
+  certificatePolicy: "auto",
+  status: "ready",
+  verificationAttemptCount: 1,
+  createdAt: "2026-01-01T00:00:06.000Z",
+} satisfies Awaited<ReturnType<DomainBindingReadModel["list"]>>[number];
+
+const emptyDomainBindingReadModel = {
+  async list() {
+    return [];
+  },
+} satisfies DomainBindingReadModel;
+
+const domainBindingReadModel = {
+  async list(_context, input) {
+    if (
+      input?.projectId === sourceDomainBinding.projectId &&
+      input?.environmentId === sourceDomainBinding.environmentId &&
+      input?.resourceId === sourceDomainBinding.resourceId
+    ) {
+      return [sourceDomainBinding];
+    }
+    return [];
+  },
+} satisfies DomainBindingReadModel;
+
 function createQueryService(input?: {
   environmentReadModel?: EnvironmentReadModel;
+  domainBindingReadModel?: DomainBindingReadModel;
 }): PlanDuplicateEnvironmentQueryService {
   return new PlanDuplicateEnvironmentQueryService(
     input?.environmentReadModel ?? createEnvironmentReadModel(),
@@ -230,6 +268,7 @@ function createQueryService(input?: {
     dependencyResourceReadModel,
     bindingReadModel,
     new FixedClock("2026-01-01T00:00:10.000Z"),
+    input?.domainBindingReadModel ?? emptyDomainBindingReadModel,
   );
 }
 
@@ -298,6 +337,7 @@ function createCommandBus(commands: AppCommand<unknown>[]): CommandBus {
 function createApplyUseCase(
   commands: AppCommand<unknown>[] = [],
   environmentProfileDecisions?: MemoryEnvironmentProfileDecisionStore,
+  input?: { domainBindingReadModel?: DomainBindingReadModel },
 ) {
   return new DuplicateEnvironmentProfileUseCase(
     createCommandBus(commands),
@@ -308,6 +348,7 @@ function createApplyUseCase(
     bindingReadModel,
     new FixedClock("2026-01-01T00:00:10.000Z"),
     environmentProfileDecisions,
+    input?.domainBindingReadModel ?? emptyDomainBindingReadModel,
   );
 }
 
@@ -388,6 +429,38 @@ describe("environment profile duplication plan query", () => {
     });
     expect(result._unsafeUnwrap().warnings).toEqual([
       expect.objectContaining({ code: "target_environment_name_conflict" }),
+    ]);
+  });
+
+  test("[ENV-PROFILE-DUP-006] classifies custom domains as deferred route decisions", async () => {
+    const queryService = createQueryService({ domainBindingReadModel });
+    const result = await queryService.execute(
+      createExecutionContext({
+        requestId: "req_env_duplicate_plan_routes",
+        entrypoint: "system",
+      }),
+      {
+        environmentId: "env_prod",
+        targetName: "staging",
+      },
+    );
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+    expect(plan.domainRouteCandidates).toEqual([
+      {
+        domainBindingId: "dom_prod_web",
+        resourceId: "res_web",
+        domainName: "www.example.com",
+        pathPrefix: "/",
+        proxyKind: "traefik",
+        tlsMode: "auto",
+        status: "ready",
+        decisionHint: "defer",
+        reasons: [
+          "Custom domains are environment-specific and must not be copied into the target environment without an explicit route decision.",
+        ],
+      },
     ]);
   });
 
@@ -666,5 +739,56 @@ describe("environment profile duplication apply command", () => {
         status: "pending",
       }),
     ]);
+  });
+
+  test("[ENV-PROFILE-DUP-006] records custom domain routes as pending target decisions", async () => {
+    const commands: AppCommand<unknown>[] = [];
+    const pendingDecisions = new MemoryEnvironmentProfileDecisionStore();
+    const result = await createApplyUseCase(commands, pendingDecisions, {
+      domainBindingReadModel,
+    }).execute(
+      createExecutionContext({
+        requestId: "req_env_duplicate_apply_route_defer",
+        entrypoint: "system",
+      }),
+      {
+        environmentId: "env_prod",
+        targetName: "staging",
+        dependencyDecisions: [
+          { dependencyResourceId: "rsi_pg", decision: "create-new-managed" },
+          {
+            dependencyResourceId: "rsi_external_pg",
+            decision: "bind-existing",
+            targetDependencyResourceId: "rsi_external_pg_staging",
+          },
+        ],
+      },
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(commands).toHaveLength(4);
+    expect(result._unsafeUnwrap().deferredDecisions).toContainEqual({
+      kind: "route",
+      sourceId: "dom_prod_web",
+      decision: "defer",
+      reason:
+        "Custom domain routes are environment-specific and must be regenerated or explicitly rebound before deployment.",
+    });
+    await expect(
+      pendingDecisions.listPending(
+        toRepositoryContext(
+          createExecutionContext({ requestId: "req_pending_route", entrypoint: "system" }),
+        ),
+        { environmentId: "env_staging", resourceId: "res_web_staging" },
+      ),
+    ).resolves.toContainEqual(
+      expect.objectContaining({
+        environmentId: "env_staging",
+        resourceId: "res_web_staging",
+        kind: "route",
+        sourceId: "dom_prod_web",
+        status: "pending",
+      }),
+    );
   });
 });

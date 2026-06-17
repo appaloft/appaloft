@@ -4863,6 +4863,20 @@ export interface EnvironmentDuplicateDependencyBindingCandidate {
   decisionHint: "rebind-after-dependency-decision" | "defer";
 }
 
+export interface EnvironmentDuplicateDomainRouteCandidate {
+  domainBindingId: string;
+  resourceId: string;
+  domainName: string;
+  pathPrefix: string;
+  proxyKind: EdgeProxyKind;
+  tlsMode: TlsMode;
+  redirectTo?: string;
+  redirectStatus?: 301 | 302 | 307 | 308;
+  status: DomainBindingSummary["status"];
+  decisionHint: "regenerate" | "defer";
+  reasons: string[];
+}
+
 export interface EnvironmentDuplicatePlanWarning {
   code: string;
   message: string;
@@ -4876,6 +4890,7 @@ export interface EnvironmentDuplicatePlanSummary {
   resourceCandidates: EnvironmentDuplicateResourceCandidate[];
   dependencyCandidates: EnvironmentDuplicateDependencyCandidate[];
   dependencyBindingCandidates: EnvironmentDuplicateDependencyBindingCandidate[];
+  domainRouteCandidates: EnvironmentDuplicateDomainRouteCandidate[];
   warnings: EnvironmentDuplicatePlanWarning[];
   generatedAt: string;
 }
