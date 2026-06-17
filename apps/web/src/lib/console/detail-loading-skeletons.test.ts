@@ -51,4 +51,20 @@ describe("console detail loading skeletons", () => {
       source.indexOf('<p class="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">'),
     );
   });
+
+  test("[PROJECT-DETAIL-SKELETON-001] renders balanced resource row placeholders", async () => {
+    const source = await readFile(
+      new URL("../../routes/projects/[projectId=consoleObjectId]/+page.svelte", import.meta.url),
+      "utf8",
+    );
+
+    const resourceSkeletonSource = source.slice(
+      source.indexOf("{#snippet projectDetailLoadingSkeleton()}"),
+      source.indexOf('<aside class="space-y-4">'),
+    );
+
+    expect(resourceSkeletonSource).toContain("{#each Array.from({ length: 2 }) as _, groupIndex}");
+    expect(resourceSkeletonSource).toContain("{#each Array.from({ length: 2 }) as _}");
+    expect(resourceSkeletonSource).not.toContain("groupIndex === 0 ? 2 : 1");
+  });
 });

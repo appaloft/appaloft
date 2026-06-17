@@ -659,7 +659,7 @@ export const zhCN = {
       recoveryTitle: "恢复就绪",
       runtimePlanDescription: "从检测到规划生成的可执行计划。",
       runtimePlanTitle: "运行计划",
-      snapshotDescription: "部署时持久化的不可变环境快照，密钥只显示元信息。",
+      snapshotDescription: "部署时持久化的不可变环境快照，密钥值会脱敏显示。",
       snapshotTitle: "环境快照",
       succeededAttemptHint: "成功部署",
       relatedContextUnavailable: "关联的项目、环境、资源或服务器上下文未能完整解析。",

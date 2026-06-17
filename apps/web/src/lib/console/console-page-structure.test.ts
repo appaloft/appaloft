@@ -702,6 +702,13 @@ describe("console page structure", () => {
     expect(projectDeploymentsTabSource).not.toMatch(
       /<a[\s\S]*?(部署|createDeployment)[\s\S]*?<\/a>/,
     );
+    expect(resourceListTableSource).toContain(
+      "aria-label={$t(i18nKeys.common.actions.createDeployment)}",
+    );
+    expect(resourceListTableSource).toContain("import { ArrowRight, Globe2, Play }");
+    expect(resourceListTableSource).not.toContain(
+      "aria-label={$t(i18nKeys.common.actions.quickDeploy)}",
+    );
   });
 
   test("[PROJECT-INSTALL-IA-003] keeps terminal install failures out of project overview health", () => {
@@ -1610,6 +1617,8 @@ describe("console page structure", () => {
   test("[DEPLOYMENT-DETAIL-IA-001] keeps recovery actions behind an intent dialog", () => {
     expect(deploymentDetailPageSource).toContain("data-deployment-attempt-snapshot");
     expect(deploymentDetailPageSource).toContain("data-deployment-access-snapshot");
+    expect(deploymentDetailPageSource).toContain("data-deployment-environment-snapshot-value");
+    expect(deploymentDetailPageSource).toContain("{variable.value}");
     expect(deploymentDetailPageSource).toContain("data-deployment-current-resource-handoff");
     expect(deploymentDetailPageSource).toContain("data-deployment-attempt-observation");
     expect(deploymentDetailPageSource).toContain("data-deployment-current-resource-observation");
@@ -3418,7 +3427,7 @@ describe("console page structure", () => {
     );
     const projectConsoleQueriesSource = sourceBetween(
       projectDetailPageSource,
-      "const { projectsQuery, environmentsQuery, resourcesQuery, deploymentsQuery }",
+      "const { projectsQuery, serversQuery, environmentsQuery, resourcesQuery, deploymentsQuery }",
       "const projectId = $derived",
     );
     const projectPreviewEnvironmentsQuerySource = sourceBetween(
@@ -3461,7 +3470,8 @@ describe("console page structure", () => {
     expect(projectConsoleQueriesSource).toContain("health: false");
     expect(projectConsoleQueriesSource).toContain("readiness: false");
     expect(projectConsoleQueriesSource).toContain("version: false");
-    expect(projectConsoleQueriesSource).toContain("servers: false");
+    expect(projectConsoleQueriesSource).toContain("serversQuery");
+    expect(projectConsoleQueriesSource).not.toContain("servers: false");
     expect(projectConsoleQueriesSource).toContain("previewEnvironments: false");
     expect(projectConsoleQueriesSource).toContain("domainBindings: false");
     expect(projectConsoleQueriesSource).toContain("certificates: false");
