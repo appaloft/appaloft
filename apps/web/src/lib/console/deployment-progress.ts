@@ -433,12 +433,14 @@ export function deploymentTimelineProgressStatus(
   envelopes: DeploymentTimelineEnvelope[],
   fallbackStatus: DeploymentSummary["status"] | null | undefined,
 ): DeploymentProgressDialogStatus {
-  const lastEvent = [...envelopes].reverse().find((envelope) => envelope.kind === "entry");
-  if (lastEvent?.kind === "entry") {
-    const status = deploymentTimelineStatus(lastEvent.entry.status);
-    if (status) {
-      return status;
-    }
+  const failedEvent = [...envelopes]
+    .reverse()
+    .find(
+      (envelope) =>
+        envelope.kind === "entry" && deploymentTimelineStatus(envelope.entry.status) === "failed",
+    );
+  if (failedEvent) {
+    return "failed";
   }
 
   if (!fallbackStatus) {

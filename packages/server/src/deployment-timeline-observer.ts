@@ -150,11 +150,7 @@ function isTerminalDeploymentStatus(status: string | undefined): boolean {
 }
 
 function isTerminalProgressEvent(event: DeploymentProgressEvent): boolean {
-  if (event.status === "failed") {
-    return true;
-  }
-
-  return event.phase === "verify" && event.status === "succeeded";
+  return event.status === "failed";
 }
 
 function createDeploymentTimelineStream(input: {

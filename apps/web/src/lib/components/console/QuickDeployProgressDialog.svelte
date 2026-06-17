@@ -99,12 +99,10 @@
   }
 
   function deploymentEventStatus(): DeploymentProgressDialogStatus | undefined {
-    const terminalEvent = [...deploymentEvents]
-      .reverse()
-      .find((event) => event.status === "failed" || event.status === "succeeded");
+    const failedEvent = [...deploymentEvents].reverse().find((event) => event.status === "failed");
 
-    if (terminalEvent?.status === "failed" || terminalEvent?.status === "succeeded") {
-      return terminalEvent.status;
+    if (failedEvent) {
+      return "failed";
     }
 
     return deploymentEvents.length > 0 ? "running" : undefined;

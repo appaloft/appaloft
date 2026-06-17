@@ -135,16 +135,6 @@
     className,
   ]}
 >
-  <div
-    class="-mx-4 -mt-3 mb-3 grid grid-cols-[4.75rem_minmax(0,1fr)] gap-x-2 border-b border-zinc-800 bg-zinc-950 px-4 py-2 text-[0.65rem] font-semibold uppercase tracking-normal text-zinc-500 md:grid-cols-[4.75rem_5rem_7rem_3.5rem_minmax(0,1fr)]"
-  >
-    <span>{$t(i18nKeys.console.deployments.progressColumnTime)}</span>
-    <span class="hidden md:block">{$t(i18nKeys.console.deployments.progressColumnPhase)}</span>
-    <span class="hidden md:block">{$t(i18nKeys.console.deployments.progressColumnSource)}</span>
-    <span class="hidden md:block">{$t(i18nKeys.console.deployments.progressColumnLevel)}</span>
-    <span>{$t(i18nKeys.console.deployments.progressColumnMessage)}</span>
-  </div>
-
   {#if events.length === 0}
     <div class="flex items-center gap-2 py-2 text-zinc-400">
       {#if isRunning}

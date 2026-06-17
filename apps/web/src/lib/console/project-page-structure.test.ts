@@ -193,7 +193,8 @@ describe("project detail page structure", () => {
     expect(deploymentProgressTerminalSource).toContain("Intl.DateTimeFormat");
     expect(deploymentProgressTerminalSource).toContain("new Date(timestamp)");
     expect(deploymentProgressTerminalSource).toContain("data-deployment-progress-terminal");
-    expect(deploymentProgressTerminalSource).toContain("progressColumnSource");
+    expect(deploymentProgressTerminalSource).not.toContain("progressColumnTime");
+    expect(deploymentProgressTerminalSource).not.toContain("progressColumnSource");
     expect(deploymentProgressTerminalSource).toContain('case "docker"');
     expect(deploymentProgressTerminalSource).toContain("bg-zinc-950");
     expect(operationProgressPanelSource).not.toContain("xl:grid-cols");
