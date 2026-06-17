@@ -79,6 +79,7 @@ or directly mutate provider resources.
 | APP-CONN-015 | Web surfaces are contextual and central | A user binds a domain, chooses a source, registers a server, or configures notifications | Web needs a connection | Web can enter from a central Connections area or contextual workflow and still uses the same application services. |
 | APP-CONN-016 | Provider adapters are mockable | Tests run without network or paid provider access | Connection flows execute | Fake providers simulate success, conflict, token expiry, revoke, callback/webhook, rate limit, and provider errors. |
 | APP-CONN-017 | Connection lifecycle is tenant scoped | A multi-tenant runtime has connection records for different owners | A user lists, shows, starts, completes callback, or revokes a connection | Application services derive or validate `ConnectionOwner.tenantId` from execution context; cross-tenant owner refs and connection ids return not found and do not mutate another tenant's connection. |
+| APP-CONN-018 | Category names are not connector keys | DNS and infrastructure expose category pages and CLI shortcuts | A user views docs, CLI help, API payloads, or audit records | `dns` and `infrastructure` are described only as categories or shortcut namespaces; install, authorization, lifecycle, and adapter selection use concrete connector keys such as `cloudflare-dns` or `vultr-infrastructure`. |
 
 ## Public Surfaces
 
@@ -112,7 +113,9 @@ appaloft connectors apply --connector <connector> --capability <key> --parameter
 
 DNS convenience aliases may exist for ergonomics, but they must translate into the same connector
 capability commands. DNS is a connector category, not a sibling model to `Connection` or
-`ConnectorDefinition`.
+`ConnectorDefinition`. The phrase "DNS connector" is only shorthand for a concrete connector in
+the DNS category, such as `cloudflare-dns`; persistent records, credentials, audit, and revoke
+surfaces must use the concrete connector key.
 
 ```text
 appaloft dns connect <domain>
