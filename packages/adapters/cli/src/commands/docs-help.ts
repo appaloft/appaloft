@@ -824,6 +824,14 @@ export const cliCommandDescriptions = {
     "environment.variable-precedence",
   ),
   environmentDiff: withDocs("Diff two environments", "environment.diff-promote"),
+  environmentDuplicate: withDocs(
+    "Plan or apply environment profile duplication",
+    "environment.lifecycle",
+  ),
+  environmentDuplicatePlan: withDocs(
+    "Plan environment profile duplication",
+    "environment.lifecycle",
+  ),
   environmentPromote: withDocs("Promote an environment", "environment.diff-promote"),
   defaultAccess: withDocs(
     "Configure generated default access domain policy",

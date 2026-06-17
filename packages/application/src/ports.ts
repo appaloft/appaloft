@@ -4804,6 +4804,82 @@ export interface EnvironmentDiffSummary {
   };
 }
 
+export type EnvironmentDuplicateDependencyDecisionHint =
+  | "create-new-managed"
+  | "bind-existing"
+  | "reuse-source"
+  | "defer";
+
+export interface EnvironmentDuplicateTargetSummary {
+  projectId: string;
+  name: string;
+  environmentId?: string;
+  existingEnvironmentId?: string;
+  existingLifecycleStatus?: EnvironmentSummary["lifecycleStatus"];
+  conflict: boolean;
+}
+
+export interface EnvironmentDuplicateVariableCandidate {
+  key: string;
+  scope: ConfigScope;
+  exposure: VariableExposure;
+  kind: VariableKind;
+  isSecret: boolean;
+  maskedValue: string;
+  decisionHint: "copy" | "defer";
+}
+
+export interface EnvironmentDuplicateResourceCandidate {
+  resourceId: string;
+  name: string;
+  slug: string;
+  kind: ResourceSummary["kind"];
+  services: ResourceSummary["services"];
+  networkProfile?: ResourceSummary["networkProfile"];
+  accessProfile?: ResourceSummary["accessProfile"];
+  decisionHint: "recreate-resource" | "bind-existing" | "defer";
+}
+
+export interface EnvironmentDuplicateDependencyCandidate {
+  dependencyResourceId: string;
+  name: string;
+  slug: string;
+  kind: DependencyResourceSummary["kind"];
+  sourceMode: DependencyResourceSummary["sourceMode"];
+  providerKey: string;
+  providerManaged: boolean;
+  lifecycleStatus: DependencyResourceSummary["lifecycleStatus"];
+  desiredCapabilities: DependencyResourceSummary["desiredCapabilities"];
+  decisionHint: EnvironmentDuplicateDependencyDecisionHint;
+  reasons: string[];
+}
+
+export interface EnvironmentDuplicateDependencyBindingCandidate {
+  bindingId: string;
+  resourceId: string;
+  dependencyResourceId: string;
+  kind: ResourceDependencyBindingSummary["kind"];
+  target: ResourceDependencyBindingSummary["target"];
+  decisionHint: "rebind-after-dependency-decision" | "defer";
+}
+
+export interface EnvironmentDuplicatePlanWarning {
+  code: string;
+  message: string;
+}
+
+export interface EnvironmentDuplicatePlanSummary {
+  schemaVersion: "environments.duplicate-plan/v1";
+  sourceEnvironment: EnvironmentSummary;
+  target: EnvironmentDuplicateTargetSummary;
+  variableCandidates: EnvironmentDuplicateVariableCandidate[];
+  resourceCandidates: EnvironmentDuplicateResourceCandidate[];
+  dependencyCandidates: EnvironmentDuplicateDependencyCandidate[];
+  dependencyBindingCandidates: EnvironmentDuplicateDependencyBindingCandidate[];
+  warnings: EnvironmentDuplicatePlanWarning[];
+  generatedAt: string;
+}
+
 export interface ServerBackedDeploymentSummaryTarget {
   kind: "server-backed";
   serverId: string;

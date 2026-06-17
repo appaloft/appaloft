@@ -6,6 +6,7 @@ import {
   EnvironmentEffectivePrecedenceQuery,
   ListEnvironmentsQuery,
   LockEnvironmentCommand,
+  PlanDuplicateEnvironmentQuery,
   PromoteEnvironmentCommand,
   RenameEnvironmentCommand,
   SetEnvironmentVariableCommand,
@@ -211,6 +212,30 @@ const diffCommand = EffectCommand.make(
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.environmentDiff));
 
+const duplicatePlanCommand = EffectCommand.make(
+  "plan",
+  {
+    environmentId: environmentIdArg,
+    name: nameOption,
+    project: projectOption,
+    target: Options.text("target").pipe(Options.optional),
+  },
+  ({ environmentId, name, project, target }) =>
+    runQuery(
+      PlanDuplicateEnvironmentQuery.create({
+        environmentId,
+        targetName: name,
+        targetProjectId: optionalValue(project),
+        targetEnvironmentId: optionalValue(target),
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.environmentDuplicatePlan));
+
+const duplicateCommand = EffectCommand.make("duplicate").pipe(
+  EffectCommand.withDescription(cliCommandDescriptions.environmentDuplicate),
+  EffectCommand.withSubcommands([duplicatePlanCommand]),
+);
+
 const effectivePrecedenceCommand = EffectCommand.make(
   "effective-precedence",
   {
@@ -251,6 +276,7 @@ export const envCommand = EffectCommand.make("env").pipe(
     unsetCommand,
     effectivePrecedenceCommand,
     diffCommand,
+    duplicateCommand,
     promoteCommand,
   ]),
 );

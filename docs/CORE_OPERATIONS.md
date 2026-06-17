@@ -309,6 +309,7 @@ Implemented operations:
 | Unset environment variable | Command | `environments.unset-variable` | `UnsetEnvironmentVariableCommand` | `UnsetEnvironmentVariableCommandInput` | `appaloft env unset <environmentId> <key>` | `DELETE /api/environments/{environmentId}/variables/{key}` |
 | Read environment effective precedence | Query | `environments.effective-precedence` | `EnvironmentEffectivePrecedenceQuery` | `EnvironmentEffectivePrecedenceQueryInput` | `appaloft env effective-precedence <environmentId>` | `GET /api/environments/{environmentId}/effective-precedence` |
 | Diff environments | Query | `environments.diff` | `DiffEnvironmentsQuery` | `DiffEnvironmentsQueryInput` | `appaloft env diff <environmentId> <otherEnvironmentId>` | `GET /api/environments/{environmentId}/diff/{otherEnvironmentId}` |
+| Plan environment profile duplication | Query | `environments.plan-duplicate` | `PlanDuplicateEnvironmentQuery` | `PlanDuplicateEnvironmentQueryInput` | `appaloft env duplicate plan <environmentId> --name <targetName>` | `GET /api/environments/{environmentId}/duplicate-plan` |
 | Clone environment | Command | `environments.clone` | `CloneEnvironmentCommand` | `CloneEnvironmentCommandInput` | `appaloft env clone <environmentId> --name <targetName>` | `POST /api/environments/{environmentId}/clone` |
 | Promote environment | Command | `environments.promote` | `PromoteEnvironmentCommand` | `PromoteEnvironmentCommandInput` | `appaloft env promote <environmentId> <targetName>` | `POST /api/environments/{environmentId}/promote` |
 | Lock environment | Command | `environments.lock` | `LockEnvironmentCommand` | `LockEnvironmentCommandInput` | `appaloft env lock <environmentId> --reason <reason>` | `POST /api/environments/{environmentId}/lock` |
@@ -318,9 +319,6 @@ Implemented operations:
 Core next operations expected here:
 - list environment change history
 - restore/delete and lifecycle history
-- `environments.plan-duplicate` to return a reviewable Environment Profile duplication plan that
-  copies shape but classifies dependencies, secrets, domains, storage data, and deployment policy as
-  explicit target decisions
 - `environments.duplicate-profile` to apply an accepted plan by dispatching explicit child
   commands for target environment, resource, dependency, variable, route, storage, and policy work
 - `environments.diff-profile` to compare environment shape across resources, profiles, variables,

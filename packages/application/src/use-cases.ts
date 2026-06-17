@@ -108,6 +108,7 @@ export * from "./operations/environments/diff-environments.query-service";
 export * from "./operations/environments/environment-effective-precedence.query-service";
 export * from "./operations/environments/list-environments.query-service";
 export * from "./operations/environments/lock-environment.use-case";
+export * from "./operations/environments/plan-duplicate-environment.query-service";
 export * from "./operations/environments/promote-environment.use-case";
 export * from "./operations/environments/rename-environment.use-case";
 export * from "./operations/environments/set-environment-variable.use-case";

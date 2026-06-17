@@ -1,0 +1,228 @@
+import {
+  domainError,
+  EnvironmentByIdSpec,
+  EnvironmentByProjectAndNameSpec,
+  EnvironmentId,
+  EnvironmentName,
+  err,
+  ok,
+  ProjectId,
+  type Result,
+  safeTry,
+} from "@appaloft/core";
+import { inject, injectable } from "tsyringe";
+
+import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
+import {
+  type Clock,
+  type DependencyResourceReadModel,
+  type DependencyResourceSummary,
+  type EnvironmentDuplicateDependencyCandidate,
+  type EnvironmentDuplicatePlanSummary,
+  type EnvironmentDuplicateResourceCandidate,
+  type EnvironmentDuplicateVariableCandidate,
+  type EnvironmentReadModel,
+  type ResourceDependencyBindingReadModel,
+  type ResourceDependencyBindingSummary,
+  type ResourceReadModel,
+} from "../../ports";
+import { tokens } from "../../tokens";
+import { type PlanDuplicateEnvironmentQueryInput } from "./plan-duplicate-environment.query";
+
+@injectable()
+export class PlanDuplicateEnvironmentQueryService {
+  constructor(
+    @inject(tokens.environmentReadModel)
+    private readonly environmentReadModel: EnvironmentReadModel,
+    @inject(tokens.resourceReadModel)
+    private readonly resourceReadModel: ResourceReadModel,
+    @inject(tokens.dependencyResourceReadModel)
+    private readonly dependencyResourceReadModel: DependencyResourceReadModel,
+    @inject(tokens.resourceDependencyBindingReadModel)
+    private readonly resourceDependencyBindingReadModel: ResourceDependencyBindingReadModel,
+    @inject(tokens.clock)
+    private readonly clock: Clock,
+  ) {}
+
+  async execute(
+    context: ExecutionContext,
+    input: PlanDuplicateEnvironmentQueryInput,
+  ): Promise<Result<EnvironmentDuplicatePlanSummary>> {
+    const repositoryContext = toRepositoryContext(context);
+
+    return safeTry(
+      async function* (this: PlanDuplicateEnvironmentQueryService) {
+        const sourceEnvironmentId = yield* EnvironmentId.create(input.environmentId);
+        const sourceEnvironment = await this.environmentReadModel.findOne(
+          repositoryContext,
+          EnvironmentByIdSpec.create(sourceEnvironmentId),
+        );
+        if (!sourceEnvironment) {
+          return err(domainError.notFound("environment", input.environmentId));
+        }
+
+        const targetProjectId = input.targetProjectId ?? sourceEnvironment.projectId;
+        const targetName = yield* EnvironmentName.create(input.targetName);
+        const existingTargetByName = await this.environmentReadModel.findOne(
+          repositoryContext,
+          EnvironmentByProjectAndNameSpec.create(ProjectId.rehydrate(targetProjectId), targetName),
+        );
+        const existingTargetById = input.targetEnvironmentId
+          ? await this.environmentReadModel.findOne(
+              repositoryContext,
+              EnvironmentByIdSpec.create(EnvironmentId.rehydrate(input.targetEnvironmentId)),
+            )
+          : null;
+
+        const resources = await this.resourceReadModel.list(repositoryContext, {
+          projectId: sourceEnvironment.projectId,
+          environmentId: sourceEnvironment.id,
+          includePreviewResources: false,
+          limit: 500,
+        });
+        const dependencyResources = await this.dependencyResourceReadModel.list(repositoryContext, {
+          projectId: sourceEnvironment.projectId,
+          environmentId: sourceEnvironment.id,
+          limit: 500,
+        });
+        const dependencyBindingsResult = await collectDependencyBindings(
+          this.resourceDependencyBindingReadModel,
+          repositoryContext,
+          resources.map((resource) => resource.id),
+        );
+        if (dependencyBindingsResult.isErr()) {
+          return err(dependencyBindingsResult.error);
+        }
+        const dependencyBindings = dependencyBindingsResult.value;
+
+        const targetConflict =
+          Boolean(existingTargetByName) && existingTargetByName?.id !== input.targetEnvironmentId;
+        const warnings = [
+          ...(targetConflict
+            ? [
+                {
+                  code: "target_environment_name_conflict",
+                  message: "Target environment name already exists in the target project.",
+                },
+              ]
+            : []),
+          ...(existingTargetById && existingTargetById.projectId !== targetProjectId
+            ? [
+                {
+                  code: "target_environment_project_mismatch",
+                  message: "Target environment id belongs to a different project.",
+                },
+              ]
+            : []),
+        ];
+
+        return ok({
+          schemaVersion: "environments.duplicate-plan/v1" as const,
+          sourceEnvironment,
+          target: {
+            projectId: targetProjectId,
+            name: targetName.value,
+            ...(input.targetEnvironmentId ? { environmentId: input.targetEnvironmentId } : {}),
+            ...(existingTargetByName
+              ? {
+                  existingEnvironmentId: existingTargetByName.id,
+                  existingLifecycleStatus: existingTargetByName.lifecycleStatus,
+                }
+              : {}),
+            conflict: targetConflict,
+          },
+          variableCandidates: sourceEnvironment.maskedVariables.map(
+            (variable): EnvironmentDuplicateVariableCandidate => ({
+              key: variable.key,
+              scope: variable.scope,
+              exposure: variable.exposure,
+              kind: variable.kind,
+              isSecret: variable.isSecret,
+              maskedValue: variable.value,
+              decisionHint: "copy",
+            }),
+          ),
+          resourceCandidates: resources.map(
+            (resource): EnvironmentDuplicateResourceCandidate => ({
+              resourceId: resource.id,
+              name: resource.name,
+              slug: resource.slug,
+              kind: resource.kind,
+              services: resource.services,
+              ...(resource.networkProfile ? { networkProfile: resource.networkProfile } : {}),
+              ...(resource.accessProfile ? { accessProfile: resource.accessProfile } : {}),
+              decisionHint: "recreate-resource",
+            }),
+          ),
+          dependencyCandidates: dependencyResources.map(toDependencyCandidate),
+          dependencyBindingCandidates: dependencyBindings.map((binding) => ({
+            bindingId: binding.id,
+            resourceId: binding.resourceId,
+            dependencyResourceId: binding.dependencyResourceId,
+            kind: binding.kind,
+            target: binding.target,
+            decisionHint: "rebind-after-dependency-decision" as const,
+          })),
+          warnings,
+          generatedAt: this.clock.now(),
+        });
+      }.bind(this),
+    );
+  }
+}
+
+async function collectDependencyBindings(
+  readModel: ResourceDependencyBindingReadModel,
+  context: ReturnType<typeof toRepositoryContext>,
+  resourceIds: string[],
+): Promise<Result<ResourceDependencyBindingSummary[]>> {
+  const bindings: ResourceDependencyBindingSummary[] = [];
+  for (const resourceId of resourceIds) {
+    const result = await readModel.list(context, { resourceId });
+    if (result.isErr()) {
+      return result;
+    }
+    bindings.push(...result.value.filter((binding) => binding.status === "active"));
+  }
+  return ok(bindings);
+}
+
+function toDependencyCandidate(
+  dependency: DependencyResourceSummary,
+): EnvironmentDuplicateDependencyCandidate {
+  if (dependency.sourceMode === "imported-external") {
+    return {
+      dependencyResourceId: dependency.id,
+      name: dependency.name,
+      slug: dependency.slug,
+      kind: dependency.kind,
+      sourceMode: dependency.sourceMode,
+      providerKey: dependency.providerKey,
+      providerManaged: dependency.providerManaged,
+      lifecycleStatus: dependency.lifecycleStatus,
+      desiredCapabilities: dependency.desiredCapabilities,
+      decisionHint: "bind-existing",
+      reasons: [
+        "Imported external dependencies are usually rebound unless the user imports another target dependency.",
+      ],
+    };
+  }
+
+  return {
+    dependencyResourceId: dependency.id,
+    name: dependency.name,
+    slug: dependency.slug,
+    kind: dependency.kind,
+    sourceMode: dependency.sourceMode,
+    providerKey: dependency.providerKey,
+    providerManaged: dependency.providerManaged,
+    lifecycleStatus: dependency.lifecycleStatus,
+    desiredCapabilities: dependency.desiredCapabilities,
+    decisionHint: dependency.providerManaged ? "create-new-managed" : "reuse-source",
+    reasons: dependency.providerManaged
+      ? [
+          "Provider-managed dependencies should default to an explicit new managed instance decision.",
+        ]
+      : ["Unmanaged dependencies can be reused unless the target profile supplies an override."],
+  };
+}
