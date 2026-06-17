@@ -306,6 +306,8 @@ import {
   MarkServerAppliedRouteStatusOnDeploymentFinishedHandler,
   OpenTerminalSessionUseCase,
   OperatorWorkQueryService,
+  PlanConnectorCapabilityQueryHandler,
+  PlanConnectorCapabilityQueryService,
   PreviewCleanupRetryScheduler,
   PreviewDeploymentProcessManager,
   PreviewEnvironmentCleanupService,
@@ -1587,6 +1589,7 @@ export function registerApplicationServices(
   container.registerSingleton(IssueCertificateOnCertificateRequestedHandler);
   container.registerSingleton(ListConnectorCategoriesQueryHandler);
   container.registerSingleton(ListConnectorsQueryHandler);
+  container.registerSingleton(PlanConnectorCapabilityQueryHandler);
   container.registerSingleton(ListBlueprintsQueryHandler);
   container.registerSingleton(ShowBlueprintQueryHandler);
   container.registerSingleton(CreateBlueprintInstallPlanQueryHandler);
@@ -2528,6 +2531,10 @@ export function registerApplicationServices(
   container.registerSingleton(
     tokens.connectorCategoriesQueryService,
     ListConnectorCategoriesQueryService,
+  );
+  container.registerSingleton(
+    tokens.connectorCapabilityPlanQueryService,
+    PlanConnectorCapabilityQueryService,
   );
   container.registerSingleton(tokens.pluginsQueryService, ListPluginsQueryService);
   container.registerSingleton(tokens.blueprintCatalogQueryService, BlueprintCatalogQueryService);

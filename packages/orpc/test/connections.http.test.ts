@@ -8,6 +8,7 @@ import {
   type ExecutionContextFactory,
   ListConnectorCategoriesQuery,
   ListConnectorsQuery,
+  PlanConnectorCapabilityQuery,
   type Query,
   type QueryBus,
 } from "@appaloft/application";
@@ -146,6 +147,80 @@ describe("connections HTTP routes", () => {
       ],
     });
     expect(capturedQuery).toBeInstanceOf(ListConnectorsQuery);
+  });
+
+  test("[APP-CONN-014] plans connector capabilities through HTTP/oRPC", async () => {
+    let capturedQuery: Query<unknown> | undefined;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      commandBus: noopCommandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus: queryBusFor((query) => {
+        capturedQuery = query;
+        return {
+          planId: "dnsplan_test",
+          connectorKey: "cloudflare-dns",
+          capabilityKey: "dns.records.plan",
+          riskLevel: "low",
+          requiresExplicitAcceptance: true,
+          summary: "Cloudflare DNS: 1 DNS record planned in example.com.",
+          effects: [
+            {
+              kind: "dns.record.upsert",
+              title: "CNAME app.example.com",
+              description: "CNAME app.example.com -> edge.appaloft.dev",
+            },
+          ],
+          cleanup: {
+            supported: true,
+          },
+          providerPlan: {
+            kind: "dns-records",
+            dnsRecords: {
+              zoneName: "example.com",
+              records: [
+                {
+                  name: "app.example.com",
+                  type: "CNAME",
+                  value: "edge.appaloft.dev",
+                  purpose: "domain-routing",
+                },
+              ],
+              conflicts: [],
+            },
+          },
+        };
+      }),
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/connections/capabilities/plan", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          connectorKey: "cloudflare-dns",
+          capabilityKey: "dns.records.plan",
+          parameters: {
+            zoneName: "example.com",
+            hostname: "app.example.com",
+            target: "edge.appaloft.dev",
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      planId: "dnsplan_test",
+      connectorKey: "cloudflare-dns",
+      capabilityKey: "dns.records.plan",
+      providerPlan: {
+        kind: "dns-records",
+      },
+    });
+    expect(capturedQuery).toBeInstanceOf(PlanConnectorCapabilityQuery);
   });
 });
 

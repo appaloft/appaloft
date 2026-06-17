@@ -341,6 +341,8 @@ import {
   OpenTerminalSessionUseCase,
   OperatorWorkQueryService,
   operationCatalog,
+  PlanConnectorCapabilityQueryHandler,
+  PlanConnectorCapabilityQueryService,
   PrepareServerRuntimeCommandHandler,
   PrepareServerRuntimeUseCase,
   PreviewCleanupRetryScheduler,
@@ -2386,6 +2388,7 @@ export function registerApplicationServices(
   container.registerSingleton(QueryCapabilitiesQueryHandler);
   container.registerSingleton(ListConnectorCategoriesQueryHandler);
   container.registerSingleton(ListConnectorsQueryHandler);
+  container.registerSingleton(PlanConnectorCapabilityQueryHandler);
   container.registerSingleton(ListBlueprintsQueryHandler);
   container.registerSingleton(ShowBlueprintQueryHandler);
   container.registerSingleton(CreateBlueprintInstallPlanQueryHandler);
@@ -3456,6 +3459,10 @@ export function registerApplicationServices(
   container.registerSingleton(
     tokens.connectorCategoriesQueryService,
     ListConnectorCategoriesQueryService,
+  );
+  container.registerSingleton(
+    tokens.connectorCapabilityPlanQueryService,
+    PlanConnectorCapabilityQueryService,
   );
   container.registerSingleton(tokens.integrationsQueryService, ListIntegrationsQueryService);
   container.registerSingleton(tokens.blueprintCatalogQueryService, BlueprintCatalogQueryService);

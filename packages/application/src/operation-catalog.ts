@@ -256,6 +256,7 @@ import { checkInstanceUpgradeQueryInputSchema } from "./operations/system/check-
 import { githubAppConnectionQueryInputSchema } from "./operations/system/github-app-connection.query";
 import { listConnectorsQueryInputSchema } from "./operations/system/list-connectors.query";
 import { listGitHubRepositoriesQueryInputSchema } from "./operations/system/list-github-repositories.query";
+import { connectorCapabilityPlanInputSchema } from "./operations/system/plan-connector-capability.query";
 import { closeTerminalSessionCommandInputSchema } from "./operations/terminal-sessions/close-terminal-session.command";
 import { expireTerminalSessionsCommandInputSchema } from "./operations/terminal-sessions/expire-terminal-sessions.command";
 import { listTerminalSessionsQueryInputSchema } from "./operations/terminal-sessions/list-terminal-sessions.query";
@@ -4073,6 +4074,23 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft connectors catalog",
       orpc: { method: "GET", path: "/api/connections/catalog" },
+    },
+  },
+  {
+    key: "connections.capability.plan",
+    kind: "query",
+    domain: "connections",
+    messageName: "PlanConnectorCapabilityQuery",
+    handlerName: "PlanConnectorCapabilityQueryHandler",
+    serviceName: "PlanConnectorCapabilityQueryService",
+    inputSchema: connectorCapabilityPlanInputSchema,
+    serviceToken: tokens.connectorCapabilityPlanQueryService,
+    transportAccess: {
+      productSession: "public",
+    },
+    transports: {
+      cli: "appaloft connectors plan --connector <connector> --capability <capability>",
+      orpc: { method: "POST", path: "/api/connections/capabilities/plan" },
     },
   },
   {

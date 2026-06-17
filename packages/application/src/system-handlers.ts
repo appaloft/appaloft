@@ -14,5 +14,7 @@ export * from "./operations/system/list-github-repositories.query-service";
 export * from "./operations/system/list-integrations.handler";
 export * from "./operations/system/list-plugins.handler";
 export * from "./operations/system/list-providers.handler";
+export * from "./operations/system/plan-connector-capability.handler";
+export * from "./operations/system/plan-connector-capability.query-service";
 export * from "./operations/system/upsert-github-app-installation.handler";
 export * from "./operations/system/upsert-github-app-installation.use-case";

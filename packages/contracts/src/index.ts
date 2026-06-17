@@ -6488,6 +6488,58 @@ export const connectorDescriptorSchema = z.object({
     .optional(),
 });
 
+export const dnsRecordRequirementSchema = z.object({
+  name: z.string(),
+  type: z.enum(["A", "AAAA", "CNAME", "TXT"]),
+  value: z.string(),
+  ttl: z.number().int().positive().optional(),
+  proxied: z.boolean().optional(),
+  purpose: z.enum(["domain-routing", "domain-verification", "certificate-validation", "manual"]),
+});
+
+export const dnsRecordConflictSchema = z.object({
+  name: z.string(),
+  requestedType: dnsRecordRequirementSchema.shape.type,
+  existingType: dnsRecordRequirementSchema.shape.type,
+  reason: z.enum(["cname-exclusive", "different-value"]),
+  existingValue: z.string(),
+  requestedValue: z.string(),
+});
+
+export const dnsRecordPlanSchema = z.object({
+  zoneName: z.string().optional(),
+  records: z.array(dnsRecordRequirementSchema),
+  conflicts: z.array(dnsRecordConflictSchema),
+});
+
+export const connectorCapabilityPlanPreviewSchema = z.object({
+  planId: z.string(),
+  connectorKey: z.string(),
+  capabilityKey: z.string(),
+  riskLevel: z.enum(["low", "medium", "high"]),
+  requiresExplicitAcceptance: z.boolean(),
+  summary: z.string(),
+  effects: z.array(
+    z.object({
+      kind: z.string(),
+      title: z.string(),
+      description: z.string().optional(),
+    }),
+  ),
+  cleanup: z
+    .object({
+      supported: z.boolean(),
+      description: z.string().optional(),
+    })
+    .optional(),
+  providerPlan: z
+    .object({
+      kind: z.string(),
+      dnsRecords: dnsRecordPlanSchema.optional(),
+    })
+    .optional(),
+});
+
 export const listConnectorCategoriesResponseSchema = z.object({
   items: z.array(connectionCategorySchema),
 });
@@ -6495,6 +6547,8 @@ export const listConnectorCategoriesResponseSchema = z.object({
 export const listConnectorsResponseSchema = z.object({
   items: z.array(connectorDescriptorSchema),
 });
+
+export const connectorCapabilityPlanResponseSchema = connectorCapabilityPlanPreviewSchema;
 
 export const listProvidersResponseSchema = z.object({
   items: z.array(providerDescriptorSchema),
@@ -6653,6 +6707,10 @@ export type IntegrationDescriptor = z.infer<typeof integrationDescriptorSchema>;
 export type ConnectionCategory = z.infer<typeof connectionCategorySchema>;
 export type CredentialGrantKind = z.infer<typeof credentialGrantKindSchema>;
 export type ConnectorDescriptor = z.infer<typeof connectorDescriptorSchema>;
+export type DnsRecordRequirement = z.infer<typeof dnsRecordRequirementSchema>;
+export type DnsRecordConflict = z.infer<typeof dnsRecordConflictSchema>;
+export type DnsRecordPlan = z.infer<typeof dnsRecordPlanSchema>;
+export type ConnectorCapabilityPlanPreview = z.infer<typeof connectorCapabilityPlanPreviewSchema>;
 export type PluginSummary = z.infer<typeof pluginSummarySchema>;
 export type SystemPluginWebExtension = z.infer<typeof systemPluginWebExtensionSchema>;
 export type MaintenanceWorkerActivation = z.infer<typeof maintenanceWorkerActivationSchema>;
@@ -7308,6 +7366,7 @@ export type ResourceDiagnosticSummary = z.infer<typeof resourceDiagnosticSummary
 export type ProxyConfigurationView = z.infer<typeof proxyConfigurationViewSchema>;
 export type ListConnectorCategoriesResponse = z.infer<typeof listConnectorCategoriesResponseSchema>;
 export type ListConnectorsResponse = z.infer<typeof listConnectorsResponseSchema>;
+export type ConnectorCapabilityPlanResponse = z.infer<typeof connectorCapabilityPlanResponseSchema>;
 export type ListProvidersResponse = z.infer<typeof listProvidersResponseSchema>;
 export type ListIntegrationsResponse = z.infer<typeof listIntegrationsResponseSchema>;
 export type ListPluginsResponse = z.infer<typeof listPluginsResponseSchema>;

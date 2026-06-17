@@ -60,6 +60,7 @@ import {
   type EventHandlerContract,
   type ExecutionContext,
   eventHandlerTypesFor,
+  FakeDnsConnectorProviderAdapter,
   type FirstAdminPasswordIssuer,
   getExecutionAuthProviderAccessToken,
   type IdGenerator,
@@ -1745,7 +1746,15 @@ export function registerRuntimeDependencies(
     ),
   });
   container.register(tokens.connectorProviderAdapterRegistry, {
-    useFactory: instanceCachingFactory(() => new InMemoryConnectorProviderAdapterRegistry([])),
+    useFactory: instanceCachingFactory(
+      () =>
+        new InMemoryConnectorProviderAdapterRegistry([
+          new FakeDnsConnectorProviderAdapter({
+            connectorKey: "cloudflare-dns",
+            providerTitle: "Cloudflare DNS",
+          }),
+        ]),
+    ),
   });
   container.register(tokens.integrationRegistry, {
     useFactory: instanceCachingFactory(

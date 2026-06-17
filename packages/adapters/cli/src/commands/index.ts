@@ -11,6 +11,7 @@ import { defaultAccessCommand } from "./default-access.js";
 import { dependencyCommand } from "./dependency.js";
 import { deployTokenCommand } from "./deploy-token.js";
 import { deployCommand, deploymentsCommand, logsCommand, previewCommand } from "./deployment.js";
+import { dnsCommand } from "./dns.js";
 import { domainBindingCommand } from "./domain-binding.js";
 import { domainEventCommand } from "./domain-event.js";
 import { envCommand } from "./environment.js";
@@ -84,6 +85,7 @@ export const mainCommand = EffectCommand.make("appaloft").pipe(
     terminalSessionCommand,
     upgradeCommand,
     connectorsCommand,
+    dnsCommand,
     pluginsCommand,
     providersCommand,
   ]),

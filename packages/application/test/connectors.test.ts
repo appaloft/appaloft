@@ -4,9 +4,12 @@ import { describe, expect, test } from "bun:test";
 import {
   createDefaultConnectorDefinitions,
   createExecutionContext,
+  FakeDnsConnectorProviderAdapter,
+  InMemoryConnectorProviderAdapterRegistry,
   InMemoryConnectorRegistry,
   ListConnectorCategoriesQueryService,
   ListConnectorsQueryService,
+  PlanConnectorCapabilityQueryService,
 } from "../src";
 
 describe("connector catalog", () => {
@@ -97,5 +100,93 @@ describe("connector catalog", () => {
     });
 
     expect(result.items).toEqual([]);
+  });
+
+  test("[APP-CONN-004][APP-CONN-014][APP-CONN-016] plans Cloudflare DNS records through a provider adapter", async () => {
+    const registry = new InMemoryConnectorRegistry(
+      createDefaultConnectorDefinitions({
+        cloudflareDns: {
+          configured: true,
+        },
+      }),
+    );
+    const service = new PlanConnectorCapabilityQueryService(
+      registry,
+      new InMemoryConnectorProviderAdapterRegistry([
+        new FakeDnsConnectorProviderAdapter({
+          connectorKey: "cloudflare-dns",
+          providerTitle: "Cloudflare DNS",
+        }),
+      ]),
+    );
+
+    const result = await service.execute(createExecutionContext({ entrypoint: "system" }), {
+      connectorKey: "cloudflare-dns",
+      capabilityKey: "dns.records.plan",
+      parameters: {
+        zoneName: "example.com",
+        hostname: "app.example.com",
+        target: "edge.appaloft.dev",
+        recordType: "CNAME",
+      },
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+    expect(plan.connectorKey).toBe("cloudflare-dns");
+    expect(plan.providerPlan?.dnsRecords?.records).toEqual([
+      {
+        name: "app.example.com",
+        type: "CNAME",
+        value: "edge.appaloft.dev",
+        purpose: "domain-routing",
+      },
+    ]);
+    expect(JSON.stringify(plan)).not.toContain("token");
+  });
+
+  test("[APP-CONN-005][APP-CONN-016] fake DNS provider reports conflicts without applying changes", async () => {
+    const registry = new InMemoryConnectorRegistry(
+      createDefaultConnectorDefinitions({
+        cloudflareDns: {
+          configured: true,
+        },
+      }),
+    );
+    const service = new PlanConnectorCapabilityQueryService(
+      registry,
+      new InMemoryConnectorProviderAdapterRegistry([
+        new FakeDnsConnectorProviderAdapter({
+          connectorKey: "cloudflare-dns",
+          providerTitle: "Cloudflare DNS",
+          existingRecords: [
+            {
+              name: "app.example.com",
+              type: "A",
+              value: "203.0.113.10",
+              purpose: "manual",
+            },
+          ],
+        }),
+      ]),
+    );
+
+    const result = await service.execute(createExecutionContext({ entrypoint: "system" }), {
+      connectorKey: "cloudflare-dns",
+      capabilityKey: "dns.records.plan",
+      parameters: {
+        zoneName: "example.com",
+        hostname: "app.example.com",
+        target: "edge.appaloft.dev",
+        recordType: "CNAME",
+      },
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+    expect(plan.riskLevel).toBe("medium");
+    expect(plan.requiresExplicitAcceptance).toBe(true);
+    expect(plan.providerPlan?.dnsRecords?.conflicts).toHaveLength(1);
+    expect(plan.effects.map((effect) => effect.kind)).toContain("dns.record.conflict");
   });
 });

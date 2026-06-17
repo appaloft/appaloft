@@ -30,6 +30,9 @@ import {
   type DestinationKind,
   type DestinationMutationSpec,
   type DestinationSelectionSpec,
+  type DnsRecordConflictSnapshot,
+  type DnsRecordPlanSnapshot,
+  type DnsRecordRequirementSnapshot,
   type DomainBinding,
   type DomainBindingMutationSpec,
   type DomainBindingSelectionSpec,
@@ -9563,6 +9566,10 @@ export interface ConnectorCapabilityPlanPreview {
     supported: boolean;
     description?: string;
   };
+  providerPlan?: {
+    kind: "dns-records" | string;
+    dnsRecords?: DnsRecordPlanSnapshot;
+  };
 }
 
 export interface ConnectorProviderAdapter {
@@ -9578,6 +9585,20 @@ export interface ConnectorProviderAdapterRegistry {
   list(): ConnectorProviderAdapter[];
   findForConnector(connectorKey: string): ConnectorProviderAdapter | null;
 }
+
+export interface DnsConnectorPlanParameters {
+  zoneName?: string;
+  records: DnsRecordRequirementSnapshot[];
+}
+
+export interface DnsConnectorProviderReadModel {
+  existingRecords(input: {
+    zoneName?: string;
+    records: readonly DnsRecordRequirementSnapshot[];
+  }): Promise<Result<readonly DnsRecordRequirementSnapshot[]>>;
+}
+
+export type { DnsRecordConflictSnapshot, DnsRecordPlanSnapshot, DnsRecordRequirementSnapshot };
 
 export interface IntegrationAuthPort {
   getProviderAccessToken(context: ExecutionContext, providerKey: "github"): Promise<string | null>;
