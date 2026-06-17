@@ -56,18 +56,27 @@ import {
   SequenceIdGenerator,
 } from "@appaloft/testkit";
 import {
+  createDefaultConnectorDefinitions,
   createExecutionContext,
   type ExecutionContext,
+  FakeDnsConnectorProviderAdapter,
+  InMemoryConnectorProviderAdapterRegistry,
+  InMemoryConnectorRegistry,
   type OperationCheckRequest,
   type OperationGuardDecision,
   type OperationGuardPort,
+  PlanConnectorCapabilityQueryService,
   type ProcessAttemptRecord,
   type ProcessAttemptRecorder,
   type RepositoryContext,
   toRepositoryContext,
 } from "../src";
 import { CreateDomainBindingCommand } from "../src/operations/domain-bindings/create-domain-binding.command";
-import { CreateDomainBindingUseCase, ListDomainBindingsQueryService } from "../src/use-cases";
+import {
+  CreateDomainBindingUseCase,
+  ListDomainBindingsQueryService,
+  PlanDomainBindingDnsQueryService,
+} from "../src/use-cases";
 
 function createTestContext(): ExecutionContext {
   return createExecutionContext({
@@ -408,6 +417,68 @@ describe("CreateDomainBindingUseCase", () => {
     expect(repeated.isOk()).toBe(true);
     expect(repeated._unsafeUnwrap().id).toBe(id);
     expect(processAttemptRecorder.records).toHaveLength(1);
+  });
+
+  test("[CLOUD-CONN-DNS-003][APP-CONN-004] plans DNS records from a domain binding through a connector", async () => {
+    const { context, readModel, useCase } = await seedRoutingContext();
+
+    const result = await useCase.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      serverId: "srv_demo",
+      destinationId: "dst_demo",
+      domainName: "WWW.Example.COM",
+      proxyKind: "traefik",
+      tlsMode: "auto",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const service = new PlanDomainBindingDnsQueryService(
+      readModel,
+      new PlanConnectorCapabilityQueryService(
+        new InMemoryConnectorRegistry(
+          createDefaultConnectorDefinitions({
+            cloudflareDns: {
+              configured: true,
+            },
+          }),
+        ),
+        new InMemoryConnectorProviderAdapterRegistry([
+          new FakeDnsConnectorProviderAdapter({
+            connectorKey: "cloudflare-dns",
+            providerTitle: "Cloudflare DNS",
+          }),
+        ]),
+      ),
+    );
+
+    const plan = await service.execute(context, {
+      domainBindingId: result._unsafeUnwrap().id,
+      connectorKey: "cloudflare-dns",
+      capabilityKey: "dns.records.plan",
+      zoneName: "example.com",
+    });
+
+    expect(plan.isOk()).toBe(true);
+    const preview = plan._unsafeUnwrap();
+    expect(preview.connectorKey).toBe("cloudflare-dns");
+    expect(preview.capabilityKey).toBe("dns.records.plan");
+    expect(preview.providerPlan?.dnsRecords).toMatchObject({
+      zoneName: "example.com",
+      records: [
+        {
+          name: "www.example.com",
+          type: "A",
+          value: "127.0.0.1",
+          purpose: "domain-routing",
+        },
+      ],
+      conflicts: [],
+    });
+    expect(preview.effects.map((effect) => effect.kind)).toContain("dns.record.upsert");
+    expect(JSON.stringify(preview)).not.toContain("token");
+    expect(JSON.stringify(preview)).not.toContain("secret");
   });
 
   test("rejects proxyKind none for durable domain bindings", async () => {

@@ -80,6 +80,7 @@ import { confirmDomainBindingOwnershipCommandInputSchema } from "./operations/do
 import { createDomainBindingCommandInputSchema } from "./operations/domain-bindings/create-domain-binding.command";
 import { deleteDomainBindingCommandInputSchema } from "./operations/domain-bindings/delete-domain-binding.command";
 import { listDomainBindingsQueryInputSchema } from "./operations/domain-bindings/list-domain-bindings.query";
+import { planDomainBindingDnsQueryInputSchema } from "./operations/domain-bindings/plan-domain-binding-dns.query";
 import { retryDomainBindingVerificationCommandInputSchema } from "./operations/domain-bindings/retry-domain-binding-verification.command";
 import { showDomainBindingQueryInputSchema } from "./operations/domain-bindings/show-domain-binding.query";
 import { pruneDomainEventsCommandInputSchema } from "./operations/domain-events/prune-domain-events.command";
@@ -3893,6 +3894,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft domain-binding show <domainBindingId>",
       orpc: { method: "GET", path: "/api/domain-bindings/{domainBindingId}" },
+    },
+  },
+  {
+    key: "domain-bindings.dns-plan",
+    kind: "query",
+    domain: "domain-bindings",
+    messageName: "PlanDomainBindingDnsQuery",
+    handlerName: "PlanDomainBindingDnsQueryHandler",
+    serviceName: "PlanDomainBindingDnsQueryService",
+    inputSchema: planDomainBindingDnsQueryInputSchema,
+    serviceToken: tokens.planDomainBindingDnsQueryService,
+    transports: {
+      cli: "appaloft domain-binding dns-plan <domainBindingId> [--connector cloudflare-dns]",
+      orpc: { method: "POST", path: "/api/domain-bindings/{domainBindingId}/dns-plan" },
     },
   },
   {

@@ -13,6 +13,8 @@ import {
   ListConnectorCategoriesQuery,
   ListConnectorsQuery,
   PlanConnectorCapabilityQuery,
+  PlanDomainBindingDnsQuery,
+  type ProductSessionAuthorizationPort,
   type Query,
   type QueryBus,
   RevokeConnectionCommand,
@@ -230,6 +232,79 @@ describe("connections HTTP routes", () => {
     expect(capturedQuery).toBeInstanceOf(PlanConnectorCapabilityQuery);
   });
 
+  test("[APP-CONN-014][APP-CONN-004] plans domain binding DNS through HTTP/oRPC", async () => {
+    let capturedQuery: Query<unknown> | undefined;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      commandBus: noopCommandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      productSessionAuthorizationPort: authenticatedProductSessionAuthorizationPort,
+      queryBus: queryBusFor((query) => {
+        capturedQuery = query;
+        return {
+          planId: "dnsplan_binding_test",
+          connectorKey: "cloudflare-dns",
+          capabilityKey: "dns.records.plan",
+          riskLevel: "low",
+          requiresExplicitAcceptance: true,
+          summary: "Cloudflare DNS: 1 DNS record planned in example.com.",
+          effects: [
+            {
+              kind: "dns.record.upsert",
+              title: "A app.example.com",
+              description: "A app.example.com -> 127.0.0.1",
+            },
+          ],
+          cleanup: {
+            supported: true,
+          },
+          providerPlan: {
+            kind: "dns-records",
+            dnsRecords: {
+              zoneName: "example.com",
+              records: [
+                {
+                  name: "app.example.com",
+                  type: "A",
+                  value: "127.0.0.1",
+                  purpose: "domain-routing",
+                },
+              ],
+              conflicts: [],
+            },
+          },
+        };
+      }),
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/domain-bindings/dbind_test/dns-plan", {
+        method: "POST",
+        headers: {
+          cookie: "appaloft-session=connections-test",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          domainBindingId: "dbind_test",
+          connectorKey: "cloudflare-dns",
+          capabilityKey: "dns.records.plan",
+          zoneName: "example.com",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      planId: "dnsplan_binding_test",
+      connectorKey: "cloudflare-dns",
+      capabilityKey: "dns.records.plan",
+      providerPlan: {
+        kind: "dns-records",
+      },
+    });
+    expect(capturedQuery).toBeInstanceOf(PlanDomainBindingDnsQuery);
+  });
+
   test("[APP-CONN-014][APP-CONN-016] applies connector capabilities through HTTP/oRPC", async () => {
     let capturedCommand: Command<unknown> | undefined;
     const app = mountAppaloftOrpcRoutes(new Elysia(), {
@@ -416,6 +491,21 @@ describe("connections HTTP routes", () => {
 const noopCommandBus = {
   execute: async <T>(): Promise<Result<T>> => ok({} as T),
 } as CommandBus;
+
+const authenticatedProductSessionAuthorizationPort = {
+  authorizeProductSession: async (_context, input) =>
+    ok({
+      actor: {
+        kind: "user",
+        id: "usr_connections_test",
+        label: "connections@example.com",
+      },
+      email: "connections@example.com",
+      organizationId: "org_connections_test",
+      role: input.requiredRole,
+      userId: "usr_connections_test",
+    }),
+} satisfies ProductSessionAuthorizationPort;
 
 function commandBusFor(resolve: (command: Command<unknown>) => unknown): CommandBus {
   return {

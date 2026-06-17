@@ -349,6 +349,8 @@ import {
   operationCatalog,
   PlanConnectorCapabilityQueryHandler,
   PlanConnectorCapabilityQueryService,
+  PlanDomainBindingDnsQueryHandler,
+  PlanDomainBindingDnsQueryService,
   PrepareServerRuntimeCommandHandler,
   PrepareServerRuntimeUseCase,
   PreviewCleanupRetryScheduler,
@@ -2563,6 +2565,7 @@ export function registerApplicationServices(
   container.registerSingleton(ShowDeployTokenQueryHandler);
   container.registerSingleton(ShowProjectQueryHandler);
   container.registerSingleton(ShowDomainBindingQueryHandler);
+  container.registerSingleton(PlanDomainBindingDnsQueryHandler);
   container.registerSingleton(ShowSshCredentialQueryHandler);
   container.registerSingleton(InspectServerCapacityQueryHandler);
   container.registerSingleton(PruneServerCapacityCommandHandler);
@@ -3354,6 +3357,10 @@ export function registerApplicationServices(
     ListDomainBindingsQueryService,
   );
   container.registerSingleton(tokens.showDomainBindingQueryService, ShowDomainBindingQueryService);
+  container.registerSingleton(
+    tokens.planDomainBindingDnsQueryService,
+    PlanDomainBindingDnsQueryService,
+  );
   container.registerSingleton(
     tokens.checkDomainBindingDeleteSafetyQueryService,
     CheckDomainBindingDeleteSafetyQueryService,

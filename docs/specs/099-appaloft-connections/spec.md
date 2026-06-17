@@ -118,6 +118,7 @@ appaloft dns plan <domain> --hostname <host> --target <target> --json
 appaloft dns apply <domain> --hostname <host> --target <target>
 appaloft dns verify <domain> --hostname <host> --target <target>
 appaloft dns cleanup <domain> --hostname <host> --target <target>
+appaloft domain-binding dns-plan <domainBindingId> [--connector cloudflare-dns]
 ```
 
 Infrastructure convenience aliases may also exist for ergonomics. They must translate into
