@@ -26,6 +26,10 @@ secrets, bind resources, or deploy workloads.
   - `defer` is reserved for policy layers or unsupported cases.
 - `dependencyBindingCandidates`: active resource dependency bindings to rebind after dependency
   decisions are reviewed.
+- `domainRouteCandidates`: source custom domain bindings that must be regenerated, rebound, or
+  deferred for the target environment. Production domains are not copied by default.
+- `storageDecisionCandidates`: source storage volume attachments whose data requires an explicit
+  empty, restore, import, or defer decision. Volume data is not copied by default.
 - `warnings`: non-fatal planning warnings such as a target-name conflict.
 
 ## Boundary

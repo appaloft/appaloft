@@ -88,6 +88,7 @@ import { archiveEnvironmentCommandInputSchema } from "./operations/environments/
 import { cloneEnvironmentCommandInputSchema } from "./operations/environments/clone-environment.command";
 import { countEnvironmentsQueryInputSchema } from "./operations/environments/count-environments.query";
 import { createEnvironmentCommandInputSchema } from "./operations/environments/create-environment.command";
+import { diffEnvironmentProfileQueryInputSchema } from "./operations/environments/diff-environment-profile.query";
 import { diffEnvironmentsQueryInputSchema } from "./operations/environments/diff-environments.query";
 import { duplicateEnvironmentProfileCommandInputSchema } from "./operations/environments/duplicate-environment-profile.command";
 import { environmentEffectivePrecedenceQueryInputSchema } from "./operations/environments/environment-effective-precedence.query";
@@ -2995,6 +2996,23 @@ export const operationCatalog = [
       orpc: {
         method: "GET",
         path: "/api/environments/{environmentId}/duplicate-plan",
+      },
+    },
+  },
+  {
+    key: "environments.diff-profile",
+    kind: "query",
+    domain: "environments",
+    messageName: "DiffEnvironmentProfileQuery",
+    handlerName: "DiffEnvironmentProfileQueryHandler",
+    serviceName: "DiffEnvironmentProfileQueryService",
+    inputSchema: diffEnvironmentProfileQueryInputSchema,
+    serviceToken: tokens.diffEnvironmentProfileQueryService,
+    transports: {
+      cli: "appaloft env diff-profile <environmentId> <targetEnvironmentId>",
+      orpc: {
+        method: "GET",
+        path: "/api/environments/{environmentId}/diff-profile/{targetEnvironmentId}",
       },
     },
   },

@@ -824,6 +824,10 @@ export const cliCommandDescriptions = {
     "environment.variable-precedence",
   ),
   environmentDiff: withDocs("Diff two environments", "environment.diff-promote"),
+  environmentDiffProfile: withDocs(
+    "Diff two environment profiles with masked values",
+    "environment.diff-promote",
+  ),
   environmentDuplicate: withDocs(
     "Plan or apply environment profile duplication",
     "environment.lifecycle",

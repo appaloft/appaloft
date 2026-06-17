@@ -199,6 +199,8 @@ import {
   DeploymentTimelineQueryService,
   DetachResourceStorageCommandHandler,
   DetachResourceStorageUseCase,
+  DiffEnvironmentProfileQueryHandler,
+  DiffEnvironmentProfileQueryService,
   DiffEnvironmentsQueryService,
   DoctorQueryService,
   type DomainBindingReadModel,
@@ -2462,6 +2464,7 @@ export function registerApplicationServices(
   container.registerSingleton(ResourceEffectiveConfigQueryHandler);
   container.registerSingleton(ResourceAccessFailureEvidenceLookupQueryHandler);
   container.registerSingleton(EnvironmentEffectivePrecedenceQueryHandler);
+  container.registerSingleton(DiffEnvironmentProfileQueryHandler);
   container.registerSingleton(PlanDuplicateEnvironmentQueryHandler);
   container.registerSingleton(ApplyActionPreviewRouteCommandHandler);
   container.registerSingleton(ConfirmActionPreviewRouteCommandHandler);
@@ -3285,6 +3288,10 @@ export function registerApplicationServices(
     UnsetEnvironmentVariableUseCase,
   );
   container.registerSingleton(tokens.diffEnvironmentsQueryService, DiffEnvironmentsQueryService);
+  container.registerSingleton(
+    tokens.diffEnvironmentProfileQueryService,
+    DiffEnvironmentProfileQueryService,
+  );
   container.registerSingleton(
     tokens.planDuplicateEnvironmentQueryService,
     PlanDuplicateEnvironmentQueryService,

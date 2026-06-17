@@ -11,11 +11,11 @@
 
 - [x] ENV-PROFILE-DUP-001: add `environments.plan-duplicate` operation catalog entry, query,
   schema, handler, query service, CLI/API contract tests, and docs.
-- [ ] ENV-PROFILE-DUP-008: add `environments.diff-profile` operation catalog entry, query,
-  schema, handler, query service, CLI/API contract tests, and docs.
-- [ ] ENV-PROFILE-DUP-001 / ENV-PROFILE-DUP-008: fix or verify all environment diff/profile views
-  mask secret values.
-- [ ] Update public docs for Duplicate Environment plan and Profile Diff read models.
+- [x] ENV-PROFILE-DUP-008: add `environments.diff-profile` operation catalog entry, query,
+  schema, handler, query service, CLI dispatch test, and docs for safe profile drift.
+- [x] ENV-PROFILE-DUP-001 / ENV-PROFILE-DUP-008: fix or verify implemented environment
+  profile views mask secret values.
+- [x] Update public docs for Duplicate Environment plan and Profile Diff read models.
 
 ## Phase 2: Duplicate Apply
 
@@ -39,8 +39,8 @@
 
 ## Phase 3: Sync And Promote
 
-- [ ] ENV-PROFILE-DUP-008: extend diff-profile to resource/source/runtime/network/dependency/route
-  shape.
+- [x] ENV-PROFILE-DUP-008: extend diff-profile to resource/source/runtime/network/dependency/route
+  shape, storage mounts, and pending target decisions.
 - [ ] ENV-PROFILE-DUP-009: implement selected sync with staged decisions.
 - [ ] Define whether profile promotion is a separate command or a constrained sync mode.
 - [ ] Add Web owner-scoped controls under Project Environment management and Resource detail.

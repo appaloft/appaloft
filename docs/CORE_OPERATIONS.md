@@ -309,6 +309,7 @@ Implemented operations:
 | Unset environment variable | Command | `environments.unset-variable` | `UnsetEnvironmentVariableCommand` | `UnsetEnvironmentVariableCommandInput` | `appaloft env unset <environmentId> <key>` | `DELETE /api/environments/{environmentId}/variables/{key}` |
 | Read environment effective precedence | Query | `environments.effective-precedence` | `EnvironmentEffectivePrecedenceQuery` | `EnvironmentEffectivePrecedenceQueryInput` | `appaloft env effective-precedence <environmentId>` | `GET /api/environments/{environmentId}/effective-precedence` |
 | Diff environments | Query | `environments.diff` | `DiffEnvironmentsQuery` | `DiffEnvironmentsQueryInput` | `appaloft env diff <environmentId> <otherEnvironmentId>` | `GET /api/environments/{environmentId}/diff/{otherEnvironmentId}` |
+| Diff environment profile | Query | `environments.diff-profile` | `DiffEnvironmentProfileQuery` | `DiffEnvironmentProfileQueryInput` | `appaloft env diff-profile <environmentId> <targetEnvironmentId>` | `GET /api/environments/{environmentId}/diff-profile/{targetEnvironmentId}` |
 | Plan environment profile duplication | Query | `environments.plan-duplicate` | `PlanDuplicateEnvironmentQuery` | `PlanDuplicateEnvironmentQueryInput` | `appaloft env duplicate plan <environmentId> --name <targetName>` | `GET /api/environments/{environmentId}/duplicate-plan` |
 | Apply environment profile duplication | Command | `environments.duplicate-profile` | `DuplicateEnvironmentProfileCommand` | `DuplicateEnvironmentProfileCommandInput` | `appaloft env duplicate apply <environmentId> --name <targetName>` | `POST /api/environments/{environmentId}/duplicate-profile` |
 | Clone environment | Command | `environments.clone` | `CloneEnvironmentCommand` | `CloneEnvironmentCommandInput` | `appaloft env clone <environmentId> --name <targetName>` | `POST /api/environments/{environmentId}/clone` |
@@ -320,8 +321,6 @@ Implemented operations:
 Core next operations expected here:
 - list environment change history
 - restore/delete and lifecycle history
-- `environments.diff-profile` to compare environment shape across resources, profiles, variables,
-  dependency bindings, routes, storage requirements, and pending decisions with secret values masked
 - `environments.sync-profile` to import selected shape changes from one environment into another
   through staged decisions rather than broad overwrite
 - `environments.rename` changes only the environment display name inside its owning project. It
