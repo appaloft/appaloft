@@ -141,6 +141,7 @@ describe("preview policy persistence", () => {
           sameRepositoryPreviews: true,
           forkPreviews: "without-secrets",
           secretBackedPreviews: false,
+          environmentProfileBaseEnvironmentId: "env_staging",
         },
         updatedAt: "2026-05-06T01:00:00.000Z",
         idempotencyKey: "idem_preview_policy_1",
@@ -157,6 +158,7 @@ describe("preview policy persistence", () => {
           sameRepositoryPreviews: true,
           forkPreviews: "without-secrets",
           secretBackedPreviews: false,
+          environmentProfileBaseEnvironmentId: "env_staging",
         },
         updatedAt: "2026-05-06T01:00:00.000Z",
       });
@@ -355,6 +357,7 @@ describe("preview policy persistence", () => {
         evaluatedAt: "2026-05-06T02:00:00.000Z",
         reasonCode: "preview_quota_exceeded",
         maxActivePreviews: 3,
+        environmentProfileBaseEnvironmentId: "env_staging",
       };
 
       await projection.record(context, blocked);
@@ -386,6 +389,7 @@ describe("preview policy persistence", () => {
         deploymentEligible: true,
         evaluatedAt: "2026-05-06T02:05:00.000Z",
         maxActivePreviews: 5,
+        environmentProfileBaseEnvironmentId: "env_staging",
         previewEnvironmentId: "prenv_policy_allowed_1",
         previewExpiresAt: "2026-05-07T02:05:00.000Z",
         deploymentId: "dep_policy_allowed_1",

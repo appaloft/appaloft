@@ -89,14 +89,18 @@ import { archiveEnvironmentCommandInputSchema } from "./operations/environments/
 import { cloneEnvironmentCommandInputSchema } from "./operations/environments/clone-environment.command";
 import { countEnvironmentsQueryInputSchema } from "./operations/environments/count-environments.query";
 import { createEnvironmentCommandInputSchema } from "./operations/environments/create-environment.command";
+import { diffEnvironmentProfileQueryInputSchema } from "./operations/environments/diff-environment-profile.query";
 import { diffEnvironmentsQueryInputSchema } from "./operations/environments/diff-environments.query";
+import { duplicateEnvironmentProfileCommandInputSchema } from "./operations/environments/duplicate-environment-profile.command";
 import { environmentEffectivePrecedenceQueryInputSchema } from "./operations/environments/environment-effective-precedence.query";
 import { listEnvironmentsQueryInputSchema } from "./operations/environments/list-environments.query";
 import { lockEnvironmentCommandInputSchema } from "./operations/environments/lock-environment.command";
+import { planDuplicateEnvironmentQueryInputSchema } from "./operations/environments/plan-duplicate-environment.query";
 import { promoteEnvironmentCommandInputSchema } from "./operations/environments/promote-environment.command";
 import { renameEnvironmentCommandInputSchema } from "./operations/environments/rename-environment.command";
 import { setEnvironmentVariableCommandInputSchema } from "./operations/environments/set-environment-variable.command";
 import { showEnvironmentQueryInputSchema } from "./operations/environments/show-environment.query";
+import { syncEnvironmentProfileCommandInputSchema } from "./operations/environments/sync-environment-profile.command";
 import { unlockEnvironmentCommandInputSchema } from "./operations/environments/unlock-environment.command";
 import { unsetEnvironmentVariableCommandInputSchema } from "./operations/environments/unset-environment-variable.command";
 import { cancelOperatorWorkCommandInputSchema } from "./operations/operator-work/cancel-operator-work.command";
@@ -2918,6 +2922,20 @@ export const operationCatalog = [
     },
   },
   {
+    key: "environments.duplicate-profile",
+    kind: "command",
+    domain: "environments",
+    messageName: "DuplicateEnvironmentProfileCommand",
+    handlerName: "DuplicateEnvironmentProfileCommandHandler",
+    serviceName: "DuplicateEnvironmentProfileUseCase",
+    inputSchema: duplicateEnvironmentProfileCommandInputSchema,
+    serviceToken: tokens.duplicateEnvironmentProfileUseCase,
+    transports: {
+      cli: "appaloft env duplicate apply <environmentId> --name <targetName>",
+      orpc: { method: "POST", path: "/api/environments/{environmentId}/duplicate-profile" },
+    },
+  },
+  {
     key: "environments.set-variable",
     kind: "command",
     domain: "environments",
@@ -2973,6 +2991,57 @@ export const operationCatalog = [
       orpc: {
         method: "GET",
         path: "/api/environments/{environmentId}/diff/{otherEnvironmentId}",
+      },
+    },
+  },
+  {
+    key: "environments.plan-duplicate",
+    kind: "query",
+    domain: "environments",
+    messageName: "PlanDuplicateEnvironmentQuery",
+    handlerName: "PlanDuplicateEnvironmentQueryHandler",
+    serviceName: "PlanDuplicateEnvironmentQueryService",
+    inputSchema: planDuplicateEnvironmentQueryInputSchema,
+    serviceToken: tokens.planDuplicateEnvironmentQueryService,
+    transports: {
+      cli: "appaloft env duplicate plan <environmentId> --name <targetName>",
+      orpc: {
+        method: "GET",
+        path: "/api/environments/{environmentId}/duplicate-plan",
+      },
+    },
+  },
+  {
+    key: "environments.diff-profile",
+    kind: "query",
+    domain: "environments",
+    messageName: "DiffEnvironmentProfileQuery",
+    handlerName: "DiffEnvironmentProfileQueryHandler",
+    serviceName: "DiffEnvironmentProfileQueryService",
+    inputSchema: diffEnvironmentProfileQueryInputSchema,
+    serviceToken: tokens.diffEnvironmentProfileQueryService,
+    transports: {
+      cli: "appaloft env diff-profile <environmentId> <targetEnvironmentId>",
+      orpc: {
+        method: "GET",
+        path: "/api/environments/{environmentId}/diff-profile/{targetEnvironmentId}",
+      },
+    },
+  },
+  {
+    key: "environments.sync-profile",
+    kind: "command",
+    domain: "environments",
+    messageName: "SyncEnvironmentProfileCommand",
+    handlerName: "SyncEnvironmentProfileCommandHandler",
+    serviceName: "SyncEnvironmentProfileUseCase",
+    inputSchema: syncEnvironmentProfileCommandInputSchema,
+    serviceToken: tokens.syncEnvironmentProfileUseCase,
+    transports: {
+      cli: "appaloft env sync-profile <environmentId> <targetEnvironmentId> --resource-ids <ids>",
+      orpc: {
+        method: "POST",
+        path: "/api/environments/{environmentId}/sync-profile/{targetEnvironmentId}",
       },
     },
   },

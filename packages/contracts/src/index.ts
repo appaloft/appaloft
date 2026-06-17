@@ -441,7 +441,14 @@ export const systemPluginWebExtensionSchema = z.object({
   title: z.string(),
   description: z.string().optional(),
   path: z.string(),
-  placement: z.enum(["auth", "navigation", "settings", "quick-deploy-source"]),
+  placement: z.enum([
+    "auth",
+    "navigation",
+    "settings",
+    "quick-deploy-source",
+    "project-environment-panel",
+    "resource-detail-panel",
+  ]),
   target: z.enum(["server-page", "external-page", "console-route"]),
   requiresAuth: z.boolean(),
   metadata: z.record(z.string(), z.unknown()).optional(),
@@ -3662,6 +3669,7 @@ export const previewPolicySettingsSchema = z.object({
   secretBackedPreviews: z.boolean(),
   maxActivePreviews: z.number().int().positive().optional(),
   previewTtlHours: z.number().int().positive().optional(),
+  environmentProfileBaseEnvironmentId: z.string().min(1).optional(),
 });
 
 export const previewPolicySummarySchema = z.object({
@@ -5478,6 +5486,8 @@ export const deploymentPlanReasonCodeSchema = z.enum([
   "missing-buildpack-evidence",
   "buildpack-start-intent-missing",
   "buildpack-preview-limited",
+  "dependency-runtime-injection-blocked",
+  "environment-profile-decision-pending",
 ]);
 
 const deploymentPlanReasonPathSchema = z.object({

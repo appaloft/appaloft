@@ -309,6 +309,10 @@ Implemented operations:
 | Unset environment variable | Command | `environments.unset-variable` | `UnsetEnvironmentVariableCommand` | `UnsetEnvironmentVariableCommandInput` | `appaloft env unset <environmentId> <key>` | `DELETE /api/environments/{environmentId}/variables/{key}` |
 | Read environment effective precedence | Query | `environments.effective-precedence` | `EnvironmentEffectivePrecedenceQuery` | `EnvironmentEffectivePrecedenceQueryInput` | `appaloft env effective-precedence <environmentId>` | `GET /api/environments/{environmentId}/effective-precedence` |
 | Diff environments | Query | `environments.diff` | `DiffEnvironmentsQuery` | `DiffEnvironmentsQueryInput` | `appaloft env diff <environmentId> <otherEnvironmentId>` | `GET /api/environments/{environmentId}/diff/{otherEnvironmentId}` |
+| Diff environment profile | Query | `environments.diff-profile` | `DiffEnvironmentProfileQuery` | `DiffEnvironmentProfileQueryInput` | `appaloft env diff-profile <environmentId> <targetEnvironmentId>` | `GET /api/environments/{environmentId}/diff-profile/{targetEnvironmentId}` |
+| Plan environment profile duplication | Query | `environments.plan-duplicate` | `PlanDuplicateEnvironmentQuery` | `PlanDuplicateEnvironmentQueryInput` | `appaloft env duplicate plan <environmentId> --name <targetName>` | `GET /api/environments/{environmentId}/duplicate-plan` |
+| Apply environment profile duplication | Command | `environments.duplicate-profile` | `DuplicateEnvironmentProfileCommand` | `DuplicateEnvironmentProfileCommandInput` | `appaloft env duplicate apply <environmentId> --name <targetName>` | `POST /api/environments/{environmentId}/duplicate-profile` |
+| Sync environment profile | Command | `environments.sync-profile` | `SyncEnvironmentProfileCommand` | `SyncEnvironmentProfileCommandInput` | `appaloft env sync-profile <environmentId> <targetEnvironmentId> --resource-ids <ids>` | `POST /api/environments/{environmentId}/sync-profile/{targetEnvironmentId}` |
 | Clone environment | Command | `environments.clone` | `CloneEnvironmentCommand` | `CloneEnvironmentCommandInput` | `appaloft env clone <environmentId> --name <targetName>` | `POST /api/environments/{environmentId}/clone` |
 | Promote environment | Command | `environments.promote` | `PromoteEnvironmentCommand` | `PromoteEnvironmentCommandInput` | `appaloft env promote <environmentId> <targetName>` | `POST /api/environments/{environmentId}/promote` |
 | Lock environment | Command | `environments.lock` | `LockEnvironmentCommand` | `LockEnvironmentCommandInput` | `appaloft env lock <environmentId> --reason <reason>` | `POST /api/environments/{environmentId}/lock` |
@@ -322,7 +326,10 @@ Core next operations expected here:
   preserves environment id, kind, parent environment, variables, resources, deployments, and
   runtime state.
 - `environments.clone` creates a new active environment in the same project from an active source
-  environment's current environment-owned variables.
+  environment's current environment-owned variables. Full resource/profile/dependency/domain
+  duplication is governed by
+  [ADR-085: Environment Profile Duplication Boundary](./decisions/ADR-085-environment-profile-duplication-boundary.md)
+  and must use the planned profile workflow instead of expanding clone into a broad copy command.
 - `environments.lock` freezes one environment from new config/deployment work while keeping it
   readable.
 - `environments.unlock` returns a locked environment to active. Archived environments remain

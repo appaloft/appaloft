@@ -87,6 +87,9 @@ export const tokens = {
   resourceDependencyBindingRepository: Symbol.for(
     "appaloft.resource_dependency_binding_repository",
   ),
+  environmentProfileDecisionRepository: Symbol.for(
+    "appaloft.environment_profile_decision_repository",
+  ),
   deployTokenMaterialIssuer: Symbol.for("appaloft.deploy_token_material_issuer"),
   deployTokenRepository: Symbol.for("appaloft.deploy_token_repository"),
   deployTokenReadModel: Symbol.for("appaloft.deploy_token_read_model"),
@@ -133,6 +136,9 @@ export const tokens = {
   dependencyResourceReadModel: Symbol.for("appaloft.dependency_resource_read_model"),
   dependencyResourceBackupReadModel: Symbol.for("appaloft.dependency_resource_backup_read_model"),
   resourceDependencyBindingReadModel: Symbol.for("appaloft.resource_dependency_binding_read_model"),
+  environmentProfileDecisionReadModel: Symbol.for(
+    "appaloft.environment_profile_decision_read_model",
+  ),
   storageVolumeReadModel: Symbol.for("appaloft.storage_volume_read_model"),
   storageVolumeBackupReadModel: Symbol.for("appaloft.storage_volume_backup_read_model"),
   resourceAccessFailureEvidenceRecorder: Symbol.for(
@@ -339,6 +345,8 @@ export const tokens = {
   bootstrapServerProxyUseCase: Symbol.for("appaloft.bootstrap_server_proxy_use_case"),
   archiveEnvironmentUseCase: Symbol.for("appaloft.archive_environment_use_case"),
   cloneEnvironmentUseCase: Symbol.for("appaloft.clone_environment_use_case"),
+  duplicateEnvironmentProfileUseCase: Symbol.for("appaloft.duplicate_environment_profile_use_case"),
+  syncEnvironmentProfileUseCase: Symbol.for("appaloft.sync_environment_profile_use_case"),
   countEnvironmentsQueryService: Symbol.for("appaloft.count_environments_query_service"),
   renameEnvironmentUseCase: Symbol.for("appaloft.rename_environment_use_case"),
   lockEnvironmentUseCase: Symbol.for("appaloft.lock_environment_use_case"),
@@ -557,6 +565,10 @@ export const tokens = {
   setEnvironmentVariableUseCase: Symbol.for("appaloft.set_environment_variable_use_case"),
   unsetEnvironmentVariableUseCase: Symbol.for("appaloft.unset_environment_variable_use_case"),
   diffEnvironmentsQueryService: Symbol.for("appaloft.diff_environments_query_service"),
+  diffEnvironmentProfileQueryService: Symbol.for("appaloft.diff_environment_profile_query_service"),
+  planDuplicateEnvironmentQueryService: Symbol.for(
+    "appaloft.plan_duplicate_environment_query_service",
+  ),
   promoteEnvironmentUseCase: Symbol.for("appaloft.promote_environment_use_case"),
   applyActionPreviewRouteUseCase: Symbol.for("appaloft.apply_action_preview_route_use_case"),
   confirmActionPreviewRouteUseCase: Symbol.for("appaloft.confirm_action_preview_route_use_case"),

@@ -87,6 +87,7 @@
   import { capabilities, capabilityKey, type CapabilityQuery } from "$lib/capabilities";
   import CapabilityGate from "$lib/components/console/CapabilityGate.svelte";
   import ConsoleStatePanel from "$lib/components/console/ConsoleStatePanel.svelte";
+  import ConsoleExtensionPanelHost from "$lib/components/console/ConsoleExtensionPanelHost.svelte";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import DeploymentProgressDialog from "$lib/components/console/DeploymentProgressDialog.svelte";
   import DeploymentStatusBadge from "$lib/components/console/DeploymentStatusBadge.svelte";
@@ -7048,6 +7049,13 @@
                   </Button>
                 </div>
               </section>
+
+              <ConsoleExtensionPanelHost
+                placement="resource-detail-panel"
+                projectId={resourceProjectId}
+                environmentId={resourceEnvironmentId}
+                {resourceId}
+              />
             </section>
           </div>
         {:else if activeTab === "networking" || activeTab === "configuration" || activeTab === "dependencies" || activeTab === "settings"}
@@ -8239,6 +8247,13 @@
                         {/each}
                       </div>
                     {/if}
+
+                    <ConsoleExtensionPanelHost
+                      placement="resource-detail-panel"
+                      projectId={resourceProjectId}
+                      environmentId={resourceEnvironmentId}
+                      {resourceId}
+                    />
 
                     <section class="rounded-md border bg-background p-4">
                       <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

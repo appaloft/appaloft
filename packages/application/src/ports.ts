@@ -4820,6 +4820,278 @@ export interface EnvironmentDiffSummary {
   };
 }
 
+export type EnvironmentDuplicateDependencyDecisionHint =
+  | "create-new-managed"
+  | "bind-existing"
+  | "reuse-source"
+  | "defer";
+
+export interface EnvironmentDuplicateTargetSummary {
+  projectId: string;
+  name: string;
+  environmentId?: string;
+  existingEnvironmentId?: string;
+  existingLifecycleStatus?: EnvironmentSummary["lifecycleStatus"];
+  conflict: boolean;
+}
+
+export interface EnvironmentDuplicateVariableCandidate {
+  key: string;
+  scope: ConfigScope;
+  exposure: VariableExposure;
+  kind: VariableKind;
+  isSecret: boolean;
+  maskedValue: string;
+  decisionHint: "copy" | "defer";
+}
+
+export interface EnvironmentDuplicateResourceCandidate {
+  resourceId: string;
+  name: string;
+  slug: string;
+  kind: ResourceSummary["kind"];
+  services: ResourceSummary["services"];
+  networkProfile?: ResourceSummary["networkProfile"];
+  accessProfile?: ResourceSummary["accessProfile"];
+  decisionHint: "recreate-resource" | "bind-existing" | "defer";
+}
+
+export interface EnvironmentDuplicateDependencyCandidate {
+  dependencyResourceId: string;
+  name: string;
+  slug: string;
+  kind: DependencyResourceSummary["kind"];
+  sourceMode: DependencyResourceSummary["sourceMode"];
+  providerKey: string;
+  providerManaged: boolean;
+  lifecycleStatus: DependencyResourceSummary["lifecycleStatus"];
+  desiredCapabilities: DependencyResourceSummary["desiredCapabilities"];
+  decisionHint: EnvironmentDuplicateDependencyDecisionHint;
+  reasons: string[];
+}
+
+export interface EnvironmentDuplicateDependencyBindingCandidate {
+  bindingId: string;
+  resourceId: string;
+  dependencyResourceId: string;
+  kind: ResourceDependencyBindingSummary["kind"];
+  target: ResourceDependencyBindingSummary["target"];
+  decisionHint: "rebind-after-dependency-decision" | "defer";
+}
+
+export interface EnvironmentDuplicateDomainRouteCandidate {
+  domainBindingId: string;
+  resourceId: string;
+  domainName: string;
+  pathPrefix: string;
+  proxyKind: EdgeProxyKind;
+  tlsMode: TlsMode;
+  redirectTo?: string;
+  redirectStatus?: 301 | 302 | 307 | 308;
+  status: DomainBindingSummary["status"];
+  decisionHint: "regenerate" | "defer";
+  reasons: string[];
+}
+
+export interface EnvironmentDuplicateStorageDecisionCandidate {
+  storageVolumeId: string;
+  storageVolumeName: string;
+  storageVolumeKind: StorageVolumeKind;
+  resourceId: string;
+  attachmentId: string;
+  destinationPath: string;
+  mountMode: "read-write" | "read-only";
+  dataFormat?: StorageVolumeBackupDataFormat;
+  applicationDataLabel?: string;
+  decisionHint: "empty" | "restore-backup" | "import-data" | "defer";
+  reasons: string[];
+}
+
+export interface EnvironmentDuplicatePlanWarning {
+  code: string;
+  message: string;
+}
+
+export interface EnvironmentDuplicatePlanSummary {
+  schemaVersion: "environments.duplicate-plan/v1";
+  sourceEnvironment: EnvironmentSummary;
+  target: EnvironmentDuplicateTargetSummary;
+  variableCandidates: EnvironmentDuplicateVariableCandidate[];
+  resourceCandidates: EnvironmentDuplicateResourceCandidate[];
+  dependencyCandidates: EnvironmentDuplicateDependencyCandidate[];
+  dependencyBindingCandidates: EnvironmentDuplicateDependencyBindingCandidate[];
+  domainRouteCandidates: EnvironmentDuplicateDomainRouteCandidate[];
+  storageDecisionCandidates: EnvironmentDuplicateStorageDecisionCandidate[];
+  warnings: EnvironmentDuplicatePlanWarning[];
+  generatedAt: string;
+}
+
+export type EnvironmentDuplicateResourceDecision = "copy-shape" | "defer";
+
+export type EnvironmentDuplicateDependencyApplyDecision =
+  EnvironmentDuplicateDependencyDecisionHint;
+
+export interface EnvironmentDuplicateCopiedResourceSummary {
+  sourceResourceId: string;
+  targetResourceId: string;
+  name: string;
+  slug: string;
+}
+
+export interface EnvironmentDuplicateAppliedDependencySummary {
+  sourceDependencyResourceId: string;
+  targetDependencyResourceId: string;
+  decision: EnvironmentDuplicateDependencyApplyDecision;
+  kind: DependencyResourceKind;
+  name: string;
+}
+
+export interface EnvironmentDuplicateCreatedDependencyBindingSummary {
+  sourceBindingId: string;
+  sourceResourceId: string;
+  targetResourceId: string;
+  sourceDependencyResourceId: string;
+  targetDependencyResourceId: string;
+  targetName: string;
+  scope: ResourceDependencyBindingTargetSummary["scope"];
+  injectionMode: ResourceDependencyBindingTargetSummary["injectionMode"];
+  bindingId: string;
+}
+
+export interface EnvironmentDuplicateDeferredDecisionSummary {
+  kind:
+    | "resource"
+    | "dependency"
+    | "dependency-binding"
+    | "route"
+    | "storage"
+    | "resource-variable"
+    | "access-profile"
+    | "auto-deploy-policy"
+    | "runtime-health-check";
+  sourceId: string;
+  decision?: string;
+  reason: string;
+}
+
+export interface EnvironmentProfilePendingDecisionSummary {
+  id: string;
+  projectId: string;
+  environmentId: string;
+  resourceId?: string;
+  kind: EnvironmentDuplicateDeferredDecisionSummary["kind"];
+  sourceId: string;
+  sourceEnvironmentId?: string;
+  sourceResourceId?: string;
+  decision?: string;
+  reason: string;
+  status: "pending" | "resolved";
+  createdAt: string;
+  resolvedAt?: string;
+}
+
+export interface RecordEnvironmentProfilePendingDecisionInput {
+  id: string;
+  projectId: string;
+  environmentId: string;
+  kind: EnvironmentProfilePendingDecisionSummary["kind"];
+  sourceId: string;
+  reason: string;
+  createdAt: string;
+  resourceId?: string;
+  sourceEnvironmentId?: string;
+  sourceResourceId?: string;
+  decision?: string;
+}
+
+export interface EnvironmentProfileDecisionRepository {
+  recordPending(
+    context: RepositoryContext,
+    input: RecordEnvironmentProfilePendingDecisionInput,
+  ): Promise<void>;
+}
+
+export interface EnvironmentProfileDecisionReadModel {
+  listPending(
+    context: RepositoryContext,
+    input: {
+      environmentId: string;
+      resourceId?: string;
+    },
+  ): Promise<EnvironmentProfilePendingDecisionSummary[]>;
+}
+
+export interface EnvironmentDuplicateProfileApplyResult {
+  schemaVersion: "environments.duplicate-profile/v1";
+  sourceEnvironmentId: string;
+  targetEnvironmentId: string;
+  copiedResources: EnvironmentDuplicateCopiedResourceSummary[];
+  appliedDependencies: EnvironmentDuplicateAppliedDependencySummary[];
+  createdDependencyBindings: EnvironmentDuplicateCreatedDependencyBindingSummary[];
+  deferredDecisions: EnvironmentDuplicateDeferredDecisionSummary[];
+  warnings: EnvironmentDuplicatePlanWarning[];
+  generatedAt: string;
+}
+
+export type EnvironmentProfileDiffSection =
+  | "variable"
+  | "resource"
+  | "dependency-binding"
+  | "route"
+  | "storage"
+  | "pending-decision";
+
+export type EnvironmentProfileDiffChange = "added" | "removed" | "changed" | "unchanged";
+
+export interface EnvironmentProfileDiffEntry<TValue = Record<string, unknown>> {
+  section: EnvironmentProfileDiffSection;
+  key: string;
+  change: EnvironmentProfileDiffChange;
+  source?: TValue;
+  target?: TValue;
+}
+
+export interface EnvironmentProfileDiffSummary {
+  schemaVersion: "environments.diff-profile/v1";
+  sourceEnvironment: EnvironmentSummary;
+  targetEnvironment: EnvironmentSummary;
+  entries: EnvironmentProfileDiffEntry[];
+  counts: {
+    added: number;
+    removed: number;
+    changed: number;
+    unchanged: number;
+  };
+  generatedAt: string;
+}
+
+export interface EnvironmentProfileSyncedResourceSummary {
+  sourceResourceId: string;
+  targetResourceId: string;
+  name: string;
+  slug: string;
+  action: "created";
+}
+
+export interface EnvironmentProfileSyncSkippedResourceSummary {
+  sourceResourceId: string;
+  targetResourceId: string;
+  name: string;
+  slug: string;
+  reason: "target-resource-exists";
+}
+
+export interface EnvironmentProfileSyncResult {
+  schemaVersion: "environments.sync-profile/v1";
+  sourceEnvironmentId: string;
+  targetEnvironmentId: string;
+  syncedResources: EnvironmentProfileSyncedResourceSummary[];
+  skippedResources: EnvironmentProfileSyncSkippedResourceSummary[];
+  deferredDecisions: EnvironmentDuplicateDeferredDecisionSummary[];
+  warnings: EnvironmentDuplicatePlanWarning[];
+  generatedAt: string;
+}
+
 export interface ServerBackedDeploymentSummaryTarget {
   kind: "server-backed";
   serverId: string;
@@ -5123,7 +5395,9 @@ export type DeploymentPlanReasonCode =
   | "ambiguous-buildpack-evidence"
   | "missing-buildpack-evidence"
   | "buildpack-start-intent-missing"
-  | "buildpack-preview-limited";
+  | "buildpack-preview-limited"
+  | "dependency-runtime-injection-blocked"
+  | "environment-profile-decision-pending";
 
 export interface DeploymentPlanReason {
   code: DeploymentPlanReasonCode;
@@ -8335,6 +8609,7 @@ export interface PreviewPolicySettings {
   secretBackedPreviews: boolean;
   maxActivePreviews?: number;
   previewTtlHours?: number;
+  environmentProfileBaseEnvironmentId?: string;
 }
 
 export interface PreviewPolicyRecord {
@@ -8384,6 +8659,7 @@ export interface PreviewPolicyDecisionProjection {
   evaluatedAt: string;
   reasonCode?: PreviewPolicyDecisionReasonCode;
   maxActivePreviews?: number;
+  environmentProfileBaseEnvironmentId?: string;
   previewEnvironmentId?: string;
   previewExpiresAt?: string;
   deploymentId?: string;

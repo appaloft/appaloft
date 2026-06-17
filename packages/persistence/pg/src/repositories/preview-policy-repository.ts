@@ -113,6 +113,8 @@ export class PgPreviewPolicyRepository implements PreviewPolicyRepository, Previ
               secret_backed_previews: values.secret_backed_previews,
               max_active_previews: values.max_active_previews,
               preview_ttl_hours: values.preview_ttl_hours,
+              environment_profile_base_environment_id:
+                values.environment_profile_base_environment_id,
               last_idempotency_key: values.last_idempotency_key,
               updated_at: values.updated_at,
             }),
@@ -183,6 +185,9 @@ function settingsFromRow(row: PreviewPolicyRow): PreviewPolicySettings {
     secretBackedPreviews: row.secret_backed_previews,
     ...(row.max_active_previews !== null ? { maxActivePreviews: row.max_active_previews } : {}),
     ...(row.preview_ttl_hours !== null ? { previewTtlHours: row.preview_ttl_hours } : {}),
+    ...(row.environment_profile_base_environment_id
+      ? { environmentProfileBaseEnvironmentId: row.environment_profile_base_environment_id }
+      : {}),
   };
 }
 
@@ -198,6 +203,8 @@ function rowFromRecord(record: PreviewPolicyRecord): Insertable<Database["previe
     secret_backed_previews: record.settings.secretBackedPreviews,
     max_active_previews: record.settings.maxActivePreviews ?? null,
     preview_ttl_hours: record.settings.previewTtlHours ?? null,
+    environment_profile_base_environment_id:
+      record.settings.environmentProfileBaseEnvironmentId ?? null,
     last_idempotency_key: record.idempotencyKey ?? null,
     updated_at: record.updatedAt,
   };

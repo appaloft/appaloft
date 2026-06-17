@@ -752,6 +752,149 @@ describe("PreviewPolicyEvaluator", () => {
     });
   });
 
+  test("[ENV-PROFILE-DUP-011] preview policy derives from a base Environment Profile without replacing preview lifecycle", async () => {
+    const repository = new InMemoryPreviewEnvironmentRepository();
+    const dispatcher = new CapturingPreviewDeploymentDispatcher();
+    const projection = new InMemoryPreviewPolicyDecisionProjection();
+    const service = new PreviewLifecycleService(
+      repository,
+      dispatcher,
+      projection,
+      projection,
+      new FixedClock("2026-05-06T01:10:00.000Z"),
+      new SequentialIdGenerator(),
+    );
+
+    const context = createExecutionContext({
+      requestId: "req_preview_profile_base_test",
+      entrypoint: "system",
+    });
+    const result = await service.deployFromPolicyEligibleEvent(context, {
+      sourceEventId: "sevt_preview_profile_base_1",
+      projectId: "prj_preview",
+      environmentId: "env_preview_pr_42",
+      resourceId: "res_preview_api",
+      serverId: "srv_preview",
+      destinationId: "dst_preview",
+      sourceBindingFingerprint: "srcfp_preview_profile_base",
+      provider: "github",
+      eventKind: "pull-request",
+      eventAction: "opened",
+      repositoryFullName: "appaloft/demo",
+      headRepositoryFullName: "appaloft/demo",
+      pullRequestNumber: 142,
+      headSha: "abcde1234",
+      baseRef: "main",
+      verified: true,
+      policy: {
+        environmentProfileBaseEnvironmentId: "env_staging",
+        previewTtlHours: 6,
+      },
+    });
+    const projected = await projection.findOne(toRepositoryContext(context), {
+      sourceEventId: "sevt_preview_profile_base_1",
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      status: "dispatched",
+      previewEnvironmentId: "prenv_1",
+      deploymentId: "dep_preview_1",
+      policyDecision: {
+        safeDetails: {
+          environmentProfileBaseEnvironmentId: "env_staging",
+        },
+      },
+    });
+    expect(dispatcher.inputs).toEqual([
+      {
+        sourceEventId: "sevt_preview_profile_base_1",
+        projectId: "prj_preview",
+        environmentId: "env_preview_pr_42",
+        resourceId: "res_preview_api",
+        serverId: "srv_preview",
+        destinationId: "dst_preview",
+      },
+    ]);
+    expect(projected).toMatchObject({
+      sourceEventId: "sevt_preview_profile_base_1",
+      status: "allowed",
+      deploymentEligible: true,
+      environmentProfileBaseEnvironmentId: "env_staging",
+      previewEnvironmentId: "prenv_1",
+      deploymentId: "dep_preview_1",
+    });
+    expect(JSON.stringify(dispatcher.inputs)).not.toContain("environmentProfileBaseEnvironmentId");
+  });
+
+  test("[ENV-PROFILE-DUP-011] fork previews with secret scopes stay blocked before profile-derived dispatch", async () => {
+    const repository = new InMemoryPreviewEnvironmentRepository();
+    const dispatcher = new CapturingPreviewDeploymentDispatcher();
+    const projection = new InMemoryPreviewPolicyDecisionProjection();
+    const service = new PreviewLifecycleService(
+      repository,
+      dispatcher,
+      projection,
+      projection,
+      new FixedClock("2026-05-06T01:15:00.000Z"),
+      new SequentialIdGenerator(),
+    );
+
+    const context = createExecutionContext({
+      requestId: "req_preview_profile_base_fork_test",
+      entrypoint: "system",
+    });
+    const result = await service.deployFromPolicyEligibleEvent(context, {
+      sourceEventId: "sevt_preview_profile_base_fork_1",
+      projectId: "prj_preview",
+      environmentId: "env_preview_pr_143",
+      resourceId: "res_preview_api",
+      serverId: "srv_preview",
+      destinationId: "dst_preview",
+      sourceBindingFingerprint: "srcfp_preview_profile_base_fork",
+      provider: "github",
+      eventKind: "pull-request",
+      eventAction: "opened",
+      repositoryFullName: "appaloft/demo",
+      headRepositoryFullName: "external/demo",
+      pullRequestNumber: 143,
+      headSha: "abcde5678",
+      baseRef: "main",
+      verified: true,
+      requestedSecretScopes: ["preview-runtime"],
+      policy: {
+        forkPreviews: "without-secrets",
+        environmentProfileBaseEnvironmentId: "env_staging",
+      },
+    });
+    const projected = await projection.findOne(toRepositoryContext(context), {
+      sourceEventId: "sevt_preview_profile_base_fork_1",
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      status: "blocked",
+      policyDecision: {
+        reasonCode: "preview_fork_secrets_blocked",
+        safeDetails: {
+          fork: true,
+          secretBacked: true,
+          environmentProfileBaseEnvironmentId: "env_staging",
+        },
+      },
+    });
+    expect(dispatcher.inputs).toEqual([]);
+    expect(repository.previewEnvironment).toBeNull();
+    expect(projected).toMatchObject({
+      sourceEventId: "sevt_preview_profile_base_fork_1",
+      status: "blocked",
+      deploymentEligible: false,
+      reasonCode: "preview_fork_secrets_blocked",
+      environmentProfileBaseEnvironmentId: "env_staging",
+    });
+    expect(JSON.stringify(projected)).not.toContain("preview-runtime");
+  });
+
   test("[PG-PREVIEW-POLICY-003] applies preview TTL when creating allowed preview environments", async () => {
     const repository = new InMemoryPreviewEnvironmentRepository();
     const dispatcher = new CapturingPreviewDeploymentDispatcher();

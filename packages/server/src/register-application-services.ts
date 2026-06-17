@@ -205,9 +205,13 @@ import {
   DeploymentTimelineQueryService,
   DetachResourceStorageCommandHandler,
   DetachResourceStorageUseCase,
+  DiffEnvironmentProfileQueryHandler,
+  DiffEnvironmentProfileQueryService,
   DiffEnvironmentsQueryService,
   DoctorQueryService,
   type DomainBindingReadModel,
+  DuplicateEnvironmentProfileCommandHandler,
+  DuplicateEnvironmentProfileUseCase,
   EnvironmentEffectivePrecedenceQueryHandler,
   EnvironmentEffectivePrecedenceQueryService,
   EvaluateDeploymentOverlayCommandHandler,
@@ -354,6 +358,8 @@ import {
   PlanConnectorCapabilityQueryService,
   PlanDomainBindingDnsQueryHandler,
   PlanDomainBindingDnsQueryService,
+  PlanDuplicateEnvironmentQueryHandler,
+  PlanDuplicateEnvironmentQueryService,
   PrepareServerRuntimeCommandHandler,
   PrepareServerRuntimeUseCase,
   PreviewCleanupRetryScheduler,
@@ -581,6 +587,8 @@ import {
   StreamOperatorWorkEventsQueryService,
   SwitchCurrentOrganizationCommandHandler,
   SwitchCurrentOrganizationUseCase,
+  SyncEnvironmentProfileCommandHandler,
+  SyncEnvironmentProfileUseCase,
   TerminalSessionLifecycleService,
   TestServerConnectivityUseCase,
   TransferOrganizationOwnerCommandHandler,
@@ -2397,6 +2405,8 @@ export function registerApplicationServices(
   container.registerSingleton(DeleteProjectCommandHandler);
   container.registerSingleton(ArchiveEnvironmentCommandHandler);
   container.registerSingleton(CloneEnvironmentCommandHandler);
+  container.registerSingleton(DuplicateEnvironmentProfileCommandHandler);
+  container.registerSingleton(SyncEnvironmentProfileCommandHandler);
   container.registerSingleton(RenameEnvironmentCommandHandler);
   container.registerSingleton(LockEnvironmentCommandHandler);
   container.registerSingleton(UnlockEnvironmentCommandHandler);
@@ -2490,6 +2500,8 @@ export function registerApplicationServices(
   container.registerSingleton(ResourceEffectiveConfigQueryHandler);
   container.registerSingleton(ResourceAccessFailureEvidenceLookupQueryHandler);
   container.registerSingleton(EnvironmentEffectivePrecedenceQueryHandler);
+  container.registerSingleton(DiffEnvironmentProfileQueryHandler);
+  container.registerSingleton(PlanDuplicateEnvironmentQueryHandler);
   container.registerSingleton(ApplyActionPreviewRouteCommandHandler);
   container.registerSingleton(ConfirmActionPreviewRouteCommandHandler);
   container.registerSingleton(CreateActionSourceLinkDeploymentCommandHandler);
@@ -3292,6 +3304,11 @@ export function registerApplicationServices(
   container.registerSingleton(tokens.bootstrapServerProxyUseCase, BootstrapServerProxyUseCase);
   container.registerSingleton(tokens.archiveEnvironmentUseCase, ArchiveEnvironmentUseCase);
   container.registerSingleton(tokens.cloneEnvironmentUseCase, CloneEnvironmentUseCase);
+  container.registerSingleton(
+    tokens.duplicateEnvironmentProfileUseCase,
+    DuplicateEnvironmentProfileUseCase,
+  );
+  container.registerSingleton(tokens.syncEnvironmentProfileUseCase, SyncEnvironmentProfileUseCase);
   container.registerSingleton(tokens.countEnvironmentsQueryService, CountEnvironmentsQueryService);
   container.registerSingleton(tokens.renameEnvironmentUseCase, RenameEnvironmentUseCase);
   container.registerSingleton(tokens.lockEnvironmentUseCase, LockEnvironmentUseCase);
@@ -3309,6 +3326,14 @@ export function registerApplicationServices(
     UnsetEnvironmentVariableUseCase,
   );
   container.registerSingleton(tokens.diffEnvironmentsQueryService, DiffEnvironmentsQueryService);
+  container.registerSingleton(
+    tokens.diffEnvironmentProfileQueryService,
+    DiffEnvironmentProfileQueryService,
+  );
+  container.registerSingleton(
+    tokens.planDuplicateEnvironmentQueryService,
+    PlanDuplicateEnvironmentQueryService,
+  );
   container.registerSingleton(tokens.promoteEnvironmentUseCase, PromoteEnvironmentUseCase);
   container.registerSingleton(
     tokens.deploymentContextDefaultsFactory,

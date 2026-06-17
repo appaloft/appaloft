@@ -196,6 +196,8 @@ import {
   DetachResourceStorageUseCase,
   DiffEnvironmentsQueryService,
   DoctorQueryService,
+  DuplicateEnvironmentProfileCommandHandler,
+  DuplicateEnvironmentProfileUseCase,
   EnvironmentEffectivePrecedenceQueryHandler,
   EnvironmentEffectivePrecedenceQueryService,
   type ExecutionContext,
@@ -316,6 +318,8 @@ import {
   OperatorWorkQueryService,
   PlanConnectorCapabilityQueryHandler,
   PlanConnectorCapabilityQueryService,
+  PlanDuplicateEnvironmentQueryHandler,
+  PlanDuplicateEnvironmentQueryService,
   PreviewCleanupRetryScheduler,
   PreviewDeploymentProcessManager,
   PreviewEnvironmentCleanupService,
@@ -1621,6 +1625,7 @@ export function registerApplicationServices(
   container.registerSingleton(DeleteProjectCommandHandler);
   container.registerSingleton(ArchiveEnvironmentCommandHandler);
   container.registerSingleton(CloneEnvironmentCommandHandler);
+  container.registerSingleton(DuplicateEnvironmentProfileCommandHandler);
   container.registerSingleton(RenameEnvironmentCommandHandler);
   container.registerSingleton(LockEnvironmentCommandHandler);
   container.registerSingleton(UnlockEnvironmentCommandHandler);
@@ -1688,6 +1693,7 @@ export function registerApplicationServices(
   container.registerSingleton(ResourceHealthHistoryQueryHandler);
   container.registerSingleton(ResourceAccessFailureEvidenceLookupQueryHandler);
   container.registerSingleton(EnvironmentEffectivePrecedenceQueryHandler);
+  container.registerSingleton(PlanDuplicateEnvironmentQueryHandler);
   container.registerSingleton(ApplyActionPreviewRouteCommandHandler);
   container.registerSingleton(ConfirmActionPreviewRouteCommandHandler);
   container.registerSingleton(CreateActionSourceLinkDeploymentCommandHandler);
@@ -2377,6 +2383,10 @@ export function registerApplicationServices(
   container.registerSingleton(tokens.bootstrapServerProxyUseCase, BootstrapServerProxyUseCase);
   container.registerSingleton(tokens.archiveEnvironmentUseCase, ArchiveEnvironmentUseCase);
   container.registerSingleton(tokens.cloneEnvironmentUseCase, CloneEnvironmentUseCase);
+  container.registerSingleton(
+    tokens.duplicateEnvironmentProfileUseCase,
+    DuplicateEnvironmentProfileUseCase,
+  );
   container.registerSingleton(tokens.countEnvironmentsQueryService, CountEnvironmentsQueryService);
   container.registerSingleton(tokens.renameEnvironmentUseCase, RenameEnvironmentUseCase);
   container.registerSingleton(tokens.lockEnvironmentUseCase, LockEnvironmentUseCase);
@@ -2394,6 +2404,10 @@ export function registerApplicationServices(
     UnsetEnvironmentVariableUseCase,
   );
   container.registerSingleton(tokens.diffEnvironmentsQueryService, DiffEnvironmentsQueryService);
+  container.registerSingleton(
+    tokens.planDuplicateEnvironmentQueryService,
+    PlanDuplicateEnvironmentQueryService,
+  );
   container.registerSingleton(tokens.promoteEnvironmentUseCase, PromoteEnvironmentUseCase);
   container.registerSingleton(
     tokens.deploymentContextDefaultsFactory,

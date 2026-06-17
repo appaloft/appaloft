@@ -52,6 +52,7 @@ preview:
       secretBackedPreviews: true
       maxActivePreviews: 5
       previewTtlHours: 72
+      environmentProfileBaseEnvironmentId: env_staging
 ```
 
 Rules:
@@ -62,6 +63,9 @@ Rules:
 - `secretBackedPreviews` defaults to `true`.
 - `maxActivePreviews` is optional and must be a non-negative integer.
 - `previewTtlHours` is optional and must be a positive integer.
+- `environmentProfileBaseEnvironmentId` is optional and selects the safe Environment Profile base
+  id used by product-grade preview policy. It does not select project/global scope, Resource,
+  provider account, credential, secret reference, or deployment target.
 - The declaration always targets the selected Resource scope after trusted identity resolution.
 - The committed file must not select project/global scope, project id, resource id, server id,
   tenant/org identity, provider account, GitHub installation id, webhook secret, feedback token,

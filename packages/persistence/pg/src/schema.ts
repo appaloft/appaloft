@@ -336,6 +336,22 @@ export interface ResourceDependencyBindingsTable {
   removed_at: NullableUpdatableTimestampColumn;
 }
 
+export interface EnvironmentProfileDecisionsTable {
+  id: string;
+  project_id: string;
+  environment_id: string;
+  resource_id: string | null;
+  kind: string;
+  source_id: string;
+  source_environment_id: string | null;
+  source_resource_id: string | null;
+  decision: string | null;
+  reason: string;
+  status: string;
+  created_at: TimestampColumn;
+  resolved_at: NullableUpdatableTimestampColumn;
+}
+
 export interface DependencyBindingSecretsTable {
   ref: string;
   binding_id: string;
@@ -651,6 +667,7 @@ export interface PreviewPoliciesTable {
   secret_backed_previews: boolean;
   max_active_previews: number | null;
   preview_ttl_hours: number | null;
+  environment_profile_base_environment_id: string | null;
   last_idempotency_key: string | null;
   updated_at: UpdatableTimestampColumn;
 }
@@ -677,6 +694,7 @@ export interface PreviewPolicyDecisionsTable {
   deployment_eligible: boolean;
   reason_code: string | null;
   max_active_previews: number | null;
+  environment_profile_base_environment_id: string | null;
   preview_environment_id: string | null;
   preview_expires_at: NullableUpdatableTimestampColumn;
   deployment_id: string | null;
@@ -1139,6 +1157,7 @@ export interface Database {
   storage_volume_backups: StorageVolumeBackupsTable;
   dependency_resource_backup_policies: DependencyResourceBackupPoliciesTable;
   resource_dependency_bindings: ResourceDependencyBindingsTable;
+  environment_profile_decisions: EnvironmentProfileDecisionsTable;
   resource_runtime_log_archives: ResourceRuntimeLogArchivesTable;
   dependency_binding_secrets: DependencyBindingSecretsTable;
   dependency_resource_secrets: DependencyResourceSecretsTable;

@@ -1,0 +1,542 @@
+import {
+  domainError,
+  EnvironmentByIdSpec,
+  EnvironmentId,
+  err,
+  ok,
+  ResourceByIdSpec,
+  ResourceId,
+  ResourceInstanceByIdSpec,
+  ResourceInstanceId,
+  type Result,
+  safeTry,
+} from "@appaloft/core";
+import { inject, injectable } from "tsyringe";
+
+import { type CommandBus } from "../../cqrs";
+import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
+import {
+  type Clock,
+  type DependencyResourceReadModel,
+  type DomainBindingReadModel,
+  type DomainBindingSummary,
+  type EnvironmentDuplicateDeferredDecisionSummary,
+  type EnvironmentDuplicateProfileApplyResult,
+  type EnvironmentProfileDecisionRepository,
+  type EnvironmentReadModel,
+  type ResourceDependencyBindingReadModel,
+  type ResourceDependencyBindingSummary,
+  type ResourceReadModel,
+  type ResourceRepository,
+  type StorageVolumeReadModel,
+  type StorageVolumeSummary,
+} from "../../ports";
+import { tokens } from "../../tokens";
+import { ProvisionDependencyResourceCommand } from "../dependency-resources/provision-dependency-resource.command";
+import { BindResourceDependencyCommand } from "../resources/bind-resource-dependency.command";
+import { CreateResourceCommand } from "../resources/create-resource.command";
+import { CloneEnvironmentCommand } from "./clone-environment.command";
+import {
+  type DuplicateEnvironmentProfileCommandInput,
+  type DuplicateEnvironmentProfileDependencyDecision,
+  type DuplicateEnvironmentProfileResourceDecision,
+} from "./duplicate-environment-profile.schema";
+import {
+  createResourceInputFromSource,
+  deferredResourceProfileDecisions,
+} from "./environment-profile-resource-shape";
+
+@injectable()
+export class DuplicateEnvironmentProfileUseCase {
+  constructor(
+    @inject(tokens.commandBus)
+    private readonly commandBus: Pick<CommandBus, "execute">,
+    @inject(tokens.environmentReadModel)
+    private readonly environmentReadModel: EnvironmentReadModel,
+    @inject(tokens.resourceReadModel)
+    private readonly resourceReadModel: ResourceReadModel,
+    @inject(tokens.resourceRepository)
+    private readonly resourceRepository: ResourceRepository,
+    @inject(tokens.dependencyResourceReadModel)
+    private readonly dependencyResourceReadModel: DependencyResourceReadModel,
+    @inject(tokens.resourceDependencyBindingReadModel)
+    private readonly resourceDependencyBindingReadModel: ResourceDependencyBindingReadModel,
+    @inject(tokens.clock)
+    private readonly clock: Clock,
+    @inject(tokens.environmentProfileDecisionRepository, { isOptional: true })
+    private readonly environmentProfileDecisionRepository?: EnvironmentProfileDecisionRepository,
+    @inject(tokens.domainBindingReadModel, { isOptional: true })
+    private readonly domainBindingReadModel?: DomainBindingReadModel,
+    @inject(tokens.storageVolumeReadModel, { isOptional: true })
+    private readonly storageVolumeReadModel?: StorageVolumeReadModel,
+  ) {}
+
+  async execute(
+    context: ExecutionContext,
+    input: DuplicateEnvironmentProfileCommandInput,
+  ): Promise<Result<EnvironmentDuplicateProfileApplyResult>> {
+    const {
+      clock,
+      commandBus,
+      dependencyResourceReadModel,
+      environmentReadModel,
+      resourceReadModel,
+      resourceRepository,
+      resourceDependencyBindingReadModel,
+      environmentProfileDecisionRepository,
+      domainBindingReadModel,
+      storageVolumeReadModel,
+    } = this;
+    const repositoryContext = toRepositoryContext(context);
+
+    return safeTry(async function* () {
+      const sourceEnvironmentId = yield* EnvironmentId.create(input.environmentId);
+      const sourceEnvironment = await environmentReadModel.findOne(
+        repositoryContext,
+        EnvironmentByIdSpec.create(sourceEnvironmentId),
+      );
+      if (!sourceEnvironment) {
+        return err(domainError.notFound("environment", input.environmentId));
+      }
+
+      const dependencyResources = await dependencyResourceReadModel.list(repositoryContext, {
+        projectId: sourceEnvironment.projectId,
+        environmentId: sourceEnvironment.id,
+        limit: 500,
+      });
+      const requiredDependencies = input.dependencyKindsToRequire?.length
+        ? dependencyResources.filter((dependency) =>
+            input.dependencyKindsToRequire?.includes(dependency.kind),
+          )
+        : dependencyResources;
+      const dependencyDecisions = new Map(
+        (input.dependencyDecisions ?? []).map((decision) => [
+          decision.dependencyResourceId,
+          decision,
+        ]),
+      );
+      const missingDependencyDecisionIds = requiredDependencies
+        .filter((dependency) => !dependencyDecisions.has(dependency.id))
+        .map((dependency) => dependency.id);
+
+      if (missingDependencyDecisionIds.length > 0) {
+        return err(
+          domainError.validation("Environment profile dependency decisions are required", {
+            phase: "environment-profile-duplication-admission",
+            environmentId: sourceEnvironment.id,
+            missingDependencyResourceIds: missingDependencyDecisionIds,
+          }),
+        );
+      }
+
+      const cloneCommand = yield* CloneEnvironmentCommand.create({
+        environmentId: input.environmentId,
+        targetName: input.targetName,
+        ...(input.targetKind ? { targetKind: input.targetKind } : {}),
+      });
+      const cloneResult = yield* await commandBus.execute(context, cloneCommand);
+      const targetEnvironmentId = cloneResult.id;
+
+      const appliedDependencies: EnvironmentDuplicateProfileApplyResult["appliedDependencies"] = [];
+      const dependencyTargetIds = new Map<string, string>();
+      const warnings: EnvironmentDuplicateProfileApplyResult["warnings"] = [];
+      for (const dependency of requiredDependencies) {
+        const decision = dependencyDecisions.get(dependency.id);
+        if (!decision || decision.decision === "defer") {
+          continue;
+        }
+
+        if (decision.decision === "create-new-managed") {
+          const provisionCommand = yield* ProvisionDependencyResourceCommand.create({
+            kind: dependency.kind,
+            projectId: dependency.projectId,
+            environmentId: targetEnvironmentId,
+            name: dependency.name,
+            providerKey: decision.providerKey ?? dependency.providerKey,
+            ...(dependency.description ? { description: dependency.description } : {}),
+            capabilities: dependency.desiredCapabilities,
+            ...(dependency.backupRelationship
+              ? { backupRelationship: dependency.backupRelationship }
+              : {}),
+          });
+          const provisionResult = yield* await commandBus.execute(context, provisionCommand);
+          dependencyTargetIds.set(dependency.id, provisionResult.id);
+          appliedDependencies.push({
+            sourceDependencyResourceId: dependency.id,
+            targetDependencyResourceId: provisionResult.id,
+            decision: decision.decision,
+            kind: dependency.kind,
+            name: dependency.name,
+          });
+          continue;
+        }
+
+        const targetDependencyResourceId =
+          decision.decision === "bind-existing"
+            ? decision.targetDependencyResourceId
+            : dependency.id;
+        if (!targetDependencyResourceId) {
+          return err(
+            domainError.validation("Dependency target decision is incomplete", {
+              phase: "environment-profile-duplication-admission",
+              dependencyResourceId: dependency.id,
+              decision: decision.decision,
+            }),
+          );
+        }
+
+        if (decision.decision === "bind-existing") {
+          const targetId = yield* ResourceInstanceId.create(targetDependencyResourceId);
+          const targetDependency = await dependencyResourceReadModel.findOne(
+            repositoryContext,
+            ResourceInstanceByIdSpec.create(targetId),
+          );
+          if (!targetDependency) {
+            return err(domainError.notFound("dependency-resource", targetDependencyResourceId));
+          }
+          if (targetDependency.projectId !== dependency.projectId) {
+            return err(
+              domainError.validation("Target dependency belongs to a different project", {
+                phase: "environment-profile-duplication-admission",
+                dependencyResourceId: dependency.id,
+                targetDependencyResourceId,
+              }),
+            );
+          }
+        }
+
+        dependencyTargetIds.set(dependency.id, targetDependencyResourceId);
+        appliedDependencies.push({
+          sourceDependencyResourceId: dependency.id,
+          targetDependencyResourceId,
+          decision: decision.decision,
+          kind: dependency.kind,
+          name: dependency.name,
+        });
+        if (decision.decision === "reuse-source") {
+          warnings.push(sharedSourceDependencyWarning(dependency.id, dependency.name));
+        }
+      }
+
+      const resourceDecisions = new Map(
+        (input.resourceDecisions ?? []).map((decision) => [decision.resourceId, decision]),
+      );
+      const sourceResources = await resourceReadModel.list(repositoryContext, {
+        projectId: sourceEnvironment.projectId,
+        environmentId: sourceEnvironment.id,
+        includePreviewResources: false,
+        limit: 500,
+      });
+      const copiedResources: EnvironmentDuplicateProfileApplyResult["copiedResources"] = [];
+      const createdDependencyBindings: EnvironmentDuplicateProfileApplyResult["createdDependencyBindings"] =
+        [];
+      const deferredDecisions: EnvironmentDuplicateDeferredDecisionSummary[] = [];
+      const pendingDecisions: PendingEnvironmentProfileDecision[] = [];
+
+      for (const resourceSummary of sourceResources) {
+        const decision = resourceDecisions.get(resourceSummary.id);
+        if (decision?.decision === "defer") {
+          const deferred = resourceDeferredDecision(resourceSummary.id, decision);
+          deferredDecisions.push(deferred);
+          pendingDecisions.push({
+            ...deferred,
+            projectId: sourceEnvironment.projectId,
+            environmentId: targetEnvironmentId,
+            sourceEnvironmentId: sourceEnvironment.id,
+            sourceResourceId: resourceSummary.id,
+          });
+          continue;
+        }
+
+        const resourceId = yield* ResourceId.create(resourceSummary.id);
+        const sourceResource = await resourceRepository.findOne(
+          repositoryContext,
+          ResourceByIdSpec.create(resourceId),
+        );
+        if (!sourceResource) {
+          return err(domainError.notFound("resource", resourceSummary.id));
+        }
+
+        const sourceState = sourceResource.toState();
+        const createInput = createResourceInputFromSource(sourceState, targetEnvironmentId);
+        const createCommand = yield* CreateResourceCommand.create(createInput);
+        const createResult = yield* await commandBus.execute(context, createCommand);
+        copiedResources.push({
+          sourceResourceId: resourceSummary.id,
+          targetResourceId: createResult.id,
+          name: resourceSummary.name,
+          slug: resourceSummary.slug,
+        });
+        const resourceProfileDeferredDecisions = deferredResourceProfileDecisions(sourceState);
+        deferredDecisions.push(...resourceProfileDeferredDecisions);
+        pendingDecisions.push(
+          ...resourceProfileDeferredDecisions.map((decision) => ({
+            ...decision,
+            projectId: sourceEnvironment.projectId,
+            environmentId: targetEnvironmentId,
+            resourceId: createResult.id,
+            sourceEnvironmentId: sourceEnvironment.id,
+            sourceResourceId: sourceState.id.value,
+          })),
+        );
+        const domainRouteDeferredDecisions = domainBindingReadModel
+          ? (
+              await domainBindingReadModel.list(repositoryContext, {
+                projectId: sourceEnvironment.projectId,
+                environmentId: sourceEnvironment.id,
+                resourceId: sourceState.id.value,
+                limit: 500,
+              })
+            ).map(domainRouteDeferredDecision)
+          : [];
+        deferredDecisions.push(...domainRouteDeferredDecisions);
+        pendingDecisions.push(
+          ...domainRouteDeferredDecisions.map((decision) => ({
+            ...decision,
+            projectId: sourceEnvironment.projectId,
+            environmentId: targetEnvironmentId,
+            resourceId: createResult.id,
+            sourceEnvironmentId: sourceEnvironment.id,
+            sourceResourceId: sourceState.id.value,
+          })),
+        );
+        const storageDeferredDecisions = storageVolumeReadModel
+          ? (
+              await collectStorageAttachments(
+                storageVolumeReadModel,
+                repositoryContext,
+                sourceEnvironment.projectId,
+                sourceEnvironment.id,
+                sourceState.id.value,
+              )
+            ).map(storageDeferredDecision)
+          : [];
+        deferredDecisions.push(...storageDeferredDecisions);
+        pendingDecisions.push(
+          ...storageDeferredDecisions.map((decision) => ({
+            ...decision,
+            projectId: sourceEnvironment.projectId,
+            environmentId: targetEnvironmentId,
+            resourceId: createResult.id,
+            sourceEnvironmentId: sourceEnvironment.id,
+            sourceResourceId: sourceState.id.value,
+          })),
+        );
+
+        const bindings = yield* await resourceDependencyBindingReadModel.list(repositoryContext, {
+          resourceId: resourceSummary.id,
+        });
+        for (const binding of bindings.filter((candidate) => candidate.status === "active")) {
+          const targetDependencyResourceId = dependencyTargetIds.get(binding.dependencyResourceId);
+          if (!targetDependencyResourceId) {
+            const deferred = dependencyBindingDeferredDecision(binding);
+            deferredDecisions.push(deferred);
+            pendingDecisions.push({
+              ...deferred,
+              projectId: sourceEnvironment.projectId,
+              environmentId: targetEnvironmentId,
+              resourceId: createResult.id,
+              sourceEnvironmentId: sourceEnvironment.id,
+              sourceResourceId: binding.resourceId,
+            });
+            continue;
+          }
+
+          const bindCommand = yield* BindResourceDependencyCommand.create({
+            resourceId: createResult.id,
+            dependencyResourceId: targetDependencyResourceId,
+            targetName: binding.target.targetName,
+            scope: binding.target.scope,
+            injectionMode: binding.target.injectionMode,
+          });
+          const bindResult = yield* await commandBus.execute(context, bindCommand);
+          createdDependencyBindings.push({
+            sourceBindingId: binding.id,
+            sourceResourceId: binding.resourceId,
+            targetResourceId: createResult.id,
+            sourceDependencyResourceId: binding.dependencyResourceId,
+            targetDependencyResourceId,
+            targetName: binding.target.targetName,
+            scope: binding.target.scope,
+            injectionMode: binding.target.injectionMode,
+            bindingId: bindResult.id,
+          });
+        }
+      }
+
+      for (const dependency of requiredDependencies) {
+        const decision = dependencyDecisions.get(dependency.id);
+        if (!decision) {
+          continue;
+        }
+        if (decision.decision === "defer") {
+          const deferred = dependencyDeferredDecision(dependency.id, decision);
+          deferredDecisions.push(deferred);
+          pendingDecisions.push({
+            ...deferred,
+            projectId: sourceEnvironment.projectId,
+            environmentId: targetEnvironmentId,
+            sourceEnvironmentId: sourceEnvironment.id,
+          });
+        }
+      }
+
+      if (environmentProfileDecisionRepository) {
+        for (const pendingDecision of pendingDecisions) {
+          await environmentProfileDecisionRepository.recordPending(repositoryContext, {
+            id: pendingDecisionId(pendingDecision),
+            projectId: pendingDecision.projectId,
+            environmentId: pendingDecision.environmentId,
+            kind: pendingDecision.kind,
+            sourceId: pendingDecision.sourceId,
+            reason: pendingDecision.reason,
+            createdAt: clock.now(),
+            ...(pendingDecision.resourceId ? { resourceId: pendingDecision.resourceId } : {}),
+            ...(pendingDecision.sourceEnvironmentId
+              ? { sourceEnvironmentId: pendingDecision.sourceEnvironmentId }
+              : {}),
+            ...(pendingDecision.sourceResourceId
+              ? { sourceResourceId: pendingDecision.sourceResourceId }
+              : {}),
+            ...(pendingDecision.decision ? { decision: pendingDecision.decision } : {}),
+          });
+        }
+      }
+
+      return ok({
+        schemaVersion: "environments.duplicate-profile/v1" as const,
+        sourceEnvironmentId: sourceEnvironment.id,
+        targetEnvironmentId,
+        copiedResources,
+        appliedDependencies,
+        createdDependencyBindings,
+        deferredDecisions,
+        warnings: [
+          ...warnings,
+          ...(deferredDecisions.length
+            ? [
+                {
+                  code: "environment_profile_apply_deferred_decisions",
+                  message:
+                    "Some environment profile decisions require follow-up before deployment.",
+                },
+              ]
+            : []),
+        ],
+        generatedAt: clock.now(),
+      });
+    });
+  }
+}
+
+type StorageAttachmentDecision = StorageVolumeSummary["attachments"][number] & {
+  storageVolumeId: string;
+  storageVolumeName: string;
+};
+
+type PendingEnvironmentProfileDecision = EnvironmentDuplicateDeferredDecisionSummary & {
+  projectId: string;
+  environmentId: string;
+  resourceId?: string;
+  sourceEnvironmentId?: string;
+  sourceResourceId?: string;
+};
+
+function pendingDecisionId(input: PendingEnvironmentProfileDecision): string {
+  const resourcePart = input.resourceId ? `${input.resourceId}_` : "";
+  return `epd_${input.environmentId}_${resourcePart}${input.kind}_${input.sourceId}`;
+}
+
+async function collectStorageAttachments(
+  readModel: StorageVolumeReadModel,
+  context: ReturnType<typeof toRepositoryContext>,
+  projectId: string,
+  environmentId: string,
+  resourceId: string,
+): Promise<StorageAttachmentDecision[]> {
+  const volumes = await readModel.list(context, {
+    projectId,
+    environmentId,
+  });
+  return volumes.flatMap((volume) =>
+    volume.attachments
+      .filter((attachment) => attachment.resourceId === resourceId)
+      .map((attachment) => ({
+        ...attachment,
+        storageVolumeId: volume.id,
+        storageVolumeName: volume.name,
+      })),
+  );
+}
+
+function sharedSourceDependencyWarning(
+  dependencyResourceId: string,
+  dependencyResourceName: string,
+): EnvironmentDuplicateProfileApplyResult["warnings"][number] {
+  return {
+    code: "environment_profile_shared_source_dependency",
+    message: `Target environment reuses source dependency ${dependencyResourceName} (${dependencyResourceId}).`,
+  };
+}
+
+function dependencyBindingDeferredDecision(
+  binding: ResourceDependencyBindingSummary,
+): EnvironmentDuplicateDeferredDecisionSummary {
+  return {
+    kind: "dependency-binding",
+    sourceId: binding.id,
+    decision: "defer",
+    reason:
+      "Dependency binding requires a non-deferred dependency target decision before it can be copied.",
+  };
+}
+
+function domainRouteDeferredDecision(
+  binding: DomainBindingSummary,
+): EnvironmentDuplicateDeferredDecisionSummary {
+  return {
+    kind: "route",
+    sourceId: binding.id,
+    decision: "defer",
+    reason:
+      "Custom domain routes are environment-specific and must be regenerated or explicitly rebound before deployment.",
+  };
+}
+
+function storageDeferredDecision(
+  attachment: StorageAttachmentDecision,
+): EnvironmentDuplicateDeferredDecisionSummary {
+  return {
+    kind: "storage",
+    sourceId: attachment.attachmentId,
+    decision: "defer",
+    reason: `Storage data for ${attachment.storageVolumeName} at ${attachment.destinationPath} requires an explicit empty, restore, import, or defer decision before deployment.`,
+  };
+}
+
+function resourceDeferredDecision(
+  resourceId: string,
+  decision: DuplicateEnvironmentProfileResourceDecision,
+): EnvironmentDuplicateDeferredDecisionSummary {
+  return {
+    kind: "resource",
+    sourceId: resourceId,
+    decision: decision.decision,
+    reason: "Resource shape copy was deferred by the reviewed profile decision.",
+  };
+}
+
+function dependencyDeferredDecision(
+  dependencyResourceId: string,
+  decision: DuplicateEnvironmentProfileDependencyDecision,
+): EnvironmentDuplicateDeferredDecisionSummary {
+  return {
+    kind: "dependency",
+    sourceId: dependencyResourceId,
+    decision: decision.decision,
+    reason:
+      decision.decision === "defer"
+        ? "Dependency binding was deferred and must be resolved before deployment."
+        : "Dependency decision is accepted but requires a later provider or binding phase before deployment.",
+  };
+}

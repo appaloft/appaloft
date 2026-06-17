@@ -35,6 +35,7 @@ import {
   type DeploymentRepository,
   type DomainRouteBindingCandidate,
   type DomainRouteBindingReader,
+  type EnvironmentProfileDecisionReadModel,
   type EventBus,
   type ExecutionBackend,
   type MutationCoordinator,
@@ -525,6 +526,22 @@ function requiredRuntimeTargetCapabilities(runtimePlan: {
   return capabilities;
 }
 
+async function listPendingEnvironmentProfileDecisions(
+  readModel: EnvironmentProfileDecisionReadModel,
+  repositoryContext: Parameters<EnvironmentProfileDecisionReadModel["listPending"]>[0],
+  input: { environmentId: string; resourceId: string },
+) {
+  const environmentDecisions = await readModel.listPending(repositoryContext, {
+    environmentId: input.environmentId,
+  });
+  const resourceDecisions = await readModel.listPending(repositoryContext, input);
+  const byId = new Map<string, (typeof environmentDecisions)[number]>();
+  for (const decision of [...environmentDecisions, ...resourceDecisions]) {
+    byId.set(decision.id, decision);
+  }
+  return [...byId.values()];
+}
+
 @injectable()
 export class CreateDeploymentUseCase {
   constructor(
@@ -572,6 +589,8 @@ export class CreateDeploymentUseCase {
     private readonly deploymentOverlayPort?: DeploymentOverlayPort,
     @inject(tokens.operationGuardPort)
     private readonly operationGuardPort?: OperationGuardPort,
+    @inject(tokens.environmentProfileDecisionReadModel, { isOptional: true })
+    private readonly environmentProfileDecisionReadModel?: EnvironmentProfileDecisionReadModel,
     @inject(tokens.sourceVersionDetector, { isOptional: true })
     private readonly sourceVersionDetector?: SourceVersionDetector,
     @inject(tokens.durableWorkQueueAdapter, { isOptional: true })
@@ -734,6 +753,7 @@ export class CreateDeploymentUseCase {
       sourceVersionDetector,
       operationGuardPort,
       durableWorkQueueAdapter,
+      environmentProfileDecisionReadModel,
     } = this;
     const persistDeployment = this.persistDeployment.bind(this);
     const supersedeActiveDeployment = this.supersedeActiveDeployment.bind(this);
@@ -815,6 +835,31 @@ export class CreateDeploymentUseCase {
         }
       }
       yield* project.ensureCanAcceptMutation("deployments.create");
+      if (environmentProfileDecisionReadModel) {
+        const environmentProfileDecisions = await listPendingEnvironmentProfileDecisions(
+          environmentProfileDecisionReadModel,
+          repositoryContext,
+          {
+            environmentId: environmentState.id.value,
+            resourceId: resourceState.id.value,
+          },
+        );
+        if (environmentProfileDecisions.length > 0) {
+          return err(
+            domainError.validation(
+              "Deployment is blocked by pending environment profile decisions",
+              {
+                commandName: "deployments.create",
+                phase: "environment-profile-decision-admission",
+                environmentId: environmentState.id.value,
+                resourceId: resourceState.id.value,
+                causeCode: "environment-profile-decision-pending",
+                pendingDecisionIds: environmentProfileDecisions.map((decision) => decision.id),
+              },
+            ),
+          );
+        }
+      }
 
       const resourceSourceResult = createResourceSourceDescriptor(resource);
       const resourceSource = yield* resourceSourceResult;

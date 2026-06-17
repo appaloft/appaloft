@@ -98,6 +98,8 @@ import { serverDisplayOrderMigration } from "./migrations/089_server_display_ord
 import { durableWorkerHeartbeatLeasesMigration } from "./migrations/090_durable_worker_heartbeat_leases";
 import { domainBindingResourceTargetsMigration } from "./migrations/091_domain_binding_resource_targets";
 import { deploymentTimelineJournalMigration } from "./migrations/092_deployment_timeline_journal";
+import { environmentProfileDecisionsMigration } from "./migrations/093_environment_profile_decisions";
+import { previewPolicyEnvironmentProfileBaseMigration } from "./migrations/094_preview_policy_environment_profile_base";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -288,6 +290,8 @@ class StaticMigrationProvider implements MigrationProvider {
       "090_durable_worker_heartbeat_leases": durableWorkerHeartbeatLeasesMigration,
       "091_domain_binding_resource_targets": domainBindingResourceTargetsMigration,
       "092_deployment_timeline_journal": deploymentTimelineJournalMigration,
+      "093_environment_profile_decisions": environmentProfileDecisionsMigration,
+      "094_preview_policy_environment_profile_base": previewPolicyEnvironmentProfileBaseMigration,
     };
   }
 }

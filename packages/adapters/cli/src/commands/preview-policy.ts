@@ -26,6 +26,9 @@ const secretBackedPreviewsOption = Options.choice(
 ).pipe(Options.withDefault("true"));
 const maxActivePreviewsOption = Options.text("max-active-previews").pipe(Options.optional);
 const previewTtlHoursOption = Options.text("preview-ttl-hours").pipe(Options.optional);
+const environmentProfileBaseOption = Options.text("environment-profile-base").pipe(
+  Options.optional,
+);
 const idempotencyKeyOption = Options.text("idempotency-key").pipe(Options.optional);
 
 function booleanOptionValue(value: (typeof previewPolicyBooleanValues)[number]): boolean {
@@ -60,9 +63,11 @@ const configureCommand = EffectCommand.make(
     secretBackedPreviews: secretBackedPreviewsOption,
     maxActivePreviews: maxActivePreviewsOption,
     previewTtlHours: previewTtlHoursOption,
+    environmentProfileBase: environmentProfileBaseOption,
     idempotencyKey: idempotencyKeyOption,
   },
   ({
+    environmentProfileBase,
     forkPreviews,
     idempotencyKey,
     maxActivePreviews,
@@ -76,6 +81,7 @@ const configureCommand = EffectCommand.make(
     const resourceId = optionalValue(resource);
     const maxActivePreviewsValue = optionalNumber(maxActivePreviews);
     const previewTtlHoursValue = optionalNumber(previewTtlHours);
+    const environmentProfileBaseValue = optionalValue(environmentProfileBase);
     const idempotencyKeyValue = optionalValue(idempotencyKey);
 
     return runCommand(
@@ -93,6 +99,9 @@ const configureCommand = EffectCommand.make(
             ? { maxActivePreviews: maxActivePreviewsValue }
             : {}),
           ...(previewTtlHoursValue !== undefined ? { previewTtlHours: previewTtlHoursValue } : {}),
+          ...(environmentProfileBaseValue
+            ? { environmentProfileBaseEnvironmentId: environmentProfileBaseValue }
+            : {}),
         },
         ...(idempotencyKeyValue ? { idempotencyKey: idempotencyKeyValue } : {}),
       }),

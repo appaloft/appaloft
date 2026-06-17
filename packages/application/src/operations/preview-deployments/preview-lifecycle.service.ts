@@ -74,6 +74,9 @@ function decisionFromProjection(
       ...(projection.maxActivePreviews !== undefined
         ? { maxActivePreviews: projection.maxActivePreviews }
         : {}),
+      ...(projection.environmentProfileBaseEnvironmentId
+        ? { environmentProfileBaseEnvironmentId: projection.environmentProfileBaseEnvironmentId }
+        : {}),
     },
     ...(projection.reasonCode ? { reasonCode: projection.reasonCode } : {}),
   };
@@ -257,6 +260,9 @@ export class PreviewLifecycleService {
       ...(policyDecision.reasonCode ? { reasonCode: policyDecision.reasonCode } : {}),
       ...(safeDetails.maxActivePreviews !== undefined
         ? { maxActivePreviews: safeDetails.maxActivePreviews }
+        : {}),
+      ...(safeDetails.environmentProfileBaseEnvironmentId
+        ? { environmentProfileBaseEnvironmentId: safeDetails.environmentProfileBaseEnvironmentId }
         : {}),
       ...(lifecycleResult?.previewEnvironmentId
         ? { previewEnvironmentId: lifecycleResult.previewEnvironmentId }

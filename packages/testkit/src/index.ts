@@ -43,6 +43,9 @@ import {
   type DomainRouteBindingReader,
   type DomainRouteFailureCandidate,
   type DomainRouteFailureCandidateReader,
+  type EnvironmentProfileDecisionReadModel,
+  type EnvironmentProfileDecisionRepository,
+  type EnvironmentProfilePendingDecisionSummary,
   type EnvironmentReadModel,
   type EnvironmentRepository,
   type EnvironmentSummary,
@@ -2251,6 +2254,46 @@ export class MemoryResourceDependencyBindingReadModel
     }
     const dependencyResource = this.dependencyResources.items.get(state.resourceInstanceId.value);
     return ok(dependencyResource ? this.toSummary(binding, dependencyResource) : null);
+  }
+}
+
+export class MemoryEnvironmentProfileDecisionStore
+  implements EnvironmentProfileDecisionRepository, EnvironmentProfileDecisionReadModel
+{
+  readonly items = new Map<string, EnvironmentProfilePendingDecisionSummary>();
+
+  async recordPending(
+    context: RepositoryContext,
+    input: Parameters<EnvironmentProfileDecisionRepository["recordPending"]>[1],
+  ): Promise<void> {
+    void context;
+    this.items.set(input.id, {
+      id: input.id,
+      projectId: input.projectId,
+      environmentId: input.environmentId,
+      ...(input.resourceId ? { resourceId: input.resourceId } : {}),
+      kind: input.kind,
+      sourceId: input.sourceId,
+      ...(input.sourceEnvironmentId ? { sourceEnvironmentId: input.sourceEnvironmentId } : {}),
+      ...(input.sourceResourceId ? { sourceResourceId: input.sourceResourceId } : {}),
+      ...(input.decision ? { decision: input.decision } : {}),
+      reason: input.reason,
+      status: "pending",
+      createdAt: input.createdAt,
+    });
+  }
+
+  async listPending(
+    context: RepositoryContext,
+    input: Parameters<EnvironmentProfileDecisionReadModel["listPending"]>[1],
+  ): Promise<EnvironmentProfilePendingDecisionSummary[]> {
+    void context;
+    return [...this.items.values()].filter(
+      (item) =>
+        item.status === "pending" &&
+        item.environmentId === input.environmentId &&
+        (input.resourceId ? item.resourceId === input.resourceId : !item.resourceId),
+    );
   }
 }
 

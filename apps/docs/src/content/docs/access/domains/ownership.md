@@ -11,6 +11,7 @@ searchAliases:
   - "domain verify"
   - "所有权"
 relatedOperations:
+  - domain-bindings.dns-plan
   - domain-bindings.confirm-ownership
   - domain-bindings.retry-verification
 sidebar:

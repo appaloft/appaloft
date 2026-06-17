@@ -132,6 +132,7 @@ preview:
       secretBackedPreviews: true
       maxActivePreviews: 5
       previewTtlHours: 72
+      environmentProfileBaseEnvironmentId: env_staging
 ```
 
 Ordinary trusted config deploys apply this as Resource preview policy before deployment. A PR
