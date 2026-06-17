@@ -1,5 +1,6 @@
 import {
   AcceptBlueprintInstallCommand,
+  AcceptConnectorCapabilityPlanCommand,
   AcceptDependencyResourceProvisioningPlanCommand,
   type ActionDeployTokenAuthorizationPort,
   type ActionDeployTokenRequestedScope,
@@ -16,6 +17,7 @@ import {
   AttachResourceStorageCommand,
   type AuthBootstrapStatus,
   acceptBlueprintInstallCommandInputSchema,
+  acceptConnectorCapabilityPlanCommandInputSchema,
   acceptDependencyResourceProvisioningPlanInputSchema,
   applyConnectorCapabilityCommandInputSchema,
   archiveDeploymentCommandInputSchema,
@@ -602,6 +604,7 @@ import {
   showBlueprintResponseSchema,
 } from "@appaloft/application/schemas";
 import {
+  acceptConnectorCapabilityPlanResponseSchema,
   accountProfileResponseSchema,
   archiveDeploymentResponseSchema,
   archiveEnvironmentResponseSchema,
@@ -6324,6 +6327,18 @@ export const planConnectorCapabilityProcedure = base
     executeQuery(context, PlanConnectorCapabilityQuery.create(input)),
   );
 
+export const acceptConnectorCapabilityPlanProcedure = base
+  .route({
+    method: "POST",
+    path: "/connections/capabilities/accept",
+    successStatus: 200,
+  })
+  .input(acceptConnectorCapabilityPlanCommandInputSchema)
+  .output(acceptConnectorCapabilityPlanResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, AcceptConnectorCapabilityPlanCommand.create(input)),
+  );
+
 export const applyConnectorCapabilityProcedure = base
   .route({
     method: "POST",
@@ -6778,6 +6793,7 @@ export const appaloftOrpcRouter = {
     },
     capability: {
       plan: planConnectorCapabilityProcedure,
+      accept: acceptConnectorCapabilityPlanProcedure,
       apply: applyConnectorCapabilityProcedure,
     },
   },
@@ -9193,6 +9209,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/connections/connect/start",
     "/api/connections/connect/callback",
     "/api/connections/capabilities/plan",
+    "/api/connections/capabilities/accept",
     "/api/connections/capabilities/apply",
     "/api/projects",
     "/api/projects/:projectId",

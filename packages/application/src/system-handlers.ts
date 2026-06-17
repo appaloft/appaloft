@@ -1,3 +1,5 @@
+export * from "./operations/system/accept-connector-capability-plan.handler";
+export * from "./operations/system/accept-connector-capability-plan.use-case";
 export * from "./operations/system/apply-connector-capability.handler";
 export * from "./operations/system/apply-connector-capability.use-case";
 export * from "./operations/system/apply-instance-upgrade.handler";

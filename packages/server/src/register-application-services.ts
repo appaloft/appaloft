@@ -6,6 +6,8 @@ import { join } from "node:path";
 
 import {
   AcceptBlueprintInstallCommandHandler,
+  AcceptConnectorCapabilityPlanCommandHandler,
+  AcceptConnectorCapabilityPlanUseCase,
   AcceptDependencyResourceProvisioningPlanCommandHandler,
   AcceptDependencyResourceProvisioningPlanUseCase,
   ApplyActionPreviewRouteCommandHandler,
@@ -2409,6 +2411,7 @@ export function registerApplicationServices(
   container.registerSingleton(RevokeConnectionCommandHandler);
   container.registerSingleton(ListConnectorsQueryHandler);
   container.registerSingleton(PlanConnectorCapabilityQueryHandler);
+  container.registerSingleton(AcceptConnectorCapabilityPlanCommandHandler);
   container.registerSingleton(ApplyConnectorCapabilityCommandHandler);
   container.registerSingleton(ListBlueprintsQueryHandler);
   container.registerSingleton(ShowBlueprintQueryHandler);
@@ -3501,6 +3504,10 @@ export function registerApplicationServices(
   container.registerSingleton(
     tokens.connectorCapabilityPlanQueryService,
     PlanConnectorCapabilityQueryService,
+  );
+  container.registerSingleton(
+    tokens.acceptConnectorCapabilityPlanUseCase,
+    AcceptConnectorCapabilityPlanUseCase,
   );
   container.registerSingleton(
     tokens.connectorCapabilityApplyUseCase,

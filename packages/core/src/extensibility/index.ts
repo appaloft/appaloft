@@ -1,3 +1,4 @@
+export * from "./accepted-connection-capability-plan";
 export * from "./connection";
 export * from "./connector-definition";
 export * from "./dns-connection";

@@ -1,4 +1,5 @@
 import {
+  AcceptedConnectionCapabilityPlan,
   ConnectionCapabilityKey,
   ConnectorDefinition,
   domainError,
@@ -9,6 +10,7 @@ import { inject, injectable } from "tsyringe";
 
 import { type ExecutionContext } from "../../execution-context";
 import {
+  type AcceptedConnectionCapabilityPlanStore,
   type ConnectorCapabilityApplyResult,
   type ConnectorProviderAdapterRegistry,
   type ConnectorRegistry,
@@ -23,6 +25,8 @@ export class ApplyConnectorCapabilityUseCase {
     private readonly connectorRegistry: ConnectorRegistry,
     @inject(tokens.connectorProviderAdapterRegistry)
     private readonly adapterRegistry: ConnectorProviderAdapterRegistry,
+    @inject(tokens.acceptedConnectionCapabilityPlanStore)
+    private readonly acceptedPlanStore?: AcceptedConnectionCapabilityPlanStore,
   ) {}
 
   async execute(
@@ -59,6 +63,28 @@ export class ApplyConnectorCapabilityUseCase {
           connectorKey: input.connectorKey,
         }),
       );
+    }
+
+    if (input.acceptedPlanId) {
+      const acceptedPlan = this.acceptedPlanStore?.findById(input.acceptedPlanId);
+      if (!acceptedPlan) {
+        return err(domainError.notFound("AcceptedConnectionCapabilityPlan", input.acceptedPlanId));
+      }
+      if (
+        !AcceptedConnectionCapabilityPlan.rehydrate(acceptedPlan).matches({
+          connectorKey: input.connectorKey,
+          capabilityKey: input.capabilityKey,
+          ...(input.ownerRef ? { ownerRef: input.ownerRef } : {}),
+        })
+      ) {
+        return err(
+          domainError.conflict("Accepted connector capability plan does not match apply request", {
+            acceptedPlanId: input.acceptedPlanId,
+            connectorKey: input.connectorKey,
+            capabilityKey: input.capabilityKey,
+          }),
+        );
+      }
     }
 
     return adapter.applyCapability(context, {

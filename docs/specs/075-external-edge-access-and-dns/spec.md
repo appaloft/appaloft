@@ -145,6 +145,7 @@ capabilities instead of introducing a second connection model:
 - `connections.connect.callback`
 - `connections.revoke`
 - `connections.capability.plan`
+- `connections.capability.accept`
 - `connections.capability.apply`
 
 Domain-bound external edge work still needs future operation names after ADR review:

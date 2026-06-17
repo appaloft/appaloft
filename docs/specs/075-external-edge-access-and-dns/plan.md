@@ -53,6 +53,7 @@ Provider connection lifecycle uses the accepted Appaloft Connections operations:
 - `connections.connect.callback`
 - `connections.revoke`
 - `connections.capability.plan`
+- `connections.capability.accept`
 - `connections.capability.apply`
 
 Future candidate operation groups:

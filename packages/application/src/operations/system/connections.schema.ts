@@ -95,6 +95,36 @@ export const applyConnectorCapabilityCommandInputSchema = z
   })
   .strict();
 
+export const acceptConnectorCapabilityPlanCommandInputSchema = z
+  .object({
+    planId: z.string().min(1),
+    connectorKey: z.string().min(1),
+    capabilityKey: z.string().min(1),
+    ownerRef: connectionOwnerInputSchema.optional(),
+    acceptedBy: z.string().min(1).optional(),
+    riskLevel: z.enum(["low", "medium", "high"]),
+    summary: z.string().min(1),
+    effects: z
+      .array(
+        z
+          .object({
+            kind: z.string().min(1),
+            title: z.string().min(1),
+            description: z.string().min(1).optional(),
+          })
+          .strict(),
+      )
+      .min(1),
+    cleanup: z
+      .object({
+        supported: z.boolean(),
+        description: z.string().min(1).optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
 export type ListConnectionsQueryInput = z.infer<typeof listConnectionsQueryInputSchema>;
 export type ShowConnectionQueryInput = z.infer<typeof showConnectionQueryInputSchema>;
 export type StartConnectionCommandInput = z.infer<typeof startConnectionCommandInputSchema>;
@@ -102,6 +132,9 @@ export type CompleteConnectionCallbackCommandInput = z.infer<
   typeof completeConnectionCallbackCommandInputSchema
 >;
 export type RevokeConnectionCommandInput = z.infer<typeof revokeConnectionCommandInputSchema>;
+export type AcceptConnectorCapabilityPlanCommandInput = z.infer<
+  typeof acceptConnectorCapabilityPlanCommandInputSchema
+>;
 export type ApplyConnectorCapabilityCommandInput = z.infer<
   typeof applyConnectorCapabilityCommandInputSchema
 >;

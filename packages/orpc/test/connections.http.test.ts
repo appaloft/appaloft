@@ -2,6 +2,7 @@ import "../../application/node_modules/reflect-metadata/Reflect.js";
 
 import { describe, expect, test } from "bun:test";
 import {
+  AcceptConnectorCapabilityPlanCommand,
   ApplyConnectorCapabilityCommand,
   type Command,
   type CommandBus,
@@ -303,6 +304,71 @@ describe("connections HTTP routes", () => {
       },
     });
     expect(capturedQuery).toBeInstanceOf(PlanDomainBindingDnsQuery);
+  });
+
+  test("[APP-CONN-014][APP-CONN-010] accepts connector capability plans through HTTP/oRPC", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      commandBus: commandBusFor((command) => {
+        capturedCommand = command;
+        return {
+          acceptedPlanId: "accepted_dnsplan_test",
+          planId: "dnsplan_test",
+          connectorKey: "cloudflare-dns",
+          capabilityKey: "dns.records.apply",
+          acceptedBy: "usr_test",
+          acceptedAt: "2026-06-17T10:00:00.000Z",
+          riskLevel: "low",
+          summary: "Apply one Cloudflare DNS record.",
+          effects: [
+            {
+              kind: "dns.record.upsert",
+              title: "CNAME app.example.com",
+            },
+          ],
+          cleanup: {
+            supported: true,
+          },
+        };
+      }),
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus: queryBusFor(() => ({})),
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/connections/capabilities/accept", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          planId: "dnsplan_test",
+          connectorKey: "cloudflare-dns",
+          capabilityKey: "dns.records.apply",
+          riskLevel: "low",
+          summary: "Apply one Cloudflare DNS record.",
+          effects: [
+            {
+              kind: "dns.record.upsert",
+              title: "CNAME app.example.com",
+            },
+          ],
+          cleanup: {
+            supported: true,
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      acceptedPlanId: "accepted_dnsplan_test",
+      planId: "dnsplan_test",
+      connectorKey: "cloudflare-dns",
+      capabilityKey: "dns.records.apply",
+    });
+    expect(capturedCommand).toBeInstanceOf(AcceptConnectorCapabilityPlanCommand);
   });
 
   test("[APP-CONN-014][APP-CONN-016] applies connector capabilities through HTTP/oRPC", async () => {
