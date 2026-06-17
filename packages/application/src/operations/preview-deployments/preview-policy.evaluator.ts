@@ -27,6 +27,7 @@ export interface PreviewPolicyDecisionSafeDetails {
   activePreviewCount: number;
   maxActivePreviews?: number;
   previewTtlHours?: number;
+  environmentProfileBaseEnvironmentId?: string;
 }
 
 export interface PreviewPolicyDecision {
@@ -58,6 +59,9 @@ function safeDetails(input: PreviewPolicyEvaluationPayload): PreviewPolicyDecisi
       : {}),
     ...(input.policy.previewTtlHours !== undefined
       ? { previewTtlHours: input.policy.previewTtlHours }
+      : {}),
+    ...(input.policy.environmentProfileBaseEnvironmentId
+      ? { environmentProfileBaseEnvironmentId: input.policy.environmentProfileBaseEnvironmentId }
       : {}),
   };
 }

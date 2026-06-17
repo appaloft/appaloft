@@ -35,6 +35,7 @@ preview:
       secretBackedPreviews: true
       maxActivePreviews: 5
       previewTtlHours: 72
+      environmentProfileBaseEnvironmentId: env_staging
 ```
 
 The accepted policy fields are:
@@ -43,7 +44,10 @@ The accepted policy fields are:
 - `forkPreviews`: `disabled`, `without-secrets`, or `with-secrets`, default `disabled`;
 - `secretBackedPreviews`: boolean, default `true`;
 - `maxActivePreviews`: optional non-negative integer;
-- `previewTtlHours`: optional positive integer.
+- `previewTtlHours`: optional positive integer;
+- `environmentProfileBaseEnvironmentId`: optional safe Environment Profile base id used by
+  product-grade preview policy. It is an Appaloft environment id, not a provider account,
+  credential, secret reference, or project/resource scope selector.
 
 Ordinary trusted repository-config deploy reconciles the declaration to the selected Resource scope
 by dispatching `preview-policies.show` and, when needed, `preview-policies.configure` before
@@ -69,6 +73,8 @@ The final deployment command remains ids-only. No preview policy fields are adde
   preview policy repositories or application services directly.
 - Product-grade preview policy becomes part of the Appaloft YAML sync gate for deployment and
   preview behavior changes.
+- Environment Profile base selection can be declared for product-grade previews, but it remains
+  preview policy/read-model context and does not add fields to `deployments.create`.
 - Committed config still cannot carry provider account, GitHub installation, webhook secret,
   token, tenant/org identity, raw secret value, project/global scope selector, or cleanup
   credential material.

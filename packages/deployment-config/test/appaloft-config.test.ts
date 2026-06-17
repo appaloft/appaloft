@@ -632,6 +632,7 @@ describe("Appaloft deployment config schema", () => {
             secretBackedPreviews: false,
             maxActivePreviews: 5,
             previewTtlHours: 72,
+            environmentProfileBaseEnvironmentId: "env_staging",
           },
         },
       },
@@ -645,6 +646,7 @@ describe("Appaloft deployment config schema", () => {
         secretBackedPreviews: false,
         maxActivePreviews: 5,
         previewTtlHours: 72,
+        environmentProfileBaseEnvironmentId: "env_staging",
       });
     }
 

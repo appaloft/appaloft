@@ -1186,6 +1186,7 @@ export const appaloftDeploymentPreviewPolicyConfigSchema = z
       .int(previewPolicyTtlHoursError)
       .positive(previewPolicyTtlHoursError)
       .optional(),
+    environmentProfileBaseEnvironmentId: z.string().min(1).optional(),
   })
   .strict()
   .describe("Product-grade pull request preview policy declaration.");

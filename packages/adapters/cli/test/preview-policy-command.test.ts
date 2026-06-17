@@ -81,6 +81,8 @@ describe("CLI preview policy commands", () => {
         "5",
         "--preview-ttl-hours",
         "24",
+        "--environment-profile-base",
+        "env_staging",
         "--idempotency-key",
         "preview-policy-cli-1",
       ]);
@@ -102,6 +104,7 @@ describe("CLI preview policy commands", () => {
         secretBackedPreviews: false,
         maxActivePreviews: 5,
         previewTtlHours: 24,
+        environmentProfileBaseEnvironmentId: "env_staging",
       },
       idempotencyKey: "preview-policy-cli-1",
     });

@@ -20,6 +20,9 @@ export const previewPolicySettingsSchema = z
     secretBackedPreviews: z.boolean().optional(),
     maxActivePreviews: z.number().int().nonnegative().optional(),
     previewTtlHours: z.number().int().positive().optional(),
+    environmentProfileBaseEnvironmentId: nonEmptyTrimmedString(
+      "Environment Profile base environment id",
+    ).optional(),
   })
   .default(defaultPreviewPolicySettings)
   .transform((settings) => ({

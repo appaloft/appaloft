@@ -3646,6 +3646,7 @@ export const previewPolicySettingsSchema = z.object({
   secretBackedPreviews: z.boolean(),
   maxActivePreviews: z.number().int().positive().optional(),
   previewTtlHours: z.number().int().positive().optional(),
+  environmentProfileBaseEnvironmentId: z.string().min(1).optional(),
 });
 
 export const previewPolicySummarySchema = z.object({

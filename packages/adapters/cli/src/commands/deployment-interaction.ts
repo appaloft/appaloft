@@ -828,6 +828,12 @@ export function deploymentPromptSeedFromConfig(
         ...(config.preview.pullRequest.policy.previewTtlHours !== undefined
           ? { previewTtlHours: config.preview.pullRequest.policy.previewTtlHours }
           : {}),
+        ...(config.preview.pullRequest.policy.environmentProfileBaseEnvironmentId
+          ? {
+              environmentProfileBaseEnvironmentId:
+                config.preview.pullRequest.policy.environmentProfileBaseEnvironmentId,
+            }
+          : {}),
       } satisfies DeploymentPreviewPolicySeed)
     : undefined;
   const resourceSecretRequirements = Object.entries(config.secrets ?? {})
@@ -1595,7 +1601,9 @@ function previewPolicyMatchesConfig(input: {
     current.settings.forkPreviews === input.desired.forkPreviews &&
     current.settings.secretBackedPreviews === input.desired.secretBackedPreviews &&
     current.settings.maxActivePreviews === input.desired.maxActivePreviews &&
-    current.settings.previewTtlHours === input.desired.previewTtlHours
+    current.settings.previewTtlHours === input.desired.previewTtlHours &&
+    current.settings.environmentProfileBaseEnvironmentId ===
+      input.desired.environmentProfileBaseEnvironmentId
   );
 }
 

@@ -47,6 +47,7 @@ or preview fields to `deployments.create`.
 | Preview source event | Provider-normalized source event that may request preview create, update, or cleanup after verification. | Source event application service | PR event |
 | Preview feedback | Idempotent GitHub App comment, check run, deployment status, or equivalent integration status pointing users to preview state and diagnostics. | Integration adapter | Comment/check/status |
 | Preview cleanup attempt | Durable cleanup work for preview runtime, route state, source link, feedback, and provider metadata, with retry and audit ownership. | Release orchestration / operator work | Cleanup retry |
+| Preview profile base | Optional Environment Profile base selected by preview policy. It gives product-grade previews a safe profile source without making preview policy own Resource shape, secrets, or deployment fields. | Preview lifecycle / Environment profile | base Environment Profile |
 
 ## Target Operation Position
 
@@ -55,8 +56,8 @@ Product-grade previews are a control-plane workflow over explicit active operati
 | Surface | State | Rule |
 | --- | --- | --- |
 | `source-events.ingest` | Active command / integration boundary | Normalizes signed GitHub pull request deliveries after webhook verification and repository/context mapping. It persists safe source event state and dedupes before preview policy evaluation. |
-| `preview-policies.show` | Active CLI, HTTP/oRPC, and Web query | Reads effective preview policy, fork/secret/domain/quota rules, and selected execution owner for a project or resource scope. |
-| `preview-policies.configure` | Active CLI, HTTP/oRPC, and Web command | Changes preview policy explicitly. It must not mutate Resource source/runtime/network profile or deployment history as a side effect. |
+| `preview-policies.show` | Active CLI, HTTP/oRPC, and Web query | Reads effective preview policy, fork/secret/domain/quota rules, optional Environment Profile base, and selected execution owner for a project or resource scope. |
+| `preview-policies.configure` | Active CLI, HTTP/oRPC, and Web command | Changes preview policy explicitly, including optional safe Environment Profile base selection. It must not mutate Resource source/runtime/network profile or deployment history as a side effect. |
 | `preview-environments.list` | Active CLI, HTTP/oRPC, and Web query | Lists durable preview environments with source event, parent Resource, deployment, route, feedback, cleanup, expiry, and audit summaries. Web should default to Resource-scoped list placement; global rollups are secondary operator views. |
 | `preview-environments.show` | Active CLI, HTTP/oRPC, and Web query | Reads one Resource-derived preview environment and its safe latest deployment, route, feedback, policy, cleanup, and diagnostic state. |
 | `preview-environments.delete` | Active CLI, HTTP/oRPC, and Web command | Requests explicit preview cleanup/deletion for one parent Resource plus preview environment id. It dispatches preview-lifecycle cleanup and preserves deployment history/audit. |
@@ -116,6 +117,7 @@ Non-scheduled compensation must exist even when the periodic scheduler is disabl
 | PG-PREVIEW-SPEC-007 | Cleanup retry is durable | Runtime cleanup, provider metadata deletion, or feedback update fails with a retriable error | Cleanup processing records the failure | Retry state records owner, attempt id, next retry timing, safe phase, and sanitized provider detail; a later retry creates a new attempt id. |
 | PG-PREVIEW-SPEC-008 | Quota and expiry are enforced | A repository or project exceeds preview count, age, or resource quota | Preview policy evaluates a create/update event or scheduler scans previews | New previews are blocked or old previews are scheduled for cleanup according to policy, with read-model visibility and safe user guidance. |
 | PG-PREVIEW-SPEC-009 | Public surfaces stay normalized | Web, CLI, HTTP/oRPC, or future MCP surfaces inspect product-grade previews | Users list, show, configure, deploy, or delete previews | Output uses Appaloft preview policy/environment language with stable operation keys and help anchors, not provider-native webhook payloads or GitHub API objects. Web presents previews as derived runtime environments under Resources by default; global preview views are secondary rollups, not primary resource peers. |
+| PG-PREVIEW-SPEC-010 | Preview policy selects base Environment Profile safely | Product-grade preview policy includes an Environment Profile base id | A verified PR preview event is evaluated | The policy decision records only the safe base environment id, then the existing preview lifecycle creates/updates the derived preview environment and dispatches ids-only deployment; fork previews with secret scopes remain blocked before dispatch unless policy explicitly allows safe no-secret previews. |
 
 ## Error And Async Semantics
 
@@ -189,10 +191,11 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
 - Action-only preview deploy/update and explicit close-event cleanup exist in the CLI/config
   workflow and reference wrapper. The public `appaloft/deploy-action` wrapper repository and
   Marketplace documentation are now published from the deterministic reference export.
-- The application layer now has an initial product-grade preview policy evaluator with a normalized
+- The application layer now has a product-grade preview policy evaluator with a normalized
   GitHub pull-request input schema. It allows verified same-repository pull request events, blocks
-  unverified events, blocks secret-backed fork previews by default, and permits fork previews
-  without secrets only when policy opts in.
+  unverified events, blocks secret-backed fork previews by default, permits fork previews
+  without secrets only when policy opts in, and carries optional safe Environment Profile base ids
+  as policy decision context without resolving secret-backed profile decisions.
 - The core domain now has a foundational `PreviewEnvironment` aggregate for product-grade preview
   identity. It stores scoped project/environment/resource/target placement, safe source fingerprint
   and pull-request context, active/cleanup-requested status, expiry, and cleanup-request state
@@ -228,6 +231,10 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   have a dedicated application scheduler and disabled-by-default shell runner that scan the safe
   preview environment read side and dispatch cleanup through `preview-environments.delete` /
   `deployments.cleanup-preview` without adding preview fields to deployment admission.
+- Preview policy now supports `environmentProfileBaseEnvironmentId`. Configure/show, CLI,
+  repository config parsing, Postgres/PGlite persistence, and preview policy decision projections
+  carry only the safe base environment id; `deployments.create` and preview cleanup dispatch
+  payloads remain unchanged.
 - The GitHub integration now has an initial preview pull-request webhook verifier/normalizer. It
   verifies `X-Hub-Signature-256`-compatible HMAC input, treats verified `ping` as no-op, rejects
   unsupported pull request actions, and emits only safe preview facts needed by policy/lifecycle
