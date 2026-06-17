@@ -190,7 +190,7 @@
   const filterProjectEnvironments = $derived(
     filterProjectId
       ? environments.filter((environment) => environment.projectId === filterProjectId)
-      : environments,
+      : [],
   );
   const filterProjectSelectValue = $derived(
     filterProjectId || allDependencyResourceFilterValue,
@@ -201,7 +201,7 @@
   const createProjectEnvironments = $derived(
     createProjectId
       ? environments.filter((environment) => environment.projectId === createProjectId)
-      : environments,
+      : [],
   );
   const filteredDependencyResources = $derived(
     dependencyResources.filter(
@@ -585,10 +585,15 @@
             <Select.Root
               value={filterEnvironmentSelectValue}
               onValueChange={selectDependencyResourceEnvironmentFilter}
+              disabled={!filterProjectId}
               type="single"
             >
               <Select.Trigger class="min-w-48">
-                {filterEnvironmentId ? environmentName(filterEnvironmentId) : $t(i18nKeys.console.dependencyResources.filterAll)}
+                {filterEnvironmentId
+                  ? environmentName(filterEnvironmentId)
+                  : filterProjectId
+                    ? $t(i18nKeys.console.dependencyResources.filterAll)
+                    : $t(i18nKeys.console.dependencyResources.selectProjectFirst)}
               </Select.Trigger>
               <Select.Content>
                 <Select.Item value={allDependencyResourceFilterValue}>

@@ -58,7 +58,7 @@
   );
   const filteredEnvironments = $derived.by(() =>
     projectFilter === "all"
-      ? environments
+      ? []
       : environments.filter((environment) => environment.projectId === projectFilter),
   );
   const filteredResourcesForProject = $derived.by(() =>
@@ -117,7 +117,10 @@
     selectedProject?.name ?? $t(i18nKeys.console.deployments.allProjects),
   );
   const selectedEnvironmentFilterLabel = $derived(
-    selectedEnvironment?.name ?? $t(i18nKeys.console.deployments.filterAllEnvironments),
+    selectedEnvironment?.name ??
+      (selectedProject
+        ? $t(i18nKeys.console.deployments.filterAllEnvironments)
+        : $t(i18nKeys.console.deployments.selectProjectFirst)),
   );
   const selectedResourceFilterLabel = $derived(
     selectedResource?.name ?? $t(i18nKeys.console.deployments.filterAllResources),
@@ -305,7 +308,7 @@
             </label>
             <label class="space-y-1.5 text-sm font-medium">
               {$t(i18nKeys.common.domain.environment)}
-              <Select.Root bind:value={environmentFilter} type="single">
+              <Select.Root bind:value={environmentFilter} disabled={!selectedProject} type="single">
                 <Select.Trigger class="w-full min-w-0 xl:w-44">
                   {selectedEnvironmentFilterLabel}
                 </Select.Trigger>

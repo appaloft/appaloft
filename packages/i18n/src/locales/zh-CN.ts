@@ -504,6 +504,7 @@ export const zhCN = {
       selectBackup: "选择备份",
       selectEnvironment: "选择环境",
       selectProject: "选择项目",
+      selectProjectFirst: "先选择项目",
       selectServer: "选择服务器",
       selectedResource: "当前资源",
       secretRef: "密钥引用",
@@ -564,6 +565,7 @@ export const zhCN = {
       filtersDescription:
         "按项目、环境、资源和状态缩小观察范围；创建或重试部署请从项目资源或资源详情进入。",
       filtersTitle: "筛选部署记录",
+      selectProjectFirst: "先选择项目",
       focusDescription: "把每次发布当成一条可追踪事件；服务器、快照和命令细节放在详情页。",
       focusTitle: "部署记录与运行状态",
       generatedAt: "计划生成时间",
