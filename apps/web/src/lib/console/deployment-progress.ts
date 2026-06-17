@@ -29,33 +29,6 @@ const deploymentProgressPhases = [
   "rollback",
 ] as const;
 
-const deploymentStatusPhase = {
-  created: "detect",
-  planning: "plan",
-  planned: "plan",
-  running: "deploy",
-  "cancel-requested": "deploy",
-  succeeded: "verify",
-  failed: "verify",
-  canceled: "deploy",
-  "rolled-back": "rollback",
-} as const satisfies Record<DeploymentSummary["status"], DeploymentProgressEvent["phase"]>;
-
-const deploymentStatusProgressStatus = {
-  created: "running",
-  planning: "running",
-  planned: "succeeded",
-  running: "running",
-  "cancel-requested": "running",
-  succeeded: "succeeded",
-  failed: "failed",
-  canceled: "failed",
-  "rolled-back": "succeeded",
-} as const satisfies Record<
-  DeploymentSummary["status"],
-  NonNullable<DeploymentProgressEvent["status"]>
->;
-
 export function createDeploymentRequestId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
@@ -260,50 +233,6 @@ function deploymentIsNewer(candidate: DeploymentSummary, current: DeploymentSumm
   return candidate.id > current.id;
 }
 
-type DeploymentProgressSource = Pick<
-  DeploymentSummary,
-  "id" | "status" | "createdAt" | "startedAt" | "finishedAt"
-> & {
-  timeline?: DeploymentSummary["timeline"];
-};
-
-export function progressEventsFromDeployment(
-  deployment: DeploymentProgressSource,
-  timeline: DeploymentSummary["timeline"] = deployment.timeline ?? [],
-): DeploymentProgressEvent[] {
-  const logEvents = timeline.map((log) => {
-    return {
-      timestamp: log.timestamp,
-      source: log.source,
-      phase: log.phase,
-      level: log.level,
-      message: log.message,
-      deploymentId: deployment.id,
-      step: progressStepForPhase(log.phase),
-    } satisfies DeploymentProgressEvent;
-  });
-  const statusPhase = deploymentStatusPhase[deployment.status];
-
-  return [
-    ...logEvents,
-    {
-      timestamp: deployment.finishedAt ?? deployment.startedAt ?? deployment.createdAt,
-      source: "appaloft",
-      phase: statusPhase,
-      level:
-        deployment.status === "failed"
-          ? "error"
-          : deployment.status === "canceled" || deployment.status === "cancel-requested"
-            ? "warn"
-            : "info",
-      message: deployment.status,
-      deploymentId: deployment.id,
-      status: deploymentStatusProgressStatus[deployment.status],
-      step: progressStepForPhase(statusPhase),
-    },
-  ];
-}
-
 export function deploymentTimelineEnvelopeCursor(
   envelope: DeploymentTimelineEnvelope,
 ): string | undefined {
@@ -383,12 +312,13 @@ export function deploymentTimelineProgressEvents(
       return [];
     }
 
+    const occurredAt = deploymentTimelineEntryOccurredAt(envelope.entry);
     const phase = envelope.entry.phase ?? "deploy";
     const status = deploymentTimelineStatus(envelope.entry.status);
 
     return [
       {
-        timestamp: envelope.entry.occurredAt,
+        timestamp: occurredAt,
         source: envelope.entry.source,
         phase,
         level: envelope.entry.level,
@@ -405,32 +335,98 @@ export function deploymentTimelineProgressEvents(
   });
 }
 
+type DeploymentTimelineTransportEnvelope<T> = {
+  json: T;
+};
+
+function isDeploymentTimelineTransportValue(value: unknown): boolean {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  return (value as { schemaVersion?: unknown }).schemaVersion === "deployments.timeline/v1";
+}
+
+function unwrapDeploymentTimelineTransport<T>(
+  value: T | DeploymentTimelineTransportEnvelope<T>,
+): T {
+  let current: unknown = value;
+
+  while (current && typeof current === "object" && "json" in current) {
+    const next = (current as { json: unknown }).json;
+    if (
+      !isDeploymentTimelineTransportValue(next) &&
+      !(next && typeof next === "object" && "json" in next)
+    ) {
+      break;
+    }
+    current = next;
+  }
+
+  return current as T;
+}
+
+function deploymentTimelineEntryOccurredAt(
+  entry: DeploymentTimelineResponse["entries"][number],
+): string {
+  const timestamp = (entry as unknown as { timestamp?: unknown }).timestamp;
+
+  return entry.occurredAt || (typeof timestamp === "string" ? timestamp : "");
+}
+
+function normalizeDeploymentTimelineEntry(
+  entry: DeploymentTimelineResponse["entries"][number],
+): DeploymentTimelineResponse["entries"][number] {
+  const occurredAt = deploymentTimelineEntryOccurredAt(entry);
+
+  return occurredAt === entry.occurredAt ? entry : { ...entry, occurredAt };
+}
+
 export function deploymentTimelineEntries(
-  response: DeploymentTimelineResponse | null | undefined,
+  response:
+    | DeploymentTimelineResponse
+    | DeploymentTimelineTransportEnvelope<DeploymentTimelineResponse>
+    | null
+    | undefined,
 ): DeploymentTimelineResponse["entries"] {
   if (!response) {
     return [];
   }
 
-  if (response.schemaVersion !== "deployments.timeline/v1") {
+  const timelineResponse = unwrapDeploymentTimelineTransport(response);
+
+  if (timelineResponse.schemaVersion !== "deployments.timeline/v1") {
     throw new Error("Expected deployments.timeline/v1 response");
   }
 
-  return response.entries;
+  return timelineResponse.entries.map(normalizeDeploymentTimelineEntry);
 }
 
 export function deploymentTimelineEnvelope(
-  envelope: DeploymentTimelineEnvelope | null | undefined,
+  envelope:
+    | DeploymentTimelineEnvelope
+    | DeploymentTimelineTransportEnvelope<DeploymentTimelineEnvelope>
+    | null
+    | undefined,
 ): DeploymentTimelineEnvelope | null {
   if (!envelope) {
     return null;
   }
 
-  if (envelope.schemaVersion !== "deployments.timeline/v1") {
+  const timelineEnvelope = unwrapDeploymentTimelineTransport(envelope);
+
+  if (timelineEnvelope.schemaVersion !== "deployments.timeline/v1") {
     throw new Error("Expected deployments.timeline/v1 envelope");
   }
 
-  return envelope;
+  if (timelineEnvelope.kind === "entry") {
+    return {
+      ...timelineEnvelope,
+      entry: normalizeDeploymentTimelineEntry(timelineEnvelope.entry),
+    };
+  }
+
+  return timelineEnvelope;
 }
 
 export function deploymentTimelineProgressStatus(
@@ -556,7 +552,7 @@ export async function observeDeploymentProgressAfterAcceptance(
   try {
     const replay = await orpcClient.deployments.timeline({
       deploymentId,
-      limit: 100,
+      limit: 500,
     });
     const replayEnvelopes: DeploymentTimelineEnvelope[] = deploymentTimelineEntries(replay).map(
       (entry) => ({
@@ -577,8 +573,8 @@ export async function observeDeploymentProgressAfterAcceptance(
     const cursor = latestDeploymentTimelineCursor(replayEnvelopes);
     const stream = await orpcClient.deployments.timelineStream({
       deploymentId,
-      limit: 0,
-      includeHistory: false,
+      limit: cursor ? 0 : 500,
+      includeHistory: !cursor,
       follow: true,
       untilTerminal: true,
       ...(cursor ? { cursor } : {}),
