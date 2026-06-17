@@ -8,6 +8,7 @@ import {
   FakeDnsConnectorProviderAdapter,
   FakeInfrastructureConnectorProviderAdapter,
   FakeNotificationConnectorProviderAdapter,
+  FakeSourceConnectorProviderAdapter,
   InMemoryConnectorConnectionStore,
   InMemoryConnectorProviderAdapterRegistry,
   InMemoryConnectorRegistry,
@@ -97,6 +98,106 @@ describe("connector catalog", () => {
     expect(result.items[0]?.grantKinds.map((grant) => grant.kind)).toEqual([
       "provider-app-installation",
     ]);
+  });
+
+  test("[APP-CONN-008][APP-CONN-016] plans GitHub source repository access with redacted short-lived provider-app token lease", async () => {
+    const registry = new InMemoryConnectorRegistry(
+      createDefaultConnectorDefinitions({
+        githubSource: {
+          configured: true,
+        },
+      }),
+    );
+    const service = new PlanConnectorCapabilityQueryService(
+      registry,
+      new InMemoryConnectorProviderAdapterRegistry([
+        new FakeSourceConnectorProviderAdapter({
+          connectorKey: "github-source",
+          providerKey: "github",
+          providerTitle: "GitHub Source",
+          installationId: "98765",
+          accountLogin: "acme",
+          permissions: ["contents:read", "metadata:read", "pull_requests:read"],
+          expiresAt: "2026-06-17T10:00:00.000Z",
+          now: "2026-06-17T09:30:00.000Z",
+        }),
+      ]),
+    );
+
+    const result = await service.execute(createExecutionContext({ entrypoint: "system" }), {
+      connectorKey: "github-source",
+      capabilityKey: "source.repositories.browse",
+      parameters: {
+        repositoryFullNames: ["acme/app"],
+        permissions: ["contents:read"],
+      },
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+    expect(plan.providerPlan?.kind).toBe("source-repository-access");
+    expect(plan.providerPlan?.sourceRepositoryAccess).toMatchObject({
+      providerKey: "github",
+      installationId: "98765",
+      accountLogin: "acme",
+      repositoriesSelection: "selected",
+      repositories: [
+        {
+          fullName: "acme/app",
+          private: true,
+        },
+      ],
+      tokenLease: {
+        providerKey: "github",
+        installationId: "98765",
+        expiresAt: "2026-06-17T10:00:00.000Z",
+        redacted: true,
+        expired: false,
+        permissions: ["contents:read"],
+        repositoryFullNames: ["acme/app"],
+      },
+    });
+    expect(plan.effects.map((effect) => effect.kind)).toContain(
+      "source.provider-app-token.exchange",
+    );
+    expect(JSON.stringify(plan)).not.toContain("ghs_");
+    expect(JSON.stringify(plan)).not.toContain("provider_token_value");
+  });
+
+  test("[APP-CONN-008][APP-CONN-016] marks expired provider-app token leases without returning token material", async () => {
+    const registry = new InMemoryConnectorRegistry(
+      createDefaultConnectorDefinitions({
+        githubSource: {
+          configured: true,
+        },
+      }),
+    );
+    const service = new PlanConnectorCapabilityQueryService(
+      registry,
+      new InMemoryConnectorProviderAdapterRegistry([
+        new FakeSourceConnectorProviderAdapter({
+          connectorKey: "github-source",
+          providerKey: "github",
+          providerTitle: "GitHub Source",
+          expiresAt: "2026-06-17T09:00:00.000Z",
+          now: "2026-06-17T09:30:00.000Z",
+        }),
+      ]),
+    );
+
+    const result = await service.execute(createExecutionContext({ entrypoint: "system" }), {
+      connectorKey: "github-source",
+      capabilityKey: "source.repositories.browse",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+    expect(plan.providerPlan?.sourceRepositoryAccess?.tokenLease).toMatchObject({
+      redacted: true,
+      expired: true,
+    });
+    expect(JSON.stringify(plan)).not.toContain("ghs_");
+    expect(JSON.stringify(plan)).not.toContain("provider_token_value");
   });
 
   test("[APP-CONN-012] keeps billing as a category without implementing a billing connector", async () => {

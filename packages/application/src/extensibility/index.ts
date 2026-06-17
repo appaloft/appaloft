@@ -6,3 +6,4 @@ export * from "./default-connectors";
 export * from "./fake-dns-connector-adapter";
 export * from "./fake-infrastructure-connector-adapter";
 export * from "./fake-notification-connector-adapter";
+export * from "./fake-source-connector-adapter";

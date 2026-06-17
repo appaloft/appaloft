@@ -98,6 +98,7 @@ import {
   type ServerSelectionSpec,
   type SourceDescriptor,
   type SourceKind,
+  type SourceRepositoryAccessSnapshot,
   type SshCredential,
   type SshCredentialMutationSpec,
   type SshCredentialSelectionSpec,
@@ -9614,6 +9615,7 @@ export interface ConnectorCapabilityPlanPreview {
     domainConnectSetup?: DomainConnectSetupSnapshot;
     infrastructureServerProposal?: InfrastructureServerProposalSnapshot;
     notificationMessage?: NotificationMessageSnapshot;
+    sourceRepositoryAccess?: SourceRepositoryAccessSnapshot;
   };
 }
 
