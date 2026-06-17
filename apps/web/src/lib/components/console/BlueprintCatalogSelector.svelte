@@ -45,6 +45,9 @@
   );
 
   const returnTo = $derived(browser ? page.url.searchParams.get("returnTo") : null);
+  const directSourceExtensionKey = $derived(
+    browser ? (page.url.searchParams.get("sourceExtension") ?? "") : "",
+  );
   const returnToSourceExtensionKey = $derived.by(() => {
     if (!returnTo) {
       return "";
@@ -56,10 +59,13 @@
       return "";
     }
   });
+  const requestedSourceExtensionKey = $derived(
+    returnToSourceExtensionKey || directSourceExtensionKey,
+  );
   const catalogExtension = $derived(
     findBlueprintCatalogExtensionByKey(
       webExtensionsQuery.data?.items ?? [],
-      returnToSourceExtensionKey,
+      requestedSourceExtensionKey,
     ) ??
       findBlueprintCatalogExtension(
         webExtensionsQuery.data?.items ?? [],
@@ -70,6 +76,10 @@
       findBlueprintCatalogExtension(webExtensionsQuery.data?.items ?? [], "navigation"),
   );
   const catalogMetadata = $derived(readBlueprintCatalogExtensionMetadata(catalogExtension));
+  const catalogMetadataLoading = $derived(
+    webExtensionsQuery.isPending ||
+      (browser && !webExtensionsQuery.data && !webExtensionsQuery.error),
+  );
   const marketplaceSurface: BlueprintMarketplaceSurface = $derived(
     surface === "dialog"
       ? "dialog"
@@ -88,7 +98,7 @@
     title={catalogExtension?.title ?? "应用市场"}
     subtitle="选择官方 Blueprint，先看清应用组件、依赖资源和部署计划，再进入部署流程。"
     badgeLabel="蓝图目录"
-    loading={webExtensionsQuery.isPending}
+    loading={catalogMetadataLoading}
     surface={marketplaceSurface}
     listEndpoint={catalogMetadata?.listEndpoint ?? ""}
     selectedSlug={selectedSlug}
