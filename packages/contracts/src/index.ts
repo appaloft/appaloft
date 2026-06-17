@@ -6576,6 +6576,35 @@ export const domainConnectSetupSchema = z.object({
   records: z.array(dnsRecordRequirementSchema),
 });
 
+export const sourceRepositorySummarySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  fullName: z.string(),
+  ownerLogin: z.string(),
+  private: z.boolean(),
+  defaultBranch: z.string(),
+  htmlUrl: z.string().optional(),
+});
+
+export const providerAppTokenLeaseSchema = z.object({
+  providerKey: z.string(),
+  installationId: z.string(),
+  expiresAt: z.string(),
+  redacted: z.literal(true),
+  expired: z.boolean(),
+  permissions: z.array(z.string()),
+  repositoryFullNames: z.array(z.string()).optional(),
+});
+
+export const sourceRepositoryAccessSchema = z.object({
+  providerKey: z.string(),
+  installationId: z.string(),
+  accountLogin: z.string().optional(),
+  repositoriesSelection: z.enum(["all", "selected"]),
+  repositories: z.array(sourceRepositorySummarySchema),
+  tokenLease: providerAppTokenLeaseSchema,
+});
+
 export const infrastructureServerProposalSchema = z.object({
   providerKey: z.string(),
   region: z.string(),
@@ -6656,6 +6685,7 @@ export const connectorCapabilityPlanPreviewSchema = z.object({
       domainConnectSetup: domainConnectSetupSchema.optional(),
       infrastructureServerProposal: infrastructureServerProposalSchema.optional(),
       notificationMessage: notificationMessageSchema.optional(),
+      sourceRepositoryAccess: sourceRepositoryAccessSchema.optional(),
     })
     .optional(),
 });
@@ -6897,6 +6927,9 @@ export type DnsRecordPlan = z.infer<typeof dnsRecordPlanSchema>;
 export type DnsRecordApply = z.infer<typeof dnsRecordApplySchema>;
 export type DomainConnectSetup = z.infer<typeof domainConnectSetupSchema>;
 export type DomainConnectApply = z.infer<typeof domainConnectApplySchema>;
+export type SourceRepositorySummary = z.infer<typeof sourceRepositorySummarySchema>;
+export type ProviderAppTokenLease = z.infer<typeof providerAppTokenLeaseSchema>;
+export type SourceRepositoryAccess = z.infer<typeof sourceRepositoryAccessSchema>;
 export type InfrastructureServerProposal = z.infer<typeof infrastructureServerProposalSchema>;
 export type NotificationMessage = z.infer<typeof notificationMessageSchema>;
 export type NotificationMessageDelivery = z.infer<typeof notificationMessageDeliverySchema>;

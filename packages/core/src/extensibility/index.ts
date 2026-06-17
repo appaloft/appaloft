@@ -6,3 +6,4 @@ export * from "./integration-connection";
 export * from "./notification-connection";
 export * from "./plugin-installation";
 export * from "./provider-connection";
+export * from "./source-connection";
