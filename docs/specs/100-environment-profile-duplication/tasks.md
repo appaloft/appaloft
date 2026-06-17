@@ -34,6 +34,8 @@
   deferred target route decisions during apply without copying production domains.
 - [x] ENV-PROFILE-DUP-007: classify source storage volume attachments in duplicate plan and
   persist deferred target storage decisions during apply without copying source volume data.
+- [x] Expose `environments.plan-duplicate` and `environments.duplicate-profile` through public
+  HTTP/oRPC routes with product-session-gated dispatch tests.
 - [ ] Add Web staged apply surface for `environments.duplicate-profile`.
 - [ ] Persist or project shared-source warning for deployment readiness, audit, and Web surfaces.
 
@@ -43,6 +45,8 @@
   shape, storage mounts, and pending target decisions.
 - [x] ENV-PROFILE-DUP-009: implement selected resource-shape sync with staged dependency, route,
   storage, and unsupported resource-profile decisions.
+- [x] Expose `environments.diff-profile` and `environments.sync-profile` through public HTTP/oRPC
+  routes with product-session-gated dispatch tests.
 - [ ] Define whether profile promotion is a separate command or a constrained sync mode.
 - [ ] Add Web owner-scoped controls under Project Environment management and Resource detail.
 

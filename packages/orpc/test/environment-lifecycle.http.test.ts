@@ -11,6 +11,7 @@ import {
   type ExecutionContext,
   type ExecutionContextFactory,
   LockEnvironmentCommand,
+  type ProductSessionAuthorizationPort,
   type Query,
   type QueryBus,
   RenameEnvironmentCommand,
@@ -35,9 +36,25 @@ class TestExecutionContextFactory implements ExecutionContextFactory {
       entrypoint: input.entrypoint,
       locale: input.locale,
       actor: input.actor,
+      principal: input.principal,
     });
   }
 }
+
+const productSessionAuthorizationPort: ProductSessionAuthorizationPort = {
+  authorizeProductSession: async (_context, input) =>
+    ok({
+      actor: {
+        kind: "user",
+        id: "usr_environment_lifecycle",
+        label: "environment-lifecycle@example.com",
+      },
+      email: "environment-lifecycle@example.com",
+      organizationId: "org_self_hosted",
+      role: input.requiredRole,
+      userId: "usr_environment_lifecycle",
+    }),
+};
 
 describe("environment lifecycle HTTP routes", () => {
   test("[ENV-LIFE-RENAME-ENTRY-002] dispatches RenameEnvironmentCommand through HTTP", async () => {
@@ -56,6 +73,7 @@ describe("environment lifecycle HTTP routes", () => {
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
       logger: new NoopLogger(),
+      productSessionAuthorizationPort,
       queryBus,
     });
 
@@ -63,6 +81,7 @@ describe("environment lifecycle HTTP routes", () => {
       new Request("http://localhost/api/environments/env_demo/rename", {
         method: "POST",
         headers: {
+          cookie: "better-auth.session_token=environment-lifecycle-test",
           "content-type": "application/json",
         },
         body: JSON.stringify({
@@ -97,6 +116,7 @@ describe("environment lifecycle HTTP routes", () => {
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
       logger: new NoopLogger(),
+      productSessionAuthorizationPort,
       queryBus,
     });
 
@@ -104,6 +124,7 @@ describe("environment lifecycle HTTP routes", () => {
       new Request("http://localhost/api/environments/env_demo/clone", {
         method: "POST",
         headers: {
+          cookie: "better-auth.session_token=environment-lifecycle-test",
           "content-type": "application/json",
         },
         body: JSON.stringify({
@@ -140,6 +161,7 @@ describe("environment lifecycle HTTP routes", () => {
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
       logger: new NoopLogger(),
+      productSessionAuthorizationPort,
       queryBus,
     });
 
@@ -147,6 +169,7 @@ describe("environment lifecycle HTTP routes", () => {
       new Request("http://localhost/api/environments/env_demo/archive", {
         method: "POST",
         headers: {
+          cookie: "better-auth.session_token=environment-lifecycle-test",
           "content-type": "application/json",
         },
         body: JSON.stringify({
@@ -181,6 +204,7 @@ describe("environment lifecycle HTTP routes", () => {
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
       logger: new NoopLogger(),
+      productSessionAuthorizationPort,
       queryBus,
     });
 
@@ -188,6 +212,7 @@ describe("environment lifecycle HTTP routes", () => {
       new Request("http://localhost/api/environments/env_demo/lock", {
         method: "POST",
         headers: {
+          cookie: "better-auth.session_token=environment-lifecycle-test",
           "content-type": "application/json",
         },
         body: JSON.stringify({
@@ -222,6 +247,7 @@ describe("environment lifecycle HTTP routes", () => {
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
       logger: new NoopLogger(),
+      productSessionAuthorizationPort,
       queryBus,
     });
 
@@ -229,6 +255,7 @@ describe("environment lifecycle HTTP routes", () => {
       new Request("http://localhost/api/environments/env_demo/unlock", {
         method: "POST",
         headers: {
+          cookie: "better-auth.session_token=environment-lifecycle-test",
           "content-type": "application/json",
         },
         body: JSON.stringify({
