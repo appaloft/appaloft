@@ -1,7 +1,13 @@
 import { readFile } from "node:fs/promises";
+import { enUS, zhCN } from "@appaloft/i18n";
 import { describe, expect, test } from "vitest";
 
-import { quickDeploySourceHelpHref, webDocsHrefs } from "./docs-help";
+import {
+  docsHelpTooltipKeyForHref,
+  quickDeploySourceHelpHref,
+  webDocsHrefs,
+  webDocsTooltipKeys,
+} from "./docs-help";
 
 describe("console docs help links", () => {
   test("[PUB-DOCS-010] quick deploy source help uses the public docs registry anchor", () => {
@@ -114,6 +120,23 @@ describe("console docs help links", () => {
     );
     expect(webDocsHrefs.scheduledTaskLifecycle).toBe(
       "/docs/resources/scheduled-tasks/#scheduled-task-resource-lifecycle",
+    );
+  });
+
+  test("[PUB-DOCS-010] Web docs help hrefs have localized tooltip summaries", () => {
+    expect(Object.keys(webDocsTooltipKeys).sort()).toEqual(Object.keys(webDocsHrefs).sort());
+    expect(docsHelpTooltipKeyForHref(webDocsHrefs.sourceAutoDeploySetup)).toBe(
+      "console:docsHelp.sourceAutoDeploySetup",
+    );
+    expect(docsHelpTooltipKeyForHref(webDocsHrefs.sourceAutoDeployDedupe)).toBe(
+      "console:docsHelp.sourceAutoDeployDedupe",
+    );
+  });
+
+  test("[PUB-DOCS-010] docs help tooltips define concepts instead of describing docs", () => {
+    expect(Object.values(zhCN.console.docsHelp)).not.toContainEqual(expect.stringMatching(/^解释/));
+    expect(Object.values(enUS.console.docsHelp)).not.toContainEqual(
+      expect.stringMatching(/^Explains\b/),
     );
   });
 
@@ -272,5 +295,43 @@ describe("console docs help links", () => {
         "utf8",
       ),
     ).toContain("serverDeploymentTarget");
+  });
+
+  test("[PUB-DOCS-010] docs help links use the shared tooltip primitive", async () => {
+    const docsHelpLinkSource = await readFile(
+      new URL("../../lib/components/console/DocsHelpLink.svelte", import.meta.url),
+      "utf8",
+    );
+
+    expect(docsHelpLinkSource).toContain("$lib/components/ui/tooltip");
+    expect(docsHelpLinkSource).toContain("docsHelpTooltipKeyForHref");
+    expect(docsHelpLinkSource).toContain("<Tooltip.Content");
+    expect(docsHelpLinkSource).not.toContain("title={ariaLabel}");
+  });
+
+  test("[PUB-DOCS-010] resource detail section headings keep one docs help affordance", async () => {
+    const resourcePageSource = await readFile(
+      new URL("../../routes/resources/[resourceId=consoleObjectId]/+page.svelte", import.meta.url),
+      "utf8",
+    );
+
+    expect(resourcePageSource).not.toMatch(
+      /sourceEventsTitle[\s\S]*?sourceAutoDeployIgnoredEvents[\s\S]*?sourceEventsDescription/,
+    );
+    expect(resourcePageSource).not.toMatch(
+      /sourceEventsTitle[\s\S]*?sourceAutoDeployRecovery[\s\S]*?sourceEventsDescription/,
+    );
+    expect(resourcePageSource).not.toMatch(
+      /overviewConfigurationSummary[\s\S]*?resourceRuntimeProfile[\s\S]*?profileEditBoundaryDescription/,
+    );
+    expect(resourcePageSource).not.toMatch(
+      /overviewConfigurationSummary[\s\S]*?resourceNetworkProfile[\s\S]*?profileEditBoundaryDescription/,
+    );
+    expect(resourcePageSource).not.toMatch(
+      /autoDeployTitle[\s\S]*?sourceAutoDeploySignatures[\s\S]*?autoDeployDescription/,
+    );
+    expect(resourcePageSource).not.toMatch(
+      /dependenciesTitle[\s\S]*?dependencyRuntimeInjection[\s\S]*?dependenciesDescription/,
+    );
   });
 });
