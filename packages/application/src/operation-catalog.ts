@@ -92,6 +92,7 @@ import { diffEnvironmentsQueryInputSchema } from "./operations/environments/diff
 import { environmentEffectivePrecedenceQueryInputSchema } from "./operations/environments/environment-effective-precedence.query";
 import { listEnvironmentsQueryInputSchema } from "./operations/environments/list-environments.query";
 import { lockEnvironmentCommandInputSchema } from "./operations/environments/lock-environment.command";
+import { planDuplicateEnvironmentQueryInputSchema } from "./operations/environments/plan-duplicate-environment.query";
 import { promoteEnvironmentCommandInputSchema } from "./operations/environments/promote-environment.command";
 import { renameEnvironmentCommandInputSchema } from "./operations/environments/rename-environment.command";
 import { setEnvironmentVariableCommandInputSchema } from "./operations/environments/set-environment-variable.command";
@@ -2962,6 +2963,23 @@ export const operationCatalog = [
       orpc: {
         method: "GET",
         path: "/api/environments/{environmentId}/diff/{otherEnvironmentId}",
+      },
+    },
+  },
+  {
+    key: "environments.plan-duplicate",
+    kind: "query",
+    domain: "environments",
+    messageName: "PlanDuplicateEnvironmentQuery",
+    handlerName: "PlanDuplicateEnvironmentQueryHandler",
+    serviceName: "PlanDuplicateEnvironmentQueryService",
+    inputSchema: planDuplicateEnvironmentQueryInputSchema,
+    serviceToken: tokens.planDuplicateEnvironmentQueryService,
+    transports: {
+      cli: "appaloft env duplicate plan <environmentId> --name <targetName>",
+      orpc: {
+        method: "GET",
+        path: "/api/environments/{environmentId}/duplicate-plan",
       },
     },
   },

@@ -302,6 +302,8 @@ import {
   MarkServerAppliedRouteStatusOnDeploymentFinishedHandler,
   OpenTerminalSessionUseCase,
   OperatorWorkQueryService,
+  PlanDuplicateEnvironmentQueryHandler,
+  PlanDuplicateEnvironmentQueryService,
   PreviewCleanupRetryScheduler,
   PreviewDeploymentProcessManager,
   PreviewEnvironmentCleanupService,
@@ -1658,6 +1660,7 @@ export function registerApplicationServices(
   container.registerSingleton(ResourceHealthHistoryQueryHandler);
   container.registerSingleton(ResourceAccessFailureEvidenceLookupQueryHandler);
   container.registerSingleton(EnvironmentEffectivePrecedenceQueryHandler);
+  container.registerSingleton(PlanDuplicateEnvironmentQueryHandler);
   container.registerSingleton(ApplyActionPreviewRouteCommandHandler);
   container.registerSingleton(ConfirmActionPreviewRouteCommandHandler);
   container.registerSingleton(CreateActionSourceLinkDeploymentCommandHandler);
@@ -2364,6 +2367,10 @@ export function registerApplicationServices(
     UnsetEnvironmentVariableUseCase,
   );
   container.registerSingleton(tokens.diffEnvironmentsQueryService, DiffEnvironmentsQueryService);
+  container.registerSingleton(
+    tokens.planDuplicateEnvironmentQueryService,
+    PlanDuplicateEnvironmentQueryService,
+  );
   container.registerSingleton(tokens.promoteEnvironmentUseCase, PromoteEnvironmentUseCase);
   container.registerSingleton(
     tokens.deploymentContextDefaultsFactory,
