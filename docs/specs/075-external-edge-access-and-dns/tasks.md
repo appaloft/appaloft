@@ -14,8 +14,10 @@
 
 ## ADR Round
 
-- [ ] Decide `EdgeProviderConnection` ownership, lifecycle, persistence, credential custody,
-  rotation, usage visibility, and deletion safety.
+- [x] Align provider connection lifecycle with the Appaloft Connections model instead of a parallel
+  `edge-provider-connections.*` model.
+- [ ] Decide whether non-DNS external edge capabilities need additional state beyond Connections
+  readback, including ownership, lifecycle, persistence, usage visibility, and deletion safety.
 - [ ] Decide `EdgeDeliveryPolicy` ownership and precedence.
 - [ ] Decide DNS record ownership, adoption, unmanaged-record conflict handling, and deletion
   safety.
@@ -25,7 +27,8 @@
 
 ## Local Specs Round
 
-- [ ] Add command/query specs for accepted provider connection operations.
+- [x] Reference accepted Connections command/query operations for provider connection lifecycle.
+- [ ] Add command/query specs only for external edge behavior not already covered by Connections.
 - [ ] Add command/query specs for accepted DomainBinding edge delivery operations.
 - [ ] Add query spec for accepted read-only edge configuration preview.
 - [ ] Add workflow spec for external edge route apply/verify.
@@ -40,7 +43,7 @@
 - [ ] Implement provider-neutral value objects and ports without provider SDK types in core or
   application command schemas.
 - [ ] Implement hermetic fake provider before concrete provider packages.
-- [ ] Implement provider connection lifecycle through explicit commands and masked queries.
+- [ ] Consume provider connection lifecycle through Connections commands and masked queries.
 - [ ] Implement DomainBinding edge delivery configuration through explicit commands.
 - [ ] Implement DNS record ownership/adoption guards.
 - [ ] Implement provider apply/verify with process attempt visibility.

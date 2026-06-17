@@ -2,9 +2,9 @@
 
 ## Source-Of-Truth Alignment
 
-- Existing ADRs are not sufficient for implementation because this behavior introduces external
-  provider connection state, provider-side DNS mutation, cache purge, and route rollback semantics.
-- Before Code Round, create or update an ADR governing external edge provider connection ownership,
+- Existing ADRs are not sufficient for implementation because this behavior introduces provider-side
+  DNS mutation, cache purge, and route rollback semantics on top of the accepted Connections model.
+- Before Code Round, create or update an ADR governing external edge provider capability ownership,
   DNS record adoption, edge delivery policy ownership, async apply/verify/purge attempts, and
   rollback snapshot use.
 - This artifact positions the future behavior only. It does not add public operation catalog
@@ -20,15 +20,16 @@
   - Deployment snapshots may record resolved external edge route state for one attempt.
 - Application:
   - Future command/query handlers dispatch explicit messages through command/query buses.
-  - Application services coordinate DomainBinding, provider connection state, provider ports,
-    process attempts, events, read models, and error translation.
+  - Application services coordinate DomainBinding, Connections readback/capabilities, provider
+    ports, process attempts, events, read models, and error translation.
 - Provider packages:
   - Concrete external edge providers live outside core/application, for example under
     `packages/providers/edge-access-*` or another ADR-approved package pattern.
   - Provider packages own API clients, provider raw payload translation, retries, and diagnostics.
 - Persistence:
-  - Provider connection state, adopted DNS record ownership, edge route snapshots, purge receipts,
-    and observations require dedicated persistence/read models after the ADR selects ownership.
+  - Connections owns provider connection lifecycle/readback. Adopted DNS record ownership, edge
+    route snapshots, purge receipts, and observations require dedicated persistence/read models
+    after the ADR selects ownership.
   - Persistence adapters must not store provider raw payloads unless a future spec defines a
     redacted, bounded diagnostic record.
 - CLI/API/Web:
@@ -40,17 +41,22 @@
 
 ## Operation Catalog Impact
 
-No operation catalog change in this documentation-only round.
+No new operation catalog change in this documentation-only round.
+
+Provider connection lifecycle uses the accepted Appaloft Connections operations:
+
+- `connections.catalog.list`
+- `connections.categories.list`
+- `connections.list`
+- `connections.show`
+- `connections.connect.start`
+- `connections.connect.callback`
+- `connections.revoke`
+- `connections.capability.plan`
+- `connections.capability.apply`
 
 Future candidate operation groups:
 
-- Provider connection lifecycle:
-  - `edge-provider-connections.create`
-  - `edge-provider-connections.list`
-  - `edge-provider-connections.show`
-  - `edge-provider-connections.rotate-credential`
-  - `edge-provider-connections.delete-check`
-  - `edge-provider-connections.delete`
 - Domain-bound edge delivery:
   - `domain-bindings.configure-edge-delivery`
   - `domain-bindings.edge-delivery.show`
@@ -67,7 +73,7 @@ These names must be rechecked during the future ADR/spec round. Do not add them 
 Future workflow:
 
 ```text
-edge-provider connection
+Connections `Connection` for a concrete DNS or future edge connector
   -> DomainBinding edge-delivery configuration
   -> DNS/provider route plan
   -> provider apply
@@ -92,7 +98,8 @@ future types implemented.
 
 Future ADR/spec work must decide:
 
-- `EdgeProviderConnection` ownership and repository boundary;
+- whether external edge requires only Connections `Connection` readback or an additional
+  edge-specific state owner after non-DNS capabilities are accepted;
 - `EdgeDeliveryPolicy` placement;
 - `DnsRecordIntent` and DNS observation value-object/read-model shape;
 - route snapshot fields safe enough for rollback, audit, diagnostics, and support;
@@ -102,7 +109,7 @@ Future ADR/spec work must decide:
 
 Future error specs must include stable codes for at least:
 
-- provider connection invalid or unauthorized;
+- connection invalid, revoked, or unauthorized;
 - provider capability unsupported;
 - DNS record conflict;
 - unmanaged DNS record collision;
@@ -128,7 +135,7 @@ Categories should follow the global error model:
 Future test matrices must cover:
 
 - operation catalog parity across CLI, HTTP/oRPC, Web, SDK, and generated future MCP/tool metadata;
-- provider connection credential masking and rotation;
+- connection credential masking, rotation, and revoke behavior through Connections;
 - domain binding admission and edge delivery policy validation;
 - DNS record ownership/adoption guardrails;
 - provider apply/verify idempotency;
@@ -159,7 +166,7 @@ Until implementation exists, public docs must not claim this feature is availabl
 1. ADR for external edge access and DNS ownership.
 2. Local command/query/workflow/error/testing specs.
 3. Provider-neutral value objects, ports, and fake provider.
-4. Provider connection lifecycle and masked read models.
+4. Connections lifecycle consumption and masked read models.
 5. DomainBinding edge-delivery configuration and DNS intent/adoption guards.
 6. Route apply/verify workflow with durable process attempt visibility.
 7. Read-only preview and diagnostic surfaces.
