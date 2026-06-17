@@ -15,7 +15,7 @@
   import { webDocsHrefs } from "$lib/console/docs-help";
   import { formatTime, resourceDetailHref } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
-  import { orpcClient } from "$lib/orpc";
+  import { orpc, orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
 
   type Feedback = {
@@ -29,9 +29,8 @@
 
   const previewEnvironmentId = $derived(page.params.previewEnvironmentId ?? "");
   const previewEnvironmentQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["preview-environments", "show", previewEnvironmentId],
-      queryFn: () => orpcClient.previewEnvironments.show({ previewEnvironmentId }),
+    orpc.previewEnvironments.show.queryOptions({
+      input: { previewEnvironmentId },
       enabled: browser && previewEnvironmentId.length > 0,
       staleTime: 5_000,
       retry: 0,
@@ -74,7 +73,9 @@
         detail: result.attemptId,
       };
       cleanupDialogOpen = false;
-      void queryClient.invalidateQueries({ queryKey: ["preview-environments"] });
+      void queryClient.invalidateQueries({
+        queryKey: orpc.previewEnvironments.key({ type: "query" }),
+      });
     },
     onError: (error) => {
       feedback = {

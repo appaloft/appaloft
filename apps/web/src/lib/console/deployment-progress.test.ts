@@ -2,6 +2,7 @@ import {
   type CreateDeploymentInput,
   type DeploymentProgressEvent,
   type DeploymentTimelineEnvelope,
+  type DeploymentTimelineResponse,
 } from "@appaloft/contracts";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
@@ -21,9 +22,12 @@ vi.mock("$lib/orpc", () => ({
 
 import {
   createDeploymentWithProgress,
+  deploymentTimelineEntries,
+  deploymentTimelineEnvelope,
   deploymentTimelineProgressEvents,
   deploymentTimelineProgressStatus,
   latestDeploymentTimelineCursor,
+  observeDeploymentProgressAfterAcceptance,
   progressSourceLabel,
 } from "./deployment-progress";
 
@@ -177,6 +181,65 @@ describe("deployment progress helpers", () => {
     expect(deploymentTimelineProgressStatus(envelopes, "running")).toBe("succeeded");
   });
 
+  test("[DEP-TIMELINE-WEB-001] rejects raw ORPC envelope timeline responses at the UI boundary", () => {
+    const response = {
+      json: {
+        schemaVersion: "deployments.timeline/v1",
+        deploymentId: "dep_demo",
+        hasMore: false,
+        entries: [
+          {
+            deploymentId: "dep_demo",
+            sequence: 1,
+            cursor: "dep_demo:1",
+            occurredAt: "2026-01-01T00:00:01.000Z",
+            source: "docker",
+            kind: "output",
+            phase: "deploy",
+            level: "info",
+            message: "latest: Pulling from muchobien/pocketbase",
+          },
+        ],
+      },
+    } satisfies { json: DeploymentTimelineResponse };
+
+    expect(() =>
+      deploymentTimelineEntries(response as unknown as DeploymentTimelineResponse),
+    ).toThrow("Expected deployments.timeline/v1 response");
+  });
+
+  test("[DEP-TIMELINE-WEB-002] rejects raw ORPC envelope timeline stream values at the UI boundary", () => {
+    const envelope = {
+      json: {
+        schemaVersion: "deployments.timeline/v1",
+        kind: "entry",
+        entry: {
+          deploymentId: "dep_demo",
+          sequence: 3,
+          cursor: "dep_demo:3",
+          occurredAt: "2026-01-01T00:00:03.000Z",
+          source: "docker",
+          kind: "output",
+          phase: "deploy",
+          level: "info",
+          message: "latest: Pulling from muchobien/pocketbase",
+        },
+      },
+    } satisfies { json: DeploymentTimelineEnvelope };
+
+    expect(() =>
+      deploymentTimelineEnvelope(envelope as unknown as DeploymentTimelineEnvelope),
+    ).toThrow("Expected deployments.timeline/v1 envelope");
+    expect(deploymentTimelineProgressEvents([envelope.json])).toMatchObject([
+      {
+        deploymentId: "dep_demo",
+        source: "docker",
+        phase: "deploy",
+        message: "latest: Pulling from muchobien/pocketbase",
+      },
+    ]);
+  });
+
   test("hands off to deployment event replay and follow after create-time acceptance", async () => {
     vi.stubGlobal("EventSource", MockEventSource);
 
@@ -316,5 +379,53 @@ describe("deployment progress helpers", () => {
       "Build requested",
       "Deployment succeeded",
     ]);
+  });
+
+  test("[QUICK-DEPLOY-TIMELINE-001] replays terminal deployment timeline without opening follow stream", async () => {
+    timelineMock.mockResolvedValue({
+      schemaVersion: "deployments.timeline/v1",
+      deploymentId: "dep_demo",
+      hasMore: false,
+      entries: [
+        {
+          deploymentId: "dep_demo",
+          sequence: 1,
+          cursor: "dep_demo:1",
+          occurredAt: "2026-01-01T00:00:01.000Z",
+          source: "docker",
+          kind: "output",
+          phase: "deploy",
+          level: "info",
+          message: "latest: Pulling from muchobien/pocketbase",
+        },
+        {
+          deploymentId: "dep_demo",
+          sequence: 2,
+          cursor: "dep_demo:2",
+          occurredAt: "2026-01-01T00:00:02.000Z",
+          source: "appaloft",
+          kind: "status",
+          phase: "verify",
+          level: "info",
+          message: "Deployment succeeded",
+          status: "succeeded",
+        },
+      ],
+    });
+
+    const progressEvents: DeploymentProgressEvent[] = [];
+    await observeDeploymentProgressAfterAcceptance(
+      "dep_demo",
+      (event) => {
+        progressEvents.push(event);
+      },
+      {},
+    );
+
+    expect(progressEvents.map((event) => event.message)).toEqual([
+      "latest: Pulling from muchobien/pocketbase",
+      "Deployment succeeded",
+    ]);
+    expect(timelineStreamMock).not.toHaveBeenCalled();
   });
 });

@@ -17,7 +17,7 @@ import { createQuery, queryOptions } from "@tanstack/svelte-query";
 
 import { request } from "$lib/api/client";
 import { canRunProductQueries } from "$lib/console/auth-query-gate";
-import { orpcClient } from "$lib/orpc";
+import { orpc } from "$lib/orpc";
 
 export const defaultConsoleListLimit = 100;
 
@@ -97,65 +97,55 @@ export function createConsoleQueries(enabled: boolean, overrides: ConsoleQueryOv
   const productQueryEnabled = (key: ConsoleQueryKey) =>
     queryEnabled(key) && canRunProductQueries(authSessionQuery.data);
   const projectsQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["projects", { limit: defaultConsoleListLimit }],
-      queryFn: () => orpcClient.projects.list({ limit: defaultConsoleListLimit }),
+    orpc.projects.list.queryOptions({
+      input: { limit: defaultConsoleListLimit },
       enabled: productQueryEnabled("projects"),
     }),
   );
   const serversQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["servers", { limit: defaultConsoleListLimit }],
-      queryFn: () => orpcClient.servers.list({ limit: defaultConsoleListLimit }),
+    orpc.servers.list.queryOptions({
+      input: { limit: defaultConsoleListLimit },
       enabled: productQueryEnabled("servers"),
     }),
   );
   const environmentsQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["environments", { limit: defaultConsoleListLimit }],
-      queryFn: () => orpcClient.environments.list({ limit: defaultConsoleListLimit }),
+    orpc.environments.list.queryOptions({
+      input: { limit: defaultConsoleListLimit },
       enabled: productQueryEnabled("environments"),
     }),
   );
   const resourcesQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["resources", { limit: defaultConsoleListLimit }],
-      queryFn: () => orpcClient.resources.list({ limit: defaultConsoleListLimit }),
+    orpc.resources.list.queryOptions({
+      input: { limit: defaultConsoleListLimit },
       enabled: productQueryEnabled("resources"),
     }),
   );
   const deploymentsQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["deployments", { limit: defaultConsoleListLimit }],
-      queryFn: () => orpcClient.deployments.list({ limit: defaultConsoleListLimit }),
+    orpc.deployments.list.queryOptions({
+      input: { limit: defaultConsoleListLimit },
       enabled: productQueryEnabled("deployments"),
     }),
   );
   const previewEnvironmentsQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["preview-environments", { limit: defaultConsoleListLimit }],
-      queryFn: () => orpcClient.previewEnvironments.list({ limit: defaultConsoleListLimit }),
+    orpc.previewEnvironments.list.queryOptions({
+      input: { limit: defaultConsoleListLimit },
       enabled: productQueryEnabled("previewEnvironments"),
     }),
   );
   const domainBindingsQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["domain-bindings", { limit: defaultConsoleListLimit }],
-      queryFn: () => orpcClient.domainBindings.list({ limit: defaultConsoleListLimit }),
+    orpc.domainBindings.list.queryOptions({
+      input: { limit: defaultConsoleListLimit },
       enabled: productQueryEnabled("domainBindings"),
     }),
   );
   const certificatesQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["certificates", { limit: defaultConsoleListLimit }],
-      queryFn: () => orpcClient.certificates.list({ limit: defaultConsoleListLimit }),
+    orpc.certificates.list.queryOptions({
+      input: { limit: defaultConsoleListLimit },
       enabled: productQueryEnabled("certificates"),
     }),
   );
   const providersQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["providers"],
-      queryFn: () => orpcClient.providers.list(),
+    orpc.providers.list.queryOptions({
       enabled: productQueryEnabled("providers"),
     }),
   );

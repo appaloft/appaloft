@@ -3,7 +3,7 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import { onDestroy } from "svelte";
-  import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
+  import { createMutation, createQuery } from "@tanstack/svelte-query";
   import {
     ArrowLeft,
     Boxes,
@@ -51,6 +51,7 @@
   import {
     deploymentTimelineProgressEvents,
     deploymentTimelineProgressStatus,
+    deploymentTimelineEntries,
     groupDeploymentProgressEvents,
     latestDeploymentTimelineCursor,
     mergeDeploymentTimelineEnvelopes,
@@ -60,6 +61,11 @@
     progressEventsFromDeployment,
     type DeploymentProgressDialogStatus,
   } from "$lib/console/deployment-progress";
+  import {
+    deploymentAccessUrls,
+    type DeploymentAccessUrl,
+    type DeploymentAccessUrlKind,
+  } from "$lib/console/deployment-access-url";
   import {
     deploymentDetailHref,
     findDeployment,
@@ -73,16 +79,11 @@
   } from "$lib/console/utils";
   import { createConsoleQueries } from "$lib/console/queries";
   import { i18nKeys, t } from "$lib/i18n";
-  import { orpcClient } from "$lib/orpc";
+  import { orpc, orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
 
-  type AccessRoute =
-    NonNullable<DeploymentDetailSummary["runtimePlan"]["execution"]["accessRoutes"]>[number];
-  type AccessUrlKind = "deployment" | "domain" | "direct";
-  type AccessUrl = {
-    url: string;
-    kind: AccessUrlKind;
-  };
+  type AccessUrlKind = DeploymentAccessUrlKind;
+  type AccessUrl = DeploymentAccessUrl;
   type DeploymentDetailTab = "overview" | "timeline" | "snapshot";
   type DeploymentTimelineJournalEntry = DeploymentTimelineResponse["entries"][number];
   type DeploymentRecoveryAction = "retry" | "redeploy" | "rollback";
@@ -135,41 +136,35 @@
 
   const deploymentId = $derived(page.params.deploymentId ?? "");
   const deploymentDetailQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["deployments", "show", deploymentId],
-      queryFn: () =>
-        orpcClient.deployments.show({
-          deploymentId,
-          includeTimeline: true,
-          includeSnapshot: true,
-          includeRelatedContext: true,
-          includeLatestFailure: true,
-        }),
+    orpc.deployments.show.queryOptions({
+      input: {
+        deploymentId,
+        includeTimeline: true,
+        includeSnapshot: true,
+        includeRelatedContext: true,
+        includeLatestFailure: true,
+      },
       enabled: browser && deploymentId.length > 0,
       staleTime: 5_000,
     }),
   );
   const deploymentTimelineQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["deployments", "timeline", deploymentId],
-      queryFn: () =>
-        orpcClient.deployments.timeline({
-          deploymentId,
-          limit: 100,
-        }),
+    orpc.deployments.timeline.queryOptions({
+      input: {
+        deploymentId,
+        limit: 100,
+      },
       enabled: browser && deploymentId.length > 0,
       staleTime: 5_000,
     }),
   );
   const deploymentRecoveryReadinessQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["deployments", "recovery-readiness", deploymentId],
-      queryFn: () =>
-        orpcClient.deployments.recoveryReadiness({
+    orpc.deployments.recoveryReadiness.queryOptions({
+      input: {
           deploymentId,
           includeCandidates: true,
           maxCandidates: 3,
-        }),
+        },
       enabled: browser && deploymentId.length > 0,
       staleTime: 5_000,
     }),
@@ -205,9 +200,9 @@
   const listedDeployment = $derived(findDeployment(deployments, deploymentId));
   const headerDeployment = $derived(deployment ?? listedDeployment);
   const recoveryReadiness = $derived(deploymentRecoveryReadinessQuery.data ?? null);
-  const deploymentTimeline = $derived(deploymentTimelineQuery.data?.entries ?? []);
+  const deploymentTimeline = $derived(deploymentTimelineEntries(deploymentTimelineQuery.data));
   const replayDeploymentTimelineEnvelopes = $derived(
-    (deploymentTimelineQuery.data?.entries ?? []).map(
+    deploymentTimeline.map(
       (entry) =>
         ({
           schemaVersion: "deployments.timeline/v1",
@@ -490,11 +485,17 @@
     deploymentTimelineFollowError = "";
 
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["deployments"] }),
-      queryClient.invalidateQueries({ queryKey: ["deployments", "recovery-readiness", deploymentId] }),
-      queryClient.invalidateQueries({ queryKey: ["deployments", "show", acceptedDeploymentId] }),
+      queryClient.invalidateQueries({ queryKey: orpc.deployments.key({ type: "query" }) }),
       queryClient.invalidateQueries({
-        queryKey: ["deployments", "timeline", acceptedDeploymentId],
+        queryKey: orpc.deployments.recoveryReadiness.key({
+          input: { deploymentId, includeCandidates: true, maxCandidates: 3 },
+        }),
+      }),
+      queryClient.invalidateQueries({ queryKey: orpc.deployments.show.key() }),
+      queryClient.invalidateQueries({
+        queryKey: orpc.deployments.timeline.key({
+          input: { deploymentId: acceptedDeploymentId, limit: 100 },
+        }),
       }),
     ]);
 
@@ -660,67 +661,6 @@
 
   function logTimeLabel(timestamp: string): string {
     return timestamp.slice(11, 19) || "--:--:--";
-  }
-
-  function normalizeAccessPath(pathPrefix: string): string {
-    if (!pathPrefix || pathPrefix === "/") {
-      return "/";
-    }
-
-    return pathPrefix.startsWith("/") ? pathPrefix : `/${pathPrefix}`;
-  }
-
-  function routeUrl(route: AccessRoute, executionPort: number | undefined, serverHost: string | undefined): AccessUrl[] {
-    const pathPrefix = normalizeAccessPath(route.pathPrefix);
-
-    if (route.domains.length > 0) {
-      const scheme = route.tlsMode === "auto" ? "https" : "http";
-      return route.domains.map((domain) => ({
-        url: `${scheme}://${domain}${pathPrefix}`,
-        kind: "domain" as const,
-      }));
-    }
-
-    const directPort = route.targetPort ?? executionPort;
-    if (route.proxyKind === "none" && serverHost && directPort) {
-      return [
-        {
-          url: `http://${serverHost}:${directPort}${pathPrefix}`,
-          kind: "direct",
-        },
-      ];
-    }
-
-    return [];
-  }
-
-  function addUniqueAccessUrl(urls: AccessUrl[], url: AccessUrl): AccessUrl[] {
-    if (urls.some((existingUrl) => existingUrl.url === url.url)) {
-      return urls;
-    }
-
-    return [...urls, url];
-  }
-
-  function deploymentAccessUrls(
-    deployment: DeploymentDetailSummary,
-    serverHost: string | undefined,
-  ): AccessUrl[] {
-    const metadata = deployment.runtimePlan.execution.metadata ?? {};
-    const metadataUrl = metadata.publicUrl ?? metadata.url;
-    let urls: AccessUrl[] = [];
-
-    for (const route of deployment.runtimePlan.execution.accessRoutes ?? []) {
-      for (const url of routeUrl(route, deployment.runtimePlan.execution.port, serverHost)) {
-        urls = addUniqueAccessUrl(urls, url);
-      }
-    }
-
-    if (typeof metadataUrl === "string" && metadataUrl) {
-      urls = addUniqueAccessUrl(urls, { url: metadataUrl, kind: "deployment" });
-    }
-
-    return urls;
   }
 
   function accessUrlKindLabel(kind: AccessUrlKind): string {

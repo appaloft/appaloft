@@ -102,6 +102,7 @@ describe("project detail page structure", () => {
     const [
       projectSource,
       quickDeployProgressDialogSource,
+      deploymentProgressDialogSource,
       deploymentStatusBadgeSource,
       quickDeploySheetSource,
       operationProgressPanelSource,
@@ -112,6 +113,10 @@ describe("project detail page structure", () => {
       ),
       readFile(
         new URL("../components/console/QuickDeployProgressDialog.svelte", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../components/console/DeploymentProgressDialog.svelte", import.meta.url),
         "utf8",
       ),
       readFile(
@@ -128,8 +133,8 @@ describe("project detail page structure", () => {
     expect(projectSource).toContain("data-project-attention-progress-item");
     expect(projectSource).toContain("data-project-attention-progress-trigger");
     expect(projectSource).toContain("data-project-attention-status-signal");
-    expect(projectSource).toContain("data-project-resource-install-failures");
-    expect(projectSource).toContain("failedProjectBlueprintInstallItems");
+    expect(projectSource).not.toContain("data-project-resource-install-failures");
+    expect(projectSource).not.toContain("failedProjectBlueprintInstallItems");
     expect(projectSource).toContain("DropdownMenuContent");
     expect(projectSource).toContain("projectAttentionStatusLabel");
     expect(projectSource).toContain("key: `operator-work-${work.id}`");
@@ -140,15 +145,27 @@ describe("project detail page structure", () => {
     expect(quickDeployProgressDialogSource).not.toContain("onOpenOperatorWork");
     expect(quickDeployProgressDialogSource).not.toContain("disabled={pending}");
     expect(quickDeployProgressDialogSource).toContain("embedded?: boolean");
+    expect(quickDeployProgressDialogSource).toContain("data-deployment-progress-terminal");
+    expect(quickDeployProgressDialogSource).toContain("bg-zinc-950");
+    expect(deploymentProgressDialogSource).not.toContain('disabled={status === "running"');
     expect(quickDeploySheetSource).toContain("embedded");
+    expect(quickDeploySheetSource).toContain("onClose?: () => void");
+    expect(quickDeploySheetSource).toContain("function closeQuickDeploySurface()");
+    expect(quickDeploySheetSource).toContain("blueprintSelectorDialogOpen = false");
+    expect(quickDeploySheetSource).toContain("blueprintDetailDialogOpen = false");
     expect(quickDeploySheetSource).toContain("readBlueprintInstallProgressSummary");
     expect(quickDeploySheetSource).toContain("startBlueprintOperatorWorkStatusPoll");
     expect(quickDeploySheetSource).toContain("orpcClient.operatorWork.show");
     expect(quickDeploySheetSource).toContain("Promise.race");
-    expect(quickDeploySheetSource).toContain('installSummary.terminalStatus !== "failed"');
+    expect(quickDeploySheetSource).toContain("if (lastCreatedDeploymentId)");
+    expect(quickDeploySheetSource).toContain("appendWorkflowDeploymentProgressEventOnce");
+    expect(quickDeploySheetSource).not.toContain('installSummary.terminalStatus === "running"');
     expect(operationProgressPanelSource).toContain("{#if requestId}");
     expect(operationProgressPanelSource).toContain("Intl.DateTimeFormat");
     expect(operationProgressPanelSource).toContain("new Date(timestamp)");
+    expect(operationProgressPanelSource).toContain("data-deployment-progress-terminal");
+    expect(operationProgressPanelSource).toContain("bg-zinc-950");
+    expect(operationProgressPanelSource).not.toContain("xl:grid-cols");
     expect(deploymentStatusBadgeSource).toContain("data-deployment-running-signal");
     expect(deploymentStatusBadgeSource).toContain("bg-amber-50");
   });

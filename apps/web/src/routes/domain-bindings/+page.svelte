@@ -42,7 +42,7 @@
     formatTime,
   } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
-  import { orpcClient } from "$lib/orpc";
+  import { orpc, orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
 
   type DomainRouteMode = "serve" | "redirect";
@@ -138,7 +138,7 @@
       };
       domainBindingVerificationDialogOpen = false;
       selectedVerificationBindingId = "";
-      void queryClient.invalidateQueries({ queryKey: ["domain-bindings"] });
+      void queryClient.invalidateQueries({ queryKey: orpc.domainBindings.key({ type: "query" }) });
     },
     onError: (error) => {
       lifecycleFeedback = {
@@ -180,7 +180,7 @@
       };
       domainBindingRouteDialogOpen = false;
       selectedRouteBindingId = "";
-      void queryClient.invalidateQueries({ queryKey: ["domain-bindings"] });
+      void queryClient.invalidateQueries({ queryKey: orpc.domainBindings.key({ type: "query" }) });
       showDomainBindingMutation.mutate({ domainBindingId: variables.domainBindingId });
     },
     onError: (error) => {
@@ -233,7 +233,7 @@
       domainBindingDeleteDialogOpen = false;
       selectedDeleteBindingId = "";
       deleteConfirmationDraft = "";
-      void queryClient.invalidateQueries({ queryKey: ["domain-bindings"] });
+      void queryClient.invalidateQueries({ queryKey: orpc.domainBindings.key({ type: "query" }) });
       showDomainBindingMutation.mutate({ domainBindingId: variables.domainBindingId });
     },
     onError: (error) => {
@@ -255,7 +255,7 @@
       };
       domainBindingVerificationDialogOpen = false;
       selectedVerificationBindingId = "";
-      void queryClient.invalidateQueries({ queryKey: ["domain-bindings"] });
+      void queryClient.invalidateQueries({ queryKey: orpc.domainBindings.key({ type: "query" }) });
       showDomainBindingMutation.mutate({ domainBindingId: variables.domainBindingId });
     },
     onError: (error) => {

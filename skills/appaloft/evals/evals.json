@@ -636,7 +636,7 @@
       "id": "appaloft-skill-cloud-cli-context",
       "family": "cloud-cli-context",
       "prompt": "I just installed the Appaloft CLI and skill. Use my default Appaloft Cloud account to list my projects and show the active organization context, but do not ask me to paste cookies or tokens into chat.",
-      "expected_output": "A Cloud CLI context workflow that first checks local auth/profile state, runs appaloft login against the default Cloud endpoint when no active profile exists, then uses Appaloft organization and project operations through the selected profile without handling raw credential material in chat.",
+      "expected_output": "A Cloud CLI context workflow that first checks local auth/profile state and APPALOFT_TOKEN, asks the user for a scoped token handoff when no profile/token exists, uses APPALOFT_TOKEN or appaloft auth token login to verify and store a profile, then uses Appaloft organization and project operations without handling raw credential material in chat.",
       "expected_operations": ["organizations.current-context", "projects.list"],
       "source_documents": [
         "docs/agent/appaloft-skill.md",
@@ -648,8 +648,10 @@
       ],
       "assertions": [
         "Checks appaloft auth status or appaloft context show before attempting product operations.",
-        "Runs appaloft login without --url when no active profile exists, relying on the default https://app.appaloft.com Cloud endpoint.",
-        "Does not ask the user to paste product-session cookies, bearer tokens, deploy tokens, browser cookies, or raw secret material into chat."
+        "Checks whether APPALOFT_TOKEN is already available before asking the user for new auth material.",
+        "When no active profile or env token exists, asks the user for a scoped token handoff and uses appaloft auth token login or APPALOFT_TOKEN instead of browser login.",
+        "Uses the default https://app.appaloft.com endpoint when the user has not selected another trusted Appaloft endpoint.",
+        "Does not ask the user to paste product-session cookies, bearer tokens, deploy tokens, browser cookies, token file contents, or raw secret material into chat."
       ]
     },
     {

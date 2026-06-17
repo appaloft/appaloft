@@ -62,7 +62,7 @@
     readBrowserConsoleSidebarOpen,
   } from "$lib/console/sidebar-state";
   import { modalIsOpen, setModalOpen } from "$lib/console/url-modal";
-  import { orpcClient } from "$lib/orpc";
+  import { orpc, orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
   import { projectDetailHref } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
@@ -149,9 +149,8 @@
     }),
   );
   const organizationContextQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["organizations", "current-context"],
-      queryFn: () => orpcClient.organizations.currentContext({}),
+    orpc.organizations.currentContext.queryOptions({
+      input: {},
       enabled: browser,
       retry: 0,
       staleTime: 30_000,
@@ -292,11 +291,20 @@
   }
 
   function setQuickDeployDialogOpen(open: boolean): void {
+    if (!open && quickDeployProgressDialogOpen) {
+      return;
+    }
+
     quickDeployDialogOpen = open;
     if (!open) {
       quickDeployProgressDialogOpen = false;
     }
     void setModalOpen(page, "quick-deploy", open);
+  }
+
+  function closeQuickDeployDialog(): void {
+    quickDeployProgressDialogOpen = false;
+    setQuickDeployDialogOpen(false);
   }
 </script>
 
@@ -622,7 +630,8 @@
   <Dialog.Root open={true} onOpenChange={setQuickDeployDialogOpen}>
     <Dialog.Content
       closeLabel={$t(i18nKeys.common.actions.close)}
-      class={quickDeployProgressDialogOpen ? "max-w-4xl" : "max-w-7xl"}
+      showCloseButton={!quickDeployProgressDialogOpen}
+      class={quickDeployProgressDialogOpen ? "max-w-6xl border-0 bg-transparent shadow-none" : "max-w-7xl"}
     >
       {#if !quickDeployProgressDialogOpen}
         <Dialog.Header>
@@ -640,6 +649,7 @@
         <QuickDeploySheet
           statePath={page.url.pathname}
           stateModal="quick-deploy"
+          onClose={closeQuickDeployDialog}
           onProgressDialogOpenChange={(open) => {
             quickDeployProgressDialogOpen = open;
           }}

@@ -26,6 +26,7 @@
   import type {
     ArchiveEnvironmentInput,
     ArchiveProjectInput,
+    CheckProjectDeleteSafetyResponse,
     CloneEnvironmentInput,
     DeleteProjectInput,
     LockEnvironmentInput,
@@ -105,7 +106,7 @@
   } from "$lib/console/utils";
   import { operatorWorkReadableFailure } from "$lib/console/blueprint-install-progress";
   import { i18nKeys, t } from "$lib/i18n";
-  import { orpcClient } from "$lib/orpc";
+  import { orpc, orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
 
   type ProjectDetailTab =
@@ -154,6 +155,7 @@
   };
   type ProjectLifecycleAction = "archive" | "restore" | "delete";
   type EnvironmentLifecycleAction = "archive" | "lock" | "unlock";
+  type ProjectDeleteBlocker = CheckProjectDeleteSafetyResponse["blockers"][number];
 
   const { projectsQuery, environmentsQuery, resourcesQuery, deploymentsQuery } =
     createConsoleQueries(browser, {
@@ -174,51 +176,39 @@
   );
   let projectLifecycleDialogOpen = $state(false);
   const projectDetailQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["projects", "show", projectId],
-      queryFn: () => orpcClient.projects.show({ projectId }),
+    orpc.projects.show.queryOptions({
+      input: { projectId },
       enabled: browser && projectId.length > 0,
       staleTime: 5_000,
     }),
   );
   const projectPreviewEnvironmentsQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["preview-environments", "project", projectId, { limit: 50 }],
-      queryFn: () =>
-        orpcClient.previewEnvironments.list({
-          projectId,
-          limit: 50,
-        }),
+    orpc.previewEnvironments.list.queryOptions({
+      input: {
+        projectId,
+        limit: 50,
+      },
       enabled: browser && projectId.length > 0 && activeProjectTab === "previews",
       staleTime: 5_000,
     }),
   );
   const projectPreviewResourcesQuery = createQuery(() =>
-    queryOptions({
-      queryKey: [
-        "resources",
-        "project-preview",
+    orpc.resources.list.queryOptions({
+      input: {
         projectId,
-        { includePreviewResources: true, limit: 100 },
-      ],
-      queryFn: () =>
-        orpcClient.resources.list({
-          projectId,
-          includePreviewResources: true,
-          limit: 100,
-        }),
+        includePreviewResources: true,
+        limit: 100,
+      },
       enabled: browser && projectId.length > 0 && activeProjectTab === "previews",
       staleTime: 5_000,
     }),
   );
   const projectOperatorWorkQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["operator-work", "project", projectId, { limit: 25 }],
-      queryFn: () =>
-        orpcClient.operatorWork.list({
-          projectId,
-          limit: 25,
-        }),
+    orpc.operatorWork.list.queryOptions({
+      input: {
+        projectId,
+        limit: 25,
+      },
       enabled: browser && projectId.length > 0,
       staleTime: 2_000,
       refetchInterval: 5_000,
@@ -246,15 +236,18 @@
   );
   const isProjectArchived = $derived(project?.lifecycleStatus === "archived");
   const projectDeleteSafetyQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["projects", "delete-check", projectId],
-      queryFn: () => orpcClient.projects.deleteCheck({ projectId }),
+    orpc.projects.deleteCheck.queryOptions({
+      input: { projectId },
       enabled: browser && isProjectArchived && projectId.length > 0 && projectDetailQuery.isSuccess,
       staleTime: 5_000,
     }),
   );
   const projectDeleteSafety = $derived(projectDeleteSafetyQuery.data ?? null);
-  const projectDeleteBlockerCount = $derived(projectDeleteSafety?.blockers.length ?? 0);
+  const projectDeleteBlockers = $derived<ProjectDeleteBlocker[]>(projectDeleteSafety?.blockers ?? []);
+  const projectDeleteBlockerCount = $derived(projectDeleteBlockers.length);
+  const projectDeleteSafetyLoading = $derived(
+    isProjectArchived && projectDeleteSafetyQuery.isPending,
+  );
   const canDeleteProject = $derived(
     Boolean(project) &&
       isProjectArchived &&
@@ -692,6 +685,16 @@
         );
     }
   });
+
+  function invalidateProjectQueries(): void {
+    void queryClient.invalidateQueries({ queryKey: orpc.projects.key({ type: "query" }) });
+  }
+
+  function invalidateEnvironmentAndProjectQueries(): void {
+    void queryClient.invalidateQueries({ queryKey: orpc.environments.key({ type: "query" }) });
+    invalidateProjectQueries();
+  }
+
   const renameProjectMutation = createMutation(() => ({
     mutationFn: (input: RenameProjectInput) => orpcClient.projects.rename(input),
     onSuccess: (result) => {
@@ -700,9 +703,7 @@
         title: $t(i18nKeys.console.projects.renameSucceeded),
         detail: result.id,
       };
-      void queryClient.invalidateQueries({ queryKey: ["projects"] });
-      void queryClient.invalidateQueries({ queryKey: ["projects", "show", result.id] });
-      void queryClient.invalidateQueries({ queryKey: ["projects", "delete-check", result.id] });
+      invalidateProjectQueries();
       projectRenameDialogOpen = false;
     },
     onError: (error) => {
@@ -721,9 +722,7 @@
         title: $t(i18nKeys.console.projects.archiveSucceeded),
         detail: result.id,
       };
-      void queryClient.invalidateQueries({ queryKey: ["projects"] });
-      void queryClient.invalidateQueries({ queryKey: ["projects", "show", result.id] });
-      void queryClient.invalidateQueries({ queryKey: ["projects", "delete-check", result.id] });
+      invalidateProjectQueries();
       setProjectLifecycleDialogOpen(false);
     },
     onError: (error) => {
@@ -742,9 +741,7 @@
         title: $t(i18nKeys.console.projects.restoreSucceeded),
         detail: result.id,
       };
-      void queryClient.invalidateQueries({ queryKey: ["projects"] });
-      void queryClient.invalidateQueries({ queryKey: ["projects", "show", result.id] });
-      void queryClient.invalidateQueries({ queryKey: ["projects", "delete-check", result.id] });
+      invalidateProjectQueries();
       setProjectLifecycleDialogOpen(false);
     },
     onError: (error) => {
@@ -764,7 +761,7 @@
         title: $t(i18nKeys.console.projects.deleteSucceeded),
         detail: result.id,
       };
-      void queryClient.invalidateQueries({ queryKey: ["projects"] });
+      invalidateProjectQueries();
       setProjectLifecycleDialogOpen(false);
       window.location.href = "/projects";
     },
@@ -774,9 +771,7 @@
         title: $t(i18nKeys.console.projects.deleteFailed),
         detail: readErrorMessage(error),
       };
-      if (project) {
-        void queryClient.invalidateQueries({ queryKey: ["projects", "delete-check", project.id] });
-      }
+      invalidateProjectQueries();
     },
   }));
   const archiveEnvironmentMutation = createMutation(() => ({
@@ -787,12 +782,8 @@
         title: $t(i18nKeys.console.projects.environmentArchiveSucceeded),
         detail: result.id,
       };
-      void queryClient.invalidateQueries({ queryKey: ["environments"] });
-      void queryClient.invalidateQueries({ queryKey: ["projects"] });
+      invalidateEnvironmentAndProjectQueries();
       setEnvironmentLifecycleDialogOpen(false);
-      if (project) {
-        void queryClient.invalidateQueries({ queryKey: ["projects", "show", project.id] });
-      }
     },
     onError: (error) => {
       lifecycleFeedback = {
@@ -813,12 +804,8 @@
       cloneEnvironmentNames = {};
       environmentCloneDialogOpen = false;
       selectedEnvironmentId = "";
-      void queryClient.invalidateQueries({ queryKey: ["environments"] });
-      void queryClient.invalidateQueries({ queryKey: ["projects"] });
+      invalidateEnvironmentAndProjectQueries();
       setEnvironmentLifecycleDialogOpen(false);
-      if (project) {
-        void queryClient.invalidateQueries({ queryKey: ["projects", "show", project.id] });
-      }
     },
     onError: (error) => {
       lifecycleFeedback = {
@@ -839,12 +826,8 @@
       renameEnvironmentNames = {};
       environmentRenameDialogOpen = false;
       selectedEnvironmentId = "";
-      void queryClient.invalidateQueries({ queryKey: ["environments"] });
-      void queryClient.invalidateQueries({ queryKey: ["projects"] });
+      invalidateEnvironmentAndProjectQueries();
       setEnvironmentLifecycleDialogOpen(false);
-      if (project) {
-        void queryClient.invalidateQueries({ queryKey: ["projects", "show", project.id] });
-      }
     },
     onError: (error) => {
       lifecycleFeedback = {
@@ -862,11 +845,7 @@
         title: $t(i18nKeys.console.projects.environmentLockSucceeded),
         detail: result.id,
       };
-      void queryClient.invalidateQueries({ queryKey: ["environments"] });
-      void queryClient.invalidateQueries({ queryKey: ["projects"] });
-      if (project) {
-        void queryClient.invalidateQueries({ queryKey: ["projects", "show", project.id] });
-      }
+      invalidateEnvironmentAndProjectQueries();
     },
     onError: (error) => {
       lifecycleFeedback = {
@@ -884,11 +863,7 @@
         title: $t(i18nKeys.console.projects.environmentUnlockSucceeded),
         detail: result.id,
       };
-      void queryClient.invalidateQueries({ queryKey: ["environments"] });
-      void queryClient.invalidateQueries({ queryKey: ["projects"] });
-      if (project) {
-        void queryClient.invalidateQueries({ queryKey: ["projects", "show", project.id] });
-      }
+      invalidateEnvironmentAndProjectQueries();
     },
     onError: (error) => {
       lifecycleFeedback = {
@@ -1342,6 +1317,10 @@
   }
 
   function setQuickDeployDialogOpen(open: boolean): void {
+    if (!open && quickDeployProgressDialogOpen) {
+      return;
+    }
+
     quickDeployDialogOpen = open;
     if (!open) {
       quickDeployProgressDialogOpen = false;
@@ -1356,6 +1335,11 @@
       noScroll: true,
       replaceState: true,
     });
+  }
+
+  function closeQuickDeployDialog(): void {
+    quickDeployProgressDialogOpen = false;
+    setQuickDeployDialogOpen(false);
   }
 
   function openProjectQuickDeploy(): void {
@@ -1393,7 +1377,7 @@
 
   function openProjectAttentionAction(item: ProjectAttentionItem): void {
     if (item.intent === "operator-work-refresh") {
-      void queryClient.invalidateQueries({ queryKey: ["operator-work", "project", projectId] });
+      void queryClient.invalidateQueries({ queryKey: orpc.operatorWork.key({ type: "query" }) });
       return;
     }
 
@@ -2998,6 +2982,30 @@
                           count: projectDeleteBlockerCount,
                         })}
                       </p>
+                      <ul class="mt-2 space-y-1 text-xs text-destructive">
+                        {#each projectDeleteBlockers as blocker}
+                          <li class="break-all font-mono">
+                            {blocker.kind}
+                            {#if typeof blocker.count === "number"}
+                              · {blocker.count}
+                            {/if}
+                            {#if blocker.relatedEntityType}
+                              · {blocker.relatedEntityType}
+                            {/if}
+                            {#if blocker.relatedEntityId}
+                              · {blocker.relatedEntityId}
+                            {/if}
+                          </li>
+                        {/each}
+                      </ul>
+                    {:else if projectDeleteSafetyLoading}
+                      <p class="mt-2 text-muted-foreground">
+                        {$t(i18nKeys.console.projects.deleteCheckLoading)}
+                      </p>
+                    {:else if projectDeleteSafetyQuery.error}
+                      <p class="mt-2 break-words text-destructive">
+                        {readErrorMessage(projectDeleteSafetyQuery.error)}
+                      </p>
                     {/if}
                   </div>
 
@@ -3021,7 +3029,8 @@
     <Dialog.Root bind:open={quickDeployDialogOpen} onOpenChange={setQuickDeployDialogOpen}>
       <Dialog.Content
         closeLabel={$t(i18nKeys.common.actions.close)}
-        class={quickDeployProgressDialogOpen ? "max-w-4xl" : "max-w-7xl"}
+        showCloseButton={!quickDeployProgressDialogOpen}
+        class={quickDeployProgressDialogOpen ? "max-w-6xl border-0 bg-transparent shadow-none" : "max-w-7xl"}
       >
         {#if !quickDeployProgressDialogOpen}
           <Dialog.Header>
@@ -3042,6 +3051,7 @@
             statePath={page.url.pathname}
             stateBaseSearch={projectModalBaseSearch()}
             stateModal="quick-deploy"
+            onClose={closeQuickDeployDialog}
             onProgressDialogOpenChange={(open) => {
               quickDeployProgressDialogOpen = open;
             }}
@@ -3072,12 +3082,12 @@
             </p>
           </div>
 
-          <div class="grid gap-2 sm:grid-cols-2">
+          <div class="grid gap-2">
             {#if isProjectArchived}
               <Button
                 type="button"
                 variant={selectedProjectLifecycleAction === "restore" ? "default" : "outline"}
-                class="h-auto justify-start px-3 py-3 text-left"
+                class="h-auto w-full items-start justify-start gap-3 overflow-hidden px-3 py-3 text-left whitespace-normal"
                 disabled={!canRestoreProjectByCapability || restoreProjectMutation.isPending}
                 onclick={() => {
                   selectedProjectLifecycleAction = "restore";
@@ -3086,11 +3096,11 @@
                 }}
               >
                 <RotateCcw class="size-4 shrink-0" />
-                <span class="min-w-0">
+                <span class="min-w-0 flex-1">
                   <span class="block font-medium">
                     {$t(i18nKeys.console.projects.restoreAction)}
                   </span>
-                  <span class="block text-xs font-normal opacity-80">
+                  <span class="block break-words text-xs leading-5 font-normal opacity-80">
                     {$t(i18nKeys.console.projects.lifecycleRestoreOption)}
                   </span>
                 </span>
@@ -3098,7 +3108,7 @@
               <Button
                 type="button"
                 variant={selectedProjectLifecycleAction === "delete" ? "destructive" : "outline"}
-                class="h-auto justify-start px-3 py-3 text-left"
+                class="h-auto w-full items-start justify-start gap-3 overflow-hidden px-3 py-3 text-left whitespace-normal"
                 disabled={!canDeleteProject || !canDeleteProjectByCapability ||
                   deleteProjectMutation.isPending}
                 title={projectDeleteBlockerCount > 0
@@ -3112,11 +3122,11 @@
                 }}
               >
                 <Trash2 class="size-4 shrink-0" />
-                <span class="min-w-0">
+                <span class="min-w-0 flex-1">
                   <span class="block font-medium">
                     {$t(i18nKeys.console.projects.deleteAction)}
                   </span>
-                  <span class="block text-xs font-normal opacity-80">
+                  <span class="block break-words text-xs leading-5 font-normal opacity-80">
                     {$t(i18nKeys.console.projects.lifecycleDeleteOption)}
                   </span>
                 </span>
@@ -3125,7 +3135,7 @@
               <Button
                 type="button"
                 variant={selectedProjectLifecycleAction === "archive" ? "destructive" : "outline"}
-                class="h-auto justify-start px-3 py-3 text-left"
+                class="h-auto w-full items-start justify-start gap-3 overflow-hidden px-3 py-3 text-left whitespace-normal"
                 disabled={!canArchiveProjectByCapability || archiveProjectMutation.isPending}
                 onclick={() => {
                   selectedProjectLifecycleAction = "archive";
@@ -3134,11 +3144,11 @@
                 }}
               >
                 <Archive class="size-4 shrink-0" />
-                <span class="min-w-0">
+                <span class="min-w-0 flex-1">
                   <span class="block font-medium">
                     {$t(i18nKeys.console.projects.archiveAction)}
                   </span>
-                  <span class="block text-xs font-normal opacity-80">
+                  <span class="block break-words text-xs leading-5 font-normal opacity-80">
                     {$t(i18nKeys.console.projects.lifecycleArchiveOption)}
                   </span>
                 </span>
@@ -3160,9 +3170,38 @@
             </label>
             {#if projectDeleteBlockerCount > 0}
               <div class="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-                {$t(i18nKeys.console.projects.deleteBlocked, {
-                  count: projectDeleteBlockerCount,
-                })}
+                <p class="font-medium">
+                  {$t(i18nKeys.console.projects.deleteBlockedTitle)}
+                </p>
+                <p class="mt-1 text-xs text-muted-foreground">
+                  {$t(i18nKeys.console.projects.deleteBlocked, {
+                    count: projectDeleteBlockerCount,
+                  })}
+                </p>
+                <ul class="mt-2 space-y-1 text-xs">
+                  {#each projectDeleteBlockers as blocker}
+                    <li class="break-all font-mono">
+                      {blocker.kind}
+                      {#if typeof blocker.count === "number"}
+                        · {blocker.count}
+                      {/if}
+                      {#if blocker.relatedEntityType}
+                        · {blocker.relatedEntityType}
+                      {/if}
+                      {#if blocker.relatedEntityId}
+                        · {blocker.relatedEntityId}
+                      {/if}
+                    </li>
+                  {/each}
+                </ul>
+              </div>
+            {:else if projectDeleteSafetyLoading}
+              <div class="rounded-md border bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+                {$t(i18nKeys.console.projects.deleteCheckLoading)}
+              </div>
+            {:else if projectDeleteSafetyQuery.error}
+              <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                {readErrorMessage(projectDeleteSafetyQuery.error)}
               </div>
             {/if}
           {/if}

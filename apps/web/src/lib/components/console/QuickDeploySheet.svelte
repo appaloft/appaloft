@@ -98,6 +98,8 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   import {
     latestOperatorWorkEventCursor,
     operatorWorkEnvelopeProgressEvents,
+    operatorWorkEventStreamEnvelope,
+    operatorWorkEventResponseEnvelopes,
     operatorWorkEventProgressStatus,
     operatorWorkItemToProgressEvent,
     summarizeBlueprintInstallProgress,
@@ -127,7 +129,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   } from "$lib/console/server-registration";
   import { deploymentDetailHref, readSessionIdentity, resourceDetailHref } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
-  import { orpcClient } from "$lib/orpc";
+  import { orpc, orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
 
   type SourceKind =
@@ -694,6 +696,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     stateBaseSearch = "",
     stateModal = "quick-deploy",
     onProgressDialogOpenChange = undefined,
+    onClose = undefined,
   }: {
     enabled?: boolean;
     lockedProjectId?: string;
@@ -702,6 +705,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     stateBaseSearch?: string;
     stateModal?: string;
     onProgressDialogOpenChange?: (open: boolean) => void;
+    onClose?: () => void;
   } = $props();
 
   const authSessionQuery = createQuery(() =>
@@ -713,34 +717,28 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     }),
   );
   const projectsQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["projects", { limit: defaultConsoleListLimit }],
-      queryFn: () => orpcClient.projects.list({ limit: defaultConsoleListLimit }),
+    orpc.projects.list.queryOptions({
+      input: { limit: defaultConsoleListLimit },
       enabled: browser && enabled,
     }),
   );
   const serversQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["servers", { limit: defaultConsoleListLimit, runtimeAvailability: "all" }],
-      queryFn: () =>
-        orpcClient.servers.list({
-          limit: defaultConsoleListLimit,
-          runtimeAvailability: "all",
-        }),
+    orpc.servers.list.queryOptions({
+      input: {
+        limit: defaultConsoleListLimit,
+        runtimeAvailability: "all",
+      },
       enabled: browser && enabled,
     }),
   );
   const environmentsQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["environments", { limit: defaultConsoleListLimit }],
-      queryFn: () => orpcClient.environments.list({ limit: defaultConsoleListLimit }),
+    orpc.environments.list.queryOptions({
+      input: { limit: defaultConsoleListLimit },
       enabled: browser && enabled,
     }),
   );
   const integrationsQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["integrations"],
-      queryFn: () => orpcClient.integrations.list(),
+    orpc.integrations.list.queryOptions({
       enabled: browser && enabled,
     }),
   );
@@ -811,6 +809,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   let deploymentCreateInFlight = $state(false);
   let blueprintInstallInFlight = $state(false);
   let workflowDeploymentProgressEvents = $state<DeploymentProgressEvent[]>([]);
+  let workflowDeploymentProgressPromises = new Map<string, Promise<void>>();
   let environmentName = $state(
     browser
       ? (page.url.searchParams.get("environmentName") ??
@@ -1018,28 +1017,20 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       orpcClient.staticArtifacts.publishArchive(input),
   }));
   const resourcesQuery = createQuery(() =>
-    queryOptions({
-      queryKey: [
-        "resources",
-        selectedProjectId,
-        environmentContextEnabled ? selectedEnvironmentId : "",
-        { limit: defaultConsoleListLimit },
-      ],
-      queryFn: () =>
-        orpcClient.resources.list({
-          ...(selectedProjectId ? { projectId: selectedProjectId } : {}),
-          ...(environmentContextEnabled && selectedEnvironmentId
-            ? { environmentId: selectedEnvironmentId }
-            : {}),
-          limit: defaultConsoleListLimit,
-        }),
+    orpc.resources.list.queryOptions({
+      input: {
+        ...(selectedProjectId ? { projectId: selectedProjectId } : {}),
+        ...(environmentContextEnabled && selectedEnvironmentId
+          ? { environmentId: selectedEnvironmentId }
+          : {}),
+        limit: defaultConsoleListLimit,
+      },
       enabled: browser && enabled,
     }),
   );
   const sshCredentialsQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["credentials", "ssh", { limit: defaultConsoleListLimit }],
-      queryFn: () => orpcClient.credentials.ssh.list({ limit: defaultConsoleListLimit }),
+    orpc.credentials.ssh.list.queryOptions({
+      input: { limit: defaultConsoleListLimit },
       enabled: browser && enabled,
     }),
   );
@@ -1067,9 +1058,8 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     githubIntegration?.configuration?.diagnostics ?? [],
   );
   const githubAppConnectionQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["integrations", "github", "app-connection"],
-      queryFn: () => orpcClient.integrations.github.appConnection.show({}),
+    orpc.integrations.github.appConnection.show.queryOptions({
+      input: {},
       enabled:
         browser &&
         enabled &&
@@ -2024,18 +2014,10 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   });
 
   const githubRepositoriesQuery = createQuery(() =>
-    queryOptions({
-      queryKey: [
-        "integrations",
-        "github",
-        githubConnectionMode?.key ?? "user-oauth",
-        "repositories",
-        githubRepositorySearch.trim(),
-      ],
-      queryFn: () =>
-        orpcClient.integrations.github.repositories.list({
-          ...(githubRepositorySearch.trim() ? { search: githubRepositorySearch.trim() } : {}),
-        }),
+    orpc.integrations.github.repositories.list.queryOptions({
+      input: {
+        ...(githubRepositorySearch.trim() ? { search: githubRepositorySearch.trim() } : {}),
+      },
       enabled:
         browser &&
         enabled &&
@@ -3607,7 +3589,15 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     workflowProgressItems = [];
     workflowProgressError = "";
     workflowDeploymentProgressEvents = [];
+    workflowDeploymentProgressPromises = new Map();
     workflowDeploymentTraceLink = "";
+  }
+
+  function closeQuickDeploySurface(): void {
+    workflowProgressDialogOpen = false;
+    blueprintSelectorDialogOpen = false;
+    blueprintDetailDialogOpen = false;
+    onClose?.();
   }
 
   function resetDiagnosticSummaryCopy(): void {
@@ -3729,6 +3719,9 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   function appendWorkflowDeploymentProgressEvent(event: DeploymentProgressEvent): void {
     workflowDeploymentProgressEvents = [...workflowDeploymentProgressEvents, event];
     lastCreatedDeploymentId = event.deploymentId ?? lastCreatedDeploymentId;
+    if (lastOperatorWorkId && event.deploymentId) {
+      void observeWorkflowDeploymentProgress(event.deploymentId);
+    }
   }
 
   function appendWorkflowDeploymentProgressEventOnce(event: DeploymentProgressEvent): void {
@@ -3778,18 +3771,37 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     });
   }
 
+  function observeWorkflowDeploymentProgress(deploymentId: string): Promise<void> {
+    const existing = workflowDeploymentProgressPromises.get(deploymentId);
+    if (existing) {
+      return existing;
+    }
+
+    const progress = observeDeploymentProgressAfterAcceptance(
+      deploymentId,
+      appendWorkflowDeploymentProgressEventOnce,
+      {
+        onStreamError: (message) => {
+          workflowProgressError = message;
+        },
+      },
+    );
+    workflowDeploymentProgressPromises.set(deploymentId, progress);
+    return progress;
+  }
+
   function testDraftServerConnectivity(input: DraftServerConnectivityInput) {
     return orpcClient.servers.testDraftConnectivity(input);
   }
 
   async function refreshWorkspaceData(): Promise<void> {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["projects"] }),
-      queryClient.invalidateQueries({ queryKey: ["servers"] }),
-      queryClient.invalidateQueries({ queryKey: ["environments"] }),
-      queryClient.invalidateQueries({ queryKey: ["resources"] }),
-      queryClient.invalidateQueries({ queryKey: ["dependency-resources"] }),
-      queryClient.invalidateQueries({ queryKey: ["deployments"] }),
+      queryClient.invalidateQueries({ queryKey: orpc.projects.key({ type: "query" }) }),
+      queryClient.invalidateQueries({ queryKey: orpc.servers.key({ type: "query" }) }),
+      queryClient.invalidateQueries({ queryKey: orpc.environments.key({ type: "query" }) }),
+      queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) }),
+      queryClient.invalidateQueries({ queryKey: orpc.dependencyResources.key({ type: "query" }) }),
+      queryClient.invalidateQueries({ queryKey: orpc.deployments.key({ type: "query" }) }),
     ]);
   }
 
@@ -4252,6 +4264,21 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     };
   }
 
+  function recordBlueprintInstallResourceOwner(
+    target: BlueprintResolvedInstallTarget,
+    resourceId: string | undefined,
+  ) {
+    if (!resourceId) {
+      return;
+    }
+
+    lastCreatedDeploymentOwner = {
+      projectId: target.projectId,
+      environmentId: target.environmentId,
+      resourceId,
+    };
+  }
+
   function blueprintInstallIdempotencyKey(slug: string): string {
     const suffix =
       browser && typeof crypto.randomUUID === "function"
@@ -4346,9 +4373,10 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       follow: false,
       untilTerminal: true,
     });
-    const progressEvents = operatorWorkEnvelopeProgressEvents(replay.envelopes);
+    const replayEnvelopes = operatorWorkEventResponseEnvelopes(replay);
+    const progressEvents = operatorWorkEnvelopeProgressEvents(replayEnvelopes);
     appendBlueprintInstallProgressEvents(progressEvents);
-    const status = operatorWorkEventProgressStatus(replay.envelopes);
+    const status = operatorWorkEventProgressStatus(replayEnvelopes);
     const lastProgressEvent = progressEvents.at(-1);
     updateBlueprintInstallFeedbackFromWorkEvent(lastProgressEvent ?? {
       timestamp: new Date().toISOString(),
@@ -4365,7 +4393,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     });
 
     return {
-      cursor: latestOperatorWorkEventCursor(replay.envelopes),
+      cursor: latestOperatorWorkEventCursor(replayEnvelopes),
       status,
       ...(lastProgressEvent?.message ? { message: lastProgressEvent.message } : {}),
     };
@@ -4465,7 +4493,11 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
         let result = await stream.next();
 
         while (!result.done && followEpoch === blueprintOperatorWorkFollowEpoch) {
-          const envelope = result.value;
+          const envelope = operatorWorkEventStreamEnvelope(result.value);
+          if (!envelope) {
+            result = await stream.next();
+            continue;
+          }
 
           switch (envelope.kind) {
             case "accepted":
@@ -4749,23 +4781,17 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       lastAccessUrl = installSummary.accessUrl;
       lastCreatedDeploymentId = installSummary.deploymentId;
       selectedResourceId = installSummary.resourceId || selectedResourceId;
+      recordBlueprintInstallResourceOwner(target, installSummary.resourceId);
 
       installSummary = await observeBlueprintInstallProgressAfterAcceptance(installSummary);
       lastOperatorWorkId = installSummary.operatorWorkId || lastOperatorWorkId;
       lastAccessUrl = installSummary.accessUrl || lastAccessUrl;
       lastCreatedDeploymentId = installSummary.deploymentId || lastCreatedDeploymentId;
       selectedResourceId = installSummary.resourceId || selectedResourceId;
+      recordBlueprintInstallResourceOwner(target, installSummary.resourceId);
 
-      if (lastCreatedDeploymentId && installSummary.terminalStatus !== "failed") {
-        await observeDeploymentProgressAfterAcceptance(
-          lastCreatedDeploymentId,
-          appendWorkflowDeploymentProgressEvent,
-          {
-            onStreamError: (message) => {
-              workflowProgressError = message;
-            },
-          },
-        );
+      if (lastCreatedDeploymentId) {
+        await observeWorkflowDeploymentProgress(lastCreatedDeploymentId);
       }
 
       await refreshWorkspaceData();
@@ -4964,8 +4990,8 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       }
 
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["dependency-resources"] }),
-        queryClient.invalidateQueries({ queryKey: ["resources"] }),
+        queryClient.invalidateQueries({ queryKey: orpc.dependencyResources.key({ type: "query" }) }),
+        queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) }),
       ]);
 
       return {
@@ -7090,21 +7116,15 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
 <QuickDeployProgressDialog
   open={workflowProgressDialogOpen}
   pending={deployPending}
-  progressItems={workflowProgressItems}
   deploymentEvents={workflowDeploymentProgressEvents}
   progressError={workflowProgressError}
   feedback={deployFeedback}
   deploymentId={lastCreatedDeploymentId}
   traceLink={workflowDeploymentTraceLink}
+  resourceHref={lastCreatedResourceHref()}
   embedded
   onClose={() => {
-    workflowProgressDialogOpen = false;
-  }}
-  onOpenResource={() => {
-    const href = lastCreatedResourceHref();
-    if (href) {
-      void goto(href);
-    }
+    closeQuickDeploySurface();
   }}
   onOpenDeployment={() => {
     void goto(lastCreatedDeploymentHref());

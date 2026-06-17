@@ -1,6 +1,7 @@
 import {
   type DeploymentProgressEvent,
   type OperatorWorkEventStreamEnvelope,
+  type OperatorWorkEventStreamResponse,
   type OperatorWorkItem,
   type OperatorWorkObservedEvent,
 } from "@appaloft/contracts";
@@ -79,6 +80,25 @@ const blueprintInstallTerminalFailureStatuses = new Set([
   "dead-lettered",
 ]);
 
+const operatorWorkEventStreamStatusKinds = new Set([
+  "accepted",
+  "running",
+  "progress",
+  "retry-scheduled",
+  "succeeded",
+  "failed",
+  "canceled",
+  "dead-lettered",
+]);
+
+const operatorWorkEventStreamEnvelopeKinds = new Set([
+  ...operatorWorkEventStreamStatusKinds,
+  "heartbeat",
+  "gap",
+  "closed",
+  "error",
+]);
+
 type OperatorWorkDisplaySource = Pick<
   OperatorWorkItem,
   | "id"
@@ -102,6 +122,45 @@ export type OperatorWorkReadableFailure = {
   phase: string;
   operation: string;
 };
+
+function isOperatorWorkEventStreamEnvelopeKind(
+  kind: unknown,
+): kind is OperatorWorkEventStreamEnvelope["kind"] {
+  return typeof kind === "string" && operatorWorkEventStreamEnvelopeKinds.has(kind);
+}
+
+export function operatorWorkEventStreamEnvelope(
+  envelope: OperatorWorkEventStreamEnvelope | null | undefined,
+): OperatorWorkEventStreamEnvelope | null {
+  if (!envelope) {
+    return null;
+  }
+
+  if (envelope.schemaVersion !== "operator-work.stream-events/v1") {
+    throw new Error("Expected operator-work.stream-events/v1 envelope");
+  }
+
+  if (!isOperatorWorkEventStreamEnvelopeKind(envelope.kind)) {
+    throw new Error("Expected operator work stream envelope kind");
+  }
+
+  return envelope;
+}
+
+export function operatorWorkEventStreamEnvelopes(
+  envelopes: readonly OperatorWorkEventStreamEnvelope[],
+): OperatorWorkEventStreamEnvelope[] {
+  return envelopes.flatMap((envelope) => {
+    const normalized = operatorWorkEventStreamEnvelope(envelope);
+    return normalized ? [normalized] : [];
+  });
+}
+
+export function operatorWorkEventResponseEnvelopes(
+  response: OperatorWorkEventStreamResponse | null | undefined,
+): OperatorWorkEventStreamEnvelope[] {
+  return operatorWorkEventStreamEnvelopes(response?.envelopes ?? []);
+}
 
 function uniqueStrings(values: readonly (string | undefined)[]): string[] {
   return [...new Set(values.filter((value): value is string => Boolean(value?.trim())))];
@@ -478,6 +537,31 @@ export function operatorWorkEnvelopeProgressEvents(
   envelopes: readonly OperatorWorkEventStreamEnvelope[],
 ): DeploymentProgressEvent[] {
   return envelopes.flatMap((envelope) =>
-    "event" in envelope ? [operatorWorkEventToProgressEvent(envelope.event)] : [],
+    "event" in envelope && shouldShowOperatorWorkProgressEvent(envelope.event)
+      ? [operatorWorkEventToProgressEvent(envelope.event)]
+      : [],
+  );
+}
+
+function shouldShowOperatorWorkProgressEvent(event: OperatorWorkObservedEvent): boolean {
+  if (event.deploymentId) {
+    return true;
+  }
+
+  if (
+    event.message &&
+    (event.kind === "running" ||
+      event.kind === "progress" ||
+      event.kind === "retry-scheduled" ||
+      event.kind === "succeeded")
+  ) {
+    return true;
+  }
+
+  return (
+    event.kind === "failed" ||
+    event.kind === "canceled" ||
+    event.kind === "dead-lettered" ||
+    event.status === "failed"
   );
 }

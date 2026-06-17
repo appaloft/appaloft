@@ -38,6 +38,14 @@ the CLI or SSH; Product-grade Preview is owned by Appaloft Cloud or a self-hoste
 with preview policy, GitHub App webhooks, comments/checks, cleanup retry, scheduler, audit, and
 quota.
 
+When a hosted Cloud or self-hosted Appaloft task needs product context, the agent should first check
+`appaloft auth status`, `appaloft context show`, and whether `APPALOFT_TOKEN` is already available.
+If no active profile or env token exists, do not make the agent open a browser, copy a user code, or
+read cookies. Ask the user to grant a scoped, expiring token through a trusted UI, secret manager,
+environment variable, or CLI-approved handoff, then use `APPALOFT_TOKEN` or
+`appaloft auth token login --stdin` / `--token-file <path>` so the CLI verifies and stores the
+profile.
+
 <h2 id="appaloft-skill-install">Install</h2>
 
 Install the full Appaloft skill:
@@ -121,8 +129,11 @@ resources, prompts, and safety boundaries.
 
 <h2 id="appaloft-skill-safety">Safety boundary</h2>
 
-- Do not read `.env`, private keys, token files, cloud credentials, deploy tokens, SSH material,
-  cookies, or unmasked secrets.
+- Do not read `.env`, private keys, token file contents, cloud credentials, deploy tokens, SSH
+  material, cookies, or unmasked secrets.
+- Do not ask the user to paste product-session cookies, bearer tokens, deploy tokens, browser
+  cookies, or token file contents into chat; tokens must enter through CLI/env/secret-manager
+  handoff.
 - Do not bypass Appaloft by mutating Docker, SSH, databases, proxies, or provider SDKs directly.
 - Do not invent agent-only operations; every action maps to an existing CLI/API/Web/MCP operation.
 - Do not assume hosted artifact storage. By default, deployment still targets the user's selected

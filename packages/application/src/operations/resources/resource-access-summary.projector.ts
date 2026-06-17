@@ -1,4 +1,5 @@
 import {
+  accessRouteUrl,
   type DeploymentStatus,
   type DomainBindingStatus,
   type EdgeProxyKind,
@@ -79,34 +80,6 @@ function isCurrentPreviewDeployment(
     !isPreviewSourceFingerprint(sourceFingerprint) ||
     activePreviewSourceFingerprints.has(sourceFingerprint)
   );
-}
-
-function routeUrl(input: {
-  hostname: string;
-  scheme: "http" | "https";
-  pathPrefix: string;
-}): string {
-  const path = input.pathPrefix === "/" ? "" : input.pathPrefix;
-  return `${input.scheme}://${input.hostname}${path}`;
-}
-
-function defaultOpenPathPrefixForRoute(
-  metadata: Record<string, string>,
-  routePathPrefix: string,
-): string {
-  const candidate = metadata["access.defaultOpenPathPrefix"]?.trim();
-  if (!candidate?.startsWith("/")) {
-    return routePathPrefix;
-  }
-
-  if (routePathPrefix === "/") {
-    return candidate;
-  }
-
-  const routePath = routePathPrefix.endsWith("/") ? routePathPrefix : `${routePathPrefix}/`;
-  return candidate === routePathPrefix || candidate.startsWith(routePath)
-    ? candidate
-    : routePathPrefix;
 }
 
 function proxyRouteStatusFor(
@@ -241,10 +214,8 @@ export function projectResourceAccessSummary(
     if (hostname) {
       const scheme =
         metadata["access.scheme"] === "https" || route.tlsMode === "auto" ? "https" : "http";
-      const urlPathPrefix = defaultOpenPathPrefixForRoute(metadata, route.pathPrefix);
-
       summary.latestGeneratedAccessRoute = {
-        url: routeUrl({ hostname, scheme, pathPrefix: urlPathPrefix }),
+        url: accessRouteUrl({ hostname, scheme, routePathPrefix: route.pathPrefix, metadata }),
         hostname,
         scheme,
         ...(metadata["access.providerKey"] ? { providerKey: metadata["access.providerKey"] } : {}),
@@ -265,10 +236,10 @@ export function projectResourceAccessSummary(
     const scheme = readyDurableBinding.tlsMode === "auto" ? "https" : "http";
 
     summary.latestDurableDomainRoute = {
-      url: routeUrl({
+      url: accessRouteUrl({
         hostname: readyDurableBinding.domainName,
         scheme,
-        pathPrefix: readyDurableBinding.pathPrefix,
+        routePathPrefix: readyDurableBinding.pathPrefix,
       }),
       hostname: readyDurableBinding.domainName,
       scheme,
@@ -291,7 +262,7 @@ export function projectResourceAccessSummary(
         metadata["access.scheme"] === "https" || route.tlsMode === "auto" ? "https" : "http";
 
       summary.latestServerAppliedDomainRoute = {
-        url: routeUrl({ hostname, scheme, pathPrefix: route.pathPrefix }),
+        url: accessRouteUrl({ hostname, scheme, routePathPrefix: route.pathPrefix, metadata }),
         hostname,
         scheme,
         ...(metadata["access.providerKey"] ? { providerKey: metadata["access.providerKey"] } : {}),

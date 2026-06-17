@@ -141,9 +141,9 @@ export const publicDocsHelpTopics = {
   },
   "cli.remote-control-plane-login": {
     id: "cli.remote-control-plane-login",
-    title: "CLI remote control-plane login",
+    title: "Appaloft CLI login and profiles",
     description:
-      "How CLI login, logout, status, and context selection work for Appaloft Cloud or self-hosted control planes.",
+      "How CLI login, token login, logout, status, and context selection work for Appaloft Cloud or self-hosted Appaloft.",
     page: {
       "zh-CN": "reference/cli",
       "en-US": "en/reference/cli",
@@ -157,9 +157,13 @@ export const publicDocsHelpTopics = {
     aliases: [
       "appaloft login",
       "appaloft auth login",
+      "appaloft auth token login",
+      "APPALOFT_TOKEN",
       "appaloft context use",
       "control plane profile",
+      "Appaloft profile",
       "控制平面登录",
+      "Appaloft 登录",
       "CLI profile",
     ],
     specReferences: [
@@ -3136,6 +3140,7 @@ export const publicDocsOperationCoverage = [
   { operationKey: "resources.show", status: "documented", topicId: "resource.concept" },
   { operationKey: "resources.create", status: "documented", topicId: "resource.concept" },
   { operationKey: "resources.archive", status: "documented", topicId: "resource.concept" },
+  { operationKey: "resources.restore", status: "documented", topicId: "resource.concept" },
   { operationKey: "resources.delete-check", status: "documented", topicId: "resource.concept" },
   { operationKey: "resources.delete", status: "documented", topicId: "resource.concept" },
   {

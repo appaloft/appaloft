@@ -4,6 +4,7 @@ import {
   type DeploymentProgressEvent,
   type DeploymentSummary,
   type DeploymentTimelineEnvelope,
+  type DeploymentTimelineResponse,
 } from "@appaloft/contracts";
 
 import { API_BASE, readErrorMessage, requestWithMetadata } from "$lib/api/client";
@@ -404,6 +405,34 @@ export function deploymentTimelineProgressEvents(
   });
 }
 
+export function deploymentTimelineEntries(
+  response: DeploymentTimelineResponse | null | undefined,
+): DeploymentTimelineResponse["entries"] {
+  if (!response) {
+    return [];
+  }
+
+  if (response.schemaVersion !== "deployments.timeline/v1") {
+    throw new Error("Expected deployments.timeline/v1 response");
+  }
+
+  return response.entries;
+}
+
+export function deploymentTimelineEnvelope(
+  envelope: DeploymentTimelineEnvelope | null | undefined,
+): DeploymentTimelineEnvelope | null {
+  if (!envelope) {
+    return null;
+  }
+
+  if (envelope.schemaVersion !== "deployments.timeline/v1") {
+    throw new Error("Expected deployments.timeline/v1 envelope");
+  }
+
+  return envelope;
+}
+
 export function deploymentTimelineProgressStatus(
   envelopes: DeploymentTimelineEnvelope[],
   fallbackStatus: DeploymentSummary["status"] | null | undefined,
@@ -529,11 +558,13 @@ export async function observeDeploymentProgressAfterAcceptance(
       deploymentId,
       limit: 100,
     });
-    const replayEnvelopes: DeploymentTimelineEnvelope[] = replay.entries.map((entry) => ({
-      schemaVersion: "deployments.timeline/v1",
-      kind: "entry",
-      entry,
-    }));
+    const replayEnvelopes: DeploymentTimelineEnvelope[] = deploymentTimelineEntries(replay).map(
+      (entry) => ({
+        schemaVersion: "deployments.timeline/v1",
+        kind: "entry",
+        entry,
+      }),
+    );
 
     for (const event of deploymentTimelineProgressEvents(replayEnvelopes)) {
       onEvent(event);
@@ -557,7 +588,11 @@ export async function observeDeploymentProgressAfterAcceptance(
       let result = await stream.next();
 
       while (!result.done) {
-        const envelope = result.value;
+        const envelope = deploymentTimelineEnvelope(result.value);
+        if (!envelope) {
+          result = await stream.next();
+          continue;
+        }
 
         switch (envelope.kind) {
           case "entry":

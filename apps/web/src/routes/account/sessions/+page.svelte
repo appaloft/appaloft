@@ -12,7 +12,7 @@
   import { accountSettingsItems } from "$lib/console/settings-nav";
   import { formatTime } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
-  import { orpcClient } from "$lib/orpc";
+  import { orpc, orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
 
   let operationNotice = $state("");
@@ -21,9 +21,8 @@
   let selectedSessionForRevoke = $state<AccountSessionSummary | null>(null);
 
   const sessionsQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["account", "sessions"],
-      queryFn: () => orpcClient.account.listSessions({}),
+    orpc.account.listSessions.queryOptions({
+      input: {},
       enabled: browser,
       retry: 0,
     }),
@@ -36,7 +35,7 @@
       operationNotice = $t(i18nKeys.console.accountSettings.sessionRevoked);
       revokeSessionDialogOpen = false;
       selectedSessionForRevoke = null;
-      void queryClient.invalidateQueries({ queryKey: ["account", "sessions"] });
+      void queryClient.invalidateQueries({ queryKey: orpc.account.listSessions.key({ input: {} }) });
     },
     onError: (error) => {
       operationNotice = "";
