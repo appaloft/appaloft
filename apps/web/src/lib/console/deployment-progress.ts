@@ -443,6 +443,21 @@ export function deploymentTimelineProgressStatus(
     return "failed";
   }
 
+  const completedEvent = [...envelopes].reverse().find((envelope) => {
+    if (envelope.kind !== "entry" || !envelope.entry.phase) {
+      return false;
+    }
+
+    return isTerminalDeploymentProgressEvent({
+      phase: envelope.entry.phase,
+      message: envelope.entry.message,
+      status: deploymentTimelineStatus(envelope.entry.status),
+    });
+  });
+  if (completedEvent) {
+    return "succeeded";
+  }
+
   if (!fallbackStatus) {
     return "idle";
   }
@@ -637,16 +652,15 @@ function deploymentProgressEventFingerprint(event: DeploymentProgressEvent): str
 function progressDialogStatusFromProgressEvent(
   event: DeploymentProgressEvent,
 ): DeploymentProgressDialogStatus {
-  switch (event.status) {
-    case "failed":
-      return "failed";
-    case "succeeded":
-      return "succeeded";
-    case "running":
-      return "running";
-    default:
-      return "running";
+  if (event.status === "failed") {
+    return "failed";
   }
+
+  if (isTerminalDeploymentProgressEvent(event)) {
+    return "succeeded";
+  }
+
+  return "running";
 }
 
 function deploymentTimelineStatus(
@@ -662,6 +676,20 @@ function deploymentTimelineStatus(
     case "rolled-back":
       return "succeeded";
   }
+}
+
+export function isTerminalDeploymentProgressEvent(
+  event: Pick<DeploymentProgressEvent, "message" | "phase" | "status">,
+): boolean {
+  if (event.status === "failed") {
+    return true;
+  }
+
+  if (event.phase !== "verify") {
+    return false;
+  }
+
+  return /\b(?:public route|deployment)\b.*\breachable\b/i.test(event.message);
 }
 
 export function redeployInputFromDeployment(deployment: DeploymentSummary): CreateDeploymentInput {

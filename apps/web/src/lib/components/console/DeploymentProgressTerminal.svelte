@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { LoaderCircle } from "@lucide/svelte";
   import type { DeploymentProgressEvent } from "@appaloft/contracts";
   import { tick } from "svelte";
 
@@ -26,7 +25,6 @@
   }: Props = $props();
 
   let terminalArea = $state<HTMLDivElement | undefined>();
-  const isRunning = $derived(status === "running");
 
   $effect(() => {
     const scrollKey = `${events.length}:${status}`;
@@ -62,19 +60,6 @@
         return $t(i18nKeys.console.deployments.progressPhaseVerify);
       case "rollback":
         return $t(i18nKeys.console.deployments.progressPhaseRollback);
-    }
-  }
-
-  function progressStatusLabel(status?: DeploymentProgressEvent["status"]): string {
-    switch (status) {
-      case "running":
-        return $t(i18nKeys.console.deployments.progressStatusRunning);
-      case "succeeded":
-        return $t(i18nKeys.console.deployments.progressStatusSucceeded);
-      case "failed":
-        return $t(i18nKeys.common.status.failed);
-      default:
-        return $t(i18nKeys.console.deployments.progressStatusLog);
     }
   }
 
@@ -137,15 +122,7 @@
 >
   {#if events.length === 0}
     <div class="flex items-center gap-2 py-2 text-zinc-400">
-      {#if isRunning}
-        <LoaderCircle class="size-4 animate-spin text-sky-300" />
-      {/if}
       <span>{$t(i18nKeys.console.deployments.progressWaiting)}</span>
-      {#if isRunning}
-        <span class="deployment-progress-terminal-dots" aria-hidden="true">
-          <span>.</span><span>.</span><span>.</span>
-        </span>
-      {/if}
     </div>
   {:else}
     <div class="space-y-1">
@@ -164,8 +141,8 @@
               <span class="text-zinc-600">└ </span>
             {/if}
             {event.message}
-            {#if event.status}
-              <span class="text-zinc-600"> · {progressStatusLabel(event.status)}</span>
+            {#if event.status === "failed"}
+              <span class="text-zinc-600"> · {$t(i18nKeys.common.status.failed)}</span>
             {/if}
           </span>
         </div>
@@ -173,35 +150,3 @@
     </div>
   {/if}
 </div>
-
-<style>
-  .deployment-progress-terminal-dots span {
-    animation: deployment-progress-dot 1.1s infinite both;
-  }
-
-  .deployment-progress-terminal-dots span:nth-child(2) {
-    animation-delay: 0.16s;
-  }
-
-  .deployment-progress-terminal-dots span:nth-child(3) {
-    animation-delay: 0.32s;
-  }
-
-  @keyframes deployment-progress-dot {
-    0%,
-    80%,
-    100% {
-      opacity: 0.25;
-    }
-
-    40% {
-      opacity: 1;
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .deployment-progress-terminal-dots span {
-      animation: none;
-    }
-  }
-</style>

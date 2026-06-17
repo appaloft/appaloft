@@ -157,7 +157,7 @@ describe("project detail page structure", () => {
     expect(quickDeployProgressDialogSource).not.toContain("disabled={pending}");
     expect(quickDeployProgressDialogSource).toContain("embedded?: boolean");
     expect(quickDeployProgressDialogSource).toContain("accessUrl?: string");
-    expect(quickDeployProgressDialogSource).toContain("sm:ml-auto sm:justify-end");
+    expect(quickDeployProgressDialogSource).toContain('class="absolute right-5 top-4"');
     expect(quickDeployProgressDialogSource).toContain("data-quick-deploy-success-access-url");
     expect(quickDeployProgressDialogSource).toContain(
       "i18nKeys.console.deployments.accessUrlTitle",
@@ -195,6 +195,9 @@ describe("project detail page structure", () => {
     expect(deploymentProgressTerminalSource).toContain("data-deployment-progress-terminal");
     expect(deploymentProgressTerminalSource).not.toContain("progressColumnTime");
     expect(deploymentProgressTerminalSource).not.toContain("progressColumnSource");
+    expect(deploymentProgressTerminalSource).not.toContain("deployment-progress-terminal-dots");
+    expect(deploymentProgressTerminalSource).not.toContain("LoaderCircle");
+    expect(deploymentProgressTerminalSource).not.toContain("progressStatusLabel(event.status)");
     expect(deploymentProgressTerminalSource).toContain('case "docker"');
     expect(deploymentProgressTerminalSource).toContain("bg-zinc-950");
     expect(operationProgressPanelSource).not.toContain("xl:grid-cols");

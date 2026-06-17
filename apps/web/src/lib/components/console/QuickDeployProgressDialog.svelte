@@ -7,6 +7,7 @@
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import {
+    isTerminalDeploymentProgressEvent,
     progressStatusVariant,
     type DeploymentProgressDialogStatus,
   } from "$lib/console/deployment-progress";
@@ -99,10 +100,16 @@
   }
 
   function deploymentEventStatus(): DeploymentProgressDialogStatus | undefined {
-    const failedEvent = [...deploymentEvents].reverse().find((event) => event.status === "failed");
+    const terminalEvent = [...deploymentEvents]
+      .reverse()
+      .find((event) => event.status === "failed" || isTerminalDeploymentProgressEvent(event));
 
-    if (failedEvent) {
+    if (terminalEvent?.status === "failed") {
       return "failed";
+    }
+
+    if (terminalEvent) {
+      return "succeeded";
     }
 
     return deploymentEvents.length > 0 ? "running" : undefined;
@@ -213,8 +220,8 @@
           {/each}
         </div>
       {/if}
-      <header class="border-b px-5 py-4">
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <header class="relative border-b px-5 py-4 pr-16 sm:pr-5">
+        <div class="flex items-start justify-between gap-4">
           <div class="min-w-0 flex-1 space-y-2">
             <div class="flex flex-wrap items-center gap-2">
               <h2 id="quick-deploy-progress-title" class="text-lg font-semibold">
@@ -237,7 +244,7 @@
             </div>
           </div>
 
-          <div class="flex shrink-0 flex-wrap gap-2 sm:ml-auto sm:justify-end">
+          <div class="flex shrink-0 flex-wrap justify-end gap-2 max-sm:pt-10 sm:ml-auto">
             {#if resourceHref && deploymentSucceeded}
               <Button type="button" size="sm" href={resourceHref}>
                 <ExternalLink class="size-4" />
@@ -262,16 +269,17 @@
                 {$t(i18nKeys.common.actions.viewDeployment)}
               </Button>
             {/if}
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onclick={() => onClose?.()}
-            >
-              {$t(i18nKeys.common.actions.close)}
-            </Button>
           </div>
         </div>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          class="absolute right-5 top-4"
+          onclick={() => onClose?.()}
+        >
+          {$t(i18nKeys.common.actions.close)}
+        </Button>
       </header>
 
       <div class="min-h-0 flex-1 space-y-4 overflow-auto p-5">

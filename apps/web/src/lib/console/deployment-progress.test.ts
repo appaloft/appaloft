@@ -394,11 +394,11 @@ describe("deployment progress helpers", () => {
       "succeeded",
     ]);
     expect(progressEvents[2]?.source).toBe("docker");
-    expect(deploymentTimelineProgressStatus(replayEnvelopes, "running")).toBe("running");
+    expect(deploymentTimelineProgressStatus(replayEnvelopes, "running")).toBe("succeeded");
     expect(deploymentTimelineProgressStatus(replayEnvelopes, "succeeded")).toBe("succeeded");
   });
 
-  test("[DEP-TIMELINE-WEB-003B] does not treat step-level success as deployment completion", () => {
+  test("[DEP-TIMELINE-WEB-003B] only treats verify reachability success as deployment completion", () => {
     const envelopes: DeploymentTimelineEnvelope[] = [
       {
         schemaVersion: "deployments.timeline/v1",
@@ -416,6 +416,12 @@ describe("deployment progress helpers", () => {
           status: "succeeded",
         },
       },
+    ];
+
+    expect(deploymentTimelineProgressStatus(envelopes, "running")).toBe("running");
+
+    const reachableEnvelopes: DeploymentTimelineEnvelope[] = [
+      ...envelopes,
       {
         schemaVersion: "deployments.timeline/v1",
         kind: "entry",
@@ -428,13 +434,12 @@ describe("deployment progress helpers", () => {
           kind: "status",
           phase: "verify",
           level: "info",
-          message: "Public route is reachable",
-          status: "succeeded",
+          message: "SSH public route is reachable at http://demo.example.test/api/health",
         },
       },
     ];
 
-    expect(deploymentTimelineProgressStatus(envelopes, "running")).toBe("running");
+    expect(deploymentTimelineProgressStatus(reachableEnvelopes, "running")).toBe("succeeded");
   });
 
   test("[DEP-TIMELINE-WEB-004] normalizes persisted timestamp timeline rows for deployment detail replay", () => {
