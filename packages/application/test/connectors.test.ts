@@ -102,6 +102,63 @@ describe("connector catalog", () => {
     ]);
   });
 
+  test("[APP-CONN-006] keeps GitHub identity login separate from GitHub source access", async () => {
+    const registry = new InMemoryConnectorRegistry(createDefaultConnectorDefinitions());
+    const listService = new ListConnectorsQueryService(registry);
+
+    const sourceCatalog = await listService.execute(
+      createExecutionContext({ entrypoint: "system" }),
+      {
+        category: "source",
+        includeUnavailable: true,
+      },
+    );
+    const identityCatalog = await listService.execute(
+      createExecutionContext({ entrypoint: "system" }),
+      {
+        category: "identity",
+        includeUnavailable: true,
+      },
+    );
+
+    expect(sourceCatalog.items.map((connector) => connector.key)).toEqual(["github-source"]);
+    expect(identityCatalog.items.map((connector) => connector.key)).toEqual(["github-identity"]);
+    expect(identityCatalog.items[0]?.grantKinds.map((grant) => grant.kind)).toEqual([
+      "limited-oauth-grant",
+    ]);
+    expect(identityCatalog.items[0]?.capabilities.map((capability) => capability.key)).toEqual([
+      "identity.sign-in",
+    ]);
+    expect(
+      identityCatalog.items[0]?.capabilities.map((capability) => capability.key),
+    ).not.toContain("source.repositories.browse");
+
+    const planService = new PlanConnectorCapabilityQueryService(
+      registry,
+      new InMemoryConnectorProviderAdapterRegistry([]),
+    );
+    const sourceAccessFromIdentity = await planService.execute(
+      createExecutionContext({ entrypoint: "system" }),
+      {
+        connectorKey: "github-identity",
+        capabilityKey: "source.repositories.browse",
+        parameters: {
+          repositoryFullNames: ["acme/app"],
+        },
+      },
+    );
+
+    expect(sourceAccessFromIdentity.isErr()).toBe(true);
+    expect(sourceAccessFromIdentity._unsafeUnwrapErr()).toMatchObject({
+      code: "validation_error",
+      category: "user",
+      retryable: false,
+    });
+    expect(sourceAccessFromIdentity._unsafeUnwrapErr().message).toContain(
+      "Connector github-identity does not implement source.repositories.browse",
+    );
+  });
+
   test("[APP-CONN-008][APP-CONN-016] plans GitHub source repository access with redacted short-lived provider-app token lease", async () => {
     const registry = new InMemoryConnectorRegistry(
       createDefaultConnectorDefinitions({
