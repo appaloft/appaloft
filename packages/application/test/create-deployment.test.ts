@@ -128,6 +128,7 @@ import {
   MemoryDeploymentReadModel,
   MemoryDeploymentRepository,
   MemoryDestinationRepository,
+  MemoryEnvironmentProfileDecisionStore,
   MemoryEnvironmentRepository,
   MemoryProjectRepository,
   MemoryResourceDependencyBindingReadModel,
@@ -959,6 +960,7 @@ async function createDeploymentFixture(
     processAttemptRecorder?: ProcessAttemptRecorder;
     durableWorkQueueAdapter?: DurableWorkQueueAdapter;
     operationGuardPort?: OperationGuardPort;
+    environmentProfileDecisionReadModel?: MemoryEnvironmentProfileDecisionStore;
     sourceVersionDetector?: SourceVersionDetector;
   } = {},
 ) {
@@ -1101,6 +1103,7 @@ async function createDeploymentFixture(
     options.processAttemptRecorder,
     undefined,
     options.operationGuardPort,
+    options.environmentProfileDecisionReadModel,
     options.sourceVersionDetector,
     options.durableWorkQueueAdapter,
   );
@@ -2386,6 +2389,42 @@ describe("CreateDeploymentUseCase", () => {
     expect(serializedReferences).not.toContain("super-secret");
     expect(serializedReferences).not.toContain("db.example.com");
     expect(serializedReferences).not.toContain("postgres://");
+  });
+
+  test("[ENV-PROFILE-DUP-005] rejects deployment admission with pending environment profile decisions", async () => {
+    const environmentProfileDecisions = new MemoryEnvironmentProfileDecisionStore();
+    const {
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      deployments,
+      repositoryContext,
+    } = await createDeploymentFixture(new ExplicitContextRequiredPolicy(), {
+      environmentProfileDecisionReadModel: environmentProfileDecisions,
+    });
+    await environmentProfileDecisions.recordPending(repositoryContext, {
+      id: "epd_env_demo_res_demo_dependency-binding_rbind_pg",
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      kind: "dependency-binding",
+      sourceId: "rbind_pg",
+      reason: "Dependency binding was deferred and must be resolved before deployment.",
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "validation_error",
+      details: {
+        phase: "environment-profile-decision-admission",
+        causeCode: "environment-profile-decision-pending",
+        pendingDecisionIds: ["epd_env_demo_res_demo_dependency-binding_rbind_pg"],
+      },
+    });
+    expect(deployments.items.size).toBe(0);
   });
 
   test("[DEP-BIND-REDIS-SNAPSHOT-001] captures active Redis binding safe references without secrets", async () => {

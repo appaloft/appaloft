@@ -18,7 +18,7 @@ import {
   ResourceServiceName,
   RuntimePlanStrategyValue,
 } from "@appaloft/core";
-import { FixedClock } from "@appaloft/testkit";
+import { FixedClock, MemoryEnvironmentProfileDecisionStore } from "@appaloft/testkit";
 
 import {
   type Command as AppCommand,
@@ -30,6 +30,7 @@ import {
   type EnvironmentReadModel,
   ProvisionDependencyResourceCommand,
   type ResourceReadModel,
+  toRepositoryContext,
 } from "../src";
 import {
   type DependencyResourceReadModel,
@@ -294,7 +295,10 @@ function createCommandBus(commands: AppCommand<unknown>[]): CommandBus {
   } as CommandBus;
 }
 
-function createApplyUseCase(commands: AppCommand<unknown>[] = []) {
+function createApplyUseCase(
+  commands: AppCommand<unknown>[] = [],
+  environmentProfileDecisions?: MemoryEnvironmentProfileDecisionStore,
+) {
   return new DuplicateEnvironmentProfileUseCase(
     createCommandBus(commands),
     createEnvironmentReadModel(),
@@ -303,6 +307,7 @@ function createApplyUseCase(commands: AppCommand<unknown>[] = []) {
     dependencyResourceReadModel,
     bindingReadModel,
     new FixedClock("2026-01-01T00:00:10.000Z"),
+    environmentProfileDecisions,
   );
 }
 
@@ -599,5 +604,67 @@ describe("environment profile duplication apply command", () => {
         },
       ],
     });
+  });
+
+  test("[ENV-PROFILE-DUP-005] records deferred dependency binding decisions for deployment admission", async () => {
+    const commands: AppCommand<unknown>[] = [];
+    const pendingDecisions = new MemoryEnvironmentProfileDecisionStore();
+    const result = await createApplyUseCase(commands, pendingDecisions).execute(
+      createExecutionContext({
+        requestId: "req_env_duplicate_apply_defer",
+        entrypoint: "system",
+      }),
+      {
+        environmentId: "env_prod",
+        targetName: "staging",
+        dependencyDecisions: [
+          {
+            dependencyResourceId: "rsi_pg",
+            decision: "defer",
+          },
+          {
+            dependencyResourceId: "rsi_external_pg",
+            decision: "bind-existing",
+            targetDependencyResourceId: "rsi_external_pg_staging",
+          },
+        ],
+      },
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(commands).toHaveLength(2);
+    expect(commands[0]).toBeInstanceOf(CloneEnvironmentCommand);
+    expect(commands[1]).toBeInstanceOf(CreateResourceCommand);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      createdDependencyBindings: [],
+      deferredDecisions: [
+        expect.objectContaining({
+          kind: "dependency-binding",
+          sourceId: "rbind_pg",
+          decision: "defer",
+        }),
+        expect.objectContaining({
+          kind: "dependency",
+          sourceId: "rsi_pg",
+          decision: "defer",
+        }),
+      ],
+    });
+    await expect(
+      pendingDecisions.listPending(
+        toRepositoryContext(
+          createExecutionContext({ requestId: "req_pending_decisions", entrypoint: "system" }),
+        ),
+        { environmentId: "env_staging", resourceId: "res_web_staging" },
+      ),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        environmentId: "env_staging",
+        resourceId: "res_web_staging",
+        kind: "dependency-binding",
+        sourceId: "rbind_pg",
+        status: "pending",
+      }),
+    ]);
   });
 });

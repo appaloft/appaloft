@@ -2,9 +2,9 @@
 
 ## Status
 
-- Round: Spec
-- Artifact state: Phase 0 source-of-truth ready; Code Round blocked until plan/tasks/test matrix
-  rows are accepted for the first implementation slice.
+- Round: Code / Post-Implementation Sync
+- Artifact state: Phase 5 deployment admission blocker implemented for deferred dependency
+  decisions; later diff/sync, route, storage, Web, and preview integration rows remain planned.
 - Governing decision: [ADR-085](../../decisions/ADR-085-environment-profile-duplication-boundary.md)
 
 ## Business Outcome

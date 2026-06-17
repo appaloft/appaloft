@@ -4928,6 +4928,53 @@ export interface EnvironmentDuplicateDeferredDecisionSummary {
   reason: string;
 }
 
+export interface EnvironmentProfilePendingDecisionSummary {
+  id: string;
+  projectId: string;
+  environmentId: string;
+  resourceId?: string;
+  kind: EnvironmentDuplicateDeferredDecisionSummary["kind"];
+  sourceId: string;
+  sourceEnvironmentId?: string;
+  sourceResourceId?: string;
+  decision?: string;
+  reason: string;
+  status: "pending" | "resolved";
+  createdAt: string;
+  resolvedAt?: string;
+}
+
+export interface RecordEnvironmentProfilePendingDecisionInput {
+  id: string;
+  projectId: string;
+  environmentId: string;
+  kind: EnvironmentProfilePendingDecisionSummary["kind"];
+  sourceId: string;
+  reason: string;
+  createdAt: string;
+  resourceId?: string;
+  sourceEnvironmentId?: string;
+  sourceResourceId?: string;
+  decision?: string;
+}
+
+export interface EnvironmentProfileDecisionRepository {
+  recordPending(
+    context: RepositoryContext,
+    input: RecordEnvironmentProfilePendingDecisionInput,
+  ): Promise<void>;
+}
+
+export interface EnvironmentProfileDecisionReadModel {
+  listPending(
+    context: RepositoryContext,
+    input: {
+      environmentId: string;
+      resourceId?: string;
+    },
+  ): Promise<EnvironmentProfilePendingDecisionSummary[]>;
+}
+
 export interface EnvironmentDuplicateProfileApplyResult {
   schemaVersion: "environments.duplicate-profile/v1";
   sourceEnvironmentId: string;
@@ -5243,7 +5290,9 @@ export type DeploymentPlanReasonCode =
   | "ambiguous-buildpack-evidence"
   | "missing-buildpack-evidence"
   | "buildpack-start-intent-missing"
-  | "buildpack-preview-limited";
+  | "buildpack-preview-limited"
+  | "dependency-runtime-injection-blocked"
+  | "environment-profile-decision-pending";
 
 export interface DeploymentPlanReason {
   code: DeploymentPlanReasonCode;

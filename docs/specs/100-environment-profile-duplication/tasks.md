@@ -28,7 +28,8 @@
   shared-source warning readback.
 - [x] ENV-PROFILE-DUP-004: validate reviewed `bind-existing` dependency ids and dispatch public
   neutral `BindResourceDependencyCommand` for copied resource bindings.
-- [ ] ENV-PROFILE-DUP-005: persist or project unresolved decisions and block deployment admission.
+- [x] ENV-PROFILE-DUP-005: persist/project unresolved dependency binding decisions, surface them
+  in `deployments.plan`, and block `deployments.create` before runtime/provider side effects.
 - [ ] ENV-PROFILE-DUP-006 / ENV-PROFILE-DUP-007: implement route regeneration/defer and storage
   requirement decisions.
 - [ ] Add Web staged apply surface for `environments.duplicate-profile`.
@@ -52,11 +53,11 @@
 
 ## Verification
 
-- [ ] Run focused unit/contract tests for each implemented phase.
+- [x] Run focused unit/contract tests for each implemented phase.
 - [ ] Run source-truth sync checks after operation catalog/doc changes.
 - [ ] Run CLI help/SDK descriptor verification after new operations are cataloged.
 
 ## Post-Implementation Sync
 
-- [ ] Keep `spec.md`, `plan.md`, `tasks.md`, ADR, Core Operations, test matrix, public docs,
-  operation catalog, and code aligned after each phase PR.
+- [x] Keep `spec.md`, `plan.md`, `tasks.md`, ADR, Core Operations, test matrix, public docs,
+  operation catalog, and code aligned after each phase commit.

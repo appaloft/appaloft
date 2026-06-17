@@ -41,7 +41,8 @@
   - Phase 1 can compute plans on demand;
   - Phase 2 starts as a synchronous apply command that dispatches existing child commands and
     returns deferred decisions;
-  - later phases may persist accepted plans, decision journals, deployment blockers, and
+  - unresolved environment profile decisions are persisted/projected as deployment blockers;
+  - later phases may persist accepted plans, decision journals beyond pending blockers, and
     idempotency keys if provider-backed apply becomes long-running.
 
 ## Roadmap And Compatibility

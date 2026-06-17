@@ -25,6 +25,7 @@ import {
   type DependencyResourceReadModel,
   type EnvironmentDuplicateDeferredDecisionSummary,
   type EnvironmentDuplicateProfileApplyResult,
+  type EnvironmentProfileDecisionRepository,
   type EnvironmentReadModel,
   type ResourceDependencyBindingReadModel,
   type ResourceDependencyBindingSummary,
@@ -60,6 +61,8 @@ export class DuplicateEnvironmentProfileUseCase {
     private readonly resourceDependencyBindingReadModel: ResourceDependencyBindingReadModel,
     @inject(tokens.clock)
     private readonly clock: Clock,
+    @inject(tokens.environmentProfileDecisionRepository, { isOptional: true })
+    private readonly environmentProfileDecisionRepository?: EnvironmentProfileDecisionRepository,
   ) {}
 
   async execute(
@@ -74,6 +77,7 @@ export class DuplicateEnvironmentProfileUseCase {
       resourceReadModel,
       resourceRepository,
       resourceDependencyBindingReadModel,
+      environmentProfileDecisionRepository,
     } = this;
     const repositoryContext = toRepositoryContext(context);
 
@@ -219,11 +223,20 @@ export class DuplicateEnvironmentProfileUseCase {
       const createdDependencyBindings: EnvironmentDuplicateProfileApplyResult["createdDependencyBindings"] =
         [];
       const deferredDecisions: EnvironmentDuplicateDeferredDecisionSummary[] = [];
+      const pendingDecisions: PendingEnvironmentProfileDecision[] = [];
 
       for (const resourceSummary of sourceResources) {
         const decision = resourceDecisions.get(resourceSummary.id);
         if (decision?.decision === "defer") {
-          deferredDecisions.push(resourceDeferredDecision(resourceSummary.id, decision));
+          const deferred = resourceDeferredDecision(resourceSummary.id, decision);
+          deferredDecisions.push(deferred);
+          pendingDecisions.push({
+            ...deferred,
+            projectId: sourceEnvironment.projectId,
+            environmentId: targetEnvironmentId,
+            sourceEnvironmentId: sourceEnvironment.id,
+            sourceResourceId: resourceSummary.id,
+          });
           continue;
         }
 
@@ -246,7 +259,18 @@ export class DuplicateEnvironmentProfileUseCase {
           name: resourceSummary.name,
           slug: resourceSummary.slug,
         });
-        deferredDecisions.push(...deferredResourceProfileDecisions(sourceState));
+        const resourceProfileDeferredDecisions = deferredResourceProfileDecisions(sourceState);
+        deferredDecisions.push(...resourceProfileDeferredDecisions);
+        pendingDecisions.push(
+          ...resourceProfileDeferredDecisions.map((decision) => ({
+            ...decision,
+            projectId: sourceEnvironment.projectId,
+            environmentId: targetEnvironmentId,
+            resourceId: createResult.id,
+            sourceEnvironmentId: sourceEnvironment.id,
+            sourceResourceId: sourceState.id.value,
+          })),
+        );
 
         const bindings = yield* await resourceDependencyBindingReadModel.list(repositoryContext, {
           resourceId: resourceSummary.id,
@@ -254,7 +278,16 @@ export class DuplicateEnvironmentProfileUseCase {
         for (const binding of bindings.filter((candidate) => candidate.status === "active")) {
           const targetDependencyResourceId = dependencyTargetIds.get(binding.dependencyResourceId);
           if (!targetDependencyResourceId) {
-            deferredDecisions.push(dependencyBindingDeferredDecision(binding));
+            const deferred = dependencyBindingDeferredDecision(binding);
+            deferredDecisions.push(deferred);
+            pendingDecisions.push({
+              ...deferred,
+              projectId: sourceEnvironment.projectId,
+              environmentId: targetEnvironmentId,
+              resourceId: createResult.id,
+              sourceEnvironmentId: sourceEnvironment.id,
+              sourceResourceId: binding.resourceId,
+            });
             continue;
           }
 
@@ -286,7 +319,36 @@ export class DuplicateEnvironmentProfileUseCase {
           continue;
         }
         if (decision.decision === "defer") {
-          deferredDecisions.push(dependencyDeferredDecision(dependency.id, decision));
+          const deferred = dependencyDeferredDecision(dependency.id, decision);
+          deferredDecisions.push(deferred);
+          pendingDecisions.push({
+            ...deferred,
+            projectId: sourceEnvironment.projectId,
+            environmentId: targetEnvironmentId,
+            sourceEnvironmentId: sourceEnvironment.id,
+          });
+        }
+      }
+
+      if (environmentProfileDecisionRepository) {
+        for (const pendingDecision of pendingDecisions) {
+          await environmentProfileDecisionRepository.recordPending(repositoryContext, {
+            id: pendingDecisionId(pendingDecision),
+            projectId: pendingDecision.projectId,
+            environmentId: pendingDecision.environmentId,
+            kind: pendingDecision.kind,
+            sourceId: pendingDecision.sourceId,
+            reason: pendingDecision.reason,
+            createdAt: clock.now(),
+            ...(pendingDecision.resourceId ? { resourceId: pendingDecision.resourceId } : {}),
+            ...(pendingDecision.sourceEnvironmentId
+              ? { sourceEnvironmentId: pendingDecision.sourceEnvironmentId }
+              : {}),
+            ...(pendingDecision.sourceResourceId
+              ? { sourceResourceId: pendingDecision.sourceResourceId }
+              : {}),
+            ...(pendingDecision.decision ? { decision: pendingDecision.decision } : {}),
+          });
         }
       }
 
@@ -314,6 +376,19 @@ export class DuplicateEnvironmentProfileUseCase {
       });
     });
   }
+}
+
+type PendingEnvironmentProfileDecision = EnvironmentDuplicateDeferredDecisionSummary & {
+  projectId: string;
+  environmentId: string;
+  resourceId?: string;
+  sourceEnvironmentId?: string;
+  sourceResourceId?: string;
+};
+
+function pendingDecisionId(input: PendingEnvironmentProfileDecision): string {
+  const resourcePart = input.resourceId ? `${input.resourceId}_` : "";
+  return `epd_${input.environmentId}_${resourcePart}${input.kind}_${input.sourceId}`;
 }
 
 function sharedSourceDependencyWarning(
