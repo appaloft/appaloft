@@ -5462,6 +5462,8 @@ export const deploymentPlanReasonCodeSchema = z.enum([
   "missing-buildpack-evidence",
   "buildpack-start-intent-missing",
   "buildpack-preview-limited",
+  "dependency-runtime-injection-blocked",
+  "environment-profile-decision-pending",
 ]);
 
 const deploymentPlanReasonPathSchema = z.object({

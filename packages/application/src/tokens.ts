@@ -87,6 +87,9 @@ export const tokens = {
   resourceDependencyBindingRepository: Symbol.for(
     "appaloft.resource_dependency_binding_repository",
   ),
+  environmentProfileDecisionRepository: Symbol.for(
+    "appaloft.environment_profile_decision_repository",
+  ),
   deployTokenMaterialIssuer: Symbol.for("appaloft.deploy_token_material_issuer"),
   deployTokenRepository: Symbol.for("appaloft.deploy_token_repository"),
   deployTokenReadModel: Symbol.for("appaloft.deploy_token_read_model"),
@@ -133,6 +136,9 @@ export const tokens = {
   dependencyResourceReadModel: Symbol.for("appaloft.dependency_resource_read_model"),
   dependencyResourceBackupReadModel: Symbol.for("appaloft.dependency_resource_backup_read_model"),
   resourceDependencyBindingReadModel: Symbol.for("appaloft.resource_dependency_binding_read_model"),
+  environmentProfileDecisionReadModel: Symbol.for(
+    "appaloft.environment_profile_decision_read_model",
+  ),
   storageVolumeReadModel: Symbol.for("appaloft.storage_volume_read_model"),
   storageVolumeBackupReadModel: Symbol.for("appaloft.storage_volume_backup_read_model"),
   resourceAccessFailureEvidenceRecorder: Symbol.for(

@@ -17,6 +17,8 @@ import {
   type DeploymentPlanReasonCode,
   type DomainRouteBindingCandidate,
   type DomainRouteBindingReader,
+  type EnvironmentProfileDecisionReadModel,
+  type EnvironmentProfilePendingDecisionSummary,
   type RequestedDeploymentConfig,
   type ResourceDependencyBindingReadModel,
   type RuntimePlanResolver,
@@ -572,6 +574,8 @@ export class DeploymentPlanQueryService {
     private readonly resourceDependencyBindingReadModel?: ResourceDependencyBindingReadModel,
     @inject(tokens.dependencyResourceSecretStore)
     private readonly dependencyResourceSecretStore?: DependencyResourceSecretStore,
+    @inject(tokens.environmentProfileDecisionReadModel, { isOptional: true })
+    private readonly environmentProfileDecisionReadModel?: EnvironmentProfileDecisionReadModel,
   ) {}
 
   static contextMetadata(input: DeploymentPlanRuntimeContext): Record<string, string> {
@@ -612,6 +616,7 @@ export class DeploymentPlanQueryService {
       runtimeTargetBackendRegistry,
       serverAppliedRouteStateRepository,
       sourceDetector,
+      environmentProfileDecisionReadModel,
     } = this;
     const repositoryContext = toRepositoryContext(context);
 
@@ -624,6 +629,16 @@ export class DeploymentPlanQueryService {
         ...(query.destinationId ? { destinationId: query.destinationId } : {}),
       });
       const { project, environment, resource, server, destination } = resolvedContext;
+      const pendingProfileDecisions = environmentProfileDecisionReadModel
+        ? await listPendingEnvironmentProfileDecisions(
+            environmentProfileDecisionReadModel,
+            repositoryContext,
+            {
+              environmentId: environment.toState().id.value,
+              resourceId: resource.toState().id.value,
+            },
+          )
+        : [];
       const dependencyBindingSummaries = resourceDependencyBindingReadModel
         ? yield* await resourceDependencyBindingReadModel.list(repositoryContext, {
             resourceId: resource.toState().id.value,
@@ -656,6 +671,9 @@ export class DeploymentPlanQueryService {
             source: detected.source,
             sourceReasoning: detected.reasoning,
             dependencyBindings,
+            unsupportedReasons: pendingProfileDecisions.map(
+              environmentProfileDecisionPendingReason,
+            ),
           }),
         );
       }
@@ -719,6 +737,9 @@ export class DeploymentPlanQueryService {
             source: detected.source,
             sourceReasoning: detected.reasoning,
             dependencyBindings,
+            unsupportedReasons: pendingProfileDecisions.map(
+              environmentProfileDecisionPendingReason,
+            ),
           }),
         );
       }
@@ -749,6 +770,7 @@ export class DeploymentPlanQueryService {
             server,
             dependencyBindings,
             unsupportedReasons: [
+              ...pendingProfileDecisions.map(environmentProfileDecisionPendingReason),
               blockedReasonFromError(
                 domainError.runtimeTargetUnsupported(runtimeTargetBackend.error.message, {
                   ...(runtimeTargetBackend.error.details ?? {}),
@@ -798,10 +820,87 @@ export class DeploymentPlanQueryService {
           sourceReasoning: detected.reasoning,
           server,
           dependencyBindings,
+          unsupportedReasons: pendingProfileDecisions.map(environmentProfileDecisionPendingReason),
         }),
       );
     });
   }
+}
+
+async function listPendingEnvironmentProfileDecisions(
+  readModel: EnvironmentProfileDecisionReadModel,
+  repositoryContext: Parameters<EnvironmentProfileDecisionReadModel["listPending"]>[0],
+  input: { environmentId: string; resourceId: string },
+): Promise<EnvironmentProfilePendingDecisionSummary[]> {
+  const environmentDecisions = await readModel.listPending(repositoryContext, {
+    environmentId: input.environmentId,
+  });
+  const resourceDecisions = await readModel.listPending(repositoryContext, input);
+  const byId = new Map<string, EnvironmentProfilePendingDecisionSummary>();
+  for (const decision of [...environmentDecisions, ...resourceDecisions]) {
+    byId.set(decision.id, decision);
+  }
+  return [...byId.values()];
+}
+
+function environmentProfileDecisionPendingReason(
+  decision: EnvironmentProfilePendingDecisionSummary,
+): DeploymentPlanReason {
+  return reason({
+    code: "environment-profile-decision-pending",
+    phase: "environment-profile-decision-admission",
+    message: decision.reason,
+    recommendation: "Resolve pending environment profile decisions before deploying.",
+    evidence: [
+      {
+        kind: decision.kind,
+        label: "Pending profile decision",
+        value: decision.sourceId,
+        source: "environment-profile-duplication",
+      },
+    ],
+    fixPath: [
+      {
+        kind: "workflow-action",
+        targetOperation: "environments.duplicate-profile",
+        label: "Resolve environment profile decision",
+        safeByDefault: true,
+      },
+    ],
+    relatedEntityId: decision.id,
+    relatedEntityType: "environment-profile-decision",
+  });
+}
+
+function dependencyRuntimeInjectionBlockedReason(
+  dependencyBindings: DeploymentPlanPreview["dependencyBindings"] | undefined,
+): DeploymentPlanReason | undefined {
+  if (!dependencyBindings || dependencyBindings.runtimeInjection.status !== "blocked") {
+    return undefined;
+  }
+
+  return reason({
+    code: "dependency-runtime-injection-blocked",
+    phase: "dependency-runtime-injection-admission",
+    message: "Dependency runtime injection is blocked for this deployment.",
+    recommendation: "Resolve dependency binding readiness before deploying.",
+    evidence: [
+      {
+        kind: "dependency-runtime-injection",
+        label: "Dependency runtime injection",
+        value: dependencyBindings.runtimeInjection.reason ?? "dependency_runtime_injection_blocked",
+        source: "deployment-plan",
+      },
+    ],
+    fixPath: [
+      {
+        kind: "command",
+        targetOperation: "resources.bind-dependency",
+        label: "Fix dependency binding",
+        safeByDefault: true,
+      },
+    ],
+  });
 }
 
 function blockedDeploymentPlanPreview(input: {
@@ -813,6 +912,7 @@ function blockedDeploymentPlanPreview(input: {
   source: SourceDescriptor;
   sourceReasoning: string[];
   dependencyBindings?: DeploymentPlanPreview["dependencyBindings"];
+  unsupportedReasons?: DeploymentPlanReason[];
   error: DomainError;
 }): DeploymentPlanPreview {
   const projectState = input.project.toState();
@@ -823,6 +923,7 @@ function blockedDeploymentPlanPreview(input: {
   const sourceState = input.source.toState();
   const sourceInspection = sourceState.inspection;
   const unsupportedReason = blockedReasonFromError(input.error);
+  const unsupportedReasons = [...(input.unsupportedReasons ?? []), unsupportedReason];
   const runtimeStrategy = resourceState.runtimeProfile?.strategy.value;
 
   return {
@@ -841,7 +942,7 @@ function blockedDeploymentPlanPreview(input: {
     readiness: {
       status: "blocked",
       ready: false,
-      reasonCodes: [unsupportedReason.code],
+      reasonCodes: unsupportedReasons.map((reason) => reason.code),
     },
     source: {
       kind: sourceState.kind.value,
@@ -918,8 +1019,8 @@ function blockedDeploymentPlanPreview(input: {
     },
     ...(input.dependencyBindings ? { dependencyBindings: input.dependencyBindings } : {}),
     warnings: [],
-    unsupportedReasons: [unsupportedReason],
-    nextActions: nextActions([unsupportedReason]),
+    unsupportedReasons,
+    nextActions: nextActions(unsupportedReasons),
     generatedAt: new Date().toISOString(),
   };
 }
@@ -959,6 +1060,10 @@ function deploymentPlanPreview(input: {
   const unsupportedReasons: DeploymentPlanReason[] = [...(input.unsupportedReasons ?? [])];
   const warnings: DeploymentPlanReason[] = [];
   const access = accessSummary(executionState.metadata);
+  const dependencyBlockedReason = dependencyRuntimeInjectionBlockedReason(input.dependencyBindings);
+  if (dependencyBlockedReason) {
+    unsupportedReasons.push(dependencyBlockedReason);
+  }
 
   if (!input.includeCommandSpecs) {
     warnings.push(
@@ -1182,11 +1287,13 @@ function nextActions(
   return unsupportedReasons.map((item) => ({
     kind: "command",
     targetOperation:
-      item.code === "internal-port-missing" ||
+      item.fixPath?.find((path) => path.kind === "command" || path.kind === "workflow-action")
+        ?.targetOperation ??
+      (item.code === "internal-port-missing" ||
       item.code === "missing-internal-port" ||
       item.code === "network-profile-missing"
         ? "resources.configure-network"
-        : "resources.configure-runtime",
+        : "resources.configure-runtime"),
     label: item.recommendation ?? "Fix resource profile",
     safeByDefault: false,
     blockedReasonCode: item.code,
