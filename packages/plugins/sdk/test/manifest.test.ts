@@ -55,6 +55,30 @@ describe("plugin manifest contract", () => {
     });
   });
 
+  test("accepts owner-scoped console panel web extension placements", () => {
+    for (const placement of ["project-environment-panel", "resource-detail-panel"] as const) {
+      expect(
+        systemPluginWebExtensionSchema.parse({
+          key: `example-${placement}`,
+          title: "Owner panel",
+          description: "Shows context-aware console panel data.",
+          path: "/owner-panel",
+          placement,
+          target: "console-route",
+          requiresAuth: true,
+          metadata: {
+            renderer: "console-page",
+            pageEndpoint:
+              "/example/owner-panel?projectId={projectId}&environmentId={environmentId}&resourceId={resourceId}",
+          },
+        }),
+      ).toMatchObject({
+        placement,
+        target: "console-route",
+      });
+    }
+  });
+
   test("accepts console route web extension metadata", () => {
     expect(
       systemPluginWebExtensionSchema.parse({

@@ -16,6 +16,11 @@ export interface ConsolePageEndpointContext {
     readonly name?: string;
     readonly role?: string;
   } | null;
+  readonly projectId?: string;
+  readonly environmentId?: string;
+  readonly resourceId?: string;
+  readonly deploymentId?: string;
+  readonly previewEnvironmentId?: string;
 }
 
 export function findConsolePageExtensionByPath(
@@ -58,6 +63,18 @@ export function readConsolePageExtensionMetadata(
   };
 }
 
+export function findConsolePanelExtensionsByPlacement(
+  extensions: readonly SystemPluginWebExtension[],
+  placement: SystemPluginWebExtension["placement"],
+): SystemPluginWebExtension[] {
+  return extensions.filter(
+    (extension) =>
+      extension.target === "console-route" &&
+      extension.placement === placement &&
+      readConsolePageExtensionMetadata(extension) !== null,
+  );
+}
+
 export function resolveConsolePageEndpoint(
   metadata: ConsolePageExtensionMetadata | null | undefined,
   context: ConsolePageEndpointContext,
@@ -73,6 +90,11 @@ export function resolveConsolePageEndpoint(
     organizationSlug: context.organization?.slug ?? "",
     organizationName: context.organization?.name ?? "",
     organizationRole: context.organization?.role ?? "",
+    projectId: context.projectId ?? "",
+    environmentId: context.environmentId ?? "",
+    resourceId: context.resourceId ?? "",
+    deploymentId: context.deploymentId ?? "",
+    previewEnvironmentId: context.previewEnvironmentId ?? "",
   };
 
   return Object.entries(replacements).reduce(
