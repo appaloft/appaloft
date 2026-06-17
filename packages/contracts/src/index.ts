@@ -6488,6 +6488,43 @@ export const connectorDescriptorSchema = z.object({
     .optional(),
 });
 
+export const connectionOwnerSchema = z.object({
+  scope: z.enum(["account", "organization", "project", "environment", "resource", "operator"]),
+  id: z.string(),
+});
+
+export const connectionCredentialGrantSchema = z.object({
+  kind: credentialGrantKindSchema,
+  storage: z.enum(["none", "secret-ref", "provider-app", "ephemeral"]),
+  redacted: z.literal(true),
+  secretRef: z.string().optional(),
+  externalAccountId: z.string().optional(),
+  externalInstallationId: z.string().optional(),
+  expiresAt: z.string().optional(),
+});
+
+export const connectionDiagnosticSchema = z.object({
+  code: z.string(),
+  severity: z.enum(["info", "warning", "error"]),
+  message: z.string(),
+});
+
+export const connectionSchema = z.object({
+  id: z.string(),
+  connectorKey: z.string(),
+  providerKey: z.string(),
+  category: connectionCategorySchema.shape.key,
+  owner: connectionOwnerSchema,
+  displayName: z.string(),
+  status: z.enum(["pending", "connected", "failed", "revoked"]),
+  capabilities: z.array(z.string()),
+  credentialGrant: connectionCredentialGrantSchema,
+  diagnostics: z.array(connectionDiagnosticSchema),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  revokedAt: z.string().optional(),
+});
+
 export const dnsRecordRequirementSchema = z.object({
   name: z.string(),
   type: z.enum(["A", "AAAA", "CNAME", "TXT"]),
@@ -6546,6 +6583,32 @@ export const listConnectorCategoriesResponseSchema = z.object({
 
 export const listConnectorsResponseSchema = z.object({
   items: z.array(connectorDescriptorSchema),
+});
+
+export const listConnectionsResponseSchema = z.object({
+  items: z.array(connectionSchema),
+});
+
+export const showConnectionResponseSchema = connectionSchema;
+
+export const startConnectionResponseSchema = z.object({
+  connection: connectionSchema,
+  authorizationUrl: z.string().optional(),
+  nextAction: z.enum([
+    "already-connected",
+    "authorize-in-browser",
+    "provider-callback",
+    "ready",
+    "manual-secret-required",
+  ]),
+});
+
+export const completeConnectionCallbackResponseSchema = z.object({
+  connection: connectionSchema,
+});
+
+export const revokeConnectionResponseSchema = z.object({
+  connection: connectionSchema,
 });
 
 export const connectorCapabilityPlanResponseSchema = connectorCapabilityPlanPreviewSchema;
@@ -6707,6 +6770,16 @@ export type IntegrationDescriptor = z.infer<typeof integrationDescriptorSchema>;
 export type ConnectionCategory = z.infer<typeof connectionCategorySchema>;
 export type CredentialGrantKind = z.infer<typeof credentialGrantKindSchema>;
 export type ConnectorDescriptor = z.infer<typeof connectorDescriptorSchema>;
+export type Connection = z.infer<typeof connectionSchema>;
+export type ConnectionOwner = z.infer<typeof connectionOwnerSchema>;
+export type ConnectionCredentialGrant = z.infer<typeof connectionCredentialGrantSchema>;
+export type ListConnectionsResponse = z.infer<typeof listConnectionsResponseSchema>;
+export type ShowConnectionResponse = z.infer<typeof showConnectionResponseSchema>;
+export type StartConnectionResponse = z.infer<typeof startConnectionResponseSchema>;
+export type CompleteConnectionCallbackResponse = z.infer<
+  typeof completeConnectionCallbackResponseSchema
+>;
+export type RevokeConnectionResponse = z.infer<typeof revokeConnectionResponseSchema>;
 export type DnsRecordRequirement = z.infer<typeof dnsRecordRequirementSchema>;
 export type DnsRecordConflict = z.infer<typeof dnsRecordConflictSchema>;
 export type DnsRecordPlan = z.infer<typeof dnsRecordPlanSchema>;

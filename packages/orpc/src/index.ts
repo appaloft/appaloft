@@ -43,6 +43,7 @@ import {
   CloseTerminalSessionCommand,
   type Command,
   type CommandBus,
+  CompleteConnectionCallbackCommand,
   ConfigureAuditEventLegalHoldCommand,
   ConfigureDefaultAccessDomainPolicyCommand,
   ConfigureDependencyResourceBackupPolicyCommand,
@@ -100,6 +101,7 @@ import {
   cleanupStorageVolumeRuntimeCommandInputSchema,
   cloneEnvironmentCommandInputSchema,
   closeTerminalSessionCommandInputSchema,
+  completeConnectionCallbackCommandInputSchema,
   configureAuditEventLegalHoldCommandInputSchema,
   configureDefaultAccessDomainPolicyCommandInputSchema,
   configureDependencyResourceBackupPolicyCommandInputSchema,
@@ -239,6 +241,7 @@ import {
   ListAuditEventsQuery,
   ListBlueprintsQuery,
   ListCertificatesQuery,
+  ListConnectionsQuery,
   ListConnectorCategoriesQuery,
   ListConnectorsQuery,
   ListDefaultAccessDomainPoliciesQuery,
@@ -284,6 +287,7 @@ import {
   listAuditEventLegalHoldsQueryInputSchema,
   listAuditEventsQueryInputSchema,
   listCertificatesQueryInputSchema,
+  listConnectionsQueryInputSchema,
   listConnectorsQueryInputSchema,
   listDefaultAccessDomainPoliciesQueryInputSchema,
   listDependencyResourceBackupPoliciesQueryInputSchema,
@@ -415,6 +419,7 @@ import {
   RetryOperatorWorkCommand,
   RevokeAccountSessionCommand,
   RevokeCertificateCommand,
+  RevokeConnectionCommand,
   RevokeDeployTokenCommand,
   RollbackDeploymentCommand,
   RotateDeployTokenCommand,
@@ -458,6 +463,7 @@ import {
   retryOperatorWorkCommandInputSchema,
   revokeAccountSessionCommandInputSchema,
   revokeCertificateCommandInputSchema,
+  revokeConnectionCommandInputSchema,
   revokeDeployTokenCommandInputSchema,
   rollbackDeploymentCommandInputSchema,
   rotateDeployTokenCommandInputSchema,
@@ -477,6 +483,7 @@ import {
   ShowBlueprintInstallationQuery,
   ShowBlueprintQuery,
   ShowCertificateQuery,
+  ShowConnectionQuery,
   ShowDefaultAccessDomainPolicyQuery,
   ShowDependencyResourceBackupPolicyQuery,
   ShowDependencyResourceBackupQuery,
@@ -508,6 +515,7 @@ import {
   ShowStorageVolumeQuery,
   ShowTerminalSessionQuery,
   type SourceEventVerificationPort,
+  StartConnectionCommand,
   StartResourceRuntimeCommand,
   type StaticArtifactPublicationSummary,
   StopResourceRuntimeCommand,
@@ -529,6 +537,7 @@ import {
   showBlueprintInstallationQueryInputSchema,
   showBlueprintQueryInputSchema,
   showCertificateQueryInputSchema,
+  showConnectionQueryInputSchema,
   showDefaultAccessDomainPolicyQueryInputSchema,
   showDependencyResourceBackupPolicyQueryInputSchema,
   showDependencyResourceBackupQueryInputSchema,
@@ -559,6 +568,7 @@ import {
   showStorageVolumeBackupQueryInputSchema,
   showStorageVolumeQueryInputSchema,
   showTerminalSessionQueryInputSchema,
+  startConnectionCommandInputSchema,
   startResourceRuntimeCommandInputSchema,
   stopResourceRuntimeCommandInputSchema,
   streamDeploymentTimelineQueryInputSchema,
@@ -610,6 +620,7 @@ import {
   cleanupStorageVolumeRuntimeResponseSchema,
   cloneEnvironmentResponseSchema,
   closeTerminalSessionResponseSchema,
+  completeConnectionCallbackResponseSchema,
   configureDefaultAccessDomainPolicyResponseSchema,
   configureDependencyResourceBackupPolicyResponseSchema,
   configureDomainBindingRouteResponseSchema,
@@ -681,6 +692,7 @@ import {
   listAuditEventLegalHoldsResponseSchema,
   listAuditEventsResponseSchema,
   listCertificatesResponseSchema,
+  listConnectionsResponseSchema,
   listConnectorCategoriesResponseSchema,
   listConnectorsResponseSchema,
   listDefaultAccessDomainPoliciesResponseSchema,
@@ -767,6 +779,7 @@ import {
   retryOperatorWorkResponseSchema,
   revokeAccountSessionResponseSchema,
   revokeCertificateResponseSchema,
+  revokeConnectionResponseSchema,
   revokeDeployTokenResponseSchema,
   rollbackDeploymentResponseSchema,
   rotateDeployTokenResponseSchema,
@@ -785,6 +798,7 @@ import {
   showAuditEventLegalHoldResponseSchema,
   showAuditEventResponseSchema,
   showCertificateResponseSchema,
+  showConnectionResponseSchema,
   showDefaultAccessDomainPolicyResponseSchema,
   showDependencyResourceBackupPolicyResponseSchema,
   showDependencyResourceBackupResponseSchema,
@@ -809,6 +823,7 @@ import {
   showStorageVolumeBackupResponseSchema,
   showStorageVolumeResponseSchema,
   showTerminalSessionResponseSchema,
+  startConnectionResponseSchema,
   startResourceRuntimeResponseSchema,
   stopResourceRuntimeResponseSchema,
   storageVolumeBackupPlanResponseSchema,
@@ -6209,6 +6224,72 @@ export const listConnectorsProcedure = base
   .output(listConnectorsResponseSchema)
   .handler(async ({ input, context }) => executeQuery(context, ListConnectorsQuery.create(input)));
 
+export const listConnectionsProcedure = base
+  .route({
+    method: "GET",
+    path: "/connections",
+    successStatus: 200,
+  })
+  .input(listConnectionsQueryInputSchema)
+  .output(listConnectionsResponseSchema)
+  .handler(async ({ input, context }) => executeQuery(context, ListConnectionsQuery.create(input)));
+
+export const showConnectionProcedure = base
+  .route({
+    method: "GET",
+    path: "/connections/{connectionId}",
+    successStatus: 200,
+  })
+  .input(showConnectionQueryInputSchema)
+  .output(showConnectionResponseSchema)
+  .handler(async ({ input, context }) => executeQuery(context, ShowConnectionQuery.create(input)));
+
+export const showConnectionStatusProcedure = base
+  .route({
+    method: "GET",
+    path: "/connections/{connectionId}/status",
+    successStatus: 200,
+  })
+  .input(showConnectionQueryInputSchema)
+  .output(showConnectionResponseSchema)
+  .handler(async ({ input, context }) => executeQuery(context, ShowConnectionQuery.create(input)));
+
+export const startConnectionProcedure = base
+  .route({
+    method: "POST",
+    path: "/connections/connect/start",
+    successStatus: 201,
+  })
+  .input(startConnectionCommandInputSchema)
+  .output(startConnectionResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, StartConnectionCommand.create(input)),
+  );
+
+export const completeConnectionCallbackProcedure = base
+  .route({
+    method: "POST",
+    path: "/connections/connect/callback",
+    successStatus: 200,
+  })
+  .input(completeConnectionCallbackCommandInputSchema)
+  .output(completeConnectionCallbackResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, CompleteConnectionCallbackCommand.create(input)),
+  );
+
+export const revokeConnectionProcedure = base
+  .route({
+    method: "POST",
+    path: "/connections/{connectionId}/revoke",
+    successStatus: 200,
+  })
+  .input(revokeConnectionCommandInputSchema)
+  .output(revokeConnectionResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RevokeConnectionCommand.create(input)),
+  );
+
 export const planConnectorCapabilityProcedure = base
   .route({
     method: "POST",
@@ -6644,6 +6725,16 @@ export const appaloftOrpcRouter = {
     delete: deletePreviewEnvironmentProcedure,
   },
   connections: {
+    list: listConnectionsProcedure,
+    show: showConnectionProcedure,
+    status: {
+      show: showConnectionStatusProcedure,
+    },
+    connect: {
+      start: startConnectionProcedure,
+      callback: completeConnectionCallbackProcedure,
+    },
+    revoke: revokeConnectionProcedure,
     categories: {
       list: listConnectorCategoriesProcedure,
     },
@@ -9059,6 +9150,12 @@ export function mountAppaloftOrpcRoutes(
     "/api/blueprints/installations/:applicationId",
     "/api/connections/categories",
     "/api/connections/catalog",
+    "/api/connections",
+    "/api/connections/:connectionId",
+    "/api/connections/:connectionId/status",
+    "/api/connections/:connectionId/revoke",
+    "/api/connections/connect/start",
+    "/api/connections/connect/callback",
     "/api/connections/capabilities/plan",
     "/api/projects",
     "/api/projects/:projectId",

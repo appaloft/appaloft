@@ -96,7 +96,13 @@ describe("operation catalog aggregate mutation boundary", () => {
     const connectorOperationKeys = [
       "connections.categories.list",
       "connections.catalog.list",
+      "connections.list",
+      "connections.show",
+      "connections.connect.start",
+      "connections.connect.callback",
       "connections.capability.plan",
+      "connections.revoke",
+      "connections.status.show",
     ];
     const entriesByKey = new Map<string, OperationCatalogEntry>(
       operationCatalog.map((entry) => [entry.key, entry]),

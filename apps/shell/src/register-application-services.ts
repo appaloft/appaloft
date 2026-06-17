@@ -61,6 +61,8 @@ import {
   CloneEnvironmentCommandHandler,
   CloneEnvironmentUseCase,
   CloseTerminalSessionCommandHandler,
+  CompleteConnectionCallbackCommandHandler,
+  CompleteConnectionCallbackUseCase,
   ConfigureAuditEventLegalHoldCommandHandler,
   ConfigureAuditEventLegalHoldUseCase,
   ConfigureDefaultAccessDomainPolicyCommandHandler,
@@ -231,6 +233,8 @@ import {
   ListBlueprintsQueryHandler,
   ListCertificatesQueryHandler,
   ListCertificatesQueryService,
+  ListConnectionsQueryHandler,
+  ListConnectionsQueryService,
   ListConnectorCategoriesQueryHandler,
   ListConnectorCategoriesQueryService,
   ListConnectorsQueryHandler,
@@ -406,6 +410,8 @@ import {
   RevokeAccountSessionUseCase,
   RevokeCertificateCommandHandler,
   RevokeCertificateUseCase,
+  RevokeConnectionCommandHandler,
+  RevokeConnectionUseCase,
   RevokeDeployTokenCommandHandler,
   RevokeDeployTokenUseCase,
   RollbackDeploymentCommandHandler,
@@ -452,6 +458,8 @@ import {
   ShowBlueprintQueryHandler,
   ShowCertificateQueryHandler,
   ShowCertificateQueryService,
+  ShowConnectionQueryHandler,
+  ShowConnectionQueryService,
   ShowDefaultAccessDomainPolicyQueryHandler,
   ShowDefaultAccessDomainPolicyQueryService,
   ShowDependencyResourceBackupPolicyQueryHandler,
@@ -507,6 +515,8 @@ import {
   ShowStorageVolumeQueryService,
   ShowTerminalSessionQueryHandler,
   SourceLinkQueryService,
+  StartConnectionCommandHandler,
+  StartConnectionUseCase,
   StartResourceRuntimeCommandHandler,
   StopResourceRuntimeCommandHandler,
   StreamDeploymentTimelineQueryHandler,
@@ -1588,6 +1598,11 @@ export function registerApplicationServices(
   container.registerSingleton(MarkServerAppliedRouteStatusOnDeploymentFinishedHandler);
   container.registerSingleton(IssueCertificateOnCertificateRequestedHandler);
   container.registerSingleton(ListConnectorCategoriesQueryHandler);
+  container.registerSingleton(ListConnectionsQueryHandler);
+  container.registerSingleton(ShowConnectionQueryHandler);
+  container.registerSingleton(StartConnectionCommandHandler);
+  container.registerSingleton(CompleteConnectionCallbackCommandHandler);
+  container.registerSingleton(RevokeConnectionCommandHandler);
   container.registerSingleton(ListConnectorsQueryHandler);
   container.registerSingleton(PlanConnectorCapabilityQueryHandler);
   container.registerSingleton(ListBlueprintsQueryHandler);
@@ -2528,6 +2543,14 @@ export function registerApplicationServices(
   );
   container.registerSingleton(tokens.providersQueryService, ListProvidersQueryService);
   container.registerSingleton(tokens.connectorsQueryService, ListConnectorsQueryService);
+  container.registerSingleton(tokens.connectionsQueryService, ListConnectionsQueryService);
+  container.registerSingleton(tokens.connectionQueryService, ShowConnectionQueryService);
+  container.registerSingleton(tokens.startConnectionUseCase, StartConnectionUseCase);
+  container.registerSingleton(
+    tokens.completeConnectionCallbackUseCase,
+    CompleteConnectionCallbackUseCase,
+  );
+  container.registerSingleton(tokens.revokeConnectionUseCase, RevokeConnectionUseCase);
   container.registerSingleton(
     tokens.connectorCategoriesQueryService,
     ListConnectorCategoriesQueryService,

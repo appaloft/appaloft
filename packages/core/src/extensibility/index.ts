@@ -1,3 +1,4 @@
+export * from "./connection";
 export * from "./connector-definition";
 export * from "./dns-connection";
 export * from "./integration-connection";

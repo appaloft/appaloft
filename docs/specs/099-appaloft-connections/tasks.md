@@ -22,7 +22,7 @@
 - [ ] APP-CONN-010: add high-cost accepted-plan test.
 - [ ] APP-CONN-011: add notification adapter redaction test.
 - [x] APP-CONN-012: add no billing ledger mutation test.
-- [ ] APP-CONN-013: add tool/operation no-secret exposure test.
+- [x] APP-CONN-013: add tool/operation no-secret exposure test.
 - [x] APP-CONN-014: add CLI/HTTP operation parity tests.
 - [ ] APP-CONN-015: add Web flow test after UI scope is accepted.
 - [x] APP-CONN-016: add fake DNS provider adapter contract tests.
@@ -31,13 +31,14 @@
 
 - [x] Add neutral connection model and value objects.
 - [x] Add connector catalog and connection query/read model.
+- [x] Add connection instance start/list/show/callback/revoke/status lifecycle operations.
 - [x] Add operation catalog entries.
 - [x] Add application ports for provider adapters.
 - [x] Add fake DNS provider adapter before real providers.
 - [x] Add GitHub App source connection projection/compatibility.
 - [x] Add persistent DNS provider plan contract.
 - [ ] Add DNS temporary setup and persistent DNS apply/verify/cleanup provider contracts.
-- [x] Add CLI and HTTP surfaces.
+- [x] Add CLI and HTTP surfaces for catalog, connection lifecycle, and DNS planning.
 - [ ] Add Web central/contextual surfaces.
 
 ## Verification
@@ -46,4 +47,4 @@
 - [x] Run CLI operation tests.
 - [x] Run HTTP/oRPC route tests.
 - [x] Run source scan for raw provider secrets in production sources.
-- [ ] Run `git diff --check`.
+- [x] Run `git diff --check`.

@@ -5,11 +5,16 @@ import {
   createDefaultConnectorDefinitions,
   createExecutionContext,
   FakeDnsConnectorProviderAdapter,
+  InMemoryConnectorConnectionStore,
   InMemoryConnectorProviderAdapterRegistry,
   InMemoryConnectorRegistry,
+  ListConnectionsQueryService,
   ListConnectorCategoriesQueryService,
   ListConnectorsQueryService,
   PlanConnectorCapabilityQueryService,
+  RevokeConnectionUseCase,
+  ShowConnectionQueryService,
+  StartConnectionUseCase,
 } from "../src";
 
 describe("connector catalog", () => {
@@ -188,5 +193,92 @@ describe("connector catalog", () => {
     expect(plan.requiresExplicitAcceptance).toBe(true);
     expect(plan.providerPlan?.dnsRecords?.conflicts).toHaveLength(1);
     expect(plan.effects.map((effect) => effect.kind)).toContain("dns.record.conflict");
+  });
+
+  test("[APP-CONN-014][APP-CONN-013] starts, lists, shows, and redacts connection instances", async () => {
+    const registry = new InMemoryConnectorRegistry(
+      createDefaultConnectorDefinitions({
+        cloudflareDns: {
+          configured: true,
+        },
+      }),
+    );
+    const store = new InMemoryConnectorConnectionStore();
+    const clock = { now: () => "2026-01-01T00:00:00.000Z" };
+    const idGenerator = { next: () => "conn_cloudflare_dns_test" };
+    const start = new StartConnectionUseCase(registry, store, clock, idGenerator);
+    const list = new ListConnectionsQueryService(store);
+    const show = new ShowConnectionQueryService(store);
+
+    const started = await start.execute({
+      connectorKey: "cloudflare-dns",
+      owner: { scope: "project", id: "project_123" },
+      credentialGrant: {
+        kind: "manual-secret-reference",
+        storage: "secret-ref",
+        secretRef: "secretref_cloudflare_dns",
+        externalAccountId: "acct_example",
+      },
+    });
+
+    expect(started.isOk()).toBe(true);
+    const result = started._unsafeUnwrap();
+    expect(result.connection.status).toBe("connected");
+    expect(result.nextAction).toBe("ready");
+    expect(result.connection.credentialGrant).toMatchObject({
+      kind: "manual-secret-reference",
+      storage: "secret-ref",
+      redacted: true,
+      secretRef: "secretref_cloudflare_dns",
+    });
+    expect(JSON.stringify(result)).not.toContain("cf_token");
+
+    const listed = await list.execute(createExecutionContext({ entrypoint: "system" }), {
+      owner: { scope: "project", id: "project_123" },
+      category: "dns",
+    });
+    expect(listed.items.map((connection) => connection.id)).toEqual(["conn_cloudflare_dns_test"]);
+
+    const shown = await show.execute(createExecutionContext({ entrypoint: "system" }), {
+      connectionId: "conn_cloudflare_dns_test",
+    });
+    expect(shown.isOk()).toBe(true);
+    expect(shown._unsafeUnwrap().connectorKey).toBe("cloudflare-dns");
+  });
+
+  test("[APP-CONN-014] revokes connection instances without deleting safe readback", async () => {
+    const registry = new InMemoryConnectorRegistry(
+      createDefaultConnectorDefinitions({
+        cloudflareDns: {
+          configured: true,
+        },
+      }),
+    );
+    const store = new InMemoryConnectorConnectionStore();
+    const start = new StartConnectionUseCase(
+      registry,
+      store,
+      { now: () => "2026-01-01T00:00:00.000Z" },
+      { next: () => "conn_revoke_test" },
+    );
+    const revoke = new RevokeConnectionUseCase(store, {
+      now: () => "2026-01-01T00:01:00.000Z",
+    });
+
+    const started = await start.execute({
+      connectorKey: "cloudflare-dns",
+      credentialGrant: {
+        kind: "manual-secret-reference",
+        storage: "secret-ref",
+        secretRef: "secretref_cloudflare_dns",
+      },
+    });
+    expect(started.isOk()).toBe(true);
+
+    const revoked = await revoke.execute({ connectionId: "conn_revoke_test" });
+    expect(revoked.isOk()).toBe(true);
+    expect(revoked._unsafeUnwrap().connection.status).toBe("revoked");
+    expect(revoked._unsafeUnwrap().connection.revokedAt).toBe("2026-01-01T00:01:00.000Z");
+    expect(revoked._unsafeUnwrap().connection.credentialGrant.redacted).toBe(true);
   });
 });

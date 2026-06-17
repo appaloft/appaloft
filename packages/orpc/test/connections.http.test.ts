@@ -2,15 +2,21 @@ import "../../application/node_modules/reflect-metadata/Reflect.js";
 
 import { describe, expect, test } from "bun:test";
 import {
+  type Command,
   type CommandBus,
+  CompleteConnectionCallbackCommand,
   createExecutionContext,
   type ExecutionContext,
   type ExecutionContextFactory,
+  ListConnectionsQuery,
   ListConnectorCategoriesQuery,
   ListConnectorsQuery,
   PlanConnectorCapabilityQuery,
   type Query,
   type QueryBus,
+  RevokeConnectionCommand,
+  ShowConnectionQuery,
+  StartConnectionCommand,
 } from "@appaloft/application";
 import { ok, type Result } from "@appaloft/core";
 import { Elysia } from "elysia";
@@ -222,15 +228,143 @@ describe("connections HTTP routes", () => {
     });
     expect(capturedQuery).toBeInstanceOf(PlanConnectorCapabilityQuery);
   });
+
+  test("[APP-CONN-014][APP-CONN-013] lists and shows connection instances through HTTP/oRPC", async () => {
+    const connection = connectionFixture();
+    const capturedQueries: Query<unknown>[] = [];
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      commandBus: noopCommandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus: queryBusFor((query) => {
+        capturedQueries.push(query);
+        if (query instanceof ListConnectionsQuery) {
+          return { items: [connection] };
+        }
+        return connection;
+      }),
+    });
+
+    const listResponse = await app.handle(new Request("http://localhost/api/connections"));
+    const showResponse = await app.handle(
+      new Request("http://localhost/api/connections/conn_cloudflare_dns_test"),
+    );
+    const statusResponse = await app.handle(
+      new Request("http://localhost/api/connections/conn_cloudflare_dns_test/status"),
+    );
+
+    expect(listResponse.status).toBe(200);
+    expect(await listResponse.json()).toEqual({ items: [connection] });
+    expect(showResponse.status).toBe(200);
+    expect(await showResponse.json()).toEqual(connection);
+    expect(statusResponse.status).toBe(200);
+    expect(await statusResponse.json()).toEqual(connection);
+    expect(capturedQueries[0]).toBeInstanceOf(ListConnectionsQuery);
+    expect(capturedQueries[1]).toBeInstanceOf(ShowConnectionQuery);
+    expect(capturedQueries[2]).toBeInstanceOf(ShowConnectionQuery);
+    expect(JSON.stringify(connection)).not.toContain("cf_token");
+  });
+
+  test("[APP-CONN-014] starts, completes callback, and revokes connections through HTTP/oRPC", async () => {
+    const connection = connectionFixture();
+    const capturedCommands: Command<unknown>[] = [];
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      commandBus: commandBusFor((command) => {
+        capturedCommands.push(command);
+        if (command instanceof StartConnectionCommand) {
+          return {
+            connection,
+            nextAction: "ready",
+          };
+        }
+        return { connection };
+      }),
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus: queryBusFor(() => ({})),
+    });
+
+    const startResponse = await app.handle(
+      new Request("http://localhost/api/connections/connect/start", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          connectorKey: "cloudflare-dns",
+          credentialGrant: {
+            kind: "manual-secret-reference",
+            storage: "secret-ref",
+            secretRef: "secretref_cloudflare_dns",
+          },
+        }),
+      }),
+    );
+    const callbackResponse = await app.handle(
+      new Request("http://localhost/api/connections/connect/callback", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          connectionId: "conn_cloudflare_dns_test",
+          status: "success",
+        }),
+      }),
+    );
+    const revokeResponse = await app.handle(
+      new Request("http://localhost/api/connections/conn_cloudflare_dns_test/revoke", {
+        method: "POST",
+      }),
+    );
+
+    expect(startResponse.status).toBe(201);
+    expect(await startResponse.json()).toEqual({ connection, nextAction: "ready" });
+    expect(callbackResponse.status).toBe(200);
+    expect(await callbackResponse.json()).toEqual({ connection });
+    expect(revokeResponse.status).toBe(200);
+    expect(await revokeResponse.json()).toEqual({ connection });
+    expect(capturedCommands[0]).toBeInstanceOf(StartConnectionCommand);
+    expect(capturedCommands[1]).toBeInstanceOf(CompleteConnectionCallbackCommand);
+    expect(capturedCommands[2]).toBeInstanceOf(RevokeConnectionCommand);
+  });
 });
 
 const noopCommandBus = {
   execute: async <T>(): Promise<Result<T>> => ok({} as T),
 } as CommandBus;
 
+function commandBusFor(resolve: (command: Command<unknown>) => unknown): CommandBus {
+  return {
+    execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> =>
+      ok(resolve(command as Command<unknown>) as T),
+  } as CommandBus;
+}
+
 function queryBusFor(resolve: (query: Query<unknown>) => unknown): QueryBus {
   return {
     execute: async <T>(_context: ExecutionContext, query: Query<T>): Promise<Result<T>> =>
       ok(resolve(query as Query<unknown>) as T),
   } as QueryBus;
+}
+
+function connectionFixture() {
+  return {
+    id: "conn_cloudflare_dns_test",
+    connectorKey: "cloudflare-dns",
+    providerKey: "cloudflare",
+    category: "dns",
+    owner: {
+      scope: "project",
+      id: "project_123",
+    },
+    displayName: "Cloudflare DNS",
+    status: "connected",
+    capabilities: ["dns.records.plan"],
+    credentialGrant: {
+      kind: "manual-secret-reference",
+      storage: "secret-ref",
+      redacted: true,
+      secretRef: "secretref_cloudflare_dns",
+    },
+    diagnostics: [],
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+  };
 }
