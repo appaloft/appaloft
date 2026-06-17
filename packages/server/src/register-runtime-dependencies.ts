@@ -64,6 +64,7 @@ import {
   type FirstAdminPasswordIssuer,
   getExecutionAuthProviderAccessToken,
   type IdGenerator,
+  InMemoryConnectorConnectionStore,
   InMemoryConnectorProviderAdapterRegistry,
   InMemoryConnectorRegistry,
   InMemoryEdgeProxyProviderRegistry,
@@ -1744,6 +1745,9 @@ export function registerRuntimeDependencies(
           }),
         ),
     ),
+  });
+  container.register(tokens.connectorConnectionStore, {
+    useFactory: instanceCachingFactory(() => new InMemoryConnectorConnectionStore()),
   });
   container.register(tokens.connectorProviderAdapterRegistry, {
     useFactory: instanceCachingFactory(

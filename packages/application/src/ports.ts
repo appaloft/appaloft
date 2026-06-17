@@ -9,6 +9,9 @@ import {
   type CertificateStatus,
   type ConfigScope,
   type ConnectionCategoryKey,
+  type ConnectionCredentialGrantSnapshot,
+  type ConnectionOwnerSnapshot,
+  type ConnectionSnapshot,
   type ConnectorDefinitionSnapshot,
   type DependencyResourceBackup,
   type DependencyResourceBackupMutationSpec,
@@ -9539,6 +9542,39 @@ export interface ConnectorRegistry {
   list(input?: ConnectorRegistryListInput): ConnectorDescriptor[];
   findByKey(key: string): ConnectorDescriptor | null;
 }
+
+export interface ConnectorConnectionStoreListInput {
+  owner?: ConnectionOwnerSnapshot;
+  connectorKey?: string;
+  category?: ConnectionCategoryKey;
+}
+
+export interface ConnectorConnectionStore {
+  list(input?: ConnectorConnectionStoreListInput): ConnectionSnapshot[];
+  findById(connectionId: string): ConnectionSnapshot | null;
+  save(connection: ConnectionSnapshot): void;
+}
+
+export interface ConnectionStartResult {
+  connection: ConnectionSnapshot;
+  authorizationUrl?: string;
+  nextAction:
+    | "already-connected"
+    | "authorize-in-browser"
+    | "provider-callback"
+    | "ready"
+    | "manual-secret-required";
+}
+
+export interface ConnectionCallbackResult {
+  connection: ConnectionSnapshot;
+}
+
+export interface ConnectionRevokeResult {
+  connection: ConnectionSnapshot;
+}
+
+export type { ConnectionCredentialGrantSnapshot, ConnectionOwnerSnapshot, ConnectionSnapshot };
 
 export interface ConnectorCapabilityPlanInput {
   connectorKey: string;
