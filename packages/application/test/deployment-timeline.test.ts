@@ -9,6 +9,7 @@ import {
   type DeploymentReadModel,
   type DeploymentSummary,
   type DeploymentTimelineEnvelope,
+  type DeploymentTimelineJournalSummary,
   type DeploymentTimelineObservationContext,
   type DeploymentTimelineObservationRequest,
   type DeploymentTimelineObserver,
@@ -21,14 +22,17 @@ class StaticDeploymentReadModel implements DeploymentReadModel {
     return 0;
   }
 
-  constructor(private readonly deployments: DeploymentSummary[]) {}
+  constructor(
+    private readonly deployments: DeploymentSummary[],
+    private readonly timeline: DeploymentTimelineJournalSummary[] = [],
+  ) {}
 
   async list(): Promise<DeploymentSummary[]> {
     return this.deployments;
   }
 
   async findTimeline() {
-    return [];
+    return this.timeline;
   }
 
   async findOne(): Promise<DeploymentSummary | null> {
@@ -174,11 +178,29 @@ function timelineEntry(message: string): DeploymentTimelineEnvelope {
 }
 
 describe("deployment timeline query service", () => {
-  test("[DEP-TIMELINE-001] returns bounded journal entries from the timeline observer", async () => {
-    const stream = new StaticDeploymentTimelineStream([timelineEntry("Pulling image")]);
+  test("[DEP-TIMELINE-001] returns bounded journal entries from the deployment timeline read model", async () => {
+    const stream = new StaticDeploymentTimelineStream([]);
     const observer = new RecordingDeploymentTimelineObserver(stream);
     const service = new DeploymentTimelineQueryService(
-      new StaticDeploymentReadModel([deploymentSummary()]),
+      new StaticDeploymentReadModel(
+        [deploymentSummary()],
+        [
+          {
+            timestamp: "2026-01-01T00:00:01.000Z",
+            source: "docker",
+            phase: "deploy",
+            level: "info",
+            message: "Pull and resolve SSH Docker image digest",
+          },
+          {
+            timestamp: "2026-01-01T00:00:02.000Z",
+            source: "health",
+            phase: "verify",
+            level: "info",
+            message: "Health check succeeded",
+          },
+        ],
+      ),
       observer,
     );
 
@@ -198,15 +220,16 @@ describe("deployment timeline query service", () => {
         {
           source: "docker",
           kind: "output",
-          message: "Pulling image",
+          message: "Pull and resolve SSH Docker image digest",
+        },
+        {
+          source: "health",
+          kind: "health-check",
+          message: "Health check succeeded",
         },
       ],
     });
-    expect(observer.calls[0]?.request).toMatchObject({
-      follow: false,
-      includeHistory: true,
-      limit: 25,
-    });
+    expect(observer.calls).toHaveLength(0);
   });
 
   test("[DEP-TIMELINE-003] forwards log-view filters as timeline kind/source filters", async () => {
@@ -214,7 +237,25 @@ describe("deployment timeline query service", () => {
       new StaticDeploymentTimelineStream([timelineEntry("stdout")]),
     );
     const service = new DeploymentTimelineQueryService(
-      new StaticDeploymentReadModel([deploymentSummary()]),
+      new StaticDeploymentReadModel(
+        [deploymentSummary()],
+        [
+          {
+            timestamp: "2026-01-01T00:00:01.000Z",
+            source: "appaloft",
+            phase: "deploy",
+            level: "info",
+            message: "Deployment started",
+          },
+          {
+            timestamp: "2026-01-01T00:00:02.000Z",
+            source: "docker",
+            phase: "deploy",
+            level: "info",
+            message: "stdout",
+          },
+        ],
+      ),
       observer,
     );
 
@@ -228,10 +269,13 @@ describe("deployment timeline query service", () => {
     );
 
     expect(result.isOk()).toBe(true);
-    expect(observer.calls[0]?.request).toMatchObject({
-      kinds: ["output", "container-log"],
-      sources: ["docker", "application"],
+    expect(result._unsafeUnwrap().entries).toHaveLength(1);
+    expect(result._unsafeUnwrap().entries[0]).toMatchObject({
+      source: "docker",
+      kind: "output",
+      message: "stdout",
     });
+    expect(observer.calls).toHaveLength(0);
   });
 
   test("[DEP-TIMELINE-004] returns a live stream when follow is requested", async () => {
