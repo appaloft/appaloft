@@ -38,7 +38,7 @@
   import { instanceSettingsItems } from "$lib/console/settings-nav";
   import { formatTime } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
-  import { orpcClient } from "$lib/orpc";
+  import { orpc, orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
 
   type UpgradeFeedback = {
@@ -103,9 +103,8 @@
   });
   const selectedWorkId = $derived(page.url.searchParams.get("workId") ?? "");
   const contextQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["organizations", "current-context"],
-      queryFn: () => orpcClient.organizations.currentContext({}),
+    orpc.organizations.currentContext.queryOptions({
+      input: {},
       enabled: browser,
       retry: 0,
       staleTime: 30_000,
@@ -131,9 +130,7 @@
     }),
   );
   const doctorQuery = createQuery(() =>
-    queryOptions<DoctorResponse>({
-      queryKey: ["system", "doctor"],
-      queryFn: () => orpcClient.system.doctor(),
+    orpc.system.doctor.queryOptions({
       enabled: browser && (activeSection === "maintenance" || activeSection === "workers"),
       staleTime: 30_000,
       refetchInterval: 60_000,
@@ -141,9 +138,8 @@
     }),
   );
   const operatorWorkQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["operator-work", "instance-workers", { limit: 25 }],
-      queryFn: () => orpcClient.operatorWork.list({ limit: 25 }),
+    orpc.operatorWork.list.queryOptions({
+      input: { limit: 25 },
       enabled: browser && activeSection === "workers",
       staleTime: 10_000,
       refetchInterval: 15_000,
@@ -151,9 +147,8 @@
     }),
   );
   const selectedOperatorWorkQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["operator-work", selectedWorkId],
-      queryFn: () => orpcClient.operatorWork.show({ workId: selectedWorkId }),
+    orpc.operatorWork.show.queryOptions({
+      input: { workId: selectedWorkId },
       enabled: browser && activeSection === "workers" && selectedWorkId.length > 0,
       staleTime: 5_000,
       refetchInterval: 10_000,
@@ -161,9 +156,8 @@
     }),
   );
   const terminalSessionsQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["terminal-sessions", "active"],
-      queryFn: () => orpcClient.terminalSessions.list({ limit: 50 }),
+    orpc.terminalSessions.list.queryOptions({
+      input: { limit: 50 },
       enabled: browser && activeSection === "sessions",
       staleTime: 15_000,
       refetchInterval: 30_000,
@@ -207,7 +201,7 @@
         title: $t(i18nKeys.console.terminal.lifecycleCloseSucceeded),
         detail: result.sessionId,
       };
-      void queryClient.invalidateQueries({ queryKey: ["terminal-sessions"] });
+      void queryClient.invalidateQueries({ queryKey: orpc.terminalSessions.key({ type: "query" }) });
     },
     onError: (error) => {
       terminalSessionFeedback = {
@@ -231,7 +225,7 @@
           count: result.expiredCount,
         }),
       };
-      void queryClient.invalidateQueries({ queryKey: ["terminal-sessions"] });
+      void queryClient.invalidateQueries({ queryKey: orpc.terminalSessions.key({ type: "query" }) });
     },
     onError: (error) => {
       terminalSessionFeedback = {

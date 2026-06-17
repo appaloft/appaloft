@@ -10,21 +10,19 @@ const homePageSource = readFileSync(
 describe("operations workbench home", () => {
   test("[HOME-WORKBENCH-001] uses list queries for cross-project operational context", () => {
     expect(homePageSource).toContain("const homeProjectListLimit = 12");
-    expect(homePageSource).toContain("orpcClient.projects.list({ limit: homeProjectListLimit })");
-    expect(homePageSource).toContain("orpcClient.resources.list({ limit: homeResourceListLimit })");
-    expect(homePageSource).toContain(
-      "orpcClient.environments.list({ limit: homeEnvironmentListLimit })",
-    );
-    expect(homePageSource).toContain(
-      "orpcClient.deployments.list({ limit: homeDeploymentListLimit })",
-    );
-    expect(homePageSource).toContain("orpcClient.servers.count({})");
-    expect(homePageSource).toContain("orpcClient.deployments.count({})");
-    expect(homePageSource).toContain(
-      "orpcClient.deployments.count({ statuses: activeDeploymentStatuses })",
-    );
-    expect(homePageSource).toContain('orpcClient.deployments.count({ status: "failed" })');
-    expect(homePageSource).toContain("orpcClient.resources.count({})");
+    expect(homePageSource).toContain("orpc.projects.list.queryOptions({");
+    expect(homePageSource).toContain("input: { limit: homeProjectListLimit }");
+    expect(homePageSource).toContain("orpc.resources.list.queryOptions({");
+    expect(homePageSource).toContain("input: { limit: homeResourceListLimit }");
+    expect(homePageSource).toContain("orpc.environments.list.queryOptions({");
+    expect(homePageSource).toContain("input: { limit: homeEnvironmentListLimit }");
+    expect(homePageSource).toContain("orpc.deployments.list.queryOptions({");
+    expect(homePageSource).toContain("input: { limit: homeDeploymentListLimit }");
+    expect(homePageSource).toContain("orpc.servers.count.queryOptions({");
+    expect(homePageSource).toContain("orpc.deployments.count.queryOptions({");
+    expect(homePageSource).toContain("input: { statuses: activeDeploymentStatuses }");
+    expect(homePageSource).toContain('input: { status: "failed" }');
+    expect(homePageSource).toContain("orpc.resources.count.queryOptions({");
   });
 
   test("[HOME-WORKBENCH-002] does not render projects as the primary list surface", () => {

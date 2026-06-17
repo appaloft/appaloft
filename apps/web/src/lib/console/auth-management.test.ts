@@ -32,10 +32,10 @@ describe("organization auth management console surface", () => {
       ),
     ]);
 
-    expect(pageSource).toContain("orpcClient.organizations.currentContext");
+    expect(pageSource).toContain("orpc.organizations.currentContext.queryOptions");
     expect(pageSource).toContain("orpcClient.organizations.switchCurrent");
-    expect(pageSource).toContain("orpcClient.organizations.listMembers");
-    expect(pageSource).toContain("orpcClient.organizations.listInvitations");
+    expect(pageSource).toContain("orpc.organizations.listMembers.queryOptions");
+    expect(pageSource).toContain("orpc.organizations.listInvitations.queryOptions");
     expect(pageSource).toContain("orpcClient.organizations.inviteMember");
     expect(pageSource).toContain("orpcClient.organizations.updateMemberRole");
     expect(pageSource).toContain("orpcClient.organizations.removeMember");
@@ -75,7 +75,7 @@ describe("organization auth management console surface", () => {
       "utf8",
     );
 
-    expect(pageSource).toContain("orpcClient.deployTokens.list");
+    expect(pageSource).toContain("orpc.deployTokens.list.queryOptions");
     expect(pageSource).toContain("orpcClient.deployTokens.create");
     expect(pageSource).toContain("orpcClient.deployTokens.rotate");
     expect(pageSource).toContain("orpcClient.deployTokens.revoke");
@@ -118,7 +118,7 @@ describe("organization auth management console surface", () => {
     expect(instancePageSource).not.toContain("ConsoleResourceCanvas");
     expect(instancePageSource).toContain("instanceSettingsItems");
     expect(instancePageSource).toContain("ConsoleOrganizationSwitcher");
-    expect(instancePageSource).toContain("orpcClient.system.doctor");
+    expect(instancePageSource).toContain("orpc.system.doctor.queryOptions");
     expect(instancePageSource).toContain("maintenanceWorkers");
     expect(instancePageSource).toContain("workerSafetyLabelKey");
     expect(instancePageSource).toContain("i18nKeys.console.instance.maintenanceWorkersTitle");
@@ -163,9 +163,9 @@ describe("organization auth management console surface", () => {
     expect(instancePageSource).toContain("i18nKeys.console.instance.overviewTitle");
     expect(instancePageSource).toContain("i18nKeys.console.instance.commitShaLabel");
     expect(instancePageSource).toContain("currentCommitSha");
-    expect(instancePageSource).toContain("orpcClient.system.doctor");
-    expect(instancePageSource).toContain("orpcClient.operatorWork.list");
-    expect(instancePageSource).toContain("orpcClient.operatorWork.show");
+    expect(instancePageSource).toContain("orpc.system.doctor.queryOptions");
+    expect(instancePageSource).toContain("orpc.operatorWork.list.queryOptions");
+    expect(instancePageSource).toContain("orpc.operatorWork.show.queryOptions");
     expect(instancePageSource).toContain("maintenanceWorkers");
     expect(instancePageSource).toContain("durableWorker");
     expect(instancePageSource).toContain("durableRuntimeTopology");
@@ -329,7 +329,7 @@ describe("organization auth management console surface", () => {
     expect(settingsNavSource).toContain('href: "/organization/danger-zone"');
 
     expect(accountProfileSource).toContain("SettingsShell");
-    expect(accountProfileSource).toContain("orpcClient.account.showProfile");
+    expect(accountProfileSource).toContain("orpc.account.showProfile.queryOptions");
     expect(accountProfileSource).toContain("orpcClient.account.changeProfile");
     expect(accountSecuritySource).toContain("SettingsShell");
     expect(accountSecuritySource).toContain("accountSettingsItems");
@@ -341,7 +341,7 @@ describe("organization auth management console surface", () => {
     expect(accountSecuritySource).not.toContain("ConsoleResourceCanvas");
     expect(accountSecuritySource).not.toContain("console-subnav-");
     expect(layoutCssSource).not.toContain(".console-subnav");
-    expect(accountSessionsSource).toContain("orpcClient.account.listSessions");
+    expect(accountSessionsSource).toContain("orpc.account.listSessions.queryOptions");
     expect(accountSessionsSource).toContain("orpcClient.account.revokeSession");
     expect(accountSessionsSource).toContain("clientKind");
     expect(accountSessionsSource).toContain("displayName");
@@ -358,7 +358,7 @@ describe("organization auth management console surface", () => {
     expect(organizationPageSource).toContain(
       "organizationSettingsItems(webExtensionsQuery.data?.items ?? [])",
     );
-    expect(organizationPageSource).toContain("orpcClient.organizations.showProfile");
+    expect(organizationPageSource).toContain("orpc.organizations.showProfile.queryOptions");
     expect(organizationPageSource).toContain("orpcClient.organizations.changeProfile");
     expect(organizationPageSource).toContain("orpcClient.organizations.delete");
     expect(organizationPageSource).toContain("orpcClient.organizations.transferOwner");

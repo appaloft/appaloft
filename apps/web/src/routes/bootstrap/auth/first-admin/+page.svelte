@@ -12,7 +12,7 @@
   import { webDocsHrefs } from "$lib/console/docs-help";
   import { readErrorMessage } from "$lib/api/client";
   import { queryClient } from "$lib/query-client";
-  import { orpcClient } from "$lib/orpc";
+  import { orpc, orpcClient } from "$lib/orpc";
   import { i18nKeys, t } from "$lib/i18n";
 
   let email = $state("");
@@ -28,9 +28,8 @@
   );
 
   const statusQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["auth", "bootstrap-status"],
-      queryFn: () => orpcClient.auth.bootstrapStatus({}),
+    orpc.auth.bootstrapStatus.queryOptions({
+      input: {},
       enabled: browser,
       retry: 0,
     }),
@@ -52,7 +51,9 @@
         title: $t(i18nKeys.console.authBootstrap.bootstrapSucceeded),
         detail: result.email,
       };
-      void queryClient.invalidateQueries({ queryKey: ["auth", "bootstrap-status"] });
+      void queryClient.invalidateQueries({
+        queryKey: orpc.auth.bootstrapStatus.key({ input: {} }),
+      });
     },
     onError: (error) => {
       feedback = {

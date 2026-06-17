@@ -94,6 +94,10 @@ export function projectDetailHref(projectId: string): string {
   return `/projects/${encodeURIComponent(projectId)}`;
 }
 
+export function dependencyResourceDetailHref(dependencyResourceId: string): string {
+  return `/dependency-resources/${encodeURIComponent(dependencyResourceId)}`;
+}
+
 export function resourceDetailHref(
   resource: Pick<ResourceSummary, "id" | "projectId" | "environmentId">,
 ): string {

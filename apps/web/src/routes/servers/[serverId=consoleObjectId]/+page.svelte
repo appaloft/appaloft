@@ -74,7 +74,7 @@
     runtimeMonitoringObservationHandoffFromSearchParams,
     runtimeMonitoringObservationHandoffMatchesScope,
   } from "$lib/console/runtime-usage";
-  import { orpcClient } from "$lib/orpc";
+  import { orpc, orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
   import { formatTime } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
@@ -103,38 +103,32 @@
   const serverSettingsSections = ["general", "credentials", "danger"] as const;
   const serverDetailListLimit = 100;
   const projectsQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["projects", { limit: serverDetailListLimit }],
-      queryFn: () => orpcClient.projects.list({ limit: serverDetailListLimit }),
+    orpc.projects.list.queryOptions({
+      input: { limit: serverDetailListLimit },
       enabled: browser,
     }),
   );
   const deploymentsQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["deployments", { limit: serverDetailListLimit }],
-      queryFn: () => orpcClient.deployments.list({ limit: serverDetailListLimit }),
+    orpc.deployments.list.queryOptions({
+      input: { limit: serverDetailListLimit },
       enabled: browser,
     }),
   );
   const serverDetailQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["servers", "show", serverId],
-      queryFn: () =>
-        orpcClient.servers.show({
-          serverId,
-          includeRollups: true,
-        }),
+    orpc.servers.show.queryOptions({
+      input: {
+        serverId,
+        includeRollups: true,
+      },
       enabled: browser && serverId.length > 0,
       staleTime: 5_000,
     }),
   );
   const serverDeleteSafetyQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["servers", "delete-check", serverId],
-      queryFn: () =>
-        orpcClient.servers.deleteCheck({
-          serverId,
-        }),
+    orpc.servers.deleteCheck.queryOptions({
+      input: {
+        serverId,
+      },
       enabled: browser && serverId.length > 0,
       staleTime: 5_000,
     }),
@@ -165,12 +159,10 @@
     runtimeMonitoringThresholdsQueryOptions(serverRuntimeScope, browser && serverId.length > 0),
   );
   const serverCapacityQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["servers", "capacity", "inspect", serverId],
-      queryFn: () =>
-        orpcClient.servers.capacity.inspect({
-          serverId,
-        }),
+    orpc.servers.capacity.inspect.queryOptions({
+      input: {
+        serverId,
+      },
       enabled: browser && serverId.length > 0,
       staleTime: 5_000,
     }),
@@ -188,13 +180,11 @@
     server?.credential?.kind === "ssh-private-key" ? (server.credential.credentialId ?? "") : "",
   );
   const sshCredentialDetailQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["credentials", "ssh", "show", storedSshCredentialId],
-      queryFn: () =>
-        orpcClient.credentials.ssh.show({
-          credentialId: storedSshCredentialId,
-          includeUsage: true,
-        }),
+    orpc.credentials.ssh.show.queryOptions({
+      input: {
+        credentialId: storedSshCredentialId,
+        includeUsage: true,
+      },
       enabled: browser && storedSshCredentialId.length > 0,
       staleTime: 5_000,
     }),
@@ -377,8 +367,7 @@
         detail: result.id,
       };
       serverRenameDialogOpen = false;
-      void queryClient.invalidateQueries({ queryKey: ["servers"] });
-      void queryClient.invalidateQueries({ queryKey: ["servers", "show", result.id] });
+      void queryClient.invalidateQueries({ queryKey: orpc.servers.key({ type: "query" }) });
     },
     onError: (error) => {
       settingsFeedback = {
@@ -397,9 +386,7 @@
         detail: result.id,
       };
       closeServerLifecycleDialog();
-      void queryClient.invalidateQueries({ queryKey: ["servers"] });
-      void queryClient.invalidateQueries({ queryKey: ["servers", "show", result.id] });
-      void queryClient.invalidateQueries({ queryKey: ["servers", "delete-check", result.id] });
+      void queryClient.invalidateQueries({ queryKey: orpc.servers.key({ type: "query" }) });
     },
     onError: (error) => {
       serverDeactivateFeedback = {
@@ -418,9 +405,7 @@
         detail: result.id,
       };
       closeServerLifecycleDialog();
-      void queryClient.invalidateQueries({ queryKey: ["servers"] });
-      void queryClient.invalidateQueries({ queryKey: ["servers", "show", result.id] });
-      void queryClient.invalidateQueries({ queryKey: ["servers", "delete-check", result.id] });
+      void queryClient.invalidateQueries({ queryKey: orpc.servers.key({ type: "query" }) });
       void goto("/servers");
     },
     onError: (error) => {
@@ -660,7 +645,9 @@
   }
 
   function refreshCapacity(): void {
-    void queryClient.invalidateQueries({ queryKey: ["servers", "capacity", "inspect", serverId] });
+    void queryClient.invalidateQueries({
+      queryKey: orpc.servers.capacity.inspect.key({ input: { serverId } }),
+    });
   }
 
   function refreshRuntimeMonitor(): void {

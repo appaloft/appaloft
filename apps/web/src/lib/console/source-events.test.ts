@@ -34,8 +34,7 @@ describe("source event console diagnostics", () => {
       "utf8",
     );
 
-    expect(source).toContain("orpcClient.sourceEvents.list");
-    expect(source).toContain('queryKey: ["source-events", "resource", resourceId]');
+    expect(source).toContain("orpc.sourceEvents.list.queryOptions");
     const sourceEventsQuerySource =
       source.match(
         /const resourceSourceEventsQuery = createQuery\(\(\) =>[\s\S]*?const resourcePreviewEnvironmentsQuery = createQuery/,

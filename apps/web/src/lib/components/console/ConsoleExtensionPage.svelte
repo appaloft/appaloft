@@ -28,7 +28,7 @@
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import SettingsShell from "$lib/components/console/SettingsShell.svelte";
   import { organizationSettingsItems } from "$lib/console/settings-nav";
-  import { orpcClient } from "$lib/orpc";
+  import { orpc } from "$lib/orpc";
   import { i18nKeys, t } from "$lib/i18n";
   import type { SystemPluginWebExtension } from "@appaloft/contracts";
 
@@ -236,9 +236,8 @@
     }),
   );
   const organizationContextQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["organizations", "current-context"],
-      queryFn: () => orpcClient.organizations.currentContext({}),
+    orpc.organizations.currentContext.queryOptions({
+      input: {},
       enabled: browser,
       retry: 0,
       staleTime: 30_000,

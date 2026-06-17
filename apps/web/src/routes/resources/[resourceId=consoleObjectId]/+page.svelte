@@ -3,7 +3,7 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import { onDestroy, untrack } from "svelte";
-  import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
+  import { createMutation, createQuery } from "@tanstack/svelte-query";
   import {
     ArrowLeft,
     ArrowRight,
@@ -98,7 +98,7 @@
   import ResourceStatusDot from "$lib/components/console/ResourceStatusDot.svelte";
   import TerminalSessionPanel from "$lib/components/console/TerminalSessionPanel.svelte";
   import { Badge } from "$lib/components/ui/badge";
-  import { Button } from "$lib/components/ui/button";
+  import { Button, buttonVariants } from "$lib/components/ui/button";
   import * as Dialog from "$lib/components/ui/dialog";
   import { Input } from "$lib/components/ui/input";
   import * as Popover from "$lib/components/ui/popover";
@@ -150,6 +150,7 @@
     runtimeMonitoringObservationHandoffMatchesScope,
     runtimeMonitoringSampleFromUsage,
     runtimeMonitoringTimestampInObservationWindow,
+    type RuntimeMonitoringObservationHandoff,
   } from "$lib/console/runtime-usage";
   import {
     deploymentDetailHref,
@@ -162,7 +163,7 @@
     resourcePreviewEnvironmentDetailHref,
   } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
-  import { orpcClient } from "$lib/orpc";
+  import { orpc, orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
 
   type RuntimeLogClientStream = {
@@ -343,99 +344,83 @@
   );
   let storageBackupVolumeId = $state("");
   const resourceDetailQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["resources", "show", resourceId],
-      queryFn: () =>
-        orpcClient.resources.show({
-          resourceId,
-          includeLatestDeployment: true,
-          includeAccessSummary: true,
-          includeProfileDiagnostics: true,
-        }),
+    orpc.resources.show.queryOptions({
+      input: {
+        resourceId,
+        includeLatestDeployment: true,
+        includeAccessSummary: true,
+        includeProfileDiagnostics: true,
+      },
       enabled: browser && resourceId.length > 0,
       staleTime: 5_000,
     }),
   );
   const resourceDeleteSafetyQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["resources", "delete-check", resourceId],
-      queryFn: () =>
-        orpcClient.resources.deleteCheck({
-          resourceId,
-        }),
+    orpc.resources.deleteCheck.queryOptions({
+      input: {
+        resourceId,
+      },
       enabled: browser && resourceId.length > 0,
       staleTime: 5_000,
     }),
   );
   const resourceHealthQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["resources", "health", resourceId, "detail"],
-      queryFn: () =>
-        orpcClient.resources.health({
-          resourceId,
-          mode: "live",
-          includeChecks: true,
-          includePublicAccessProbe: true,
-        }),
+    orpc.resources.health.queryOptions({
+      input: {
+        resourceId,
+        mode: "live",
+        includeChecks: true,
+        includePublicAccessProbe: true,
+      },
       enabled: browser && resourceId.length > 0,
       staleTime: 5_000,
     }),
   );
   const resourceEffectiveConfigQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["resources", "effective-config", resourceId],
-      queryFn: () =>
-        orpcClient.resources.effectiveConfig({
-          resourceId,
-        }),
+    orpc.resources.effectiveConfig.queryOptions({
+      input: {
+        resourceId,
+      },
       enabled: browser && resourceId.length > 0,
       staleTime: 5_000,
     }),
   );
   const resourceSourceEventsQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["source-events", "resource", resourceId],
-      queryFn: () =>
-        orpcClient.sourceEvents.list({
-          resourceId,
-          limit: 25,
-        }),
+    orpc.sourceEvents.list.queryOptions({
+      input: {
+        resourceId,
+        limit: 25,
+      },
       enabled: resourceSourceEventsEnabled,
       staleTime: 5_000,
     }),
   );
   const resourcePreviewEnvironmentsQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["preview-environments", "resource", resourceId],
-      queryFn: () =>
-        orpcClient.previewEnvironments.list({
-          resourceId,
-          limit: 50,
-        }),
+    orpc.previewEnvironments.list.queryOptions({
+      input: {
+        resourceId,
+        limit: 50,
+      },
       enabled: resourcePreviewsEnabled,
       staleTime: 5_000,
     }),
   );
   const scheduledTasksQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["scheduled-tasks", "resource", resourceId],
-      queryFn: () =>
-        orpcClient.scheduledTasks.list({
-          resourceId,
-          limit: 25,
-        }),
+    orpc.scheduledTasks.list.queryOptions({
+      input: {
+        resourceId,
+        limit: 25,
+      },
       enabled: resourceScheduledTasksEnabled,
       staleTime: 5_000,
     }),
   );
   const scheduledTaskRunsQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["scheduled-task-runs", "resource", resourceId],
-      queryFn: () =>
-        orpcClient.scheduledTasks.runs.list({
-          resourceId,
-          limit: 25,
-        }),
+    orpc.scheduledTasks.runs.list.queryOptions({
+      input: {
+        resourceId,
+        limit: 25,
+      },
       enabled: browser && resourceId.length > 0,
       staleTime: 5_000,
     }),
@@ -568,57 +553,39 @@
     void capabilities.fetch(resourceCapabilityQueries);
   });
   const storageVolumesQuery = createQuery(() =>
-    queryOptions({
-      queryKey: [
-        "storage-volumes",
-        "resource-attach",
-        resourceProjectId,
-        resourceEnvironmentId,
-      ],
-      queryFn: () =>
-        orpcClient.storageVolumes.list({
-          projectId: resourceProjectId,
-          environmentId: resourceEnvironmentId,
-        }),
+    orpc.storageVolumes.list.queryOptions({
+      input: {
+        projectId: resourceProjectId,
+        environmentId: resourceEnvironmentId,
+      },
       enabled: browser && resourceProjectId.length > 0 && resourceEnvironmentId.length > 0,
       staleTime: 5_000,
     }),
   );
   const dependencyResourcesQuery = createQuery(() =>
-    queryOptions({
-      queryKey: [
-        "dependency-resources",
-        "resource-bind",
-        resourceProjectId,
-        resourceEnvironmentId,
-      ],
-      queryFn: () =>
-        orpcClient.dependencyResources.list({
-          projectId: resourceProjectId,
-          environmentId: resourceEnvironmentId,
-        }),
+    orpc.dependencyResources.list.queryOptions({
+      input: {
+        projectId: resourceProjectId,
+        environmentId: resourceEnvironmentId,
+      },
       enabled: browser && resourceProjectId.length > 0 && resourceEnvironmentId.length > 0,
       staleTime: 5_000,
     }),
   );
   const resourceDependencyBindingsQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["resource-dependency-bindings", resourceId],
-      queryFn: () =>
-        orpcClient.resources.dependencyBindings.list({
-          resourceId,
-        }),
+    orpc.resources.dependencyBindings.list.queryOptions({
+      input: {
+        resourceId,
+      },
       enabled: browser && resourceId.length > 0,
       staleTime: 5_000,
     }),
   );
   const storageVolumeBackupsQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["storage-volume-backups", storageBackupVolumeId],
-      queryFn: () =>
-        orpcClient.storageVolumes.backups.list({
-          storageVolumeId: storageBackupVolumeId,
-        }),
+    orpc.storageVolumes.backups.list.queryOptions({
+      input: {
+        storageVolumeId: storageBackupVolumeId,
+      },
       enabled: browser && storageBackupVolumeId.length > 0,
       staleTime: 5_000,
     }),
@@ -766,6 +733,9 @@
   const resourceStorageAttachments = $derived(resourceDetail?.storageAttachments ?? []);
   const dependencyResources = $derived(dependencyResourcesQuery.data?.items ?? []);
   const resourceDependencyBindings = $derived(resourceDependencyBindingsQuery.data?.items ?? []);
+  const selectedDependencyBindingForUnbind = $derived(
+    resourceDependencyBindings.find((binding) => binding.id === dependencyUnbindBindingId) ?? null,
+  );
   const storageVolumeBackups = $derived(storageVolumeBackupsQuery.data?.items ?? []);
   const bindableDependencyResources = $derived(
     dependencyResources.filter(
@@ -808,20 +778,29 @@
   const resourceFallbackServerRuntimeUsageHasMonitorValues = $derived(
     runtimeUsageHasMonitorSignals(resourceFallbackServerRuntimeUsage),
   );
+  const resourceServerRuntimeFallbackLoading = $derived(
+    !resourceRuntimeUsageHasMonitorValues &&
+      resourceFallbackServerScope !== null &&
+      resourceFallbackServerRuntimeUsageQuery.isPending,
+  );
   const showResourceServerRuntimeFallback = $derived(
     !resourceRuntimeUsageHasMonitorValues && resourceFallbackServerRuntimeUsageHasMonitorValues,
   );
   const effectiveResourceRuntimeUsage = $derived(
-    showResourceServerRuntimeFallback ? resourceFallbackServerRuntimeUsage : resourceRuntimeUsage,
+    showResourceServerRuntimeFallback
+      ? resourceFallbackServerRuntimeUsage
+      : resourceServerRuntimeFallbackLoading
+        ? null
+        : resourceRuntimeUsage,
   );
   const effectiveResourceRuntimeUsageLoading = $derived(
     resourceRuntimeUsageQuery.isPending ||
-      (!resourceRuntimeUsageHasMonitorValues &&
-        resourceFallbackServerScope !== null &&
-        resourceFallbackServerRuntimeUsageQuery.isPending),
+      resourceServerRuntimeFallbackLoading,
   );
   const effectiveResourceRuntimeUsageError = $derived(
-    showResourceServerRuntimeFallback
+    resourceServerRuntimeFallbackLoading
+      ? ""
+      : showResourceServerRuntimeFallback
       ? resourceFallbackServerRuntimeUsageQuery.error
         ? readErrorMessage(resourceFallbackServerRuntimeUsageQuery.error)
         : ""
@@ -923,6 +902,7 @@
   let deploymentDialogInitializedForResourceId = $state("");
   let domainBindingCreateDialogOpen = $state(false);
   let domainBindingDialogInitializedForResourceId = $state("");
+  let domainBindingDialogOpenedLocally = $state(false);
   let serverId = $state("");
   let destinationId = $state("");
   let domainName = $state("");
@@ -1088,6 +1068,7 @@
   let runtimeLogsFollowing = $state(false);
   let runtimeLogStream = $state<RuntimeLogClientStream | null>(null);
   let runtimeLogRequestGeneration = $state(0);
+  let runtimeLogsCacheKey = $state("");
   const runtimeLogsInObservationWindow = $derived(
     resourceRuntimeMonitoringObservationHandoff
       ? runtimeLogs.filter((line) =>
@@ -1108,6 +1089,8 @@
   let configImportExposure = $state<ResourceVariableExposure>("runtime");
   let configImportSecretKeys = $state("");
   let configImportPlainKeys = $state("");
+  let configEditorDialogOpen = $state(false);
+  let configEditorMode = $state<"single" | "env">("single");
   let configFeedback = $state<{
     kind: "success" | "error";
     title: string;
@@ -1171,6 +1154,8 @@
   let dependencyBindingResourceId = $state("");
   let dependencyBindingTargetName = $state("DATABASE_URL");
   let dependencyBindDialogOpen = $state(false);
+  let dependencyUnbindDialogOpen = $state(false);
+  let dependencyUnbindBindingId = $state("");
   let dependencyBindingSecretRefs = $state<Record<string, string>>({});
   let dependencyBindingSecretValues = $state<Record<string, string>>({});
   let dependencyBindingSecretRotationAcks = $state<Record<string, boolean>>({});
@@ -1205,7 +1190,6 @@
   let resourceDeleteConfirmation = $state("");
 
   const selectedDeploymentServer = $derived(findServer(servers, deploymentServerId));
-  const selectedServer = $derived(findServer(servers, serverId));
   const deploymentSource = $derived(
     latestDeployment?.runtimePlan.source ?? resourceDetail?.source ?? null,
   );
@@ -1257,9 +1241,7 @@
   const isServerlessStaticArtifactDeployment = $derived(
     latestDeployment?.target.kind === "serverless-static-artifact",
   );
-  const isDirectStaticArtifactRuntime = $derived(
-    isServerlessStaticArtifactAccess || isServerlessStaticArtifactDeployment,
-  );
+  const isDirectStaticArtifactRuntime = $derived(isServerlessStaticArtifactDeployment);
   $effect(() => {
     resourceSupportsServerBackedRuntimeSurfaces = !resource || !isDirectStaticArtifactRuntime;
   });
@@ -1271,29 +1253,32 @@
     ),
   );
   const shouldShowServerField = $derived(
-    !isDirectStaticArtifactRuntime &&
-      !domainBindingUsesResourceRouteProvider &&
-      !latestDeployment?.serverId,
+    !domainBindingUsesResourceRouteProvider && !latestDeployment?.serverId,
   );
   const shouldShowDestinationField = $derived(
-    !isDirectStaticArtifactRuntime && !domainBindingUsesResourceRouteProvider && !defaultDestinationId,
+    !domainBindingUsesResourceRouteProvider && !defaultDestinationId,
   );
+  const effectiveDomainBindingServerId = $derived(
+    domainBindingUsesResourceRouteProvider
+      ? ""
+      : serverId || latestDeployment?.serverId || servers[0]?.id || "",
+  );
+  const effectiveDomainBindingDestinationId = $derived(
+    domainBindingUsesResourceRouteProvider ? "" : destinationId || defaultDestinationId,
+  );
+  const selectedServer = $derived(findServer(servers, effectiveDomainBindingServerId));
   const canCreateBinding = $derived(
     Boolean(
-      !isDirectStaticArtifactRuntime &&
-        resource &&
-        domainName.trim() &&
-        pathPrefix.trim() &&
+      resource &&
         proxyKind !== "none" &&
         (routeMode === "serve" || redirectTo) &&
-        (domainBindingUsesResourceRouteProvider || (serverId && destinationId)),
+        (domainBindingUsesResourceRouteProvider ||
+          (effectiveDomainBindingServerId && effectiveDomainBindingDestinationId)),
     ),
   );
   const canImportCertificate = $derived(
     Boolean(
       importBindingId &&
-        importCertificateChain.trim() &&
-        importPrivateKey.trim() &&
         resourceDomainBindings.some(
           (binding) => binding.id === importBindingId && binding.certificatePolicy === "manual",
         ),
@@ -1529,8 +1514,8 @@
       domainName = "";
       redirectTo = "";
       setResourceDomainBindingCreateDialogOpen(false);
-      void queryClient.invalidateQueries({ queryKey: ["domain-bindings"] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
+      void queryClient.invalidateQueries({ queryKey: orpc.domainBindings.key({ type: "query" }) });
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
     },
     onError: (error) => {
       createFeedback = {
@@ -1549,8 +1534,8 @@
         title: $t(i18nKeys.console.domainBindings.confirmOwnershipSuccessTitle),
         detail: $t(i18nKeys.common.status.bound),
       };
-      void queryClient.invalidateQueries({ queryKey: ["domain-bindings"] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
+      void queryClient.invalidateQueries({ queryKey: orpc.domainBindings.key({ type: "query" }) });
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
     },
     onError: (error) => {
       createFeedback = {
@@ -1570,10 +1555,9 @@
         detail: result.certificateId,
       };
       closeCertificateImportDialog();
-      void queryClient.invalidateQueries({ queryKey: ["resources"] });
-      void queryClient.invalidateQueries({ queryKey: ["domain-bindings"] });
-      void queryClient.invalidateQueries({ queryKey: ["certificates"] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
+      void queryClient.invalidateQueries({ queryKey: orpc.domainBindings.key({ type: "query" }) });
+      void queryClient.invalidateQueries({ queryKey: orpc.certificates.key({ type: "query" }) });
     },
     onError: (error, variables) => {
       importFeedback = {
@@ -1593,8 +1577,8 @@
         title: $t(i18nKeys.console.resources.certificateRetrySuccessTitle),
         detail: result.attemptId,
       };
-      void queryClient.invalidateQueries({ queryKey: ["certificates"] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
+      void queryClient.invalidateQueries({ queryKey: orpc.certificates.key({ type: "query" }) });
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
     },
     onError: (error, variables) => {
       certificateActionFeedback = {
@@ -1614,9 +1598,9 @@
         title: $t(i18nKeys.console.resources.certificateRevokeSuccessTitle),
         detail: result.certificateId,
       };
-      void queryClient.invalidateQueries({ queryKey: ["certificates"] });
-      void queryClient.invalidateQueries({ queryKey: ["domain-bindings"] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
+      void queryClient.invalidateQueries({ queryKey: orpc.certificates.key({ type: "query" }) });
+      void queryClient.invalidateQueries({ queryKey: orpc.domainBindings.key({ type: "query" }) });
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
     },
     onError: (error, variables) => {
       certificateActionFeedback = {
@@ -1635,12 +1619,7 @@
         title: $t(i18nKeys.console.resources.healthPolicySaved),
         detail: result.id,
       };
-      void queryClient.invalidateQueries({ queryKey: ["resources"] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "delete-check", resourceId] });
-      void queryClient.invalidateQueries({
-        queryKey: ["resources", "health", resourceId, "detail"],
-      });
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
     },
     onError: (error) => {
       healthFeedback = {
@@ -1659,8 +1638,7 @@
         title: $t(i18nKeys.console.resources.sourceProfileSaved),
         detail: result.id,
       };
-      void queryClient.invalidateQueries({ queryKey: ["resources"] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
     },
     onError: (error) => {
       sourceFeedback = {
@@ -1679,8 +1657,7 @@
         detail: result.sourceFingerprint,
       };
       sourceLinkDialogOpen = false;
-      void queryClient.invalidateQueries({ queryKey: ["resources"] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
     },
     onError: (error) => {
       sourceLinkFeedback = {
@@ -1699,9 +1676,8 @@
         title: $t(i18nKeys.console.resources.autoDeploySaved),
         detail: autoDeployStatusLabel(result.status),
       };
-      void queryClient.invalidateQueries({ queryKey: ["resources"] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
-      void queryClient.invalidateQueries({ queryKey: ["source-events", "resource", resourceId] });
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
+      void queryClient.invalidateQueries({ queryKey: orpc.sourceEvents.key({ type: "query" }) });
     },
     onError: (error) => {
       autoDeployFeedback = {
@@ -1720,9 +1696,8 @@
         title: $t(i18nKeys.console.previewEnvironments.cleanupSucceeded),
         detail: result.attemptId,
       };
-      void queryClient.invalidateQueries({ queryKey: ["preview-environments"] });
       void queryClient.invalidateQueries({
-        queryKey: ["preview-environments", "resource", resourceId],
+        queryKey: orpc.previewEnvironments.key({ type: "query" }),
       });
     },
     onError: (error) => {
@@ -1749,9 +1724,8 @@
 
   async function refreshResourceDeploymentData(): Promise<void> {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["resources"] }),
-      queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] }),
-      queryClient.invalidateQueries({ queryKey: ["deployments"] }),
+      queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) }),
+      queryClient.invalidateQueries({ queryKey: orpc.deployments.key({ type: "query" }) }),
     ]);
   }
 
@@ -1794,7 +1768,7 @@
   }
 
   function prepareResourceDomainBindingCreateDialog(): void {
-    if (!resource || isResourceArchived || isDirectStaticArtifactRuntime) {
+    if (!resource || isResourceArchived) {
       return;
     }
 
@@ -1816,10 +1790,12 @@
   }
 
   function openResourceDomainBindingCreateDialog(): void {
-    if (!resource || isResourceArchived || isDirectStaticArtifactRuntime) {
+    if (!resource || isResourceArchived) {
       return;
     }
 
+    domainBindingDialogOpenedLocally = true;
+    prepareResourceDomainBindingCreateDialog();
     void setModalOpen(page, "domain-binding", true);
   }
 
@@ -1834,6 +1810,7 @@
 
     domainBindingCreateDialogOpen = false;
     domainBindingDialogInitializedForResourceId = "";
+    domainBindingDialogOpenedLocally = false;
     if (modalIsOpen(page, "domain-binding")) {
       void setModalOpen(page, "domain-binding", false);
     }
@@ -2038,9 +2015,8 @@
         title: $t(i18nKeys.console.resources.runtimeProfileSaved),
         detail: result.id,
       };
-      void queryClient.invalidateQueries({ queryKey: ["resources"] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
-    },
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
+          },
     onError: (error) => {
       runtimeFeedback = {
         kind: "error",
@@ -2059,13 +2035,8 @@
       };
       runtimeControlDialogOpen = false;
       selectedRuntimeControlOperation = null;
-      void queryClient.invalidateQueries({ queryKey: ["resources"] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "delete-check", resourceId] });
-      void queryClient.invalidateQueries({
-        queryKey: ["resources", "health", resourceId, "detail"],
-      });
-    },
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
+                      },
     onError: (error) => {
       runtimeControlFeedback = {
         kind: "error",
@@ -2084,13 +2055,8 @@
       };
       runtimeControlDialogOpen = false;
       selectedRuntimeControlOperation = null;
-      void queryClient.invalidateQueries({ queryKey: ["resources"] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "delete-check", resourceId] });
-      void queryClient.invalidateQueries({
-        queryKey: ["resources", "health", resourceId, "detail"],
-      });
-    },
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
+                      },
     onError: (error) => {
       runtimeControlFeedback = {
         kind: "error",
@@ -2109,12 +2075,8 @@
       };
       runtimeControlDialogOpen = false;
       selectedRuntimeControlOperation = null;
-      void queryClient.invalidateQueries({ queryKey: ["resources"] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
-      void queryClient.invalidateQueries({
-        queryKey: ["resources", "health", resourceId, "detail"],
-      });
-    },
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
+                },
     onError: (error) => {
       runtimeControlFeedback = {
         kind: "error",
@@ -2132,12 +2094,8 @@
         title: $t(i18nKeys.console.resources.networkProfileSaved),
         detail: result.id,
       };
-      void queryClient.invalidateQueries({ queryKey: ["resources"] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
-      void queryClient.invalidateQueries({
-        queryKey: ["resources", "health", resourceId, "detail"],
-      });
-      if (resource) {
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
+                  if (resource) {
         void loadProxyConfiguration(resource.id);
       }
     },
@@ -2158,12 +2116,8 @@
         title: $t(i18nKeys.console.resources.accessProfileSaved),
         detail: result.id,
       };
-      void queryClient.invalidateQueries({ queryKey: ["resources"] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
-      void queryClient.invalidateQueries({
-        queryKey: ["resources", "health", resourceId, "detail"],
-      });
-      if (resource) {
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
+                  if (resource) {
         void loadProxyConfiguration(resource.id);
       }
     },
@@ -2184,8 +2138,9 @@
         detail: configKey.trim(),
       };
       configValue = "";
+      configEditorDialogOpen = false;
       void queryClient.invalidateQueries({
-        queryKey: ["resources", "effective-config", resourceId],
+        queryKey: orpc.resources.effectiveConfig.key({ input: { resourceId } }),
       });
     },
     onError: (error) => {
@@ -2207,8 +2162,9 @@
         }),
       };
       configImportContent = "";
+      configEditorDialogOpen = false;
       void queryClient.invalidateQueries({
-        queryKey: ["resources", "effective-config", resourceId],
+        queryKey: orpc.resources.effectiveConfig.key({ input: { resourceId } }),
       });
     },
     onError: (error) => {
@@ -2229,7 +2185,7 @@
         detail: variables.key,
       };
       void queryClient.invalidateQueries({
-        queryKey: ["resources", "effective-config", resourceId],
+        queryKey: orpc.resources.effectiveConfig.key({ input: { resourceId } }),
       });
     },
     onError: (error) => {
@@ -2459,7 +2415,10 @@
         title: $t(i18nKeys.console.resources.dependencyUnbindSucceeded),
         detail: result.id,
       };
+      dependencyUnbindDialogOpen = false;
+      dependencyUnbindBindingId = "";
       void invalidateDependencyQueries();
+      void resourceDeleteSafetyQuery.refetch();
     },
     onError: (error) => {
       dependencyFeedback = {
@@ -2487,12 +2446,8 @@
         title: $t(i18nKeys.console.resources.archiveSucceeded),
         detail: result.id,
       };
-      void queryClient.invalidateQueries({ queryKey: ["resources"] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
-      void queryClient.invalidateQueries({
-        queryKey: ["resources", "health", resourceId, "detail"],
-      });
-    },
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
+                },
     onError: (error) => {
       archiveFeedback = {
         kind: "error",
@@ -2514,12 +2469,8 @@
         title: $t(i18nKeys.console.resources.restoreSucceeded),
         detail: result.id,
       };
-      void queryClient.invalidateQueries({ queryKey: ["resources"] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
-      void queryClient.invalidateQueries({
-        queryKey: ["resources", "health", resourceId, "detail"],
-      });
-    },
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
+                },
     onError: (error) => {
       restoreFeedback = {
         kind: "error",
@@ -2541,12 +2492,8 @@
         title: $t(i18nKeys.console.resources.deleteSucceeded),
         detail: result.id,
       };
-      void queryClient.invalidateQueries({ queryKey: ["resources"] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
-      void queryClient.invalidateQueries({
-        queryKey: ["resources", "health", resourceId, "detail"],
-      });
-      void goto(project ? projectDetailHref(project.id) : "/projects");
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
+                  void goto(project ? projectDetailHref(project.id) : "/projects");
     },
     onError: (error) => {
       deleteFeedback = {
@@ -2576,12 +2523,8 @@
         title: $t(i18nKeys.console.resources.deleteSucceeded),
         detail: result.id,
       };
-      void queryClient.invalidateQueries({ queryKey: ["resources"] });
-      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
-      void queryClient.invalidateQueries({
-        queryKey: ["resources", "health", resourceId, "detail"],
-      });
-      void goto(project ? projectDetailHref(project.id) : "/projects");
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
+                  void goto(project ? projectDetailHref(project.id) : "/projects");
     },
     onError: (error) => {
       deleteFeedback = {
@@ -2611,9 +2554,18 @@
           .filter(Boolean)
           .join(" · ");
 
-        return suffix ? `${blocker.kind} (${suffix})` : blocker.kind;
+        const label = resourceDeleteBlockerLabel(blocker.kind);
+        return suffix ? `${label} (${suffix})` : label;
       })
       .join(", ");
+  }
+
+  function resourceDeleteBlockerLabel(kind: string): string {
+    if (kind === "dependency-binding") {
+      return $t(i18nKeys.console.resources.dependencyDeleteBlockedByBinding);
+    }
+
+    return kind;
   }
 
   function resourceDeleteBlockerErrorDetail(error: unknown): string {
@@ -2633,6 +2585,15 @@
 
   function isActiveRuntimeLogFollow(currentResourceId: string, generation: number): boolean {
     return isActiveRuntimeLogRequest(currentResourceId, generation) && runtimeLogsFollowing;
+  }
+
+  function runtimeLogsKey(
+    currentResourceId: string,
+    handoff: RuntimeMonitoringObservationHandoff | null,
+  ): string {
+    return handoff
+      ? `${currentResourceId}:${handoff.from}:${handoff.to}`
+      : `${currentResourceId}:latest`;
   }
 
   function readDomainErrorCode(error: unknown): string {
@@ -2723,10 +2684,14 @@
     void stream?.return?.().catch(() => undefined);
   }
 
-  async function loadRuntimeLogs(currentResourceId: string, since?: string): Promise<void> {
+  async function loadRuntimeLogs(
+    currentResourceId: string,
+    handoff: RuntimeMonitoringObservationHandoff | null,
+  ): Promise<void> {
     const generation = runtimeLogRequestGeneration + 1;
     runtimeLogRequestGeneration = generation;
     runtimeLogResourceId = currentResourceId;
+    runtimeLogsCacheKey = runtimeLogsKey(currentResourceId, handoff);
     runtimeLogsLoading = true;
     runtimeLogsError = null;
     runtimeLogsUnavailable = false;
@@ -2735,7 +2700,7 @@
       const result = await orpcClient.resources.logs({
         resourceId: currentResourceId,
         tailLines: 100,
-        ...(since ? { since } : {}),
+        ...(handoff ? { since: handoff.from } : {}),
         follow: false,
       });
 
@@ -2820,8 +2785,10 @@
     }
 
     const generation = runtimeLogRequestGeneration + 1;
+    const handoff = resourceRuntimeMonitoringObservationHandoff;
     runtimeLogRequestGeneration = generation;
     runtimeLogResourceId = resource.id;
+    runtimeLogsCacheKey = runtimeLogsKey(resource.id, handoff);
     runtimeLogsError = null;
     runtimeLogsUnavailable = false;
     runtimeLogsFollowing = true;
@@ -2830,7 +2797,7 @@
       resource.id,
       generation,
       tailLines,
-      resourceRuntimeMonitoringObservationHandoff?.from,
+      handoff?.from,
     );
   }
 
@@ -2840,7 +2807,7 @@
     }
 
     stopRuntimeLogFollow();
-    void loadRuntimeLogs(resource.id, resourceRuntimeMonitoringObservationHandoff?.from);
+    void loadRuntimeLogs(resource.id, resourceRuntimeMonitoringObservationHandoff);
   }
 
   async function loadProxyConfiguration(currentResourceId: string): Promise<void> {
@@ -2995,12 +2962,12 @@
     }
   }
 
-  function openResourceLifecycleDialog(): void {
+  function openResourceLifecycleDialog(defaultAction: ResourceLifecycleAction | null = null): void {
     if (!browser || !resource) {
       return;
     }
 
-    selectedResourceLifecycleAction = null;
+    selectedResourceLifecycleAction = defaultAction;
     resourceDeleteConfirmation = "";
     archiveFeedback = null;
     restoreFeedback = null;
@@ -3063,10 +3030,12 @@
     });
   }
 
-  function deleteResource(): void {
+  function deleteResource(confirmationResourceSlug = resourceDeleteConfirmation): void {
+    const normalizedConfirmationResourceSlug = confirmationResourceSlug.trim();
     if (
       !resource ||
       !isResourceArchived ||
+      normalizedConfirmationResourceSlug !== resource.slug ||
       !resourceDeleteEligible ||
       resourceDeleteSafetyLoading ||
       deleteResourceMutation.isPending
@@ -3074,13 +3043,12 @@
       return;
     }
 
-    const confirmationResourceSlug = resourceDeleteConfirmation;
     deleteFeedback = null;
     closeResourceLifecycleDialog();
     deleteResourceMutation.mutate({
       resourceId: resource.id,
       confirmation: {
-        resourceSlug: confirmationResourceSlug,
+        resourceSlug: normalizedConfirmationResourceSlug,
       },
     });
   }
@@ -3154,6 +3122,7 @@
     }
 
     if (modalIsOpen(page, "domain-binding")) {
+      domainBindingDialogOpenedLocally = false;
       if (
         !domainBindingCreateDialogOpen ||
         domainBindingDialogInitializedForResourceId !== resource.id
@@ -3163,7 +3132,7 @@
       return;
     }
 
-    if (domainBindingCreateDialogOpen) {
+    if (domainBindingCreateDialogOpen && !domainBindingDialogOpenedLocally) {
       domainBindingCreateDialogOpen = false;
       domainBindingDialogInitializedForResourceId = "";
     }
@@ -3528,30 +3497,53 @@
     }
 
     untrack(() => {
-      stopRuntimeLogFollow();
-
       if (!currentResourceId) {
+        stopRuntimeLogFollow();
         runtimeLogs = [];
         runtimeLogResourceId = "";
+        runtimeLogsCacheKey = "";
         runtimeLogsLoading = false;
         return;
+      }
+
+      if (runtimeLogResourceId && runtimeLogResourceId !== currentResourceId) {
+        stopRuntimeLogFollow();
+        runtimeLogs = [];
+        runtimeLogsError = null;
+        runtimeLogsUnavailable = false;
+        runtimeLogsCacheKey = "";
       }
 
       if (currentTab !== "logs") {
-        runtimeLogsLoading = false;
         return;
       }
+
+      const currentRuntimeLogsCacheKey = runtimeLogsKey(
+        currentResourceId,
+        currentObservationHandoff,
+      );
 
       if (!currentResourceSupportsServerBackedRuntimeSurfaces) {
-        runtimeLogs = [];
-        runtimeLogsError = null;
-        runtimeLogsUnavailable = true;
-        runtimeLogResourceId = currentResourceId;
-        runtimeLogsLoading = false;
+        if (runtimeLogsCacheKey !== currentRuntimeLogsCacheKey) {
+          stopRuntimeLogFollow();
+          runtimeLogs = [];
+          runtimeLogsError = null;
+          runtimeLogsUnavailable = true;
+          runtimeLogResourceId = currentResourceId;
+          runtimeLogsCacheKey = currentRuntimeLogsCacheKey;
+          runtimeLogsLoading = false;
+        }
         return;
       }
 
-      void loadRuntimeLogs(currentResourceId, currentObservationHandoff?.from);
+      if (
+        runtimeLogsCacheKey === currentRuntimeLogsCacheKey &&
+        (runtimeLogs.length > 0 || runtimeLogsUnavailable || runtimeLogsError || runtimeLogsLoading || runtimeLogsFollowing)
+      ) {
+        return;
+      }
+
+      void loadRuntimeLogs(currentResourceId, currentObservationHandoff);
     });
   });
 
@@ -3606,7 +3598,20 @@
   function createResourceDomainBinding(event: SubmitEvent): void {
     event.preventDefault();
 
-    if (!resource || !canCreateBinding || createDomainBindingMutation.isPending) {
+    const formData =
+      event.currentTarget instanceof HTMLFormElement
+        ? new FormData(event.currentTarget)
+        : null;
+    const submittedDomainName = String(formData?.get("domainName") ?? domainName).trim();
+    const submittedPathPrefix = String(formData?.get("pathPrefix") ?? pathPrefix).trim() || "/";
+
+    if (
+      !resource ||
+      !submittedDomainName ||
+      !submittedPathPrefix ||
+      !canCreateBinding ||
+      createDomainBindingMutation.isPending
+    ) {
       return;
     }
 
@@ -3615,9 +3620,14 @@
       projectId: resource.projectId,
       environmentId: resource.environmentId,
       resourceId: resource.id,
-      ...(serverId && destinationId ? { serverId, destinationId } : {}),
-      domainName: domainName.trim(),
-      pathPrefix: pathPrefix.trim() || "/",
+      ...(effectiveDomainBindingServerId && effectiveDomainBindingDestinationId
+        ? {
+            serverId: effectiveDomainBindingServerId,
+            destinationId: effectiveDomainBindingDestinationId,
+          }
+        : {}),
+      domainName: submittedDomainName,
+      pathPrefix: submittedPathPrefix,
       proxyKind,
       tlsMode,
       ...(routeMode === "redirect"
@@ -3687,32 +3697,31 @@
 
   async function invalidateScheduledTaskQueries(): Promise<void> {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["scheduled-tasks", "resource", resourceId] }),
-      queryClient.invalidateQueries({ queryKey: ["scheduled-task-runs", "resource", resourceId] }),
+      queryClient.invalidateQueries({ queryKey: orpc.scheduledTasks.key({ type: "query" }) }),
+      queryClient.invalidateQueries({ queryKey: orpc.scheduledTasks.runs.key({ type: "query" }) }),
     ]);
   }
 
   async function invalidateStorageAttachmentQueries(): Promise<void> {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["resources"] }),
-      queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] }),
-      queryClient.invalidateQueries({ queryKey: ["storage-volumes"] }),
+      queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) }),
+      queryClient.invalidateQueries({ queryKey: orpc.storageVolumes.key({ type: "query" }) }),
     ]);
   }
 
   async function invalidateStorageBackupQueries(): Promise<void> {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["storage-volume-backups"] }),
-      queryClient.invalidateQueries({ queryKey: ["storage-volumes"] }),
-      queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] }),
+      queryClient.invalidateQueries({ queryKey: orpc.storageVolumes.backups.key({ type: "query" }) }),
+      queryClient.invalidateQueries({ queryKey: orpc.storageVolumes.key({ type: "query" }) }),
     ]);
   }
 
   async function invalidateDependencyQueries(): Promise<void> {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["dependency-resources"] }),
-      queryClient.invalidateQueries({ queryKey: ["resource-dependency-bindings", resourceId] }),
-      queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] }),
+      queryClient.invalidateQueries({ queryKey: orpc.dependencyResources.key({ type: "query" }) }),
+      queryClient.invalidateQueries({
+        queryKey: orpc.resources.dependencyBindings.key({ type: "query" }),
+      }),
     ]);
   }
 
@@ -4205,6 +4214,12 @@
     });
   }
 
+  function openResourceConfigurationEditor(mode: "single" | "env"): void {
+    configEditorMode = mode;
+    configFeedback = null;
+    configEditorDialogOpen = true;
+  }
+
   function unsetResourceVariable(entry: ResourceConfigEntry): void {
     if (!resource || isResourceArchived || unsetResourceVariableMutation.isPending) {
       return;
@@ -4461,6 +4476,30 @@
     dependencyFeedback = null;
   }
 
+  function openDependencyUnbindDialog(binding: ResourceDependencyBindingSummary): void {
+    dependencyFeedback = null;
+    dependencyUnbindBindingId = binding.id;
+    dependencyUnbindDialogOpen = true;
+  }
+
+  function closeDependencyUnbindDialog(): void {
+    dependencyUnbindDialogOpen = false;
+    dependencyUnbindBindingId = "";
+    dependencyFeedback = null;
+  }
+
+  function unbindDependencyResource(): void {
+    if (!resource || !selectedDependencyBindingForUnbind || unbindResourceDependencyMutation.isPending) {
+      return;
+    }
+
+    dependencyFeedback = null;
+    unbindResourceDependencyMutation.mutate({
+      resourceId: resource.id,
+      bindingId: selectedDependencyBindingForUnbind.id,
+    });
+  }
+
   function canRotateDependencyBindingSecret(bindingId: string): boolean {
     const hasSecretRef = Boolean((dependencyBindingSecretRefs[bindingId] ?? "").trim());
     const hasSecretValue = Boolean((dependencyBindingSecretValues[bindingId] ?? "").trim());
@@ -4534,10 +4573,21 @@
   function importCertificateForBinding(binding: DomainBindingSummary, event: SubmitEvent): void {
     event.preventDefault();
 
+    const form = event.currentTarget;
+    if (!(form instanceof HTMLFormElement)) {
+      return;
+    }
+    const formData = new FormData(form);
+    const certificateChain = String(formData.get("certificateChain") ?? "").trim();
+    const privateKey = String(formData.get("privateKey") ?? "").trim();
+    const passphrase = String(formData.get("passphrase") ?? "").trim();
+
     if (
       binding.certificatePolicy !== "manual" ||
       importBindingId !== binding.id ||
       !canImportCertificate ||
+      !certificateChain ||
+      !privateKey ||
       importCertificateMutation.isPending
     ) {
       return;
@@ -4546,9 +4596,9 @@
     importFeedback = null;
     importCertificateMutation.mutate({
       domainBindingId: binding.id,
-      certificateChain: importCertificateChain.trim(),
-      privateKey: importPrivateKey.trim(),
-      ...(importPassphrase.trim() ? { passphrase: importPassphrase } : {}),
+      certificateChain,
+      privateKey,
+      ...(passphrase ? { passphrase } : {}),
     });
   }
 
@@ -5546,6 +5596,7 @@
       >
         {#each resourceSectionsForTab(activeTab) as section (section)}
           <a
+            id={`resource-section-${section}`}
             href={resourceSectionHref(section)}
             role="tab"
             aria-selected={activeResourceSection === section}
@@ -5772,6 +5823,7 @@
       <nav aria-label={$t(i18nKeys.console.resources.overviewTitle)} class={detailTabsClass}>
         {#each resourceDetailTabs as tab (tab)}
           <a
+            id={`resource-tab-${tab}`}
             href={resourceTabHref(tab)}
             class={detailTabClass}
             aria-current={activeTab === tab ? "page" : undefined}
@@ -6265,6 +6317,7 @@
 
                           <div class="flex flex-wrap gap-2 lg:justify-end">
                             <Button
+                              id={`scheduled-task-run-manage-${task.taskId}`}
                               type="button"
                               size="sm"
                               variant="outline"
@@ -6701,6 +6754,7 @@
                           </Button>
                         {/if}
                         <Button
+                          id={`preview-environment-cleanup-open-${previewEnvironment.previewEnvironmentId}`}
                           type="button"
                           size="sm"
                           variant="outline"
@@ -7009,7 +7063,7 @@
             <div class={[detailSubnavLayoutClass, "md:grid-cols-[12rem_minmax(0,1fr)]"]}>
               {@render resourceSectionNavigation()}
 
-              <div class="space-y-8 p-5">
+              <div class={[detailSubnavContentClass, "space-y-8"]}>
                 {#if activeResourceSection === "general"}
                   <div id="resource-settings-general" class="space-y-4" data-resource-settings-general>
                     <section class="rounded-md border bg-background p-4" data-resource-settings-identity>
@@ -7030,7 +7084,7 @@
                       </div>
 
                       <dl class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                        <div class="rounded-md border border-border bg-muted/25 px-3 py-2">
                           <dt class="text-xs text-muted-foreground">
                             {$t(i18nKeys.common.domain.resource)}
                           </dt>
@@ -7041,7 +7095,7 @@
                             </p>
                           </dd>
                         </div>
-                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                        <div class="rounded-md border border-border bg-muted/25 px-3 py-2">
                           <dt class="text-xs text-muted-foreground">
                             {$t(i18nKeys.common.domain.project)}
                           </dt>
@@ -7049,7 +7103,7 @@
                             {project?.name ?? resource.projectId}
                           </dd>
                         </div>
-                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                        <div class="rounded-md border border-border bg-muted/25 px-3 py-2">
                           <dt class="text-xs text-muted-foreground">
                             {$t(i18nKeys.common.domain.environment)}
                           </dt>
@@ -7057,19 +7111,19 @@
                             {environment?.name ?? resource.environmentId}
                           </dd>
                         </div>
-                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                        <div class="rounded-md border border-border bg-muted/25 px-3 py-2">
                           <dt class="text-xs text-muted-foreground">
                             {$t(i18nKeys.common.domain.kind)}
                           </dt>
                           <dd class="mt-1 truncate text-sm font-medium">{resource.kind}</dd>
                         </div>
-                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                        <div class="rounded-md border border-border bg-muted/25 px-3 py-2">
                           <dt class="text-xs text-muted-foreground">
                             {$t(i18nKeys.common.domain.slug)}
                           </dt>
                           <dd class="mt-1 truncate font-mono text-sm font-medium">{resource.slug}</dd>
                         </div>
-                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                        <div class="rounded-md border border-border bg-muted/25 px-3 py-2">
                           <dt class="text-xs text-muted-foreground">
                             {$t(i18nKeys.common.domain.destination)}
                           </dt>
@@ -7077,7 +7131,7 @@
                             {defaultDestinationId || "-"}
                           </dd>
                         </div>
-                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                        <div class="rounded-md border border-border bg-muted/25 px-3 py-2">
                           <dt class="text-xs text-muted-foreground">
                             {$t(i18nKeys.common.domain.createdAt)}
                           </dt>
@@ -7085,7 +7139,7 @@
                             {formatTime(resource.createdAt)}
                           </dd>
                         </div>
-                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                        <div class="rounded-md border border-border bg-muted/25 px-3 py-2">
                           <dt class="text-xs text-muted-foreground">
                             {$t(i18nKeys.common.domain.status)}
                           </dt>
@@ -7120,9 +7174,12 @@
                           {/if}
                         </div>
                         <Button
+                          id="resource-lifecycle-manage-action"
                           type="button"
                           variant="outline"
-                          onclick={openResourceLifecycleDialog}
+                          onclick={() => {
+                            openResourceLifecycleDialog();
+                          }}
                         >
                           <Archive class="size-4" />
                           {$t(i18nKeys.console.resources.lifecycleManageAction)}
@@ -7237,42 +7294,30 @@
                       </div>
                       <div class="flex shrink-0 flex-wrap items-center gap-2">
                         <Badge variant="outline">{resourceDomainBindings.length}</Badge>
-                        {#if !isDirectStaticArtifactRuntime}
-                          <Button
-                            type="button"
-                            size="sm"
-                            disabled={isResourceArchived}
-                            onclick={openResourceDomainBindingCreateDialog}
-                          >
-                            <Plus class="size-4" />
-                            {$t(i18nKeys.console.domainBindings.createTitle)}
-                          </Button>
-                        {/if}
+                        <Button
+                          id="resource-domain-binding-create-action"
+                          type="button"
+                          size="sm"
+                          disabled={!resource || isResourceArchived}
+                          onclick={openResourceDomainBindingCreateDialog}
+                        >
+                          <Plus class="size-4" />
+                          {$t(i18nKeys.console.domainBindings.createTitle)}
+                        </Button>
                       </div>
                     </div>
 
-                    {#if isDirectStaticArtifactRuntime}
-                      <div
-                        class="rounded-md border border-dashed bg-muted/25 px-4 py-6"
-                        data-resource-static-artifact-domain-unavailable
-                      >
-                        <p class="text-sm font-medium">
-                          {$t(i18nKeys.console.resources.staticArtifactDomainBindingsUnavailableTitle)}
-                        </p>
-                        <p class="mt-2 text-sm leading-6 text-muted-foreground">
-                          {$t(i18nKeys.console.resources.staticArtifactDomainBindingsUnavailableDescription)}
-                        </p>
-                      </div>
-                    {:else if resourceDomainBindings.length === 0}
+                    {#if resourceDomainBindings.length === 0}
                       <div class="rounded-md border border-dashed bg-muted/25 px-4 py-6">
                         <p class="text-sm text-muted-foreground">
                           {$t(i18nKeys.console.domainBindings.emptyBody)}
                         </p>
                         <Button
+                          id="resource-domain-binding-create-empty-action"
                           type="button"
                           size="sm"
                           class="mt-4"
-                          disabled={isResourceArchived}
+                          disabled={!resource || isResourceArchived}
                           onclick={openResourceDomainBindingCreateDialog}
                         >
                           <Plus class="size-4" />
@@ -7577,7 +7622,7 @@
                         <Badge variant="outline">{resourceDetail?.generatedAt ? formatTime(resourceDetail.generatedAt) : "-"}</Badge>
                       </div>
                       <dl class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                        <div class="rounded-md border border-border bg-muted/25 px-3 py-2">
                           <dt class="flex items-center gap-1.5 text-xs text-muted-foreground">
                             {$t(i18nKeys.common.domain.source)}
                             <DocsHelpLink
@@ -7588,7 +7633,7 @@
                           </dt>
                           <dd class="mt-1 truncate text-sm font-medium">{resourceSourceSummary()}</dd>
                         </div>
-                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                        <div class="rounded-md border border-border bg-muted/25 px-3 py-2">
                           <dt class="flex items-center gap-1.5 text-xs text-muted-foreground">
                             {$t(i18nKeys.console.resources.runtimeProfileTitle)}
                             <DocsHelpLink
@@ -7599,7 +7644,7 @@
                           </dt>
                           <dd class="mt-1 truncate text-sm font-medium">{resourceRuntimeSummary()}</dd>
                         </div>
-                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                        <div class="rounded-md border border-border bg-muted/25 px-3 py-2">
                           <dt class="flex items-center gap-1.5 text-xs text-muted-foreground">
                             {$t(i18nKeys.console.resources.networkProfileTitle)}
                             <DocsHelpLink
@@ -7610,7 +7655,7 @@
                           </dt>
                           <dd class="mt-1 truncate text-sm font-medium">{resourceNetworkSummary()}</dd>
                         </div>
-                        <div class="rounded-md bg-muted/25 px-3 py-2">
+                        <div class="rounded-md border border-border bg-muted/25 px-3 py-2">
                           <dt class="text-xs text-muted-foreground">
                             {$t(i18nKeys.console.resources.accessProfileTitle)}
                           </dt>
@@ -7763,6 +7808,59 @@
                             {/each}
                           </div>
                         {/if}
+                      </section>
+
+                      <section class="rounded-md border bg-background p-4" data-resource-config-editor>
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <h3 class="text-base font-semibold">
+                              {$t(i18nKeys.console.resources.configurationFormTitle)}
+                            </h3>
+                            <p class="mt-1 text-sm text-muted-foreground">
+                              {$t(i18nKeys.console.resources.configurationFormDescription)}
+                            </p>
+                          </div>
+                          <Badge variant="outline">
+                            {$t(i18nKeys.console.resources.configurationImportTitle)}
+                          </Badge>
+                        </div>
+
+                        {#if configFeedback}
+                          <div
+                            class={[
+                              "mt-4 rounded-md border px-3 py-2 text-sm",
+                              configFeedback.kind === "success"
+                                ? "border-primary/25 bg-primary/5"
+                                : "border-destructive/30 bg-destructive/5 text-destructive",
+                            ]}
+                          >
+                            <p class="font-medium">{configFeedback.title}</p>
+                            <p class="mt-1 break-all text-xs">{configFeedback.detail}</p>
+                          </div>
+                        {/if}
+
+                        <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            class="justify-start"
+                            disabled={isResourceArchived}
+                            onclick={() => openResourceConfigurationEditor("single")}
+                          >
+                            <Plus class="size-4" />
+                            {$t(i18nKeys.console.resources.configurationSetAction)}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            class="justify-start"
+                            disabled={isResourceArchived}
+                            onclick={() => openResourceConfigurationEditor("env")}
+                          >
+                            <Clipboard class="size-4" />
+                            {$t(i18nKeys.console.resources.configurationImportAction)}
+                          </Button>
+                        </div>
                       </section>
 
                       <section class="rounded-md border bg-background p-4">
@@ -8068,7 +8166,12 @@
                           type="button"
                           variant="outline"
                           disabled={isResourceArchived || bindableDependencyResources.length === 0}
-                          onclick={openDependencyBindDialog}
+                          onpointerdown={() => {
+                            openDependencyBindDialog();
+                          }}
+                          onclick={() => {
+                            openDependencyBindDialog();
+                          }}
                         >
                           <Link2 class="size-4" />
                           {$t(i18nKeys.console.resources.dependencyBindAction)}
@@ -8134,9 +8237,27 @@
                                   </div>
                                 </dl>
                               </div>
-                              <Badge variant={binding.snapshotReadiness.status === "blocked" ? "destructive" : "outline"}>
-                                {binding.snapshotReadiness.status}
-                              </Badge>
+                              <div class="flex flex-wrap items-center gap-2">
+                                <Badge
+                                  variant={binding.snapshotReadiness.status === "blocked"
+                                    ? "destructive"
+                                    : "outline"}
+                                >
+                                  {binding.snapshotReadiness.status}
+                                </Badge>
+                                {#if binding.status === "active"}
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={unbindResourceDependencyMutation.isPending}
+                                    onclick={() => openDependencyUnbindDialog(binding)}
+                                  >
+                                    <X class="size-4" />
+                                    {$t(i18nKeys.console.resources.dependencyUnbindAction)}
+                                  </Button>
+                                {/if}
+                              </div>
                             </div>
                           </article>
                         {/each}
@@ -8155,15 +8276,15 @@
                         </div>
                         <div class="flex flex-wrap items-center gap-2">
                           <Badge variant="outline">{dependencyResources.length}</Badge>
-                          <Button
+                          <button
+                            id="resource-dependency-bind-action"
                             type="button"
-                            variant="outline"
-                            size="sm"
+                            class={buttonVariants({ variant: "outline", size: "sm" })}
                             disabled={isResourceArchived || bindableDependencyResources.length === 0}
                             onclick={openDependencyBindDialog}
                           >
                             {$t(i18nKeys.console.resources.dependencyBindAction)}
-                          </Button>
+                          </button>
                           <Button href="/dependency-resources" variant="outline" size="sm">
                             {$t(i18nKeys.common.actions.viewDetails)}
                           </Button>
@@ -8446,8 +8567,8 @@
                         </p>
                         <ul class="mt-2 space-y-1 text-xs">
                           {#each resourceDeleteBlockers as blocker}
-                            <li class="break-all font-mono">
-                              {blocker.kind}
+                            <li class="break-words">
+                              {resourceDeleteBlockerLabel(blocker.kind)}
                               {#if typeof blocker.count === "number"}
                                 · {blocker.count}
                               {/if}
@@ -8464,10 +8585,13 @@
                     {/if}
 
                     <Button
+                      id="resource-lifecycle-manage-danger-action"
                       type="button"
                       variant="outline"
                       class="w-full justify-start"
-                      onclick={openResourceLifecycleDialog}
+                      onclick={() => {
+                        openResourceLifecycleDialog(isResourceArchived ? "delete" : "archive");
+                      }}
                     >
                       <Archive class="size-4" />
                       {$t(i18nKeys.console.resources.lifecycleManageAction)}
@@ -8614,6 +8738,155 @@
           </div>
         {/if}
       </div>
+
+      <Dialog.Root bind:open={configEditorDialogOpen}>
+        <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-3xl">
+          <Dialog.Header>
+            <Dialog.Title>
+              {configEditorMode === "single"
+                ? $t(i18nKeys.console.resources.configurationFormTitle)
+                : $t(i18nKeys.console.resources.configurationImportTitle)}
+            </Dialog.Title>
+            <Dialog.Description>
+              {configEditorMode === "single"
+                ? $t(i18nKeys.console.resources.configurationFormDescription)
+                : $t(i18nKeys.console.resources.configurationImportDescription)}
+            </Dialog.Description>
+          </Dialog.Header>
+
+          {#if configEditorMode === "single"}
+            <form class="space-y-4 px-5 pb-5" onsubmit={setResourceVariable}>
+              <div class="grid gap-3 sm:grid-cols-2">
+                <label class="space-y-1.5 text-sm font-medium">
+                  <span>{$t(i18nKeys.common.domain.key)}</span>
+                  <Input bind:value={configKey} autocomplete="off" placeholder="APP_NAME" />
+                </label>
+                <label class="space-y-1.5 text-sm font-medium">
+                  <span>{$t(i18nKeys.common.domain.value)}</span>
+                  <Input bind:value={configValue} autocomplete="off" placeholder="pocketbase" />
+                </label>
+                <label class="space-y-1.5 text-sm font-medium">
+                  <span>{$t(i18nKeys.common.domain.kind)}</span>
+                  <Select.Root bind:value={configKind} type="single">
+                    <Select.Trigger class="w-full">
+                      {configKindLabel(configKind)}
+                    </Select.Trigger>
+                    <Select.Content>
+                      <Select.Item value="plain-config">
+                        {$t(i18nKeys.console.resources.configurationKindPlain)}
+                      </Select.Item>
+                      <Select.Item value="secret">
+                        {$t(i18nKeys.console.resources.configurationKindSecret)}
+                      </Select.Item>
+                      <Select.Item value="provider-specific">
+                        {$t(i18nKeys.console.resources.configurationKindProviderSpecific)}
+                      </Select.Item>
+                      <Select.Item value="deployment-strategy">
+                        {$t(i18nKeys.console.resources.configurationKindDeploymentStrategy)}
+                      </Select.Item>
+                    </Select.Content>
+                  </Select.Root>
+                </label>
+                <label class="space-y-1.5 text-sm font-medium">
+                  <span>{$t(i18nKeys.common.domain.exposure)}</span>
+                  <Select.Root bind:value={configExposure} type="single">
+                    <Select.Trigger class="w-full">
+                      {configExposureLabel(configExposure)}
+                    </Select.Trigger>
+                    <Select.Content>
+                      <Select.Item value="runtime">
+                        {$t(i18nKeys.console.resources.configurationExposureRuntime)}
+                      </Select.Item>
+                      <Select.Item value="build-time">
+                        {$t(i18nKeys.console.resources.configurationExposureBuildTime)}
+                      </Select.Item>
+                    </Select.Content>
+                  </Select.Root>
+                </label>
+              </div>
+              <label class="flex items-center gap-2 text-sm text-muted-foreground">
+                <input
+                  bind:checked={configSecret}
+                  type="checkbox"
+                  class="size-4 rounded border-border text-primary"
+                />
+                {$t(i18nKeys.console.resources.configurationKindSecret)}
+              </label>
+              {#if configFeedback?.kind === "error"}
+                <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                  <p class="font-medium">{configFeedback.title}</p>
+                  <p class="mt-1 break-all text-xs">{configFeedback.detail}</p>
+                </div>
+              {/if}
+              <Dialog.Footer class="px-0 pb-0">
+                <Button type="button" variant="outline" onclick={() => (configEditorDialogOpen = false)}>
+                  {$t(i18nKeys.common.actions.cancel)}
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={!canSetResourceVariable || setResourceVariableMutation.isPending}
+                >
+                  {$t(i18nKeys.console.resources.configurationSetAction)}
+                </Button>
+              </Dialog.Footer>
+            </form>
+          {:else}
+            <form class="space-y-4 px-5 pb-5" onsubmit={importResourceVariables}>
+              <label class="space-y-1.5 text-sm font-medium">
+                <span>{$t(i18nKeys.console.resources.configurationImportContent)}</span>
+                <Textarea
+                  bind:value={configImportContent}
+                  class="min-h-40 font-mono text-xs"
+                  placeholder={"APP_NAME=pocketbase\nPOCKETBASE_ADMIN_PASSWORD=..."}
+                />
+              </label>
+              <div class="grid gap-3 sm:grid-cols-3">
+                <label class="space-y-1.5 text-sm font-medium">
+                  <span>{$t(i18nKeys.common.domain.exposure)}</span>
+                  <Select.Root bind:value={configImportExposure} type="single">
+                    <Select.Trigger class="w-full">
+                      {configExposureLabel(configImportExposure)}
+                    </Select.Trigger>
+                    <Select.Content>
+                      <Select.Item value="runtime">
+                        {$t(i18nKeys.console.resources.configurationExposureRuntime)}
+                      </Select.Item>
+                      <Select.Item value="build-time">
+                        {$t(i18nKeys.console.resources.configurationExposureBuildTime)}
+                      </Select.Item>
+                    </Select.Content>
+                  </Select.Root>
+                </label>
+                <label class="space-y-1.5 text-sm font-medium">
+                  <span>{$t(i18nKeys.console.resources.configurationImportSecretKeys)}</span>
+                  <Input bind:value={configImportSecretKeys} autocomplete="off" placeholder="PASSWORD, TOKEN" />
+                </label>
+                <label class="space-y-1.5 text-sm font-medium">
+                  <span>{$t(i18nKeys.console.resources.configurationImportPlainKeys)}</span>
+                  <Input bind:value={configImportPlainKeys} autocomplete="off" placeholder="APP_NAME" />
+                </label>
+              </div>
+              {#if configFeedback?.kind === "error"}
+                <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                  <p class="font-medium">{configFeedback.title}</p>
+                  <p class="mt-1 break-all text-xs">{configFeedback.detail}</p>
+                </div>
+              {/if}
+              <Dialog.Footer class="px-0 pb-0">
+                <Button type="button" variant="outline" onclick={() => (configEditorDialogOpen = false)}>
+                  {$t(i18nKeys.common.actions.cancel)}
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={!canImportResourceVariables || importResourceVariablesMutation.isPending}
+                >
+                  {$t(i18nKeys.console.resources.configurationImportAction)}
+                </Button>
+              </Dialog.Footer>
+            </form>
+          {/if}
+        </Dialog.Content>
+      </Dialog.Root>
 
       <Dialog.Root bind:open={deploymentDialogOpen} onOpenChange={setResourceDeploymentDialogOpen}>
         <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-6xl">
@@ -8955,8 +9228,10 @@
                     <span>{$t(i18nKeys.common.domain.domainName)}</span>
                     <Input
                       id="resource-domain-binding-domain"
+                      name="domainName"
                       bind:value={domainName}
                       autocomplete="off"
+                      required
                       placeholder={$t(i18nKeys.console.domainBindings.formDomainPlaceholder)}
                     />
                   </label>
@@ -8965,8 +9240,10 @@
                     <span>{$t(i18nKeys.common.domain.pathPrefix)}</span>
                     <Input
                       id="resource-domain-binding-path-prefix"
+                      name="pathPrefix"
                       bind:value={pathPrefix}
                       autocomplete="off"
+                      required
                       placeholder="/"
                     />
                   </label>
@@ -9027,7 +9304,9 @@
                       <span>{$t(i18nKeys.common.domain.server)}</span>
                       <Select.Root bind:value={serverId} type="single" disabled={!shouldShowServerField}>
                         <Select.Trigger class="w-full">
-                          {selectedServer?.name ?? serverId ?? $t(i18nKeys.console.domainBindings.noServerOptions)}
+                          {selectedServer?.name ||
+                            effectiveDomainBindingServerId ||
+                            $t(i18nKeys.console.domainBindings.noServerOptions)}
                         </Select.Trigger>
                         <Select.Content>
                           {#each servers as server (server.id)}
@@ -9135,11 +9414,13 @@
                   {#if !domainBindingUsesResourceRouteProvider}
                     <div class="grid grid-cols-[6rem_minmax(0,1fr)] gap-3 py-3">
                       <dt class="text-muted-foreground">{$t(i18nKeys.common.domain.server)}</dt>
-                      <dd class="truncate font-medium">{(selectedServer?.name ?? serverId) || "-"}</dd>
+                      <dd class="truncate font-medium">
+                        {(selectedServer?.name ?? effectiveDomainBindingServerId) || "-"}
+                      </dd>
                     </div>
                     <div class="grid grid-cols-[6rem_minmax(0,1fr)] gap-3 py-3">
                       <dt class="text-muted-foreground">{$t(i18nKeys.common.domain.destination)}</dt>
-                      <dd class="truncate font-medium">{destinationId || "-"}</dd>
+                      <dd class="truncate font-medium">{effectiveDomainBindingDestinationId || "-"}</dd>
                     </div>
                   {/if}
                 </dl>
@@ -9201,24 +9482,29 @@
                 <span>{$t(i18nKeys.console.resources.certificateImportCertificateChain)}</span>
                 <Textarea
                   id={`resource-domain-binding-import-certificate-chain-${selectedImportBinding.id}`}
+                  name="certificateChain"
                   bind:value={importCertificateChain}
                   class="min-h-28 font-mono text-xs"
                   placeholder={$t(i18nKeys.console.resources.certificateImportCertificateChainPlaceholder)}
+                  required
                 />
               </label>
               <label class="space-y-1.5 text-sm font-medium" for={`resource-domain-binding-import-private-key-${selectedImportBinding.id}`}>
                 <span>{$t(i18nKeys.console.resources.certificateImportPrivateKey)}</span>
                 <Textarea
                   id={`resource-domain-binding-import-private-key-${selectedImportBinding.id}`}
+                  name="privateKey"
                   bind:value={importPrivateKey}
                   class="min-h-28 font-mono text-xs"
                   placeholder={$t(i18nKeys.console.resources.certificateImportPrivateKeyPlaceholder)}
+                  required
                 />
               </label>
               <label class="space-y-1.5 text-sm font-medium" for={`resource-domain-binding-import-passphrase-${selectedImportBinding.id}`}>
                 <span>{$t(i18nKeys.console.resources.certificateImportPassphrase)}</span>
                 <Input
                   id={`resource-domain-binding-import-passphrase-${selectedImportBinding.id}`}
+                  name="passphrase"
                   bind:value={importPassphrase}
                   autocomplete="off"
                   placeholder={$t(i18nKeys.console.resources.certificateImportPassphrasePlaceholder)}
@@ -9233,6 +9519,7 @@
                   {$t(i18nKeys.common.actions.cancel)}
                 </Button>
                 <Button
+                  id={`resource-domain-binding-import-submit-${selectedImportBinding.id}`}
                   type="submit"
                   disabled={!canImportCertificate || importCertificateMutation.isPending}
                 >
@@ -9500,6 +9787,7 @@
                 {$t(i18nKeys.common.actions.cancel)}
               </Button>
               <Button
+                id="resource-preview-cleanup-submit"
                 type="button"
                 variant="destructive"
                 disabled={cleanupPreviewEnvironmentMutation.isPending}
@@ -9638,6 +9926,7 @@
 
             <div class="flex flex-wrap justify-end gap-2">
               <Button
+                id="scheduled-task-create-cancel"
                 type="button"
                 variant="outline"
                 onclick={() => {
@@ -9647,6 +9936,7 @@
                 {$t(i18nKeys.common.actions.cancel)}
               </Button>
               <Button
+                id="scheduled-task-create-submit"
                 type="submit"
                 disabled={!canCreateScheduledTask || createScheduledTaskMutation.isPending}
               >
@@ -9767,6 +10057,69 @@
         </Dialog.Content>
       </Dialog.Root>
 
+      <Dialog.Root bind:open={dependencyUnbindDialogOpen}>
+        <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-xl">
+          <Dialog.Header>
+            <Dialog.Title>{$t(i18nKeys.console.resources.dependencyUnbindTitle)}</Dialog.Title>
+            <Dialog.Description>
+              {$t(i18nKeys.console.resources.dependencyUnbindDescription)}
+            </Dialog.Description>
+          </Dialog.Header>
+
+          <section
+            class="space-y-4 px-5 pb-5"
+            data-resource-dependency-unbind-dialog
+          >
+            {#if selectedDependencyBindingForUnbind}
+              <div class="rounded-md border bg-background p-4 text-sm">
+                <div class="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline">
+                    {dependencyResourceKindLabel(selectedDependencyBindingForUnbind.kind)}
+                  </Badge>
+                  <Badge variant="secondary">{selectedDependencyBindingForUnbind.sourceMode}</Badge>
+                  <Badge variant="outline">{selectedDependencyBindingForUnbind.status}</Badge>
+                </div>
+                <p class="mt-3 font-medium">
+                  {selectedDependencyBindingForUnbind.dependencyResourceName ??
+                    selectedDependencyBindingForUnbind.dependencyResourceSlug ??
+                    selectedDependencyBindingForUnbind.dependencyResourceId}
+                </p>
+                <p class="mt-1 break-all font-mono text-xs text-muted-foreground">
+                  {selectedDependencyBindingForUnbind.target.targetName}
+                </p>
+              </div>
+              <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                {$t(i18nKeys.console.resources.dependencyUnbindWarning)}
+              </div>
+            {/if}
+
+            {#if dependencyFeedback?.kind === "error"}
+              <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                <p class="font-medium">{dependencyFeedback.title}</p>
+                <p class="mt-1 break-all text-xs">{dependencyFeedback.detail}</p>
+              </div>
+            {/if}
+
+            <Dialog.Footer class="px-0 pb-0">
+              <Button type="button" variant="outline" onclick={closeDependencyUnbindDialog}>
+                {$t(i18nKeys.common.actions.cancel)}
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={!selectedDependencyBindingForUnbind || unbindResourceDependencyMutation.isPending}
+                onclick={unbindDependencyResource}
+              >
+                <X class="size-4" />
+                {unbindResourceDependencyMutation.isPending
+                  ? $t(i18nKeys.common.actions.saving)
+                  : $t(i18nKeys.console.resources.dependencyUnbindAction)}
+              </Button>
+            </Dialog.Footer>
+          </section>
+        </Dialog.Content>
+      </Dialog.Root>
+
       <Dialog.Root bind:open={scheduledTaskManageDialogOpen}>
         <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)}>
           <Dialog.Header>
@@ -9794,6 +10147,7 @@
               </div>
               <div class="grid gap-2 sm:grid-cols-2">
                 <Button
+                  id={`scheduled-task-run-now-${task.taskId}`}
                   type="button"
                   variant="outline"
                   disabled={
@@ -9895,6 +10249,11 @@
             class="box-border min-w-0 w-full space-y-5 overflow-x-hidden px-5 pb-5"
             onsubmit={(event) => {
               event.preventDefault();
+              const form = event.currentTarget;
+              const confirmationResourceSlug =
+                form instanceof HTMLFormElement
+                  ? String(new FormData(form).get("resourceSlug") ?? "").trim()
+                  : resourceDeleteConfirmation.trim();
               if (selectedResourceLifecycleAction === "archive") {
                 archiveResource();
               } else if (selectedResourceLifecycleAction === "restore") {
@@ -9902,7 +10261,7 @@
               } else if (isPreviewEnvironmentResource) {
                 deletePreviewResource();
               } else {
-                deleteResource();
+                deleteResource(confirmationResourceSlug);
               }
             }}
             data-resource-lifecycle-dialog
@@ -9920,6 +10279,7 @@
             <div class="grid min-w-0 gap-2 sm:grid-cols-3">
               {#if !isPreviewEnvironmentResource}
                 <Button
+                  id="resource-lifecycle-select-archive"
                   type="button"
                   variant={selectedResourceLifecycleAction === "archive" ? "destructive" : "outline"}
                   class="h-auto min-w-0 w-full max-w-full items-start justify-start whitespace-normal px-3 py-3 text-left"
@@ -9939,6 +10299,7 @@
               {/if}
               {#if !isPreviewEnvironmentResource}
                 <Button
+                  id="resource-lifecycle-select-restore"
                   type="button"
                   variant={selectedResourceLifecycleAction === "restore" ? "default" : "outline"}
                   class="h-auto min-w-0 w-full max-w-full items-start justify-start whitespace-normal px-3 py-3 text-left"
@@ -9957,6 +10318,7 @@
                 </Button>
               {/if}
               <Button
+                id="resource-lifecycle-select-delete"
                 type="button"
                 variant={selectedResourceLifecycleAction === "delete" ? "destructive" : "outline"}
                 class="h-auto min-w-0 w-full max-w-full items-start justify-start whitespace-normal px-3 py-3 text-left"
@@ -9988,9 +10350,11 @@
                 <span>{$t(i18nKeys.console.resources.deleteConfirmPrompt)}</span>
                 <Input
                   id="resource-delete-confirmation"
+                  name="resourceSlug"
                   bind:value={resourceDeleteConfirmation}
                   autocomplete="off"
                   placeholder={resource.slug}
+                  required
                 />
               </label>
               {#if resourceDeleteSafetyLoading}
@@ -10011,8 +10375,8 @@
                   </p>
                   <ul class="mt-2 space-y-1 text-xs">
                     {#each resourceDeleteBlockers as blocker}
-                      <li class="break-all font-mono">
-                        {blocker.kind}
+                      <li class="break-words">
+                        {resourceDeleteBlockerLabel(blocker.kind)}
                         {#if typeof blocker.count === "number"}
                           · {blocker.count}
                         {/if}
@@ -10057,6 +10421,7 @@
                 {$t(i18nKeys.common.actions.cancel)}
               </Button>
               <Button
+                id="resource-lifecycle-submit"
                 type="submit"
                 variant={selectedResourceLifecycleAction === "archive" ||
                   selectedResourceLifecycleAction === "delete"
@@ -10068,8 +10433,7 @@
                   (selectedResourceLifecycleAction === "restore" &&
                     (!isResourceArchived || restoreResourceMutation.isPending)) ||
                   (selectedResourceLifecycleAction === "delete" &&
-                    (resourceDeleteConfirmation.trim() !== resource.slug ||
-                      (!isPreviewEnvironmentResource && !isResourceArchived) ||
+                    ((!isPreviewEnvironmentResource && !isResourceArchived) ||
                       (!isPreviewEnvironmentResource && !resourceDeleteEligible) ||
                       (!isPreviewEnvironmentResource && resourceDeleteSafetyLoading) ||
                       deleteResourceMutation.isPending ||

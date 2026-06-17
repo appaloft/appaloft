@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { createInterface } from "node:readline/promises";
 import { type DomainError, err, ok, type Result } from "@appaloft/core";
 import { type AppaloftSdkFetch } from "@appaloft/sdk";
@@ -11,6 +12,7 @@ import {
   controlPlaneStatus,
   loginControlPlane,
   logoutControlPlane,
+  tokenLoginControlPlane,
   useControlPlaneProfile,
 } from "./control-plane-service.js";
 
@@ -25,6 +27,7 @@ export interface StandaloneControlPlaneCliInput {
   readonly onLoginSession?: CliControlPlaneDependencies["onLoginSession"];
   readonly openBrowser?: (url: string) => Promise<boolean> | boolean;
   readonly sleep?: (milliseconds: number) => Promise<void>;
+  readonly stdinText?: string;
   readonly stdout?: Pick<NodeJS.WriteStream, "write">;
   readonly stderr?: Pick<NodeJS.WriteStream, "write">;
 }
@@ -163,6 +166,14 @@ async function confirmBrowserOpen(): Promise<boolean> {
   }
 }
 
+async function readStdinText(): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
 function bold(value: string): string {
   return `\u001b[1m${value}\u001b[22m`;
 }
@@ -172,6 +183,7 @@ function renderRootHelp(stdout: Pick<NodeJS.WriteStream, "write">): void {
 
 Usage:
   appaloft login [--url <url>] [--mode cloud|self-hosted] [--no-browser]
+  appaloft auth token login [--stdin | --token-file <path>] [--url <url>] [--profile <name>]
   appaloft auth status
   appaloft context show
   appaloft server list
@@ -293,6 +305,42 @@ function handleStatus(
   return finish(controlPlaneStatus(parsed.value.values.profile, deps(input)), input);
 }
 
+async function handleTokenLogin(
+  args: readonly string[],
+  input: StandaloneControlPlaneCliInput,
+): Promise<StandaloneControlPlaneCliResult> {
+  const parsed = parseOptions(args, ["url", "mode", "profile", "token-file"], ["stdin"]);
+  if (parsed.isErr()) {
+    return finish(parsed, input);
+  }
+  const mode = modeValue(parsed.value.values.mode);
+  if (mode.isErr()) {
+    return finish(mode, input);
+  }
+  if (parsed.value.booleans.stdin && parsed.value.values["token-file"]) {
+    return finish(parseError("Use either --stdin or --token-file, not both"), input);
+  }
+
+  const token = parsed.value.values["token-file"]
+    ? await readFile(parsed.value.values["token-file"], "utf8")
+    : parsed.value.booleans.stdin
+      ? (input.stdinText ?? (await readStdinText()))
+      : undefined;
+
+  return finish(
+    tokenLoginControlPlane(
+      {
+        ...(parsed.value.values.url ? { url: parsed.value.values.url } : {}),
+        ...(mode.value ? { mode: mode.value } : {}),
+        ...(parsed.value.values.profile ? { profile: parsed.value.values.profile } : {}),
+        ...(token === undefined ? {} : { token }),
+      },
+      deps(input),
+    ),
+    input,
+  );
+}
+
 function handleLogout(
   args: readonly string[],
   input: StandaloneControlPlaneCliInput,
@@ -352,6 +400,9 @@ export async function runStandaloneControlPlaneCli(
     const subcommand = args[1];
     if (subcommand === "login") {
       return handleLogin(args.slice(2), input);
+    }
+    if (subcommand === "token" && args[2] === "login") {
+      return handleTokenLogin(args.slice(3), input);
     }
     if (subcommand === "status") {
       return handleStatus(args.slice(2), input);

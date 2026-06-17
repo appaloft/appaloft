@@ -29,7 +29,7 @@
     projectDetailHref,
   } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
-  import { orpcClient } from "$lib/orpc";
+  import { orpc, orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
 
   const projectPageSize = 12;
@@ -131,9 +131,8 @@
       providers: false,
     });
   const projectsQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["projects", { limit: projectPageSize, offset: projectOffset }],
-      queryFn: () => orpcClient.projects.list({ limit: projectPageSize, offset: projectOffset }),
+    orpc.projects.list.queryOptions({
+      input: { limit: projectPageSize, offset: projectOffset },
       enabled: browser && canRunProductQueries(authSessionQuery.data),
     }),
   );
@@ -165,7 +164,7 @@
       }),
     onSuccess: () => {
       projectReorderError = "";
-      void queryClient.invalidateQueries({ queryKey: ["projects"] });
+      void queryClient.invalidateQueries({ queryKey: orpc.projects.key({ type: "query" }) });
     },
     onError: (error, variables) => {
       visibleProjects = [...variables.rollbackProjects];

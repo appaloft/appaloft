@@ -18,7 +18,7 @@
   import { createConsoleQueries } from "$lib/console/queries";
   import { findProject, findResource, formatTime } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
-  import { orpcClient } from "$lib/orpc";
+  import { orpc, orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
 
   type ScopeKind = PreviewPolicyScope["kind"];
@@ -108,9 +108,8 @@
   }
 
   const previewPolicyQuery = createQuery(() =>
-    queryOptions({
-      queryKey: ["preview-policies", "show", selectedScopeKind, selectedProjectId, selectedResourceId],
-      queryFn: () => orpcClient.previewPolicies.show({ scope: scopeForRequest() }),
+    orpc.previewPolicies.show.queryOptions({
+      input: { scope: scopeForRequest() },
       enabled: canReadPolicy,
       staleTime: 5_000,
       retry: 0,
@@ -126,7 +125,7 @@
         detail: result.id,
       };
       policyEditDialogOpen = false;
-      void queryClient.invalidateQueries({ queryKey: ["preview-policies"] });
+      void queryClient.invalidateQueries({ queryKey: orpc.previewPolicies.key({ type: "query" }) });
     },
     onError: (error) => {
       feedback = {

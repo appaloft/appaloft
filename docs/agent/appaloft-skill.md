@@ -34,7 +34,7 @@ single skill-manager entrypoint.
 Treat the skill as an AI-oriented peer to these Appaloft surfaces:
 
 - CLI: local shell-capable agent sessions;
-- HTTP/API: agents running beside or integrating with a control plane;
+- HTTP/API: agents running beside or integrating with a hosted or self-hosted Appaloft API;
 - Web: human-guided console workflows;
 - MCP/tools: callable descriptors over the same operation catalog when `appaloft mcp stdio` is
   configured;
@@ -42,9 +42,12 @@ Treat the skill as an AI-oriented peer to these Appaloft surfaces:
 
 The skill chooses among those surfaces based on the current agent environment. It must not invent
 agent-only operations. In shell-capable sessions that need hosted product context, the skill should
-check `appaloft auth status` or `appaloft context show` first, then run `appaloft login` when no
-active profile exists. Without `--url`, login defaults to `https://app.appaloft.com`; credential
-material stays in local CLI environment/profile handling, not in chat.
+check `appaloft auth status`, `appaloft context show`, and whether `APPALOFT_TOKEN` is already
+available first. If no active profile or env token exists, the agent should ask the user to grant a
+scoped, expiring token through a trusted UI, secret manager, environment variable, or
+CLI-approved handoff, then use `APPALOFT_TOKEN` or `appaloft auth token login --stdin` /
+`--token-file <path>` so the CLI verifies the token and writes a redacted profile. `appaloft login`
+remains a human interactive browser login command, not the default AI-agent auth path.
 
 For GitHub Actions, the skill must keep three deployment shapes distinct:
 
@@ -65,16 +68,19 @@ The installable `appaloft` skill must include:
 - operation keys beside CLI forms so an agent can map CLI/API/Web/MCP surfaces back to the same
   business operation;
 - safety rules for secrets, credentials, local files, logs, and diagnostics;
-- local CLI profile/context guidance for default Appaloft Cloud login and remote control-plane use;
+- local CLI profile/context guidance for default Appaloft Cloud login, scoped token handoff, and
+  hosted or self-hosted Appaloft API use;
 - deploy, progress-watch, observe, recover, configure, administer, and maintenance workflows;
 - a deploy subprotocol equivalent to `appaloft-deploy` for first-deploy and URL-first outcomes.
 
 ## Safety Rules
 
-- Do not read `.env`, private keys, token files, cloud credential files, deploy tokens, SSH
+- Do not read `.env`, private keys, token file contents, cloud credential files, deploy tokens, SSH
   material, cookies, or unmasked secrets.
 - Do not ask users to paste product-session cookies, bearer tokens, deploy tokens, browser cookies,
-  or raw secret material into chat for CLI login.
+  token file contents, or raw secret material into chat for CLI login. The user may provide a token
+  through `APPALOFT_TOKEN`, stdin, a trusted secret manager, or a token file path that the CLI reads
+  directly.
 - Do not call provider SDKs or mutate Docker, SSH, database, proxy, or cloud state directly when an
   Appaloft operation exists.
 - Do not add source/runtime/network fields to `deployments.create`; configure Resource profile

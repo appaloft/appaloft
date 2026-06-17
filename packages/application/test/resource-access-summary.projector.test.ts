@@ -107,7 +107,7 @@ describe("projectResourceAccessSummary", () => {
     });
   });
 
-  test("projects generated access URL with a default open path while preserving proxy prefix", () => {
+  test("[DEF-ACCESS-ENTRY-009] projects generated access URL with a default open path while preserving proxy prefix", () => {
     const summary = projectResourceAccessSummary([
       {
         id: "dep_pocketbase",

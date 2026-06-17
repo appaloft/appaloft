@@ -11,7 +11,7 @@ describe("terminal session Web console surface", () => {
       ),
     ]);
 
-    expect(instancePageSource).toContain("orpcClient.terminalSessions.list");
+    expect(instancePageSource).toContain("orpc.terminalSessions.list.queryOptions");
     expect(instancePageSource).toContain("orpcClient.terminalSessions.close");
     expect(instancePageSource).toContain("orpcClient.terminalSessions.expire");
     expect(instancePageSource).toContain("terminalSessionsQuery");
