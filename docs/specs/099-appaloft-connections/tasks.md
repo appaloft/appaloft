@@ -18,8 +18,9 @@
 - [x] APP-CONN-006: add identity/source separation test.
 - [x] APP-CONN-007: add GitHub App installation to source connection test.
 - [ ] APP-CONN-008: add provider app token expiry/redaction test.
-- [ ] APP-CONN-009: add infrastructure target proposal test.
-- [ ] APP-CONN-010: add high-cost accepted-plan test.
+- [x] APP-CONN-009: add infrastructure target proposal test.
+- [x] APP-CONN-010: add high-cost proposal explicit-acceptance test.
+- [ ] APP-CONN-010: add durable accepted-plan mutation test.
 - [ ] APP-CONN-011: add notification adapter redaction test.
 - [x] APP-CONN-012: add no billing ledger mutation test.
 - [x] APP-CONN-013: add tool/operation no-secret exposure test.
@@ -35,11 +36,12 @@
 - [x] Add operation catalog entries.
 - [x] Add application ports for provider adapters.
 - [x] Add fake DNS provider adapter before real providers.
+- [x] Add fake infrastructure provider adapter before real providers.
 - [x] Add GitHub App source connection projection/compatibility.
 - [x] Add persistent DNS provider plan contract.
 - [x] Add persistent DNS apply/verify/cleanup provider contracts.
 - [ ] Add DNS temporary setup provider contract.
-- [x] Add CLI and HTTP surfaces for catalog, connection lifecycle, DNS planning, and DNS apply/verify/cleanup.
+- [x] Add CLI and HTTP surfaces for catalog, connection lifecycle, DNS planning, DNS apply/verify/cleanup, and infrastructure proposal planning.
 - [ ] Add Web central/contextual surfaces.
 
 ## Verification

@@ -6,6 +6,7 @@ import {
   createDefaultConnectorDefinitions,
   createExecutionContext,
   FakeDnsConnectorProviderAdapter,
+  FakeInfrastructureConnectorProviderAdapter,
   InMemoryConnectorConnectionStore,
   InMemoryConnectorProviderAdapterRegistry,
   InMemoryConnectorRegistry,
@@ -106,6 +107,79 @@ describe("connector catalog", () => {
     });
 
     expect(result.items).toEqual([]);
+  });
+
+  test("[APP-CONN-009] exposes Vultr as the primary infrastructure connector when configured", async () => {
+    const registry = new InMemoryConnectorRegistry(
+      createDefaultConnectorDefinitions({
+        vultrInfrastructure: {
+          configured: true,
+        },
+      }),
+    );
+    const service = new ListConnectorsQueryService(registry);
+    const result = await service.execute(createExecutionContext({ entrypoint: "system" }), {
+      category: "infrastructure",
+    });
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]?.key).toBe("vultr-infrastructure");
+    expect(result.items[0]?.availability.status).toBe("available");
+    expect(result.items[0]?.capabilities.map((capability) => capability.key)).toContain(
+      "infrastructure.server.propose",
+    );
+  });
+
+  test("[APP-CONN-009][APP-CONN-010][APP-CONN-016] plans infrastructure server proposals through a provider adapter", async () => {
+    const registry = new InMemoryConnectorRegistry(
+      createDefaultConnectorDefinitions({
+        vultrInfrastructure: {
+          configured: true,
+        },
+      }),
+    );
+    const service = new PlanConnectorCapabilityQueryService(
+      registry,
+      new InMemoryConnectorProviderAdapterRegistry([
+        new FakeInfrastructureConnectorProviderAdapter({
+          connectorKey: "vultr-infrastructure",
+          providerKey: "vultr",
+          providerTitle: "Vultr Infrastructure",
+        }),
+      ]),
+    );
+
+    const result = await service.execute(createExecutionContext({ entrypoint: "system" }), {
+      connectorKey: "vultr-infrastructure",
+      capabilityKey: "infrastructure.server.propose",
+      parameters: {
+        region: "ewr",
+        size: "vc2-4c-8gb",
+        image: "ubuntu-24.04",
+        serverName: "appaloft-edge-prod",
+        sshPublicKeyRef: "sshkey_prod",
+        estimatedMonthlyCostUsd: 96,
+      },
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+    expect(plan.connectorKey).toBe("vultr-infrastructure");
+    expect(plan.riskLevel).toBe("high");
+    expect(plan.requiresExplicitAcceptance).toBe(true);
+    expect(plan.providerPlan?.kind).toBe("infrastructure-server-proposal");
+    expect(plan.providerPlan?.infrastructureServerProposal).toMatchObject({
+      providerKey: "vultr",
+      region: "ewr",
+      size: "vc2-4c-8gb",
+      image: "ubuntu-24.04",
+      recommendedServerName: "appaloft-edge-prod",
+      sshPublicKeyRef: "sshkey_prod",
+      costRiskLevel: "high",
+      cleanupSupported: true,
+    });
+    expect(plan.effects.map((effect) => effect.kind)).toContain("infrastructure.cost.estimate");
+    expect(JSON.stringify(plan)).not.toContain("token");
   });
 
   test("[APP-CONN-004][APP-CONN-014][APP-CONN-016] plans Cloudflare DNS records through a provider adapter", async () => {

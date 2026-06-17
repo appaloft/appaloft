@@ -54,6 +54,7 @@ import {
   type EnvironmentSelectionSpec,
   type EnvironmentSnapshot,
   type ExecutionStrategyKind,
+  type InfrastructureServerProposalSnapshot,
   type LogLevel,
   type PackagingMode,
   type PreviewEnvironment,
@@ -9606,6 +9607,7 @@ export interface ConnectorCapabilityPlanPreview {
   providerPlan?: {
     kind: "dns-records" | string;
     dnsRecords?: DnsRecordPlanSnapshot;
+    infrastructureServerProposal?: InfrastructureServerProposalSnapshot;
   };
 }
 
@@ -9690,6 +9692,7 @@ export type {
   DnsRecordConflictSnapshot,
   DnsRecordPlanSnapshot,
   DnsRecordRequirementSnapshot,
+  InfrastructureServerProposalSnapshot,
 };
 
 export interface IntegrationAuthPort {

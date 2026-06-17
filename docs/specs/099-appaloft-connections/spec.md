@@ -120,6 +120,15 @@ appaloft dns verify <domain> --hostname <host> --target <target>
 appaloft dns cleanup <domain> --hostname <host> --target <target>
 ```
 
+Infrastructure convenience aliases may also exist for ergonomics. They must translate into
+`connections.capability.plan` or future accepted-plan operations against a concrete connector such
+as `vultr-infrastructure`; `infrastructure` is a connector category and CLI namespace, not a
+separate domain model.
+
+```text
+appaloft infrastructure propose <target> --provider vultr --region <region> --size <size> --image <image>
+```
+
 Candidate HTTP routes may be shaped as REST/oRPC equivalents of the same operations. Exact transport
 schemas belong in the future operation catalog/code round.
 
