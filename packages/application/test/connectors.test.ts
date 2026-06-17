@@ -40,6 +40,25 @@ describe("connector catalog", () => {
     ]);
   });
 
+  test("[APP-CONN-002] keeps DNS as a category rather than an installable connector", async () => {
+    const registry = new InMemoryConnectorRegistry(
+      createDefaultConnectorDefinitions({
+        cloudflareDns: {
+          configured: true,
+        },
+      }),
+    );
+    const service = new ListConnectorsQueryService(registry);
+    const result = await service.execute(createExecutionContext({ entrypoint: "system" }), {
+      category: "dns",
+      includeUnavailable: true,
+    });
+
+    expect(result.items.map((item) => item.key)).toEqual(["cloudflare-dns"]);
+    expect(result.items.every((item) => item.category === "dns")).toBe(true);
+    expect(result.items.map((item) => item.key)).not.toContain("dns");
+  });
+
   test("[APP-CONN-004] exposes Cloudflare DNS as the primary DNS connector when configured", async () => {
     const registry = new InMemoryConnectorRegistry(
       createDefaultConnectorDefinitions({
