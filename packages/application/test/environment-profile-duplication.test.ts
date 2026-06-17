@@ -532,4 +532,72 @@ describe("environment profile duplication apply command", () => {
       generatedAt: "2026-01-01T00:00:10.000Z",
     });
   });
+
+  test("[ENV-PROFILE-DUP-003] warns when a target environment reuses a source dependency", async () => {
+    const commands: AppCommand<unknown>[] = [];
+    const result = await createApplyUseCase(commands).execute(
+      createExecutionContext({
+        requestId: "req_env_duplicate_apply_reuse_source",
+        entrypoint: "system",
+      }),
+      {
+        environmentId: "env_prod",
+        targetName: "staging",
+        dependencyDecisions: [
+          {
+            dependencyResourceId: "rsi_pg",
+            decision: "reuse-source",
+            acknowledgement: "Share production database intentionally for read-only validation.",
+            accessMode: "read-only",
+          },
+          {
+            dependencyResourceId: "rsi_external_pg",
+            decision: "bind-existing",
+            targetDependencyResourceId: "rsi_external_pg_staging",
+          },
+        ],
+      },
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(commands).toHaveLength(3);
+    expect(commands[0]).toBeInstanceOf(CloneEnvironmentCommand);
+    expect(commands[1]).toBeInstanceOf(CreateResourceCommand);
+    expect(commands[2]).toBeInstanceOf(BindResourceDependencyCommand);
+    expect(commands[2]).toMatchObject({
+      resourceId: "res_web_staging",
+      dependencyResourceId: "rsi_pg",
+      targetName: "DATABASE_URL",
+    });
+    expect(result._unsafeUnwrap()).toMatchObject({
+      appliedDependencies: [
+        {
+          sourceDependencyResourceId: "rsi_pg",
+          targetDependencyResourceId: "rsi_pg",
+          decision: "reuse-source",
+          kind: "postgres",
+          name: "Main DB",
+        },
+        {
+          sourceDependencyResourceId: "rsi_external_pg",
+          targetDependencyResourceId: "rsi_external_pg_staging",
+          decision: "bind-existing",
+          kind: "postgres",
+          name: "External DB",
+        },
+      ],
+      createdDependencyBindings: [
+        expect.objectContaining({
+          sourceDependencyResourceId: "rsi_pg",
+          targetDependencyResourceId: "rsi_pg",
+        }),
+      ],
+      warnings: [
+        {
+          code: "environment_profile_shared_source_dependency",
+          message: "Target environment reuses source dependency Main DB (rsi_pg).",
+        },
+      ],
+    });
+  });
 });
