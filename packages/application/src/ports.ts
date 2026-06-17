@@ -9562,6 +9562,14 @@ export interface ConnectorConnectionStore {
   save(connection: ConnectionSnapshot): void;
 }
 
+export interface ConnectorConnectionProjectionSource {
+  list(
+    context: ExecutionContext,
+    input?: ConnectorConnectionStoreListInput,
+  ): Promise<ConnectionSnapshot[]>;
+  findById(context: ExecutionContext, connectionId: string): Promise<ConnectionSnapshot | null>;
+}
+
 export interface ConnectionStartResult {
   connection: ConnectionSnapshot;
   authorizationUrl?: string;

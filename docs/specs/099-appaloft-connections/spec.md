@@ -174,7 +174,7 @@ Future implementation should provide fake provider adapters before real provider
 
 - Add public neutral connection model and operation catalog entries.
 - Add fake provider adapters and contract tests.
-- Integrate GitHub App source-provider records into `source/github` connection read models.
+- Add durable accepted-plan storage for high-cost provider mutations.
 - Add Domain Connect temporary DNS setup and persistent DNS provider boundary.
 - Add Web/CLI/API surfaces using the same operation names.
 - Add hosted/private distribution overlays outside public core for official provider apps, commercial

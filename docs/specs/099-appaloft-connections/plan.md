@@ -55,8 +55,8 @@
 
 ## Migration Notes
 
-- Existing GitHub App source-provider behavior should become the first `source/github` compatibility
-  slice.
+- Existing GitHub App source-provider behavior is the first `source/github` compatibility slice;
+  durable installation records are projected into `connections.list` and `connections.show`.
 - Existing GitHub OAuth login remains identity/auth only.
 - Existing external edge/DNS and SSH onboarding specs should reference connection ids once the
   neutral model exists.

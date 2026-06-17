@@ -225,6 +225,7 @@ import {
   GetCurrentOrganizationContextQueryService,
   GitHubAppConnectionQueryHandler,
   GitHubAppConnectionQueryService,
+  GitHubAppSourceConnectionProjectionSource,
   ImportCertificateCommandHandler,
   ImportCertificateUseCase,
   ImportDependencyResourceCommandHandler,
@@ -3481,6 +3482,10 @@ export function registerApplicationServices(
   );
   container.registerSingleton(tokens.providersQueryService, ListProvidersQueryService);
   container.registerSingleton(tokens.connectorsQueryService, ListConnectorsQueryService);
+  container.registerSingleton(
+    tokens.connectorConnectionProjectionSource,
+    GitHubAppSourceConnectionProjectionSource,
+  );
   container.registerSingleton(tokens.connectionsQueryService, ListConnectionsQueryService);
   container.registerSingleton(tokens.connectionQueryService, ShowConnectionQueryService);
   container.registerSingleton(tokens.startConnectionUseCase, StartConnectionUseCase);
