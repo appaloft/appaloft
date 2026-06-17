@@ -163,8 +163,10 @@ import {
   DeploymentRecoveryReadinessQuery,
   DeploymentTimelineQuery,
   DetachResourceStorageCommand,
+  DiffEnvironmentProfileQuery,
   DiffEnvironmentsQuery,
   DoctorQuery,
+  DuplicateEnvironmentProfileCommand,
   deactivateServerCommandInputSchema,
   deadLetterOperatorWorkCommandInputSchema,
   deleteAccountCommandInputSchema,
@@ -185,7 +187,9 @@ import {
   deploymentRecoveryReadinessQueryInputSchema,
   deploymentTimelineQueryInputSchema,
   detachResourceStorageCommandInputSchema,
+  diffEnvironmentProfileQueryInputSchema,
   diffEnvironmentsQueryInputSchema,
+  duplicateEnvironmentProfileCommandInputSchema,
   EnvironmentEffectivePrecedenceQuery,
   EvaluateDeploymentOverlayCommand,
   EvaluateRouteSurfaceCommand,
@@ -325,6 +329,7 @@ import {
   type OperatorWorkEventStreamEnvelope,
   openTerminalSessionCommandInputSchema,
   operationCatalog,
+  PlanDuplicateEnvironmentQuery,
   PrepareServerRuntimeCommand,
   type ProductOrganizationRole,
   type ProductSessionAuthorizationPort,
@@ -344,6 +349,7 @@ import {
   PublishStaticArtifactArchiveCommand,
   PublishStaticArtifactCommand,
   PublishStaticArtifactPayloadCommand,
+  planDuplicateEnvironmentQueryInputSchema,
   prepareServerRuntimeCommandInputSchema,
   promoteEnvironmentCommandInputSchema,
   provisionDependencyResourceCommandInputSchema,
@@ -513,6 +519,7 @@ import {
   type StreamOperatorWorkEventsQueryInput,
   type StreamOperatorWorkEventsResult,
   SwitchCurrentOrganizationCommand,
+  SyncEnvironmentProfileCommand,
   scheduledTaskRunLogsQueryInputSchema,
   setEnvironmentVariableCommandInputSchema,
   setProjectDescriptionCommandInputSchema,
@@ -559,6 +566,7 @@ import {
   streamDeploymentTimelineQueryInputSchema,
   streamOperatorWorkEventsQueryInputSchema,
   switchCurrentOrganizationCommandInputSchema,
+  syncEnvironmentProfileCommandInputSchema,
   TestServerConnectivityCommand,
   TransferOrganizationOwnerCommand,
   tenantContextForPrincipal,
@@ -1038,6 +1046,38 @@ const deleteSourceLinkResponseSchema = z.object({
 const base = os.$context<AppaloftOrpcRequestContext>();
 const emptyResponseSchema = z.null();
 export const createDeploymentDocsHref = resolvePublicDocsHelpHref("deployment.source");
+
+const environmentDuplicatePlanResponseSchema = z.custom(
+  (value) =>
+    typeof value === "object" &&
+    value !== null &&
+    "schemaVersion" in value &&
+    value.schemaVersion === "environments.duplicate-plan/v1",
+);
+
+const environmentDuplicateProfileResponseSchema = z.custom(
+  (value) =>
+    typeof value === "object" &&
+    value !== null &&
+    "schemaVersion" in value &&
+    value.schemaVersion === "environments.duplicate-profile/v1",
+);
+
+const environmentProfileDiffResponseSchema = z.custom(
+  (value) =>
+    typeof value === "object" &&
+    value !== null &&
+    "schemaVersion" in value &&
+    value.schemaVersion === "environments.diff-profile/v1",
+);
+
+const environmentProfileSyncResponseSchema = z.custom(
+  (value) =>
+    typeof value === "object" &&
+    value !== null &&
+    "schemaVersion" in value &&
+    value.schemaVersion === "environments.sync-profile/v1",
+);
 
 const productLoginMethodStatusSchema = z.object({
   key: z.enum(["local-password", "github", "google", "oidc"]),
@@ -1624,6 +1664,22 @@ export const apiRouteDescriptions = {
   ),
   diffEnvironments: routeDescription(
     "Compares two environment configuration sets.",
+    "environment.diff-promote",
+  ),
+  planDuplicateEnvironment: routeDescription(
+    "Plans an Environment Profile duplication without mutating the target environment.",
+    "environment.lifecycle",
+  ),
+  duplicateEnvironmentProfile: routeDescription(
+    "Applies a reviewed Environment Profile duplication plan.",
+    "environment.lifecycle",
+  ),
+  diffEnvironmentProfile: routeDescription(
+    "Compares Environment Profile shape, decisions, routes, storage, dependencies, and masked variables.",
+    "environment.diff-promote",
+  ),
+  syncEnvironmentProfile: routeDescription(
+    "Synchronizes selected Environment Profile resource shape into an existing target environment.",
     "environment.diff-promote",
   ),
   deploymentTimeline: routeDescription(
@@ -4648,6 +4704,58 @@ export const diffEnvironmentsProcedure = base
     executeQuery(context, DiffEnvironmentsQuery.create(input)),
   );
 
+export const planDuplicateEnvironmentProcedure = base
+  .route({
+    method: "GET",
+    path: "/environments/{environmentId}/duplicate-plan",
+    description: apiRouteDescriptions.planDuplicateEnvironment,
+    successStatus: 200,
+  })
+  .input(planDuplicateEnvironmentQueryInputSchema)
+  .output(environmentDuplicatePlanResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, PlanDuplicateEnvironmentQuery.create(input)),
+  );
+
+export const duplicateEnvironmentProfileProcedure = base
+  .route({
+    method: "POST",
+    path: "/environments/{environmentId}/duplicate-profile",
+    description: apiRouteDescriptions.duplicateEnvironmentProfile,
+    successStatus: 200,
+  })
+  .input(duplicateEnvironmentProfileCommandInputSchema)
+  .output(environmentDuplicateProfileResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, DuplicateEnvironmentProfileCommand.create(input)),
+  );
+
+export const diffEnvironmentProfileProcedure = base
+  .route({
+    method: "GET",
+    path: "/environments/{environmentId}/diff-profile/{targetEnvironmentId}",
+    description: apiRouteDescriptions.diffEnvironmentProfile,
+    successStatus: 200,
+  })
+  .input(diffEnvironmentProfileQueryInputSchema)
+  .output(environmentProfileDiffResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, DiffEnvironmentProfileQuery.create(input)),
+  );
+
+export const syncEnvironmentProfileProcedure = base
+  .route({
+    method: "POST",
+    path: "/environments/{environmentId}/sync-profile/{targetEnvironmentId}",
+    description: apiRouteDescriptions.syncEnvironmentProfile,
+    successStatus: 200,
+  })
+  .input(syncEnvironmentProfileCommandInputSchema)
+  .output(environmentProfileSyncResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, SyncEnvironmentProfileCommand.create(input)),
+  );
+
 export const environmentEffectivePrecedenceProcedure = base
   .route({
     method: "GET",
@@ -6382,6 +6490,10 @@ export const appaloftOrpcRouter = {
     effectivePrecedence: environmentEffectivePrecedenceProcedure,
     promote: promoteEnvironmentProcedure,
     diff: diffEnvironmentsProcedure,
+    planDuplicate: planDuplicateEnvironmentProcedure,
+    duplicateProfile: duplicateEnvironmentProfileProcedure,
+    diffProfile: diffEnvironmentProfileProcedure,
+    syncProfile: syncEnvironmentProfileProcedure,
   },
   defaultAccessDomainPolicies: {
     configure: configureDefaultAccessDomainPolicyProcedure,
@@ -9053,6 +9165,10 @@ export function mountAppaloftOrpcRoutes(
     "/api/environments/:environmentId/effective-precedence",
     "/api/environments/:environmentId/promote",
     "/api/environments/:environmentId/diff/:otherEnvironmentId",
+    "/api/environments/:environmentId/duplicate-plan",
+    "/api/environments/:environmentId/duplicate-profile",
+    "/api/environments/:environmentId/diff-profile/:targetEnvironmentId",
+    "/api/environments/:environmentId/sync-profile/:targetEnvironmentId",
     "/api/resources",
     "/api/resources/:resourceId",
     "/api/resources/:resourceId/delete-check",
