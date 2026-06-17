@@ -23,6 +23,7 @@ export const i18nKeys = {
       creating: "common:actions.creating",
       next: "common:actions.next",
       learnMore: "common:actions.learnMore",
+      view: "common:actions.view",
       openDocs: "common:actions.openDocs",
       openDocumentation: "common:actions.openDocumentation",
       openDeployments: "common:actions.openDeployments",

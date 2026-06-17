@@ -154,6 +154,9 @@ describe("Console page extension surface", () => {
     expect(panelHostSource).toContain("environmentId");
     expect(panelHostSource).toContain("resourceId");
     expect(panelHostSource).toContain("type ConsolePageRequestAction");
+    expect(panelHostSource).toContain("collapsedByDefault?: boolean");
+    expect(panelHostSource).toContain("expandedPanelKeys");
+    expect(panelHostSource).toContain("togglePanel(result)");
     expect(panelHostSource).toContain("runRequestAction(action, item)");
     expect(panelHostSource).toContain("data-console-extension-panel-host");
     expect(projectPageSource).toContain('placement="project-environment-panel"');
