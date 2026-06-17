@@ -49,6 +49,7 @@ const listResourceIdOption = Options.text("resource").pipe(Options.optional);
 const connectorOption = Options.text("connector").pipe(Options.withDefault("cloudflare-dns"));
 const dnsCapabilityOption = Options.choice("capability", [
   "dns.records.plan",
+  "dns.records.apply",
   "dns.domain-connect.start",
 ] as const).pipe(Options.withDefault("dns.records.plan"));
 const zoneNameOption = Options.text("zone").pipe(Options.optional);

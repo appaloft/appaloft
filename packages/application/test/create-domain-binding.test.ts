@@ -481,6 +481,63 @@ describe("CreateDomainBindingUseCase", () => {
     expect(JSON.stringify(preview)).not.toContain("secret");
   });
 
+  test("[CLOUD-CONN-WEB-017][APP-CONN-014] plans an accepted DNS apply capability from a domain binding", async () => {
+    const { context, readModel, useCase } = await seedRoutingContext();
+
+    const result = await useCase.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      serverId: "srv_demo",
+      destinationId: "dst_demo",
+      domainName: "app.example.com",
+      proxyKind: "traefik",
+      tlsMode: "auto",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const service = new PlanDomainBindingDnsQueryService(
+      readModel,
+      new PlanConnectorCapabilityQueryService(
+        new InMemoryConnectorRegistry(
+          createDefaultConnectorDefinitions({
+            cloudflareDns: {
+              configured: true,
+            },
+          }),
+        ),
+        new InMemoryConnectorProviderAdapterRegistry([
+          new FakeDnsConnectorProviderAdapter({
+            connectorKey: "cloudflare-dns",
+            providerTitle: "Cloudflare DNS",
+          }),
+        ]),
+      ),
+    );
+
+    const plan = await service.execute(context, {
+      domainBindingId: result._unsafeUnwrap().id,
+      connectorKey: "cloudflare-dns",
+      capabilityKey: "dns.records.apply",
+      zoneName: "example.com",
+    });
+
+    expect(plan.isOk()).toBe(true);
+    const preview = plan._unsafeUnwrap();
+    expect(preview.connectorKey).toBe("cloudflare-dns");
+    expect(preview.capabilityKey).toBe("dns.records.apply");
+    expect(preview.requiresExplicitAcceptance).toBe(true);
+    expect(preview.providerPlan?.dnsRecords?.records).toEqual([
+      {
+        name: "app.example.com",
+        type: "A",
+        value: "127.0.0.1",
+        purpose: "domain-routing",
+      },
+    ]);
+    expect(preview.effects.map((effect) => effect.kind)).toContain("dns.record.upsert");
+  });
+
   test("rejects proxyKind none for durable domain bindings", async () => {
     const { context, eventBus, useCase } = await seedRoutingContext();
 
