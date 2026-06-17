@@ -29,8 +29,8 @@ profile decisions without mutating either environment.
 ## Boundary
 
 This is a query. It does not apply profile changes, create resources, bind dependencies, copy
-storage data, regenerate domains, or resolve pending decisions. `environments.sync-profile` will
-own selected write-side application after explicit decisions are reviewed.
+storage data, regenerate domains, or resolve pending decisions. `environments.sync-profile` owns
+selected write-side application and records follow-up decisions for target-specific values.
 
 Secret values must not appear in the response. Implementations must mask secret environment values
 even if an underlying read model accidentally returns raw values.

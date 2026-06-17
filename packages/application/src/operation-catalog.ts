@@ -99,6 +99,7 @@ import { promoteEnvironmentCommandInputSchema } from "./operations/environments/
 import { renameEnvironmentCommandInputSchema } from "./operations/environments/rename-environment.command";
 import { setEnvironmentVariableCommandInputSchema } from "./operations/environments/set-environment-variable.command";
 import { showEnvironmentQueryInputSchema } from "./operations/environments/show-environment.query";
+import { syncEnvironmentProfileCommandInputSchema } from "./operations/environments/sync-environment-profile.command";
 import { unlockEnvironmentCommandInputSchema } from "./operations/environments/unlock-environment.command";
 import { unsetEnvironmentVariableCommandInputSchema } from "./operations/environments/unset-environment-variable.command";
 import { cancelOperatorWorkCommandInputSchema } from "./operations/operator-work/cancel-operator-work.command";
@@ -3013,6 +3014,23 @@ export const operationCatalog = [
       orpc: {
         method: "GET",
         path: "/api/environments/{environmentId}/diff-profile/{targetEnvironmentId}",
+      },
+    },
+  },
+  {
+    key: "environments.sync-profile",
+    kind: "command",
+    domain: "environments",
+    messageName: "SyncEnvironmentProfileCommand",
+    handlerName: "SyncEnvironmentProfileCommandHandler",
+    serviceName: "SyncEnvironmentProfileUseCase",
+    inputSchema: syncEnvironmentProfileCommandInputSchema,
+    serviceToken: tokens.syncEnvironmentProfileUseCase,
+    transports: {
+      cli: "appaloft env sync-profile <environmentId> <targetEnvironmentId> --resource-ids <ids>",
+      orpc: {
+        method: "POST",
+        path: "/api/environments/{environmentId}/sync-profile/{targetEnvironmentId}",
       },
     },
   },

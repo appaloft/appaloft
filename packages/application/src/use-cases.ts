@@ -115,6 +115,7 @@ export * from "./operations/environments/promote-environment.use-case";
 export * from "./operations/environments/rename-environment.use-case";
 export * from "./operations/environments/set-environment-variable.use-case";
 export * from "./operations/environments/show-environment.query-service";
+export * from "./operations/environments/sync-environment-profile.use-case";
 export * from "./operations/environments/unlock-environment.use-case";
 export * from "./operations/environments/unset-environment-variable.use-case";
 export * from "./operations/operator-work/cancel-operator-work.use-case";

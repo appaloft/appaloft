@@ -14,5 +14,6 @@ export * from "./operations/environments/promote-environment.handler";
 export * from "./operations/environments/rename-environment.handler";
 export * from "./operations/environments/set-environment-variable.handler";
 export * from "./operations/environments/show-environment.handler";
+export * from "./operations/environments/sync-environment-profile.handler";
 export * from "./operations/environments/unlock-environment.handler";
 export * from "./operations/environments/unset-environment-variable.handler";

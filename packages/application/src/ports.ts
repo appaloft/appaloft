@@ -5049,6 +5049,33 @@ export interface EnvironmentProfileDiffSummary {
   generatedAt: string;
 }
 
+export interface EnvironmentProfileSyncedResourceSummary {
+  sourceResourceId: string;
+  targetResourceId: string;
+  name: string;
+  slug: string;
+  action: "created";
+}
+
+export interface EnvironmentProfileSyncSkippedResourceSummary {
+  sourceResourceId: string;
+  targetResourceId: string;
+  name: string;
+  slug: string;
+  reason: "target-resource-exists";
+}
+
+export interface EnvironmentProfileSyncResult {
+  schemaVersion: "environments.sync-profile/v1";
+  sourceEnvironmentId: string;
+  targetEnvironmentId: string;
+  syncedResources: EnvironmentProfileSyncedResourceSummary[];
+  skippedResources: EnvironmentProfileSyncSkippedResourceSummary[];
+  deferredDecisions: EnvironmentDuplicateDeferredDecisionSummary[];
+  warnings: EnvironmentDuplicatePlanWarning[];
+  generatedAt: string;
+}
+
 export interface ServerBackedDeploymentSummaryTarget {
   kind: "server-backed";
   serverId: string;

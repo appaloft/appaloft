@@ -564,6 +564,8 @@ import {
   StreamOperatorWorkEventsQueryService,
   SwitchCurrentOrganizationCommandHandler,
   SwitchCurrentOrganizationUseCase,
+  SyncEnvironmentProfileCommandHandler,
+  SyncEnvironmentProfileUseCase,
   TerminalSessionLifecycleService,
   TestServerConnectivityUseCase,
   TransferOrganizationOwnerCommandHandler,
@@ -2381,6 +2383,7 @@ export function registerApplicationServices(
   container.registerSingleton(ArchiveEnvironmentCommandHandler);
   container.registerSingleton(CloneEnvironmentCommandHandler);
   container.registerSingleton(DuplicateEnvironmentProfileCommandHandler);
+  container.registerSingleton(SyncEnvironmentProfileCommandHandler);
   container.registerSingleton(RenameEnvironmentCommandHandler);
   container.registerSingleton(LockEnvironmentCommandHandler);
   container.registerSingleton(UnlockEnvironmentCommandHandler);
@@ -3271,6 +3274,7 @@ export function registerApplicationServices(
     tokens.duplicateEnvironmentProfileUseCase,
     DuplicateEnvironmentProfileUseCase,
   );
+  container.registerSingleton(tokens.syncEnvironmentProfileUseCase, SyncEnvironmentProfileUseCase);
   container.registerSingleton(tokens.countEnvironmentsQueryService, CountEnvironmentsQueryService);
   container.registerSingleton(tokens.renameEnvironmentUseCase, RenameEnvironmentUseCase);
   container.registerSingleton(tokens.lockEnvironmentUseCase, LockEnvironmentUseCase);

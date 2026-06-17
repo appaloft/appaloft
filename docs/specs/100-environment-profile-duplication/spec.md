@@ -3,7 +3,7 @@
 ## Status
 
 - Round: Code / Post-Implementation Sync
-- Artifact state: Phase 8 profile diff implemented; later sync, Web, and preview integration rows
+- Artifact state: Phase 9 selected resource-shape sync implemented; later Web and preview integration rows
   remain planned.
 - Governing decision: [ADR-085](../../decisions/ADR-085-environment-profile-duplication-boundary.md)
 
@@ -65,15 +65,15 @@ attempt.
 ## Public Surfaces
 
 - API/HTTP/oRPC:
-  - planned query `environments.plan-duplicate`;
-  - planned command `environments.duplicate-profile`;
-  - planned query `environments.diff-profile`;
-  - planned command `environments.sync-profile`.
+  - query `environments.plan-duplicate`;
+  - command `environments.duplicate-profile`;
+  - query `environments.diff-profile`;
+  - command `environments.sync-profile`.
 - CLI:
-  - planned `appaloft env duplicate plan`;
-  - planned `appaloft env duplicate apply`;
-  - planned `appaloft env diff-profile`;
-  - planned `appaloft env sync-profile`.
+  - `appaloft env duplicate plan`;
+  - `appaloft env duplicate apply`;
+  - `appaloft env diff-profile`;
+  - `appaloft env sync-profile`.
 - Web/UI:
   - Project Environment management should show Duplicate, Diff, and Sync as staged workflows with
     required decisions before apply.
