@@ -36,6 +36,7 @@
 - [x] Add operation catalog entries.
 - [x] Add application ports for provider adapters.
 - [x] Add fake DNS provider adapter before real providers.
+- [x] Add real Cloudflare DNS provider adapter with mocked HTTP contract tests.
 - [x] Add fake source provider adapter for provider-app token lease redaction/expiry.
 - [x] Add fake infrastructure provider adapter before real providers.
 - [x] Add fake notification provider adapter before real providers.
