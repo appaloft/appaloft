@@ -9043,9 +9043,9 @@ describe.serial("console e2e with Bun.WebView", () => {
     await using view = createWebView();
     await view.navigate(`${previewUrl}/projects/prj_demo?tab=environments`);
     await expectAnyText(view, ["Environments", "环境"]);
-    await clickButtonByAnyText(view, ["Clone", "克隆"]);
+    await clickButtonByAnyText(view, ["Copy", "复制"]);
     await setInputValue(view, "#environment-clone-dialog-name", "production-copy");
-    await clickDialogFooterButtonByExactText(view, ["Clone", "克隆"]);
+    await clickDialogFooterButtonByExactText(view, ["Copy", "复制"]);
 
     const cloneRequest = await waitForRecordedRequest("/api/rpc/environments/clone");
     const cloneInput = readOrpcJsonPayload(cloneRequest.body);

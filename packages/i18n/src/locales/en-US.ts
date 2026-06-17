@@ -23,6 +23,7 @@ export const enUS = {
       creating: "Creating",
       next: "Next",
       learnMore: "Learn more",
+      view: "View",
       openDocs: "Open related docs",
       openDocumentation: "Documentation",
       openDeployments: "Open deployment records",
@@ -266,7 +267,7 @@ export const enUS = {
       environmentConcept:
         "An environment scopes variables, resources, and deployments within a project.",
       environmentLifecycle:
-        "An environment lifecycle covers creation, cloning, locking, and archiving.",
+        "An environment lifecycle covers creation, copying, locking, and archiving.",
       environmentVariablePrecedence:
         "Variable precedence decides which project, environment, or resource value wins on conflict.",
       domainGeneratedAccessRoute:
@@ -1534,12 +1535,12 @@ export const enUS = {
         "Temporarily block variables, resources, promotions, and deployments.",
       environmentLifecycleUnlockOption:
         "Allow this locked environment to accept configuration and deployment changes again.",
-      environmentCloneAction: "Clone",
-      environmentCloneFailed: "Environment was not cloned",
-      environmentCloneNameLabel: "Clone name",
+      environmentCloneAction: "Copy",
+      environmentCloneFailed: "Environment was not copied",
+      environmentCloneNameLabel: "New environment name",
       environmentCloneNamePlaceholder: "production-copy",
-      environmentCloneSucceeded: "Environment cloned",
-      environmentCloneValidation: "Enter a clone name before cloning.",
+      environmentCloneSucceeded: "Environment copied",
+      environmentCloneValidation: "Enter a new environment name before copying.",
       environmentCreateAction: "Create environment",
       environmentCreateDescription:
         "An environment is a project-scoped configuration boundary for resources and deployments.",
@@ -1618,7 +1619,7 @@ export const enUS = {
       dangerZoneTitle: "Danger zone",
       environmentFilterLabel: "Environment",
       environmentManageDescription:
-        "Rename, clone, lock, or archive one environment at a time. Resource configuration stays on resource pages.",
+        "Rename, copy, lock, or archive one environment at a time. Resource configuration stays on resource pages.",
       environmentVariablesLabel: "variables",
       generalSettingsTitle: "General",
       lifecycleArchiveOption:
