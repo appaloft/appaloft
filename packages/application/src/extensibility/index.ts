@@ -5,3 +5,4 @@ export * from "./connector-registry";
 export * from "./default-connectors";
 export * from "./fake-dns-connector-adapter";
 export * from "./fake-infrastructure-connector-adapter";
+export * from "./fake-notification-connector-adapter";

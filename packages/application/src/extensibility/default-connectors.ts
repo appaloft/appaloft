@@ -25,6 +25,10 @@ export interface DefaultConnectorOptions {
     configured?: boolean;
     documentationHref?: string;
   };
+  slackNotification?: {
+    configured?: boolean;
+    documentationHref?: string;
+  };
 }
 
 export function createDefaultConnectorDefinitions(
@@ -171,25 +175,38 @@ export function createDefaultConnectorDefinitions(
       providerKey: "slack",
       capabilities: [
         {
-          key: "notification.messages.send",
-          title: "Send messages",
-          implemented: false,
+          key: "notification.messages.plan",
+          title: "Plan message delivery",
+          implemented: true,
         },
         {
-          key: "notification.channels.select",
-          title: "Select destination channels",
-          implemented: false,
+          key: "notification.messages.send",
+          title: "Send accepted message",
+          implemented: true,
         },
       ],
       grantKinds: [
         {
-          kind: "limited-oauth-grant",
-          title: "Slack OAuth grant",
-          storesLongLivedSecret: false,
+          kind: "manual-secret-reference",
+          title: "Slack webhook or app secret reference",
+          storesLongLivedSecret: true,
+          description: "Uses an operator-managed secret reference for deterministic message sends.",
         },
       ],
-      availability: deferred("Notification connector adapters are not enabled yet."),
+      availability: options.slackNotification?.configured
+        ? ConnectorAvailabilityValue.available(
+            "Slack notification connector is configured.",
+          ).toJSON()
+        : unavailable(
+            "connector.slack_notification.not_configured",
+            "Slack notification requires a webhook, app credential, or secret reference.",
+          ),
       visibility: "hidden-when-unavailable",
+      setup: {
+        ...(options.slackNotification?.documentationHref
+          ? { documentationHref: options.slackNotification.documentationHref }
+          : {}),
+      },
     },
     {
       key: "github-identity",

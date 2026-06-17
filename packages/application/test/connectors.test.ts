@@ -7,6 +7,7 @@ import {
   createExecutionContext,
   FakeDnsConnectorProviderAdapter,
   FakeInfrastructureConnectorProviderAdapter,
+  FakeNotificationConnectorProviderAdapter,
   InMemoryConnectorConnectionStore,
   InMemoryConnectorProviderAdapterRegistry,
   InMemoryConnectorRegistry,
@@ -109,6 +110,28 @@ describe("connector catalog", () => {
     expect(result.items).toEqual([]);
   });
 
+  test("[APP-CONN-011] exposes Slack as the primary notification connector when configured", async () => {
+    const registry = new InMemoryConnectorRegistry(
+      createDefaultConnectorDefinitions({
+        slackNotification: {
+          configured: true,
+        },
+      }),
+    );
+    const service = new ListConnectorsQueryService(registry);
+    const result = await service.execute(createExecutionContext({ entrypoint: "system" }), {
+      category: "notification",
+    });
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]?.key).toBe("slack-notification");
+    expect(result.items[0]?.availability.status).toBe("available");
+    expect(result.items[0]?.capabilities.map((capability) => capability.key)).toEqual([
+      "notification.messages.plan",
+      "notification.messages.send",
+    ]);
+  });
+
   test("[APP-CONN-009] exposes Vultr as the primary infrastructure connector when configured", async () => {
     const registry = new InMemoryConnectorRegistry(
       createDefaultConnectorDefinitions({
@@ -180,6 +203,129 @@ describe("connector catalog", () => {
     });
     expect(plan.effects.map((effect) => effect.kind)).toContain("infrastructure.cost.estimate");
     expect(JSON.stringify(plan)).not.toContain("token");
+  });
+
+  test("[APP-CONN-011][APP-CONN-016] plans Slack notification messages with payload redaction", async () => {
+    const registry = new InMemoryConnectorRegistry(
+      createDefaultConnectorDefinitions({
+        slackNotification: {
+          configured: true,
+        },
+      }),
+    );
+    const service = new PlanConnectorCapabilityQueryService(
+      registry,
+      new InMemoryConnectorProviderAdapterRegistry([
+        new FakeNotificationConnectorProviderAdapter({
+          connectorKey: "slack-notification",
+          providerKey: "slack",
+          providerTitle: "Slack Notification",
+          defaultChannelRef: "#deployments",
+        }),
+      ]),
+    );
+
+    const result = await service.execute(createExecutionContext({ entrypoint: "system" }), {
+      connectorKey: "slack-notification",
+      capabilityKey: "notification.messages.plan",
+      parameters: {
+        channelRef: "#deployments",
+        subject: "Deploy finished",
+        body: "Deploy finished for owner@example.com token=secret-token",
+        payload: {
+          deploymentId: "dep_123",
+          actorEmail: "owner@example.com",
+          token: "secret-token",
+        },
+        metadata: {
+          resourceId: "res_123",
+        },
+      },
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+    expect(plan.connectorKey).toBe("slack-notification");
+    expect(plan.riskLevel).toBe("medium");
+    expect(plan.requiresExplicitAcceptance).toBe(true);
+    expect(plan.providerPlan?.kind).toBe("notification-message");
+    expect(plan.providerPlan?.notificationMessage).toMatchObject({
+      providerKey: "slack",
+      channelRef: "#deployments",
+      subject: "Deploy finished",
+      bodyPreview: "Deploy finished for [redacted-email] token=[redacted]",
+      payloadSensitivity: "sensitive",
+      redactedFields: ["actorEmail", "token"],
+      metadata: {
+        resourceId: "res_123",
+      },
+    });
+    expect(JSON.stringify(plan)).not.toContain("owner@example.com");
+    expect(JSON.stringify(plan)).not.toContain("secret-token");
+  });
+
+  test("[APP-CONN-011][APP-CONN-016] sends accepted Slack notification messages without exposing provider secrets", async () => {
+    const registry = new InMemoryConnectorRegistry(
+      createDefaultConnectorDefinitions({
+        slackNotification: {
+          configured: true,
+        },
+      }),
+    );
+    const service = new ApplyConnectorCapabilityUseCase(
+      registry,
+      new InMemoryConnectorProviderAdapterRegistry([
+        new FakeNotificationConnectorProviderAdapter({
+          connectorKey: "slack-notification",
+          providerKey: "slack",
+          providerTitle: "Slack Notification",
+        }),
+      ]),
+    );
+
+    const rejected = await service.execute(createExecutionContext({ entrypoint: "system" }), {
+      connectorKey: "slack-notification",
+      capabilityKey: "notification.messages.send",
+      parameters: {
+        channelRef: "#deployments",
+        subject: "Deploy finished",
+        body: "Deploy finished for owner@example.com",
+        payload: {
+          actorEmail: "owner@example.com",
+        },
+      },
+    });
+    expect(rejected.isErr()).toBe(true);
+    expect(rejected._unsafeUnwrapErr().code).toBe("conflict");
+
+    const sent = await service.execute(createExecutionContext({ entrypoint: "system" }), {
+      connectorKey: "slack-notification",
+      capabilityKey: "notification.messages.send",
+      acceptedPlanId: "notifyplan_test",
+      parameters: {
+        channelRef: "#deployments",
+        subject: "Deploy finished",
+        body: "Deploy finished for owner@example.com",
+        payload: {
+          actorEmail: "owner@example.com",
+        },
+      },
+    });
+
+    expect(sent.isOk()).toBe(true);
+    const result = sent._unsafeUnwrap();
+    expect(result.status).toBe("applied");
+    expect(result.effects.map((effect) => effect.kind)).toEqual(["notification.message.sent"]);
+    expect(result.providerResult?.notificationDelivery).toMatchObject({
+      providerKey: "slack",
+      channelRef: "#deployments",
+      subject: "Deploy finished",
+      status: "sent",
+      payloadSensitivity: "sensitive",
+      redactedFields: ["actorEmail"],
+    });
+    expect(JSON.stringify(result)).not.toContain("owner@example.com");
+    expect(JSON.stringify(result)).not.toContain("slack_secret_token");
   });
 
   test("[APP-CONN-004][APP-CONN-014][APP-CONN-016] plans Cloudflare DNS records through a provider adapter", async () => {

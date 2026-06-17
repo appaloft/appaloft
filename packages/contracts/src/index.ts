@@ -6581,6 +6581,21 @@ export const infrastructureServerProposalSchema = z.object({
   tags: z.array(z.string()),
 });
 
+export const notificationMessageSchema = z.object({
+  providerKey: z.string(),
+  channelRef: z.string(),
+  subject: z.string(),
+  bodyPreview: z.string(),
+  payloadSensitivity: z.enum(["normal", "sensitive"]),
+  redactedFields: z.array(z.string()),
+  metadata: z.record(z.string(), z.string()),
+});
+
+export const notificationMessageDeliverySchema = notificationMessageSchema.extend({
+  providerMessageId: z.string(),
+  status: z.enum(["sent", "skipped"]),
+});
+
 export const dnsRecordApplySchema = z.object({
   zoneName: z.string().optional(),
   status: z.enum(["applied", "verified", "cleaned-up", "conflict", "skipped"]),
@@ -6623,6 +6638,7 @@ export const connectorCapabilityPlanPreviewSchema = z.object({
       kind: z.string(),
       dnsRecords: dnsRecordPlanSchema.optional(),
       infrastructureServerProposal: infrastructureServerProposalSchema.optional(),
+      notificationMessage: notificationMessageSchema.optional(),
     })
     .optional(),
 });
@@ -6646,6 +6662,7 @@ export const connectorCapabilityApplyResultSchema = z.object({
     .object({
       kind: z.string(),
       dnsRecords: dnsRecordApplySchema.optional(),
+      notificationDelivery: notificationMessageDeliverySchema.optional(),
     })
     .optional(),
 });
@@ -6861,6 +6878,8 @@ export type DnsRecordConflict = z.infer<typeof dnsRecordConflictSchema>;
 export type DnsRecordPlan = z.infer<typeof dnsRecordPlanSchema>;
 export type DnsRecordApply = z.infer<typeof dnsRecordApplySchema>;
 export type InfrastructureServerProposal = z.infer<typeof infrastructureServerProposalSchema>;
+export type NotificationMessage = z.infer<typeof notificationMessageSchema>;
+export type NotificationMessageDelivery = z.infer<typeof notificationMessageDeliverySchema>;
 export type ConnectorCapabilityPlanPreview = z.infer<typeof connectorCapabilityPlanPreviewSchema>;
 export type ConnectorCapabilityApplyResult = z.infer<typeof connectorCapabilityApplyResultSchema>;
 export type PluginSummary = z.infer<typeof pluginSummarySchema>;
