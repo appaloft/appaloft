@@ -23,6 +23,8 @@ import { type ExecutionContext, toRepositoryContext } from "../../execution-cont
 import {
   type Clock,
   type DependencyResourceReadModel,
+  type DomainBindingReadModel,
+  type DomainBindingSummary,
   type EnvironmentDuplicateDeferredDecisionSummary,
   type EnvironmentDuplicateProfileApplyResult,
   type EnvironmentProfileDecisionRepository,
@@ -63,6 +65,8 @@ export class DuplicateEnvironmentProfileUseCase {
     private readonly clock: Clock,
     @inject(tokens.environmentProfileDecisionRepository, { isOptional: true })
     private readonly environmentProfileDecisionRepository?: EnvironmentProfileDecisionRepository,
+    @inject(tokens.domainBindingReadModel, { isOptional: true })
+    private readonly domainBindingReadModel?: DomainBindingReadModel,
   ) {}
 
   async execute(
@@ -78,6 +82,7 @@ export class DuplicateEnvironmentProfileUseCase {
       resourceRepository,
       resourceDependencyBindingReadModel,
       environmentProfileDecisionRepository,
+      domainBindingReadModel,
     } = this;
     const repositoryContext = toRepositoryContext(context);
 
@@ -271,6 +276,27 @@ export class DuplicateEnvironmentProfileUseCase {
             sourceResourceId: sourceState.id.value,
           })),
         );
+        const domainRouteDeferredDecisions = domainBindingReadModel
+          ? (
+              await domainBindingReadModel.list(repositoryContext, {
+                projectId: sourceEnvironment.projectId,
+                environmentId: sourceEnvironment.id,
+                resourceId: sourceState.id.value,
+                limit: 500,
+              })
+            ).map(domainRouteDeferredDecision)
+          : [];
+        deferredDecisions.push(...domainRouteDeferredDecisions);
+        pendingDecisions.push(
+          ...domainRouteDeferredDecisions.map((decision) => ({
+            ...decision,
+            projectId: sourceEnvironment.projectId,
+            environmentId: targetEnvironmentId,
+            resourceId: createResult.id,
+            sourceEnvironmentId: sourceEnvironment.id,
+            sourceResourceId: sourceState.id.value,
+          })),
+        );
 
         const bindings = yield* await resourceDependencyBindingReadModel.list(repositoryContext, {
           resourceId: resourceSummary.id,
@@ -439,6 +465,18 @@ function dependencyBindingDeferredDecision(
     decision: "defer",
     reason:
       "Dependency binding requires a non-deferred dependency target decision before it can be copied.",
+  };
+}
+
+function domainRouteDeferredDecision(
+  binding: DomainBindingSummary,
+): EnvironmentDuplicateDeferredDecisionSummary {
+  return {
+    kind: "route",
+    sourceId: binding.id,
+    decision: "defer",
+    reason:
+      "Custom domain routes are environment-specific and must be regenerated or explicitly rebound before deployment.",
   };
 }
 
