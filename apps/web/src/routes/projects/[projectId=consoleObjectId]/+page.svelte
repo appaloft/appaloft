@@ -44,6 +44,7 @@
   import { readErrorMessage } from "$lib/api/client";
   import { capabilities, capabilityKey, type CapabilityQuery } from "$lib/capabilities";
   import CapabilityGate from "$lib/components/console/CapabilityGate.svelte";
+  import ConsoleExtensionPanelHost from "$lib/components/console/ConsoleExtensionPanelHost.svelte";
   import DeploymentTable from "$lib/components/console/DeploymentTable.svelte";
   import DeploymentStatusBadge from "$lib/components/console/DeploymentStatusBadge.svelte";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
@@ -2671,6 +2672,12 @@
                     <p class="mt-4 text-sm leading-6 text-muted-foreground">
                       {$t(i18nKeys.console.projects.environmentManageDescription)}
                     </p>
+                    <ConsoleExtensionPanelHost
+                      class="mt-4"
+                      placement="project-environment-panel"
+                      {projectId}
+                      environmentId={environment.id}
+                    />
                   </article>
                 {/each}
               {:else}

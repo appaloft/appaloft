@@ -5,6 +5,7 @@ import { describe, expect, test } from "vitest";
 import {
   consolePageRenderer,
   findConsolePageExtensionByPath,
+  findConsolePanelExtensionsByPlacement,
   readConsolePageExtensionMetadata,
   resolveConsolePageEndpoint,
 } from "./console-page-extension";
@@ -22,6 +23,19 @@ const consolePageExtension: SystemPluginWebExtension = {
     renderer: consolePageRenderer,
     pageEndpoint:
       "/example/usage-page?organizationId={organizationId}&path={pathname}&query={query}",
+  },
+};
+
+const resourcePanelExtension: SystemPluginWebExtension = {
+  ...consolePageExtension,
+  key: "example-resource-panel",
+  title: "Resource panel",
+  path: "/resources",
+  placement: "resource-detail-panel",
+  metadata: {
+    renderer: consolePageRenderer,
+    pageEndpoint:
+      "/example/resource-panel?projectId={projectId}&environmentId={environmentId}&resourceId={resourceId}",
   },
 };
 
@@ -63,6 +77,41 @@ describe("Console page extension surface", () => {
     );
   });
 
+  test("[CONSOLE-EXT-PAGE-003] resolves owner-scoped console panel template variables", () => {
+    const metadata = readConsolePageExtensionMetadata(resourcePanelExtension);
+
+    expect(
+      resolveConsolePageEndpoint(metadata, {
+        pathname: "/resources/res_123",
+        query: "tab=dependencies",
+        organization: {
+          organizationId: "org_123",
+          slug: "acme-team",
+        },
+        projectId: "proj_123",
+        environmentId: "env_staging",
+        resourceId: "res_123",
+      }),
+    ).toBe(
+      "/example/resource-panel?projectId=proj_123&environmentId=env_staging&resourceId=res_123",
+    );
+  });
+
+  test("[CONSOLE-EXT-PAGE-003] discovers console panel extensions by placement", () => {
+    expect(
+      findConsolePanelExtensionsByPlacement(
+        [consolePageExtension, resourcePanelExtension],
+        "resource-detail-panel",
+      ),
+    ).toEqual([resourcePanelExtension]);
+    expect(
+      findConsolePanelExtensionsByPlacement(
+        [consolePageExtension, resourcePanelExtension],
+        "project-environment-panel",
+      ),
+    ).toEqual([]);
+  });
+
   test("[CONSOLE-EXT-PAGE-002] renderer supports neutral panel fields and request body bindings", () => {
     const rendererSource = readFileSync(
       new URL("../components/console/ConsoleExtensionPage.svelte", import.meta.url),
@@ -83,5 +132,31 @@ describe("Console page extension surface", () => {
     expect(rendererSource).not.toContain("href={filter.href}");
     expect(rendererSource).not.toContain("<Table.Root");
     expect(rendererSource).not.toContain('from "$lib/components/ui/table"');
+  });
+
+  test("[CONSOLE-EXT-PAGE-003] embeds owner-scoped console panel hosts in project and resource pages", () => {
+    const panelHostSource = readFileSync(
+      new URL("../components/console/ConsoleExtensionPanelHost.svelte", import.meta.url),
+      "utf8",
+    );
+    const projectPageSource = readFileSync(
+      new URL("../../routes/projects/[projectId=consoleObjectId]/+page.svelte", import.meta.url),
+      "utf8",
+    );
+    const resourcePageSource = readFileSync(
+      new URL("../../routes/resources/[resourceId=consoleObjectId]/+page.svelte", import.meta.url),
+      "utf8",
+    );
+
+    expect(panelHostSource).toContain("data-console-extension-panel-host");
+    expect(panelHostSource).toContain("findConsolePanelExtensionsByPlacement");
+    expect(panelHostSource).toContain("projectId");
+    expect(panelHostSource).toContain("environmentId");
+    expect(panelHostSource).toContain("resourceId");
+    expect(projectPageSource).toContain('placement="project-environment-panel"');
+    expect(projectPageSource).toContain("environmentId={environment.id}");
+    expect(resourcePageSource).toContain('placement="resource-detail-panel"');
+    expect(resourcePageSource).toContain("projectId={resourceProjectId}");
+    expect(resourcePageSource).toContain("environmentId={resourceEnvironmentId}");
   });
 });
