@@ -659,6 +659,9 @@ export const tokens = {
   providerRegistry: Symbol.for("appaloft.provider_registry"),
   connectorRegistry: Symbol.for("appaloft.connector_registry"),
   connectorConnectionStore: Symbol.for("appaloft.connector_connection_store"),
+  connectorConnectionProjectionSource: Symbol.for(
+    "appaloft.connector_connection_projection_source",
+  ),
   connectorProviderAdapterRegistry: Symbol.for("appaloft.connector_provider_adapter_registry"),
   integrationRegistry: Symbol.for("appaloft.integration_registry"),
   blueprintRegistry: Symbol.for("appaloft.blueprint_registry"),

@@ -1,8 +1,10 @@
 import { inject, injectable } from "tsyringe";
 
 import { type ExecutionContext } from "../../execution-context";
+import { EmptyConnectorConnectionProjectionSource } from "../../extensibility/connection-projections";
 import {
   type ConnectionSnapshot,
+  type ConnectorConnectionProjectionSource,
   type ConnectorConnectionStore,
   type ConnectorConnectionStoreListInput,
 } from "../../ports";
@@ -14,13 +16,14 @@ export class ListConnectionsQueryService {
   constructor(
     @inject(tokens.connectorConnectionStore)
     private readonly connectionStore: ConnectorConnectionStore,
+    @inject(tokens.connectorConnectionProjectionSource)
+    private readonly projectionSource: ConnectorConnectionProjectionSource = new EmptyConnectorConnectionProjectionSource(),
   ) {}
 
   async execute(
     context: ExecutionContext,
     input: ListConnectionsQueryInput = {},
   ): Promise<{ items: ConnectionSnapshot[] }> {
-    void context;
     const storeInput: ConnectorConnectionStoreListInput = {};
     if (input.owner) {
       storeInput.owner = input.owner;
@@ -31,6 +34,14 @@ export class ListConnectionsQueryService {
     if (input.category) {
       storeInput.category = input.category;
     }
-    return { items: this.connectionStore.list(storeInput) };
+    const items = this.connectionStore.list(storeInput);
+    const projected = await this.projectionSource.list(context, storeInput);
+    const byId = new Map(items.map((item) => [item.id, item]));
+    for (const item of projected) {
+      if (!byId.has(item.id)) {
+        byId.set(item.id, item);
+      }
+    }
+    return { items: [...byId.values()] };
   }
 }

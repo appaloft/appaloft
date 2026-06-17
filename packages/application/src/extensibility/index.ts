@@ -1,5 +1,6 @@
 export * from "../system-handlers";
 export * from "../system-messages";
+export * from "./connection-projections";
 export * from "./connection-store";
 export * from "./connector-registry";
 export * from "./default-connectors";
