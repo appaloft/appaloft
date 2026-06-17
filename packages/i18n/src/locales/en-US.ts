@@ -521,6 +521,7 @@ export const enUS = {
       selectBackup: "Select backup",
       selectEnvironment: "Select environment",
       selectProject: "Select project",
+      selectProjectFirst: "Select a project first",
       selectServer: "Select server",
       selectedResource: "Selected resource",
       secretRef: "Secret reference",
@@ -585,6 +586,7 @@ export const enUS = {
       filtersDescription:
         "Filter deployment records by project, environment, resource, and status. Create or retry deployments from project resource views or resource pages.",
       filtersTitle: "Filter deployment records",
+      selectProjectFirst: "Select a project first",
       focusDescription:
         "Treat each release as a traceable event; server, snapshot, and command details live on the detail page.",
       focusTitle: "Deployment records and runtime state",
