@@ -41,7 +41,8 @@
 
 - [x] ENV-PROFILE-DUP-008: extend diff-profile to resource/source/runtime/network/dependency/route
   shape, storage mounts, and pending target decisions.
-- [ ] ENV-PROFILE-DUP-009: implement selected sync with staged decisions.
+- [x] ENV-PROFILE-DUP-009: implement selected resource-shape sync with staged dependency, route,
+  storage, and unsupported resource-profile decisions.
 - [ ] Define whether profile promotion is a separate command or a constrained sync mode.
 - [ ] Add Web owner-scoped controls under Project Environment management and Resource detail.
 
@@ -57,7 +58,7 @@
 
 - [x] Run focused unit/contract tests for each implemented phase.
 - [ ] Run source-truth sync checks after operation catalog/doc changes.
-- [ ] Run CLI help/SDK descriptor verification after new operations are cataloged.
+- [x] Run CLI help/SDK descriptor verification after new operations are cataloged for Phase 9.
 
 ## Post-Implementation Sync
 

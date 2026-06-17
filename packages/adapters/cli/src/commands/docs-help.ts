@@ -840,6 +840,10 @@ export const cliCommandDescriptions = {
     "Apply reviewed environment profile duplication",
     "environment.lifecycle",
   ),
+  environmentSyncProfile: withDocs(
+    "Sync selected environment profile shape",
+    "environment.diff-promote",
+  ),
   environmentPromote: withDocs("Promote an environment", "environment.diff-promote"),
   defaultAccess: withDocs(
     "Configure generated default access domain policy",

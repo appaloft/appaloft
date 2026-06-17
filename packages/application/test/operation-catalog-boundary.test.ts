@@ -44,6 +44,7 @@ describe("operation catalog aggregate mutation boundary", () => {
       "environments.diff",
       "environments.diff-profile",
       "environments.plan-duplicate",
+      "environments.sync-profile",
       "environments.promote",
       "servers.register",
       "servers.configure-credential",

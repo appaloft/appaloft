@@ -346,6 +346,7 @@ export const tokens = {
   archiveEnvironmentUseCase: Symbol.for("appaloft.archive_environment_use_case"),
   cloneEnvironmentUseCase: Symbol.for("appaloft.clone_environment_use_case"),
   duplicateEnvironmentProfileUseCase: Symbol.for("appaloft.duplicate_environment_profile_use_case"),
+  syncEnvironmentProfileUseCase: Symbol.for("appaloft.sync_environment_profile_use_case"),
   countEnvironmentsQueryService: Symbol.for("appaloft.count_environments_query_service"),
   renameEnvironmentUseCase: Symbol.for("appaloft.rename_environment_use_case"),
   lockEnvironmentUseCase: Symbol.for("appaloft.lock_environment_use_case"),

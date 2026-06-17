@@ -13,5 +13,6 @@ export * from "./operations/environments/promote-environment.command";
 export * from "./operations/environments/rename-environment.command";
 export * from "./operations/environments/set-environment-variable.command";
 export * from "./operations/environments/show-environment.query";
+export * from "./operations/environments/sync-environment-profile.command";
 export * from "./operations/environments/unlock-environment.command";
 export * from "./operations/environments/unset-environment-variable.command";

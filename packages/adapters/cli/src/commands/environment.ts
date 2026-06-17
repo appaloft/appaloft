@@ -14,6 +14,7 @@ import {
   RenameEnvironmentCommand,
   SetEnvironmentVariableCommand,
   ShowEnvironmentQuery,
+  SyncEnvironmentProfileCommand,
   UnlockEnvironmentCommand,
   UnsetEnvironmentVariableCommand,
 } from "@appaloft/application";
@@ -37,6 +38,7 @@ const archiveReasonOption = Options.text("reason").pipe(Options.optional);
 const cloneKindOption = Options.choice("kind", environmentKinds).pipe(Options.optional);
 const dependencyDecisionsOption = Options.text("dependency-decisions").pipe(Options.optional);
 const resourceDecisionsOption = Options.text("resource-decisions").pipe(Options.optional);
+const resourceIdsOption = Options.text("resource-ids");
 const lockReasonOption = Options.text("reason").pipe(Options.optional);
 const exposureOption = Options.choice("exposure", variableExposures);
 const scopeOption = Options.choice("scope", configScopes).pipe(Options.optional);
@@ -310,6 +312,23 @@ const promoteCommand = EffectCommand.make(
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.environmentPromote));
 
+const syncProfileCommand = EffectCommand.make(
+  "sync-profile",
+  {
+    environmentId: environmentIdArg,
+    targetEnvironmentId: Args.text({ name: "targetEnvironmentId" }),
+    resourceIds: resourceIdsOption,
+  },
+  ({ environmentId, resourceIds, targetEnvironmentId }) =>
+    runCommand(
+      SyncEnvironmentProfileCommand.create({
+        environmentId,
+        targetEnvironmentId,
+        resourceIds: parseCommaSeparatedOption(resourceIds, "resource-ids"),
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.environmentSyncProfile));
+
 export const envCommand = EffectCommand.make("env").pipe(
   EffectCommand.withDescription(cliCommandDescriptions.environment),
   EffectCommand.withSubcommands([
@@ -327,6 +346,7 @@ export const envCommand = EffectCommand.make("env").pipe(
     diffCommand,
     diffProfileCommand,
     duplicateCommand,
+    syncProfileCommand,
     promoteCommand,
   ]),
 );
@@ -341,4 +361,15 @@ function parseJsonArrayOption(text: string | undefined, optionName: string): unk
     throw new Error(`--${optionName} must be a JSON array`);
   }
   return parsed;
+}
+
+function parseCommaSeparatedOption(text: string, optionName: string): string[] {
+  const values = text
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  if (values.length === 0) {
+    throw new Error(`--${optionName} must include at least one value`);
+  }
+  return values;
 }

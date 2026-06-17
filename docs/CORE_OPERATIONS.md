@@ -312,6 +312,7 @@ Implemented operations:
 | Diff environment profile | Query | `environments.diff-profile` | `DiffEnvironmentProfileQuery` | `DiffEnvironmentProfileQueryInput` | `appaloft env diff-profile <environmentId> <targetEnvironmentId>` | `GET /api/environments/{environmentId}/diff-profile/{targetEnvironmentId}` |
 | Plan environment profile duplication | Query | `environments.plan-duplicate` | `PlanDuplicateEnvironmentQuery` | `PlanDuplicateEnvironmentQueryInput` | `appaloft env duplicate plan <environmentId> --name <targetName>` | `GET /api/environments/{environmentId}/duplicate-plan` |
 | Apply environment profile duplication | Command | `environments.duplicate-profile` | `DuplicateEnvironmentProfileCommand` | `DuplicateEnvironmentProfileCommandInput` | `appaloft env duplicate apply <environmentId> --name <targetName>` | `POST /api/environments/{environmentId}/duplicate-profile` |
+| Sync environment profile | Command | `environments.sync-profile` | `SyncEnvironmentProfileCommand` | `SyncEnvironmentProfileCommandInput` | `appaloft env sync-profile <environmentId> <targetEnvironmentId> --resource-ids <ids>` | `POST /api/environments/{environmentId}/sync-profile/{targetEnvironmentId}` |
 | Clone environment | Command | `environments.clone` | `CloneEnvironmentCommand` | `CloneEnvironmentCommandInput` | `appaloft env clone <environmentId> --name <targetName>` | `POST /api/environments/{environmentId}/clone` |
 | Promote environment | Command | `environments.promote` | `PromoteEnvironmentCommand` | `PromoteEnvironmentCommandInput` | `appaloft env promote <environmentId> <targetName>` | `POST /api/environments/{environmentId}/promote` |
 | Lock environment | Command | `environments.lock` | `LockEnvironmentCommand` | `LockEnvironmentCommandInput` | `appaloft env lock <environmentId> --reason <reason>` | `POST /api/environments/{environmentId}/lock` |
@@ -321,8 +322,6 @@ Implemented operations:
 Core next operations expected here:
 - list environment change history
 - restore/delete and lifecycle history
-- `environments.sync-profile` to import selected shape changes from one environment into another
-  through staged decisions rather than broad overwrite
 - `environments.rename` changes only the environment display name inside its owning project. It
   preserves environment id, kind, parent environment, variables, resources, deployments, and
   runtime state.
