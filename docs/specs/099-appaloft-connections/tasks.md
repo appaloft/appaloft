@@ -39,6 +39,7 @@
 - [x] Add real Cloudflare DNS provider adapter with mocked HTTP contract tests.
 - [x] Add fake source provider adapter for provider-app token lease redaction/expiry.
 - [x] Add fake infrastructure provider adapter before real providers.
+- [x] Add real Vultr infrastructure proposal adapter with mocked HTTP contract tests.
 - [x] Add fake notification provider adapter before real providers.
 - [x] Add GitHub App source connection projection/compatibility.
 - [x] Add persistent DNS provider plan contract.
