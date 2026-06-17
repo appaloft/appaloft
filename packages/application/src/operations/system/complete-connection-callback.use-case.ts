@@ -1,6 +1,6 @@
 import { Connection, domainError, err, OccurredAt, ok, type Result } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
-
+import { type ExecutionContext } from "../../execution-context";
 import {
   type Clock,
   type ConnectionCallbackResult,
@@ -8,6 +8,7 @@ import {
 } from "../../ports";
 import { tokens } from "../../tokens";
 import { type CompleteConnectionCallbackCommandInput } from "./complete-connection-callback.command";
+import { connectionBelongsToContext } from "./connection-tenant-scope";
 
 @injectable()
 export class CompleteConnectionCallbackUseCase {
@@ -20,9 +21,19 @@ export class CompleteConnectionCallbackUseCase {
 
   async execute(
     input: CompleteConnectionCallbackCommandInput,
+  ): Promise<Result<ConnectionCallbackResult>>;
+  async execute(
+    context: ExecutionContext,
+    input: CompleteConnectionCallbackCommandInput,
+  ): Promise<Result<ConnectionCallbackResult>>;
+  async execute(
+    contextOrInput: ExecutionContext | CompleteConnectionCallbackCommandInput,
+    maybeInput?: CompleteConnectionCallbackCommandInput,
   ): Promise<Result<ConnectionCallbackResult>> {
+    const context = maybeInput ? (contextOrInput as ExecutionContext) : undefined;
+    const input = maybeInput ?? (contextOrInput as CompleteConnectionCallbackCommandInput);
     const snapshot = this.connectionStore.findById(input.connectionId);
-    if (!snapshot) {
+    if (!snapshot || !connectionBelongsToContext(context, snapshot)) {
       return err(domainError.notFound("Connection", input.connectionId));
     }
     const connection = Connection.rehydrate(snapshot);

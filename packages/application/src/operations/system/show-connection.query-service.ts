@@ -9,6 +9,7 @@ import {
   type ConnectorConnectionStore,
 } from "../../ports";
 import { tokens } from "../../tokens";
+import { connectionBelongsToContext } from "./connection-tenant-scope";
 
 @injectable()
 export class ShowConnectionQueryService {
@@ -25,11 +26,17 @@ export class ShowConnectionQueryService {
   ): Promise<Result<ConnectionSnapshot>> {
     const connection = this.connectionStore.findById(input.connectionId);
     if (connection) {
+      if (!connectionBelongsToContext(context, connection)) {
+        return err(domainError.notFound("Connection", input.connectionId));
+      }
       return ok(connection);
     }
 
     const projected = await this.projectionSource.findById(context, input.connectionId);
     if (!projected) {
+      return err(domainError.notFound("Connection", input.connectionId));
+    }
+    if (!connectionBelongsToContext(context, projected)) {
       return err(domainError.notFound("Connection", input.connectionId));
     }
     return ok(projected);

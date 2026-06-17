@@ -27,6 +27,7 @@ export type ConnectionCredentialStorage = "none" | "secret-ref" | "provider-app"
 export interface ConnectionOwnerSnapshot {
   scope: ConnectionOwnerScope;
   id: string;
+  tenantId?: string | undefined;
 }
 
 export interface ConnectionCredentialGrantSnapshot {
@@ -121,17 +122,32 @@ export class ConnectionOwnerRef {
     if (!ownerScopes.includes(snapshot.scope)) {
       return err(domainError.validation(`Unknown connection owner scope ${snapshot.scope}`));
     }
-    return requiredText(snapshot.id, "Connection owner ID").map(
-      (id) => new ConnectionOwnerRef({ scope: snapshot.scope, id }),
+    return requiredText(snapshot.id, "Connection owner ID").andThen((id) =>
+      rejectSecretLikeText(snapshot.tenantId, "Connection owner tenant ID").map(
+        (tenantId) =>
+          new ConnectionOwnerRef({
+            scope: snapshot.scope,
+            id,
+            ...(tenantId ? { tenantId } : {}),
+          }),
+      ),
     );
   }
 
   static rehydrate(snapshot: ConnectionOwnerSnapshot): ConnectionOwnerRef {
-    return new ConnectionOwnerRef({ scope: snapshot.scope, id: snapshot.id.trim() });
+    return new ConnectionOwnerRef({
+      scope: snapshot.scope,
+      id: snapshot.id.trim(),
+      ...(snapshot.tenantId?.trim() ? { tenantId: snapshot.tenantId.trim() } : {}),
+    });
   }
 
   sameAs(other: ConnectionOwnerRef): boolean {
-    return this.snapshot.scope === other.snapshot.scope && this.snapshot.id === other.snapshot.id;
+    return (
+      this.snapshot.scope === other.snapshot.scope &&
+      this.snapshot.id === other.snapshot.id &&
+      this.snapshot.tenantId === other.snapshot.tenantId
+    );
   }
 
   toJSON(): ConnectionOwnerSnapshot {

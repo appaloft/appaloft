@@ -8,7 +8,7 @@ import {
   type Result,
 } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
-
+import { type ExecutionContext } from "../../execution-context";
 import {
   type Clock,
   type ConnectionStartResult,
@@ -17,6 +17,10 @@ import {
   type IdGenerator,
 } from "../../ports";
 import { tokens } from "../../tokens";
+import {
+  defaultConnectionOwnerForContext,
+  ensureConnectionOwnerAllowedForContext,
+} from "./connection-tenant-scope";
 import { type StartConnectionCommandInput } from "./start-connection.command";
 
 @injectable()
@@ -32,7 +36,17 @@ export class StartConnectionUseCase {
     private readonly idGenerator: IdGenerator,
   ) {}
 
-  async execute(input: StartConnectionCommandInput): Promise<Result<ConnectionStartResult>> {
+  async execute(input: StartConnectionCommandInput): Promise<Result<ConnectionStartResult>>;
+  async execute(
+    context: ExecutionContext,
+    input: StartConnectionCommandInput,
+  ): Promise<Result<ConnectionStartResult>>;
+  async execute(
+    contextOrInput: ExecutionContext | StartConnectionCommandInput,
+    maybeInput?: StartConnectionCommandInput,
+  ): Promise<Result<ConnectionStartResult>> {
+    const context = maybeInput ? (contextOrInput as ExecutionContext) : undefined;
+    const input = maybeInput ?? (contextOrInput as StartConnectionCommandInput);
     const connector = this.connectorRegistry.findByKey(input.connectorKey);
     if (!connector) {
       return err(domainError.notFound("Connector", input.connectorKey));
@@ -46,7 +60,14 @@ export class StartConnectionUseCase {
       );
     }
 
-    const owner = input.owner ?? { scope: "operator" as const, id: "local" };
+    const ownerResult = ensureConnectionOwnerAllowedForContext(
+      context,
+      input.owner ?? defaultConnectionOwnerForContext(context),
+    );
+    if (ownerResult.isErr()) {
+      return err(ownerResult.error);
+    }
+    const owner = ownerResult.value;
     const existing = this.connectionStore
       .list({ owner, connectorKey: connector.key })
       .find((connection) => connection.status !== "revoked");

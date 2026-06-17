@@ -35,7 +35,7 @@ or directly mutate provider resources.
 | Term | Meaning | Notes |
 | --- | --- | --- |
 | ConnectorDefinition | A provider-neutral catalog item describing one supported category/provider/capability set. | Example: `github-source`, `cloudflare-dns`. |
-| Connection | An authorized instance of a connector for an owner such as an account, organization, project, environment, resource, or operator scope. | This is the user/operator-owned thing. |
+| Connection | An authorized instance of a connector for an owner such as an account, organization, project, environment, resource, or operator scope. | This is the user/operator-owned thing. Hosted or multi-tenant runtimes also carry a neutral `tenantId` on the owner so lifecycle reads and mutations can fail closed across tenant boundaries. |
 | ConnectionCategory | A second-level capability family such as `source`, `dns`, `infrastructure`, `notification`, `billing`, `identity`, `observability`, or `storage`. | Categories are not provider brands. |
 | ConnectionCapability | A deterministic action Appaloft can plan, accept, apply, observe, or revoke through a connection. | Example: `dns.records.apply`. |
 | CredentialGrant | The grant or credential lifecycle behind a connection. | It may be temporary, persistent, provider-app based, or a manual secret reference. |
@@ -78,6 +78,7 @@ or directly mutate provider resources.
 | APP-CONN-014 | HTTP and CLI expose the same semantics | A user, tool, or automation manages connections | It uses API or CLI | Catalog, list, show, connect, callback, plan, accept, apply, revoke, and status surfaces share the same operation contract. |
 | APP-CONN-015 | Web surfaces are contextual and central | A user binds a domain, chooses a source, registers a server, or configures notifications | Web needs a connection | Web can enter from a central Connections area or contextual workflow and still uses the same application services. |
 | APP-CONN-016 | Provider adapters are mockable | Tests run without network or paid provider access | Connection flows execute | Fake providers simulate success, conflict, token expiry, revoke, callback/webhook, rate limit, and provider errors. |
+| APP-CONN-017 | Connection lifecycle is tenant scoped | A multi-tenant runtime has connection records for different owners | A user lists, shows, starts, completes callback, or revokes a connection | Application services derive or validate `ConnectionOwner.tenantId` from execution context; cross-tenant owner refs and connection ids return not found and do not mutate another tenant's connection. |
 
 ## Public Surfaces
 
@@ -146,7 +147,8 @@ Provider-specific concerns stay behind adapters:
 - provider-specific record tags, comments, metadata, and audit ids.
 
 Core/application surfaces should expose only Appaloft terms: connection id, provider key, category,
-capabilities, owner, grant kind, status, safe readback, plan, acceptance, and audit references.
+capabilities, owner, owner tenant id, grant kind, status, safe readback, plan, acceptance, and audit
+references.
 
 ## Mock Provider Requirements
 

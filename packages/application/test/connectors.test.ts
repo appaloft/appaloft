@@ -4,6 +4,7 @@ import { describe, expect, test } from "bun:test";
 import {
   AcceptConnectorCapabilityPlanUseCase,
   ApplyConnectorCapabilityUseCase,
+  CompleteConnectionCallbackUseCase,
   createDefaultConnectorDefinitions,
   createExecutionContext,
   FakeDnsConnectorProviderAdapter,
@@ -1143,6 +1144,125 @@ describe("connector catalog", () => {
     });
     expect(shown.isOk()).toBe(true);
     expect(shown._unsafeUnwrap().connectorKey).toBe("cloudflare-dns");
+  });
+
+  test("[APP-CONN-014] scopes connection lifecycle reads and mutations to the execution tenant", async () => {
+    const registry = new InMemoryConnectorRegistry(
+      createDefaultConnectorDefinitions({
+        cloudflareDns: {
+          configured: true,
+        },
+      }),
+    );
+    const store = new InMemoryConnectorConnectionStore();
+    const clock = { now: () => "2026-01-01T00:00:00.000Z" };
+    const tenantAlphaContext = createExecutionContext({
+      entrypoint: "http",
+      tenant: {
+        tenantId: "tenant_alpha",
+        organizationId: "org_alpha",
+        source: "product-session",
+      },
+    });
+    const tenantBetaContext = createExecutionContext({
+      entrypoint: "http",
+      tenant: {
+        tenantId: "tenant_beta",
+        organizationId: "org_beta",
+        source: "product-session",
+      },
+    });
+    const startAlpha = new StartConnectionUseCase(registry, store, clock, {
+      next: () => "conn_alpha_dns",
+    });
+    const startBeta = new StartConnectionUseCase(registry, store, clock, {
+      next: () => "conn_beta_dns",
+    });
+    const list = new ListConnectionsQueryService(store);
+    const show = new ShowConnectionQueryService(store);
+    const callback = new CompleteConnectionCallbackUseCase(store, {
+      now: () => "2026-01-01T00:01:00.000Z",
+    });
+    const revoke = new RevokeConnectionUseCase(store, {
+      now: () => "2026-01-01T00:02:00.000Z",
+    });
+
+    const alpha = await startAlpha.execute(tenantAlphaContext, {
+      connectorKey: "cloudflare-dns",
+      credentialGrant: {
+        kind: "manual-secret-reference",
+        storage: "secret-ref",
+        secretRef: "secretref_alpha_cloudflare",
+      },
+    });
+    const beta = await startBeta.execute(tenantBetaContext, {
+      connectorKey: "cloudflare-dns",
+      credentialGrant: {
+        kind: "manual-secret-reference",
+        storage: "secret-ref",
+        secretRef: "secretref_beta_cloudflare",
+      },
+    });
+
+    expect(alpha.isOk()).toBe(true);
+    expect(beta.isOk()).toBe(true);
+    expect(alpha._unsafeUnwrap().connection.owner).toEqual({
+      scope: "organization",
+      id: "org_alpha",
+      tenantId: "tenant_alpha",
+    });
+    expect(beta._unsafeUnwrap().connection.owner).toEqual({
+      scope: "organization",
+      id: "org_beta",
+      tenantId: "tenant_beta",
+    });
+
+    const crossTenantStart = await startAlpha.execute(tenantAlphaContext, {
+      connectorKey: "cloudflare-dns",
+      owner: {
+        scope: "organization",
+        id: "org_beta",
+        tenantId: "tenant_beta",
+      },
+      credentialGrant: {
+        kind: "manual-secret-reference",
+        storage: "secret-ref",
+        secretRef: "secretref_cross_tenant_cloudflare",
+      },
+    });
+    expect(crossTenantStart.isErr()).toBe(true);
+    expect(crossTenantStart._unsafeUnwrapErr().code).toBe("not_found");
+
+    const alphaList = await list.execute(tenantAlphaContext, { category: "dns" });
+    const betaList = await list.execute(tenantBetaContext, { category: "dns" });
+    expect(alphaList.items.map((connection) => connection.id)).toEqual(["conn_alpha_dns"]);
+    expect(betaList.items.map((connection) => connection.id)).toEqual(["conn_beta_dns"]);
+
+    const crossTenantShow = await show.execute(tenantBetaContext, {
+      connectionId: "conn_alpha_dns",
+    });
+    expect(crossTenantShow.isErr()).toBe(true);
+    expect(crossTenantShow._unsafeUnwrapErr().code).toBe("not_found");
+
+    const crossTenantCallback = await callback.execute(tenantBetaContext, {
+      connectionId: "conn_alpha_dns",
+      status: "error",
+      errorCode: "provider_denied",
+    });
+    expect(crossTenantCallback.isErr()).toBe(true);
+    expect(crossTenantCallback._unsafeUnwrapErr().code).toBe("not_found");
+
+    const crossTenantRevoke = await revoke.execute(tenantBetaContext, {
+      connectionId: "conn_alpha_dns",
+    });
+    expect(crossTenantRevoke.isErr()).toBe(true);
+    expect(crossTenantRevoke._unsafeUnwrapErr().code).toBe("not_found");
+
+    const alphaShow = await show.execute(tenantAlphaContext, {
+      connectionId: "conn_alpha_dns",
+    });
+    expect(alphaShow.isOk()).toBe(true);
+    expect(alphaShow._unsafeUnwrap().status).toBe("connected");
   });
 
   test("[APP-CONN-014] revokes connection instances without deleting safe readback", async () => {
