@@ -28,6 +28,7 @@
     deploymentId?: string;
     traceLink?: string;
     resourceHref?: string;
+    accessUrl?: string;
     embedded?: boolean;
     onClose?: () => void;
     onOpenDeployment?: () => void;
@@ -42,6 +43,7 @@
     deploymentId = "",
     traceLink = "",
     resourceHref = "",
+    accessUrl = "",
     embedded = false,
     onClose,
     onOpenDeployment,
@@ -71,19 +73,17 @@
   }
 
   function workflowStatusLabel(): string {
-    if (pending) {
+    const status = deploymentPanelStatus();
+
+    if (status === "running") {
       return $t(i18nKeys.console.deployments.progressStatusRunning);
     }
 
-    if (feedback?.kind === "running") {
-      return $t(i18nKeys.console.deployments.progressStatusRunning);
-    }
-
-    if (feedback?.kind === "success") {
+    if (status === "succeeded") {
       return $t(i18nKeys.console.deployments.progressStatusSucceeded);
     }
 
-    if (feedback?.kind === "error" || progressError) {
+    if (status === "failed") {
       return $t(i18nKeys.common.status.failed);
     }
 
@@ -91,22 +91,45 @@
   }
 
   function workflowStatusVariant(): "default" | "secondary" | "outline" | "destructive" {
-    if (feedback?.kind === "success") {
+    const status = deploymentPanelStatus();
+
+    if (status === "succeeded") {
       return "default";
     }
 
-    if (feedback?.kind === "running") {
+    if (status === "running") {
       return "secondary";
     }
 
-    if (feedback?.kind === "error" || progressError) {
+    if (status === "failed") {
       return "destructive";
     }
 
-    return pending ? "secondary" : "outline";
+    return "outline";
+  }
+
+  function deploymentEventStatus(): DeploymentProgressDialogStatus | undefined {
+    const terminalEvent = [...deploymentEvents]
+      .reverse()
+      .find((event) => event.status === "failed" || event.status === "succeeded");
+
+    if (terminalEvent?.status === "failed" || terminalEvent?.status === "succeeded") {
+      return terminalEvent.status;
+    }
+
+    return deploymentEvents.length > 0 ? "running" : undefined;
   }
 
   function deploymentPanelStatus(): DeploymentProgressDialogStatus {
+    const eventStatus = deploymentEventStatus();
+    if (eventStatus) {
+      return eventStatus;
+    }
+
+    if (deploymentId) {
+      return progressError || feedback?.kind === "error" ? "failed" : "running";
+    }
+
     if (pending) {
       return "running";
     }
@@ -207,8 +230,8 @@
       ]}
     >
       <header class="border-b px-5 py-4">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div class="min-w-0 space-y-2">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div class="min-w-0 flex-1 space-y-2">
             <div class="flex flex-wrap items-center gap-2">
               <h2 id="quick-deploy-progress-title" class="text-lg font-semibold">
                 {$t(i18nKeys.console.quickDeploy.workflowProgressTitle)}
@@ -227,14 +250,32 @@
                   {$t(i18nKeys.console.deployments.progressTraceLabel)} {traceLink}
                 </span>
               {/if}
+              {#if accessUrl && deploymentPanelStatus() === "succeeded"}
+                <span class="max-w-full truncate">
+                  {$t(i18nKeys.console.resources.accessUrlTitle)} {accessUrl}
+                </span>
+              {/if}
             </div>
           </div>
 
-          <div class="flex shrink-0 flex-wrap gap-2">
+          <div class="flex shrink-0 flex-wrap gap-2 sm:ml-auto sm:justify-end">
             {#if resourceHref && deploymentPanelStatus() === "succeeded"}
               <Button type="button" size="sm" href={resourceHref}>
                 <ExternalLink class="size-4" />
                 {$t(i18nKeys.common.actions.openResource)}
+              </Button>
+            {/if}
+            {#if accessUrl && deploymentPanelStatus() === "succeeded"}
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                href={accessUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <ExternalLink class="size-4" />
+                {$t(i18nKeys.console.resources.openGeneratedAccess)}
               </Button>
             {/if}
             {#if traceLink}

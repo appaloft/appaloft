@@ -52,13 +52,12 @@
     deploymentTimelineProgressEvents,
     deploymentTimelineProgressStatus,
     deploymentTimelineEntries,
-    groupDeploymentProgressEvents,
+    isTerminalDeploymentStatus,
     latestDeploymentTimelineCursor,
     mergeDeploymentTimelineEnvelopes,
     observeDeploymentProgressAfterAcceptance,
     progressSourceLabel,
     progressStatusVariant,
-    progressEventsFromDeployment,
     type DeploymentProgressDialogStatus,
   } from "$lib/console/deployment-progress";
   import {
@@ -114,7 +113,10 @@
   let recoveryDeploymentProgressStatus = $state<DeploymentProgressDialogStatus>("idle");
   let recoveryDeploymentProgressEvents = $state<DeploymentProgressEvent[]>([]);
   let liveDeploymentTimelineEnvelopes = $state<DeploymentTimelineEnvelope[]>([]);
+  let replayDeploymentTimelineEntries = $state<DeploymentTimelineJournalEntry[]>([]);
   let deploymentTimelineFollowError = $state("");
+  let replayDeploymentTimelineLoadError = $state("");
+  let replayDeploymentTimelineRequestKey = "";
   let deploymentTimelineFollowing = $state(false);
   let deploymentTimelineFollowGeneration = 0;
   let deploymentTimelineStream: Awaited<
@@ -152,7 +154,7 @@
     orpc.deployments.timeline.queryOptions({
       input: {
         deploymentId,
-        limit: 100,
+        limit: 500,
       },
       enabled: browser && deploymentId.length > 0,
       staleTime: 5_000,
@@ -200,7 +202,10 @@
   const listedDeployment = $derived(findDeployment(deployments, deploymentId));
   const headerDeployment = $derived(deployment ?? listedDeployment);
   const recoveryReadiness = $derived(deploymentRecoveryReadinessQuery.data ?? null);
-  const deploymentTimeline = $derived(deploymentTimelineEntries(deploymentTimelineQuery.data));
+  const queryDeploymentTimeline = $derived(deploymentTimelineEntries(deploymentTimelineQuery.data));
+  const deploymentTimeline = $derived(
+    queryDeploymentTimeline.length > 0 ? queryDeploymentTimeline : replayDeploymentTimelineEntries,
+  );
   const replayDeploymentTimelineEnvelopes = $derived(
     deploymentTimeline.map(
       (entry) =>
@@ -223,13 +228,7 @@
   const replayDeploymentTimelineError = $derived(
     deploymentTimelineQuery.error ? readErrorMessage(deploymentTimelineQuery.error) : "",
   );
-  const deploymentProgressEvents = $derived(
-    deploymentObservedProgressEvents.length > 0
-      ? deploymentObservedProgressEvents
-      : deployment
-        ? progressEventsFromDeployment(deployment)
-        : [],
-  );
+  const deploymentProgressEvents = $derived(deploymentObservedProgressEvents);
   const deploymentProgressDialogEvents = $derived(
     recoveryDeploymentProgressEvents.length > 0
       ? recoveryDeploymentProgressEvents
@@ -243,11 +242,57 @@
       : "idle",
   );
   const deploymentProgressStreamError = $derived(
-    deploymentTimelineFollowError || replayDeploymentTimelineError,
+    deploymentTimelineFollowError || replayDeploymentTimelineError || replayDeploymentTimelineLoadError,
   );
-  const deploymentTimelineSections = $derived(
-    groupDeploymentProgressEvents(deploymentProgressEvents),
-  );
+  $effect(() => {
+    if (!browser || deploymentId.length === 0) {
+      replayDeploymentTimelineEntries = [];
+      replayDeploymentTimelineLoadError = "";
+      replayDeploymentTimelineRequestKey = "";
+      return;
+    }
+
+    if (queryDeploymentTimeline.length > 0) {
+      replayDeploymentTimelineEntries = queryDeploymentTimeline;
+      replayDeploymentTimelineLoadError = "";
+      replayDeploymentTimelineRequestKey = "";
+      return;
+    }
+
+    if (deploymentTimelineQuery.isPending || deploymentTimelineQuery.isFetching) {
+      return;
+    }
+
+    const requestKey = `${deploymentId}:replay`;
+    if (requestKey === replayDeploymentTimelineRequestKey) {
+      return;
+    }
+
+    replayDeploymentTimelineRequestKey = requestKey;
+
+    void orpcClient.deployments
+      .timeline({
+        deploymentId,
+        limit: 500,
+      })
+      .then((response) => {
+        if (replayDeploymentTimelineRequestKey !== requestKey) {
+          return;
+        }
+
+        replayDeploymentTimelineEntries = deploymentTimelineEntries(response);
+        replayDeploymentTimelineLoadError = "";
+      })
+      .catch((error: unknown) => {
+        if (replayDeploymentTimelineRequestKey !== requestKey) {
+          return;
+        }
+
+        replayDeploymentTimelineEntries = [];
+        replayDeploymentTimelineLoadError = readErrorMessage(error);
+      });
+  });
+
   const sectionErrors = $derived(deploymentDetail?.sectionErrors ?? []);
   const project = $derived(
     deploymentDetail?.relatedContext?.project ??
@@ -316,8 +361,7 @@
   const shouldFollowDeploymentTimeline = $derived(
     browser &&
       Boolean(deployment) &&
-      deploymentProgressDeploymentId === deployment?.id &&
-      deploymentProgressDialogStatus === "running" &&
+      !isTerminalDeploymentStatus(deployment?.status) &&
       (activeTab === "timeline" || deploymentProgressDialogOpen),
   );
   const timelineCopyLabel = $derived(
@@ -494,7 +538,7 @@
       queryClient.invalidateQueries({ queryKey: orpc.deployments.show.key() }),
       queryClient.invalidateQueries({
         queryKey: orpc.deployments.timeline.key({
-          input: { deploymentId: acceptedDeploymentId, limit: 100 },
+          input: { deploymentId: acceptedDeploymentId, limit: 500 },
         }),
       }),
     ]);
@@ -508,6 +552,24 @@
         },
       },
     );
+  }
+
+  async function refreshDeploymentProgressQueries(currentDeploymentId: string): Promise<void> {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: orpc.deployments.key({ type: "query" }) }),
+      queryClient.invalidateQueries({ queryKey: orpc.deployments.show.key() }),
+      queryClient.invalidateQueries({
+        queryKey: orpc.deployments.timeline.key({
+          input: { deploymentId: currentDeploymentId, limit: 500 },
+        }),
+      }),
+    ]);
+
+    await Promise.all([
+      deploymentDetailQuery.refetch(),
+      deploymentTimelineQuery.refetch(),
+      deploymentsQuery.refetch(),
+    ]);
   }
 
   function runDeploymentRecoveryAction(action: DeploymentRecoveryAction): void {
@@ -907,8 +969,8 @@
     try {
       const stream = await orpcClient.deployments.timelineStream({
         deploymentId: currentDeploymentId,
-        limit: 0,
-        includeHistory: false,
+        limit: cursor ? 0 : 500,
+        includeHistory: !cursor,
         follow: true,
         untilTerminal: true,
         ...(cursor ? { cursor } : {}),
@@ -959,6 +1021,9 @@
       ) {
         deploymentTimelineStream = null;
         deploymentTimelineFollowing = false;
+        void refreshDeploymentProgressQueries(currentDeploymentId).catch((error: unknown) => {
+          deploymentTimelineFollowError = readErrorMessage(error);
+        });
       }
     }
   }
@@ -1390,6 +1455,24 @@
                   {sourceVersion.shortValue}
                 </p>
               {/if}
+              {#if primaryAccessUrl}
+                <div class="flex min-w-0 flex-wrap items-center gap-2 text-sm">
+                  <span class="shrink-0 text-muted-foreground">
+                    {$t(i18nKeys.console.deployments.accessSnapshotTitle)}
+                  </span>
+                  <a
+                    class="min-w-0 break-all font-medium text-primary underline-offset-4 hover:underline"
+                    href={primaryAccessUrl.url}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {primaryAccessUrl.url}
+                  </a>
+                  <Badge variant="outline">
+                    {accessUrlKindLabel(primaryAccessUrl.kind)}
+                  </Badge>
+                </div>
+              {/if}
             </div>
           </div>
 
@@ -1408,6 +1491,26 @@
               <Button href={resourceOverviewHref} variant="outline">
                 <Boxes class="size-4" />
                 {$t(i18nKeys.common.actions.openResource)}
+              </Button>
+            {/if}
+            {#if primaryAccessUrl}
+              <Button href={primaryAccessUrl.url} target="_blank" rel="noreferrer" variant="outline">
+                <ExternalLink class="size-4" />
+                {$t(i18nKeys.console.deployments.openAccessUrl)}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                aria-label={accessUrlCopyLabel}
+                title={accessUrlCopyLabel}
+                onclick={handleCopyAccessUrl}
+              >
+                {#if accessUrlCopyState === "copied"}
+                  <Check class="size-4" />
+                {:else}
+                  <Copy class="size-4" />
+                {/if}
+                {accessUrlCopyLabel}
               </Button>
             {/if}
           </div>
@@ -1882,11 +1985,6 @@
                       : deploymentProgressDialogStatus,
                   )}
                 </Badge>
-                {#if deploymentTimelineFollowing}
-                  <Badge variant="secondary">
-                    {$t(i18nKeys.console.deployments.progressStatusRunning)}
-                  </Badge>
-                {/if}
                 <Button
                   type="button"
                   size="sm"
@@ -1932,46 +2030,30 @@
             </div>
 
             <div class="mt-4 max-h-[42rem] overflow-auto rounded-md border border-zinc-800 bg-zinc-950 px-4 py-3 font-mono text-xs text-zinc-200 shadow-inner">
-              {#if deploymentTimelineSections.length === 0}
+              {#if deploymentProgressEvents.length === 0}
                 <p class="text-zinc-500">{$t(i18nKeys.console.deployments.progressWaiting)}</p>
               {:else}
-                {#each deploymentTimelineSections as section (section.phase)}
-                  <div class="border-t border-zinc-800/80 py-2 first:border-t-0 first:pt-0">
-                    <div class="flex flex-wrap items-center gap-2 text-zinc-400">
-                      <span class="text-emerald-300">
-                        [{section.step?.current ?? "-"} / {section.step?.total ?? "-"}]
+                <div class="space-y-1">
+                  {#each deploymentProgressEvents as event, index (`${event.timestamp}-${event.phase}-${index}`)}
+                    <div class="grid grid-cols-[4.75rem_minmax(0,1fr)] gap-x-2 gap-y-1 leading-5 md:grid-cols-[4.75rem_5rem_6rem_3.5rem_minmax(0,1fr)]">
+                      <span class="text-zinc-600">{logTimeLabel(event.timestamp)}</span>
+                      <span class="text-zinc-400">{progressPhaseLabel(event.phase)}</span>
+                      <span class={event.source === "application" ? "text-sky-300" : "text-emerald-300"}>
+                        {progressSourceLabel(event)}
                       </span>
-                      <span>{progressPhaseLabel(section.phase)}</span>
-                      <span class="text-zinc-600">·</span>
-                      <span>
-                        {section.step?.label ??
-                          $t(i18nKeys.console.deployments.progressStepFallback)}
+                      <span class={logLevelClass(event.level)}>{event.level}</span>
+                      <span
+                        class={`col-span-2 min-w-0 break-words md:col-span-1 ${logLevelClass(event.level)} ${event.source === "application" ? "md:pl-3" : ""}`}
+                      >
+                        {event.source === "application" ? "└ " : ""}
+                        {event.message}
+                        {#if event.status}
+                          <span class="text-zinc-600"> · {progressStatusLabel(event.status)}</span>
+                        {/if}
                       </span>
-                      {#if section.status}
-                        <span class="text-zinc-600">·</span>
-                        <span>{progressStatusLabel(section.status)}</span>
-                      {/if}
                     </div>
-
-                    <div class="mt-2 space-y-1">
-                      {#each section.events as event, index (`${event.timestamp}-${section.phase}-${index}`)}
-                        <div class="grid grid-cols-[4.75rem_minmax(0,1fr)] gap-x-2 gap-y-1 leading-5 md:grid-cols-[4.75rem_6rem_3.5rem_minmax(0,1fr)]">
-                          <span class="text-zinc-600">{logTimeLabel(event.timestamp)}</span>
-                          <span class={event.source === "application" ? "text-sky-300" : "text-emerald-300"}>
-                            {progressSourceLabel(event)}
-                          </span>
-                          <span class={logLevelClass(event.level)}>{event.level}</span>
-                          <span
-                            class={`col-span-2 min-w-0 break-words md:col-span-1 ${logLevelClass(event.level)} ${event.source === "application" ? "md:pl-3" : ""}`}
-                          >
-                            {event.source === "application" ? "└ " : ""}
-                            {event.message}
-                          </span>
-                        </div>
-                      {/each}
-                    </div>
-                  </div>
-                {/each}
+                  {/each}
+                </div>
               {/if}
             </div>
           </section>

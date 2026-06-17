@@ -8774,7 +8774,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       expect(replayRequest.method).toBe("POST");
       expect(readOrpcJsonPayload(replayRequest.body)).toEqual({
         deploymentId: "dep_demo",
-        limit: 100,
+        limit: 500,
       });
 
       const streamRequest = await waitForRecordedRequest("/api/rpc/deployments/timelineStream");
@@ -8891,7 +8891,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       const replayRequest = await waitForRecordedRequest("/api/rpc/deployments/timeline");
       expect(readOrpcJsonPayload(replayRequest.body)).toEqual({
         deploymentId: "dep_demo",
-        limit: 100,
+        limit: 500,
       });
       expect(
         recordedApiRequests.some(

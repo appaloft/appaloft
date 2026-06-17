@@ -1,10 +1,4 @@
-import {
-  type DeploymentProgressEvent,
-  type OperatorWorkEventStreamEnvelope,
-  type OperatorWorkEventStreamResponse,
-  type OperatorWorkItem,
-  type OperatorWorkObservedEvent,
-} from "@appaloft/contracts";
+import { type OperatorWorkItem } from "@appaloft/contracts";
 
 export type BlueprintInstallExecutionStatus =
   | "accepted"
@@ -22,6 +16,7 @@ export type BlueprintInstallProgressSnapshot = {
   monitoring?: {
     workId?: string;
     workIds?: readonly string[];
+    deploymentId?: string;
     deploymentIds?: readonly string[];
     commands?: {
       showWork?: string;
@@ -47,7 +42,6 @@ export type BlueprintInstallProgressSnapshot = {
     currentStep?: string;
     message?: string;
     deploymentIds?: readonly string[];
-    operatorWorkId?: string;
     failure?: {
       code?: string;
       reason?: string;
@@ -61,7 +55,6 @@ export type BlueprintInstallStatusSummary = {
   executionStatus: BlueprintInstallExecutionStatus;
   userStatus: "running" | "succeeded" | "failed" | "unknown";
   terminalStatus: "running" | "succeeded" | "failed";
-  operatorWorkId: string;
   deploymentIds: string[];
   deploymentId: string;
   resourceId: string;
@@ -78,25 +71,6 @@ const blueprintInstallTerminalFailureStatuses = new Set([
   "rolled-back",
   "canceled",
   "dead-lettered",
-]);
-
-const operatorWorkEventStreamStatusKinds = new Set([
-  "accepted",
-  "running",
-  "progress",
-  "retry-scheduled",
-  "succeeded",
-  "failed",
-  "canceled",
-  "dead-lettered",
-]);
-
-const operatorWorkEventStreamEnvelopeKinds = new Set([
-  ...operatorWorkEventStreamStatusKinds,
-  "heartbeat",
-  "gap",
-  "closed",
-  "error",
 ]);
 
 type OperatorWorkDisplaySource = Pick<
@@ -122,45 +96,6 @@ export type OperatorWorkReadableFailure = {
   phase: string;
   operation: string;
 };
-
-function isOperatorWorkEventStreamEnvelopeKind(
-  kind: unknown,
-): kind is OperatorWorkEventStreamEnvelope["kind"] {
-  return typeof kind === "string" && operatorWorkEventStreamEnvelopeKinds.has(kind);
-}
-
-export function operatorWorkEventStreamEnvelope(
-  envelope: OperatorWorkEventStreamEnvelope | null | undefined,
-): OperatorWorkEventStreamEnvelope | null {
-  if (!envelope) {
-    return null;
-  }
-
-  if (envelope.schemaVersion !== "operator-work.stream-events/v1") {
-    throw new Error("Expected operator-work.stream-events/v1 envelope");
-  }
-
-  if (!isOperatorWorkEventStreamEnvelopeKind(envelope.kind)) {
-    throw new Error("Expected operator work stream envelope kind");
-  }
-
-  return envelope;
-}
-
-export function operatorWorkEventStreamEnvelopes(
-  envelopes: readonly OperatorWorkEventStreamEnvelope[],
-): OperatorWorkEventStreamEnvelope[] {
-  return envelopes.flatMap((envelope) => {
-    const normalized = operatorWorkEventStreamEnvelope(envelope);
-    return normalized ? [normalized] : [];
-  });
-}
-
-export function operatorWorkEventResponseEnvelopes(
-  response: OperatorWorkEventStreamResponse | null | undefined,
-): OperatorWorkEventStreamEnvelope[] {
-  return operatorWorkEventStreamEnvelopes(response?.envelopes ?? []);
-}
 
 function uniqueStrings(values: readonly (string | undefined)[]): string[] {
   return [...new Set(values.filter((value): value is string => Boolean(value?.trim())))];
@@ -202,6 +137,7 @@ export function summarizeBlueprintInstallProgress(
       ? snapshot.progress.userStatus
       : "unknown";
   const deploymentIds = uniqueStrings([
+    snapshot?.monitoring?.deploymentId,
     ...(snapshot?.monitoring?.deploymentIds ?? []),
     ...(snapshot?.progress?.deploymentIds ?? []),
     ...components.map((component) => component.deployment?.deploymentId),
@@ -233,11 +169,6 @@ export function summarizeBlueprintInstallProgress(
     executionStatus: normalizedExecutionStatus,
     userStatus,
     terminalStatus,
-    operatorWorkId:
-      snapshot?.progress?.operatorWorkId ??
-      snapshot?.monitoring?.workId ??
-      snapshot?.monitoring?.workIds?.[0] ??
-      "",
     deploymentIds,
     deploymentId: deploymentIds[0] ?? firstComponentDeploymentId(snapshot ?? {}) ?? "",
     resourceId:
@@ -249,117 +180,6 @@ export function summarizeBlueprintInstallProgress(
     message: snapshot?.progress?.message ?? "",
     failureReason,
   };
-}
-
-function operatorWorkStatus(event: OperatorWorkObservedEvent): DeploymentProgressEvent["status"] {
-  switch (event.status) {
-    case "succeeded":
-      return "succeeded";
-    case "failed":
-    case "canceled":
-    case "dead-lettered":
-      return "failed";
-    default:
-      return "running";
-  }
-}
-
-function operatorWorkPhase(event: OperatorWorkObservedEvent): DeploymentProgressEvent["phase"] {
-  switch (event.kind) {
-    case "accepted":
-      return "detect";
-    case "succeeded":
-    case "failed":
-    case "canceled":
-    case "dead-lettered":
-      return "verify";
-    default:
-      return "deploy";
-  }
-}
-
-function operatorWorkItemProgressPhase(
-  work: OperatorWorkDisplaySource,
-): DeploymentProgressEvent["phase"] {
-  const failurePhase = safeDetailString(work.safeDetails, "failure_phase") || work.phase || "";
-  const normalizedPhase = failurePhase.toLowerCase();
-
-  if (normalizedPhase.includes("rollback")) {
-    return "rollback";
-  }
-
-  if (
-    normalizedPhase.includes("readback") ||
-    normalizedPhase.includes("verify") ||
-    normalizedPhase.includes("health")
-  ) {
-    return "verify";
-  }
-
-  if (normalizedPhase.includes("deploy") || normalizedPhase.includes("execution")) {
-    return "deploy";
-  }
-
-  if (normalizedPhase.includes("admission") || normalizedPhase.includes("resource")) {
-    return "plan";
-  }
-
-  return work.status === "failed" || work.status === "dead-lettered" ? "verify" : "deploy";
-}
-
-function operatorWorkDisplayStatus(
-  status: OperatorWorkItem["status"],
-): DeploymentProgressEvent["status"] {
-  switch (status) {
-    case "succeeded":
-      return "succeeded";
-    case "failed":
-    case "canceled":
-    case "dead-lettered":
-      return "failed";
-    default:
-      return "running";
-  }
-}
-
-function operatorWorkLevel(event: OperatorWorkObservedEvent): DeploymentProgressEvent["level"] {
-  return operatorWorkStatus(event) === "failed" ? "error" : "info";
-}
-
-function operatorWorkMessage(event: OperatorWorkObservedEvent): string {
-  const readableFailure = operatorWorkReadableFailure({
-    id: event.workId,
-    kind: event.workKind,
-    status: event.status,
-    operationKey: event.operationKey,
-    phase: event.phase,
-    step: event.step,
-    updatedAt: event.emittedAt,
-    finishedAt: event.emittedAt,
-    errorCode: event.errorCode,
-    safeDetails: event.safeDetails,
-  });
-  if (operatorWorkStatus(event) === "failed") {
-    return [
-      readableFailure.title,
-      readableFailure.detail,
-      readableFailure.recovery,
-      readableFailure.phase ? `阶段: ${readableFailure.phase}` : undefined,
-      readableFailure.operation ? `操作: ${readableFailure.operation}` : undefined,
-      readableFailure.code ? `错误: ${readableFailure.code}` : undefined,
-    ]
-      .filter(Boolean)
-      .join(" · ");
-  }
-
-  const parts = [
-    event.message,
-    event.step ? `step: ${event.step}` : undefined,
-    event.errorCode ? `error: ${event.errorCode}` : undefined,
-    ...operatorWorkSafeDetailMessageParts(event.safeDetails),
-  ].filter(Boolean);
-
-  return parts.join(" · ") || `Deployment task ${event.kind}`;
 }
 
 export function operatorWorkReadableFailure(
@@ -407,161 +227,4 @@ export function operatorWorkReadableFailure(
     phase,
     operation,
   };
-}
-
-export function operatorWorkItemToProgressEvent(
-  work: OperatorWorkDisplaySource,
-): DeploymentProgressEvent {
-  const status = operatorWorkDisplayStatus(work.status);
-  const readableFailure = operatorWorkReadableFailure(work);
-  const failed = status === "failed";
-
-  return {
-    timestamp: work.finishedAt ?? work.updatedAt,
-    source: "appaloft",
-    phase: operatorWorkItemProgressPhase(work),
-    level: failed ? "error" : "info",
-    message: failed
-      ? [
-          readableFailure.title,
-          readableFailure.detail,
-          readableFailure.recovery,
-          readableFailure.phase ? `阶段: ${readableFailure.phase}` : undefined,
-          readableFailure.operation ? `操作: ${readableFailure.operation}` : undefined,
-          readableFailure.code ? `错误: ${readableFailure.code}` : undefined,
-        ]
-          .filter(Boolean)
-          .join(" · ")
-      : `部署任务${work.status === "succeeded" ? "已完成" : "正在执行"}${work.step ? ` · ${work.step}` : ""}`,
-    status,
-    ...(work.deploymentId ? { deploymentId: work.deploymentId } : {}),
-    step: {
-      current: failed || status === "succeeded" ? 1 : 0,
-      total: failed || status === "succeeded" ? 1 : 2,
-      label: work.step ?? work.phase ?? work.status,
-    },
-  };
-}
-
-function operatorWorkSafeDetailMessageParts(
-  safeDetails: OperatorWorkObservedEvent["safeDetails"],
-): string[] {
-  if (!safeDetails) {
-    return [];
-  }
-
-  return [
-    ["failure_code", "failure"],
-    ["failure_phase", "phase"],
-    ["failure_failurePhase", "deployment phase"],
-    ["failure_componentId", "component"],
-    ["failure_deploymentStatus", "deployment"],
-    ["failure_operation", "operation"],
-    ["resourceSlug", "resource"],
-  ].flatMap(([key, label]) => {
-    const value = safeDetails[key];
-    return typeof value === "string" && value.trim() ? [`${label}: ${value}`] : [];
-  });
-}
-
-export function operatorWorkEventToProgressEvent(
-  event: OperatorWorkObservedEvent,
-): DeploymentProgressEvent {
-  return {
-    timestamp: event.emittedAt,
-    source: "appaloft",
-    phase: operatorWorkPhase(event),
-    level: operatorWorkLevel(event),
-    message: operatorWorkMessage(event),
-    ...(event.deploymentId ? { deploymentId: event.deploymentId } : {}),
-    status: operatorWorkStatus(event),
-    step: {
-      current: event.sequence,
-      total:
-        event.status === "pending" || event.status === "running"
-          ? event.sequence + 1
-          : event.sequence,
-      label: event.step ?? event.kind,
-    },
-  };
-}
-
-function operatorWorkEventEnvelopeCursor(
-  envelope: OperatorWorkEventStreamEnvelope,
-): string | undefined {
-  switch (envelope.kind) {
-    case "accepted":
-    case "running":
-    case "progress":
-    case "retry-scheduled":
-    case "succeeded":
-    case "failed":
-    case "canceled":
-    case "dead-lettered":
-      return envelope.event.cursor;
-    case "heartbeat":
-      return envelope.cursor;
-    case "gap":
-      return envelope.gap.cursor;
-    case "closed":
-      return envelope.cursor;
-    case "error":
-      return undefined;
-  }
-}
-
-export function latestOperatorWorkEventCursor(
-  envelopes: readonly OperatorWorkEventStreamEnvelope[],
-): string | undefined {
-  const cursors = envelopes
-    .map((envelope) => operatorWorkEventEnvelopeCursor(envelope))
-    .filter((cursor) => typeof cursor === "string");
-
-  return cursors.at(-1);
-}
-
-export function operatorWorkEventProgressStatus(
-  envelopes: readonly OperatorWorkEventStreamEnvelope[],
-): "running" | "succeeded" | "failed" {
-  const lastEvent = [...envelopes].reverse().find((envelope) => "event" in envelope);
-  return lastEvent?.kind === "succeeded"
-    ? "succeeded"
-    : lastEvent?.kind === "failed" ||
-        lastEvent?.kind === "canceled" ||
-        lastEvent?.kind === "dead-lettered"
-      ? "failed"
-      : "running";
-}
-
-export function operatorWorkEnvelopeProgressEvents(
-  envelopes: readonly OperatorWorkEventStreamEnvelope[],
-): DeploymentProgressEvent[] {
-  return envelopes.flatMap((envelope) =>
-    "event" in envelope && shouldShowOperatorWorkProgressEvent(envelope.event)
-      ? [operatorWorkEventToProgressEvent(envelope.event)]
-      : [],
-  );
-}
-
-function shouldShowOperatorWorkProgressEvent(event: OperatorWorkObservedEvent): boolean {
-  if (event.deploymentId) {
-    return true;
-  }
-
-  if (
-    event.message &&
-    (event.kind === "running" ||
-      event.kind === "progress" ||
-      event.kind === "retry-scheduled" ||
-      event.kind === "succeeded")
-  ) {
-    return true;
-  }
-
-  return (
-    event.kind === "failed" ||
-    event.kind === "canceled" ||
-    event.kind === "dead-lettered" ||
-    event.status === "failed"
-  );
 }

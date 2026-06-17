@@ -12,9 +12,13 @@ import { inject, injectable } from "tsyringe";
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
 import {
   type DeploymentReadModel,
+  type DeploymentTimelineEntry,
   type DeploymentTimelineEnvelope,
+  type DeploymentTimelineJournalSummary,
+  type DeploymentTimelineKind,
   type DeploymentTimelineObserver,
   type DeploymentTimelineReadResult,
+  type DeploymentTimelineSource,
   type StreamDeploymentTimelineResult,
 } from "../../ports";
 import { tokens } from "../../tokens";
@@ -66,6 +70,102 @@ async function collectTimelineEnvelopes(
   }
 }
 
+function timelineCursor(deploymentId: string, sequence: number): string {
+  return `${deploymentId}:${sequence}`;
+}
+
+function deploymentTimelineInvalidCursor(deploymentId: string, cursor: string): DomainError {
+  return {
+    ...domainError.validation("Deployment timeline cursor is invalid", {
+      queryName: "deployments.timeline",
+      phase: "cursor-resolution",
+      deploymentId,
+      cursor,
+    }),
+    code: "deployment_timeline_cursor_invalid",
+  };
+}
+
+function parseTimelineCursor(
+  deploymentId: string,
+  cursor: string | undefined,
+): Result<number | undefined> {
+  if (!cursor) {
+    return ok(undefined);
+  }
+
+  const separatorIndex = cursor.lastIndexOf(":");
+  if (separatorIndex <= 0 || separatorIndex >= cursor.length - 1) {
+    return err(deploymentTimelineInvalidCursor(deploymentId, cursor));
+  }
+
+  const cursorDeploymentId = cursor.slice(0, separatorIndex);
+  const rawSequence = cursor.slice(separatorIndex + 1);
+  const sequence = Number(rawSequence);
+  if (
+    cursorDeploymentId !== deploymentId ||
+    !Number.isInteger(sequence) ||
+    sequence < 1 ||
+    rawSequence !== String(sequence)
+  ) {
+    return err(deploymentTimelineInvalidCursor(deploymentId, cursor));
+  }
+
+  return ok(sequence);
+}
+
+function timelineKindFromJournalSource(source: DeploymentTimelineSource): DeploymentTimelineKind {
+  if (
+    source === "application" ||
+    source === "docker" ||
+    source === "ssh" ||
+    source === "provider"
+  ) {
+    return "output";
+  }
+
+  if (source === "health") {
+    return "health-check";
+  }
+
+  if (source === "domain-event") {
+    return "status";
+  }
+
+  return "lifecycle";
+}
+
+function timelineEntryFromJournal(
+  deploymentId: string,
+  log: DeploymentTimelineJournalSummary,
+  index: number,
+): DeploymentTimelineEntry {
+  const sequence = index + 1;
+
+  return {
+    deploymentId,
+    sequence,
+    cursor: timelineCursor(deploymentId, sequence),
+    occurredAt: log.timestamp,
+    source: log.source,
+    kind: timelineKindFromJournalSource(log.source),
+    phase: log.phase,
+    level: log.level,
+    message: log.message,
+    ...(log.level === "error" ? { status: "failed" as const } : {}),
+  };
+}
+
+function timelineEntryMatchesQuery(
+  entry: DeploymentTimelineEntry,
+  query: DeploymentTimelineQuery,
+): boolean {
+  return (
+    (!query.kinds || query.kinds.includes(entry.kind)) &&
+    (!query.sources || query.sources.includes(entry.source))
+  );
+}
+
 @injectable()
 export class DeploymentTimelineQueryService {
   constructor(
@@ -79,32 +179,41 @@ export class DeploymentTimelineQueryService {
     context: ExecutionContext,
     query: DeploymentTimelineQuery,
   ): Promise<Result<DeploymentTimelineReadResult>> {
-    const result = await this.stream(context, {
-      ...query,
-      includeHistory: true,
-      follow: false,
-      untilTerminal: true,
-    } as StreamDeploymentTimelineQuery);
+    const repositoryContext = toRepositoryContext(context);
+    const deployment = await this.deploymentReadModel.findOne(
+      repositoryContext,
+      DeploymentByIdSpec.create(DeploymentId.rehydrate(query.deploymentId)),
+    );
 
-    if (result.isErr()) {
-      return err(result.error);
+    if (!deployment) {
+      return err(deploymentTimelineNotFound(query.deploymentId));
     }
 
-    let envelopes: DeploymentTimelineEnvelope[];
-    if (result.value.mode === "bounded") {
-      envelopes = result.value.envelopes;
-    } else {
-      const collected = await collectTimelineEnvelopes(query.deploymentId, result.value.stream);
-      if (collected.isErr()) {
-        return err(collected.error);
-      }
-      envelopes = collected.value;
+    const cursorSequence = parseTimelineCursor(query.deploymentId, query.cursor);
+    if (cursorSequence.isErr()) {
+      return err(cursorSequence.error);
     }
-    const entries = envelopes
-      .filter((envelope): envelope is Extract<DeploymentTimelineEnvelope, { kind: "entry" }> => {
-        return envelope.kind === "entry";
-      })
-      .map((envelope) => envelope.entry);
+
+    let entries: DeploymentTimelineEntry[];
+    try {
+      const logs = await this.deploymentReadModel.findTimeline(
+        repositoryContext,
+        query.deploymentId,
+      );
+      entries = logs
+        .map((log, index) => timelineEntryFromJournal(query.deploymentId, log, index))
+        .filter((entry) => timelineEntryMatchesQuery(entry, query));
+    } catch (error) {
+      return err(deploymentTimelineReadFailed(query.deploymentId, error));
+    }
+
+    if (cursorSequence.value) {
+      entries = entries.filter((entry) => entry.sequence > cursorSequence.value!);
+    }
+    if (query.limit > 0) {
+      entries = query.cursor ? entries.slice(0, query.limit) : entries.slice(-query.limit);
+    }
+
     const nextCursor = entries.at(-1)?.cursor;
 
     return ok({

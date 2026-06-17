@@ -151,6 +151,12 @@ describe("project detail page structure", () => {
     expect(quickDeployProgressDialogSource).not.toContain("onOpenOperatorWork");
     expect(quickDeployProgressDialogSource).not.toContain("disabled={pending}");
     expect(quickDeployProgressDialogSource).toContain("embedded?: boolean");
+    expect(quickDeployProgressDialogSource).toContain("accessUrl?: string");
+    expect(quickDeployProgressDialogSource).toContain("sm:ml-auto sm:justify-end");
+    expect(quickDeployProgressDialogSource).toContain("i18nKeys.console.resources.accessUrlTitle");
+    expect(quickDeployProgressDialogSource).toContain(
+      "i18nKeys.console.resources.openGeneratedAccess",
+    );
     expect(quickDeployProgressDialogSource).toContain("data-deployment-progress-terminal");
     expect(quickDeployProgressDialogSource).toContain("bg-zinc-950");
     expect(deploymentProgressDialogSource).not.toContain('disabled={status === "running"');
@@ -159,11 +165,21 @@ describe("project detail page structure", () => {
     expect(quickDeploySheetSource).toContain("function closeQuickDeploySurface()");
     expect(quickDeploySheetSource).toContain("blueprintSelectorDialogOpen = false");
     expect(quickDeploySheetSource).toContain("blueprintDetailDialogOpen = false");
-    expect(quickDeploySheetSource).toContain("readBlueprintInstallProgressSummary");
-    expect(quickDeploySheetSource).toContain("startBlueprintOperatorWorkStatusPoll");
-    expect(quickDeploySheetSource).toContain("orpcClient.operatorWork.show");
+    expect(quickDeploySheetSource).toContain("readBlueprintInstallFinalSummary");
+    expect(quickDeploySheetSource).toContain("requireBlueprintInstallDeploymentTimeline");
+    expect(quickDeploySheetSource).not.toContain("readBlueprintInstallProgressSummary");
+    expect(quickDeploySheetSource).not.toContain("appendBlueprintInstallAcceptedEvent");
+    expect(quickDeploySheetSource).not.toContain("startBlueprintOperatorWorkStatusPoll");
+    expect(quickDeploySheetSource).not.toContain("orpcClient.operatorWork.show");
+    expect(quickDeploySheetSource).not.toContain("startBlueprintDeploymentDiscovery");
+    expect(quickDeploySheetSource).not.toContain("orpcClient.operatorWork.eventsStream");
+    expect(quickDeploySheetSource).not.toContain("operatorWorkEventStreamEnvelope");
+    expect(quickDeploySheetSource).not.toContain("operatorWorkEventResponseEnvelopes");
+    expect(quickDeploySheetSource).not.toContain("operatorWorkItemToProgressEvent");
     expect(quickDeploySheetSource).toContain("Promise.race");
-    expect(quickDeploySheetSource).toContain("if (lastCreatedDeploymentId)");
+    expect(quickDeploySheetSource).toContain("observeBlueprintInstallDeploymentProgress");
+    expect(quickDeploySheetSource).toContain("...installSummary.deploymentIds");
+    expect(quickDeploySheetSource).toContain("accessUrl={lastAccessUrl}");
     expect(quickDeploySheetSource).toContain("appendWorkflowDeploymentProgressEventOnce");
     expect(quickDeploySheetSource).not.toContain('installSummary.terminalStatus === "running"');
     expect(operationProgressPanelSource).toContain("{#if requestId}");

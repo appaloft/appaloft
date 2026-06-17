@@ -1,15 +1,7 @@
-import {
-  type OperatorWorkEventStreamEnvelope,
-  type OperatorWorkEventStreamResponse,
-} from "@appaloft/contracts";
 import { describe, expect, test } from "vitest";
 
 import {
   type BlueprintInstallProgressSnapshot,
-  operatorWorkEnvelopeProgressEvents,
-  operatorWorkEventResponseEnvelopes,
-  operatorWorkEventStreamEnvelope,
-  operatorWorkItemToProgressEvent,
   operatorWorkReadableFailure,
   summarizeBlueprintInstallProgress,
 } from "./blueprint-install-progress";
@@ -47,7 +39,6 @@ describe("Blueprint install progress helpers", () => {
         message: "Application install was accepted and is waiting for the worker.",
         componentDeployments: [],
         deploymentIds: [],
-        operatorWorkId: "dw_blueprint_install_cia_demo",
       } as BlueprintInstallProgressSnapshot["progress"],
     };
 
@@ -56,7 +47,6 @@ describe("Blueprint install progress helpers", () => {
       executionStatus: "installing",
       userStatus: "running",
       terminalStatus: "running",
-      operatorWorkId: "dw_blueprint_install_cia_demo",
       deploymentIds: [],
       deploymentId: "",
       currentStep: "queued",
@@ -65,205 +55,7 @@ describe("Blueprint install progress helpers", () => {
     });
   });
 
-  test("[CLOUD-BLUEPRINT-QD-031] keeps internal operator work events out of progress rows", () => {
-    const progressEvents = operatorWorkEnvelopeProgressEvents([
-      {
-        schemaVersion: "operator-work.stream-events/v1",
-        kind: "accepted",
-        event: {
-          workId: "dw_blueprint_install_cia_demo",
-          sequence: 1,
-          cursor: "dw_blueprint_install_cia_demo:1",
-          emittedAt: "2026-06-11T01:55:49.517Z",
-          kind: "accepted",
-          status: "pending",
-          operationKey: "blueprints.install",
-          workKind: "blueprint-install",
-          phase: "install-execution",
-          step: "queued",
-          message: "Blueprint install accepted",
-        },
-      },
-      {
-        schemaVersion: "operator-work.stream-events/v1",
-        kind: "failed",
-        event: {
-          workId: "dw_blueprint_install_cia_demo",
-          sequence: 2,
-          cursor: "dw_blueprint_install_cia_demo:2",
-          emittedAt: "2026-06-11T01:55:59.517Z",
-          kind: "failed",
-          status: "failed",
-          operationKey: "blueprints.install",
-          workKind: "blueprint-install",
-          phase: "install-execution",
-          step: "rollback-required",
-          workerGroup: "appaloft-cloud-production-worker",
-          workerId: "appaloft-cloud-production-worker-replica-2",
-          errorCode: "blueprint_install_failed",
-          safeDetails: {
-            failure_code: "resource_slug_conflict",
-            failure_phase: "resource-admission",
-            failure_operation: "CreateResourceCommand",
-          },
-        },
-      },
-    ]);
-
-    expect(progressEvents).toMatchObject([
-      {
-        phase: "verify",
-        status: "failed",
-        level: "error",
-        message:
-          "资源名称冲突 · 资源名称已经被占用，创建资源时失败。 · 请换一个资源名称，或选择复用已有资源后重新安装。 · 阶段: resource-admission · 操作: CreateResourceCommand · 错误: resource_slug_conflict",
-      },
-    ]);
-    expect(progressEvents[0]?.message).not.toContain("worker:");
-    expect(progressEvents[0]?.message).not.toContain("appaloft-cloud-production-worker-replica-2");
-  });
-
-  test("[CLOUD-BLUEPRINT-QD-035] reads typed streamed operator work progress for quick deploy", () => {
-    const streamEnvelope = {
-      schemaVersion: "operator-work.stream-events/v1",
-      kind: "progress",
-      event: {
-        workId: "dw_blueprint_install_cia_demo",
-        sequence: 8,
-        cursor: "dw_blueprint_install_cia_demo:8",
-        emittedAt: "2026-06-16T02:02:17.198Z",
-        kind: "progress",
-        status: "running",
-        operationKey: "blueprints.install",
-        workKind: "blueprint-install",
-        phase: "deploy-component",
-        step: "deployment-started",
-        message: "Deployment started for component pocketbase.",
-        projectId: "prj_demo",
-        serverId: "srv_demo",
-        resourceId: "res_demo",
-        deploymentId: "dep_demo",
-      },
-    } satisfies OperatorWorkEventStreamEnvelope;
-
-    const envelope = operatorWorkEventStreamEnvelope(streamEnvelope);
-    expect(envelope).toMatchObject({
-      schemaVersion: "operator-work.stream-events/v1",
-      kind: "progress",
-      event: {
-        deploymentId: "dep_demo",
-        message: "Deployment started for component pocketbase.",
-      },
-    });
-    expect(operatorWorkEnvelopeProgressEvents(envelope ? [envelope] : [])).toMatchObject([
-      {
-        deploymentId: "dep_demo",
-        phase: "deploy",
-        status: "running",
-        message: "Deployment started for component pocketbase. · step: deployment-started",
-      },
-    ]);
-  });
-
-  test("[CLOUD-BLUEPRINT-QD-037] renders operator work progress messages without deployment ids", () => {
-    const progressEvents = operatorWorkEnvelopeProgressEvents([
-      {
-        schemaVersion: "operator-work.stream-events/v1",
-        kind: "progress",
-        event: {
-          workId: "dw_blueprint_install_cia_demo",
-          sequence: 3,
-          cursor: "dw_blueprint_install_cia_demo:3",
-          emittedAt: "2026-06-16T04:06:16.400Z",
-          kind: "progress",
-          status: "running",
-          operationKey: "blueprints.install",
-          workKind: "blueprint-install",
-          phase: "target-validation",
-          step: "target-validated",
-          message: "Project, environment, and server targets were validated.",
-          projectId: "prj_demo",
-          serverId: "srv_demo",
-        },
-      },
-      {
-        schemaVersion: "operator-work.stream-events/v1",
-        kind: "progress",
-        event: {
-          workId: "dw_blueprint_install_cia_demo",
-          sequence: 4,
-          cursor: "dw_blueprint_install_cia_demo:4",
-          emittedAt: "2026-06-16T04:06:16.439Z",
-          kind: "progress",
-          status: "running",
-          operationKey: "blueprints.install",
-          workKind: "blueprint-install",
-          phase: "create-resource",
-          step: "resource-create-started",
-          message: "Resource creation started for component pocketbase.",
-          projectId: "prj_demo",
-          serverId: "srv_demo",
-        },
-      },
-    ]);
-
-    expect(progressEvents).toMatchObject([
-      {
-        phase: "deploy",
-        status: "running",
-        level: "info",
-        message:
-          "Project, environment, and server targets were validated. · step: target-validated",
-      },
-      {
-        phase: "deploy",
-        status: "running",
-        level: "info",
-        message:
-          "Resource creation started for component pocketbase. · step: resource-create-started",
-      },
-    ]);
-  });
-
-  test("[CLOUD-BLUEPRINT-QD-036] reads typed replayed operator work responses", () => {
-    const response = {
-      workId: "dw_blueprint_install_cia_demo",
-      envelopes: [
-        {
-          schemaVersion: "operator-work.stream-events/v1",
-          kind: "succeeded",
-          event: {
-            workId: "dw_blueprint_install_cia_demo",
-            sequence: 10,
-            cursor: "dw_blueprint_install_cia_demo:10",
-            emittedAt: "2026-06-16T02:02:47.107Z",
-            kind: "succeeded",
-            status: "succeeded",
-            operationKey: "blueprints.install",
-            workKind: "blueprint-install",
-            phase: "install-execution",
-            step: "ready",
-            message: "Operator work completed.",
-            deploymentId: "dep_demo",
-          },
-        },
-      ],
-    } satisfies OperatorWorkEventStreamResponse;
-
-    expect(operatorWorkEventResponseEnvelopes(response)).toHaveLength(1);
-    expect(
-      operatorWorkEnvelopeProgressEvents(operatorWorkEventResponseEnvelopes(response)),
-    ).toMatchObject([
-      {
-        deploymentId: "dep_demo",
-        phase: "verify",
-        status: "succeeded",
-        message: "Operator work completed. · step: ready",
-      },
-    ]);
-  });
-
-  test("[CLOUD-BLUEPRINT-QD-034] maps operator work show terminal failure into user-facing progress", () => {
+  test("[CLOUD-BLUEPRINT-QD-034] maps operator work show terminal failure into readable diagnostics", () => {
     const work = {
       id: "dw_blueprint_install_cia_failed",
       kind: "blueprint-install" as const,
@@ -291,12 +83,43 @@ describe("Blueprint install progress helpers", () => {
       phase: "resource-admission",
       operation: "CreateResourceCommand",
     });
-    expect(operatorWorkItemToProgressEvent(work)).toMatchObject({
-      phase: "plan",
-      status: "failed",
-      level: "error",
-      message:
-        "资源名称冲突 · 资源名称已经被占用，创建资源时失败。 · 请换一个资源名称，或选择复用已有资源后重新安装。 · 阶段: resource-admission · 操作: CreateResourceCommand · 错误: resource_slug_conflict",
+  });
+
+  test("[CLOUD-BLUEPRINT-QD-035] reads the primary timeline handle from monitoring deploymentId", () => {
+    const snapshot: BlueprintInstallProgressSnapshot = {
+      schemaVersion: "appaloft.cloud.installed-application.command-result/v1",
+      applicationId: "cia_timeline",
+      executionStatus: "installing",
+      monitoring: {
+        workId: "dw_blueprint_install_cia_timeline",
+        deploymentId: "dep_timeline_primary",
+        deploymentIds: [],
+      },
+      installedApplication: {
+        applicationId: "cia_timeline",
+        status: "installing",
+        components: [
+          {
+            resource: { resourceId: "res_timeline" },
+            deployment: { status: "planned", reason: "blueprint-install" },
+            endpoints: [],
+          },
+        ],
+      },
+      progress: {
+        status: "installing",
+        userStatus: "running",
+        currentStep: "deploying-components",
+        message: "Application components are being deployed.",
+        deploymentIds: [],
+      },
+    };
+
+    expect(summarizeBlueprintInstallProgress(snapshot)).toMatchObject({
+      deploymentId: "dep_timeline_primary",
+      deploymentIds: ["dep_timeline_primary"],
+      currentStep: "deploying-components",
+      terminalStatus: "running",
     });
   });
 
@@ -326,7 +149,6 @@ describe("Blueprint install progress helpers", () => {
         currentStep: "rollback-required",
         message: "Blueprint install failed before deployment creation.",
         deploymentIds: [],
-        operatorWorkId: "dw_blueprint_install_cia_failed",
       },
     };
 
@@ -335,7 +157,6 @@ describe("Blueprint install progress helpers", () => {
       executionStatus: "rollback-required",
       userStatus: "failed",
       terminalStatus: "failed",
-      operatorWorkId: "dw_blueprint_install_cia_failed",
       deploymentIds: [],
       deploymentId: "",
       resourceId: "res_failed",
@@ -373,7 +194,6 @@ describe("Blueprint install progress helpers", () => {
         userStatus: "running",
         currentStep: "deploy-component-readback",
         deploymentIds: ["dep_component_failed"],
-        operatorWorkId: "dw_blueprint_install_cia_component_failed",
       },
     };
 

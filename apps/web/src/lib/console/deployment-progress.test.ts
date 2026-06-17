@@ -181,7 +181,7 @@ describe("deployment progress helpers", () => {
     expect(deploymentTimelineProgressStatus(envelopes, "running")).toBe("succeeded");
   });
 
-  test("[DEP-TIMELINE-WEB-001] rejects raw ORPC envelope timeline responses at the UI boundary", () => {
+  test("[DEP-TIMELINE-WEB-001] reads raw ORPC envelope timeline responses at the UI boundary", () => {
     const response = {
       json: {
         schemaVersion: "deployments.timeline/v1",
@@ -203,12 +203,59 @@ describe("deployment progress helpers", () => {
       },
     } satisfies { json: DeploymentTimelineResponse };
 
-    expect(() =>
-      deploymentTimelineEntries(response as unknown as DeploymentTimelineResponse),
-    ).toThrow("Expected deployments.timeline/v1 response");
+    expect(deploymentTimelineEntries(response)).toMatchObject([
+      {
+        deploymentId: "dep_demo",
+        sequence: 1,
+        source: "docker",
+        message: "latest: Pulling from muchobien/pocketbase",
+      },
+    ]);
   });
 
-  test("[DEP-TIMELINE-WEB-002] rejects raw ORPC envelope timeline stream values at the UI boundary", () => {
+  test("[DEP-TIMELINE-WEB-001B] reads ORPC timeline responses with transport metadata", () => {
+    const response = {
+      json: {
+        schemaVersion: "deployments.timeline/v1",
+        deploymentId: "dep_demo",
+        hasMore: false,
+        entries: [
+          {
+            deploymentId: "dep_demo",
+            sequence: 1,
+            cursor: "dep_demo:1",
+            occurredAt: "2026-01-01T00:00:01.000Z",
+            source: "docker",
+            kind: "output",
+            phase: "deploy",
+            level: "info",
+            message: "latest: Pulling from muchobien/pocketbase",
+          },
+          {
+            deploymentId: "dep_demo",
+            sequence: 2,
+            cursor: "dep_demo:2",
+            occurredAt: "2026-01-01T00:00:02.000Z",
+            source: "appaloft",
+            kind: "health-check",
+            phase: "verify",
+            level: "info",
+            message: "SSH public route is reachable at http://demo.example.test/api/health",
+          },
+        ],
+      },
+      meta: {
+        transport: "orpc",
+      },
+    } as unknown as { json: DeploymentTimelineResponse };
+
+    expect(deploymentTimelineEntries(response).map((entry) => entry.message)).toEqual([
+      "latest: Pulling from muchobien/pocketbase",
+      "SSH public route is reachable at http://demo.example.test/api/health",
+    ]);
+  });
+
+  test("[DEP-TIMELINE-WEB-002] reads raw ORPC envelope timeline stream values at the UI boundary", () => {
     const envelope = {
       json: {
         schemaVersion: "deployments.timeline/v1",
@@ -227,15 +274,232 @@ describe("deployment progress helpers", () => {
       },
     } satisfies { json: DeploymentTimelineEnvelope };
 
-    expect(() =>
-      deploymentTimelineEnvelope(envelope as unknown as DeploymentTimelineEnvelope),
-    ).toThrow("Expected deployments.timeline/v1 envelope");
-    expect(deploymentTimelineProgressEvents([envelope.json])).toMatchObject([
+    const parsedEnvelope = deploymentTimelineEnvelope(envelope);
+
+    expect(parsedEnvelope).toMatchObject({
+      kind: "entry",
+      entry: {
+        deploymentId: "dep_demo",
+        source: "docker",
+        message: "latest: Pulling from muchobien/pocketbase",
+      },
+    });
+    expect(deploymentTimelineProgressEvents(parsedEnvelope ? [parsedEnvelope] : [])).toMatchObject([
       {
         deploymentId: "dep_demo",
         source: "docker",
         phase: "deploy",
         message: "latest: Pulling from muchobien/pocketbase",
+      },
+    ]);
+  });
+
+  test("[DEP-TIMELINE-WEB-003] replays rich docker, proxy, and health timeline rows", () => {
+    const response = {
+      json: {
+        schemaVersion: "deployments.timeline/v1",
+        deploymentId: "dep_demo",
+        hasMore: false,
+        nextCursor: "dep_demo:6",
+        entries: [
+          {
+            deploymentId: "dep_demo",
+            sequence: 1,
+            cursor: "dep_demo:1",
+            occurredAt: "2026-01-01T00:00:01.000Z",
+            source: "appaloft",
+            kind: "lifecycle",
+            phase: "plan",
+            level: "info",
+            message: "Using SSH docker-container execution on root@2.25.182.56:22",
+          },
+          {
+            deploymentId: "dep_demo",
+            sequence: 2,
+            cursor: "dep_demo:2",
+            occurredAt: "2026-01-01T00:00:02.000Z",
+            source: "appaloft",
+            kind: "lifecycle",
+            phase: "deploy",
+            level: "info",
+            message: "Ensure Traefik edge proxy on Docker network appaloft-edge",
+          },
+          {
+            deploymentId: "dep_demo",
+            sequence: 3,
+            cursor: "dep_demo:3",
+            occurredAt: "2026-01-01T00:00:03.000Z",
+            source: "docker",
+            kind: "output",
+            phase: "deploy",
+            level: "info",
+            message: "latest: Pulling from muchobien/pocketbase",
+          },
+          {
+            deploymentId: "dep_demo",
+            sequence: 4,
+            cursor: "dep_demo:4",
+            occurredAt: "2026-01-01T00:00:04.000Z",
+            source: "appaloft",
+            kind: "lifecycle",
+            phase: "verify",
+            level: "info",
+            message: "SSH container is reachable internally at http://172.18.0.25:8090/api/health",
+          },
+          {
+            deploymentId: "dep_demo",
+            sequence: 5,
+            cursor: "dep_demo:5",
+            occurredAt: "2026-01-01T00:00:05.000Z",
+            source: "appaloft",
+            kind: "lifecycle",
+            phase: "verify",
+            level: "info",
+            message: "SSH public route is reachable at http://demo.example.test/api/health",
+          },
+          {
+            deploymentId: "dep_demo",
+            sequence: 6,
+            cursor: "dep_demo:6",
+            occurredAt: "2026-01-01T00:00:06.000Z",
+            source: "domain-event",
+            kind: "status",
+            phase: "verify",
+            level: "info",
+            message: "succeeded",
+            status: "succeeded",
+          },
+        ],
+      },
+    } satisfies { json: DeploymentTimelineResponse };
+
+    const replayEnvelopes = deploymentTimelineEntries(response).map(
+      (entry) =>
+        ({
+          schemaVersion: "deployments.timeline/v1",
+          kind: "entry",
+          entry,
+        }) satisfies DeploymentTimelineEnvelope,
+    );
+    const progressEvents = deploymentTimelineProgressEvents(replayEnvelopes);
+
+    expect(progressEvents).toHaveLength(6);
+    expect(progressEvents.map((event) => event.message)).toEqual([
+      "Using SSH docker-container execution on root@2.25.182.56:22",
+      "Ensure Traefik edge proxy on Docker network appaloft-edge",
+      "latest: Pulling from muchobien/pocketbase",
+      "SSH container is reachable internally at http://172.18.0.25:8090/api/health",
+      "SSH public route is reachable at http://demo.example.test/api/health",
+      "succeeded",
+    ]);
+    expect(progressEvents[2]?.source).toBe("docker");
+    expect(deploymentTimelineProgressStatus(replayEnvelopes, "running")).toBe("succeeded");
+  });
+
+  test("[DEP-TIMELINE-WEB-004] normalizes persisted timestamp timeline rows for deployment detail replay", () => {
+    const response = {
+      json: {
+        json: {
+          schemaVersion: "deployments.timeline/v1",
+          deploymentId: "dep_demo",
+          hasMore: false,
+          entries: [
+            {
+              deploymentId: "dep_demo",
+              sequence: 1,
+              cursor: "dep_demo:1",
+              timestamp: "2026-01-01T00:00:01.000Z",
+              source: "appaloft",
+              kind: "lifecycle",
+              phase: "deploy",
+              level: "info",
+              message: "Ensure Traefik edge proxy on Docker network appaloft-edge",
+            },
+            {
+              deploymentId: "dep_demo",
+              sequence: 2,
+              cursor: "dep_demo:2",
+              timestamp: "2026-01-01T00:00:02.000Z",
+              source: "docker",
+              kind: "output",
+              phase: "deploy",
+              level: "info",
+              message: "latest: Pulling from muchobien/pocketbase",
+            },
+            {
+              deploymentId: "dep_demo",
+              sequence: 3,
+              cursor: "dep_demo:3",
+              timestamp: "2026-01-01T00:00:03.000Z",
+              source: "appaloft",
+              kind: "lifecycle",
+              phase: "verify",
+              level: "info",
+              message: "SSH public route is reachable at http://demo.example.test/api/health",
+            },
+          ],
+        },
+      },
+    } as unknown as { json: DeploymentTimelineResponse };
+
+    const replayEnvelopes = deploymentTimelineEntries(response).map(
+      (entry) =>
+        ({
+          schemaVersion: "deployments.timeline/v1",
+          kind: "entry",
+          entry,
+        }) satisfies DeploymentTimelineEnvelope,
+    );
+    const progressEvents = deploymentTimelineProgressEvents(replayEnvelopes);
+
+    expect(progressEvents.map((event) => event.timestamp)).toEqual([
+      "2026-01-01T00:00:01.000Z",
+      "2026-01-01T00:00:02.000Z",
+      "2026-01-01T00:00:03.000Z",
+    ]);
+    expect(progressEvents.map((event) => event.message)).toEqual([
+      "Ensure Traefik edge proxy on Docker network appaloft-edge",
+      "latest: Pulling from muchobien/pocketbase",
+      "SSH public route is reachable at http://demo.example.test/api/health",
+    ]);
+    expect(progressEvents[1]?.source).toBe("docker");
+  });
+
+  test("[DEP-TIMELINE-WEB-005] normalizes persisted timestamp stream envelopes", () => {
+    const envelope = {
+      json: {
+        json: {
+          schemaVersion: "deployments.timeline/v1",
+          kind: "entry",
+          entry: {
+            deploymentId: "dep_demo",
+            sequence: 4,
+            cursor: "dep_demo:4",
+            timestamp: "2026-01-01T00:00:04.000Z",
+            source: "appaloft",
+            kind: "lifecycle",
+            phase: "verify",
+            level: "info",
+            message: "SSH container is reachable internally at http://172.18.0.26:8090/api/health",
+          },
+        },
+      },
+    } as unknown as { json: DeploymentTimelineEnvelope };
+
+    const parsedEnvelope = deploymentTimelineEnvelope(envelope);
+
+    expect(parsedEnvelope).toMatchObject({
+      kind: "entry",
+      entry: {
+        occurredAt: "2026-01-01T00:00:04.000Z",
+        message: "SSH container is reachable internally at http://172.18.0.26:8090/api/health",
+      },
+    });
+    expect(deploymentTimelineProgressEvents(parsedEnvelope ? [parsedEnvelope] : [])).toMatchObject([
+      {
+        timestamp: "2026-01-01T00:00:04.000Z",
+        phase: "verify",
+        message: "SSH container is reachable internally at http://172.18.0.26:8090/api/health",
       },
     ]);
   });
@@ -364,7 +628,7 @@ describe("deployment progress helpers", () => {
 
     expect(timelineMock).toHaveBeenCalledWith({
       deploymentId: "dep_demo",
-      limit: 100,
+      limit: 500,
     });
     expect(timelineStreamMock).toHaveBeenCalledWith({
       deploymentId: "dep_demo",
@@ -427,5 +691,59 @@ describe("deployment progress helpers", () => {
       "Deployment succeeded",
     ]);
     expect(timelineStreamMock).not.toHaveBeenCalled();
+  });
+
+  test("[QUICK-DEPLOY-TIMELINE-002] asks the follow stream for history when replay is initially empty", async () => {
+    timelineMock.mockResolvedValue({
+      schemaVersion: "deployments.timeline/v1",
+      deploymentId: "dep_demo",
+      hasMore: false,
+      entries: [],
+    });
+    timelineStreamMock.mockResolvedValue(
+      (async function* () {
+        yield {
+          schemaVersion: "deployments.timeline/v1",
+          kind: "entry",
+          entry: {
+            deploymentId: "dep_demo",
+            sequence: 1,
+            cursor: "dep_demo:1",
+            occurredAt: "2026-01-01T00:00:01.000Z",
+            source: "docker",
+            kind: "output",
+            phase: "deploy",
+            level: "info",
+            message: "latest: Pulling from muchobien/pocketbase",
+          },
+        } satisfies DeploymentTimelineEnvelope;
+        yield {
+          schemaVersion: "deployments.timeline/v1",
+          kind: "closed",
+          reason: "completed",
+          cursor: "dep_demo:1",
+        } satisfies DeploymentTimelineEnvelope;
+      })(),
+    );
+
+    const progressEvents: DeploymentProgressEvent[] = [];
+    await observeDeploymentProgressAfterAcceptance(
+      "dep_demo",
+      (event) => {
+        progressEvents.push(event);
+      },
+      {},
+    );
+
+    expect(timelineStreamMock).toHaveBeenCalledWith({
+      deploymentId: "dep_demo",
+      limit: 500,
+      includeHistory: true,
+      follow: true,
+      untilTerminal: true,
+    });
+    expect(progressEvents.map((event) => event.message)).toEqual([
+      "latest: Pulling from muchobien/pocketbase",
+    ]);
   });
 });
