@@ -4,6 +4,8 @@ export * from "./operations/system/db-migrate.command";
 export * from "./operations/system/db-status.query";
 export * from "./operations/system/doctor.query";
 export * from "./operations/system/github-app-connection.query";
+export * from "./operations/system/list-connector-categories.query";
+export * from "./operations/system/list-connectors.query";
 export * from "./operations/system/list-github-repositories.query";
 export * from "./operations/system/list-integrations.query";
 export * from "./operations/system/list-plugins.query";

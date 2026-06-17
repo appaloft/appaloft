@@ -4,6 +4,7 @@ import { auditEventCommand } from "./audit-event.js";
 import { authCommand } from "./auth.js";
 import { blueprintCommand } from "./blueprint.js";
 import { certificateCommand } from "./certificate.js";
+import { connectorsCommand } from "./connectors.js";
 import { contextCommand, loginCommand, logoutCommand } from "./control-plane.js";
 import { dbCommand } from "./db.js";
 import { defaultAccessCommand } from "./default-access.js";
@@ -82,6 +83,7 @@ export const mainCommand = EffectCommand.make("appaloft").pipe(
     operatorWorkCommand,
     terminalSessionCommand,
     upgradeCommand,
+    connectorsCommand,
     pluginsCommand,
     providersCommand,
   ]),

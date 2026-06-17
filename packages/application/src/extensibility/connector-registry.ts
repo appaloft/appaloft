@@ -1,0 +1,61 @@
+import {
+  type ConnectionCategoryDefinitionSnapshot,
+  ConnectorDefinition,
+  type ConnectorDefinitionSnapshot,
+  connectionCategoryDefinitions,
+} from "@appaloft/core";
+
+import {
+  type ConnectorDescriptor,
+  type ConnectorProviderAdapter,
+  type ConnectorProviderAdapterRegistry,
+  type ConnectorRegistry,
+  type ConnectorRegistryListInput,
+} from "../ports";
+
+export class InMemoryConnectorRegistry implements ConnectorRegistry {
+  private readonly definitions: ConnectorDefinition[];
+  private readonly byKey: Map<string, ConnectorDefinition>;
+
+  constructor(connectors: ConnectorDefinitionSnapshot[]) {
+    this.definitions = connectors.map(ConnectorDefinition.rehydrate);
+    this.byKey = new Map(
+      this.definitions.map((definition) => [definition.key().value, definition]),
+    );
+  }
+
+  list(input: ConnectorRegistryListInput = {}): ConnectorDescriptor[] {
+    return this.definitions
+      .filter((definition) =>
+        input.category ? definition.category().value === input.category : true,
+      )
+      .filter((definition) =>
+        definition.shouldShowInCatalog({ includeUnavailable: input.includeUnavailable ?? false }),
+      )
+      .map((definition) => definition.toJSON());
+  }
+
+  findByKey(key: string): ConnectorDescriptor | null {
+    return this.byKey.get(key)?.toJSON() ?? null;
+  }
+}
+
+export class InMemoryConnectorProviderAdapterRegistry implements ConnectorProviderAdapterRegistry {
+  private readonly byConnectorKey: Map<string, ConnectorProviderAdapter>;
+
+  constructor(private readonly adapters: ConnectorProviderAdapter[]) {
+    this.byConnectorKey = new Map(adapters.map((adapter) => [adapter.connectorKey, adapter]));
+  }
+
+  list(): ConnectorProviderAdapter[] {
+    return [...this.adapters];
+  }
+
+  findForConnector(connectorKey: string): ConnectorProviderAdapter | null {
+    return this.byConnectorKey.get(connectorKey) ?? null;
+  }
+}
+
+export function listConnectionCategoryDefinitions(): ConnectionCategoryDefinitionSnapshot[] {
+  return [...connectionCategoryDefinitions];
+}
