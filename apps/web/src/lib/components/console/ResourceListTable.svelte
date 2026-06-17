@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ArrowRight, Globe2, Plus } from "@lucide/svelte";
+  import { ArrowRight, Globe2, Play } from "@lucide/svelte";
   import type { DeploymentSummary, EnvironmentSummary, ResourceSummary } from "@appaloft/contracts";
 
   import ConsoleStatePanel from "$lib/components/console/ConsoleStatePanel.svelte";
@@ -164,10 +164,10 @@
             type="button"
             size="sm"
             variant="outline"
-            aria-label={$t(i18nKeys.common.actions.quickDeploy)}
+            aria-label={$t(i18nKeys.common.actions.createDeployment)}
             onclick={() => onDeployResource?.(resource)}
           >
-            <Plus class="size-4" />
+            <Play class="size-4" />
           </Button>
           <Button
             href={resourceDetailHref(resource)}

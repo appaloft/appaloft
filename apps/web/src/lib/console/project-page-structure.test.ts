@@ -42,8 +42,14 @@ describe("project detail page structure", () => {
     expect(projectSource).toContain('import * as Select from "$lib/components/ui/select"');
     expect(projectSource).toContain("data-project-monitor-environment-select");
     expect(projectSource).toContain("data-project-resource-environment-filter");
+    expect(projectSource).toContain("data-project-resource-deployment-create-dialog");
     expect(projectSource).toContain("<Select.Root bind:value={selectedMonitoringEnvironmentId}");
     expect(projectSource).toContain("<Select.Root bind:value={resourceEnvironmentFilter}");
+    expect(projectSource).toContain(
+      "onclick={() => openProjectResourceDeploymentDialog(resource)}",
+    );
+    expect(projectSource).toContain("onDeployResource={openProjectResourceDeploymentDialog}");
+    expect(projectSource).not.toContain("openResourceQuickDeploy");
     expect(projectSource).not.toContain("<select");
     expect(projectSource).not.toContain("<option");
     expect(projectSource).toContain("projectRenameDialogOpen");

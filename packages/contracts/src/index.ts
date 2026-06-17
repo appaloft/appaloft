@@ -6429,6 +6429,190 @@ export const integrationDescriptorSchema = z.object({
   configuration: systemConfigurationSummarySchema.optional(),
 });
 
+export const connectionCategorySchema = z.object({
+  key: z.enum([
+    "source",
+    "dns",
+    "infrastructure",
+    "notification",
+    "billing",
+    "identity",
+    "observability",
+    "storage",
+  ]),
+  title: z.string(),
+  description: z.string(),
+});
+
+export const credentialGrantKindSchema = z.enum([
+  "temporary-domain-connect",
+  "limited-oauth-grant",
+  "persistent-provider-credential",
+  "provider-app-installation",
+  "manual-secret-reference",
+]);
+
+export const connectorCapabilitySchema = z.object({
+  key: z.string(),
+  title: z.string(),
+  description: z.string().optional(),
+  implemented: z.boolean(),
+});
+
+export const credentialGrantSchema = z.object({
+  kind: credentialGrantKindSchema,
+  title: z.string(),
+  storesLongLivedSecret: z.boolean(),
+  description: z.string().optional(),
+});
+
+export const connectorAvailabilitySchema = z.object({
+  status: z.enum(["available", "setup-required", "unavailable", "deferred"]),
+  diagnostics: z.array(systemConfigurationDiagnosticSchema),
+});
+
+export const connectorDescriptorSchema = z.object({
+  key: z.string(),
+  title: z.string(),
+  category: connectionCategorySchema.shape.key,
+  providerKey: z.string(),
+  capabilities: z.array(connectorCapabilitySchema),
+  grantKinds: z.array(credentialGrantSchema),
+  availability: connectorAvailabilitySchema,
+  visibility: z.enum(["catalog", "hidden-when-unavailable", "internal"]),
+  setup: z
+    .object({
+      connectHref: z.string().optional(),
+      documentationHref: z.string().optional(),
+    })
+    .optional(),
+});
+
+export const connectionOwnerSchema = z.object({
+  scope: z.enum(["account", "organization", "project", "environment", "resource", "operator"]),
+  id: z.string(),
+});
+
+export const connectionCredentialGrantSchema = z.object({
+  kind: credentialGrantKindSchema,
+  storage: z.enum(["none", "secret-ref", "provider-app", "ephemeral"]),
+  redacted: z.literal(true),
+  secretRef: z.string().optional(),
+  externalAccountId: z.string().optional(),
+  externalInstallationId: z.string().optional(),
+  expiresAt: z.string().optional(),
+});
+
+export const connectionDiagnosticSchema = z.object({
+  code: z.string(),
+  severity: z.enum(["info", "warning", "error"]),
+  message: z.string(),
+});
+
+export const connectionSchema = z.object({
+  id: z.string(),
+  connectorKey: z.string(),
+  providerKey: z.string(),
+  category: connectionCategorySchema.shape.key,
+  owner: connectionOwnerSchema,
+  displayName: z.string(),
+  status: z.enum(["pending", "connected", "failed", "revoked"]),
+  capabilities: z.array(z.string()),
+  credentialGrant: connectionCredentialGrantSchema,
+  diagnostics: z.array(connectionDiagnosticSchema),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  revokedAt: z.string().optional(),
+});
+
+export const dnsRecordRequirementSchema = z.object({
+  name: z.string(),
+  type: z.enum(["A", "AAAA", "CNAME", "TXT"]),
+  value: z.string(),
+  ttl: z.number().int().positive().optional(),
+  proxied: z.boolean().optional(),
+  purpose: z.enum(["domain-routing", "domain-verification", "certificate-validation", "manual"]),
+});
+
+export const dnsRecordConflictSchema = z.object({
+  name: z.string(),
+  requestedType: dnsRecordRequirementSchema.shape.type,
+  existingType: dnsRecordRequirementSchema.shape.type,
+  reason: z.enum(["cname-exclusive", "different-value"]),
+  existingValue: z.string(),
+  requestedValue: z.string(),
+});
+
+export const dnsRecordPlanSchema = z.object({
+  zoneName: z.string().optional(),
+  records: z.array(dnsRecordRequirementSchema),
+  conflicts: z.array(dnsRecordConflictSchema),
+});
+
+export const connectorCapabilityPlanPreviewSchema = z.object({
+  planId: z.string(),
+  connectorKey: z.string(),
+  capabilityKey: z.string(),
+  riskLevel: z.enum(["low", "medium", "high"]),
+  requiresExplicitAcceptance: z.boolean(),
+  summary: z.string(),
+  effects: z.array(
+    z.object({
+      kind: z.string(),
+      title: z.string(),
+      description: z.string().optional(),
+    }),
+  ),
+  cleanup: z
+    .object({
+      supported: z.boolean(),
+      description: z.string().optional(),
+    })
+    .optional(),
+  providerPlan: z
+    .object({
+      kind: z.string(),
+      dnsRecords: dnsRecordPlanSchema.optional(),
+    })
+    .optional(),
+});
+
+export const listConnectorCategoriesResponseSchema = z.object({
+  items: z.array(connectionCategorySchema),
+});
+
+export const listConnectorsResponseSchema = z.object({
+  items: z.array(connectorDescriptorSchema),
+});
+
+export const listConnectionsResponseSchema = z.object({
+  items: z.array(connectionSchema),
+});
+
+export const showConnectionResponseSchema = connectionSchema;
+
+export const startConnectionResponseSchema = z.object({
+  connection: connectionSchema,
+  authorizationUrl: z.string().optional(),
+  nextAction: z.enum([
+    "already-connected",
+    "authorize-in-browser",
+    "provider-callback",
+    "ready",
+    "manual-secret-required",
+  ]),
+});
+
+export const completeConnectionCallbackResponseSchema = z.object({
+  connection: connectionSchema,
+});
+
+export const revokeConnectionResponseSchema = z.object({
+  connection: connectionSchema,
+});
+
+export const connectorCapabilityPlanResponseSchema = connectorCapabilityPlanPreviewSchema;
+
 export const listProvidersResponseSchema = z.object({
   items: z.array(providerDescriptorSchema),
 });
@@ -6583,6 +6767,23 @@ export type DeleteAccountResponse = z.infer<typeof deleteAccountResponseSchema>;
 export type GitHubRepositorySummary = z.infer<typeof githubRepositorySummarySchema>;
 export type GitHubAppConnectionResponse = z.infer<typeof githubAppConnectionResponseSchema>;
 export type IntegrationDescriptor = z.infer<typeof integrationDescriptorSchema>;
+export type ConnectionCategory = z.infer<typeof connectionCategorySchema>;
+export type CredentialGrantKind = z.infer<typeof credentialGrantKindSchema>;
+export type ConnectorDescriptor = z.infer<typeof connectorDescriptorSchema>;
+export type Connection = z.infer<typeof connectionSchema>;
+export type ConnectionOwner = z.infer<typeof connectionOwnerSchema>;
+export type ConnectionCredentialGrant = z.infer<typeof connectionCredentialGrantSchema>;
+export type ListConnectionsResponse = z.infer<typeof listConnectionsResponseSchema>;
+export type ShowConnectionResponse = z.infer<typeof showConnectionResponseSchema>;
+export type StartConnectionResponse = z.infer<typeof startConnectionResponseSchema>;
+export type CompleteConnectionCallbackResponse = z.infer<
+  typeof completeConnectionCallbackResponseSchema
+>;
+export type RevokeConnectionResponse = z.infer<typeof revokeConnectionResponseSchema>;
+export type DnsRecordRequirement = z.infer<typeof dnsRecordRequirementSchema>;
+export type DnsRecordConflict = z.infer<typeof dnsRecordConflictSchema>;
+export type DnsRecordPlan = z.infer<typeof dnsRecordPlanSchema>;
+export type ConnectorCapabilityPlanPreview = z.infer<typeof connectorCapabilityPlanPreviewSchema>;
 export type PluginSummary = z.infer<typeof pluginSummarySchema>;
 export type SystemPluginWebExtension = z.infer<typeof systemPluginWebExtensionSchema>;
 export type MaintenanceWorkerActivation = z.infer<typeof maintenanceWorkerActivationSchema>;
@@ -7236,6 +7437,9 @@ export type ExpireTerminalSessionsResponse = z.infer<typeof expireTerminalSessio
 export type TerminalSessionFrame = z.infer<typeof terminalSessionFrameSchema>;
 export type ResourceDiagnosticSummary = z.infer<typeof resourceDiagnosticSummarySchema>;
 export type ProxyConfigurationView = z.infer<typeof proxyConfigurationViewSchema>;
+export type ListConnectorCategoriesResponse = z.infer<typeof listConnectorCategoriesResponseSchema>;
+export type ListConnectorsResponse = z.infer<typeof listConnectorsResponseSchema>;
+export type ConnectorCapabilityPlanResponse = z.infer<typeof connectorCapabilityPlanResponseSchema>;
 export type ListProvidersResponse = z.infer<typeof listProvidersResponseSchema>;
 export type ListIntegrationsResponse = z.infer<typeof listIntegrationsResponseSchema>;
 export type ListPluginsResponse = z.infer<typeof listPluginsResponseSchema>;

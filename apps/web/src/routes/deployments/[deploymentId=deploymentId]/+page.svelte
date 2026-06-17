@@ -2009,6 +2009,15 @@
                     <p class="mt-2 text-sm text-muted-foreground">
                       {variable.scope} · {variable.exposure} · {variable.kind}
                     </p>
+                    <div
+                      class="mt-3 rounded-md bg-muted/40 px-3 py-2"
+                      data-deployment-environment-snapshot-value
+                    >
+                      <p class="text-xs font-medium text-muted-foreground">
+                        {$t(i18nKeys.common.domain.value)}
+                      </p>
+                      <p class="mt-1 break-all font-mono text-sm">{variable.value}</p>
+                    </div>
                   </div>
                 {/each}
               {:else}

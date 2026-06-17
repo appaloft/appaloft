@@ -4,12 +4,14 @@ import { auditEventCommand } from "./audit-event.js";
 import { authCommand } from "./auth.js";
 import { blueprintCommand } from "./blueprint.js";
 import { certificateCommand } from "./certificate.js";
+import { connectorsCommand } from "./connectors.js";
 import { contextCommand, loginCommand, logoutCommand } from "./control-plane.js";
 import { dbCommand } from "./db.js";
 import { defaultAccessCommand } from "./default-access.js";
 import { dependencyCommand } from "./dependency.js";
 import { deployTokenCommand } from "./deploy-token.js";
 import { deployCommand, deploymentsCommand, logsCommand, previewCommand } from "./deployment.js";
+import { dnsCommand } from "./dns.js";
 import { domainBindingCommand } from "./domain-binding.js";
 import { domainEventCommand } from "./domain-event.js";
 import { envCommand } from "./environment.js";
@@ -82,6 +84,8 @@ export const mainCommand = EffectCommand.make("appaloft").pipe(
     operatorWorkCommand,
     terminalSessionCommand,
     upgradeCommand,
+    connectorsCommand,
+    dnsCommand,
     pluginsCommand,
     providersCommand,
   ]),

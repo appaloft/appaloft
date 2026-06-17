@@ -1019,12 +1019,39 @@
 
   .nothing-deployment-row,
   .nothing-deployment-rollup-row {
+    position: relative;
+    isolation: isolate;
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
     gap: 10px;
     border-top: 1px solid var(--input);
     padding: 12px 0;
+  }
+
+  .nothing-deployment-row::before,
+  .nothing-deployment-rollup-row::before {
+    position: absolute;
+    inset: -5px -10px;
+    z-index: 0;
+    border-radius: var(--radius-md);
+    background: color-mix(in oklch, var(--primary) 4%, transparent);
+    content: "";
+    opacity: 0;
+    transition: opacity var(--nothing-motion-duration) var(--nothing-motion-ease);
+  }
+
+  .nothing-deployment-row:hover::before,
+  .nothing-deployment-row:focus-visible::before,
+  .nothing-deployment-rollup-row:hover::before,
+  .nothing-deployment-rollup-row:focus-visible::before {
+    opacity: 1;
+  }
+
+  .nothing-deployment-row > *,
+  .nothing-deployment-rollup-row > * {
+    position: relative;
+    z-index: 1;
   }
 
   .nothing-deployment-row > span:first-child,
@@ -1088,10 +1115,6 @@
     text-underline-offset: 3px;
   }
 
-  .nothing-deployment-row:hover,
-  .nothing-deployment-row:focus-visible,
-  .nothing-deployment-rollup-row:hover,
-  .nothing-deployment-rollup-row:focus-visible,
   a.nothing-status-cell:hover,
   a.nothing-status-cell:focus-visible,
   .nothing-next-row:hover,
