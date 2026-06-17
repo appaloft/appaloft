@@ -1,4 +1,5 @@
 import {
+  AcceptConnectorCapabilityPlanCommand,
   ApplyConnectorCapabilityCommand,
   CompleteConnectionCallbackCommand,
   ListConnectionsQuery,
@@ -30,6 +31,13 @@ const includeUnavailableOption = Options.boolean("include-unavailable").pipe(
 );
 const connectorOption = Options.text("connector");
 const capabilityOption = Options.text("capability");
+const planIdOption = Options.text("plan-id");
+const riskLevelOption = Options.choice("risk", ["low", "medium", "high"]);
+const summaryOption = Options.text("summary");
+const effectsJsonOption = Options.text("effects-json");
+const acceptedByOption = Options.text("accepted-by").pipe(Options.optional);
+const cleanupSupportedOption = Options.boolean("cleanup-supported").pipe(Options.optional);
+const cleanupDescriptionOption = Options.text("cleanup-description").pipe(Options.optional);
 const parametersJsonOption = Options.text("parameters-json").pipe(Options.optional);
 const acceptedPlanIdOption = Options.text("accepted-plan-id").pipe(Options.optional);
 const connectorArg = Args.text({ name: "connector" });
@@ -121,6 +129,59 @@ const planCommand = EffectCommand.make(
       ),
     ),
 ).pipe(EffectCommand.withDescription("Plan a connector capability without applying changes"));
+
+const acceptCommand = EffectCommand.make(
+  "accept",
+  {
+    connector: connectorOption,
+    capability: capabilityOption,
+    planId: planIdOption,
+    risk: riskLevelOption,
+    summary: summaryOption,
+    effectsJson: effectsJsonOption,
+    acceptedBy: acceptedByOption,
+    cleanupSupported: cleanupSupportedOption,
+    cleanupDescription: cleanupDescriptionOption,
+    ownerScope: ownerScopeOption,
+    ownerId: ownerIdOption,
+  },
+  ({
+    connector,
+    capability,
+    planId,
+    risk,
+    summary,
+    effectsJson,
+    acceptedBy,
+    cleanupSupported,
+    cleanupDescription,
+    ownerScope,
+    ownerId,
+  }) =>
+    runCommand(
+      parseEffectsJson(effectsJson).andThen((effects) =>
+        AcceptConnectorCapabilityPlanCommand.create({
+          connectorKey: connector,
+          capabilityKey: capability,
+          planId,
+          riskLevel: risk,
+          summary,
+          effects,
+          acceptedBy: optionalValue(acceptedBy),
+          ownerRef: ownerRef(optionalValue(ownerScope), optionalValue(ownerId)),
+          ...(optionalValue(cleanupSupported) !== undefined ||
+          optionalValue(cleanupDescription) !== undefined
+            ? {
+                cleanup: {
+                  supported: optionalValue(cleanupSupported) ?? false,
+                  description: optionalValue(cleanupDescription),
+                },
+              }
+            : {}),
+        }),
+      ),
+    ),
+).pipe(EffectCommand.withDescription("Accept a planned connector capability mutation"));
 
 const applyCommand = EffectCommand.make(
   "apply",
@@ -222,6 +283,7 @@ export const connectorsCommand = EffectCommand.make("connectors").pipe(
     callbackCommand,
     revokeCommand,
     planCommand,
+    acceptCommand,
     applyCommand,
   ]),
 );
@@ -240,6 +302,39 @@ function parseParametersJson(
     return ok(parsed as Record<string, unknown>);
   } catch {
     return err(domainError.validation("Connector parameters JSON is invalid"));
+  }
+}
+
+function parseEffectsJson(
+  value: string,
+): Result<{ kind: string; title: string; description?: string }[]> {
+  try {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) {
+      return err(domainError.validation("Connector effects JSON must be an array"));
+    }
+    const effects: { kind: string; title: string; description?: string }[] = [];
+    for (const [index, item] of parsed.entries()) {
+      if (!item || typeof item !== "object" || Array.isArray(item)) {
+        return err(domainError.validation(`Connector effect ${index + 1} JSON must be an object`));
+      }
+      const record = item as Record<string, unknown>;
+      if (typeof record.kind !== "string" || typeof record.title !== "string") {
+        return err(
+          domainError.validation(
+            `Connector effect ${index + 1} JSON must include kind and title strings`,
+          ),
+        );
+      }
+      effects.push({
+        kind: record.kind,
+        title: record.title,
+        ...(typeof record.description === "string" ? { description: record.description } : {}),
+      });
+    }
+    return ok(effects);
+  } catch {
+    return err(domainError.validation("Connector effects JSON is invalid"));
   }
 }
 

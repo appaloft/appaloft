@@ -22,7 +22,7 @@
 - [x] APP-CONN-008: add provider app token expiry/redaction test.
 - [x] APP-CONN-009: add infrastructure target proposal test.
 - [x] APP-CONN-010: add high-cost proposal explicit-acceptance test.
-- [ ] APP-CONN-010: add durable accepted-plan mutation test.
+- [x] APP-CONN-010: add durable accepted-plan mutation test.
 - [x] APP-CONN-011: add notification adapter redaction test.
 - [x] APP-CONN-012: add no billing ledger mutation test.
 - [x] APP-CONN-013: add tool/operation no-secret exposure test.
@@ -48,7 +48,7 @@
 - [x] Add persistent DNS provider plan contract.
 - [x] Add persistent DNS apply/verify/cleanup provider contracts.
 - [x] Add DNS temporary setup provider contract.
-- [x] Add CLI and HTTP surfaces for catalog, connection lifecycle, DNS planning, DNS apply/verify/cleanup, and infrastructure proposal planning.
+- [x] Add CLI and HTTP surfaces for catalog, connection lifecycle, accepted capability plans, DNS planning, DNS apply/verify/cleanup, and infrastructure proposal planning.
 - [x] Add Web central/contextual extension metadata for Connections console pages.
 
 ## Verification

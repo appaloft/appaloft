@@ -21,6 +21,7 @@ const purposeOption = Options.choice("purpose", [
   "manual",
 ]).pipe(Options.withDefault("domain-routing"));
 const ttlOption = Options.integer("ttl").pipe(Options.optional);
+const acceptedPlanIdOption = Options.text("accepted-plan-id").pipe(Options.optional);
 const domainArg = Args.text({ name: "domain" });
 
 const planCommand = EffectCommand.make(
@@ -91,12 +92,14 @@ const applyCommand = EffectCommand.make(
     type: recordTypeOption,
     purpose: purposeOption,
     ttl: ttlOption,
+    acceptedPlanId: acceptedPlanIdOption,
   },
-  ({ domain, provider, hostname, target, type, purpose, ttl }) =>
+  ({ domain, provider, hostname, target, type, purpose, ttl, acceptedPlanId }) =>
     runCommand(
       ApplyConnectorCapabilityCommand.create({
         connectorKey: `${provider}-dns`,
         capabilityKey: "dns.records.apply",
+        acceptedPlanId: optionalValue(acceptedPlanId),
         parameters: dnsParameters({
           domain,
           hostname: optionalValue(hostname),

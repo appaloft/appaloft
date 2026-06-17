@@ -101,6 +101,7 @@ describe("operation catalog aggregate mutation boundary", () => {
       "connections.connect.start",
       "connections.connect.callback",
       "connections.capability.plan",
+      "connections.capability.accept",
       "connections.capability.apply",
       "connections.revoke",
       "connections.status.show",

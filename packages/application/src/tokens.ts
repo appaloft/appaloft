@@ -633,6 +633,9 @@ export const tokens = {
   startConnectionUseCase: Symbol.for("appaloft.start_connection_use_case"),
   completeConnectionCallbackUseCase: Symbol.for("appaloft.complete_connection_callback_use_case"),
   revokeConnectionUseCase: Symbol.for("appaloft.revoke_connection_use_case"),
+  acceptConnectorCapabilityPlanUseCase: Symbol.for(
+    "appaloft.accept_connector_capability_plan_use_case",
+  ),
   connectorCategoriesQueryService: Symbol.for("appaloft.connector_categories_query_service"),
   connectorCapabilityPlanQueryService: Symbol.for(
     "appaloft.connector_capability_plan_query_service",
@@ -659,6 +662,9 @@ export const tokens = {
   providerRegistry: Symbol.for("appaloft.provider_registry"),
   connectorRegistry: Symbol.for("appaloft.connector_registry"),
   connectorConnectionStore: Symbol.for("appaloft.connector_connection_store"),
+  acceptedConnectionCapabilityPlanStore: Symbol.for(
+    "appaloft.accepted_connection_capability_plan_store",
+  ),
   connectorConnectionProjectionSource: Symbol.for(
     "appaloft.connector_connection_projection_source",
   ),

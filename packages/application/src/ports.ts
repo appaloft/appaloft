@@ -1,4 +1,5 @@
 import {
+  type AcceptedConnectionCapabilityPlanSnapshot,
   type BuildStrategyKind,
   type Certificate,
   type CertificateIssueReason,
@@ -9562,6 +9563,11 @@ export interface ConnectorConnectionStore {
   save(connection: ConnectionSnapshot): void;
 }
 
+export interface AcceptedConnectionCapabilityPlanStore {
+  save(plan: AcceptedConnectionCapabilityPlanSnapshot): void;
+  findById(acceptedPlanId: string): AcceptedConnectionCapabilityPlanSnapshot | null;
+}
+
 export interface ConnectorConnectionProjectionSource {
   list(
     context: ExecutionContext,
@@ -9589,7 +9595,12 @@ export interface ConnectionRevokeResult {
   connection: ConnectionSnapshot;
 }
 
-export type { ConnectionCredentialGrantSnapshot, ConnectionOwnerSnapshot, ConnectionSnapshot };
+export type {
+  AcceptedConnectionCapabilityPlanSnapshot,
+  ConnectionCredentialGrantSnapshot,
+  ConnectionOwnerSnapshot,
+  ConnectionSnapshot,
+};
 
 export interface ConnectorCapabilityPlanInput {
   connectorKey: string;

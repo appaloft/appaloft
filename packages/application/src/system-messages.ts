@@ -1,3 +1,4 @@
+export * from "./operations/system/accept-connector-capability-plan.command";
 export * from "./operations/system/apply-connector-capability.command";
 export * from "./operations/system/apply-instance-upgrade.command";
 export * from "./operations/system/check-instance-upgrade.query";

@@ -6690,6 +6690,31 @@ export const connectorCapabilityPlanPreviewSchema = z.object({
     .optional(),
 });
 
+export const acceptedConnectorCapabilityPlanSchema = z.object({
+  acceptedPlanId: z.string(),
+  planId: z.string(),
+  connectorKey: z.string(),
+  capabilityKey: z.string(),
+  ownerRef: connectionOwnerSchema.optional(),
+  acceptedBy: z.string(),
+  acceptedAt: z.string(),
+  riskLevel: z.enum(["low", "medium", "high"]),
+  summary: z.string(),
+  effects: z.array(
+    z.object({
+      kind: z.string(),
+      title: z.string(),
+      description: z.string().optional(),
+    }),
+  ),
+  cleanup: z
+    .object({
+      supported: z.boolean(),
+      description: z.string().optional(),
+    })
+    .optional(),
+});
+
 export const connectorCapabilityApplyResultSchema = z.object({
   operationId: z.string(),
   connectorKey: z.string(),
@@ -6750,6 +6775,7 @@ export const revokeConnectionResponseSchema = z.object({
 });
 
 export const connectorCapabilityPlanResponseSchema = connectorCapabilityPlanPreviewSchema;
+export const acceptConnectorCapabilityPlanResponseSchema = acceptedConnectorCapabilityPlanSchema;
 export const connectorCapabilityApplyResponseSchema = connectorCapabilityApplyResultSchema;
 
 export const listProvidersResponseSchema = z.object({
@@ -6934,6 +6960,7 @@ export type InfrastructureServerProposal = z.infer<typeof infrastructureServerPr
 export type NotificationMessage = z.infer<typeof notificationMessageSchema>;
 export type NotificationMessageDelivery = z.infer<typeof notificationMessageDeliverySchema>;
 export type ConnectorCapabilityPlanPreview = z.infer<typeof connectorCapabilityPlanPreviewSchema>;
+export type AcceptedConnectorCapabilityPlan = z.infer<typeof acceptedConnectorCapabilityPlanSchema>;
 export type ConnectorCapabilityApplyResult = z.infer<typeof connectorCapabilityApplyResultSchema>;
 export type PluginSummary = z.infer<typeof pluginSummarySchema>;
 export type SystemPluginWebExtension = z.infer<typeof systemPluginWebExtensionSchema>;
@@ -7591,6 +7618,9 @@ export type ProxyConfigurationView = z.infer<typeof proxyConfigurationViewSchema
 export type ListConnectorCategoriesResponse = z.infer<typeof listConnectorCategoriesResponseSchema>;
 export type ListConnectorsResponse = z.infer<typeof listConnectorsResponseSchema>;
 export type ConnectorCapabilityPlanResponse = z.infer<typeof connectorCapabilityPlanResponseSchema>;
+export type AcceptConnectorCapabilityPlanResponse = z.infer<
+  typeof acceptConnectorCapabilityPlanResponseSchema
+>;
 export type ConnectorCapabilityApplyResponse = z.infer<
   typeof connectorCapabilityApplyResponseSchema
 >;

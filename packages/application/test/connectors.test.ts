@@ -2,6 +2,7 @@ import "reflect-metadata";
 import { describe, expect, test } from "bun:test";
 
 import {
+  AcceptConnectorCapabilityPlanUseCase,
   ApplyConnectorCapabilityUseCase,
   createDefaultConnectorDefinitions,
   createExecutionContext,
@@ -9,6 +10,7 @@ import {
   FakeInfrastructureConnectorProviderAdapter,
   FakeNotificationConnectorProviderAdapter,
   FakeSourceConnectorProviderAdapter,
+  InMemoryAcceptedConnectionCapabilityPlanStore,
   InMemoryConnectorConnectionStore,
   InMemoryConnectorProviderAdapterRegistry,
   InMemoryConnectorRegistry,
@@ -306,6 +308,60 @@ describe("connector catalog", () => {
     expect(JSON.stringify(plan)).not.toContain("token");
   });
 
+  test("[APP-CONN-010][APP-CONN-016] stores accepted high-cost connector capability plans without secrets", async () => {
+    const store = new InMemoryAcceptedConnectionCapabilityPlanStore();
+    const service = new AcceptConnectorCapabilityPlanUseCase(store);
+
+    const result = await service.execute(
+      createExecutionContext({
+        entrypoint: "system",
+        actor: {
+          kind: "user",
+          id: "actor_deployer",
+          label: "Deployer",
+        },
+      }),
+      {
+        planId: "infra_plan_high_cost",
+        connectorKey: "vultr-infrastructure",
+        capabilityKey: "infrastructure.server.create",
+        ownerRef: {
+          scope: "project",
+          id: "proj_prod",
+        },
+        riskLevel: "high",
+        summary: "Create a 4 CPU / 8 GB server in ewr.",
+        effects: [
+          {
+            kind: "infrastructure.server.create",
+            title: "Create appaloft-edge-prod",
+            description: "Estimated monthly cost is 96 USD.",
+          },
+        ],
+        cleanup: {
+          supported: true,
+          description: "Destroy the provider server and remove generated SSH access.",
+        },
+      },
+    );
+
+    expect(result.isOk()).toBe(true);
+    const accepted = result._unsafeUnwrap();
+    expect(accepted.acceptedPlanId).toStartWith("accepted_");
+    expect(accepted.acceptedBy).toBe("actor_deployer");
+    expect(accepted.riskLevel).toBe("high");
+    expect(store.findById(accepted.acceptedPlanId)).toMatchObject({
+      connectorKey: "vultr-infrastructure",
+      capabilityKey: "infrastructure.server.create",
+      ownerRef: {
+        scope: "project",
+        id: "proj_prod",
+      },
+    });
+    expect(JSON.stringify(accepted)).not.toContain("token=");
+    expect(JSON.stringify(accepted)).not.toContain("private_key");
+  });
+
   test("[APP-CONN-011][APP-CONN-016] plans Slack notification messages with payload redaction", async () => {
     const registry = new InMemoryConnectorRegistry(
       createDefaultConnectorDefinitions({
@@ -373,6 +429,24 @@ describe("connector catalog", () => {
         },
       }),
     );
+    const acceptedPlanStore = new InMemoryAcceptedConnectionCapabilityPlanStore();
+    const accepted = await new AcceptConnectorCapabilityPlanUseCase(acceptedPlanStore).execute(
+      createExecutionContext({ entrypoint: "system" }),
+      {
+        planId: "notifyplan_test",
+        connectorKey: "slack-notification",
+        capabilityKey: "notification.messages.send",
+        riskLevel: "medium",
+        summary: "Send deployment notification to Slack.",
+        effects: [
+          {
+            kind: "notification.message.sent",
+            title: "Send Slack message",
+          },
+        ],
+      },
+    );
+    expect(accepted.isOk()).toBe(true);
     const service = new ApplyConnectorCapabilityUseCase(
       registry,
       new InMemoryConnectorProviderAdapterRegistry([
@@ -382,6 +456,7 @@ describe("connector catalog", () => {
           providerTitle: "Slack Notification",
         }),
       ]),
+      acceptedPlanStore,
     );
 
     const rejected = await service.execute(createExecutionContext({ entrypoint: "system" }), {
@@ -402,7 +477,7 @@ describe("connector catalog", () => {
     const sent = await service.execute(createExecutionContext({ entrypoint: "system" }), {
       connectorKey: "slack-notification",
       capabilityKey: "notification.messages.send",
-      acceptedPlanId: "notifyplan_test",
+      acceptedPlanId: accepted._unsafeUnwrap().acceptedPlanId,
       parameters: {
         channelRef: "#deployments",
         subject: "Deploy finished",
@@ -642,15 +717,37 @@ describe("connector catalog", () => {
       connectorKey: "cloudflare-dns",
       providerTitle: "Cloudflare DNS",
     });
+    const acceptedPlanStore = new InMemoryAcceptedConnectionCapabilityPlanStore();
+    const accepted = await new AcceptConnectorCapabilityPlanUseCase(acceptedPlanStore).execute(
+      createExecutionContext({ entrypoint: "system" }),
+      {
+        planId: "dnsplan_test",
+        connectorKey: "cloudflare-dns",
+        capabilityKey: "dns.records.apply",
+        riskLevel: "low",
+        summary: "Apply one Cloudflare DNS record.",
+        effects: [
+          {
+            kind: "dns.record.upsert",
+            title: "CNAME app.example.com",
+          },
+        ],
+        cleanup: {
+          supported: true,
+        },
+      },
+    );
+    expect(accepted.isOk()).toBe(true);
     const service = new ApplyConnectorCapabilityUseCase(
       registry,
       new InMemoryConnectorProviderAdapterRegistry([adapter]),
+      acceptedPlanStore,
     );
 
     const apply = await service.execute(createExecutionContext({ entrypoint: "system" }), {
       connectorKey: "cloudflare-dns",
       capabilityKey: "dns.records.apply",
-      acceptedPlanId: "dnsplan_test",
+      acceptedPlanId: accepted._unsafeUnwrap().acceptedPlanId,
       parameters: {
         zoneName: "example.com",
         hostname: "app.example.com",
@@ -672,6 +769,24 @@ describe("connector catalog", () => {
       },
     ]);
     expect(JSON.stringify(applied)).not.toContain("token");
+
+    const mismatchedAcceptance = await service.execute(
+      createExecutionContext({ entrypoint: "system" }),
+      {
+        connectorKey: "cloudflare-dns",
+        capabilityKey: "dns.records.cleanup",
+        acceptedPlanId: accepted._unsafeUnwrap().acceptedPlanId,
+        parameters: {
+          zoneName: "example.com",
+          hostname: "app.example.com",
+          target: "edge.appaloft.dev",
+          recordType: "CNAME",
+        },
+      },
+    );
+
+    expect(mismatchedAcceptance.isErr()).toBe(true);
+    expect(mismatchedAcceptance._unsafeUnwrapErr().code).toBe("conflict");
 
     const verify = await service.execute(createExecutionContext({ entrypoint: "system" }), {
       connectorKey: "cloudflare-dns",

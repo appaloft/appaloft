@@ -1749,6 +1749,8 @@ Current boundary:
   planner. It derives DNS records from the binding's expected DNS targets, delegates to a concrete
   DNS category connector such as `cloudflare-dns`, returns a plan, and does not apply provider
   changes or introduce DNS as a sibling model to `Connection` or `ConnectorDefinition`.
+- DNS apply must use the shared connector `connections.capability.accept` and
+  `connections.capability.apply` flow with an accepted-plan id when provider mutation is required.
 - `domain-bindings.configure-route` is the explicit route-behavior update operation for switching
   between serving traffic and redirecting to an existing served canonical binding in the same
   owner/path scope; generic `domain-bindings.update` remains forbidden
