@@ -28,7 +28,7 @@ import {
   UpsertGitHubAppInstallationCommand,
 } from "@appaloft/application";
 import { type AppConfig } from "@appaloft/config";
-import { apiVersion, type ReadinessResponse } from "@appaloft/contracts";
+import { type AuthPublicConfig, apiVersion, type ReadinessResponse } from "@appaloft/contracts";
 import { type Result } from "@appaloft/core";
 import { appaloftDeploymentConfigJsonSchema } from "@appaloft/deployment-config";
 import {
@@ -71,6 +71,7 @@ interface SystemPluginRuntime {
 }
 
 interface AuthRuntime extends ProductSessionAuthorizationPort {
+  getPublicConfig(): AuthPublicConfig;
   getSessionStatus(request: Request): Promise<{
     accountSecurity: {
       changePasswordPath?: string;
@@ -169,6 +170,10 @@ interface StaticAssetSource {
   staticDir: string | null;
 }
 
+interface PublicRuntimeConfig {
+  auth: AuthPublicConfig;
+}
+
 const firstAdminBootstrapPath = "/bootstrap/auth/first-admin";
 const forgotPasswordPath = "/forgot-password";
 const loginPath = "/login";
@@ -177,6 +182,13 @@ const signUpPath = "/sign-up";
 const verifyEmailPath = "/verify-email";
 const githubAppQuickDeployReturnPath =
   "/?modal=quick-deploy&source=github&githubMode=browser&step=source";
+
+const disabledAuthPublicConfig: AuthPublicConfig = {
+  schemaVersion: "appaloft.auth.public-config/v1",
+  enabled: false,
+  provider: "none",
+  providers: [],
+};
 
 function publicReadiness(readiness: ReadinessResponse): ReadinessResponse {
   const details: Record<string, string> = {};
@@ -193,6 +205,13 @@ function publicReadiness(readiness: ReadinessResponse): ReadinessResponse {
     checks: readiness.checks,
     ...(Object.keys(details).length > 0 ? { details } : {}),
   };
+}
+
+function escapeScriptJson(value: unknown): string {
+  return JSON.stringify(value)
+    .replaceAll("<", "\\u003c")
+    .replaceAll("\u2028", "\\u2028")
+    .replaceAll("\u2029", "\\u2029");
 }
 
 function isSafeStaticArtifactSegment(value: string): boolean {
@@ -1058,6 +1077,16 @@ export function createHttpApp(input: {
     });
   }
 
+  function publicRuntimeConfig(): PublicRuntimeConfig {
+    return {
+      auth: input.authRuntime?.getPublicConfig() ?? disabledAuthPublicConfig,
+    };
+  }
+
+  function publicRuntimeConfigScript(): string {
+    return `window.__APPALOFT_PUBLIC_CONFIG__=${escapeScriptJson(publicRuntimeConfig())};\n`;
+  }
+
   function staticArtifactResponse(pathname: string): Response | null {
     return staticArtifactImmutableResponse(pathname) ?? staticArtifactAliasResponse(pathname);
   }
@@ -1756,6 +1785,15 @@ export function createHttpApp(input: {
     .get("/api/deployment-progress/:requestId", ({ request, params }) =>
       deploymentProgressStream(request, params.requestId),
     )
+    .get("/api/auth/public-config", ({ set }) => {
+      set.headers["cache-control"] = "no-store";
+      return publicRuntimeConfig().auth;
+    })
+    .get("/api/auth/public-config.js", ({ set }) => {
+      set.headers["cache-control"] = "no-store";
+      set.headers["content-type"] = "application/javascript; charset=utf-8";
+      return publicRuntimeConfigScript();
+    })
     .get("/api/auth/session", async ({ request }) => {
       if (!input.authRuntime) {
         return {

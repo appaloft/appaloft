@@ -102,6 +102,7 @@ export * from "./operations/domain-bindings/confirm-domain-binding-ownership.sch
 export * from "./operations/domain-bindings/create-domain-binding.schema";
 export * from "./operations/domain-bindings/delete-domain-binding.schema";
 export * from "./operations/domain-bindings/list-domain-bindings.schema";
+export * from "./operations/domain-bindings/plan-domain-binding-dns.schema";
 export * from "./operations/domain-bindings/retry-domain-binding-verification.schema";
 export * from "./operations/domain-bindings/show-domain-binding.schema";
 export type {

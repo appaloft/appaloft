@@ -5,6 +5,7 @@ import {
   CreateDomainBindingCommand,
   DeleteDomainBindingCommand,
   ListDomainBindingsQuery,
+  PlanDomainBindingDnsQuery,
   RetryDomainBindingVerificationCommand,
   ShowDomainBindingQuery,
 } from "@appaloft/application";
@@ -45,6 +46,20 @@ const deleteConfirmationOption = Options.text("confirm");
 const listProjectIdOption = Options.text("project").pipe(Options.optional);
 const listEnvironmentIdOption = Options.text("environment").pipe(Options.optional);
 const listResourceIdOption = Options.text("resource").pipe(Options.optional);
+const connectorOption = Options.text("connector").pipe(Options.withDefault("cloudflare-dns"));
+const dnsCapabilityOption = Options.choice("capability", [
+  "dns.records.plan",
+  "dns.domain-connect.start",
+] as const).pipe(Options.withDefault("dns.records.plan"));
+const zoneNameOption = Options.text("zone").pipe(Options.optional);
+const dnsRecordTypeOption = Options.choice("record-type", [
+  "A",
+  "AAAA",
+  "CNAME",
+  "TXT",
+] as const).pipe(Options.optional);
+const dnsTtlOption = Options.integer("ttl").pipe(Options.optional);
+const dnsProxiedOption = Options.boolean("proxied").pipe(Options.optional);
 
 const createCommand = EffectCommand.make(
   "create",
@@ -143,6 +158,35 @@ const showCommand = EffectCommand.make(
   ({ domainBindingId }) => runQuery(ShowDomainBindingQuery.create({ domainBindingId })),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.domainBindingShow));
 
+const dnsPlanCommand = EffectCommand.make(
+  "dns-plan",
+  {
+    domainBindingId: domainBindingIdArg,
+    connector: connectorOption,
+    capability: dnsCapabilityOption,
+    zone: zoneNameOption,
+    recordType: dnsRecordTypeOption,
+    ttl: dnsTtlOption,
+    proxied: dnsProxiedOption,
+  },
+  ({ capability, connector, domainBindingId, proxied, recordType, ttl, zone }) =>
+    runQuery(
+      PlanDomainBindingDnsQuery.create({
+        domainBindingId,
+        connectorKey: connector,
+        capabilityKey: capability,
+        zoneName: optionalValue(zone),
+        recordType: optionalValue(recordType),
+        ttl: optionalValue(ttl),
+        proxied: optionalValue(proxied),
+      }),
+    ),
+).pipe(
+  EffectCommand.withDescription(
+    "Plan DNS category connector records from a domain binding without applying provider changes",
+  ),
+);
+
 const configureRouteCommand = EffectCommand.make(
   "configure-route",
   {
@@ -230,6 +274,7 @@ export const domainBindingCommand = EffectCommand.make("domain-binding").pipe(
   EffectCommand.withSubcommands([
     createCommand,
     showCommand,
+    dnsPlanCommand,
     configureRouteCommand,
     confirmOwnershipCommand,
     deleteCheckCommand,

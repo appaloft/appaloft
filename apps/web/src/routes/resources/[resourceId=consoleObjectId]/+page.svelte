@@ -6474,14 +6474,6 @@
                     href={webDocsHrefs.sourceAutoDeployDedupe}
                     ariaLabel={$t(i18nKeys.common.actions.openDocs)}
                   />
-                  <DocsHelpLink
-                    href={webDocsHrefs.sourceAutoDeployIgnoredEvents}
-                    ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                  />
-                  <DocsHelpLink
-                    href={webDocsHrefs.sourceAutoDeployRecovery}
-                    ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                  />
                 </div>
                 <p class="mt-1 text-sm text-muted-foreground">
                   {$t(i18nKeys.console.resources.sourceEventsDescription)}
@@ -7614,14 +7606,6 @@
                               href={webDocsHrefs.resourceSourceProfile}
                               ariaLabel={$t(i18nKeys.common.actions.openDocs)}
                             />
-                            <DocsHelpLink
-                              href={webDocsHrefs.resourceRuntimeProfile}
-                              ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                            />
-                            <DocsHelpLink
-                              href={webDocsHrefs.resourceNetworkProfile}
-                              ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                            />
                           </div>
                           <p class="mt-1 text-sm leading-6 text-muted-foreground">
                             {$t(i18nKeys.console.resources.profileEditBoundaryDescription)}
@@ -7933,10 +7917,6 @@
                             href={webDocsHrefs.sourceAutoDeploySetup}
                             ariaLabel={$t(i18nKeys.common.actions.openDocs)}
                           />
-                          <DocsHelpLink
-                            href={webDocsHrefs.sourceAutoDeploySignatures}
-                            ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                          />
                           {#if autoDeployPolicy}
                             <Badge variant={autoDeployStatusVariant(autoDeployPolicy.status)}>
                               {autoDeployStatusLabel(autoDeployPolicy.status)}
@@ -8157,10 +8137,6 @@
                           </h2>
                           <DocsHelpLink
                             href={webDocsHrefs.dependencyResourceLifecycle}
-                            ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-                          />
-                          <DocsHelpLink
-                            href={webDocsHrefs.dependencyRuntimeInjection}
                             ariaLabel={$t(i18nKeys.common.actions.openDocs)}
                           />
                         </div>

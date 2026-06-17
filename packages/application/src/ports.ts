@@ -1,4 +1,5 @@
 import {
+  type AcceptedConnectionCapabilityPlanSnapshot,
   type BuildStrategyKind,
   type Certificate,
   type CertificateIssueReason,
@@ -8,6 +9,11 @@ import {
   type CertificateSource,
   type CertificateStatus,
   type ConfigScope,
+  type ConnectionCategoryKey,
+  type ConnectionCredentialGrantSnapshot,
+  type ConnectionOwnerSnapshot,
+  type ConnectionSnapshot,
+  type ConnectorDefinitionSnapshot,
   type DependencyResourceBackup,
   type DependencyResourceBackupMutationSpec,
   type DependencyResourceBackupSelectionSpec,
@@ -28,10 +34,16 @@ import {
   type DestinationKind,
   type DestinationMutationSpec,
   type DestinationSelectionSpec,
+  type DnsRecordApplySnapshot,
+  type DnsRecordConflictSnapshot,
+  type DnsRecordPlanSnapshot,
+  type DnsRecordRequirementSnapshot,
   type DomainBinding,
   type DomainBindingMutationSpec,
   type DomainBindingSelectionSpec,
   type DomainBindingStatus,
+  type DomainConnectApplySnapshot,
+  type DomainConnectSetupSnapshot,
   type DomainError,
   type DomainErrorDetails,
   type DomainEvent,
@@ -45,7 +57,10 @@ import {
   type EnvironmentSelectionSpec,
   type EnvironmentSnapshot,
   type ExecutionStrategyKind,
+  type InfrastructureServerProposalSnapshot,
   type LogLevel,
+  type NotificationMessageDeliverySnapshot,
+  type NotificationMessageSnapshot,
   type PackagingMode,
   type PreviewEnvironment,
   type PreviewEnvironmentMutationSpec,
@@ -84,6 +99,7 @@ import {
   type ServerSelectionSpec,
   type SourceDescriptor,
   type SourceKind,
+  type SourceRepositoryAccessSnapshot,
   type SshCredential,
   type SshCredentialMutationSpec,
   type SshCredentialSelectionSpec,
@@ -9798,6 +9814,191 @@ export interface IntegrationRegistry {
   list(): IntegrationDescriptor[];
   findByKey(key: string): IntegrationDescriptor | null;
 }
+
+export type ConnectorDescriptor = ConnectorDefinitionSnapshot;
+
+export interface ConnectorRegistryListInput {
+  category?: ConnectionCategoryKey;
+  includeUnavailable?: boolean;
+}
+
+export interface ConnectorRegistry {
+  list(input?: ConnectorRegistryListInput): ConnectorDescriptor[];
+  findByKey(key: string): ConnectorDescriptor | null;
+}
+
+export interface ConnectorConnectionStoreListInput {
+  owner?: ConnectionOwnerSnapshot;
+  connectorKey?: string;
+  category?: ConnectionCategoryKey;
+}
+
+export interface ConnectorConnectionStore {
+  list(input?: ConnectorConnectionStoreListInput): ConnectionSnapshot[];
+  findById(connectionId: string): ConnectionSnapshot | null;
+  save(connection: ConnectionSnapshot): void;
+}
+
+export interface AcceptedConnectionCapabilityPlanStore {
+  save(plan: AcceptedConnectionCapabilityPlanSnapshot): void;
+  findById(acceptedPlanId: string): AcceptedConnectionCapabilityPlanSnapshot | null;
+}
+
+export interface ConnectorConnectionProjectionSource {
+  list(
+    context: ExecutionContext,
+    input?: ConnectorConnectionStoreListInput,
+  ): Promise<ConnectionSnapshot[]>;
+  findById(context: ExecutionContext, connectionId: string): Promise<ConnectionSnapshot | null>;
+}
+
+export interface ConnectionStartResult {
+  connection: ConnectionSnapshot;
+  authorizationUrl?: string;
+  nextAction:
+    | "already-connected"
+    | "authorize-in-browser"
+    | "provider-callback"
+    | "ready"
+    | "manual-secret-required";
+}
+
+export interface ConnectionCallbackResult {
+  connection: ConnectionSnapshot;
+}
+
+export interface ConnectionRevokeResult {
+  connection: ConnectionSnapshot;
+}
+
+export type {
+  AcceptedConnectionCapabilityPlanSnapshot,
+  ConnectionCredentialGrantSnapshot,
+  ConnectionOwnerSnapshot,
+  ConnectionSnapshot,
+};
+
+export interface ConnectorCapabilityPlanInput {
+  connectorKey: string;
+  capabilityKey: string;
+  ownerRef?: {
+    scope: "account" | "organization" | "project" | "environment" | "resource" | "operator";
+    id: string;
+  };
+  parameters?: Record<string, unknown>;
+}
+
+export interface ConnectorCapabilityPlanPreview {
+  planId: string;
+  connectorKey: string;
+  capabilityKey: string;
+  riskLevel: "low" | "medium" | "high";
+  requiresExplicitAcceptance: boolean;
+  summary: string;
+  effects: {
+    kind: string;
+    title: string;
+    description?: string;
+  }[];
+  cleanup?: {
+    supported: boolean;
+    description?: string;
+  };
+  providerPlan?: {
+    kind: "dns-records" | string;
+    dnsRecords?: DnsRecordPlanSnapshot;
+    domainConnectSetup?: DomainConnectSetupSnapshot;
+    infrastructureServerProposal?: InfrastructureServerProposalSnapshot;
+    notificationMessage?: NotificationMessageSnapshot;
+    sourceRepositoryAccess?: SourceRepositoryAccessSnapshot;
+  };
+}
+
+export interface ConnectorCapabilityApplyInput {
+  connectorKey: string;
+  capabilityKey: string;
+  ownerRef?: {
+    scope: "account" | "organization" | "project" | "environment" | "resource" | "operator";
+    id: string;
+  };
+  acceptedPlanId?: string;
+  parameters?: Record<string, unknown>;
+}
+
+export interface ConnectorCapabilityApplyResult {
+  operationId: string;
+  connectorKey: string;
+  capabilityKey: string;
+  status: "applied" | "verified" | "cleaned-up" | "conflict" | "skipped";
+  summary: string;
+  effects: {
+    kind: string;
+    title: string;
+    description?: string;
+    providerRecordId?: string;
+    managed?: boolean;
+  }[];
+  providerResult?: {
+    kind: "dns-records" | string;
+    dnsRecords?: DnsRecordApplySnapshot;
+    domainConnectApply?: DomainConnectApplySnapshot;
+    notificationDelivery?: NotificationMessageDeliverySnapshot;
+  };
+}
+
+export interface ConnectorProviderAdapter {
+  readonly connectorKey: string;
+  canPlan(capabilityKey: string): boolean;
+  planCapability(
+    context: ExecutionContext,
+    input: ConnectorCapabilityPlanInput,
+  ): Promise<Result<ConnectorCapabilityPlanPreview>>;
+  canApply(capabilityKey: string): boolean;
+  applyCapability(
+    context: ExecutionContext,
+    input: ConnectorCapabilityApplyInput,
+  ): Promise<Result<ConnectorCapabilityApplyResult>>;
+}
+
+export interface ConnectorProviderAdapterRegistry {
+  list(): ConnectorProviderAdapter[];
+  findForConnector(connectorKey: string): ConnectorProviderAdapter | null;
+}
+
+export interface DnsConnectorPlanParameters {
+  zoneName?: string;
+  records: DnsRecordRequirementSnapshot[];
+}
+
+export interface DnsConnectorProviderReadModel {
+  existingRecords(input: {
+    zoneName?: string;
+    records: readonly DnsRecordRequirementSnapshot[];
+  }): Promise<Result<readonly DnsRecordRequirementSnapshot[]>>;
+}
+
+export interface DnsConnectorProviderRecordStore extends DnsConnectorProviderReadModel {
+  applyRecords(input: {
+    zoneName?: string;
+    records: readonly DnsRecordRequirementSnapshot[];
+  }): Promise<Result<DnsRecordApplySnapshot>>;
+  verifyRecords(input: {
+    zoneName?: string;
+    records: readonly DnsRecordRequirementSnapshot[];
+  }): Promise<Result<DnsRecordApplySnapshot>>;
+  cleanupRecords(input: {
+    zoneName?: string;
+    records: readonly DnsRecordRequirementSnapshot[];
+  }): Promise<Result<DnsRecordApplySnapshot>>;
+}
+
+export type {
+  DnsRecordApplySnapshot,
+  DnsRecordConflictSnapshot,
+  DnsRecordPlanSnapshot,
+  DnsRecordRequirementSnapshot,
+  InfrastructureServerProposalSnapshot,
+};
 
 export interface IntegrationAuthPort {
   getProviderAccessToken(context: ExecutionContext, providerKey: "github"): Promise<string | null>;

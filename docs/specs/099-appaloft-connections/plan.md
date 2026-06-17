@@ -26,8 +26,8 @@
 | Surface | Plan |
 | --- | --- |
 | Operation catalog | Add neutral `connections.*` operations. |
-| CLI | Add `appaloft connections ...` and DNS convenience wrappers. |
-| HTTP/oRPC | Add route/handler equivalents for catalog, connect, callback, plan, accept, revoke, and status. |
+| CLI | Add `appaloft connectors ...` and DNS convenience wrappers. |
+| HTTP/oRPC | Add route/handler equivalents for catalog, connect, callback, plan, accept, apply, revoke, and status. |
 | Web | Add a central Connections area plus contextual DNS/source/server/notification entrypoints. |
 | Config | Use provider enablement and secret refs, not raw secret values. |
 | Future MCP/tools | Tools call operation catalog entries and never receive long-lived credentials. |
@@ -55,8 +55,8 @@
 
 ## Migration Notes
 
-- Existing GitHub App source-provider behavior should become the first `source/github` compatibility
-  slice.
+- Existing GitHub App source-provider behavior is the first `source/github` compatibility slice;
+  durable installation records are projected into `connections.list` and `connections.show`.
 - Existing GitHub OAuth login remains identity/auth only.
 - Existing external edge/DNS and SSH onboarding specs should reference connection ids once the
   neutral model exists.
@@ -67,5 +67,6 @@
 
 - Provider tokens and raw responses can leak if adapters are not strictly translated.
 - DNS mutation can damage user domains if conflict and ownership rules do not fail closed.
-- Infrastructure provider actions can create cost, so plan/accept/readback must be explicit.
+- Infrastructure provider actions can create cost, so plan/accept/readback must be explicit and
+  durable accepted-plan ids must match the connector, mutation capability, and owner before apply.
 - Coupling the model to one hosted distribution would make Community/self-host workflows weaker.

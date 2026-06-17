@@ -6,10 +6,14 @@ import { join } from "node:path";
 
 import {
   AcceptBlueprintInstallCommandHandler,
+  AcceptConnectorCapabilityPlanCommandHandler,
+  AcceptConnectorCapabilityPlanUseCase,
   AcceptDependencyResourceProvisioningPlanCommandHandler,
   AcceptDependencyResourceProvisioningPlanUseCase,
   ApplyActionPreviewRouteCommandHandler,
   ApplyActionPreviewRouteUseCase,
+  ApplyConnectorCapabilityCommandHandler,
+  ApplyConnectorCapabilityUseCase,
   ApplyInstanceUpgradeCommandHandler,
   ApplyInstanceUpgradeUseCase,
   ArchiveDeploymentCommandHandler,
@@ -64,6 +68,8 @@ import {
   CloneEnvironmentCommandHandler,
   CloneEnvironmentUseCase,
   CloseTerminalSessionCommandHandler,
+  CompleteConnectionCallbackCommandHandler,
+  CompleteConnectionCallbackUseCase,
   ConfigureAuditEventLegalHoldCommandHandler,
   ConfigureAuditEventLegalHoldUseCase,
   ConfigureDefaultAccessDomainPolicyCommandHandler,
@@ -225,6 +231,7 @@ import {
   GetCurrentOrganizationContextQueryService,
   GitHubAppConnectionQueryHandler,
   GitHubAppConnectionQueryService,
+  GitHubAppSourceConnectionProjectionSource,
   ImportCertificateCommandHandler,
   ImportCertificateUseCase,
   ImportDependencyResourceCommandHandler,
@@ -253,6 +260,12 @@ import {
   ListBlueprintsQueryHandler,
   ListCertificatesQueryHandler,
   ListCertificatesQueryService,
+  ListConnectionsQueryHandler,
+  ListConnectionsQueryService,
+  ListConnectorCategoriesQueryHandler,
+  ListConnectorCategoriesQueryService,
+  ListConnectorsQueryHandler,
+  ListConnectorsQueryService,
   ListDefaultAccessDomainPoliciesQueryHandler,
   ListDefaultAccessDomainPoliciesQueryService,
   ListDependencyResourceBackupPoliciesQueryHandler,
@@ -341,6 +354,10 @@ import {
   OpenTerminalSessionUseCase,
   OperatorWorkQueryService,
   operationCatalog,
+  PlanConnectorCapabilityQueryHandler,
+  PlanConnectorCapabilityQueryService,
+  PlanDomainBindingDnsQueryHandler,
+  PlanDomainBindingDnsQueryService,
   PlanDuplicateEnvironmentQueryHandler,
   PlanDuplicateEnvironmentQueryService,
   PrepareServerRuntimeCommandHandler,
@@ -455,6 +472,8 @@ import {
   RevokeAccountSessionUseCase,
   RevokeCertificateCommandHandler,
   RevokeCertificateUseCase,
+  RevokeConnectionCommandHandler,
+  RevokeConnectionUseCase,
   RevokeDeployTokenCommandHandler,
   RevokeDeployTokenUseCase,
   RollbackDeploymentCommandHandler,
@@ -502,6 +521,8 @@ import {
   ShowBlueprintQueryHandler,
   ShowCertificateQueryHandler,
   ShowCertificateQueryService,
+  ShowConnectionQueryHandler,
+  ShowConnectionQueryService,
   ShowDefaultAccessDomainPolicyQueryHandler,
   ShowDefaultAccessDomainPolicyQueryService,
   ShowDependencyResourceBackupPolicyQueryHandler,
@@ -557,6 +578,8 @@ import {
   ShowStorageVolumeQueryService,
   ShowTerminalSessionQueryHandler,
   SourceLinkQueryService,
+  StartConnectionCommandHandler,
+  StartConnectionUseCase,
   StartResourceRuntimeCommandHandler,
   StopResourceRuntimeCommandHandler,
   StreamDeploymentTimelineQueryHandler,
@@ -2390,6 +2413,16 @@ export function registerApplicationServices(
   container.registerSingleton(BootstrapServerProxyCommandHandler);
   container.registerSingleton(PrepareServerRuntimeCommandHandler);
   container.registerSingleton(QueryCapabilitiesQueryHandler);
+  container.registerSingleton(ListConnectorCategoriesQueryHandler);
+  container.registerSingleton(ListConnectionsQueryHandler);
+  container.registerSingleton(ShowConnectionQueryHandler);
+  container.registerSingleton(StartConnectionCommandHandler);
+  container.registerSingleton(CompleteConnectionCallbackCommandHandler);
+  container.registerSingleton(RevokeConnectionCommandHandler);
+  container.registerSingleton(ListConnectorsQueryHandler);
+  container.registerSingleton(PlanConnectorCapabilityQueryHandler);
+  container.registerSingleton(AcceptConnectorCapabilityPlanCommandHandler);
+  container.registerSingleton(ApplyConnectorCapabilityCommandHandler);
   container.registerSingleton(ListBlueprintsQueryHandler);
   container.registerSingleton(ShowBlueprintQueryHandler);
   container.registerSingleton(CreateBlueprintInstallPlanQueryHandler);
@@ -2548,6 +2581,7 @@ export function registerApplicationServices(
   container.registerSingleton(ShowDeployTokenQueryHandler);
   container.registerSingleton(ShowProjectQueryHandler);
   container.registerSingleton(ShowDomainBindingQueryHandler);
+  container.registerSingleton(PlanDomainBindingDnsQueryHandler);
   container.registerSingleton(ShowSshCredentialQueryHandler);
   container.registerSingleton(InspectServerCapacityQueryHandler);
   container.registerSingleton(PruneServerCapacityCommandHandler);
@@ -3353,6 +3387,10 @@ export function registerApplicationServices(
   );
   container.registerSingleton(tokens.showDomainBindingQueryService, ShowDomainBindingQueryService);
   container.registerSingleton(
+    tokens.planDomainBindingDnsQueryService,
+    PlanDomainBindingDnsQueryService,
+  );
+  container.registerSingleton(
     tokens.checkDomainBindingDeleteSafetyQueryService,
     CheckDomainBindingDeleteSafetyQueryService,
   );
@@ -3471,6 +3509,35 @@ export function registerApplicationServices(
     ResourceProxyConfigurationPreviewQueryService,
   );
   container.registerSingleton(tokens.providersQueryService, ListProvidersQueryService);
+  container.registerSingleton(tokens.connectorsQueryService, ListConnectorsQueryService);
+  container.registerSingleton(
+    tokens.connectorConnectionProjectionSource,
+    GitHubAppSourceConnectionProjectionSource,
+  );
+  container.registerSingleton(tokens.connectionsQueryService, ListConnectionsQueryService);
+  container.registerSingleton(tokens.connectionQueryService, ShowConnectionQueryService);
+  container.registerSingleton(tokens.startConnectionUseCase, StartConnectionUseCase);
+  container.registerSingleton(
+    tokens.completeConnectionCallbackUseCase,
+    CompleteConnectionCallbackUseCase,
+  );
+  container.registerSingleton(tokens.revokeConnectionUseCase, RevokeConnectionUseCase);
+  container.registerSingleton(
+    tokens.connectorCategoriesQueryService,
+    ListConnectorCategoriesQueryService,
+  );
+  container.registerSingleton(
+    tokens.connectorCapabilityPlanQueryService,
+    PlanConnectorCapabilityQueryService,
+  );
+  container.registerSingleton(
+    tokens.acceptConnectorCapabilityPlanUseCase,
+    AcceptConnectorCapabilityPlanUseCase,
+  );
+  container.registerSingleton(
+    tokens.connectorCapabilityApplyUseCase,
+    ApplyConnectorCapabilityUseCase,
+  );
   container.registerSingleton(tokens.integrationsQueryService, ListIntegrationsQueryService);
   container.registerSingleton(tokens.blueprintCatalogQueryService, BlueprintCatalogQueryService);
   container.registerSingleton(
