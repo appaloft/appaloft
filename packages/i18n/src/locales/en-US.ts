@@ -203,6 +203,103 @@ export const enUS = {
     },
   },
   console: {
+    docsHelp: {
+      docsHome: "The docs center is the entry point for Appaloft concepts, tasks, and references.",
+      firstAdminBootstrap:
+        "The first administrator is the initial local admin account for a self-hosted console.",
+      organizationTeamManagement:
+        "Organizations and teams manage members, roles, and project access scope.",
+      deploymentLifecycle:
+        "The deployment lifecycle is the state path from request to execution, verification, and history.",
+      deploymentPlanPreview:
+        "A deployment plan preview is the runtime operation list shown before changes are applied.",
+      productGradePreviews:
+        "Preview environments are temporary runtimes for pull request or product review flows.",
+      deploymentSource:
+        "A deployment source is the code, image, or directory Appaloft uses to build or publish a resource.",
+      appaloftSkill:
+        "The Appaloft skill is the operating guide AI agents use to drive deployment workflows.",
+      appaloftMcpServer:
+        "The Appaloft MCP server is the tool gateway that exposes operations to agents.",
+      serverDeploymentTarget:
+        "A deployment target server is a server Appaloft can connect to and run resources on.",
+      serverDockerSwarmTarget:
+        "A Docker Swarm target is the server mode that runs resources through Swarm orchestration.",
+      serverSshCredential:
+        "An SSH credential is the identity material Appaloft uses to connect to a server.",
+      serverConnectivityTest:
+        "A connectivity test confirms Appaloft can reach the server and run basic checks.",
+      serverProxyReadiness:
+        "Proxy readiness means the server proxy can accept routed resource traffic.",
+      serverTerminalSession:
+        "A server terminal session is a controlled operator shell opened in the browser.",
+      maintenanceWorkerActivation:
+        "A maintenance worker runs background maintenance, retry, and cleanup jobs.",
+      projectLifecycle:
+        "A project is the workspace that groups environments, resources, and deployment history.",
+      defaultAccessPolicy:
+        "A default access policy controls generated resource routes before custom rules are added.",
+      resourceConcept:
+        "A resource is Appaloft's deployable unit, carrying source, runtime, and access configuration.",
+      resourceSourceProfile:
+        "A source profile records the code, image, or directory used by future deployments.",
+      resourceRuntimeProfile:
+        "A runtime profile defines the commands, image, ports, and variables used to run a resource.",
+      resourceProfileDrift:
+        "Profile drift means declared resource configuration no longer matches runtime state.",
+      resourceRuntimeControls:
+        "Runtime controls are actions such as pause, resume, restart, and scale.",
+      resourceHealthProfile:
+        "A health profile defines the probes and signals Appaloft uses to judge availability.",
+      resourceNetworkProfile:
+        "A network profile defines ports, routes, domains, and external exposure.",
+      resourceAccessProfile:
+        "An access profile defines generated routes and access behavior for a resource.",
+      storageVolumeLifecycle:
+        "A storage volume lifecycle covers attach, backup, restore, and cleanup for persistent data.",
+      dependencyResourceLifecycle:
+        "A dependency resource is a managed database, cache, or service used by an application resource.",
+      dependencyBackupRestore:
+        "Dependency backup and restore saves dependency data and restores it when needed.",
+      dependencyRuntimeInjection:
+        "Dependency injection passes database, cache, or service connection values into a resource runtime.",
+      environmentConcept:
+        "An environment scopes variables, resources, and deployments within a project.",
+      environmentLifecycle:
+        "An environment lifecycle covers creation, cloning, locking, and archiving.",
+      environmentVariablePrecedence:
+        "Variable precedence decides which project, environment, or resource value wins on conflict.",
+      domainGeneratedAccessRoute:
+        "A generated access route is the default resource URL before a custom domain is bound.",
+      domainCustomDomainBinding:
+        "A custom domain binding connects a user-owned domain to a resource route.",
+      domainOwnershipCheck:
+        "A domain ownership check proves control of a domain before Appaloft serves traffic for it.",
+      certificateReadiness:
+        "Certificate readiness is the issuance, retry, or ready state for TLS certificates.",
+      observabilityRuntimeLogs:
+        "Runtime logs are process output from a resource, used to diagnose startup and runtime issues.",
+      observabilityHealthSummary:
+        "A health summary combines availability, probe, and recent failure signals.",
+      diagnosticsSafeSupportPayload:
+        "A safe support payload is redacted diagnostic data suitable for sharing with support.",
+      runtimeUsageInspect:
+        "Runtime usage is consumption, load, and capacity pressure for a resource or environment over an observation window.",
+      runtimeTargetCapacity:
+        "Runtime target capacity is how much workload a server or runtime target can still carry.",
+      sourceAutoDeploySetup:
+        "Auto-deploy lets trusted source events trigger ordinary deployments for this resource.",
+      sourceAutoDeploySignatures:
+        "Auto-deploy signatures verify that webhook events came from a trusted source.",
+      sourceAutoDeployDedupe:
+        "Source event dedupe prevents the same commit or event from triggering duplicate deployments.",
+      sourceAutoDeployIgnoredEvents:
+        "Ignored source events are events that do not satisfy the policy, ref, or state requirements.",
+      sourceAutoDeployRecovery:
+        "Auto-deploy recovery re-enables event deployments after source bindings or policies change.",
+      scheduledTaskLifecycle:
+        "A scheduled task resource runs commands on a schedule or manually, with run records and logs.",
+    },
     authBootstrap: {
       alreadyConfiguredBody: "This instance is already configured. Use the login page to continue.",
       alreadyConfiguredTitle: "Setup is already complete.",
