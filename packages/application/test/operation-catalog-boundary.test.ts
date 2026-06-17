@@ -92,6 +92,32 @@ describe("operation catalog aggregate mutation boundary", () => {
     }
   });
 
+  test("[APP-CONN-014] connector catalog operations expose CLI and HTTP/oRPC transports", () => {
+    const connectorOperationKeys = [
+      "connections.categories.list",
+      "connections.catalog.list",
+      "connections.list",
+      "connections.show",
+      "connections.connect.start",
+      "connections.connect.callback",
+      "connections.capability.plan",
+      "connections.revoke",
+      "connections.status.show",
+    ];
+    const entriesByKey = new Map<string, OperationCatalogEntry>(
+      operationCatalog.map((entry) => [entry.key, entry]),
+    );
+
+    for (const key of connectorOperationKeys) {
+      const entry = entriesByKey.get(key);
+
+      expect(entry, key).toBeDefined();
+      expect(entry?.domain, key).toBe("connections");
+      expect(entry?.transports.cli, key).toBeTruthy();
+      expect(entry?.transports.orpc, key).toBeDefined();
+    }
+  });
+
   test("[PHASE7-DAY2-MGMT-001] day-two management exit operations expose CLI and HTTP/oRPC transports", () => {
     const dayTwoManagementOperationKeys = [
       "resources.configure-source",

@@ -45,6 +45,7 @@ import {
   type CertificateProviderPort,
   type Clock,
   CommandBus,
+  createDefaultConnectorDefinitions,
   type DefaultAccessDomainPolicyRepository,
   DefaultAccessDomainRuntimePlanResolver,
   type DependencyResourceBackupPolicyRepository,
@@ -56,9 +57,13 @@ import {
   type EventHandlerContract,
   type ExecutionContext,
   eventHandlerTypesFor,
+  FakeDnsConnectorProviderAdapter,
   type FirstAdminPasswordIssuer,
   getExecutionAuthProviderAccessToken,
   type IdGenerator,
+  InMemoryConnectorConnectionStore,
+  InMemoryConnectorProviderAdapterRegistry,
+  InMemoryConnectorRegistry,
   InMemoryEdgeProxyProviderRegistry,
   type IntegrationAuthPort,
   type MutationCoordinator,
@@ -1704,6 +1709,25 @@ export function registerRuntimeDependencies(
           localShellProvider,
           genericSshProvider,
           acmeCertificateProvider,
+        ]),
+    ),
+  });
+  container.register(tokens.connectorRegistry, {
+    useFactory: instanceCachingFactory(
+      () => new InMemoryConnectorRegistry(createDefaultConnectorDefinitions()),
+    ),
+  });
+  container.register(tokens.connectorConnectionStore, {
+    useFactory: instanceCachingFactory(() => new InMemoryConnectorConnectionStore()),
+  });
+  container.register(tokens.connectorProviderAdapterRegistry, {
+    useFactory: instanceCachingFactory(
+      () =>
+        new InMemoryConnectorProviderAdapterRegistry([
+          new FakeDnsConnectorProviderAdapter({
+            connectorKey: "cloudflare-dns",
+            providerTitle: "Cloudflare DNS",
+          }),
         ]),
     ),
   });

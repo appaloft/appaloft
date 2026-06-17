@@ -9,9 +9,11 @@
     ArrowRight,
     ChevronDown,
     Copy,
+    Eye,
     ExternalLink,
     FolderOpen,
     Gauge,
+    GitBranch,
     GitPullRequestArrow,
     Lock,
     Pencil,
@@ -20,6 +22,7 @@
     RotateCcw,
     Save,
     Search,
+    Server,
     Trash2,
     Unlock,
   } from "@lucide/svelte";
@@ -28,7 +31,10 @@
     ArchiveProjectInput,
     CheckProjectDeleteSafetyResponse,
     CloneEnvironmentInput,
+    CreateDeploymentInput,
     DeleteProjectInput,
+    DeploymentPlanResponse,
+    DeploymentProgressEvent,
     LockEnvironmentInput,
     PreviewEnvironmentStatus,
     RenameEnvironmentInput,
@@ -44,6 +50,7 @@
   import { readErrorMessage } from "$lib/api/client";
   import { capabilities, capabilityKey, type CapabilityQuery } from "$lib/capabilities";
   import CapabilityGate from "$lib/components/console/CapabilityGate.svelte";
+  import DeploymentProgressDialog from "$lib/components/console/DeploymentProgressDialog.svelte";
   import DeploymentTable from "$lib/components/console/DeploymentTable.svelte";
   import DeploymentStatusBadge from "$lib/components/console/DeploymentStatusBadge.svelte";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
@@ -66,6 +73,10 @@
   import * as Select from "$lib/components/ui/select";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import * as Tabs from "$lib/components/ui/tabs";
+  import {
+    createDeploymentWithProgress,
+    type DeploymentProgressDialogStatus,
+  } from "$lib/console/deployment-progress";
   import { selectCurrentResourceAccessRoute } from "$lib/console/resource-access-route";
   import { webDocsHrefs } from "$lib/console/docs-help";
   import {
@@ -97,6 +108,7 @@
     findEnvironment,
     findProject,
     findResource,
+    findServer,
     formatTime,
     latestResourceDeployment,
     previewEnvironmentDetailHref,
@@ -140,14 +152,14 @@
     detail: string;
     href?: string;
     action: string;
-    intent?: "resource-quick-deploy" | "operator-work-refresh";
+    intent?: "resource-create-deployment" | "operator-work-refresh";
     resourceId?: string;
     tone: "destructive" | "warning" | "neutral";
   };
   type ProjectNextAction = {
     label: string;
     href?: string;
-    intent?: "project-quick-deploy" | "resource-quick-deploy";
+    intent?: "project-quick-deploy" | "resource-create-deployment";
     resourceId?: string;
   };
   type QuickDeployModalTarget = {
@@ -157,12 +169,11 @@
   type EnvironmentLifecycleAction = "archive" | "lock" | "unlock";
   type ProjectDeleteBlocker = CheckProjectDeleteSafetyResponse["blockers"][number];
 
-  const { projectsQuery, environmentsQuery, resourcesQuery, deploymentsQuery } =
+  const { projectsQuery, serversQuery, environmentsQuery, resourcesQuery, deploymentsQuery } =
     createConsoleQueries(browser, {
       health: false,
       readiness: false,
       version: false,
-      servers: false,
       previewEnvironments: false,
       domainBindings: false,
       certificates: false,
@@ -215,6 +226,7 @@
     }),
   );
   const projects = $derived(projectsQuery.data?.items ?? []);
+  const servers = $derived(serversQuery.data?.items ?? []);
   const environments = $derived(environmentsQuery.data?.items ?? []);
   const resources = $derived(resourcesQuery.data?.items ?? []);
   const deployments = $derived(deploymentsQuery.data?.items ?? []);
@@ -514,7 +526,7 @@
           title: $t(i18nKeys.console.projects.attentionNoDeploymentTitle),
           detail: $t(i18nKeys.console.projects.attentionNoDeploymentDetail),
           action: $t(i18nKeys.common.actions.createDeployment),
-          intent: "resource-quick-deploy",
+          intent: "resource-create-deployment",
           resourceId: resource.id,
           tone: "neutral",
         });
@@ -545,7 +557,7 @@
     if (projectDeployments.length === 0) {
       return {
         label: $t(i18nKeys.common.actions.createDeployment),
-        intent: "resource-quick-deploy",
+        intent: "resource-create-deployment",
         resourceId: primaryResource.id,
       };
     }
@@ -573,6 +585,27 @@
   let projectName = $state("");
   let quickDeployDialogOpen = $state(false);
   let quickDeployProgressDialogOpen = $state(false);
+  let projectResourceDeploymentDialogOpen = $state(false);
+  let selectedProjectResourceDeploymentId = $state("");
+  let projectResourceDeploymentServerId = $state("");
+  let projectResourceDeploymentDestinationId = $state("");
+  let projectResourceDeploymentCreatePending = $state(false);
+  let projectResourceDeploymentProgressDialogOpen = $state(false);
+  let projectResourceDeploymentProgressDialogStatus =
+    $state<DeploymentProgressDialogStatus>("idle");
+  let projectResourceDeploymentProgressEvents = $state<DeploymentProgressEvent[]>([]);
+  let projectResourceDeploymentProgressStreamError = $state("");
+  let projectResourceDeploymentProgressDeploymentId = $state("");
+  let projectResourceDeploymentProgressRequestId = $state("");
+  let projectResourceDeploymentProgressTraceLink = $state("");
+  let projectResourceDeploymentPlanPending = $state(false);
+  let projectResourceDeploymentPlanPreview = $state<DeploymentPlanResponse | null>(null);
+  let projectResourceDeploymentPlanError = $state("");
+  let projectResourceDeploymentFeedback = $state<{
+    kind: "success" | "error";
+    title: string;
+    detail: string;
+  } | null>(null);
   let projectRenameDialogOpen = $state(false);
   let environmentCreateDialogOpen = $state(false);
   let environmentRenameDialogOpen = $state(false);
@@ -609,6 +642,35 @@
   );
   const selectedEnvironment = $derived(
     projectEnvironments.find((environment) => environment.id === selectedEnvironmentId) ?? null,
+  );
+  const selectedProjectResourceDeployment = $derived(
+    projectResources.find((resource) => resource.id === selectedProjectResourceDeploymentId) ?? null,
+  );
+  const selectedProjectResourceDeploymentEnvironment = $derived(
+    selectedProjectResourceDeployment
+      ? findEnvironment(projectEnvironments, selectedProjectResourceDeployment.environmentId)
+      : null,
+  );
+  const selectedProjectResourceLatestDeployment = $derived(
+    selectedProjectResourceDeployment
+      ? latestResourceDeployment(selectedProjectResourceDeployment, projectDeployments)
+      : null,
+  );
+  const selectedProjectResourceDeploymentServer = $derived(
+    findServer(servers, projectResourceDeploymentServerId),
+  );
+  const selectedProjectResourceDeploymentSource = $derived(
+    selectedProjectResourceLatestDeployment?.runtimePlan.source ?? null,
+  );
+  const canCreateProjectResourceDeployment = $derived(
+    Boolean(selectedProjectResourceDeployment && projectResourceDeploymentServerId) &&
+      !isProjectArchived &&
+      !projectResourceDeploymentCreatePending,
+  );
+  const canPreviewProjectResourceDeploymentPlan = $derived(
+    Boolean(selectedProjectResourceDeployment && projectResourceDeploymentServerId) &&
+      !isProjectArchived &&
+      !projectResourceDeploymentPlanPending,
   );
   const canRenameProject = $derived(
     Boolean(project) &&
@@ -1342,17 +1404,183 @@
     setQuickDeployDialogOpen(false);
   }
 
+  function appendProjectResourceDeploymentProgressEvent(event: DeploymentProgressEvent): void {
+    projectResourceDeploymentProgressEvents = [...projectResourceDeploymentProgressEvents, event];
+    projectResourceDeploymentProgressDeploymentId =
+      event.deploymentId ?? projectResourceDeploymentProgressDeploymentId;
+
+    if (event.status === "failed") {
+      projectResourceDeploymentProgressDialogStatus = "failed";
+    } else if (event.status === "succeeded") {
+      projectResourceDeploymentProgressDialogStatus = "succeeded";
+    } else {
+      projectResourceDeploymentProgressDialogStatus = "running";
+    }
+  }
+
+  async function refreshProjectResourceDeploymentData(): Promise<void> {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) }),
+      queryClient.invalidateQueries({ queryKey: orpc.deployments.key({ type: "query" }) }),
+      queryClient.invalidateQueries({ queryKey: orpc.projects.key({ type: "query" }) }),
+    ]);
+  }
+
+  function prepareProjectResourceDeploymentDialog(resource: ResourceSummary): void {
+    const latestDeployment = latestResourceDeployment(resource, projectDeployments);
+    selectedProjectResourceDeploymentId = resource.id;
+    projectResourceDeploymentServerId =
+      (latestDeployment?.serverId ?? projectResourceDeploymentServerId) || (servers[0]?.id ?? "");
+    projectResourceDeploymentDestinationId =
+      resource.destinationId ?? latestDeployment?.destinationId ?? "";
+    projectResourceDeploymentPlanPreview = null;
+    projectResourceDeploymentPlanError = "";
+    projectResourceDeploymentFeedback = null;
+    projectResourceDeploymentDialogOpen = true;
+  }
+
+  function openProjectResourceDeploymentDialog(resource: ResourceSummary): void {
+    if (isProjectArchived) {
+      return;
+    }
+
+    prepareProjectResourceDeploymentDialog(resource);
+  }
+
+  function setProjectResourceDeploymentDialogOpen(open: boolean): void {
+    if (open) {
+      if (selectedProjectResourceDeployment) {
+        prepareProjectResourceDeploymentDialog(selectedProjectResourceDeployment);
+      }
+      return;
+    }
+
+    projectResourceDeploymentDialogOpen = false;
+  }
+
+  async function createProjectResourceDeployment(event: SubmitEvent): Promise<void> {
+    event.preventDefault();
+
+    if (!selectedProjectResourceDeployment || !canCreateProjectResourceDeployment) {
+      return;
+    }
+
+    const input: CreateDeploymentInput = {
+      projectId: selectedProjectResourceDeployment.projectId,
+      environmentId: selectedProjectResourceDeployment.environmentId,
+      resourceId: selectedProjectResourceDeployment.id,
+      serverId: projectResourceDeploymentServerId,
+      ...(projectResourceDeploymentDestinationId.trim()
+        ? { destinationId: projectResourceDeploymentDestinationId.trim() }
+        : {}),
+    };
+
+    projectResourceDeploymentCreatePending = true;
+    projectResourceDeploymentFeedback = null;
+    projectResourceDeploymentProgressDialogOpen = true;
+    projectResourceDeploymentProgressDialogStatus = "running";
+    projectResourceDeploymentProgressEvents = [];
+    projectResourceDeploymentProgressStreamError = "";
+    projectResourceDeploymentProgressDeploymentId = "";
+    projectResourceDeploymentProgressRequestId = "";
+    projectResourceDeploymentProgressTraceLink = "";
+
+    try {
+      const result = await createDeploymentWithProgress(
+        input,
+        appendProjectResourceDeploymentProgressEvent,
+        {
+          onRequestId: (requestId) => {
+            projectResourceDeploymentProgressRequestId = requestId;
+          },
+          onStreamError: (message) => {
+            projectResourceDeploymentProgressStreamError = message;
+          },
+          onTraceLink: (traceLink) => {
+            projectResourceDeploymentProgressTraceLink = traceLink;
+          },
+        },
+      );
+      projectResourceDeploymentProgressDeploymentId = result.id;
+      projectResourceDeploymentProgressDialogStatus = "succeeded";
+      projectResourceDeploymentFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.newDeploymentSuccessTitle),
+        detail: result.id,
+      };
+      setProjectResourceDeploymentDialogOpen(false);
+      await refreshProjectResourceDeploymentData();
+    } catch (error) {
+      projectResourceDeploymentProgressDialogStatus = "failed";
+      projectResourceDeploymentProgressStreamError = readErrorMessage(error);
+      projectResourceDeploymentFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.newDeploymentErrorTitle),
+        detail: readErrorMessage(error),
+      };
+    } finally {
+      projectResourceDeploymentCreatePending = false;
+    }
+  }
+
+  async function previewProjectResourceDeploymentPlan(): Promise<void> {
+    if (!selectedProjectResourceDeployment || !canPreviewProjectResourceDeploymentPlan) {
+      return;
+    }
+
+    projectResourceDeploymentPlanPending = true;
+    projectResourceDeploymentPlanError = "";
+    projectResourceDeploymentPlanPreview = null;
+
+    try {
+      projectResourceDeploymentPlanPreview = await orpcClient.deployments.plan({
+        projectId: selectedProjectResourceDeployment.projectId,
+        environmentId: selectedProjectResourceDeployment.environmentId,
+        resourceId: selectedProjectResourceDeployment.id,
+        serverId: projectResourceDeploymentServerId,
+        ...(projectResourceDeploymentDestinationId.trim()
+          ? { destinationId: projectResourceDeploymentDestinationId.trim() }
+          : {}),
+      });
+    } catch (error) {
+      projectResourceDeploymentPlanError = readErrorMessage(error);
+    } finally {
+      projectResourceDeploymentPlanPending = false;
+    }
+  }
+
+  function projectResourceDeploymentPlanStatusLabel(
+    status: DeploymentPlanResponse["readiness"]["status"],
+  ): string {
+    if (status === "ready") {
+      return $t(i18nKeys.console.resources.newDeploymentPlanReady);
+    }
+    if (status === "warning") {
+      return $t(i18nKeys.console.resources.newDeploymentPlanWarning);
+    }
+    return $t(i18nKeys.console.resources.newDeploymentPlanBlocked);
+  }
+
+  function projectResourceDeploymentProgressHref(): string {
+    if (!selectedProjectResourceDeployment || !projectResourceDeploymentProgressDeploymentId) {
+      return "/deployments";
+    }
+
+    return deploymentDetailHref({
+      id: projectResourceDeploymentProgressDeploymentId,
+      projectId: selectedProjectResourceDeployment.projectId,
+      environmentId: selectedProjectResourceDeployment.environmentId,
+      resourceId: selectedProjectResourceDeployment.id,
+    });
+  }
+
   function openProjectQuickDeploy(): void {
     openQuickDeployModal();
   }
 
-  function openResourceQuickDeploy(resource: ResourceSummary): void {
-    openQuickDeployModal({ resource });
-  }
-
   function openProjectDeploymentAction(): void {
     if (primaryResource) {
-      openResourceQuickDeploy(primaryResource);
+      openProjectResourceDeploymentDialog(primaryResource);
       return;
     }
 
@@ -1365,10 +1593,10 @@
       return;
     }
 
-    if (projectNextAction.intent === "resource-quick-deploy") {
+    if (projectNextAction.intent === "resource-create-deployment") {
       const resource = projectResources.find((item) => item.id === projectNextAction.resourceId);
       if (resource) {
-        openResourceQuickDeploy(resource);
+        openProjectResourceDeploymentDialog(resource);
       } else {
         openProjectQuickDeploy();
       }
@@ -1381,11 +1609,11 @@
       return;
     }
 
-    if (item.intent !== "resource-quick-deploy") return;
+    if (item.intent !== "resource-create-deployment") return;
 
     const resource = projectResources.find((projectResource) => projectResource.id === item.resourceId);
     if (resource) {
-      openResourceQuickDeploy(resource);
+      openProjectResourceDeploymentDialog(resource);
     } else {
       openProjectQuickDeploy();
     }
@@ -1560,7 +1788,7 @@
                     <Skeleton class="h-5 w-20 rounded-md" />
                   </div>
                   <div class="console-record-list">
-                    {#each Array.from({ length: groupIndex === 0 ? 2 : 1 }) as _}
+                    {#each Array.from({ length: 2 }) as _}
                       <div class="console-record-row">
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                           <div class="min-w-0">
@@ -1889,7 +2117,7 @@
                               <div class="flex shrink-0 flex-wrap gap-2">
                                 <Button
                                   type="button"
-                                  onclick={() => openResourceQuickDeploy(resource)}
+                                  onclick={() => openProjectResourceDeploymentDialog(resource)}
                                   size="sm"
                                   variant="outline"
                                 >
@@ -2385,7 +2613,7 @@
               createAction={openProjectQuickDeploy}
               createLabel={$t(i18nKeys.console.projects.addResourceAction)}
               createDisabled={isProjectArchived}
-              onDeployResource={openResourceQuickDeploy}
+              onDeployResource={openProjectResourceDeploymentDialog}
               showEnvironment
             />
           </section>
@@ -3059,6 +3287,340 @@
         </div>
       </Dialog.Content>
     </Dialog.Root>
+
+    <Dialog.Root
+      bind:open={projectResourceDeploymentDialogOpen}
+      onOpenChange={setProjectResourceDeploymentDialogOpen}
+    >
+      <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-6xl">
+        <Dialog.Header>
+          <Dialog.Title>{$t(i18nKeys.common.actions.createDeployment)}</Dialog.Title>
+          <Dialog.Description>
+            {$t(i18nKeys.console.resources.newDeploymentDescription)}
+          </Dialog.Description>
+        </Dialog.Header>
+
+        {#if selectedProjectResourceDeployment}
+          <form
+            class="max-h-[calc(100vh-12rem)] overflow-y-auto px-5 pb-5"
+            onsubmit={createProjectResourceDeployment}
+            data-project-resource-deployment-create-dialog
+          >
+            <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
+              <div class="space-y-0 border-y">
+                <section class="grid gap-5 py-5 md:grid-cols-[11rem_minmax(0,1fr)]">
+                  <div class="flex items-start gap-2">
+                    <span class="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md border bg-muted/30 text-muted-foreground">
+                      <Server class="size-[18px]" />
+                    </span>
+                    <div class="space-y-1">
+                      <div class="flex items-center gap-2">
+                        <h3 class="font-semibold">
+                          {$t(i18nKeys.console.resources.newDeploymentTargetTitle)}
+                        </h3>
+                        <DocsHelpLink
+                          href={webDocsHrefs.deploymentLifecycle}
+                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                          className="size-5"
+                        />
+                      </div>
+                      <p class="text-sm leading-6 text-muted-foreground">
+                        {$t(i18nKeys.console.resources.newDeploymentTargetDescription)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div class="grid gap-4 sm:grid-cols-2">
+                    <label class="space-y-1.5 text-sm font-medium">
+                      <span class="inline-flex items-center gap-1.5">
+                        {$t(i18nKeys.common.domain.server)}
+                        <DocsHelpLink
+                          href={webDocsHrefs.serverDeploymentTarget}
+                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                          className="size-5"
+                        />
+                      </span>
+                      <Select.Root bind:value={projectResourceDeploymentServerId} type="single">
+                        <Select.Trigger class="w-full">
+                          {selectedProjectResourceDeploymentServer?.name ??
+                            $t(i18nKeys.console.domainBindings.noServerOptions)}
+                        </Select.Trigger>
+                        <Select.Content>
+                          {#each servers as server (server.id)}
+                            <Select.Item value={server.id}>{server.name}</Select.Item>
+                          {/each}
+                        </Select.Content>
+                      </Select.Root>
+                    </label>
+
+                    <label class="space-y-1.5 text-sm font-medium">
+                      <span class="inline-flex items-center gap-1.5">
+                        {$t(i18nKeys.common.domain.destination)}
+                        <DocsHelpLink
+                          href={webDocsHrefs.domainGeneratedAccessRoute}
+                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                          className="size-5"
+                        />
+                      </span>
+                      <Input
+                        bind:value={projectResourceDeploymentDestinationId}
+                        autocomplete="off"
+                        placeholder={$t(i18nKeys.console.domainBindings.formDestinationPlaceholder)}
+                      />
+                    </label>
+                  </div>
+                </section>
+
+                <section class="grid gap-5 border-t py-5 md:grid-cols-[11rem_minmax(0,1fr)]">
+                  <div class="flex items-start gap-2">
+                    <span class="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md border bg-muted/30 text-muted-foreground">
+                      <GitBranch class="size-[18px]" />
+                    </span>
+                    <div class="space-y-1">
+                      <h3 class="font-semibold">
+                        {$t(i18nKeys.console.resources.newDeploymentSourceTitle)}
+                      </h3>
+                      <p class="text-sm leading-6 text-muted-foreground">
+                        {$t(i18nKeys.console.resources.newDeploymentSourceDescription)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div>
+                    {#if selectedProjectResourceDeploymentSource}
+                      <div class="divide-y rounded-md border bg-background">
+                        <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+                          <p class="min-w-0 truncate text-sm font-medium">
+                            {selectedProjectResourceDeploymentSource.displayName}
+                          </p>
+                          <Badge variant="secondary">
+                            {selectedProjectResourceDeploymentSource.kind}
+                          </Badge>
+                        </div>
+                        <p class="truncate px-4 py-3 font-mono text-xs text-muted-foreground">
+                          {selectedProjectResourceDeploymentSource.locator}
+                        </p>
+                      </div>
+                    {:else}
+                      <div class="rounded-md border border-dashed px-4 py-4 text-sm text-muted-foreground">
+                        {$t(i18nKeys.console.resources.newDeploymentNoSourceSnapshot)}
+                      </div>
+                    {/if}
+                  </div>
+                </section>
+
+                <section class="grid gap-5 border-t py-5 md:grid-cols-[11rem_minmax(0,1fr)]">
+                  <div class="flex items-start gap-2">
+                    <span class="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md border bg-muted/30 text-muted-foreground">
+                      <Eye class="size-[18px]" />
+                    </span>
+                    <div class="space-y-1">
+                      <div class="flex items-center gap-2">
+                        <h3 class="font-semibold">
+                          {$t(i18nKeys.console.resources.newDeploymentPlanTitle)}
+                        </h3>
+                        <DocsHelpLink
+                          href={webDocsHrefs.deploymentPlanPreview}
+                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                          className="size-5"
+                        />
+                      </div>
+                      <p class="text-sm leading-6 text-muted-foreground">
+                        {$t(i18nKeys.console.resources.newDeploymentPlanDescription)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div class="space-y-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={!canPreviewProjectResourceDeploymentPlan}
+                      onclick={previewProjectResourceDeploymentPlan}
+                    >
+                      <Eye class="size-4" />
+                      {projectResourceDeploymentPlanPending
+                        ? $t(i18nKeys.console.resources.newDeploymentPlanPending)
+                        : $t(i18nKeys.console.resources.newDeploymentPlanAction)}
+                    </Button>
+
+                    {#if projectResourceDeploymentPlanError}
+                      <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                        <p class="font-medium">
+                          {$t(i18nKeys.console.resources.newDeploymentPlanErrorTitle)}
+                        </p>
+                        <p class="mt-1 break-all text-xs">
+                          {projectResourceDeploymentPlanError}
+                        </p>
+                      </div>
+                    {/if}
+
+                    {#if projectResourceDeploymentPlanPreview}
+                      <div class="divide-y rounded-md border bg-background">
+                        <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+                          <div class="min-w-0">
+                            <p class="truncate text-sm font-medium">
+                              {projectResourceDeploymentPlanPreview.source.framework ??
+                                projectResourceDeploymentPlanPreview.source.runtimeFamily ??
+                                projectResourceDeploymentPlanPreview.source.kind}
+                            </p>
+                            <p class="mt-1 truncate text-xs text-muted-foreground">
+                              {projectResourceDeploymentPlanPreview.source.displayName}
+                            </p>
+                          </div>
+                          <Badge
+                            variant={projectResourceDeploymentPlanPreview.readiness.ready
+                              ? "secondary"
+                              : "outline"}
+                          >
+                            {projectResourceDeploymentPlanStatusLabel(
+                              projectResourceDeploymentPlanPreview.readiness.status,
+                            )}
+                          </Badge>
+                        </div>
+
+                        <dl class="grid gap-3 px-4 py-3 text-sm sm:grid-cols-2">
+                          <div>
+                            <dt class="text-muted-foreground">
+                              {$t(i18nKeys.console.resources.newDeploymentPlanPlanner)}
+                            </dt>
+                            <dd class="mt-1 font-medium">
+                              {projectResourceDeploymentPlanPreview.planner.plannerKey} · {projectResourceDeploymentPlanPreview.planner.supportTier}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt class="text-muted-foreground">
+                              {$t(i18nKeys.console.resources.newDeploymentPlanArtifact)}
+                            </dt>
+                            <dd class="mt-1 font-medium">
+                              {projectResourceDeploymentPlanPreview.artifact.kind}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt class="text-muted-foreground">
+                              {$t(i18nKeys.console.resources.newDeploymentPlanNetworkHealth)}
+                            </dt>
+                            <dd class="mt-1 font-medium">
+                              {projectResourceDeploymentPlanPreview.network.internalPort ?? "-"} · {projectResourceDeploymentPlanPreview.health.kind}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt class="text-muted-foreground">
+                              {$t(i18nKeys.console.resources.generatedAccessRoute)}
+                            </dt>
+                            <dd class="mt-1 font-medium">
+                              {projectResourceDeploymentPlanPreview.access?.hostname ?? "-"}
+                            </dd>
+                          </div>
+                        </dl>
+                      </div>
+                    {/if}
+
+                    {#if projectResourceDeploymentFeedback}
+                      <div
+                        class={[
+                          "rounded-md border px-3 py-2 text-sm",
+                          projectResourceDeploymentFeedback.kind === "success"
+                            ? "border-primary/25 bg-primary/5"
+                            : "border-destructive/30 bg-destructive/5 text-destructive",
+                        ]}
+                      >
+                        <p class="font-medium">{projectResourceDeploymentFeedback.title}</p>
+                        <p class="mt-1 break-all text-xs">
+                          {projectResourceDeploymentFeedback.detail}
+                        </p>
+                      </div>
+                    {/if}
+                  </div>
+                </section>
+              </div>
+
+              <aside class="rounded-md border bg-muted/15 p-4">
+                <h3 class="text-base font-semibold">
+                  {$t(i18nKeys.console.resources.newDeploymentContextTitle)}
+                </h3>
+                <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                  {$t(i18nKeys.console.resources.profileDescription)}
+                </p>
+                <dl class="mt-4 divide-y text-sm">
+                  <div class="grid grid-cols-[6rem_minmax(0,1fr)] gap-3 py-3">
+                    <dt class="text-muted-foreground">{$t(i18nKeys.common.domain.project)}</dt>
+                    <dd class="truncate font-medium">{project.name}</dd>
+                  </div>
+                  <div class="grid grid-cols-[6rem_minmax(0,1fr)] gap-3 py-3">
+                    <dt class="text-muted-foreground">
+                      {$t(i18nKeys.common.domain.environment)}
+                    </dt>
+                    <dd class="truncate font-medium">
+                      {selectedProjectResourceDeploymentEnvironment?.name ??
+                        selectedProjectResourceDeployment.environmentId}
+                    </dd>
+                  </div>
+                  <div class="grid grid-cols-[6rem_minmax(0,1fr)] gap-3 py-3">
+                    <dt class="text-muted-foreground">{$t(i18nKeys.common.domain.resource)}</dt>
+                    <dd class="min-w-0">
+                      <p class="truncate font-medium">{selectedProjectResourceDeployment.name}</p>
+                      <p class="mt-1 truncate font-mono text-xs text-muted-foreground">
+                        {selectedProjectResourceDeployment.id}
+                      </p>
+                    </dd>
+                  </div>
+                  <div class="grid grid-cols-[6rem_minmax(0,1fr)] gap-3 py-3">
+                    <dt class="text-muted-foreground">{$t(i18nKeys.common.domain.server)}</dt>
+                    <dd class="truncate font-medium">
+                      {(selectedProjectResourceDeploymentServer?.name ??
+                        projectResourceDeploymentServerId) || "-"}
+                    </dd>
+                  </div>
+                  <div class="grid grid-cols-[6rem_minmax(0,1fr)] gap-3 py-3">
+                    <dt class="text-muted-foreground">
+                      {$t(i18nKeys.common.domain.destination)}
+                    </dt>
+                    <dd class="truncate font-medium">
+                      {projectResourceDeploymentDestinationId || "-"}
+                    </dd>
+                  </div>
+                </dl>
+              </aside>
+            </div>
+
+            <Dialog.Footer class="mt-5 px-0 pb-0">
+              <Button
+                type="button"
+                variant="outline"
+                onclick={() => setProjectResourceDeploymentDialogOpen(false)}
+              >
+                {$t(i18nKeys.common.actions.cancel)}
+              </Button>
+              <Button type="submit" disabled={!canCreateProjectResourceDeployment}>
+                <Play class="size-4" />
+                {projectResourceDeploymentCreatePending
+                  ? $t(i18nKeys.console.quickDeploy.submitPending)
+                  : $t(i18nKeys.common.actions.createDeployment)}
+              </Button>
+            </Dialog.Footer>
+          </form>
+        {/if}
+      </Dialog.Content>
+    </Dialog.Root>
+
+    <DeploymentProgressDialog
+      open={projectResourceDeploymentProgressDialogOpen}
+      status={projectResourceDeploymentProgressDialogStatus}
+      events={projectResourceDeploymentProgressEvents}
+      streamError={projectResourceDeploymentProgressStreamError}
+      requestId={projectResourceDeploymentProgressRequestId}
+      deploymentId={projectResourceDeploymentProgressDeploymentId}
+      traceLink={projectResourceDeploymentProgressTraceLink}
+      title={$t(i18nKeys.console.deployments.progressTitle)}
+      description={$t(i18nKeys.console.deployments.progressDescription)}
+      onClose={() => {
+        projectResourceDeploymentProgressDialogOpen = false;
+      }}
+      onOpenDeployment={() => {
+        void goto(projectResourceDeploymentProgressHref());
+      }}
+    />
 
     <Dialog.Root bind:open={projectLifecycleDialogOpen} onOpenChange={setProjectLifecycleDialogOpen}>
       <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)}>

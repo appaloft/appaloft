@@ -702,6 +702,13 @@ describe("console page structure", () => {
     expect(projectDeploymentsTabSource).not.toMatch(
       /<a[\s\S]*?(部署|createDeployment)[\s\S]*?<\/a>/,
     );
+    expect(resourceListTableSource).toContain(
+      "aria-label={$t(i18nKeys.common.actions.createDeployment)}",
+    );
+    expect(resourceListTableSource).toContain("import { ArrowRight, Globe2, Play }");
+    expect(resourceListTableSource).not.toContain(
+      "aria-label={$t(i18nKeys.common.actions.quickDeploy)}",
+    );
   });
 
   test("[PROJECT-INSTALL-IA-003] keeps terminal install failures out of project overview health", () => {
@@ -1536,6 +1543,13 @@ describe("console page structure", () => {
     expect(deploymentsPageSource).toContain('import * as Select from "$lib/components/ui/select"');
     expect(deploymentsPageSource).toContain("<Select.Root bind:value={projectFilter}");
     expect(deploymentsPageSource).toContain("<Select.Root bind:value={environmentFilter}");
+    expect(deploymentsPageSource).toContain("disabled={!selectedProject}");
+    expect(deploymentsPageSource).toContain(
+      ": $t(i18nKeys.console.deployments.selectProjectFirst)",
+    );
+    expect(deploymentsPageSource).toContain(
+      'projectFilter === "all"\n      ? []\n      : environments.filter',
+    );
     expect(deploymentsPageSource).toContain("<Select.Root bind:value={resourceFilter}");
     expect(deploymentsPageSource).toContain("<Select.Root bind:value={statusFilter}");
     expect(deploymentsPageSource).not.toContain("<select");
@@ -1603,6 +1617,8 @@ describe("console page structure", () => {
   test("[DEPLOYMENT-DETAIL-IA-001] keeps recovery actions behind an intent dialog", () => {
     expect(deploymentDetailPageSource).toContain("data-deployment-attempt-snapshot");
     expect(deploymentDetailPageSource).toContain("data-deployment-access-snapshot");
+    expect(deploymentDetailPageSource).toContain("data-deployment-environment-snapshot-value");
+    expect(deploymentDetailPageSource).toContain("{variable.value}");
     expect(deploymentDetailPageSource).toContain("data-deployment-current-resource-handoff");
     expect(deploymentDetailPageSource).toContain("data-deployment-attempt-observation");
     expect(deploymentDetailPageSource).toContain("data-deployment-current-resource-observation");
@@ -2222,6 +2238,10 @@ describe("console page structure", () => {
     expect(dependencyResourceDisplaySurface).toContain("filterEnvironmentSelectValue");
     expect(dependencyResourceDisplaySurface).toContain("selectDependencyResourceProjectFilter");
     expect(dependencyResourceDisplaySurface).toContain("selectDependencyResourceEnvironmentFilter");
+    expect(dependencyResourceDisplaySurface).toContain("disabled={!filterProjectId}");
+    expect(dependencyResourceDisplaySurface).toContain(
+      "$t(i18nKeys.console.dependencyResources.selectProjectFirst)",
+    );
     expect(dependencyResourceDisplaySurface).not.toContain('id="dependency-resource-create-form"');
     expect(dependencyResourceDisplaySurface).not.toContain("bind:value={createProjectId}");
     expect(dependencyResourceDisplaySurface).not.toContain("bind:value={createEnvironmentId}");
@@ -2246,6 +2266,12 @@ describe("console page structure", () => {
     expect(dependencyResourcesPageSource).toContain("let createProjectId = $state");
     expect(dependencyResourcesPageSource).toContain("let createEnvironmentId = $state");
     expect(dependencyResourcesPageSource).toContain("allDependencyResourceFilterValue");
+    expect(dependencyResourcesPageSource).toContain(
+      "filterProjectId\n      ? environments.filter((environment) => environment.projectId === filterProjectId)\n      : []",
+    );
+    expect(dependencyResourcesPageSource).toContain(
+      "createProjectId\n      ? environments.filter((environment) => environment.projectId === createProjectId)\n      : []",
+    );
     expect(dependencyResourcesPageSource).toContain(
       'filterProjectId = value === allDependencyResourceFilterValue ? "" : value',
     );
@@ -3401,7 +3427,7 @@ describe("console page structure", () => {
     );
     const projectConsoleQueriesSource = sourceBetween(
       projectDetailPageSource,
-      "const { projectsQuery, environmentsQuery, resourcesQuery, deploymentsQuery }",
+      "const { projectsQuery, serversQuery, environmentsQuery, resourcesQuery, deploymentsQuery }",
       "const projectId = $derived",
     );
     const projectPreviewEnvironmentsQuerySource = sourceBetween(
@@ -3444,7 +3470,8 @@ describe("console page structure", () => {
     expect(projectConsoleQueriesSource).toContain("health: false");
     expect(projectConsoleQueriesSource).toContain("readiness: false");
     expect(projectConsoleQueriesSource).toContain("version: false");
-    expect(projectConsoleQueriesSource).toContain("servers: false");
+    expect(projectConsoleQueriesSource).toContain("serversQuery");
+    expect(projectConsoleQueriesSource).not.toContain("servers: false");
     expect(projectConsoleQueriesSource).toContain("previewEnvironments: false");
     expect(projectConsoleQueriesSource).toContain("domainBindings: false");
     expect(projectConsoleQueriesSource).toContain("certificates: false");
