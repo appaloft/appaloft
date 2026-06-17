@@ -23,11 +23,14 @@ import {
   type EnvironmentDuplicateDomainRouteCandidate,
   type EnvironmentDuplicatePlanSummary,
   type EnvironmentDuplicateResourceCandidate,
+  type EnvironmentDuplicateStorageDecisionCandidate,
   type EnvironmentDuplicateVariableCandidate,
   type EnvironmentReadModel,
   type ResourceDependencyBindingReadModel,
   type ResourceDependencyBindingSummary,
   type ResourceReadModel,
+  type StorageVolumeReadModel,
+  type StorageVolumeSummary,
 } from "../../ports";
 import { tokens } from "../../tokens";
 import { type PlanDuplicateEnvironmentQueryInput } from "./plan-duplicate-environment.query";
@@ -47,6 +50,8 @@ export class PlanDuplicateEnvironmentQueryService {
     private readonly clock: Clock,
     @inject(tokens.domainBindingReadModel, { isOptional: true })
     private readonly domainBindingReadModel?: DomainBindingReadModel,
+    @inject(tokens.storageVolumeReadModel, { isOptional: true })
+    private readonly storageVolumeReadModel?: StorageVolumeReadModel,
   ) {}
 
   async execute(
@@ -102,6 +107,15 @@ export class PlanDuplicateEnvironmentQueryService {
         const domainRoutes = this.domainBindingReadModel
           ? await collectDomainRoutes(
               this.domainBindingReadModel,
+              repositoryContext,
+              sourceEnvironment.projectId,
+              sourceEnvironment.id,
+              resources.map((resource) => resource.id),
+            )
+          : [];
+        const storageDecisions = this.storageVolumeReadModel
+          ? await collectStorageDecisions(
+              this.storageVolumeReadModel,
               repositoryContext,
               sourceEnvironment.projectId,
               sourceEnvironment.id,
@@ -178,6 +192,7 @@ export class PlanDuplicateEnvironmentQueryService {
             decisionHint: "rebind-after-dependency-decision" as const,
           })),
           domainRouteCandidates: domainRoutes.map(toDomainRouteCandidate),
+          storageDecisionCandidates: storageDecisions.map(toStorageDecisionCandidate),
           warnings,
           generatedAt: this.clock.now(),
         });
@@ -185,6 +200,12 @@ export class PlanDuplicateEnvironmentQueryService {
     );
   }
 }
+
+type StorageAttachmentDecision = StorageVolumeSummary["attachments"][number] & {
+  storageVolumeId: string;
+  storageVolumeName: string;
+  storageVolumeKind: StorageVolumeSummary["kind"];
+};
 
 async function collectDomainRoutes(
   readModel: DomainBindingReadModel,
@@ -205,6 +226,30 @@ async function collectDomainRoutes(
     );
   }
   return routes;
+}
+
+async function collectStorageDecisions(
+  readModel: StorageVolumeReadModel,
+  context: ReturnType<typeof toRepositoryContext>,
+  projectId: string,
+  environmentId: string,
+  resourceIds: string[],
+): Promise<StorageAttachmentDecision[]> {
+  const resourceIdSet = new Set(resourceIds);
+  const volumes = await readModel.list(context, {
+    projectId,
+    environmentId,
+  });
+  return volumes.flatMap((volume) =>
+    volume.attachments
+      .filter((attachment) => resourceIdSet.has(attachment.resourceId))
+      .map((attachment) => ({
+        ...attachment,
+        storageVolumeId: volume.id,
+        storageVolumeName: volume.name,
+        storageVolumeKind: volume.kind,
+      })),
+  );
 }
 
 async function collectDependencyBindings(
@@ -239,6 +284,28 @@ function toDomainRouteCandidate(
     decisionHint: "defer",
     reasons: [
       "Custom domains are environment-specific and must not be copied into the target environment without an explicit route decision.",
+    ],
+  };
+}
+
+function toStorageDecisionCandidate(
+  attachment: StorageAttachmentDecision,
+): EnvironmentDuplicateStorageDecisionCandidate {
+  return {
+    storageVolumeId: attachment.storageVolumeId,
+    storageVolumeName: attachment.storageVolumeName,
+    storageVolumeKind: attachment.storageVolumeKind,
+    resourceId: attachment.resourceId,
+    attachmentId: attachment.attachmentId,
+    destinationPath: attachment.destinationPath,
+    mountMode: attachment.mountMode,
+    ...(attachment.dataFormat ? { dataFormat: attachment.dataFormat } : {}),
+    ...(attachment.applicationDataLabel
+      ? { applicationDataLabel: attachment.applicationDataLabel }
+      : {}),
+    decisionHint: "defer",
+    reasons: [
+      "Storage volume data is environment-specific and must not be copied without an explicit empty, restore, import, or defer decision.",
     ],
   };
 }

@@ -3,8 +3,8 @@
 ## Status
 
 - Round: Code / Post-Implementation Sync
-- Artifact state: Phase 6 custom domain route defer implemented; later storage, diff/sync, Web,
-  and preview integration rows remain planned.
+- Artifact state: Phase 7 storage data defer implemented; later diff/sync, Web, and preview
+  integration rows remain planned.
 - Governing decision: [ADR-085](../../decisions/ADR-085-environment-profile-duplication-boundary.md)
 
 ## Business Outcome
