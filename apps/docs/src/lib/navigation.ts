@@ -91,6 +91,7 @@ const zhTree: NavFolder[] = [
   {
     name: "Integrations",
     children: [
+      page("Connections", "integrations/connections"),
       page("GitHub", "integrations/github"),
       page("Providers", "integrations/providers"),
       page("Plugins", "integrations/plugins"),
