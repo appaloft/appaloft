@@ -166,7 +166,7 @@ const cleanupCommand = EffectCommand.make(
 ).pipe(EffectCommand.withDescription("Clean up Appaloft-managed DNS records through a connector"));
 
 export const dnsCommand = EffectCommand.make("dns").pipe(
-  EffectCommand.withDescription("Shortcut commands for DNS connector capabilities"),
+  EffectCommand.withDescription("Shortcut commands for connectors in the DNS category"),
   EffectCommand.withSubcommands([
     connectCommand,
     planCommand,

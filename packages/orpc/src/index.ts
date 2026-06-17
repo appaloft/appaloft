@@ -336,6 +336,7 @@ import {
   openTerminalSessionCommandInputSchema,
   operationCatalog,
   PlanConnectorCapabilityQuery,
+  PlanDomainBindingDnsQuery,
   PrepareServerRuntimeCommand,
   type ProductOrganizationRole,
   type ProductSessionAuthorizationPort,
@@ -355,6 +356,7 @@ import {
   PublishStaticArtifactArchiveCommand,
   PublishStaticArtifactCommand,
   PublishStaticArtifactPayloadCommand,
+  planDomainBindingDnsQueryInputSchema,
   prepareServerRuntimeCommandInputSchema,
   promoteEnvironmentCommandInputSchema,
   provisionDependencyResourceCommandInputSchema,
@@ -1570,6 +1572,10 @@ export const apiRouteDescriptions = {
   ),
   showDomainBinding: routeDescription(
     "Reads custom domain binding ownership, route readiness, proxy readiness, diagnostics, and certificate readiness.",
+    "domain.custom-domain-binding",
+  ),
+  planDomainBindingDns: routeDescription(
+    "Plans DNS category connector records from a custom domain binding without applying provider changes.",
     "domain.custom-domain-binding",
   ),
   configureDomainBindingRoute: routeDescription(
@@ -4382,6 +4388,19 @@ export const showDomainBindingProcedure = base
     executeQuery(context, ShowDomainBindingQuery.create(input)),
   );
 
+export const planDomainBindingDnsProcedure = base
+  .route({
+    method: "POST",
+    path: "/domain-bindings/{domainBindingId}/dns-plan",
+    description: apiRouteDescriptions.planDomainBindingDns,
+    successStatus: 200,
+  })
+  .input(planDomainBindingDnsQueryInputSchema)
+  .output(connectorCapabilityPlanResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, PlanDomainBindingDnsQuery.create(input)),
+  );
+
 export const configureDomainBindingRouteProcedure = base
   .route({
     method: "POST",
@@ -6648,6 +6667,7 @@ export const appaloftOrpcRouter = {
   domainBindings: {
     list: listDomainBindingsProcedure,
     show: showDomainBindingProcedure,
+    dnsPlan: planDomainBindingDnsProcedure,
     create: createDomainBindingProcedure,
     configureRoute: configureDomainBindingRouteProcedure,
     confirmOwnership: confirmDomainBindingOwnershipProcedure,
@@ -9275,6 +9295,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/terminal-sessions/:sessionId/close",
     "/api/domain-bindings",
     "/api/domain-bindings/:domainBindingId",
+    "/api/domain-bindings/:domainBindingId/dns-plan",
     "/api/domain-bindings/:domainBindingId/route",
     "/api/domain-bindings/:domainBindingId/ownership-confirmations",
     "/api/domain-bindings/:domainBindingId/delete-check",
