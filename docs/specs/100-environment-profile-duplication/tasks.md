@@ -22,12 +22,12 @@
 - [x] Add first `environments.duplicate-profile` apply slice: require reviewed dependency
   decisions before mutation, dispatch `environments.clone`, dispatch `resources.create` for copied
   resource shape, and return deferred decisions for unsupported profile parts.
-- [ ] ENV-PROFILE-DUP-002: implement provider-backed `create-new-managed` dependency realization
-  through public neutral dependency resource commands/ports.
+- [x] ENV-PROFILE-DUP-002: dispatch public neutral `ProvisionDependencyResourceCommand` for
+  reviewed `create-new-managed` dependency decisions.
 - [ ] ENV-PROFILE-DUP-003: implement provider-backed `reuse-source` binding with explicit
   acknowledgement and shared-source warning readback.
-- [ ] ENV-PROFILE-DUP-004: implement provider-backed `bind-existing` decision with safe dependency
-  readback and binding command dispatch.
+- [x] ENV-PROFILE-DUP-004: validate reviewed `bind-existing` dependency ids and dispatch public
+  neutral `BindResourceDependencyCommand` for copied resource bindings.
 - [ ] ENV-PROFILE-DUP-005: persist or project unresolved decisions and block deployment admission.
 - [ ] ENV-PROFILE-DUP-006 / ENV-PROFILE-DUP-007: implement route regeneration/defer and storage
   requirement decisions.

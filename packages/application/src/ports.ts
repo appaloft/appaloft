@@ -4892,6 +4892,26 @@ export interface EnvironmentDuplicateCopiedResourceSummary {
   slug: string;
 }
 
+export interface EnvironmentDuplicateAppliedDependencySummary {
+  sourceDependencyResourceId: string;
+  targetDependencyResourceId: string;
+  decision: EnvironmentDuplicateDependencyApplyDecision;
+  kind: DependencyResourceKind;
+  name: string;
+}
+
+export interface EnvironmentDuplicateCreatedDependencyBindingSummary {
+  sourceBindingId: string;
+  sourceResourceId: string;
+  targetResourceId: string;
+  sourceDependencyResourceId: string;
+  targetDependencyResourceId: string;
+  targetName: string;
+  scope: ResourceDependencyBindingTargetSummary["scope"];
+  injectionMode: ResourceDependencyBindingTargetSummary["injectionMode"];
+  bindingId: string;
+}
+
 export interface EnvironmentDuplicateDeferredDecisionSummary {
   kind:
     | "resource"
@@ -4913,6 +4933,8 @@ export interface EnvironmentDuplicateProfileApplyResult {
   sourceEnvironmentId: string;
   targetEnvironmentId: string;
   copiedResources: EnvironmentDuplicateCopiedResourceSummary[];
+  appliedDependencies: EnvironmentDuplicateAppliedDependencySummary[];
+  createdDependencyBindings: EnvironmentDuplicateCreatedDependencyBindingSummary[];
   deferredDecisions: EnvironmentDuplicateDeferredDecisionSummary[];
   warnings: EnvironmentDuplicatePlanWarning[];
   generatedAt: string;

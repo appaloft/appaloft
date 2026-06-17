@@ -22,11 +22,13 @@ import { FixedClock } from "@appaloft/testkit";
 
 import {
   type Command as AppCommand,
+  BindResourceDependencyCommand,
   CloneEnvironmentCommand,
   type CommandBus,
   CreateResourceCommand,
   createExecutionContext,
   type EnvironmentReadModel,
+  ProvisionDependencyResourceCommand,
   type ResourceReadModel,
 } from "../src";
 import {
@@ -158,7 +160,28 @@ const dependencyResourceReadModel = {
       },
     ];
   },
-  async findOne() {
+  async findOne(_context, spec) {
+    if (specName(spec) === "ResourceInstanceByIdSpec") {
+      const id = (spec as unknown as { id: { value: string } }).id.value;
+      if (id === "rsi_external_pg_staging") {
+        return {
+          id,
+          projectId: "prj_demo",
+          environmentId: "env_staging",
+          name: "External DB Staging",
+          slug: "external-db-staging",
+          kind: "postgres",
+          sourceMode: "imported-external",
+          providerKey: "external-postgres",
+          providerManaged: false,
+          lifecycleStatus: "ready",
+          desiredCapabilities: [],
+          capabilityReadbacks: [],
+          bindingReadiness: { status: "ready" },
+          createdAt: "2026-01-01T00:00:05.000Z",
+        };
+      }
+    }
     return null;
   },
 } satisfies DependencyResourceReadModel;
@@ -257,8 +280,14 @@ function createCommandBus(commands: AppCommand<unknown>[]): CommandBus {
       if (command instanceof CloneEnvironmentCommand) {
         return ok({ id: "env_staging" } as T);
       }
+      if (command instanceof ProvisionDependencyResourceCommand) {
+        return ok({ id: "rsi_pg_staging" } as T);
+      }
       if (command instanceof CreateResourceCommand) {
         return ok({ id: "res_web_staging" } as T);
+      }
+      if (command instanceof BindResourceDependencyCommand) {
+        return ok({ id: "rbind_pg_staging" } as T);
       }
       return ok({} as T);
     },
@@ -272,6 +301,7 @@ function createApplyUseCase(commands: AppCommand<unknown>[] = []) {
     resourceReadModel,
     createResourceRepository(),
     dependencyResourceReadModel,
+    bindingReadModel,
     new FixedClock("2026-01-01T00:00:10.000Z"),
   );
 }
@@ -420,14 +450,22 @@ describe("environment profile duplication apply command", () => {
     );
 
     expect(result.isOk()).toBe(true);
-    expect(commands).toHaveLength(2);
+    expect(commands).toHaveLength(4);
     expect(commands[0]).toBeInstanceOf(CloneEnvironmentCommand);
     expect(commands[0]).toMatchObject({
       environmentId: "env_prod",
       targetName: "staging",
     });
-    expect(commands[1]).toBeInstanceOf(CreateResourceCommand);
+    expect(commands[1]).toBeInstanceOf(ProvisionDependencyResourceCommand);
     expect(commands[1]).toMatchObject({
+      kind: "postgres",
+      projectId: "prj_demo",
+      environmentId: "env_staging",
+      name: "Main DB",
+      providerKey: "appaloft-managed-postgres",
+    });
+    expect(commands[2]).toBeInstanceOf(CreateResourceCommand);
+    expect(commands[2]).toMatchObject({
       projectId: "prj_demo",
       environmentId: "env_staging",
       destinationId: "dst_demo",
@@ -441,6 +479,14 @@ describe("environment profile duplication apply command", () => {
         exposureMode: "reverse-proxy",
       },
     });
+    expect(commands[3]).toBeInstanceOf(BindResourceDependencyCommand);
+    expect(commands[3]).toMatchObject({
+      resourceId: "res_web_staging",
+      dependencyResourceId: "rsi_pg_staging",
+      targetName: "DATABASE_URL",
+      scope: "environment",
+      injectionMode: "env",
+    });
     expect(result._unsafeUnwrap()).toMatchObject({
       schemaVersion: "environments.duplicate-profile/v1",
       sourceEnvironmentId: "env_prod",
@@ -453,18 +499,36 @@ describe("environment profile duplication apply command", () => {
           slug: "web",
         },
       ],
-      deferredDecisions: [
-        expect.objectContaining({
-          kind: "dependency",
-          sourceId: "rsi_pg",
+      appliedDependencies: [
+        {
+          sourceDependencyResourceId: "rsi_pg",
+          targetDependencyResourceId: "rsi_pg_staging",
           decision: "create-new-managed",
-        }),
-        expect.objectContaining({
-          kind: "dependency",
-          sourceId: "rsi_external_pg",
+          kind: "postgres",
+          name: "Main DB",
+        },
+        {
+          sourceDependencyResourceId: "rsi_external_pg",
+          targetDependencyResourceId: "rsi_external_pg_staging",
           decision: "bind-existing",
-        }),
+          kind: "postgres",
+          name: "External DB",
+        },
       ],
+      createdDependencyBindings: [
+        {
+          sourceBindingId: "rbind_pg",
+          sourceResourceId: "res_web",
+          targetResourceId: "res_web_staging",
+          sourceDependencyResourceId: "rsi_pg",
+          targetDependencyResourceId: "rsi_pg_staging",
+          targetName: "DATABASE_URL",
+          scope: "environment",
+          injectionMode: "env",
+          bindingId: "rbind_pg_staging",
+        },
+      ],
+      deferredDecisions: [],
       generatedAt: "2026-01-01T00:00:10.000Z",
     });
   });
