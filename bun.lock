@@ -508,6 +508,13 @@
         "@appaloft/provider-core": "workspace:*",
       },
     },
+    "packages/providers/infrastructure-vultr": {
+      "name": "@appaloft/provider-infrastructure-vultr",
+      "dependencies": {
+        "@appaloft/application": "workspace:*",
+        "@appaloft/core": "workspace:*",
+      },
+    },
     "packages/providers/local-shell": {
       "name": "@appaloft/provider-local-shell",
       "dependencies": {
@@ -710,6 +717,8 @@
     "@appaloft/provider-edge-proxy-traefik": ["@appaloft/provider-edge-proxy-traefik@workspace:packages/providers/edge-proxy-traefik"],
 
     "@appaloft/provider-generic-ssh": ["@appaloft/provider-generic-ssh@workspace:packages/providers/generic-ssh"],
+
+    "@appaloft/provider-infrastructure-vultr": ["@appaloft/provider-infrastructure-vultr@workspace:packages/providers/infrastructure-vultr"],
 
     "@appaloft/provider-local-shell": ["@appaloft/provider-local-shell@workspace:packages/providers/local-shell"],
 
