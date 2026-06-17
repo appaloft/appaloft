@@ -24,14 +24,15 @@
   resource shape, and return deferred decisions for unsupported profile parts.
 - [x] ENV-PROFILE-DUP-002: dispatch public neutral `ProvisionDependencyResourceCommand` for
   reviewed `create-new-managed` dependency decisions.
-- [ ] ENV-PROFILE-DUP-003: implement provider-backed `reuse-source` binding with explicit
-  acknowledgement and shared-source warning readback.
+- [x] ENV-PROFILE-DUP-003: implement `reuse-source` binding with explicit acknowledgement and
+  shared-source warning readback.
 - [x] ENV-PROFILE-DUP-004: validate reviewed `bind-existing` dependency ids and dispatch public
   neutral `BindResourceDependencyCommand` for copied resource bindings.
 - [ ] ENV-PROFILE-DUP-005: persist or project unresolved decisions and block deployment admission.
 - [ ] ENV-PROFILE-DUP-006 / ENV-PROFILE-DUP-007: implement route regeneration/defer and storage
   requirement decisions.
 - [ ] Add Web staged apply surface for `environments.duplicate-profile`.
+- [ ] Persist or project shared-source warning for deployment readiness, audit, and Web surfaces.
 
 ## Phase 3: Sync And Promote
 

@@ -52,6 +52,8 @@ Rules:
 - `bind-existing` requires `targetDependencyResourceId`.
 - `reuse-source` requires an explicit acknowledgement.
 - Resource decisions default to `copy-shape` when omitted.
+- `reuse-source` returns a `environment_profile_shared_source_dependency` warning so UI, tools, and
+  audit consumers can keep shared dependency use visible.
 
 ## Processing Rules
 
@@ -64,7 +66,7 @@ Rules:
    - `create-new-managed` dispatches `ProvisionDependencyResourceCommand` in the target environment;
    - `bind-existing` validates the target dependency id and uses it as the binding target;
    - `reuse-source` requires acknowledgement and uses the source dependency id as the binding
-     target.
+     target while returning a shared-source warning.
 6. Read source resources and load each resource aggregate selected for `copy-shape`.
 7. Dispatch `CreateResourceCommand` for each selected source resource with:
    - project id;

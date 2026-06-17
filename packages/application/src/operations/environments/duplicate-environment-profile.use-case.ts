@@ -127,6 +127,7 @@ export class DuplicateEnvironmentProfileUseCase {
 
       const appliedDependencies: EnvironmentDuplicateProfileApplyResult["appliedDependencies"] = [];
       const dependencyTargetIds = new Map<string, string>();
+      const warnings: EnvironmentDuplicateProfileApplyResult["warnings"] = [];
       for (const dependency of requiredDependencies) {
         const decision = dependencyDecisions.get(dependency.id);
         if (!decision || decision.decision === "defer") {
@@ -200,6 +201,9 @@ export class DuplicateEnvironmentProfileUseCase {
           kind: dependency.kind,
           name: dependency.name,
         });
+        if (decision.decision === "reuse-source") {
+          warnings.push(sharedSourceDependencyWarning(dependency.id, dependency.name));
+        }
       }
 
       const resourceDecisions = new Map(
@@ -294,18 +298,32 @@ export class DuplicateEnvironmentProfileUseCase {
         appliedDependencies,
         createdDependencyBindings,
         deferredDecisions,
-        warnings: deferredDecisions.length
-          ? [
-              {
-                code: "environment_profile_apply_deferred_decisions",
-                message: "Some environment profile decisions require follow-up before deployment.",
-              },
-            ]
-          : [],
+        warnings: [
+          ...warnings,
+          ...(deferredDecisions.length
+            ? [
+                {
+                  code: "environment_profile_apply_deferred_decisions",
+                  message:
+                    "Some environment profile decisions require follow-up before deployment.",
+                },
+              ]
+            : []),
+        ],
         generatedAt: clock.now(),
       });
     });
   }
+}
+
+function sharedSourceDependencyWarning(
+  dependencyResourceId: string,
+  dependencyResourceName: string,
+): EnvironmentDuplicateProfileApplyResult["warnings"][number] {
+  return {
+    code: "environment_profile_shared_source_dependency",
+    message: `Target environment reuses source dependency ${dependencyResourceName} (${dependencyResourceId}).`,
+  };
 }
 
 function createResourceInputFromSource(
