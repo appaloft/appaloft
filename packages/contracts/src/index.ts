@@ -6565,6 +6565,17 @@ export const dnsRecordPlanSchema = z.object({
   conflicts: z.array(dnsRecordConflictSchema),
 });
 
+export const domainConnectSetupSchema = z.object({
+  providerKey: z.string(),
+  zoneName: z.string(),
+  hostname: z.string(),
+  serviceId: z.string(),
+  templateId: z.string(),
+  redirectUrl: z.string(),
+  state: z.string(),
+  records: z.array(dnsRecordRequirementSchema),
+});
+
 export const infrastructureServerProposalSchema = z.object({
   providerKey: z.string(),
   region: z.string(),
@@ -6613,6 +6624,11 @@ export const dnsRecordApplySchema = z.object({
   ),
 });
 
+export const domainConnectApplySchema = domainConnectSetupSchema.extend({
+  status: z.enum(["applied", "verified", "skipped"]),
+  dnsRecords: dnsRecordApplySchema,
+});
+
 export const connectorCapabilityPlanPreviewSchema = z.object({
   planId: z.string(),
   connectorKey: z.string(),
@@ -6637,6 +6653,7 @@ export const connectorCapabilityPlanPreviewSchema = z.object({
     .object({
       kind: z.string(),
       dnsRecords: dnsRecordPlanSchema.optional(),
+      domainConnectSetup: domainConnectSetupSchema.optional(),
       infrastructureServerProposal: infrastructureServerProposalSchema.optional(),
       notificationMessage: notificationMessageSchema.optional(),
     })
@@ -6662,6 +6679,7 @@ export const connectorCapabilityApplyResultSchema = z.object({
     .object({
       kind: z.string(),
       dnsRecords: dnsRecordApplySchema.optional(),
+      domainConnectApply: domainConnectApplySchema.optional(),
       notificationDelivery: notificationMessageDeliverySchema.optional(),
     })
     .optional(),
@@ -6877,6 +6895,8 @@ export type DnsRecordRequirement = z.infer<typeof dnsRecordRequirementSchema>;
 export type DnsRecordConflict = z.infer<typeof dnsRecordConflictSchema>;
 export type DnsRecordPlan = z.infer<typeof dnsRecordPlanSchema>;
 export type DnsRecordApply = z.infer<typeof dnsRecordApplySchema>;
+export type DomainConnectSetup = z.infer<typeof domainConnectSetupSchema>;
+export type DomainConnectApply = z.infer<typeof domainConnectApplySchema>;
 export type InfrastructureServerProposal = z.infer<typeof infrastructureServerProposalSchema>;
 export type NotificationMessage = z.infer<typeof notificationMessageSchema>;
 export type NotificationMessageDelivery = z.infer<typeof notificationMessageDeliverySchema>;
