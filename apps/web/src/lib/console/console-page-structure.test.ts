@@ -1536,6 +1536,13 @@ describe("console page structure", () => {
     expect(deploymentsPageSource).toContain('import * as Select from "$lib/components/ui/select"');
     expect(deploymentsPageSource).toContain("<Select.Root bind:value={projectFilter}");
     expect(deploymentsPageSource).toContain("<Select.Root bind:value={environmentFilter}");
+    expect(deploymentsPageSource).toContain("disabled={!selectedProject}");
+    expect(deploymentsPageSource).toContain(
+      ": $t(i18nKeys.console.deployments.selectProjectFirst)",
+    );
+    expect(deploymentsPageSource).toContain(
+      'projectFilter === "all"\n      ? []\n      : environments.filter',
+    );
     expect(deploymentsPageSource).toContain("<Select.Root bind:value={resourceFilter}");
     expect(deploymentsPageSource).toContain("<Select.Root bind:value={statusFilter}");
     expect(deploymentsPageSource).not.toContain("<select");
@@ -2222,6 +2229,10 @@ describe("console page structure", () => {
     expect(dependencyResourceDisplaySurface).toContain("filterEnvironmentSelectValue");
     expect(dependencyResourceDisplaySurface).toContain("selectDependencyResourceProjectFilter");
     expect(dependencyResourceDisplaySurface).toContain("selectDependencyResourceEnvironmentFilter");
+    expect(dependencyResourceDisplaySurface).toContain("disabled={!filterProjectId}");
+    expect(dependencyResourceDisplaySurface).toContain(
+      "$t(i18nKeys.console.dependencyResources.selectProjectFirst)",
+    );
     expect(dependencyResourceDisplaySurface).not.toContain('id="dependency-resource-create-form"');
     expect(dependencyResourceDisplaySurface).not.toContain("bind:value={createProjectId}");
     expect(dependencyResourceDisplaySurface).not.toContain("bind:value={createEnvironmentId}");
@@ -2246,6 +2257,12 @@ describe("console page structure", () => {
     expect(dependencyResourcesPageSource).toContain("let createProjectId = $state");
     expect(dependencyResourcesPageSource).toContain("let createEnvironmentId = $state");
     expect(dependencyResourcesPageSource).toContain("allDependencyResourceFilterValue");
+    expect(dependencyResourcesPageSource).toContain(
+      "filterProjectId\n      ? environments.filter((environment) => environment.projectId === filterProjectId)\n      : []",
+    );
+    expect(dependencyResourcesPageSource).toContain(
+      "createProjectId\n      ? environments.filter((environment) => environment.projectId === createProjectId)\n      : []",
+    );
     expect(dependencyResourcesPageSource).toContain(
       'filterProjectId = value === allDependencyResourceFilterValue ? "" : value',
     );
