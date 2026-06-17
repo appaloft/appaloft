@@ -318,11 +318,23 @@ Implemented operations:
 Core next operations expected here:
 - list environment change history
 - restore/delete and lifecycle history
+- `environments.plan-duplicate` to return a reviewable Environment Profile duplication plan that
+  copies shape but classifies dependencies, secrets, domains, storage data, and deployment policy as
+  explicit target decisions
+- `environments.duplicate-profile` to apply an accepted plan by dispatching explicit child
+  commands for target environment, resource, dependency, variable, route, storage, and policy work
+- `environments.diff-profile` to compare environment shape across resources, profiles, variables,
+  dependency bindings, routes, storage requirements, and pending decisions with secret values masked
+- `environments.sync-profile` to import selected shape changes from one environment into another
+  through staged decisions rather than broad overwrite
 - `environments.rename` changes only the environment display name inside its owning project. It
   preserves environment id, kind, parent environment, variables, resources, deployments, and
   runtime state.
 - `environments.clone` creates a new active environment in the same project from an active source
-  environment's current environment-owned variables.
+  environment's current environment-owned variables. Full resource/profile/dependency/domain
+  duplication is governed by
+  [ADR-085: Environment Profile Duplication Boundary](./decisions/ADR-085-environment-profile-duplication-boundary.md)
+  and must use the planned profile workflow instead of expanding clone into a broad copy command.
 - `environments.lock` freezes one environment from new config/deployment work while keeping it
   readable.
 - `environments.unlock` returns a locked environment to active. Archived environments remain
