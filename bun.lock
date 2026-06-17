@@ -521,6 +521,13 @@
         "@appaloft/provider-core": "workspace:*",
       },
     },
+    "packages/providers/notification-slack": {
+      "name": "@appaloft/provider-notification-slack",
+      "dependencies": {
+        "@appaloft/application": "workspace:*",
+        "@appaloft/core": "workspace:*",
+      },
+    },
     "packages/sdk": {
       "name": "@appaloft/sdk",
       "version": "0.1.0",
@@ -721,6 +728,8 @@
     "@appaloft/provider-infrastructure-vultr": ["@appaloft/provider-infrastructure-vultr@workspace:packages/providers/infrastructure-vultr"],
 
     "@appaloft/provider-local-shell": ["@appaloft/provider-local-shell@workspace:packages/providers/local-shell"],
+
+    "@appaloft/provider-notification-slack": ["@appaloft/provider-notification-slack@workspace:packages/providers/notification-slack"],
 
     "@appaloft/sdk": ["@appaloft/sdk@workspace:packages/sdk"],
 
