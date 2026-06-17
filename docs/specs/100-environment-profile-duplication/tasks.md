@@ -9,7 +9,7 @@
 
 ## Phase 1: Safe Read Models
 
-- [ ] ENV-PROFILE-DUP-001: add `environments.plan-duplicate` operation catalog entry, query,
+- [x] ENV-PROFILE-DUP-001: add `environments.plan-duplicate` operation catalog entry, query,
   schema, handler, query service, CLI/API contract tests, and docs.
 - [ ] ENV-PROFILE-DUP-008: add `environments.diff-profile` operation catalog entry, query,
   schema, handler, query service, CLI/API contract tests, and docs.
@@ -19,15 +19,19 @@
 
 ## Phase 2: Duplicate Apply
 
-- [ ] ENV-PROFILE-DUP-002: implement `create-new-managed` dependency decision through public
-  neutral dependency resource commands/ports.
-- [ ] ENV-PROFILE-DUP-003: implement `reuse-source` decision with explicit acknowledgement and
-  shared-source warning readback.
-- [ ] ENV-PROFILE-DUP-004: implement `bind-existing` decision with safe dependency readback.
+- [x] Add first `environments.duplicate-profile` apply slice: require reviewed dependency
+  decisions before mutation, dispatch `environments.clone`, dispatch `resources.create` for copied
+  resource shape, and return deferred decisions for unsupported profile parts.
+- [ ] ENV-PROFILE-DUP-002: implement provider-backed `create-new-managed` dependency realization
+  through public neutral dependency resource commands/ports.
+- [ ] ENV-PROFILE-DUP-003: implement provider-backed `reuse-source` binding with explicit
+  acknowledgement and shared-source warning readback.
+- [ ] ENV-PROFILE-DUP-004: implement provider-backed `bind-existing` decision with safe dependency
+  readback and binding command dispatch.
 - [ ] ENV-PROFILE-DUP-005: persist or project unresolved decisions and block deployment admission.
 - [ ] ENV-PROFILE-DUP-006 / ENV-PROFILE-DUP-007: implement route regeneration/defer and storage
   requirement decisions.
-- [ ] Add API/CLI/Web staged apply surfaces for `environments.duplicate-profile`.
+- [ ] Add Web staged apply surface for `environments.duplicate-profile`.
 
 ## Phase 3: Sync And Promote
 

@@ -1,15 +1,43 @@
 import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
-import { ok } from "@appaloft/core";
+import {
+  CreatedAt,
+  DestinationId,
+  EnvironmentId,
+  ok,
+  PortNumber,
+  ProjectId,
+  Resource,
+  ResourceExposureModeValue,
+  ResourceId,
+  ResourceKindValue,
+  ResourceName,
+  ResourceNetworkProtocolValue,
+  ResourceServiceKindValue,
+  ResourceServiceName,
+  RuntimePlanStrategyValue,
+} from "@appaloft/core";
 import { FixedClock } from "@appaloft/testkit";
 
-import { createExecutionContext, type EnvironmentReadModel, type ResourceReadModel } from "../src";
+import {
+  type Command as AppCommand,
+  CloneEnvironmentCommand,
+  type CommandBus,
+  CreateResourceCommand,
+  createExecutionContext,
+  type EnvironmentReadModel,
+  type ResourceReadModel,
+} from "../src";
 import {
   type DependencyResourceReadModel,
   type ResourceDependencyBindingReadModel,
+  type ResourceRepository,
 } from "../src/ports";
-import { PlanDuplicateEnvironmentQueryService } from "../src/use-cases";
+import {
+  DuplicateEnvironmentProfileUseCase,
+  PlanDuplicateEnvironmentQueryService,
+} from "../src/use-cases";
 
 const sourceEnvironment = {
   id: "env_prod",
@@ -181,6 +209,73 @@ function createQueryService(input?: {
   );
 }
 
+function createSourceResource() {
+  return Resource.create({
+    id: ResourceId.rehydrate("res_web"),
+    projectId: ProjectId.rehydrate("prj_demo"),
+    environmentId: EnvironmentId.rehydrate("env_prod"),
+    destinationId: DestinationId.rehydrate("dst_demo"),
+    name: ResourceName.rehydrate("Web"),
+    kind: ResourceKindValue.rehydrate("application"),
+    services: [
+      {
+        name: ResourceServiceName.rehydrate("web"),
+        kind: ResourceServiceKindValue.rehydrate("web"),
+      },
+    ],
+    runtimeProfile: {
+      strategy: RuntimePlanStrategyValue.rehydrate("workspace-commands"),
+    },
+    networkProfile: {
+      internalPort: PortNumber.rehydrate(3000),
+      upstreamProtocol: ResourceNetworkProtocolValue.rehydrate("http"),
+      exposureMode: ResourceExposureModeValue.rehydrate("reverse-proxy"),
+    },
+    createdAt: CreatedAt.rehydrate("2026-01-01T00:00:01.000Z"),
+  })._unsafeUnwrap();
+}
+
+function createResourceRepository(): ResourceRepository {
+  const sourceResource = createSourceResource();
+  return {
+    async findOne(_context, spec) {
+      if (specName(spec) !== "ResourceByIdSpec") {
+        return null;
+      }
+      return (spec as unknown as { id: { value: string } }).id.value === "res_web"
+        ? sourceResource
+        : null;
+    },
+    async upsert() {},
+  };
+}
+
+function createCommandBus(commands: AppCommand<unknown>[]): CommandBus {
+  return {
+    async execute<T>(_context: unknown, command: AppCommand<T>) {
+      commands.push(command as AppCommand<unknown>);
+      if (command instanceof CloneEnvironmentCommand) {
+        return ok({ id: "env_staging" } as T);
+      }
+      if (command instanceof CreateResourceCommand) {
+        return ok({ id: "res_web_staging" } as T);
+      }
+      return ok({} as T);
+    },
+  } as CommandBus;
+}
+
+function createApplyUseCase(commands: AppCommand<unknown>[] = []) {
+  return new DuplicateEnvironmentProfileUseCase(
+    createCommandBus(commands),
+    createEnvironmentReadModel(),
+    resourceReadModel,
+    createResourceRepository(),
+    dependencyResourceReadModel,
+    new FixedClock("2026-01-01T00:00:10.000Z"),
+  );
+}
+
 describe("environment profile duplication plan query", () => {
   test("[ENV-PROFILE-DUP-001] [ENV-PROFILE-DUP-003] builds a plan with dependency decisions", async () => {
     const queryService = createQueryService();
@@ -277,6 +372,100 @@ describe("environment profile duplication plan query", () => {
         entity: "environment",
         id: "env_missing",
       },
+    });
+  });
+});
+
+describe("environment profile duplication apply command", () => {
+  test("[ENV-PROFILE-DUP-002] rejects missing dependency decisions before mutation", async () => {
+    const commands: AppCommand<unknown>[] = [];
+    const result = await createApplyUseCase(commands).execute(
+      createExecutionContext({
+        requestId: "req_env_duplicate_apply_missing",
+        entrypoint: "system",
+      }),
+      {
+        environmentId: "env_prod",
+        targetName: "staging",
+      },
+    );
+
+    expect(result.isErr()).toBe(true);
+    expect(commands).toHaveLength(0);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "validation_error",
+      details: {
+        phase: "environment-profile-duplication-admission",
+        missingDependencyResourceIds: ["rsi_pg", "rsi_external_pg"],
+      },
+    });
+  });
+
+  test("[ENV-PROFILE-DUP-003] [ENV-PROFILE-DUP-004] dispatches reviewed clone and resource shape commands", async () => {
+    const commands: AppCommand<unknown>[] = [];
+    const result = await createApplyUseCase(commands).execute(
+      createExecutionContext({ requestId: "req_env_duplicate_apply", entrypoint: "system" }),
+      {
+        environmentId: "env_prod",
+        targetName: "staging",
+        dependencyDecisions: [
+          { dependencyResourceId: "rsi_pg", decision: "create-new-managed" },
+          {
+            dependencyResourceId: "rsi_external_pg",
+            decision: "bind-existing",
+            targetDependencyResourceId: "rsi_external_pg_staging",
+          },
+        ],
+      },
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(commands).toHaveLength(2);
+    expect(commands[0]).toBeInstanceOf(CloneEnvironmentCommand);
+    expect(commands[0]).toMatchObject({
+      environmentId: "env_prod",
+      targetName: "staging",
+    });
+    expect(commands[1]).toBeInstanceOf(CreateResourceCommand);
+    expect(commands[1]).toMatchObject({
+      projectId: "prj_demo",
+      environmentId: "env_staging",
+      destinationId: "dst_demo",
+      name: "Web",
+      kind: "application",
+      services: [{ name: "web", kind: "web" }],
+      runtimeProfile: { strategy: "workspace-commands" },
+      networkProfile: {
+        internalPort: 3000,
+        upstreamProtocol: "http",
+        exposureMode: "reverse-proxy",
+      },
+    });
+    expect(result._unsafeUnwrap()).toMatchObject({
+      schemaVersion: "environments.duplicate-profile/v1",
+      sourceEnvironmentId: "env_prod",
+      targetEnvironmentId: "env_staging",
+      copiedResources: [
+        {
+          sourceResourceId: "res_web",
+          targetResourceId: "res_web_staging",
+          name: "Web",
+          slug: "web",
+        },
+      ],
+      deferredDecisions: [
+        expect.objectContaining({
+          kind: "dependency",
+          sourceId: "rsi_pg",
+          decision: "create-new-managed",
+        }),
+        expect.objectContaining({
+          kind: "dependency",
+          sourceId: "rsi_external_pg",
+          decision: "bind-existing",
+        }),
+      ],
+      generatedAt: "2026-01-01T00:00:10.000Z",
     });
   });
 });

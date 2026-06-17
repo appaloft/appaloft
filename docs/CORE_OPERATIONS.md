@@ -310,6 +310,7 @@ Implemented operations:
 | Read environment effective precedence | Query | `environments.effective-precedence` | `EnvironmentEffectivePrecedenceQuery` | `EnvironmentEffectivePrecedenceQueryInput` | `appaloft env effective-precedence <environmentId>` | `GET /api/environments/{environmentId}/effective-precedence` |
 | Diff environments | Query | `environments.diff` | `DiffEnvironmentsQuery` | `DiffEnvironmentsQueryInput` | `appaloft env diff <environmentId> <otherEnvironmentId>` | `GET /api/environments/{environmentId}/diff/{otherEnvironmentId}` |
 | Plan environment profile duplication | Query | `environments.plan-duplicate` | `PlanDuplicateEnvironmentQuery` | `PlanDuplicateEnvironmentQueryInput` | `appaloft env duplicate plan <environmentId> --name <targetName>` | `GET /api/environments/{environmentId}/duplicate-plan` |
+| Apply environment profile duplication | Command | `environments.duplicate-profile` | `DuplicateEnvironmentProfileCommand` | `DuplicateEnvironmentProfileCommandInput` | `appaloft env duplicate apply <environmentId> --name <targetName>` | `POST /api/environments/{environmentId}/duplicate-profile` |
 | Clone environment | Command | `environments.clone` | `CloneEnvironmentCommand` | `CloneEnvironmentCommandInput` | `appaloft env clone <environmentId> --name <targetName>` | `POST /api/environments/{environmentId}/clone` |
 | Promote environment | Command | `environments.promote` | `PromoteEnvironmentCommand` | `PromoteEnvironmentCommandInput` | `appaloft env promote <environmentId> <targetName>` | `POST /api/environments/{environmentId}/promote` |
 | Lock environment | Command | `environments.lock` | `LockEnvironmentCommand` | `LockEnvironmentCommandInput` | `appaloft env lock <environmentId> --reason <reason>` | `POST /api/environments/{environmentId}/lock` |
@@ -319,8 +320,6 @@ Implemented operations:
 Core next operations expected here:
 - list environment change history
 - restore/delete and lifecycle history
-- `environments.duplicate-profile` to apply an accepted plan by dispatching explicit child
-  commands for target environment, resource, dependency, variable, route, storage, and policy work
 - `environments.diff-profile` to compare environment shape across resources, profiles, variables,
   dependency bindings, routes, storage requirements, and pending decisions with secret values masked
 - `environments.sync-profile` to import selected shape changes from one environment into another

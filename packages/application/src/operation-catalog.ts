@@ -89,6 +89,7 @@ import { cloneEnvironmentCommandInputSchema } from "./operations/environments/cl
 import { countEnvironmentsQueryInputSchema } from "./operations/environments/count-environments.query";
 import { createEnvironmentCommandInputSchema } from "./operations/environments/create-environment.command";
 import { diffEnvironmentsQueryInputSchema } from "./operations/environments/diff-environments.query";
+import { duplicateEnvironmentProfileCommandInputSchema } from "./operations/environments/duplicate-environment-profile.command";
 import { environmentEffectivePrecedenceQueryInputSchema } from "./operations/environments/environment-effective-precedence.query";
 import { listEnvironmentsQueryInputSchema } from "./operations/environments/list-environments.query";
 import { lockEnvironmentCommandInputSchema } from "./operations/environments/lock-environment.command";
@@ -2905,6 +2906,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft env clone <environmentId> --name <targetName>",
       orpc: { method: "POST", path: "/api/environments/{environmentId}/clone" },
+    },
+  },
+  {
+    key: "environments.duplicate-profile",
+    kind: "command",
+    domain: "environments",
+    messageName: "DuplicateEnvironmentProfileCommand",
+    handlerName: "DuplicateEnvironmentProfileCommandHandler",
+    serviceName: "DuplicateEnvironmentProfileUseCase",
+    inputSchema: duplicateEnvironmentProfileCommandInputSchema,
+    serviceToken: tokens.duplicateEnvironmentProfileUseCase,
+    transports: {
+      cli: "appaloft env duplicate apply <environmentId> --name <targetName>",
+      orpc: { method: "POST", path: "/api/environments/{environmentId}/duplicate-profile" },
     },
   },
   {

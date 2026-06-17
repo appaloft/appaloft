@@ -3,6 +3,8 @@ import {
   CloneEnvironmentCommand,
   CreateEnvironmentCommand,
   DiffEnvironmentsQuery,
+  DuplicateEnvironmentProfileCommand,
+  type DuplicateEnvironmentProfileCommandInput,
   EnvironmentEffectivePrecedenceQuery,
   ListEnvironmentsQuery,
   LockEnvironmentCommand,
@@ -32,6 +34,8 @@ const kindOption = Options.choice("kind", environmentKinds);
 const parentOption = Options.text("parent").pipe(Options.optional);
 const archiveReasonOption = Options.text("reason").pipe(Options.optional);
 const cloneKindOption = Options.choice("kind", environmentKinds).pipe(Options.optional);
+const dependencyDecisionsOption = Options.text("dependency-decisions").pipe(Options.optional);
+const resourceDecisionsOption = Options.text("resource-decisions").pipe(Options.optional);
 const lockReasonOption = Options.text("reason").pipe(Options.optional);
 const exposureOption = Options.choice("exposure", variableExposures);
 const scopeOption = Options.choice("scope", configScopes).pipe(Options.optional);
@@ -231,9 +235,36 @@ const duplicatePlanCommand = EffectCommand.make(
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.environmentDuplicatePlan));
 
+const duplicateApplyCommand = EffectCommand.make(
+  "apply",
+  {
+    environmentId: environmentIdArg,
+    name: nameOption,
+    kind: cloneKindOption,
+    dependencyDecisions: dependencyDecisionsOption,
+    resourceDecisions: resourceDecisionsOption,
+  },
+  ({ dependencyDecisions, environmentId, kind, name, resourceDecisions }) =>
+    runCommand(
+      DuplicateEnvironmentProfileCommand.create({
+        environmentId,
+        targetName: name,
+        targetKind: optionalValue(kind),
+        dependencyDecisions: parseJsonArrayOption(
+          optionalValue(dependencyDecisions),
+          "dependency-decisions",
+        ) as DuplicateEnvironmentProfileCommandInput["dependencyDecisions"],
+        resourceDecisions: parseJsonArrayOption(
+          optionalValue(resourceDecisions),
+          "resource-decisions",
+        ) as DuplicateEnvironmentProfileCommandInput["resourceDecisions"],
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.environmentDuplicateApply));
+
 const duplicateCommand = EffectCommand.make("duplicate").pipe(
   EffectCommand.withDescription(cliCommandDescriptions.environmentDuplicate),
-  EffectCommand.withSubcommands([duplicatePlanCommand]),
+  EffectCommand.withSubcommands([duplicatePlanCommand, duplicateApplyCommand]),
 );
 
 const effectivePrecedenceCommand = EffectCommand.make(
@@ -280,3 +311,15 @@ export const envCommand = EffectCommand.make("env").pipe(
     promoteCommand,
   ]),
 );
+
+function parseJsonArrayOption(text: string | undefined, optionName: string): unknown[] {
+  if (!text?.trim()) {
+    return [];
+  }
+
+  const parsed = JSON.parse(text) as unknown;
+  if (!Array.isArray(parsed)) {
+    throw new Error(`--${optionName} must be a JSON array`);
+  }
+  return parsed;
+}
