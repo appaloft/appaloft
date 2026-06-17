@@ -84,6 +84,7 @@ const remoteCapableTopLevelCommands = new Set([
   "domain-binding",
   "domain-event",
   "env",
+  "infrastructure",
   "logs",
   "operator-work",
   "organization",

@@ -21,6 +21,10 @@ export interface DefaultConnectorOptions {
     configured?: boolean;
     documentationHref?: string;
   };
+  vultrInfrastructure?: {
+    configured?: boolean;
+    documentationHref?: string;
+  };
 }
 
 export function createDefaultConnectorDefinitions(
@@ -145,8 +149,20 @@ export function createDefaultConnectorDefinitions(
           storesLongLivedSecret: true,
         },
       ],
-      availability: deferred("Infrastructure provider mutation is planned but not enabled."),
+      availability: options.vultrInfrastructure?.configured
+        ? ConnectorAvailabilityValue.available(
+            "Vultr infrastructure connector is configured.",
+          ).toJSON()
+        : unavailable(
+            "connector.vultr_infrastructure.not_configured",
+            "Vultr infrastructure requires a provider credential or secret reference.",
+          ),
       visibility: "hidden-when-unavailable",
+      setup: {
+        ...(options.vultrInfrastructure?.documentationHref
+          ? { documentationHref: options.vultrInfrastructure.documentationHref }
+          : {}),
+      },
     },
     {
       key: "slack-notification",

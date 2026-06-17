@@ -6565,6 +6565,22 @@ export const dnsRecordPlanSchema = z.object({
   conflicts: z.array(dnsRecordConflictSchema),
 });
 
+export const infrastructureServerProposalSchema = z.object({
+  providerKey: z.string(),
+  region: z.string(),
+  size: z.string(),
+  image: z.string(),
+  recommendedServerName: z.string(),
+  osUser: z.string(),
+  sshPort: z.number().int().positive(),
+  sshPublicKeyRef: z.string().optional(),
+  estimatedMonthlyCostUsd: z.number().nonnegative().optional(),
+  costRiskLevel: z.enum(["low", "medium", "high"]),
+  cleanupSupported: z.boolean(),
+  notes: z.array(z.string()),
+  tags: z.array(z.string()),
+});
+
 export const dnsRecordApplySchema = z.object({
   zoneName: z.string().optional(),
   status: z.enum(["applied", "verified", "cleaned-up", "conflict", "skipped"]),
@@ -6606,6 +6622,7 @@ export const connectorCapabilityPlanPreviewSchema = z.object({
     .object({
       kind: z.string(),
       dnsRecords: dnsRecordPlanSchema.optional(),
+      infrastructureServerProposal: infrastructureServerProposalSchema.optional(),
     })
     .optional(),
 });
@@ -6843,6 +6860,7 @@ export type DnsRecordRequirement = z.infer<typeof dnsRecordRequirementSchema>;
 export type DnsRecordConflict = z.infer<typeof dnsRecordConflictSchema>;
 export type DnsRecordPlan = z.infer<typeof dnsRecordPlanSchema>;
 export type DnsRecordApply = z.infer<typeof dnsRecordApplySchema>;
+export type InfrastructureServerProposal = z.infer<typeof infrastructureServerProposalSchema>;
 export type ConnectorCapabilityPlanPreview = z.infer<typeof connectorCapabilityPlanPreviewSchema>;
 export type ConnectorCapabilityApplyResult = z.infer<typeof connectorCapabilityApplyResultSchema>;
 export type PluginSummary = z.infer<typeof pluginSummarySchema>;
