@@ -25,7 +25,7 @@
 - [x] APP-CONN-012: add no billing ledger mutation test.
 - [x] APP-CONN-013: add tool/operation no-secret exposure test.
 - [x] APP-CONN-014: add CLI/HTTP operation parity tests.
-- [ ] APP-CONN-015: add Web flow test after UI scope is accepted.
+- [x] APP-CONN-015: add Web extension metadata test after UI scope is accepted.
 - [x] APP-CONN-016: add fake DNS provider adapter contract tests.
 
 ## Implementation
@@ -43,7 +43,7 @@
 - [x] Add persistent DNS apply/verify/cleanup provider contracts.
 - [x] Add DNS temporary setup provider contract.
 - [x] Add CLI and HTTP surfaces for catalog, connection lifecycle, DNS planning, DNS apply/verify/cleanup, and infrastructure proposal planning.
-- [ ] Add Web central/contextual surfaces.
+- [x] Add Web central/contextual extension metadata for Connections console pages.
 
 ## Verification
 
