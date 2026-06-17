@@ -238,6 +238,8 @@ import {
   ListAuditEventsQuery,
   ListBlueprintsQuery,
   ListCertificatesQuery,
+  ListConnectorCategoriesQuery,
+  ListConnectorsQuery,
   ListDefaultAccessDomainPoliciesQuery,
   ListDependencyResourceBackupPoliciesQuery,
   ListDependencyResourceBackupsQuery,
@@ -281,6 +283,7 @@ import {
   listAuditEventLegalHoldsQueryInputSchema,
   listAuditEventsQueryInputSchema,
   listCertificatesQueryInputSchema,
+  listConnectorsQueryInputSchema,
   listDefaultAccessDomainPoliciesQueryInputSchema,
   listDependencyResourceBackupPoliciesQueryInputSchema,
   listDependencyResourceBackupsQueryInputSchema,
@@ -675,6 +678,8 @@ import {
   listAuditEventLegalHoldsResponseSchema,
   listAuditEventsResponseSchema,
   listCertificatesResponseSchema,
+  listConnectorCategoriesResponseSchema,
+  listConnectorsResponseSchema,
   listDefaultAccessDomainPoliciesResponseSchema,
   listDependencyResourceBackupPoliciesResponseSchema,
   listDependencyResourceBackupsResponseSchema,
@@ -6182,6 +6187,25 @@ export const expireTerminalSessionsProcedure = base
     executeCommand(context, ExpireTerminalSessionsCommand.create(input)),
   );
 
+export const listConnectorCategoriesProcedure = base
+  .route({
+    method: "GET",
+    path: "/connections/categories",
+    successStatus: 200,
+  })
+  .output(listConnectorCategoriesResponseSchema)
+  .handler(async ({ context }) => executeQuery(context, ListConnectorCategoriesQuery.create()));
+
+export const listConnectorsProcedure = base
+  .route({
+    method: "GET",
+    path: "/connections/catalog",
+    successStatus: 200,
+  })
+  .input(listConnectorsQueryInputSchema)
+  .output(listConnectorsResponseSchema)
+  .handler(async ({ input, context }) => executeQuery(context, ListConnectorsQuery.create(input)));
+
 export const listProvidersProcedure = base
   .route({
     method: "GET",
@@ -6603,6 +6627,14 @@ export const appaloftOrpcRouter = {
     list: listPreviewEnvironmentsProcedure,
     show: showPreviewEnvironmentProcedure,
     delete: deletePreviewEnvironmentProcedure,
+  },
+  connections: {
+    categories: {
+      list: listConnectorCategoriesProcedure,
+    },
+    catalog: {
+      list: listConnectorsProcedure,
+    },
   },
   providers: {
     list: listProvidersProcedure,
@@ -9007,6 +9039,8 @@ export function mountAppaloftOrpcRoutes(
     "/api/blueprints/:slug/install-plan",
     "/api/blueprints/:slug/install",
     "/api/blueprints/installations/:applicationId",
+    "/api/connections/categories",
+    "/api/connections/catalog",
     "/api/projects",
     "/api/projects/:projectId",
     "/api/projects/:projectId/rename",

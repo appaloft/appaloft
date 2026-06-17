@@ -48,6 +48,7 @@ import {
   type CertificateProviderPort,
   type Clock,
   CommandBus,
+  createDefaultConnectorDefinitions,
   type DefaultAccessDomainPolicyRepository,
   DefaultAccessDomainRuntimePlanResolver,
   type DependencyResourceBackupPolicyRepository,
@@ -62,6 +63,8 @@ import {
   type FirstAdminPasswordIssuer,
   getExecutionAuthProviderAccessToken,
   type IdGenerator,
+  InMemoryConnectorProviderAdapterRegistry,
+  InMemoryConnectorRegistry,
   InMemoryEdgeProxyProviderRegistry,
   type IntegrationAuthPort,
   type MutationCoordinator,
@@ -1723,6 +1726,24 @@ export function registerRuntimeDependencies(
           acmeCertificateProvider,
         ]),
     ),
+  });
+  container.register(tokens.connectorRegistry, {
+    useFactory: instanceCachingFactory(
+      () =>
+        new InMemoryConnectorRegistry(
+          createDefaultConnectorDefinitions({
+            githubSource: {
+              configured: Boolean(input.config.githubAppId),
+              ...(input.config.githubAppInstallUrl
+                ? { installUrl: input.config.githubAppInstallUrl }
+                : {}),
+            },
+          }),
+        ),
+    ),
+  });
+  container.register(tokens.connectorProviderAdapterRegistry, {
+    useFactory: instanceCachingFactory(() => new InMemoryConnectorProviderAdapterRegistry([])),
   });
   container.register(tokens.integrationRegistry, {
     useFactory: instanceCachingFactory(

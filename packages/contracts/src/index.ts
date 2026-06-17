@@ -6429,6 +6429,73 @@ export const integrationDescriptorSchema = z.object({
   configuration: systemConfigurationSummarySchema.optional(),
 });
 
+export const connectionCategorySchema = z.object({
+  key: z.enum([
+    "source",
+    "dns",
+    "infrastructure",
+    "notification",
+    "billing",
+    "identity",
+    "observability",
+    "storage",
+  ]),
+  title: z.string(),
+  description: z.string(),
+});
+
+export const credentialGrantKindSchema = z.enum([
+  "temporary-domain-connect",
+  "limited-oauth-grant",
+  "persistent-provider-credential",
+  "provider-app-installation",
+  "manual-secret-reference",
+]);
+
+export const connectorCapabilitySchema = z.object({
+  key: z.string(),
+  title: z.string(),
+  description: z.string().optional(),
+  implemented: z.boolean(),
+});
+
+export const credentialGrantSchema = z.object({
+  kind: credentialGrantKindSchema,
+  title: z.string(),
+  storesLongLivedSecret: z.boolean(),
+  description: z.string().optional(),
+});
+
+export const connectorAvailabilitySchema = z.object({
+  status: z.enum(["available", "setup-required", "unavailable", "deferred"]),
+  diagnostics: z.array(systemConfigurationDiagnosticSchema),
+});
+
+export const connectorDescriptorSchema = z.object({
+  key: z.string(),
+  title: z.string(),
+  category: connectionCategorySchema.shape.key,
+  providerKey: z.string(),
+  capabilities: z.array(connectorCapabilitySchema),
+  grantKinds: z.array(credentialGrantSchema),
+  availability: connectorAvailabilitySchema,
+  visibility: z.enum(["catalog", "hidden-when-unavailable", "internal"]),
+  setup: z
+    .object({
+      connectHref: z.string().optional(),
+      documentationHref: z.string().optional(),
+    })
+    .optional(),
+});
+
+export const listConnectorCategoriesResponseSchema = z.object({
+  items: z.array(connectionCategorySchema),
+});
+
+export const listConnectorsResponseSchema = z.object({
+  items: z.array(connectorDescriptorSchema),
+});
+
 export const listProvidersResponseSchema = z.object({
   items: z.array(providerDescriptorSchema),
 });
@@ -6583,6 +6650,9 @@ export type DeleteAccountResponse = z.infer<typeof deleteAccountResponseSchema>;
 export type GitHubRepositorySummary = z.infer<typeof githubRepositorySummarySchema>;
 export type GitHubAppConnectionResponse = z.infer<typeof githubAppConnectionResponseSchema>;
 export type IntegrationDescriptor = z.infer<typeof integrationDescriptorSchema>;
+export type ConnectionCategory = z.infer<typeof connectionCategorySchema>;
+export type CredentialGrantKind = z.infer<typeof credentialGrantKindSchema>;
+export type ConnectorDescriptor = z.infer<typeof connectorDescriptorSchema>;
 export type PluginSummary = z.infer<typeof pluginSummarySchema>;
 export type SystemPluginWebExtension = z.infer<typeof systemPluginWebExtensionSchema>;
 export type MaintenanceWorkerActivation = z.infer<typeof maintenanceWorkerActivationSchema>;
@@ -7236,6 +7306,8 @@ export type ExpireTerminalSessionsResponse = z.infer<typeof expireTerminalSessio
 export type TerminalSessionFrame = z.infer<typeof terminalSessionFrameSchema>;
 export type ResourceDiagnosticSummary = z.infer<typeof resourceDiagnosticSummarySchema>;
 export type ProxyConfigurationView = z.infer<typeof proxyConfigurationViewSchema>;
+export type ListConnectorCategoriesResponse = z.infer<typeof listConnectorCategoriesResponseSchema>;
+export type ListConnectorsResponse = z.infer<typeof listConnectorsResponseSchema>;
 export type ListProvidersResponse = z.infer<typeof listProvidersResponseSchema>;
 export type ListIntegrationsResponse = z.infer<typeof listIntegrationsResponseSchema>;
 export type ListPluginsResponse = z.infer<typeof listPluginsResponseSchema>;

@@ -8,6 +8,8 @@ import {
   type CertificateSource,
   type CertificateStatus,
   type ConfigScope,
+  type ConnectionCategoryKey,
+  type ConnectorDefinitionSnapshot,
   type DependencyResourceBackup,
   type DependencyResourceBackupMutationSpec,
   type DependencyResourceBackupSelectionSpec,
@@ -9521,6 +9523,60 @@ export interface IntegrationSetupDescriptor {
 export interface IntegrationRegistry {
   list(): IntegrationDescriptor[];
   findByKey(key: string): IntegrationDescriptor | null;
+}
+
+export type ConnectorDescriptor = ConnectorDefinitionSnapshot;
+
+export interface ConnectorRegistryListInput {
+  category?: ConnectionCategoryKey;
+  includeUnavailable?: boolean;
+}
+
+export interface ConnectorRegistry {
+  list(input?: ConnectorRegistryListInput): ConnectorDescriptor[];
+  findByKey(key: string): ConnectorDescriptor | null;
+}
+
+export interface ConnectorCapabilityPlanInput {
+  connectorKey: string;
+  capabilityKey: string;
+  ownerRef?: {
+    scope: "account" | "organization" | "project" | "environment" | "resource" | "operator";
+    id: string;
+  };
+  parameters?: Record<string, unknown>;
+}
+
+export interface ConnectorCapabilityPlanPreview {
+  planId: string;
+  connectorKey: string;
+  capabilityKey: string;
+  riskLevel: "low" | "medium" | "high";
+  requiresExplicitAcceptance: boolean;
+  summary: string;
+  effects: {
+    kind: string;
+    title: string;
+    description?: string;
+  }[];
+  cleanup?: {
+    supported: boolean;
+    description?: string;
+  };
+}
+
+export interface ConnectorProviderAdapter {
+  readonly connectorKey: string;
+  canPlan(capabilityKey: string): boolean;
+  planCapability(
+    context: ExecutionContext,
+    input: ConnectorCapabilityPlanInput,
+  ): Promise<Result<ConnectorCapabilityPlanPreview>>;
+}
+
+export interface ConnectorProviderAdapterRegistry {
+  list(): ConnectorProviderAdapter[];
+  findForConnector(connectorKey: string): ConnectorProviderAdapter | null;
 }
 
 export interface IntegrationAuthPort {

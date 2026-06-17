@@ -254,6 +254,7 @@ import { showStorageVolumeBackupQueryInputSchema } from "./operations/storage-vo
 import { applyInstanceUpgradeCommandInputSchema } from "./operations/system/apply-instance-upgrade.command";
 import { checkInstanceUpgradeQueryInputSchema } from "./operations/system/check-instance-upgrade.query";
 import { githubAppConnectionQueryInputSchema } from "./operations/system/github-app-connection.query";
+import { listConnectorsQueryInputSchema } from "./operations/system/list-connectors.query";
 import { listGitHubRepositoriesQueryInputSchema } from "./operations/system/list-github-repositories.query";
 import { closeTerminalSessionCommandInputSchema } from "./operations/terminal-sessions/close-terminal-session.command";
 import { expireTerminalSessionsCommandInputSchema } from "./operations/terminal-sessions/expire-terminal-sessions.command";
@@ -297,6 +298,7 @@ type OperationDomain =
   | "source-events"
   | "source-links"
   | "static-artifacts"
+  | "connections"
   | "system"
   | "terminal-sessions";
 
@@ -4038,6 +4040,39 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft certificate delete <certificateId> --confirm <certificateId>",
       orpc: { method: "DELETE", path: "/api/certificates/{certificateId}" },
+    },
+  },
+  {
+    key: "connections.categories.list",
+    kind: "query",
+    domain: "connections",
+    messageName: "ListConnectorCategoriesQuery",
+    handlerName: "ListConnectorCategoriesQueryHandler",
+    serviceName: "ListConnectorCategoriesQueryService",
+    serviceToken: tokens.connectorCategoriesQueryService,
+    transportAccess: {
+      productSession: "public",
+    },
+    transports: {
+      cli: "appaloft connectors categories",
+      orpc: { method: "GET", path: "/api/connections/categories" },
+    },
+  },
+  {
+    key: "connections.catalog.list",
+    kind: "query",
+    domain: "connections",
+    messageName: "ListConnectorsQuery",
+    handlerName: "ListConnectorsQueryHandler",
+    serviceName: "ListConnectorsQueryService",
+    inputSchema: listConnectorsQueryInputSchema,
+    serviceToken: tokens.connectorsQueryService,
+    transportAccess: {
+      productSession: "public",
+    },
+    transports: {
+      cli: "appaloft connectors catalog",
+      orpc: { method: "GET", path: "/api/connections/catalog" },
     },
   },
   {

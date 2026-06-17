@@ -231,6 +231,10 @@ import {
   ListBlueprintsQueryHandler,
   ListCertificatesQueryHandler,
   ListCertificatesQueryService,
+  ListConnectorCategoriesQueryHandler,
+  ListConnectorCategoriesQueryService,
+  ListConnectorsQueryHandler,
+  ListConnectorsQueryService,
   ListDefaultAccessDomainPoliciesQueryHandler,
   ListDefaultAccessDomainPoliciesQueryService,
   ListDependencyResourceBackupPoliciesQueryHandler,
@@ -1581,6 +1585,8 @@ export function registerApplicationServices(
   container.registerSingleton(MarkDomainRouteFailedOnDeploymentFinishedHandler);
   container.registerSingleton(MarkServerAppliedRouteStatusOnDeploymentFinishedHandler);
   container.registerSingleton(IssueCertificateOnCertificateRequestedHandler);
+  container.registerSingleton(ListConnectorCategoriesQueryHandler);
+  container.registerSingleton(ListConnectorsQueryHandler);
   container.registerSingleton(ListBlueprintsQueryHandler);
   container.registerSingleton(ShowBlueprintQueryHandler);
   container.registerSingleton(CreateBlueprintInstallPlanQueryHandler);
@@ -2518,6 +2524,11 @@ export function registerApplicationServices(
     ResourceProxyConfigurationPreviewQueryService,
   );
   container.registerSingleton(tokens.providersQueryService, ListProvidersQueryService);
+  container.registerSingleton(tokens.connectorsQueryService, ListConnectorsQueryService);
+  container.registerSingleton(
+    tokens.connectorCategoriesQueryService,
+    ListConnectorCategoriesQueryService,
+  );
   container.registerSingleton(tokens.pluginsQueryService, ListPluginsQueryService);
   container.registerSingleton(tokens.blueprintCatalogQueryService, BlueprintCatalogQueryService);
   container.registerSingleton(
