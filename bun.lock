@@ -481,6 +481,13 @@
         "@appaloft/core": "workspace:*",
       },
     },
+    "packages/providers/dns-cloudflare": {
+      "name": "@appaloft/provider-dns-cloudflare",
+      "dependencies": {
+        "@appaloft/application": "workspace:*",
+        "@appaloft/core": "workspace:*",
+      },
+    },
     "packages/providers/edge-proxy-caddy": {
       "name": "@appaloft/provider-edge-proxy-caddy",
       "dependencies": {
@@ -695,6 +702,8 @@
     "@appaloft/provider-core": ["@appaloft/provider-core@workspace:packages/providers/core"],
 
     "@appaloft/provider-default-access-domain-sslip": ["@appaloft/provider-default-access-domain-sslip@workspace:packages/providers/default-access-domain-sslip"],
+
+    "@appaloft/provider-dns-cloudflare": ["@appaloft/provider-dns-cloudflare@workspace:packages/providers/dns-cloudflare"],
 
     "@appaloft/provider-edge-proxy-caddy": ["@appaloft/provider-edge-proxy-caddy@workspace:packages/providers/edge-proxy-caddy"],
 
