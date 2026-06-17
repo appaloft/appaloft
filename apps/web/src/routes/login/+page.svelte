@@ -12,6 +12,7 @@
   import GitHubIcon from "$lib/components/console/GitHubIcon.svelte";
   import { Input } from "$lib/components/ui/input";
   import { buildApiUrl, request } from "$lib/api/client";
+  import { isPublicGitHubAuthConfigured } from "$lib/auth-public-config";
   import { i18nKeys, localeHeaders, t } from "$lib/i18n";
 
   let email = $state("");
@@ -30,9 +31,7 @@
       retry: 0,
     }),
   );
-  const githubConfigured = $derived(
-    Boolean(authSessionQuery.data?.providers.find((provider) => provider.key === "github")?.configured),
-  );
+  const githubConfigured = isPublicGitHubAuthConfigured();
   const requiresEmailOtpVerification = $derived(
     Boolean(
       authSessionQuery.data?.emailVerification.required &&
