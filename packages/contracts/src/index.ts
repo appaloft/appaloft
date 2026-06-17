@@ -123,6 +123,22 @@ export const authProviderStatusSchema = z.object({
   reason: z.string().optional(),
 });
 
+export const authPublicProviderStatusSchema = z.object({
+  key: z.enum(["github", "google", "oidc"]),
+  title: z.string(),
+  configured: z.boolean(),
+  deferred: z.boolean(),
+  connectPath: z.string().optional(),
+  reason: z.string().optional(),
+});
+
+export const authPublicConfigSchema = z.object({
+  schemaVersion: z.literal("appaloft.auth.public-config/v1"),
+  enabled: z.boolean(),
+  provider: z.enum(["none", "better-auth"]),
+  providers: z.array(authPublicProviderStatusSchema),
+});
+
 export const authEmailVerificationStatusSchema = z.object({
   changeEmail: z
     .object({
@@ -6757,6 +6773,8 @@ export type InstanceUpgradeCheckResponse = z.infer<typeof instanceUpgradeCheckRe
 export type ApplyInstanceUpgradeInput = z.infer<typeof applyInstanceUpgradeInputSchema>;
 export type InstanceUpgradeApplyResponse = z.infer<typeof instanceUpgradeApplyResponseSchema>;
 export type AuthProviderStatus = z.infer<typeof authProviderStatusSchema>;
+export type AuthPublicProviderStatus = z.infer<typeof authPublicProviderStatusSchema>;
+export type AuthPublicConfig = z.infer<typeof authPublicConfigSchema>;
 export type AuthAccountRecoveryStatus = z.infer<typeof authAccountRecoveryStatusSchema>;
 export type AuthSessionResponse = z.infer<typeof authSessionResponseSchema>;
 export type AccountProfileResponse = z.infer<typeof accountProfileResponseSchema>;
