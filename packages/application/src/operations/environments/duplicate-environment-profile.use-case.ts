@@ -33,6 +33,8 @@ import {
   type ResourceDependencyBindingSummary,
   type ResourceReadModel,
   type ResourceRepository,
+  type StorageVolumeReadModel,
+  type StorageVolumeSummary,
 } from "../../ports";
 import { tokens } from "../../tokens";
 import { ProvisionDependencyResourceCommand } from "../dependency-resources/provision-dependency-resource.command";
@@ -67,6 +69,8 @@ export class DuplicateEnvironmentProfileUseCase {
     private readonly environmentProfileDecisionRepository?: EnvironmentProfileDecisionRepository,
     @inject(tokens.domainBindingReadModel, { isOptional: true })
     private readonly domainBindingReadModel?: DomainBindingReadModel,
+    @inject(tokens.storageVolumeReadModel, { isOptional: true })
+    private readonly storageVolumeReadModel?: StorageVolumeReadModel,
   ) {}
 
   async execute(
@@ -83,6 +87,7 @@ export class DuplicateEnvironmentProfileUseCase {
       resourceDependencyBindingReadModel,
       environmentProfileDecisionRepository,
       domainBindingReadModel,
+      storageVolumeReadModel,
     } = this;
     const repositoryContext = toRepositoryContext(context);
 
@@ -297,6 +302,28 @@ export class DuplicateEnvironmentProfileUseCase {
             sourceResourceId: sourceState.id.value,
           })),
         );
+        const storageDeferredDecisions = storageVolumeReadModel
+          ? (
+              await collectStorageAttachments(
+                storageVolumeReadModel,
+                repositoryContext,
+                sourceEnvironment.projectId,
+                sourceEnvironment.id,
+                sourceState.id.value,
+              )
+            ).map(storageDeferredDecision)
+          : [];
+        deferredDecisions.push(...storageDeferredDecisions);
+        pendingDecisions.push(
+          ...storageDeferredDecisions.map((decision) => ({
+            ...decision,
+            projectId: sourceEnvironment.projectId,
+            environmentId: targetEnvironmentId,
+            resourceId: createResult.id,
+            sourceEnvironmentId: sourceEnvironment.id,
+            sourceResourceId: sourceState.id.value,
+          })),
+        );
 
         const bindings = yield* await resourceDependencyBindingReadModel.list(repositoryContext, {
           resourceId: resourceSummary.id,
@@ -404,6 +431,11 @@ export class DuplicateEnvironmentProfileUseCase {
   }
 }
 
+type StorageAttachmentDecision = StorageVolumeSummary["attachments"][number] & {
+  storageVolumeId: string;
+  storageVolumeName: string;
+};
+
 type PendingEnvironmentProfileDecision = EnvironmentDuplicateDeferredDecisionSummary & {
   projectId: string;
   environmentId: string;
@@ -415,6 +447,28 @@ type PendingEnvironmentProfileDecision = EnvironmentDuplicateDeferredDecisionSum
 function pendingDecisionId(input: PendingEnvironmentProfileDecision): string {
   const resourcePart = input.resourceId ? `${input.resourceId}_` : "";
   return `epd_${input.environmentId}_${resourcePart}${input.kind}_${input.sourceId}`;
+}
+
+async function collectStorageAttachments(
+  readModel: StorageVolumeReadModel,
+  context: ReturnType<typeof toRepositoryContext>,
+  projectId: string,
+  environmentId: string,
+  resourceId: string,
+): Promise<StorageAttachmentDecision[]> {
+  const volumes = await readModel.list(context, {
+    projectId,
+    environmentId,
+  });
+  return volumes.flatMap((volume) =>
+    volume.attachments
+      .filter((attachment) => attachment.resourceId === resourceId)
+      .map((attachment) => ({
+        ...attachment,
+        storageVolumeId: volume.id,
+        storageVolumeName: volume.name,
+      })),
+  );
 }
 
 function sharedSourceDependencyWarning(
@@ -477,6 +531,17 @@ function domainRouteDeferredDecision(
     decision: "defer",
     reason:
       "Custom domain routes are environment-specific and must be regenerated or explicitly rebound before deployment.",
+  };
+}
+
+function storageDeferredDecision(
+  attachment: StorageAttachmentDecision,
+): EnvironmentDuplicateDeferredDecisionSummary {
+  return {
+    kind: "storage",
+    sourceId: attachment.attachmentId,
+    decision: "defer",
+    reason: `Storage data for ${attachment.storageVolumeName} at ${attachment.destinationPath} requires an explicit empty, restore, import, or defer decision before deployment.`,
   };
 }
 

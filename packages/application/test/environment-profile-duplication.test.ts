@@ -31,6 +31,7 @@ import {
   type EnvironmentReadModel,
   ProvisionDependencyResourceCommand,
   type ResourceReadModel,
+  type StorageVolumeReadModel,
   toRepositoryContext,
 } from "../src";
 import {
@@ -258,9 +259,65 @@ const domainBindingReadModel = {
   },
 } satisfies DomainBindingReadModel;
 
+const sourceStorageVolume = {
+  id: "stv_prod_uploads",
+  projectId: "prj_demo",
+  environmentId: "env_prod",
+  name: "Uploads",
+  slug: "uploads",
+  kind: "named-volume",
+  lifecycleStatus: "active",
+  attachmentCount: 1,
+  attachments: [
+    {
+      attachmentId: "rsta_prod_uploads",
+      resourceId: "res_web",
+      resourceName: "Web",
+      resourceSlug: "web",
+      destinationPath: "/app/uploads",
+      mountMode: "read-write",
+      dataFormat: "filesystem",
+      applicationDataLabel: "user uploads",
+      attachedAt: "2026-01-01T00:00:07.000Z",
+    },
+  ],
+  createdAt: "2026-01-01T00:00:07.000Z",
+} satisfies Awaited<ReturnType<StorageVolumeReadModel["list"]>>[number];
+
+const emptyStorageVolumeReadModel = {
+  async list() {
+    return [];
+  },
+  async findOne() {
+    return null;
+  },
+  async countAttachments() {
+    return 0;
+  },
+} satisfies StorageVolumeReadModel;
+
+const storageVolumeReadModel = {
+  async list(_context, input) {
+    if (
+      input?.projectId === sourceStorageVolume.projectId &&
+      input?.environmentId === sourceStorageVolume.environmentId
+    ) {
+      return [sourceStorageVolume];
+    }
+    return [];
+  },
+  async findOne() {
+    return null;
+  },
+  async countAttachments() {
+    return 1;
+  },
+} satisfies StorageVolumeReadModel;
+
 function createQueryService(input?: {
   environmentReadModel?: EnvironmentReadModel;
   domainBindingReadModel?: DomainBindingReadModel;
+  storageVolumeReadModel?: StorageVolumeReadModel;
 }): PlanDuplicateEnvironmentQueryService {
   return new PlanDuplicateEnvironmentQueryService(
     input?.environmentReadModel ?? createEnvironmentReadModel(),
@@ -269,6 +326,7 @@ function createQueryService(input?: {
     bindingReadModel,
     new FixedClock("2026-01-01T00:00:10.000Z"),
     input?.domainBindingReadModel ?? emptyDomainBindingReadModel,
+    input?.storageVolumeReadModel ?? emptyStorageVolumeReadModel,
   );
 }
 
@@ -337,7 +395,10 @@ function createCommandBus(commands: AppCommand<unknown>[]): CommandBus {
 function createApplyUseCase(
   commands: AppCommand<unknown>[] = [],
   environmentProfileDecisions?: MemoryEnvironmentProfileDecisionStore,
-  input?: { domainBindingReadModel?: DomainBindingReadModel },
+  input?: {
+    domainBindingReadModel?: DomainBindingReadModel;
+    storageVolumeReadModel?: StorageVolumeReadModel;
+  },
 ) {
   return new DuplicateEnvironmentProfileUseCase(
     createCommandBus(commands),
@@ -349,6 +410,7 @@ function createApplyUseCase(
     new FixedClock("2026-01-01T00:00:10.000Z"),
     environmentProfileDecisions,
     input?.domainBindingReadModel ?? emptyDomainBindingReadModel,
+    input?.storageVolumeReadModel ?? emptyStorageVolumeReadModel,
   );
 }
 
@@ -459,6 +521,40 @@ describe("environment profile duplication plan query", () => {
         decisionHint: "defer",
         reasons: [
           "Custom domains are environment-specific and must not be copied into the target environment without an explicit route decision.",
+        ],
+      },
+    ]);
+  });
+
+  test("[ENV-PROFILE-DUP-007] classifies storage volume data as explicit decisions", async () => {
+    const queryService = createQueryService({ storageVolumeReadModel });
+    const result = await queryService.execute(
+      createExecutionContext({
+        requestId: "req_env_duplicate_plan_storage",
+        entrypoint: "system",
+      }),
+      {
+        environmentId: "env_prod",
+        targetName: "staging",
+      },
+    );
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+    expect(plan.storageDecisionCandidates).toEqual([
+      {
+        storageVolumeId: "stv_prod_uploads",
+        storageVolumeName: "Uploads",
+        storageVolumeKind: "named-volume",
+        resourceId: "res_web",
+        attachmentId: "rsta_prod_uploads",
+        destinationPath: "/app/uploads",
+        mountMode: "read-write",
+        dataFormat: "filesystem",
+        applicationDataLabel: "user uploads",
+        decisionHint: "defer",
+        reasons: [
+          "Storage volume data is environment-specific and must not be copied without an explicit empty, restore, import, or defer decision.",
         ],
       },
     ]);
@@ -787,6 +883,57 @@ describe("environment profile duplication apply command", () => {
         resourceId: "res_web_staging",
         kind: "route",
         sourceId: "dom_prod_web",
+        status: "pending",
+      }),
+    );
+  });
+
+  test("[ENV-PROFILE-DUP-007] records storage data as pending target decisions", async () => {
+    const commands: AppCommand<unknown>[] = [];
+    const pendingDecisions = new MemoryEnvironmentProfileDecisionStore();
+    const result = await createApplyUseCase(commands, pendingDecisions, {
+      storageVolumeReadModel,
+    }).execute(
+      createExecutionContext({
+        requestId: "req_env_duplicate_apply_storage_defer",
+        entrypoint: "system",
+      }),
+      {
+        environmentId: "env_prod",
+        targetName: "staging",
+        dependencyDecisions: [
+          { dependencyResourceId: "rsi_pg", decision: "create-new-managed" },
+          {
+            dependencyResourceId: "rsi_external_pg",
+            decision: "bind-existing",
+            targetDependencyResourceId: "rsi_external_pg_staging",
+          },
+        ],
+      },
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(commands).toHaveLength(4);
+    expect(result._unsafeUnwrap().deferredDecisions).toContainEqual({
+      kind: "storage",
+      sourceId: "rsta_prod_uploads",
+      decision: "defer",
+      reason:
+        "Storage data for Uploads at /app/uploads requires an explicit empty, restore, import, or defer decision before deployment.",
+    });
+    await expect(
+      pendingDecisions.listPending(
+        toRepositoryContext(
+          createExecutionContext({ requestId: "req_pending_storage", entrypoint: "system" }),
+        ),
+        { environmentId: "env_staging", resourceId: "res_web_staging" },
+      ),
+    ).resolves.toContainEqual(
+      expect.objectContaining({
+        environmentId: "env_staging",
+        resourceId: "res_web_staging",
+        kind: "storage",
+        sourceId: "rsta_prod_uploads",
         status: "pending",
       }),
     );

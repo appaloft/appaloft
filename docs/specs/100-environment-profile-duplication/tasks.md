@@ -32,7 +32,8 @@
   in `deployments.plan`, and block `deployments.create` before runtime/provider side effects.
 - [x] ENV-PROFILE-DUP-006: classify source custom domain routes in duplicate plan and persist
   deferred target route decisions during apply without copying production domains.
-- [ ] ENV-PROFILE-DUP-007: implement storage requirement decisions.
+- [x] ENV-PROFILE-DUP-007: classify source storage volume attachments in duplicate plan and
+  persist deferred target storage decisions during apply without copying source volume data.
 - [ ] Add Web staged apply surface for `environments.duplicate-profile`.
 - [ ] Persist or project shared-source warning for deployment readiness, audit, and Web surfaces.
 

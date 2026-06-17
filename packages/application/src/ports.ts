@@ -4877,6 +4877,20 @@ export interface EnvironmentDuplicateDomainRouteCandidate {
   reasons: string[];
 }
 
+export interface EnvironmentDuplicateStorageDecisionCandidate {
+  storageVolumeId: string;
+  storageVolumeName: string;
+  storageVolumeKind: StorageVolumeKind;
+  resourceId: string;
+  attachmentId: string;
+  destinationPath: string;
+  mountMode: "read-write" | "read-only";
+  dataFormat?: StorageVolumeBackupDataFormat;
+  applicationDataLabel?: string;
+  decisionHint: "empty" | "restore-backup" | "import-data" | "defer";
+  reasons: string[];
+}
+
 export interface EnvironmentDuplicatePlanWarning {
   code: string;
   message: string;
@@ -4891,6 +4905,7 @@ export interface EnvironmentDuplicatePlanSummary {
   dependencyCandidates: EnvironmentDuplicateDependencyCandidate[];
   dependencyBindingCandidates: EnvironmentDuplicateDependencyBindingCandidate[];
   domainRouteCandidates: EnvironmentDuplicateDomainRouteCandidate[];
+  storageDecisionCandidates: EnvironmentDuplicateStorageDecisionCandidate[];
   warnings: EnvironmentDuplicatePlanWarning[];
   generatedAt: string;
 }
