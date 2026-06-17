@@ -153,6 +153,9 @@ describe("Console page extension surface", () => {
     expect(panelHostSource).toContain("projectId");
     expect(panelHostSource).toContain("environmentId");
     expect(panelHostSource).toContain("resourceId");
+    expect(panelHostSource).toContain("type ConsolePageRequestAction");
+    expect(panelHostSource).toContain("runRequestAction(action, item)");
+    expect(panelHostSource).toContain("data-console-extension-panel-host");
     expect(projectPageSource).toContain('placement="project-environment-panel"');
     expect(projectPageSource).toContain("environmentId={environment.id}");
     expect(resourcePageSource).toContain('placement="resource-detail-panel"');

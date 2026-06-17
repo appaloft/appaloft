@@ -46,7 +46,19 @@
     title: string;
     description?: string;
     rows?: ConsolePageKeyValue[];
+    actions?: ConsolePageRequestAction[];
     tone?: ConsolePageTone;
+  };
+
+  type ConsolePageRequestAction = {
+    label: string;
+    endpoint: string;
+    method?: "POST";
+    body?: Record<string, unknown>;
+    variant?: "primary" | "secondary";
+    disabled?: boolean;
+    disabledReason?: string;
+    redirectUrlField?: string;
   };
 
   type ConsolePageKeyValue = {
@@ -101,6 +113,8 @@
     previewEnvironmentId = "",
     class: className = "",
   }: Props = $props();
+  let pendingActionKey = $state<string | null>(null);
+  let actionErrorMessage = $state("");
 
   const webExtensionsQuery = createQuery(() =>
     queryOptions({
@@ -207,6 +221,51 @@
     if (tone === "positive") return "border-emerald-200 bg-emerald-50/60 dark:border-emerald-400/30 dark:bg-emerald-400/10";
     return "";
   }
+
+  function requestActionKey(action: ConsolePageRequestAction, item?: ConsolePagePanelItem): string {
+    return `${item?.title ?? "panel"}:${action.method ?? "POST"}:${action.endpoint}:${action.label}`;
+  }
+
+  async function runRequestAction(
+    action: ConsolePageRequestAction,
+    item?: ConsolePagePanelItem,
+  ): Promise<void> {
+    if (action.disabled) {
+      actionErrorMessage = action.disabledReason ?? "";
+      return;
+    }
+
+    const actionKey = requestActionKey(action, item);
+    pendingActionKey = actionKey;
+    actionErrorMessage = "";
+    try {
+      const response = await request<Record<string, unknown>>(action.endpoint, {
+        method: action.method ?? "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(action.body ?? {}),
+      });
+      if (response.accepted === false) {
+        actionErrorMessage =
+          typeof response.reason === "string"
+            ? response.reason
+            : $t(i18nKeys.errors.web.unknownRequestFailure);
+        return;
+      }
+
+      const redirectUrlField = action.redirectUrlField ?? "url";
+      const redirectUrl = response[redirectUrlField];
+      if (typeof redirectUrl === "string" && redirectUrl.length > 0) {
+        window.location.assign(redirectUrl);
+        return;
+      }
+
+      await panelDocumentsQuery.refetch();
+    } catch (error) {
+      actionErrorMessage = readErrorMessage(error);
+    } finally {
+      pendingActionKey = null;
+    }
+  }
 </script>
 
 {#if loading}
@@ -226,6 +285,11 @@
   </section>
 {:else if visiblePanelResults.length > 0}
   <div class={["space-y-4", className]} data-console-extension-panel-host={placement}>
+    {#if actionErrorMessage}
+      <section class="console-panel border-destructive/25 bg-destructive/5 p-4 text-sm text-destructive">
+        {actionErrorMessage}
+      </section>
+    {/if}
     {#each visiblePanelResults as result (result.extension.key)}
       {@const document = result.document}
       <section class="console-panel space-y-4 p-5" data-console-extension-panel>
@@ -301,6 +365,29 @@
                           </div>
                         {/each}
                       </dl>
+                    {/if}
+                    {#if item.actions?.length}
+                      <div class="mt-4 flex flex-wrap gap-2">
+                        {#each item.actions as action (requestActionKey(action, item))}
+                          <Button
+                            type="button"
+                            variant={action.variant === "primary" ? "default" : "outline"}
+                            size="sm"
+                            disabled={Boolean(action.disabled) ||
+                              pendingActionKey === requestActionKey(action, item)}
+                            onclick={() => runRequestAction(action, item)}
+                          >
+                            {pendingActionKey === requestActionKey(action, item)
+                              ? $t(i18nKeys.common.status.loading)
+                              : action.label}
+                          </Button>
+                        {/each}
+                      </div>
+                      {#each item.actions as action (requestActionKey(action, item))}
+                        {#if action.disabled && action.disabledReason}
+                          <p class="mt-2 text-xs text-muted-foreground">{action.disabledReason}</p>
+                        {/if}
+                      {/each}
                     {/if}
                   </article>
                 {/each}
