@@ -56,6 +56,8 @@ import {
   type ExecutionStrategyKind,
   type InfrastructureServerProposalSnapshot,
   type LogLevel,
+  type NotificationMessageDeliverySnapshot,
+  type NotificationMessageSnapshot,
   type PackagingMode,
   type PreviewEnvironment,
   type PreviewEnvironmentMutationSpec,
@@ -9608,6 +9610,7 @@ export interface ConnectorCapabilityPlanPreview {
     kind: "dns-records" | string;
     dnsRecords?: DnsRecordPlanSnapshot;
     infrastructureServerProposal?: InfrastructureServerProposalSnapshot;
+    notificationMessage?: NotificationMessageSnapshot;
   };
 }
 
@@ -9638,6 +9641,7 @@ export interface ConnectorCapabilityApplyResult {
   providerResult?: {
     kind: "dns-records" | string;
     dnsRecords?: DnsRecordApplySnapshot;
+    notificationDelivery?: NotificationMessageDeliverySnapshot;
   };
 }
 
