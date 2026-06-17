@@ -12,9 +12,10 @@
 ## Intent
 
 `environments.duplicate-profile` applies reviewed Environment Profile Duplication decisions for a
-source environment. The first apply slice creates the target environment by reusing
-`environments.clone`, then recreates selected source resources by dispatching `resources.create`
-with the source resource's public shape.
+source environment. The apply flow creates the target environment by reusing `environments.clone`,
+recreates selected source resources by dispatching `resources.create`, realizes non-deferred
+dependency decisions through public dependency commands, then recreates resource dependency
+bindings against the reviewed target dependency ids.
 
 The command is decision-first. It requires explicit dependency decisions before mutation so a
 production database, cache, storage backend, or external service is never silently reused or
@@ -59,8 +60,13 @@ Rules:
 3. Reject missing dependency decisions before dispatching child commands.
 4. Dispatch `CloneEnvironmentCommand` to create the target environment and copy environment-owned
    variables.
-5. Read source resources and load each resource aggregate selected for `copy-shape`.
-6. Dispatch `CreateResourceCommand` for each selected source resource with:
+5. Apply non-deferred dependency decisions:
+   - `create-new-managed` dispatches `ProvisionDependencyResourceCommand` in the target environment;
+   - `bind-existing` validates the target dependency id and uses it as the binding target;
+   - `reuse-source` requires acknowledgement and uses the source dependency id as the binding
+     target.
+6. Read source resources and load each resource aggregate selected for `copy-shape`.
+7. Dispatch `CreateResourceCommand` for each selected source resource with:
    - project id;
    - target environment id;
    - destination id when present;
@@ -68,13 +74,17 @@ Rules:
    - source binding;
    - runtime profile;
    - network profile.
-7. Return copied resource summaries plus deferred decisions.
+8. Read active source resource dependency bindings and dispatch `BindResourceDependencyCommand`
+   against the copied target resource whenever the dependency decision produced a target dependency
+   id.
+9. Return copied resource summaries, applied dependency summaries, created binding summaries, and
+   deferred decisions.
 
 ## Deferred Decisions
 
 This command does not implicitly copy:
 
-- dependency secret material or resource dependency bindings;
+- dependency secret material;
 - production database/cache/storage data;
 - custom domains or generated routes;
 - resource variables;
@@ -83,8 +93,8 @@ This command does not implicitly copy:
 - auto-deploy policy;
 - command-based health checks.
 
-These are returned as `deferredDecisions` and must be handled by later provider, binding,
-admission, route, storage, or UI phases.
+These are returned as `deferredDecisions` and must be handled by later provider, admission, route,
+storage, or UI phases.
 
 ## Entrypoints
 

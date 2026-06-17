@@ -7,6 +7,8 @@ import {
   ResourceByIdSpec,
   type ResourceHealthCheckPolicyState,
   ResourceId,
+  ResourceInstanceByIdSpec,
+  ResourceInstanceId,
   type ResourceNetworkProfileState,
   type ResourceRuntimeProfileState,
   type ResourceSourceBindingState,
@@ -24,10 +26,14 @@ import {
   type EnvironmentDuplicateDeferredDecisionSummary,
   type EnvironmentDuplicateProfileApplyResult,
   type EnvironmentReadModel,
+  type ResourceDependencyBindingReadModel,
+  type ResourceDependencyBindingSummary,
   type ResourceReadModel,
   type ResourceRepository,
 } from "../../ports";
 import { tokens } from "../../tokens";
+import { ProvisionDependencyResourceCommand } from "../dependency-resources/provision-dependency-resource.command";
+import { BindResourceDependencyCommand } from "../resources/bind-resource-dependency.command";
 import { CreateResourceCommand } from "../resources/create-resource.command";
 import { type CreateResourceCommandInput } from "../resources/create-resource.schema";
 import { CloneEnvironmentCommand } from "./clone-environment.command";
@@ -50,6 +56,8 @@ export class DuplicateEnvironmentProfileUseCase {
     private readonly resourceRepository: ResourceRepository,
     @inject(tokens.dependencyResourceReadModel)
     private readonly dependencyResourceReadModel: DependencyResourceReadModel,
+    @inject(tokens.resourceDependencyBindingReadModel)
+    private readonly resourceDependencyBindingReadModel: ResourceDependencyBindingReadModel,
     @inject(tokens.clock)
     private readonly clock: Clock,
   ) {}
@@ -65,6 +73,7 @@ export class DuplicateEnvironmentProfileUseCase {
       environmentReadModel,
       resourceReadModel,
       resourceRepository,
+      resourceDependencyBindingReadModel,
     } = this;
     const repositoryContext = toRepositoryContext(context);
 
@@ -116,6 +125,83 @@ export class DuplicateEnvironmentProfileUseCase {
       const cloneResult = yield* await commandBus.execute(context, cloneCommand);
       const targetEnvironmentId = cloneResult.id;
 
+      const appliedDependencies: EnvironmentDuplicateProfileApplyResult["appliedDependencies"] = [];
+      const dependencyTargetIds = new Map<string, string>();
+      for (const dependency of requiredDependencies) {
+        const decision = dependencyDecisions.get(dependency.id);
+        if (!decision || decision.decision === "defer") {
+          continue;
+        }
+
+        if (decision.decision === "create-new-managed") {
+          const provisionCommand = yield* ProvisionDependencyResourceCommand.create({
+            kind: dependency.kind,
+            projectId: dependency.projectId,
+            environmentId: targetEnvironmentId,
+            name: dependency.name,
+            providerKey: decision.providerKey ?? dependency.providerKey,
+            ...(dependency.description ? { description: dependency.description } : {}),
+            capabilities: dependency.desiredCapabilities,
+            ...(dependency.backupRelationship
+              ? { backupRelationship: dependency.backupRelationship }
+              : {}),
+          });
+          const provisionResult = yield* await commandBus.execute(context, provisionCommand);
+          dependencyTargetIds.set(dependency.id, provisionResult.id);
+          appliedDependencies.push({
+            sourceDependencyResourceId: dependency.id,
+            targetDependencyResourceId: provisionResult.id,
+            decision: decision.decision,
+            kind: dependency.kind,
+            name: dependency.name,
+          });
+          continue;
+        }
+
+        const targetDependencyResourceId =
+          decision.decision === "bind-existing"
+            ? decision.targetDependencyResourceId
+            : dependency.id;
+        if (!targetDependencyResourceId) {
+          return err(
+            domainError.validation("Dependency target decision is incomplete", {
+              phase: "environment-profile-duplication-admission",
+              dependencyResourceId: dependency.id,
+              decision: decision.decision,
+            }),
+          );
+        }
+
+        if (decision.decision === "bind-existing") {
+          const targetId = yield* ResourceInstanceId.create(targetDependencyResourceId);
+          const targetDependency = await dependencyResourceReadModel.findOne(
+            repositoryContext,
+            ResourceInstanceByIdSpec.create(targetId),
+          );
+          if (!targetDependency) {
+            return err(domainError.notFound("dependency-resource", targetDependencyResourceId));
+          }
+          if (targetDependency.projectId !== dependency.projectId) {
+            return err(
+              domainError.validation("Target dependency belongs to a different project", {
+                phase: "environment-profile-duplication-admission",
+                dependencyResourceId: dependency.id,
+                targetDependencyResourceId,
+              }),
+            );
+          }
+        }
+
+        dependencyTargetIds.set(dependency.id, targetDependencyResourceId);
+        appliedDependencies.push({
+          sourceDependencyResourceId: dependency.id,
+          targetDependencyResourceId,
+          decision: decision.decision,
+          kind: dependency.kind,
+          name: dependency.name,
+        });
+      }
+
       const resourceDecisions = new Map(
         (input.resourceDecisions ?? []).map((decision) => [decision.resourceId, decision]),
       );
@@ -126,6 +212,8 @@ export class DuplicateEnvironmentProfileUseCase {
         limit: 500,
       });
       const copiedResources: EnvironmentDuplicateProfileApplyResult["copiedResources"] = [];
+      const createdDependencyBindings: EnvironmentDuplicateProfileApplyResult["createdDependencyBindings"] =
+        [];
       const deferredDecisions: EnvironmentDuplicateDeferredDecisionSummary[] = [];
 
       for (const resourceSummary of sourceResources) {
@@ -155,6 +243,37 @@ export class DuplicateEnvironmentProfileUseCase {
           slug: resourceSummary.slug,
         });
         deferredDecisions.push(...deferredResourceProfileDecisions(sourceState));
+
+        const bindings = yield* await resourceDependencyBindingReadModel.list(repositoryContext, {
+          resourceId: resourceSummary.id,
+        });
+        for (const binding of bindings.filter((candidate) => candidate.status === "active")) {
+          const targetDependencyResourceId = dependencyTargetIds.get(binding.dependencyResourceId);
+          if (!targetDependencyResourceId) {
+            deferredDecisions.push(dependencyBindingDeferredDecision(binding));
+            continue;
+          }
+
+          const bindCommand = yield* BindResourceDependencyCommand.create({
+            resourceId: createResult.id,
+            dependencyResourceId: targetDependencyResourceId,
+            targetName: binding.target.targetName,
+            scope: binding.target.scope,
+            injectionMode: binding.target.injectionMode,
+          });
+          const bindResult = yield* await commandBus.execute(context, bindCommand);
+          createdDependencyBindings.push({
+            sourceBindingId: binding.id,
+            sourceResourceId: binding.resourceId,
+            targetResourceId: createResult.id,
+            sourceDependencyResourceId: binding.dependencyResourceId,
+            targetDependencyResourceId,
+            targetName: binding.target.targetName,
+            scope: binding.target.scope,
+            injectionMode: binding.target.injectionMode,
+            bindingId: bindResult.id,
+          });
+        }
       }
 
       for (const dependency of requiredDependencies) {
@@ -162,7 +281,9 @@ export class DuplicateEnvironmentProfileUseCase {
         if (!decision) {
           continue;
         }
-        deferredDecisions.push(dependencyDeferredDecision(dependency.id, decision));
+        if (decision.decision === "defer") {
+          deferredDecisions.push(dependencyDeferredDecision(dependency.id, decision));
+        }
       }
 
       return ok({
@@ -170,6 +291,8 @@ export class DuplicateEnvironmentProfileUseCase {
         sourceEnvironmentId: sourceEnvironment.id,
         targetEnvironmentId,
         copiedResources,
+        appliedDependencies,
+        createdDependencyBindings,
         deferredDecisions,
         warnings: deferredDecisions.length
           ? [
@@ -211,6 +334,18 @@ function createResourceInputFromSource(
     ...(source.networkProfile
       ? { networkProfile: networkProfileInput(source.networkProfile) }
       : {}),
+  };
+}
+
+function dependencyBindingDeferredDecision(
+  binding: ResourceDependencyBindingSummary,
+): EnvironmentDuplicateDeferredDecisionSummary {
+  return {
+    kind: "dependency-binding",
+    sourceId: binding.id,
+    decision: "defer",
+    reason:
+      "Dependency binding requires a non-deferred dependency target decision before it can be copied.",
   };
 }
 
