@@ -87,7 +87,9 @@ describe("dependency resource Web console surface", () => {
     expect(resourcePageSource).toContain("resourceDependencyBindings");
     expect(resourcePageSource).toContain("i18nKeys.console.resources.dependenciesTitle");
     expect(resourcePageSource).toContain("webDocsHrefs.dependencyResourceLifecycle");
-    expect(resourcePageSource).toContain("webDocsHrefs.dependencyRuntimeInjection");
+    expect(resourcePageSource).not.toMatch(
+      /dependenciesTitle[\s\S]*?dependencyRuntimeInjection[\s\S]*?dependenciesDescription/,
+    );
     const resourceOverviewSource = resourcePageSource.slice(
       resourcePageSource.indexOf('id="resource-overview"'),
       resourcePageSource.indexOf('id="resource-settings-general"'),
