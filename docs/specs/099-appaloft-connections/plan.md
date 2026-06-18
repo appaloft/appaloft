@@ -52,6 +52,9 @@
 | APP-CONN-014 | CLI/API contract | CLI and HTTP share operation semantics and JSON status. |
 | APP-CONN-015 | Web/e2e | Central and contextual Web flows use the same application services. |
 | APP-CONN-016 | adapter/contract | Fake providers cover success/conflict/revoke/expiry/rate-limit/error paths. |
+| APP-CONN-017 | authz/application | Connection lifecycle and readiness are tenant/owner scoped. |
+| APP-CONN-018 | docs/source scan | Category names are not treated as concrete connector keys. |
+| APP-CONN-019 | application/API/UI/adapter | Domain binding DNS readiness checks owner-scoped connected zones, route conflicts, and plan generation without frontend zone guessing. |
 
 ## Migration Notes
 
@@ -60,6 +63,9 @@
 - Existing GitHub OAuth login remains identity/auth only.
 - Existing external edge/DNS and SSH onboarding specs should reference connection ids once the
   neutral model exists.
+- Domain binding DNS apply must first call the readiness query. That query uses provider-neutral
+  zone listing, so Cloudflare, Route53, DNSPod, GoDaddy, and other DNS providers can plug into the
+  same flow without Web-specific branching.
 - Hosted/private distributions can decorate provider availability and official app defaults without
   changing public Appaloft contracts.
 

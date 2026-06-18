@@ -8,6 +8,8 @@ export * from "./operations/domain-bindings/create-domain-binding.handler";
 export * from "./operations/domain-bindings/create-domain-binding.use-case";
 export * from "./operations/domain-bindings/delete-domain-binding.handler";
 export * from "./operations/domain-bindings/delete-domain-binding.use-case";
+export * from "./operations/domain-bindings/inspect-domain-binding-dns-readiness.handler";
+export * from "./operations/domain-bindings/inspect-domain-binding-dns-readiness.query-service";
 export * from "./operations/domain-bindings/list-domain-bindings.handler";
 export * from "./operations/domain-bindings/list-domain-bindings.query-service";
 export * from "./operations/domain-bindings/mark-domain-ready-on-certificate-imported.handler";

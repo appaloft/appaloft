@@ -90,6 +90,7 @@ export * from "./operations/domain-bindings/configure-domain-binding-route.use-c
 export * from "./operations/domain-bindings/confirm-domain-binding-ownership.use-case";
 export * from "./operations/domain-bindings/create-domain-binding.use-case";
 export * from "./operations/domain-bindings/delete-domain-binding.use-case";
+export * from "./operations/domain-bindings/inspect-domain-binding-dns-readiness.query-service";
 export * from "./operations/domain-bindings/list-domain-bindings.query-service";
 export * from "./operations/domain-bindings/mark-domain-ready-on-certificate-imported.handler";
 export * from "./operations/domain-bindings/mark-domain-ready-on-certificate-issued.handler";
