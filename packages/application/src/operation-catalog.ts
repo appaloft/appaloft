@@ -4226,7 +4226,9 @@ export const operationCatalog = [
     inputSchema: startConnectionCommandInputSchema,
     serviceToken: tokens.startConnectionUseCase,
     transportAccess: {
-      productSession: "public",
+      productSession: {
+        minRole: "member",
+      },
     },
     transports: {
       cli: "appaloft connectors connect <connector>",
@@ -4260,7 +4262,9 @@ export const operationCatalog = [
     inputSchema: revokeConnectionCommandInputSchema,
     serviceToken: tokens.revokeConnectionUseCase,
     transportAccess: {
-      productSession: "public",
+      productSession: {
+        minRole: "member",
+      },
     },
     transports: {
       cli: "appaloft connectors revoke <connectionId>",
@@ -4311,7 +4315,9 @@ export const operationCatalog = [
     inputSchema: acceptConnectorCapabilityPlanCommandInputSchema,
     serviceToken: tokens.acceptConnectorCapabilityPlanUseCase,
     transportAccess: {
-      productSession: "public",
+      productSession: {
+        minRole: "member",
+      },
     },
     transports: {
       cli: "appaloft connectors accept --connector <connector> --capability <capability> --plan-id <planId>",
@@ -4328,7 +4334,9 @@ export const operationCatalog = [
     inputSchema: applyConnectorCapabilityCommandInputSchema,
     serviceToken: tokens.connectorCapabilityApplyUseCase,
     transportAccess: {
-      productSession: "public",
+      productSession: {
+        minRole: "member",
+      },
     },
     transports: {
       cli: "appaloft connectors apply --connector <connector> --capability <capability>",
