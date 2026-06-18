@@ -62,7 +62,6 @@ import {
   getExecutionAuthProviderAccessToken,
   type IdGenerator,
   InMemoryAcceptedConnectionCapabilityPlanStore,
-  InMemoryConnectorConnectionStore,
   InMemoryConnectorProviderAdapterRegistry,
   InMemoryConnectorRegistry,
   InMemoryEdgeProxyProviderRegistry,
@@ -133,6 +132,8 @@ import {
   PgCertificateRepository,
   PgCertificateRetryCandidateReader,
   PgCertificateSecretStore,
+  PgConnectorAuthorizationAttemptStore,
+  PgConnectorConnectionStore,
   PgDefaultAccessDomainPolicyRepository,
   PgDependencyBindingSecretStore,
   PgDependencyResourceBackupPolicyRepository,
@@ -1730,7 +1731,12 @@ export function registerRuntimeDependencies(
     ),
   });
   container.register(tokens.connectorConnectionStore, {
-    useFactory: instanceCachingFactory(() => new InMemoryConnectorConnectionStore()),
+    useFactory: instanceCachingFactory(() => new PgConnectorConnectionStore(input.database.db)),
+  });
+  container.register(tokens.connectorAuthorizationAttemptStore, {
+    useFactory: instanceCachingFactory(
+      () => new PgConnectorAuthorizationAttemptStore(input.database.db),
+    ),
   });
   container.register(tokens.acceptedConnectionCapabilityPlanStore, {
     useFactory: instanceCachingFactory(() => new InMemoryAcceptedConnectionCapabilityPlanStore()),
