@@ -1082,7 +1082,7 @@ describe("console page structure", () => {
     expect(resourceDetailTabsSource).toContain('"terminal"');
     expect(resourceDetailTabsSource).toContain('"previews"');
     expect(resourceDetailPageSource).toContain(
-      'latestDeployment?.target.kind === "serverless-static-artifact"',
+      'latestDeployment?.target?.kind === "serverless-static-artifact"',
     );
     expect(resourceDetailPageSource).toContain("const visibleResourceDetailTabs = $derived");
     expect(resourceDetailPageSource).toContain(

@@ -1269,7 +1269,7 @@
       !defaultDestinationId,
   );
   const isServerlessStaticArtifactDeployment = $derived(
-    latestDeployment?.target.kind === "serverless-static-artifact",
+    latestDeployment?.target?.kind === "serverless-static-artifact",
   );
   const isDirectStaticArtifactRuntime = $derived(isServerlessStaticArtifactDeployment);
   $effect(() => {
