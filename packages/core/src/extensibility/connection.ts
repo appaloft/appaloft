@@ -46,6 +46,13 @@ export interface ConnectionDiagnosticSnapshot {
   message: string;
 }
 
+export interface ConnectionProviderResourceSnapshot {
+  kind: string;
+  name: string;
+  id?: string;
+  providerAccountId?: string;
+}
+
 export interface ConnectionSnapshot {
   id: string;
   connectorKey: string;
@@ -56,6 +63,7 @@ export interface ConnectionSnapshot {
   status: ConnectionStatus;
   capabilities: string[];
   credentialGrant: ConnectionCredentialGrantSnapshot;
+  providerResources: ConnectionProviderResourceSnapshot[];
   diagnostics: ConnectionDiagnosticSnapshot[];
   createdAt: string;
   updatedAt: string;
@@ -233,14 +241,16 @@ export class ConnectionCredentialGrant {
     snapshot: Partial<
       Pick<
         ConnectionCredentialGrantSnapshot,
-        "externalAccountId" | "externalInstallationId" | "expiresAt"
+        "storage" | "secretRef" | "externalAccountId" | "externalInstallationId" | "expiresAt"
       >
     >,
   ): Result<ConnectionCredentialGrant> {
     return ConnectionCredentialGrant.create({
       kind: this.snapshot.kind,
-      storage: this.snapshot.storage,
-      ...(this.snapshot.secretRef ? { secretRef: this.snapshot.secretRef } : {}),
+      storage: snapshot.storage ?? this.snapshot.storage,
+      ...((snapshot.secretRef ?? this.snapshot.secretRef)
+        ? { secretRef: snapshot.secretRef ?? this.snapshot.secretRef }
+        : {}),
       ...((snapshot.externalAccountId ?? this.snapshot.externalAccountId)
         ? { externalAccountId: snapshot.externalAccountId ?? this.snapshot.externalAccountId }
         : {}),
@@ -324,6 +334,7 @@ export class Connection extends AggregateRoot<
             .filter((capability) => capability.implemented)
             .map((capability) => capability.key),
           credentialGrant: credentialGrant.toJSON(),
+          providerResources: [],
           diagnostics: [],
           createdAt: input.createdAt.value,
           updatedAt: input.createdAt.value,
@@ -339,7 +350,10 @@ export class Connection extends AggregateRoot<
   }
 
   static rehydrate(snapshot: ConnectionSnapshot): Connection {
-    return new Connection({ id: ConnectionId.rehydrate(snapshot.id), snapshot: { ...snapshot } });
+    return new Connection({
+      id: ConnectionId.rehydrate(snapshot.id),
+      snapshot: { ...snapshot, providerResources: snapshot.providerResources ?? [] },
+    });
   }
 
   owner(): ConnectionOwnerRef {
@@ -355,9 +369,11 @@ export class Connection extends AggregateRoot<
     readback: Partial<
       Pick<
         ConnectionCredentialGrantSnapshot,
-        "externalAccountId" | "externalInstallationId" | "expiresAt"
+        "storage" | "secretRef" | "externalAccountId" | "externalInstallationId" | "expiresAt"
       >
-    > = {},
+    > & {
+      providerResources?: readonly ConnectionProviderResourceSnapshot[];
+    } = {},
   ): Result<void> {
     return ConnectionStatusValue.rehydrate(this.state.snapshot.status)
       .establish()
@@ -371,6 +387,9 @@ export class Connection extends AggregateRoot<
           ...this.state.snapshot,
           status: status.value,
           credentialGrant: credentialGrant.toJSON(),
+          providerResources: readback.providerResources
+            ? readback.providerResources.map((resource) => ({ ...resource }))
+            : this.state.snapshot.providerResources,
           diagnostics: [],
           updatedAt: at.value,
         };
@@ -417,6 +436,9 @@ export class Connection extends AggregateRoot<
       owner: { ...this.state.snapshot.owner },
       capabilities: [...this.state.snapshot.capabilities],
       credentialGrant: { ...this.state.snapshot.credentialGrant, redacted: true },
+      providerResources: this.state.snapshot.providerResources.map((resource) => ({
+        ...resource,
+      })),
       diagnostics: [...this.state.snapshot.diagnostics],
     };
   }

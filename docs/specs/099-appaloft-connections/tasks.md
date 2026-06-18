@@ -35,6 +35,13 @@
 - [x] APP-CONN-019: add domain binding DNS readiness tests for no connected zone, longest authorized zone match, and active hostname/path conflict.
 - [x] APP-CONN-019: add HTTP/oRPC route test for DNS readiness inspection.
 - [x] APP-CONN-019: add Cloudflare real-adapter zone listing test so provider ownership checks do not depend on frontend zone guessing.
+- [x] APP-CONN-020: add authorization-attempt tests for provider start, callback completion, redacted secret-ref readback, and replay denial.
+- [x] APP-CONN-020: add authorization-attempt store state lookup for provider browser callbacks.
+- [x] APP-CONN-020: add authorization-attempt tests for callback state lookup, expiry, replay, tenant scope, and cancel/error diagnostics.
+- [ ] APP-CONN-020: deferred-gap - add manual-secret fallback lifecycle tests when a product surface accepts one-time provider token material through a credential-store port.
+- [x] APP-CONN-020: add credential-store contract tests proving callback writes secret material through a port and read models only expose redacted references.
+- [x] APP-CONN-021: add Web source tests for connect-from-hostname, Cloudflare-branded connect action, callback return binding id, and readiness rerun trigger.
+- [ ] APP-CONN-021: deferred-gap - add end-to-end domain-binding product-flow tests for provider callback, zone discovery, hostname rematch, plan, accept, and apply in one browser/API scenario; current coverage is split across application, Cloud HTTP callback, Web source, and WebView tests.
 
 ## Implementation
 
@@ -62,6 +69,13 @@
 - [x] Add `domain-bindings.dns-readiness.inspect` to inspect owner-scoped DNS zone authorization, route conflicts, and plan readiness before apply.
 - [x] Update resource domain binding DNS connector dialog to call `domainBindings.inspectDnsReadiness` and remove client-side zone inference/manual zone input.
 - [x] Add public docs page for neutral connection language and category/concrete connector naming.
+- [x] Add provider-neutral authorization attempt snapshot/store contract and in-memory test store.
+- [x] Add connector authorization adapter port for provider start and callback exchange.
+- [x] Add connector credential store port that persists provider secret material and returns only secret refs.
+- [x] Update `connections.connect.start` to create an attempt and call the authorization adapter when the connector requires provider authorization.
+- [x] Update `connections.connect.callback` to validate pending attempt status, exchange provider payload through the authorization adapter, apply returned secret-ref readback, and connect the owner-scoped `Connection`.
+- [x] Update `connections.connect.callback` to support adapter-written credential refs and safe provider resource readback.
+- [x] Update DNS readiness/connect flow so a hostname without a matching zone can start provider authorization and then re-run readiness after callback on the resource domain-binding page.
 
 ## Verification
 
@@ -70,3 +84,6 @@
 - [x] Run HTTP/oRPC route tests.
 - [x] Run source scan for raw provider secrets in production sources.
 - [x] Run `git diff --check`.
+- [x] Run authorization lifecycle unit/contract tests.
+- [x] Run domain-binding connect-from-hostname UI/source tests.
+- [ ] deferred-gap: run domain-binding connect-from-hostname HTTP/browser E2E tests after the composed Cloud Console E2E harness can drive provider callback and domain-binding mocks in one scenario.

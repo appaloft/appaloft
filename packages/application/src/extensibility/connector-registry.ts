@@ -6,6 +6,8 @@ import {
 } from "@appaloft/core";
 
 import {
+  type ConnectorAuthorizationAdapter,
+  type ConnectorAuthorizationAdapterRegistry,
   type ConnectorDescriptor,
   type ConnectorProviderAdapter,
   type ConnectorProviderAdapterRegistry,
@@ -52,6 +54,20 @@ export class InMemoryConnectorProviderAdapterRegistry implements ConnectorProvid
   }
 
   findForConnector(connectorKey: string): ConnectorProviderAdapter | null {
+    return this.byConnectorKey.get(connectorKey) ?? null;
+  }
+}
+
+export class InMemoryConnectorAuthorizationAdapterRegistry
+  implements ConnectorAuthorizationAdapterRegistry
+{
+  private readonly byConnectorKey: Map<string, ConnectorAuthorizationAdapter>;
+
+  constructor(private readonly adapters: ConnectorAuthorizationAdapter[]) {
+    this.byConnectorKey = new Map(adapters.map((adapter) => [adapter.connectorKey, adapter]));
+  }
+
+  findForConnector(connectorKey: string): ConnectorAuthorizationAdapter | null {
     return this.byConnectorKey.get(connectorKey) ?? null;
   }
 }

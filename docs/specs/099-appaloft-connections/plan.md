@@ -18,6 +18,15 @@
   - temporary one-click DNS setup does not store reusable provider tokens;
   - persistent provider credentials are encrypted or secret-reference backed;
   - provider app installations exchange short-lived runtime tokens.
+- Treat connector authorization as its own lifecycle, not as a static catalog URL:
+  - `connect.start` creates an authorization attempt with owner, connector, requested capability,
+    return URL, provider state, expiry, and redacted diagnostics;
+  - provider-specific OAuth/app-install/device-code/manual-secret details stay behind an
+    authorization adapter;
+  - `connect.callback` validates the attempt state, translates provider response, writes credential
+    material through a credential-store port, and records only a redacted secret reference and safe
+    external account/installation/zone readback on the connection;
+  - abandoned attempts expire and cannot be replayed.
 - Keep identity connections separate from source connections.
 - Keep billing downstream from domain/application facts.
 
@@ -55,6 +64,8 @@
 | APP-CONN-017 | authz/application | Connection lifecycle and readiness are tenant/owner scoped. |
 | APP-CONN-018 | docs/source scan | Category names are not treated as concrete connector keys. |
 | APP-CONN-019 | application/API/UI/adapter | Domain binding DNS readiness checks owner-scoped connected zones, route conflicts, and plan generation without frontend zone guessing. |
+| APP-CONN-020 | application/adapter/persistence | Stateful provider authorization attempts validate callback state, store credentials behind a port, and expose no raw secret values. |
+| APP-CONN-021 | application/API/UI/adapter | Domain binding connect flow authorizes a provider, discovers zones, rematches the hostname, and applies DNS through the owner-scoped connection. |
 
 ## Migration Notes
 

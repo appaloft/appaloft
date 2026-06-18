@@ -1,10 +1,12 @@
 import "reflect-metadata";
 import { describe, expect, test } from "bun:test";
+import { ok } from "@appaloft/core";
 
 import {
   AcceptConnectorCapabilityPlanUseCase,
   ApplyConnectorCapabilityUseCase,
   CompleteConnectionCallbackUseCase,
+  type ConnectorAuthorizationAdapter,
   createDefaultConnectorDefinitions,
   createExecutionContext,
   FakeDnsConnectorProviderAdapter,
@@ -12,6 +14,8 @@ import {
   FakeNotificationConnectorProviderAdapter,
   FakeSourceConnectorProviderAdapter,
   InMemoryAcceptedConnectionCapabilityPlanStore,
+  InMemoryConnectorAuthorizationAdapterRegistry,
+  InMemoryConnectorAuthorizationAttemptStore,
   InMemoryConnectorConnectionStore,
   InMemoryConnectorProviderAdapterRegistry,
   InMemoryConnectorRegistry,
@@ -1144,6 +1148,267 @@ describe("connector catalog", () => {
     });
     expect(shown.isOk()).toBe(true);
     expect(shown._unsafeUnwrap().connectorKey).toBe("cloudflare-dns");
+  });
+
+  test("[APP-CONN-020][APP-CONN-021] completes provider authorization through an attempt and redacted credential ref", async () => {
+    const registry = new InMemoryConnectorRegistry(
+      createDefaultConnectorDefinitions({
+        cloudflareDns: {
+          configured: true,
+        },
+      }),
+    );
+    const store = new InMemoryConnectorConnectionStore();
+    const attemptStore = new InMemoryConnectorAuthorizationAttemptStore();
+    const authAdapter: ConnectorAuthorizationAdapter = {
+      connectorKey: "cloudflare-dns",
+      async startAuthorization(_context, input) {
+        return ok({
+          authorizationUrl: `https://dash.cloudflare.test/oauth/authorize?state=${input.attempt.state}`,
+          nextAction: "authorize-in-browser",
+        });
+      },
+      async completeAuthorization(_context, input) {
+        expect(input.callbackParameters).toMatchObject({ code: "cf_oauth_code" });
+        return ok({
+          credentialGrant: {
+            kind: "persistent-provider-credential",
+            storage: "secret-ref",
+            secretRef: "secretref_org_alpha_cloudflare_dns",
+          },
+          externalAccountId: "cloudflare_account_alpha",
+          expiresAt: "2026-01-01T01:00:00.000Z",
+          providerResources: [
+            {
+              kind: "dns-zone",
+              id: "zone_appalofttest",
+              name: "appalofttest.xyz",
+              providerAccountId: "cloudflare_account_alpha",
+            },
+          ],
+        });
+      },
+    };
+    const authRegistry = new InMemoryConnectorAuthorizationAdapterRegistry([authAdapter]);
+    const clock = { now: () => "2026-01-01T00:00:00.000Z" };
+    const ids = ["conn_cloudflare_dns_oauth", "conn_auth_cloudflare_dns", "state_cloudflare_dns"];
+    const idGenerator = { next: () => ids.shift() ?? "id_extra" };
+    const context = createExecutionContext({
+      entrypoint: "http",
+      tenant: {
+        tenantId: "tenant_alpha",
+        organizationId: "org_alpha",
+        source: "product-session",
+      },
+    });
+    const start = new StartConnectionUseCase(
+      registry,
+      store,
+      clock,
+      idGenerator,
+    ).withAuthorizationLifecycle({
+      authorizationAdapterRegistry: authRegistry,
+      authorizationAttemptStore: attemptStore,
+    });
+    const callback = new CompleteConnectionCallbackUseCase(store, {
+      now: () => "2026-01-01T00:01:00.000Z",
+    }).withAuthorizationLifecycle({
+      authorizationAdapterRegistry: authRegistry,
+      authorizationAttemptStore: attemptStore,
+    });
+
+    const started = await start.execute(context, {
+      connectorKey: "cloudflare-dns",
+      returnUrl: "/resources/res_123/domains",
+      requestedCapabilityKey: "dns.records.apply",
+      originalHostname: "pocketbase.appalofttest.xyz",
+    });
+
+    expect(started.isOk()).toBe(true);
+    const startResult = started._unsafeUnwrap();
+    expect(startResult.nextAction).toBe("authorize-in-browser");
+    expect(startResult.authorizationAttemptId).toBe("conn_auth_cloudflare_dns");
+    expect(startResult.authorizationUrl).toContain("state_cloudflare_dns");
+    expect(startResult.connection.status).toBe("pending");
+    expect(attemptStore.findById("conn_auth_cloudflare_dns")).toMatchObject({
+      status: "pending",
+      originalHostname: "pocketbase.appalofttest.xyz",
+      owner: {
+        scope: "organization",
+        id: "org_alpha",
+        tenantId: "tenant_alpha",
+      },
+    });
+    expect(attemptStore.findByState("state_cloudflare_dns")).toMatchObject({
+      id: "conn_auth_cloudflare_dns",
+      connectionId: "conn_cloudflare_dns_oauth",
+    });
+
+    const completed = await callback.execute(context, {
+      connectionId: "conn_cloudflare_dns_oauth",
+      authorizationAttemptId: "conn_auth_cloudflare_dns",
+      callbackParameters: { code: "cf_oauth_code", state: "state_cloudflare_dns" },
+      status: "success",
+    });
+
+    expect(completed.isOk()).toBe(true);
+    expect(completed._unsafeUnwrap().connection).toMatchObject({
+      status: "connected",
+      credentialGrant: {
+        kind: "persistent-provider-credential",
+        storage: "secret-ref",
+        redacted: true,
+        secretRef: "secretref_org_alpha_cloudflare_dns",
+        externalAccountId: "cloudflare_account_alpha",
+      },
+      providerResources: [
+        {
+          kind: "dns-zone",
+          id: "zone_appalofttest",
+          name: "appalofttest.xyz",
+          providerAccountId: "cloudflare_account_alpha",
+        },
+      ],
+    });
+    expect(JSON.stringify(completed._unsafeUnwrap())).not.toContain("cf_oauth_code");
+    expect(attemptStore.findById("conn_auth_cloudflare_dns")).toMatchObject({
+      status: "completed",
+      completedAt: "2026-01-01T00:01:00.000Z",
+    });
+
+    const replay = await callback.execute(context, {
+      connectionId: "conn_cloudflare_dns_oauth",
+      authorizationAttemptId: "conn_auth_cloudflare_dns",
+      callbackParameters: { code: "cf_oauth_code", state: "state_cloudflare_dns" },
+      status: "success",
+    });
+    expect(replay.isErr()).toBe(true);
+    expect(replay._unsafeUnwrapErr().code).toBe("conflict");
+  });
+
+  test("[APP-CONN-020] fails closed for expired and canceled authorization attempts", async () => {
+    const registry = new InMemoryConnectorRegistry(
+      createDefaultConnectorDefinitions({
+        cloudflareDns: {
+          configured: true,
+        },
+      }),
+    );
+    const store = new InMemoryConnectorConnectionStore();
+    const attemptStore = new InMemoryConnectorAuthorizationAttemptStore();
+    const authAdapter: ConnectorAuthorizationAdapter = {
+      connectorKey: "cloudflare-dns",
+      async startAuthorization(_context, input) {
+        return ok({
+          authorizationUrl: `https://dash.cloudflare.test/oauth/authorize?state=${input.attempt.state}`,
+          nextAction: "authorize-in-browser",
+        });
+      },
+      async completeAuthorization() {
+        throw new Error("Expired or canceled attempts must not exchange provider credentials.");
+      },
+    };
+    const authRegistry = new InMemoryConnectorAuthorizationAdapterRegistry([authAdapter]);
+    const idGenerator = {
+      next: (() => {
+        const ids = [
+          "conn_expired_dns",
+          "conn_auth_expired_dns",
+          "state_expired_dns",
+          "conn_cancel_dns",
+          "conn_auth_cancel_dns",
+          "state_cancel_dns",
+        ];
+        return () => ids.shift() ?? "id_extra";
+      })(),
+    };
+    const context = createExecutionContext({
+      entrypoint: "http",
+      tenant: {
+        tenantId: "tenant_alpha",
+        organizationId: "org_alpha",
+        source: "product-session",
+      },
+    });
+    const start = new StartConnectionUseCase(
+      registry,
+      store,
+      { now: () => "2026-01-01T00:00:00.000Z" },
+      idGenerator,
+    ).withAuthorizationLifecycle({
+      authorizationAdapterRegistry: authRegistry,
+      authorizationAttemptStore: attemptStore,
+    });
+
+    const expiredStart = await start.execute(context, {
+      connectorKey: "cloudflare-dns",
+      originalHostname: "expired.appalofttest.xyz",
+    });
+    expect(expiredStart.isOk()).toBe(true);
+    const expiredCallback = new CompleteConnectionCallbackUseCase(store, {
+      now: () => "2026-01-01T00:16:00.000Z",
+    }).withAuthorizationLifecycle({
+      authorizationAdapterRegistry: authRegistry,
+      authorizationAttemptStore: attemptStore,
+    });
+    const expired = await expiredCallback.execute(context, {
+      connectionId: "conn_expired_dns",
+      authorizationAttemptId: "conn_auth_expired_dns",
+      callbackParameters: { code: "late_code", state: "state_expired_dns" },
+      status: "success",
+    });
+
+    expect(expired.isErr()).toBe(true);
+    expect(expired._unsafeUnwrapErr().code).toBe("conflict");
+    expect(attemptStore.findById("conn_auth_expired_dns")).toMatchObject({
+      status: "expired",
+      diagnostics: [
+        {
+          code: "connection.authorization.expired",
+          severity: "warning",
+        },
+      ],
+    });
+    expect(store.findById("conn_expired_dns")?.status).toBe("pending");
+
+    const cancelStart = await start.execute(context, {
+      connectorKey: "cloudflare-dns",
+      originalHostname: "cancel.appalofttest.xyz",
+    });
+    expect(cancelStart.isOk()).toBe(true);
+    const canceled = await new CompleteConnectionCallbackUseCase(store, {
+      now: () => "2026-01-01T00:02:00.000Z",
+    })
+      .withAuthorizationLifecycle({
+        authorizationAdapterRegistry: authRegistry,
+        authorizationAttemptStore: attemptStore,
+      })
+      .execute(context, {
+        connectionId: "conn_cancel_dns",
+        authorizationAttemptId: "conn_auth_cancel_dns",
+        status: "cancel",
+      });
+
+    expect(canceled.isOk()).toBe(true);
+    expect(canceled._unsafeUnwrap().connection).toMatchObject({
+      status: "failed",
+      diagnostics: [
+        {
+          code: "connection.callback.cancel",
+          severity: "warning",
+          message: "Connection authorization was cancelled.",
+        },
+      ],
+    });
+    expect(attemptStore.findById("conn_auth_cancel_dns")).toMatchObject({
+      status: "failed",
+      diagnostics: [
+        {
+          code: "connection.callback.cancel",
+          severity: "warning",
+        },
+      ],
+    });
   });
 
   test("[APP-CONN-014] scopes connection lifecycle reads and mutations to the execution tenant", async () => {

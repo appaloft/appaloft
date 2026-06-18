@@ -12,6 +12,7 @@ import {
   type ConnectionCategoryKey,
   type ConnectionCredentialGrantSnapshot,
   type ConnectionOwnerSnapshot,
+  type ConnectionProviderResourceSnapshot,
   type ConnectionSnapshot,
   type ConnectorDefinitionSnapshot,
   type DependencyResourceBackup,
@@ -9852,8 +9853,99 @@ export interface ConnectorConnectionProjectionSource {
   findById(context: ExecutionContext, connectionId: string): Promise<ConnectionSnapshot | null>;
 }
 
+export type ConnectorAuthorizationAttemptStatus = "pending" | "completed" | "failed" | "expired";
+
+export interface ConnectorAuthorizationAttemptSnapshot {
+  id: string;
+  connectorKey: string;
+  connectionId: string;
+  owner: ConnectionOwnerSnapshot;
+  state: string;
+  status: ConnectorAuthorizationAttemptStatus;
+  returnUrl?: string;
+  requestedCapabilityKey?: string;
+  originalHostname?: string;
+  createdAt: string;
+  expiresAt: string;
+  completedAt?: string;
+  diagnostics: {
+    code: string;
+    severity: "info" | "warning" | "error";
+    message: string;
+  }[];
+}
+
+export interface ConnectorAuthorizationAttemptStore {
+  save(attempt: ConnectorAuthorizationAttemptSnapshot): void;
+  findById(attemptId: string): ConnectorAuthorizationAttemptSnapshot | null;
+  findByState(state: string): ConnectorAuthorizationAttemptSnapshot | null;
+}
+
+export interface ConnectorAuthorizationStartInput {
+  connector: ConnectorDescriptor;
+  connection: ConnectionSnapshot;
+  attempt: ConnectorAuthorizationAttemptSnapshot;
+}
+
+export interface ConnectorAuthorizationStartResult {
+  authorizationUrl?: string;
+  nextAction: "authorize-in-browser" | "provider-callback" | "manual-secret-required";
+}
+
+export interface ConnectorAuthorizationCallbackInput {
+  connector: ConnectorDescriptor;
+  connection: ConnectionSnapshot;
+  attempt: ConnectorAuthorizationAttemptSnapshot;
+  callbackParameters?: Record<string, unknown>;
+}
+
+export interface ConnectorAuthorizationCallbackResult {
+  credentialGrant: Omit<ConnectionCredentialGrantSnapshot, "redacted">;
+  externalAccountId?: string;
+  externalInstallationId?: string;
+  expiresAt?: string;
+  providerResources?: readonly ConnectionProviderResourceSnapshot[];
+}
+
+export interface ConnectorCredentialStoreInput {
+  connectorKey: string;
+  owner: ConnectionOwnerSnapshot;
+  connectionId: string;
+  purpose: string;
+  secretMaterial: Record<string, string>;
+  metadata?: Record<string, string>;
+}
+
+export interface ConnectorCredentialStoreResult {
+  secretRef: string;
+  expiresAt?: string;
+}
+
+export interface ConnectorCredentialStore {
+  storeSecret(
+    input: ConnectorCredentialStoreInput,
+  ): Promise<Result<ConnectorCredentialStoreResult>>;
+}
+
+export interface ConnectorAuthorizationAdapter {
+  readonly connectorKey: string;
+  startAuthorization(
+    context: ExecutionContext,
+    input: ConnectorAuthorizationStartInput,
+  ): Promise<Result<ConnectorAuthorizationStartResult>>;
+  completeAuthorization(
+    context: ExecutionContext,
+    input: ConnectorAuthorizationCallbackInput,
+  ): Promise<Result<ConnectorAuthorizationCallbackResult>>;
+}
+
+export interface ConnectorAuthorizationAdapterRegistry {
+  findForConnector(connectorKey: string): ConnectorAuthorizationAdapter | null;
+}
+
 export interface ConnectionStartResult {
   connection: ConnectionSnapshot;
+  authorizationAttemptId?: string;
   authorizationUrl?: string;
   nextAction:
     | "already-connected"

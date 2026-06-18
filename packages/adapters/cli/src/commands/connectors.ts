@@ -57,6 +57,10 @@ const externalAccountIdOption = Options.text("external-account-id").pipe(Options
 const externalInstallationIdOption = Options.text("external-installation-id").pipe(
   Options.optional,
 );
+const returnUrlOption = Options.text("return-url").pipe(Options.optional);
+const requestedCapabilityOption = Options.text("requested-capability").pipe(Options.optional);
+const domainOption = Options.text("domain").pipe(Options.optional);
+const originalHostnameOption = Options.text("original-hostname").pipe(Options.optional);
 
 const catalogCommand = EffectCommand.make(
   "catalog",
@@ -217,6 +221,10 @@ const connectCommand = EffectCommand.make(
     secretRef: secretRefOption,
     externalAccountId: externalAccountIdOption,
     externalInstallationId: externalInstallationIdOption,
+    returnUrl: returnUrlOption,
+    requestedCapability: requestedCapabilityOption,
+    domain: domainOption,
+    originalHostname: originalHostnameOption,
   },
   ({
     connector,
@@ -226,12 +234,19 @@ const connectCommand = EffectCommand.make(
     secretRef,
     externalAccountId,
     externalInstallationId,
+    returnUrl,
+    requestedCapability,
+    domain,
+    originalHostname,
   }) =>
     runCommand(
       StartConnectionCommand.create({
         connectorKey: connector,
         owner: ownerRef(optionalValue(ownerScope), optionalValue(ownerId)),
         displayName: optionalValue(displayName),
+        returnUrl: optionalValue(returnUrl),
+        requestedCapabilityKey: optionalValue(requestedCapability),
+        originalHostname: optionalValue(originalHostname) ?? optionalValue(domain),
         credentialGrant: optionalValue(secretRef)
           ? {
               kind: "manual-secret-reference",
