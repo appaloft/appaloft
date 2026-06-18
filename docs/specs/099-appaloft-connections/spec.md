@@ -80,6 +80,7 @@ or directly mutate provider resources.
 | APP-CONN-016 | Provider adapters are mockable | Tests run without network or paid provider access | Connection flows execute | Fake providers simulate success, conflict, token expiry, revoke, callback/webhook, rate limit, and provider errors. |
 | APP-CONN-017 | Connection lifecycle is tenant scoped | A multi-tenant runtime has connection records for different owners | A user lists, shows, starts, completes callback, or revokes a connection | Application services derive or validate `ConnectionOwner.tenantId` from execution context; cross-tenant owner refs and connection ids return not found and do not mutate another tenant's connection. |
 | APP-CONN-018 | Category names are not connector keys | DNS and infrastructure expose category pages and CLI shortcuts | A user views docs, CLI help, API payloads, or audit records | `dns` and `infrastructure` are described only as categories or shortcut namespaces; install, authorization, lifecycle, and adapter selection use concrete connector keys such as `cloudflare-dns` or `vultr-infrastructure`. |
+| APP-CONN-019 | Domain binding DNS readiness is owner-scoped | A user enters or opens a custom domain binding | Web/API/CLI inspect DNS readiness | Appaloft checks connected DNS connections for the execution owner, matches the longest authorized zone through the provider adapter, detects active route conflicts for the same hostname/path, and only generates an apply plan when the domain is covered by an owned/authorized zone. If no zone matches, Appaloft offers provider connect and manual DNS fallback rather than guessing the zone or using a platform-wide credential. |
 
 ## Public Surfaces
 
@@ -124,6 +125,7 @@ appaloft dns apply <domain> --hostname <host> --target <target> --accepted-plan-
 appaloft dns verify <domain> --hostname <host> --target <target>
 appaloft dns cleanup <domain> --hostname <host> --target <target>
 appaloft domain-binding dns-plan <domainBindingId> [--connector cloudflare-dns]
+appaloft domain-binding dns-readiness <domainBindingId> [--connector cloudflare-dns]
 ```
 
 Infrastructure convenience aliases may also exist for ergonomics. They must translate into
@@ -144,6 +146,7 @@ Provider-specific concerns stay behind adapters:
 
 - token format, refresh, revocation, and expiry;
 - provider account, team, zone, project, server, repository, or webhook ids;
+- provider-authorized zone listing for ownership/readiness checks;
 - conflict detection and provider-native error codes;
 - provider API pagination, rate limits, retries, and backoff;
 - provider SDK request/response DTOs;
@@ -158,7 +161,7 @@ references.
 Future implementation should provide fake provider adapters before real provider adapters:
 
 - fake Domain Connect provider: discovery, settings, supported template, consent success/cancel/error;
-- fake DNS provider: list/create/update/delete records, conflicts, revoked credentials, rate limit;
+- fake DNS provider: list authorized zones, list/create/update/delete records, conflicts, revoked credentials, rate limit;
 - fake GitHub provider: installation callback/webhook, repository list, token expiry, permission narrowing;
 - fake infrastructure provider: region/size/image catalog, cost estimate, accepted fake create, cleanup evidence;
 - fake notification provider: payload capture and redaction;
@@ -184,5 +187,7 @@ Future implementation should provide fake provider adapters before real provider
   tracking if long-running provider actions need it.
 - Add Domain Connect temporary DNS setup and persistent DNS provider boundary.
 - Add Web/CLI/API surfaces using the same operation names.
+- Keep domain-binding DNS readiness provider-neutral so future DNS providers only implement the
+  same zone listing, plan, apply, verify, and cleanup adapter methods.
 - Add hosted/private distribution overlays outside public core for official provider apps, commercial
   policy, credential stores, and provider availability.

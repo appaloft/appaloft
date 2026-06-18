@@ -60,8 +60,10 @@ import {
   createExecutionContext,
   type ExecutionContext,
   FakeDnsConnectorProviderAdapter,
+  InMemoryConnectorConnectionStore,
   InMemoryConnectorProviderAdapterRegistry,
   InMemoryConnectorRegistry,
+  ListConnectionsQueryService,
   type OperationCheckRequest,
   type OperationGuardDecision,
   type OperationGuardPort,
@@ -74,6 +76,7 @@ import {
 import { CreateDomainBindingCommand } from "../src/operations/domain-bindings/create-domain-binding.command";
 import {
   CreateDomainBindingUseCase,
+  InspectDomainBindingDnsReadinessQueryService,
   ListDomainBindingsQueryService,
   PlanDomainBindingDnsQueryService,
 } from "../src/use-cases";
@@ -536,6 +539,210 @@ describe("CreateDomainBindingUseCase", () => {
       },
     ]);
     expect(preview.effects.map((effect) => effect.kind)).toContain("dns.record.upsert");
+  });
+
+  test("[APP-CONN-019] blocks DNS apply readiness when no connected DNS zone covers the binding", async () => {
+    const { context, readModel, useCase } = await seedRoutingContext();
+    const result = await useCase.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      serverId: "srv_demo",
+      destinationId: "dst_demo",
+      domainName: "pocketbase.appalofttest.xyz",
+      proxyKind: "traefik",
+      tlsMode: "auto",
+    });
+    expect(result.isOk()).toBe(true);
+
+    const service = new InspectDomainBindingDnsReadinessQueryService(
+      readModel,
+      new ListConnectionsQueryService(new InMemoryConnectorConnectionStore()),
+      new InMemoryConnectorProviderAdapterRegistry([]),
+      new PlanConnectorCapabilityQueryService(
+        new InMemoryConnectorRegistry(createDefaultConnectorDefinitions()),
+        new InMemoryConnectorProviderAdapterRegistry([]),
+      ),
+    );
+
+    const readiness = await service.execute(context, {
+      domainBindingId: result._unsafeUnwrap().id,
+      pathPrefix: "/",
+      capabilityKey: "dns.records.apply",
+    });
+
+    expect(readiness.isOk()).toBe(true);
+    expect(readiness._unsafeUnwrap()).toMatchObject({
+      zoneMatch: { status: "no-dns-connections" },
+      conflict: { status: "available" },
+      plan: { status: "blocked" },
+      actions: {
+        canApplyDns: false,
+        canConnectProvider: true,
+        canShowManualDns: true,
+        reason: "dns-zone-not-connected",
+      },
+    });
+  });
+
+  test("[APP-CONN-019] matches the longest authorized DNS zone before generating an apply plan", async () => {
+    const { context, readModel, useCase } = await seedRoutingContext();
+    const result = await useCase.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      serverId: "srv_demo",
+      destinationId: "dst_demo",
+      domainName: "api.bar.example.com",
+      proxyKind: "traefik",
+      tlsMode: "auto",
+    });
+    expect(result.isOk()).toBe(true);
+
+    const adapterRegistry = new InMemoryConnectorProviderAdapterRegistry([
+      new FakeDnsConnectorProviderAdapter({
+        connectorKey: "cloudflare-dns",
+        providerTitle: "Cloudflare DNS",
+        zones: [{ name: "example.com" }, { name: "bar.example.com" }],
+      }),
+    ]);
+    const connectorRegistry = new InMemoryConnectorRegistry(
+      createDefaultConnectorDefinitions({
+        cloudflareDns: { configured: true },
+      }),
+    );
+    const service = new InspectDomainBindingDnsReadinessQueryService(
+      readModel,
+      new ListConnectionsQueryService(
+        new InMemoryConnectorConnectionStore([
+          {
+            id: "conn_cloudflare_dns_org",
+            connectorKey: "cloudflare-dns",
+            providerKey: "cloudflare",
+            category: "dns",
+            owner: { scope: "organization", id: "org_demo" },
+            displayName: "Cloudflare DNS",
+            status: "connected",
+            capabilities: ["dns.records.plan", "dns.records.apply"],
+            credentialGrant: {
+              kind: "persistent-provider-credential",
+              storage: "secret-ref",
+              redacted: true,
+              externalAccountId: "acct_demo",
+            },
+            diagnostics: [],
+            createdAt: "2026-01-01T00:00:00.000Z",
+            updatedAt: "2026-01-01T00:00:00.000Z",
+          },
+        ]),
+      ),
+      adapterRegistry,
+      new PlanConnectorCapabilityQueryService(connectorRegistry, adapterRegistry),
+    );
+
+    const readiness = await service.execute(context, {
+      domainBindingId: result._unsafeUnwrap().id,
+      pathPrefix: "/",
+      capabilityKey: "dns.records.apply",
+    });
+
+    expect(readiness.isOk()).toBe(true);
+    const payload = readiness._unsafeUnwrap();
+    expect(payload.zoneMatch).toMatchObject({
+      status: "matched",
+      connectorKey: "cloudflare-dns",
+      connectionId: "conn_cloudflare_dns_org",
+      zoneName: "bar.example.com",
+    });
+    expect(payload.actions.canApplyDns).toBe(true);
+    expect(payload.plan.preview?.providerPlan?.dnsRecords?.zoneName).toBe("bar.example.com");
+  });
+
+  test("[APP-CONN-019] reports current-owner domain route conflicts before DNS apply", async () => {
+    const { context, readModel, useCase } = await seedRoutingContext();
+    const result = await useCase.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      serverId: "srv_demo",
+      destinationId: "dst_demo",
+      domainName: "api.example.com",
+      proxyKind: "traefik",
+      tlsMode: "auto",
+    });
+    expect(result.isOk()).toBe(true);
+
+    const adapterRegistry = new InMemoryConnectorProviderAdapterRegistry([
+      new FakeDnsConnectorProviderAdapter({
+        connectorKey: "cloudflare-dns",
+        providerTitle: "Cloudflare DNS",
+        zones: [{ name: "example.com" }],
+      }),
+    ]);
+    const service = new InspectDomainBindingDnsReadinessQueryService(
+      readModel,
+      new ListConnectionsQueryService(
+        new InMemoryConnectorConnectionStore([
+          {
+            id: "conn_cloudflare_dns_org",
+            connectorKey: "cloudflare-dns",
+            providerKey: "cloudflare",
+            category: "dns",
+            owner: { scope: "organization", id: "org_demo" },
+            displayName: "Cloudflare DNS",
+            status: "connected",
+            capabilities: ["dns.records.plan", "dns.records.apply"],
+            credentialGrant: {
+              kind: "persistent-provider-credential",
+              storage: "secret-ref",
+              redacted: true,
+            },
+            diagnostics: [],
+            createdAt: "2026-01-01T00:00:00.000Z",
+            updatedAt: "2026-01-01T00:00:00.000Z",
+          },
+        ]),
+      ),
+      adapterRegistry,
+      new PlanConnectorCapabilityQueryService(
+        new InMemoryConnectorRegistry(
+          createDefaultConnectorDefinitions({
+            cloudflareDns: { configured: true },
+          }),
+        ),
+        adapterRegistry,
+      ),
+    );
+
+    const readiness = await service.execute(context, {
+      resourceId: "res_other",
+      domainName: "api.example.com",
+      pathPrefix: "/",
+      capabilityKey: "dns.records.apply",
+      records: [
+        {
+          name: "api.example.com",
+          type: "CNAME",
+          value: "res-other.example.net",
+          purpose: "domain-routing",
+        },
+      ],
+    });
+
+    expect(readiness.isOk()).toBe(true);
+    expect(readiness._unsafeUnwrap()).toMatchObject({
+      zoneMatch: { status: "matched", zoneName: "example.com" },
+      conflict: {
+        status: "conflict",
+        conflictingDomainBindingId: result._unsafeUnwrap().id,
+        conflictingResourceId: "res_demo",
+      },
+      plan: { status: "blocked" },
+      actions: {
+        canApplyDns: false,
+        reason: "domain-binding-conflict",
+      },
+    });
   });
 
   test("rejects proxyKind none for durable domain bindings", async () => {

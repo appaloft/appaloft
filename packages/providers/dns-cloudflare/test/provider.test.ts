@@ -105,6 +105,21 @@ function adapter(input: Parameters<typeof cloudflareFetcher>[0] = {}) {
 }
 
 describe("CloudflareDnsConnectorProviderAdapter", () => {
+  test("[APP-CONN-019] lists authorized Cloudflare DNS zones for provider-neutral readiness checks", async () => {
+    const service = adapter();
+
+    const result = await service.listZones();
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toEqual([
+      {
+        id: "zone_123",
+        name: "example.com",
+        providerKey: "cloudflare",
+      },
+    ]);
+  });
+
   test("[APP-CONN-004][APP-CONN-016] plans Cloudflare DNS records through the real provider API boundary without exposing token material", async () => {
     const captured: CapturedRequest[] = [];
     const service = adapter({ captured });

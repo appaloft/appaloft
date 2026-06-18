@@ -937,9 +937,11 @@
   } | null>(null);
   let dnsConnectorDialogOpen = $state(false);
   let dnsConnectorBindingId = $state("");
-  let dnsConnectorZoneName = $state("");
   let dnsConnectorPlanPending = $state(false);
   let dnsConnectorApplyPending = $state(false);
+  let dnsConnectorReadiness = $state<Awaited<
+    ReturnType<typeof orpcClient.domainBindings.inspectDnsReadiness>
+  > | null>(null);
   let dnsConnectorPlan = $state<ConnectorCapabilityPlanResponse | null>(null);
   let dnsConnectorApplyResult = $state<ConnectorCapabilityApplyResponse | null>(null);
   let dnsConnectorFeedback = $state<{
@@ -1526,6 +1528,9 @@
   const selectedDnsConnectorBinding = $derived(
     resourceDomainBindings.find((binding) => binding.id === dnsConnectorBindingId) ?? null,
   );
+  const dnsConnectorMatchedZoneName = $derived(
+    dnsConnectorReadiness?.zoneMatch.zoneName ?? "",
+  );
   const dnsConnectorRecords = $derived(
     dnsConnectorPlan?.providerPlan?.dnsRecords?.records ?? [],
   );
@@ -1535,8 +1540,9 @@
   const canApplyDnsConnectorPlan = $derived(
     Boolean(
       selectedDnsConnectorBinding &&
+        dnsConnectorReadiness?.actions.canApplyDns === true &&
         dnsConnectorPlan &&
-        dnsConnectorZoneName.trim() &&
+        dnsConnectorMatchedZoneName &&
         dnsConnectorRecords.length > 0 &&
         dnsConnectorConflicts.length === 0 &&
         !dnsConnectorPlanPending &&
@@ -1864,28 +1870,13 @@
     }
   }
 
-  function inferDnsZoneName(domain: string): string {
-    const labels = domain
-      .trim()
-      .toLowerCase()
-      .replace(/\.$/, "")
-      .split(".")
-      .filter(Boolean);
-
-    if (labels.length <= 2) {
-      return labels.join(".");
-    }
-
-    return labels.slice(-2).join(".");
-  }
-
   function openDnsConnectorDialog(binding: DomainBindingSummary): void {
     if (isResourceArchived) {
       return;
     }
 
     dnsConnectorBindingId = binding.id;
-    dnsConnectorZoneName = inferDnsZoneName(binding.domainName);
+    dnsConnectorReadiness = null;
     dnsConnectorPlan = null;
     dnsConnectorApplyResult = null;
     dnsConnectorFeedback = null;
@@ -1900,7 +1891,7 @@
     }
 
     dnsConnectorBindingId = "";
-    dnsConnectorZoneName = "";
+    dnsConnectorReadiness = null;
     dnsConnectorPlan = null;
     dnsConnectorApplyResult = null;
     dnsConnectorFeedback = null;
@@ -1908,8 +1899,7 @@
 
   async function refreshDnsConnectorPlan(): Promise<void> {
     const binding = selectedDnsConnectorBinding;
-    const zoneName = dnsConnectorZoneName.trim();
-    if (!binding || !zoneName || dnsConnectorPlanPending) {
+    if (!binding || dnsConnectorPlanPending) {
       return;
     }
 
@@ -1917,13 +1907,16 @@
     dnsConnectorApplyResult = null;
     dnsConnectorFeedback = null;
     try {
-      dnsConnectorPlan = await orpcClient.domainBindings.dnsPlan({
+      dnsConnectorReadiness = await orpcClient.domainBindings.inspectDnsReadiness({
         domainBindingId: binding.id,
-        connectorKey: "cloudflare-dns",
         capabilityKey: "dns.records.apply",
-        zoneName,
       });
+      dnsConnectorPlan =
+        dnsConnectorReadiness.plan.status === "ready"
+          ? (dnsConnectorReadiness.plan.preview ?? null)
+          : null;
     } catch (error) {
+      dnsConnectorReadiness = null;
       dnsConnectorPlan = null;
       dnsConnectorFeedback = {
         bindingId: binding.id,
@@ -1938,10 +1931,18 @@
 
   async function applyDnsConnectorPlan(): Promise<void> {
     const binding = selectedDnsConnectorBinding;
-    const zoneName = dnsConnectorZoneName.trim();
+    const readiness = dnsConnectorReadiness;
+    const zoneName = readiness?.zoneMatch.zoneName ?? "";
     const plan = dnsConnectorPlan;
     const records = dnsConnectorRecords;
-    if (!binding || !plan || !zoneName || records.length === 0 || dnsConnectorApplyPending) {
+    if (
+      !binding ||
+      !readiness?.actions.canApplyDns ||
+      !plan ||
+      !zoneName ||
+      records.length === 0 ||
+      dnsConnectorApplyPending
+    ) {
       return;
     }
 
@@ -5454,6 +5455,36 @@
       case undefined:
         return $t(i18nKeys.console.domainBindings.dnsPending);
     }
+  }
+
+  function dnsConnectorZoneLabel(): string {
+    if (!dnsConnectorReadiness) {
+      return "";
+    }
+    if (dnsConnectorReadiness.zoneMatch.status === "matched") {
+      return dnsConnectorMatchedZoneName;
+    }
+    return $t(i18nKeys.console.domainBindings.dnsConnectorReadinessNoZone);
+  }
+
+  function dnsConnectorRouteLabel(): string {
+    if (!dnsConnectorReadiness || dnsConnectorReadiness.conflict.status === "available") {
+      return $t(i18nKeys.console.domainBindings.dnsConnectorReadinessRouteAvailable);
+    }
+    return $t(i18nKeys.console.domainBindings.dnsConnectorReadinessConflictWith, {
+      id: dnsConnectorReadiness.conflict.conflictingDomainBindingId ?? "-",
+    });
+  }
+
+  function dnsConnectorReadinessIssueLabel(): string {
+    const reason = dnsConnectorReadiness?.actions.reason;
+    if (reason === "domain-binding-conflict") {
+      return $t(i18nKeys.console.domainBindings.dnsConnectorReadinessConflict);
+    }
+    if (reason === "dns-zone-not-connected") {
+      return $t(i18nKeys.console.domainBindings.dnsConnectorReadinessNoZone);
+    }
+    return dnsConnectorReadiness?.plan.status ?? "";
   }
 
   function domainDnsObservationStatusVariant(
@@ -9678,20 +9709,36 @@
                   </Badge>
                 </div>
                 <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
-                  <label class="min-w-0 flex-1 space-y-1.5 text-sm font-medium" for="resource-domain-binding-dns-zone">
-                    <span>{$t(i18nKeys.console.domainBindings.dnsConnectorZoneName)}</span>
-                    <Input
-                      id="resource-domain-binding-dns-zone"
-                      bind:value={dnsConnectorZoneName}
-                      autocomplete="off"
-                      placeholder="example.com"
-                    />
-                  </label>
+                  <div class="min-w-0 flex-1 space-y-1.5 text-sm">
+                    <span class="font-medium">
+                      {$t(i18nKeys.console.domainBindings.dnsConnectorReadinessTitle)}
+                    </span>
+                    <div class="rounded-md bg-background px-3 py-2 text-xs text-muted-foreground">
+                      {#if dnsConnectorReadiness}
+                        <p class="break-all">
+                          {$t(i18nKeys.console.domainBindings.dnsConnectorReadinessZone)}:
+                          {dnsConnectorZoneLabel()}
+                        </p>
+                        <p class="mt-1 break-all">
+                          {$t(i18nKeys.console.domainBindings.dnsConnectorReadinessRoute)}:
+                          {dnsConnectorRouteLabel()}
+                        </p>
+                        <p class="mt-1 break-all">
+                          {$t(i18nKeys.console.domainBindings.dnsConnectorReadinessPlan)}:
+                          {dnsConnectorReadiness.plan.status}
+                        </p>
+                      {:else}
+                        <p>
+                          {$t(i18nKeys.console.domainBindings.dnsConnectorReadinessInitial)}
+                        </p>
+                      {/if}
+                    </div>
+                  </div>
                   <Button
                     id="resource-domain-binding-dns-plan-refresh"
                     type="button"
                     variant="outline"
-                    disabled={!dnsConnectorZoneName.trim() || dnsConnectorPlanPending || dnsConnectorApplyPending}
+                    disabled={dnsConnectorPlanPending || dnsConnectorApplyPending}
                     onclick={refreshDnsConnectorPlan}
                   >
                     <RefreshCw class={["size-4", dnsConnectorPlanPending ? "animate-spin" : ""]} />
@@ -9771,6 +9818,32 @@
                       <p class="mt-1 break-all">{dnsConnectorApplyResult.summary}</p>
                     </div>
                   {/if}
+                </section>
+              {:else if dnsConnectorReadiness}
+                <section class="space-y-3 rounded-md border bg-background p-4">
+                  <p class="text-sm font-medium">
+                    {dnsConnectorReadinessIssueLabel()}
+                  </p>
+                  {#if dnsConnectorReadiness.plan.message}
+                    <p class="break-all text-sm leading-6 text-muted-foreground">
+                      {dnsConnectorReadiness.plan.message}
+                    </p>
+                  {/if}
+                  <div class="flex flex-wrap gap-2">
+                    {#if dnsConnectorReadiness.actions.canConnectProvider}
+                      <a class={buttonVariants({ variant: "outline", size: "sm" })} href="/connections?category=dns">
+                        {$t(i18nKeys.console.domainBindings.dnsConnectorConnectProvider)}
+                      </a>
+                    {/if}
+                    {#if dnsConnectorReadiness.actions.canShowManualDns}
+                      <a
+                        class={buttonVariants({ variant: "ghost", size: "sm" })}
+                        href={webDocsHrefs.domainCustomDomainBinding}
+                      >
+                        {$t(i18nKeys.console.domainBindings.dnsConnectorManualDns)}
+                      </a>
+                    {/if}
+                  </div>
                 </section>
               {/if}
 

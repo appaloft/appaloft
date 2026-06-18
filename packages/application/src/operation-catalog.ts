@@ -79,6 +79,7 @@ import { configureDomainBindingRouteCommandInputSchema } from "./operations/doma
 import { confirmDomainBindingOwnershipCommandInputSchema } from "./operations/domain-bindings/confirm-domain-binding-ownership.command";
 import { createDomainBindingCommandInputSchema } from "./operations/domain-bindings/create-domain-binding.command";
 import { deleteDomainBindingCommandInputSchema } from "./operations/domain-bindings/delete-domain-binding.command";
+import { inspectDomainBindingDnsReadinessQueryInputSchema } from "./operations/domain-bindings/inspect-domain-binding-dns-readiness.query";
 import { listDomainBindingsQueryInputSchema } from "./operations/domain-bindings/list-domain-bindings.query";
 import { planDomainBindingDnsQueryInputSchema } from "./operations/domain-bindings/plan-domain-binding-dns.query";
 import { retryDomainBindingVerificationCommandInputSchema } from "./operations/domain-bindings/retry-domain-binding-verification.command";
@@ -3978,6 +3979,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft domain-binding dns-plan <domainBindingId> [--connector cloudflare-dns]",
       orpc: { method: "POST", path: "/api/domain-bindings/{domainBindingId}/dns-plan" },
+    },
+  },
+  {
+    key: "domain-bindings.dns-readiness.inspect",
+    kind: "query",
+    domain: "domain-bindings",
+    messageName: "InspectDomainBindingDnsReadinessQuery",
+    handlerName: "InspectDomainBindingDnsReadinessQueryHandler",
+    serviceName: "InspectDomainBindingDnsReadinessQueryService",
+    inputSchema: inspectDomainBindingDnsReadinessQueryInputSchema,
+    serviceToken: tokens.inspectDomainBindingDnsReadinessQueryService,
+    transports: {
+      cli: "appaloft domain-binding dns-readiness <domainBindingId>",
+      orpc: { method: "POST", path: "/api/domain-bindings/dns-readiness/inspect" },
     },
   },
   {

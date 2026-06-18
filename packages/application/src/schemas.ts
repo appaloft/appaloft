@@ -101,6 +101,7 @@ export * from "./operations/domain-bindings/configure-domain-binding-route.schem
 export * from "./operations/domain-bindings/confirm-domain-binding-ownership.schema";
 export * from "./operations/domain-bindings/create-domain-binding.schema";
 export * from "./operations/domain-bindings/delete-domain-binding.schema";
+export * from "./operations/domain-bindings/inspect-domain-binding-dns-readiness.schema";
 export * from "./operations/domain-bindings/list-domain-bindings.schema";
 export * from "./operations/domain-bindings/plan-domain-binding-dns.schema";
 export * from "./operations/domain-bindings/retry-domain-binding-verification.schema";

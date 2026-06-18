@@ -603,6 +603,9 @@ export const tokens = {
   listDomainBindingsQueryService: Symbol.for("appaloft.list_domain_bindings_query_service"),
   showDomainBindingQueryService: Symbol.for("appaloft.show_domain_binding_query_service"),
   planDomainBindingDnsQueryService: Symbol.for("appaloft.plan_domain_binding_dns_query_service"),
+  inspectDomainBindingDnsReadinessQueryService: Symbol.for(
+    "appaloft.inspect_domain_binding_dns_readiness_query_service",
+  ),
   checkDomainBindingDeleteSafetyQueryService: Symbol.for(
     "appaloft.check_domain_binding_delete_safety_query_service",
   ),

@@ -3,6 +3,7 @@ export * from "./operations/domain-bindings/configure-domain-binding-route.comma
 export * from "./operations/domain-bindings/confirm-domain-binding-ownership.command";
 export * from "./operations/domain-bindings/create-domain-binding.command";
 export * from "./operations/domain-bindings/delete-domain-binding.command";
+export * from "./operations/domain-bindings/inspect-domain-binding-dns-readiness.query";
 export * from "./operations/domain-bindings/list-domain-bindings.query";
 export * from "./operations/domain-bindings/plan-domain-binding-dns.query";
 export * from "./operations/domain-bindings/retry-domain-binding-verification.command";

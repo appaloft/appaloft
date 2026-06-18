@@ -1272,7 +1272,8 @@ describe("console page structure", () => {
     expect(resourceDetailPageSource).toContain("openDnsConnectorDialog(binding)");
     expect(resourceDetailPageSource).toContain("setResourceDomainBindingCreateDialogOpen");
     expect(resourceDetailPageSource).toContain("setDnsConnectorDialogOpen");
-    expect(resourceDetailPageSource).toContain("orpcClient.domainBindings.dnsPlan");
+    expect(resourceDetailPageSource).toContain("orpcClient.domainBindings.inspectDnsReadiness");
+    expect(resourceDetailPageSource).not.toContain("inferDnsZoneName");
     expect(resourceDetailPageSource).toContain("orpcClient.connections.capability.accept");
     expect(resourceDetailPageSource).toContain("orpcClient.connections.capability.apply");
     expect(resourceDetailPageSource).toContain('capabilityKey: "dns.records.apply"');
@@ -1318,7 +1319,9 @@ describe("console page structure", () => {
       '<Select.Item value="nginx">nginx</Select.Item>',
     );
     expect(resourceDetailPageSource).toContain("data-resource-domain-binding-dns-dialog");
-    expect(resourceDetailPageSource).toContain('id="resource-domain-binding-dns-zone"');
+    expect(resourceDetailPageSource).toContain("dnsConnectorReadiness");
+    expect(resourceDetailPageSource).toContain("dnsConnectorConnectProvider");
+    expect(resourceDetailPageSource).toContain("dnsConnectorManualDns");
     expect(resourceDetailPageSource).toContain('id="resource-domain-binding-dns-apply"');
   });
 
