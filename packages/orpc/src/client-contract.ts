@@ -1,3 +1,4 @@
+import { type DomainBindingDnsReadiness } from "@appaloft/application";
 import {
   type AcceptBlueprintInstallCommandInput,
   type AcceptBlueprintInstallCommandResponse,
@@ -88,6 +89,7 @@ import {
   type ImportCertificateCommandInput,
   type ImportDependencyResourceCommandInput,
   type ImportResourceVariablesCommandInput,
+  type InspectDomainBindingDnsReadinessQueryInput,
   type InspectRuntimeUsageQueryInput,
   type InspectServerCapacityQueryInput,
   type InviteOrganizationMemberCommandInput,
@@ -1658,6 +1660,12 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       PlanDomainBindingDnsQueryInput,
       ConnectorCapabilityPlanResponse,
+      AppaloftClientError
+    >;
+    inspectDnsReadiness: Client<
+      AppaloftClientContext,
+      InspectDomainBindingDnsReadinessQueryInput,
+      DomainBindingDnsReadiness,
       AppaloftClientError
     >;
     configureRoute: Client<

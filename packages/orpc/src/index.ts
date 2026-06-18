@@ -235,6 +235,7 @@ import {
   ImportResourceVariablesCommand,
   IngestPreviewPullRequestEventCommand,
   IngestSourceEventCommand,
+  InspectDomainBindingDnsReadinessQuery,
   InspectRuntimeUsageQuery,
   type InspectRuntimeUsageQueryInput,
   InspectServerCapacityQuery,
@@ -243,6 +244,7 @@ import {
   importCertificateCommandInputSchema,
   importDependencyResourceCommandInputSchema,
   importResourceVariablesCommandInputSchema,
+  inspectDomainBindingDnsReadinessQueryInputSchema,
   inspectRuntimeUsageQueryInputSchema,
   inspectServerCapacityQueryInputSchema,
   inviteOrganizationMemberCommandInputSchema,
@@ -1080,6 +1082,40 @@ const deleteSourceLinkResponseSchema = z.object({
 
 const base = os.$context<AppaloftOrpcRequestContext>();
 const emptyResponseSchema = z.null();
+
+const domainBindingDnsReadinessResponseSchema = z.object({
+  domainBindingId: z.string().optional(),
+  resourceId: z.string(),
+  domainName: z.string(),
+  pathPrefix: z.string(),
+  zoneMatch: z.object({
+    status: z.enum(["matched", "no-matching-zone", "no-dns-connections"]),
+    connectorKey: z.string().optional(),
+    connectionId: z.string().optional(),
+    providerKey: z.string().optional(),
+    providerAccountId: z.string().optional(),
+    zoneName: z.string().optional(),
+  }),
+  conflict: z.object({
+    status: z.enum(["available", "conflict"]),
+    conflictingDomainBindingId: z.string().optional(),
+    conflictingResourceId: z.string().optional(),
+    conflictingProjectId: z.string().optional(),
+    domainName: z.string().optional(),
+    pathPrefix: z.string().optional(),
+  }),
+  plan: z.object({
+    status: z.enum(["ready", "blocked", "not-requested", "error"]),
+    message: z.string().optional(),
+    preview: connectorCapabilityPlanResponseSchema.optional(),
+  }),
+  actions: z.object({
+    canApplyDns: z.boolean(),
+    canConnectProvider: z.boolean(),
+    canShowManualDns: z.boolean(),
+    reason: z.string().optional(),
+  }),
+});
 export const createDeploymentDocsHref = resolvePublicDocsHelpHref("deployment.source");
 
 const environmentProfileRecordSchema = z.record(z.string(), z.unknown());
@@ -4648,6 +4684,19 @@ export const planDomainBindingDnsProcedure = base
     executeQuery(context, PlanDomainBindingDnsQuery.create(input)),
   );
 
+export const inspectDomainBindingDnsReadinessProcedure = base
+  .route({
+    method: "POST",
+    path: "/domain-bindings/dns-readiness/inspect",
+    description: "Inspect DNS zone authorization, route conflicts, and DNS plan readiness.",
+    successStatus: 200,
+  })
+  .input(inspectDomainBindingDnsReadinessQueryInputSchema)
+  .output(domainBindingDnsReadinessResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, InspectDomainBindingDnsReadinessQuery.create(input)),
+  );
+
 export const configureDomainBindingRouteProcedure = base
   .route({
     method: "POST",
@@ -6983,6 +7032,7 @@ export const appaloftOrpcRouter = {
     list: listDomainBindingsProcedure,
     show: showDomainBindingProcedure,
     dnsPlan: planDomainBindingDnsProcedure,
+    inspectDnsReadiness: inspectDomainBindingDnsReadinessProcedure,
     create: createDomainBindingProcedure,
     configureRoute: configureDomainBindingRouteProcedure,
     confirmOwnership: confirmDomainBindingOwnershipProcedure,
@@ -9511,6 +9561,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/connections/capabilities/plan",
     "/api/connections/capabilities/accept",
     "/api/connections/capabilities/apply",
+    "/api/domain-bindings/dns-readiness/inspect",
     "/api/projects",
     "/api/projects/:projectId",
     "/api/projects/:projectId/rename",

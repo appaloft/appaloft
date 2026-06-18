@@ -10,6 +10,7 @@ import {
   createExecutionContext,
   type ExecutionContext,
   type ExecutionContextFactory,
+  InspectDomainBindingDnsReadinessQuery,
   ListConnectionsQuery,
   ListConnectorCategoriesQuery,
   ListConnectorsQuery,
@@ -304,6 +305,103 @@ describe("connections HTTP routes", () => {
       },
     });
     expect(capturedQuery).toBeInstanceOf(PlanDomainBindingDnsQuery);
+  });
+
+  test("[APP-CONN-014][APP-CONN-019] inspects domain binding DNS readiness through HTTP/oRPC", async () => {
+    let capturedQuery: Query<unknown> | undefined;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      commandBus: noopCommandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      productSessionAuthorizationPort: authenticatedProductSessionAuthorizationPort,
+      queryBus: queryBusFor((query) => {
+        capturedQuery = query;
+        return {
+          domainBindingId: "dbind_test",
+          resourceId: "res_test",
+          domainName: "app.example.com",
+          pathPrefix: "/",
+          zoneMatch: {
+            status: "matched",
+            connectorKey: "cloudflare-dns",
+            connectionId: "conn_cloudflare_dns_org",
+            providerKey: "cloudflare",
+            zoneName: "example.com",
+          },
+          conflict: {
+            status: "available",
+          },
+          plan: {
+            status: "ready",
+            preview: {
+              planId: "dnsplan_binding_test",
+              connectorKey: "cloudflare-dns",
+              capabilityKey: "dns.records.apply",
+              riskLevel: "low",
+              requiresExplicitAcceptance: true,
+              summary: "Cloudflare DNS: 1 DNS record planned in example.com.",
+              effects: [
+                {
+                  kind: "dns.record.upsert",
+                  title: "A app.example.com",
+                  description: "A app.example.com -> 127.0.0.1",
+                },
+              ],
+              cleanup: {
+                supported: true,
+              },
+              providerPlan: {
+                kind: "dns-records",
+                dnsRecords: {
+                  zoneName: "example.com",
+                  records: [
+                    {
+                      name: "app.example.com",
+                      type: "A",
+                      value: "127.0.0.1",
+                      purpose: "domain-routing",
+                    },
+                  ],
+                  conflicts: [],
+                },
+              },
+            },
+          },
+          actions: {
+            canApplyDns: true,
+            canConnectProvider: false,
+            canShowManualDns: true,
+          },
+        };
+      }),
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/domain-bindings/dns-readiness/inspect", {
+        method: "POST",
+        headers: {
+          cookie: "appaloft-session=connections-test",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          domainBindingId: "dbind_test",
+          capabilityKey: "dns.records.apply",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      zoneMatch: {
+        status: "matched",
+        connectionId: "conn_cloudflare_dns_org",
+        zoneName: "example.com",
+      },
+      conflict: { status: "available" },
+      plan: { status: "ready" },
+      actions: { canApplyDns: true },
+    });
+    expect(capturedQuery).toBeInstanceOf(InspectDomainBindingDnsReadinessQuery);
   });
 
   test("[APP-CONN-014][APP-CONN-010] accepts connector capability plans through HTTP/oRPC", async () => {

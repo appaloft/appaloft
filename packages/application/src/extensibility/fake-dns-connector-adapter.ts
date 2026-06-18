@@ -22,12 +22,14 @@ import {
   type ConnectorCapabilityPlanPreview,
   type ConnectorProviderAdapter,
   type DnsConnectorProviderRecordStore,
+  type DnsConnectorZoneSnapshot,
 } from "../ports";
 
 export interface FakeDnsConnectorProviderAdapterOptions {
   connectorKey: string;
   providerTitle: string;
   existingRecords?: readonly DnsRecordRequirementSnapshot[];
+  zones?: readonly DnsConnectorZoneSnapshot[];
   failureMode?: FakeDnsConnectorProviderFailureMode;
   domainConnect?: {
     providerKey?: string;
@@ -245,6 +247,7 @@ export class FakeDnsConnectorProviderAdapter implements ConnectorProviderAdapter
   readonly connectorKey: string;
   private readonly providerTitle: string;
   private readonly recordStore: DnsConnectorProviderRecordStore;
+  private readonly zones: readonly DnsConnectorZoneSnapshot[];
   private readonly domainConnectProviderKey: string;
   private readonly domainConnectServiceId: string;
   private readonly domainConnectTemplateId: string;
@@ -256,12 +259,17 @@ export class FakeDnsConnectorProviderAdapter implements ConnectorProviderAdapter
     this.recordStore = new InMemoryDnsConnectorProviderRecordStore(options.existingRecords, {
       ...(options.failureMode ? { failureMode: options.failureMode } : {}),
     });
+    this.zones = options.zones ?? [];
     this.domainConnectProviderKey = options.domainConnect?.providerKey ?? "cloudflare";
     this.domainConnectServiceId = options.domainConnect?.serviceId ?? "appaloft";
     this.domainConnectTemplateId = options.domainConnect?.templateId ?? "appaloft-domain";
     this.domainConnectConsentBaseUrl =
       options.domainConnect?.consentBaseUrl ??
       "https://domainconnect.example.test/v2/domainTemplates/providers";
+  }
+
+  async listZones(): Promise<Result<readonly DnsConnectorZoneSnapshot[]>> {
+    return ok(this.zones.map((zone) => ({ ...zone })));
   }
 
   canPlan(capabilityKey: string): boolean {

@@ -32,6 +32,9 @@
 - [x] APP-CONN-016: add fake DNS provider adapter contract tests.
 - [x] APP-CONN-017: add connection lifecycle tenant scope test.
 - [x] APP-CONN-018: document that category names are not connector keys.
+- [x] APP-CONN-019: add domain binding DNS readiness tests for no connected zone, longest authorized zone match, and active hostname/path conflict.
+- [x] APP-CONN-019: add HTTP/oRPC route test for DNS readiness inspection.
+- [x] APP-CONN-019: add Cloudflare real-adapter zone listing test so provider ownership checks do not depend on frontend zone guessing.
 
 ## Implementation
 
@@ -55,6 +58,9 @@
 - [x] Add CLI and HTTP surfaces for catalog, connection lifecycle, accepted capability plans, DNS planning, DNS apply/verify/cleanup, and infrastructure proposal planning.
 - [x] Add Web central/contextual extension metadata for Connections console pages.
 - [x] Add resource domain binding DNS connector dialog that plans records from `domainBindings.dnsPlan`, accepts the plan, and applies it through `connections.capability.apply`.
+- [x] Add provider-neutral DNS zone listing to connector adapters and fake providers.
+- [x] Add `domain-bindings.dns-readiness.inspect` to inspect owner-scoped DNS zone authorization, route conflicts, and plan readiness before apply.
+- [x] Update resource domain binding DNS connector dialog to call `domainBindings.inspectDnsReadiness` and remove client-side zone inference/manual zone input.
 - [x] Add public docs page for neutral connection language and category/concrete connector naming.
 
 ## Verification

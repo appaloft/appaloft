@@ -241,6 +241,8 @@ import {
   IngestSourceEventCommandHandler,
   IngestSourceEventUseCase,
   InMemoryDependencyResourceProvisioningPlanStore,
+  InspectDomainBindingDnsReadinessQueryHandler,
+  InspectDomainBindingDnsReadinessQueryService,
   InspectRuntimeUsageQueryHandler,
   InspectServerCapacityQueryHandler,
   InspectServerCapacityQueryService,
@@ -2490,6 +2492,7 @@ export function registerApplicationServices(
   container.registerSingleton(DeleteServerCommandHandler);
   container.registerSingleton(DeleteSshCredentialCommandHandler);
   container.registerSingleton(DeleteDomainBindingCommandHandler);
+  container.registerSingleton(InspectDomainBindingDnsReadinessQueryHandler);
   container.registerSingleton(RotateSshCredentialCommandHandler);
   container.registerSingleton(RenameServerCommandHandler);
   container.registerSingleton(SetProjectDescriptionCommandHandler);
@@ -3389,6 +3392,10 @@ export function registerApplicationServices(
   container.registerSingleton(
     tokens.planDomainBindingDnsQueryService,
     PlanDomainBindingDnsQueryService,
+  );
+  container.registerSingleton(
+    tokens.inspectDomainBindingDnsReadinessQueryService,
+    InspectDomainBindingDnsReadinessQueryService,
   );
   container.registerSingleton(
     tokens.checkDomainBindingDeleteSafetyQueryService,

@@ -61,7 +61,7 @@ export class PlanDomainBindingDnsQueryService {
   }
 }
 
-function domainBindingDnsRecords(
+export function domainBindingDnsRecords(
   binding: DomainBindingSummary,
   input: Pick<PlanDomainBindingDnsQueryPayload, "proxied" | "recordType" | "ttl">,
 ): Result<DnsRecordRequirementSnapshot[]> {

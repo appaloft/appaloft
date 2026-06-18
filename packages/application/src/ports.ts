@@ -9946,8 +9946,52 @@ export interface ConnectorCapabilityApplyResult {
   };
 }
 
+export interface DomainBindingDnsZoneMatch {
+  status: "matched" | "no-matching-zone" | "no-dns-connections";
+  connectorKey?: string;
+  connectionId?: string;
+  providerKey?: string;
+  providerAccountId?: string;
+  zoneName?: string;
+}
+
+export interface DomainBindingDnsConflictReadiness {
+  status: "available" | "conflict";
+  conflictingDomainBindingId?: string;
+  conflictingResourceId?: string;
+  conflictingProjectId?: string;
+  domainName?: string;
+  pathPrefix?: string;
+}
+
+export interface DomainBindingDnsPlanReadiness {
+  status: "ready" | "blocked" | "not-requested" | "error";
+  message?: string;
+  preview?: ConnectorCapabilityPlanPreview;
+}
+
+export interface DomainBindingDnsReadiness {
+  domainBindingId?: string;
+  resourceId: string;
+  domainName: string;
+  pathPrefix: string;
+  zoneMatch: DomainBindingDnsZoneMatch;
+  conflict: DomainBindingDnsConflictReadiness;
+  plan: DomainBindingDnsPlanReadiness;
+  actions: {
+    canApplyDns: boolean;
+    canConnectProvider: boolean;
+    canShowManualDns: boolean;
+    reason?: string;
+  };
+}
+
 export interface ConnectorProviderAdapter {
   readonly connectorKey: string;
+  listZones?(input?: {
+    ownerRef?: ConnectionOwnerSnapshot;
+    connectorKey?: string;
+  }): Promise<Result<readonly DnsConnectorZoneSnapshot[]>>;
   canPlan(capabilityKey: string): boolean;
   planCapability(
     context: ExecutionContext,
@@ -9970,7 +10014,20 @@ export interface DnsConnectorPlanParameters {
   records: DnsRecordRequirementSnapshot[];
 }
 
+export interface DnsConnectorZoneSnapshot {
+  id?: string;
+  name: string;
+  providerKey?: string;
+  providerAccountId?: string;
+  connectionId?: string;
+  verified?: boolean;
+}
+
 export interface DnsConnectorProviderReadModel {
+  listZones?(input?: {
+    ownerRef?: ConnectionOwnerSnapshot;
+    connectorKey?: string;
+  }): Promise<Result<readonly DnsConnectorZoneSnapshot[]>>;
   existingRecords(input: {
     zoneName?: string;
     records: readonly DnsRecordRequirementSnapshot[];

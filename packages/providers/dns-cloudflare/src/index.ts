@@ -5,6 +5,7 @@ import {
   type ConnectorCapabilityPlanPreview,
   type ConnectorProviderAdapter,
   type DnsConnectorProviderRecordStore,
+  type DnsConnectorZoneSnapshot,
   type ExecutionContext,
 } from "@appaloft/application";
 import {
@@ -77,6 +78,10 @@ interface CloudflareApiError {
 interface CloudflareZoneRecord {
   id: string;
   name: string;
+  account?: {
+    id?: string;
+    name?: string;
+  } | null;
 }
 
 interface CloudflareDnsRecord {
@@ -288,6 +293,22 @@ export class CloudflareDnsRecordStore implements DnsConnectorProviderRecordStore
     });
   }
 
+  async listZones(): Promise<Result<readonly DnsConnectorZoneSnapshot[], DomainError>> {
+    const url = this.url("/zones");
+    url.searchParams.set("status", "active");
+    url.searchParams.set("per_page", "50");
+    const response = await this.request<CloudflareListResponse<CloudflareZoneRecord>>(url);
+    if (response.isErr()) return err(response.error);
+    return ok(
+      response.value.result.map((zone) => ({
+        id: zone.id,
+        name: normalizeZoneName(zone.name),
+        providerKey: "cloudflare",
+        ...(zone.account?.id ? { providerAccountId: zone.account.id } : {}),
+      })),
+    );
+  }
+
   private async listRelevantRecords(input: {
     zoneName?: string;
     records: readonly DnsRecordRequirementSnapshot[];
@@ -420,6 +441,12 @@ export class CloudflareDnsConnectorProviderAdapter implements ConnectorProviderA
 
   canPlan(capabilityKey: string): boolean {
     return capabilityKey === "dns.records.plan" || capabilityKey === "dns.records.apply";
+  }
+
+  async listZones(): Promise<Result<readonly DnsConnectorZoneSnapshot[], DomainError>> {
+    return this.recordStore.listZones
+      ? this.recordStore.listZones()
+      : err(domainError.invariant("Cloudflare DNS record store cannot list zones"));
   }
 
   async planCapability(
