@@ -24,7 +24,7 @@ export class ShowConnectionQueryService {
     context: ExecutionContext,
     input: { connectionId: string },
   ): Promise<Result<ConnectionSnapshot>> {
-    const connection = this.connectionStore.findById(input.connectionId);
+    const connection = await this.connectionStore.findById(input.connectionId);
     if (connection) {
       if (!connectionBelongsToContext(context, connection)) {
         return err(domainError.notFound("Connection", input.connectionId));

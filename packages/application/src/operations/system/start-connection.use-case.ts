@@ -82,9 +82,9 @@ export class StartConnectionUseCase {
       return err(ownerResult.error);
     }
     const owner = ownerResult.value;
-    const existing = this.connectionStore
-      .list({ owner, connectorKey: connector.key })
-      .find((connection) => connection.status !== "revoked");
+    const existing = (await this.connectionStore.list({ owner, connectorKey: connector.key })).find(
+      (connection) => connection.status !== "revoked",
+    );
     if (existing?.status === "connected") {
       return ok({ connection: existing, nextAction: "already-connected" });
     }
@@ -145,8 +145,8 @@ export class StartConnectionUseCase {
       if (authorization.isErr()) {
         return err(authorization.error);
       }
-      this.authorizationAttemptStore.save(attempt);
-      this.connectionStore.save(snapshot);
+      await this.authorizationAttemptStore.save(attempt);
+      await this.connectionStore.save(snapshot);
       return ok({
         connection: snapshot,
         authorizationAttemptId: attempt.id,
@@ -173,7 +173,7 @@ export class StartConnectionUseCase {
     }
 
     const snapshot = connection.toJSON();
-    this.connectionStore.save(snapshot);
+    await this.connectionStore.save(snapshot);
     return ok({
       connection: snapshot,
       ...(connector.setup?.connectHref ? { authorizationUrl: connector.setup.connectHref } : {}),

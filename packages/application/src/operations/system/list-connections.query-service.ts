@@ -39,7 +39,7 @@ export class ListConnectionsQueryService {
     if (input.category) {
       storeInput.category = input.category;
     }
-    const items = this.connectionStore.list(storeInput);
+    const items = await this.connectionStore.list(storeInput);
     const projected = await this.projectionSource.list(context, storeInput);
     const byId = new Map(items.map((item) => [item.id, item]));
     for (const item of projected) {

@@ -9834,10 +9834,12 @@ export interface ConnectorConnectionStoreListInput {
   category?: ConnectionCategoryKey;
 }
 
+export type MaybePromise<T> = T | Promise<T>;
+
 export interface ConnectorConnectionStore {
-  list(input?: ConnectorConnectionStoreListInput): ConnectionSnapshot[];
-  findById(connectionId: string): ConnectionSnapshot | null;
-  save(connection: ConnectionSnapshot): void;
+  list(input?: ConnectorConnectionStoreListInput): MaybePromise<ConnectionSnapshot[]>;
+  findById(connectionId: string): MaybePromise<ConnectionSnapshot | null>;
+  save(connection: ConnectionSnapshot): MaybePromise<void>;
 }
 
 export interface AcceptedConnectionCapabilityPlanStore {
@@ -9876,9 +9878,9 @@ export interface ConnectorAuthorizationAttemptSnapshot {
 }
 
 export interface ConnectorAuthorizationAttemptStore {
-  save(attempt: ConnectorAuthorizationAttemptSnapshot): void;
-  findById(attemptId: string): ConnectorAuthorizationAttemptSnapshot | null;
-  findByState(state: string): ConnectorAuthorizationAttemptSnapshot | null;
+  save(attempt: ConnectorAuthorizationAttemptSnapshot): MaybePromise<void>;
+  findById(attemptId: string): MaybePromise<ConnectorAuthorizationAttemptSnapshot | null>;
+  findByState(state: string): MaybePromise<ConnectorAuthorizationAttemptSnapshot | null>;
 }
 
 export interface ConnectorAuthorizationStartInput {

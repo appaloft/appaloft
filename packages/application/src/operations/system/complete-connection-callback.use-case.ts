@@ -46,7 +46,7 @@ export class CompleteConnectionCallbackUseCase {
   ): Promise<Result<ConnectionCallbackResult>> {
     const context = maybeInput ? (contextOrInput as ExecutionContext) : undefined;
     const input = maybeInput ?? (contextOrInput as CompleteConnectionCallbackCommandInput);
-    const snapshot = this.connectionStore.findById(input.connectionId);
+    const snapshot = await this.connectionStore.findById(input.connectionId);
     if (!snapshot || !connectionBelongsToContext(context, snapshot)) {
       return err(domainError.notFound("Connection", input.connectionId));
     }
@@ -96,21 +96,21 @@ export class CompleteConnectionCallbackUseCase {
             ? "Connection authorization was cancelled."
             : "Connection authorization failed."),
       });
-      this.failAuthorizationAttempt(snapshot, input);
+      await this.failAuthorizationAttempt(snapshot, input);
     }
     const connectionSnapshot = connection.toJSON();
-    this.connectionStore.save(connectionSnapshot);
+    await this.connectionStore.save(connectionSnapshot);
     return ok({ connection: connectionSnapshot });
   }
 
-  private failAuthorizationAttempt(
+  private async failAuthorizationAttempt(
     connectionSnapshot: ReturnType<Connection["toJSON"]>,
     input: CompleteConnectionCallbackCommandInput,
-  ): void {
+  ): Promise<void> {
     if (!input.authorizationAttemptId || !this.authorizationAttemptStore) {
       return;
     }
-    const attempt = this.authorizationAttemptStore.findById(input.authorizationAttemptId);
+    const attempt = await this.authorizationAttemptStore.findById(input.authorizationAttemptId);
     if (
       !attempt ||
       attempt.connectionId !== connectionSnapshot.id ||
@@ -119,7 +119,7 @@ export class CompleteConnectionCallbackUseCase {
     ) {
       return;
     }
-    this.authorizationAttemptStore.save({
+    await this.authorizationAttemptStore.save({
       ...attempt,
       status: "failed",
       diagnostics: [
@@ -148,7 +148,7 @@ export class CompleteConnectionCallbackUseCase {
     if (!this.authorizationAdapterRegistry || !this.authorizationAttemptStore) {
       return err(domainError.conflict("Connection authorization lifecycle is not configured"));
     }
-    const attempt = this.authorizationAttemptStore.findById(input.authorizationAttemptId);
+    const attempt = await this.authorizationAttemptStore.findById(input.authorizationAttemptId);
     if (
       !attempt ||
       attempt.connectionId !== connectionSnapshot.id ||
@@ -167,7 +167,7 @@ export class CompleteConnectionCallbackUseCase {
     }
     const now = this.clock.now();
     if (Date.parse(attempt.expiresAt) <= Date.parse(now)) {
-      this.authorizationAttemptStore.save({
+      await this.authorizationAttemptStore.save({
         ...attempt,
         status: "expired",
         diagnostics: [
@@ -223,7 +223,7 @@ export class CompleteConnectionCallbackUseCase {
       },
     );
     if (completed.isOk()) {
-      this.authorizationAttemptStore.save({
+      await this.authorizationAttemptStore.save({
         ...attempt,
         status: "completed",
         completedAt: now,
