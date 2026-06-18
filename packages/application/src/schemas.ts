@@ -333,3 +333,4 @@ export * from "./operations/system/show-connection.query";
 export * from "./operations/system/start-connection.command";
 export * from "./operations/terminal-sessions/open-terminal-session.schema";
 export * from "./operations/terminal-sessions/terminal-session-lifecycle.schema";
+export type { DomainBindingDnsReadiness } from "./ports";
