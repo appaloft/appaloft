@@ -7696,7 +7696,7 @@
                                   type="button"
                                   size="sm"
                                   variant="outline"
-                                  disabled={isResourceArchived}
+                                  disabled={isResourceArchived || binding.status === "deleted"}
                                   onclick={() => openDnsConnectorDialog(binding)}
                                 >
                                   <Globe2 class="size-4" />

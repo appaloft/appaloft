@@ -1,4 +1,3 @@
-import { type DomainBindingDnsReadiness } from "@appaloft/application";
 import {
   type AcceptBlueprintInstallCommandInput,
   type AcceptBlueprintInstallCommandResponse,
@@ -81,6 +80,7 @@ import {
   type DeploymentRecoveryReadinessQueryInput,
   type DeploymentTimelineQueryInput,
   type DiffEnvironmentsQueryInput,
+  type DomainBindingDnsReadiness,
   type EnvironmentEffectivePrecedenceQueryInput,
   type ExpireTerminalSessionsCommandInput,
   type GetAuthBootstrapStatusQueryInput,
