@@ -154,7 +154,11 @@ function isTerminalProgressEvent(event: DeploymentProgressEvent): boolean {
     return true;
   }
 
-  return event.phase === "verify" && event.status === "succeeded";
+  if (event.phase !== "verify") {
+    return false;
+  }
+
+  return /\b(?:public route|deployment)\b.*\breachable\b/i.test(event.message);
 }
 
 function createDeploymentTimelineStream(input: {

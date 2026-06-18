@@ -112,6 +112,7 @@ describe("project detail page structure", () => {
       deploymentStatusBadgeSource,
       quickDeploySheetSource,
       operationProgressPanelSource,
+      deploymentProgressTerminalSource,
     ] = await Promise.all([
       readFile(
         new URL("../../routes/projects/[projectId=consoleObjectId]/+page.svelte", import.meta.url),
@@ -134,6 +135,10 @@ describe("project detail page structure", () => {
         new URL("../components/console/OperationProgressPanel.svelte", import.meta.url),
         "utf8",
       ),
+      readFile(
+        new URL("../components/console/DeploymentProgressTerminal.svelte", import.meta.url),
+        "utf8",
+      ),
     ]);
 
     expect(projectSource).toContain("data-project-attention-progress-item");
@@ -152,13 +157,14 @@ describe("project detail page structure", () => {
     expect(quickDeployProgressDialogSource).not.toContain("disabled={pending}");
     expect(quickDeployProgressDialogSource).toContain("embedded?: boolean");
     expect(quickDeployProgressDialogSource).toContain("accessUrl?: string");
-    expect(quickDeployProgressDialogSource).toContain("sm:ml-auto sm:justify-end");
-    expect(quickDeployProgressDialogSource).toContain("i18nKeys.console.resources.accessUrlTitle");
+    expect(quickDeployProgressDialogSource).toContain('class="absolute right-5 top-4"');
+    expect(quickDeployProgressDialogSource).toContain("data-quick-deploy-success-access-url");
     expect(quickDeployProgressDialogSource).toContain(
-      "i18nKeys.console.resources.openGeneratedAccess",
+      "i18nKeys.console.deployments.accessUrlTitle",
     );
-    expect(quickDeployProgressDialogSource).toContain("data-deployment-progress-terminal");
-    expect(quickDeployProgressDialogSource).toContain("bg-zinc-950");
+    expect(quickDeployProgressDialogSource).toContain("i18nKeys.console.deployments.openAccessUrl");
+    expect(quickDeployProgressDialogSource).toContain("DeploymentProgressTerminal");
+    expect(quickDeployProgressDialogSource).toContain("quick-deploy-confetti");
     expect(deploymentProgressDialogSource).not.toContain('disabled={status === "running"');
     expect(quickDeploySheetSource).toContain("embedded");
     expect(quickDeploySheetSource).toContain("onClose?: () => void");
@@ -183,10 +189,17 @@ describe("project detail page structure", () => {
     expect(quickDeploySheetSource).toContain("appendWorkflowDeploymentProgressEventOnce");
     expect(quickDeploySheetSource).not.toContain('installSummary.terminalStatus === "running"');
     expect(operationProgressPanelSource).toContain("{#if requestId}");
-    expect(operationProgressPanelSource).toContain("Intl.DateTimeFormat");
-    expect(operationProgressPanelSource).toContain("new Date(timestamp)");
-    expect(operationProgressPanelSource).toContain("data-deployment-progress-terminal");
-    expect(operationProgressPanelSource).toContain("bg-zinc-950");
+    expect(operationProgressPanelSource).toContain("DeploymentProgressTerminal");
+    expect(deploymentProgressTerminalSource).toContain("Intl.DateTimeFormat");
+    expect(deploymentProgressTerminalSource).toContain("new Date(timestamp)");
+    expect(deploymentProgressTerminalSource).toContain("data-deployment-progress-terminal");
+    expect(deploymentProgressTerminalSource).not.toContain("progressColumnTime");
+    expect(deploymentProgressTerminalSource).not.toContain("progressColumnSource");
+    expect(deploymentProgressTerminalSource).not.toContain("deployment-progress-terminal-dots");
+    expect(deploymentProgressTerminalSource).not.toContain("LoaderCircle");
+    expect(deploymentProgressTerminalSource).not.toContain("progressStatusLabel(event.status)");
+    expect(deploymentProgressTerminalSource).toContain('case "docker"');
+    expect(deploymentProgressTerminalSource).toContain("bg-zinc-950");
     expect(operationProgressPanelSource).not.toContain("xl:grid-cols");
     expect(deploymentStatusBadgeSource).toContain("data-deployment-running-signal");
     expect(deploymentStatusBadgeSource).toContain("bg-amber-50");

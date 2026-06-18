@@ -823,7 +823,7 @@ describe("console page structure", () => {
     assertDisplaySurfaceIsFormFree(deploymentTimelineSource);
     expect(deploymentTimelineSource).toContain("deploymentProgressEvents");
     expect(deploymentTimelineSource).toContain("progressDescription");
-    expect(deploymentTimelineSource).toContain("progressPhaseLabel(event.phase)");
+    expect(deploymentTimelineSource).toContain("DeploymentProgressTerminal");
     expect(deploymentTimelineSource).not.toContain("project activity");
     expect(deploymentTimelineSource).not.toContain("resource activity");
 
@@ -1683,9 +1683,7 @@ describe("console page structure", () => {
     expect(deploymentDetailPageSource).not.toContain('deploymentTabHref("logs")');
     expect(deploymentDetailPageSource).toContain('deploymentTabHref("timeline")');
     expect(deploymentDetailPageSource).toContain('deploymentTabHref("snapshot")');
-    expect(deploymentDetailPageSource).toContain(
-      "grid-cols-[4.75rem_minmax(0,1fr)] gap-x-2 gap-y-1 leading-5 md:grid-cols-[4.75rem_5rem_6rem_3.5rem_minmax(0,1fr)]",
-    );
+    expect(deploymentDetailPageSource).toContain("DeploymentProgressTerminal");
     expect(deploymentDetailPageSource).not.toContain(
       'class="grid grid-cols-[4.75rem_5rem_3.5rem_5rem_minmax(0,1fr)]',
     );
