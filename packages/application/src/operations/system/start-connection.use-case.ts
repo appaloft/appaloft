@@ -8,10 +8,12 @@ import {
   type Result,
 } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
-import { type ExecutionContext } from "../../execution-context";
+import { createExecutionContext, type ExecutionContext } from "../../execution-context";
 import {
   type Clock,
   type ConnectionStartResult,
+  type ConnectorAuthorizationAdapterRegistry,
+  type ConnectorAuthorizationAttemptStore,
   type ConnectorConnectionStore,
   type ConnectorRegistry,
   type IdGenerator,
@@ -25,6 +27,9 @@ import { type StartConnectionCommandInput } from "./start-connection.command";
 
 @injectable()
 export class StartConnectionUseCase {
+  private authorizationAdapterRegistry?: ConnectorAuthorizationAdapterRegistry;
+  private authorizationAttemptStore?: ConnectorAuthorizationAttemptStore;
+
   constructor(
     @inject(tokens.connectorRegistry)
     private readonly connectorRegistry: ConnectorRegistry,
@@ -35,6 +40,15 @@ export class StartConnectionUseCase {
     @inject(tokens.idGenerator)
     private readonly idGenerator: IdGenerator,
   ) {}
+
+  withAuthorizationLifecycle(input: {
+    authorizationAdapterRegistry: ConnectorAuthorizationAdapterRegistry;
+    authorizationAttemptStore: ConnectorAuthorizationAttemptStore;
+  }): this {
+    this.authorizationAdapterRegistry = input.authorizationAdapterRegistry;
+    this.authorizationAttemptStore = input.authorizationAttemptStore;
+    return this;
+  }
 
   async execute(input: StartConnectionCommandInput): Promise<Result<ConnectionStartResult>>;
   async execute(
@@ -101,6 +115,48 @@ export class StartConnectionUseCase {
     const connection = started.value;
     const shouldConnectImmediately =
       credentialGrant.storage === "secret-ref" || credentialGrant.storage === "provider-app";
+    const authAdapter = this.authorizationAdapterRegistry?.findForConnector(connector.key) ?? null;
+    if (!shouldConnectImmediately && authAdapter && this.authorizationAttemptStore) {
+      const snapshot = connection.toJSON();
+      const attempt = {
+        id: this.idGenerator.next("conn_auth"),
+        connectorKey: connector.key,
+        connectionId: snapshot.id,
+        owner,
+        state: this.idGenerator.next("conn_state"),
+        status: "pending" as const,
+        ...(input.returnUrl ? { returnUrl: input.returnUrl } : {}),
+        ...(input.requestedCapabilityKey
+          ? { requestedCapabilityKey: input.requestedCapabilityKey }
+          : {}),
+        ...(input.originalHostname ? { originalHostname: input.originalHostname } : {}),
+        createdAt: this.clock.now(),
+        expiresAt: addSeconds(this.clock.now(), 900),
+        diagnostics: [],
+      };
+      const authorization = await authAdapter.startAuthorization(
+        context ?? createExecutionContext({ entrypoint: "system" }),
+        {
+          connector,
+          connection: snapshot,
+          attempt,
+        },
+      );
+      if (authorization.isErr()) {
+        return err(authorization.error);
+      }
+      this.authorizationAttemptStore.save(attempt);
+      this.connectionStore.save(snapshot);
+      return ok({
+        connection: snapshot,
+        authorizationAttemptId: attempt.id,
+        ...(authorization.value.authorizationUrl
+          ? { authorizationUrl: authorization.value.authorizationUrl }
+          : {}),
+        nextAction: authorization.value.nextAction,
+      });
+    }
+
     if (shouldConnectImmediately) {
       const connected = connection.connect(OccurredAt.rehydrate(this.clock.now()), {
         ...(credentialGrant.externalAccountId
@@ -145,4 +201,12 @@ function compactCredentialGrant(
       : {}),
     ...(credentialGrant.expiresAt ? { expiresAt: credentialGrant.expiresAt } : {}),
   };
+}
+
+function addSeconds(iso: string, seconds: number): string {
+  const timestamp = Date.parse(iso);
+  if (Number.isNaN(timestamp)) {
+    return iso;
+  }
+  return new Date(timestamp + seconds * 1000).toISOString();
 }

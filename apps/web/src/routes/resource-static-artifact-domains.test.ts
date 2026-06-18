@@ -25,6 +25,16 @@ describe("resource static artifact domains panel", () => {
     expect(resourcePageSource).toContain("onsubmit={createResourceDomainBinding}");
     expect(resourcePageSource).toContain("serverId: effectiveDomainBindingServerId");
     expect(resourcePageSource).toContain("destinationId: effectiveDomainBindingDestinationId");
+    expect(resourcePageSource).toContain("connectDnsProviderForSelectedBinding");
+    expect(resourcePageSource).toContain("orpcClient.connections.connect.start");
+    expect(resourcePageSource).toContain('connectorKey: "cloudflare-dns"');
+    expect(resourcePageSource).toContain('requestedCapabilityKey: "dns.records.apply"');
+    expect(resourcePageSource).toContain("originalHostname: binding.domainName");
+    expect(resourcePageSource).toContain("dnsBindingId=");
+    expect(resourcePageSource).toContain('page.url.searchParams.get("connectionStatus")');
+    expect(resourcePageSource).toContain("openDnsConnectorDialog(callbackBinding)");
+    expect(resourcePageSource).toContain('id="resource-domain-binding-dns-connect-provider"');
+    expect(resourcePageSource).toContain("cloudflareConnectorIcon.svg");
     expect(resourcePageSource).not.toContain('id="resource-domain-binding-create-form"');
     expect(resourcePageSource).not.toContain(
       "disabled={isResourceArchived || domainBindingUsesResourceRouteProvider}",

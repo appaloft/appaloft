@@ -51,6 +51,7 @@ function cloneConnection(connection: ConnectionSnapshot): ConnectionSnapshot {
     owner: { ...connection.owner },
     capabilities: [...connection.capabilities],
     credentialGrant: { ...connection.credentialGrant, redacted: true },
+    providerResources: (connection.providerResources ?? []).map((resource) => ({ ...resource })),
     diagnostics: [...connection.diagnostics],
   };
 }

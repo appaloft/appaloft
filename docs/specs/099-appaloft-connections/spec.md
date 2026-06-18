@@ -3,7 +3,10 @@
 - Scope: provider-neutral public Appaloft connection model for external systems used by deploy,
   domains, source providers, infrastructure onboarding, notifications, billing adapters, identity,
   observability, storage, and future tool runtimes.
-- Status: Proposed spec-only slice.
+- Status: First implementation slice active. Neutral model, lifecycle operations, provider
+  authorization attempts, credential-store port, DNS readiness, CLI/API/Web source coverage, and
+  Cloudflare DNS product-flow hooks are implemented; single-scenario browser/API E2E and manual
+  secret fallback remain deferred gaps.
 - Governing docs: [Operations](../../OPERATIONS.md), [Providers](../../PROVIDERS.md),
   [External Edge Access And DNS](../075-external-edge-access-and-dns/spec.md),
   [SSH Onboarding Provider](../092-ssh-onboarding-provider/spec.md).
@@ -81,6 +84,8 @@ or directly mutate provider resources.
 | APP-CONN-017 | Connection lifecycle is tenant scoped | A multi-tenant runtime has connection records for different owners | A user lists, shows, starts, completes callback, or revokes a connection | Application services derive or validate `ConnectionOwner.tenantId` from execution context; cross-tenant owner refs and connection ids return not found and do not mutate another tenant's connection. |
 | APP-CONN-018 | Category names are not connector keys | DNS and infrastructure expose category pages and CLI shortcuts | A user views docs, CLI help, API payloads, or audit records | `dns` and `infrastructure` are described only as categories or shortcut namespaces; install, authorization, lifecycle, and adapter selection use concrete connector keys such as `cloudflare-dns` or `vultr-infrastructure`. |
 | APP-CONN-019 | Domain binding DNS readiness is owner-scoped | A user enters or opens a custom domain binding | Web/API/CLI inspect DNS readiness | Appaloft checks connected DNS connections for the execution owner, matches the longest authorized zone through the provider adapter, detects active route conflicts for the same hostname/path, and only generates an apply plan when the domain is covered by an owned/authorized zone. If no zone matches, Appaloft offers provider connect and manual DNS fallback rather than guessing the zone or using a platform-wide credential. |
+| APP-CONN-020 | Provider authorization is a first-class lifecycle | A connector requires OAuth, provider-app install, device-code, temporary provider consent, or a manual scoped secret | A user starts and completes connection authorization | Appaloft records a bounded authorization attempt, generates a stateful provider redirect or manual-secret challenge, validates callback/state, exchanges or stores credential material behind a credential-store port, records only a secret reference and safe provider readback on the `Connection`, and expires failed or abandoned attempts. |
+| APP-CONN-021 | Productized DNS connect flows use owner credentials | A user binds a hostname under a DNS provider zone they control | They click Connect Provider from the domain binding workflow and return from provider authorization | Appaloft discovers zones through the newly authorized connection, rematches the requested hostname, plans/applies only accepted DNS records through that owner-scoped credential, and never substitutes an operator/platform credential for customer-domain ownership. |
 
 ## Public Surfaces
 
@@ -183,6 +188,8 @@ Future implementation should provide fake provider adapters before real provider
 
 - Add public neutral connection model and operation catalog entries.
 - Add fake provider adapters and contract tests.
+- Add stateful provider authorization attempt ports, callback validation, credential-store write
+  boundary, and safe provider readback before treating `connect.start` as product-ready.
 - Keep durable accepted-plan storage for high-cost provider mutations and extend it with async work
   tracking if long-running provider actions need it.
 - Add Domain Connect temporary DNS setup and persistent DNS provider boundary.
