@@ -29,14 +29,14 @@ export class RevokeConnectionUseCase {
   ): Promise<Result<ConnectionRevokeResult>> {
     const context = maybeInput ? (contextOrInput as ExecutionContext) : undefined;
     const input = maybeInput ?? (contextOrInput as { connectionId: string });
-    const snapshot = this.connectionStore.findById(input.connectionId);
+    const snapshot = await this.connectionStore.findById(input.connectionId);
     if (!snapshot || !connectionBelongsToContext(context, snapshot)) {
       return err(domainError.notFound("Connection", input.connectionId));
     }
     const connection = Connection.rehydrate(snapshot);
     connection.revoke(OccurredAt.rehydrate(this.clock.now()));
     const connectionSnapshot = connection.toJSON();
-    this.connectionStore.save(connectionSnapshot);
+    await this.connectionStore.save(connectionSnapshot);
     return ok({ connection: connectionSnapshot });
   }
 }

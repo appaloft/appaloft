@@ -1142,6 +1142,34 @@ export interface DurableWorkerHeartbeatsTable {
   status: string;
 }
 
+export interface ConnectorConnectionsTable {
+  id: string;
+  owner_scope: string;
+  owner_id: string;
+  owner_tenant_id: ColumnType<string | null, string | null | undefined, string | null>;
+  connector_key: string;
+  category: string;
+  status: string;
+  snapshot: ColumnType<Record<string, unknown>, Record<string, unknown>, Record<string, unknown>>;
+  created_at: TimestampColumn;
+  updated_at: UpdatableTimestampColumn;
+}
+
+export interface ConnectorAuthorizationAttemptsTable {
+  id: string;
+  state: string;
+  connection_id: string;
+  connector_key: string;
+  owner_scope: string;
+  owner_id: string;
+  owner_tenant_id: ColumnType<string | null, string | null | undefined, string | null>;
+  status: string;
+  expires_at: string;
+  snapshot: ColumnType<Record<string, unknown>, Record<string, unknown>, Record<string, unknown>>;
+  created_at: TimestampColumn;
+  updated_at: UpdatableTimestampColumn;
+}
+
 export interface Database {
   account: BetterAuthAccountsTable;
   projects: ProjectsTable;
@@ -1198,6 +1226,8 @@ export interface Database {
   durable_work_items: DurableWorkItemsTable;
   durable_work_events: DurableWorkEventsTable;
   durable_worker_heartbeats: DurableWorkerHeartbeatsTable;
+  connector_connections: ConnectorConnectionsTable;
+  connector_authorization_attempts: ConnectorAuthorizationAttemptsTable;
   github_app_installations: GitHubAppInstallationsTable;
   deploy_tokens: DeployTokensTable;
   invitation: BetterAuthInvitationsTable;
