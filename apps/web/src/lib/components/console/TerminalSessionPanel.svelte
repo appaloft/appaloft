@@ -387,7 +387,7 @@
   });
 </script>
 
-<section class="console-panel space-y-3 p-4">
+<section class="console-panel space-y-3 p-4" data-terminal-session-status={status}>
   <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
     <div class="min-w-0">
       <div class="flex items-center gap-2">
@@ -400,7 +400,13 @@
     </div>
     <div class="flex shrink-0 flex-wrap items-center gap-2">
       <Badge variant={terminalStatusVariant(status)}>{terminalStatusLabel(status)}</Badge>
-      <Button type="button" variant={status === "connected" ? "outline" : "default"} disabled={disabled || status === "connecting"} onclick={handleAction}>
+      <Button
+        type="button"
+        variant={status === "connected" ? "outline" : "default"}
+        disabled={disabled || status === "connecting"}
+        data-terminal-session-action
+        onclick={handleAction}
+      >
         {buttonLabel}
       </Button>
     </div>

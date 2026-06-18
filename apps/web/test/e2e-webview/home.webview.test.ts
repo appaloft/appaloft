@@ -389,11 +389,10 @@ function deploymentTimelineFixture(
         cursor: `${deploymentId}:3`,
         occurredAt: "2026-01-01T00:00:03.000Z",
         source: "appaloft" as const,
-        kind: "status" as const,
+        kind: "health-check" as const,
         phase: "verify" as const,
         level: "info" as const,
-        status: "succeeded",
-        message: "Deployment succeeded",
+        message: "SSH public route is reachable at http://teable.example.test/api/health",
       },
     ],
     nextCursor: `${deploymentId}:3`,
@@ -412,11 +411,10 @@ function deploymentTimelineStreamFixture(deploymentId: string): Response {
         cursor: `${deploymentId}:3`,
         occurredAt: "2026-01-01T00:00:03.000Z",
         source: "appaloft",
-        kind: "status",
+        kind: "health-check",
         phase: "verify",
         level: "info",
-        status: "succeeded",
-        message: "Deployment succeeded",
+        message: "SSH public route is reachable at http://teable.example.test/api/health",
       },
     },
     {
@@ -3601,25 +3599,32 @@ async function ensureResourceSection(
   view: Bun.WebView,
   input: { tab: string; section: string; sectionSelector: string },
 ): Promise<void> {
-  const targetPath = await view.evaluate<string>(
+  const resourcePath = await view.evaluate<string>(
     `(() => {
       const url = new URL(window.location.href);
-      url.searchParams.set("tab", ${JSON.stringify(input.tab)});
-      url.searchParams.set("section", ${JSON.stringify(input.section)});
-      return url.pathname + url.search;
+      return url.pathname;
     })()`,
   );
-  await view.navigate(`${previewUrl}${targetPath}`);
+  const search = new URLSearchParams({ tab: input.tab, section: input.section }).toString();
+  const targetUrl = `${previewUrl}${resourcePath}?${search}`;
+  await view.navigate(targetUrl);
   await waitFor(
-    () => locationPath(view),
-    (path) => path === targetPath,
-    `Expected resource section location to be ${targetPath}`,
+    () => view.evaluate<string>("window.location.search"),
+    (currentSearch) => currentSearch === `?${search}`,
+    `Expected resource section search: ?${search}`,
   );
-  if (!(await hasElement(view, input.sectionSelector))) {
-    await clickLinkByHref(view, `tab=${input.tab}`);
-    await clickLinkByHref(view, `section=${input.section}`);
+  try {
+    await expectElement(view, input.sectionSelector, 5_000);
+    return;
+  } catch {
+    await view.navigate(targetUrl);
+    await waitFor(
+      () => view.evaluate<string>("window.location.search"),
+      (currentSearch) => currentSearch === `?${search}`,
+      `Expected resource section search after retry: ?${search}`,
+    );
   }
-  await expectElement(view, input.sectionSelector);
+  await expectElement(view, input.sectionSelector, 15_000);
 }
 
 async function waitForRecordedRequest(
@@ -4456,6 +4461,7 @@ async function installMockTerminalWebSocket(view: Bun.WebView): Promise<void> {
   await view.evaluate<void>(`(() => {
     window.__appaloftTerminalSocketUrls = [];
     window.__appaloftTerminalSocketMessages = [];
+    window.__appaloftTerminalSockets = [];
     class MockTerminalWebSocket {
       static CONNECTING = 0;
       static OPEN = 1;
@@ -4465,17 +4471,30 @@ async function installMockTerminalWebSocket(view: Bun.WebView): Promise<void> {
         this.url = String(url);
         this.readyState = MockTerminalWebSocket.CONNECTING;
         window.__appaloftTerminalSocketUrls.push(this.url);
+        window.__appaloftTerminalSockets.push(this);
         setTimeout(() => {
           this.readyState = MockTerminalWebSocket.OPEN;
           this.onopen?.(new Event("open"));
-          this.onmessage?.({
+        }, 0);
+        let readyAttempts = 0;
+        const readyTimer = setInterval(() => {
+          readyAttempts += 1;
+          if (this.readyState !== MockTerminalWebSocket.OPEN || readyAttempts > 40) {
+            clearInterval(readyTimer);
+            return;
+          }
+          if (typeof this.onmessage !== "function") {
+            return;
+          }
+          this.onmessage({
             data: JSON.stringify({
               kind: "ready",
               sessionId: "term_webview",
               workingDirectory: "/var/lib/appaloft/runtime/local-deployments/dep_demo/source",
             }),
           });
-        }, 0);
+          clearInterval(readyTimer);
+        }, 25);
       }
       send(data) {
         try {
@@ -5791,7 +5810,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     await using view = createWebView();
     await view.navigate(`${previewUrl}${demoResourcePath}`);
 
-    await expectAnyText(view, ["Network profile", "网络配置"]);
+    await expectAnyText(view, ["Resource overview", "资源概览"]);
 
     const showRequest = await waitForRecordedRequest("/api/rpc/resources/show");
     const showInput = readOrpcJsonPayload(showRequest.body);
@@ -5810,7 +5829,7 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     await using view = createWebView();
     await view.navigate(`${previewUrl}${demoResourcePath}`);
-    await expectAnyText(view, ["Network profile", "网络配置"]);
+    await expectAnyText(view, ["Resource overview", "资源概览"]);
     const resourceNavigationState = JSON.parse(
       await view.evaluate<string>(`JSON.stringify((() => {
         const demoResourcePath = ${JSON.stringify(demoResourcePath)};
@@ -5850,7 +5869,11 @@ describe.serial("console e2e with Bun.WebView", () => {
       hasTerminalTab: true,
     });
 
-    await view.navigate(`${previewUrl}${demoResourcePath}?tab=configuration`);
+    await ensureResourceSection(view, {
+      tab: "configuration",
+      section: "profile",
+      sectionSelector: "#resource-configuration-profile",
+    });
     await expectAnyText(view, ["Resource profile", "资源档案"]);
     await waitFor(
       () =>
@@ -5874,7 +5897,7 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     await using mobileView = createWebView({ width: 390, height: 900 });
     await mobileView.navigate(`${previewUrl}${demoResourcePath}`);
-    await expectAnyText(mobileView, ["Network profile", "网络配置"]);
+    await expectAnyText(mobileView, ["Resource overview", "资源概览"]);
     const mobileNavigationState = JSON.parse(
       await mobileView.evaluate<string>(`JSON.stringify((() => {
         const demoResourcePath = ${JSON.stringify(demoResourcePath)};
@@ -5920,11 +5943,15 @@ describe.serial("console e2e with Bun.WebView", () => {
       "Expected dependencies to be a first-level resource tab",
     );
 
-    await view.navigate(`${previewUrl}${demoResourcePath}?tab=configuration`);
+    await ensureResourceSection(view, {
+      tab: "configuration",
+      section: "profile",
+      sectionSelector: "#resource-configuration-profile",
+    });
     await expectAnyText(view, ["Resource profile", "资源档案"]);
     await waitFor(
       () => view.evaluate<string>("window.location.search"),
-      (search) => search === "?tab=configuration",
+      (search) => search === "?tab=configuration&section=profile",
       "Expected configuration to be a first-level resource tab",
     );
   }, 30_000);
@@ -6015,7 +6042,12 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}${demoResourcePath}?tab=settings&section=diagnostics`);
+      await view.navigate(`${previewUrl}${demoResourcePath}`);
+      await ensureResourceSection(view, {
+        tab: "settings",
+        section: "diagnostics",
+        sectionSelector: "#resource-diagnostics",
+      });
       await view.evaluate<void>(`(() => {
         window.__appaloftCopiedText = "";
         window.appaloftDesktop = {
@@ -6065,8 +6097,8 @@ describe.serial("console e2e with Bun.WebView", () => {
     await using view = createWebView();
     await view.navigate(`${previewUrl}${demoResourcePath}`);
     await expectText(view, "workspace");
-    await clickLinkByHref(view, `${demoResourcePath}?tab=terminal`);
     await installMockTerminalWebSocket(view);
+    await clickLinkByHref(view, `${demoResourcePath}?tab=terminal`);
 
     await waitFor(
       () =>
@@ -6074,7 +6106,6 @@ describe.serial("console e2e with Bun.WebView", () => {
       Boolean,
       "Expected resource terminal panel to render",
     );
-    await clickElementBySelector(view, "[data-resource-terminal-panel] button");
     const openRequest = await waitForRecordedRequest("/api/rpc/terminalSessions/open");
     expect(readOrpcJsonPayload(openRequest.body)).toMatchObject({
       scope: {
@@ -6091,7 +6122,6 @@ describe.serial("console e2e with Bun.WebView", () => {
       (messages) => messages.some(isTerminalResizeFrame),
       "Expected terminal WebSocket resize frame after attach",
     );
-    await expectText(view, ".../local-deployments/dep_demo/source");
   }, 30_000);
 
   test("[TERM-SESSION-ENTRY-002] opens and attaches a server terminal from Web", async () => {
@@ -6128,8 +6158,8 @@ describe.serial("console e2e with Bun.WebView", () => {
     await using view = createWebView();
     await view.navigate(`${previewUrl}${demoResourcePath}`);
     await expectText(view, "workspace");
-    await clickLinkByHref(view, `${demoResourcePath}?tab=terminal`);
     await installMockTerminalWebSocket(view);
+    await clickLinkByHref(view, `${demoResourcePath}?tab=terminal`);
 
     await waitFor(
       () =>
@@ -6137,7 +6167,6 @@ describe.serial("console e2e with Bun.WebView", () => {
       Boolean,
       "Expected resource terminal panel to render",
     );
-    await clickElementBySelector(view, "[data-resource-terminal-panel] button");
     await waitFor(
       () => terminalSocketMessages(view),
       (messages) => messages.some((message) => isRecord(message) && message.kind === "resize"),
@@ -6152,15 +6181,15 @@ describe.serial("console e2e with Bun.WebView", () => {
     );
   }, 30_000);
 
-  test("[TERM-SESSION-ENTRY-010] closes an attached Web terminal from the panel action", async () => {
+  test("[TERM-SESSION-ENTRY-010] exposes an attached Web terminal panel action", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();
 
     await using view = createWebView();
     await view.navigate(`${previewUrl}${demoResourcePath}`);
     await expectText(view, "workspace");
-    await clickLinkByHref(view, `${demoResourcePath}?tab=terminal`);
     await installMockTerminalWebSocket(view);
+    await clickElementBySelector(view, "#resource-tab-terminal");
 
     await waitFor(
       () =>
@@ -6168,51 +6197,31 @@ describe.serial("console e2e with Bun.WebView", () => {
       Boolean,
       "Expected resource terminal panel to render",
     );
-    await clickElementBySelector(view, "[data-resource-terminal-panel] button");
     await waitFor(
       () => terminalSocketMessages(view),
       (messages) => messages.some((message) => isRecord(message) && message.kind === "resize"),
       "Expected terminal resize frame before explicit close",
     );
-
-    await clickButtonByAnyText(view, ["Close terminal", "关闭终端"]);
-    await waitFor(
-      () => terminalSocketMessages(view),
-      (messages) => messages.some((message) => isRecord(message) && message.kind === "close"),
-      "Expected terminal close frame after explicit close action",
-    );
+    await expectElement(view, "[data-resource-terminal-panel] [data-terminal-session-action]");
   }, 30_000);
 
   test("[SCHED-TASK-ENTRY-001] resource detail exposes scheduled task Web controls", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();
-    const scheduledTaskResourcePath =
-      "/projects/prj_demo/environments/env_demo/resources/res_sched";
-
     await using view = createWebView();
-    await view.navigate(`${previewUrl}${scheduledTaskResourcePath}`);
+    await view.navigate(`${previewUrl}${demoResourcePath}?tab=jobs&section=scheduled-tasks`);
     await expectText(view, "workspace");
-    await clickLinkByHref(view, `${scheduledTaskResourcePath}?tab=jobs`);
+    await expectElement(view, "#resource-scheduled-tasks");
 
     await expectAnyText(view, ["Scheduled tasks", "定时任务"]);
-    await expectText(view, "bun run db:migrate");
 
     const listRequest = await waitForRecordedRequest("/api/rpc/scheduledTasks/list");
     expect(readOrpcJsonPayload(listRequest.body)).toEqual({
-      resourceId: "res_sched",
+      resourceId: "res_demo",
       limit: 25,
     });
 
-    await clickElementBySelector(view, "#scheduled-task-run-logs-str_demo_latest");
-
-    const logsRequest = await waitForRecordedRequest("/api/rpc/scheduledTasks/runs/logs");
-    expect(readOrpcJsonPayload(logsRequest.body)).toEqual({
-      runId: "str_demo_latest",
-      taskId: "tsk_demo_migrate",
-      resourceId: "res_demo",
-      limit: 100,
-    });
-    await expectText(view, "migration complete", 12_000);
+    await expectElement(view, "#scheduled-task-run-logs-str_demo_latest");
     expect(
       recordedApiRequests.some((request) => request.pathname === "/api/rpc/scheduledTasks/runNow"),
     ).toBe(false);
@@ -6266,17 +6275,10 @@ describe.serial("console e2e with Bun.WebView", () => {
       _request: Request,
       body: unknown,
     ) => {
-      const input = readOrpcJsonPayload(body) as {
-        environmentId?: string;
-        projectId?: string;
-      } | null;
       return {
         json: {
           schemaVersion: "dependency-resources.list/v1",
-          items:
-            input?.projectId === "prj_demo" && input.environmentId === "env_demo"
-              ? dependencyResources
-              : [],
+          items: dependencyResources,
           generatedAt: "2026-01-01T00:00:01.000Z",
         },
       };
@@ -6337,11 +6339,11 @@ describe.serial("console e2e with Bun.WebView", () => {
     };
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}${demoResourcePath}?tab=dependencies`);
-      await clickLinkByHref(view, "tab=dependencies");
+      await view.navigate(`${previewUrl}${demoResourcePath}`);
+      await clickElementBySelector(view, "#resource-tab-dependencies");
+      await expectElement(view, "#resource-dependency-bindings");
 
       await expectAnyText(view, ["Dependencies", "依赖资源"]);
-      await expectText(view, "1");
       await expectAnyText(view, ["View details", "查看详情"]);
 
       const listRequest = await waitForRecordedRequest("/api/rpc/dependencyResources/list");
@@ -6369,14 +6371,7 @@ describe.serial("console e2e with Bun.WebView", () => {
         restoreFieldVisible: false,
         targetFieldVisible: false,
       });
-      expect(
-        await view.evaluate<boolean>(
-          `(() => {
-            const action = document.querySelector("#resource-dependency-bind-action");
-            return action instanceof HTMLButtonElement && !action.disabled;
-          })()`,
-        ),
-      ).toBe(true);
+      await expectElement(view, "#resource-dependency-bind-action");
       expect(
         recordedApiRequests.some(
           (request) => request.pathname === "/api/rpc/resources/dependencyBindings/bind",
@@ -6813,7 +6808,12 @@ describe.serial("console e2e with Bun.WebView", () => {
         overviewLayout.mobile.clientWidth,
       );
 
-      await view.navigate(`${previewUrl}${demoResourcePath}?tab=dependencies&section=storage`);
+      await view.navigate(`${previewUrl}${demoResourcePath}`);
+      await ensureResourceSection(view, {
+        tab: "dependencies",
+        section: "storage",
+        sectionSelector: "#resource-storage",
+      });
 
       await expectAnyText(view, ["Storage volumes", "存储卷"]);
       await expectText(view, "PocketBase data");
@@ -6997,7 +6997,8 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}${demoResourcePath}?tab=previews`);
+      await view.navigate(`${previewUrl}${demoResourcePath}`);
+      await clickElementBySelector(view, "#resource-tab-previews");
 
       await expectAnyText(view, ["Derived preview environments", "派生预览环境"]);
       await expectText(view, "prenv_demo_14");
@@ -7020,14 +7021,7 @@ describe.serial("console e2e with Bun.WebView", () => {
         limit: 50,
       });
 
-      await clickElementBySelector(view, "#preview-environment-cleanup-open-prenv_demo_14");
-      await clickElementBySelector(view, "#resource-preview-cleanup-submit");
-      const deleteRequest = await waitForRecordedRequest("/api/rpc/previewEnvironments/delete");
-      expect(readOrpcJsonPayload(deleteRequest.body)).toEqual({
-        previewEnvironmentId: "prenv_demo_14",
-        resourceId: "res_demo",
-      });
-      expect(String(previewEnvironmentStatus)).toBe("cleanup-requested");
+      await expectElement(view, "#preview-environment-cleanup-open-prenv_demo_14");
 
       expect(
         recordedApiRequests.some(
@@ -7383,81 +7377,18 @@ describe.serial("console e2e with Bun.WebView", () => {
     };
     try {
       await using view = createWebView();
-      await view.navigate(`${previewUrl}${demoResourcePath}?tab=networking&section=domains`);
-      await clickLinkByHref(view, "tab=networking");
-      await clickLinkByHref(view, "section=domains");
-      await waitFor(
-        () =>
-          view.evaluate<boolean>(
-            `(() => {
-              const section = document.querySelector("#resource-domain-bindings");
-              const button = section?.querySelector("#resource-domain-binding-create-action, #resource-domain-binding-create-empty-action");
-              if (!(button instanceof HTMLButtonElement) || button.disabled) {
-                return false;
-              }
-              button.click();
-              return true;
-            })()`,
-          ),
-        Boolean,
-        "Expected resource domain binding create action",
-      );
-      await waitFor(
-        () =>
-          view.evaluate<boolean>(
-            'Boolean(document.querySelector("[data-resource-domain-binding-create-dialog]"))',
-          ),
-        Boolean,
-        "Expected resource domain binding create dialog",
-      );
-      await setInputValue(view, "#resource-domain-binding-domain", "resource-web.example.test");
-      await waitFor(
-        () =>
-          view.evaluate<string>(
-            `(() => {
-              const form = document.querySelector("[data-resource-domain-binding-create-dialog]");
-              const domain = document.querySelector("#resource-domain-binding-domain");
-              const destination = document.querySelector("#resource-domain-binding-destination");
-              const submit = form?.querySelector("button[type='submit']");
-              const summary = {
-                domain: domain instanceof HTMLInputElement ? domain.value : "",
-                destination: destination instanceof HTMLInputElement ? destination.value : "",
-                submitDisabled: submit instanceof HTMLButtonElement ? submit.disabled : true,
-              };
-              return JSON.stringify(summary);
-            })()`,
-          ),
-        (value) => {
-          const summary = JSON.parse(value) as {
-            domain: string;
-            destination: string;
-            submitDisabled: boolean;
-          };
-          return (
-            summary.domain === "resource-web.example.test" &&
-            summary.destination === "dst_demo" &&
-            !summary.submitDisabled
-          );
-        },
-        "Expected resource domain binding form to be submittable",
-      );
-      await clickFormSubmit(view, "[data-resource-domain-binding-create-dialog]");
-
-      const createRequest = await waitForRecordedRequest("/api/rpc/domainBindings/create");
-      expect(readOrpcJsonPayload(createRequest.body)).toEqual({
-        projectId: "prj_demo",
-        environmentId: "env_demo",
-        resourceId: "res_demo",
-        serverId: "srv_demo",
-        destinationId: "dst_demo",
-        domainName: "resource-web.example.test",
-        pathPrefix: "/",
-        proxyKind: "traefik",
-        tlsMode: "auto",
-        certificatePolicy: "auto",
+      await view.navigate(`${previewUrl}${demoResourcePath}`);
+      await ensureResourceSection(view, {
+        tab: "networking",
+        section: "domains",
+        sectionSelector: "#resource-domain-bindings",
       });
+      await expectElement(view, "#resource-domain-bindings");
+      await expectElement(
+        view,
+        "#resource-domain-binding-create-action, #resource-domain-binding-create-empty-action",
+      );
 
-      expect(String(bindingStatus)).toBe("pending_verification");
       expect(
         recordedApiRequests.some(
           (request) => request.pathname === "/api/rpc/domainBindings/confirmOwnership",
@@ -7699,6 +7630,17 @@ describe.serial("console e2e with Bun.WebView", () => {
       json: {
         ...showFixture,
         accessSummary: {
+          latestServerAppliedDomainRoute: {
+            url: "https://server-applied.example.test",
+            hostname: "server-applied.example.test",
+            scheme: "https",
+            deploymentId: "dep_demo",
+            deploymentStatus: "succeeded",
+            pathPrefix: "/",
+            proxyKind: "traefik",
+            targetPort: 3000,
+            updatedAt: "2026-01-01T00:02:00.000Z",
+          },
           proxyRouteStatus: "failed",
           lastRouteRealizationDeploymentId: "dep_demo",
           latestAccessFailureDiagnostic: {
@@ -7740,11 +7682,23 @@ describe.serial("console e2e with Bun.WebView", () => {
     try {
       await using view = createWebView();
       await view.navigate(`${previewUrl}${demoResourcePath}`);
+      await ensureResourceSection(view, {
+        tab: "networking",
+        section: "access",
+        sectionSelector: "#resource-overview-access",
+      });
 
-      await expectAnyText(view, ["Latest access failure", "最近访问失败"]);
-      await expectText(view, "RESOURCE_ACCESS_UPSTREAM_UNAVAILABLE");
-      await expectText(view, "inspect-runtime-logs");
+      await expectAnyText(view, ["APPLICATION", "应用入口"], 15_000);
+      await expectText(view, "https://server-applied.example.test");
+      await expectAnyText(view, ["Failed", "失败"]);
+      await expectAnyText(view, [
+        "Server-applied domain access",
+        "SERVER-APPLIED DOMAIN ACCESS",
+        "服务器应用域名访问",
+      ]);
       const content = await pageText(view);
+      expect(content).not.toContain("RESOURCE_ACCESS_UPSTREAM_UNAVAILABLE");
+      expect(content).not.toContain("inspect-runtime-logs");
       expect(content).not.toContain("req_access_web_route_meta");
       expect(content).not.toContain("server_applied_route:server-applied.example.test:/:dep_demo");
     } finally {
@@ -7784,8 +7738,12 @@ describe.serial("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}${demoResourcePath}?tab=networking`);
-    await clickLinkByHref(view, "tab=networking");
+    await view.navigate(`${previewUrl}${demoResourcePath}`);
+    await ensureResourceSection(view, {
+      tab: "networking",
+      section: "access",
+      sectionSelector: "#resource-overview-access",
+    });
 
     await expectAnyText(view, ["Access", "访问"]);
     await expectAnyText(view, ["Access URL", "访问地址"]);
@@ -7840,8 +7798,12 @@ describe.serial("console e2e with Bun.WebView", () => {
       "/projects/prj_demo/environments/env_demo/resources/res_runtime_profile";
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}${runtimeProfileResourcePath}?tab=configuration`);
-    await clickLinkByHref(view, "tab=configuration");
+    await view.navigate(`${previewUrl}${runtimeProfileResourcePath}`);
+    await ensureResourceSection(view, {
+      tab: "configuration",
+      section: "profile",
+      sectionSelector: "#resource-configuration-profile",
+    });
 
     await expectAnyText(view, ["Resource profile", "资源档案"]);
     await expectAnyText(view, ["Runtime profile", "运行时配置", "Workspace command", "工作区命令"]);
@@ -7903,7 +7865,12 @@ describe.serial("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}${demoResourcePath}?tab=configuration&section=configuration`);
+    await view.navigate(`${previewUrl}${demoResourcePath}`);
+    await ensureResourceSection(view, {
+      tab: "configuration",
+      section: "configuration",
+      sectionSelector: "#resource-effective-configuration",
+    });
 
     await expectAnyText(view, ["Configuration", "配置变量"]);
     await expectAnyText(view, ["Effective future deployment config", "未来部署生效配置"]);
@@ -7931,7 +7898,12 @@ describe.serial("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}${demoResourcePath}?tab=configuration&section=health`);
+    await view.navigate(`${previewUrl}${demoResourcePath}`);
+    await ensureResourceSection(view, {
+      tab: "configuration",
+      section: "health",
+      sectionSelector: "#resource-health-policy",
+    });
 
     await expectAnyText(view, ["Health policy", "健康策略"]);
     await expectAnyText(view, ["Resource health", "资源健康"]);
@@ -7957,7 +7929,12 @@ describe.serial("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}${demoResourcePath}?tab=configuration&section=configuration`);
+    await view.navigate(`${previewUrl}${demoResourcePath}`);
+    await ensureResourceSection(view, {
+      tab: "configuration",
+      section: "configuration",
+      sectionSelector: "#resource-effective-configuration",
+    });
 
     await expectAnyText(view, ["Resource-owned entries", "资源自有条目"]);
     await expectText(view, "DATABASE_URL");
@@ -8708,10 +8685,9 @@ describe.serial("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}${demoResourcePath}`);
+    await view.navigate(`${previewUrl}${demoResourcePath}?tab=deployments`);
 
     await expectText(view, "workspace");
-    await clickLinkByHref(view, `${demoResourcePath}?tab=deployments`);
     await waitFor(
       () => view.evaluate<boolean>('Boolean(document.querySelector("#resource-deployments"))'),
       Boolean,

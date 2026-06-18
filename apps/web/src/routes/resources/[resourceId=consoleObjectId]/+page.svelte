@@ -1,8 +1,8 @@
 <script lang="ts">
   import { browser } from "$app/environment";
-  import { goto } from "$app/navigation";
+  import { afterNavigate, goto } from "$app/navigation";
   import { page } from "$app/state";
-  import { onDestroy, untrack } from "svelte";
+  import { onDestroy, onMount, untrack } from "svelte";
   import { createMutation, createQuery } from "@tanstack/svelte-query";
   import {
     ArrowLeft,
@@ -311,12 +311,32 @@
     certificatesQuery,
   } = createConsoleQueries(browser);
   const resourceId = $derived(page.params.resourceId ?? "");
+  let resourceLocationSearch = $state(page.url.search);
+  $effect(() => {
+    const search = page.url.search;
+    resourceLocationSearch = browser ? (window.location.search || search) : search;
+  });
+  afterNavigate(({ to }) => {
+    resourceLocationSearch = to?.url.search ?? (browser ? window.location.search : page.url.search);
+  });
+  onMount(() => {
+    const syncResourceLocationSearch = () => {
+      resourceLocationSearch = window.location.search;
+    };
+    syncResourceLocationSearch();
+    window.addEventListener("popstate", syncResourceLocationSearch);
+
+    return () => {
+      window.removeEventListener("popstate", syncResourceLocationSearch);
+    };
+  });
   let resourceSupportsServerBackedRuntimeSurfaces = $state(true);
+  const resourceSearchParams = $derived(new URLSearchParams(resourceLocationSearch));
   const activeTab = $derived(
-    parseResourceDetailTab(page.url.searchParams.get("tab")),
+    parseResourceDetailTab(resourceSearchParams.get("tab")),
   );
   const activeResourceSection = $derived(
-    parseResourceDetailSection(activeTab, page.url.searchParams.get("section")),
+    parseResourceDetailSection(activeTab, resourceSearchParams.get("section")),
   );
   const resourceRuntimeMonitorActive = $derived(
     activeTab === "monitor",
@@ -4735,7 +4755,9 @@
 
   function selectResourceTab(tab: ResourceDetailTab, event: MouseEvent): void {
     event.preventDefault();
-    void goto(resourceTabHref(tab), { noScroll: true, keepFocus: true });
+    const href = resourceTabHref(tab);
+    resourceLocationSearch = new URL(href, window.location.href).search;
+    void goto(href, { noScroll: true, keepFocus: true });
   }
 
   function resourceTabLabel(tab: ResourceDetailTab): string {
@@ -4839,7 +4861,9 @@
 
   function selectResourceDetailSection(section: ResourceDetailSection, event: MouseEvent): void {
     event.preventDefault();
-    void goto(resourceSectionHref(section), { noScroll: true, keepFocus: true });
+    const href = resourceSectionHref(section);
+    resourceLocationSearch = new URL(href, window.location.href).search;
+    void goto(href, { noScroll: true, keepFocus: true });
   }
 
   function resourceSectionLabel(section: ResourceDetailSection): string {
@@ -6131,6 +6155,7 @@
         >
           {#each visibleResourceDetailTabs as tab (tab)}
             <a
+              id={`resource-tab-${tab}`}
               href={resourceTabHref(tab)}
               class={detailTabClass}
               aria-current={activeTab === tab ? "page" : undefined}
