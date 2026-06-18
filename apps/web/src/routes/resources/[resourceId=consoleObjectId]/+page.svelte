@@ -957,8 +957,10 @@
   } | null>(null);
   let dnsConnectorDialogOpen = $state(false);
   let dnsConnectorBindingId = $state("");
+  let dnsConnectorCallbackHandledKey = $state("");
   let dnsConnectorPlanPending = $state(false);
   let dnsConnectorApplyPending = $state(false);
+  let dnsConnectorConnectPending = $state(false);
   let dnsConnectorReadiness = $state<Awaited<
     ReturnType<typeof orpcClient.domainBindings.inspectDnsReadiness>
   > | null>(null);
@@ -1900,6 +1902,7 @@
     dnsConnectorPlan = null;
     dnsConnectorApplyResult = null;
     dnsConnectorFeedback = null;
+    dnsConnectorConnectPending = false;
     dnsConnectorDialogOpen = true;
     void refreshDnsConnectorPlan();
   }
@@ -1915,6 +1918,7 @@
     dnsConnectorPlan = null;
     dnsConnectorApplyResult = null;
     dnsConnectorFeedback = null;
+    dnsConnectorConnectPending = false;
   }
 
   async function refreshDnsConnectorPlan(): Promise<void> {
@@ -2011,6 +2015,47 @@
       };
     } finally {
       dnsConnectorApplyPending = false;
+    }
+  }
+
+  async function connectDnsProviderForSelectedBinding(): Promise<void> {
+    const binding = selectedDnsConnectorBinding;
+    if (!browser || !binding || dnsConnectorConnectPending) {
+      return;
+    }
+
+    dnsConnectorConnectPending = true;
+    dnsConnectorFeedback = null;
+    try {
+      const started = await orpcClient.connections.connect.start({
+        connectorKey: "cloudflare-dns",
+        returnUrl: `/resources/${resourceId}?tab=networking&section=domains&dnsBindingId=${encodeURIComponent(binding.id)}`,
+        requestedCapabilityKey: "dns.records.apply",
+        originalHostname: binding.domainName,
+      });
+      if (started.authorizationUrl) {
+        window.location.assign(started.authorizationUrl);
+        return;
+      }
+      if (started.nextAction === "already-connected" || started.nextAction === "ready") {
+        await refreshDnsConnectorPlan();
+        return;
+      }
+      dnsConnectorFeedback = {
+        bindingId: binding.id,
+        kind: "error",
+        title: $t(i18nKeys.console.domainBindings.dnsConnectorPlanErrorTitle),
+        detail: started.nextAction,
+      };
+    } catch (error) {
+      dnsConnectorFeedback = {
+        bindingId: binding.id,
+        kind: "error",
+        title: $t(i18nKeys.console.domainBindings.dnsConnectorPlanErrorTitle),
+        detail: readErrorMessage(error),
+      };
+    } finally {
+      dnsConnectorConnectPending = false;
     }
   }
 
@@ -3663,6 +3708,30 @@
       storageRuntimeCleanupHandoffOpenedKey = observationHandoffKey;
       openStorageRuntimeCleanupDialog();
     }
+  });
+
+  $effect(() => {
+    const currentResourceId = resource?.id ?? "";
+    const callbackBindingId = page.url.searchParams.get("dnsBindingId") ?? "";
+    const callbackStatus = page.url.searchParams.get("connectionStatus") ?? "";
+    const callbackConnectionId = page.url.searchParams.get("connectionId") ?? "";
+    const callbackKey = `${currentResourceId}:${callbackBindingId}:${callbackStatus}:${callbackConnectionId}`;
+    const callbackBinding = resourceDomainBindings.find(
+      (binding) => binding.id === callbackBindingId,
+    );
+
+    if (!browser || !currentResourceId || !callbackBindingId || !callbackStatus) {
+      return;
+    }
+
+    untrack(() => {
+      if (!callbackBinding || dnsConnectorCallbackHandledKey === callbackKey) {
+        return;
+      }
+
+      dnsConnectorCallbackHandledKey = callbackKey;
+      openDnsConnectorDialog(callbackBinding);
+    });
   });
 
   $effect(() => {
@@ -9856,9 +9925,25 @@
                   {/if}
                   <div class="flex flex-wrap gap-2">
                     {#if dnsConnectorReadiness.actions.canConnectProvider}
-                      <a class={buttonVariants({ variant: "outline", size: "sm" })} href="/connections?category=dns">
-                        {$t(i18nKeys.console.domainBindings.dnsConnectorConnectProvider)}
-                      </a>
+                      <Button
+                        id="resource-domain-binding-dns-connect-provider"
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={dnsConnectorConnectPending || dnsConnectorPlanPending}
+                        onclick={connectDnsProviderForSelectedBinding}
+                      >
+                        <span
+                          class="inline-flex h-4 w-5 items-center justify-center [&_svg]:h-3.5 [&_svg]:w-5"
+                          aria-hidden="true"
+                          title={cloudflareConnectorIcon.title}
+                        >
+                          {@html cloudflareConnectorIcon.svg}
+                        </span>
+                        {dnsConnectorConnectPending
+                          ? $t(i18nKeys.common.status.loading)
+                          : $t(i18nKeys.console.domainBindings.dnsConnectorConnectProvider)}
+                      </Button>
                     {/if}
                     {#if dnsConnectorReadiness.actions.canShowManualDns}
                       <a

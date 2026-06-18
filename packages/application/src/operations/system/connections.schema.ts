@@ -64,6 +64,9 @@ export const startConnectionCommandInputSchema = z
     connectorKey: z.string().min(1),
     owner: connectionOwnerInputSchema.optional(),
     displayName: z.string().min(1).optional(),
+    returnUrl: z.string().min(1).optional(),
+    requestedCapabilityKey: z.string().min(1).optional(),
+    originalHostname: z.string().min(1).optional(),
     credentialGrant: connectionCredentialGrantInputSchema.optional(),
   })
   .strict();
@@ -71,7 +74,10 @@ export const startConnectionCommandInputSchema = z
 export const completeConnectionCallbackCommandInputSchema = z
   .object({
     connectionId: z.string().min(1),
+    authorizationAttemptId: z.string().min(1).optional(),
     status: z.enum(["success", "cancel", "error"]).default("success"),
+    callbackParameters: z.record(z.string(), z.unknown()).optional(),
+    secretRef: z.string().min(1).optional(),
     externalAccountId: z.string().min(1).optional(),
     externalInstallationId: z.string().min(1).optional(),
     expiresAt: z.string().min(1).optional(),
