@@ -148,7 +148,10 @@ describe("deployment timeline observer", () => {
   test("[DEP-TIMELINE-STREAM-001] keeps following after step-level succeeded progress", async () => {
     const observer = new ShellDeploymentTimelineObserver(
       readModel({
-        deployment: deploymentSummary(),
+        deployment: deploymentSummary({
+          status: "succeeded",
+          finishedAt: "2026-01-01T00:00:13.000Z",
+        }),
         timeline: [
           {
             timestamp: "2026-01-01T00:00:10.000Z",

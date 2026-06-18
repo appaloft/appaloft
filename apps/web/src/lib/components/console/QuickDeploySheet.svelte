@@ -101,6 +101,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   } from "$lib/console/blueprint-install-progress";
   import {
     createDeploymentWithProgress,
+    isTerminalDeploymentProgressEvent,
     observeDeploymentProgressAfterAcceptance,
   } from "$lib/console/deployment-progress";
   import { quickDeploySourceHelpHref, webDocsHrefs } from "$lib/console/docs-help";
@@ -4349,9 +4350,15 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   }
 
   function blueprintDeploymentTerminalStatus(): string {
-    return [...workflowDeploymentProgressEvents]
+    const terminalEvent = [...workflowDeploymentProgressEvents]
       .reverse()
-      .find((event) => event.status === "failed" || event.status === "succeeded")?.status ?? "";
+      .find((event) => event.status === "failed" || isTerminalDeploymentProgressEvent(event));
+
+    if (terminalEvent?.status === "failed") {
+      return "failed";
+    }
+
+    return terminalEvent ? "succeeded" : "";
   }
 
   function requireBlueprintInstallDeploymentTimeline(

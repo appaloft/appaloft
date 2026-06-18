@@ -178,7 +178,8 @@ describe("deployment progress helpers", () => {
       status: "succeeded",
     } satisfies Partial<DeploymentProgressEvent>);
     expect(latestDeploymentTimelineCursor(envelopes)).toBe("dep_demo:3");
-    expect(deploymentTimelineProgressStatus(envelopes, "running")).toBe("succeeded");
+    expect(deploymentTimelineProgressStatus(envelopes, "running")).toBe("running");
+    expect(deploymentTimelineProgressStatus(envelopes, "succeeded")).toBe("succeeded");
   });
 
   test("[DEP-TIMELINE-WEB-001] reads raw ORPC envelope timeline responses at the UI boundary", () => {
@@ -394,6 +395,51 @@ describe("deployment progress helpers", () => {
     ]);
     expect(progressEvents[2]?.source).toBe("docker");
     expect(deploymentTimelineProgressStatus(replayEnvelopes, "running")).toBe("succeeded");
+    expect(deploymentTimelineProgressStatus(replayEnvelopes, "succeeded")).toBe("succeeded");
+  });
+
+  test("[DEP-TIMELINE-WEB-003B] only treats verify reachability success as deployment completion", () => {
+    const envelopes: DeploymentTimelineEnvelope[] = [
+      {
+        schemaVersion: "deployments.timeline/v1",
+        kind: "entry",
+        entry: {
+          deploymentId: "dep_demo",
+          sequence: 1,
+          cursor: "dep_demo:1",
+          occurredAt: "2026-01-01T00:00:01.000Z",
+          source: "appaloft",
+          kind: "status",
+          phase: "plan",
+          level: "info",
+          message: "Build runtime plan succeeded",
+          status: "succeeded",
+        },
+      },
+    ];
+
+    expect(deploymentTimelineProgressStatus(envelopes, "running")).toBe("running");
+
+    const reachableEnvelopes: DeploymentTimelineEnvelope[] = [
+      ...envelopes,
+      {
+        schemaVersion: "deployments.timeline/v1",
+        kind: "entry",
+        entry: {
+          deploymentId: "dep_demo",
+          sequence: 2,
+          cursor: "dep_demo:2",
+          occurredAt: "2026-01-01T00:00:02.000Z",
+          source: "appaloft",
+          kind: "status",
+          phase: "verify",
+          level: "info",
+          message: "SSH public route is reachable at http://demo.example.test/api/health",
+        },
+      },
+    ];
+
+    expect(deploymentTimelineProgressStatus(reachableEnvelopes, "running")).toBe("succeeded");
   });
 
   test("[DEP-TIMELINE-WEB-004] normalizes persisted timestamp timeline rows for deployment detail replay", () => {
@@ -645,7 +691,7 @@ describe("deployment progress helpers", () => {
     ]);
   });
 
-  test("[QUICK-DEPLOY-TIMELINE-001] replays terminal deployment timeline without opening follow stream", async () => {
+  test("[QUICK-DEPLOY-TIMELINE-001] confirms terminal replay with the follow stream", async () => {
     timelineMock.mockResolvedValue({
       schemaVersion: "deployments.timeline/v1",
       deploymentId: "dep_demo",
@@ -676,6 +722,16 @@ describe("deployment progress helpers", () => {
         },
       ],
     });
+    timelineStreamMock.mockResolvedValue(
+      (async function* () {
+        yield {
+          schemaVersion: "deployments.timeline/v1",
+          kind: "closed",
+          reason: "completed",
+          cursor: "dep_demo:2",
+        } satisfies DeploymentTimelineEnvelope;
+      })(),
+    );
 
     const progressEvents: DeploymentProgressEvent[] = [];
     await observeDeploymentProgressAfterAcceptance(
@@ -690,7 +746,14 @@ describe("deployment progress helpers", () => {
       "latest: Pulling from muchobien/pocketbase",
       "Deployment succeeded",
     ]);
-    expect(timelineStreamMock).not.toHaveBeenCalled();
+    expect(timelineStreamMock).toHaveBeenCalledWith({
+      deploymentId: "dep_demo",
+      limit: 0,
+      includeHistory: false,
+      follow: true,
+      untilTerminal: true,
+      cursor: "dep_demo:2",
+    });
   });
 
   test("[QUICK-DEPLOY-TIMELINE-002] asks the follow stream for history when replay is initially empty", async () => {
