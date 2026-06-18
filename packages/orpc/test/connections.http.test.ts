@@ -431,6 +431,7 @@ describe("connections HTTP routes", () => {
       }),
       executionContextFactory: new TestExecutionContextFactory(),
       logger: new NoopLogger(),
+      productSessionAuthorizationPort: authenticatedProductSessionAuthorizationPort,
       queryBus: queryBusFor(() => ({})),
     });
 
@@ -438,6 +439,7 @@ describe("connections HTTP routes", () => {
       new Request("http://localhost/api/connections/capabilities/accept", {
         method: "POST",
         headers: {
+          cookie: "appaloft-session=connections-test",
           "content-type": "application/json",
         },
         body: JSON.stringify({
@@ -520,6 +522,7 @@ describe("connections HTTP routes", () => {
       }),
       executionContextFactory: new TestExecutionContextFactory(),
       logger: new NoopLogger(),
+      productSessionAuthorizationPort: authenticatedProductSessionAuthorizationPort,
       queryBus: queryBusFor(() => ({})),
     });
 
@@ -527,6 +530,7 @@ describe("connections HTTP routes", () => {
       new Request("http://localhost/api/connections/capabilities/apply", {
         method: "POST",
         headers: {
+          cookie: "appaloft-session=connections-test",
           "content-type": "application/json",
         },
         body: JSON.stringify({
@@ -607,13 +611,17 @@ describe("connections HTTP routes", () => {
       }),
       executionContextFactory: new TestExecutionContextFactory(),
       logger: new NoopLogger(),
+      productSessionAuthorizationPort: authenticatedProductSessionAuthorizationPort,
       queryBus: queryBusFor(() => ({})),
     });
 
     const startResponse = await app.handle(
       new Request("http://localhost/api/connections/connect/start", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          cookie: "appaloft-session=connections-test",
+          "content-type": "application/json",
+        },
         body: JSON.stringify({
           connectorKey: "cloudflare-dns",
           credentialGrant: {
@@ -637,6 +645,9 @@ describe("connections HTTP routes", () => {
     const revokeResponse = await app.handle(
       new Request("http://localhost/api/connections/conn_cloudflare_dns_test/revoke", {
         method: "POST",
+        headers: {
+          cookie: "appaloft-session=connections-test",
+        },
       }),
     );
 
@@ -649,6 +660,39 @@ describe("connections HTTP routes", () => {
     expect(capturedCommands[0]).toBeInstanceOf(StartConnectionCommand);
     expect(capturedCommands[1]).toBeInstanceOf(CompleteConnectionCallbackCommand);
     expect(capturedCommands[2]).toBeInstanceOf(RevokeConnectionCommand);
+  });
+
+  test("[APP-CONN-014] connector management commands require a product session", async () => {
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      commandBus: commandBusFor(() => {
+        throw new Error("connector management command should not run without product session");
+      }),
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus: queryBusFor(() => ({})),
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/connections/connect/start", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          connectorKey: "cloudflare-dns",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toMatchObject({
+      error: {
+        code: "product_auth_missing",
+        details: {
+          endpoint: "/api/connections/connect/start",
+          method: "POST",
+          requiredRole: "member",
+        },
+      },
+    });
   });
 });
 
