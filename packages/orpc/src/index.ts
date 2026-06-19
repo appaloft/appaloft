@@ -1088,6 +1088,23 @@ const domainBindingDnsReadinessResponseSchema = z.object({
   resourceId: z.string(),
   domainName: z.string(),
   pathPrefix: z.string(),
+  providerDiscovery: z.object({
+    status: z.enum(["detected", "unknown", "unavailable"]),
+    hostname: z.string(),
+    baseDomain: z.string(),
+    nameservers: z.array(z.string()),
+    providerId: z.string(),
+    providerTitle: z.string(),
+    confidence: z.enum(["high", "medium", "unknown"]),
+    recommendedConnectorKey: z.string().optional(),
+    recommendedConnectorTitle: z.string().optional(),
+    message: z.string().optional(),
+  }),
+  selectedConnector: z.object({
+    connectorKey: z.string().optional(),
+    title: z.string().optional(),
+    source: z.enum(["requested", "connected-zone", "detected-provider", "none"]),
+  }),
   zoneMatch: z.object({
     status: z.enum(["matched", "no-matching-zone", "no-dns-connections"]),
     connectorKey: z.string().optional(),
