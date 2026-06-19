@@ -86,6 +86,7 @@ or directly mutate provider resources.
 | APP-CONN-019 | Domain binding DNS readiness is owner-scoped | A user enters or opens a custom domain binding | Web/API/CLI inspect DNS readiness | Appaloft checks connected DNS connections for the execution owner, matches the longest authorized zone through the provider adapter, detects active route conflicts for the same hostname/path, and only generates an apply plan when the domain is covered by an owned/authorized zone. If no zone matches, Appaloft offers provider connect and manual DNS fallback rather than guessing the zone or using a platform-wide credential. |
 | APP-CONN-020 | Provider authorization is a first-class lifecycle | A connector requires OAuth, provider-app install, device-code, temporary provider consent, or a manual scoped secret | A user starts and completes connection authorization | Appaloft records a bounded authorization attempt, generates a stateful provider redirect or manual-secret challenge, validates callback/state, exchanges or stores credential material behind a credential-store port, records only a secret reference and safe provider readback on the `Connection`, and expires failed or abandoned attempts. |
 | APP-CONN-021 | Productized DNS connect flows use owner credentials | A user binds a hostname under a DNS provider zone they control | They click Connect Provider from the domain binding workflow and return from provider authorization | Appaloft discovers zones through the newly authorized connection, rematches the requested hostname, plans/applies only accepted DNS records through that owner-scoped credential, and never substitutes an operator/platform credential for customer-domain ownership. |
+| APP-CONN-022 | Public DNS discovery recommends but does not authorize | A user enters `pocketbase.example.com` before connecting a provider account | Appaloft inspects DNS readiness | Appaloft derives the base domain, queries public NS/authoritative nameserver data through a neutral discovery port, detects known providers such as Cloudflare, GoDaddy, Route53, Namecheap, Vercel, DNSPod, Alibaba Cloud DNS, or Tencent Cloud DNS, and maps the detected provider to an available connector when one exists. The result is only `detectedProvider`; it never proves ownership or grants write access. The page separately reports `connectedZone`, `selectedConnector`, and manual DNS fallback. If the detected provider is supported but the authorized account lacks a covering zone, readiness says the authorized account does not include that base domain and blocks apply. |
 
 ## Public Surfaces
 
@@ -122,6 +123,19 @@ capability commands. DNS is a connector category, not a sibling model to `Connec
 `ConnectorDefinition`. The phrase "DNS connector" is only shorthand for a concrete connector in
 the DNS category, such as `cloudflare-dns`; persistent records, credentials, audit, and revoke
 surfaces must use the concrete connector key.
+
+Domain binding DNS readiness has three separate layers:
+
+1. Public DNS discovery derives the base domain and reads public NS/authoritative nameserver data.
+   It may detect a likely provider, but it does not require authorization and does not prove
+   ownership.
+2. Connector authorization lets a user authorize a concrete provider connector such as
+   `cloudflare-dns`.
+3. Zone ownership matching lists zones visible through that authorized connection and only permits
+   DNS plan/apply when one zone covers the requested hostname.
+
+UI/API payloads must not default to Cloudflare or any other provider before discovery. They should
+show detected provider, connected zone, selected connector, and manual fallback as separate fields.
 
 ```text
 appaloft dns connect <domain>

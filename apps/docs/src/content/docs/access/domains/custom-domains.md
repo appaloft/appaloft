@@ -62,6 +62,18 @@ HTTP API 使用同一组 operation contract。API 不应把 DNS/TLS 语义藏在
 - `ready`：域名和证书都可以使用。
 - `failed` 或具体错误：需要用户修正 DNS、证书材料或代理入口。
 
+<h2 id="domain-binding-provider-dns">提供商 DNS 自动配置</h2>
+
+当用户输入 `pocketbase.example.com` 这类 hostname 时，Appaloft 会先把它归约到 base domain，例如 `example.com`，再通过公开 DNS 查询 NS/authoritative nameserver。这个探测不需要授权，只能说明域名大概率由哪个 DNS provider 托管，例如 Cloudflare、GoDaddy、Route53、Namecheap、Vercel、DNSPod、阿里云、腾讯云，或未知 provider。
+
+公开 DNS 探测结果不会证明用户拥有该域名，也不会给 Appaloft 写 DNS 的权限。自动配置 DNS 还需要用户授权具体 connector，并且 Appaloft 必须在授权账号里找到能覆盖当前 hostname 的 zone：
+
+- 检测到 Cloudflare 且 Cloudflare connector 可用：页面推荐连接 Cloudflare DNS。
+- 授权成功后，如果授权账号里有 `example.com` zone：Appaloft 可以展示 DNS plan，用户确认后再应用记录。
+- 授权成功后，如果授权账号里没有 `example.com` zone：Appaloft 会提示授权账号不包含该 zone，不能自动 Apply。
+- 检测到 GoDaddy 等 provider 但没有对应 connector：页面显示手动 DNS fallback。
+- 未识别 provider：用户可以使用手动 DNS，未来也可以选择其他 connector。
+
 <h2 id="domain-binding-recovery">失败恢复</h2>
 
 如果绑定失败，先不要重新部署应用。按顺序检查：

@@ -6,6 +6,7 @@ export * from "./connection-projections";
 export * from "./connection-store";
 export * from "./connector-registry";
 export * from "./default-connectors";
+export * from "./dns-provider-discovery";
 export * from "./fake-dns-connector-adapter";
 export * from "./fake-infrastructure-connector-adapter";
 export * from "./fake-notification-connector-adapter";

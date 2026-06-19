@@ -2,6 +2,7 @@ export * from "./accepted-connection-capability-plan";
 export * from "./connection";
 export * from "./connector-definition";
 export * from "./dns-connection";
+export * from "./dns-provider-discovery";
 export * from "./infrastructure-connection";
 export * from "./integration-connection";
 export * from "./notification-connection";
