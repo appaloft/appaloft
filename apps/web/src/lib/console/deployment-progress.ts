@@ -307,7 +307,7 @@ export function mergeDeploymentTimelineEnvelopes(
 export function deploymentTimelineProgressEvents(
   envelopes: DeploymentTimelineEnvelope[],
 ): DeploymentProgressEvent[] {
-  return envelopes.flatMap((envelope) => {
+  const events = envelopes.flatMap((envelope, index) => {
     if (envelope.kind !== "entry") {
       return [];
     }
@@ -318,21 +318,32 @@ export function deploymentTimelineProgressEvents(
 
     return [
       {
-        timestamp: occurredAt,
-        source: envelope.entry.source,
-        phase,
-        level: envelope.entry.level,
-        message: envelope.entry.message,
-        deploymentId: envelope.entry.deploymentId,
-        ...(status ? { status } : {}),
-        ...(envelope.entry.stream ? { stream: envelope.entry.stream } : {}),
-        step: envelope.entry.step ?? {
-          ...progressStepForPhase(phase),
-          label: envelope.entry.message,
-        },
-      } satisfies DeploymentProgressEvent,
+        index,
+        event: {
+          timestamp: occurredAt,
+          source: envelope.entry.source,
+          phase,
+          level: envelope.entry.level,
+          message: envelope.entry.message,
+          deploymentId: envelope.entry.deploymentId,
+          ...(status ? { status } : {}),
+          ...(envelope.entry.stream ? { stream: envelope.entry.stream } : {}),
+          step: envelope.entry.step ?? {
+            ...progressStepForPhase(phase),
+            label: envelope.entry.message,
+          },
+        } satisfies DeploymentProgressEvent,
+      },
     ];
   });
+
+  return events
+    .sort((left, right) => {
+      const timestampOrder = left.event.timestamp.localeCompare(right.event.timestamp);
+
+      return timestampOrder || left.index - right.index;
+    })
+    .map(({ event }) => event);
 }
 
 type DeploymentTimelineTransportEnvelope<T> = {
