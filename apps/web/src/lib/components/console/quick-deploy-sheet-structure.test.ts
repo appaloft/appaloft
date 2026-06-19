@@ -78,16 +78,16 @@ describe("QuickDeploySheet structure", () => {
       'return complete ? "text-emerald-600" : "text-muted-foreground";',
     );
     expect(quickDeploySheetSource).toContain(
-      "<Circle class={`size-4 ${statusIconClasses(false)}`} />",
+      "<Circle class={`size-4 $" + "{statusIconClasses(false)}`} />",
     );
     expect(quickDeploySheetSource).toContain(
-      "<Circle class={`mt-0.5 size-4 shrink-0 ${statusIconClasses(false)}`} />",
+      "<Circle class={`mt-0.5 size-4 shrink-0 $" + "{statusIconClasses(false)}`} />",
     );
     expect(quickDeploySheetSource).not.toContain(
-      "<AlertCircle class={`size-4 ${statusIconClasses(false)}`} />",
+      "<AlertCircle class={`size-4 $" + "{statusIconClasses(false)}`} />",
     );
     expect(quickDeploySheetSource).not.toContain(
-      "<AlertCircle class={`mt-0.5 size-4 shrink-0 ${statusIconClasses(false)}`} />",
+      "<AlertCircle class={`mt-0.5 size-4 shrink-0 $" + "{statusIconClasses(false)}`} />",
     );
     expect(quickDeploySheetSource).not.toContain(
       'return complete ? "text-emerald-600" : "text-destructive";',
@@ -121,6 +121,15 @@ describe("QuickDeploySheet structure", () => {
     expect(quickDeploySheetSource).not.toContain(
       "resourceSlugPrefix:\n        selectedBlueprintSlug.trim()",
     );
+  });
+
+  test("[QUICK-DEPLOY-BLUEPRINT-002] keeps the Blueprint selector dialog usable on narrow viewports", () => {
+    expect(quickDeploySheetSource).toContain("h-[calc(100svh-0.75rem)]");
+    expect(quickDeploySheetSource).toContain("w-[calc(100%-0.75rem)]");
+    expect(quickDeploySheetSource).toContain("grid-rows-[auto_minmax(0,1fr)]");
+    expect(quickDeploySheetSource).toContain("overflow-hidden");
+    expect(quickDeploySheetSource).toContain("min-h-0 overflow-y-auto px-3 pb-3");
+    expect(quickDeploySheetSource).toContain('surface="dialog"');
   });
 
   test("[QUICK-DEPLOY-UX-003] keeps the source picker readable at constrained console widths", () => {

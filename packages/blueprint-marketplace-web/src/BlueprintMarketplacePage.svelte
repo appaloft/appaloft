@@ -2,6 +2,7 @@
   import BlueprintMarketplaceCard from "./BlueprintMarketplaceCard.svelte";
   import type {
     BlueprintMarketplaceCategory,
+    BlueprintMarketplaceCardDensity,
     BlueprintMarketplaceCardLabels,
     BlueprintMarketplaceChrome,
     BlueprintMarketplaceListResponse,
@@ -16,6 +17,7 @@
     defaultBlueprintMarketplaceListEndpoint,
   } from "./url";
   import { Skeleton } from "@appaloft/ui/skeleton";
+  import { cn } from "@appaloft/ui/utils";
 
   type BlueprintRegistryEntry = {
     readonly id: string;
@@ -131,6 +133,62 @@
       }))
       .filter((group) => group.items.length > 0),
   );
+  const cardDensity: BlueprintMarketplaceCardDensity = $derived(
+    surface === "dialog" || surface === "quick-deploy" ? "compact" : "default",
+  );
+  const isDialogSurface = $derived(surface === "dialog" || surface === "quick-deploy");
+  const rootClass = $derived(cn(
+    "flex min-w-0 flex-col gap-[18px] font-sans text-[#172033]",
+    chrome === "standalone"
+      ? "min-h-svh bg-[#f8fafc] bg-[linear-gradient(180deg,rgba(242,247,255,0.95),rgba(255,255,255,0.98)_42%)] px-4 pb-12 pt-[18px] min-[821px]:px-[max(20px,calc((100vw-1180px)/2))] min-[821px]:pb-16 min-[821px]:pt-6"
+      : "w-full",
+    isDialogSurface && "max-[820px]:gap-3.5",
+  ));
+  const heroClass = $derived(cn(
+    "grid items-start gap-5 max-[820px]:grid-cols-1",
+    chrome === "standalone"
+      ? "grid-cols-[minmax(180px,220px)_minmax(0,1fr)_auto] py-[18px] pb-5"
+      : "grid-cols-[minmax(0,1fr)_auto]",
+    isDialogSurface && "grid-cols-1 gap-2",
+  ));
+  const badgeClass =
+    "rounded-full border border-[#dbe2ea] px-2 py-1 text-[0.72rem] font-extrabold text-[#526071]";
+  const primaryBadgeClass =
+    "rounded-full border border-teal-700/25 px-2 py-1 text-[0.72rem] font-extrabold uppercase text-teal-700";
+  const heroTitleClass = $derived(cn(
+    "m-0 max-w-[720px] tracking-normal",
+    isDialogSurface
+      ? "text-base font-semibold leading-6"
+      : chrome === "embedded"
+        ? "text-[clamp(1.6rem,4vw,2.4rem)] leading-[1.1] max-[820px]:text-[clamp(2rem,18vw,4rem)]"
+        : "text-[clamp(2rem,6vw,4.8rem)] leading-[0.96] max-[820px]:text-[clamp(2rem,18vw,4rem)]",
+  ));
+  const heroDescriptionClass = $derived(cn(
+    "m-0 mt-3 max-w-[680px] text-base leading-[1.7] text-[#526071]",
+    isDialogSurface && "mt-1 max-w-none text-sm leading-6",
+  ));
+  const controlsClass = $derived(cn(
+    "flex flex-col gap-3",
+    isDialogSurface &&
+      "sticky top-0 z-20 -mx-0.5 mt-[-2px] border-b border-[#dbe2ea]/80 bg-white/95 px-0.5 pb-3.5 pt-4 backdrop-blur max-[820px]:-mx-2.5 max-[820px]:px-2.5 max-[820px]:pb-3 max-[820px]:pt-3",
+  ));
+  const toolbarClass =
+    "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 max-[820px]:grid-cols-1";
+  const categoryTabsClass = $derived(cn(
+    "flex flex-wrap gap-2",
+    isDialogSurface &&
+      "max-[820px]:-mx-0.5 max-[820px]:flex-nowrap max-[820px]:overflow-x-auto max-[820px]:px-0.5 max-[820px]:pb-0.5 max-[820px]:[scrollbar-width:thin]",
+  ));
+  const groupsClass = $derived(cn(
+    "flex flex-col gap-6",
+    isDialogSurface && "max-[820px]:gap-[18px]",
+  ));
+  const gridClass = $derived(cn(
+    "grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr))]",
+    chrome === "embedded" && "[grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr))]",
+    isDialogSurface &&
+      "gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr))] max-[820px]:grid-cols-1 max-[820px]:gap-2.5",
+  ));
 
   $effect(() => {
     const endpoint = listEndpoint;
@@ -284,50 +342,58 @@
       onselect?.(item);
     }
   }
+
+  function categoryTabClass(selected: boolean): string {
+    return cn(
+      "min-h-9 rounded-lg border border-[#dbe2ea] bg-white px-3 font-sans text-sm font-extrabold text-[#425166]",
+      selected && "border-[#9bb8ff] bg-[#edf3ff] text-[#4e84ff]",
+      isDialogSurface && "max-[820px]:shrink-0",
+    );
+  }
 </script>
 
-<section
-  class:standalone={chrome === "standalone"}
-  class:embedded={chrome === "embedded"}
-  class="blueprint-marketplace"
-  data-marketplace-surface={surface}
-  data-blueprint-marketplace-page
->
-  <header class="marketplace-hero">
+<section class={rootClass} data-marketplace-surface={surface} data-blueprint-marketplace-page>
+  <header class={heroClass}>
     {#if chrome === "standalone"}
-      <a class="marketplace-brand" href="/" aria-label="Appaloft">
-        <img src="/appaloft-logo-horizontal.svg" alt="Appaloft" width="188" height="54" />
+      <a class="inline-flex w-fit leading-none" href="/" aria-label="Appaloft">
+        <img class="h-auto w-[188px]" src="/appaloft-logo-horizontal.svg" alt="Appaloft" width="188" height="54" />
       </a>
     {/if}
-    <div class="hero-copy">
-      <div class="badge-row">
-        <span>{badgeLabel}</span>
+    <div class="min-w-0">
+      <div class="mb-3 flex flex-wrap gap-2">
+        <span class={primaryBadgeClass}>{badgeLabel}</span>
         {#if pluginDisplayName}
-          <span>{pluginDisplayName}</span>
+          <span class={badgeClass}>{pluginDisplayName}</span>
         {/if}
       </div>
-      <h1>{title}</h1>
-      <p>{subtitle}</p>
+      <h1 class={heroTitleClass}>{title}</h1>
+      <p class={heroDescriptionClass}>{subtitle}</p>
     </div>
     {#if chrome === "standalone" && deployBaseUrl}
-      <div class="hero-actions">
-        <a class="secondary-link" href={deployBaseUrl}>打开控制台</a>
+      <div class="flex justify-end max-[820px]:justify-start">
+        <a
+          class="inline-flex min-h-8 items-center justify-center gap-1.5 rounded-lg border border-[#c9d3df] bg-white px-3 text-[0.82rem] font-extrabold text-[#172033] no-underline transition-transform duration-150 hover:-translate-y-px"
+          href={deployBaseUrl}
+        >
+          打开控制台
+        </a>
       </div>
     {/if}
   </header>
 
-  <div class="marketplace-controls" data-blueprint-marketplace-controls>
-    <div class="marketplace-toolbar">
-      <label class="search-field">
+  <div class={controlsClass} data-blueprint-marketplace-controls>
+    <div class={toolbarClass}>
+      <label>
         <span class="sr-only">搜索 Blueprint 目录</span>
         <input
+          class="min-h-[46px] w-full rounded-lg border border-[#c9d3df] bg-white px-4 font-sans text-[#172033] outline-none focus:border-[#4e84ff] focus:shadow-[0_0_0_3px_rgba(78,132,255,0.14)]"
           data-blueprint-marketplace-search
           type="search"
           placeholder="搜索应用、分类、依赖或标签"
           bind:value={searchTerm}
         />
       </label>
-      <div class="catalog-count" aria-live="polite">
+      <div class="text-sm font-bold text-slate-500" aria-live="polite">
         {#if marketplace}
           {filteredListings.length} / {listings.length} 个 Blueprint
         {:else}
@@ -337,10 +403,10 @@
     </div>
 
     {#if !isLoading && !errorMessage}
-      <nav class="category-tabs" aria-label="Blueprint categories" data-blueprint-marketplace-category-tabs>
+      <nav class={categoryTabsClass} aria-label="Blueprint categories" data-blueprint-marketplace-category-tabs>
         <button
           type="button"
-          class:selected={selectedCategoryKey === "all"}
+          class={categoryTabClass(selectedCategoryKey === "all")}
           aria-pressed={selectedCategoryKey === "all"}
           onclick={() => {
             selectedCategoryKey = "all";
@@ -351,7 +417,7 @@
         {#each categories as category (category.key)}
           <button
             type="button"
-            class:selected={selectedCategoryKey === category.key}
+            class={categoryTabClass(selectedCategoryKey === category.key)}
             aria-pressed={selectedCategoryKey === category.key}
             title={category.description}
             onclick={() => {
@@ -366,25 +432,25 @@
   </div>
 
   {#if isLoading}
-    <section class="marketplace-loading" aria-label="正在加载 Blueprint 目录" data-blueprint-marketplace-skeleton>
-      <div class="category-tabs is-loading-tabs" aria-hidden="true">
+    <section class="flex min-h-[760px] flex-col gap-7" aria-label="正在加载 Blueprint 目录" data-blueprint-marketplace-skeleton>
+      <div class={cn(categoryTabsClass, "pointer-events-none")} aria-hidden="true">
         {#each Array.from({ length: 12 }) as _, index (index)}
           <Skeleton class={index === 1 || index === 8 ? "h-9 w-40 rounded-lg" : "h-9 w-28 rounded-lg"} />
         {/each}
       </div>
       {#each Array.from({ length: 3 }) as _, groupIndex (groupIndex)}
-        <section class="marketplace-skeleton-group" aria-hidden="true">
-          <div class="group-heading">
+        <section class="flex flex-col gap-3" aria-hidden="true">
+          <div class="flex items-end justify-between gap-3">
             <div>
               <Skeleton class="h-7 w-[190px]" />
               <Skeleton class="mt-2.5 h-4 w-full max-w-[360px]" />
             </div>
             <Skeleton class="h-7 w-[34px]" />
           </div>
-          <div class="marketplace-grid">
+          <div class={gridClass}>
             {#each Array.from({ length: groupIndex === 2 ? 2 : 4 }) as _, cardIndex (cardIndex)}
-              <article class="listing-card is-loading">
-                <div class="listing-card-main">
+              <article class="min-h-[300px]">
+                <div class="grid min-w-0 grid-cols-[56px_minmax(0,1fr)] gap-3">
                   <Skeleton class="size-14 rounded-lg" />
                   <div>
                     <Skeleton class="h-[26px] w-2/3" />
@@ -403,36 +469,43 @@
       {/each}
     </section>
   {:else if errorMessage}
-    <section class="marketplace-empty">
-      <h2>无法加载 Blueprint 目录</h2>
-      <p>{errorMessage}</p>
-      <button type="button" onclick={() => loadMarketplace()}>重试</button>
+    <section class="rounded-lg border border-[#dbe2ea] bg-white/90 p-7 shadow-[0_18px_48px_rgba(20,31,47,0.07)]">
+      <h2 class="m-0 text-xl">无法加载 Blueprint 目录</h2>
+      <p class="m-0 mt-2 text-[#526071]">{errorMessage}</p>
+      <button
+        class="mt-4 inline-flex min-h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-[#4e84ff] bg-[#4e84ff] px-3 font-sans text-[0.82rem] font-extrabold text-white transition-transform duration-150 hover:-translate-y-px"
+        type="button"
+        onclick={() => loadMarketplace()}
+      >
+        重试
+      </button>
     </section>
   {:else}
     {#if selectedCategory}
-      <p class="category-note">
+      <p class="m-0 flex flex-wrap gap-2 text-sm font-bold text-slate-500">
         <strong>{selectedCategory.label}</strong>
         <span>/</span>
         {selectedCategory.description}
       </p>
     {/if}
 
-    <div class="marketplace-groups" data-blueprint-marketplace-groups>
+    <div class={groupsClass} data-blueprint-marketplace-groups>
       {#each groupedListings as group (group.category.key)}
-        <section class="marketplace-group">
-          <div class="group-heading">
+        <section class="flex flex-col gap-3">
+          <div class="flex items-end justify-between gap-3">
             <div>
-              <h2>{group.category.label}</h2>
-              <p>{group.category.description}</p>
+              <h2 class="m-0 text-[1.05rem]">{group.category.label}</h2>
+              <p class="m-0 mt-1 text-sm text-[#526071]">{group.category.description}</p>
             </div>
-            <span>{group.items.length}</span>
+            <span class={badgeClass}>{group.items.length}</span>
           </div>
-          <div class="marketplace-grid">
+          <div class={gridClass}>
             {#each group.items as item (item.slug)}
               <BlueprintMarketplaceCard
                 {item}
                 actionHref={primaryAction === "select" ? "#" : actionHref(item)}
                 {actionLabel}
+                density={cardDensity}
                 labels={cardLabels}
                 selected={selectedSlug === item.slug}
                 onprimaryaction={(event) => {
@@ -447,390 +520,11 @@
           </div>
         </section>
       {:else}
-        <section class="marketplace-empty">
-          <h2>没有匹配的 Blueprint</h2>
-          <p>试试其他搜索词或分类。</p>
+        <section class="rounded-lg border border-[#dbe2ea] bg-white/90 p-7 shadow-[0_18px_48px_rgba(20,31,47,0.07)]">
+          <h2 class="m-0 text-xl">没有匹配的 Blueprint</h2>
+          <p class="m-0 mt-2 text-[#526071]">试试其他搜索词或分类。</p>
         </section>
       {/each}
     </div>
   {/if}
 </section>
-
-<style>
-  .blueprint-marketplace {
-    --marketplace-background: #f8fafc;
-    --marketplace-foreground: #172033;
-    --marketplace-muted: #526071;
-    --marketplace-border: #dbe2ea;
-    --marketplace-border-strong: #c9d3df;
-    --marketplace-card: rgba(255, 255, 255, 0.92);
-    --marketplace-accent: #0f766e;
-    --marketplace-primary: #4e84ff;
-    --marketplace-primary-foreground: #ffffff;
-    --marketplace-panel-shadow: 0 18px 48px rgba(20, 31, 47, 0.07);
-    display: flex;
-    min-width: 0;
-    flex-direction: column;
-    gap: 18px;
-    color: var(--marketplace-foreground);
-    font-family:
-      "IBM Plex Sans",
-      ui-sans-serif,
-      system-ui,
-      -apple-system,
-      BlinkMacSystemFont,
-      "Segoe UI",
-      sans-serif;
-  }
-
-  .blueprint-marketplace.standalone {
-    min-height: 100svh;
-    padding: 24px max(20px, calc((100vw - 1180px) / 2)) 64px;
-    background:
-      linear-gradient(180deg, rgba(242, 247, 255, 0.95), rgba(255, 255, 255, 0.98) 42%),
-      var(--marketplace-background);
-  }
-
-  .blueprint-marketplace.embedded {
-    width: 100%;
-  }
-
-  .marketplace-hero {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 20px;
-    align-items: start;
-  }
-
-  .standalone .marketplace-hero {
-    grid-template-columns: minmax(180px, 220px) minmax(0, 1fr) auto;
-    padding: 18px 0 20px;
-  }
-
-  .marketplace-brand {
-    display: inline-flex;
-    width: fit-content;
-    line-height: 0;
-  }
-
-  .marketplace-brand img {
-    width: 188px;
-    height: auto;
-  }
-
-  .hero-copy {
-    min-width: 0;
-  }
-
-  .badge-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 12px;
-  }
-
-  .badge-row span,
-  .group-heading > span {
-    border: 1px solid var(--marketplace-border);
-    border-radius: 999px;
-    color: var(--marketplace-muted);
-    padding: 4px 8px;
-    font-size: 0.72rem;
-    font-weight: 800;
-  }
-
-  .badge-row span:first-child {
-    border-color: rgba(15, 118, 110, 0.24);
-    color: var(--marketplace-accent);
-    text-transform: uppercase;
-  }
-
-  h1,
-  h2,
-  p {
-    margin: 0;
-  }
-
-  h1 {
-    max-width: 720px;
-    font-size: clamp(2rem, 6vw, 4.8rem);
-    line-height: 0.96;
-    letter-spacing: 0;
-  }
-
-  .embedded h1 {
-    font-size: clamp(1.6rem, 4vw, 2.4rem);
-    line-height: 1.1;
-  }
-
-  .hero-copy > p {
-    max-width: 680px;
-    margin-top: 12px;
-    color: var(--marketplace-muted);
-    font-size: 1rem;
-    line-height: 1.7;
-  }
-
-  .hero-actions {
-    display: flex;
-    justify-content: flex-end;
-  }
-
-  .secondary-link,
-  .marketplace-empty button {
-    display: inline-flex;
-    min-height: 32px;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    border: 1px solid var(--marketplace-primary);
-    border-radius: 8px;
-    background: var(--marketplace-primary);
-    color: var(--marketplace-primary-foreground);
-    padding: 0 12px;
-    font: inherit;
-    font-weight: 800;
-    font-size: 0.82rem;
-    text-decoration: none;
-    transition:
-      transform 160ms ease,
-      background 160ms ease;
-  }
-
-  .secondary-link {
-    background: white;
-    border-color: var(--marketplace-border-strong);
-    color: var(--marketplace-foreground);
-  }
-
-  .secondary-link:hover,
-  .marketplace-empty button:hover {
-    transform: translateY(-1px);
-  }
-
-  .marketplace-toolbar {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 16px;
-    align-items: center;
-  }
-
-  .marketplace-controls {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .blueprint-marketplace[data-marketplace-surface="dialog"] .marketplace-controls,
-  .blueprint-marketplace[data-marketplace-surface="quick-deploy"] .marketplace-controls {
-    position: sticky;
-    top: 0;
-    z-index: 20;
-    margin: -2px -2px 0;
-    border-bottom: 1px solid rgba(219, 226, 234, 0.82);
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.94)),
-      var(--marketplace-card);
-    padding: 2px 2px 14px;
-    box-shadow: 0 12px 24px rgba(20, 31, 47, 0.06);
-    backdrop-filter: blur(10px);
-  }
-
-  .search-field input {
-    width: 100%;
-    min-height: 46px;
-    border: 1px solid var(--marketplace-border-strong);
-    border-radius: 8px;
-    background: white;
-    color: var(--marketplace-foreground);
-    font: inherit;
-    padding: 0 16px;
-    outline: none;
-  }
-
-  .search-field input:focus {
-    border-color: var(--marketplace-primary);
-    box-shadow: 0 0 0 3px rgba(78, 132, 255, 0.14);
-  }
-
-  .catalog-count,
-  .category-note {
-    color: #64748b;
-    font-size: 0.9rem;
-    font-weight: 700;
-  }
-
-  .category-tabs {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  .category-tabs button {
-    min-height: 36px;
-    border: 1px solid var(--marketplace-border);
-    border-radius: 8px;
-    background: white;
-    color: #425166;
-    padding: 0 12px;
-    font: inherit;
-    font-weight: 800;
-  }
-
-  .category-tabs button.selected {
-    border-color: color-mix(in srgb, var(--marketplace-primary) 42%, var(--marketplace-border));
-    background: color-mix(in srgb, var(--marketplace-primary) 12%, white);
-    color: var(--marketplace-primary);
-  }
-
-  .category-note {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  .marketplace-groups {
-    display: flex;
-    flex-direction: column;
-    gap: 24px;
-  }
-
-  .marketplace-loading {
-    display: flex;
-    min-height: 760px;
-    flex-direction: column;
-    gap: 28px;
-  }
-
-  .marketplace-group,
-  .marketplace-skeleton-group {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .group-heading {
-    display: flex;
-    align-items: end;
-    justify-content: space-between;
-    gap: 12px;
-  }
-
-  .group-heading h2 {
-    font-size: 1.05rem;
-  }
-
-  .group-heading p {
-    margin-top: 4px;
-    color: var(--marketplace-muted);
-    font-size: 0.9rem;
-  }
-
-  .marketplace-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
-    gap: 16px;
-  }
-
-  .embedded .marketplace-grid {
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
-  }
-
-  .marketplace-empty {
-    border: 1px solid var(--marketplace-border);
-    border-radius: 8px;
-    background: var(--marketplace-card);
-    box-shadow: var(--marketplace-panel-shadow);
-  }
-
-  .listing-card-main {
-    display: grid;
-    min-width: 0;
-    grid-template-columns: 44px minmax(0, 1fr);
-    gap: 12px;
-  }
-
-  .marketplace-empty {
-    padding: 28px;
-  }
-
-  .marketplace-empty h2 {
-    font-size: 1.25rem;
-  }
-
-  .marketplace-empty p {
-    margin-top: 8px;
-    color: var(--marketplace-muted);
-  }
-
-  .marketplace-empty button {
-    margin-top: 16px;
-    cursor: pointer;
-  }
-
-  .is-loading-tabs {
-    pointer-events: none;
-  }
-
-  .listing-card.is-loading {
-    min-height: 300px;
-  }
-
-  .listing-card.is-loading .listing-card-main {
-    grid-template-columns: 56px minmax(0, 1fr);
-  }
-
-  .sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-
-  @keyframes pulse {
-    from {
-      background-position: 120% 0;
-    }
-    to {
-      background-position: -120% 0;
-    }
-  }
-
-  @media (max-width: 820px) {
-    .blueprint-marketplace.standalone {
-      padding: 18px 16px 48px;
-    }
-
-    .marketplace-hero,
-    .standalone .marketplace-hero,
-    .marketplace-toolbar {
-      grid-template-columns: 1fr;
-    }
-
-    .hero-actions {
-      justify-content: flex-start;
-    }
-
-    .blueprint-marketplace[data-marketplace-surface="dialog"] .category-tabs,
-    .blueprint-marketplace[data-marketplace-surface="quick-deploy"] .category-tabs {
-      flex-wrap: nowrap;
-      margin-inline: -2px;
-      overflow-x: auto;
-      padding-inline: 2px;
-      padding-bottom: 2px;
-      scrollbar-width: thin;
-    }
-
-    .blueprint-marketplace[data-marketplace-surface="dialog"] .category-tabs button,
-    .blueprint-marketplace[data-marketplace-surface="quick-deploy"] .category-tabs button {
-      flex: 0 0 auto;
-    }
-
-    h1 {
-      font-size: clamp(2rem, 18vw, 4rem);
-    }
-  }
-</style>
