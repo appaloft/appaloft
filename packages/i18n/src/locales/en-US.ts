@@ -1751,7 +1751,15 @@ export const enUS = {
       dnsConnectorCleanup: "Cleanup",
       dnsConnectorConfigure: "Configure DNS",
       dnsConnectorConflicts: "Conflicts",
+      dnsConnectorConnectErrorDetail:
+        "DNS provider authorization did not complete. Try connecting again, or use manual DNS while the provider is unavailable.",
+      dnsConnectorConnectErrorDetailWithCode:
+        "DNS provider authorization did not complete ({code}). Try connecting again, or use manual DNS while the provider is unavailable.",
+      dnsConnectorConnectErrorTitle: "Unable to connect DNS provider",
       dnsConnectorConnectProvider: "Connect DNS provider",
+      dnsConnectorConnectSuccessDetail:
+        "The DNS provider is connected. Appaloft is refreshing DNS readiness and will show the records it can apply.",
+      dnsConnectorConnectSuccessTitle: "DNS provider connected",
       dnsConnectorDialogDescription:
         "Review the DNS records Appaloft will ask the connected provider to apply.",
       dnsConnectorDialogTitle: "Configure provider DNS",
