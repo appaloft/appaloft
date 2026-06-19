@@ -19,6 +19,7 @@
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
+  import { ScrollArea } from "$lib/components/ui/scroll-area";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import {
     detailHeaderClass,
@@ -26,6 +27,7 @@
     detailTabClass,
     detailTabPanelScrollClass,
     detailTabsClass,
+    detailTabsScrollAreaClass,
   } from "$lib/console/layout-classes";
   import { deploymentDetailHref, formatTime, projectDetailHref, resourceDetailHref } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
@@ -322,18 +324,20 @@
         </div>
       </section>
 
-      <nav class={detailTabsClass} aria-label={$t(i18nKeys.console.installedApplications.tabAriaLabel)}>
-        {#each installedApplicationTabs as tab (tab.value)}
-          <a
-            href={installedApplicationTabHref(tab.value)}
-            onclick={(event) => selectInstalledApplicationTab(tab.value, event)}
-            class={detailTabClass}
-            aria-current={activeTab === tab.value ? "page" : undefined}
-          >
-            {$t(tab.labelKey)}
-          </a>
-        {/each}
-      </nav>
+      <ScrollArea class={detailTabsScrollAreaClass}>
+        <nav class={detailTabsClass} aria-label={$t(i18nKeys.console.installedApplications.tabAriaLabel)}>
+          {#each installedApplicationTabs as tab (tab.value)}
+            <a
+              href={installedApplicationTabHref(tab.value)}
+              onclick={(event) => selectInstalledApplicationTab(tab.value, event)}
+              class={detailTabClass}
+              aria-current={activeTab === tab.value ? "page" : undefined}
+            >
+              {$t(tab.labelKey)}
+            </a>
+          {/each}
+        </nav>
+      </ScrollArea>
 
       <div class={detailTabPanelScrollClass}>
         {#if activeTab === "overview"}
