@@ -1891,6 +1891,14 @@ describe("Appaloft deployment config schema", () => {
 
     expect(envSecretName.success).toBe(false);
 
+    const tokenAuthMethod = parseAppaloftDeploymentConfig({
+      env: {
+        APPALOFT_CLOUD_CONNECTOR_CLOUDFLARE_DNS_OAUTH_TOKEN_AUTH_METHOD: "client_secret_post",
+      },
+    });
+
+    expect(tokenAuthMethod.success).toBe(true);
+
     const databaseUrl = parseAppaloftDeploymentConfig({
       env: {
         DATABASE_URL: "postgres://user:password@example.test/app",
