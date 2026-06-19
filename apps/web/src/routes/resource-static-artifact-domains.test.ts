@@ -33,9 +33,17 @@ describe("resource static artifact domains panel", () => {
     expect(resourcePageSource).toContain("dnsBindingId=");
     expect(resourcePageSource).toContain('searchParams.get("connectionStatus")');
     expect(resourcePageSource).toContain("window.open(");
-    expect(resourcePageSource).toContain('"appaloft-dns-provider-authorization"');
-    expect(resourcePageSource).toContain('type: "appaloft:dns-connector-callback"');
-    expect(resourcePageSource).toContain("window.opener.postMessage(callbackPayload");
+    expect(resourcePageSource).toContain("dnsConnectorAuthWindowName");
+    expect(resourcePageSource).toContain("dnsConnectorAuthorizationPopupFeatures()");
+    expect(resourcePageSource).toContain("`left=${left}`");
+    expect(resourcePageSource).toContain("`top=${top}`");
+    expect(resourcePageSource).toContain(
+      'const dnsConnectorCallbackMessageType = "appaloft:dns-connector-callback"',
+    );
+    expect(resourcePageSource).toContain("publishDnsConnectorCallbackPayload(callbackPayload)");
+    expect(resourcePageSource).toContain("new BroadcastChannel(dnsConnectorCallbackChannelName)");
+    expect(resourcePageSource).toContain("dnsConnectorCallbackStorageKey");
+    expect(resourcePageSource).toContain("dnsConnectorCallbackStandalonePayload");
     expect(resourcePageSource).toContain("handleDnsConnectorCallback(callbackPayload)");
     expect(resourcePageSource).toContain("dnsConnectorConnectErrorDetailWithCode");
     expect(resourcePageSource).toContain('id="resource-domain-binding-dns-connect-provider"');
