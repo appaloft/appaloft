@@ -257,6 +257,7 @@ const secretLikeKeyPattern =
 const rawSecretValuePattern =
   /-----BEGIN [A-Z ]*(?:PRIVATE KEY|CERTIFICATE)-----|(?:ssh-rsa|ssh-ed25519) [A-Za-z0-9+/=]+/;
 const allowedSecretLikeConfigFields = new Set(["secretBackedPreviews"]);
+const nonSecretTokenAuthMethodPattern = /(?:^|[_-])token[_-]?auth(?:entication)?[_-]?method$/i;
 
 export type AppaloftDeploymentConfigViolationCode =
   | "config_identity_field"
@@ -1670,7 +1671,7 @@ function shouldTreatSecretField(path: (string | number)[], key: string, value: u
     return false;
   }
 
-  if (allowedSecretLikeConfigFields.has(key)) {
+  if (allowedSecretLikeConfigFields.has(key) || nonSecretTokenAuthMethodPattern.test(key)) {
     return false;
   }
 
