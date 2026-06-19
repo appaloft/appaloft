@@ -1593,7 +1593,15 @@ export const zhCN = {
       dnsConnectorCleanup: "清理",
       dnsConnectorConfigure: "配置 DNS",
       dnsConnectorConflicts: "冲突",
+      dnsConnectorConnectErrorDetail:
+        "DNS 提供商授权没有完成。可以重新连接，或在提供商暂不可用时使用手动 DNS。",
+      dnsConnectorConnectErrorDetailWithCode:
+        "DNS 提供商授权没有完成（{code}）。可以重新连接，或在提供商暂不可用时使用手动 DNS。",
+      dnsConnectorConnectErrorTitle: "无法连接 DNS 提供商",
       dnsConnectorConnectProvider: "连接 DNS 提供商",
+      dnsConnectorConnectSuccessDetail:
+        "DNS 提供商已连接。Appaloft 会刷新 DNS 就绪状态，并展示可以应用的记录。",
+      dnsConnectorConnectSuccessTitle: "DNS 提供商已连接",
       dnsConnectorDialogDescription: "查看 Appaloft 将通过已连接的提供商应用哪些 DNS 记录。",
       dnsConnectorDialogTitle: "配置提供商 DNS",
       dnsConnectorManualDns: "手动 DNS",
