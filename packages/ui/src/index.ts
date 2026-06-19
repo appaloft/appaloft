@@ -33,6 +33,7 @@ export { Input } from "./input/index.js";
 export * as InputOTPPrimitives from "./input-otp/index.js";
 export * as PopoverPrimitives from "./popover/index.js";
 export { Progress, type ProgressProps } from "./progress/index.js";
+export * as ScrollAreaPrimitives from "./scroll-area/index.js";
 export * as SelectPrimitives from "./select/index.js";
 export { Separator } from "./separator/index.js";
 export * as SheetPrimitives from "./sheet/index.js";

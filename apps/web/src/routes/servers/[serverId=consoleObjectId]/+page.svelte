@@ -43,6 +43,7 @@
   import { Button } from "$lib/components/ui/button";
   import * as Dialog from "$lib/components/ui/dialog";
   import { Input } from "$lib/components/ui/input";
+  import { ScrollArea } from "$lib/components/ui/scroll-area";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import * as Tabs from "$lib/components/ui/tabs";
   import { webDocsHrefs } from "$lib/console/docs-help";
@@ -57,6 +58,7 @@
     detailTabPanelScrollClass,
     detailTabPanelSubnavClass,
     detailTabsClass,
+    detailTabsScrollAreaClass,
     subnavItemClass,
     subnavListClass,
   } from "$lib/console/layout-classes";
@@ -959,18 +961,20 @@
     </section>
 
     <Tabs.Root value={activeTab} class={detailBodyClass}>
-      <nav aria-label={$t(i18nKeys.console.servers.pageTitle)} class={detailTabsClass}>
-        {#each serverDetailTabs as tab (tab)}
-          <a
-            href={serverTabHref(tab)}
-            class={detailTabClass}
-            aria-current={activeTab === tab ? "page" : undefined}
-            onclick={(event) => selectServerTab(tab, event)}
-          >
-            {serverTabLabel(tab)}
-          </a>
-        {/each}
-      </nav>
+      <ScrollArea class={detailTabsScrollAreaClass}>
+        <nav aria-label={$t(i18nKeys.console.servers.pageTitle)} class={detailTabsClass}>
+          {#each serverDetailTabs as tab (tab)}
+            <a
+              href={serverTabHref(tab)}
+              class={detailTabClass}
+              aria-current={activeTab === tab ? "page" : undefined}
+              onclick={(event) => selectServerTab(tab, event)}
+            >
+              {serverTabLabel(tab)}
+            </a>
+          {/each}
+        </nav>
+      </ScrollArea>
 
       <Tabs.Content
         value="overview"
@@ -1184,21 +1188,23 @@
       </section>
 
       <Tabs.Root value={activeTab} class={detailBodyClass}>
-          <nav
-            aria-label={$t(i18nKeys.console.servers.pageTitle)}
-            class={detailTabsClass}
-          >
-            {#each serverDetailTabs as tab (tab)}
-              <a
-                href={serverTabHref(tab)}
-                class={detailTabClass}
-                aria-current={activeTab === tab ? "page" : undefined}
-                onclick={(event) => selectServerTab(tab, event)}
-              >
-                {serverTabLabel(tab)}
-              </a>
-            {/each}
-          </nav>
+          <ScrollArea class={detailTabsScrollAreaClass}>
+            <nav
+              aria-label={$t(i18nKeys.console.servers.pageTitle)}
+              class={detailTabsClass}
+            >
+              {#each serverDetailTabs as tab (tab)}
+                <a
+                  href={serverTabHref(tab)}
+                  class={detailTabClass}
+                  aria-current={activeTab === tab ? "page" : undefined}
+                  onclick={(event) => selectServerTab(tab, event)}
+                >
+                  {serverTabLabel(tab)}
+                </a>
+              {/each}
+            </nav>
+          </ScrollArea>
 
           <Tabs.Content
             value="overview"

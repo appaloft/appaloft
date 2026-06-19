@@ -108,6 +108,7 @@
   import * as Dialog from "$lib/components/ui/dialog";
   import { Input } from "$lib/components/ui/input";
   import * as Popover from "$lib/components/ui/popover";
+  import { ScrollArea } from "$lib/components/ui/scroll-area";
   import * as Select from "$lib/components/ui/select";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import { Textarea } from "$lib/components/ui/textarea";
@@ -127,6 +128,7 @@
     detailTabPanelScrollClass,
     detailTabPanelSubnavClass,
     detailTabsClass,
+    detailTabsScrollAreaClass,
     subnavItemClass,
     subnavItemTitleClass,
     subnavListClass,
@@ -6238,19 +6240,21 @@
     </section>
 
     <div class={detailBodyClass}>
-      <nav aria-label={$t(i18nKeys.console.resources.overviewTitle)} class={detailTabsClass}>
-        {#each resourceDetailTabs as tab (tab)}
-          <a
-            id={`resource-tab-${tab}`}
-            href={resourceTabHref(tab)}
-            class={detailTabClass}
-            aria-current={activeTab === tab ? "page" : undefined}
-            onclick={(event) => selectResourceTab(tab, event)}
-          >
-            {resourceTabLabel(tab)}
-          </a>
-        {/each}
-      </nav>
+      <ScrollArea class={detailTabsScrollAreaClass}>
+        <nav aria-label={$t(i18nKeys.console.resources.overviewTitle)} class={detailTabsClass}>
+          {#each resourceDetailTabs as tab (tab)}
+            <a
+              id={`resource-tab-${tab}`}
+              href={resourceTabHref(tab)}
+              class={detailTabClass}
+              aria-current={activeTab === tab ? "page" : undefined}
+              onclick={(event) => selectResourceTab(tab, event)}
+            >
+              {resourceTabLabel(tab)}
+            </a>
+          {/each}
+        </nav>
+      </ScrollArea>
 
       {#if activeTab === "deployments"}
         <div class={detailTabPanelScrollClass}>
@@ -6542,22 +6546,24 @@
       </section>
 
       <div class={detailBodyClass}>
-        <nav
-          aria-label={$t(i18nKeys.console.resources.overviewTitle)}
-          class={detailTabsClass}
-        >
-          {#each visibleResourceDetailTabs as tab (tab)}
-            <a
-              id={`resource-tab-${tab}`}
-              href={resourceTabHref(tab)}
-              class={detailTabClass}
-              aria-current={activeTab === tab ? "page" : undefined}
-              onclick={(event) => selectResourceTab(tab, event)}
-            >
-              {resourceTabLabel(tab)}
-            </a>
-          {/each}
-        </nav>
+        <ScrollArea class={detailTabsScrollAreaClass}>
+          <nav
+            aria-label={$t(i18nKeys.console.resources.overviewTitle)}
+            class={detailTabsClass}
+          >
+            {#each visibleResourceDetailTabs as tab (tab)}
+              <a
+                id={`resource-tab-${tab}`}
+                href={resourceTabHref(tab)}
+                class={detailTabClass}
+                aria-current={activeTab === tab ? "page" : undefined}
+                onclick={(event) => selectResourceTab(tab, event)}
+              >
+                {resourceTabLabel(tab)}
+              </a>
+            {/each}
+          </nav>
+        </ScrollArea>
 
         {#if activeTab === "deployments"}
           <div class={detailTabPanelScrollClass}>
