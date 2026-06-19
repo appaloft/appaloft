@@ -71,6 +71,7 @@
     DropdownMenuTrigger,
   } from "$lib/components/ui/dropdown-menu";
   import { Input } from "$lib/components/ui/input";
+  import { ScrollArea } from "$lib/components/ui/scroll-area";
   import * as Select from "$lib/components/ui/select";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import * as Tabs from "$lib/components/ui/tabs";
@@ -91,6 +92,7 @@
     detailTabPanelSubnavClass,
     detailTabPanelScrollClass,
     detailTabsClass,
+    detailTabsScrollAreaClass,
     subnavItemClass,
     subnavListClass,
   } from "$lib/console/layout-classes";
@@ -1728,14 +1730,14 @@
         </div>
       </div>
 
-      <section class="grid gap-3 lg:grid-cols-4" aria-label={$t(i18nKeys.console.projects.operationalSummaryTitle)}>
+      <section class="console-metric-strip mt-5 lg:grid-cols-4" aria-label={$t(i18nKeys.console.projects.operationalSummaryTitle)}>
         {#each [
           i18nKeys.common.domain.resources,
           i18nKeys.console.projects.publicAccessTitle,
           i18nKeys.console.projects.latestDeploymentTitle,
           i18nKeys.console.projects.attentionTitle,
         ] as summaryTitle}
-          <article class="console-subtle-panel p-4">
+          <article>
             <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               {$t(summaryTitle)}
             </p>
@@ -1747,18 +1749,20 @@
     </section>
 
     <Tabs.Root value={activeProjectTab} class={detailBodyClass}>
-      <nav aria-label={$t(i18nKeys.console.projects.pageTitle)} class={detailTabsClass}>
-        {#each projectDetailTabs as tab (tab)}
-          <a
-            href={projectTabHref(tab)}
-            class={detailTabClass}
-            aria-current={activeProjectTab === tab ? "page" : undefined}
-            onclick={(event) => selectProjectTab(tab, event)}
-          >
-            {projectTabLabel(tab)}
-          </a>
-        {/each}
-      </nav>
+      <ScrollArea class={detailTabsScrollAreaClass}>
+        <nav aria-label={$t(i18nKeys.console.projects.pageTitle)} class={detailTabsClass}>
+          {#each projectDetailTabs as tab (tab)}
+            <a
+              href={projectTabHref(tab)}
+              class={detailTabClass}
+              aria-current={activeProjectTab === tab ? "page" : undefined}
+              onclick={(event) => selectProjectTab(tab, event)}
+            >
+              {projectTabLabel(tab)}
+            </a>
+          {/each}
+        </nav>
+      </ScrollArea>
 
       <Tabs.Content value="overview" class={[detailTabPanelScrollClass, "flex flex-col gap-6"]}>
         <section class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
@@ -1986,8 +1990,8 @@
           </div>
         </div>
 
-        <section class="grid gap-3 lg:grid-cols-4" aria-label={$t(i18nKeys.console.projects.operationalSummaryTitle)}>
-          <article class="console-subtle-panel p-4">
+        <section class="console-metric-strip mt-5 lg:grid-cols-4" aria-label={$t(i18nKeys.console.projects.operationalSummaryTitle)}>
+          <article>
             <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               {$t(i18nKeys.common.domain.resources)}
             </p>
@@ -1996,7 +2000,7 @@
               {deployedProjectResources.length} {$t(i18nKeys.console.projects.deployedResourcesLabel)}
             </p>
           </article>
-          <article class="console-subtle-panel p-4">
+          <article>
             <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               {$t(i18nKeys.console.projects.publicAccessTitle)}
             </p>
@@ -2005,20 +2009,21 @@
               {resourcesWithoutAccess.length} {$t(i18nKeys.console.projects.noAccessResourcesLabel)}
             </p>
           </article>
-          <article class="console-subtle-panel p-4">
+          <article>
             <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               {$t(i18nKeys.console.projects.latestDeploymentTitle)}
             </p>
             {#if latestProjectDeploymentSummary}
+              <div class="mt-2">
+                <DeploymentStatusBadge status={latestProjectDeploymentSummary.status} />
+              </div>
               <a
                 href={deploymentDetailHref(latestProjectDeploymentSummary)}
-                class="mt-2 block truncate text-sm font-semibold underline-offset-4 hover:underline"
+                class="mt-2 block truncate text-xs font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                title={`${latestDeploymentResource?.name ?? latestProjectDeploymentSummary.resourceId} · ${formatTime(latestProjectDeploymentSummary.createdAt)}`}
               >
-                {latestProjectDeploymentSummary.status}
-              </a>
-              <p class="mt-1 truncate text-xs text-muted-foreground">
                 {latestDeploymentResource?.name ?? latestProjectDeploymentSummary.resourceId} · {formatTime(latestProjectDeploymentSummary.createdAt)}
-              </p>
+              </a>
             {:else}
               <p class="mt-2 text-sm font-semibold">{$t(i18nKeys.console.projects.noDeploymentShort)}</p>
               <p class="mt-1 text-xs text-muted-foreground">
@@ -2026,7 +2031,7 @@
               </p>
             {/if}
           </article>
-          <article class="console-subtle-panel p-4">
+          <article>
             <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               {$t(i18nKeys.console.projects.attentionTitle)}
             </p>
@@ -2042,21 +2047,23 @@
       </section>
 
       <Tabs.Root value={activeProjectTab} class={detailBodyClass}>
-        <nav
-          aria-label={$t(i18nKeys.console.projects.pageTitle)}
-          class={detailTabsClass}
-        >
-          {#each projectDetailTabs as tab (tab)}
-            <a
-              href={projectTabHref(tab)}
-              class={detailTabClass}
-              aria-current={activeProjectTab === tab ? "page" : undefined}
-              onclick={(event) => selectProjectTab(tab, event)}
-            >
-              {projectTabLabel(tab)}
-            </a>
-          {/each}
-        </nav>
+        <ScrollArea class={detailTabsScrollAreaClass}>
+          <nav
+            aria-label={$t(i18nKeys.console.projects.pageTitle)}
+            class={detailTabsClass}
+          >
+            {#each projectDetailTabs as tab (tab)}
+              <a
+                href={projectTabHref(tab)}
+                class={detailTabClass}
+                aria-current={activeProjectTab === tab ? "page" : undefined}
+                onclick={(event) => selectProjectTab(tab, event)}
+              >
+                {projectTabLabel(tab)}
+              </a>
+            {/each}
+          </nav>
+        </ScrollArea>
 
         <Tabs.Content
           value="overview"
@@ -2242,23 +2249,24 @@
                   {$t(i18nKeys.console.projects.latestDeploymentTitle)}
                 </h2>
                 {#if latestProjectDeploymentSummary}
-                  <a
-                    href={deploymentDetailHref(latestProjectDeploymentSummary)}
-                    class="console-record-row block"
-                  >
+                  <div class="console-record-row">
                     <div class="flex flex-wrap items-center justify-between gap-2">
-                      <span class="text-sm font-medium">{latestProjectDeploymentSummary.status}</span>
+                      <DeploymentStatusBadge status={latestProjectDeploymentSummary.status} />
                       <Badge variant="outline">
                         {latestDeploymentEnvironment?.name ?? latestProjectDeploymentSummary.environmentId}
                       </Badge>
                     </div>
-                    <p class="mt-1 truncate text-xs text-muted-foreground">
+                    <a
+                      href={deploymentDetailHref(latestProjectDeploymentSummary)}
+                      class="mt-1 block truncate text-sm font-medium underline-offset-4 hover:underline"
+                      title={latestDeploymentResource?.name ?? latestProjectDeploymentSummary.resourceId}
+                    >
                       {latestDeploymentResource?.name ?? latestProjectDeploymentSummary.resourceId}
-                    </p>
+                    </a>
                     <p class="mt-1 text-xs text-muted-foreground">
                       {formatTime(latestProjectDeploymentSummary.createdAt)}
                     </p>
-                  </a>
+                  </div>
                 {:else}
                   <p class="text-sm leading-6 text-muted-foreground">
                     {$t(i18nKeys.console.projects.noProjectDeploymentBody)}

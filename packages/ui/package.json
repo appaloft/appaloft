@@ -102,6 +102,11 @@
       "types": "./src/select/index.ts",
       "default": "./src/select/index.ts"
     },
+    "./scroll-area": {
+      "svelte": "./src/scroll-area/index.ts",
+      "types": "./src/scroll-area/index.ts",
+      "default": "./src/scroll-area/index.ts"
+    },
     "./separator": {
       "svelte": "./src/separator/index.ts",
       "types": "./src/separator/index.ts",
