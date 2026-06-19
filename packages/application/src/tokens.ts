@@ -685,6 +685,7 @@ export const tokens = {
     "appaloft.connector_connection_projection_source",
   ),
   connectorProviderAdapterRegistry: Symbol.for("appaloft.connector_provider_adapter_registry"),
+  dnsProviderDiscoveryPort: Symbol.for("appaloft.dns_provider_discovery_port"),
   integrationRegistry: Symbol.for("appaloft.integration_registry"),
   blueprintRegistry: Symbol.for("appaloft.blueprint_registry"),
   blueprintCatalogQueryService: Symbol.for("appaloft.blueprint_catalog_query_service"),

@@ -1567,6 +1567,14 @@
   const dnsConnectorConflicts = $derived(
     dnsConnectorPlan?.providerPlan?.dnsRecords?.conflicts ?? [],
   );
+  const dnsConnectorSelectedConnectorKey = $derived(
+    dnsConnectorReadiness?.selectedConnector.connectorKey ?? "",
+  );
+  const dnsConnectorSelectedConnectorTitle = $derived(
+    dnsConnectorReadiness?.selectedConnector.title ??
+      dnsConnectorReadiness?.providerDiscovery.recommendedConnectorTitle ??
+      "",
+  );
   const canApplyDnsConnectorPlan = $derived(
     Boolean(
       selectedDnsConnectorBinding &&
@@ -2209,12 +2217,21 @@
     if (!browser || !binding || dnsConnectorConnectPending) {
       return;
     }
+    if (!dnsConnectorSelectedConnectorKey) {
+      dnsConnectorFeedback = {
+        bindingId: binding.id,
+        kind: "error",
+        title: $t(i18nKeys.console.domainBindings.dnsConnectorPlanErrorTitle),
+        detail: dnsConnectorUnsupportedProviderLabel() || "DNS connector is not available.",
+      };
+      return;
+    }
 
     dnsConnectorConnectPending = true;
     dnsConnectorFeedback = null;
     try {
       const started = await orpcClient.connections.connect.start({
-        connectorKey: "cloudflare-dns",
+        connectorKey: dnsConnectorSelectedConnectorKey,
         returnUrl: `/resources/${resourceId}?tab=networking&section=domains&dnsBindingId=${encodeURIComponent(binding.id)}`,
         requestedCapabilityKey: "dns.records.apply",
         originalHostname: binding.domainName,
@@ -5831,6 +5848,52 @@
       return $t(i18nKeys.console.domainBindings.dnsConnectorReadinessNoZone);
     }
     return dnsConnectorReadiness?.plan.status ?? "";
+  }
+
+  function dnsConnectorProviderLabel(): string {
+    const discovery = dnsConnectorReadiness?.providerDiscovery;
+    if (!discovery) {
+      return "检测 DNS 提供商";
+    }
+    if (discovery.status === "detected") {
+      return `检测到：${discovery.providerTitle}`;
+    }
+    if (discovery.status === "unavailable") {
+      return "DNS 提供商检测暂不可用";
+    }
+    return "未识别 DNS 提供商";
+  }
+
+  function dnsConnectorProviderDetail(): string {
+    const discovery = dnsConnectorReadiness?.providerDiscovery;
+    if (!discovery) {
+      return "";
+    }
+    if (discovery.nameservers.length > 0) {
+      return `${discovery.baseDomain} NS: ${discovery.nameservers.join(", ")}`;
+    }
+    return discovery.message ?? discovery.baseDomain;
+  }
+
+  function dnsConnectorConnectProviderLabel(): string {
+    if (dnsConnectorConnectPending) {
+      return $t(i18nKeys.common.status.loading);
+    }
+    if (dnsConnectorSelectedConnectorTitle) {
+      return `连接 ${dnsConnectorSelectedConnectorTitle}`;
+    }
+    return $t(i18nKeys.console.domainBindings.dnsConnectorConnectProvider);
+  }
+
+  function dnsConnectorUnsupportedProviderLabel(): string {
+    const discovery = dnsConnectorReadiness?.providerDiscovery;
+    if (discovery?.status === "detected" && !discovery.recommendedConnectorKey) {
+      return `暂不支持自动配置 ${discovery.providerTitle}，请使用手动 DNS。`;
+    }
+    if (discovery?.status === "unknown") {
+      return "未识别 DNS 提供商，可以选择手动 DNS。";
+    }
+    return "";
   }
 
   function domainDnsObservationStatusVariant(
@@ -10070,16 +10133,25 @@
                       {selectedDnsConnectorBinding.id}
                     </p>
                   </div>
-                  <Badge variant="outline" class="gap-1.5">
-                    <span
-                      class="inline-flex h-4 w-5 items-center justify-center [&_svg]:h-3.5 [&_svg]:w-5"
-                      aria-hidden="true"
-                      title={cloudflareConnectorIcon.title}
-                    >
-                      {@html cloudflareConnectorIcon.svg}
-                    </span>
-                    <span>Cloudflare DNS</span>
-                  </Badge>
+                  <div class="flex flex-col items-start gap-1 sm:items-end">
+                    <Badge variant="outline" class="gap-1.5">
+                      {#if dnsConnectorReadiness?.providerDiscovery.providerId === "cloudflare"}
+                        <span
+                          class="inline-flex h-4 w-5 items-center justify-center [&_svg]:h-3.5 [&_svg]:w-5"
+                          aria-hidden="true"
+                          title={cloudflareConnectorIcon.title}
+                        >
+                          {@html cloudflareConnectorIcon.svg}
+                        </span>
+                      {/if}
+                      <span>{dnsConnectorProviderLabel()}</span>
+                    </Badge>
+                    {#if dnsConnectorReadiness}
+                      <p class="max-w-xs break-all text-xs text-muted-foreground sm:text-right">
+                        {dnsConnectorProviderDetail()}
+                      </p>
+                    {/if}
+                  </div>
                 </div>
                 <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
                   <div class="min-w-0 flex-1 space-y-1.5 text-sm">
@@ -10203,6 +10275,11 @@
                     </p>
                   {/if}
                   <div class="flex flex-wrap gap-2">
+                    {#if dnsConnectorUnsupportedProviderLabel()}
+                      <p class="basis-full text-sm text-muted-foreground">
+                        {dnsConnectorUnsupportedProviderLabel()}
+                      </p>
+                    {/if}
                     {#if dnsConnectorReadiness.actions.canConnectProvider}
                       <Button
                         id="resource-domain-binding-dns-connect-provider"
@@ -10219,9 +10296,7 @@
                         >
                           {@html cloudflareConnectorIcon.svg}
                         </span>
-                        {dnsConnectorConnectPending
-                          ? $t(i18nKeys.common.status.loading)
-                          : $t(i18nKeys.console.domainBindings.dnsConnectorConnectProvider)}
+                        {dnsConnectorConnectProviderLabel()}
                       </Button>
                     {/if}
                     {#if dnsConnectorReadiness.actions.canShowManualDns}

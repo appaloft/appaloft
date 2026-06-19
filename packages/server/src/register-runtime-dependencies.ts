@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash, createPrivateKey, createPublicKey, X509Certificate } from "node:crypto";
+import { resolveNs } from "node:dns/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
 import { type SshRemoteStateTarget } from "@appaloft/adapter-cli";
@@ -84,6 +85,7 @@ import {
   QueryBus,
   type RemoteStateWorkReadModel,
   RepositoryBackedDeploymentExecutionGuard,
+  ResolvingDnsProviderDiscoveryPort,
   type ResourceAccessFailureRendererTarget,
   type RetentionDefaultRepository,
   type RouteRealizationWorkReadModel,
@@ -1779,6 +1781,14 @@ export function registerRuntimeDependencies(
             providerTitle: "Cloudflare DNS",
           }),
         ]),
+    ),
+  });
+  container.register(tokens.dnsProviderDiscoveryPort, {
+    useFactory: instanceCachingFactory(
+      () =>
+        new ResolvingDnsProviderDiscoveryPort({
+          resolveNs,
+        }),
     ),
   });
   container.register(tokens.integrationRegistry, {

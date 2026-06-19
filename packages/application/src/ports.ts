@@ -9826,6 +9826,7 @@ export interface ConnectorRegistryListInput {
 export interface ConnectorRegistry {
   list(input?: ConnectorRegistryListInput): ConnectorDescriptor[];
   findByKey(key: string): ConnectorDescriptor | null;
+  findDnsConnectorForProvider(providerId: string): ConnectorDescriptor | null;
 }
 
 export interface ConnectorConnectionStoreListInput {
@@ -10064,11 +10065,32 @@ export interface DomainBindingDnsPlanReadiness {
   preview?: ConnectorCapabilityPlanPreview;
 }
 
+export interface DomainBindingDnsProviderDiscoveryReadiness {
+  status: "detected" | "unknown" | "unavailable";
+  hostname: string;
+  baseDomain: string;
+  nameservers: string[];
+  providerId: string;
+  providerTitle: string;
+  confidence: "high" | "medium" | "unknown";
+  recommendedConnectorKey?: string;
+  recommendedConnectorTitle?: string;
+  message?: string;
+}
+
+export interface DomainBindingDnsSelectedConnectorReadiness {
+  connectorKey?: string;
+  title?: string;
+  source: "requested" | "connected-zone" | "detected-provider" | "none";
+}
+
 export interface DomainBindingDnsReadiness {
   domainBindingId?: string;
   resourceId: string;
   domainName: string;
   pathPrefix: string;
+  providerDiscovery: DomainBindingDnsProviderDiscoveryReadiness;
+  selectedConnector: DomainBindingDnsSelectedConnectorReadiness;
   zoneMatch: DomainBindingDnsZoneMatch;
   conflict: DomainBindingDnsConflictReadiness;
   plan: DomainBindingDnsPlanReadiness;
@@ -10078,6 +10100,10 @@ export interface DomainBindingDnsReadiness {
     canShowManualDns: boolean;
     reason?: string;
   };
+}
+
+export interface DnsProviderDiscoveryPort {
+  inspectHostname(hostname: string): Promise<Result<DomainBindingDnsProviderDiscoveryReadiness>>;
 }
 
 export interface ConnectorProviderAdapter {

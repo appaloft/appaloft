@@ -62,6 +62,7 @@ export interface ConnectorDefinitionSnapshot {
   title: string;
   category: ConnectionCategoryKey;
   providerKey: string;
+  dnsProviderIds?: string[];
   capabilities: ConnectorCapabilitySnapshot[];
   grantKinds: CredentialGrantSnapshot[];
   availability: ConnectorAvailabilitySnapshot;
@@ -333,6 +334,7 @@ export class ConnectorDefinition {
     private readonly grantKindValues: CredentialGrantDefinition[],
     private readonly availabilityValue: ConnectorAvailabilityValue,
     private readonly visibilityValue: ConnectorVisibility,
+    private readonly dnsProviderIdsValue: string[],
     private readonly setupValue?: ConnectorDefinitionSnapshot["setup"],
   ) {}
 
@@ -372,6 +374,7 @@ export class ConnectorDefinition {
         grants,
         availability.value,
         input.visibility,
+        [...(input.dnsProviderIds ?? [])],
         input.setup,
       ),
     );
@@ -387,6 +390,7 @@ export class ConnectorDefinition {
       input.grantKinds.map(CredentialGrantDefinition.rehydrate),
       ConnectorAvailabilityValue.create(input.availability)._unsafeUnwrap(),
       input.visibility,
+      [...(input.dnsProviderIds ?? [])],
       input.setup,
     );
   }
@@ -435,6 +439,7 @@ export class ConnectorDefinition {
       title: this.titleValue,
       category: this.categoryValue.value,
       providerKey: this.providerKeyValue.value,
+      ...(this.dnsProviderIdsValue.length ? { dnsProviderIds: [...this.dnsProviderIdsValue] } : {}),
       capabilities: this.capabilityValues.map((capability) => capability.toJSON()),
       grantKinds: this.grantKindValues.map((grant) => grant.toJSON()),
       availability: this.availabilityValue.toJSON(),

@@ -2,10 +2,15 @@ import { domainError, err, ok, type Result } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
+import { InMemoryConnectorRegistry } from "../../extensibility/connector-registry";
+import { createDefaultConnectorDefinitions } from "../../extensibility/default-connectors";
+import { StaticDnsProviderDiscoveryPort } from "../../extensibility/dns-provider-discovery";
 import {
   type ConnectionSnapshot,
   type ConnectorProviderAdapterRegistry,
+  type ConnectorRegistry,
   type DnsConnectorZoneSnapshot,
+  type DnsProviderDiscoveryPort,
   type DnsRecordRequirementSnapshot,
   type DomainBindingDnsReadiness,
   type DomainBindingReadModel,
@@ -28,6 +33,12 @@ export class InspectDomainBindingDnsReadinessQueryService {
     private readonly adapterRegistry: ConnectorProviderAdapterRegistry,
     @inject(tokens.connectorCapabilityPlanQueryService)
     private readonly connectorPlanQueryService: PlanConnectorCapabilityQueryService,
+    @inject(tokens.connectorRegistry)
+    private readonly connectorRegistry: ConnectorRegistry = new InMemoryConnectorRegistry(
+      createDefaultConnectorDefinitions(),
+    ),
+    @inject(tokens.dnsProviderDiscoveryPort)
+    private readonly dnsProviderDiscovery: DnsProviderDiscoveryPort = new StaticDnsProviderDiscoveryPort(),
   ) {}
 
   async execute(
@@ -66,14 +77,25 @@ export class InspectDomainBindingDnsReadinessQueryService {
           },
     );
 
+    const providerDiscovery = await this.inspectDnsProvider(domainName);
+    const recommendedConnector = providerDiscovery.recommendedConnectorKey
+      ? this.connectorRegistry.findByKey(providerDiscovery.recommendedConnectorKey)
+      : null;
+    const effectiveConnectorKey = input.connectorKey ?? recommendedConnector?.key;
+
     const connections = (
       await this.connectionsQueryService.execute(context, {
         category: "dns",
-        ...(input.connectorKey ? { connectorKey: input.connectorKey } : {}),
+        ...(effectiveConnectorKey ? { connectorKey: effectiveConnectorKey } : {}),
       })
     ).items.filter((connection) => connection.status === "connected");
 
     const zoneMatch = await this.matchAuthorizedZone(context, domainName, connections);
+    const selectedConnector = this.selectedConnectorReadiness({
+      ...(input.connectorKey ? { requestedConnectorKey: input.connectorKey } : {}),
+      recommendedConnector,
+      zoneMatch,
+    });
     const records = input.records
       ? ok(input.records as DnsRecordRequirementSnapshot[])
       : binding
@@ -97,7 +119,12 @@ export class InspectDomainBindingDnsReadinessQueryService {
     } else if (zoneMatch.status !== "matched") {
       plan = {
         status: "blocked",
-        message: "No connected DNS zone covers this domain.",
+        message: missingZoneMessage({
+          domainName,
+          providerDiscovery,
+          connections,
+          selectedConnector,
+        }),
       };
     } else {
       const connectorKey = zoneMatch.connectorKey;
@@ -129,11 +156,74 @@ export class InspectDomainBindingDnsReadinessQueryService {
       resourceId,
       domainName,
       pathPrefix,
+      providerDiscovery,
+      selectedConnector,
       zoneMatch,
       conflict,
       plan,
-      actions: readinessActions({ zoneMatch, conflict, plan }),
+      actions: readinessActions({ zoneMatch, conflict, plan, selectedConnector }),
     });
+  }
+
+  private async inspectDnsProvider(
+    domainName: string,
+  ): Promise<DomainBindingDnsReadiness["providerDiscovery"]> {
+    const discovery = await this.dnsProviderDiscovery.inspectHostname(domainName);
+    const providerDiscovery = discovery.isOk()
+      ? discovery.value
+      : {
+          status: "unavailable" as const,
+          hostname: domainName,
+          baseDomain: normalizeDomainName(domainName),
+          nameservers: [],
+          providerId: "unknown",
+          providerTitle: "Unknown DNS provider",
+          confidence: "unknown" as const,
+          message: discovery.error.message,
+        };
+    const recommendedConnector = this.connectorRegistry.findDnsConnectorForProvider(
+      providerDiscovery.providerId,
+    );
+    return {
+      ...providerDiscovery,
+      ...(recommendedConnector
+        ? {
+            recommendedConnectorKey: recommendedConnector.key,
+            recommendedConnectorTitle: recommendedConnector.title,
+          }
+        : {}),
+    };
+  }
+
+  private selectedConnectorReadiness(input: {
+    requestedConnectorKey?: string;
+    recommendedConnector: ReturnType<ConnectorRegistry["findByKey"]>;
+    zoneMatch: DomainBindingDnsReadiness["zoneMatch"];
+  }): DomainBindingDnsReadiness["selectedConnector"] {
+    if (input.zoneMatch.status === "matched" && input.zoneMatch.connectorKey) {
+      const connector = this.connectorRegistry.findByKey(input.zoneMatch.connectorKey);
+      return {
+        connectorKey: input.zoneMatch.connectorKey,
+        ...(connector?.title ? { title: connector.title } : {}),
+        source: "connected-zone",
+      };
+    }
+    if (input.requestedConnectorKey) {
+      const connector = this.connectorRegistry.findByKey(input.requestedConnectorKey);
+      return {
+        connectorKey: input.requestedConnectorKey,
+        ...(connector?.title ? { title: connector.title } : {}),
+        source: "requested",
+      };
+    }
+    if (input.recommendedConnector) {
+      return {
+        connectorKey: input.recommendedConnector.key,
+        title: input.recommendedConnector.title,
+        source: "detected-provider",
+      };
+    }
+    return { source: "none" };
   }
 
   private async matchAuthorizedZone(
@@ -219,6 +309,7 @@ function readinessActions(input: {
   zoneMatch: DomainBindingDnsReadiness["zoneMatch"];
   conflict: DomainBindingDnsReadiness["conflict"];
   plan: DomainBindingDnsReadiness["plan"];
+  selectedConnector: DomainBindingDnsReadiness["selectedConnector"];
 }): DomainBindingDnsReadiness["actions"] {
   const canApplyDns =
     input.zoneMatch.status === "matched" &&
@@ -226,7 +317,8 @@ function readinessActions(input: {
     input.plan.status === "ready";
   return {
     canApplyDns,
-    canConnectProvider: input.zoneMatch.status !== "matched",
+    canConnectProvider:
+      input.zoneMatch.status !== "matched" && Boolean(input.selectedConnector.connectorKey),
     canShowManualDns: true,
     ...(!canApplyDns
       ? {
@@ -239,6 +331,29 @@ function readinessActions(input: {
         }
       : {}),
   };
+}
+
+function missingZoneMessage(input: {
+  domainName: string;
+  providerDiscovery: DomainBindingDnsReadiness["providerDiscovery"];
+  connections: readonly ConnectionSnapshot[];
+  selectedConnector: DomainBindingDnsReadiness["selectedConnector"];
+}): string {
+  if (
+    input.selectedConnector.connectorKey &&
+    input.connections.some(
+      (connection) => connection.connectorKey === input.selectedConnector.connectorKey,
+    )
+  ) {
+    return `The authorized ${input.selectedConnector.title ?? input.providerDiscovery.providerTitle} account does not include ${input.providerDiscovery.baseDomain}.`;
+  }
+  if (input.providerDiscovery.recommendedConnectorTitle) {
+    return `No connected ${input.providerDiscovery.recommendedConnectorTitle} zone covers ${input.domainName}.`;
+  }
+  if (input.providerDiscovery.status === "detected") {
+    return `${input.providerDiscovery.providerTitle} was detected, but automatic DNS is not available for this provider yet.`;
+  }
+  return "No connected DNS zone covers this domain.";
 }
 
 function normalizeDomainName(value: string): string {
