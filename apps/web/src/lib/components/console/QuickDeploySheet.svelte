@@ -6888,7 +6888,10 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
 />
 
 <Dialog.Root bind:open={blueprintSelectorDialogOpen}>
-  <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-6xl">
+  <Dialog.Content
+    closeLabel={$t(i18nKeys.common.actions.close)}
+    class="grid h-[calc(100svh-0.75rem)] w-[calc(100%-0.75rem)] max-w-6xl grid-rows-[auto_minmax(0,1fr)] gap-3 overflow-hidden sm:h-auto sm:w-[calc(100%-2rem)] sm:max-h-[calc(100vh-2rem)] sm:gap-4"
+  >
     <Dialog.Header>
       <Dialog.Title>选择蓝图</Dialog.Title>
       <Dialog.Description>
@@ -6896,7 +6899,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       </Dialog.Description>
     </Dialog.Header>
 
-    <div class="px-5 pb-5">
+    <div class="min-h-0 overflow-y-auto px-3 pb-3 sm:px-5 sm:pb-5">
       <BlueprintCatalogSelector
         surface="dialog"
         selectedSlug={selectedBlueprintSlug}

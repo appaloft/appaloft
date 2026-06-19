@@ -40,12 +40,24 @@ describe("Blueprint marketplace web URLs", () => {
     expect(pageSource).toContain("BlueprintMarketplaceCard");
     expect(pageSource).toContain("readonly surface?: BlueprintMarketplaceSurface");
     expect(pageSource).toContain("data-marketplace-surface={surface}");
-    expect(pageSource).toContain(".marketplace-controls");
+    expect(pageSource).toContain('import { cn } from "@appaloft/ui/utils"');
+    expect(pageSource).toContain("const controlsClass = $derived");
+    expect(pageSource).toContain("pb-3.5 pt-4");
+    expect(pageSource).toContain("max-[820px]:pb-3 max-[820px]:pt-3");
+    expect(pageSource).not.toContain("shadow-[0_12px");
     expect(pageSource).toContain("data-blueprint-marketplace-search");
     expect(pageSource).toContain("data-blueprint-marketplace-category-tabs");
     expect(pageSource).toContain("data-blueprint-marketplace-groups");
-    expect(pageSource).toContain('data-marketplace-surface="dialog"');
-    expect(pageSource).toContain('data-marketplace-surface="quick-deploy"');
+    expect(pageSource).toContain(
+      'const isDialogSurface = $derived(surface === "dialog" || surface === "quick-deploy")',
+    );
+    expect(pageSource).toContain("const cardDensity: BlueprintMarketplaceCardDensity = $derived");
+    expect(pageSource).toContain(
+      'surface === "dialog" || surface === "quick-deploy" ? "compact" : "default"',
+    );
+    expect(pageSource).toContain("density={cardDensity}");
+    expect(pageSource).toContain("minmax(min(100%,280px),1fr)");
+    expect(pageSource).not.toContain("<style>");
     expect(pageSource).toContain("isBlueprintRegistryListResponse(value)");
     expect(pageSource).toContain("registryEntryToListing");
     expect(pageSource).not.toContain('name: "Appaloft"');
