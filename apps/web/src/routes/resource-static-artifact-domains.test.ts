@@ -31,8 +31,13 @@ describe("resource static artifact domains panel", () => {
     expect(resourcePageSource).toContain('requestedCapabilityKey: "dns.records.apply"');
     expect(resourcePageSource).toContain("originalHostname: binding.domainName");
     expect(resourcePageSource).toContain("dnsBindingId=");
-    expect(resourcePageSource).toContain('page.url.searchParams.get("connectionStatus")');
-    expect(resourcePageSource).toContain("openDnsConnectorDialog(callbackBinding)");
+    expect(resourcePageSource).toContain('searchParams.get("connectionStatus")');
+    expect(resourcePageSource).toContain("window.open(");
+    expect(resourcePageSource).toContain('"appaloft-dns-provider-authorization"');
+    expect(resourcePageSource).toContain('type: "appaloft:dns-connector-callback"');
+    expect(resourcePageSource).toContain("window.opener.postMessage(callbackPayload");
+    expect(resourcePageSource).toContain("handleDnsConnectorCallback(callbackPayload)");
+    expect(resourcePageSource).toContain("dnsConnectorConnectErrorDetailWithCode");
     expect(resourcePageSource).toContain('id="resource-domain-binding-dns-connect-provider"');
     expect(resourcePageSource).toContain("cloudflareConnectorIcon.svg");
     expect(resourcePageSource).not.toContain('id="resource-domain-binding-create-form"');
