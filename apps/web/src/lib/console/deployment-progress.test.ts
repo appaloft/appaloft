@@ -442,6 +442,63 @@ describe("deployment progress helpers", () => {
     expect(deploymentTimelineProgressStatus(reachableEnvelopes, "running")).toBe("succeeded");
   });
 
+  test("[DEP-TIMELINE-WEB-003C] sorts displayed timeline rows by occurrence time", () => {
+    const envelopes: DeploymentTimelineEnvelope[] = [
+      {
+        schemaVersion: "deployments.timeline/v1",
+        kind: "entry",
+        entry: {
+          deploymentId: "dep_demo",
+          sequence: 1,
+          cursor: "dep_demo:1",
+          occurredAt: "2026-01-01T00:00:10.000Z",
+          source: "appaloft",
+          kind: "lifecycle",
+          phase: "verify",
+          level: "info",
+          message: "SSH public route is reachable at http://demo.example.test/api/health",
+        },
+      },
+      {
+        schemaVersion: "deployments.timeline/v1",
+        kind: "entry",
+        entry: {
+          deploymentId: "dep_demo",
+          sequence: 2,
+          cursor: "dep_demo:2",
+          occurredAt: "2026-01-01T00:00:03.000Z",
+          source: "appaloft",
+          kind: "lifecycle",
+          phase: "deploy",
+          level: "info",
+          message: "Reload Traefik edge proxy",
+        },
+      },
+      {
+        schemaVersion: "deployments.timeline/v1",
+        kind: "entry",
+        entry: {
+          deploymentId: "dep_demo",
+          sequence: 3,
+          cursor: "dep_demo:3",
+          occurredAt: "2026-01-01T00:00:03.000Z",
+          source: "appaloft",
+          kind: "lifecycle",
+          phase: "deploy",
+          level: "info",
+          message: "Traefik edge proxy reload is complete",
+        },
+      },
+    ];
+
+    expect(deploymentTimelineProgressEvents(envelopes).map((event) => event.message)).toEqual([
+      "Reload Traefik edge proxy",
+      "Traefik edge proxy reload is complete",
+      "SSH public route is reachable at http://demo.example.test/api/health",
+    ]);
+    expect(latestDeploymentTimelineCursor(envelopes)).toBe("dep_demo:3");
+  });
+
   test("[DEP-TIMELINE-WEB-004] normalizes persisted timestamp timeline rows for deployment detail replay", () => {
     const response = {
       json: {
