@@ -4136,5 +4136,9 @@ function normalizeDocsBasePath(input: string): string {
     return "";
   }
 
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+
   return trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
 }

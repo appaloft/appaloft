@@ -51,6 +51,7 @@ function createTestApp(input?: {
     typeof createHttpApp
   >[0]["executionContextFactory"]["create"];
   onQuery?: (query: Query<unknown>) => void;
+  publicDocsBasePath?: string;
   webStaticDir?: string;
 }) {
   const queryBus = {
@@ -73,6 +74,7 @@ function createTestApp(input?: {
       flags: {
         appVersion: "0.1.0-test",
         authProvider: "none",
+        publicDocsBasePath: input?.publicDocsBasePath,
         webStaticDir: input?.webStaticDir ?? "",
         docsStaticDir: input?.docsStaticDir ?? "",
       },
@@ -258,6 +260,20 @@ describe("HTTP static assets", () => {
     });
 
     expect(authChecks).toEqual([]);
+  });
+
+  test("serves public docs base path through runtime config script", async () => {
+    const app = createTestApp({
+      publicDocsBasePath: "https://appaloft.com/docs",
+    });
+
+    await withServer(app, async (baseUrl) => {
+      const scriptResponse = await fetch(`${baseUrl}/api/auth/public-config.js`);
+      expect(scriptResponse.status).toBe(200);
+      const script = await scriptResponse.text();
+      expect(script).toContain('"docs":{"basePath":"https://appaloft.com/docs"}');
+      expect(script).not.toContain("clientSecret");
+    });
   });
 
   test("[FIRST-ADMIN-NAV-001] redirects console navigation to first-admin before serving SPA", async () => {

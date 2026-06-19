@@ -2,6 +2,9 @@ import { type AuthPublicConfig } from "@appaloft/contracts";
 
 type PublicRuntimeConfig = {
   auth?: AuthPublicConfig;
+  docs?: {
+    basePath?: string;
+  };
 };
 
 declare global {

@@ -172,6 +172,9 @@ interface StaticAssetSource {
 
 interface PublicRuntimeConfig {
   auth: AuthPublicConfig;
+  docs?: {
+    basePath: string;
+  };
 }
 
 const firstAdminBootstrapPath = "/bootstrap/auth/first-admin";
@@ -1080,6 +1083,9 @@ export function createHttpApp(input: {
   function publicRuntimeConfig(): PublicRuntimeConfig {
     return {
       auth: input.authRuntime?.getPublicConfig() ?? disabledAuthPublicConfig,
+      ...(input.config.publicDocsBasePath
+        ? { docs: { basePath: input.config.publicDocsBasePath } }
+        : {}),
     };
   }
 

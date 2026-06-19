@@ -170,6 +170,7 @@ export interface AppConfig {
   httpPort: number;
   webOrigin: string;
   resourceAccessFailureRendererUrl?: string;
+  publicDocsBasePath?: string;
   webStaticDir?: string;
   docsStaticDir?: string;
   databaseDriver: "postgres" | "pglite";
@@ -1129,6 +1130,16 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
     ),
     webOrigin,
     ...(resourceAccessFailureRendererUrl ? { resourceAccessFailureRendererUrl } : {}),
+    ...(source.flags?.publicDocsBasePath ||
+    env.APPALOFT_PUBLIC_DOCS_BASE_PATH ||
+    fileConfig.publicDocsBasePath
+      ? {
+          publicDocsBasePath:
+            source.flags?.publicDocsBasePath ??
+            env.APPALOFT_PUBLIC_DOCS_BASE_PATH ??
+            fileConfig.publicDocsBasePath,
+        }
+      : {}),
     ...(source.flags?.webStaticDir || env.APPALOFT_WEB_STATIC_DIR || fileConfig.webStaticDir
       ? {
           webStaticDir:

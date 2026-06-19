@@ -14,6 +14,13 @@ const chineseLocaleSource = readFileSync(
   fileURLToPath(new URL("../../../../packages/i18n/src/locales/zh-CN.ts", import.meta.url)),
   "utf8",
 );
+const dnsConnectorCallbackEffectSource = resourcePageSource.slice(
+  resourcePageSource.indexOf("const callbackPayload = readDnsConnectorCallbackPayload"),
+  resourcePageSource.indexOf(
+    "$effect(() => {\n    if (!browser)",
+    resourcePageSource.indexOf("const callbackPayload = readDnsConnectorCallbackPayload"),
+  ),
+);
 
 describe("resource static artifact domains panel", () => {
   test("[RESOURCE-STATIC-DOMAINS-001] offers the normal domain binding flow for static artifacts", () => {
@@ -38,12 +45,22 @@ describe("resource static artifact domains panel", () => {
     expect(resourcePageSource).toContain("dnsConnectorSelectedConnectorKey");
     expect(resourcePageSource).toContain("dnsConnectorProviderLabel()");
     expect(resourcePageSource).toContain("dnsConnectorUnsupportedProviderLabel()");
+    expect(resourcePageSource).toContain("manualDnsRecordsForBinding");
+    expect(resourcePageSource).toContain("data-resource-domain-binding-manual-dns");
+    expect(resourcePageSource).toContain("manualDnsRecords.length > 0");
+    expect(resourcePageSource).not.toContain(
+      'class={buttonVariants({ variant: "ghost", size: "sm" })}\n                        href={webDocsHrefs.domainCustomDomainBinding}',
+    );
     expect(resourcePageSource).not.toContain('connectorKey: "cloudflare-dns"');
     expect(resourcePageSource).not.toContain("<span>Cloudflare DNS</span>");
     expect(resourcePageSource).toContain('requestedCapabilityKey: "dns.records.apply"');
     expect(resourcePageSource).toContain("originalHostname: binding.domainName");
     expect(resourcePageSource).toContain("dnsBindingId=");
     expect(resourcePageSource).toContain('searchParams.get("connectionStatus")');
+    expect(resourcePageSource).toContain('searchParams.get("connectionErrorPhase")');
+    expect(resourcePageSource).toContain('searchParams.get("connectionErrorStatusCode")');
+    expect(resourcePageSource).toContain("dnsConnectorConnectErrorTokenExchangeWithStatus");
+    expect(resourcePageSource).toContain("dnsConnectorConnectErrorZoneDiscoveryWithStatus");
     expect(resourcePageSource).toContain("window.open(");
     expect(resourcePageSource).toContain("dnsConnectorAuthWindowName");
     expect(resourcePageSource).toContain("dnsConnectorAuthorizationPopupFeatures()");
@@ -53,6 +70,9 @@ describe("resource static artifact domains panel", () => {
       'const dnsConnectorCallbackMessageType = "appaloft:dns-connector-callback"',
     );
     expect(resourcePageSource).toContain("publishDnsConnectorCallbackPayload(callbackPayload)");
+    expect(dnsConnectorCallbackEffectSource).not.toContain(
+      "const currentResourceId = resource?.id",
+    );
     expect(resourcePageSource).toContain("new BroadcastChannel(dnsConnectorCallbackChannelName)");
     expect(resourcePageSource).toContain("dnsConnectorCallbackStorageKey");
     expect(resourcePageSource).toContain("dnsConnectorCallbackStandalonePayload");
@@ -63,6 +83,8 @@ describe("resource static artifact domains panel", () => {
     expect(resourcePageSource).toContain("dnsConnectorConnectErrorDetailWithCode");
     expect(englishLocaleSource).toContain("{{code}}");
     expect(chineseLocaleSource).toContain("{{code}}");
+    expect(englishLocaleSource).toContain("{{statusCode}}");
+    expect(chineseLocaleSource).toContain("{{statusCode}}");
     expect(resourcePageSource).toContain('id="resource-domain-binding-dns-connect-provider"');
     expect(resourcePageSource).toContain("cloudflareConnectorIcon.svg");
     expect(resourcePageSource).not.toContain('id="resource-domain-binding-create-form"');
