@@ -53,6 +53,7 @@
   let accessUrlCopyResetTimeout: ReturnType<typeof setTimeout> | undefined;
   const panelStatus = $derived(deploymentPanelStatus());
   const deploymentSucceeded = $derived(panelStatus === "succeeded");
+  const resolvedAccessUrl = $derived(accessUrl || accessUrlFromDeploymentProgressEvents());
   const accessUrlCopyLabel = $derived(
     accessUrlCopyState === "copied"
       ? $t(i18nKeys.console.deployments.accessUrlCopied)
@@ -161,6 +162,15 @@
     }
   }
 
+  function accessUrlFromDeploymentProgressEvents(): string {
+    const terminalAccessEvent = [...deploymentEvents]
+      .reverse()
+      .find((event) => event.phase === "verify" && /public route/i.test(event.message));
+    const match = terminalAccessEvent?.message.match(/https?:\/\/\S+/i);
+
+    return match?.[0]?.replace(/[),.;]+$/, "") ?? "";
+  }
+
   function updateAccessUrlCopyState(state: typeof accessUrlCopyState): void {
     accessUrlCopyState = state;
 
@@ -174,12 +184,12 @@
   }
 
   async function handleCopyAccessUrl(): Promise<void> {
-    if (!accessUrl) {
+    if (!resolvedAccessUrl) {
       return;
     }
 
     try {
-      await navigator.clipboard.writeText(accessUrl);
+      await navigator.clipboard.writeText(resolvedAccessUrl);
       updateAccessUrlCopyState("copied");
     } catch {
       updateAccessUrlCopyState("failed");
@@ -220,7 +230,7 @@
           {/each}
         </div>
       {/if}
-      <header class="relative border-b px-5 py-4 pr-16 sm:pr-5">
+      <header class="relative border-b px-5 py-4 pr-20">
         <div class="flex items-start justify-between gap-4">
           <div class="min-w-0 flex-1 space-y-2">
             <div class="flex flex-wrap items-center gap-2">
@@ -289,7 +299,7 @@
           </div>
         {/if}
 
-        {#if deploymentSucceeded && accessUrl}
+        {#if deploymentSucceeded && resolvedAccessUrl}
           <section
             class="rounded-lg border border-primary/20 bg-primary/5 px-4 py-5 text-center shadow-sm"
             data-quick-deploy-success-access-url
@@ -298,15 +308,15 @@
               {$t(i18nKeys.console.deployments.accessUrlTitle)}
             </p>
             <a
-              href={accessUrl}
+              href={resolvedAccessUrl}
               target="_blank"
               rel="noreferrer"
               class="mx-auto mt-2 block max-w-3xl break-all text-base font-semibold text-primary underline-offset-4 hover:underline sm:text-lg"
             >
-              {accessUrl}
+              {resolvedAccessUrl}
             </a>
             <div class="mt-4 flex flex-wrap justify-center gap-2">
-              <Button type="button" href={accessUrl} target="_blank" rel="noreferrer">
+              <Button type="button" href={resolvedAccessUrl} target="_blank" rel="noreferrer">
                 <ExternalLink class="size-4" />
                 {$t(i18nKeys.console.deployments.openAccessUrl)}
               </Button>

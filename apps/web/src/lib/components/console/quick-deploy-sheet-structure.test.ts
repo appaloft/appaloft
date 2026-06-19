@@ -6,6 +6,10 @@ const quickDeploySheetSource = readFileSync(
   fileURLToPath(new URL("./QuickDeploySheet.svelte", import.meta.url)),
   "utf8",
 );
+const quickDeployProgressDialogSource = readFileSync(
+  fileURLToPath(new URL("./QuickDeployProgressDialog.svelte", import.meta.url)),
+  "utf8",
+);
 const resourceSourceOptionSource = readFileSync(
   fileURLToPath(new URL("./ResourceSourceOption.svelte", import.meta.url)),
   "utf8",
@@ -91,6 +95,21 @@ describe("QuickDeploySheet structure", () => {
     );
     expect(quickDeploySheetSource).not.toContain(
       'return complete ? "text-emerald-600" : "text-destructive";',
+    );
+  });
+
+  test("[QUICK-DEPLOY-UX-002D] surfaces the successful access URL above deployment logs", () => {
+    expect(quickDeployProgressDialogSource).toContain("data-quick-deploy-success-access-url");
+    expect(quickDeployProgressDialogSource).toContain("resolvedAccessUrl");
+    expect(quickDeployProgressDialogSource).toContain("accessUrlFromDeploymentProgressEvents");
+    expect(quickDeployProgressDialogSource).toContain("/https?:\\/\\/\\S+/i");
+    expect(quickDeployProgressDialogSource).toContain('target="_blank"');
+    expect(quickDeployProgressDialogSource).toContain(
+      "await navigator.clipboard.writeText(resolvedAccessUrl)",
+    );
+    expect(quickDeployProgressDialogSource).toContain('class="relative border-b px-5 py-4 pr-20"');
+    expect(quickDeployProgressDialogSource).not.toContain(
+      'class="relative border-b px-5 py-4 pr-16 sm:pr-5"',
     );
   });
 
