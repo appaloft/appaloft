@@ -321,6 +321,22 @@ describe("connections HTTP routes", () => {
           resourceId: "res_test",
           domainName: "app.example.com",
           pathPrefix: "/",
+          providerDiscovery: {
+            status: "detected",
+            hostname: "app.example.com",
+            baseDomain: "example.com",
+            nameservers: ["marge.ns.cloudflare.com"],
+            providerId: "cloudflare",
+            providerTitle: "Cloudflare DNS",
+            confidence: "high",
+            recommendedConnectorKey: "cloudflare-dns",
+            recommendedConnectorTitle: "Cloudflare DNS",
+          },
+          selectedConnector: {
+            connectorKey: "cloudflare-dns",
+            title: "Cloudflare DNS",
+            source: "connected-zone",
+          },
           zoneMatch: {
             status: "matched",
             connectorKey: "cloudflare-dns",
@@ -392,6 +408,16 @@ describe("connections HTTP routes", () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
+      providerDiscovery: {
+        status: "detected",
+        providerId: "cloudflare",
+        recommendedConnectorKey: "cloudflare-dns",
+      },
+      selectedConnector: {
+        connectorKey: "cloudflare-dns",
+        title: "Cloudflare DNS",
+        source: "connected-zone",
+      },
       zoneMatch: {
         status: "matched",
         connectionId: "conn_cloudflare_dns_org",
