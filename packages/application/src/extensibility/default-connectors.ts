@@ -80,6 +80,7 @@ export function createDefaultConnectorDefinitions(
       title: "Cloudflare DNS",
       category: "dns",
       providerKey: "cloudflare",
+      dnsProviderIds: ["cloudflare"],
       capabilities: [
         {
           key: "dns.domain-connect.start",

@@ -71,6 +71,7 @@ import {
   type ProcessAttemptRecord,
   type ProcessAttemptRecorder,
   type RepositoryContext,
+  StaticDnsProviderDiscoveryPort,
   toRepositoryContext,
 } from "../src";
 import { CreateDomainBindingCommand } from "../src/operations/domain-bindings/create-domain-binding.command";
@@ -555,14 +556,26 @@ describe("CreateDomainBindingUseCase", () => {
     });
     expect(result.isOk()).toBe(true);
 
+    const connectorRegistry = new InMemoryConnectorRegistry(
+      createDefaultConnectorDefinitions({
+        cloudflareDns: { configured: true },
+      }),
+    );
     const service = new InspectDomainBindingDnsReadinessQueryService(
       readModel,
       new ListConnectionsQueryService(new InMemoryConnectorConnectionStore()),
       new InMemoryConnectorProviderAdapterRegistry([]),
       new PlanConnectorCapabilityQueryService(
-        new InMemoryConnectorRegistry(createDefaultConnectorDefinitions()),
+        connectorRegistry,
         new InMemoryConnectorProviderAdapterRegistry([]),
       ),
+      connectorRegistry,
+      new StaticDnsProviderDiscoveryPort({
+        "pocketbase.appalofttest.xyz": {
+          baseDomain: "appalofttest.xyz",
+          nameservers: ["marge.ns.cloudflare.com", "theo.ns.cloudflare.com"],
+        },
+      }),
     );
 
     const readiness = await service.execute(context, {
@@ -574,6 +587,12 @@ describe("CreateDomainBindingUseCase", () => {
     expect(readiness.isOk()).toBe(true);
     expect(readiness._unsafeUnwrap()).toMatchObject({
       zoneMatch: { status: "no-dns-connections" },
+      providerDiscovery: {
+        status: "detected",
+        providerId: "cloudflare",
+        providerTitle: "Cloudflare DNS",
+        recommendedConnectorKey: "cloudflare-dns",
+      },
       conflict: { status: "available" },
       plan: { status: "blocked" },
       actions: {
@@ -581,6 +600,162 @@ describe("CreateDomainBindingUseCase", () => {
         canConnectProvider: true,
         canShowManualDns: true,
         reason: "dns-zone-not-connected",
+      },
+    });
+  });
+
+  test("[APP-CONN-019] recommends manual DNS when detected provider has no connector", async () => {
+    const { context, readModel, useCase } = await seedRoutingContext();
+    const result = await useCase.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      serverId: "srv_demo",
+      destinationId: "dst_demo",
+      domainName: "www.example.com",
+      proxyKind: "traefik",
+      tlsMode: "auto",
+    });
+    expect(result.isOk()).toBe(true);
+
+    const connectorRegistry = new InMemoryConnectorRegistry(
+      createDefaultConnectorDefinitions({
+        cloudflareDns: { configured: true },
+      }),
+    );
+    const service = new InspectDomainBindingDnsReadinessQueryService(
+      readModel,
+      new ListConnectionsQueryService(new InMemoryConnectorConnectionStore()),
+      new InMemoryConnectorProviderAdapterRegistry([]),
+      new PlanConnectorCapabilityQueryService(
+        connectorRegistry,
+        new InMemoryConnectorProviderAdapterRegistry([]),
+      ),
+      connectorRegistry,
+      new StaticDnsProviderDiscoveryPort({
+        "www.example.com": {
+          baseDomain: "example.com",
+          nameservers: ["ns17.domaincontrol.com", "ns18.domaincontrol.com"],
+        },
+      }),
+    );
+
+    const readiness = await service.execute(context, {
+      domainBindingId: result._unsafeUnwrap().id,
+      pathPrefix: "/",
+      capabilityKey: "dns.records.apply",
+    });
+
+    expect(readiness.isOk()).toBe(true);
+    expect(readiness._unsafeUnwrap()).toMatchObject({
+      providerDiscovery: {
+        status: "detected",
+        providerId: "godaddy",
+        providerTitle: "GoDaddy DNS",
+      },
+      selectedConnector: { source: "none" },
+      actions: {
+        canApplyDns: false,
+        canConnectProvider: false,
+        canShowManualDns: true,
+      },
+      plan: {
+        status: "blocked",
+        message:
+          "GoDaddy DNS was detected, but automatic DNS is not available for this provider yet.",
+      },
+    });
+  });
+
+  test("[APP-CONN-019] reports when the authorized provider account does not own the detected zone", async () => {
+    const { context, readModel, useCase } = await seedRoutingContext();
+    const result = await useCase.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      serverId: "srv_demo",
+      destinationId: "dst_demo",
+      domainName: "pocketbase.appalofttest.xyz",
+      proxyKind: "traefik",
+      tlsMode: "auto",
+    });
+    expect(result.isOk()).toBe(true);
+
+    const adapterRegistry = new InMemoryConnectorProviderAdapterRegistry([
+      new FakeDnsConnectorProviderAdapter({
+        connectorKey: "cloudflare-dns",
+        providerTitle: "Cloudflare DNS",
+        zones: [{ name: "other-zone.example" }],
+      }),
+    ]);
+    const connectorRegistry = new InMemoryConnectorRegistry(
+      createDefaultConnectorDefinitions({
+        cloudflareDns: { configured: true },
+      }),
+    );
+    const service = new InspectDomainBindingDnsReadinessQueryService(
+      readModel,
+      new ListConnectionsQueryService(
+        new InMemoryConnectorConnectionStore([
+          {
+            id: "conn_cloudflare_dns_org",
+            connectorKey: "cloudflare-dns",
+            providerKey: "cloudflare",
+            category: "dns",
+            owner: { scope: "organization", id: "org_demo" },
+            displayName: "Cloudflare DNS",
+            status: "connected",
+            capabilities: ["dns.records.plan", "dns.records.apply"],
+            credentialGrant: {
+              kind: "persistent-provider-credential",
+              storage: "secret-ref",
+              redacted: true,
+              externalAccountId: "acct_demo",
+            },
+            providerResources: [],
+            diagnostics: [],
+            createdAt: "2026-01-01T00:00:00.000Z",
+            updatedAt: "2026-01-01T00:00:00.000Z",
+          },
+        ]),
+      ),
+      adapterRegistry,
+      new PlanConnectorCapabilityQueryService(connectorRegistry, adapterRegistry),
+      connectorRegistry,
+      new StaticDnsProviderDiscoveryPort({
+        "pocketbase.appalofttest.xyz": {
+          baseDomain: "appalofttest.xyz",
+          nameservers: ["marge.ns.cloudflare.com"],
+        },
+      }),
+    );
+
+    const readiness = await service.execute(context, {
+      domainBindingId: result._unsafeUnwrap().id,
+      pathPrefix: "/",
+      capabilityKey: "dns.records.apply",
+    });
+
+    expect(readiness.isOk()).toBe(true);
+    expect(readiness._unsafeUnwrap()).toMatchObject({
+      providerDiscovery: {
+        status: "detected",
+        providerId: "cloudflare",
+        recommendedConnectorKey: "cloudflare-dns",
+      },
+      zoneMatch: { status: "no-matching-zone" },
+      selectedConnector: {
+        connectorKey: "cloudflare-dns",
+        title: "Cloudflare DNS",
+        source: "detected-provider",
+      },
+      actions: {
+        canApplyDns: false,
+        canConnectProvider: true,
+      },
+      plan: {
+        status: "blocked",
+        message: "The authorized Cloudflare DNS account does not include appalofttest.xyz.",
       },
     });
   });

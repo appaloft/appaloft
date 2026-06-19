@@ -35,7 +35,11 @@ describe("resource static artifact domains panel", () => {
     expect(resourcePageSource).toContain("destinationId: effectiveDomainBindingDestinationId");
     expect(resourcePageSource).toContain("connectDnsProviderForSelectedBinding");
     expect(resourcePageSource).toContain("orpcClient.connections.connect.start");
-    expect(resourcePageSource).toContain('connectorKey: "cloudflare-dns"');
+    expect(resourcePageSource).toContain("dnsConnectorSelectedConnectorKey");
+    expect(resourcePageSource).toContain("dnsConnectorProviderLabel()");
+    expect(resourcePageSource).toContain("dnsConnectorUnsupportedProviderLabel()");
+    expect(resourcePageSource).not.toContain('connectorKey: "cloudflare-dns"');
+    expect(resourcePageSource).not.toContain("<span>Cloudflare DNS</span>");
     expect(resourcePageSource).toContain('requestedCapabilityKey: "dns.records.apply"');
     expect(resourcePageSource).toContain("originalHostname: binding.domainName");
     expect(resourcePageSource).toContain("dnsBindingId=");

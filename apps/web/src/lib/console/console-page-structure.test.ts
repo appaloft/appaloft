@@ -1279,7 +1279,9 @@ describe("console page structure", () => {
     expect(resourceDetailPageSource).toContain('capabilityKey: "dns.records.apply"');
     expect(resourceDetailPageSource).toContain('from "@thesvg/icons/cloudflare"');
     expect(resourceDetailPageSource).toContain("cloudflareConnectorIcon.svg");
-    expect(resourceDetailPageSource).toContain("<span>Cloudflare DNS</span>");
+    expect(resourceDetailPageSource).toContain("dnsConnectorProviderLabel()");
+    expect(resourceDetailPageSource).toContain("dnsConnectorSelectedConnectorKey");
+    expect(resourceDetailPageSource).not.toContain("<span>Cloudflare DNS</span>");
     expect(resourceDetailPageSource).toContain('modalIsOpen(page, "domain-binding")');
     expect(resourceDomainBindingsSectionSource).not.toContain(
       "data-resource-static-artifact-domain-unavailable",

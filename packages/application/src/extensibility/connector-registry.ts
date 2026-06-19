@@ -40,6 +40,23 @@ export class InMemoryConnectorRegistry implements ConnectorRegistry {
   findByKey(key: string): ConnectorDescriptor | null {
     return this.byKey.get(key)?.toJSON() ?? null;
   }
+
+  findDnsConnectorForProvider(providerId: string): ConnectorDescriptor | null {
+    const normalizedProviderId = providerId.trim().toLowerCase();
+    if (!normalizedProviderId || normalizedProviderId === "unknown") {
+      return null;
+    }
+
+    const match = this.definitions.find((definition) => {
+      const snapshot = definition.toJSON();
+      return (
+        snapshot.category === "dns" &&
+        snapshot.availability.status !== "unavailable" &&
+        snapshot.dnsProviderIds?.includes(normalizedProviderId)
+      );
+    });
+    return match?.toJSON() ?? null;
+  }
 }
 
 export class InMemoryConnectorProviderAdapterRegistry implements ConnectorProviderAdapterRegistry {
