@@ -178,6 +178,16 @@ describe("resolveConfig", () => {
     expect(config.docsStaticDir).toBe("/srv/appaloft/docs");
   });
 
+  test("allows serving console docs help links from an external docs base", () => {
+    const config = resolveConfig({
+      env: {
+        APPALOFT_PUBLIC_DOCS_BASE_PATH: "https://appaloft.com/docs",
+      },
+    });
+
+    expect(config.publicDocsBasePath).toBe("https://appaloft.com/docs");
+  });
+
   test("reads the GitHub webhook secret from runtime configuration", () => {
     const config = resolveConfig({
       env: {

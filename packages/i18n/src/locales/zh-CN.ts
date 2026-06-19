@@ -1597,6 +1597,14 @@ export const zhCN = {
         "DNS 提供商授权没有完成。可以重新连接，或在提供商暂不可用时使用手动 DNS。",
       dnsConnectorConnectErrorDetailWithCode:
         "DNS 提供商授权没有完成（{{code}}）。可以重新连接，或在提供商暂不可用时使用手动 DNS。",
+      dnsConnectorConnectErrorTokenExchange:
+        "DNS 提供商已返回授权码，但 Appaloft 无法换取访问令牌。请确认 OAuth 客户端密钥、令牌认证方式和回调地址与 Appaloft 配置一致。",
+      dnsConnectorConnectErrorTokenExchangeWithStatus:
+        "DNS 提供商已返回授权码，但 Appaloft 无法换取访问令牌（HTTP {{statusCode}}）。请确认 OAuth 客户端密钥、令牌认证方式和回调地址与 Appaloft 配置一致。",
+      dnsConnectorConnectErrorZoneDiscovery:
+        "DNS 提供商授权已完成，但 Appaloft 无法读取 DNS zones。请确认授权 scope 包含 Zone Read，并且当前账号能访问这个域名的 zone。",
+      dnsConnectorConnectErrorZoneDiscoveryWithStatus:
+        "DNS 提供商授权已完成，但 Appaloft 无法读取 DNS zones（HTTP {{statusCode}}）。请确认授权 scope 包含 Zone Read，并且当前账号能访问这个域名的 zone。",
       dnsConnectorConnectErrorTitle: "无法连接 DNS 提供商",
       dnsConnectorConnectProvider: "连接 DNS 提供商",
       dnsConnectorConnectSuccessDetail:
@@ -1605,6 +1613,10 @@ export const zhCN = {
       dnsConnectorDialogDescription: "查看 Appaloft 将通过已连接的提供商应用哪些 DNS 记录。",
       dnsConnectorDialogTitle: "配置提供商 DNS",
       dnsConnectorManualDns: "手动 DNS",
+      dnsConnectorManualDnsDescription:
+        "在当前 DNS 提供商里添加这些记录。记录生效后，回到这里刷新计划或重试验证。",
+      dnsConnectorManualDnsEmpty:
+        "当前绑定还没有可展示的 DNS 目标。请刷新计划，或先确认这个域名绑定的路由目标已生成。",
       dnsConnectorNoRecords: "这个绑定不需要 DNS 记录。",
       dnsConnectorPlanErrorTitle: "无法生成 DNS 计划",
       dnsConnectorPlanTitle: "DNS 计划",
