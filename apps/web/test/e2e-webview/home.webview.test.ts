@@ -5875,6 +5875,38 @@ describe.serial("console e2e with Bun.WebView", () => {
       sectionSelector: "#resource-configuration-profile",
     });
     await expectAnyText(view, ["Resource profile", "资源档案"]);
+    const desktopSubnavBleedState = JSON.parse(
+      await view.evaluate<string>(`JSON.stringify((() => {
+        const demoResourcePath = ${JSON.stringify(demoResourcePath)};
+        const main = document.querySelector("[data-console-main]");
+        const subnav = Array.from(document.querySelectorAll("nav")).find((nav) => {
+          const links = Array.from(nav.querySelectorAll("a"))
+            .map((anchor) => new URL(anchor.href).pathname + new URL(anchor.href).search);
+          return links.includes(demoResourcePath + "?tab=configuration")
+            && links.includes(demoResourcePath + "?tab=configuration&section=configuration")
+            && links.includes(demoResourcePath + "?tab=configuration&section=auto-deploy")
+            && links.includes(demoResourcePath + "?tab=configuration&section=health");
+        })?.closest("aside");
+        const mainRect = main?.getBoundingClientRect();
+        const subnavRect = subnav?.getBoundingClientRect();
+        return {
+          mainLeft: mainRect?.left ?? null,
+          subnavLeft: subnavRect?.left ?? null,
+          bodyOverflows: document.documentElement.scrollWidth > window.innerWidth + 1,
+        };
+      })())`),
+    ) as {
+      mainLeft: number | null;
+      subnavLeft: number | null;
+      bodyOverflows: boolean;
+    };
+    expect(desktopSubnavBleedState.bodyOverflows).toBe(false);
+    if (desktopSubnavBleedState.mainLeft === null || desktopSubnavBleedState.subnavLeft === null) {
+      throw new Error("Expected desktop resource secondary navigation bounds to be measurable");
+    }
+    expect(
+      Math.abs(desktopSubnavBleedState.subnavLeft - desktopSubnavBleedState.mainLeft),
+    ).toBeLessThanOrEqual(1);
     await waitFor(
       () =>
         view.evaluate<boolean>(`(() => {
@@ -5934,6 +5966,41 @@ describe.serial("console e2e with Bun.WebView", () => {
       hasConfigurationTab: true,
       hasTabNav: true,
     });
+
+    await mobileView.navigate(`${previewUrl}${demoResourcePath}?tab=configuration&section=profile`);
+    await expectAnyText(mobileView, ["Resource profile", "资源档案"]);
+    const mobileSubnavBleedState = JSON.parse(
+      await mobileView.evaluate<string>(`JSON.stringify((() => {
+        const demoResourcePath = ${JSON.stringify(demoResourcePath)};
+        const main = document.querySelector("[data-console-main]");
+        const subnav = Array.from(document.querySelectorAll("nav")).find((nav) => {
+          const links = Array.from(nav.querySelectorAll("a"))
+            .map((anchor) => new URL(anchor.href).pathname + new URL(anchor.href).search);
+          return links.includes(demoResourcePath + "?tab=configuration")
+            && links.includes(demoResourcePath + "?tab=configuration&section=configuration")
+            && links.includes(demoResourcePath + "?tab=configuration&section=auto-deploy")
+            && links.includes(demoResourcePath + "?tab=configuration&section=health");
+        })?.closest("aside");
+        const mainRect = main?.getBoundingClientRect();
+        const subnavRect = subnav?.getBoundingClientRect();
+        return {
+          mainLeft: mainRect?.left ?? null,
+          subnavLeft: subnavRect?.left ?? null,
+          bodyOverflows: document.documentElement.scrollWidth > window.innerWidth + 1,
+        };
+      })())`),
+    ) as {
+      mainLeft: number | null;
+      subnavLeft: number | null;
+      bodyOverflows: boolean;
+    };
+    expect(mobileSubnavBleedState.bodyOverflows).toBe(false);
+    if (mobileSubnavBleedState.mainLeft === null || mobileSubnavBleedState.subnavLeft === null) {
+      throw new Error("Expected mobile resource secondary navigation bounds to be measurable");
+    }
+    expect(
+      Math.abs(mobileSubnavBleedState.subnavLeft - mobileSubnavBleedState.mainLeft),
+    ).toBeLessThanOrEqual(1);
 
     await view.navigate(`${previewUrl}${demoResourcePath}?tab=dependencies`);
     await expectAnyText(view, ["Dependencies", "依赖资源"]);
