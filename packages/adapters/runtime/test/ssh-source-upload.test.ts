@@ -8,6 +8,7 @@ import {
   buildRemoteDockerImageVersionMetadataCommand,
   buildRemotePreviewArtifactSweepCommand,
   parseDockerRepoDigestFromInspect,
+  parseRemoteDockerImageVersionMetadataOutput,
 } from "../src/ssh-execution";
 
 describe("SSH source upload", () => {
@@ -71,6 +72,18 @@ describe("SSH Docker image version metadata", () => {
     expect(parseDockerRepoDigestFromInspect(`ghcr.io/acme/api@${digest}`)).toBe(digest);
     expect(parseDockerRepoDigestFromInspect(`[]\n${digest}`)).toBe(digest);
     expect(parseDockerRepoDigestFromInspect("[]")).toBeUndefined();
+  });
+
+  test("falls back to Docker pull digest when inspect output does not include repo digests", () => {
+    const digest =
+      "sha256:0afb71a39e51637b4d5b4010d90e68bc502d3ca1d2a4d953eb5fcd7d86330ccd";
+
+    expect(
+      parseRemoteDockerImageVersionMetadataOutput({
+        stdout: "[]",
+        stderr: `latest: Pulling from n8nio/n8n\nDigest: ${digest}\nStatus: Downloaded newer image for n8nio/n8n:latest`,
+      }),
+    ).toBe(digest);
   });
 });
 

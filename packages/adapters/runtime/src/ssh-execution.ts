@@ -242,6 +242,16 @@ export function parseDockerRepoDigestFromInspect(output: string): string | undef
   return trimmed.match(/\b(sha256:[0-9a-f]{64})\b/i)?.[1];
 }
 
+export function parseRemoteDockerImageVersionMetadataOutput(input: {
+  stdout: string;
+  stderr: string;
+}): string | undefined {
+  return (
+    parseDockerRepoDigestFromInspect(input.stdout) ??
+    parseDockerRepoDigestFromInspect(input.stderr)
+  );
+}
+
 function dockerPullWithStderrCommand(image: string): string {
   return `docker pull ${shellQuote(image)} >&2`;
 }
@@ -1333,7 +1343,10 @@ export class SshExecutionBackend implements ExecutionBackend {
       };
     }
 
-    const digest = parseDockerRepoDigestFromInspect(inspect.stdout);
+    const digest = parseRemoteDockerImageVersionMetadataOutput({
+      stdout: inspect.stdout,
+      stderr: inspect.stderr,
+    });
     if (!digest) {
       return {
         status: "failed",
