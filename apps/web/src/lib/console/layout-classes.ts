@@ -20,10 +20,10 @@ export const detailTabPanelScrollNoTopClass =
   "mt-0 min-w-0 md:min-h-0 md:flex-1 md:overflow-x-hidden md:overflow-y-auto md:pb-6";
 
 export const detailTabPanelSubnavClass =
-  "mt-0 min-w-0 md:min-h-0 md:w-[calc(100%+3rem)] md:flex-1 md:-mx-6 md:overflow-hidden";
+  "mt-0 -mx-4 min-w-0 w-[calc(100%+2rem)] overflow-hidden md:min-h-0 md:w-[calc(100%+3rem)] md:flex-1 md:-mx-6";
 
 export const subnavLayoutClass =
-  "grid -m-4 min-h-[calc(100svh-3.5rem)] md:-m-6 md:grid-cols-[16rem_minmax(0,1fr)]";
+  "grid -m-4 min-h-[calc(100svh-3.5rem)] w-[calc(100%+2rem)] md:-m-6 md:w-[calc(100%+3rem)] md:grid-cols-[16rem_minmax(0,1fr)]";
 
 export const detailSubnavLayoutClass =
   "grid min-h-0 md:m-0 md:h-full md:min-h-0 md:overflow-hidden";
