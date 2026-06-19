@@ -6,6 +6,14 @@ const resourcePageSource = readFileSync(
   fileURLToPath(new URL("./resources/[resourceId=consoleObjectId]/+page.svelte", import.meta.url)),
   "utf8",
 );
+const englishLocaleSource = readFileSync(
+  fileURLToPath(new URL("../../../../packages/i18n/src/locales/en-US.ts", import.meta.url)),
+  "utf8",
+);
+const chineseLocaleSource = readFileSync(
+  fileURLToPath(new URL("../../../../packages/i18n/src/locales/zh-CN.ts", import.meta.url)),
+  "utf8",
+);
 
 describe("resource static artifact domains panel", () => {
   test("[RESOURCE-STATIC-DOMAINS-001] offers the normal domain binding flow for static artifacts", () => {
@@ -44,8 +52,13 @@ describe("resource static artifact domains panel", () => {
     expect(resourcePageSource).toContain("new BroadcastChannel(dnsConnectorCallbackChannelName)");
     expect(resourcePageSource).toContain("dnsConnectorCallbackStorageKey");
     expect(resourcePageSource).toContain("dnsConnectorCallbackStandalonePayload");
+    expect(resourcePageSource).toContain("isDnsConnectorAuxiliaryCallbackWindow");
+    expect(resourcePageSource).toContain("popupSizedWindow");
+    expect(resourcePageSource).toContain("window.setTimeout(() =>");
     expect(resourcePageSource).toContain("handleDnsConnectorCallback(callbackPayload)");
     expect(resourcePageSource).toContain("dnsConnectorConnectErrorDetailWithCode");
+    expect(englishLocaleSource).toContain("{{code}}");
+    expect(chineseLocaleSource).toContain("{{code}}");
     expect(resourcePageSource).toContain('id="resource-domain-binding-dns-connect-provider"');
     expect(resourcePageSource).toContain("cloudflareConnectorIcon.svg");
     expect(resourcePageSource).not.toContain('id="resource-domain-binding-create-form"');

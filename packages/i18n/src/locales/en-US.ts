@@ -1754,7 +1754,7 @@ export const enUS = {
       dnsConnectorConnectErrorDetail:
         "DNS provider authorization did not complete. Try connecting again, or use manual DNS while the provider is unavailable.",
       dnsConnectorConnectErrorDetailWithCode:
-        "DNS provider authorization did not complete ({code}). Try connecting again, or use manual DNS while the provider is unavailable.",
+        "DNS provider authorization did not complete ({{code}}). Try connecting again, or use manual DNS while the provider is unavailable.",
       dnsConnectorConnectErrorTitle: "Unable to connect DNS provider",
       dnsConnectorConnectProvider: "Connect DNS provider",
       dnsConnectorConnectSuccessDetail:

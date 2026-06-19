@@ -2047,6 +2047,27 @@
     ].join(",");
   }
 
+  function isDnsConnectorAuxiliaryCallbackWindow(): boolean {
+    if (!browser) {
+      return false;
+    }
+    if (window.name === dnsConnectorAuthWindowName || (window.opener && !window.opener.closed)) {
+      return true;
+    }
+
+    const outerWidth = window.outerWidth || window.innerWidth;
+    const outerHeight = window.outerHeight || window.innerHeight;
+    const popupSizedWindow =
+      outerWidth > 0 && outerWidth <= 900 && outerHeight > 0 && outerHeight <= 900;
+
+    return (
+      popupSizedWindow &&
+      page.url.searchParams.has("connectionStatus") &&
+      page.url.searchParams.has("connectionId") &&
+      page.url.searchParams.has("dnsBindingId")
+    );
+  }
+
   function handleDnsConnectorCallback(payload: DnsConnectorCallbackPayload): void {
     if (payload.resourceId !== resourceId) {
       return;
@@ -3894,9 +3915,11 @@
 
     untrack(() => {
       publishDnsConnectorCallbackPayload(callbackPayload);
-      if (window.name === dnsConnectorAuthWindowName || (window.opener && !window.opener.closed)) {
+      if (isDnsConnectorAuxiliaryCallbackWindow()) {
         dnsConnectorCallbackStandalonePayload = callbackPayload;
-        window.close();
+        window.setTimeout(() => {
+          window.close();
+        }, 250);
         return;
       }
 

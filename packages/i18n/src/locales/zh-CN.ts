@@ -1596,7 +1596,7 @@ export const zhCN = {
       dnsConnectorConnectErrorDetail:
         "DNS 提供商授权没有完成。可以重新连接，或在提供商暂不可用时使用手动 DNS。",
       dnsConnectorConnectErrorDetailWithCode:
-        "DNS 提供商授权没有完成（{code}）。可以重新连接，或在提供商暂不可用时使用手动 DNS。",
+        "DNS 提供商授权没有完成（{{code}}）。可以重新连接，或在提供商暂不可用时使用手动 DNS。",
       dnsConnectorConnectErrorTitle: "无法连接 DNS 提供商",
       dnsConnectorConnectProvider: "连接 DNS 提供商",
       dnsConnectorConnectSuccessDetail:
