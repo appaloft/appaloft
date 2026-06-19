@@ -972,6 +972,7 @@
     title: string;
     detail: string;
   } | null>(null);
+  let dnsConnectorAuthWindow: Window | null = null;
   let importFeedback = $state<{
     bindingId: string;
     kind: "success" | "error";
@@ -1571,6 +1572,16 @@
         !dnsConnectorApplyPending,
     ),
   );
+
+  type DnsConnectorCallbackPayload = {
+    type: "appaloft:dns-connector-callback";
+    resourceId: string;
+    dnsBindingId: string;
+    connectionStatus: string;
+    connectionId: string;
+    connector?: string;
+    connectionError?: string;
+  };
   const canBindDependencyResource = $derived(
     Boolean(
       resource &&
@@ -1907,6 +1918,65 @@
     void refreshDnsConnectorPlan();
   }
 
+  function readDnsConnectorCallbackPayload(
+    searchParams: URLSearchParams,
+  ): DnsConnectorCallbackPayload | null {
+    const dnsBindingId = searchParams.get("dnsBindingId") ?? "";
+    const connectionStatus = searchParams.get("connectionStatus") ?? "";
+    const connectionId = searchParams.get("connectionId") ?? "";
+    if (!dnsBindingId || !connectionStatus || !connectionId) {
+      return null;
+    }
+    return {
+      type: "appaloft:dns-connector-callback",
+      resourceId,
+      dnsBindingId,
+      connectionStatus,
+      connectionId,
+      ...(searchParams.get("connector") ? { connector: searchParams.get("connector") ?? "" } : {}),
+      ...(searchParams.get("connectionError")
+        ? { connectionError: searchParams.get("connectionError") ?? "" }
+        : {}),
+    };
+  }
+
+  function dnsConnectorCallbackDetail(payload: DnsConnectorCallbackPayload): string {
+    if (payload.connectionStatus === "connected") {
+      return $t(i18nKeys.console.domainBindings.dnsConnectorConnectSuccessDetail);
+    }
+    const errorCode = payload.connectionError?.trim();
+    return errorCode
+      ? $t(i18nKeys.console.domainBindings.dnsConnectorConnectErrorDetailWithCode, {
+          code: errorCode,
+        })
+      : $t(i18nKeys.console.domainBindings.dnsConnectorConnectErrorDetail);
+  }
+
+  function handleDnsConnectorCallback(payload: DnsConnectorCallbackPayload): void {
+    if (payload.resourceId !== resourceId) {
+      return;
+    }
+    const callbackKey = `${payload.resourceId}:${payload.dnsBindingId}:${payload.connectionStatus}:${payload.connectionId}:${payload.connectionError ?? ""}`;
+    const callbackBinding = resourceDomainBindings.find(
+      (binding) => binding.id === payload.dnsBindingId,
+    );
+    if (!callbackBinding || dnsConnectorCallbackHandledKey === callbackKey) {
+      return;
+    }
+
+    dnsConnectorCallbackHandledKey = callbackKey;
+    openDnsConnectorDialog(callbackBinding);
+    dnsConnectorFeedback = {
+      bindingId: callbackBinding.id,
+      kind: payload.connectionStatus === "connected" ? "success" : "error",
+      title:
+        payload.connectionStatus === "connected"
+          ? $t(i18nKeys.console.domainBindings.dnsConnectorConnectSuccessTitle)
+          : $t(i18nKeys.console.domainBindings.dnsConnectorConnectErrorTitle),
+      detail: dnsConnectorCallbackDetail(payload),
+    };
+  }
+
   function setDnsConnectorDialogOpen(open: boolean): void {
     dnsConnectorDialogOpen = open;
     if (open) {
@@ -2034,6 +2104,15 @@
         originalHostname: binding.domainName,
       });
       if (started.authorizationUrl) {
+        dnsConnectorAuthWindow = window.open(
+          started.authorizationUrl,
+          "appaloft-dns-provider-authorization",
+          "popup=yes,width=720,height=760,menubar=no,toolbar=no,location=yes,status=no,resizable=yes,scrollbars=yes",
+        );
+        if (dnsConnectorAuthWindow) {
+          dnsConnectorAuthWindow.focus();
+          return;
+        }
         window.location.assign(started.authorizationUrl);
         return;
       }
@@ -3712,26 +3791,60 @@
 
   $effect(() => {
     const currentResourceId = resource?.id ?? "";
-    const callbackBindingId = page.url.searchParams.get("dnsBindingId") ?? "";
-    const callbackStatus = page.url.searchParams.get("connectionStatus") ?? "";
-    const callbackConnectionId = page.url.searchParams.get("connectionId") ?? "";
-    const callbackKey = `${currentResourceId}:${callbackBindingId}:${callbackStatus}:${callbackConnectionId}`;
-    const callbackBinding = resourceDomainBindings.find(
-      (binding) => binding.id === callbackBindingId,
-    );
+    const callbackPayload = readDnsConnectorCallbackPayload(page.url.searchParams);
 
-    if (!browser || !currentResourceId || !callbackBindingId || !callbackStatus) {
+    if (!browser || !currentResourceId || !callbackPayload) {
       return;
     }
 
     untrack(() => {
-      if (!callbackBinding || dnsConnectorCallbackHandledKey === callbackKey) {
+      if (window.opener && !window.opener.closed) {
+        window.opener.postMessage(callbackPayload, window.location.origin);
+        window.close();
         return;
       }
 
-      dnsConnectorCallbackHandledKey = callbackKey;
-      openDnsConnectorDialog(callbackBinding);
+      handleDnsConnectorCallback(callbackPayload);
     });
+  });
+
+  $effect(() => {
+    if (!browser) {
+      return;
+    }
+
+    const handleDnsConnectorCallbackMessage = (event: MessageEvent): void => {
+      if (event.origin !== window.location.origin) {
+        return;
+      }
+      const payload = event.data as Partial<DnsConnectorCallbackPayload> | null;
+      if (
+        !payload ||
+        payload.type !== "appaloft:dns-connector-callback" ||
+        typeof payload.resourceId !== "string" ||
+        typeof payload.dnsBindingId !== "string" ||
+        typeof payload.connectionStatus !== "string" ||
+        typeof payload.connectionId !== "string"
+      ) {
+        return;
+      }
+      handleDnsConnectorCallback({
+        type: "appaloft:dns-connector-callback",
+        resourceId: payload.resourceId,
+        dnsBindingId: payload.dnsBindingId,
+        connectionStatus: payload.connectionStatus,
+        connectionId: payload.connectionId,
+        ...(typeof payload.connector === "string" ? { connector: payload.connector } : {}),
+        ...(typeof payload.connectionError === "string"
+          ? { connectionError: payload.connectionError }
+          : {}),
+      });
+      dnsConnectorAuthWindow?.close();
+      dnsConnectorAuthWindow = null;
+    };
+
+    window.addEventListener("message", handleDnsConnectorCallbackMessage);
+    return () => window.removeEventListener("message", handleDnsConnectorCallbackMessage);
   });
 
   $effect(() => {
@@ -9957,8 +10070,15 @@
                 </section>
               {/if}
 
-              {#if dnsConnectorFeedback?.bindingId === selectedDnsConnectorBinding.id && dnsConnectorFeedback.kind === "error"}
-                <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+              {#if dnsConnectorFeedback?.bindingId === selectedDnsConnectorBinding.id}
+                <div
+                  class={[
+                    "rounded-md border px-3 py-2 text-xs",
+                    dnsConnectorFeedback.kind === "success"
+                      ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-700"
+                      : "border-destructive/30 bg-destructive/5 text-destructive",
+                  ]}
+                >
                   <p class="font-medium">{dnsConnectorFeedback.title}</p>
                   <p class="mt-1 break-all">{dnsConnectorFeedback.detail}</p>
                 </div>

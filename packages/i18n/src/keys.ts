@@ -1530,7 +1530,13 @@ export const i18nKeys = {
       dnsConnectorCleanup: "console:domainBindings.dnsConnectorCleanup",
       dnsConnectorConfigure: "console:domainBindings.dnsConnectorConfigure",
       dnsConnectorConflicts: "console:domainBindings.dnsConnectorConflicts",
+      dnsConnectorConnectErrorDetail: "console:domainBindings.dnsConnectorConnectErrorDetail",
+      dnsConnectorConnectErrorDetailWithCode:
+        "console:domainBindings.dnsConnectorConnectErrorDetailWithCode",
+      dnsConnectorConnectErrorTitle: "console:domainBindings.dnsConnectorConnectErrorTitle",
       dnsConnectorConnectProvider: "console:domainBindings.dnsConnectorConnectProvider",
+      dnsConnectorConnectSuccessDetail: "console:domainBindings.dnsConnectorConnectSuccessDetail",
+      dnsConnectorConnectSuccessTitle: "console:domainBindings.dnsConnectorConnectSuccessTitle",
       dnsConnectorDialogDescription: "console:domainBindings.dnsConnectorDialogDescription",
       dnsConnectorDialogTitle: "console:domainBindings.dnsConnectorDialogTitle",
       dnsConnectorManualDns: "console:domainBindings.dnsConnectorManualDns",
