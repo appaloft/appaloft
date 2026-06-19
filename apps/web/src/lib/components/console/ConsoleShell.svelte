@@ -579,7 +579,7 @@
       </div>
     </header>
 
-    <main data-console-main class="min-w-0 flex-1 p-4 md:p-6">
+    <main data-console-main class="min-h-0 min-w-0 flex-1 overflow-y-auto p-4 md:p-6">
       {#if connectionError}
         <section class="console-panel space-y-4 p-5">
           <div class="space-y-2">

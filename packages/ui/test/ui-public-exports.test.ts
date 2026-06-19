@@ -10,6 +10,7 @@ import * as Empty from "@appaloft/ui/empty";
 import { Icon, type IconProps } from "@appaloft/ui/icon";
 import { Input } from "@appaloft/ui/input";
 import { Progress, type ProgressProps } from "@appaloft/ui/progress";
+import * as ScrollArea from "@appaloft/ui/scroll-area";
 import * as Select from "@appaloft/ui/select";
 import * as Tabs from "@appaloft/ui/tabs";
 import { Textarea } from "@appaloft/ui/textarea";
@@ -31,6 +32,7 @@ describe("@appaloft/ui public exports", () => {
     expect(uiPackage.primitiveEntrypoints.dropdownMenu).toBe("@appaloft/ui/dropdown-menu");
     expect(uiPackage.primitiveEntrypoints.chart).toBe("@appaloft/ui/chart");
     expect(uiPackage.primitiveEntrypoints.progress).toBe("@appaloft/ui/progress");
+    expect(uiPackage.primitiveEntrypoints.scrollArea).toBe("@appaloft/ui/scroll-area");
     expect(uiPackage.shellEntrypoints.appShell).toBe("@appaloft/ui/app-shell");
     expect(uiPackage.shellEntrypoints.icon).toBe("@appaloft/ui/icon");
     expect(appaloftPortableDesignTokens.color.primary).toBe("#4e84ff");
@@ -54,6 +56,8 @@ describe("@appaloft/ui public exports", () => {
     expect(Select.SelectTrigger).toBeDefined();
     expect(Input).toBeDefined();
     expect(Progress).toBeDefined();
+    expect(ScrollArea.ScrollArea).toBeDefined();
+    expect(ScrollArea.ScrollBar).toBeDefined();
     expect(Textarea).toBeDefined();
     expect(AppShell).toBeDefined();
     expect(AppShellRegion).toBeDefined();

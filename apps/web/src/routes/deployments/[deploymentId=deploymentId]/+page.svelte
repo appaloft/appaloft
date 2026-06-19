@@ -39,6 +39,7 @@
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import * as Dialog from "$lib/components/ui/dialog";
+  import { ScrollArea } from "$lib/components/ui/scroll-area";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import * as Tabs from "$lib/components/ui/tabs";
   import {
@@ -48,6 +49,7 @@
     detailTabClass,
     detailTabPanelScrollClass,
     detailTabsClass,
+    detailTabsScrollAreaClass,
   } from "$lib/console/layout-classes";
   import {
     deploymentTimelineProgressEvents,
@@ -1143,18 +1145,20 @@
     </section>
 
     <Tabs.Root value={activeTab} class={detailBodyClass}>
-      <nav aria-label={$t(i18nKeys.console.deployments.pageTitle)} class={detailTabsClass}>
-        {#each deploymentDetailTabs as tab (tab)}
-          <a
-            href={deploymentTabHref(tab)}
-            class={detailTabClass}
-            aria-current={activeTab === tab ? "page" : undefined}
-            onclick={(event) => selectDeploymentTab(tab, event)}
-          >
-            {deploymentTabLabel(tab)}
-          </a>
-        {/each}
-      </nav>
+      <ScrollArea class={detailTabsScrollAreaClass}>
+        <nav aria-label={$t(i18nKeys.console.deployments.pageTitle)} class={detailTabsClass}>
+          {#each deploymentDetailTabs as tab (tab)}
+            <a
+              href={deploymentTabHref(tab)}
+              class={detailTabClass}
+              aria-current={activeTab === tab ? "page" : undefined}
+              onclick={(event) => selectDeploymentTab(tab, event)}
+            >
+              {deploymentTabLabel(tab)}
+            </a>
+          {/each}
+        </nav>
+      </ScrollArea>
 
       <Tabs.Content value="overview" class={[detailTabPanelScrollClass, "space-y-5"]}>
         <section class="console-panel p-4" data-deployment-attempt-snapshot>
@@ -1481,21 +1485,23 @@
       </section>
 
       <Tabs.Root value={activeTab} class={detailBodyClass}>
-        <nav
-          aria-label={$t(i18nKeys.console.deployments.pageTitle)}
-          class={detailTabsClass}
-        >
-          {#each deploymentDetailTabs as tab (tab)}
-            <a
-              href={deploymentTabHref(tab)}
-              class={detailTabClass}
-              aria-current={activeTab === tab ? "page" : undefined}
-              onclick={(event) => selectDeploymentTab(tab, event)}
-            >
-              {deploymentTabLabel(tab)}
-            </a>
-          {/each}
-        </nav>
+        <ScrollArea class={detailTabsScrollAreaClass}>
+          <nav
+            aria-label={$t(i18nKeys.console.deployments.pageTitle)}
+            class={detailTabsClass}
+          >
+            {#each deploymentDetailTabs as tab (tab)}
+              <a
+                href={deploymentTabHref(tab)}
+                class={detailTabClass}
+                aria-current={activeTab === tab ? "page" : undefined}
+                onclick={(event) => selectDeploymentTab(tab, event)}
+              >
+                {deploymentTabLabel(tab)}
+              </a>
+            {/each}
+          </nav>
+        </ScrollArea>
 
         <Tabs.Content
           value="overview"
