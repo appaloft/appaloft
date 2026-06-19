@@ -122,9 +122,14 @@ describe("Console page extension surface", () => {
     expect(rendererSource).toContain("data-console-page-panel-field");
     expect(rendererSource).toContain("data-console-page-record-list");
     expect(rendererSource).toContain("data-console-page-record-row");
+    expect(rendererSource).toContain('kind: "dialog-panel-grid"');
+    expect(rendererSource).toContain("openPanelGridDialog(section)");
+    expect(rendererSource).toContain("bind:open={panelGridDialogOpen}");
     expect(rendererSource).toContain("fieldBindings?: Record<string, string>");
     expect(rendererSource).toContain("requestActionBody(action, item)");
     expect(rendererSource).toContain('kind: "tiered-unit-rate"');
+    expect(rendererSource).toContain("<table");
+    expect(rendererSource).toContain("<thead");
     expect(rendererSource).toContain('import { goto } from "$app/navigation";');
     expect(rendererSource).toContain("placeholderData: (previousData) => previousData");
     expect(rendererSource).toContain("navigateConsolePageHref(filter.href)");
