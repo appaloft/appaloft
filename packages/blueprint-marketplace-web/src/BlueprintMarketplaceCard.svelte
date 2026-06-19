@@ -237,8 +237,10 @@
   </CardContent>
 
   {#if showFooter}
-    <CardFooter class="flex min-w-0 items-center justify-end gap-2 border-t px-4 py-3">
-      <div class="flex shrink-0 items-center gap-2">
+    <CardFooter
+      class={cn("flex min-w-0 items-center justify-end gap-2 border-t px-4 py-3", isCompact && "px-3 py-2.5")}
+    >
+      <div class={cn("flex shrink-0 items-center gap-2", isCompact && "min-w-0 flex-wrap justify-end")}>
         {#if item.websiteUrl}
           <Button
             href={item.websiteUrl}
@@ -253,12 +255,23 @@
           </Button>
         {/if}
         {#if onview}
-          <Button variant="outline" size="sm" onclick={() => onview?.(item)}>
+          <Button
+            variant="outline"
+            size="sm"
+            class={isCompact ? "h-8 px-2.5" : ""}
+            onclick={() => onview?.(item)}
+          >
             查看 <span aria-hidden="true">↗</span>
           </Button>
         {/if}
         {#if actionHref}
-          <Button href={actionHref} size="sm" data-marketplace-deploy-link onclick={handlePrimaryAction}>
+          <Button
+            href={actionHref}
+            size="sm"
+            class={isCompact ? "h-8 px-2.5" : ""}
+            data-marketplace-deploy-link
+            onclick={handlePrimaryAction}
+          >
             {actionLabel}
             <span aria-hidden="true">→</span>
           </Button>

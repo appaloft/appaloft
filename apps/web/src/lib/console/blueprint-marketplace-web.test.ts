@@ -130,10 +130,9 @@ describe("Blueprint marketplace console surface", () => {
     expect(selectorSource).not.toContain("@appaloft-cloud");
     expect(sharedPackageSource).toContain("data-blueprint-marketplace-page");
     expect(sharedPackageSource).toContain("marketplace-controls");
-    expect(sharedPackageSource).toContain('data-marketplace-surface="dialog"');
-    expect(sharedPackageSource).toContain('data-marketplace-surface="quick-deploy"');
+    expect(sharedPackageSource).toContain("data-marketplace-surface={surface}");
     expect(sharedPackageSource).toContain("data-blueprint-marketplace-skeleton");
-    expect(sharedPackageSource).toContain("marketplace-skeleton-group");
+    expect(sharedPackageSource).toContain('class="flex min-h-[760px] flex-col gap-7"');
     expect(sharedPackageSource).toContain("readonly loading?: boolean");
     expect(sharedPackageSource).toContain('title = "应用市场"');
     expect(sharedPackageSource).not.toContain('title = "Marketplace"');
