@@ -1564,6 +1564,9 @@
   const dnsConnectorRecords = $derived(
     dnsConnectorPlan?.providerPlan?.dnsRecords?.records ?? [],
   );
+  const manualDnsRecords = $derived(
+    selectedDnsConnectorBinding ? manualDnsRecordsForBinding(selectedDnsConnectorBinding) : [],
+  );
   const dnsConnectorConflicts = $derived(
     dnsConnectorPlan?.providerPlan?.dnsRecords?.conflicts ?? [],
   );
@@ -1596,6 +1599,8 @@
     connectionId: string;
     connector?: string;
     connectionError?: string;
+    connectionErrorPhase?: string;
+    connectionErrorStatusCode?: string;
   };
   const canBindDependencyResource = $derived(
     Boolean(
@@ -1952,6 +1957,12 @@
       ...(searchParams.get("connectionError")
         ? { connectionError: searchParams.get("connectionError") ?? "" }
         : {}),
+      ...(searchParams.get("connectionErrorPhase")
+        ? { connectionErrorPhase: searchParams.get("connectionErrorPhase") ?? "" }
+        : {}),
+      ...(searchParams.get("connectionErrorStatusCode")
+        ? { connectionErrorStatusCode: searchParams.get("connectionErrorStatusCode") ?? "" }
+        : {}),
     };
   }
 
@@ -1960,6 +1971,22 @@
       return $t(i18nKeys.console.domainBindings.dnsConnectorConnectSuccessDetail);
     }
     const errorCode = payload.connectionError?.trim();
+    const phase = payload.connectionErrorPhase?.trim();
+    const statusCode = payload.connectionErrorStatusCode?.trim();
+    if (errorCode === "provider_error" && phase === "token_exchange") {
+      return statusCode
+        ? $t(i18nKeys.console.domainBindings.dnsConnectorConnectErrorTokenExchangeWithStatus, {
+            statusCode,
+          })
+        : $t(i18nKeys.console.domainBindings.dnsConnectorConnectErrorTokenExchange);
+    }
+    if (errorCode === "provider_error" && phase === "zone_discovery") {
+      return statusCode
+        ? $t(i18nKeys.console.domainBindings.dnsConnectorConnectErrorZoneDiscoveryWithStatus, {
+            statusCode,
+          })
+        : $t(i18nKeys.console.domainBindings.dnsConnectorConnectErrorZoneDiscovery);
+    }
     return errorCode
       ? $t(i18nKeys.console.domainBindings.dnsConnectorConnectErrorDetailWithCode, {
           code: errorCode,
@@ -1996,6 +2023,12 @@
       ...(typeof payload.connector === "string" ? { connector: payload.connector } : {}),
       ...(typeof payload.connectionError === "string"
         ? { connectionError: payload.connectionError }
+        : {}),
+      ...(typeof payload.connectionErrorPhase === "string"
+        ? { connectionErrorPhase: payload.connectionErrorPhase }
+        : {}),
+      ...(typeof payload.connectionErrorStatusCode === "string"
+        ? { connectionErrorStatusCode: payload.connectionErrorStatusCode }
         : {}),
     };
   }
@@ -2080,7 +2113,7 @@
     if (payload.resourceId !== resourceId) {
       return;
     }
-    const callbackKey = `${payload.resourceId}:${payload.dnsBindingId}:${payload.connectionStatus}:${payload.connectionId}:${payload.connectionError ?? ""}`;
+    const callbackKey = `${payload.resourceId}:${payload.dnsBindingId}:${payload.connectionStatus}:${payload.connectionId}:${payload.connectionError ?? ""}:${payload.connectionErrorPhase ?? ""}:${payload.connectionErrorStatusCode ?? ""}`;
     const callbackBinding = resourceDomainBindings.find(
       (binding) => binding.id === payload.dnsBindingId,
     );
@@ -3923,10 +3956,9 @@
   });
 
   $effect(() => {
-    const currentResourceId = resource?.id ?? "";
     const callbackPayload = readDnsConnectorCallbackPayload(page.url.searchParams);
 
-    if (!browser || !currentResourceId || !callbackPayload) {
+    if (!browser || !callbackPayload) {
       return;
     }
 
@@ -5176,6 +5208,28 @@
 
   function dnsRecordSummary(record: DnsRecordRequirement): string {
     return `${record.type} ${record.name} -> ${record.value}`;
+  }
+
+  function manualDnsRecordsForBinding(binding: DomainBindingSummary): DnsRecordRequirement[] {
+    return (binding.dnsObservation?.expectedTargets ?? [])
+      .map((target) => target.trim())
+      .filter(Boolean)
+      .map((target) => ({
+        name: binding.domainName,
+        type: dnsRecordTypeForTarget(target),
+        value: target,
+        purpose: "domain-routing",
+      }));
+  }
+
+  function dnsRecordTypeForTarget(target: string): DnsRecordRequirement["type"] {
+    if (/^(?:\d{1,3}\.){3}\d{1,3}$/.test(target)) {
+      return "A";
+    }
+    if (target.includes(":")) {
+      return "AAAA";
+    }
+    return "CNAME";
   }
 
   function serverTerminalHref(serverId: string): string {
@@ -10300,12 +10354,47 @@
                       </Button>
                     {/if}
                     {#if dnsConnectorReadiness.actions.canShowManualDns}
-                      <a
-                        class={buttonVariants({ variant: "ghost", size: "sm" })}
-                        href={webDocsHrefs.domainCustomDomainBinding}
+                      <div
+                        class="basis-full space-y-3 rounded-md border border-dashed bg-muted/15 p-3"
+                        data-resource-domain-binding-manual-dns
                       >
-                        {$t(i18nKeys.console.domainBindings.dnsConnectorManualDns)}
-                      </a>
+                        <div class="flex items-start justify-between gap-3">
+                          <div class="min-w-0">
+                            <p class="text-sm font-medium">
+                              {$t(i18nKeys.console.domainBindings.dnsConnectorManualDns)}
+                            </p>
+                            <p class="mt-1 text-xs leading-5 text-muted-foreground">
+                              {$t(
+                                i18nKeys.console.domainBindings
+                                  .dnsConnectorManualDnsDescription,
+                              )}
+                            </p>
+                          </div>
+                          <DocsHelpLink
+                            href={webDocsHrefs.domainCustomDomainBinding}
+                            ariaLabel={$t(i18nKeys.console.docsHelp.domainCustomDomainBinding)}
+                          />
+                        </div>
+                        {#if manualDnsRecords.length > 0}
+                          <div class="space-y-2">
+                            {#each manualDnsRecords as record (`${record.type}:${record.name}:${record.value}`)}
+                              <div class="grid gap-2 rounded-md bg-background px-3 py-2 text-xs sm:grid-cols-[5rem_minmax(0,1fr)]">
+                                <Badge variant="outline" class="w-fit">{record.type}</Badge>
+                                <div class="min-w-0 space-y-1">
+                                  <p class="break-all font-medium">{record.name}</p>
+                                  <p class="break-all text-muted-foreground">{record.value}</p>
+                                </div>
+                              </div>
+                            {/each}
+                          </div>
+                        {:else}
+                          <div class="rounded-md bg-background px-3 py-2 text-xs text-muted-foreground">
+                            {$t(
+                              i18nKeys.console.domainBindings.dnsConnectorManualDnsEmpty,
+                            )}
+                          </div>
+                        {/if}
+                      </div>
                     {/if}
                   </div>
                 </section>

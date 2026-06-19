@@ -1755,6 +1755,14 @@ export const enUS = {
         "DNS provider authorization did not complete. Try connecting again, or use manual DNS while the provider is unavailable.",
       dnsConnectorConnectErrorDetailWithCode:
         "DNS provider authorization did not complete ({{code}}). Try connecting again, or use manual DNS while the provider is unavailable.",
+      dnsConnectorConnectErrorTokenExchange:
+        "The DNS provider returned an authorization code, but Appaloft could not exchange it for an access token. Check the OAuth client secret, token authentication method, and redirect URL against the Appaloft configuration.",
+      dnsConnectorConnectErrorTokenExchangeWithStatus:
+        "The DNS provider returned an authorization code, but Appaloft could not exchange it for an access token (HTTP {{statusCode}}). Check the OAuth client secret, token authentication method, and redirect URL against the Appaloft configuration.",
+      dnsConnectorConnectErrorZoneDiscovery:
+        "DNS provider authorization completed, but Appaloft could not read DNS zones. Confirm the authorized scopes include Zone Read and that this account can access the zone for this domain.",
+      dnsConnectorConnectErrorZoneDiscoveryWithStatus:
+        "DNS provider authorization completed, but Appaloft could not read DNS zones (HTTP {{statusCode}}). Confirm the authorized scopes include Zone Read and that this account can access the zone for this domain.",
       dnsConnectorConnectErrorTitle: "Unable to connect DNS provider",
       dnsConnectorConnectProvider: "Connect DNS provider",
       dnsConnectorConnectSuccessDetail:
@@ -1764,6 +1772,10 @@ export const enUS = {
         "Review the DNS records Appaloft will ask the connected provider to apply.",
       dnsConnectorDialogTitle: "Configure provider DNS",
       dnsConnectorManualDns: "Manual DNS",
+      dnsConnectorManualDnsDescription:
+        "Add these records in your current DNS provider. After they propagate, refresh the plan here or retry verification.",
+      dnsConnectorManualDnsEmpty:
+        "This binding does not have DNS targets to show yet. Refresh the plan, or confirm that the route target has been generated.",
       dnsConnectorNoRecords: "No DNS records are required for this binding.",
       dnsConnectorPlanErrorTitle: "Unable to generate DNS plan",
       dnsConnectorPlanTitle: "DNS plan",

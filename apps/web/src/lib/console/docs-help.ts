@@ -1,8 +1,43 @@
-import { publicDocsBasePath, resolvePublicDocsHelpHref } from "@appaloft/docs-registry";
+import {
+  type PublicDocsHelpTopicId,
+  publicDocsBasePath,
+  resolvePublicDocsHelpHref as resolveRegistryPublicDocsHelpHref,
+} from "@appaloft/docs-registry";
 import { i18nKeys, type TranslationKey } from "@appaloft/i18n";
 
+type PublicDocsRuntimeConfigWindow = Window & {
+  __APPALOFT_PUBLIC_CONFIG__?: {
+    docs?: {
+      basePath?: string;
+    };
+  };
+};
+
+function readPublicDocsBasePath(): string {
+  if (typeof window !== "undefined") {
+    const configuredBasePath = (
+      window as PublicDocsRuntimeConfigWindow
+    ).__APPALOFT_PUBLIC_CONFIG__?.docs?.basePath?.trim();
+    if (configuredBasePath) {
+      return configuredBasePath;
+    }
+  }
+
+  const configuredBasePath = (
+    import.meta.env.VITE_APPALOFT_PUBLIC_DOCS_BASE_PATH as string | undefined
+  )?.trim();
+
+  return configuredBasePath || publicDocsBasePath;
+}
+
+function resolvePublicDocsHelpHref(topicId: PublicDocsHelpTopicId): string {
+  return resolveRegistryPublicDocsHelpHref(topicId, { basePath: readPublicDocsBasePath() });
+}
+
+const docsBasePath = readPublicDocsBasePath().replace(/\/+$/g, "");
+
 export const webDocsHrefs = {
-  docsHome: `${publicDocsBasePath}/`,
+  docsHome: `${docsBasePath}/`,
   firstAdminBootstrap: resolvePublicDocsHelpHref("self-hosting.first-admin-bootstrap"),
   organizationTeamManagement: resolvePublicDocsHelpHref(
     "self-hosting.organization-team-management",

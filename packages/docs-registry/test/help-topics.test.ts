@@ -86,6 +86,11 @@ describe("public docs help registry", () => {
     expect(resolvePublicDocsHelpHref("deployment.source", { basePath: "help" })).toBe(
       "/help/deploy/sources/#deployment-source",
     );
+    expect(
+      resolvePublicDocsHelpHref("domain.custom-domain-binding", {
+        basePath: "https://appaloft.com/docs",
+      }),
+    ).toBe("https://appaloft.com/docs/access/domains/custom-domains/#domain-binding-purpose");
   });
 
   test("[TS-SDK-DOCS-001] TypeScript SDK help resolves to the SDK reference", () => {

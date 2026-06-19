@@ -1533,6 +1533,14 @@ export const i18nKeys = {
       dnsConnectorConnectErrorDetail: "console:domainBindings.dnsConnectorConnectErrorDetail",
       dnsConnectorConnectErrorDetailWithCode:
         "console:domainBindings.dnsConnectorConnectErrorDetailWithCode",
+      dnsConnectorConnectErrorTokenExchange:
+        "console:domainBindings.dnsConnectorConnectErrorTokenExchange",
+      dnsConnectorConnectErrorTokenExchangeWithStatus:
+        "console:domainBindings.dnsConnectorConnectErrorTokenExchangeWithStatus",
+      dnsConnectorConnectErrorZoneDiscovery:
+        "console:domainBindings.dnsConnectorConnectErrorZoneDiscovery",
+      dnsConnectorConnectErrorZoneDiscoveryWithStatus:
+        "console:domainBindings.dnsConnectorConnectErrorZoneDiscoveryWithStatus",
       dnsConnectorConnectErrorTitle: "console:domainBindings.dnsConnectorConnectErrorTitle",
       dnsConnectorConnectProvider: "console:domainBindings.dnsConnectorConnectProvider",
       dnsConnectorConnectSuccessDetail: "console:domainBindings.dnsConnectorConnectSuccessDetail",
@@ -1540,6 +1548,8 @@ export const i18nKeys = {
       dnsConnectorDialogDescription: "console:domainBindings.dnsConnectorDialogDescription",
       dnsConnectorDialogTitle: "console:domainBindings.dnsConnectorDialogTitle",
       dnsConnectorManualDns: "console:domainBindings.dnsConnectorManualDns",
+      dnsConnectorManualDnsDescription: "console:domainBindings.dnsConnectorManualDnsDescription",
+      dnsConnectorManualDnsEmpty: "console:domainBindings.dnsConnectorManualDnsEmpty",
       dnsConnectorNoRecords: "console:domainBindings.dnsConnectorNoRecords",
       dnsConnectorPlanErrorTitle: "console:domainBindings.dnsConnectorPlanErrorTitle",
       dnsConnectorPlanTitle: "console:domainBindings.dnsConnectorPlanTitle",
