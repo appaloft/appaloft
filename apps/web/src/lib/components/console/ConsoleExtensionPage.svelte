@@ -51,6 +51,7 @@
   type ConsolePageSection =
     | ConsolePageSummaryGridSection
     | ConsolePagePanelGridSection
+    | ConsolePageDialogPanelGridSection
     | ConsolePageTableSection
     | ConsolePageCalloutSection;
 
@@ -73,6 +74,16 @@
     kind: "panel-grid";
     title?: string;
     description?: string;
+    items: ConsolePagePanelItem[];
+  };
+
+  type ConsolePageDialogPanelGridSection = {
+    kind: "dialog-panel-grid";
+    title: string;
+    description?: string;
+    triggerLabel: string;
+    dialogTitle?: string;
+    dialogDescription?: string;
     items: ConsolePagePanelItem[];
   };
 
@@ -224,6 +235,8 @@
   let pendingActionKey = $state<string | null>(null);
   let actionErrorMessage = $state("");
   let panelFieldValues = $state<Record<string, number>>({});
+  let selectedPanelGridSection = $state<ConsolePageDialogPanelGridSection | null>(null);
+  let panelGridDialogOpen = $state(false);
   let selectedTableDetails = $state<ConsolePageTableDetails | null>(null);
   let tableDetailsOpen = $state(false);
 
@@ -334,6 +347,11 @@
     if (!details) return;
     selectedTableDetails = details;
     tableDetailsOpen = true;
+  }
+
+  function openPanelGridDialog(section: ConsolePageDialogPanelGridSection): void {
+    selectedPanelGridSection = section;
+    panelGridDialogOpen = true;
   }
 
   function tableSectionClass(section: ConsolePageTableSection): string {
@@ -514,6 +532,109 @@
   }
 </script>
 
+{#snippet panelGridItems(items: ConsolePagePanelItem[], className: string)}
+  <div class={className}>
+    {#each items as item (item.title)}
+      <article class={["console-panel space-y-4 p-5", panelToneClass(item.tone)]}>
+        <div class="space-y-1">
+          <h3 class="text-base font-semibold">{item.title}</h3>
+          {#if item.description}
+            <p class="text-sm text-muted-foreground">{item.description}</p>
+          {/if}
+        </div>
+        {#if item.fields?.length}
+          <div class="space-y-3">
+            {#each item.fields as field (field.name)}
+              <label
+                class="block space-y-2 text-sm"
+                data-console-page-panel-field={field.name}
+              >
+                <span class="font-medium text-foreground">{field.label}</span>
+                <div class="flex items-center gap-3">
+                  {#if field.type === "range" || field.type === "range-number"}
+                    <input
+                      class="h-2 min-w-0 flex-1 cursor-pointer appearance-none rounded-full bg-muted accent-primary"
+                      type="range"
+                      value={panelFieldDisplayValue(item, field)}
+                      min={panelFieldDisplayBound(field.min, field)}
+                      max={panelFieldDisplayBound(field.max, field)}
+                      step={panelFieldDisplayBound(field.step, field)}
+                      oninput={(event) =>
+                        setPanelFieldDisplayValue(
+                          item,
+                          field,
+                          Number((event.currentTarget as HTMLInputElement).value),
+                        )}
+                    />
+                  {/if}
+                  {#if field.prefix}
+                    <span class="shrink-0 text-sm font-medium text-muted-foreground">
+                      {field.prefix}
+                    </span>
+                  {/if}
+                  {#if field.type === "number" || field.type === "range-number"}
+                    <input
+                      class="h-9 w-24 rounded-md border border-input bg-background px-3 py-1 text-right text-sm font-medium shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                      type="number"
+                      value={panelFieldDisplayValue(item, field)}
+                      min={panelFieldDisplayBound(field.min, field)}
+                      max={panelFieldDisplayBound(field.max, field)}
+                      step={panelFieldDisplayBound(field.step, field)}
+                      oninput={(event) =>
+                        setPanelFieldDisplayValue(
+                          item,
+                          field,
+                          Number((event.currentTarget as HTMLInputElement).value),
+                        )}
+                    />
+                  {/if}
+                  {#if field.suffix}
+                    <span class="shrink-0 text-sm text-muted-foreground">{field.suffix}</span>
+                  {/if}
+                </div>
+              </label>
+            {/each}
+          </div>
+        {/if}
+        {#if item.rows?.length}
+          <dl class="divide-y">
+            {#each item.rows as row (row.label)}
+              <div class="flex items-center justify-between gap-4 py-2 text-sm">
+                <dt class="text-muted-foreground">{row.label}</dt>
+                <dd class={["text-right font-medium", toneClass(row.tone)]}>
+                  {panelRowValue(item, row)}
+                </dd>
+              </div>
+            {/each}
+          </dl>
+        {/if}
+        {#if item.actions?.length}
+          <div class="flex flex-wrap gap-2">
+            {#each item.actions as action (requestActionKey(action, item))}
+              <Button
+                type="button"
+                variant={action.variant === "primary" ? "default" : "outline"}
+                disabled={Boolean(action.disabled) ||
+                  pendingActionKey === requestActionKey(action, item)}
+                onclick={() => runRequestAction(action, item)}
+              >
+                {pendingActionKey === requestActionKey(action, item)
+                  ? $t(i18nKeys.common.status.loading)
+                  : action.label}
+              </Button>
+            {/each}
+          </div>
+          {#each item.actions as action (requestActionKey(action, item))}
+            {#if action.disabled && action.disabledReason}
+              <p class="text-xs text-muted-foreground">{action.disabledReason}</p>
+            {/if}
+          {/each}
+        {/if}
+      </article>
+    {/each}
+  </div>
+{/snippet}
+
 <svelte:head>
   <title>{shellTitle} · Appaloft</title>
 </svelte:head>
@@ -641,106 +762,19 @@
                 {/if}
               </div>
             {/if}
-            <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {#each section.items as item (item.title)}
-                <article class={["console-panel space-y-4 p-5", panelToneClass(item.tone)]}>
-                  <div class="space-y-1">
-                    <h3 class="text-base font-semibold">{item.title}</h3>
-                    {#if item.description}
-                      <p class="text-sm text-muted-foreground">{item.description}</p>
-                    {/if}
-                  </div>
-                  {#if item.fields?.length}
-                    <div class="space-y-3">
-                      {#each item.fields as field (field.name)}
-                        <label
-                          class="block space-y-2 text-sm"
-                          data-console-page-panel-field={field.name}
-                        >
-                          <span class="font-medium text-foreground">{field.label}</span>
-                          <div class="flex items-center gap-3">
-                            {#if field.type === "range" || field.type === "range-number"}
-                              <input
-                                class="h-2 min-w-0 flex-1 cursor-pointer appearance-none rounded-full bg-muted accent-primary"
-                                type="range"
-                                value={panelFieldDisplayValue(item, field)}
-                                min={panelFieldDisplayBound(field.min, field)}
-                                max={panelFieldDisplayBound(field.max, field)}
-                                step={panelFieldDisplayBound(field.step, field)}
-                                oninput={(event) =>
-                                  setPanelFieldDisplayValue(
-                                    item,
-                                    field,
-                                    Number((event.currentTarget as HTMLInputElement).value),
-                                  )}
-                              />
-                            {/if}
-                            {#if field.prefix}
-                              <span class="shrink-0 text-sm font-medium text-muted-foreground">
-                                {field.prefix}
-                              </span>
-                            {/if}
-                            {#if field.type === "number" || field.type === "range-number"}
-                              <input
-                                class="h-9 w-24 rounded-md border border-input bg-background px-3 py-1 text-right text-sm font-medium shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                                type="number"
-                                value={panelFieldDisplayValue(item, field)}
-                                min={panelFieldDisplayBound(field.min, field)}
-                                max={panelFieldDisplayBound(field.max, field)}
-                                step={panelFieldDisplayBound(field.step, field)}
-                                oninput={(event) =>
-                                  setPanelFieldDisplayValue(
-                                    item,
-                                    field,
-                                    Number((event.currentTarget as HTMLInputElement).value),
-                                  )}
-                              />
-                            {/if}
-                            {#if field.suffix}
-                              <span class="shrink-0 text-sm text-muted-foreground">{field.suffix}</span>
-                            {/if}
-                          </div>
-                        </label>
-                      {/each}
-                    </div>
-                  {/if}
-                  {#if item.rows?.length}
-                    <dl class="divide-y">
-                      {#each item.rows as row (row.label)}
-                        <div class="flex items-center justify-between gap-4 py-2 text-sm">
-                          <dt class="text-muted-foreground">{row.label}</dt>
-                          <dd class={["text-right font-medium", toneClass(row.tone)]}>
-                            {panelRowValue(item, row)}
-                          </dd>
-                        </div>
-                      {/each}
-                    </dl>
-                  {/if}
-                  {#if item.actions?.length}
-                    <div class="flex flex-wrap gap-2">
-                      {#each item.actions as action (requestActionKey(action, item))}
-                        <Button
-                          type="button"
-                          variant={action.variant === "primary" ? "default" : "outline"}
-                          disabled={Boolean(action.disabled) ||
-                            pendingActionKey === requestActionKey(action, item)}
-                          onclick={() => runRequestAction(action, item)}
-                        >
-                          {pendingActionKey === requestActionKey(action, item)
-                            ? $t(i18nKeys.common.status.loading)
-                            : action.label}
-                        </Button>
-                      {/each}
-                    </div>
-                    {#each item.actions as action (requestActionKey(action, item))}
-                      {#if action.disabled && action.disabledReason}
-                        <p class="text-xs text-muted-foreground">{action.disabledReason}</p>
-                      {/if}
-                    {/each}
-                  {/if}
-                </article>
-              {/each}
+            {@render panelGridItems(section.items, "grid gap-4 md:grid-cols-2 xl:grid-cols-3")}
+          </section>
+        {:else if section.kind === "dialog-panel-grid"}
+          <section class="console-panel flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between">
+            <div class="min-w-0 space-y-1">
+              <h2 class="text-lg font-semibold">{section.title}</h2>
+              {#if section.description}
+                <p class="text-sm leading-6 text-muted-foreground">{section.description}</p>
+              {/if}
             </div>
+            <Button type="button" class="shrink-0" onclick={() => openPanelGridDialog(section)}>
+              {section.triggerLabel}
+            </Button>
           </section>
         {:else if section.kind === "table"}
           <section class={["console-panel overflow-hidden", tableSectionClass(section)]}>
@@ -774,52 +808,62 @@
               {/if}
             </div>
             {#if section.rows.length > 0}
-              <div class="border-t p-5" data-console-page-table-body>
-                <div class="console-record-list" data-console-page-record-list>
-                  {#each section.rows as row, rowIndex (rowIndex)}
-                    <article
-                      class="console-record-row gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start"
-                      data-console-page-record-row
-                    >
-                      <dl class="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <div class="overflow-x-auto border-t" data-console-page-table-body>
+                <table class="w-full min-w-[760px] text-sm" data-console-page-record-list>
+                  <thead class="bg-muted/40 text-xs font-medium text-muted-foreground">
+                    <tr>
+                      {#each section.columns as column (column.key)}
+                        <th
+                          scope="col"
+                          class={[
+                            "px-5 py-3 font-medium",
+                            column.align === "right" ? "text-right" : "text-left",
+                          ]}
+                        >
+                          {column.label}
+                        </th>
+                      {/each}
+                      <th scope="col" class="w-24 px-5 py-3 text-right font-medium"></th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y">
+                    {#each section.rows as row, rowIndex (rowIndex)}
+                      <tr class="transition-colors hover:bg-muted/30" data-console-page-record-row>
                         {#each section.columns as column (column.key)}
                           {@const cell = readTableCell(row, column.key)}
-                          <div
+                          <td
                             class={[
-                              "min-w-0",
-                              column.align === "right" ? "sm:text-right" : "",
+                              "max-w-64 px-5 py-4 align-top",
+                              column.align === "right" ? "text-right tabular-nums" : "text-left",
                             ]}
                           >
-                            <dt class="text-xs font-medium text-muted-foreground">
-                              {column.label}
-                            </dt>
-                            <dd
+                            <span
                               class={[
-                                "mt-1 truncate text-sm font-medium",
-                                column.align === "right" ? "tabular-nums" : "",
+                                "block truncate font-medium",
                                 toneClass(cell.tone),
                               ]}
                               title={cell.text}
                             >
                               {cell.text}
-                            </dd>
-                          </div>
+                            </span>
+                          </td>
                         {/each}
-                      </dl>
-                      {#if row.details}
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          class="justify-self-start lg:justify-self-end"
-                          onclick={() => openTableDetails(row.details)}
-                        >
-                          {row.details.label}
-                        </Button>
-                      {/if}
-                    </article>
-                  {/each}
-                </div>
+                        <td class="px-5 py-4 text-right align-top">
+                          {#if row.details}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onclick={() => openTableDetails(row.details)}
+                            >
+                              {row.details.label}
+                            </Button>
+                          {/if}
+                        </td>
+                      </tr>
+                    {/each}
+                  </tbody>
+                </table>
               </div>
             {:else}
               <div class="border-t p-5 text-sm text-muted-foreground">
@@ -878,6 +922,34 @@
     {/if}
   </ConsoleResourceCanvas>
 {/snippet}
+
+<Dialog.Root bind:open={panelGridDialogOpen}>
+  <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-5xl">
+    {#if selectedPanelGridSection}
+      <Dialog.Header>
+        <Dialog.Title>
+          {selectedPanelGridSection.dialogTitle ?? selectedPanelGridSection.title}
+        </Dialog.Title>
+        {#if selectedPanelGridSection.dialogDescription || selectedPanelGridSection.description}
+          <Dialog.Description>
+            {selectedPanelGridSection.dialogDescription ?? selectedPanelGridSection.description}
+          </Dialog.Description>
+        {/if}
+      </Dialog.Header>
+      {#if actionErrorMessage}
+        <div class="mt-5 rounded-md border border-destructive/25 bg-destructive/5 p-3 text-sm text-destructive">
+          {actionErrorMessage}
+        </div>
+      {/if}
+      <div class="mt-5">
+        {@render panelGridItems(
+          selectedPanelGridSection.items,
+          "grid max-h-[70vh] gap-4 overflow-y-auto pr-1 md:grid-cols-2 xl:grid-cols-3",
+        )}
+      </div>
+    {/if}
+  </Dialog.Content>
+</Dialog.Root>
 
 <Dialog.Root bind:open={tableDetailsOpen}>
   <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-2xl">
