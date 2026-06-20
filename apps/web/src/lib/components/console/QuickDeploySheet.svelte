@@ -4361,17 +4361,6 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     return terminalEvent ? "succeeded" : "";
   }
 
-  function requireBlueprintInstallDeploymentTimeline(
-    installSummary: BlueprintInstallStatusSummary,
-  ): string {
-    const deploymentId = installSummary.deploymentId || installSummary.deploymentIds[0] || "";
-    if (!deploymentId) {
-      throw new Error("Blueprint install did not return a deployment timeline id.");
-    }
-
-    return deploymentId;
-  }
-
   function serverIsRuntimeAvailable(server: ServerSummary | null | undefined): boolean {
     if (!server) {
       return false;
@@ -4538,12 +4527,14 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
           )
         : await orpcClient.blueprints.install(installInput);
       let installSummary = summarizeBlueprintInstallProgress(installResult);
-      const deploymentId = requireBlueprintInstallDeploymentTimeline(installSummary);
+      const deploymentId = installSummary.deploymentId || installSummary.deploymentIds[0] || "";
       lastAccessUrl = installSummary.accessUrl;
       lastCreatedDeploymentId = deploymentId;
       selectedResourceId = installSummary.resourceId || selectedResourceId;
       recordBlueprintInstallResourceOwner(target, installSummary.resourceId);
-      await observeBlueprintInstallDeploymentProgress(installSummary);
+      if (deploymentId) {
+        await observeBlueprintInstallDeploymentProgress(installSummary);
+      }
       installSummary = mergeBlueprintInstallFinalSummary(
         installSummary,
         await readBlueprintInstallFinalSummary(installSummary.applicationId),
