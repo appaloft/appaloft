@@ -971,6 +971,7 @@
     />
   {/snippet}
 
+  <div class="p-4 md:p-6">
   {#if contextQuery.isPending}
     <div class="space-y-5">
       <Skeleton class="h-5 w-40" />
@@ -2263,4 +2264,5 @@
       </form>
     </Dialog.Content>
   </Dialog.Root>
+  </div>
 </SettingsShell>

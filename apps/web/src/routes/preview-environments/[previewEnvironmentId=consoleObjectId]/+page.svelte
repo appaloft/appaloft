@@ -126,6 +126,7 @@
   description={$t(i18nKeys.console.previewEnvironments.detailDescription)}
   breadcrumbs={previewEnvironmentBreadcrumbs}
 >
+  <div class="p-4 md:p-6">
   {#if previewEnvironmentQuery.isPending}
     <div class="space-y-5">
       <Skeleton class="h-5 w-56" />
@@ -384,4 +385,5 @@
       </Dialog.Content>
     </Dialog.Root>
   {/if}
+  </div>
 </ConsoleShell>

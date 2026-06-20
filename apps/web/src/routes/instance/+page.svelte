@@ -584,7 +584,7 @@ server-config-deploy: true`);
     />
   {/snippet}
 
-  <div class="mx-auto max-w-6xl space-y-4">
+  <div class="mx-auto max-w-6xl space-y-4 p-4 md:p-6">
         {#if activeSection === "overview"}
           <section class="console-panel p-5" data-instance-overview-display-surface>
             <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">

@@ -166,7 +166,7 @@
     { label: $t(i18nKeys.console.accountSettings.sessionsTitle) },
   ]}
 >
-  <div class="mx-auto max-w-5xl space-y-6">
+  <div class="mx-auto max-w-5xl space-y-6 p-4 md:p-6">
     <section class="space-y-2">
       <h1 class="text-lg font-semibold">{$t(i18nKeys.console.accountSettings.sessionsTitle)}</h1>
       <p class="max-w-3xl text-sm leading-6 text-muted-foreground">

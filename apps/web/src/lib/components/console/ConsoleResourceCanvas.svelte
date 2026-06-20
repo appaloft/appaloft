@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { HTMLAttributes } from "svelte/elements";
 
+  import { consolePageContentClass } from "$lib/console/layout-classes";
   import { cn } from "$lib/utils";
 
   let {
@@ -11,7 +12,7 @@
 </script>
 
 <div
-  class={cn("mx-auto w-full max-w-5xl space-y-6", className)}
+  class={cn("mx-auto w-full max-w-5xl space-y-6", consolePageContentClass, className)}
   data-console-resource-canvas
   {...restProps}
 >
