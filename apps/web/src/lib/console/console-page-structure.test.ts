@@ -1324,6 +1324,14 @@ describe("console page structure", () => {
     expect(resourceDetailPageSource).toContain("dnsConnectorReadiness");
     expect(resourceDetailPageSource).toContain("dnsConnectorConnectProvider");
     expect(resourceDetailPageSource).toContain("dnsConnectorManualDns");
+    expect(resourceDetailPageSource).toContain("dnsConnectorRecordDomain");
+    expect(resourceDetailPageSource).toContain("dnsConnectorRecordTarget");
+    expect(resourceDetailPageSource).toContain(
+      'onclick={() => copyManualDnsRecord(record, "name")}',
+    );
+    expect(resourceDetailPageSource).toContain(
+      'onclick={() => copyManualDnsRecord(record, "value")}',
+    );
     expect(resourceDetailPageSource).toContain('id="resource-domain-binding-dns-apply"');
   });
 
