@@ -1771,6 +1771,10 @@ export const enUS = {
       dnsConnectorDialogDescription:
         "Review the DNS records Appaloft will ask the connected provider to apply.",
       dnsConnectorDialogTitle: "Configure provider DNS",
+      dnsConnectorCopied: "Copied",
+      dnsConnectorCopyDomain: "Copy domain",
+      dnsConnectorCopyFailed: "Copy failed",
+      dnsConnectorCopyTarget: "Copy target",
       dnsConnectorManualDns: "Manual DNS",
       dnsConnectorManualDnsDescription:
         "Add these records in your current DNS provider. After they propagate, refresh the plan here or retry verification.",
@@ -1788,6 +1792,9 @@ export const enUS = {
       dnsConnectorReadinessRouteAvailable: "available",
       dnsConnectorReadinessTitle: "DNS readiness",
       dnsConnectorReadinessZone: "Zone",
+      dnsConnectorRecordDomain: "Domain",
+      dnsConnectorRecordTarget: "Target / IP",
+      dnsConnectorRecordType: "Type",
       dnsConnectorRecords: "Records",
       dnsConnectorRefreshPlan: "Refresh plan",
       dnsConnectorRisk: "Risk",
