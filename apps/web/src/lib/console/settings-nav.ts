@@ -78,7 +78,7 @@ export function organizationSettingsItems(extensions: readonly SystemPluginWebEx
   ];
 }
 
-export function instanceSettingsItems() {
+export function instanceSettingsItems(extensions: readonly SystemPluginWebExtension[] = []) {
   return [
     {
       href: "/instance",
@@ -100,6 +100,7 @@ export function instanceSettingsItems() {
       labelKey: i18nKeys.console.terminal.lifecycleTitle,
       icon: Terminal,
     },
+    ...settingsExtensionItems(extensions, "/instance"),
     {
       href: "/instance/guidance",
       labelKey: i18nKeys.console.instance.guidanceTitle,

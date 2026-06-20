@@ -12,8 +12,8 @@ const connectionsExtension: SystemPluginWebExtension = {
   pluginName: "example",
   pluginDisplayName: "Example",
   title: "Connections",
-  path: "/connections",
-  placement: "navigation",
+  path: "/instance/connections",
+  placement: "settings",
   target: "console-route",
   requiresAuth: true,
   metadata: {
@@ -22,22 +22,20 @@ const connectionsExtension: SystemPluginWebExtension = {
     pageEndpoint: "/example/connections/page?path={pathname}&query={query}",
     catalogEndpoint: "/api/connections/catalog",
     categoriesEndpoint: "/api/connections/categories",
-    dnsConnectPath: "/connections?category=dns",
+    dnsConnectPath: "/instance/connections?category=dns",
   },
 };
 
 describe("Connections console extension surface", () => {
   test("[APP-CONN-015] discovers neutral Connections console extension metadata", () => {
-    expect(findConnectionsConsoleExtension([connectionsExtension], "navigation")).toEqual(
-      connectionsExtension,
-    );
+    expect(findConnectionsConsoleExtension([connectionsExtension])).toEqual(connectionsExtension);
     expect(readConnectionsConsoleExtensionMetadata(connectionsExtension)).toEqual({
       renderer: "console-page",
       connectionSurface: connectionsConsoleSurface,
       pageEndpoint: "/example/connections/page?path={pathname}&query={query}",
       catalogEndpoint: "/api/connections/catalog",
       categoriesEndpoint: "/api/connections/categories",
-      dnsConnectPath: "/connections?category=dns",
+      dnsConnectPath: "/instance/connections?category=dns",
     });
   });
 

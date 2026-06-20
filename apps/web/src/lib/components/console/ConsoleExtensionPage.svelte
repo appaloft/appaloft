@@ -27,7 +27,7 @@
   import ConsoleResourceCanvas from "$lib/components/console/ConsoleResourceCanvas.svelte";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import SettingsShell from "$lib/components/console/SettingsShell.svelte";
-  import { organizationSettingsItems } from "$lib/console/settings-nav";
+  import { instanceSettingsItems, organizationSettingsItems } from "$lib/console/settings-nav";
   import { orpc } from "$lib/orpc";
   import { i18nKeys, t } from "$lib/i18n";
   import type { SystemPluginWebExtension } from "@appaloft/contracts";
@@ -228,7 +228,7 @@
     items: SystemPluginWebExtension[];
   };
   type Props = {
-    settingsScope?: "organization" | null;
+    settingsScope?: "organization" | "instance" | null;
   };
 
   let { settingsScope = null }: Props = $props();
@@ -984,6 +984,21 @@
     breadcrumbs={[
       { label: $t(i18nKeys.console.nav.home), href: "/" },
       { label: $t(i18nKeys.console.organization.pageTitle), href: "/organization" },
+      { label: shellTitle },
+    ]}
+  >
+    {@render content()}
+  </SettingsShell>
+{:else if settingsScope === "instance"}
+  <SettingsShell
+    title={$t(i18nKeys.console.instance.pageTitle)}
+    description={shellDescription}
+    groupLabel={$t(i18nKeys.console.instance.pageTitle)}
+    activePath={pathname}
+    items={instanceSettingsItems(webExtensionsQuery.data?.items ?? [])}
+    breadcrumbs={[
+      { label: $t(i18nKeys.console.nav.home), href: "/" },
+      { label: $t(i18nKeys.console.instance.pageTitle), href: "/instance" },
       { label: shellTitle },
     ]}
   >
