@@ -3,7 +3,7 @@ export const consolePageContentClass = "p-4 md:p-6";
 export const detailPageClass =
   "flex min-h-0 min-w-0 flex-col md:h-[calc(100svh-3.5rem-3rem)] md:overflow-visible";
 
-export const detailHeaderClass = "shrink-0 border-b px-4 pb-3 md:px-6";
+export const detailHeaderClass = "shrink-0 border-b px-4 pb-3 pt-3 md:px-6";
 
 export const detailBodyClass = "flex min-h-0 min-w-0 flex-col overflow-hidden md:flex-1";
 
