@@ -15,7 +15,7 @@ export interface ConnectionsConsoleExtensionMetadata {
 
 export function findConnectionsConsoleExtension(
   extensions: readonly SystemPluginWebExtension[],
-  placement: SystemPluginWebExtension["placement"] = "navigation",
+  placement: SystemPluginWebExtension["placement"] = "settings",
 ): SystemPluginWebExtension | null {
   return (
     extensions.find(
