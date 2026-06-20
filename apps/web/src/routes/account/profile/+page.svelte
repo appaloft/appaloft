@@ -94,7 +94,7 @@
     { label: $t(i18nKeys.console.accountSettings.introTitle) },
   ]}
 >
-  <div class="mx-auto grid max-w-5xl gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+  <div class="mx-auto grid max-w-5xl gap-6 p-4 md:p-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
     <section class="console-panel space-y-5 p-5" data-account-profile-summary>
       <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div class="flex items-start gap-3">

@@ -79,6 +79,7 @@
     { label: $t(i18nKeys.console.previewEnvironments.pageTitle) },
   ]}
 >
+  <div class="p-4 md:p-6">
   {#if previewEnvironmentsLoading}
     <div class="space-y-5">
       <section class="space-y-3">
@@ -272,4 +273,5 @@
       </section>
     </div>
   {/if}
+  </div>
 </ConsoleShell>

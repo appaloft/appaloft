@@ -1,11 +1,13 @@
+export const consolePageContentClass = "p-4 md:p-6";
+
 export const detailPageClass =
   "flex min-h-0 min-w-0 flex-col md:h-[calc(100svh-3.5rem-3rem)] md:overflow-visible";
 
-export const detailHeaderClass = "-mx-4 shrink-0 border-b px-4 pb-3 md:-mx-6 md:px-6";
+export const detailHeaderClass = "shrink-0 border-b px-4 pb-3 md:px-6";
 
 export const detailBodyClass = "flex min-h-0 min-w-0 flex-col overflow-hidden md:flex-1";
 
-export const detailTabsScrollAreaClass = "-mx-4 shrink-0 border-b md:-mx-6";
+export const detailTabsScrollAreaClass = "shrink-0 border-b";
 
 export const detailTabsClass =
   "flex min-w-max shrink-0 gap-6 px-4 scroll-px-4 md:px-6 md:scroll-px-6";
@@ -14,16 +16,15 @@ export const detailTabClass =
   "flex h-11 flex-none items-center border-b-2 border-transparent text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground aria-[current=page]:border-foreground aria-[current=page]:text-foreground data-[state=active]:border-foreground data-[state=active]:text-foreground";
 
 export const detailTabPanelScrollClass =
-  "mt-0 min-w-0 pt-5 md:min-h-0 md:flex-1 md:overflow-x-hidden md:overflow-y-auto md:pb-6";
+  "mt-0 min-w-0 px-4 pt-5 md:min-h-0 md:flex-1 md:overflow-x-hidden md:overflow-y-auto md:px-6 md:pb-6";
 
 export const detailTabPanelScrollNoTopClass =
-  "mt-0 min-w-0 md:min-h-0 md:flex-1 md:overflow-x-hidden md:overflow-y-auto md:pb-6";
+  "mt-0 min-w-0 px-4 md:min-h-0 md:flex-1 md:overflow-x-hidden md:overflow-y-auto md:px-6 md:pb-6";
 
-export const detailTabPanelSubnavClass =
-  "mt-0 -mx-4 min-w-0 w-[calc(100%+2rem)] overflow-hidden md:min-h-0 md:w-[calc(100%+3rem)] md:flex-1 md:-mx-6";
+export const detailTabPanelSubnavClass = "mt-0 min-w-0 overflow-hidden md:min-h-0 md:flex-1";
 
 export const subnavLayoutClass =
-  "grid -m-4 min-h-[calc(100svh-3.5rem)] w-[calc(100%+2rem)] md:-m-6 md:w-[calc(100%+3rem)] md:grid-cols-[16rem_minmax(0,1fr)]";
+  "grid min-h-[calc(100svh-3.5rem)] md:grid-cols-[16rem_minmax(0,1fr)]";
 
 export const detailSubnavLayoutClass =
   "grid min-h-0 md:m-0 md:h-full md:min-h-0 md:overflow-hidden";

@@ -422,6 +422,7 @@
   title={selectedDependencyResource?.name ?? $t(i18nKeys.console.dependencyResources.pageTitle)}
   description={$t(i18nKeys.console.dependencyResources.pageDescription)}
 >
+  <div class="p-4 md:p-6">
   {#if pageLoading}
     <div class="space-y-5">
       <Skeleton class="h-8 w-72" />
@@ -919,4 +920,5 @@
     </Dialog.Content>
   </Dialog.Root>
   {/if}
+  </div>
 </ConsoleShell>

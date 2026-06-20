@@ -254,13 +254,13 @@
   {breadcrumbs}
 >
   {#if installedApplicationQuery.isPending}
-    <div class="space-y-5">
+    <div class="space-y-5 p-4 md:p-6">
       <Skeleton class="h-7 w-72" />
       <Skeleton class="h-32 w-full" />
       <Skeleton class="h-72 w-full" />
     </div>
   {:else if installedApplicationQuery.error || !installedApplication}
-    <section class="console-panel p-5">
+    <section class="console-panel m-4 p-5 md:m-6">
       <div class="flex items-start gap-3">
         <Package class="mt-0.5 size-5 text-destructive" />
         <div class="space-y-2">
@@ -277,7 +277,10 @@
       </div>
     </section>
   {:else}
-    <div class={[detailPageClass, "mx-auto w-full max-w-7xl space-y-0"]} data-installed-application-display-surface>
+    <div
+      class={[detailPageClass, "mx-auto w-full max-w-7xl space-y-0 p-4 md:p-6"]}
+      data-installed-application-display-surface
+    >
       <section class={detailHeaderClass} data-installed-application-overview>
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div class="min-w-0 space-y-2">

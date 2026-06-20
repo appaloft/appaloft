@@ -1913,7 +1913,7 @@
   {#if pageLoading}
     {@render projectDetailLoadingSkeleton()}
   {:else if !project}
-    <section class="space-y-5 py-2">
+    <section class="space-y-5 p-4 md:p-6">
       <Badge class="w-fit" variant="outline">{$t(i18nKeys.errors.backend.notFound)}</Badge>
       <div class="mt-4 max-w-2xl space-y-3">
         <h1 class="text-2xl font-semibold md:text-3xl">
