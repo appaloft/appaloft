@@ -204,7 +204,11 @@ describe("Blueprint marketplace console surface", () => {
     expect(quickDeploySource).toContain("orpcClient.blueprints.install");
     expect(quickDeploySource).toContain("orpcClient.blueprints.installation.show");
     expect(quickDeploySource).toContain("observeWorkflowDeploymentProgress");
-    expect(quickDeploySource).toContain("requireBlueprintInstallDeploymentTimeline");
+    expect(quickDeploySource).toContain("if (deploymentId) {");
+    expect(quickDeploySource).not.toContain("requireBlueprintInstallDeploymentTimeline");
+    expect(quickDeploySource).not.toContain(
+      "Blueprint install did not return a deployment timeline id.",
+    );
     expect(quickDeploySource).not.toContain("startBlueprintInstallDeploymentProgressObservation");
     expect(quickDeploySource).not.toContain("onProgressSummary?.(latestSummary)");
     expect(quickDeploySource).not.toContain("appendBlueprintInstallAcceptedEvent");

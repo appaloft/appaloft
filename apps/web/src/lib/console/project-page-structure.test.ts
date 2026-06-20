@@ -172,7 +172,11 @@ describe("project detail page structure", () => {
     expect(quickDeploySheetSource).toContain("blueprintSelectorDialogOpen = false");
     expect(quickDeploySheetSource).toContain("blueprintDetailDialogOpen = false");
     expect(quickDeploySheetSource).toContain("readBlueprintInstallFinalSummary");
-    expect(quickDeploySheetSource).toContain("requireBlueprintInstallDeploymentTimeline");
+    expect(quickDeploySheetSource).toContain("if (deploymentId) {");
+    expect(quickDeploySheetSource).not.toContain("requireBlueprintInstallDeploymentTimeline");
+    expect(quickDeploySheetSource).not.toContain(
+      "Blueprint install did not return a deployment timeline id.",
+    );
     expect(quickDeploySheetSource).not.toContain("readBlueprintInstallProgressSummary");
     expect(quickDeploySheetSource).not.toContain("appendBlueprintInstallAcceptedEvent");
     expect(quickDeploySheetSource).not.toContain("startBlueprintOperatorWorkStatusPoll");
