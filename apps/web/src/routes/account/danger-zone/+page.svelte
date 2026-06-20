@@ -88,7 +88,7 @@
     { label: $t(i18nKeys.console.accountSettings.dangerZoneTitle) },
   ]}
 >
-  <div class="mx-auto max-w-4xl space-y-6">
+  <div class="mx-auto max-w-4xl space-y-6 p-4 md:p-6">
     <section class="console-panel space-y-5 border-destructive/25 bg-destructive/5 p-5">
       <div class="flex items-start gap-3">
         <div class="rounded-[calc(var(--radius-lg)-2px)] border border-destructive/30 bg-background p-2">

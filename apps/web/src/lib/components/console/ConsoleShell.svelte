@@ -579,9 +579,9 @@
       </div>
     </header>
 
-    <main data-console-main class="min-h-0 min-w-0 flex-1 overflow-y-auto p-4 md:p-6">
+    <main data-console-main class="min-h-0 min-w-0 flex-1 overflow-y-auto">
       {#if connectionError}
-        <section class="console-panel space-y-4 p-5">
+        <section class="console-panel m-4 space-y-4 p-5 md:m-6">
           <div class="space-y-2">
             <h2 class="flex items-center gap-2 text-lg font-semibold">
               <ServerCrash class="size-5" />
@@ -601,7 +601,7 @@
         </section>
       {:else}
         {#if loginRequired}
-          <section class="console-panel flex max-w-xl flex-col gap-4 p-6">
+          <section class="console-panel m-4 flex max-w-xl flex-col gap-4 p-6 md:m-6">
             <div class="flex items-start gap-3">
               <div class="flex size-10 shrink-0 items-center justify-center rounded-[calc(var(--radius-lg)-2px)] border bg-muted/30">
                 <ShieldCheck class="size-5 text-primary" />

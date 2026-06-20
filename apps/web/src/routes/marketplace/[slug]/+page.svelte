@@ -1055,6 +1055,7 @@
     { label: listing?.title ?? slug },
   ]}
 >
+  <div class="p-4 md:p-6">
   {#if webExtensionsQuery.isPending || detailQuery.isPending}
     <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
       <Skeleton class="h-96 w-full" />
@@ -2055,4 +2056,5 @@
       {/if}
     </div>
   {/if}
+  </div>
 </ConsoleShell>

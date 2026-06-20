@@ -198,7 +198,7 @@
       </div>
     </header>
 
-    <main data-console-main class="min-w-0 flex-1 p-4 md:p-6">
+    <main data-console-main class="min-w-0 flex-1">
       {@render children()}
     </main>
   </SidebarInset>
