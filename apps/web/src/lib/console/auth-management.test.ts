@@ -96,12 +96,17 @@ describe("organization auth management console surface", () => {
       organizationPageSource,
       instancePageSource,
       instanceWorkersRouteSource,
+      instanceExtensionRouteSource,
       managementShellSource,
       settingsNavSource,
     ] = await Promise.all([
       readFile(new URL("../../routes/organization/+page.svelte", import.meta.url), "utf8"),
       readFile(new URL("../../routes/instance/+page.svelte", import.meta.url), "utf8"),
       readFile(new URL("../../routes/instance/workers/+page.svelte", import.meta.url), "utf8"),
+      readFile(
+        new URL("../../routes/instance/[...extensionPath]/+page.svelte", import.meta.url),
+        "utf8",
+      ),
       readFile(
         new URL("../../lib/components/console/ManagementShell.svelte", import.meta.url),
         "utf8",
@@ -123,11 +128,13 @@ describe("organization auth management console surface", () => {
     expect(instancePageSource).toContain("workerSafetyLabelKey");
     expect(instancePageSource).toContain("i18nKeys.console.instance.maintenanceWorkersTitle");
     expect(instanceWorkersRouteSource).toContain('<InstancePage section="workers" />');
+    expect(instanceExtensionRouteSource).toContain('settingsScope="instance"');
     expect(instancePageSource).not.toContain("ManagementShell");
     expect(settingsNavSource).toContain('href: "/organization/members"');
     expect(settingsNavSource).toContain('href: "/organization/invitations"');
     expect(settingsNavSource).toContain('href: "/organization/deploy-tokens"');
     expect(settingsNavSource).toContain("instanceSettingsItems");
+    expect(settingsNavSource).toContain('settingsExtensionItems(extensions, "/instance")');
     expect(settingsNavSource).toContain('href: "/instance/workers"');
     expect(settingsNavSource).toContain("i18nKeys.console.instance.workerManagementTitle");
     expect(managementShellSource).not.toContain('href: "/organization"');
