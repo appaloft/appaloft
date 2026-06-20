@@ -1243,6 +1243,11 @@
   let diagnosticSummaryCopyResetTimeout: ReturnType<typeof setTimeout> | undefined;
   let accessUrlCopyState = $state<"idle" | "copied" | "failed">("idle");
   let accessUrlCopyResetTimeout: ReturnType<typeof setTimeout> | undefined;
+  let manualDnsCopyState = $state<{
+    key: string;
+    state: "copied" | "failed";
+  } | null>(null);
+  let manualDnsCopyResetTimeout: ReturnType<typeof setTimeout> | undefined;
   let previewEnvironmentCleanupDialogOpen = $state(false);
   let selectedPreviewEnvironmentForCleanup = $state<PreviewEnvironmentSummary | null>(null);
   let resourceLifecycleDialogOpen = $state(false);
@@ -3355,6 +3360,18 @@
     }, 1800);
   }
 
+  function markManualDnsCopyState(key: string, state: "copied" | "failed"): void {
+    if (manualDnsCopyResetTimeout) {
+      clearTimeout(manualDnsCopyResetTimeout);
+    }
+
+    manualDnsCopyState = { key, state };
+    manualDnsCopyResetTimeout = setTimeout(() => {
+      manualDnsCopyState = null;
+      manualDnsCopyResetTimeout = undefined;
+    }, 1800);
+  }
+
   async function copyTextToClipboard(text: string): Promise<void> {
     const desktopCopyText = (window as WindowWithAppaloftDesktopBridge).appaloftDesktop?.copyText;
     if (desktopCopyText) {
@@ -3447,6 +3464,42 @@
       markAccessUrlCopyState("copied");
     } catch {
       markAccessUrlCopyState("failed");
+    }
+  }
+
+  function manualDnsCopyKey(record: DnsRecordRequirement, field: "name" | "value"): string {
+    return `${field}:${record.type}:${record.name}:${record.value}`;
+  }
+
+  function manualDnsCopyLabel(record: DnsRecordRequirement, field: "name" | "value"): string {
+    const key = manualDnsCopyKey(record, field);
+    if (manualDnsCopyState?.key === key) {
+      if (manualDnsCopyState.state === "copied") {
+        return $t(i18nKeys.console.domainBindings.dnsConnectorCopied);
+      }
+      return $t(i18nKeys.console.domainBindings.dnsConnectorCopyFailed);
+    }
+
+    return field === "name"
+      ? $t(i18nKeys.console.domainBindings.dnsConnectorCopyDomain)
+      : $t(i18nKeys.console.domainBindings.dnsConnectorCopyTarget);
+  }
+
+  async function copyManualDnsRecord(
+    record: DnsRecordRequirement,
+    field: "name" | "value",
+  ): Promise<void> {
+    if (!browser) {
+      return;
+    }
+
+    const key = manualDnsCopyKey(record, field);
+    const value = field === "name" ? record.name : record.value;
+    try {
+      await copyTextToClipboard(value);
+      markManualDnsCopyState(key, "copied");
+    } catch {
+      markManualDnsCopyState(key, "failed");
     }
   }
 
@@ -4123,6 +4176,9 @@
     }
     if (accessUrlCopyResetTimeout) {
       clearTimeout(accessUrlCopyResetTimeout);
+    }
+    if (manualDnsCopyResetTimeout) {
+      clearTimeout(manualDnsCopyResetTimeout);
     }
   });
 
@@ -10376,16 +10432,71 @@
                           />
                         </div>
                         {#if manualDnsRecords.length > 0}
-                          <div class="space-y-2">
-                            {#each manualDnsRecords as record (`${record.type}:${record.name}:${record.value}`)}
-                              <div class="grid gap-2 rounded-md bg-background px-3 py-2 text-xs sm:grid-cols-[5rem_minmax(0,1fr)]">
-                                <Badge variant="outline" class="w-fit">{record.type}</Badge>
-                                <div class="min-w-0 space-y-1">
-                                  <p class="break-all font-medium">{record.name}</p>
-                                  <p class="break-all text-muted-foreground">{record.value}</p>
-                                </div>
-                              </div>
-                            {/each}
+                          <div class="overflow-x-auto rounded-md border bg-background">
+                            <table class="w-full min-w-[34rem] text-left text-xs">
+                              <thead class="border-b bg-muted/35 text-muted-foreground">
+                                <tr>
+                                  <th class="w-20 px-3 py-2 font-medium">
+                                    {$t(i18nKeys.console.domainBindings.dnsConnectorRecordType)}
+                                  </th>
+                                  <th class="px-3 py-2 font-medium">
+                                    {$t(i18nKeys.console.domainBindings.dnsConnectorRecordDomain)}
+                                  </th>
+                                  <th class="px-3 py-2 font-medium">
+                                    {$t(i18nKeys.console.domainBindings.dnsConnectorRecordTarget)}
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody class="divide-y">
+                                {#each manualDnsRecords as record (`${record.type}:${record.name}:${record.value}`)}
+                                  <tr>
+                                    <td class="px-3 py-2 align-middle">
+                                      <Badge variant="outline" class="w-fit">{record.type}</Badge>
+                                    </td>
+                                    <td class="min-w-0 px-3 py-2 align-middle">
+                                      <div class="flex min-w-0 items-center gap-2">
+                                        <span class="min-w-0 flex-1 break-all font-medium">{record.name}</span>
+                                        <Button
+                                          type="button"
+                                          size="icon"
+                                          variant="ghost"
+                                          class="h-7 w-7 shrink-0"
+                                          aria-label={manualDnsCopyLabel(record, "name")}
+                                          title={manualDnsCopyLabel(record, "name")}
+                                          onclick={() => copyManualDnsRecord(record, "name")}
+                                        >
+                                          {#if manualDnsCopyState?.key === manualDnsCopyKey(record, "name") && manualDnsCopyState.state === "copied"}
+                                            <Check class="size-3.5" />
+                                          {:else}
+                                            <Copy class="size-3.5" />
+                                          {/if}
+                                        </Button>
+                                      </div>
+                                    </td>
+                                    <td class="min-w-0 px-3 py-2 align-middle">
+                                      <div class="flex min-w-0 items-center gap-2">
+                                        <span class="min-w-0 flex-1 break-all text-muted-foreground">{record.value}</span>
+                                        <Button
+                                          type="button"
+                                          size="icon"
+                                          variant="ghost"
+                                          class="h-7 w-7 shrink-0"
+                                          aria-label={manualDnsCopyLabel(record, "value")}
+                                          title={manualDnsCopyLabel(record, "value")}
+                                          onclick={() => copyManualDnsRecord(record, "value")}
+                                        >
+                                          {#if manualDnsCopyState?.key === manualDnsCopyKey(record, "value") && manualDnsCopyState.state === "copied"}
+                                            <Check class="size-3.5" />
+                                          {:else}
+                                            <Copy class="size-3.5" />
+                                          {/if}
+                                        </Button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                {/each}
+                              </tbody>
+                            </table>
                           </div>
                         {:else}
                           <div class="rounded-md bg-background px-3 py-2 text-xs text-muted-foreground">
