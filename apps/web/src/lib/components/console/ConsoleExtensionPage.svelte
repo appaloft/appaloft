@@ -937,14 +937,16 @@
         {/if}
       </Dialog.Header>
       {#if actionErrorMessage}
-        <div class="mt-5 rounded-md border border-destructive/25 bg-destructive/5 p-3 text-sm text-destructive">
+        <div
+          class="mx-5 mt-5 rounded-md border border-destructive/25 bg-destructive/5 p-3 text-sm text-destructive sm:mx-8"
+        >
           {actionErrorMessage}
         </div>
       {/if}
-      <div class="mt-5">
+      <div class="mt-5 px-5 pb-5 sm:px-8 sm:pb-8" data-console-page-dialog-panel-body>
         {@render panelGridItems(
           selectedPanelGridSection.items,
-          "grid max-h-[70vh] gap-4 overflow-y-auto pr-1 md:grid-cols-2 xl:grid-cols-3",
+          "grid max-h-[70vh] gap-4 overflow-y-auto md:grid-cols-2 xl:grid-cols-3",
         )}
       </div>
     {/if}

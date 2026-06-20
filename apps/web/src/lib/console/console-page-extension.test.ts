@@ -125,6 +125,8 @@ describe("Console page extension surface", () => {
     expect(rendererSource).toContain('kind: "dialog-panel-grid"');
     expect(rendererSource).toContain("openPanelGridDialog(section)");
     expect(rendererSource).toContain("bind:open={panelGridDialogOpen}");
+    expect(rendererSource).toContain("data-console-page-dialog-panel-body");
+    expect(rendererSource).toContain("px-5 pb-5 sm:px-8 sm:pb-8");
     expect(rendererSource).toContain("fieldBindings?: Record<string, string>");
     expect(rendererSource).toContain("requestActionBody(action, item)");
     expect(rendererSource).toContain('kind: "tiered-unit-rate"');
