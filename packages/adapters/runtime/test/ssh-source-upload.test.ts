@@ -9,6 +9,7 @@ import {
   buildRemotePreviewArtifactSweepCommand,
   parseDockerRepoDigestFromInspect,
   parseRemoteDockerImageVersionMetadataOutput,
+  SshExecutionBackend,
 } from "../src/ssh-execution";
 
 describe("SSH source upload", () => {
@@ -84,6 +85,62 @@ describe("SSH Docker image version metadata", () => {
         stderr: `latest: Pulling from n8nio/n8n\nDigest: ${digest}\nStatus: Downloaded newer image for n8nio/n8n:latest`,
       }),
     ).toBe(digest);
+  });
+
+  test("parses digest from raw SSH output before applying timeline redactions", async () => {
+    const digest =
+      "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const rawStdout = `["ghcr.io/acme/api@${digest}"]`;
+    const backend = new SshExecutionBackend(
+      "/tmp/appaloft-runtime",
+      { warn: () => undefined } as never,
+      { record: async () => ({ isErr: () => false }) } as never,
+      { report: () => undefined } as never,
+    );
+    const recordedCommands: unknown[] = [];
+
+    (backend as never as { runRemoteCommand: (input: unknown) => Promise<unknown> }).runRemoteCommand =
+      async (input) => {
+        recordedCommands.push(input);
+        const redactions = (input as { redactions?: readonly string[] }).redactions ?? [];
+        const stdout = redactions.reduce(
+          (text, secret) => text.replaceAll(secret, "[redacted]"),
+          rawStdout,
+        );
+        return { failed: false, stdout, stderr: "", exitCode: 0 };
+      };
+
+    const result = await (
+      backend as never as {
+        resolveRemoteDockerImageVersionMetadata: (input: unknown) => Promise<unknown>;
+      }
+    ).resolveRemoteDockerImageVersionMetadata({
+      context: {},
+      deploymentId: "dep_digest_redaction",
+      state: {
+        runtimePlan: {
+          source: { kind: "docker-image", version: { isUnknown: () => true } },
+        },
+      },
+      target: { host: "deploy@example.test", publicHost: "example.test", port: "22" },
+      runtimeDir: "/tmp/appaloft-runtime",
+      env: {},
+      redactions: ["a"],
+      image: "ghcr.io/acme/api:latest",
+      timeline: [],
+    });
+
+    expect(recordedCommands).toEqual([
+      expect.not.objectContaining({ redactions: expect.anything() }),
+    ]);
+    expect(result).toEqual({
+      status: "resolved",
+      metadata: {
+        imageDigest: digest,
+        sourceVersion: digest,
+        sourceVersionKind: "image-digest",
+      },
+    });
   });
 });
 

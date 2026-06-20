@@ -1314,7 +1314,6 @@ export class SshExecutionBackend implements ExecutionBackend {
       command: buildRemoteDockerImageVersionMetadataCommand(input.image),
       cwd: input.runtimeDir,
       env: input.env,
-      redactions: input.redactions,
     });
     this.pushCommandOutput(input.timeline, {
       context: input.context,
@@ -1324,6 +1323,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       level: inspect.failed ? "warn" : "info",
       stream: "stdout",
       source: "docker",
+      redactions: input.redactions,
     });
     this.pushCommandOutput(input.timeline, {
       context: input.context,
@@ -1333,6 +1333,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       level: "warn",
       stream: "stderr",
       source: "docker",
+      redactions: input.redactions,
     });
 
     if (inspect.failed) {
