@@ -6,8 +6,12 @@
     Activity,
     AlertTriangle,
     ArrowUpRight,
+    CheckCircle2,
+    CircleDashed,
     CreditCard,
     FileText,
+    PlugZap,
+    Search,
     WalletCards,
   } from "@lucide/svelte";
   import { createQuery, queryOptions } from "@tanstack/svelte-query";
@@ -50,6 +54,7 @@
 
   type ConsolePageSection =
     | ConsolePageSummaryGridSection
+    | ConsolePageIntegrationCatalogSection
     | ConsolePagePanelGridSection
     | ConsolePageDialogPanelGridSection
     | ConsolePageTableSection
@@ -68,6 +73,42 @@
     href?: string;
     tone?: ConsolePageTone;
     icon?: ConsolePageIcon;
+  };
+
+  type ConsolePageIntegrationCatalogSection = {
+    kind: "integration-catalog";
+    eyebrow?: string;
+    title: string;
+    description?: string;
+    searchPlaceholder?: string;
+    categories?: ConsolePageCatalogFilterLink[];
+    items: ConsolePageIntegrationItem[];
+    emptyLabel?: string;
+  };
+
+  type ConsolePageCatalogFilterLink = ConsolePageFilterLink & {
+    count?: number;
+  };
+
+  type ConsolePageIntegrationItem = {
+    title: string;
+    description?: string;
+    categoryLabel?: string;
+    icon?: ConsolePageIntegrationIcon;
+    status: {
+      label: string;
+      tone?: ConsolePageTone;
+      description?: string;
+    };
+    badges?: string[];
+    capabilities?: string[];
+    primaryAction?: ConsolePageAction;
+    secondaryAction?: ConsolePageAction;
+  };
+
+  type ConsolePageIntegrationIcon = {
+    label?: string;
+    brandHex?: string;
   };
 
   type ConsolePagePanelGridSection = {
@@ -360,6 +401,44 @@
 
   function summaryGridClass(section: ConsolePageSummaryGridSection): string {
     return section.items.length <= 3 ? "xl:grid-cols-3" : "xl:grid-cols-4";
+  }
+
+  function integrationInitials(item: ConsolePageIntegrationItem): string {
+    const label = item.icon?.label ?? item.title;
+    const words = label
+      .split(/[\s./-]+/)
+      .map((word) => word.trim())
+      .filter(Boolean);
+    const initials = words
+      .slice(0, 2)
+      .map((word) => word[0]?.toUpperCase() ?? "")
+      .join("");
+    return initials || "AP";
+  }
+
+  function integrationAccentStyle(item: ConsolePageIntegrationItem): string {
+    const accent = item.icon?.brandHex?.trim() || "hsl(var(--primary))";
+    return `--integration-accent: ${accent}`;
+  }
+
+  function integrationStatusClass(tone: ConsolePageTone | undefined): string {
+    if (tone === "positive") {
+      return "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-300";
+    }
+    if (tone === "warning") {
+      return "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-300";
+    }
+    if (tone === "danger") {
+      return "border-destructive/30 bg-destructive/5 text-destructive";
+    }
+    return "border-border bg-muted/60 text-muted-foreground";
+  }
+
+  function integrationStatusIcon(tone: ConsolePageTone | undefined): Component {
+    if (tone === "positive") return CheckCircle2;
+    if (tone === "warning") return CircleDashed;
+    if (tone === "danger") return AlertTriangle;
+    return PlugZap;
   }
 
   function requestActionKey(action: ConsolePageRequestAction, item?: ConsolePagePanelItem): string {
@@ -749,6 +828,154 @@
                 </Card.Root>
               {/if}
             {/each}
+          </section>
+        {:else if section.kind === "integration-catalog"}
+          <section class="space-y-4" data-console-page-integration-catalog>
+            <div class="rounded-xl border bg-card p-5 shadow-sm">
+              <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                <div class="min-w-0 max-w-2xl space-y-2">
+                  {#if section.eyebrow}
+                    <Badge variant="outline">{section.eyebrow}</Badge>
+                  {/if}
+                  <h2 class="text-xl font-semibold">{section.title}</h2>
+                  {#if section.description}
+                    <p class="text-sm leading-6 text-muted-foreground">{section.description}</p>
+                  {/if}
+                </div>
+                {#if section.searchPlaceholder}
+                  <div
+                    class="flex min-h-10 w-full items-center gap-2 rounded-lg border bg-background px-3 text-sm text-muted-foreground shadow-sm lg:max-w-xs"
+                    aria-label={section.searchPlaceholder}
+                  >
+                    <Search class="size-4 shrink-0" />
+                    <span class="truncate">{section.searchPlaceholder}</span>
+                  </div>
+                {/if}
+              </div>
+              {#if section.categories?.length}
+                <div class="mt-5 flex flex-wrap gap-2">
+                  {#each section.categories as category (category.href)}
+                    <Button
+                      type="button"
+                      variant={category.active ? "default" : "outline"}
+                      size="sm"
+                      onclick={() => navigateConsolePageHref(category.href)}
+                    >
+                      {category.label}
+                      {#if typeof category.count === "number"}
+                        <span class="ml-1 text-xs opacity-75">{category.count}</span>
+                      {/if}
+                    </Button>
+                  {/each}
+                </div>
+              {/if}
+            </div>
+
+            {#if section.items.length > 0}
+              <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {#each section.items as item (item.title)}
+                  {@const StatusIcon = integrationStatusIcon(item.status.tone)}
+                  <article
+                    class="group flex min-h-72 flex-col rounded-xl border bg-card p-4 shadow-sm transition-colors hover:border-primary/40 hover:bg-primary/5"
+                    style={integrationAccentStyle(item)}
+                    data-console-page-integration-card
+                  >
+                    <div class="flex items-start justify-between gap-3">
+                      <div
+                        class="flex size-11 shrink-0 items-center justify-center rounded-lg border bg-background text-sm font-semibold shadow-sm"
+                        style="border-color: color-mix(in srgb, var(--integration-accent) 35%, transparent); color: var(--integration-accent);"
+                      >
+                        {integrationInitials(item)}
+                      </div>
+                      <span
+                        class={[
+                          "inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 text-xs font-medium",
+                          integrationStatusClass(item.status.tone),
+                        ]}
+                      >
+                        <StatusIcon class="size-3.5" />
+                        {item.status.label}
+                      </span>
+                    </div>
+
+                    <div class="mt-4 min-w-0 flex-1 space-y-3">
+                      <div class="space-y-1">
+                        {#if item.categoryLabel}
+                          <p class="text-xs font-medium uppercase tracking-normal text-muted-foreground">
+                            {item.categoryLabel}
+                          </p>
+                        {/if}
+                        <h3 class="text-base font-semibold">{item.title}</h3>
+                        {#if item.description}
+                          <p class="text-sm leading-6 text-muted-foreground">{item.description}</p>
+                        {/if}
+                      </div>
+
+                      {#if item.status.description}
+                        <p class="rounded-md border bg-muted/30 px-3 py-2 text-xs leading-5 text-muted-foreground">
+                          {item.status.description}
+                        </p>
+                      {/if}
+
+                      {#if item.badges?.length}
+                        <div class="flex flex-wrap gap-1.5">
+                          {#each item.badges as badge (badge)}
+                            <Badge variant="outline">{badge}</Badge>
+                          {/each}
+                        </div>
+                      {/if}
+
+                      {#if item.capabilities?.length}
+                        <div class="flex flex-wrap gap-1.5">
+                          {#each item.capabilities as capability (capability)}
+                            <span class="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground">
+                              {capability}
+                            </span>
+                          {/each}
+                        </div>
+                      {/if}
+                    </div>
+
+                    {#if item.primaryAction || item.secondaryAction}
+                      <div class="mt-5 flex flex-wrap gap-2">
+                        {#if item.primaryAction}
+                          <Button
+                            href={item.primaryAction.href}
+                            target={item.primaryAction.external ? "_blank" : undefined}
+                            rel={item.primaryAction.external ? "noreferrer" : undefined}
+                            variant={item.primaryAction.variant === "secondary" ? "outline" : "default"}
+                            size="sm"
+                          >
+                            {item.primaryAction.label}
+                            {#if item.primaryAction.external}
+                              <ArrowUpRight class="size-4" />
+                            {/if}
+                          </Button>
+                        {/if}
+                        {#if item.secondaryAction}
+                          <Button
+                            href={item.secondaryAction.href}
+                            target={item.secondaryAction.external ? "_blank" : undefined}
+                            rel={item.secondaryAction.external ? "noreferrer" : undefined}
+                            variant="outline"
+                            size="sm"
+                          >
+                            {item.secondaryAction.label}
+                            {#if item.secondaryAction.external}
+                              <ArrowUpRight class="size-4" />
+                            {/if}
+                          </Button>
+                        {/if}
+                      </div>
+                    {/if}
+                  </article>
+                {/each}
+              </div>
+            {:else}
+              <div class="rounded-xl border bg-card p-5 text-sm text-muted-foreground">
+                {section.emptyLabel ?? $t(i18nKeys.common.status.unknown)}
+              </div>
+            {/if}
           </section>
         {:else if section.kind === "panel-grid"}
           <section class="space-y-4">
