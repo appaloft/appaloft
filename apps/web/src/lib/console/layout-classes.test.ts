@@ -7,11 +7,14 @@ describe("console layout classes", () => {
 
     const detailPanelClass =
       source.match(/export const detailTabPanelScrollClass =\n {2}"([^"]+)";/)?.[1] ?? "";
+    const detailHeaderClass =
+      source.match(/export const detailHeaderClass = "([^"]+)";/)?.[1] ?? "";
     const detailSubnavClass =
       source.match(/export const detailTabPanelSubnavClass =\n {2}"([^"]+)";/)?.[1] ?? "";
     const shellSubnavClass =
       source.match(/export const subnavLayoutClass =\n {2}"([^"]+)";/)?.[1] ?? "";
 
+    expect(detailHeaderClass).toContain("pt-3");
     expect(detailPanelClass).toContain("px-4");
     expect(detailPanelClass).toContain("md:px-6");
     expect(detailSubnavClass).not.toContain("-mx-");
