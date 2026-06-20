@@ -133,6 +133,8 @@ describe("Console page extension surface", () => {
     expect(rendererSource).toContain("<table");
     expect(rendererSource).toContain("<thead");
     expect(rendererSource).toContain('import { goto } from "$app/navigation";');
+    expect(rendererSource).toContain('settingsScope?: "organization" | "instance" | null');
+    expect(rendererSource).toContain("items={instanceSettingsItems");
     expect(rendererSource).toContain("placeholderData: (previousData) => previousData");
     expect(rendererSource).toContain("navigateConsolePageHref(filter.href)");
     expect(rendererSource).toContain("noScroll: true");
