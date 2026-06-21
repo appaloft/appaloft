@@ -1532,6 +1532,13 @@
   const resourceInitialAccessCredentials = $derived(
     resourceInitialAccessCredentialsQuery.data?.items ?? [],
   );
+  const visibleResourceInitialAccessCredentials = $derived(
+    resourceInitialAccessCredentials.filter(
+      (credential) =>
+        credential.status === "pending" ||
+        Boolean(revealedInitialAccessCredentials[credential.credentialId]),
+    ),
+  );
   const initialAccessCredentialClaimMutation = createMutation(() => ({
     mutationFn: (credential: ResourceInitialAccessCredential) => {
       if (!credential.claimEndpoint) {
@@ -8706,7 +8713,7 @@
                 </section>
               </div>
 
-              {#if resourceInitialAccessCredentials.length > 0}
+              {#if visibleResourceInitialAccessCredentials.length > 0}
                 <section
                   class="rounded-md border bg-background p-4"
                   data-resource-initial-access-credentials
@@ -8723,33 +8730,53 @@
                     </div>
                   </div>
                   <div class="mt-4 grid gap-3">
-                    {#each resourceInitialAccessCredentials as credential (credential.credentialId)}
+                    {#each visibleResourceInitialAccessCredentials as credential (credential.credentialId)}
                       {@const revealedCredential = revealedInitialAccessCredentials[credential.credentialId]}
                       <article
                         class="rounded-md border border-border bg-muted/25 p-3"
                         data-resource-initial-access-credential
                       >
-                        <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                          <div class="min-w-0 space-y-2">
-                            <div class="flex flex-wrap items-center gap-2">
-                              <p class="font-mono text-sm font-semibold">{credential.key}</p>
-                              <Badge variant="outline">
-                                {initialAccessCredentialStatusLabel(credential)}
-                              </Badge>
-                            </div>
-                            <p class="text-xs leading-5 text-muted-foreground">
-                              {#if credential.expiresAt && credential.status === "pending"}
-                                {$t(i18nKeys.console.resources.initialAccessCredentialExpiresAt)}
-                                <span class="font-mono">{formatTime(credential.expiresAt)}</span>
-                              {:else if credential.revealedAt}
-                                {$t(i18nKeys.console.resources.initialAccessCredentialRevealedAt)}
-                                <span class="font-mono">{formatTime(credential.revealedAt)}</span>
-                              {:else if credential.resetRequired}
-                                {$t(i18nKeys.console.resources.initialAccessCredentialResetRequired)}
+                        <div class="space-y-3">
+                          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div class="min-w-0 space-y-2">
+                              <div class="flex flex-wrap items-center gap-2">
+                                <p class="font-mono text-sm font-semibold">{credential.key}</p>
+                                {#if !revealedCredential}
+                                  <Badge variant="outline">
+                                    {initialAccessCredentialStatusLabel(credential)}
+                                  </Badge>
+                                {/if}
+                              </div>
+                              {#if !revealedCredential}
+                                <p class="text-xs leading-5 text-muted-foreground">
+                                  {#if credential.expiresAt && credential.status === "pending"}
+                                    {$t(i18nKeys.console.resources.initialAccessCredentialExpiresAt)}
+                                    <span class="font-mono">{formatTime(credential.expiresAt)}</span>
+                                  {:else if credential.resetRequired}
+                                    {$t(i18nKeys.console.resources.initialAccessCredentialResetRequired)}
+                                  {/if}
+                                </p>
                               {/if}
-                            </p>
-                            {#if revealedCredential}
-                              <div class="rounded-md border bg-background p-3">
+                            </div>
+                            {#if !revealedCredential && canClaimInitialAccessCredential(credential)}
+                              <Button
+                                type="button"
+                                size="sm"
+                                class="shrink-0"
+                                disabled={initialAccessCredentialClaimMutation.isPending}
+                                onclick={() => claimInitialAccessCredential(credential)}
+                              >
+                                <KeyRound class="size-4" />
+                                {$t(i18nKeys.console.resources.initialAccessCredentialReveal)}
+                              </Button>
+                            {/if}
+                          </div>
+
+                          {#if revealedCredential}
+                            <div
+                              class="flex flex-col gap-3 rounded-md border bg-background p-3 sm:flex-row sm:items-start sm:justify-between"
+                            >
+                              <div class="min-w-0 flex-1">
                                 <p class="text-xs text-muted-foreground">
                                   {$t(i18nKeys.console.resources.initialAccessCredentialValueLabel)}
                                 </p>
@@ -8757,19 +8784,11 @@
                                   {revealedCredential.value}
                                 </p>
                               </div>
-                            {/if}
-                            {#if initialAccessCredentialFeedback[credential.credentialId]}
-                              <p class="text-xs leading-5 text-muted-foreground">
-                                {initialAccessCredentialFeedback[credential.credentialId]}
-                              </p>
-                            {/if}
-                          </div>
-                          <div class="flex shrink-0 flex-wrap gap-2">
-                            {#if revealedCredential}
                               <Button
                                 type="button"
                                 variant="outline"
                                 size="sm"
+                                class="shrink-0"
                                 onclick={() => copyInitialAccessCredential(credential.credentialId)}
                               >
                                 {#if initialAccessCredentialCopyState[credential.credentialId] === "copied"}
@@ -8779,18 +8798,14 @@
                                 {/if}
                                 {initialAccessCredentialCopyLabel(credential.credentialId)}
                               </Button>
-                            {:else if canClaimInitialAccessCredential(credential)}
-                              <Button
-                                type="button"
-                                size="sm"
-                                disabled={initialAccessCredentialClaimMutation.isPending}
-                                onclick={() => claimInitialAccessCredential(credential)}
-                              >
-                                <KeyRound class="size-4" />
-                                {$t(i18nKeys.console.resources.initialAccessCredentialReveal)}
-                              </Button>
-                            {/if}
-                          </div>
+                            </div>
+                          {/if}
+
+                          {#if initialAccessCredentialFeedback[credential.credentialId]}
+                            <p class="text-xs leading-5 text-muted-foreground">
+                              {initialAccessCredentialFeedback[credential.credentialId]}
+                            </p>
+                          {/if}
                         </div>
                       </article>
                     {/each}
