@@ -2375,6 +2375,11 @@ describe("console page structure", () => {
       "data-domain-binding-list-display-surface",
       "{:else}",
     );
+    const domainBindingLoadingSource = sourceBetween(
+      domainBindingsPageSource,
+      "data-domain-binding-list-skeleton",
+      "{:else}",
+    );
     const domainBindingVerificationDialogSource = sourceBetween(
       domainBindingDetailPageSource,
       "data-domain-binding-verification-dialog",
@@ -2399,6 +2404,15 @@ describe("console page structure", () => {
     expect(domainBindingDetailPageSource).not.toContain("routeRedirectDrafts");
     expect(domainBindingDetailPageSource).not.toContain("routeRedirectStatusDrafts");
     expect(domainBindingDetailPageSource).not.toContain("deleteConfirmationDrafts");
+    expect(
+      domainBindingsPageSource.indexOf(
+        "<ConsoleResourceCanvas data-domain-bindings-display-surface>",
+      ),
+    ).toBeLessThan(domainBindingsPageSource.indexOf("{#if domainBindingsLoading}"));
+    expect(domainBindingLoadingSource).toContain("console-record-list");
+    expect(domainBindingLoadingSource).toContain("console-record-row p-0");
+    expect(domainBindingLoadingSource).toContain("md:grid-cols-3");
+    expect(domainBindingLoadingSource).toContain("lg:absolute lg:right-4 lg:top-4");
     expect(domainBindingsListSource).toContain("domainBindingDetailHref(binding)");
     expect(domainBindingsListSource).toContain("data-domain-binding-row");
     expect(domainBindingsListSource).toContain("data-domain-binding-pending-dns-notice");

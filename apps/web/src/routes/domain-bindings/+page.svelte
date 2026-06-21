@@ -122,13 +122,68 @@
   title={$t(i18nKeys.console.domainBindings.pageTitle)}
   description={$t(i18nKeys.console.domainBindings.pageDescription)}
 >
-  {#if domainBindingsLoading}
-    <div class="space-y-5">
-      <Skeleton class="h-52 w-full" />
-      <Skeleton class="h-80 w-full" />
-    </div>
-  {:else}
-    <ConsoleResourceCanvas data-domain-bindings-display-surface>
+  <ConsoleResourceCanvas data-domain-bindings-display-surface>
+    {#if domainBindingsLoading}
+      <section class="space-y-6" data-domain-binding-list-skeleton>
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div class="max-w-3xl space-y-3">
+            <div class="space-y-2">
+              <div class="flex items-center gap-2">
+                <Skeleton class="h-8 w-40" />
+                <Skeleton class="size-5 rounded-full" />
+              </div>
+              <Skeleton class="h-4 w-72 max-w-full" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <Skeleton class="h-9 w-44 rounded-md" />
+        <Skeleton class="h-4 w-72 max-w-full" />
+      </div>
+
+      <section class="space-y-4">
+        <div class="console-record-list">
+          {#each Array.from({ length: 2 }) as _, index (index)}
+            <article class="console-record-row p-0">
+              <div class="block min-w-0 space-y-3 p-4">
+                <div
+                  class={[
+                    "flex min-w-0 flex-wrap items-center gap-2",
+                    index === 1 ? "lg:pr-64" : "",
+                  ]}
+                >
+                  <Skeleton class="size-4 shrink-0 rounded-sm" />
+                  <Skeleton class="h-5 w-48 max-w-full" />
+                  <Skeleton class="h-5 w-16 rounded-sm" />
+                </div>
+                <div class="grid gap-2 md:grid-cols-3">
+                  {#each Array.from({ length: 3 }) as _, cardIndex (`${index}-${cardIndex}`)}
+                    <div class="rounded-md border border-border/60 bg-muted/20 px-3 py-2">
+                      <Skeleton class="h-3 w-16" />
+                      <Skeleton class="mt-2 h-4 w-32 max-w-full" />
+                    </div>
+                  {/each}
+                </div>
+                <Skeleton class="h-4 w-80 max-w-full" />
+                {#if index === 1}
+                  <div class="rounded-md border border-primary/20 bg-primary/5 px-3 py-2">
+                    <Skeleton class="h-4 w-32" />
+                    <Skeleton class="mt-2 h-3 w-96 max-w-full" />
+                  </div>
+                {/if}
+              </div>
+              {#if index === 1}
+                <div class="z-10 flex p-4 pt-0 lg:absolute lg:right-4 lg:top-4 lg:p-0">
+                  <Skeleton class="h-9 w-40 rounded-md" />
+                </div>
+              {/if}
+            </article>
+          {/each}
+        </div>
+      </section>
+    {:else}
       <section class="space-y-6">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div class="max-w-3xl space-y-3">
@@ -308,6 +363,6 @@
           {/if}
         </section>
       {/if}
-    </ConsoleResourceCanvas>
-  {/if}
+    {/if}
+  </ConsoleResourceCanvas>
 </ConsoleShell>
