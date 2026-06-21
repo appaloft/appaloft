@@ -80,11 +80,13 @@ describe("console header switcher", () => {
       'class="inline-flex h-8 min-w-0 max-w-[12rem] items-center gap-1',
     );
     expect(shellSource).toContain(
-      'class="group/link inline-flex h-8 min-w-0 flex-1 items-center gap-2 px-1.5',
+      'class="group/link inline-flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2',
     );
     expect(shellSource).toContain(
       'class="group/dropdown-trigger inline-flex size-8 shrink-0 items-center justify-center rounded-md',
     );
+    expect(shellSource).toContain("hover:bg-primary/5");
+    expect(shellSource).toContain("data-[state=open]:bg-primary/5");
     expect(shellSource).not.toContain("border-l border-border/70");
     expect(shellSource.indexOf("data-console-header-switcher-link")).toBeLessThan(
       shellSource.indexOf("data-console-header-switcher-trigger"),
