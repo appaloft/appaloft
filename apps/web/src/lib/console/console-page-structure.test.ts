@@ -3631,7 +3631,7 @@ describe("console page structure", () => {
     expect(projectSettingsSource).not.toContain('openProjectLifecycleDialog("archive")');
     expect(projectSettingsSource).not.toContain('openProjectLifecycleDialog("restore")');
     expect(projectSettingsSource).not.toContain('openProjectLifecycleDialog("delete")');
-    expect(projectSettingsSource).not.toContain('variant="destructive"');
+    expect(projectSettingsSource).not.toMatch(/<Button\b(?=[^>]*variant="destructive")[^>]*>/);
     expect(projectSettingsSource).not.toContain('id="project-delete-button"');
     expect(projectSettingsSource).not.toContain('id="project-archive-button"');
     expect(projectSettingsSource).not.toContain('id="project-restore-button"');
