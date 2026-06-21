@@ -2425,6 +2425,15 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
         environmentId: "env_demo",
         ownedEntries: [
           {
+            key: "APP_NAME",
+            value: "workspace",
+            scope: "resource",
+            exposure: "runtime",
+            isSecret: false,
+            kind: "plain-config",
+            updatedAt: "2026-01-01T00:00:00.000Z",
+          },
+          {
             key: "DATABASE_URL",
             value: "****",
             scope: "resource",
@@ -2435,6 +2444,14 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
           },
         ],
         effectiveEntries: [
+          {
+            key: "APP_NAME",
+            value: "workspace",
+            scope: "resource",
+            exposure: "runtime",
+            isSecret: false,
+            kind: "plain-config",
+          },
           {
             key: "DATABASE_URL",
             value: "****",
@@ -7898,10 +7915,58 @@ describe.serial("console e2e with Bun.WebView", () => {
     await using view = createWebView();
     await view.navigate(`${previewUrl}${demoResourcePath}?tab=configuration&section=configuration`);
     await clickLinkByHref(view, "section=configuration");
+    await view.evaluate<void>(`(() => {
+      window.__appaloftCopiedText = "";
+      window.appaloftDesktop = {
+        copyText: async (text) => {
+          window.__appaloftCopiedText = text;
+        },
+      };
+    })()`);
 
     await expectAnyText(view, ["Configuration", "配置变量"]);
     await expectAnyText(view, ["Resource-owned entries", "资源自有条目"]);
+    await expectText(view, "APP_NAME");
     await expectText(view, "DATABASE_URL");
+    const configTableState = JSON.parse(
+      await view.evaluate<string>(`JSON.stringify({
+        ownedTableVisible: Boolean(document.querySelector("#resource-owned-configuration-table")),
+        effectiveTableVisible: Boolean(document.querySelector("#resource-effective-configuration-table")),
+        appNameCopyButtonCount: document.querySelectorAll('[data-resource-config-copy-button="APP_NAME"]').length,
+        databaseCopyButtonVisible: Boolean(document.querySelector('[data-resource-config-copy-button="DATABASE_URL"]')),
+        ownedHeaders: Array.from(document.querySelectorAll("#resource-owned-configuration-table th")).map((cell) => cell.textContent?.trim())
+      })`),
+    ) as {
+      ownedTableVisible: boolean;
+      effectiveTableVisible: boolean;
+      appNameCopyButtonCount: number;
+      databaseCopyButtonVisible: boolean;
+      ownedHeaders: string[];
+    };
+    expect(configTableState).toMatchObject({
+      ownedTableVisible: true,
+      effectiveTableVisible: true,
+      databaseCopyButtonVisible: false,
+    });
+    expect(configTableState.appNameCopyButtonCount).toBeGreaterThanOrEqual(2);
+    expect(configTableState.ownedHeaders.length).toBeGreaterThanOrEqual(5);
+    await clickElementBySelector(
+      view,
+      '#resource-owned-configuration-table [data-resource-config-copy-button="APP_NAME"]',
+    );
+    await waitFor(
+      () => view.evaluate<string>("window.__appaloftCopiedText ?? ''"),
+      (copied) => copied === "workspace",
+      "Expected resource config plain value to be copied through the desktop bridge",
+    );
+    await waitFor(
+      () =>
+        view.evaluate<string>(
+          `document.querySelector('#resource-owned-configuration-table [data-resource-config-copy-button="APP_NAME"]')?.getAttribute("aria-label") ?? ""`,
+        ),
+      (label) => label.includes("Copied") || label.includes("已复制"),
+      "Expected resource config copy button to report copied state",
+    );
 
     const effectiveConfigRequest = await waitForRecordedRequest(
       "/api/rpc/resources/effectiveConfig",

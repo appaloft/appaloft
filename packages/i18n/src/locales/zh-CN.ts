@@ -1818,6 +1818,12 @@ export const zhCN = {
       composeProfileTitle: "Compose 栈",
       composeServicesDescription: "Compose 文件里的服务边界和当前流量目标。",
       composeServicesTitle: "Compose 服务",
+      configurationColumnExposure: "生效阶段",
+      configurationColumnKey: "键",
+      configurationColumnKind: "类型",
+      configurationColumnScope: "来源",
+      configurationColumnValue: "值",
+      configurationCopyValue: "复制值",
       configurationDescription:
         "管理资源级变量和密钥，供后续部署使用。生成部署快照时，资源级配置会覆盖继承来的环境配置。",
       configurationEffectiveDescription:
@@ -1859,6 +1865,8 @@ export const zhCN = {
       configurationUnsetFailed: "资源变量移除失败",
       configurationUnsetSucceeded: "资源变量已移除",
       configurationUpdatedAt: "更新时间",
+      configurationValueCopied: "已复制",
+      configurationValueCopyFailed: "复制失败",
       storageAttachAction: "挂载存储",
       storageAttachDescription: "把已有存储卷挂到这个资源配置。未来部署快照会记录这个挂载。",
       storageAttachedAt: "挂载时间 ",
