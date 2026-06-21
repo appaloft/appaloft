@@ -1330,7 +1330,7 @@
           <Dialog.Description>{selectedIntegrationDetails.description}</Dialog.Description>
         {/if}
       </Dialog.Header>
-      <div class="mt-5 space-y-5" data-console-page-integration-details>
+      <div class="mt-5 space-y-5 px-5 pb-5 sm:px-8 sm:pb-8" data-console-page-integration-details>
         {#if selectedIntegrationDetails.rows?.length}
           <dl class="divide-y rounded-lg border">
             {#each selectedIntegrationDetails.rows as row (row.label)}
