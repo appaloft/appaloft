@@ -9435,7 +9435,7 @@
                           {/if}
                         </div>
                         <dl class="mt-4 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
-                          <div class="rounded-md bg-muted/25 px-3 py-2">
+                          <div class="rounded-md border bg-muted/25 px-3 py-2">
                             <dt class="text-xs text-muted-foreground">
                               {$t(i18nKeys.common.domain.deployment)}
                             </dt>
@@ -9443,7 +9443,7 @@
                               {proxyConfiguration.deploymentId ?? proxyConfiguration.lastAppliedDeploymentId ?? "-"}
                             </dd>
                           </div>
-                          <div class="rounded-md bg-muted/25 px-3 py-2">
+                          <div class="rounded-md border bg-muted/25 px-3 py-2">
                             <dt class="text-xs text-muted-foreground">
                               {$t(i18nKeys.console.resources.proxyConfigurationGeneratedAt)}
                             </dt>
@@ -9451,13 +9451,13 @@
                               {formatTime(proxyConfiguration.generatedAt)}
                             </dd>
                           </div>
-                          <div class="rounded-md bg-muted/25 px-3 py-2">
+                          <div class="rounded-md border bg-muted/25 px-3 py-2">
                             <dt class="text-xs text-muted-foreground">
                               {$t(i18nKeys.console.domainBindings.routeReadiness)}
                             </dt>
                             <dd class="mt-1 font-medium">{proxyConfiguration.routes.length}</dd>
                           </div>
-                          <div class="rounded-md bg-muted/25 px-3 py-2">
+                          <div class="rounded-md border bg-muted/25 px-3 py-2">
                             <dt class="text-xs text-muted-foreground">
                               {$t(i18nKeys.console.resources.profileDiagnosticsTitle)}
                             </dt>

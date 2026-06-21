@@ -1422,6 +1422,17 @@ describe("console page structure", () => {
     expect(resourceDetailPageSource).toContain('id="resource-domain-binding-dns-apply"');
   });
 
+  test("[RESOURCE-PROXY-UI-001] keeps proxy configuration summary tiles visually bounded", () => {
+    const proxyConfigurationSource = sourceBetween(
+      resourceDetailPageSource,
+      'id="resource-proxy-configuration"',
+      'id="resource-configuration-profile"',
+    );
+
+    expect(proxyConfigurationSource.match(/class="rounded-md border bg-muted\/25 px-3 py-2"/g))
+      .toHaveLength(4);
+  });
+
   test("[RESOURCE-DEPENDENCIES-IA-001] keeps dependency binding forms behind a focused dialog", () => {
     const resourceDependencyBindingsSectionSource = sourceBetween(
       resourceDetailPageSource,
