@@ -2773,6 +2773,61 @@ describe("pglite persistence integration", () => {
     }
   }, 15000);
 
+  test("[PG-RESOURCE-LIST-001] pglite filters archived resources by lifecycle status", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-archived-resource-list-"));
+    const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
+    let closeDatabase: (() => Promise<void>) | undefined;
+
+    try {
+      const { createDatabase, createMigrator, PgResourceReadModel } = await import("../src/index");
+      const database = await createDatabase({
+        driver: "pglite",
+        pgliteDataDir,
+      });
+      closeDatabase = () => database.close();
+      const migrator = createMigrator(database.db);
+      const migrationResult = await migrator.migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      const activeTarget = await seedSourceLinkContext(database.db, "resource_list_active");
+      const archivedTarget = await seedSourceLinkContext(database.db, "resource_list_archived", {
+        lifecycleStatus: "archived",
+        archivedAt: "2026-01-01T00:01:00.000Z",
+      });
+      const context = createTestExecutionContext();
+      const listResourcesQueryService = new ListResourcesQueryService(
+        new PgResourceReadModel(database.db),
+        new EmptyDestinationRepository(),
+        new EmptyServerRepository(),
+        new DisabledDefaultAccessDomainProvider(),
+      );
+
+      const defaultList = await listResourcesQueryService.execute(context, {
+        projectId: activeTarget.projectId,
+      });
+      const archivedProjectDefaultList = await listResourcesQueryService.execute(context, {
+        projectId: archivedTarget.projectId,
+      });
+      const archivedList = await listResourcesQueryService.execute(context, {
+        projectId: archivedTarget.projectId,
+        lifecycleStatus: "archived",
+      });
+
+      expect(defaultList.items.map((item) => item.id)).toEqual([activeTarget.resourceId]);
+      expect(archivedProjectDefaultList.items).toEqual([]);
+      expect(archivedList.items).toMatchObject([
+        {
+          id: archivedTarget.resourceId,
+          lifecycleStatus: "archived",
+          archivedAt: "2026-01-01T00:01:00.000Z",
+        },
+      ]);
+    } finally {
+      await closeDatabase?.();
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  }, 15000);
+
   test("[RES-HEALTH-QRY-015][RES-DIAG-QRY-018] pglite exposes non-ready durable domain state before generated fallback", async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-pending-domain-"));
     const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
