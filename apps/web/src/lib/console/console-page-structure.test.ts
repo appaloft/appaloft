@@ -1352,7 +1352,7 @@ describe("console page structure", () => {
       "Boolean(revealedInitialAccessCredentials[credential.credentialId])",
     );
     expect(resourceDetailPageSource).toContain(
-      "/api/resources/${encodeURIComponent(resourceId)}/initial-access-credentials",
+      "/api/resources/" + "$" + "{encodeURIComponent(resourceId)}/initial-access-credentials",
     );
     expect(resourceDetailPageSource).toContain("initialAccessCredentialsTitle");
     expect(resourceDetailPageSource).toContain("claimInitialAccessCredential");
@@ -1720,6 +1720,9 @@ describe("console page structure", () => {
     expect(resourceDetailPageSource).toContain("deploymentProgressStreamError = message;");
     expect(resourceDetailPageSource).toContain("isTerminalDeploymentProgressEvent(event)");
     expect(deploymentProgressDialogSource).toContain("{onClose}");
+    expect(deploymentProgressDialogSource).toContain("accessUrl?: string");
+    expect(deploymentProgressDialogSource).toContain("{accessUrl}");
+    expect(resourceDetailPageSource).toContain("accessUrl={primaryAccessHref}");
     expect(deploymentProgressDialogSource).toContain('class="max-h-[86vh] shadow-lg"');
     expect(deploymentProgressDialogSource).not.toContain(
       "flex-col overflow-hidden rounded-lg border bg-background",
@@ -1729,6 +1732,9 @@ describe("console page structure", () => {
     expect(operationProgressPanelSource).toContain("deployment-progress-spinner");
     expect(operationProgressPanelSource).toContain("deployment-progress-confetti");
     expect(operationProgressPanelSource).toContain("data-deployment-progress-success-access-url");
+    expect(operationProgressPanelSource).toContain("const resolvedAccessUrl = $derived(accessUrl)");
+    expect(operationProgressPanelSource).not.toContain("accessUrlFromDeploymentProgressEvents");
+    expect(operationProgressPanelSource).not.toContain("/public route/i");
     expect(resourceDetailActionsMenuSource).toContain('controlResourceRuntime("stop")');
     expect(resourceDetailActionsMenuSource).toContain('controlResourceRuntime("restart")');
     expect(resourceDetailActionsMenuSource).toContain("forceRedeploy");

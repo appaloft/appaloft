@@ -12118,6 +12118,7 @@
         requestId={deploymentProgressRequestId}
         deploymentId={deploymentProgressDeploymentId}
         traceLink={deploymentProgressTraceLink}
+        accessUrl={primaryAccessHref}
         title={$t(i18nKeys.console.deployments.progressTitle)}
         description={$t(i18nKeys.console.deployments.progressDescription)}
         onClose={() => {
