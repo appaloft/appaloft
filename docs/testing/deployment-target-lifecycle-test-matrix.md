@@ -88,10 +88,10 @@ registration, connectivity, proxy bootstrap, and proxy repair behavior.
 | SRV-LIFE-ENTRY-014 | HTTP/oRPC | e2e-preferred | Server rename route. | `POST /api/servers/{serverId}/rename` reuses `RenameServerCommandInput`, dispatches through `CommandBus`, and returns `{ id }`. |
 | SRV-LIFE-ENTRY-015 | Operation catalog | contract | Public exposure in Code Round. | `CORE_OPERATIONS.md`, `operation-catalog.ts`, and public docs operation coverage include `servers.rename`. |
 | SRV-LIFE-ENTRY-016 | Web | e2e-preferred | Server detail rename action. | Web server detail exposes a display-name input/action for active and inactive servers, dispatches `servers.rename`, and refreshes detail/list-visible name. |
-| SRV-LIFE-ENTRY-017 | CLI | e2e-preferred | Server edge proxy configure command. | `appaloft server proxy configure <serverId> --kind none\|traefik\|caddy` dispatches `ConfigureServerEdgeProxyCommand`; no repository bypass. |
+| SRV-LIFE-ENTRY-017 | CLI | contract | Server edge proxy provider selection is not exposed. | Routine CLI flows use the configured default proxy provider and do not expose `appaloft server proxy configure <serverId> --kind ...` or registration-time proxy provider choices. |
 | SRV-LIFE-ENTRY-018 | HTTP/oRPC | e2e-preferred | Server edge proxy configure route. | `POST /api/servers/{serverId}/edge-proxy/configuration` reuses `ConfigureServerEdgeProxyCommandInput`, dispatches through `CommandBus`, and returns `{ id, edgeProxy }`. |
 | SRV-LIFE-ENTRY-019 | Operation catalog | contract | Public exposure in Code Round. | `CORE_OPERATIONS.md`, `operation-catalog.ts`, and public docs operation coverage include `servers.configure-edge-proxy`. |
-| SRV-LIFE-ENTRY-020 | Web | e2e-preferred | Server detail edge proxy configure action. | Web server detail exposes an active-server proxy kind selector, dispatches `servers.configure-edge-proxy`, and refreshes detail/list-visible proxy status; inactive servers show read-only proxy state. |
+| SRV-LIFE-ENTRY-020 | Web | e2e-preferred | Server detail proxy state display. | Web server detail shows proxy state as read-only and routine creation flows use the configured default proxy provider without exposing a provider selector. |
 
 ## Required Non-Coverage Assertions
 

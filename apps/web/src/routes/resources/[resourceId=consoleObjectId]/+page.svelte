@@ -968,14 +968,10 @@
   let destinationId = $state("");
   let domainName = $state("");
   let pathPrefix = $state("/");
-  let proxyKind = $state<CreateDomainBindingInput["proxyKind"]>("traefik");
   let tlsMode = $state<NonNullable<CreateDomainBindingInput["tlsMode"]>>("auto");
   let routeMode = $state<DomainRouteMode>("serve");
   let redirectTo = $state("");
   let redirectStatus = $state<RedirectStatusText>("308");
-  let certificatePolicy = $state<NonNullable<CreateDomainBindingInput["certificatePolicy"]>>(
-    "auto",
-  );
   let createFeedback = $state<{
     kind: "success" | "error";
     title: string;
@@ -1365,7 +1361,6 @@
   const canCreateBinding = $derived(
     Boolean(
       resource &&
-        proxyKind !== "none" &&
         (routeMode === "serve" || redirectTo) &&
         (domainBindingUsesResourceRouteProvider ||
           (effectiveDomainBindingServerId && effectiveDomainBindingDestinationId)),
@@ -1920,12 +1915,10 @@
     destinationId = domainBindingUsesResourceRouteProvider ? "" : defaultDestinationId || destinationId;
     domainName = "";
     pathPrefix = "/";
-    proxyKind = "traefik";
     tlsMode = "auto";
     routeMode = "serve";
     redirectTo = "";
     redirectStatus = "308";
-    certificatePolicy = "auto";
     createFeedback = null;
     domainBindingCreateDialogOpen = true;
     domainBindingDialogInitializedForResourceId = resource.id;
@@ -4379,7 +4372,7 @@
         : {}),
       domainName: submittedDomainName,
       pathPrefix: submittedPathPrefix,
-      proxyKind,
+      proxyKind: "traefik",
       tlsMode,
       ...(routeMode === "redirect"
         ? {
@@ -4387,7 +4380,6 @@
             redirectStatus: parseRedirectStatus(redirectStatus),
           }
         : {}),
-      certificatePolicy,
     });
   }
 
@@ -10497,36 +10489,25 @@
                       </Select.Root>
                     </label>
 
-                    <label class="space-y-1.5 text-sm font-medium" for="resource-domain-binding-destination">
+                    <label class="space-y-1.5 text-sm font-medium">
                       <span>{$t(i18nKeys.common.domain.destination)}</span>
-                      <Input
-                        id="resource-domain-binding-destination"
-                        bind:value={destinationId}
-                        autocomplete="off"
-                        disabled={!shouldShowDestinationField}
-                        placeholder={$t(i18nKeys.console.domainBindings.formDestinationPlaceholder)}
-                      />
-                      <span class="block text-xs leading-5 text-muted-foreground">
-                        {defaultDestinationId
-                          ? $t(i18nKeys.console.domainBindings.selectedResourceDestination, {
-                              destinationId: defaultDestinationId,
-                            })
-                          : $t(i18nKeys.console.domainBindings.destinationHelp)}
-                      </span>
+                      {#if shouldShowDestinationField}
+                        <Input
+                          id="resource-domain-binding-destination"
+                          bind:value={destinationId}
+                          autocomplete="off"
+                          placeholder={$t(i18nKeys.console.domainBindings.formDestinationPlaceholder)}
+                        />
+                      {:else}
+                        <div
+                          id="resource-domain-binding-destination"
+                          class="flex h-9 items-center rounded-md border bg-muted/40 px-3 font-mono text-sm text-muted-foreground"
+                        >
+                          {defaultDestinationId}
+                        </div>
+                      {/if}
                     </label>
                   {/if}
-
-                  <label class="space-y-1.5 text-sm font-medium">
-                    <span>{$t(i18nKeys.common.domain.proxy)}</span>
-                    <Select.Root bind:value={proxyKind} type="single">
-                      <Select.Trigger class="w-full">{proxyKind}</Select.Trigger>
-                      <Select.Content>
-                        <Select.Item value="none">none</Select.Item>
-                        <Select.Item value="traefik">traefik</Select.Item>
-                        <Select.Item value="caddy">caddy</Select.Item>
-                      </Select.Content>
-                    </Select.Root>
-                  </label>
 
                   <label class="space-y-1.5 text-sm font-medium">
                     <span>{$t(i18nKeys.common.domain.tls)}</span>
@@ -10534,18 +10515,6 @@
                       <Select.Trigger class="w-full">{tlsMode}</Select.Trigger>
                       <Select.Content>
                         <Select.Item value="auto">auto</Select.Item>
-                        <Select.Item value="disabled">disabled</Select.Item>
-                      </Select.Content>
-                    </Select.Root>
-                  </label>
-
-                  <label class="space-y-1.5 text-sm font-medium sm:col-span-2">
-                    <span>{$t(i18nKeys.console.domainBindings.tlsStepTitle)}</span>
-                    <Select.Root bind:value={certificatePolicy} type="single">
-                      <Select.Trigger class="w-full">{certificatePolicy}</Select.Trigger>
-                      <Select.Content>
-                        <Select.Item value="auto">auto</Select.Item>
-                        <Select.Item value="manual">manual</Select.Item>
                         <Select.Item value="disabled">disabled</Select.Item>
                       </Select.Content>
                     </Select.Root>

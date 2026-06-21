@@ -148,7 +148,6 @@ appaloft server deactivate <serverId>
 POST /api/servers/{serverId}/rename
 appaloft server rename <serverId> --name <name>
 POST /api/servers/{serverId}/edge-proxy/configuration
-appaloft server proxy configure <serverId> --kind none|traefik|caddy
 GET /api/servers/{serverId}/delete-check
 appaloft server delete-check <serverId>
 DELETE /api/servers/{serverId}
@@ -178,12 +177,10 @@ can support it without broad redesign. The control must use a text input, submit
 name. If the Web action is deferred, the plan and lifecycle spec must record the exact Web action
 gap; read-only display of the renamed value is still required.
 
-The configure edge proxy slice should add an owner-scoped server detail proxy kind selector when
-the existing page can support it without broad redesign. The control must use a select/radio choice
-over `none`, `traefik`, and `caddy`, submit through `servers.configure-edge-proxy`, support active
-servers only, and refresh the server detail/list-visible proxy status. If the Web action is
-deferred, the plan and lifecycle spec must record the exact Web action gap; read-only display of
-the configured value is still required.
+The configure edge proxy slice is API/internal-operator facing. Routine Web and CLI entrypoints do
+not expose a provider selector while provider support is uneven; server registration and domain
+binding creation use the configured default provider. Server detail keeps read-only display of the
+configured proxy state.
 
 ## Minimal Deliverable
 
@@ -239,15 +236,14 @@ the configured value is still required.
   preserves all non-proxy state;
 - configuring `none` stores status `disabled` and prevents future proxy-backed target eligibility
   without deleting historical route/deployment/domain/audit/provider-owned state;
-- configuring `traefik` or `caddy` stores status `pending` and does not synchronously run
+- configuring a provider-backed kind stores status `pending` and does not synchronously run
   `servers.bootstrap-proxy` or provider/runtime bootstrap work;
 - same-kind configuration is idempotent and preserves the current proxy status summary;
 - inactive servers return `server_inactive`; deleted servers return `not_found`;
 - normal server list/show read models return the new edge proxy kind/status and still omit deleted
   servers;
-- CLI and HTTP/oRPC dispatch through `ConfigureServerEdgeProxyCommand`;
-- Web server detail exposes the proxy kind selector/action for active servers and read-only proxy
-  state for inactive or deleted servers through the shared command/query boundary;
+- HTTP/oRPC dispatches through `ConfigureServerEdgeProxyCommand`;
+- Web server detail exposes read-only proxy state through the shared query boundary;
 - contracts and typed clients expose the command shape and result shape;
 - public docs coverage maps the operation to the server proxy readiness anchor;
 - focused tests cover `SRV-LIFE-PROXY-CONFIG-001`, `SRV-LIFE-PROXY-CONFIG-002`,
