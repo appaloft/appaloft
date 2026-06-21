@@ -94,6 +94,11 @@ export function projectDetailHref(projectId: string): string {
   return `/projects/${encodeURIComponent(projectId)}`;
 }
 
+export function hrefWithSearchParams(href: string, params: URLSearchParams): string {
+  const search = params.toString();
+  return `${href}${search ? `?${search}` : ""}`;
+}
+
 export function dependencyResourceDetailHref(dependencyResourceId: string): string {
   return `/dependency-resources/${encodeURIComponent(dependencyResourceId)}`;
 }
