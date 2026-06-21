@@ -2729,6 +2729,8 @@ describe("console page structure", () => {
     expect(installedApplicationDetailPageSource).toContain(
       "i18nKeys.console.installedApplications",
     );
+    expect(installedApplicationDetailPageSource).toContain("claimEndpoint");
+    expect(installedApplicationDetailPageSource).not.toContain("/cloud/installed-applications/");
     expect(installedApplicationDetailPageSource).toContain("tabOverview");
     expect(installedApplicationDetailPageSource).toContain("tabResources");
     expect(installedApplicationDetailPageSource).toContain("tabDependencies");
@@ -2762,7 +2764,7 @@ describe("console page structure", () => {
     const installedApplicationAccessTab = sourceBetween(
       installedApplicationDetailPageSource,
       '{:else if activeTab === "access"}',
-      "{:else}",
+      '{:else}\n          <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">',
     );
     const installedApplicationHistoryTab = sourceBetween(
       installedApplicationDetailPageSource,
@@ -2785,8 +2787,17 @@ describe("console page structure", () => {
       "data-installed-application-dependencies",
     );
     expect(installedApplicationDependenciesTab).toContain("openGovernance");
+    expect(installedApplicationAccessTab).toContain("data-installed-application-access");
+    expect(installedApplicationAccessTab).toContain(
+      "data-installed-application-initial-access-credentials",
+    );
+    expect(installedApplicationAccessTab).toContain(
+      "data-installed-application-initial-access-credential",
+    );
     expect(installedApplicationAccessTab).toContain("data-installed-application-public-urls");
     expect(installedApplicationAccessTab).toContain("accessTitle");
+    expect(installedApplicationAccessTab).toContain("initialAccessCredentialsTitle");
+    expect(installedApplicationAccessTab).toContain("claimInitialAccessCredential");
     expect(installedApplicationHistoryTab).toContain("data-installed-application-history");
     expect(installedApplicationHistoryTab).toContain("data-installed-application-lifecycle-gap");
     expect(installedApplicationHistoryTab).toContain(

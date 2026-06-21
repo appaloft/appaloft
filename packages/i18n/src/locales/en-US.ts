@@ -1080,6 +1080,24 @@ export const enUS = {
       historyTitle: "Install history",
       installResultDescription: "The install result view does not own resource configuration.",
       installResultTitle: "Install result",
+      initialAccessCredentialCopied: "Copied",
+      initialAccessCredentialCopy: "Copy",
+      initialAccessCredentialCopyFailed: "Copy failed",
+      initialAccessCredentialExpired: "Expired",
+      initialAccessCredentialExpiresAt: "Available until ",
+      initialAccessCredentialPending: "Available",
+      initialAccessCredentialResetRequired: "Reset required in the application",
+      initialAccessCredentialReveal: "Reveal once",
+      initialAccessCredentialRevealed: "Revealed",
+      initialAccessCredentialRevealedAt: "Revealed at ",
+      initialAccessCredentialRevealedHint:
+        "This value is shown only in this browser session. Store it now or reset it in the application.",
+      initialAccessCredentialUnavailable:
+        "This credential cannot be revealed from the current install result.",
+      initialAccessCredentialValueLabel: "One-time value",
+      initialAccessCredentialsDescription:
+        "Generated login values can be revealed once from this install result. Runtime secrets remain sealed.",
+      initialAccessCredentialsTitle: "Initial access credentials",
       lastChangedAtLabel: "Last changed",
       latestDeploymentEmpty: "No deployment record yet",
       latestDeploymentLabel: "Latest deployment: ",
@@ -1113,6 +1131,7 @@ export const enUS = {
       projectSummaryDescription:
         "Review the project resource board, environments, and deployment rollup.",
       projectSummaryTitle: "Project",
+      publicUrlsTitle: "Public URLs",
       resourceControlsDescription:
         "Configuration, networking, runtime, and deployment actions belong on resource pages.",
       resourceControlsTitle: "Resource",

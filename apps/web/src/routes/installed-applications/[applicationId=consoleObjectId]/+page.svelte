@@ -7,15 +7,18 @@
     ArrowRight,
     Boxes,
     ExternalLink,
+    Check,
+    Copy,
+    KeyRound,
     Link2,
     ListChecks,
     Package,
     PlugZap,
   } from "@lucide/svelte";
   import type { TranslationKey } from "@appaloft/i18n";
-  import { createQuery, queryOptions } from "@tanstack/svelte-query";
+  import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
 
-  import { request } from "$lib/api/client";
+  import { readErrorMessage, request } from "$lib/api/client";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
@@ -31,6 +34,7 @@
   } from "$lib/console/layout-classes";
   import { deploymentDetailHref, formatTime, projectDetailHref, resourceDetailHref } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
+  import { queryClient } from "$lib/query-client";
 
   type InstalledApplicationResourceRef =
     | { status: "planned"; resourceSlug?: string }
@@ -71,6 +75,18 @@
     message?: string;
     deploymentIds?: readonly string[];
   };
+  type InstalledApplicationInitialAccessCredential = {
+    credentialId: string;
+    componentId?: string;
+    key: string;
+    status: "pending" | "revealed" | "expired";
+    createdAt?: string;
+    expiresAt?: string;
+    revealedAt?: string;
+    revealedBy?: string;
+    resetRequired?: boolean;
+    claimEndpoint?: string;
+  };
   type InstalledApplicationDetail = {
     applicationId?: string;
     status?: string;
@@ -103,11 +119,28 @@
       completedAt?: string;
       reason?: string;
     };
+    initialAccessCredentials?: readonly InstalledApplicationInitialAccessCredential[];
     createdAt?: string;
     lastChangedAt?: string;
   };
+  type InitialAccessCredentialClaimResult = {
+    schemaVersion?: string;
+    applicationId?: string;
+    credential: {
+      credentialId: string;
+      key: string;
+      value: string;
+    };
+    installedApplication?: InstalledApplicationDetail;
+  };
   type InstalledApplicationTab = "overview" | "resources" | "dependencies" | "access" | "history";
   type InstalledApplicationTabItem = { value: InstalledApplicationTab; labelKey: TranslationKey };
+
+  let revealedInitialAccessCredentials = $state<
+    Record<string, { readonly key: string; readonly value: string }>
+  >({});
+  let initialAccessCredentialFeedback = $state<Record<string, string>>({});
+  let initialAccessCredentialCopyState = $state<Record<string, "idle" | "copied" | "failed">>({});
 
   const installedApplicationTabs: InstalledApplicationTabItem[] = [
     { value: "overview", labelKey: i18nKeys.console.installedApplications.tabOverview },
@@ -133,6 +166,7 @@
   const installedApplication = $derived(installedApplicationQuery.data ?? null);
   const components = $derived(installedApplication?.components ?? []);
   const dependencies = $derived(installedApplication?.dependencies ?? []);
+  const initialAccessCredentials = $derived(installedApplication?.initialAccessCredentials ?? []);
   const publicEndpoints = $derived(
     components.flatMap((component) =>
       (component.endpoints ?? [])
@@ -191,6 +225,36 @@
   const latestDeploymentLabel = $derived(
     deploymentIds[0] ?? $t(i18nKeys.console.installedApplications.latestDeploymentEmpty),
   );
+  const initialAccessCredentialClaimMutation = createMutation(() => ({
+    mutationFn: (credential: InstalledApplicationInitialAccessCredential) => {
+      if (!credential.claimEndpoint) {
+        throw new Error($t(i18nKeys.console.installedApplications.initialAccessCredentialUnavailable));
+      }
+      return request<InitialAccessCredentialClaimResult>(credential.claimEndpoint, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({}),
+      });
+    },
+    onSuccess: (result) => {
+      revealedInitialAccessCredentials = {
+        ...revealedInitialAccessCredentials,
+        [result.credential.credentialId]: {
+          key: result.credential.key,
+          value: result.credential.value,
+        },
+      };
+      initialAccessCredentialFeedback = {
+        ...initialAccessCredentialFeedback,
+        [result.credential.credentialId]: $t(
+          i18nKeys.console.installedApplications.initialAccessCredentialRevealedHint,
+        ),
+      };
+      void queryClient.invalidateQueries({
+        queryKey: ["installed-applications", "show", applicationId],
+      });
+    },
+  }));
 
   function parseInstalledApplicationTab(value: string | null): InstalledApplicationTab {
     if (
@@ -241,6 +305,69 @@
     if (!dependencyResourceId) return "/dependency-resources";
     const params = new URLSearchParams({ resourceId: dependencyResourceId });
     return `/dependency-resources?${params.toString()}`;
+  }
+
+  function initialAccessCredentialStatusLabel(
+    credential: InstalledApplicationInitialAccessCredential,
+  ): string {
+    if (credential.status === "pending") {
+      return $t(i18nKeys.console.installedApplications.initialAccessCredentialPending);
+    }
+    if (credential.status === "expired") {
+      return $t(i18nKeys.console.installedApplications.initialAccessCredentialExpired);
+    }
+    return $t(i18nKeys.console.installedApplications.initialAccessCredentialRevealed);
+  }
+
+  function canClaimInitialAccessCredential(
+    credential: InstalledApplicationInitialAccessCredential,
+  ): boolean {
+    return credential.status === "pending" && Boolean(credential.claimEndpoint);
+  }
+
+  async function claimInitialAccessCredential(
+    credential: InstalledApplicationInitialAccessCredential,
+  ): Promise<void> {
+    initialAccessCredentialFeedback = {
+      ...initialAccessCredentialFeedback,
+      [credential.credentialId]: "",
+    };
+    try {
+      await initialAccessCredentialClaimMutation.mutateAsync(credential);
+    } catch (error) {
+      initialAccessCredentialFeedback = {
+        ...initialAccessCredentialFeedback,
+        [credential.credentialId]: readErrorMessage(error),
+      };
+    }
+  }
+
+  async function copyInitialAccessCredential(credentialId: string): Promise<void> {
+    const revealed = revealedInitialAccessCredentials[credentialId];
+    if (!revealed) return;
+    try {
+      await navigator.clipboard.writeText(revealed.value);
+      initialAccessCredentialCopyState = {
+        ...initialAccessCredentialCopyState,
+        [credentialId]: "copied",
+      };
+    } catch {
+      initialAccessCredentialCopyState = {
+        ...initialAccessCredentialCopyState,
+        [credentialId]: "failed",
+      };
+    }
+  }
+
+  function initialAccessCredentialCopyLabel(credentialId: string): string {
+    const state = initialAccessCredentialCopyState[credentialId] ?? "idle";
+    if (state === "copied") {
+      return $t(i18nKeys.console.installedApplications.initialAccessCredentialCopied);
+    }
+    if (state === "failed") {
+      return $t(i18nKeys.console.installedApplications.initialAccessCredentialCopyFailed);
+    }
+    return $t(i18nKeys.console.installedApplications.initialAccessCredentialCopy);
   }
 </script>
 
@@ -563,12 +690,94 @@
             </div>
           </section>
         {:else if activeTab === "access"}
-          <section class="console-panel p-5" data-installed-application-public-urls>
+          <section class="console-panel p-5" data-installed-application-access>
             <div class="mb-4 flex items-center gap-2">
               <Link2 class="size-4 text-muted-foreground" />
               <h2 class="text-lg font-semibold">{$t(i18nKeys.console.installedApplications.accessTitle)}</h2>
             </div>
-            <div class="space-y-3">
+            <div class="space-y-5">
+              {#if initialAccessCredentials.length > 0}
+                <section class="space-y-3" data-installed-application-initial-access-credentials>
+                  <div>
+                    <h3 class="text-sm font-semibold">
+                      {$t(i18nKeys.console.installedApplications.initialAccessCredentialsTitle)}
+                    </h3>
+                    <p class="mt-1 text-xs leading-5 text-muted-foreground">
+                      {$t(i18nKeys.console.installedApplications.initialAccessCredentialsDescription)}
+                    </p>
+                  </div>
+                  {#each initialAccessCredentials as credential (credential.credentialId)}
+                    {@const revealedCredential = revealedInitialAccessCredentials[credential.credentialId]}
+                    <article class="console-subtle-panel p-4" data-installed-application-initial-access-credential>
+                      <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                        <div class="min-w-0 space-y-2">
+                          <div class="flex flex-wrap items-center gap-2">
+                            <KeyRound class="size-4 text-muted-foreground" />
+                            <h4 class="font-semibold">{credential.key}</h4>
+                            <Badge variant="outline">{initialAccessCredentialStatusLabel(credential)}</Badge>
+                          </div>
+                          <p class="text-xs leading-5 text-muted-foreground">
+                            {#if credential.expiresAt && credential.status === "pending"}
+                              {$t(i18nKeys.console.installedApplications.initialAccessCredentialExpiresAt)}
+                              <span class="font-mono">{formatTime(credential.expiresAt)}</span>
+                            {:else if credential.revealedAt}
+                              {$t(i18nKeys.console.installedApplications.initialAccessCredentialRevealedAt)}
+                              <span class="font-mono">{formatTime(credential.revealedAt)}</span>
+                            {:else if credential.resetRequired}
+                              {$t(i18nKeys.console.installedApplications.initialAccessCredentialResetRequired)}
+                            {/if}
+                          </p>
+                          {#if revealedCredential}
+                            <div class="rounded-md border bg-background p-3">
+                              <p class="text-xs text-muted-foreground">
+                                {$t(i18nKeys.console.installedApplications.initialAccessCredentialValueLabel)}
+                              </p>
+                              <p class="mt-1 break-all font-mono text-sm">{revealedCredential.value}</p>
+                            </div>
+                          {/if}
+                          {#if initialAccessCredentialFeedback[credential.credentialId]}
+                            <p class="text-xs leading-5 text-muted-foreground">
+                              {initialAccessCredentialFeedback[credential.credentialId]}
+                            </p>
+                          {/if}
+                        </div>
+                        <div class="flex shrink-0 flex-wrap gap-2">
+                          {#if revealedCredential}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onclick={() => copyInitialAccessCredential(credential.credentialId)}
+                            >
+                              {#if initialAccessCredentialCopyState[credential.credentialId] === "copied"}
+                                <Check class="size-4" />
+                              {:else}
+                                <Copy class="size-4" />
+                              {/if}
+                              {initialAccessCredentialCopyLabel(credential.credentialId)}
+                            </Button>
+                          {:else if canClaimInitialAccessCredential(credential)}
+                            <Button
+                              type="button"
+                              size="sm"
+                              disabled={initialAccessCredentialClaimMutation.isPending}
+                              onclick={() => claimInitialAccessCredential(credential)}
+                            >
+                              <KeyRound class="size-4" />
+                              {$t(i18nKeys.console.installedApplications.initialAccessCredentialReveal)}
+                            </Button>
+                          {/if}
+                        </div>
+                      </div>
+                    </article>
+                  {/each}
+                </section>
+              {/if}
+              {#if publicEndpoints.length > 0}
+                <section class="space-y-3" data-installed-application-public-urls>
+                  <h3 class="text-sm font-semibold">
+                    {$t(i18nKeys.console.installedApplications.publicUrlsTitle)}
+                  </h3>
               {#each publicEndpoints as endpoint (`${endpoint.componentId}-${endpoint.url}`)}
                 <article class="console-subtle-panel p-4">
                   <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -582,11 +791,13 @@
                     </Button>
                   </div>
                 </article>
-              {:else}
+                  {/each}
+                </section>
+              {:else if initialAccessCredentials.length === 0}
                 <p class="text-sm text-muted-foreground">
                   {$t(i18nKeys.console.installedApplications.accessEmpty)}
                 </p>
-              {/each}
+              {/if}
             </div>
           </section>
         {:else}
