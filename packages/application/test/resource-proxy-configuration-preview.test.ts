@@ -10,6 +10,8 @@ import {
   type DeploymentReadModel,
   type DeploymentSummary,
   type DestinationRepository,
+  type DomainBindingReadModel,
+  type DomainBindingSummary,
   type EdgeProxyEnsureInput,
   type EdgeProxyEnsurePlan,
   type EdgeProxyExecutionContext,
@@ -81,6 +83,26 @@ class StaticDeploymentReadModel implements DeploymentReadModel {
 
   async findOne(): Promise<DeploymentSummary | null> {
     return null;
+  }
+}
+
+class StaticDomainBindingReadModel implements DomainBindingReadModel {
+  constructor(private readonly bindings: DomainBindingSummary[] = []) {}
+
+  async list(
+    _context: ReturnType<typeof toRepositoryContext>,
+    input?: {
+      projectId?: string;
+      environmentId?: string;
+      resourceId?: string;
+    },
+  ): Promise<DomainBindingSummary[]> {
+    return this.bindings
+      .filter((binding) => (input?.projectId ? binding.projectId === input.projectId : true))
+      .filter((binding) =>
+        input?.environmentId ? binding.environmentId === input.environmentId : true,
+      )
+      .filter((binding) => (input?.resourceId ? binding.resourceId === input.resourceId : true));
   }
 }
 
@@ -344,8 +366,14 @@ function deploymentSummary(): DeploymentSummary {
   };
 }
 
-function createService(provider = new FakeEdgeProxyProvider()) {
-  const resourceReadModel = new StaticResourceReadModel([resourceSummary()]);
+function createService(input?: {
+  provider?: FakeEdgeProxyProvider;
+  resources?: ResourceSummary[];
+  deployments?: DeploymentSummary[];
+  domainBindings?: DomainBindingSummary[];
+}) {
+  const provider = input?.provider ?? new FakeEdgeProxyProvider();
+  const resourceReadModel = new StaticResourceReadModel(input?.resources ?? [resourceSummary()]);
   const listResourcesQueryService = new ListResourcesQueryService(
     resourceReadModel,
     new EmptyDestinationRepository(),
@@ -354,9 +382,10 @@ function createService(provider = new FakeEdgeProxyProvider()) {
   );
   const service = new ResourceProxyConfigurationPreviewQueryService(
     listResourcesQueryService,
-    new StaticDeploymentReadModel([deploymentSummary()]),
+    new StaticDeploymentReadModel(input?.deployments ?? [deploymentSummary()]),
     new StaticEdgeProxyProviderRegistry(provider),
     new FixedClock(),
+    new StaticDomainBindingReadModel(input?.domainBindings ?? []),
   );
 
   return {
@@ -393,6 +422,81 @@ describe("ResourceProxyConfigurationPreviewQueryService", () => {
       port: 3000,
       includeDiagnostics: true,
     });
+  });
+
+  test("[PROXY-OBS-004][ROUTE-STATUS-002] plans bound durable domain before generated route snapshot", async () => {
+    const context = createTestContext();
+    const { provider, service } = createService({
+      resources: [
+        resourceSummary({
+          accessSummary: {
+            latestGeneratedAccessRoute: {
+              url: "http://web.203.0.113.10.sslip.io",
+              hostname: "web.203.0.113.10.sslip.io",
+              scheme: "http",
+              providerKey: "sslip",
+              deploymentId: "dep_web",
+              deploymentStatus: "succeeded",
+              pathPrefix: "/",
+              proxyKind: "traefik",
+              targetPort: 3000,
+              updatedAt: "2026-01-01T00:00:02.000Z",
+            },
+            proxyRouteStatus: "ready",
+            lastRouteRealizationDeploymentId: "dep_web",
+          },
+        }),
+      ],
+      domainBindings: [
+        {
+          id: "dmb_bound",
+          projectId: "prj_demo",
+          environmentId: "env_demo",
+          resourceId: "res_web",
+          serverId: "srv_demo",
+          destinationId: "dst_demo",
+          domainName: "www.example.test",
+          pathPrefix: "/",
+          proxyKind: "traefik",
+          tlsMode: "auto",
+          certificatePolicy: "auto",
+          status: "bound",
+          verificationAttemptCount: 1,
+          createdAt: "2026-01-01T00:00:03.000Z",
+        },
+      ],
+    });
+    const query = ResourceProxyConfigurationPreviewQuery.create({
+      resourceId: "res_web",
+      routeScope: "latest",
+      includeDiagnostics: true,
+    })._unsafeUnwrap();
+
+    const result = await service.execute(context, query);
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      resourceId: "res_web",
+      deploymentId: "dep_web",
+      status: "planned",
+      stale: true,
+      routes: [
+        {
+          hostname: "www.example.test",
+          scheme: "https",
+          source: "domain-binding",
+          targetPort: 3000,
+        },
+      ],
+    });
+    expect(provider.lastConfigurationInput?.accessRoutes).toEqual([
+      expect.objectContaining({
+        domains: ["www.example.test"],
+        source: "domain-binding",
+        tlsMode: "auto",
+        targetPort: 3000,
+      }),
+    ]);
   });
 
   test("[DEF-ACCESS-QRY-002][EDGE-PROXY-QRY-002][PROXY-OBS-001] renders durable route before server-applied and generated routes", async () => {

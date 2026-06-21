@@ -6,6 +6,8 @@ import {
   type Clock,
   type DeploymentReadModel,
   type DeploymentSummary,
+  type DomainBindingReadModel,
+  type DomainBindingSummary,
   type EdgeProxyProviderRegistry,
   type EdgeProxyRouteInput,
   type PlannedResourceAccessRouteSummary,
@@ -233,6 +235,76 @@ function routeRequiresProvider(route: EdgeProxyRouteInput): boolean {
   return route.proxyKind !== "none" && route.domains.length > 0;
 }
 
+function domainBindingCanPlanRoute(binding: DomainBindingSummary): boolean {
+  switch (binding.status) {
+    case "bound":
+    case "certificate_pending":
+    case "not_ready":
+    case "ready":
+      return binding.proxyKind !== "none";
+    case "requested":
+    case "pending_verification":
+    case "failed":
+    case "deleted":
+      return false;
+  }
+}
+
+function compareBindingsForRoutePlan(
+  left: DomainBindingSummary,
+  right: DomainBindingSummary,
+): number {
+  const statusWeight = (binding: DomainBindingSummary): number => {
+    switch (binding.status) {
+      case "ready":
+        return 4;
+      case "bound":
+        return 3;
+      case "certificate_pending":
+        return 2;
+      case "not_ready":
+        return 1;
+      case "requested":
+      case "pending_verification":
+      case "failed":
+      case "deleted":
+        return 0;
+    }
+  };
+  const weightCompare = statusWeight(right) - statusWeight(left);
+  if (weightCompare !== 0) {
+    return weightCompare;
+  }
+
+  const createdCompare = right.createdAt.localeCompare(left.createdAt);
+  return createdCompare !== 0 ? createdCompare : right.id.localeCompare(left.id);
+}
+
+function routeFromDomainBinding(
+  binding: DomainBindingSummary,
+  resource: ResourceSummary,
+  deployment: DeploymentSummary | undefined,
+): EdgeProxyRouteInput {
+  const targetPort =
+    deployment?.runtimePlan.execution.port ?? resource.networkProfile?.internalPort;
+
+  return {
+    proxyKind: binding.proxyKind,
+    domains: [binding.domainName],
+    pathPrefix: binding.pathPrefix,
+    tlsMode: binding.tlsMode,
+    ...(targetPort === undefined || binding.redirectTo ? {} : { targetPort }),
+    source: "domain-binding",
+    ...(binding.redirectTo
+      ? {
+          routeBehavior: "redirect" as const,
+          redirectTo: binding.redirectTo,
+          redirectStatus: binding.redirectStatus ?? 308,
+        }
+      : {}),
+  };
+}
+
 function portFromRoutes(
   resource: ResourceSummary,
   deployment: DeploymentSummary | undefined,
@@ -286,6 +358,8 @@ export class ResourceProxyConfigurationPreviewQueryService {
     @inject(tokens.edgeProxyProviderRegistry)
     private readonly edgeProxyProviderRegistry: EdgeProxyProviderRegistry,
     @inject(tokens.clock) private readonly clock: Clock,
+    @inject(tokens.domainBindingReadModel, { isOptional: true })
+    private readonly domainBindingReadModel?: DomainBindingReadModel,
   ) {}
 
   async execute(
@@ -310,11 +384,19 @@ export class ResourceProxyConfigurationPreviewQueryService {
     }
 
     const selectedDeployment = selectedDeploymentResult.value;
+    const domainBindings = this.domainBindingReadModel
+      ? await this.domainBindingReadModel.list(toRepositoryContext(context), {
+          projectId: resource.projectId,
+          environmentId: resource.environmentId,
+          resourceId: resource.id,
+        })
+      : [];
     const routeStateResult = this.resolveRouteState(
       resource,
       query,
       selectedDeployment,
       deployments,
+      domainBindings,
     );
     if (routeStateResult.isErr()) {
       return err(routeStateResult.error);
@@ -406,6 +488,7 @@ export class ResourceProxyConfigurationPreviewQueryService {
     query: ResourceProxyConfigurationPreviewQuery,
     selectedDeployment: DeploymentSummary | undefined,
     deployments: DeploymentSummary[],
+    domainBindings: DomainBindingSummary[],
   ): Result<
     {
       routes: EdgeProxyRouteInput[];
@@ -435,6 +518,15 @@ export class ResourceProxyConfigurationPreviewQueryService {
     }
 
     if (query.routeScope === "latest") {
+      const plannedDomainRoute = this.currentDomainBindingRoute(
+        resource,
+        selectedDeployment,
+        domainBindings,
+      );
+      if (plannedDomainRoute) {
+        return ok(plannedDomainRoute);
+      }
+
       const currentRoute = this.currentRouteFromAccessSummary(resource, deployments);
       if (currentRoute) {
         return ok(currentRoute);
@@ -475,6 +567,37 @@ export class ResourceProxyConfigurationPreviewQueryService {
       status: "not-configured",
       stale: false,
     });
+  }
+
+  private currentDomainBindingRoute(
+    resource: ResourceSummary,
+    selectedDeployment: DeploymentSummary | undefined,
+    domainBindings: DomainBindingSummary[],
+  ):
+    | {
+        routes: EdgeProxyRouteInput[];
+        status: ProxyConfigurationStatus;
+        stale: boolean;
+        deployment?: DeploymentSummary;
+      }
+    | undefined {
+    if (resource.accessSummary?.latestDurableDomainRoute) {
+      return undefined;
+    }
+
+    const binding = domainBindings
+      .filter(domainBindingCanPlanRoute)
+      .sort(compareBindingsForRoutePlan)[0];
+    if (!binding) {
+      return undefined;
+    }
+
+    return {
+      ...(selectedDeployment ? { deployment: selectedDeployment } : {}),
+      routes: [routeFromDomainBinding(binding, resource, selectedDeployment)],
+      status: "planned",
+      stale: Boolean(resource.accessSummary?.lastRouteRealizationDeploymentId),
+    };
   }
 
   private currentRouteFromAccessSummary(
