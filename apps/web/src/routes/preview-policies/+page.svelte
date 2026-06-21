@@ -45,10 +45,9 @@
     providers: false,
   });
 
-  const initialScopeKind = page.url.searchParams.get("scope") === "resource" ? "resource" : "project";
-  let selectedScopeKind = $state<ScopeKind>(initialScopeKind);
-  let selectedProjectId = $state(page.url.searchParams.get("projectId") ?? "");
-  let selectedResourceId = $state(page.url.searchParams.get("resourceId") ?? "");
+  let selectedScopeKind = $state<ScopeKind>("project");
+  let selectedProjectId = $state("");
+  let selectedResourceId = $state("");
   let sameRepositoryPreviews = $state(true);
   let forkPreviews = $state<ForkMode>("disabled");
   let secretBackedPreviews = $state(true);
@@ -58,6 +57,7 @@
   let scopeDialogOpen = $state(false);
   let policyEditDialogOpen = $state(false);
   let feedback = $state<Feedback | null>(null);
+  let initialScopeApplied = $state(false);
 
   const projects = $derived(projectsQuery.data?.items ?? []);
   const resources = $derived(resourcesQuery.data?.items ?? []);
@@ -137,6 +137,18 @@
       };
     },
   }));
+
+  $effect(() => {
+    if (!browser || initialScopeApplied) {
+      return;
+    }
+
+    const searchParams = page.url.searchParams;
+    selectedScopeKind = searchParams.get("scope") === "resource" ? "resource" : "project";
+    selectedProjectId = searchParams.get("projectId") ?? "";
+    selectedResourceId = searchParams.get("resourceId") ?? "";
+    initialScopeApplied = true;
+  });
 
   $effect(() => {
     if (selectedProjectId || projects.length === 0) {

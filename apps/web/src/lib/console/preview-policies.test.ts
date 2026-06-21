@@ -16,8 +16,9 @@ describe("preview policies console page", () => {
     expect(pageSource).toContain("scopeDialogOpen");
     expect(pageSource).toContain("data-preview-policy-scope-display-surface");
     expect(pageSource).toContain("data-preview-policy-scope-dialog");
-    expect(pageSource).toContain('page.url.searchParams.get("projectId")');
-    expect(pageSource).toContain('page.url.searchParams.get("resourceId")');
+    expect(pageSource).toContain("const searchParams = page.url.searchParams");
+    expect(pageSource).toContain('searchParams.get("projectId")');
+    expect(pageSource).toContain('searchParams.get("resourceId")');
     expect(shellSource).not.toContain('href: "/preview-policies"');
     expect(shellSource).not.toContain("i18nKeys.console.nav.previewPolicies");
   });
