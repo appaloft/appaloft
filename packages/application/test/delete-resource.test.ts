@@ -432,4 +432,22 @@ describe("DeleteResourceUseCase", () => {
 
     expect(listed).toEqual([]);
   });
+
+  test("[RES-PROFILE-LIST-009] includes archived resource lifecycle metadata in resources.list read models", async () => {
+    const { repositoryContext, resources } = await createHarness({
+      resource: archivedResourceFixture(),
+    });
+    const readModel = new MemoryResourceReadModel(resources);
+
+    const listed = await readModel.list(repositoryContext);
+
+    expect(listed).toMatchObject([
+      {
+        id: "res_web",
+        lifecycleStatus: "archived",
+        archivedAt: "2026-01-01T00:00:05.000Z",
+        archiveReason: "Old test resource",
+      },
+    ]);
+  });
 });

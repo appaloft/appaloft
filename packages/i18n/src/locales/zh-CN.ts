@@ -1361,6 +1361,10 @@ export const zhCN = {
       archiveSucceeded: "项目已归档",
       archived: "已归档",
       archivedAt: "归档时间",
+      archivedResourcesCount: "{{count}} 个已归档",
+      archivedResourcesDescription: "已归档但未删除的资源会保留在这里，便于后续清理或恢复决策。",
+      archivedResourcesEmpty: "这个项目没有已归档且保留的资源。",
+      archivedResourcesTitle: "已归档资源",
       restoreAction: "恢复",
       restoreConfirm:
         "确定恢复这个项目吗？恢复后可再次在项目下创建资源、环境和部署；已有子资源和部署历史不会被更改。",
