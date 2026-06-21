@@ -1921,7 +1921,7 @@ export const zhCN = {
       storageVolume: "存储卷",
       storageVolumeAttachmentCount: "{{count}} 个挂载",
       storageVolumeBackupSummaryDescription:
-        "备份点归属于存储卷。这里仅展示当前归属摘要；备份和清理控制留在独立治理流程中。",
+        "备份点归属于存储卷。可以在存储卷备份流程里预览、创建、恢复到新卷或清理备份产物。",
       storageVolumeBackupSummaryTitle: "备份点",
       storageBackupRestorePointCount: "{{count}} 个备份点",
       storageBackupPolicyOptional: "可选",
@@ -1957,7 +1957,7 @@ export const zhCN = {
       storageVolumesLoading: "正在加载存储卷...",
       storageBackupTitle: "存储卷备份",
       storageBackupDescription:
-        "为挂载的应用数据预览、创建、查看、恢复和清理备份。这里不会调用依赖资源的备份命令。",
+        "为挂载的应用数据预览、创建、查看、恢复和清理备份。本地文件系统目标保存在运行主机上，不等同于灾备。",
       storageBackupDataFormat: "数据格式",
       storageBackupDestinationPath: "挂载路径",
       storageBackupConsistency: "一致性",

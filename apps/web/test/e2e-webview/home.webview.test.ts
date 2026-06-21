@@ -5983,6 +5983,10 @@ describe.serial("console e2e with Bun.WebView", () => {
     try {
       await using view = createWebView();
       await view.navigate(`${previewUrl}${demoResourcePath}`);
+      await expectAnyText(view, ["Resource overview", "资源概览"]);
+      await clickButtonByAnyText(view, ["Refresh status", "刷新状态"]);
+      await waitForRecordedRequest("/api/rpc/resources/health");
+      await clickButtonByAnyText(view, ["Resource health", "资源健康"]);
       await expectAnyText(view, ["Why this is not healthy", "为什么不是健康"]);
       await expectAnyText(view, ["The domain has not been verified yet", "域名尚未完成验证"]);
       await expectAnyText(view, ["Public access", "公网访问"]);
@@ -6004,6 +6008,9 @@ describe.serial("console e2e with Bun.WebView", () => {
 
       await using mobileView = createWebView({ width: 390, height: 900 });
       await mobileView.navigate(`${previewUrl}${demoResourcePath}`);
+      await expectAnyText(mobileView, ["Resource overview", "资源概览"]);
+      await clickButtonByAnyText(mobileView, ["Refresh status", "刷新状态"]);
+      await clickButtonByAnyText(mobileView, ["Resource health", "资源健康"]);
       await expectAnyText(mobileView, ["Why this is not healthy", "为什么不是健康"]);
       const mobileOverflows = await mobileView.evaluate<boolean>(
         "document.documentElement.scrollWidth > window.innerWidth + 1",
@@ -7073,26 +7080,30 @@ describe.serial("console e2e with Bun.WebView", () => {
         sectionSelector: "#resource-storage",
       });
 
-      await expectAnyText(view, ["Storage volumes", "存储卷"]);
+      await expectAnyText(view, ["Storage", "存储"]);
       await expectText(view, "PocketBase data");
       await expectText(view, "/pb_data");
+      await expectAnyText(view, ["Volume backups", "存储卷备份"]);
       await expectAnyText(view, ["Backup restore points", "备份点"]);
       const storagePageDefaultState = JSON.parse(
         await view.evaluate<string>(`JSON.stringify({
           attachFormVisible: Boolean(document.querySelector("#resource-storage-attachment-form")),
-          backupFieldVisible: Boolean(document.querySelector("#resource-storage-backup-path")),
+          backupFormVisible: Boolean(document.querySelector("[data-resource-storage-backup-form]")),
+          backupDestinationPathVisible: Boolean(document.querySelector("#resource-storage-backup-destination-path")),
           cleanupFieldVisible: Boolean(document.querySelector("#resource-storage-runtime-cleanup-before")),
           createFormVisible: Boolean(document.querySelector("#resource-storage-volume-form")),
         })`),
       ) as {
         attachFormVisible: boolean;
-        backupFieldVisible: boolean;
+        backupFormVisible: boolean;
+        backupDestinationPathVisible: boolean;
         cleanupFieldVisible: boolean;
         createFormVisible: boolean;
       };
       expect(storagePageDefaultState).toEqual({
         attachFormVisible: false,
-        backupFieldVisible: false,
+        backupFormVisible: true,
+        backupDestinationPathVisible: true,
         cleanupFieldVisible: false,
         createFormVisible: false,
       });
@@ -7110,7 +7121,6 @@ describe.serial("console e2e with Bun.WebView", () => {
           (request) =>
             request.pathname === "/api/rpc/storageVolumes/create" ||
             request.pathname === "/api/rpc/storageVolumes/cleanupRuntime" ||
-            request.pathname === "/api/rpc/storageVolumes/backups/create" ||
             request.pathname === "/api/rpc/resources/attachStorage" ||
             request.pathname === "/api/rpc/resources/detachStorage",
         ),
@@ -7118,6 +7128,34 @@ describe.serial("console e2e with Bun.WebView", () => {
       expect(recordedApiRequests.some((request) => request.pathname.includes("capacity"))).toBe(
         false,
       );
+
+      await clickButtonByAnyText(view, ["Plan backup", "预览备份"]);
+      const planRequest = await waitForRecordedRequest("/api/rpc/storageVolumes/backups/plan");
+      expect(readOrpcJsonPayload(planRequest.body)).toMatchObject({
+        requestedConsistency: "application-consistent",
+        source: {
+          storageVolumeId: "stv_uploads",
+          destinationPath: "/pb_data",
+          dataFormat: "sqlite",
+        },
+        target: {
+          providerKey: "local-filesystem",
+          targetRef: "/var/lib/appaloft/backups",
+        },
+      });
+      await expectAnyText(view, ["Backup plan ready", "备份预览已就绪"]);
+
+      await clickButtonByAnyText(view, ["Create backup", "创建备份"]);
+      await waitForRecordedRequest("/api/rpc/storageVolumes/backups/create");
+      await expectText(view, "svb_created");
+
+      await clickButtonByAnyText(view, ["Restore to new volume", "恢复到新存储卷"]);
+      await waitForRecordedRequest("/api/rpc/storageVolumes/backups/restore");
+      await expectAnyText(view, ["Storage backup restored", "存储备份已恢复"]);
+
+      await clickButtonByAnyText(view, ["Prune", "清理"]);
+      await waitForRecordedRequest("/api/rpc/storageVolumes/backups/prune");
+      await expectAnyText(view, ["Storage backup pruned", "存储备份已清理"]);
     } finally {
       apiResponses.dashboard["/api/rpc/resources/show"] = previousShowRoute;
       if (previousStorageListRoute === undefined) {

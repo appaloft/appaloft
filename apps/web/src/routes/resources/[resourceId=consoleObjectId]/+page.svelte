@@ -556,6 +556,10 @@
           { operationKey: "resources.runtime.stop", resourceRefs: resourceCapabilityRefs },
           { operationKey: "resources.runtime.start", resourceRefs: resourceCapabilityRefs },
           { operationKey: "resources.runtime.restart", resourceRefs: resourceCapabilityRefs },
+          { operationKey: "storage-volumes.backup-plan", resourceRefs: resourceCapabilityRefs },
+          { operationKey: "storage-volumes.create-backup", resourceRefs: resourceCapabilityRefs },
+          { operationKey: "storage-volumes.restore-backup", resourceRefs: resourceCapabilityRefs },
+          { operationKey: "storage-volumes.prune-backups", resourceRefs: resourceCapabilityRefs },
         ]
       : [],
   );
@@ -586,6 +590,38 @@
         })
       : "",
   );
+  const planStorageBackupCapabilityKey = $derived(
+    resourceCapabilityRefs
+      ? capabilityKey({
+          operationKey: "storage-volumes.backup-plan",
+          resourceRefs: resourceCapabilityRefs,
+        })
+      : "",
+  );
+  const createStorageBackupCapabilityKey = $derived(
+    resourceCapabilityRefs
+      ? capabilityKey({
+          operationKey: "storage-volumes.create-backup",
+          resourceRefs: resourceCapabilityRefs,
+        })
+      : "",
+  );
+  const restoreStorageBackupCapabilityKey = $derived(
+    resourceCapabilityRefs
+      ? capabilityKey({
+          operationKey: "storage-volumes.restore-backup",
+          resourceRefs: resourceCapabilityRefs,
+        })
+      : "",
+  );
+  const pruneStorageBackupCapabilityKey = $derived(
+    resourceCapabilityRefs
+      ? capabilityKey({
+          operationKey: "storage-volumes.prune-backups",
+          resourceRefs: resourceCapabilityRefs,
+        })
+      : "",
+  );
   const canConfigureRuntimeByCapability = $derived(
     configureRuntimeCapabilityKey
       ? $capabilities.capabilities[configureRuntimeCapabilityKey]?.allowed === true
@@ -604,6 +640,26 @@
   const canRestartRuntimeByCapability = $derived(
     restartRuntimeCapabilityKey
       ? $capabilities.capabilities[restartRuntimeCapabilityKey]?.allowed === true
+      : false,
+  );
+  const canPlanStorageBackupByCapability = $derived(
+    planStorageBackupCapabilityKey
+      ? $capabilities.capabilities[planStorageBackupCapabilityKey]?.allowed === true
+      : false,
+  );
+  const canCreateStorageBackupByCapability = $derived(
+    createStorageBackupCapabilityKey
+      ? $capabilities.capabilities[createStorageBackupCapabilityKey]?.allowed === true
+      : false,
+  );
+  const canRestoreStorageBackupByCapability = $derived(
+    restoreStorageBackupCapabilityKey
+      ? $capabilities.capabilities[restoreStorageBackupCapabilityKey]?.allowed === true
+      : false,
+  );
+  const canPruneStorageBackupByCapability = $derived(
+    pruneStorageBackupCapabilityKey
+      ? $capabilities.capabilities[pruneStorageBackupCapabilityKey]?.allowed === true
       : false,
   );
   let loadedResourceCapabilityLoadKey = $state("");
@@ -1588,6 +1644,7 @@
     Boolean(
       resource &&
         !isResourceArchived &&
+        canPlanStorageBackupByCapability &&
         storageBackupVolumeId &&
         storageBackupTargetRef.trim() &&
         isPositiveIntegerText(storageBackupRetentionMaxCount) &&
@@ -1596,6 +1653,7 @@
   );
   const canCreateStorageBackup = $derived(
     canPlanStorageBackup &&
+      canCreateStorageBackupByCapability &&
       Boolean(storageBackupPlan && storageBackupPlan.blockers.length === 0),
   );
   const canCleanupStorageRuntime = $derived(
@@ -5274,6 +5332,7 @@
     if (
       !resource ||
       isResourceArchived ||
+      !canRestoreStorageBackupByCapability ||
       backup.status !== "ready" ||
       restoreStorageVolumeBackupMutation.isPending
     ) {
@@ -5294,6 +5353,7 @@
     if (
       !resource ||
       isResourceArchived ||
+      !canPruneStorageBackupByCapability ||
       backup.status === "pruned" ||
       pruneStorageVolumeBackupMutation.isPending
     ) {
@@ -7465,7 +7525,10 @@
                       {/if}
                     </div>
                     {#if resourceHealthIssues.length > 0}
-                      <div class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+                      <div
+                        class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950"
+                        data-resource-health-primary-issues
+                      >
                         <p class="font-medium">
                           {$t(i18nKeys.console.resources.healthIssueTitle)}
                         </p>
@@ -9889,14 +9952,278 @@
                       <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div>
                           <h3 class="text-base font-semibold">
-                            {$t(i18nKeys.console.resources.storageVolumeBackupSummaryTitle)}
+                            {$t(i18nKeys.console.resources.storageBackupTitle)}
                           </h3>
-                          <p class="mt-1 text-sm text-muted-foreground">
-                            {$t(i18nKeys.console.resources.storageVolumeBackupSummaryDescription)}
+                          <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                            {$t(i18nKeys.console.resources.storageBackupDescription)}
                           </p>
                         </div>
-                        <Badge variant="outline">{storageVolumes.length}</Badge>
+                        <div class="flex flex-wrap items-center gap-2">
+                          <Badge variant="outline">{storageVolumes.length}</Badge>
+                          <Badge variant="secondary">
+                            {$t(i18nKeys.console.resources.storageBackupLocalOnly)}
+                          </Badge>
+                        </div>
                       </div>
+
+                      {#if storageVolumes.length === 0}
+                        <div class="mt-4 rounded-md border border-dashed bg-muted/25 px-4 py-6 text-sm text-muted-foreground">
+                          {$t(i18nKeys.console.resources.storageVolumesEmpty)}
+                        </div>
+                      {:else}
+                        <form
+                          class="mt-4 space-y-4"
+                          onsubmit={(event) => {
+                            event.preventDefault();
+                            planStorageBackup();
+                          }}
+                          data-resource-storage-backup-form
+                        >
+                          <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                            <label class="space-y-1.5 text-sm font-medium">
+                              <span>{$t(i18nKeys.console.resources.storageVolumeSelect)}</span>
+                              <Select.Root bind:value={storageBackupVolumeId} type="single">
+                                <Select.Trigger class="w-full">
+                                  {selectedStorageBackupVolume
+                                    ? storageVolumeOptionLabel(selectedStorageBackupVolume)
+                                    : $t(i18nKeys.console.resources.storageVolumeSelect)}
+                                </Select.Trigger>
+                                <Select.Content>
+                                  {#each storageVolumes as volume (volume.id)}
+                                    <Select.Item value={volume.id}>
+                                      {storageVolumeOptionLabel(volume)}
+                                    </Select.Item>
+                                  {/each}
+                                </Select.Content>
+                              </Select.Root>
+                            </label>
+                            <label class="space-y-1.5 text-sm font-medium" for="resource-storage-backup-destination-path">
+                              <span>{$t(i18nKeys.console.resources.storageBackupDestinationPath)}</span>
+                              <Input
+                                id="resource-storage-backup-destination-path"
+                                bind:value={storageBackupDestinationPath}
+                                spellcheck={false}
+                                autocomplete="off"
+                                placeholder={selectedStorageBackupAttachment?.destinationPath ?? "/data"}
+                              />
+                            </label>
+                            <label class="space-y-1.5 text-sm font-medium">
+                              <span>{$t(i18nKeys.console.resources.storageBackupDataFormat)}</span>
+                              <Select.Root bind:value={storageBackupDataFormat} type="single">
+                                <Select.Trigger class="w-full">
+                                  {storageBackupDataFormat}
+                                </Select.Trigger>
+                                <Select.Content>
+                                  <Select.Item value="sqlite">sqlite</Select.Item>
+                                  <Select.Item value="filesystem">filesystem</Select.Item>
+                                  <Select.Item value="json-files">json-files</Select.Item>
+                                  <Select.Item value="application-export">application-export</Select.Item>
+                                  <Select.Item value="unknown">unknown</Select.Item>
+                                </Select.Content>
+                              </Select.Root>
+                            </label>
+                            <label class="space-y-1.5 text-sm font-medium">
+                              <span>{$t(i18nKeys.console.resources.storageBackupConsistency)}</span>
+                              <Select.Root bind:value={storageBackupConsistency} type="single">
+                                <Select.Trigger class="w-full">
+                                  {storageBackupConsistency}
+                                </Select.Trigger>
+                                <Select.Content>
+                                  <Select.Item value="application-consistent">application-consistent</Select.Item>
+                                  <Select.Item value="quiesced">quiesced</Select.Item>
+                                  <Select.Item value="crash-consistent">crash-consistent</Select.Item>
+                                  <Select.Item value="provider-snapshot-consistent">provider-snapshot-consistent</Select.Item>
+                                </Select.Content>
+                              </Select.Root>
+                            </label>
+                            <label class="space-y-1.5 text-sm font-medium" for="resource-storage-backup-target-ref">
+                              <span>{$t(i18nKeys.console.resources.storageBackupTargetRef)}</span>
+                              <Input
+                                id="resource-storage-backup-target-ref"
+                                bind:value={storageBackupTargetRef}
+                                spellcheck={false}
+                                autocomplete="off"
+                              />
+                            </label>
+                            <div class="grid gap-3 sm:grid-cols-2 xl:col-span-1">
+                              <label class="space-y-1.5 text-sm font-medium" for="resource-storage-backup-retention-max-count">
+                                <span>{$t(i18nKeys.console.resources.storageBackupRetentionMaxCount)}</span>
+                                <Input
+                                  id="resource-storage-backup-retention-max-count"
+                                  bind:value={storageBackupRetentionMaxCount}
+                                  inputmode="numeric"
+                                  autocomplete="off"
+                                />
+                              </label>
+                              <label class="space-y-1.5 text-sm font-medium" for="resource-storage-backup-retention-min-free-bytes">
+                                <span>{$t(i18nKeys.console.resources.storageBackupRetentionMinFreeBytes)}</span>
+                                <Input
+                                  id="resource-storage-backup-retention-min-free-bytes"
+                                  bind:value={storageBackupRetentionMinFreeBytes}
+                                  inputmode="numeric"
+                                  autocomplete="off"
+                                />
+                              </label>
+                            </div>
+                          </div>
+
+                          <label class="flex items-center gap-2 text-sm text-muted-foreground">
+                            <input
+                              bind:checked={storageBackupLiveWrites}
+                              type="checkbox"
+                              class="size-4 rounded border-border text-primary"
+                            />
+                            {$t(i18nKeys.console.resources.storageBackupLiveWrites)}
+                          </label>
+
+                          {#if storageBackupFeedback}
+                            <div
+                              class={[
+                                "rounded-md border px-3 py-2 text-sm",
+                                storageBackupFeedback.kind === "success"
+                                  ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-700"
+                                  : "border-destructive/30 bg-destructive/5 text-destructive",
+                              ]}
+                            >
+                              <p class="font-medium">{storageBackupFeedback.title}</p>
+                              <p class="mt-1 break-all text-xs">{storageBackupFeedback.detail}</p>
+                            </div>
+                          {/if}
+
+                          {#if storageBackupPlan}
+                            <div class="rounded-md border bg-muted/20 px-3 py-2 text-sm">
+                              <div class="flex flex-wrap items-center gap-2">
+                                <Badge variant={storageBackupPlan.blockers.length > 0 ? "destructive" : "outline"}>
+                                  {storageBackupPlan.consistency}
+                                </Badge>
+                                <Badge variant="secondary">{storageBackupPlan.sourceAdapterKey}</Badge>
+                                <Badge variant={storageBackupPlan.localOnly ? "secondary" : "outline"}>
+                                  {storageBackupPlan.targetProviderKey}
+                                </Badge>
+                              </div>
+                              <p class="mt-2 break-all text-xs text-muted-foreground">
+                                {storageBackupPlanSummary(storageBackupPlan)}
+                              </p>
+                            </div>
+                          {/if}
+
+                          <div class="flex flex-wrap justify-end gap-2">
+                            <Button
+                              type="submit"
+                              variant="outline"
+                              disabled={!canPlanStorageBackup || planStorageVolumeBackupMutation.isPending}
+                            >
+                              <RefreshCw class={["size-4", planStorageVolumeBackupMutation.isPending ? "animate-spin" : ""]} />
+                              {$t(i18nKeys.console.resources.storageBackupPlanAction)}
+                            </Button>
+                            <Button
+                              type="button"
+                              disabled={!canCreateStorageBackup || createStorageVolumeBackupMutation.isPending}
+                              onclick={createStorageBackup}
+                            >
+                              <Archive class="size-4" />
+                              {$t(i18nKeys.console.resources.storageBackupCreateAction)}
+                            </Button>
+                          </div>
+                        </form>
+
+                        <div class="mt-5 space-y-3">
+                          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <p class="text-sm font-medium">
+                              {$t(i18nKeys.console.resources.storageVolumeBackupSummaryTitle)}
+                            </p>
+                            <Badge variant="outline">
+                              {$t(i18nKeys.console.resources.storageBackupRestorePointCount, {
+                                count: String(storageVolumeBackups.length),
+                              })}
+                            </Badge>
+                          </div>
+
+                          {#if storageVolumeBackupsQuery.isPending || storageVolumeBackupsQuery.isFetching}
+                            <div class="rounded-md border border-dashed bg-muted/25 px-4 py-6 text-sm text-muted-foreground">
+                              {$t(i18nKeys.console.resources.storageBackupsLoading)}
+                            </div>
+                          {:else if storageVolumeBackups.length === 0}
+                            <div class="rounded-md border border-dashed bg-muted/25 px-4 py-6 text-sm text-muted-foreground">
+                              {$t(i18nKeys.console.resources.storageBackupsEmpty)}
+                            </div>
+                          {:else}
+                            <div class="space-y-2">
+                              {#each storageVolumeBackups as backup (backup.id)}
+                                <article class="rounded-md border bg-muted/10 p-3">
+                                  <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                                    <div class="min-w-0">
+                                      <div class="flex flex-wrap items-center gap-2">
+                                        <p class="break-all font-mono text-xs font-medium">
+                                          {storageBackupLabel(backup)}
+                                        </p>
+                                        <Badge variant={backup.status === "failed" ? "destructive" : "outline"}>
+                                          {backup.status}
+                                        </Badge>
+                                        {#if backup.localOnly}
+                                          <Badge variant="secondary">
+                                            {$t(i18nKeys.console.resources.storageBackupLocalOnly)}
+                                          </Badge>
+                                        {/if}
+                                      </div>
+                                      <p class="mt-2 break-all text-xs text-muted-foreground">
+                                        {backup.sourceAdapterKey} -> {backup.targetProviderKey} · {backup.consistency}
+                                      </p>
+                                      <p class="mt-1 break-all text-xs text-muted-foreground">
+                                        {storageBackupArtifactLabel(backup)}
+                                      </p>
+                                      {#if backup.failureMessage}
+                                        <p class="mt-1 break-all text-xs text-destructive">
+                                          {backup.failureCode ?? backup.status}: {backup.failureMessage}
+                                        </p>
+                                      {/if}
+                                      {#if backup.latestRestoreAttempt}
+                                        <p class="mt-1 break-all text-xs text-muted-foreground">
+                                          {backup.latestRestoreAttempt.status} · {backup.latestRestoreAttempt.target.restoredVolumeId ?? backup.latestRestoreAttempt.target.storageVolumeId}
+                                        </p>
+                                      {/if}
+                                    </div>
+                                    <div class="flex min-w-0 flex-col gap-2 sm:min-w-72">
+                                      <Input
+                                        aria-label={$t(i18nKeys.console.resources.storageBackupRestoreName)}
+                                        bind:value={storageBackupRestoreNames[backup.id]}
+                                        placeholder={$t(i18nKeys.console.resources.storageBackupRestoreNamePlaceholder)}
+                                        disabled={backup.status !== "ready" || restoreStorageVolumeBackupMutation.isPending}
+                                      />
+                                      <div class="flex flex-wrap justify-end gap-2">
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          variant="outline"
+                                          disabled={backup.status !== "ready" ||
+                                            !canRestoreStorageBackupByCapability ||
+                                            restoreStorageVolumeBackupMutation.isPending}
+                                          onclick={() => restoreStorageBackup(backup)}
+                                        >
+                                          <RotateCw class="size-4" />
+                                          {$t(i18nKeys.console.resources.storageBackupRestoreAction)}
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          variant="outline"
+                                          disabled={backup.status === "pruned" ||
+                                            !canPruneStorageBackupByCapability ||
+                                            pruneStorageVolumeBackupMutation.isPending}
+                                          onclick={() => pruneStorageBackup(backup)}
+                                        >
+                                          <Trash2 class="size-4" />
+                                          {$t(i18nKeys.console.resources.storageBackupPruneAction)}
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </article>
+                              {/each}
+                            </div>
+                          {/if}
+                        </div>
+                      {/if}
                     </section>
                   </section>
                 {:else if activeResourceSection === "diagnostics"}
