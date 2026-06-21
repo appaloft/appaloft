@@ -737,6 +737,9 @@ export const enUS = {
       progressColumnPhase: "Phase",
       progressColumnSource: "Source",
       progressColumnTime: "Time",
+      progressCompletionDescription:
+        "The latest deployment finished and the public access route is ready.",
+      progressCompletionTitle: "Deployment complete",
       progressDescription:
         "Shows deployment phases, Appaloft logs, and application output from the same progress stream as the CLI.",
       progressParseError: "Could not parse deployment progress.",

@@ -106,7 +106,7 @@ export async function createDeploymentWithProgress(
 
     seenEventFingerprints.add(fingerprint);
     const status = progressDialogStatusFromProgressEvent(event);
-    deploymentTerminalObserved = status === "succeeded" || status === "failed";
+    deploymentTerminalObserved ||= status === "succeeded" || status === "failed";
     onEvent(event);
   };
   const stream = createDeploymentProgressStream(input, options);
@@ -693,6 +693,10 @@ export function isTerminalDeploymentProgressEvent(
   event: Pick<DeploymentProgressEvent, "message" | "phase" | "status">,
 ): boolean {
   if (event.status === "failed") {
+    return true;
+  }
+
+  if (event.status === "succeeded" && event.phase === "verify") {
     return true;
   }
 

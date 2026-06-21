@@ -653,6 +653,8 @@ export const i18nKeys = {
       progressColumnPhase: "console:deployments.progressColumnPhase",
       progressColumnSource: "console:deployments.progressColumnSource",
       progressColumnTime: "console:deployments.progressColumnTime",
+      progressCompletionDescription: "console:deployments.progressCompletionDescription",
+      progressCompletionTitle: "console:deployments.progressCompletionTitle",
       progressDescription: "console:deployments.progressDescription",
       progressParseError: "console:deployments.progressParseError",
       progressPhaseDeploy: "console:deployments.progressPhaseDeploy",
