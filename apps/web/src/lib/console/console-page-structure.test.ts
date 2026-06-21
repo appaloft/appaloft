@@ -1429,8 +1429,9 @@ describe("console page structure", () => {
       'id="resource-configuration-profile"',
     );
 
-    expect(proxyConfigurationSource.match(/class="rounded-md border bg-muted\/25 px-3 py-2"/g))
-      .toHaveLength(4);
+    expect(
+      proxyConfigurationSource.match(/class="rounded-md border bg-muted\/25 px-3 py-2"/g),
+    ).toHaveLength(4);
   });
 
   test("[RESOURCE-DEPENDENCIES-IA-001] keeps dependency binding forms behind a focused dialog", () => {
@@ -2599,8 +2600,9 @@ describe("console page structure", () => {
     expect(dependencyResourceListSource).toContain(
       'class="console-record-row rounded-md border bg-background lg:grid-cols-[minmax(0,1fr)_auto]"',
     );
-    expect(dependencyResourceListSource.match(/class="rounded-md border bg-muted\/20 px-3 py-2"/g))
-      .toHaveLength(4);
+    expect(
+      dependencyResourceListSource.match(/class="rounded-md border bg-muted\/20 px-3 py-2"/g),
+    ).toHaveLength(4);
     expect(dependencyResourcesPageSource).not.toContain(
       "data-dependency-resource-detail-display-surface",
     );
@@ -2660,9 +2662,7 @@ describe("console page structure", () => {
   });
 
   test("[RT-USAGE-UI-001] renders runtime usage metric tiles with visible card borders", () => {
-    expect(runtimeUsagePanelSource).toContain(
-      'class="rounded-md border bg-muted/30 px-3 py-2"',
-    );
+    expect(runtimeUsagePanelSource).toContain('class="rounded-md border bg-muted/30 px-3 py-2"');
   });
 
   test("[BLUEPRINT-INSTALL-IA-001] keeps Blueprint install inputs behind intent dialogs", () => {
