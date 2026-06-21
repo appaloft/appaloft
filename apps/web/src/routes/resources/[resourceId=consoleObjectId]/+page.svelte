@@ -10750,8 +10750,14 @@
                       </Select.Root>
                     </label>
 
-                    <label class="space-y-1.5 text-sm font-medium">
-                      <span>{$t(i18nKeys.common.domain.destination)}</span>
+                    <div class="space-y-1.5 text-sm font-medium">
+                      <label
+                        id="resource-domain-binding-destination-label"
+                        class="block"
+                        for="resource-domain-binding-destination"
+                      >
+                        {$t(i18nKeys.common.domain.destination)}
+                      </label>
                       {#if shouldShowDestinationField}
                         <Input
                           id="resource-domain-binding-destination"
@@ -10762,12 +10768,13 @@
                       {:else}
                         <div
                           id="resource-domain-binding-destination"
-                          class="flex h-9 items-center rounded-md border bg-muted/40 px-3 font-mono text-sm text-muted-foreground"
+                          aria-labelledby="resource-domain-binding-destination-label"
+                          class="flex h-9 w-full items-center rounded-md border bg-muted/40 px-3 font-mono text-sm text-muted-foreground"
                         >
                           {defaultDestinationId}
                         </div>
                       {/if}
-                    </label>
+                    </div>
                   {/if}
 
                   <label class="space-y-1.5 text-sm font-medium">

@@ -1325,6 +1325,12 @@ describe("console page structure", () => {
     expect(resourceDomainBindingDialogSource).toContain('id="resource-domain-binding-domain"');
     expect(resourceDomainBindingDialogSource).toContain('id="resource-domain-binding-destination"');
     expect(resourceDomainBindingDialogSource).toContain(
+      'id="resource-domain-binding-destination-label"',
+    );
+    expect(resourceDomainBindingDialogSource).toContain(
+      'aria-labelledby="resource-domain-binding-destination-label"',
+    );
+    expect(resourceDomainBindingDialogSource).toContain(
       '<Select.Item value="disabled">disabled</Select.Item>',
     );
     expect(resourceDetailPageSource).toContain('proxyKind: "traefik"');
