@@ -152,6 +152,14 @@ function deploymentDetailFixture(input: {
   };
   sourceMetadata?: Record<string, string>;
   executionMetadata?: Record<string, string>;
+  snapshotVariables?: Array<{
+    key: string;
+    value: string;
+    scope: string;
+    exposure: "build-time" | "runtime";
+    kind: string;
+    isSecret: boolean;
+  }>;
   status?: "created" | "planning" | "planned" | "running" | "succeeded" | "failed";
   sectionErrors?: Array<{
     section: "related-context" | "timeline" | "snapshot" | "latest-failure";
@@ -216,7 +224,7 @@ function deploymentDetailFixture(input: {
         environmentId: input.environmentId,
         createdAt: "2026-01-01T00:00:00.000Z",
         precedence: ["defaults", "project", "environment", "deployment"],
-        variables: [],
+        variables: input.snapshotVariables ?? [],
       },
       createdAt: "2026-01-01T00:00:00.000Z",
       startedAt: "2026-01-01T00:00:01.000Z",
@@ -287,7 +295,7 @@ function deploymentDetailFixture(input: {
         environmentId: input.environmentId,
         createdAt: "2026-01-01T00:00:00.000Z",
         precedence: ["defaults", "project", "environment", "deployment"],
-        variables: [],
+        variables: input.snapshotVariables ?? [],
       },
     },
     timeline: {
@@ -2823,6 +2831,24 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
                   sourceVersion: fixedDockerImageDigest,
                   sourceVersionKind: "image-digest",
                 },
+                snapshotVariables: [
+                  {
+                    key: "APP_NAME",
+                    value: "workspace",
+                    scope: "resource",
+                    exposure: "runtime",
+                    kind: "plain-config",
+                    isSecret: false,
+                  },
+                  {
+                    key: "DATABASE_URL",
+                    value: "********",
+                    scope: "environment",
+                    exposure: "runtime",
+                    kind: "secret",
+                    isSecret: true,
+                  },
+                ],
               }),
       };
     },
@@ -8351,6 +8377,67 @@ describe.serial("console e2e with Bun.WebView", () => {
         includeRelatedContext: true,
         includeLatestFailure: true,
       });
+
+      await clickLinkByHref(view, "tab=snapshot");
+      await expectAnyText(view, ["Environment snapshot", "环境快照"]);
+      await expectText(view, "APP_NAME");
+      await expectText(view, "DATABASE_URL");
+      const hasSnapshotTable = await view.evaluate<boolean>(
+        `Boolean(document.querySelector("#deployment-environment-snapshot-table"))`,
+      );
+      expect(hasSnapshotTable).toBe(true);
+      const hasSecretCopyButton = await view.evaluate<boolean>(
+        `Boolean(document.querySelector('[data-deployment-snapshot-config-copy-button="DATABASE_URL"]'))`,
+      );
+      expect(hasSecretCopyButton).toBe(false);
+      const snapshotText = await pageText(view);
+      expect(snapshotText).not.toContain("Precedence");
+      expect(snapshotText).not.toContain("优先级");
+
+      const clickedSnapshotCopy = await waitFor(
+        () =>
+          view.evaluate<boolean>(
+            `(() => {
+              const button = document.querySelector('[data-deployment-snapshot-config-copy-button="APP_NAME"]');
+              if (!(button instanceof HTMLButtonElement)) {
+                return false;
+              }
+              button.click();
+              return true;
+            })()`,
+          ),
+        Boolean,
+        "Expected deployment snapshot APP_NAME copy button to be available",
+      );
+      expect(clickedSnapshotCopy).toBe(true);
+      await waitFor(
+        () => view.evaluate<string>("window.__appaloftCopiedText ?? ''"),
+        (copied) => copied === "workspace",
+        "Expected deployment snapshot config copy to write the plain value through the desktop bridge",
+      );
+
+      const clickedOverviewTab = await waitFor(
+        () =>
+          view.evaluate<boolean>(
+            `(() => {
+              const deploymentPath = ${JSON.stringify(demoDeploymentPath)};
+              const link = Array.from(document.querySelectorAll("a")).find((candidate) => {
+                const href = candidate.getAttribute("href") ?? "";
+                const text = candidate.textContent ?? "";
+                return href === deploymentPath && (text.includes("Overview") || text.includes("基本信息"));
+              });
+              if (!(link instanceof HTMLAnchorElement)) {
+                return false;
+              }
+              link.click();
+              return true;
+            })()`,
+          ),
+        Boolean,
+        "Expected deployment overview tab to be available",
+      );
+      expect(clickedOverviewTab).toBe(true);
+      await expectAnyText(view, ["Deployment snapshot", "当时的部署信息"]);
 
       await clickButtonByAnyText(view, ["Copy diagnostic JSON", "复制诊断 JSON"]);
       const diagnosticRequest = await waitForRecordedRequest(
