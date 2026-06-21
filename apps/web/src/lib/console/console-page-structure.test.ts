@@ -960,8 +960,9 @@ describe("console page structure", () => {
     expect(resourceDetailPageSource).toContain("function resourcePreviewPolicyHref()");
     expect(resourceDetailPageSource).toContain("data-resource-preview-policy-link");
     expect(resourceDetailPageSource).toContain('scope: "resource"');
-    expect(previewPoliciesPageSource).toContain('page.url.searchParams.get("projectId")');
-    expect(previewPoliciesPageSource).toContain('page.url.searchParams.get("resourceId")');
+    expect(previewPoliciesPageSource).toContain("const searchParams = page.url.searchParams");
+    expect(previewPoliciesPageSource).toContain('searchParams.get("projectId")');
+    expect(previewPoliciesPageSource).toContain('searchParams.get("resourceId")');
   });
 
   test("[PROJECT-NAV-IA-001] uses the plural Previews tab contract for project previews", () => {
