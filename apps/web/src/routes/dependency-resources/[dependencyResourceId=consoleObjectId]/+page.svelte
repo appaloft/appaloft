@@ -1,9 +1,10 @@
 <script lang="ts">
   import { browser } from "$app/environment";
-  import { goto } from "$app/navigation";
+  import { afterNavigate, goto } from "$app/navigation";
   import { page } from "$app/state";
+  import { onMount } from "svelte";
   import { createMutation, createQuery } from "@tanstack/svelte-query";
-  import { ArchiveRestore, ArrowLeft, BadgeCheck, HardDriveDownload, Trash2 } from "@lucide/svelte";
+  import { ArchiveRestore, BadgeCheck, HardDriveDownload, Settings2, Trash2 } from "@lucide/svelte";
   import type {
     DependencyResourceBackupPolicyRead,
     DependencyResourceBackupSummary,
@@ -19,10 +20,18 @@
   import { Button } from "$lib/components/ui/button";
   import * as Dialog from "$lib/components/ui/dialog";
   import { Input } from "$lib/components/ui/input";
+  import { ScrollArea } from "$lib/components/ui/scroll-area";
   import * as Select from "$lib/components/ui/select";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import { webDocsHrefs } from "$lib/console/docs-help";
   import { canRunProductQueries } from "$lib/console/auth-query-gate";
+  import {
+    detailTabClass,
+    detailTabsClass,
+    subnavItemClass,
+    subnavItemTitleClass,
+    subnavListClass,
+  } from "$lib/console/layout-classes";
   import { createConsoleQueries } from "$lib/console/queries";
   import { formatTime } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
@@ -35,8 +44,33 @@
     detail: string;
   };
   type DeleteBlocker = NonNullable<DependencyResourceSummary["deleteSafety"]>["blockers"][number];
+  type DependencyResourceDetailTab = "overview" | "backups" | "settings" | "danger";
+  type DependencyResourceBackupSection = "backup-history" | "backup-policy";
+
+  const dependencyResourceDetailTabs = ["overview", "backups", "settings", "danger"] as const;
+  const dependencyResourceBackupSections = ["backup-history", "backup-policy"] as const;
 
   const dependencyResourceId = $derived(page.params.dependencyResourceId ?? "");
+  let dependencyResourceLocationSearch = $state(page.url.search);
+  $effect(() => {
+    const search = page.url.search;
+    dependencyResourceLocationSearch = browser ? (window.location.search || search) : search;
+  });
+  afterNavigate(({ to }) => {
+    dependencyResourceLocationSearch =
+      to?.url.search ?? (browser ? window.location.search : page.url.search);
+  });
+  onMount(() => {
+    const syncDependencyResourceLocationSearch = () => {
+      dependencyResourceLocationSearch = window.location.search;
+    };
+    syncDependencyResourceLocationSearch();
+    window.addEventListener("popstate", syncDependencyResourceLocationSearch);
+
+    return () => {
+      window.removeEventListener("popstate", syncDependencyResourceLocationSearch);
+    };
+  });
   const { authSessionQuery, projectsQuery, environmentsQuery } = createConsoleQueries(browser, {
     resources: false,
     deployments: false,
@@ -120,6 +154,15 @@
   );
   const dependencyResourceError = $derived(
     dependencyResourceQuery.error ? readErrorMessage(dependencyResourceQuery.error) : "",
+  );
+  const dependencyResourceSearchParams = $derived(
+    new URLSearchParams(dependencyResourceLocationSearch),
+  );
+  const activeDependencyResourceTab = $derived(
+    parseDependencyResourceDetailTab(dependencyResourceSearchParams.get("tab")),
+  );
+  const activeDependencyResourceBackupSection = $derived(
+    parseDependencyResourceBackupSection(dependencyResourceSearchParams.get("section")),
   );
 
   const createBackupMutation = createMutation(() => ({
@@ -329,6 +372,87 @@
       : $t(i18nKeys.console.dependencyResources.selectBackup);
   }
 
+  function parseDependencyResourceDetailTab(value: string | null): DependencyResourceDetailTab {
+    if (!value) return "overview";
+    return dependencyResourceDetailTabs.includes(value as DependencyResourceDetailTab)
+      ? (value as DependencyResourceDetailTab)
+      : "overview";
+  }
+
+  function parseDependencyResourceBackupSection(
+    value: string | null,
+  ): DependencyResourceBackupSection {
+    if (!value) return "backup-history";
+    return dependencyResourceBackupSections.includes(value as DependencyResourceBackupSection)
+      ? (value as DependencyResourceBackupSection)
+      : "backup-history";
+  }
+
+  function dependencyResourceTabHref(tab: DependencyResourceDetailTab): string {
+    const params = new URLSearchParams();
+    if (tab !== "overview") {
+      params.set("tab", tab);
+    }
+    if (tab === "backups") {
+      params.set("section", "backup-history");
+    }
+    const search = params.toString();
+    return `${page.url.pathname}${search ? `?${search}` : ""}`;
+  }
+
+  function selectDependencyResourceTab(tab: DependencyResourceDetailTab, event: MouseEvent): void {
+    event.preventDefault();
+    const href = dependencyResourceTabHref(tab);
+    dependencyResourceLocationSearch = new URL(href, window.location.href).search;
+    void goto(href, { noScroll: true, keepFocus: true });
+  }
+
+  function dependencyResourceTabLabel(tab: DependencyResourceDetailTab): string {
+    switch (tab) {
+      case "overview":
+        return $t(i18nKeys.console.dependencyResources.overviewTab);
+      case "backups":
+        return $t(i18nKeys.console.dependencyResources.backupsTab);
+      case "settings":
+        return $t(i18nKeys.console.dependencyResources.settingsTab);
+      case "danger":
+        return $t(i18nKeys.console.dependencyResources.dangerZoneTitle);
+    }
+  }
+
+  function dependencyResourceBackupSectionHref(
+    section: DependencyResourceBackupSection,
+  ): string {
+    const params = new URLSearchParams();
+    params.set("tab", "backups");
+    if (section !== "backup-history") {
+      params.set("section", section);
+    }
+    const search = params.toString();
+    return `${page.url.pathname}${search ? `?${search}` : ""}`;
+  }
+
+  function selectDependencyResourceBackupSection(
+    section: DependencyResourceBackupSection,
+    event: MouseEvent,
+  ): void {
+    event.preventDefault();
+    const href = dependencyResourceBackupSectionHref(section);
+    dependencyResourceLocationSearch = new URL(href, window.location.href).search;
+    void goto(href, { noScroll: true, keepFocus: true });
+  }
+
+  function dependencyResourceBackupSectionLabel(
+    section: DependencyResourceBackupSection,
+  ): string {
+    switch (section) {
+      case "backup-history":
+        return $t(i18nKeys.console.dependencyResources.backupHistorySection);
+      case "backup-policy":
+        return $t(i18nKeys.console.dependencyResources.backupPolicy);
+    }
+  }
+
   function buildDeleteSafetyBlockers(resource: DependencyResourceSummary): DeleteBlocker[] {
     const blockers = [...(resource.deleteSafety?.blockers ?? [])];
     if (resource.backupRelationship?.retentionRequired) {
@@ -442,10 +566,6 @@
     <section class="space-y-5" data-dependency-resource-detail-display-surface>
       <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div class="min-w-0 space-y-2">
-          <Button type="button" variant="ghost" size="sm" href="/dependency-resources">
-            <ArrowLeft class="size-4" />
-            {$t(i18nKeys.console.dependencyResources.focusTitle)}
-          </Button>
           <div class="flex min-w-0 flex-wrap items-center gap-2">
             <Badge variant="outline">{selectedDependencyResource.kind}</Badge>
             <h1 class="truncate text-2xl font-semibold">{selectedDependencyResource.name}</h1>
@@ -480,8 +600,28 @@
         </section>
       {/if}
 
-      <section class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
+      <ScrollArea class="rounded-md border bg-background">
+        <nav
+          aria-label={$t(i18nKeys.console.dependencyResources.pageTitle)}
+          class={detailTabsClass}
+        >
+          {#each dependencyResourceDetailTabs as tab (tab)}
+            <a
+              id={`dependency-resource-tab-${tab}`}
+              href={dependencyResourceTabHref(tab)}
+              class={detailTabClass}
+              aria-current={activeDependencyResourceTab === tab ? "page" : undefined}
+              onclick={(event) => selectDependencyResourceTab(tab, event)}
+            >
+              {dependencyResourceTabLabel(tab)}
+            </a>
+          {/each}
+        </nav>
+      </ScrollArea>
+
+      <section class="space-y-5">
         <div class="space-y-5">
+          {#if activeDependencyResourceTab === "overview"}
           <section class="console-panel space-y-4 p-5" data-dependency-resource-identity-summary>
             <div class="flex flex-wrap items-center gap-2">
               <Badge variant="outline">
@@ -531,7 +671,41 @@
               </div>
             </dl>
           </section>
+          {/if}
 
+          {#if activeDependencyResourceTab === "backups"}
+          <section class="console-panel overflow-hidden p-0">
+            <nav
+              aria-label={$t(i18nKeys.console.dependencyResources.backupsTab)}
+              class="border-b bg-sidebar text-sidebar-foreground"
+            >
+              <div
+                role="tablist"
+                class={[subnavListClass, "flex min-w-0 overflow-x-auto lg:grid lg:overflow-visible"]}
+              >
+                {#each dependencyResourceBackupSections as section (section)}
+                  <a
+                    id={`dependency-resource-backup-section-${section}`}
+                    href={dependencyResourceBackupSectionHref(section)}
+                    role="tab"
+                    aria-selected={activeDependencyResourceBackupSection === section}
+                    aria-current={activeDependencyResourceBackupSection === section ? "page" : undefined}
+                    class={[
+                      subnavItemClass,
+                      "min-h-10 flex-none whitespace-nowrap lg:flex lg:w-full lg:whitespace-normal",
+                    ]}
+                    onclick={(event) => selectDependencyResourceBackupSection(section, event)}
+                  >
+                    <span class={[subnavItemTitleClass, "lg:whitespace-normal"]}>
+                      {dependencyResourceBackupSectionLabel(section)}
+                    </span>
+                  </a>
+                {/each}
+              </div>
+            </nav>
+          </section>
+
+          {#if activeDependencyResourceBackupSection === "backup-history"}
           <section class="console-panel space-y-4 p-5" data-dependency-resource-backup-summary>
             <div class="space-y-1">
               <h2 class="flex items-center gap-2 font-semibold">
@@ -585,7 +759,9 @@
               </Button>
             </div>
           </section>
+          {/if}
 
+          {#if activeDependencyResourceBackupSection === "backup-policy"}
           <section class="console-panel space-y-4 p-5" data-dependency-resource-policy-summary>
             <div class="space-y-1">
               <h2 class="font-semibold">
@@ -620,11 +796,17 @@
               {$t(i18nKeys.console.dependencyResources.backupPolicyManageAction)}
             </Button>
           </section>
+          {/if}
+          {/if}
         </div>
 
+        {#if activeDependencyResourceTab === "settings"}
         <aside class="console-side-panel space-y-5" data-dependency-resource-lifecycle-handoff>
           <div class="space-y-1">
-            <h2 class="font-semibold">{$t(i18nKeys.common.domain.status)}</h2>
+            <h2 class="flex items-center gap-2 font-semibold">
+              <Settings2 class="size-4" />
+              {$t(i18nKeys.common.domain.status)}
+            </h2>
             <p class="text-sm text-muted-foreground">
               {$t(i18nKeys.console.dependencyResources.lifecycleDescription)}
             </p>
@@ -645,9 +827,29 @@
               </dt>
               <dd class="font-medium">{selectedDependencyResource.bindingReadiness.status}</dd>
             </div>
+            <div class="flex items-center justify-between gap-3">
+              <dt class="text-muted-foreground">
+                {$t(i18nKeys.console.dependencyResources.sourceMode)}
+              </dt>
+              <dd class="font-medium">{selectedDependencyResource.sourceMode}</dd>
+            </div>
           </dl>
+        </aside>
+        {/if}
+
+        {#if activeDependencyResourceTab === "danger"}
+        <aside
+          class="console-side-panel space-y-5 border-destructive/25 bg-destructive/5"
+          data-dependency-resource-danger-zone
+        >
+          <div class="space-y-1">
+            <h2 class="font-semibold">{$t(i18nKeys.console.dependencyResources.dangerZoneTitle)}</h2>
+            <p class="text-sm text-muted-foreground">
+              {$t(i18nKeys.console.dependencyResources.dangerZoneDescription)}
+            </p>
+          </div>
           {#if deleteSafetyBlockers.length > 0}
-            <div class="rounded-md border border-destructive/25 bg-destructive/5 p-3 text-sm">
+            <div class="rounded-md border border-destructive/25 bg-background p-3 text-sm">
               <p class="font-medium text-foreground">
                 {$t(i18nKeys.console.dependencyResources.deleteBlockedTitle)}
               </p>
@@ -659,16 +861,17 @@
             </div>
           {/if}
           <Button
-            class="w-full"
+            class="w-full border-destructive/35 text-destructive hover:bg-destructive/10 hover:text-destructive"
             type="button"
             variant="outline"
             disabled={deleteDependencyResourceMutation.isPending}
             onclick={openDeleteDependencyResourceDialog}
           >
             <Trash2 class="size-4" />
-            {$t(i18nKeys.console.dependencyResources.lifecycleManageAction)}
+            {$t(i18nKeys.console.dependencyResources.deleteAction)}
           </Button>
         </aside>
+        {/if}
       </section>
     </section>
   {/if}
