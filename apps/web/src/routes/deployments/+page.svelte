@@ -64,13 +64,15 @@
       : environments.filter((environment) => environment.projectId === projectFilter),
   );
   const filteredResourcesForProject = $derived.by(() =>
-    resources.filter((resource) => {
-      if (projectFilter !== "all" && resource.projectId !== projectFilter) return false;
-      if (environmentFilter !== "all" && resource.environmentId !== environmentFilter) {
-        return false;
-      }
-      return true;
-    }),
+    projectFilter === "all"
+      ? []
+      : resources.filter((resource) => {
+          if (resource.projectId !== projectFilter) return false;
+          if (environmentFilter !== "all" && resource.environmentId !== environmentFilter) {
+            return false;
+          }
+          return true;
+        }),
   );
   const deploymentStatuses = $derived.by(() =>
     Array.from(new Set(deployments.map((deployment) => deployment.status))).sort(),
@@ -135,7 +137,10 @@
         : $t(i18nKeys.console.deployments.selectProjectFirst)),
   );
   const selectedResourceFilterLabel = $derived(
-    selectedResource?.name ?? $t(i18nKeys.console.deployments.filterAllResources),
+    selectedResource?.name ??
+      (selectedProject
+        ? $t(i18nKeys.console.deployments.filterAllResources)
+        : $t(i18nKeys.console.deployments.selectProjectFirst)),
   );
   const selectedStatusFilterLabel = $derived(
     statusFilter === "all" ? $t(i18nKeys.console.deployments.filterAllStatuses) : statusLabel(statusFilter),
@@ -350,7 +355,7 @@
         </label>
         <label class="min-w-0 space-y-1.5 text-sm font-medium">
           {$t(i18nKeys.common.domain.resource)}
-          <Select.Root bind:value={resourceFilter} type="single">
+          <Select.Root bind:value={resourceFilter} disabled={!selectedProject} type="single">
             <Select.Trigger class="w-full min-w-0">
               {selectedResourceFilterLabel}
             </Select.Trigger>

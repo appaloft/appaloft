@@ -25,4 +25,18 @@ describe("deployments page pagination surface", () => {
     );
     expect(tableSource).toContain("data-deployment-table-display-surface");
   });
+
+  test("[DEPLOYMENTS-LIST-UX-002] gates the resource filter behind project selection", async () => {
+    const pageSource = await readFile(new URL("deployments/+page.svelte", import.meta.url), "utf8");
+
+    expect(pageSource).toContain(
+      'const filteredResourcesForProject = $derived.by(() =>\n    projectFilter === "all"\n      ? []',
+    );
+    expect(pageSource).toContain(
+      "selectedProject\n        ? $t(i18nKeys.console.deployments.filterAllResources)\n        : $t(i18nKeys.console.deployments.selectProjectFirst)",
+    );
+    expect(pageSource).toContain(
+      '<Select.Root bind:value={resourceFilter} disabled={!selectedProject} type="single">',
+    );
+  });
 });
