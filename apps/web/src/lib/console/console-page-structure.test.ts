@@ -2596,6 +2596,11 @@ describe("console page structure", () => {
     );
     expect(dependencyResourceListSource).toContain("resource.bindingReadiness.status");
     expect(dependencyResourceListSource).toContain("resource.sourceMode");
+    expect(dependencyResourceListSource).toContain(
+      'class="console-record-row rounded-md border bg-background lg:grid-cols-[minmax(0,1fr)_auto]"',
+    );
+    expect(dependencyResourceListSource.match(/class="rounded-md border bg-muted\/20 px-3 py-2"/g))
+      .toHaveLength(4);
     expect(dependencyResourcesPageSource).not.toContain(
       "data-dependency-resource-detail-display-surface",
     );
