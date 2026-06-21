@@ -110,11 +110,6 @@
     },
     { href: "/domain-bindings", labelKey: i18nKeys.console.nav.domainBindings, icon: Globe2 },
     { href: "/deployments", labelKey: i18nKeys.console.nav.deployments, icon: Rocket },
-    {
-      href: "/preview-policies",
-      labelKey: i18nKeys.console.nav.previewPolicies,
-      icon: ShieldCheck,
-    },
   ] as const;
 
   let { title, breadcrumbs = [], quickDeployModalEnabled = true, children }: Props = $props();
