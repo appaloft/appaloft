@@ -1,9 +1,17 @@
 <script lang="ts">
   import { ArrowRight, Globe2, Play } from "@lucide/svelte";
-  import type { DeploymentSummary, EnvironmentSummary, ResourceSummary } from "@appaloft/contracts";
+  import type {
+    DeploymentSummary,
+    DomainBindingSummary,
+    EnvironmentSummary,
+    ResourceSummary,
+  } from "@appaloft/contracts";
 
   import ConsoleStatePanel from "$lib/components/console/ConsoleStatePanel.svelte";
   import DeploymentStatusBadge from "$lib/components/console/DeploymentStatusBadge.svelte";
+  import DomainBindingVerifyDnsButton, {
+    type DomainBindingVerificationFeedback,
+  } from "$lib/components/console/DomainBindingVerifyDnsButton.svelte";
   import ResourceHealthDot from "$lib/components/console/ResourceHealthDot.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
@@ -19,6 +27,7 @@
   type Props = {
     resources: ResourceSummary[];
     deployments: DeploymentSummary[];
+    domainBindings?: DomainBindingSummary[];
     environments?: EnvironmentSummary[];
     emptyTitle: string;
     emptyDescription: string;
@@ -27,12 +36,14 @@
     createAction?: () => void;
     createDisabled?: boolean;
     onDeployResource?: (resource: ResourceSummary) => void;
+    onDomainBindingVerificationFeedback?: (feedback: DomainBindingVerificationFeedback) => void;
     showEnvironment?: boolean;
   };
 
   let {
     resources,
     deployments,
+    domainBindings = [],
     environments = [],
     emptyTitle,
     emptyDescription,
@@ -41,6 +52,7 @@
     createAction,
     createDisabled = false,
     onDeployResource,
+    onDomainBindingVerificationFeedback,
     showEnvironment = false,
   }: Props = $props();
 
@@ -54,6 +66,15 @@
 
   function resourceDeployments(resource: ResourceSummary): DeploymentSummary[] {
     return deployments.filter((deployment) => deployment.resourceId === resource.id);
+  }
+
+  function pendingDomainBinding(resource: ResourceSummary): DomainBindingSummary | null {
+    return (
+      domainBindings.find(
+        (binding) =>
+          binding.resourceId === resource.id && binding.status === "pending_verification",
+      ) ?? null
+    );
   }
 </script>
 
@@ -72,6 +93,7 @@
       {@const latestDeployment = latestResourceDeployment(resource, deployments)}
       {@const childDeployments = resourceDeployments(resource)}
       {@const currentAccessUrl = accessUrl(resource)}
+      {@const resourcePendingDomainBinding = pendingDomainBinding(resource)}
       <article
         class="console-record-row gap-4 xl:grid-cols-[minmax(0,1.3fr)_8rem_minmax(0,1fr)_minmax(0,1fr)_10rem_auto] xl:items-center xl:py-3"
         data-resource-record-row
@@ -151,6 +173,15 @@
             </a>
           {:else}
             <p class="mt-1 text-muted-foreground">{$t(i18nKeys.console.projects.noPublicAccess)}</p>
+          {/if}
+          {#if resourcePendingDomainBinding}
+            <div class="mt-2">
+              <DomainBindingVerifyDnsButton
+                binding={resourcePendingDomainBinding}
+                label={$t(i18nKeys.console.domainBindings.verifyDnsShortAction)}
+                onFeedback={onDomainBindingVerificationFeedback}
+              />
+            </div>
           {/if}
         </div>
 
