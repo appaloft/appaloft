@@ -231,11 +231,16 @@
   type ResourceAccessKind = "domain-binding" | CurrentResourceAccessRouteKind;
   type ResourceAccessStatus = NonNullable<ResourceAccessSummary["proxyRouteStatus"]>;
   type ResourceHealthViewStatus = ResourceHealthOverall | "loading";
+  type ResourceHealthIssueAction = {
+    label: string;
+    href?: string;
+    kind?: "refresh";
+  };
   type ResourceHealthIssue = {
     key: string;
     title: string;
     detail?: string;
-    code?: string;
+    action?: ResourceHealthIssueAction;
   };
   type HealthCheckHttpInput = NonNullable<ConfigureResourceHealthInput["healthCheck"]["http"]>;
   type HealthCheckMethod = HealthCheckHttpInput["method"];
@@ -956,7 +961,6 @@
     return resourceHealth?.overall ?? "unknown";
   });
   const resourceHealthIssues = $derived.by(() => resourceHealthIssueList(resourceHealth));
-  const primaryResourceHealthIssues = $derived(resourceHealthIssues.slice(0, 3));
   const currentAccessRoute = $derived(selectCurrentResourceAccessRoute(resource?.accessSummary));
   const latestAccessFailure = $derived(resource?.accessSummary?.latestAccessFailureDiagnostic);
   const defaultDestinationId = $derived(
@@ -6449,6 +6453,98 @@
     }
   }
 
+  function resourceHealthActionForRecommendedAction(
+    action:
+      | NonNullable<
+          ResourceHealthSummary["publicAccess"]["routeIntentStatus"]
+        >["recommendedAction"]
+      | undefined,
+  ): ResourceHealthIssueAction | undefined {
+    switch (action) {
+      case "verify-domain":
+      case "fix-dns":
+      case "provide-certificate":
+        return {
+          label: $t(i18nKeys.console.resources.healthActionManageAccess),
+          href: resourceSectionHref("domains"),
+        };
+      case "inspect-proxy-preview":
+      case "repair-proxy":
+        return {
+          label: $t(i18nKeys.console.resources.healthActionInspectProxy),
+          href: resourceSectionHref("proxy"),
+        };
+      case "inspect-logs":
+        return {
+          label: $t(i18nKeys.console.resources.healthActionOpenLogs),
+          href: resourceTabHref("logs"),
+        };
+      case "check-health":
+      case "wait":
+        return {
+          label: $t(i18nKeys.console.resources.healthActionRefreshStatus),
+          kind: "refresh",
+        };
+      case "diagnostic-summary":
+      case "manual-review":
+        return {
+          label: $t(i18nKeys.console.resources.healthActionReviewDiagnostics),
+          href: resourceSectionHref("diagnostics"),
+        };
+      case "none":
+      case undefined:
+        return undefined;
+    }
+  }
+
+  function resourceHealthRecommendedActionForCode(
+    code: string,
+  ): NonNullable<ResourceHealthSummary["publicAccess"]["routeIntentStatus"]>["recommendedAction"] {
+    switch (code) {
+      case "domain_not_verified":
+      case "resource_domain_binding_not_ready":
+        return "verify-domain";
+      case "resource_proxy_route_unavailable":
+      case "resource_public_access_not_ready":
+      case "resource_public_access_unavailable":
+        return "inspect-proxy-preview";
+      case "resource_health_policy_not_configured":
+        return "check-health";
+      case "resource_health_check_failed":
+      case "resource_public_access_probe_failed":
+      case "resource_health_check_unavailable":
+      case "resource_runtime_live_probe_unavailable":
+      case "runtime_probe_not_available":
+        return "inspect-logs";
+      default:
+        return "manual-review";
+    }
+  }
+
+  function resourceHealthActionForCode(code: string): ResourceHealthIssueAction | undefined {
+    if (code === "resource_health_policy_not_configured") {
+      return {
+        label: $t(i18nKeys.console.resources.healthActionConfigureHealth),
+        href: resourceSectionHref("health"),
+      };
+    }
+
+    return resourceHealthActionForRecommendedAction(resourceHealthRecommendedActionForCode(code));
+  }
+
+  function resourceHealthIssueDetail(code: string, fallbackRecommendedAction?: string): string {
+    if (fallbackRecommendedAction) {
+      return fallbackRecommendedAction;
+    }
+
+    if (code === "resource_health_policy_not_configured") {
+      return $t(i18nKeys.console.resources.healthRecommendedConfigureHealth);
+    }
+
+    const action = resourceHealthRecommendedActionForCode(code);
+    return resourceHealthRecommendedActionLabel(action);
+  }
+
   function resourceHealthIssueTitle(code: string): string {
     switch (code) {
       case "domain_not_verified":
@@ -6488,8 +6584,8 @@
       issues.push({
         key: `route-${blockingCode}`,
         title: resourceHealthIssueTitle(blockingCode),
-        detail: recommendedAction || selectedRoute.copySafeSummary.message,
-        code: blockingCode,
+        detail: resourceHealthIssueDetail(blockingCode, recommendedAction),
+        action: resourceHealthActionForRecommendedAction(selectedRoute.recommendedAction),
       });
       seen.add(blockingCode);
     }
@@ -6501,13 +6597,8 @@
       issues.push({
         key: `source-${error.source}-${error.code}-${error.phase}`,
         title: resourceHealthIssueTitle(error.code),
-        detail:
-          error.message ??
-          $t(i18nKeys.console.resources.healthIssueTechnicalCode, {
-            code: error.code,
-            phase: error.phase,
-          }),
-        code: error.code,
+        detail: resourceHealthIssueDetail(error.code),
+        action: resourceHealthActionForCode(error.code),
       });
       seen.add(error.code);
     }
@@ -6519,13 +6610,8 @@
       issues.push({
         key: `check-${check.name}-${check.reasonCode}`,
         title: resourceHealthIssueTitle(check.reasonCode),
-        detail:
-          check.message ??
-          $t(i18nKeys.console.resources.healthIssueTechnicalCode, {
-            code: check.reasonCode,
-            phase: check.phase ?? check.name,
-          }),
-        code: check.reasonCode,
+        detail: resourceHealthIssueDetail(check.reasonCode),
+        action: resourceHealthActionForCode(check.reasonCode),
       });
       seen.add(check.reasonCode);
     }
@@ -7262,7 +7348,11 @@
                   </Button>
                 {/snippet}
               </Popover.Trigger>
-              <Popover.Content align="end" sideOffset={8} class="w-96 max-w-[calc(100vw-2rem)] p-3">
+              <Popover.Content
+                align="end"
+                sideOffset={8}
+                class="max-h-[min(32rem,calc(100vh-8rem))] w-[28rem] max-w-[calc(100vw-2rem)] overflow-y-auto p-3"
+              >
                 <div class="flex items-start justify-between gap-3">
                   <div class="min-w-0">
                     <p class="flex items-center gap-2 text-sm font-medium">
@@ -7374,23 +7464,48 @@
                         </p>
                       {/if}
                     </div>
-                    {#if primaryResourceHealthIssues.length > 0}
+                    {#if resourceHealthIssues.length > 0}
                       <div class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
                         <p class="font-medium">
                           {$t(i18nKeys.console.resources.healthIssueTitle)}
                         </p>
-                        <div class="mt-2 space-y-2">
-                          {#each primaryResourceHealthIssues as issue (issue.key)}
-                            <div>
-                              <p class="font-medium">{issue.title}</p>
+                        <ol class="mt-2 list-decimal space-y-3 pl-5">
+                          {#each resourceHealthIssues as issue (issue.key)}
+                            <li class="min-w-0 pl-1">
+                              <p class="font-medium leading-5">{issue.title}</p>
                               {#if issue.detail}
-                                <p class="mt-0.5 break-words text-xs text-amber-900">
+                                <p class="mt-1 break-words text-xs leading-5 text-amber-900">
                                   {issue.detail}
                                 </p>
                               {/if}
-                            </div>
+                              {#if issue.action}
+                                <div class="mt-2">
+                                  {#if issue.action.kind === "refresh"}
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      disabled={resourceHealthQuery.isFetching}
+                                      onclick={() => resourceHealthQuery.refetch()}
+                                    >
+                                      <RefreshCw
+                                        class={[
+                                          "size-4",
+                                          resourceHealthQuery.isFetching ? "animate-spin" : "",
+                                        ]}
+                                      />
+                                      {issue.action.label}
+                                    </Button>
+                                  {:else if issue.action.href}
+                                    <Button href={issue.action.href} size="sm" variant="outline">
+                                      {issue.action.label}
+                                    </Button>
+                                  {/if}
+                                </div>
+                              {/if}
+                            </li>
                           {/each}
-                        </div>
+                        </ol>
                       </div>
                     {/if}
                   </div>
@@ -8304,33 +8419,6 @@
                       </p>
                     </div>
                   </div>
-                  {#if primaryResourceHealthIssues.length > 0}
-                    <div
-                      class="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950"
-                      data-resource-health-primary-issues
-                    >
-                      <p class="font-medium">
-                        {$t(i18nKeys.console.resources.healthIssueTitle)}
-                      </p>
-                      <div class="mt-2 space-y-2">
-                        {#each primaryResourceHealthIssues as issue (issue.key)}
-                          <div class="min-w-0">
-                            <div class="flex flex-wrap items-center gap-2">
-                              <p class="font-medium">{issue.title}</p>
-                              {#if issue.code}
-                                <Badge variant="outline">{issue.code}</Badge>
-                              {/if}
-                            </div>
-                            {#if issue.detail}
-                              <p class="mt-1 break-words text-xs text-amber-900">
-                                {issue.detail}
-                              </p>
-                            {/if}
-                          </div>
-                        {/each}
-                      </div>
-                    </div>
-                  {/if}
                 </section>
               </div>
 
