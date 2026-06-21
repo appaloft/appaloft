@@ -1459,26 +1459,6 @@
                 {$t(i18nKeys.common.actions.openResource)}
               </Button>
             {/if}
-            {#if primaryAccessUrl}
-              <Button href={primaryAccessUrl.url} target="_blank" rel="noreferrer" variant="outline">
-                <ExternalLink class="size-4" />
-                {$t(i18nKeys.console.deployments.openAccessUrl)}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                aria-label={accessUrlCopyLabel}
-                title={accessUrlCopyLabel}
-                onclick={handleCopyAccessUrl}
-              >
-                {#if accessUrlCopyState === "copied"}
-                  <Check class="size-4" />
-                {:else}
-                  <Copy class="size-4" />
-                {/if}
-                {accessUrlCopyLabel}
-              </Button>
-            {/if}
           </div>
         </div>
 
