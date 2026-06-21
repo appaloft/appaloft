@@ -141,6 +141,20 @@ describe("dependency resource Web console surface", () => {
       "orpcClient.dependencyResources.configureBackupPolicy",
     );
     expect(dependencyResourceDetailPageSource).toContain("orpcClient.dependencyResources.delete");
+    expect(dependencyResourceDetailPageSource).toContain("dependencyResourceDetailTabs");
+    expect(dependencyResourceDetailPageSource).toContain("dependencyResourceBackupSections");
+    const dependencyResourceTabInterpolation = "$" + "{tab}";
+    expect(dependencyResourceDetailPageSource).toContain(
+      `id={\`dependency-resource-tab-${dependencyResourceTabInterpolation}\`}`,
+    );
+    const dependencyResourceBackupSectionInterpolation = "$" + "{section}";
+    expect(dependencyResourceDetailPageSource).toContain(
+      `id={\`dependency-resource-backup-section-${dependencyResourceBackupSectionInterpolation}\`}`,
+    );
+    expect(dependencyResourceDetailPageSource).not.toContain("ArrowLeft");
+    expect(dependencyResourceDetailPageSource).not.toContain(
+      'variant="ghost" size="sm" href="/dependency-resources"',
+    );
     expect(dependencyResourcePageSource).toContain(
       'import ProjectCreateForm from "$lib/components/console/ProjectCreateForm.svelte"',
     );
