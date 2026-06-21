@@ -125,6 +125,9 @@
       ].some((value) => value.toLowerCase().includes(query));
     });
   });
+  const featuredListings = $derived(
+    filteredListings.filter((item) => item.featured).slice(0, 6),
+  );
   const groupedListings = $derived.by(() =>
     categories
       .map((category) => ({
@@ -184,8 +187,8 @@
     isDialogSurface && "max-[820px]:gap-[18px]",
   ));
   const gridClass = $derived(cn(
-    "grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr))]",
-    chrome === "embedded" && "[grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr))]",
+    "grid gap-4 min-[821px]:grid-cols-2 xl:grid-cols-3",
+    chrome === "standalone" && "gap-5",
     isDialogSurface &&
       "gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr))] max-[820px]:grid-cols-1 max-[820px]:gap-2.5",
   ));
@@ -490,6 +493,45 @@
     {/if}
 
     <div class={groupsClass} data-blueprint-marketplace-groups>
+      {#if !isDialogSurface && featuredListings.length > 0}
+        <section class="flex flex-col gap-3" data-blueprint-marketplace-featured>
+          <div class="flex flex-col gap-1.5">
+            <h2 class="m-0 text-[1.2rem]">精选蓝图</h2>
+            <p class="m-0 text-sm leading-6 text-[#526071]">
+              排序参考官方推荐优先级、GitHub 关注度和近期热度。
+            </p>
+          </div>
+          <div class={gridClass}>
+            {#each featuredListings as item (item.slug)}
+              <BlueprintMarketplaceCard
+                {item}
+                actionHref={primaryAction === "select" ? "#" : actionHref(item)}
+                {actionLabel}
+                density="default"
+                labels={cardLabels}
+                selected={selectedSlug === item.slug}
+                onprimaryaction={(event) => {
+                  if (primaryAction === "select") {
+                    event.preventDefault();
+                    handlePrimaryAction(item);
+                  }
+                }}
+                {onview}
+              />
+            {/each}
+          </div>
+        </section>
+
+        <section class="flex flex-col gap-3" data-blueprint-marketplace-catalog-heading>
+          <div class="flex flex-col gap-1.5">
+            <h2 class="m-0 text-[1.2rem]">全部官方蓝图</h2>
+            <p class="m-0 text-sm leading-6 text-[#526071]">
+              {categories.length} 分类 · {filteredListings.length} 条目
+            </p>
+          </div>
+        </section>
+      {/if}
+
       {#each groupedListings as group (group.category.key)}
         <section class="flex flex-col gap-3">
           <div class="flex items-end justify-between gap-3">
