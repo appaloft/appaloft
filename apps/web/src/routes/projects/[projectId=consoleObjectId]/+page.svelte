@@ -59,6 +59,7 @@
   import EnvironmentCreateForm from "$lib/components/console/EnvironmentCreateForm.svelte";
   import QuickDeploySheet from "$lib/components/console/QuickDeploySheet.svelte";
   import ResourceListTable from "$lib/components/console/ResourceListTable.svelte";
+  import type { DomainBindingVerificationFeedback } from "$lib/components/console/DomainBindingVerifyDnsButton.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import * as Dialog from "$lib/components/ui/dialog";
@@ -172,13 +173,19 @@
   type EnvironmentLifecycleAction = "archive" | "lock" | "unlock";
   type ProjectDeleteBlocker = CheckProjectDeleteSafetyResponse["blockers"][number];
 
-  const { projectsQuery, serversQuery, environmentsQuery, resourcesQuery, deploymentsQuery } =
+  const {
+    projectsQuery,
+    serversQuery,
+    environmentsQuery,
+    resourcesQuery,
+    deploymentsQuery,
+    domainBindingsQuery,
+  } =
     createConsoleQueries(browser, {
       health: false,
       readiness: false,
       version: false,
       previewEnvironments: false,
-      domainBindings: false,
       certificates: false,
       providers: false,
     });
@@ -233,10 +240,12 @@
   const environments = $derived(environmentsQuery.data?.items ?? []);
   const resources = $derived(resourcesQuery.data?.items ?? []);
   const deployments = $derived(deploymentsQuery.data?.items ?? []);
+  const domainBindings = $derived(domainBindingsQuery.data?.items ?? []);
   const pageLoading = $derived(
     projectsQuery.isPending ||
       environmentsQuery.isPending ||
       resourcesQuery.isPending ||
+      domainBindingsQuery.isPending ||
       deploymentsQuery.isPending ||
       projectDetailQuery.isPending,
   );
@@ -332,6 +341,9 @@
   });
   const projectResources = $derived(
     project ? resources.filter((resource) => resource.projectId === project.id) : [],
+  );
+  const projectDomainBindings = $derived(
+    project ? domainBindings.filter((binding) => binding.projectId === project.id) : [],
   );
   const projectPreviewEnvironments = $derived(projectPreviewEnvironmentsQuery.data?.items ?? []);
   const projectPreviewEnvironmentIds = $derived(
@@ -609,6 +621,7 @@
     title: string;
     detail: string;
   } | null>(null);
+  let domainBindingFeedback = $state<DomainBindingVerificationFeedback | null>(null);
   let projectRenameDialogOpen = $state(false);
   let environmentCreateDialogOpen = $state(false);
   let environmentRenameDialogOpen = $state(false);
@@ -2163,9 +2176,13 @@
                       <ResourceListTable
                         resources={projectResourcesWithoutKnownEnvironment}
                         deployments={projectDeployments}
+                        domainBindings={projectDomainBindings}
                         {environments}
                         emptyTitle={$t(i18nKeys.console.projects.noResourcesShort)}
                         emptyDescription={$t(i18nKeys.console.projects.noResources)}
+                        onDomainBindingVerificationFeedback={(feedback) => {
+                          domainBindingFeedback = feedback;
+                        }}
                         showEnvironment
                       />
                     </section>
@@ -2611,9 +2628,24 @@
               </div>
             </div>
 
+            {#if domainBindingFeedback}
+              <div
+                class={[
+                  "rounded-md border px-3 py-2 text-sm",
+                  domainBindingFeedback.kind === "success"
+                    ? "border-primary/25 bg-primary/5"
+                    : "border-destructive/30 bg-destructive/5 text-destructive",
+                ]}
+              >
+                <p class="font-medium">{domainBindingFeedback.title}</p>
+                <p class="mt-1 break-all text-xs">{domainBindingFeedback.detail}</p>
+              </div>
+            {/if}
+
             <ResourceListTable
               resources={filteredProjectResources}
               {deployments}
+              domainBindings={projectDomainBindings}
               environments={projectEnvironments}
               emptyTitle={$t(i18nKeys.console.projects.noResourcesShort)}
               emptyDescription={projectResources.length === 0
@@ -2623,6 +2655,9 @@
               createLabel={$t(i18nKeys.console.projects.addResourceAction)}
               createDisabled={isProjectArchived}
               onDeployResource={openProjectResourceDeploymentDialog}
+              onDomainBindingVerificationFeedback={(feedback) => {
+                domainBindingFeedback = feedback;
+              }}
               showEnvironment
             />
           </section>
@@ -2790,9 +2825,13 @@
                   <ResourceListTable
                     resources={projectPreviewResources}
                     deployments={deployments}
+                    domainBindings={projectDomainBindings}
                     environments={projectEnvironments}
                     emptyTitle={$t(i18nKeys.console.projects.noPreviewResourcesTitle)}
                     emptyDescription={$t(i18nKeys.console.projects.noPreviewResources)}
+                    onDomainBindingVerificationFeedback={(feedback) => {
+                      domainBindingFeedback = feedback;
+                    }}
                     showEnvironment
                   />
                 {/if}

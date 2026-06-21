@@ -268,7 +268,10 @@ describe("dependency resource Web console surface", () => {
     expect(projectsPageSource).toContain("version: false");
     expect(projectsPageSource).toContain("servers: false");
     expect(projectsPageSource).toContain("previewEnvironments: false");
-    expect(projectsPageSource).toContain("domainBindings: false");
+    expect(projectsPageSource).toContain("domainBindingsQuery");
+    expect(projectsPageSource).toContain("data-project-pending-domain-bindings");
+    expect(projectsPageSource).toContain("DomainBindingVerifyDnsButton");
+    expect(projectsPageSource).not.toContain("domainBindings: false");
     expect(projectsPageSource).toContain("certificates: false");
     expect(projectsPageSource).toContain("providers: false");
     expect(projectsPageSource).toContain("ResourceHealthDot");

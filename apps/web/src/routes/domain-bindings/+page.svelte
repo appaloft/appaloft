@@ -25,6 +25,7 @@
   import ConsoleEmptyState from "$lib/components/console/ConsoleEmptyState.svelte";
   import ConsoleResourceCanvas from "$lib/components/console/ConsoleResourceCanvas.svelte";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
+  import DomainBindingVerifyDnsButton from "$lib/components/console/DomainBindingVerifyDnsButton.svelte";
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
@@ -607,8 +608,31 @@
                         {binding.pathPrefix} · {binding.proxyKind} · {$t(i18nKeys.common.domain.tls)}
                         {binding.tlsMode} · {formatTime(binding.createdAt)}
                       </p>
+                      {#if binding.status === "pending_verification"}
+                        <div
+                          class="rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-xs"
+                          data-domain-binding-pending-dns-notice
+                        >
+                          <p class="font-medium text-foreground">
+                            {$t(i18nKeys.console.domainBindings.pendingDnsNoticeTitle)}
+                          </p>
+                          <p class="mt-1 text-muted-foreground">
+                            {$t(i18nKeys.console.domainBindings.pendingDnsNoticeBody)}
+                          </p>
+                        </div>
+                      {/if}
                     </div>
                     <div class="flex flex-wrap gap-2 lg:justify-end">
+                      {#if binding.status === "pending_verification"}
+                        <DomainBindingVerifyDnsButton
+                          {binding}
+                          variant="default"
+                          onFeedback={(feedback) => {
+                            lifecycleFeedback = feedback;
+                            selectedDomainBindingId = binding.id;
+                          }}
+                        />
+                      {/if}
                       <Button size="sm" variant="outline" onclick={() => selectDomainBinding(binding)}>
                         {$t(i18nKeys.common.actions.viewDetails)}
                       </Button>
