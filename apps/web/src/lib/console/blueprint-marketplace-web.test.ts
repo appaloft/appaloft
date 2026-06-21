@@ -8,6 +8,7 @@ import {
   findBlueprintCatalogExtensionByKey,
   readBlueprintCatalogExtensionMetadata,
 } from "./blueprint-marketplace-extension";
+import { systemPluginExtensionIconPresentation } from "./web-extension-presentation";
 
 const marketplaceExtension: SystemPluginWebExtension = {
   key: "example-marketplace",
@@ -45,7 +46,24 @@ describe("Blueprint marketplace console surface", () => {
 
     expect(shellSource).toContain("{#each navigationExtensions as extension");
     expect(shellSource).toContain("isWorkspaceNavigationExtension");
+    expect(shellSource).toContain("data-system-plugin-extension-icon-image");
     expect(shellSource).not.toContain("i18nKeys.console.nav.extensions");
+  });
+
+  test("[CLOUD-BLUEPRINT-UI-NAV-026] accepts custom image icons for navigation extensions", () => {
+    expect(
+      systemPluginExtensionIconPresentation({
+        ...marketplaceExtension,
+        icon: {
+          src: "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%2F%3E",
+          label: "Marketplace",
+        },
+      }),
+    ).toEqual({
+      kind: "image",
+      src: "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%2F%3E",
+      label: "Marketplace",
+    });
   });
 
   test("[CLOUD-BLUEPRINT-SELECTOR-027] discovers neutral Blueprint catalog extension metadata", () => {

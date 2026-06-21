@@ -20,6 +20,17 @@ import {
 } from "@lucide/svelte";
 import { type Component } from "svelte";
 
+export type SystemPluginExtensionIconPresentation =
+  | {
+      kind: "component";
+      component: Component;
+    }
+  | {
+      kind: "image";
+      src: string;
+      label?: string;
+    };
+
 export function systemPluginExtensionTitle(
   extension: SystemPluginWebExtension,
   locale: AppaloftLocale,
@@ -34,8 +45,26 @@ export function systemPluginExtensionDescription(
   return extension.localizations?.[locale]?.description ?? extension.description;
 }
 
+export function systemPluginExtensionIconPresentation(
+  extension: SystemPluginWebExtension,
+): SystemPluginExtensionIconPresentation {
+  const icon = extension.icon;
+  if (icon && typeof icon === "object") {
+    return {
+      kind: "image",
+      src: icon.src,
+      ...(icon.label ? { label: icon.label } : {}),
+    };
+  }
+
+  return {
+    kind: "component",
+    component: systemPluginExtensionIcon(extension),
+  };
+}
+
 export function systemPluginExtensionIcon(extension: SystemPluginWebExtension): Component {
-  switch (extension.icon) {
+  switch (typeof extension.icon === "string" ? extension.icon : undefined) {
     case "activity":
       return Activity;
     case "archive":

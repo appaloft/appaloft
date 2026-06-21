@@ -23,6 +23,7 @@
     SidebarTrigger,
   } from "$lib/components/ui/sidebar";
   import { i18nKeys, t } from "$lib/i18n";
+  import type { SystemPluginExtensionIconPresentation } from "$lib/console/web-extension-presentation";
   import type { TranslationKey } from "@appaloft/i18n";
 
   type BreadcrumbItem = {
@@ -30,9 +31,11 @@
     href?: string;
   };
 
+  type SettingsShellIcon = Component | SystemPluginExtensionIconPresentation;
+
   export type SettingsShellItem = {
     href: string;
-    icon: Component;
+    icon: SettingsShellIcon;
     labelKey?: TranslationKey;
     label?: string;
     matchPrefix?: string;
@@ -100,6 +103,12 @@
   function itemLabel(item: SettingsShellItem): string {
     return item.labelKey ? $t(item.labelKey) : (item.label ?? item.href);
   }
+
+  function itemIconPresentation(item: SettingsShellItem): SystemPluginExtensionIconPresentation {
+    return typeof item.icon === "function"
+      ? { kind: "component", component: item.icon }
+      : item.icon;
+  }
 </script>
 
 <SidebarProvider>
@@ -130,11 +139,25 @@
         <SidebarGroupContent>
           <SidebarMenu>
             {#each items as item (item.href)}
+              {@const itemIcon = itemIconPresentation(item)}
               <SidebarMenuItem>
                 <SidebarMenuButton isActive={itemIsActive(item)} tooltipContent={itemLabel(item)}>
                   {#snippet child({ props })}
                     <a href={item.href} {...props}>
-                      <item.icon class="size-4" />
+                      {#if itemIcon.kind === "image"}
+                        <img
+                          class="size-4 shrink-0 rounded-sm object-contain"
+                          src={itemIcon.src}
+                          alt=""
+                          aria-hidden="true"
+                          loading="lazy"
+                          decoding="async"
+                          data-system-plugin-extension-icon-image
+                        />
+                      {:else}
+                        {@const ItemIcon = itemIcon.component}
+                        <ItemIcon class="size-4" />
+                      {/if}
                       <span>{itemLabel(item)}</span>
                     </a>
                   {/snippet}

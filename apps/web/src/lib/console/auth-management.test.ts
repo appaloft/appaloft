@@ -171,7 +171,7 @@ describe("organization auth management console surface", () => {
     expect(settingsNavSource).toContain('href: "/organization/deploy-tokens"');
     expect(settingsNavSource).toContain("instanceSettingsItems");
     expect(settingsNavSource).toContain('settingsExtensionItems(extensions, "/instance", locale)');
-    expect(settingsNavSource).toContain("systemPluginExtensionIcon(extension)");
+    expect(settingsNavSource).toContain("systemPluginExtensionIconPresentation(extension)");
     expect(settingsNavSource).toContain("systemPluginExtensionTitle(extension, locale)");
     expect(settingsNavSource).toContain('href: "/instance/workers"');
     expect(settingsNavSource).toContain("i18nKeys.console.instance.workerManagementTitle");
