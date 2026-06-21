@@ -6,7 +6,9 @@
 access, deployment snapshot history, server-applied route audit, and certificate history.
 
 It does not revoke certificates, delete certificates, delete deployments, rewrite route snapshots,
-or remove generated access state.
+remove generated access state, or silently mutate DNS providers. DNS records created through an
+Appaloft DNS connector must be cleaned through the connector cleanup flow when cleanup is needed.
+Manually managed DNS records remain a user/provider action after the binding is deleted.
 
 ## Input
 
