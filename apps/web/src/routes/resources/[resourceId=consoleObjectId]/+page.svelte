@@ -5722,6 +5722,16 @@
     return `${page.url.pathname}${search ? `?${search}` : ""}`;
   }
 
+  function resourcePreviewPolicyHref(): string {
+    const params = new URLSearchParams({
+      projectId: resourceProjectId,
+      scope: "resource",
+      resourceId,
+    });
+
+    return `/preview-policies?${params.toString()}`;
+  }
+
   function selectResourceDetailSection(section: ResourceDetailSection, event: MouseEvent): void {
     event.preventDefault();
     const href = resourceSectionHref(section);
@@ -8707,6 +8717,15 @@
                         </Button>
                         <Button href={resourceSectionHref("diagnostics")} variant="outline" class="justify-start">
                           {$t(i18nKeys.console.resources.diagnosticsTitle)}
+                        </Button>
+                        <Button
+                          href={resourcePreviewPolicyHref()}
+                          variant="outline"
+                          class="justify-start"
+                          data-resource-preview-policy-link
+                        >
+                          <ShieldCheck class="size-4" />
+                          {$t(i18nKeys.console.resources.previewPolicyAction)}
                         </Button>
                         <Button href={resourceSectionHref("danger")} variant="outline" class="justify-start">
                           {$t(i18nKeys.console.resources.dangerZoneTitle)}

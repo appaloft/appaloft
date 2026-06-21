@@ -1,5 +1,6 @@
 <script lang="ts">
   import { browser } from "$app/environment";
+  import { page } from "$app/state";
   import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
   import { Settings2, ShieldCheck } from "@lucide/svelte";
   import type { PreviewPolicyScope, PreviewPolicySettings } from "@appaloft/contracts";
@@ -44,9 +45,10 @@
     providers: false,
   });
 
-  let selectedScopeKind = $state<ScopeKind>("project");
-  let selectedProjectId = $state("");
-  let selectedResourceId = $state("");
+  const initialScopeKind = page.url.searchParams.get("scope") === "resource" ? "resource" : "project";
+  let selectedScopeKind = $state<ScopeKind>(initialScopeKind);
+  let selectedProjectId = $state(page.url.searchParams.get("projectId") ?? "");
+  let selectedResourceId = $state(page.url.searchParams.get("resourceId") ?? "");
   let sameRepositoryPreviews = $state(true);
   let forkPreviews = $state<ForkMode>("disabled");
   let secretBackedPreviews = $state(true);
