@@ -57,9 +57,11 @@ describe("project detail page structure", () => {
     expect(projectSource).toContain("environmentCloneDialogOpen");
     expect(projectSource).toContain("i18nKeys.console.projects.activityGapTitle");
     expect(projectSource).toContain("i18nKeys.console.projects.dangerZoneTitle");
-    expect(projectSource).toContain('type ProjectSettingsSection = "general" | "danger"');
     expect(projectSource).toContain(
-      'const projectSettingsSections = ["general", "danger"] as const',
+      'type ProjectSettingsSection = "general" | "archivedResources" | "danger"',
+    );
+    expect(projectSource).toContain(
+      'const projectSettingsSections = ["general", "archivedResources", "danger"] as const',
     );
     expect(projectSource).toContain(
       'parseProjectSettingsSection(page.url.searchParams.get("section"))',
@@ -70,7 +72,9 @@ describe("project detail page structure", () => {
     expect(projectSource).toContain("data-project-settings-general");
     expect(projectSource).toContain("data-project-settings-archived-resources");
     expect(projectSource).toContain("projectArchivedResources");
-    expect(projectSource).toContain('resource.lifecycleStatus === "archived"');
+    expect(projectSource).toContain("projectArchivedResourcesQuery");
+    expect(projectSource).toContain('lifecycleStatus: "archived"');
+    expect(projectSource).not.toContain('resource.lifecycleStatus === "archived"');
     expect(projectSource).toContain("detailTabPanelSubnavClass");
     expect(projectSource).toContain("detailSubnavLayoutClass");
     expect(projectSource).toContain("detailSubnavClass");
@@ -78,9 +82,15 @@ describe("project detail page structure", () => {
     expect(projectSource).toContain("subnavItemClass");
     expect(projectSource).toContain("detailSubnavContentClass");
     expect(projectSource.indexOf("data-project-settings-general")).toBeLessThan(
+      projectSource.indexOf("data-project-settings-archived-resources"),
+    );
+    expect(projectSource.indexOf("data-project-settings-archived-resources")).toBeLessThan(
       projectSource.indexOf("data-project-danger-display-surface"),
     );
     expect(projectSource).toContain('{#if activeProjectSettingsSection === "general"}');
+    expect(projectSource).toContain(
+      '{:else if activeProjectSettingsSection === "archivedResources"}',
+    );
     expect(projectSource).toContain('{:else if activeProjectSettingsSection === "danger"}');
     expect(projectSource.indexOf('value="overview"')).toBeLessThan(
       projectSource.indexOf("i18nKeys.console.runtimeUsage.monitorTitle"),
