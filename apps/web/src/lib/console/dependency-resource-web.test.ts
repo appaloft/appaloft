@@ -143,13 +143,18 @@ describe("dependency resource Web console surface", () => {
     expect(dependencyResourceDetailPageSource).toContain("orpcClient.dependencyResources.delete");
     expect(dependencyResourceDetailPageSource).toContain("dependencyResourceDetailTabs");
     expect(dependencyResourceDetailPageSource).toContain("dependencyResourceBackupSections");
-    const dependencyResourceTabInterpolation = "$" + "{tab}";
+    expect(dependencyResourceDetailPageSource).toContain("ConsoleDetailTabs");
+    expect(dependencyResourceDetailPageSource).toContain("ConsoleDetailSubnav");
+    expect(dependencyResourceDetailPageSource).toContain("dependencyResourceDetailTabItems");
+    expect(dependencyResourceDetailPageSource).toContain("dependencyResourceBackupSubnavItems");
+    expect(dependencyResourceDetailPageSource).toContain('idPrefix="dependency-resource-tab"');
     expect(dependencyResourceDetailPageSource).toContain(
-      `id={\`dependency-resource-tab-${dependencyResourceTabInterpolation}\`}`,
+      'idPrefix="dependency-resource-backup-section"',
     );
-    const dependencyResourceBackupSectionInterpolation = "$" + "{section}";
-    expect(dependencyResourceDetailPageSource).toContain(
-      `id={\`dependency-resource-backup-section-${dependencyResourceBackupSectionInterpolation}\`}`,
+    expect(dependencyResourceDetailPageSource).toContain("class={detailPageClass}");
+    expect(dependencyResourceDetailPageSource).toContain("class={detailBodyClass}");
+    expect(dependencyResourceDetailPageSource).not.toContain(
+      '<ScrollArea class="rounded-md border bg-background">',
     );
     expect(dependencyResourceDetailPageSource).not.toContain("ArrowLeft");
     expect(dependencyResourceDetailPageSource).not.toContain(

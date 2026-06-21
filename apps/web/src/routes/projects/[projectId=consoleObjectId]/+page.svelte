@@ -51,6 +51,8 @@
   import { readErrorMessage } from "$lib/api/client";
   import { capabilities, capabilityKey, type CapabilityQuery } from "$lib/capabilities";
   import CapabilityGate from "$lib/components/console/CapabilityGate.svelte";
+  import ConsoleDetailSubnav from "$lib/components/console/ConsoleDetailSubnav.svelte";
+  import ConsoleDetailTabs from "$lib/components/console/ConsoleDetailTabs.svelte";
   import ConsoleExtensionPanelHost from "$lib/components/console/ConsoleExtensionPanelHost.svelte";
   import DeploymentProgressDialog from "$lib/components/console/DeploymentProgressDialog.svelte";
   import DeploymentTable from "$lib/components/console/DeploymentTable.svelte";
@@ -73,7 +75,6 @@
     DropdownMenuTrigger,
   } from "$lib/components/ui/dropdown-menu";
   import { Input } from "$lib/components/ui/input";
-  import { ScrollArea } from "$lib/components/ui/scroll-area";
   import * as Select from "$lib/components/ui/select";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import * as Tabs from "$lib/components/ui/tabs";
@@ -87,16 +88,10 @@
     detailBodyClass,
     detailHeaderClass,
     detailPageClass,
-    detailSubnavClass,
     detailSubnavContentClass,
     detailSubnavLayoutClass,
-    detailTabClass,
     detailTabPanelSubnavClass,
     detailTabPanelScrollClass,
-    detailTabsClass,
-    detailTabsScrollAreaClass,
-    subnavItemClass,
-    subnavListClass,
   } from "$lib/console/layout-classes";
   import { modalIsOpen, setModalOpen } from "$lib/console/url-modal";
   import { createConsoleQueries } from "$lib/console/queries";
@@ -196,6 +191,24 @@
   const activeProjectTab = $derived(parseProjectDetailTab(page.url.searchParams.get("tab")));
   const activeProjectSettingsSection = $derived(
     parseProjectSettingsSection(page.url.searchParams.get("section")),
+  );
+  const projectDetailTabItems = $derived(
+    projectDetailTabs.map((tab) => ({
+      id: tab,
+      label: projectTabLabel(tab),
+      href: projectTabHref(tab),
+      active: activeProjectTab === tab,
+      onSelect: (event: MouseEvent) => selectProjectTab(tab, event),
+    })),
+  );
+  const projectSettingsSubnavItems = $derived(
+    projectSettingsSections.map((section) => ({
+      id: section,
+      label: projectSettingsSectionLabel(section),
+      href: projectSettingsSectionHref(section),
+      active: activeProjectSettingsSection === section,
+      onSelect: (event: MouseEvent) => selectProjectSettingsSection(section, event),
+    })),
   );
   let projectLifecycleDialogOpen = $state(false);
   const projectDetailQuery = createQuery(() =>
@@ -1790,20 +1803,10 @@
     </section>
 
     <Tabs.Root value={activeProjectTab} class={detailBodyClass}>
-      <ScrollArea class={detailTabsScrollAreaClass}>
-        <nav aria-label={$t(i18nKeys.console.projects.pageTitle)} class={detailTabsClass}>
-          {#each projectDetailTabs as tab (tab)}
-            <a
-              href={projectTabHref(tab)}
-              class={detailTabClass}
-              aria-current={activeProjectTab === tab ? "page" : undefined}
-              onclick={(event) => selectProjectTab(tab, event)}
-            >
-              {projectTabLabel(tab)}
-            </a>
-          {/each}
-        </nav>
-      </ScrollArea>
+      <ConsoleDetailTabs
+        ariaLabel={$t(i18nKeys.console.projects.pageTitle)}
+        items={projectDetailTabItems}
+      />
 
       <Tabs.Content value="overview" class={[detailTabPanelScrollClass, "flex flex-col gap-6"]}>
         <section class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
@@ -2088,23 +2091,10 @@
       </section>
 
       <Tabs.Root value={activeProjectTab} class={detailBodyClass}>
-        <ScrollArea class={detailTabsScrollAreaClass}>
-          <nav
-            aria-label={$t(i18nKeys.console.projects.pageTitle)}
-            class={detailTabsClass}
-          >
-            {#each projectDetailTabs as tab (tab)}
-              <a
-                href={projectTabHref(tab)}
-                class={detailTabClass}
-                aria-current={activeProjectTab === tab ? "page" : undefined}
-                onclick={(event) => selectProjectTab(tab, event)}
-              >
-                {projectTabLabel(tab)}
-              </a>
-            {/each}
-          </nav>
-        </ScrollArea>
+        <ConsoleDetailTabs
+          ariaLabel={$t(i18nKeys.console.projects.pageTitle)}
+          items={projectDetailTabItems}
+        />
 
         <Tabs.Content
           value="overview"
@@ -3134,22 +3124,10 @@
           data-project-settings-display-surface
         >
           <div class={[detailSubnavLayoutClass, "md:grid-cols-[13rem_minmax(0,1fr)]"]}>
-            <aside class={detailSubnavClass}>
-              <nav class="min-w-0" aria-label={$t(i18nKeys.console.projects.settingsTitle)}>
-                <div class={subnavListClass}>
-                  {#each projectSettingsSections as section (section)}
-                    <a
-                      class={[subnavItemClass, "min-h-10"]}
-                      href={projectSettingsSectionHref(section)}
-                      aria-current={activeProjectSettingsSection === section ? "page" : undefined}
-                      onclick={(event) => selectProjectSettingsSection(section, event)}
-                    >
-                      <span class="min-w-0 truncate">{projectSettingsSectionLabel(section)}</span>
-                    </a>
-                  {/each}
-                </div>
-              </nav>
-            </aside>
+            <ConsoleDetailSubnav
+              ariaLabel={$t(i18nKeys.console.projects.settingsTitle)}
+              items={projectSettingsSubnavItems}
+            />
 
             <div class={detailSubnavContentClass}>
               {#if activeProjectSettingsSection === "general"}
