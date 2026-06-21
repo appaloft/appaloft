@@ -231,6 +231,7 @@
 <style>
   :global(.deployment-progress-spinner) {
     animation: deployment-progress-spin 0.9s linear infinite;
+    transform-box: fill-box;
     transform-origin: center;
   }
 
