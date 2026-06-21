@@ -2101,7 +2101,7 @@
 
               <div class="space-y-3">
                 {#if connectivityMutation.isPending}
-                  <div class="bg-muted/25 px-4 py-4 text-sm text-muted-foreground">
+                  <div class="rounded-md border bg-muted/25 px-4 py-4 text-sm text-muted-foreground">
                     {$t(i18nKeys.common.actions.testConnectivity)}...
                   </div>
                 {:else if connectivityError}
@@ -2112,7 +2112,7 @@
                     </div>
                   </div>
                 {:else if connectivityResult}
-                  <div class="bg-muted/25 px-4 py-3">
+                  <div class="rounded-md border bg-muted/25 px-4 py-3">
                     <div class="flex flex-wrap items-center justify-between gap-2">
                       <p class="text-sm font-medium">
                         {$t(i18nKeys.console.servers.connectivityLastResult)}
@@ -2123,7 +2123,7 @@
                     </div>
                   </div>
                   {#each connectivityResult.checks as check (check.name)}
-                    <div class="bg-muted/25 px-4 py-3">
+                    <div class="rounded-md border bg-muted/25 px-4 py-3">
                       <div class="flex flex-wrap items-center justify-between gap-2">
                         <p class="flex items-center gap-2 text-sm font-medium">
                           {#if check.status === "passed"}
@@ -2144,7 +2144,7 @@
                     </div>
                   {/each}
                 {:else}
-                  <div class="bg-muted/25 px-4 py-4 text-sm text-muted-foreground">
+                  <div class="rounded-md border bg-muted/25 px-4 py-4 text-sm text-muted-foreground">
                     {$t(i18nKeys.console.servers.connectivityNoResult)}
                   </div>
                 {/if}
