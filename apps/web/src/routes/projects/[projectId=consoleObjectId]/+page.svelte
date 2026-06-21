@@ -135,7 +135,7 @@
     | "previews"
     | "activity"
     | "settings";
-  type ProjectSettingsSection = "general" | "danger";
+  type ProjectSettingsSection = "general" | "archivedResources" | "danger";
   const projectDetailTabs = [
     "overview",
     "resources",
@@ -145,7 +145,7 @@
     "activity",
     "settings",
   ] as const;
-  const projectSettingsSections = ["general", "danger"] as const;
+  const projectSettingsSections = ["general", "archivedResources", "danger"] as const;
   type ProjectAttentionItem = {
     key: string;
     kind:
@@ -223,6 +223,21 @@
         limit: 100,
       },
       enabled: browser && projectId.length > 0 && activeProjectTab === "previews",
+      staleTime: 5_000,
+    }),
+  );
+  const projectArchivedResourcesQuery = createQuery(() =>
+    orpc.resources.list.queryOptions({
+      input: {
+        projectId,
+        lifecycleStatus: "archived",
+        limit: 100,
+      },
+      enabled:
+        browser &&
+        projectId.length > 0 &&
+        activeProjectTab === "settings" &&
+        activeProjectSettingsSection === "archivedResources",
       staleTime: 5_000,
     }),
   );
@@ -344,9 +359,7 @@
   const projectResources = $derived(
     project ? resources.filter((resource) => resource.projectId === project.id) : [],
   );
-  const projectArchivedResources = $derived(
-    projectResources.filter((resource) => resource.lifecycleStatus === "archived"),
-  );
+  const projectArchivedResources = $derived(projectArchivedResourcesQuery.data?.items ?? []);
   const projectDomainBindings = $derived(
     project ? domainBindings.filter((binding) => binding.projectId === project.id) : [],
   );
@@ -1712,6 +1725,8 @@
     switch (section) {
       case "general":
         return $t(i18nKeys.console.projects.generalSettingsTitle);
+      case "archivedResources":
+        return $t(i18nKeys.console.projects.archivedResourcesTitle);
       case "danger":
         return $t(i18nKeys.console.projects.dangerZoneTitle);
     }
@@ -3251,62 +3266,6 @@
                     </div>
                   </section>
 
-                  <section class="console-panel space-y-4 p-5" data-project-settings-archived-resources>
-                    <div class="space-y-1">
-                      <div class="flex flex-wrap items-center justify-between gap-2">
-                        <h2 class="text-lg font-semibold">
-                          {$t(i18nKeys.console.projects.archivedResourcesTitle)}
-                        </h2>
-                        <Badge variant="outline">
-                          {$t(i18nKeys.console.projects.archivedResourcesCount, {
-                            count: projectArchivedResources.length,
-                          })}
-                        </Badge>
-                      </div>
-                      <p class="text-sm text-muted-foreground">
-                        {$t(i18nKeys.console.projects.archivedResourcesDescription)}
-                      </p>
-                    </div>
-
-                    {#if projectArchivedResources.length > 0}
-                      <div class="console-record-list">
-                        {#each projectArchivedResources as resource (resource.id)}
-                          {@const environment = findEnvironment(projectEnvironments, resource.environmentId)}
-                          <a
-                            href={resourceDetailHref(resource)}
-                            class="console-record-row block underline-offset-4 hover:underline"
-                          >
-                            <div class="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                              <div class="min-w-0">
-                                <div class="flex min-w-0 flex-wrap items-center gap-2">
-                                  <span class="truncate text-sm font-medium">{resource.name}</span>
-                                  <Badge variant="secondary">{resource.kind}</Badge>
-                                  <Badge variant="destructive">
-                                    {$t(i18nKeys.console.projects.archived)}
-                                  </Badge>
-                                </div>
-                                <p class="mt-1 truncate text-xs text-muted-foreground">
-                                  {environment?.name ?? resource.environmentId}
-                                </p>
-                              </div>
-                              <div class="shrink-0 text-xs text-muted-foreground">
-                                {#if resource.archivedAt}
-                                  {$t(i18nKeys.console.projects.archivedAt)} · {formatTime(resource.archivedAt)}
-                                {:else}
-                                  {resource.id}
-                                {/if}
-                              </div>
-                            </div>
-                          </a>
-                        {/each}
-                      </div>
-                    {:else}
-                      <div class="rounded-md border border-dashed px-4 py-4 text-sm text-muted-foreground">
-                        {$t(i18nKeys.console.projects.archivedResourcesEmpty)}
-                      </div>
-                    {/if}
-                  </section>
-
                   <section class="console-panel space-y-4 p-5" data-project-preview-policy-link>
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div class="min-w-0 space-y-1">
@@ -3323,6 +3282,65 @@
                       </Button>
                     </div>
                   </section>
+                </section>
+              {:else if activeProjectSettingsSection === "archivedResources"}
+                <section
+                  class="console-panel space-y-4 p-5"
+                  data-project-settings-archived-resources
+                >
+                  <div class="space-y-1">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                      <h2 class="text-lg font-semibold">
+                        {$t(i18nKeys.console.projects.archivedResourcesTitle)}
+                      </h2>
+                      <Badge variant="outline">
+                        {$t(i18nKeys.console.projects.archivedResourcesCount, {
+                          count: projectArchivedResources.length,
+                        })}
+                      </Badge>
+                    </div>
+                    <p class="text-sm text-muted-foreground">
+                      {$t(i18nKeys.console.projects.archivedResourcesDescription)}
+                    </p>
+                  </div>
+
+                  {#if projectArchivedResources.length > 0}
+                    <div class="console-record-list">
+                      {#each projectArchivedResources as resource (resource.id)}
+                        {@const environment = findEnvironment(projectEnvironments, resource.environmentId)}
+                        <a
+                          href={resourceDetailHref(resource)}
+                          class="console-record-row block underline-offset-4 hover:underline"
+                        >
+                          <div class="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <div class="min-w-0">
+                              <div class="flex min-w-0 flex-wrap items-center gap-2">
+                                <span class="truncate text-sm font-medium">{resource.name}</span>
+                                <Badge variant="secondary">{resource.kind}</Badge>
+                                <Badge variant="destructive">
+                                  {$t(i18nKeys.console.projects.archived)}
+                                </Badge>
+                              </div>
+                              <p class="mt-1 truncate text-xs text-muted-foreground">
+                                {environment?.name ?? resource.environmentId}
+                              </p>
+                            </div>
+                            <div class="shrink-0 text-xs text-muted-foreground">
+                              {#if resource.archivedAt}
+                                {$t(i18nKeys.console.projects.archivedAt)} · {formatTime(resource.archivedAt)}
+                              {:else}
+                                {resource.id}
+                              {/if}
+                            </div>
+                          </div>
+                        </a>
+                      {/each}
+                    </div>
+                  {:else}
+                    <div class="rounded-md border border-dashed px-4 py-4 text-sm text-muted-foreground">
+                      {$t(i18nKeys.console.projects.archivedResourcesEmpty)}
+                    </div>
+                  {/if}
                 </section>
               {:else if activeProjectSettingsSection === "danger"}
                 <section

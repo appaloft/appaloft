@@ -1320,13 +1320,18 @@ export class MemoryResourceReadModel implements ResourceReadModel {
       projectId?: string;
       environmentId?: string;
       includePreviewResources?: boolean;
+      lifecycleStatus?: "active" | "archived" | "all";
     },
   ): Promise<number> {
     void context;
     void input?.includePreviewResources;
     return [...this.repository.items.values()]
       .map((resource) => resource.toState())
-      .filter((resource) => !resource.lifecycleStatus.isDeleted())
+      .filter((resource) =>
+        input?.lifecycleStatus === "all"
+          ? !resource.lifecycleStatus.isDeleted()
+          : resource.lifecycleStatus.value === (input?.lifecycleStatus ?? "active"),
+      )
       .filter((resource) =>
         input?.projectId ? resource.projectId.value === input.projectId : true,
       )
@@ -1341,13 +1346,18 @@ export class MemoryResourceReadModel implements ResourceReadModel {
       projectId?: string;
       environmentId?: string;
       includePreviewResources?: boolean;
+      lifecycleStatus?: "active" | "archived" | "all";
       limit?: number;
     },
   ) {
     void context;
     return [...this.repository.items.values()]
       .map((resource) => resource.toState())
-      .filter((resource) => !resource.lifecycleStatus.isDeleted())
+      .filter((resource) =>
+        input?.lifecycleStatus === "all"
+          ? !resource.lifecycleStatus.isDeleted()
+          : resource.lifecycleStatus.value === (input?.lifecycleStatus ?? "active"),
+      )
       .filter((resource) =>
         input?.projectId ? resource.projectId.value === input.projectId : true,
       )

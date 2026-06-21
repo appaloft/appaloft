@@ -8788,6 +8788,7 @@ export interface ResourceReadModel {
       projectId?: string;
       environmentId?: string;
       includePreviewResources?: boolean;
+      lifecycleStatus?: "active" | "archived" | "all";
     },
   ): Promise<number>;
   list(
@@ -8796,6 +8797,7 @@ export interface ResourceReadModel {
       projectId?: string;
       environmentId?: string;
       includePreviewResources?: boolean;
+      lifecycleStatus?: "active" | "archived" | "all";
       limit?: number;
     },
   ): Promise<ResourceSummary[]>;
