@@ -130,6 +130,9 @@ describe("Console page extension surface", () => {
     expect(rendererSource).toContain("data-console-page-integration-card");
     expect(rendererSource).toContain("data-console-page-integration-details-trigger");
     expect(rendererSource).toContain("data-console-page-integration-details");
+    expect(rendererSource).toContain(
+      'class="mt-5 space-y-5 px-5 pb-5 sm:px-8 sm:pb-8" data-console-page-integration-details',
+    );
     expect(rendererSource).toContain("integrationInitials(item)");
     expect(rendererSource).toContain("integrationStatusClass(item.status.tone)");
     expect(rendererSource).toContain("openIntegrationDetails(item.details)");
