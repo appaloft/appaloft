@@ -256,6 +256,7 @@
 
   type ConsolePageTableDetails = {
     label: string;
+    href?: string;
     title: string;
     description?: string;
     rows: ConsolePageKeyValue[];
@@ -1230,7 +1231,7 @@
                           {@const cell = readTableCell(row, column.key)}
                           <td
                             class={[
-                              "max-w-64 px-5 py-4 align-top",
+                              "max-w-64 px-5 py-4 align-middle",
                               column.align === "right" ? "text-right tabular-nums" : "text-left",
                             ]}
                           >
@@ -1245,13 +1246,16 @@
                             </span>
                           </td>
                         {/each}
-                        <td class="px-5 py-4 text-right align-top">
+                        <td class="px-5 py-4 text-right align-middle">
                           {#if row.details}
                             <Button
                               type="button"
                               variant="outline"
                               size="sm"
-                              onclick={() => openTableDetails(row.details)}
+                              onclick={() =>
+                                row.details?.href
+                                  ? navigateConsolePageHref(row.details.href)
+                                  : openTableDetails(row.details)}
                             >
                               {row.details.label}
                             </Button>
