@@ -240,7 +240,7 @@
 </section>
 
 <style>
-  .deployment-progress-spinner {
+  :global(.deployment-progress-spinner) {
     animation: deployment-progress-spin 0.9s linear infinite;
     transform-origin: center;
   }
@@ -280,7 +280,7 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .deployment-progress-spinner,
+    :global(.deployment-progress-spinner),
     .deployment-progress-confetti {
       animation: none;
     }
