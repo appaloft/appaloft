@@ -262,6 +262,7 @@ export class PgResourceReadModel implements ResourceReadModel {
       projectId?: string;
       environmentId?: string;
       includePreviewResources?: boolean;
+      lifecycleStatus?: "active" | "archived" | "all";
     },
   ) {
     const executor = resolveRepositoryExecutor(this.db, context);
@@ -276,8 +277,12 @@ export class PgResourceReadModel implements ResourceReadModel {
         const organizationId = resolveRepositoryContextOrganizationId(context);
         let query = executor
           .selectFrom("resources")
-          .select((expressionBuilder) => [expressionBuilder.fn.count<number>("id").as("count")])
-          .where("lifecycle_status", "!=", "deleted");
+          .select((expressionBuilder) => [expressionBuilder.fn.count<number>("id").as("count")]);
+        if (input?.lifecycleStatus === "all") {
+          query = query.where("lifecycle_status", "!=", "deleted");
+        } else {
+          query = query.where("lifecycle_status", "=", input?.lifecycleStatus ?? "active");
+        }
         if (organizationId) {
           query = query.where(
             "project_id",
@@ -317,6 +322,7 @@ export class PgResourceReadModel implements ResourceReadModel {
       projectId?: string;
       environmentId?: string;
       includePreviewResources?: boolean;
+      lifecycleStatus?: "active" | "archived" | "all";
       limit?: number;
     },
   ) {
@@ -330,11 +336,12 @@ export class PgResourceReadModel implements ResourceReadModel {
       },
       async () => {
         const organizationId = resolveRepositoryContextOrganizationId(context);
-        let query = executor
-          .selectFrom("resources")
-          .selectAll()
-          .where("lifecycle_status", "!=", "deleted")
-          .orderBy("created_at", "desc");
+        let query = executor.selectFrom("resources").selectAll().orderBy("created_at", "desc");
+        if (input?.lifecycleStatus === "all") {
+          query = query.where("lifecycle_status", "!=", "deleted");
+        } else {
+          query = query.where("lifecycle_status", "=", input?.lifecycleStatus ?? "active");
+        }
         if (organizationId) {
           query = query.where(
             "project_id",

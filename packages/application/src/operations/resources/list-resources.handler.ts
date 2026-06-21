@@ -25,10 +25,20 @@ export class ListResourcesQueryHandler
     return ok(
       await this.queryService.execute(
         context,
-        query.projectId || query.environmentId || query.limit
+        query.projectId ||
+          query.environmentId ||
+          query.includePreviewResources !== undefined ||
+          query.lifecycleStatus !== "active" ||
+          query.limit
           ? {
               ...(query.projectId ? { projectId: query.projectId } : {}),
               ...(query.environmentId ? { environmentId: query.environmentId } : {}),
+              ...(query.includePreviewResources !== undefined
+                ? { includePreviewResources: query.includePreviewResources }
+                : {}),
+              ...(query.lifecycleStatus !== "active"
+                ? { lifecycleStatus: query.lifecycleStatus }
+                : {}),
               ...(query.limit ? { limit: query.limit } : {}),
             }
           : undefined,

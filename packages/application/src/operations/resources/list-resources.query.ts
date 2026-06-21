@@ -6,17 +6,22 @@ import { boundedListLimit, parseOperationInput, trimToUndefined } from "../share
 import {
   type ListResourcesQueryInput,
   listResourcesQueryInputSchema,
+  type ResourceListLifecycleStatus,
 } from "./list-resources.schema";
 
 export {
   type ListResourcesQueryInput,
   listResourcesQueryInputSchema,
+  type ResourceListLifecycleStatus,
+  resourceListLifecycleStatusSchema,
 } from "./list-resources.schema";
 
 export class ListResourcesQuery extends Query<{ items: ResourceSummary[] }> {
   constructor(
     public readonly projectId?: string,
     public readonly environmentId?: string,
+    public readonly includePreviewResources?: boolean,
+    public readonly lifecycleStatus: ResourceListLifecycleStatus = "active",
     public readonly limit: number = boundedListLimit(),
   ) {
     super();
@@ -28,6 +33,8 @@ export class ListResourcesQuery extends Query<{ items: ResourceSummary[] }> {
         new ListResourcesQuery(
           trimToUndefined(parsed.projectId),
           trimToUndefined(parsed.environmentId),
+          parsed.includePreviewResources,
+          parsed.lifecycleStatus,
           boundedListLimit(parsed.limit),
         ),
     );

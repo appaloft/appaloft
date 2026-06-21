@@ -40,6 +40,7 @@ export class ListResourcesQueryService {
       projectId?: string;
       environmentId?: string;
       includePreviewResources?: boolean;
+      lifecycleStatus?: "active" | "archived" | "all";
       limit?: number;
     },
   ): Promise<{ items: Awaited<ReturnType<ResourceReadModel["list"]>> }> {
@@ -50,6 +51,7 @@ export class ListResourcesQueryService {
       ...(input?.includePreviewResources !== undefined
         ? { includePreviewResources: input.includePreviewResources }
         : {}),
+      ...(input?.lifecycleStatus ? { lifecycleStatus: input.lifecycleStatus } : {}),
       limit: boundedListLimit(input?.limit),
     });
     const items = await Promise.all(
