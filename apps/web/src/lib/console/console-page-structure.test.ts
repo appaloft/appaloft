@@ -156,6 +156,15 @@ const domainBindingDetailPageSource = readFileSync(
   ),
   "utf8",
 );
+const domainBindingDetailRouteSource = readFileSync(
+  fileURLToPath(
+    new URL(
+      "../../routes/domain-bindings/[domainBindingId=consoleObjectId]/+page.ts",
+      import.meta.url,
+    ),
+  ),
+  "utf8",
+);
 const marketplaceBlueprintDetailPageSource = readFileSync(
   fileURLToPath(new URL("../../routes/marketplace/[slug]/+page.svelte", import.meta.url)),
   "utf8",
@@ -2272,6 +2281,8 @@ describe("console page structure", () => {
     expect(domainBindingsPageSource).toContain("domainBindingDetailHref(binding)");
     expect(domainBindingsPageSource).not.toContain("dangerZoneTitle");
     expect(domainBindingsPageSource).not.toContain("dangerZoneDescription");
+    expect(domainBindingDetailRouteSource).toContain("export const prerender = false");
+    expect(domainBindingDetailRouteSource).toContain("export const ssr = false");
     expect(domainBindingDetailPageSource).toContain("data-domain-binding-detail-display-surface");
     expect(domainBindingDetailPageSource).toContain("type DomainBindingDetailTab =");
     expect(domainBindingDetailPageSource).toContain('"overview" | "routing" | "dns" | "lifecycle"');
