@@ -101,8 +101,12 @@ describe("QuickDeploySheet structure", () => {
   test("[QUICK-DEPLOY-UX-002D] surfaces the successful access URL above deployment logs", () => {
     expect(quickDeployProgressDialogSource).toContain("data-quick-deploy-success-access-url");
     expect(quickDeployProgressDialogSource).toContain("resolvedAccessUrl");
-    expect(quickDeployProgressDialogSource).toContain("accessUrlFromDeploymentProgressEvents");
-    expect(quickDeployProgressDialogSource).toContain("/https?:\\/\\/\\S+/i");
+    expect(quickDeployProgressDialogSource).toContain(
+      "const resolvedAccessUrl = $derived(accessUrl)",
+    );
+    expect(quickDeployProgressDialogSource).not.toContain("accessUrlFromDeploymentProgressEvents");
+    expect(quickDeployProgressDialogSource).not.toContain("/https?:\\/\\/\\S+/i");
+    expect(quickDeployProgressDialogSource).not.toContain("/public route/i");
     expect(quickDeployProgressDialogSource).toContain('target="_blank"');
     expect(quickDeployProgressDialogSource).toContain(
       "await navigator.clipboard.writeText(resolvedAccessUrl)",
@@ -111,6 +115,20 @@ describe("QuickDeploySheet structure", () => {
     expect(quickDeployProgressDialogSource).not.toContain(
       'class="relative border-b px-5 py-4 pr-16 sm:pr-5"',
     );
+  });
+
+  test("[QUICK-DEPLOY-WF-022] resolves completion URL from the resource access read model", () => {
+    expect(quickDeploySheetSource).toContain("readResourceCurrentAccessUrl");
+    expect(quickDeploySheetSource).toContain("selectCurrentResourceAccessRoute");
+    expect(quickDeploySheetSource).toContain("orpcClient.resources.show");
+    expect(quickDeploySheetSource).toContain("includeAccessSummary: true");
+    expect(quickDeploySheetSource).toContain("lastAccessUrl =");
+    expect(quickDeploySheetSource).toContain("await readResourceCurrentAccessUrl(");
+    expect(quickDeploySheetSource).not.toContain("orpcClient.resources.list");
+    expect(quickDeploySheetSource).not.toContain(
+      "(candidate) => candidate.id === input.resourceId",
+    );
+    expect(quickDeploySheetSource).not.toContain("lastAccessUrl = installSummary.accessUrl;");
   });
 
   test("[QUICK-DEPLOY-UX-002B] keeps modal state URL-addressable inside QuickDeploySheet", () => {

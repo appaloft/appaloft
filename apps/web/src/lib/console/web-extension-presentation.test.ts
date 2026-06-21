@@ -38,7 +38,7 @@ describe("web extension presentation", () => {
     );
 
     expect(item && "label" in item ? item.label : undefined).toBe("账单");
-    expect(item?.icon).toBe(WalletCards);
+    expect(item?.icon).toEqual({ kind: "component", component: WalletCards });
   });
 
   test("[CONSOLE-EXT-PRESENTATION-001] falls back to title and puzzle icon", () => {

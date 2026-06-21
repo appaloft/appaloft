@@ -8,6 +8,7 @@ import {
   findBlueprintCatalogExtensionByKey,
   readBlueprintCatalogExtensionMetadata,
 } from "./blueprint-marketplace-extension";
+import { systemPluginExtensionIconPresentation } from "./web-extension-presentation";
 
 const marketplaceExtension: SystemPluginWebExtension = {
   key: "example-marketplace",
@@ -44,7 +45,25 @@ describe("Blueprint marketplace console surface", () => {
     );
 
     expect(shellSource).toContain("{#each navigationExtensions as extension");
+    expect(shellSource).toContain("isWorkspaceNavigationExtension");
+    expect(shellSource).toContain("data-system-plugin-extension-icon-image");
     expect(shellSource).not.toContain("i18nKeys.console.nav.extensions");
+  });
+
+  test("[CLOUD-BLUEPRINT-UI-NAV-026] accepts custom image icons for navigation extensions", () => {
+    expect(
+      systemPluginExtensionIconPresentation({
+        ...marketplaceExtension,
+        icon: {
+          src: "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%2F%3E",
+          label: "Marketplace",
+        },
+      }),
+    ).toEqual({
+      kind: "image",
+      src: "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%2F%3E",
+      label: "Marketplace",
+    });
   });
 
   test("[CLOUD-BLUEPRINT-SELECTOR-027] discovers neutral Blueprint catalog extension metadata", () => {
@@ -107,6 +126,7 @@ describe("Blueprint marketplace console surface", () => {
 
     expect(listPageSource).toContain("ConsoleShell");
     expect(listPageSource).toContain('title="应用市场"');
+    expect(listPageSource).toContain('class="max-w-7xl"');
     expect(detailPageSource).toContain("ConsoleShell");
     expect(detailPageSource).toContain('title={listing?.title ?? "蓝图详情"}');
     expect(detailPageSource).toContain("normalizeBlueprintDetailResponse");
@@ -130,6 +150,9 @@ describe("Blueprint marketplace console surface", () => {
     expect(selectorSource).not.toContain("@appaloft-cloud");
     expect(sharedPackageSource).toContain("data-blueprint-marketplace-page");
     expect(sharedPackageSource).toContain("marketplace-controls");
+    expect(sharedPackageSource).toContain("data-blueprint-marketplace-featured");
+    expect(sharedPackageSource).toContain("精选蓝图");
+    expect(sharedPackageSource).toContain("全部官方蓝图");
     expect(sharedPackageSource).toContain("data-marketplace-surface={surface}");
     expect(sharedPackageSource).toContain("data-blueprint-marketplace-skeleton");
     expect(sharedPackageSource).toContain('class="flex min-h-[760px] flex-col gap-7"');
@@ -298,6 +321,8 @@ describe("Blueprint marketplace console surface", () => {
     expect(sharedPackageSource).toContain("data-blueprint-marketplace-search");
     expect(sharedPackageSource).toContain("data-blueprint-marketplace-category-tabs");
     expect(sharedPackageSource).toContain("data-blueprint-marketplace-groups");
+    expect(sharedPackageSource).toContain("featuredListings");
+    expect(sharedPackageSource).toContain("xl:grid-cols-3");
     expect(sharedPackageSource).toContain("createBlueprintDetailHref");
     expect(sharedPackageSource).toContain("createBlueprintDeployHandoffUrl");
     expect(sharedPackageSource).toContain('primaryAction === "select"');

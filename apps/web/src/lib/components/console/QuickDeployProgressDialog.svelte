@@ -53,7 +53,7 @@
   let accessUrlCopyResetTimeout: ReturnType<typeof setTimeout> | undefined;
   const panelStatus = $derived(deploymentPanelStatus());
   const deploymentSucceeded = $derived(panelStatus === "succeeded");
-  const resolvedAccessUrl = $derived(accessUrl || accessUrlFromDeploymentProgressEvents());
+  const resolvedAccessUrl = $derived(accessUrl);
   const accessUrlCopyLabel = $derived(
     accessUrlCopyState === "copied"
       ? $t(i18nKeys.console.deployments.accessUrlCopied)
@@ -160,15 +160,6 @@
       default:
         return $t(i18nKeys.console.deployments.progressStatusLog);
     }
-  }
-
-  function accessUrlFromDeploymentProgressEvents(): string {
-    const terminalAccessEvent = [...deploymentEvents]
-      .reverse()
-      .find((event) => event.phase === "verify" && /public route/i.test(event.message));
-    const match = terminalAccessEvent?.message.match(/https?:\/\/\S+/i);
-
-    return match?.[0]?.replace(/[),.;]+$/, "") ?? "";
   }
 
   function updateAccessUrlCopyState(state: typeof accessUrlCopyState): void {
