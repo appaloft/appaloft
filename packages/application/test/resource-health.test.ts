@@ -768,6 +768,54 @@ describe("ResourceHealthQueryService", () => {
     );
   });
 
+  test("[RES-HEALTH-QRY-015][ROUTE-STATUS-002][HEALTH-ACCESS-001] reports bound durable domain as proxy route work", async () => {
+    const service = createService({
+      domainBindings: [
+        {
+          id: "dmb_bound",
+          projectId: "prj_demo",
+          environmentId: "env_demo",
+          resourceId: "res_web",
+          serverId: "srv_demo",
+          destinationId: "dst_demo",
+          domainName: "bound.example.test",
+          pathPrefix: "/",
+          proxyKind: "traefik",
+          tlsMode: "auto",
+          certificatePolicy: "auto",
+          status: "bound",
+          dnsObservation: {
+            status: "matched",
+            expectedTargets: ["203.0.113.10"],
+            observedTargets: ["203.0.113.10"],
+            checkedAt: "2026-01-01T00:00:07.000Z",
+          },
+          verificationAttemptCount: 1,
+          createdAt: "2026-01-01T00:00:06.000Z",
+        },
+      ],
+    });
+
+    const result = await service.execute(createTestContext(), createQuery());
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      overall: "degraded",
+      publicAccess: {
+        status: "not-ready",
+        url: "https://bound.example.test",
+        kind: "durable-domain",
+        reasonCode: "resource_domain_binding_not_ready",
+        routeIntentStatus: {
+          source: "durable-domain-binding",
+          domainVerification: "verified",
+          blockingReason: "proxy_route_missing",
+          recommendedAction: "inspect-proxy-preview",
+        },
+      },
+    });
+  });
+
   test("[ACCESS-DIAG-002][HEALTH-ACCESS-001][HEALTH-ACCESS-003] degrades current health when public access or proxy route state failed", async () => {
     const service = createService({
       resources: [
