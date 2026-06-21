@@ -50,6 +50,7 @@
     ConnectorCapabilityApplyResponse,
     ConnectorCapabilityPlanResponse,
     CreateDeploymentInput,
+    ForceRedeployDeploymentInput,
     RedeployDeploymentInput,
     CreateDomainBindingInput,
     CreateStorageVolumeInput,
@@ -1034,7 +1035,6 @@
   } | null>(null);
   let runtimeControlDialogOpen = $state(false);
   let selectedRuntimeControlOperation = $state<"stop" | "start" | "restart" | null>(null);
-  let redeployResourceForceMode = $state(false);
   let sourceFeedback = $state<{
     kind: "success" | "error";
     title: string;
@@ -2599,9 +2599,7 @@
     onSuccess: async (result) => {
       deploymentFeedback = {
         kind: "success",
-        title: redeployResourceForceMode
-          ? $t(i18nKeys.console.resources.forceRedeploySuccessTitle)
-          : $t(i18nKeys.console.resources.redeploySuccessTitle),
+        title: $t(i18nKeys.console.resources.redeploySuccessTitle),
         detail: result.id,
       };
       deploymentProgressDeploymentId = result.id;
@@ -2610,9 +2608,27 @@
     onError: (error) => {
       deploymentFeedback = {
         kind: "error",
-        title: redeployResourceForceMode
-          ? $t(i18nKeys.console.resources.forceRedeployErrorTitle)
-          : $t(i18nKeys.console.resources.redeployErrorTitle),
+        title: $t(i18nKeys.console.resources.redeployErrorTitle),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const forceRedeployResourceMutation = createMutation(() => ({
+    mutationFn: (input: ForceRedeployDeploymentInput) =>
+      orpcClient.deployments.forceRedeploy(input),
+    onSuccess: async (result) => {
+      deploymentFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.forceRedeploySuccessTitle),
+        detail: result.id,
+      };
+      deploymentProgressDeploymentId = result.id;
+      await refreshResourceDeploymentData();
+    },
+    onError: (error) => {
+      deploymentFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.forceRedeployErrorTitle),
         detail: readErrorMessage(error),
       };
     },
@@ -2965,7 +2981,9 @@
       startResourceRuntimeMutation.isPending ||
       restartResourceRuntimeMutation.isPending,
   );
-  const resourceRedeployPending = $derived(redeployResourceMutation.isPending);
+  const resourceRedeployPending = $derived(
+    redeployResourceMutation.isPending || forceRedeployResourceMutation.isPending,
+  );
   let archiveFeedback = $state<{
     kind: "success" | "error";
     title: string;
@@ -4763,16 +4781,20 @@
       return;
     }
 
-    redeployResourceForceMode = force;
     deploymentFeedback = null;
-    redeployResourceMutation.mutate({
+    const input = {
       resourceId: resource.id,
       projectId: resource.projectId,
       environmentId: resource.environmentId,
       serverId: resourceRedeployServerId,
       ...(resourceRedeployDestinationId ? { destinationId: resourceRedeployDestinationId } : {}),
       ...(latestDeployment?.id ? { sourceDeploymentId: latestDeployment.id } : {}),
-    });
+    };
+    if (force) {
+      forceRedeployResourceMutation.mutate(input);
+      return;
+    }
+    redeployResourceMutation.mutate(input);
   }
 
   function configureResourceNetwork(event: SubmitEvent): void {

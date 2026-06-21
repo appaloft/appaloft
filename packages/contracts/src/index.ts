@@ -4991,7 +4991,7 @@ export const deploymentSummarySchema = z.object({
     "canceled",
     "rolled-back",
   ]),
-  triggerKind: z.enum(["create", "retry", "redeploy", "rollback"]).optional(),
+  triggerKind: z.enum(["create", "retry", "redeploy", "force-redeploy", "rollback"]).optional(),
   sourceDeploymentId: z.string().optional(),
   rollbackCandidateDeploymentId: z.string().optional(),
   sourceCommitSha: z.string().optional(),
@@ -5075,6 +5075,8 @@ export const redeployDeploymentInputSchema = z.object({
   readinessGeneratedAt: z.string().optional(),
 });
 
+export const forceRedeployDeploymentInputSchema = redeployDeploymentInputSchema;
+
 export const rollbackDeploymentInputSchema = z.object({
   deploymentId: z.string().min(1),
   rollbackCandidateDeploymentId: z.string().min(1),
@@ -5104,6 +5106,7 @@ export const pruneDeploymentsInputSchema = z.object({
 
 export const retryDeploymentResponseSchema = createDeploymentResponseSchema;
 export const redeployDeploymentResponseSchema = createDeploymentResponseSchema;
+export const forceRedeployDeploymentResponseSchema = createDeploymentResponseSchema;
 export const rollbackDeploymentResponseSchema = createDeploymentResponseSchema;
 export const cancelDeploymentResponseSchema = z.object({
   id: z.string(),
@@ -7488,6 +7491,8 @@ export type RetryDeploymentInput = z.infer<typeof retryDeploymentInputSchema>;
 export type RetryDeploymentResponse = z.infer<typeof retryDeploymentResponseSchema>;
 export type RedeployDeploymentInput = z.infer<typeof redeployDeploymentInputSchema>;
 export type RedeployDeploymentResponse = z.infer<typeof redeployDeploymentResponseSchema>;
+export type ForceRedeployDeploymentInput = z.infer<typeof forceRedeployDeploymentInputSchema>;
+export type ForceRedeployDeploymentResponse = z.infer<typeof forceRedeployDeploymentResponseSchema>;
 export type RollbackDeploymentInput = z.infer<typeof rollbackDeploymentInputSchema>;
 export type RollbackDeploymentResponse = z.infer<typeof rollbackDeploymentResponseSchema>;
 export type CancelDeploymentInput = z.infer<typeof cancelDeploymentInputSchema>;

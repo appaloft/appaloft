@@ -88,6 +88,8 @@ function renderDockerBuildImageCommand(
 ): string {
   return [
     "docker build",
+    spec.pull ? "--pull" : "",
+    spec.noCache ? "--no-cache" : "",
     "-t",
     options.quote(spec.image.value),
     "-f",
@@ -96,7 +98,9 @@ function renderDockerBuildImageCommand(
       `--label ${options.quote(`${label.name.value}=${label.value.value}`)}`,
     ),
     options.quote(spec.contextPath.value),
-  ].join(" ");
+  ]
+    .filter((part) => part.length > 0)
+    .join(" ");
 }
 
 function renderDockerRunContainerCommand(
@@ -144,8 +148,30 @@ function renderDockerComposeUpCommand(
     .filter((part) => part.length > 0)
     .join(" ");
 
+  const composeBuildInvocation =
+    spec.build && (spec.pull || spec.noCache)
+      ? [
+          spec.portableDockerCompose === true ? "$appaloft_docker_compose_cmd" : "docker compose",
+          spec.projectName ? `-p ${options.quote(spec.projectName.value)}` : "",
+          "-f",
+          options.quote(spec.composeFile.value),
+          ...spec.additionalComposeFiles.flatMap((composeFile) => [
+            "-f",
+            options.quote(composeFile.value),
+          ]),
+          "build",
+          spec.pull ? "--pull" : "",
+          spec.noCache ? "--no-cache" : "",
+        ]
+          .filter((part) => part.length > 0)
+          .join(" ")
+      : undefined;
+  const command = composeBuildInvocation
+    ? `${composeBuildInvocation} && ${composeInvocation}`
+    : composeInvocation;
+
   if (spec.portableDockerCompose !== true) {
-    return composeInvocation;
+    return command;
   }
 
   return [
@@ -154,7 +180,7 @@ function renderDockerComposeUpCommand(
     `if docker compose -f ${options.quote(spec.composeFile.value)} config --services >/dev/null 2>&1; then appaloft_docker_compose_cmd='docker compose';`,
     `elif command -v docker-compose >/dev/null 2>&1 && docker-compose -f ${options.quote(spec.composeFile.value)} config --services >/dev/null 2>&1; then appaloft_docker_compose_cmd='docker-compose';`,
     "else appaloft_docker_compose_cmd='docker compose'; fi;",
-    composeInvocation,
+    command,
     ";",
     "}",
   ].join(" ");

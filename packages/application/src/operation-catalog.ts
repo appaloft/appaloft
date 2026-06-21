@@ -67,6 +67,7 @@ import { createDeploymentCommandInputSchema } from "./operations/deployments/cre
 import { deploymentPlanQueryInputSchema } from "./operations/deployments/deployment-plan.query";
 import { deploymentRecoveryReadinessQueryInputSchema } from "./operations/deployments/deployment-recovery-readiness.query";
 import { deploymentTimelineQueryInputSchema } from "./operations/deployments/deployment-timeline.query";
+import { forceRedeployDeploymentCommandInputSchema } from "./operations/deployments/force-redeploy-deployment.command";
 import { listDeploymentsQueryInputSchema } from "./operations/deployments/list-deployments.query";
 import { pruneDeploymentsCommandInputSchema } from "./operations/deployments/prune-deployments.command";
 import { redeployDeploymentCommandInputSchema } from "./operations/deployments/redeploy-deployment.command";
@@ -3115,6 +3116,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft deployments redeploy <resourceId>",
       orpc: { method: "POST", path: "/api/resources/{resourceId}/redeploy" },
+    },
+  },
+  {
+    key: "deployments.force-redeploy",
+    kind: "command",
+    domain: "deployments",
+    messageName: "ForceRedeployDeploymentCommand",
+    handlerName: "ForceRedeployDeploymentCommandHandler",
+    serviceName: "ForceRedeployDeploymentUseCase",
+    inputSchema: forceRedeployDeploymentCommandInputSchema,
+    serviceToken: tokens.forceRedeployDeploymentUseCase,
+    transports: {
+      cli: "appaloft deployments force-redeploy <resourceId>",
+      orpc: { method: "POST", path: "/api/resources/{resourceId}/force-redeploy" },
     },
   },
   {

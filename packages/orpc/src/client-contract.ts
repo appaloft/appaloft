@@ -83,6 +83,7 @@ import {
   type DomainBindingDnsReadiness,
   type EnvironmentEffectivePrecedenceQueryInput,
   type ExpireTerminalSessionsCommandInput,
+  type ForceRedeployDeploymentCommandInput,
   type GetAuthBootstrapStatusQueryInput,
   type GetCurrentOrganizationContextQueryInput,
   type GitHubAppConnectionQueryInput,
@@ -316,6 +317,7 @@ import {
   type EnvironmentEffectivePrecedenceResponse,
   type EnvironmentSummary,
   type ExpireTerminalSessionsResponse,
+  type ForceRedeployDeploymentResponse,
   type GitHubAppConnectionResponse,
   type ImportCertificateResponse,
   type ImportResourceVariablesResponse,
@@ -1874,6 +1876,12 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       RedeployDeploymentCommandInput,
       RedeployDeploymentResponse,
+      AppaloftClientError
+    >;
+    forceRedeploy: Client<
+      AppaloftClientContext,
+      ForceRedeployDeploymentCommandInput,
+      ForceRedeployDeploymentResponse,
       AppaloftClientError
     >;
     rollback: Client<

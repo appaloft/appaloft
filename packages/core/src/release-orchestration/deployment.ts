@@ -36,7 +36,7 @@ import {
   type RuntimePlan,
 } from "./runtime-plan";
 
-export type DeploymentTriggerKind = "create" | "retry" | "redeploy" | "rollback";
+export type DeploymentTriggerKind = "create" | "retry" | "redeploy" | "force-redeploy" | "rollback";
 export type DeploymentTargetVariantKind = "server-backed" | "serverless-static-artifact";
 
 export interface ServerBackedDeploymentTargetState {
@@ -225,12 +225,13 @@ export class DeploymentTriggerKindValue extends ScalarValueObject<DeploymentTrig
       case "create":
       case "retry":
       case "redeploy":
+      case "force-redeploy":
       case "rollback":
         return ok(new DeploymentTriggerKindValue(value));
       default:
         return err(
           domainError.validation(
-            "Deployment trigger kind must be one of create, retry, redeploy, rollback",
+            "Deployment trigger kind must be one of create, retry, redeploy, force-redeploy, rollback",
             {
               value,
             },
@@ -253,6 +254,10 @@ export class DeploymentTriggerKindValue extends ScalarValueObject<DeploymentTrig
 
   static redeploy(): DeploymentTriggerKindValue {
     return new DeploymentTriggerKindValue("redeploy");
+  }
+
+  static forceRedeploy(): DeploymentTriggerKindValue {
+    return new DeploymentTriggerKindValue("force-redeploy");
   }
 
   static rollback(): DeploymentTriggerKindValue {

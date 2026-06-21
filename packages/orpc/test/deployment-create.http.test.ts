@@ -21,6 +21,8 @@ import {
   createExecutionContext,
   type ExecutionContext,
   type ExecutionContextFactory,
+  ForceRedeployDeploymentCommand,
+  type ProductSessionAuthorizationPort,
   PruneDeploymentsCommand,
   type Query,
   type QueryBus,
@@ -67,6 +69,10 @@ const actionDeployToken = "test_action_deploy_token";
 const actionDeployTokenHeaders = {
   authorization: `Bearer ${actionDeployToken}`,
 } as const;
+const productJsonHeaders = {
+  cookie: "better-auth.session_token=test-admin-session",
+  "content-type": "application/json",
+} as const;
 
 const testActionDeployTokenAuthorizationPort: ActionDeployTokenAuthorizationPort = {
   authorize: async (_context, input) => {
@@ -93,12 +99,28 @@ const testActionDeployTokenAuthorizationPort: ActionDeployTokenAuthorizationPort
   },
 };
 
+const testProductSessionAuthorizationPort: ProductSessionAuthorizationPort = {
+  authorizeProductSession: async (_context, input) =>
+    ok({
+      actor: {
+        kind: "user",
+        id: "usr_test_admin",
+        label: "test-admin@example.com",
+      },
+      email: "test-admin@example.com",
+      organizationId: "org_test",
+      role: input.requiredRole,
+      userId: "usr_test_admin",
+    }),
+};
+
 function mountDeploymentCreateHttpRoutes(
   app: Elysia,
   context: Parameters<typeof mountAppaloftOrpcRoutes>[1],
 ) {
   return mountAppaloftOrpcRoutes(app, {
     actionDeployTokenAuthorizationPort: testActionDeployTokenAuthorizationPort,
+    productSessionAuthorizationPort: testProductSessionAuthorizationPort,
     ...context,
   });
 }
@@ -162,9 +184,7 @@ describe("deployment create HTTP route", () => {
     const response = await app.handle(
       new Request("http://localhost/api/deployments", {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
+        headers: productJsonHeaders,
         body: JSON.stringify({
           projectId: "prj_demo",
           serverId: "srv_demo",
@@ -209,9 +229,7 @@ describe("deployment create HTTP route", () => {
     const response = await app.handle(
       new Request("http://localhost/api/deployments", {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
+        headers: productJsonHeaders,
         body: JSON.stringify({
           projectId: "prj_demo",
           serverId: "srv_demo",
@@ -2672,9 +2690,7 @@ describe("deployment create HTTP route", () => {
     const response = await app.handle(
       new Request("http://localhost/api/deployments/dep_failed/retry", {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
+        headers: productJsonHeaders,
         body: JSON.stringify({
           resourceId: "res_demo",
           readinessGeneratedAt: "2026-01-01T00:00:10.000Z",
@@ -2714,9 +2730,7 @@ describe("deployment create HTTP route", () => {
     const response = await app.handle(
       new Request("http://localhost/api/resources/res_demo/redeploy", {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
+        headers: productJsonHeaders,
         body: JSON.stringify({
           sourceDeploymentId: "dep_failed",
           readinessGeneratedAt: "2026-01-01T00:00:10.000Z",
@@ -2727,6 +2741,46 @@ describe("deployment create HTTP route", () => {
     expect(response.status).toBe(201);
     expect(await response.json()).toEqual({ id: "dep_redeploy" });
     expect(capturedCommand).toBeInstanceOf(RedeployDeploymentCommand);
+    expect(capturedCommand).toMatchObject({
+      resourceId: "res_demo",
+      sourceDeploymentId: "dep_failed",
+      readinessGeneratedAt: "2026-01-01T00:00:10.000Z",
+    });
+  });
+
+  test("[DEP-FORCE-REDEPLOY-ENTRY-001] dispatches ForceRedeployDeploymentCommand through HTTP", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({ id: "dep_force_redeploy" } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/resources/res_demo/force-redeploy", {
+        method: "POST",
+        headers: productJsonHeaders,
+        body: JSON.stringify({
+          sourceDeploymentId: "dep_failed",
+          readinessGeneratedAt: "2026-01-01T00:00:10.000Z",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(201);
+    expect(await response.json()).toEqual({ id: "dep_force_redeploy" });
+    expect(capturedCommand).toBeInstanceOf(ForceRedeployDeploymentCommand);
     expect(capturedCommand).toMatchObject({
       resourceId: "res_demo",
       sourceDeploymentId: "dep_failed",
@@ -2756,9 +2810,7 @@ describe("deployment create HTTP route", () => {
     const response = await app.handle(
       new Request("http://localhost/api/deployments/dep_failed/rollback", {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
+        headers: productJsonHeaders,
         body: JSON.stringify({
           rollbackCandidateDeploymentId: "dep_success",
           resourceId: "res_demo",
@@ -2804,9 +2856,7 @@ describe("deployment create HTTP route", () => {
     const response = await app.handle(
       new Request("http://localhost/api/deployments/dep_cancel/cancel", {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
+        headers: productJsonHeaders,
         body: JSON.stringify({
           confirm: "dep_cancel",
           resourceId: "res_demo",
@@ -2853,9 +2903,7 @@ describe("deployment create HTTP route", () => {
     const response = await app.handle(
       new Request("http://localhost/api/deployments/dep_archive/archive", {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
+        headers: productJsonHeaders,
         body: JSON.stringify({
           confirm: "dep_archive",
           resourceId: "res_demo",
@@ -2897,9 +2945,7 @@ describe("deployment create HTTP route", () => {
     const response = await app.handle(
       new Request("http://localhost/api/deployments/dep_archive/archive", {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
+        headers: productJsonHeaders,
         body: JSON.stringify({
           confirm: "dep_archive",
           resourceId: "res_demo",
@@ -2957,9 +3003,7 @@ describe("deployment create HTTP route", () => {
     const response = await app.handle(
       new Request("http://localhost/api/deployments/prune", {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
+        headers: productJsonHeaders,
         body: JSON.stringify({
           before: "2026-01-01T00:05:00.000Z",
           resourceId: "res_demo",
@@ -3018,9 +3062,7 @@ describe("deployment create HTTP route", () => {
     const stopResponse = await app.handle(
       new Request("http://localhost/api/resources/res_demo/runtime/stop", {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
+        headers: productJsonHeaders,
         body: JSON.stringify({
           deploymentId: "dep_current",
           reason: "operator-request",
@@ -3030,9 +3072,7 @@ describe("deployment create HTTP route", () => {
     const startResponse = await app.handle(
       new Request("http://localhost/api/resources/res_demo/runtime/start", {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
+        headers: productJsonHeaders,
         body: JSON.stringify({
           acknowledgeRetainedRuntimeMetadata: true,
         }),
@@ -3041,9 +3081,7 @@ describe("deployment create HTTP route", () => {
     const restartResponse = await app.handle(
       new Request("http://localhost/api/resources/res_demo/runtime/restart", {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
+        headers: productJsonHeaders,
         body: JSON.stringify({
           acknowledgeRetainedRuntimeMetadata: true,
         }),
@@ -3101,9 +3139,7 @@ describe("deployment create HTTP route", () => {
     const response = await app.handle(
       new Request("http://localhost/api/deployments/cleanup-preview", {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
+        headers: productJsonHeaders,
         body: JSON.stringify({
           sourceFingerprint:
             "source-fingerprint:v1:preview%3Apr%3A42:github:github.com%2Fappaloft%2Fwww:.:appaloft.docs.yml",
@@ -3151,6 +3187,7 @@ describe("deployment create HTTP route", () => {
       new Request("http://localhost/api/deployments/cleanup-preview", {
         method: "POST",
         headers: {
+          cookie: productJsonHeaders.cookie,
           "content-type": "application/json",
           "x-appaloft-action-command": "preview-cleanup",
         },
