@@ -124,10 +124,16 @@ describe("Console page extension surface", () => {
     expect(rendererSource).toContain("data-console-page-record-row");
     expect(rendererSource).toContain('kind: "dialog-panel-grid"');
     expect(rendererSource).toContain('kind: "integration-catalog"');
+    expect(rendererSource).toContain('layout?: "catalog-grid" | "settings-list"');
     expect(rendererSource).toContain("data-console-page-integration-catalog");
+    expect(rendererSource).toContain("data-console-page-integration-list");
     expect(rendererSource).toContain("data-console-page-integration-card");
+    expect(rendererSource).toContain("data-console-page-integration-details-trigger");
+    expect(rendererSource).toContain("data-console-page-integration-details");
     expect(rendererSource).toContain("integrationInitials(item)");
     expect(rendererSource).toContain("integrationStatusClass(item.status.tone)");
+    expect(rendererSource).toContain("openIntegrationDetails(item.details)");
+    expect(rendererSource).toContain("bind:open={integrationDetailsOpen}");
     expect(rendererSource).toContain("openPanelGridDialog(section)");
     expect(rendererSource).toContain("bind:open={panelGridDialogOpen}");
     expect(rendererSource).toContain("data-console-page-dialog-panel-body");
