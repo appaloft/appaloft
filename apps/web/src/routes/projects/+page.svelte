@@ -8,6 +8,9 @@
   import Sortable from "sortablejs";
 
   import ConsoleEmptyState from "$lib/components/console/ConsoleEmptyState.svelte";
+  import DomainBindingVerifyDnsButton, {
+    type DomainBindingVerificationFeedback,
+  } from "$lib/components/console/DomainBindingVerifyDnsButton.svelte";
   import ConsoleResourceCanvas from "$lib/components/console/ConsoleResourceCanvas.svelte";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
@@ -118,7 +121,7 @@
     }
   }
 
-  const { authSessionQuery, environmentsQuery, resourcesQuery, deploymentsQuery } =
+  const { authSessionQuery, environmentsQuery, resourcesQuery, deploymentsQuery, domainBindingsQuery } =
     createConsoleQueries(browser, {
       health: false,
       readiness: false,
@@ -126,7 +129,6 @@
       projects: false,
       servers: false,
       previewEnvironments: false,
-      domainBindings: false,
       certificates: false,
       providers: false,
     });
@@ -148,8 +150,10 @@
   const environments = $derived(environmentsQuery.data?.items ?? []);
   const resources = $derived(resourcesQuery.data?.items ?? []);
   const deployments = $derived(deploymentsQuery.data?.items ?? []);
+  const domainBindings = $derived(domainBindingsQuery.data?.items ?? []);
   const projectListLoading = $derived(projectsQuery.isPending && visibleProjects.length === 0);
   let projectCreateDialogOpen = $state(false);
+  let domainBindingFeedback = $state<DomainBindingVerificationFeedback | null>(null);
 
   const reorderProjectsMutation = createMutation(() => ({
     mutationFn: ({
@@ -409,6 +413,20 @@
           </p>
         {/if}
 
+        {#if domainBindingFeedback}
+          <div
+            class={[
+              "rounded-md border px-3 py-2 text-sm",
+              domainBindingFeedback.kind === "success"
+                ? "border-primary/25 bg-primary/5"
+                : "border-destructive/30 bg-destructive/5 text-destructive",
+            ]}
+          >
+            <p class="font-medium">{domainBindingFeedback.title}</p>
+            <p class="mt-1 break-all text-xs">{domainBindingFeedback.detail}</p>
+          </div>
+        {/if}
+
         <div
           class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
           bind:this={projectGridElement}
@@ -440,6 +458,10 @@
           {:else}
             {#each visibleProjects as project (project.id)}
               {@const projectResources = resources.filter((resource) => resource.projectId === project.id)}
+              {@const pendingProjectDomainBindings = domainBindings.filter(
+                (binding) =>
+                  binding.projectId === project.id && binding.status === "pending_verification",
+              )}
               {@const latestDeployment = latestProjectDeployment(project, deployments)}
               {@const latestResource =
                 projectResources.find((resource) => resource.lastDeploymentId === latestDeployment?.id) ??
@@ -501,6 +523,31 @@
                     {/if}
                   </span>
                 </div>
+
+                {#if pendingProjectDomainBindings.length > 0}
+                  <div
+                    class="mt-4 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-sm"
+                    data-project-pending-domain-bindings
+                  >
+                    <p class="font-medium">
+                      {$t(i18nKeys.console.domainBindings.pendingDnsNoticeTitle)}
+                    </p>
+                    <p class="mt-1 text-xs text-muted-foreground">
+                      {$t(i18nKeys.console.domainBindings.pendingDnsProjectSummary, {
+                        count: pendingProjectDomainBindings.length,
+                      })}
+                    </p>
+                    <DomainBindingVerifyDnsButton
+                      class="mt-3"
+                      binding={pendingProjectDomainBindings[0]}
+                      label={$t(i18nKeys.console.domainBindings.verifyDnsShortAction)}
+                      variant="default"
+                      onFeedback={(feedback) => {
+                        domainBindingFeedback = feedback;
+                      }}
+                    />
+                  </div>
+                {/if}
 
                 <a
                   href={projectDetailHref(project.id)}

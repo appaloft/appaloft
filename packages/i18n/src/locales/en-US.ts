@@ -1859,6 +1859,14 @@ export const enUS = {
       showErrorTitle: "Unable to read domain binding",
       showSuccessTitle: "Domain binding read",
       verificationAttempts: "{{count}} verification attempts",
+      verifyDnsAction: "Verify DNS and continue",
+      verifyDnsShortAction: "Verify DNS",
+      pendingDnsActionDescription:
+        "After adding DNS records manually, verify DNS to continue route and TLS activation.",
+      pendingDnsNoticeTitle: "DNS verification is waiting",
+      pendingDnsNoticeBody:
+        "Add the DNS records at your provider, then run verification so Appaloft can continue route and TLS activation.",
+      pendingDnsProjectSummary: "{{count}} domain bindings need DNS verification.",
     },
     runtimeUsage: {
       artifacts: "Artifacts",

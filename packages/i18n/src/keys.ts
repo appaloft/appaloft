@@ -1639,6 +1639,12 @@ export const i18nKeys = {
       showErrorTitle: "console:domainBindings.showErrorTitle",
       showSuccessTitle: "console:domainBindings.showSuccessTitle",
       verificationAttempts: "console:domainBindings.verificationAttempts",
+      verifyDnsAction: "console:domainBindings.verifyDnsAction",
+      verifyDnsShortAction: "console:domainBindings.verifyDnsShortAction",
+      pendingDnsActionDescription: "console:domainBindings.pendingDnsActionDescription",
+      pendingDnsNoticeTitle: "console:domainBindings.pendingDnsNoticeTitle",
+      pendingDnsNoticeBody: "console:domainBindings.pendingDnsNoticeBody",
+      pendingDnsProjectSummary: "console:domainBindings.pendingDnsProjectSummary",
     },
     runtimeUsage: {
       artifacts: "console:runtimeUsage.artifacts",

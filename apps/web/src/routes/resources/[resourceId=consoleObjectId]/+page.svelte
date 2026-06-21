@@ -101,6 +101,7 @@
   import DeploymentProgressDialog from "$lib/components/console/DeploymentProgressDialog.svelte";
   import DeploymentStatusBadge from "$lib/components/console/DeploymentStatusBadge.svelte";
   import DeploymentTable from "$lib/components/console/DeploymentTable.svelte";
+  import DomainBindingVerifyDnsButton from "$lib/components/console/DomainBindingVerifyDnsButton.svelte";
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
   import ResourceProfileSummary from "$lib/components/console/ResourceProfileSummary.svelte";
   import RuntimeMonitorPanel from "$lib/components/console/RuntimeMonitorPanel.svelte";
@@ -7940,6 +7941,15 @@
                   </p>
                 </div>
                 <div class="flex flex-wrap gap-2">
+                  {#if primaryDomainBinding?.status === "pending_verification"}
+                    <DomainBindingVerifyDnsButton
+                      binding={primaryDomainBinding}
+                      variant="default"
+                      onFeedback={(feedback) => {
+                        createFeedback = feedback;
+                      }}
+                    />
+                  {/if}
                   {#if primaryAccessHref}
                     <Button href={primaryAccessHref} target="_blank" rel="noreferrer" variant="outline">
                       <Globe2 class="size-4" />
@@ -8006,21 +8016,34 @@
                         </div>
                       {/if}
                     </div>
-                    {#if primaryAccessHref}
-                      <Button
-                        type="button"
-                        variant="outline"
-                        aria-label={accessUrlCopyLabel}
-                        title={accessUrlCopyLabel}
-                        onclick={handleCopyAccessUrl}
-                      >
-                        {#if accessUrlCopyState === "copied"}
-                          <Check class="size-4" />
-                        {:else}
-                          <Copy class="size-4" />
+                    {#if primaryAccessHref || primaryDomainBinding?.status === "pending_verification"}
+                      <div class="flex shrink-0 flex-wrap gap-2">
+                        {#if primaryDomainBinding?.status === "pending_verification"}
+                          <DomainBindingVerifyDnsButton
+                            binding={primaryDomainBinding}
+                            variant="default"
+                            onFeedback={(feedback) => {
+                              createFeedback = feedback;
+                            }}
+                          />
                         {/if}
-                        {accessUrlCopyLabel}
-                      </Button>
+                        {#if primaryAccessHref}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            aria-label={accessUrlCopyLabel}
+                            title={accessUrlCopyLabel}
+                            onclick={handleCopyAccessUrl}
+                          >
+                            {#if accessUrlCopyState === "copied"}
+                              <Check class="size-4" />
+                            {:else}
+                              <Copy class="size-4" />
+                            {/if}
+                            {accessUrlCopyLabel}
+                          </Button>
+                        {/if}
+                      </div>
                     {/if}
                   </div>
                 </section>
@@ -8459,21 +8482,34 @@
                         {/if}
                       </div>
 
-                      {#if primaryAccessHref}
-                        <Button
-                          type="button"
-                          variant="outline"
-                          aria-label={accessUrlCopyLabel}
-                          title={accessUrlCopyLabel}
-                          onclick={handleCopyAccessUrl}
-                        >
-                          {#if accessUrlCopyState === "copied"}
-                            <Check class="size-4" />
-                          {:else}
-                            <Copy class="size-4" />
+                      {#if primaryAccessHref || primaryDomainBinding?.status === "pending_verification"}
+                        <div class="flex shrink-0 flex-wrap gap-2">
+                          {#if primaryDomainBinding?.status === "pending_verification"}
+                            <DomainBindingVerifyDnsButton
+                              binding={primaryDomainBinding}
+                              variant="default"
+                              onFeedback={(feedback) => {
+                                createFeedback = feedback;
+                              }}
+                            />
                           {/if}
-                          {accessUrlCopyLabel}
-                        </Button>
+                          {#if primaryAccessHref}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              aria-label={accessUrlCopyLabel}
+                              title={accessUrlCopyLabel}
+                              onclick={handleCopyAccessUrl}
+                            >
+                              {#if accessUrlCopyState === "copied"}
+                                <Check class="size-4" />
+                              {:else}
+                                <Copy class="size-4" />
+                              {/if}
+                              {accessUrlCopyLabel}
+                            </Button>
+                          {/if}
+                        </div>
                       {/if}
                     </div>
                   </section>
@@ -8508,6 +8544,20 @@
                         </Button>
                       </div>
                     </div>
+
+                    {#if createFeedback}
+                      <div
+                        class={[
+                          "rounded-md border px-3 py-2 text-sm",
+                          createFeedback.kind === "success"
+                            ? "border-primary/25 bg-primary/5"
+                            : "border-destructive/30 bg-destructive/5 text-destructive",
+                        ]}
+                      >
+                        <p class="font-medium">{createFeedback.title}</p>
+                        <p class="mt-1 break-all text-xs">{createFeedback.detail}</p>
+                      </div>
+                    {/if}
 
                     {#if resourceDomainBindings.length === 0}
                       <div class="rounded-md border border-dashed bg-muted/25 px-4 py-6">
@@ -8588,17 +8638,29 @@
                                     {/if}
                                   </div>
                                 {/if}
-                                <Button
-                                  id={`resource-domain-binding-dns-connector-${binding.id}`}
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  disabled={isResourceArchived || binding.status === "deleted"}
-                                  onclick={() => openDnsConnectorDialog(binding)}
-                                >
-                                  <Globe2 class="size-4" />
-                                  {$t(i18nKeys.console.domainBindings.dnsConnectorConfigure)}
-                                </Button>
+                                <div class="flex flex-wrap gap-2">
+                                  {#if binding.status === "pending_verification"}
+                                    <DomainBindingVerifyDnsButton
+                                      {binding}
+                                      variant="default"
+                                      disabled={isResourceArchived}
+                                      onFeedback={(feedback) => {
+                                        createFeedback = feedback;
+                                      }}
+                                    />
+                                  {/if}
+                                  <Button
+                                    id={`resource-domain-binding-dns-connector-${binding.id}`}
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={isResourceArchived || binding.status === "deleted"}
+                                    onclick={() => openDnsConnectorDialog(binding)}
+                                  >
+                                    <Globe2 class="size-4" />
+                                    {$t(i18nKeys.console.domainBindings.dnsConnectorConfigure)}
+                                  </Button>
+                                </div>
                               </div>
 
                               <div class="min-w-0 space-y-2 lg:w-64">
