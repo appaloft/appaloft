@@ -82,6 +82,7 @@ export class PgDomainBindingReadModel implements DomainBindingReadModel {
             ...(row.destination_id ? { destinationId: row.destination_id } : {}),
             domainName: row.domain_name,
             pathPrefix: row.path_prefix,
+            pathHandling: row.path_handling === "strip" ? "strip" : "preserve",
             proxyKind: row.proxy_kind as DomainBindingSummary["proxyKind"],
             tlsMode: row.tls_mode as DomainBindingSummary["tlsMode"],
             ...(row.redirect_to ? { redirectTo: row.redirect_to } : {}),

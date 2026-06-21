@@ -279,6 +279,35 @@ describe("TraefikEdgeProxyProvider", () => {
     expect(labels).not.toContain("dep-canonical-1-svc.loadbalancer");
   });
 
+  test("[EDGE-PROXY-ROUTE-009] renders strip-prefix middleware for explicit strip path handling", async () => {
+    const provider = new TraefikEdgeProxyProvider();
+    const realized = await provider.realizeRoutes(
+      { correlationId: "req_traefik_path_handling_test" },
+      {
+        deploymentId: "dep_path",
+        port: 3000,
+        accessRoutes: [
+          {
+            proxyKind: "traefik",
+            domains: ["app.example.test"],
+            pathPrefix: "/nocodb",
+            pathHandling: "strip",
+            tlsMode: "disabled",
+            targetPort: 3000,
+          },
+        ],
+      },
+    );
+
+    expect(realized.isOk()).toBe(true);
+    expect(realized._unsafeUnwrap().labels).toEqual(
+      expect.arrayContaining([
+        "traefik.http.routers.dep-path.middlewares=dep-path-strip-prefix",
+        "traefik.http.middlewares.dep-path-strip-prefix.stripprefix.prefixes=/nocodb",
+      ]),
+    );
+  });
+
   test("[EDGE-PROXY-QRY-007] exposes canonical redirect route views", async () => {
     const provider = new TraefikEdgeProxyProvider();
     const accessRoutes = [

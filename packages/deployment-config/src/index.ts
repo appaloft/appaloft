@@ -736,6 +736,7 @@ const appaloftDeploymentAccessDomainConfigSchema = z
       .optional()
       .default("/")
       .pipe(z.string().refine(isSafeDomainPathPrefix, domainPathPrefixError)),
+    pathHandling: z.enum(["preserve", "strip"]).optional().default("preserve"),
     tlsMode: z.enum(["auto", "disabled"]).optional().default("auto"),
     redirectTo: nonEmptyStringSchema
       .refine((value) => isDomainName(value.toLowerCase()), domainRedirectToError)

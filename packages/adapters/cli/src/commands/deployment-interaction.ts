@@ -695,6 +695,7 @@ export function deploymentPromptSeedFromConfig(
   const serverAppliedRoutes = config.access?.domains?.map((domain) => ({
     host: domain.host,
     pathPrefix: domain.pathPrefix,
+    pathHandling: domain.pathHandling,
     tlsMode: domain.tlsMode,
     ...(domain.redirectTo ? { redirectTo: domain.redirectTo } : {}),
     ...(domain.redirectStatus ? { redirectStatus: domain.redirectStatus } : {}),

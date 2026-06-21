@@ -322,6 +322,26 @@ function httpToHttpsRedirectLabels(input: {
   ];
 }
 
+function routePathHandlingMiddlewareName(input: {
+  route: EdgeProxyRouteInput;
+  router: string;
+}): string | null {
+  if ((input.route.pathHandling ?? "preserve") !== "strip" || input.route.pathPrefix === "/") {
+    return null;
+  }
+
+  return `${input.router}-strip-prefix`;
+}
+
+function routePathHandlingLabels(input: {
+  route: EdgeProxyRouteInput;
+  middleware: string;
+}): string[] {
+  return [
+    `traefik.http.middlewares.${input.middleware}.stripprefix.prefixes=${input.route.pathPrefix}`,
+  ];
+}
+
 function routeProbeCommand(input: {
   httpPort: number;
   networkName: string;
@@ -433,6 +453,11 @@ function labelsForTraefik(input: {
 
   const service = `${router}-svc`;
   const entrypoint = input.route.tlsMode === "auto" ? "websecure" : "web";
+  const pathHandlingMiddleware = routePathHandlingMiddlewareName({ route: input.route, router });
+  const middlewares = [
+    ...(pathHandlingMiddleware ? [pathHandlingMiddleware] : []),
+    ...(input.accessFailureMiddlewareName ? [input.accessFailureMiddlewareName] : []),
+  ];
 
   return [
     "traefik.enable=true",
@@ -441,8 +466,11 @@ function labelsForTraefik(input: {
     `traefik.http.routers.${router}.entrypoints=${entrypoint}`,
     ...autoTlsLabels,
     ...httpToHttpsRedirectLabels({ route: input.route, router }),
-    ...(input.accessFailureMiddlewareName
-      ? [`traefik.http.routers.${router}.middlewares=${input.accessFailureMiddlewareName}`]
+    ...(middlewares.length > 0
+      ? [`traefik.http.routers.${router}.middlewares=${middlewares.join(",")}`]
+      : []),
+    ...(pathHandlingMiddleware
+      ? routePathHandlingLabels({ route: input.route, middleware: pathHandlingMiddleware })
       : []),
     `traefik.http.routers.${router}.service=${service}`,
     `traefik.http.services.${service}.loadbalancer.server.port=${input.route.targetPort ?? input.port}`,
@@ -485,6 +513,7 @@ function routeViews(input: ProxyConfigurationViewInput): ProxyConfigurationRoute
         scheme,
         url: routeUrl({ hostname, scheme, pathPrefix: route.pathPrefix }),
         pathPrefix: route.pathPrefix,
+        pathHandling: route.pathHandling ?? "preserve",
         tlsMode: route.tlsMode,
         ...(route.targetPort === undefined ? {} : { targetPort: route.targetPort }),
         source,
