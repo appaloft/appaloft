@@ -234,7 +234,7 @@
                       </Badge>
                     </div>
                     <div class="grid gap-2 text-xs text-muted-foreground md:grid-cols-3">
-                      <div class="rounded-md bg-muted/20 px-3 py-2">
+                      <div class="rounded-md border border-border/60 bg-muted/20 px-3 py-2">
                         <p class="uppercase tracking-wide">
                           {$t(i18nKeys.common.domain.project)}
                         </p>
@@ -242,7 +242,7 @@
                           {project?.name ?? binding.projectId}
                         </p>
                       </div>
-                      <div class="rounded-md bg-muted/20 px-3 py-2">
+                      <div class="rounded-md border border-border/60 bg-muted/20 px-3 py-2">
                         <p class="uppercase tracking-wide">
                           {$t(i18nKeys.common.domain.environment)}
                         </p>
@@ -250,7 +250,7 @@
                           {environment?.name ?? binding.environmentId}
                         </p>
                       </div>
-                      <div class="rounded-md bg-muted/20 px-3 py-2">
+                      <div class="rounded-md border border-border/60 bg-muted/20 px-3 py-2">
                         <p class="uppercase tracking-wide">
                           {$t(i18nKeys.common.domain.resource)}
                         </p>
