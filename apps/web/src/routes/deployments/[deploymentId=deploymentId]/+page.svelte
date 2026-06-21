@@ -86,6 +86,8 @@
   type AccessUrlKind = DeploymentAccessUrlKind;
   type AccessUrl = DeploymentAccessUrl;
   type DeploymentDetailTab = "overview" | "timeline" | "snapshot";
+  type DeploymentEnvironmentSnapshotVariable =
+    DeploymentDetailSummary["environmentSnapshot"]["variables"][number];
   type DeploymentTimelineJournalEntry = DeploymentTimelineResponse["entries"][number];
   type DeploymentRecoveryAction = "retry" | "redeploy" | "rollback";
   type AppaloftDesktopBridge = {
@@ -130,6 +132,10 @@
   let diagnosticSummaryCopyState = $state<"idle" | "copied" | "failed">("idle");
   let diagnosticSummaryError = $state<string | null>(null);
   let diagnosticSummaryCopyFallback = $state<string | null>(null);
+  let snapshotConfigCopyState = $state<{
+    key: string;
+    state: "copied" | "failed";
+  } | null>(null);
   let deploymentRecoveryActionError = $state("");
   let recoveryDialogOpen = $state(false);
   let selectedRecoveryAction = $state<DeploymentRecoveryAction | null>(null);
@@ -137,6 +143,7 @@
   let timelineCopyResetTimeout: ReturnType<typeof setTimeout> | undefined;
   let accessUrlCopyResetTimeout: ReturnType<typeof setTimeout> | undefined;
   let diagnosticSummaryCopyResetTimeout: ReturnType<typeof setTimeout> | undefined;
+  let snapshotConfigCopyResetTimeout: ReturnType<typeof setTimeout> | undefined;
 
   const deploymentId = $derived(page.params.deploymentId ?? "");
   const deploymentDetailQuery = createQuery(() =>
@@ -821,6 +828,48 @@
     }, 2200);
   }
 
+  function snapshotConfigCopyKey(variable: DeploymentEnvironmentSnapshotVariable): string {
+    return `${variable.scope}:${variable.key}:${variable.exposure}:${variable.kind}`;
+  }
+
+  function markSnapshotConfigCopyState(key: string, state: "copied" | "failed"): void {
+    if (snapshotConfigCopyResetTimeout) {
+      clearTimeout(snapshotConfigCopyResetTimeout);
+    }
+
+    snapshotConfigCopyState = { key, state };
+    snapshotConfigCopyResetTimeout = setTimeout(() => {
+      snapshotConfigCopyState = null;
+      snapshotConfigCopyResetTimeout = undefined;
+    }, 1800);
+  }
+
+  function snapshotConfigCopyLabel(variable: DeploymentEnvironmentSnapshotVariable): string {
+    const key = snapshotConfigCopyKey(variable);
+    if (snapshotConfigCopyState?.key === key) {
+      if (snapshotConfigCopyState.state === "copied") {
+        return $t(i18nKeys.console.resources.configurationValueCopied);
+      }
+      return $t(i18nKeys.console.resources.configurationValueCopyFailed);
+    }
+
+    return $t(i18nKeys.console.resources.configurationCopyValue);
+  }
+
+  function snapshotConfigScopeBadgeVariant(
+    scope: DeploymentEnvironmentSnapshotVariable["scope"],
+  ): "default" | "outline" {
+    return scope === "resource" || scope === "deployment" ? "default" : "outline";
+  }
+
+  function snapshotConfigExposureLabel(
+    exposure: DeploymentEnvironmentSnapshotVariable["exposure"],
+  ): string {
+    return exposure === "build-time"
+      ? $t(i18nKeys.console.resources.configurationExposureBuildTime)
+      : $t(i18nKeys.console.resources.configurationExposureRuntime);
+  }
+
   async function copyTextToClipboard(text: string): Promise<void> {
     const desktopCopyText = (window as WindowWithAppaloftDesktopBridge).appaloftDesktop?.copyText;
     if (desktopCopyText) {
@@ -857,6 +906,20 @@
       }
     } finally {
       textArea.remove();
+    }
+  }
+
+  async function copySnapshotConfigValue(variable: DeploymentEnvironmentSnapshotVariable): Promise<void> {
+    if (!browser || variable.isSecret) {
+      return;
+    }
+
+    const key = snapshotConfigCopyKey(variable);
+    try {
+      await copyTextToClipboard(variable.value);
+      markSnapshotConfigCopyState(key, "copied");
+    } catch {
+      markSnapshotConfigCopyState(key, "failed");
     }
   }
 
@@ -1056,6 +1119,9 @@
     if (diagnosticSummaryCopyResetTimeout) {
       clearTimeout(diagnosticSummaryCopyResetTimeout);
     }
+    if (snapshotConfigCopyResetTimeout) {
+      clearTimeout(snapshotConfigCopyResetTimeout);
+    }
   });
 
   function progressStatusLabel(status?: DeploymentProgressEvent["status"]): string {
@@ -1110,6 +1176,90 @@
 <svelte:head>
   <title>{deployment?.runtimePlan.source.displayName ?? $t(i18nKeys.console.deployments.pageTitle)} · Appaloft</title>
 </svelte:head>
+
+{#snippet deploymentSnapshotConfigTable(variables: DeploymentEnvironmentSnapshotVariable[])}
+  <div class="mt-4 overflow-hidden rounded-md border">
+    <div class="overflow-x-auto">
+      <table
+        id="deployment-environment-snapshot-table"
+        class="w-full min-w-[760px] text-left text-sm"
+        data-deployment-environment-snapshot-table
+      >
+        <thead class="bg-muted/35 text-xs text-muted-foreground">
+          <tr>
+            <th class="px-3 py-2 font-medium">
+              {$t(i18nKeys.console.resources.configurationColumnKey)}
+            </th>
+            <th class="px-3 py-2 font-medium">
+              {$t(i18nKeys.console.resources.configurationColumnValue)}
+            </th>
+            <th class="px-3 py-2 font-medium">
+              {$t(i18nKeys.console.resources.configurationColumnScope)}
+            </th>
+            <th class="px-3 py-2 font-medium">
+              {$t(i18nKeys.console.resources.configurationColumnExposure)}
+            </th>
+            <th class="px-3 py-2 font-medium">
+              {$t(i18nKeys.console.resources.configurationColumnKind)}
+            </th>
+          </tr>
+        </thead>
+        <tbody class="divide-y bg-background">
+          {#each variables as variable (snapshotConfigCopyKey(variable))}
+            <tr>
+              <td class="min-w-0 px-3 py-2.5 align-middle">
+                <span class="block truncate font-medium">{variable.key}</span>
+              </td>
+              <td
+                class="min-w-0 px-3 py-2.5 align-middle"
+                data-deployment-environment-snapshot-value
+              >
+                <div class="flex min-w-0 items-center gap-2">
+                  <span class="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">
+                    {variable.value}
+                  </span>
+                  {#if !variable.isSecret}
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      class="h-7 w-7 shrink-0"
+                      aria-label={`${snapshotConfigCopyLabel(variable)}: ${variable.key}`}
+                      title={snapshotConfigCopyLabel(variable)}
+                      data-deployment-snapshot-config-copy-button={variable.key}
+                      onclick={() => void copySnapshotConfigValue(variable)}
+                    >
+                      {#if snapshotConfigCopyState?.key === snapshotConfigCopyKey(variable) && snapshotConfigCopyState.state === "copied"}
+                        <Check class="size-3.5" />
+                      {:else}
+                        <Copy class="size-3.5" />
+                      {/if}
+                    </Button>
+                  {/if}
+                </div>
+              </td>
+              <td class="px-3 py-2.5 align-middle">
+                <Badge class="w-fit" variant={snapshotConfigScopeBadgeVariant(variable.scope)}>
+                  {variable.scope}
+                </Badge>
+              </td>
+              <td class="px-3 py-2.5 align-middle">
+                <Badge class="w-fit" variant="outline">
+                  {snapshotConfigExposureLabel(variable.exposure)}
+                </Badge>
+              </td>
+              <td class="px-3 py-2.5 align-middle">
+                <Badge class="w-fit" variant={variable.isSecret ? "secondary" : "outline"}>
+                  {variable.kind}
+                </Badge>
+              </td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{/snippet}
 
 {#snippet deploymentDetailLoadingSkeleton()}
   <div class={detailPageClass} data-deployment-detail-loading-skeleton>
@@ -1997,45 +2147,13 @@
               {$t(i18nKeys.console.deployments.snapshotDescription)}
             </p>
 
-            <div class="console-subtle-panel mt-4 px-4 py-3">
-              <p class="text-xs text-muted-foreground">{$t(i18nKeys.console.deployments.precedence)}</p>
-              <p class="mt-1 break-words text-sm font-medium">
-                {deployment.environmentSnapshot.precedence.join(" / ")}
-              </p>
-            </div>
-
-            <div class="mt-4 divide-y rounded-md border">
-              {#if deployment.environmentSnapshot.variables.length > 0}
-                {#each deployment.environmentSnapshot.variables as variable (variable.key)}
-                  <div class="px-4 py-3">
-                    <div class="flex flex-wrap items-center justify-between gap-2">
-                      <p class="font-medium">{variable.key}</p>
-                      <Badge variant={variable.isSecret ? "secondary" : "outline"}>
-                        {variable.isSecret
-                          ? $t(i18nKeys.console.quickDeploy.secretStorage)
-                          : $t(i18nKeys.console.quickDeploy.variablePlainStorage)}
-                      </Badge>
-                    </div>
-                    <p class="mt-2 text-sm text-muted-foreground">
-                      {variable.scope} · {variable.exposure} · {variable.kind}
-                    </p>
-                    <div
-                      class="mt-3 rounded-md bg-muted/40 px-3 py-2"
-                      data-deployment-environment-snapshot-value
-                    >
-                      <p class="text-xs font-medium text-muted-foreground">
-                        {$t(i18nKeys.common.domain.value)}
-                      </p>
-                      <p class="mt-1 break-all font-mono text-sm">{variable.value}</p>
-                    </div>
-                  </div>
-                {/each}
-              {:else}
-                <div class="px-4 py-4 text-sm text-muted-foreground">
-                  {$t(i18nKeys.console.deployments.noSnapshotVariables)}
-                </div>
-              {/if}
-            </div>
+            {#if deployment.environmentSnapshot.variables.length > 0}
+              {@render deploymentSnapshotConfigTable(deployment.environmentSnapshot.variables)}
+            {:else}
+              <div class="mt-4 rounded-md border border-dashed bg-muted/25 px-4 py-6 text-sm text-muted-foreground">
+                {$t(i18nKeys.console.deployments.noSnapshotVariables)}
+              </div>
+            {/if}
           </section>
         </Tabs.Content>
       </Tabs.Root>

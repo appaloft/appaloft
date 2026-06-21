@@ -1662,6 +1662,7 @@ describe("console page structure", () => {
   test("[DEPLOYMENT-DETAIL-IA-001] keeps recovery actions behind an intent dialog", () => {
     expect(deploymentDetailPageSource).toContain("data-deployment-attempt-snapshot");
     expect(deploymentDetailPageSource).toContain("data-deployment-access-snapshot");
+    expect(deploymentDetailPageSource).toContain("data-deployment-environment-snapshot-table");
     expect(deploymentDetailPageSource).toContain("data-deployment-environment-snapshot-value");
     expect(deploymentDetailPageSource).toContain("{variable.value}");
     expect(deploymentDetailPageSource).toContain("data-deployment-current-resource-handoff");
