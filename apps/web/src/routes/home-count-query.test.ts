@@ -110,6 +110,22 @@ describe("operations workbench home", () => {
     expect(homePageSource).not.toContain("letter-spacing: 0.08em");
   });
 
+  test("[HOME-ATTENTION-LAYOUT-001] keeps attention icon, title, and action on a compact row", () => {
+    expect(homePageSource).toContain('<div class="nothing-attention-row">');
+    expect(homePageSource).toContain('<span class="nothing-attention-icon" aria-hidden="true">');
+    expect(homePageSource).toContain('class="nothing-attention-action justify-self-start md:justify-self-end"');
+    expect(homePageSource).toContain(".nothing-attention-row {");
+    expect(homePageSource).toContain("grid-template-columns: auto minmax(0, 1fr) auto;");
+    expect(homePageSource).toContain(".nothing-attention-row > :global(.nothing-attention-action)");
+
+    expect(homePageSource.indexOf('<div class="nothing-attention-row">')).toBeLessThan(
+      homePageSource.indexOf('<div class="nothing-attention-copy">'),
+    );
+    expect(homePageSource.indexOf(".nothing-attention-icon {")).toBeLessThan(
+      homePageSource.indexOf(".nothing-attention-copy {"),
+    );
+  });
+
   test("[HOME-SKELETON-001] uses the shared shadcn skeleton primitive", () => {
     expect(homePageSource).toContain('import { Skeleton } from "$lib/components/ui/skeleton";');
     expect(homePageSource).toContain("<Skeleton class=");
