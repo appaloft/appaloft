@@ -949,6 +949,32 @@ export const i18nKeys = {
       historyTitle: "console:installedApplications.historyTitle",
       installResultDescription: "console:installedApplications.installResultDescription",
       installResultTitle: "console:installedApplications.installResultTitle",
+      initialAccessCredentialCopied: "console:installedApplications.initialAccessCredentialCopied",
+      initialAccessCredentialCopy: "console:installedApplications.initialAccessCredentialCopy",
+      initialAccessCredentialCopyFailed:
+        "console:installedApplications.initialAccessCredentialCopyFailed",
+      initialAccessCredentialExpired:
+        "console:installedApplications.initialAccessCredentialExpired",
+      initialAccessCredentialExpiresAt:
+        "console:installedApplications.initialAccessCredentialExpiresAt",
+      initialAccessCredentialPending:
+        "console:installedApplications.initialAccessCredentialPending",
+      initialAccessCredentialResetRequired:
+        "console:installedApplications.initialAccessCredentialResetRequired",
+      initialAccessCredentialReveal: "console:installedApplications.initialAccessCredentialReveal",
+      initialAccessCredentialRevealed:
+        "console:installedApplications.initialAccessCredentialRevealed",
+      initialAccessCredentialRevealedAt:
+        "console:installedApplications.initialAccessCredentialRevealedAt",
+      initialAccessCredentialRevealedHint:
+        "console:installedApplications.initialAccessCredentialRevealedHint",
+      initialAccessCredentialUnavailable:
+        "console:installedApplications.initialAccessCredentialUnavailable",
+      initialAccessCredentialValueLabel:
+        "console:installedApplications.initialAccessCredentialValueLabel",
+      initialAccessCredentialsDescription:
+        "console:installedApplications.initialAccessCredentialsDescription",
+      initialAccessCredentialsTitle: "console:installedApplications.initialAccessCredentialsTitle",
       lastChangedAtLabel: "console:installedApplications.lastChangedAtLabel",
       latestDeploymentEmpty: "console:installedApplications.latestDeploymentEmpty",
       latestDeploymentLabel: "console:installedApplications.latestDeploymentLabel",
@@ -978,6 +1004,7 @@ export const i18nKeys = {
       progressFallback: "console:installedApplications.progressFallback",
       projectSummaryDescription: "console:installedApplications.projectSummaryDescription",
       projectSummaryTitle: "console:installedApplications.projectSummaryTitle",
+      publicUrlsTitle: "console:installedApplications.publicUrlsTitle",
       resourceControlsDescription: "console:installedApplications.resourceControlsDescription",
       resourceControlsTitle: "console:installedApplications.resourceControlsTitle",
       resourcesEmpty: "console:installedApplications.resourcesEmpty",
