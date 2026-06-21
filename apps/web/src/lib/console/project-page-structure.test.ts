@@ -77,10 +77,11 @@ describe("project detail page structure", () => {
     expect(projectSource).not.toContain('resource.lifecycleStatus === "archived"');
     expect(projectSource).toContain("detailTabPanelSubnavClass");
     expect(projectSource).toContain("detailSubnavLayoutClass");
-    expect(projectSource).toContain("detailSubnavClass");
-    expect(projectSource).toContain("subnavListClass");
-    expect(projectSource).toContain("subnavItemClass");
     expect(projectSource).toContain("detailSubnavContentClass");
+    expect(projectSource).toContain("ConsoleDetailTabs");
+    expect(projectSource).toContain("ConsoleDetailSubnav");
+    expect(projectSource).toContain("projectDetailTabItems");
+    expect(projectSource).toContain("projectSettingsSubnavItems");
     expect(projectSource.indexOf("data-project-settings-general")).toBeLessThan(
       projectSource.indexOf("data-project-settings-archived-resources"),
     );

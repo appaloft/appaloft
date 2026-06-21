@@ -26,11 +26,20 @@ const detailPages = [
 
 describe("console detail loading skeletons", () => {
   test("[DETAIL-LOADING-001] detail pages keep fixed structure visible while records load", async () => {
+    const detailTabsSource = await readFile(
+      new URL("../components/console/ConsoleDetailTabs.svelte", import.meta.url),
+      "utf8",
+    );
+
     for (const page of detailPages) {
       const source = await readFile(new URL(page.path, import.meta.url), "utf8");
 
       expect(source).toContain(page.marker);
-      expect(source).toContain("detailTabsClass");
+      if (source.includes("ConsoleDetailTabs")) {
+        expect(detailTabsSource).toContain("detailTabsClass");
+      } else {
+        expect(source).toContain("detailTabsClass");
+      }
       expect(source).toContain("{#if pageLoading}");
       expect(source).toContain(page.renderCall);
     }
