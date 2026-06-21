@@ -229,7 +229,7 @@ Initial inputs:
 | `ssh-port` | No | Trusted SSH port, mapped to `--server-port`. |
 | `ssh-private-key` | Yes when no key file is supplied | Secret value written to a runner temp file with mode `0600`; the file path is passed to `--server-ssh-private-key-file`. |
 | `ssh-private-key-file` | No | Existing runner-local private key path; mutually exclusive with `ssh-private-key`. |
-| `server-proxy-kind` | No | Trusted proxy selection such as `traefik` or `caddy`, mapped to `--server-proxy-kind`. |
+| `server-proxy-kind` | No | Removed from the CLI wrapper surface while provider support is uneven; preview deploys use the configured default proxy provider. |
 | `state-backend` | No | Optional explicit backend: `ssh-pglite`, `local-pglite`, or `postgres-control-plane`. |
 | `control-plane-mode` | No | Explicit mode: `none` for pure SSH CLI mode or `self-hosted` for the first server API trigger slice. `auto` and `cloud` remain future and must fail before mutation. |
 | `control-plane-url` | Required for `self-hosted` | Trusted endpoint for the self-hosted Appaloft server, mapped outside committed config. |

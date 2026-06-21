@@ -247,8 +247,6 @@ describe("routing/domain/TLS proxy workflow e2e", () => {
           initialContext.serverId,
           "--destination-id",
           initialContext.destinationId,
-          "--proxy-kind",
-          "traefik",
           "--tls-mode",
           "disabled",
         ],

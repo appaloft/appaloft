@@ -150,7 +150,7 @@ Implemented operations:
 | Inspect deployment target capacity | Query | `servers.capacity.inspect` | `InspectServerCapacityQuery` | `InspectServerCapacityQueryInput` | `appaloft server capacity inspect <serverId>` | `GET /api/servers/{serverId}/capacity` |
 | Inspect runtime usage attribution | Query | `runtime-usage.inspect` | `InspectRuntimeUsageQuery` | `InspectRuntimeUsageQueryInput` | `appaloft runtime-usage inspect <scope>` | `GET /api/runtime-usage/inspect` |
 | Rename deployment target | Command | `servers.rename` | `RenameServerCommand` | `RenameServerCommandInput` | `appaloft server rename <serverId> --name <name>` | `POST /api/servers/{serverId}/rename` |
-| Configure deployment target edge proxy | Command | `servers.configure-edge-proxy` | `ConfigureServerEdgeProxyCommand` | `ConfigureServerEdgeProxyCommandInput` | `appaloft server proxy configure <serverId> --kind none\|traefik\|caddy` | `POST /api/servers/{serverId}/edge-proxy/configuration` |
+| Configure deployment target edge proxy | Command | `servers.configure-edge-proxy` | `ConfigureServerEdgeProxyCommand` | `ConfigureServerEdgeProxyCommandInput` | — | `POST /api/servers/{serverId}/edge-proxy/configuration` |
 | Deactivate deployment target | Command | `servers.deactivate` | `DeactivateServerCommand` | `DeactivateServerCommandInput` | `appaloft server deactivate <serverId>` | `POST /api/servers/{serverId}/deactivate` |
 | Check deployment target delete safety | Query | `servers.delete-check` | `CheckServerDeleteSafetyQuery` | `CheckServerDeleteSafetyQueryInput` | `appaloft server delete-check <serverId>` | `GET /api/servers/{serverId}/delete-check` |
 | Delete deployment target | Command | `servers.delete` | `DeleteServerCommand` | `DeleteServerCommandInput` | `appaloft server delete <serverId> --confirm <serverId>` | `DELETE /api/servers/{serverId}` |
@@ -258,10 +258,11 @@ Runtime monitoring operations:
   proxy kind. It preserves the server id, host, provider, credential, lifecycle state, destination
   ids, and historical deployment/domain/route/audit references. `none` disables future generated
   default access or custom-domain proxy-backed target selection for that server without deleting
-  historical route snapshots or provider-owned artifacts. `traefik` and `caddy` record
+  historical route snapshots or provider-owned artifacts. Provider-backed kinds record
   provider-owned proxy intent for later route realization. The command does not synchronously
   bootstrap or repair proxy infrastructure; after changing from `none` to a provider-backed kind,
-  users should run `servers.bootstrap-proxy` or rely on a later deployment ensure path.
+  operators should run `servers.bootstrap-proxy` or rely on a later deployment ensure path. Routine
+  Web and CLI entrypoints do not expose provider selection; they use the configured default provider.
 - `servers.deactivate` moves a server to inactive lifecycle state. Inactive servers remain
   readable and keep history/dependency visibility, but deployment admission, scheduler target
   selection, and new proxy target configuration must not use them for future work.

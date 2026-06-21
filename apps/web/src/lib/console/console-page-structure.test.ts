@@ -1325,14 +1325,16 @@ describe("console page structure", () => {
     expect(resourceDomainBindingDialogSource).toContain('id="resource-domain-binding-domain"');
     expect(resourceDomainBindingDialogSource).toContain('id="resource-domain-binding-destination"');
     expect(resourceDomainBindingDialogSource).toContain(
-      '<Select.Item value="traefik">traefik</Select.Item>',
-    );
-    expect(resourceDomainBindingDialogSource).toContain(
-      '<Select.Item value="caddy">caddy</Select.Item>',
-    );
-    expect(resourceDomainBindingDialogSource).toContain(
       '<Select.Item value="disabled">disabled</Select.Item>',
     );
+    expect(resourceDetailPageSource).toContain('proxyKind: "traefik"');
+    expect(resourceDomainBindingDialogSource).not.toContain(
+      '<Select.Item value="traefik">traefik</Select.Item>',
+    );
+    expect(resourceDomainBindingDialogSource).not.toContain(
+      '<Select.Item value="caddy">caddy</Select.Item>',
+    );
+    expect(resourceDomainBindingDialogSource).not.toContain("tlsStepTitle");
     expect(resourceDomainBindingDialogSource).not.toContain(
       '<Select.Item value="nginx">nginx</Select.Item>',
     );

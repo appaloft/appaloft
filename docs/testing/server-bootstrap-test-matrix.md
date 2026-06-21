@@ -85,7 +85,7 @@ Then:
 
 | Test ID | Preferred automation | Case | Entry | Input/read state | Expected observable result | Companion lower-level coverage |
 | --- | --- | --- | --- | --- | --- | --- |
-| SERVER-BOOT-ENTRY-001 | e2e-preferred | CLI registers server and CLI read model observes it | CLI command plus CLI read model | `appaloft server register --provider local-shell --proxy-kind none`; then `appaloft server list` | Register returns a server id; CLI list includes the same id, name, host, provider key, and disabled proxy summary | `SERVER-BOOT-CMD-002` covers repository state, accepted event, and edge proxy disabled semantics at integration level |
+| SERVER-BOOT-ENTRY-001 | e2e-preferred | CLI registers server and CLI read model observes it | CLI command plus CLI read model | `appaloft server register --provider local-shell`; then `appaloft server list` | Register returns a server id; CLI list includes the same id, name, host, provider key, and default proxy summary | `SERVER-BOOT-CMD-002` covers repository state, accepted event, and edge proxy default semantics at integration level |
 | SERVER-BOOT-ENTRY-002 | e2e-preferred | HTTP registers server and HTTP read model observes it | HTTP API command plus HTTP read model | `POST /api/servers` with `providerKey = local-shell`, `proxyKind = none`; then `GET /api/servers` | HTTP register returns `201` and server id; HTTP list includes the same id, name, host, provider key, and disabled proxy summary | `SERVER-BOOT-CMD-002` covers repository state, accepted event, and edge proxy disabled semantics at integration level |
 
 ## Event Matrix

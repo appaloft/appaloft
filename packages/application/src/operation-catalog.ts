@@ -1482,7 +1482,6 @@ export const operationCatalog = [
     inputSchema: configureServerEdgeProxyCommandInputSchema,
     serviceToken: tokens.configureServerEdgeProxyUseCase,
     transports: {
-      cli: "appaloft server proxy configure <serverId> --kind none|traefik|caddy",
       orpc: { method: "POST", path: "/api/servers/{serverId}/edge-proxy/configuration" },
     },
   },
