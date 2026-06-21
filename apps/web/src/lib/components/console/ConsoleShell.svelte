@@ -61,11 +61,15 @@
     defaultConsoleSidebarOpen,
     readBrowserConsoleSidebarOpen,
   } from "$lib/console/sidebar-state";
+  import {
+    systemPluginExtensionIcon,
+    systemPluginExtensionTitle,
+  } from "$lib/console/web-extension-presentation";
   import { modalIsOpen, setModalOpen } from "$lib/console/url-modal";
   import { orpc, orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
   import { projectDetailHref } from "$lib/console/utils";
-  import { i18nKeys, t } from "$lib/i18n";
+  import { i18nKeys, locale, t } from "$lib/i18n";
   import type { SystemPluginWebExtension } from "@appaloft/contracts";
 
   type BreadcrumbItem = {
@@ -174,7 +178,11 @@
   const navigationExtensions = $derived.by(() =>
     (webExtensionsQuery.data?.items ?? [])
       .filter((extension) => extension.placement === "navigation")
-      .toSorted((a, b) => a.title.localeCompare(b.title)),
+      .toSorted((a, b) =>
+        systemPluginExtensionTitle(a, $locale).localeCompare(
+          systemPluginExtensionTitle(b, $locale),
+        ),
+      ),
   );
   const filteredProjects = $derived.by(() => {
     const query = projectSearch.trim().toLowerCase();
@@ -351,10 +359,12 @@
               </SidebarMenuItem>
             {/each}
             {#each navigationExtensions as extension (extension.key)}
+              {@const extensionLabel = systemPluginExtensionTitle(extension, $locale)}
+              {@const ExtensionIcon = systemPluginExtensionIcon(extension)}
               <SidebarMenuItem>
                 <SidebarMenuButton
                   isActive={isNavigationActive(extension.path)}
-                  tooltipContent={extension.title}
+                  tooltipContent={extensionLabel}
                 >
                   {#snippet child({ props })}
                     <a
@@ -363,8 +373,8 @@
                       rel={extension.target === "external-page" ? "noreferrer" : undefined}
                       {...props}
                     >
-                      <Package class="size-4" />
-                      <span>{extension.title}</span>
+                      <ExtensionIcon class="size-4" />
+                      <span>{extensionLabel}</span>
                     </a>
                   {/snippet}
                 </SidebarMenuButton>

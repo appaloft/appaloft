@@ -84,7 +84,18 @@ describe("plugin manifest contract", () => {
       systemPluginWebExtensionSchema.parse({
         key: "example-marketplace",
         title: "Marketplace",
+        localizations: {
+          "zh-CN": {
+            title: "应用市场",
+            description: "浏览可安装应用。",
+          },
+          "en-US": {
+            title: "Marketplace",
+            description: "Browse installable applications.",
+          },
+        },
         path: "/marketplace",
+        icon: "package",
         placement: "navigation",
         target: "console-route",
         requiresAuth: false,
@@ -95,6 +106,12 @@ describe("plugin manifest contract", () => {
       }),
     ).toMatchObject({
       key: "example-marketplace",
+      icon: "package",
+      localizations: {
+        "zh-CN": {
+          title: "应用市场",
+        },
+      },
       target: "console-route",
       metadata: {
         renderer: "blueprint-catalog",

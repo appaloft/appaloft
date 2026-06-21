@@ -41,7 +41,7 @@
   import { readErrorMessage, request } from "$lib/api/client";
   import { orpc, orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
-  import { i18nKeys, t } from "$lib/i18n";
+  import { i18nKeys, locale, t } from "$lib/i18n";
 
   type DeployTokenWorkflow = "preview-cleanup" | "server-config-deploy" | "source-link-deploy";
   type MemberLifecycleAction = "remove" | "restore";
@@ -955,7 +955,7 @@
   description={$t(i18nKeys.console.organization.pageDescription)}
   groupLabel={$t(i18nKeys.console.organization.pageTitle)}
   activePath={page.url.pathname}
-  items={organizationSettingsItems(webExtensionsQuery.data?.items ?? [])}
+  items={organizationSettingsItems(webExtensionsQuery.data?.items ?? [], $locale)}
   breadcrumbs={[
     { label: $t(i18nKeys.console.nav.home), href: "/" },
     { label: $t(i18nKeys.console.organization.pageTitle) },

@@ -1,4 +1,5 @@
 import { type SystemPluginWebExtension } from "@appaloft/contracts";
+import { type AppaloftLocale, defaultAppaloftLocale } from "@appaloft/i18n";
 import {
   Activity,
   Archive,
@@ -7,7 +8,6 @@ import {
   Globe2,
   KeyRound,
   MailPlus,
-  Puzzle,
   ShieldAlert,
   ShieldCheck,
   Terminal,
@@ -16,6 +16,10 @@ import {
 } from "@lucide/svelte";
 
 import { i18nKeys } from "$lib/i18n";
+import {
+  systemPluginExtensionIcon,
+  systemPluginExtensionTitle,
+} from "./web-extension-presentation";
 
 export function accountSettingsItems() {
   return [
@@ -42,7 +46,10 @@ export function accountSettingsItems() {
   ];
 }
 
-export function organizationSettingsItems(extensions: readonly SystemPluginWebExtension[] = []) {
+export function organizationSettingsItems(
+  extensions: readonly SystemPluginWebExtension[] = [],
+  locale: AppaloftLocale = defaultAppaloftLocale,
+) {
   return [
     {
       href: "/organization",
@@ -69,7 +76,7 @@ export function organizationSettingsItems(extensions: readonly SystemPluginWebEx
       labelKey: i18nKeys.console.organization.archivedProjectsTitle,
       icon: Archive,
     },
-    ...settingsExtensionItems(extensions, "/organization"),
+    ...settingsExtensionItems(extensions, "/organization", locale),
     {
       href: "/organization/danger-zone",
       labelKey: i18nKeys.console.organization.dangerZoneTitle,
@@ -78,7 +85,10 @@ export function organizationSettingsItems(extensions: readonly SystemPluginWebEx
   ];
 }
 
-export function instanceSettingsItems(extensions: readonly SystemPluginWebExtension[] = []) {
+export function instanceSettingsItems(
+  extensions: readonly SystemPluginWebExtension[] = [],
+  locale: AppaloftLocale = defaultAppaloftLocale,
+) {
   return [
     {
       href: "/instance",
@@ -100,7 +110,7 @@ export function instanceSettingsItems(extensions: readonly SystemPluginWebExtens
       labelKey: i18nKeys.console.terminal.lifecycleTitle,
       icon: Terminal,
     },
-    ...settingsExtensionItems(extensions, "/instance"),
+    ...settingsExtensionItems(extensions, "/instance", locale),
     {
       href: "/instance/guidance",
       labelKey: i18nKeys.console.instance.guidanceTitle,
@@ -112,6 +122,7 @@ export function instanceSettingsItems(extensions: readonly SystemPluginWebExtens
 function settingsExtensionItems(
   extensions: readonly SystemPluginWebExtension[],
   scopePath: string,
+  locale: AppaloftLocale,
 ) {
   return extensions
     .filter((extension) => {
@@ -122,11 +133,15 @@ function settingsExtensionItems(
         path.startsWith(`${normalizePath(scopePath)}/`)
       );
     })
-    .sort((left, right) => left.title.localeCompare(right.title))
+    .sort((left, right) =>
+      systemPluginExtensionTitle(left, locale).localeCompare(
+        systemPluginExtensionTitle(right, locale),
+      ),
+    )
     .map((extension) => ({
       href: normalizePath(extension.path),
-      label: extension.title,
-      icon: Puzzle,
+      label: systemPluginExtensionTitle(extension, locale),
+      icon: systemPluginExtensionIcon(extension),
       matchPrefix: normalizePath(extension.path),
     }));
 }
