@@ -15,7 +15,8 @@
 ## Normative Contract
 
 `terminal-sessions.open` starts an ephemeral interactive operator terminal for either a deployment
-target/server or a resource-owned deployment workspace.
+target/server, a resource-owned deployment workspace, or a resource runtime container target when
+the selected deployment exposes retained container identity metadata.
 
 It is not:
 
@@ -49,7 +50,7 @@ This command inherits:
 | --- | --- | --- | --- |
 | `scope.kind` | Yes | Whether the terminal is server-scoped or resource-scoped. | Command schema |
 | `scope.serverId` | Required for server scope | Deployment target/server to connect to. | Deployment target id value object / command schema |
-| `scope.resourceId` | Required for resource scope | Resource whose latest or selected deployment workspace is opened. | Resource id value object / command schema |
+| `scope.resourceId` | Required for resource scope | Resource whose latest or selected deployment workspace or retained runtime container target is opened. | Resource id value object / command schema |
 | `scope.deploymentId` | Optional for resource scope | Deployment/runtime instance whose workspace should be opened instead of latest observable. | Deployment id value object / command schema |
 | `relativeDirectory` | No | Additional directory below the resolved root workspace. | Safe relative path value object / command schema |
 | `initialRows` | No | Initial terminal row count. | Command schema bounded integer |
@@ -97,7 +98,7 @@ host path. Consumers must not reconstruct filesystem paths from resource names, 
    - for server scope, load the deployment target/server and credential context;
    - for resource scope, load the resource and resolve the selected or latest observable
      deployment/runtime instance.
-4. Resolve a safe initial working directory.
+4. Resolve a safe initial working directory or a runtime container target.
 5. Open a terminal session through `TerminalSessionGateway`.
 6. Return the session descriptor and transport path.
 7. Attach the terminal transport to the session and stream bidirectional frames until the client or
@@ -117,7 +118,12 @@ Resource scope must start in the deployed project directory:
    source `baseDirectory` is applied exactly once. Source locators such as HTTPS Git URLs and
    SSH-style Git remotes are not safe working directories.
 5. Apply `relativeDirectory` below the resolved workspace root after validation.
-6. Reject with `terminal_session_workspace_unavailable` if no safe workspace can be resolved.
+6. For runtime container targets such as `docker-container` and `docker-compose-stack`, allow the
+   terminal gateway to open the retained container/service target when no source workspace exists.
+   `relativeDirectory` still requires a resolved workspace root; it is not interpreted as an
+   arbitrary container path.
+7. Reject with `terminal_session_workspace_unavailable` if neither a safe workspace nor a supported
+   runtime container target can be resolved.
 
 Current deployment workspace naming remains deployment-attempt scoped. Git clone and source
 materialization must not use resource name, resource slug, or resource id as the checkout directory.
@@ -151,8 +157,10 @@ Binary transport is allowed later if it preserves the same logical frame semanti
 | Server missing | `serverId` cannot be resolved or is not visible | Reject during context resolution | `err(not_found)` |
 | Resource missing | `resourceId` cannot be resolved or is not visible | Reject during context resolution | `err(not_found)` |
 | Deployment mismatch | `deploymentId` does not belong to `resourceId` | Reject during context resolution | `err(terminal_session_context_mismatch)` |
-| No observable deployment | Resource scope has no runtime placement | Reject during workspace resolution | `err(terminal_session_workspace_unavailable)` |
+| No observable deployment | Resource scope has no runtime placement | Reject during terminal target resolution | `err(terminal_session_workspace_unavailable)` |
 | Source locator fallback | Runtime execution only exposes a source locator such as `https://...` or `git@host:org/repo.git` as `workingDirectory` | Reject during workspace resolution instead of opening a shell in the locator text | `err(terminal_session_workspace_unavailable)` |
+| Container runtime without source workspace | Runtime execution is a retained Docker container or Compose service target and no `relativeDirectory` was requested | Open through the terminal gateway without `workingDirectory`; the runtime adapter enters the container/service shell | `ok(TerminalSessionDescriptor)` |
+| Container runtime relative directory without source workspace | Runtime execution is a retained Docker container or Compose service target, no workspace can be resolved, and `relativeDirectory` is supplied | Reject because relative directories are scoped below a resolved workspace root, not arbitrary container paths | `err(terminal_session_workspace_unavailable)` |
 | Unsafe relative directory | `relativeDirectory` is absolute, has `..`, URL, or shell fragment | Reject during validation | `err(validation_error)` |
 | Unsupported target | Provider/runtime cannot open a terminal | Reject during terminal open | `err(terminal_session_not_configured)` or `err(terminal_session_unsupported)` |
 | Hosted control plane disabled | Runtime mode disallows direct shell | Reject during policy gate | `err(terminal_session_policy_denied)` |
@@ -198,9 +206,10 @@ Application command/schema/handler/use case, terminal gateway port, runtime adap
 endpoint, WebSocket attach transport, CLI descriptor commands, explicit CLI `--attach`, and Web
 terminal component are implemented.
 
-Resource terminals can open either the latest observable deployment workspace or a selected
-deployment attempt supplied through `scope.deploymentId`; selected deployment ids are verified
-against the resource before workspace resolution. Current resource workspace resolution uses
+Resource terminals can open either the latest observable deployment workspace, a retained runtime
+container target, or a selected deployment attempt supplied through `scope.deploymentId`; selected
+deployment ids are verified against the resource before terminal target resolution. Current resource
+workspace resolution uses
 execution metadata `workdir`, `remoteWorkdir`, `sourceDir`, and safe
 `runtimePlan.execution.workingDirectory` fallbacks. Source `baseDirectory` normalization is
 implemented for `sourceDir` and safe working-directory fallbacks, with adapter-resolved `workdir`

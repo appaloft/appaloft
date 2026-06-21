@@ -4409,7 +4409,7 @@ export type TerminalSessionTargetScope =
       resource: ResourceSummary;
       deployment: DeploymentSummary;
       server: ServerSummary;
-      workingDirectory: string;
+      workingDirectory?: string;
     };
 
 export interface TerminalSessionOpenRequest {
