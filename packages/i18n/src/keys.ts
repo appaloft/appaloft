@@ -620,6 +620,7 @@ export const i18nKeys = {
       inFlight: "console:deployments.inFlight",
       installCommand: "console:deployments.installCommand",
       listDescription: "console:deployments.listDescription",
+      listRange: "console:deployments.listRange",
       listTitle: "console:deployments.listTitle",
       metadataTitle: "console:deployments.metadataTitle",
       needsAttention: "console:deployments.needsAttention",

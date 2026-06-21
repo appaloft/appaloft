@@ -2378,6 +2378,7 @@ describe("console page structure", () => {
       'class="mt-3 grid gap-3 lg:grid-cols-[1fr_auto]"',
     );
     expect(domainBindingsPageSource).not.toContain("sm:grid-cols-[minmax(0,1fr)_auto_auto]");
+    expect(domainBindingDetailRouteSource).toContain("export const prerender = false;");
   });
 
   test("[CONSOLE-DISPLAY-STATE-IA-001] keeps collection display surfaces free of intent forms", () => {
