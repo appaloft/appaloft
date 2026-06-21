@@ -2761,24 +2761,25 @@ describe("console page structure", () => {
 
   test("[BLUEPRINT-INSTALL-IA-001] keeps Blueprint install inputs behind intent dialogs", () => {
     expect(marketplaceBlueprintDetailPageSource).toContain("installDialogOpen");
-    expect(marketplaceBlueprintDetailPageSource).toContain("upgradePlanDialogOpen");
     expect(marketplaceBlueprintDetailPageSource).toContain(
       'modalIsOpen(page, "blueprint-install")',
     );
-    expect(marketplaceBlueprintDetailPageSource).toContain(
-      'modalIsOpen(page, "blueprint-upgrade-plan")',
-    );
     expect(marketplaceBlueprintDetailPageSource).toContain("data-blueprint-install-summary");
-    expect(marketplaceBlueprintDetailPageSource).toContain("data-blueprint-upgrade-summary");
     expect(marketplaceBlueprintDetailPageSource).toContain("data-blueprint-detail-display-surface");
     expect(marketplaceBlueprintDetailPageSource).toContain(
       "data-blueprint-variant-display-surface",
     );
     expect(marketplaceBlueprintDetailPageSource).toContain("data-blueprint-variant-option");
     expect(marketplaceBlueprintDetailPageSource).toContain("data-blueprint-install-dialog");
-    expect(marketplaceBlueprintDetailPageSource).toContain("data-blueprint-upgrade-plan-dialog");
     expect(marketplaceBlueprintDetailPageSource).toContain("openInstallDialog");
-    expect(marketplaceBlueprintDetailPageSource).toContain("openUpgradePlanDialog");
+    expect(marketplaceBlueprintDetailPageSource).not.toContain("openQuickDeployDialog");
+    expect(marketplaceBlueprintDetailPageSource).not.toContain("data-blueprint-upgrade-summary");
+    expect(marketplaceBlueprintDetailPageSource).not.toContain(
+      "data-blueprint-upgrade-plan-dialog",
+    );
+    expect(marketplaceBlueprintDetailPageSource).not.toContain(
+      'modalIsOpen(page, "blueprint-upgrade-plan")',
+    );
     const blueprintDetailDisplaySurface = sourceBetween(
       marketplaceBlueprintDetailPageSource,
       "data-blueprint-detail-display-surface",
@@ -2793,17 +2794,9 @@ describe("console page structure", () => {
       marketplaceBlueprintDetailPageSource.match(
         /<section class="console-side-panel space-y-4" data-blueprint-install-summary>[\s\S]*?<\/section>/,
       )?.[0] ?? "";
-    const upgradeSummarySource =
-      marketplaceBlueprintDetailPageSource.match(
-        /<section class="console-side-panel space-y-4" data-blueprint-upgrade-summary>[\s\S]*?<\/section>/,
-      )?.[0] ?? "";
     const installDialogSource =
       marketplaceBlueprintDetailPageSource.match(
         /<Dialog\.Root bind:open={installDialogOpen}[\s\S]*?<\/Dialog\.Root>/,
-      )?.[0] ?? "";
-    const upgradeDialogSource =
-      marketplaceBlueprintDetailPageSource.match(
-        /<Dialog\.Root bind:open={upgradePlanDialogOpen}[\s\S]*?<\/Dialog\.Root>/,
       )?.[0] ?? "";
     expect(blueprintDetailDisplaySurface).not.toContain("<Input");
     expect(blueprintDetailDisplaySurface).not.toContain("<Textarea");
@@ -2812,35 +2805,30 @@ describe("console page structure", () => {
     expect(blueprintDetailDisplaySurface).not.toContain("<form");
     expect(blueprintDetailDisplaySurface).not.toContain('type="submit"');
     expect(blueprintDetailDisplaySurface).toContain("onclick={openInstallDialog}");
-    expect(blueprintDetailDisplaySurface).toContain("onclick={openQuickDeployDialog}");
+    expect(blueprintDetailDisplaySurface).toContain("快速部署");
     expect(blueprintVariantDisplaySurface).toContain("data-blueprint-variant-option");
     expect(blueprintVariantDisplaySurface).toContain(
-      "方案选择、Profile 和参数输入在配置安装弹窗内完成",
+      "方案选择、Profile 和参数输入在部署弹窗内完成；来源固定为当前 Blueprint。",
     );
     expect(blueprintVariantDisplaySurface).not.toContain("selectedVariant = variant.id");
     expect(blueprintVariantDisplaySurface).not.toContain("<button");
     expect(blueprintVariantDisplaySurface).not.toContain("<Select.Root");
-    expect(installSummarySource).toContain("配置安装");
+    expect(installSummarySource).toContain("快速部署");
+    expect(installSummarySource).toContain("打开弹窗后直接部署当前 Blueprint");
     expect(installSummarySource).not.toContain("<Input");
     expect(installSummarySource).not.toContain("<select");
     expect(installSummarySource).not.toContain("data-blueprint-install-secret-inputs");
-    expect(upgradeSummarySource).toContain("配置升级 dry-run");
-    expect(upgradeSummarySource).not.toContain("<Input");
-    expect(upgradeSummarySource).not.toContain("data-blueprint-upgrade-from-installed-application");
-    expect(upgradeSummarySource).not.toContain("upgradePlanError");
-    expect(upgradeSummarySource).not.toContain("upgradePlanOutput");
-    expect(upgradeSummarySource).not.toContain("查看 upgrade plan JSON");
+    expect(installSummarySource).not.toContain("dry-run");
+    expect(installSummarySource).not.toContain("openQuickDeployDialog");
     expect(installDialogSource).toContain("<Input");
     expect(installDialogSource).toContain("<Select.Root");
     expect(installDialogSource).not.toContain("<select");
     expect(installDialogSource).toContain("data-blueprint-install-secret-inputs");
     expect(installDialogSource).toContain("data-blueprint-accept-install");
-    expect(upgradeDialogSource).toContain("<Input");
-    expect(upgradeDialogSource).toContain("data-blueprint-upgrade-from-installed-application");
-    expect(upgradeDialogSource).toContain("onclick={generateUpgradePlan}");
-    expect(upgradeDialogSource).toContain("upgradePlanError");
-    expect(upgradeDialogSource).toContain("upgradePlanOutput");
-    expect(upgradeDialogSource).toContain("查看 upgrade plan JSON");
+    expect(installDialogSource).toContain("来源固定为当前 Blueprint");
+    expect(installDialogSource).toContain("开始部署");
+    expect(installDialogSource).not.toContain("生成 dry-run");
+    expect(installDialogSource).not.toContain("预览部署计划");
   });
 
   test("[BLUEPRINT-INSTALL-IA-002] presents install completion as a handoff, not a progress dump", () => {
@@ -2887,7 +2875,7 @@ describe("console page structure", () => {
 
     const installHandoffSource =
       marketplaceBlueprintDetailPageSource.match(
-        /data-blueprint-install-handoff[\s\S]*?data-blueprint-upgrade-summary/,
+        /data-blueprint-install-handoff[\s\S]*?<Button href="\/marketplace"/,
       )?.[0] ?? "";
 
     expect(installHandoffSource).toContain("installHandoffTitle(installResult.progress)");
