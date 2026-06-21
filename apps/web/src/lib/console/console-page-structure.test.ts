@@ -143,6 +143,15 @@ const domainBindingsPageSource = readFileSync(
   fileURLToPath(new URL("../../routes/domain-bindings/+page.svelte", import.meta.url)),
   "utf8",
 );
+const domainBindingDetailPageSource = readFileSync(
+  fileURLToPath(
+    new URL(
+      "../../routes/domain-bindings/[domainBindingId=consoleObjectId]/+page.svelte",
+      import.meta.url,
+    ),
+  ),
+  "utf8",
+);
 const marketplaceBlueprintDetailPageSource = readFileSync(
   fileURLToPath(new URL("../../routes/marketplace/[slug]/+page.svelte", import.meta.url)),
   "utf8",
@@ -1892,8 +1901,9 @@ describe("console page structure", () => {
     expect(serverRowHeaderSource.indexOf("data-server-row-lifecycle")).toBeGreaterThan(
       serverRowHeaderSource.indexOf("<h3"),
     );
+    const serverHostPortTitleSource = "title={`" + "$" + "{server.host}:$" + "{server.port}`}";
     expect(serverRowHeaderSource.indexOf("data-server-row-lifecycle")).toBeLessThan(
-      serverRowHeaderSource.indexOf("title={`${server.host}:${server.port}`}"),
+      serverRowHeaderSource.indexOf(serverHostPortTitleSource),
     );
     expect(serverRowHeaderSource).toContain('class="shrink-0"');
     expect(serversDisplaySurface).toContain("data-server-row-readiness");
@@ -2170,63 +2180,68 @@ describe("console page structure", () => {
     expect(domainBindingsPageSource).toContain("domainBindingEnrichmentLoading");
     expect(domainBindingsPageSource).not.toContain("const pageLoading = $derived");
     expect(domainBindingsPageSource).not.toContain("createFeedback");
-    expect(domainBindingsPageSource).toContain("selectedDomainBindingId");
-    expect(domainBindingsPageSource).toContain("selectedDomainBinding");
-    expect(domainBindingsPageSource).toContain("selectedDomainBindingDetail");
-    expect(domainBindingsPageSource).toContain("function selectDomainBinding");
-    expect(domainBindingsPageSource).toContain("function showSelectedDomainBindingDetail");
-    expect(domainBindingsPageSource).toContain("domainBindingVerificationDialogOpen");
-    expect(domainBindingsPageSource).toContain("domainBindingRouteDialogOpen");
-    expect(domainBindingsPageSource).toContain("domainBindingDeleteDialogOpen");
+    expect(domainBindingsPageSource).not.toContain("selectedDomainBindingId");
+    expect(domainBindingsPageSource).not.toContain("selectedDomainBindingDetail");
+    expect(domainBindingsPageSource).not.toContain("function selectDomainBinding");
+    expect(domainBindingsPageSource).not.toContain("function showSelectedDomainBindingDetail");
+    expect(domainBindingsPageSource).not.toContain("domainBindingVerificationDialogOpen");
+    expect(domainBindingsPageSource).not.toContain("domainBindingRouteDialogOpen");
+    expect(domainBindingsPageSource).not.toContain("domainBindingDeleteDialogOpen");
     expect(domainBindingsPageSource).toContain("data-domain-binding-list-display-surface");
-    expect(domainBindingsPageSource).toContain("data-domain-binding-detail-display-surface");
-    expect(domainBindingsPageSource).toContain("data-domain-binding-identity-summary");
-    expect(domainBindingsPageSource).toContain("data-domain-binding-owner-summary");
-    expect(domainBindingsPageSource).toContain("data-domain-binding-route-summary");
-    expect(domainBindingsPageSource).toContain("data-domain-binding-verification-summary");
-    expect(domainBindingsPageSource).toContain("data-domain-binding-lifecycle-handoff");
-    expect(domainBindingsPageSource).toContain("data-domain-binding-verification-dialog");
-    expect(domainBindingsPageSource).toContain("routeManagedInDialog");
-    expect(domainBindingsPageSource).toContain("routeDialogTitle");
-    expect(domainBindingsPageSource).toContain("deleteDialogTitle");
+    expect(domainBindingsPageSource).not.toContain("data-domain-binding-detail-display-surface");
+    expect(domainBindingsPageSource).toContain("function domainBindingDetailHref");
+    expect(domainBindingsPageSource).toContain("domainBindingDetailHref(binding)");
     expect(domainBindingsPageSource).not.toContain("dangerZoneTitle");
     expect(domainBindingsPageSource).not.toContain("dangerZoneDescription");
+    expect(domainBindingDetailPageSource).toContain("data-domain-binding-detail-display-surface");
+    expect(domainBindingDetailPageSource).toContain("type DomainBindingDetailTab =");
+    expect(domainBindingDetailPageSource).toContain('"overview" | "routing" | "dns" | "lifecycle"');
+    expect(domainBindingDetailPageSource).toContain("domainBindingOverviewSections");
+    expect(domainBindingDetailPageSource).toContain("class={detailTabsClass}");
+    expect(domainBindingDetailPageSource).toContain("class={detailTabClass}");
+    expect(domainBindingDetailPageSource).toContain("class={detailTabPanelSubnavClass}");
+    expect(domainBindingDetailPageSource).toContain("detailSubnavLayoutClass");
+    expect(domainBindingDetailPageSource).toContain("class={detailSubnavContentClass}");
+    expect(domainBindingDetailPageSource).toContain("data-domain-binding-identity-summary");
+    expect(domainBindingDetailPageSource).toContain("data-domain-binding-owner-summary");
+    expect(domainBindingDetailPageSource).toContain("data-domain-binding-route-summary");
+    expect(domainBindingDetailPageSource).toContain("data-domain-binding-verification-summary");
+    expect(domainBindingDetailPageSource).toContain("data-domain-binding-lifecycle-handoff");
+    expect(domainBindingDetailPageSource).toContain("data-domain-binding-verification-dialog");
+    expect(domainBindingDetailPageSource).toContain("routeManagedInDialog");
+    expect(domainBindingDetailPageSource).toContain("routeDialogTitle");
+    expect(domainBindingDetailPageSource).toContain("deleteDialogTitle");
 
     const domainBindingsListSource = sourceBetween(
       domainBindingsPageSource,
       "data-domain-binding-list-display-surface",
-      "data-domain-binding-detail-display-surface",
-    );
-    const domainBindingDetailSurface = sourceBetween(
-      domainBindingsPageSource,
-      "data-domain-binding-detail-display-surface",
-      "<Dialog.Root\n    bind:open={domainBindingVerificationDialogOpen}",
+      "{:else}",
     );
     const domainBindingVerificationDialogSource = sourceBetween(
-      domainBindingsPageSource,
+      domainBindingDetailPageSource,
       "data-domain-binding-verification-dialog",
       "bind:open={domainBindingRouteDialogOpen}",
     );
     const domainBindingRouteDialogSource = sourceBetween(
-      domainBindingsPageSource,
+      domainBindingDetailPageSource,
       "data-domain-binding-route-dialog",
       "bind:open={domainBindingDeleteDialogOpen}",
     );
     const domainBindingDeleteDialogSource = sourceBetween(
-      domainBindingsPageSource,
+      domainBindingDetailPageSource,
       "data-domain-binding-delete-dialog",
       "</ConsoleShell>",
     );
 
-    expect(domainBindingsPageSource).toContain('let routeRedirectDraft = $state("")');
-    expect(domainBindingsPageSource).toContain(
+    expect(domainBindingDetailPageSource).toContain('let routeRedirectDraft = $state("")');
+    expect(domainBindingDetailPageSource).toContain(
       'let routeRedirectStatusDraft = $state<RedirectStatusText>("308")',
     );
-    expect(domainBindingsPageSource).toContain('let deleteConfirmationDraft = $state("")');
-    expect(domainBindingsPageSource).not.toContain("routeRedirectDrafts");
-    expect(domainBindingsPageSource).not.toContain("routeRedirectStatusDrafts");
-    expect(domainBindingsPageSource).not.toContain("deleteConfirmationDrafts");
-    expect(domainBindingsListSource).toContain("selectDomainBinding(binding)");
+    expect(domainBindingDetailPageSource).toContain('let deleteConfirmationDraft = $state("")');
+    expect(domainBindingDetailPageSource).not.toContain("routeRedirectDrafts");
+    expect(domainBindingDetailPageSource).not.toContain("routeRedirectStatusDrafts");
+    expect(domainBindingDetailPageSource).not.toContain("deleteConfirmationDrafts");
+    expect(domainBindingsListSource).toContain("domainBindingDetailHref(binding)");
     expect(domainBindingsListSource).toContain("data-domain-binding-row");
     expect(domainBindingsListSource).toContain("data-domain-binding-pending-dns-notice");
     expect(domainBindingsListSource).toContain("DomainBindingVerifyDnsButton");
@@ -2242,34 +2257,16 @@ describe("console page structure", () => {
     expect(domainBindingsListSource).not.toContain("<Trash2");
     expect(domainBindingsListSource).not.toContain('variant="destructive"');
 
-    expect(domainBindingDetailSurface).toContain(
-      "showSelectedDomainBindingDetail(selectedDomainBinding)",
-    );
-    expect(domainBindingDetailSurface).toContain(
-      "openDomainBindingRouteDialog(selectedDomainBinding)",
-    );
-    expect(domainBindingDetailSurface).toContain(
-      "openDomainBindingVerificationDialog(selectedDomainBinding)",
-    );
-    expect(domainBindingDetailSurface).toContain(
-      "openDomainBindingDeleteDialog(selectedDomainBinding)",
-    );
-    expect(domainBindingDetailSurface).toContain("lifecycleStatus");
-    expect(domainBindingDetailSurface).toContain("lifecycleDescription");
-    expect(domainBindingDetailSurface).toContain("lifecycleManageAction");
-    expect(domainBindingDetailSurface).not.toContain("routeRedirectDraft");
-    expect(domainBindingDetailSurface).not.toContain("routeRedirectStatusDraft");
-    expect(domainBindingDetailSurface).not.toContain("deleteConfirmationDraft");
-    expect(domainBindingDetailSurface).not.toContain("deleteSafety");
-    expect(domainBindingDetailSurface).not.toContain("deleteDialogTitle");
-    expect(domainBindingDetailSurface).not.toContain("<Input");
-    expect(domainBindingDetailSurface).not.toContain("<Select.Root");
-    expect(domainBindingDetailSurface).not.toContain('variant="destructive"');
-    expect(domainBindingDetailSurface).not.toContain("<Trash2");
+    expect(domainBindingDetailPageSource).toContain("openDomainBindingRouteDialog()");
+    expect(domainBindingDetailPageSource).toContain("openDomainBindingVerificationDialog()");
+    expect(domainBindingDetailPageSource).toContain("openDomainBindingDeleteDialog()");
+    expect(domainBindingDetailPageSource).toContain("lifecycleStatus");
+    expect(domainBindingDetailPageSource).toContain("lifecycleDescription");
+    expect(domainBindingDetailPageSource).toContain("lifecycleManageAction");
 
     expect(domainBindingVerificationDialogSource).not.toContain("deleteDialogTitle");
     expect(domainBindingVerificationDialogSource).toContain(
-      "confirmDomainBindingOwnership(selectedVerificationBinding)",
+      "confirmDomainBindingOwnership(selectedDomainBinding)",
     );
     expect(domainBindingVerificationDialogSource).toContain(
       "retryDomainBindingVerificationMutation.mutate",
@@ -2376,35 +2373,32 @@ describe("console page structure", () => {
     );
 
     expect(domainBindingDisplaySurface).toContain("data-domain-binding-list-display-surface");
-    expect(domainBindingDisplaySurface).toContain("data-domain-binding-detail-display-surface");
-    expect(domainBindingDisplaySurface).toContain("selectDomainBinding(binding)");
-    expect(domainBindingDisplaySurface).toContain(
-      "openDomainBindingVerificationDialog(selectedDomainBinding)",
-    );
-    expect(domainBindingDisplaySurface).toContain(
-      "openDomainBindingRouteDialog(selectedDomainBinding)",
-    );
-    expect(domainBindingDisplaySurface).toContain(
-      "openDomainBindingDeleteDialog(selectedDomainBinding)",
-    );
-    expect(domainBindingDisplaySurface).toContain("lifecycleStatus");
-    expect(domainBindingDisplaySurface).toContain("lifecycleDescription");
-    expect(domainBindingDisplaySurface).toContain("lifecycleManageAction");
+    expect(domainBindingDisplaySurface).toContain("domainBindingDetailHref(binding)");
+    expect(domainBindingDisplaySurface).not.toContain("data-domain-binding-detail-display-surface");
+    expect(domainBindingDisplaySurface).not.toContain("selectDomainBinding(binding)");
+    expect(domainBindingDetailPageSource).toContain("openDomainBindingVerificationDialog()");
+    expect(domainBindingDetailPageSource).toContain("openDomainBindingRouteDialog()");
+    expect(domainBindingDetailPageSource).toContain("openDomainBindingDeleteDialog()");
+    expect(domainBindingDetailPageSource).toContain("lifecycleStatus");
+    expect(domainBindingDetailPageSource).toContain("lifecycleDescription");
+    expect(domainBindingDetailPageSource).toContain("lifecycleManageAction");
     expect(domainBindingDisplaySurface).not.toContain("routeRedirectDraft");
     expect(domainBindingDisplaySurface).not.toContain("routeRedirectStatusDraft");
     expect(domainBindingDisplaySurface).not.toContain("deleteConfirmationDraft");
     expect(domainBindingDisplaySurface).not.toContain("deleteSafety");
     expect(domainBindingDisplaySurface).not.toContain("deleteDialogTitle");
-    expect(domainBindingsPageSource).toContain("bind:open={domainBindingVerificationDialogOpen}");
-    expect(domainBindingsPageSource).toContain("bind:open={domainBindingRouteDialogOpen}");
-    expect(domainBindingsPageSource).toContain("bind:open={domainBindingDeleteDialogOpen}");
+    expect(domainBindingDetailPageSource).toContain(
+      "bind:open={domainBindingVerificationDialogOpen}",
+    );
+    expect(domainBindingDetailPageSource).toContain("bind:open={domainBindingRouteDialogOpen}");
+    expect(domainBindingDetailPageSource).toContain("bind:open={domainBindingDeleteDialogOpen}");
     const domainBindingRouteDialogSource = sourceBetween(
-      domainBindingsPageSource,
+      domainBindingDetailPageSource,
       "data-domain-binding-route-dialog",
       "bind:open={domainBindingDeleteDialogOpen}",
     );
     const domainBindingDeleteDialogSource = sourceBetween(
-      domainBindingsPageSource,
+      domainBindingDetailPageSource,
       "data-domain-binding-delete-dialog",
       "</Dialog.Root>",
     );
