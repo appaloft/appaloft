@@ -1996,6 +1996,12 @@ export const enUS = {
       composeServicesDescription:
         "Service boundaries from the compose file and the current traffic target.",
       composeServicesTitle: "Compose services",
+      configurationColumnExposure: "Exposure",
+      configurationColumnKey: "Key",
+      configurationColumnKind: "Kind",
+      configurationColumnScope: "Scope",
+      configurationColumnValue: "Value",
+      configurationCopyValue: "Copy value",
       configurationDescription:
         "Manage resource-scoped variables and secrets for future deployments. Resource entries override inherited environment values at snapshot materialization time.",
       configurationEffectiveDescription:
@@ -2038,6 +2044,8 @@ export const enUS = {
       configurationUnsetFailed: "Resource variable was not removed",
       configurationUnsetSucceeded: "Resource variable removed",
       configurationUpdatedAt: "Updated",
+      configurationValueCopied: "Copied",
+      configurationValueCopyFailed: "Copy failed",
       storageAttachAction: "Attach storage",
       storageAttachDescription:
         "Attach an existing storage volume to this resource profile. The mount is materialized by future deployment snapshots.",
