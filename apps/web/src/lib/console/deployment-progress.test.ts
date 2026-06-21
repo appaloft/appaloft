@@ -813,6 +813,55 @@ describe("deployment progress helpers", () => {
     });
   });
 
+  test("[DEP-REDEPLOY-WEB-001] follows accepted redeploy timeline without injecting skipped phases", async () => {
+    timelineMock.mockResolvedValue({
+      schemaVersion: "deployments.timeline/v1",
+      deploymentId: "dep_redeploy",
+      hasMore: false,
+      entries: [
+        {
+          deploymentId: "dep_redeploy",
+          sequence: 1,
+          cursor: "dep_redeploy:1",
+          occurredAt: "2026-01-01T00:00:01.000Z",
+          source: "docker",
+          kind: "output",
+          phase: "deploy",
+          level: "info",
+          message: "Container image already present, recreating service",
+        },
+        {
+          deploymentId: "dep_redeploy",
+          sequence: 2,
+          cursor: "dep_redeploy:2",
+          occurredAt: "2026-01-01T00:00:02.000Z",
+          source: "health",
+          kind: "health-check",
+          phase: "verify",
+          level: "info",
+          message: "Public route is reachable at https://demo.example.test",
+          status: "succeeded",
+        },
+      ],
+    });
+
+    const progressEvents: DeploymentProgressEvent[] = [];
+    await observeDeploymentProgressAfterAcceptance(
+      "dep_redeploy",
+      (event) => {
+        progressEvents.push(event);
+      },
+      {},
+    );
+
+    expect(progressEvents.map((event) => event.phase)).toEqual(["deploy", "verify"]);
+    expect(progressEvents.map((event) => event.message)).toEqual([
+      "Container image already present, recreating service",
+      "Public route is reachable at https://demo.example.test",
+    ]);
+    expect(timelineStreamMock).not.toHaveBeenCalled();
+  });
+
   test("[QUICK-DEPLOY-TIMELINE-002] asks the follow stream for history when replay is initially empty", async () => {
     timelineMock.mockResolvedValue({
       schemaVersion: "deployments.timeline/v1",
