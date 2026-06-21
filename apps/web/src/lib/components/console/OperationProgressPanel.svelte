@@ -19,6 +19,7 @@
     requestId?: string;
     deploymentId?: string;
     traceLink?: string;
+    accessUrl?: string;
     title?: string;
     description?: string;
     onClose?: () => void;
@@ -33,6 +34,7 @@
     requestId = "",
     deploymentId = "",
     traceLink = "",
+    accessUrl = "",
     title,
     description,
     onClose,
@@ -45,7 +47,7 @@
 
   const resolvedStatus = $derived(status === "idle" ? undefined : status);
   const deploymentSucceeded = $derived(status === "succeeded");
-  const resolvedAccessUrl = $derived(accessUrlFromDeploymentProgressEvents());
+  const resolvedAccessUrl = $derived(accessUrl);
   const accessUrlCopyLabel = $derived(
     accessUrlCopyState === "copied"
       ? $t(i18nKeys.console.deployments.accessUrlCopied)
@@ -71,19 +73,6 @@
       default:
         return $t(i18nKeys.console.deployments.progressStatusLog);
     }
-  }
-
-  function accessUrlFromDeploymentProgressEvents(): string {
-    const terminalAccessEvent = [...events].reverse().find((event) => {
-      if (event.phase !== "verify") {
-        return false;
-      }
-
-      return /\b(?:public route|deployment)\b.*\b(?:reachable|available)\b/i.test(event.message);
-    });
-    const match = terminalAccessEvent?.message.match(/https?:\/\/\S+/i);
-
-    return match?.[0]?.replace(/[),.;]+$/, "") ?? "";
   }
 
   function updateAccessUrlCopyState(state: typeof accessUrlCopyState): void {
