@@ -81,6 +81,10 @@ function recommendedAction(
   }
 }
 
+function isDomainVerificationPending(binding: DomainBindingSummary): boolean {
+  return binding.status === "requested" || binding.status === "pending_verification";
+}
+
 function descriptorFromRoute(input: {
   resourceId: string;
   source: RouteIntentStatusDescriptor["source"];
@@ -204,6 +208,9 @@ export function selectedRouteIntentStatus(input: {
   );
   if (blockingDurable) {
     const scheme = blockingDurable.tlsMode === "auto" ? "https" : "http";
+    const domainVerificationPending = isDomainVerificationPending(blockingDurable);
+    const reason = domainVerificationPending ? "domain_not_verified" : "proxy_route_missing";
+    const action = recommendedAction(reason);
     const routeId = descriptorId({
       source: "durable-domain-binding",
       hostname: blockingDurable.domainName,
@@ -230,17 +237,17 @@ export function selectedRouteIntentStatus(input: {
         intent: "required",
         applied: "not-ready",
       },
-      domainVerification: "pending",
+      domainVerification: domainVerificationPending ? "pending" : "verified",
       tls: blockingDurable.tlsMode === "auto" ? "pending" : "disabled",
       runtimeHealth: "unknown",
       latestObservation: {
         source: "resource-access-summary",
       },
-      blockingReason: "domain_not_verified",
-      recommendedAction: "verify-domain",
+      blockingReason: reason,
+      recommendedAction: action,
       copySafeSummary: {
         status: "not-ready",
-        code: "domain_not_verified",
+        code: reason,
         phase: "route-status-observation",
         message: "Durable domain route is selected but not ready.",
       },
