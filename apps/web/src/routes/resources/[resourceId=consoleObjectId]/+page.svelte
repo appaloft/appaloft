@@ -19,6 +19,7 @@
     Gauge,
     HardDrive,
     Globe2,
+    KeyRound,
     Link2,
     Play,
     Plus,
@@ -92,7 +93,7 @@
     DnsRecordRequirement,
   } from "@appaloft/contracts";
 
-  import { readErrorMessage } from "$lib/api/client";
+  import { readErrorMessage, request } from "$lib/api/client";
   import { capabilities, capabilityKey, type CapabilityQuery } from "$lib/capabilities";
   import CapabilityGate from "$lib/components/console/CapabilityGate.svelte";
   import ConsoleStatePanel from "$lib/components/console/ConsoleStatePanel.svelte";
@@ -241,6 +242,34 @@
     title: string;
     detail?: string;
     action?: ResourceHealthIssueAction;
+  };
+  type ResourceInitialAccessCredential = {
+    credentialId: string;
+    applicationId: string;
+    applicationName?: string;
+    componentId?: string;
+    key: string;
+    status: "pending" | "revealed" | "expired";
+    createdAt?: string;
+    expiresAt?: string;
+    revealedAt?: string;
+    revealedBy?: string;
+    resetRequired?: boolean;
+    claimEndpoint?: string;
+  };
+  type ResourceInitialAccessCredentialsResponse = {
+    schemaVersion?: string;
+    resourceId: string;
+    items: ResourceInitialAccessCredential[];
+  };
+  type ResourceInitialAccessCredentialClaimResult = {
+    schemaVersion?: string;
+    applicationId?: string;
+    credential: {
+      credentialId: string;
+      key: string;
+      value: string;
+    };
   };
   type HealthCheckHttpInput = NonNullable<ConfigureResourceHealthInput["healthCheck"]["http"]>;
   type HealthCheckMethod = HealthCheckHttpInput["method"];
@@ -452,6 +481,24 @@
       staleTime: 5_000,
     }),
   );
+  const resourceInitialAccessCredentialsQuery = createQuery(() => ({
+    queryKey: ["resources", "initial-access-credentials", resourceId],
+    queryFn: async (): Promise<ResourceInitialAccessCredentialsResponse> => {
+      try {
+        return await request<ResourceInitialAccessCredentialsResponse>(
+          `/api/resources/${encodeURIComponent(resourceId)}/initial-access-credentials`,
+        );
+      } catch {
+        return {
+          schemaVersion: "appaloft.resource.initial-access-credentials/v1",
+          resourceId,
+          items: [],
+        };
+      }
+    },
+    enabled: browser && resourceId.length > 0,
+    staleTime: 5_000,
+  }));
   const resourceSourceEventsQuery = createQuery(() =>
     orpc.sourceEvents.list.queryOptions({
       input: {
@@ -1340,6 +1387,14 @@
   let diagnosticSummaryCopyResetTimeout: ReturnType<typeof setTimeout> | undefined;
   let accessUrlCopyState = $state<"idle" | "copied" | "failed">("idle");
   let accessUrlCopyResetTimeout: ReturnType<typeof setTimeout> | undefined;
+  let initialAccessCredentialFeedback = $state<Record<string, string>>({});
+  let initialAccessCredentialCopyState = $state<Record<string, "idle" | "copied" | "failed">>(
+    {},
+  );
+  let initialAccessCredentialCopyResetTimeout: ReturnType<typeof setTimeout> | undefined;
+  let revealedInitialAccessCredentials = $state<
+    Record<string, { readonly key: string; readonly value: string }>
+  >({});
   let resourceConfigCopyState = $state<{
     key: string;
     state: "copied" | "failed";
@@ -1471,6 +1526,41 @@
         ? $t(i18nKeys.console.resources.accessUrlCopyFailed)
         : $t(i18nKeys.console.resources.copyAccessUrl),
   );
+  const resourceInitialAccessCredentials = $derived(
+    resourceInitialAccessCredentialsQuery.data?.items ?? [],
+  );
+  const initialAccessCredentialClaimMutation = createMutation(() => ({
+    mutationFn: (credential: ResourceInitialAccessCredential) => {
+      if (!credential.claimEndpoint) {
+        throw new Error(
+          $t(i18nKeys.console.resources.initialAccessCredentialUnavailable),
+        );
+      }
+      return request<ResourceInitialAccessCredentialClaimResult>(credential.claimEndpoint, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({}),
+      });
+    },
+    onSuccess: (result) => {
+      revealedInitialAccessCredentials = {
+        ...revealedInitialAccessCredentials,
+        [result.credential.credentialId]: {
+          key: result.credential.key,
+          value: result.credential.value,
+        },
+      };
+      initialAccessCredentialFeedback = {
+        ...initialAccessCredentialFeedback,
+        [result.credential.credentialId]: $t(
+          i18nKeys.console.resources.initialAccessCredentialRevealedHint,
+        ),
+      };
+      void queryClient.invalidateQueries({
+        queryKey: ["resources", "initial-access-credentials", resourceId],
+      });
+    },
+  }));
   const sourceProfileStatusLabel = $derived(
     resourceDetail?.source
       ? $t(i18nKeys.common.status.configured)
@@ -3551,6 +3641,27 @@
     }, 1800);
   }
 
+  function markInitialAccessCredentialCopyState(
+    credentialId: string,
+    state: "copied" | "failed",
+  ): void {
+    if (initialAccessCredentialCopyResetTimeout) {
+      clearTimeout(initialAccessCredentialCopyResetTimeout);
+    }
+
+    initialAccessCredentialCopyState = {
+      ...initialAccessCredentialCopyState,
+      [credentialId]: state,
+    };
+    initialAccessCredentialCopyResetTimeout = setTimeout(() => {
+      initialAccessCredentialCopyState = {
+        ...initialAccessCredentialCopyState,
+        [credentialId]: "idle",
+      };
+      initialAccessCredentialCopyResetTimeout = undefined;
+    }, 1800);
+  }
+
   async function copyTextToClipboard(text: string): Promise<void> {
     const desktopCopyText = (window as WindowWithAppaloftDesktopBridge).appaloftDesktop?.copyText;
     if (desktopCopyText) {
@@ -3643,6 +3754,64 @@
       markAccessUrlCopyState("copied");
     } catch {
       markAccessUrlCopyState("failed");
+    }
+  }
+
+  function initialAccessCredentialStatusLabel(
+    credential: ResourceInitialAccessCredential,
+  ): string {
+    if (credential.status === "pending") {
+      return $t(i18nKeys.console.resources.initialAccessCredentialPending);
+    }
+    if (credential.status === "expired") {
+      return $t(i18nKeys.console.resources.initialAccessCredentialExpired);
+    }
+    return $t(i18nKeys.console.resources.initialAccessCredentialRevealed);
+  }
+
+  function canClaimInitialAccessCredential(
+    credential: ResourceInitialAccessCredential,
+  ): boolean {
+    return credential.status === "pending" && Boolean(credential.claimEndpoint);
+  }
+
+  async function claimInitialAccessCredential(
+    credential: ResourceInitialAccessCredential,
+  ): Promise<void> {
+    initialAccessCredentialFeedback = {
+      ...initialAccessCredentialFeedback,
+      [credential.credentialId]: "",
+    };
+    try {
+      await initialAccessCredentialClaimMutation.mutateAsync(credential);
+    } catch (error) {
+      initialAccessCredentialFeedback = {
+        ...initialAccessCredentialFeedback,
+        [credential.credentialId]: readErrorMessage(error),
+      };
+    }
+  }
+
+  function initialAccessCredentialCopyLabel(credentialId: string): string {
+    const state = initialAccessCredentialCopyState[credentialId] ?? "idle";
+    if (state === "copied") {
+      return $t(i18nKeys.console.resources.initialAccessCredentialCopied);
+    }
+    if (state === "failed") {
+      return $t(i18nKeys.console.resources.initialAccessCredentialCopyFailed);
+    }
+    return $t(i18nKeys.console.resources.initialAccessCredentialCopy);
+  }
+
+  async function copyInitialAccessCredential(credentialId: string): Promise<void> {
+    const revealed = revealedInitialAccessCredentials[credentialId];
+    if (!browser || !revealed) return;
+
+    try {
+      await copyTextToClipboard(revealed.value);
+      markInitialAccessCredentialCopyState(credentialId, "copied");
+    } catch {
+      markInitialAccessCredentialCopyState(credentialId, "failed");
     }
   }
 
@@ -8494,6 +8663,98 @@
                   </div>
                 </section>
               </div>
+
+              {#if resourceInitialAccessCredentials.length > 0}
+                <section
+                  class="rounded-md border bg-background p-4"
+                  data-resource-initial-access-credentials
+                >
+                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div class="min-w-0">
+                      <h3 class="flex items-center gap-2 text-base font-semibold">
+                        <KeyRound class="size-4 text-muted-foreground" />
+                        {$t(i18nKeys.console.resources.initialAccessCredentialsTitle)}
+                      </h3>
+                      <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                        {$t(i18nKeys.console.resources.initialAccessCredentialsDescription)}
+                      </p>
+                    </div>
+                  </div>
+                  <div class="mt-4 grid gap-3">
+                    {#each resourceInitialAccessCredentials as credential (credential.credentialId)}
+                      {@const revealedCredential = revealedInitialAccessCredentials[credential.credentialId]}
+                      <article
+                        class="rounded-md border border-border bg-muted/25 p-3"
+                        data-resource-initial-access-credential
+                      >
+                        <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                          <div class="min-w-0 space-y-2">
+                            <div class="flex flex-wrap items-center gap-2">
+                              <p class="font-mono text-sm font-semibold">{credential.key}</p>
+                              <Badge variant="outline">
+                                {initialAccessCredentialStatusLabel(credential)}
+                              </Badge>
+                            </div>
+                            <p class="text-xs leading-5 text-muted-foreground">
+                              {#if credential.expiresAt && credential.status === "pending"}
+                                {$t(i18nKeys.console.resources.initialAccessCredentialExpiresAt)}
+                                <span class="font-mono">{formatTime(credential.expiresAt)}</span>
+                              {:else if credential.revealedAt}
+                                {$t(i18nKeys.console.resources.initialAccessCredentialRevealedAt)}
+                                <span class="font-mono">{formatTime(credential.revealedAt)}</span>
+                              {:else if credential.resetRequired}
+                                {$t(i18nKeys.console.resources.initialAccessCredentialResetRequired)}
+                              {/if}
+                            </p>
+                            {#if revealedCredential}
+                              <div class="rounded-md border bg-background p-3">
+                                <p class="text-xs text-muted-foreground">
+                                  {$t(i18nKeys.console.resources.initialAccessCredentialValueLabel)}
+                                </p>
+                                <p class="mt-1 break-all font-mono text-sm">
+                                  {revealedCredential.value}
+                                </p>
+                              </div>
+                            {/if}
+                            {#if initialAccessCredentialFeedback[credential.credentialId]}
+                              <p class="text-xs leading-5 text-muted-foreground">
+                                {initialAccessCredentialFeedback[credential.credentialId]}
+                              </p>
+                            {/if}
+                          </div>
+                          <div class="flex shrink-0 flex-wrap gap-2">
+                            {#if revealedCredential}
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onclick={() => copyInitialAccessCredential(credential.credentialId)}
+                              >
+                                {#if initialAccessCredentialCopyState[credential.credentialId] === "copied"}
+                                  <Check class="size-4" />
+                                {:else}
+                                  <Copy class="size-4" />
+                                {/if}
+                                {initialAccessCredentialCopyLabel(credential.credentialId)}
+                              </Button>
+                            {:else if canClaimInitialAccessCredential(credential)}
+                              <Button
+                                type="button"
+                                size="sm"
+                                disabled={initialAccessCredentialClaimMutation.isPending}
+                                onclick={() => claimInitialAccessCredential(credential)}
+                              >
+                                <KeyRound class="size-4" />
+                                {$t(i18nKeys.console.resources.initialAccessCredentialReveal)}
+                              </Button>
+                            {/if}
+                          </div>
+                        </div>
+                      </article>
+                    {/each}
+                  </div>
+                </section>
+              {/if}
 
               <div class="grid gap-4 xl:grid-cols-3">
                 <section class="rounded-md border bg-background p-4 xl:col-span-2">
