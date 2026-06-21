@@ -1351,9 +1351,13 @@ describe("console page structure", () => {
     expect(resourceDetailPageSource).toContain(
       "Boolean(revealedInitialAccessCredentials[credential.credentialId])",
     );
-    expect(resourceDetailPageSource).toContain(
-      "/api/resources/" + "$" + "{encodeURIComponent(resourceId)}/initial-access-credentials",
-    );
+    const initialAccessCredentialsEndpointSource = [
+      "/api/resources/",
+      "$",
+      "{encodeURIComponent(resourceId)}",
+      "/initial-access-credentials",
+    ].join("");
+    expect(resourceDetailPageSource).toContain(initialAccessCredentialsEndpointSource);
     expect(resourceDetailPageSource).toContain("initialAccessCredentialsTitle");
     expect(resourceDetailPageSource).toContain("claimInitialAccessCredential");
     expect(resourceDetailPageSource).not.toContain("/cloud/installed-applications/");
@@ -1730,6 +1734,7 @@ describe("console page structure", () => {
     expect(deploymentProgressDialogSource).not.toContain("min-h-0 flex-1 overflow-auto p-5");
     expect(operationProgressPanelSource).toContain("onclick={() => onClose?.()}");
     expect(operationProgressPanelSource).toContain("deployment-progress-spinner");
+    expect(operationProgressPanelSource).toContain(":global(.deployment-progress-spinner)");
     expect(operationProgressPanelSource).toContain("deployment-progress-confetti");
     expect(operationProgressPanelSource).toContain("data-deployment-progress-success-access-url");
     expect(operationProgressPanelSource).toContain("const resolvedAccessUrl = $derived(accessUrl)");

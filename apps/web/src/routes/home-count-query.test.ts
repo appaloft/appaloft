@@ -113,7 +113,9 @@ describe("operations workbench home", () => {
   test("[HOME-ATTENTION-LAYOUT-001] keeps attention icon, title, and action on a compact row", () => {
     expect(homePageSource).toContain('<div class="nothing-attention-row">');
     expect(homePageSource).toContain('<span class="nothing-attention-icon" aria-hidden="true">');
-    expect(homePageSource).toContain('class="nothing-attention-action justify-self-start md:justify-self-end"');
+    expect(homePageSource).toContain(
+      'class="nothing-attention-action justify-self-start md:justify-self-end"',
+    );
     expect(homePageSource).toContain(".nothing-attention-row {");
     expect(homePageSource).toContain("grid-template-columns: auto minmax(0, 1fr) auto;");
     expect(homePageSource).toContain(".nothing-attention-row > :global(.nothing-attention-action)");
