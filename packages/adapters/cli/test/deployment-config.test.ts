@@ -3341,8 +3341,6 @@ describe("CLI deployment config entry workflow", () => {
               "root",
               "--server-ssh-private-key-file",
               sshKeyPath,
-              "--server-proxy-kind",
-              "traefik",
               "--state-backend",
               "ssh-pglite",
               "--method",

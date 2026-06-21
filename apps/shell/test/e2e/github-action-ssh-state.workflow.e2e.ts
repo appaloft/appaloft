@@ -198,7 +198,6 @@ function githubActionEnv(input: {
 function deployFromWorkspace(input: {
   config: SshConfig;
   resourceName: string;
-  serverProxyKind?: "none" | "traefik";
   sourceDir: string;
   workspace: ShellE2eWorkspace;
 }): string {
@@ -214,8 +213,6 @@ function deployFromWorkspace(input: {
       input.config.port,
       "--server-provider",
       "generic-ssh",
-      "--server-proxy-kind",
-      input.serverProxyKind ?? "none",
       "--server-ssh-username",
       input.config.username,
       "--server-ssh-private-key-file",
@@ -465,7 +462,6 @@ describe("GitHub Action SSH remote-state workflow e2e", () => {
       const deploymentId = deployFromWorkspace({
         config,
         resourceName: routeResourceName,
-        serverProxyKind: "traefik",
         sourceDir: routeSourceDir,
         workspace: routeWorkspace,
       });

@@ -23,7 +23,6 @@ import {
 import { createQuickDeployGeneratedResourceName } from "@appaloft/contracts";
 import {
   domainError,
-  edgeProxyKinds,
   err,
   ok,
   type Result,
@@ -93,9 +92,6 @@ const serverHostOption = Options.text("server-host").pipe(Options.optional);
 const serverNameOption = Options.text("server-name").pipe(Options.optional);
 const serverProviderOption = Options.text("server-provider").pipe(Options.optional);
 const serverPortOption = Options.text("server-port").pipe(Options.optional);
-const serverProxyKindOption = Options.choice("server-proxy-kind", edgeProxyKinds).pipe(
-  Options.optional,
-);
 const serverSshUsernameOption = Options.text("server-ssh-username").pipe(Options.optional);
 const serverSshPublicKeyOption = Options.text("server-ssh-public-key").pipe(Options.optional);
 const serverSshPrivateKeyFileOption = Options.text("server-ssh-private-key-file").pipe(
@@ -1421,7 +1417,6 @@ export const deployCommand = EffectCommand.make(
     serverName: serverNameOption,
     serverProvider: serverProviderOption,
     serverPort: serverPortOption,
-    serverProxyKind: serverProxyKindOption,
     serverSshUsername: serverSshUsernameOption,
     serverSshPublicKey: serverSshPublicKeyOption,
     serverSshPrivateKeyFile: serverSshPrivateKeyFileOption,
@@ -1503,7 +1498,6 @@ export const deployCommand = EffectCommand.make(
     serverName,
     serverPort,
     serverProvider,
-    serverProxyKind,
     serverSshPrivateKeyFile,
     serverSshPublicKey,
     serverSshUsername,
@@ -1538,7 +1532,6 @@ export const deployCommand = EffectCommand.make(
       const serverNameValue = optionalValue(serverName);
       const serverProviderValue = optionalValue(serverProvider);
       const serverPortValue = optionalNumber(serverPort);
-      const serverProxyKindValue = optionalValue(serverProxyKind);
       const serverSshUsernameValue = optionalValue(serverSshUsername);
       const serverSshPublicKeyValue = optionalValue(serverSshPublicKey);
       const serverSshPrivateKeyFileValue = optionalValue(serverSshPrivateKeyFile);
@@ -1749,7 +1742,6 @@ export const deployCommand = EffectCommand.make(
         serverNameValue ||
         serverProviderValue ||
         serverPortValue !== undefined ||
-        serverProxyKindValue ||
         serverSshUsernameValue ||
         serverSshPublicKeyValue ||
         serverSshPrivateKey
@@ -1758,7 +1750,6 @@ export const deployCommand = EffectCommand.make(
               ...(serverHostValue ? { host: serverHostValue } : {}),
               ...(serverProviderValue ? { providerKey: serverProviderValue } : {}),
               ...(serverPortValue === undefined ? {} : { port: serverPortValue }),
-              ...(serverProxyKindValue ? { proxyKind: serverProxyKindValue } : {}),
               ...(serverSshPrivateKey
                 ? {
                     credential: {

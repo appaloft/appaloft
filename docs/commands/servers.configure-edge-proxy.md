@@ -125,10 +125,11 @@ deployment history, domain history, audit records, provider-owned proxy containe
 networks, or provider-owned files. Explicit cleanup or artifact removal requires a separate future
 operation/spec.
 
-`traefik` and `caddy` mean future proxy-backed route realization should resolve provider-owned
-edge proxy intent for that kind through the provider registry/runtime provider boundary. The command
+Provider-backed kinds mean future proxy-backed route realization should resolve provider-owned edge
+proxy intent for that kind through the provider registry/runtime provider boundary. The command
 records desired intent only. It does not render labels, write proxy config, create containers,
-restart proxy infrastructure, or verify proxy readiness.
+restart proxy infrastructure, or verify proxy readiness. Routine Web and CLI entrypoints use the
+configured default provider and do not expose provider selection while provider support is uneven.
 
 When the kind changes from `none` to a provider-backed kind, the server's current proxy status
 becomes `pending`. The command does not synchronously request bootstrap. The accepted follow-up
@@ -217,8 +218,8 @@ the configure implementation introduces a provider registry admission check in a
 
 | Entrypoint | Mapping | Status |
 | --- | --- | --- |
-| Web | Server detail exposes a proxy kind selector for active servers using `none`, `traefik`, and `caddy`, dispatches the typed `servers.configure-edge-proxy` oRPC client, and shows inactive/deleted servers as read-only. | Active |
-| CLI | `appaloft server proxy configure <serverId> --kind none\|traefik\|caddy [--json]`. | Active |
+| Web | Server detail shows proxy state as read-only. Routine Web creation flows use the configured default provider and do not expose a provider selector. | Active |
+| CLI | Not exposed. Routine CLI flows use the configured default provider and do not expose a provider selector. | Intentionally not exposed |
 | oRPC / HTTP | `POST /api/servers/{serverId}/edge-proxy/configuration` using the command schema. | Active |
 | Repository config files | Not applicable. Repository config cannot change deployment target identity or server-owned proxy intent. | Not applicable |
 | Automation / MCP | Future command/tool over the same operation key. | Future |
@@ -233,10 +234,8 @@ Canonical event spec:
 
 ## Current Implementation Notes And Migration Gaps
 
-The active implementation exposes API/oRPC, CLI, and Web closure and updates list/show read-model
-visibility. Web server detail carries the owner-scoped proxy kind selector for active servers,
-dispatches the same command schema through the typed oRPC client, and keeps inactive/deleted
-servers read-only for this operation.
+The active implementation exposes API/oRPC closure and updates list/show read-model visibility.
+Routine Web and CLI surfaces do not expose provider selection while provider support is uneven.
 
 The current code still uses `proxyKind` as provider-selection migration data. This command reuses
 that existing value object/enum seam and does not introduce provider-specific SDK types.

@@ -59,13 +59,14 @@ servers.
 `servers.configure-edge-proxy` changes only the active server's desired edge proxy kind. It must
 preserve the server id, host, port, provider key, credential relationship, lifecycle status,
 destination ids, deployment history, domain history, route snapshots, logs, audit records, and all
-historical references. It must use the existing edge proxy value object/enum rules (`none`,
-`traefik`, `caddy`) and must not introduce provider SDK types or free-form provider strings into
+historical references. It must use the existing edge proxy value object/enum rules and must not
+introduce provider SDK types or free-form provider strings into
 core/application state. `none` disables future generated/default access and custom-domain
 proxy-backed target selection for that server without deleting historical route snapshots or
-provider-owned artifacts. `traefik` and `caddy` record provider-owned proxy intent for future
-bootstrap/route realization. The command must not synchronously bootstrap, repair, stop, delete, or
-reload proxy infrastructure. Active servers may be configured. Inactive servers are rejected with
+provider-owned artifacts. Provider-backed kinds record provider-owned proxy intent for future
+bootstrap/route realization. Routine Web and CLI entrypoints use the configured default provider and
+do not expose provider selection while provider support is uneven. The command must not
+synchronously bootstrap, repair, stop, delete, or reload proxy infrastructure. Active servers may be configured. Inactive servers are rejected with
 `server_inactive` because inactive targets must not receive new deployment, scheduling, or proxy
 target configuration work. Deleted server tombstones are immutable through the ordinary configure
 entrypoint; normal command admission returns `not_found` for deleted servers.
@@ -105,9 +106,9 @@ them through explicit future cleanup or lifecycle commands before deletion can p
 
 | Surface | Decision |
 | --- | --- |
-| CLI | Expose `server show <serverId>`, `server rename <serverId> --name <name>`, `server proxy configure <serverId> --kind none\|traefik\|caddy`, `server deactivate <serverId>`, `server delete-check <serverId>`, and `server delete <serverId> --confirm <serverId>` with positional ids and explicit confirmation where destructive. |
+| CLI | Expose `server show <serverId>`, `server rename <serverId> --name <name>`, `server deactivate <serverId>`, `server delete-check <serverId>`, and `server delete <serverId> --confirm <serverId>` with positional ids and explicit confirmation where destructive. Routine CLI flows use the configured default proxy provider and do not expose provider selection. |
 | HTTP/oRPC | Expose `GET /api/servers/{serverId}`, `POST /api/servers/{serverId}/rename`, `POST /api/servers/{serverId}/edge-proxy/configuration`, `POST /api/servers/{serverId}/deactivate`, `GET /api/servers/{serverId}/delete-check`, and `DELETE /api/servers/{serverId}` using operation schemas; no `PATCH /api/servers/{id}` is allowed. |
-| Web | Server detail reads `servers.show` for identity, proxy status, credential summary, rollups, and lifecycle status; exposes a display-name rename text input/action for active and inactive servers; exposes an edge-proxy kind selector/action and typed-confirmation deactivate action for active servers; shows read-only proxy/deactivate state for inactive/deleted servers; reads `servers.delete-check`; and enables destructive delete only when delete safety is eligible and the operator types the exact server id confirmation. |
+| Web | Server detail reads `servers.show` for identity, proxy status, credential summary, rollups, and lifecycle status; exposes a display-name rename text input/action for active and inactive servers; shows proxy state as read-only; exposes typed-confirmation deactivate action for active servers; shows read-only deactivate state for inactive/deleted servers; reads `servers.delete-check`; and enables destructive delete only when delete safety is eligible and the operator types the exact server id confirmation. |
 | Repository config | Not applicable. Repository config must not select server identity. |
 | Future MCP/tools | Generate command/query tools from the operation catalog entries. |
 | Public docs | Existing `server.deployment-target` anchor explains server identity preservation, display-name, detail, deactivation, and delete-safety semantics. Existing `server.proxy-readiness` anchor explains edge proxy intent, readiness, and repair semantics. |

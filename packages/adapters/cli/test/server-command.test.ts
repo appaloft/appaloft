@@ -71,8 +71,6 @@ describe("CLI server commands", () => {
         "swarm-manager.internal",
         "--provider",
         "docker-swarm",
-        "--proxy-kind",
-        "none",
         "--target-kind",
         "orchestrator-cluster",
       ]);
@@ -87,7 +85,7 @@ describe("CLI server commands", () => {
       host: "swarm-manager.internal",
       providerKey: "docker-swarm",
       targetKind: "orchestrator-cluster",
-      proxyKind: "none",
+      proxyKind: "traefik",
     });
   });
 

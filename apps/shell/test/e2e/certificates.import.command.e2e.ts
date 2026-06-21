@@ -298,8 +298,6 @@ function createConfirmedManualBinding(input: {
       input.context.serverId,
       "--destination-id",
       input.context.destinationId,
-      "--proxy-kind",
-      "traefik",
       "--tls-mode",
       "auto",
       "--certificate-policy",
