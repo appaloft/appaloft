@@ -1756,6 +1756,9 @@ export const enUS = {
       deleteSafetyPreserves:
         "Generated access, deployment snapshots, and route audit are preserved.",
       deleteSuccessTitle: "Domain binding deleted",
+      detailDescription:
+        "Review one domain binding's identity, resource ownership, routing, DNS, and lifecycle state.",
+      detailIdentityDescription: "Stable identity, domain name, and current binding status.",
       destinationHelp:
         "If the selected resource already has a destination it is prefilled; otherwise enter the target destination ID.",
       lifecycleBlocked: "Needs governance",
@@ -1865,6 +1868,12 @@ export const enUS = {
       routeManagedInDialog: "Managed in dialog",
       routeModeRedirect: "Redirect to canonical",
       routeModeServe: "Serve traffic",
+      sectionIdentity: "Identity",
+      sectionResource: "Resource ownership",
+      tabDns: "DNS",
+      tabLifecycle: "Lifecycle",
+      tabOverview: "Overview",
+      tabRouting: "Routing",
       tlsStepTitle: "TLS certificate",
       selectedResourceDestination: "Using resource destination {{destinationId}}.",
       showDetails: "Show details",
