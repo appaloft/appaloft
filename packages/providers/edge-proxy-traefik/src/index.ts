@@ -297,6 +297,31 @@ function redirectReplacement(route: EdgeProxyRouteInput): string {
   return [`${scheme}://${route.redirectTo}/$$`, "{1}"].join("");
 }
 
+function httpToHttpsRedirectRule(route: EdgeProxyRouteInput): string {
+  return `(${traefikRule(route)}) && !PathPrefix(\`/.well-known/acme-challenge/\`)`;
+}
+
+function httpToHttpsRedirectLabels(input: {
+  route: EdgeProxyRouteInput;
+  router: string;
+}): string[] {
+  if (input.route.tlsMode !== "auto") {
+    return [];
+  }
+
+  const router = `${input.router}-http-redirect`;
+  const middleware = `${router}-scheme`;
+
+  return [
+    `traefik.http.routers.${router}.rule=${httpToHttpsRedirectRule(input.route)}`,
+    `traefik.http.routers.${router}.entrypoints=web`,
+    `traefik.http.routers.${router}.middlewares=${middleware}`,
+    `traefik.http.routers.${router}.service=noop@internal`,
+    `traefik.http.middlewares.${middleware}.redirectscheme.scheme=https`,
+    `traefik.http.middlewares.${middleware}.redirectscheme.permanent=true`,
+  ];
+}
+
 function routeProbeCommand(input: {
   httpPort: number;
   networkName: string;
@@ -396,6 +421,7 @@ function labelsForTraefik(input: {
       `traefik.http.routers.${router}.rule=${traefikRule(input.route)}`,
       `traefik.http.routers.${router}.entrypoints=${entrypoint}`,
       ...autoTlsLabels,
+      ...httpToHttpsRedirectLabels({ route: input.route, router }),
       `traefik.http.routers.${router}.middlewares=${middleware}`,
       `traefik.http.routers.${router}.service=noop@internal`,
       `traefik.http.middlewares.${middleware}.redirectregex.regex=${regex}`,
@@ -414,6 +440,7 @@ function labelsForTraefik(input: {
     `traefik.http.routers.${router}.rule=${traefikRule(input.route)}`,
     `traefik.http.routers.${router}.entrypoints=${entrypoint}`,
     ...autoTlsLabels,
+    ...httpToHttpsRedirectLabels({ route: input.route, router }),
     ...(input.accessFailureMiddlewareName
       ? [`traefik.http.routers.${router}.middlewares=${input.accessFailureMiddlewareName}`]
       : []),
