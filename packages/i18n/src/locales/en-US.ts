@@ -1497,6 +1497,11 @@ export const enUS = {
       archiveSucceeded: "Project archived",
       archived: "Archived",
       archivedAt: "Archived at",
+      archivedResourcesCount: "{{count}} archived",
+      archivedResourcesDescription:
+        "Resources archived but not deleted remain retained and visible here for follow-up cleanup or restore decisions.",
+      archivedResourcesEmpty: "This project has no archived, retained resources.",
+      archivedResourcesTitle: "Archived resources",
       restoreAction: "Restore",
       restoreConfirm:
         "Restore this project? New project-scoped resources, environments, and deployments can be created again. Existing child resources and deployment history will not be changed.",

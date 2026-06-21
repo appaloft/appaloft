@@ -203,6 +203,14 @@ function toResourceSummary(
     slug: row.slug,
     kind: row.kind as ResourceSummaryItem["kind"],
     ...(row.description ? { description: row.description } : {}),
+    lifecycleStatus: row.lifecycle_status as Exclude<
+      ResourceSummaryItem["lifecycleStatus"],
+      undefined
+    >,
+    ...(row.archived_at
+      ? { archivedAt: normalizeTimestamp(row.archived_at) ?? row.archived_at }
+      : {}),
+    ...(row.archive_reason ? { archiveReason: row.archive_reason } : {}),
     services: services.map((service) => ({
       name: service.name,
       kind: service.kind,

@@ -2779,6 +2779,9 @@ export interface ResourceSummary {
   slug: string;
   kind: ResourceKind;
   description?: string;
+  lifecycleStatus?: "active" | "archived";
+  archivedAt?: string;
+  archiveReason?: string;
   createdAt: string;
   services: Array<{
     name: string;
