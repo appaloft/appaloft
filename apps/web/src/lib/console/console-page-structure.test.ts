@@ -1256,6 +1256,22 @@ describe("console page structure", () => {
     expect(healthPolicySource).not.toContain('class="rounded-md bg-muted/25 px-3 py-2"');
   });
 
+  test("[RES-HEALTH-ENTRY-001] surfaces primary health reasons on the resource overview", () => {
+    const overviewSource = sourceBetween(
+      resourceDetailPageSource,
+      'id="resource-overview"',
+      "{$t(i18nKeys.console.resources.overviewLatestDeployment)}",
+    );
+
+    expect(overviewSource).toContain("healthRuntime");
+    expect(overviewSource).toContain("healthPolicy");
+    expect(overviewSource).toContain("healthPublicAccess");
+    expect(overviewSource).toContain("healthProxy");
+    expect(overviewSource).toContain("data-resource-health-primary-issues");
+    expect(overviewSource).toContain("primaryResourceHealthIssues");
+    expect(overviewSource).toContain("healthIssueTitle");
+  });
+
   test("[RESOURCE-NETWORKING-IA-001] owns domain binding creation from a focused dialog", () => {
     const resourceDomainBindingsSectionSource =
       resourceDetailPageSource.match(

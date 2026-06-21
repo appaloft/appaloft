@@ -2328,6 +2328,16 @@ export const enUS = {
       healthDescription:
         "Health policy defines application-level probes. When it is not configured, only runtime state is shown.",
       healthLatestDeployment: "Latest deployment",
+      healthIssueDomainNotVerified:
+        "The domain has not been verified yet, so the custom domain cannot reliably receive traffic.",
+      healthIssueHealthPolicyMissing: "No application-level health policy is configured.",
+      healthIssueNeedsAttention: "A health signal needs attention.",
+      healthIssueProxyRouteUnavailable: "The proxy route is not ready yet.",
+      healthIssuePublicAccessProbeFailed:
+        "The public access probe could not reach the current URL.",
+      healthIssueRuntimeUnavailable: "Runtime probing is not available right now.",
+      healthIssueTechnicalCode: "{{code}} · {{phase}}",
+      healthIssueTitle: "Why this is not healthy",
       healthNoChecks: "No health check records yet.",
       healthNoSourceIssues: "No source issues.",
       healthObservedAt: "Observed",
@@ -2336,6 +2346,16 @@ export const enUS = {
       healthPolicySaved: "Health policy saved",
       healthProxy: "Proxy route",
       healthPublicAccess: "Public access",
+      healthRecommendedCheckHealth: "Run resource health checks again.",
+      healthRecommendedFixDns:
+        "Check that DNS records point to the target address Appaloft expects.",
+      healthRecommendedInspectLogs: "Inspect runtime logs to confirm the app started correctly.",
+      healthRecommendedInspectProxy:
+        "Inspect the proxy configuration preview and route apply status.",
+      healthRecommendedProvideCertificate:
+        "Configure or issue a certificate, then verify access again.",
+      healthRecommendedVerifyDomain: "Verify domain ownership and DNS targets.",
+      healthRecommendedWait: "Wait for the current change to propagate, then refresh status.",
       healthRefresh: "Refresh status",
       healthRuntime: "Runtime",
       healthSourceIssues: "Source issues",
