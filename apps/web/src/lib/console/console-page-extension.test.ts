@@ -125,9 +125,11 @@ describe("Console page extension surface", () => {
     expect(rendererSource).toContain('kind: "dialog-panel-grid"');
     expect(rendererSource).toContain('kind: "integration-catalog"');
     expect(rendererSource).toContain('layout?: "catalog-grid" | "settings-list"');
+    expect(rendererSource).toContain("src?: string");
     expect(rendererSource).toContain("data-console-page-integration-catalog");
     expect(rendererSource).toContain("data-console-page-integration-list");
     expect(rendererSource).toContain("data-console-page-integration-card");
+    expect(rendererSource).toContain("data-console-page-integration-icon-image");
     expect(rendererSource).toContain("data-console-page-integration-details-trigger");
     expect(rendererSource).toContain("data-console-page-integration-details");
     expect(rendererSource).toContain(

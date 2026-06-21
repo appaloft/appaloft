@@ -120,6 +120,7 @@
   type ConsolePageIntegrationIcon = {
     label?: string;
     brandHex?: string;
+    src?: string;
   };
 
   type ConsolePagePanelGridSection = {
@@ -877,7 +878,18 @@
                           class="flex size-10 shrink-0 items-center justify-center rounded-lg border bg-background text-sm font-semibold"
                           style="border-color: color-mix(in srgb, var(--integration-accent) 35%, transparent); color: var(--integration-accent);"
                         >
-                          {integrationInitials(item)}
+                          {#if item.icon?.src}
+                            <img
+                              src={item.icon.src}
+                              alt={item.icon.label ?? item.title}
+                              class="size-5 object-contain"
+                              loading="lazy"
+                              decoding="async"
+                              data-console-page-integration-icon-image
+                            />
+                          {:else}
+                            {integrationInitials(item)}
+                          {/if}
                         </div>
                         <div class="min-w-0 space-y-1.5">
                           <div class="flex flex-wrap items-center gap-2">
@@ -1015,7 +1027,18 @@
                           class="flex size-11 shrink-0 items-center justify-center rounded-lg border bg-background text-sm font-semibold shadow-sm"
                           style="border-color: color-mix(in srgb, var(--integration-accent) 35%, transparent); color: var(--integration-accent);"
                         >
-                          {integrationInitials(item)}
+                          {#if item.icon?.src}
+                            <img
+                              src={item.icon.src}
+                              alt={item.icon.label ?? item.title}
+                              class="size-6 object-contain"
+                              loading="lazy"
+                              decoding="async"
+                              data-console-page-integration-icon-image
+                            />
+                          {:else}
+                            {integrationInitials(item)}
+                          {/if}
                         </div>
                         <span
                           class={[
