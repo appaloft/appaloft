@@ -1769,7 +1769,9 @@ Current boundary:
   owner/path scope; generic `domain-bindings.update` remains forbidden
 - `domain-bindings.delete-check` and `domain-bindings.delete` preserve generated access,
   deployment snapshot history, server-applied route audit, and certificate history. Delete is
-  blocked while active certificate state is attached and does not revoke/delete certificates.
+  blocked while active certificate state is attached, does not revoke/delete certificates, and does
+  not silently mutate DNS providers. Appaloft-managed DNS records require the DNS connector cleanup
+  flow; manually managed DNS records remain a user/provider cleanup action.
 - `domain-bindings.retry-verification` creates a new ownership verification attempt and resets DNS
   observation to a waitable pending state when expected targets are known. Accepted verification
   retry attempts are also projected into `operator-work.*` through safe process-attempt rows with

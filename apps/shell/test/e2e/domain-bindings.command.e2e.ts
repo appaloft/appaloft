@@ -13,6 +13,7 @@ import {
   expectCliSuccess,
   parseJson,
   runShellCli,
+  type ShellHttpAdminSession,
   startShellHttpServer,
 } from "./support/shell-e2e-fixture";
 
@@ -22,6 +23,13 @@ type DomainBindingListResponse = {
 
 describe("domain-bindings command e2e", () => {
   let fixture: RoutingDomainTlsFixture;
+  let httpAdminSession: ShellHttpAdminSession | null = null;
+
+  async function getHttpAdminSession(baseUrl: string): Promise<ShellHttpAdminSession> {
+    httpAdminSession ??= await createShellHttpAdminSession(baseUrl);
+
+    return httpAdminSession;
+  }
 
   beforeAll(() => {
     fixture = createRoutingDomainTlsFixture({
@@ -134,7 +142,7 @@ describe("domain-bindings command e2e", () => {
     const httpServer = await startShellHttpServer(fixture.cliOptions);
 
     try {
-      const auth = await createShellHttpAdminSession(httpServer.baseUrl);
+      const auth = await getHttpAdminSession(httpServer.baseUrl);
       const created = await fetch(`${httpServer.baseUrl}/api/domain-bindings`, {
         body: JSON.stringify({
           destinationId: context.destinationId,
@@ -191,6 +199,149 @@ describe("domain-bindings command e2e", () => {
         domainName,
         resourceId: context.resourceId,
         status: "bound",
+      });
+    } finally {
+      await httpServer.stop();
+    }
+  }, 60000);
+
+  test("[ROUTE-TLS-ENTRY-024] CLI checks and deletes a domain binding while preserving default access", async () => {
+    const suffix = crypto.randomUUID().slice(0, 6);
+    const context = fixture.createResource({
+      internalPort: 4725 + Math.floor(Math.random() * 100),
+      suffix,
+    });
+    const domainName = `${suffix}.delete.example.net`;
+    const httpServer = await startShellHttpServer(fixture.cliOptions);
+    let domainBindingId = "";
+
+    try {
+      const auth = await getHttpAdminSession(httpServer.baseUrl);
+      const created = await fetch(`${httpServer.baseUrl}/api/domain-bindings`, {
+        body: JSON.stringify({
+          domainName,
+          environmentId: context.environmentId,
+          pathPrefix: "/",
+          projectId: context.projectId,
+          proxyKind: "traefik",
+          resourceId: context.resourceId,
+          tlsMode: "auto",
+        }),
+        headers: {
+          ...auth.headers,
+          "content-type": "application/json",
+        },
+        method: "POST",
+      });
+      expect(created.status).toBe(201);
+      domainBindingId = ((await created.json()) as { id: string }).id;
+    } finally {
+      await httpServer.stop();
+    }
+
+    const deleteCheck = runShellCli(
+      ["domain-binding", "delete-check", domainBindingId],
+      fixture.cliOptions,
+    );
+    expectCliSuccess(deleteCheck, "check domain binding delete safety through CLI");
+    expect(
+      parseJson<{ safeToDelete: boolean; preservesGeneratedAccess: boolean }>(deleteCheck.stdout),
+    ).toMatchObject({
+      safeToDelete: true,
+      preservesGeneratedAccess: true,
+    });
+
+    const deleted = runShellCli(
+      ["domain-binding", "delete", domainBindingId, "--confirm", domainBindingId],
+      fixture.cliOptions,
+    );
+    expectCliSuccess(deleted, "delete domain binding through CLI");
+    expect(parseJson<{ id: string }>(deleted.stdout)).toEqual({ id: domainBindingId });
+
+    const listed = runShellCli(
+      ["domain-binding", "list", "--resource", context.resourceId],
+      fixture.cliOptions,
+    );
+    expectCliSuccess(listed, "list domain bindings after CLI delete");
+    expect(
+      findDomainBinding({
+        domainBindingId,
+        items: parseJson<DomainBindingListResponse>(listed.stdout).items,
+      }),
+    ).toMatchObject({
+      id: domainBindingId,
+      status: "deleted",
+    });
+  }, 60000);
+
+  test("[ROUTE-TLS-ENTRY-023][ROUTE-TLS-ENTRY-024] HTTP checks and deletes a domain binding", async () => {
+    const suffix = crypto.randomUUID().slice(0, 6);
+    const context = fixture.createResource({
+      internalPort: 4775 + Math.floor(Math.random() * 100),
+      suffix,
+    });
+    const domainName = `${suffix}.delete-http.example.net`;
+    const httpServer = await startShellHttpServer(fixture.cliOptions);
+
+    try {
+      const auth = await getHttpAdminSession(httpServer.baseUrl);
+      const created = await fetch(`${httpServer.baseUrl}/api/domain-bindings`, {
+        body: JSON.stringify({
+          domainName,
+          environmentId: context.environmentId,
+          pathPrefix: "/",
+          projectId: context.projectId,
+          proxyKind: "traefik",
+          resourceId: context.resourceId,
+          tlsMode: "auto",
+        }),
+        headers: {
+          ...auth.headers,
+          "content-type": "application/json",
+        },
+        method: "POST",
+      });
+      expect(created.status).toBe(201);
+      const domainBindingId = ((await created.json()) as { id: string }).id;
+
+      const deleteCheck = await fetch(
+        `${httpServer.baseUrl}/api/domain-bindings/${domainBindingId}/delete-check`,
+        { headers: auth.headers },
+      );
+      expect(deleteCheck.status).toBe(200);
+      expect((await deleteCheck.json()) as { safeToDelete: boolean }).toMatchObject({
+        domainBindingId,
+        safeToDelete: true,
+        preservesGeneratedAccess: true,
+      });
+
+      const deleted = await fetch(`${httpServer.baseUrl}/api/domain-bindings/${domainBindingId}`, {
+        body: JSON.stringify({
+          domainBindingId,
+          confirmation: { domainBindingId },
+        }),
+        headers: {
+          ...auth.headers,
+          "content-type": "application/json",
+        },
+        method: "DELETE",
+      });
+      expect(deleted.status).toBe(200);
+      expect((await deleted.json()) as { id: string }).toEqual({ id: domainBindingId });
+
+      const listed = await fetch(
+        `${httpServer.baseUrl}/api/domain-bindings?resourceId=${context.resourceId}`,
+        { headers: auth.headers },
+      );
+      expect(listed.ok).toBe(true);
+      expect(
+        findDomainBinding({
+          domainBindingId,
+          items: ((await listed.json()) as DomainBindingListResponse).items,
+        }),
+      ).toMatchObject({
+        id: domainBindingId,
+        status: "deleted",
       });
     } finally {
       await httpServer.stop();

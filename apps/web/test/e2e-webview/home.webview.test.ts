@@ -9652,6 +9652,105 @@ describe.serial("console e2e with Bun.WebView", () => {
     }
   }, 30_000);
 
+  test("[ROUTE-TLS-ENTRY-026] deletes a resource-scoped domain binding through delete-check gated Web action", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    const previousDomainBindingsRoute = apiResponses.dashboard["/api/rpc/domainBindings/list"];
+    const previousDeleteCheckRoute = apiResponses.dashboard["/api/rpc/domainBindings/deleteCheck"];
+    const previousDeleteRoute = apiResponses.dashboard["/api/rpc/domainBindings/delete"];
+    let deleted = false;
+
+    apiResponses.dashboard["/api/rpc/domainBindings/list"] = () => ({
+      json: {
+        items: deleted
+          ? []
+          : [
+              {
+                id: "dbn_delete_web",
+                projectId: "prj_demo",
+                environmentId: "env_demo",
+                resourceId: "res_demo",
+                serverId: "srv_demo",
+                destinationId: "dst_demo",
+                domainName: "delete-web.example.test",
+                pathPrefix: "/",
+                proxyKind: "traefik",
+                tlsMode: "auto",
+                certificatePolicy: "auto",
+                status: "pending_verification",
+                verificationAttemptCount: 0,
+                createdAt: "2026-01-01T00:00:00.000Z",
+              },
+            ],
+      },
+    });
+    apiResponses.dashboard["/api/rpc/domainBindings/deleteCheck"] = () => ({
+      json: {
+        domainBindingId: "dbn_delete_web",
+        safeToDelete: true,
+        blockers: [],
+        warnings: [],
+        preservesGeneratedAccess: true,
+        preservesDeploymentSnapshots: true,
+        preservesServerAppliedRouteAudit: true,
+      },
+    });
+    apiResponses.dashboard["/api/rpc/domainBindings/delete"] = () => {
+      deleted = true;
+      return {
+        json: {
+          id: "dbn_delete_web",
+        },
+      };
+    };
+
+    try {
+      await using view = createWebView();
+      await view.navigate(`${previewUrl}${demoResourcePath}?tab=networking&section=domains`);
+      await ensureResourceSection(view, {
+        tab: "networking",
+        section: "domains",
+        sectionSelector: "#resource-domain-bindings",
+      });
+
+      await expectText(view, "delete-web.example.test");
+      await clickElementBySelector(view, "#resource-domain-binding-delete-action-dbn_delete_web");
+      await expectAnyText(view, ["Delete domain binding", "删除域名绑定"]);
+      await clickElementBySelector(view, "#resource-domain-binding-delete-check");
+
+      const deleteCheckRequest = await waitForRecordedRequest(
+        "/api/rpc/domainBindings/deleteCheck",
+      );
+      expect(readOrpcJsonPayload(deleteCheckRequest.body)).toEqual({
+        domainBindingId: "dbn_delete_web",
+      });
+      await expectAnyText(view, ["Safe to delete", "可以删除"]);
+
+      await setInputValue(view, "#resource-domain-binding-delete-confirmation", "dbn_delete_web");
+      await clickElementBySelector(view, "#resource-domain-binding-delete-confirm");
+
+      const deleteRequest = await waitForRecordedRequest("/api/rpc/domainBindings/delete");
+      expect(readOrpcJsonPayload(deleteRequest.body)).toEqual({
+        domainBindingId: "dbn_delete_web",
+        confirmation: { domainBindingId: "dbn_delete_web" },
+      });
+      expect(deleted).toBe(true);
+    } finally {
+      apiResponses.dashboard["/api/rpc/domainBindings/list"] = previousDomainBindingsRoute;
+      if (previousDeleteCheckRoute === undefined) {
+        delete apiResponses.dashboard["/api/rpc/domainBindings/deleteCheck"];
+      } else {
+        apiResponses.dashboard["/api/rpc/domainBindings/deleteCheck"] = previousDeleteCheckRoute;
+      }
+      if (previousDeleteRoute === undefined) {
+        delete apiResponses.dashboard["/api/rpc/domainBindings/delete"];
+      } else {
+        apiResponses.dashboard["/api/rpc/domainBindings/delete"] = previousDeleteRoute;
+      }
+    }
+  }, 30_000);
+
   test("[CERT-IMPORT-ENTRY-003] imports a manual certificate from the resource detail Web surface", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();
