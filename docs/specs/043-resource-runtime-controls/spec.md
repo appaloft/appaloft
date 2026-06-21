@@ -81,6 +81,9 @@ must report whether stop succeeded but start failed.
 ## Read And Recovery Surface
 
 Runtime-control attempt status is exposed through `resources.health.latestRuntimeControl`.
+While the latest attempt is `accepted` or `running`, Web Resource detail must treat resource health
+as actively changing, short-poll `resources.health`, and surface the runtime-control attempt in the
+Resource header or health popover without requiring the operator to reopen the action menu.
 
 A future `resources.runtime-control.show` or `resources.runtime-controls.list` query remains
 deferred until attempt history, pagination, or audit workflows need an independent read model. Do
@@ -104,6 +107,7 @@ Failures should guide users to:
 | `RUNTIME-CTRL-SPEC-004` | Runtime metadata is missing or stale. | Command is blocked and suggests redeploy or recovery readiness. |
 | `RUNTIME-CTRL-SPEC-005` | Deployment is active for same Resource runtime scope. | Runtime control is blocked or times out through `resource-runtime` coordination. |
 | `RUNTIME-CTRL-SPEC-006` | Resource profile changed after last deployment. | Restart/start still use retained runtime metadata and do not apply profile changes. |
+| `RUNTIME-CTRL-SPEC-007` | Runtime control active readback. | Web Resource detail short-polls health, shows the active attempt outside the dropdown menu, and names operation, status, runtime state, and phases when available. |
 
 ## Public Surfaces
 
@@ -113,6 +117,8 @@ Active surfaces:
 - HTTP/oRPC routes using the same command schemas.
 - Web Resource detail affordances showing clear stop/start/restart versus redeploy language.
 - Public docs/help anchors explaining runtime controls, blocked start, and restart versus redeploy.
+- Web restart copy directs operators to redeploy or force redeploy when they want saved variables,
+  secrets, source, or runtime profile changes applied.
 
 Future MCP/tool descriptors remain deferred until the tool surface exists and must be generated from
 operation catalog metadata.
