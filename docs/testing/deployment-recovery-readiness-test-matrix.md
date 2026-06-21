@@ -24,6 +24,7 @@ by [Deployment Rollback](../specs/041-deployment-rollback/spec.md).
 - [deployments.recovery-readiness Query Spec](../queries/deployments.recovery-readiness.md)
 - [deployments.retry Command Spec](../commands/deployments.retry.md)
 - [deployments.redeploy Command Spec](../commands/deployments.redeploy.md)
+- [deployments.force-redeploy Command Spec](../commands/deployments.force-redeploy.md)
 - [deployments.rollback Command Spec](../commands/deployments.rollback.md)
 - [deployments.cancel Command Spec](../commands/deployments.cancel.md)
 - [Deployments Cancel Test Matrix](./deployments.cancel-test-matrix.md)
@@ -59,6 +60,9 @@ by [Deployment Rollback](../specs/041-deployment-rollback/spec.md).
 | `DEP-REDEPLOY-002` | Source deployment has usable snapshot but current profile differs. | Command creates a current-profile attempt and does not reuse the old snapshot as runtime truth. | `packages/application/test/deployment-retry-redeploy.test.ts` | Passing |
 | `DEP-REDEPLOY-003` | Source deployment has usable snapshot but current profile is invalid. | Command rejects redeploy; it does not fall back to retry semantics. | `packages/application/test/deployment-retry-redeploy.test.ts` | Passing |
 | `DEP-REDEPLOY-004` | Runtime operation is already in progress for the resource. | Command rejects or waits according to coordination policy without bypassing create/retry/rollback serialization. | `packages/application/test/deployment-retry-redeploy.test.ts` | Passing |
+| `DEP-FORCE-REDEPLOY-001` | Force redeploy admitted for current valid Resource profile. | Command returns accepted async result with a new attempt id, `triggerKind = force-redeploy`, and current-profile runtime inputs. | `packages/application/test/deployment-retry-redeploy.test.ts`; `packages/orpc/test/deployment-create.http.test.ts` | Passing |
+| `DEP-FORCE-REDEPLOY-002` | Force redeploy uses Docker image build. | Runtime command rendering includes `docker build --pull --no-cache`. | `packages/adapters/runtime/test/runtime-command-builder.test.ts` | Passing |
+| `DEP-FORCE-REDEPLOY-003` | Force redeploy uses Docker Compose build. | Runtime command rendering runs `docker compose build --pull --no-cache` before `docker compose up --build`. | `packages/adapters/runtime/test/runtime-command-builder.test.ts` | Passing |
 | `DEP-ROLLBACK-001` | Rollback admitted with retained successful candidate. | Command returns accepted async result with a new rollback attempt id and emits `triggerKind = "rollback"` plus source/candidate metadata. | `packages/application/test/deployment-rollback.test.ts`, `packages/core/test/deployment.test.ts`, `packages/persistence/pg/test/deployment-repository.pglite.test.ts` | Passing |
 | `DEP-ROLLBACK-002` | Requested rollback candidate is missing, expired, wrong-resource, or not visible. | Command rejects with `deployment_rollback_candidate_not_found`. | `packages/application/test/deployment-rollback.test.ts` | Passing |
 | `DEP-ROLLBACK-003` | Requested candidate lacks artifact, snapshot, or safe stateless rollback support. | Command rejects with `deployment_not_rollback_ready` and safe missing metadata detail. | `packages/application/test/deployment-rollback.test.ts` | Passing |

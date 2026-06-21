@@ -41,6 +41,7 @@ import {
   err,
   ok,
   type Deployment,
+  type DeploymentState,
   type Result,
   type RollbackPlan,
   type RuntimeExecutionPlan,
@@ -166,6 +167,10 @@ function isRemoteGitSourceKind(kind: string): boolean {
     kind === "git-github-app" ||
     kind === "git-deploy-key"
   );
+}
+
+function isForceRedeployDeployment(state: DeploymentState): boolean {
+  return state.triggerKind.value === "force-redeploy";
 }
 
 function sourceBaseDirectory(metadata?: Record<string, string>): string | undefined {
@@ -1549,6 +1554,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       state.runtimePlan.buildStrategy === "dockerfile" ||
       state.runtimePlan.buildStrategy === "workspace-commands" ||
       state.runtimePlan.buildStrategy === "static-artifact";
+    const forceRedeploy = isForceRedeployDeployment(state);
 
     if (shouldBuildImage) {
       image = runtimeInstanceNames.imageName;
@@ -1689,6 +1695,8 @@ export class LocalExecutionBackend implements ExecutionBackend {
             dockerfilePath,
             contextPath: workdir,
             labels: dockerLabelsFromAssignments(appaloftDockerContainerLabelsForDeployment(state)),
+            pull: forceRedeploy,
+            noCache: forceRedeploy,
           }),
           { quote: shellQuote },
         );
@@ -1779,6 +1787,47 @@ export class LocalExecutionBackend implements ExecutionBackend {
           errorCode: "missing_docker_image",
         }).deployment,
       });
+    }
+
+    if (forceRedeploy && !shouldBuildImage) {
+      const pullCommand = `docker pull ${shellQuote(image)}`;
+      timeline.push(phaseLog("package", pullCommand));
+      const pull = await runShellCommand({
+        command: pullCommand,
+        cwd: workdir,
+        env,
+      });
+      this.pushCommandOutput(timeline, {
+        context,
+        deploymentId: state.id.value,
+        phase: "package",
+        output: pull.stdout,
+        level: "info",
+        stream: "stdout",
+        source: "docker",
+      });
+      this.pushCommandOutput(timeline, {
+        context,
+        deploymentId: state.id.value,
+        phase: "package",
+        output: pull.stderr,
+        level: "warn",
+        stream: "stderr",
+        source: "docker",
+      });
+      if (pull.failed) {
+        const message = "Docker image pull failed";
+        return ok({
+          deployment: this.applyFailure(deployment, {
+            timeline: [
+              ...timeline,
+              phaseLog("package", message, "error"),
+            ],
+            errorCode: "docker_pull_failed",
+            retryable: true,
+          }).deployment,
+        });
+      }
     }
 
     await this.report(context, {
@@ -2755,6 +2804,8 @@ export class LocalExecutionBackend implements ExecutionBackend {
         additionalComposeFiles: [composeOwnershipOverrideFile],
         projectName: runtimeInstanceNames.composeProjectName,
         scales: composeScaleFromRuntimeMetadata(state.runtimePlan.execution.metadata),
+        pull: isForceRedeployDeployment(state),
+        noCache: isForceRedeployDeployment(state),
       }),
       { quote: shellQuote },
     );

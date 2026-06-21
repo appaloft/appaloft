@@ -221,7 +221,9 @@ import {
   expireTerminalSessionsCommandInputSchema,
   exportAuditEventsQueryInputSchema,
   exportGlobalAuditEventsQueryInputSchema,
+  ForceRedeployDeploymentCommand,
   findOperationCatalogEntryByMessageName,
+  forceRedeployDeploymentCommandInputSchema,
   GetAuthBootstrapStatusQuery,
   GetCurrentOrganizationContextQuery,
   GitHubAppConnectionQuery,
@@ -701,6 +703,7 @@ import {
   expireTerminalSessionsResponseSchema,
   exportAuditEventsResponseSchema,
   exportGlobalAuditEventsResponseSchema,
+  forceRedeployDeploymentResponseSchema,
   githubAppConnectionResponseSchema,
   type InspectRuntimeUsageResponse,
   importCertificateResponseSchema,
@@ -5622,6 +5625,20 @@ export const redeployDeploymentProcedure = base
     executeCommand(context, RedeployDeploymentCommand.create(input)),
   );
 
+export const forceRedeployDeploymentProcedure = base
+  .route({
+    method: "POST",
+    path: "/resources/{resourceId}/force-redeploy",
+    summary: "Force redeploy resource",
+    description: apiRouteDescriptions.deploymentRecoveryReadiness,
+    successStatus: 201,
+  })
+  .input(forceRedeployDeploymentCommandInputSchema)
+  .output(forceRedeployDeploymentResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ForceRedeployDeploymentCommand.create(input)),
+  );
+
 export const rollbackDeploymentProcedure = base
   .route({
     method: "POST",
@@ -7073,6 +7090,7 @@ export const appaloftOrpcRouter = {
     cleanupPreview: cleanupPreviewProcedure,
     retry: retryDeploymentProcedure,
     redeploy: redeployDeploymentProcedure,
+    forceRedeploy: forceRedeployDeploymentProcedure,
     rollback: rollbackDeploymentProcedure,
     cancel: cancelDeploymentProcedure,
     archive: archiveDeploymentProcedure,
@@ -9636,6 +9654,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/resources/:resourceId/archive",
     "/api/resources/:resourceId/restore",
     "/api/resources/:resourceId/redeploy",
+    "/api/resources/:resourceId/force-redeploy",
     "/api/resources/:resourceId/source",
     "/api/resources/:resourceId/health",
     "/api/resources/:resourceId/health-history",

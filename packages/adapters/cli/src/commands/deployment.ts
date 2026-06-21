@@ -10,6 +10,7 @@ import {
   DeploymentRecoveryReadinessQuery,
   type DeploymentSummary,
   DeploymentTimelineQuery,
+  ForceRedeployDeploymentCommand,
   ListDeploymentsQuery,
   PruneDeploymentsCommand,
   publicPreviewUrlsFromDeploymentSummary,
@@ -2129,6 +2130,39 @@ const redeployDeploymentCommand = EffectCommand.make(
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentRedeploy));
 
+const forceRedeployDeploymentCommand = EffectCommand.make(
+  "force-redeploy",
+  {
+    resourceId: resourceIdArg,
+    project: projectOption,
+    environment: environmentOption,
+    server: serverOption,
+    destination: destinationOption,
+    sourceDeployment: sourceDeploymentOption,
+    readinessGeneratedAt: readinessGeneratedAtOption,
+  },
+  ({
+    destination,
+    environment,
+    project,
+    readinessGeneratedAt,
+    resourceId,
+    server,
+    sourceDeployment,
+  }) =>
+    runCommand(
+      ForceRedeployDeploymentCommand.create({
+        resourceId,
+        projectId: optionalValue(project),
+        environmentId: optionalValue(environment),
+        serverId: optionalValue(server),
+        destinationId: optionalValue(destination),
+        sourceDeploymentId: optionalValue(sourceDeployment),
+        readinessGeneratedAt: optionalValue(readinessGeneratedAt),
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentForceRedeploy));
+
 const rollbackDeploymentCommand = EffectCommand.make(
   "rollback",
   {
@@ -2253,6 +2287,7 @@ export const deploymentsCommand = EffectCommand.make("deployments").pipe(
     deploymentRecoveryReadinessCommand,
     retryDeploymentCommand,
     redeployDeploymentCommand,
+    forceRedeployDeploymentCommand,
     rollbackDeploymentCommand,
     cancelDeploymentCommand,
     archiveDeploymentCommand,

@@ -76,6 +76,7 @@ export * from "./operations/deployments/deployment-plan.query-service";
 export * from "./operations/deployments/deployment-recovery-readiness.query-service";
 export * from "./operations/deployments/deployment-snapshot.factory";
 export * from "./operations/deployments/deployment-timeline.query-service";
+export * from "./operations/deployments/force-redeploy-deployment.use-case";
 export * from "./operations/deployments/list-deployments.query-service";
 export * from "./operations/deployments/mark-server-applied-route-status-on-deployment-finished.handler";
 export * from "./operations/deployments/prune-deployments.use-case";

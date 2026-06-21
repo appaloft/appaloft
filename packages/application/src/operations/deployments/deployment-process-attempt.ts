@@ -12,7 +12,7 @@ export async function recordDeploymentProcessAttempt(input: {
   repositoryContext: ReturnType<typeof toRepositoryContext>;
   context: ExecutionContext;
   deployment: Deployment;
-  operationKey: "deployments.create" | "deployments.redeploy";
+  operationKey: "deployments.create" | "deployments.redeploy" | "deployments.force-redeploy";
 }): Promise<void> {
   const state = requireServerBackedDeploymentState(
     input.deployment,

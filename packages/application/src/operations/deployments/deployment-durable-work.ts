@@ -53,7 +53,10 @@ export interface DeploymentDurableWorkScheduleInput {
     readonly destinationId?: string;
     readonly triggerKind: string;
   };
-  readonly operationKey: "deployments.create" | "deployments.redeploy";
+  readonly operationKey:
+    | "deployments.create"
+    | "deployments.redeploy"
+    | "deployments.force-redeploy";
   readonly acceptedAt: string;
 }
 
@@ -283,10 +286,12 @@ export class DeploymentDurableWorkHandler implements DurableWorkHandler {
 
   private processAttemptOperationKey(
     deployment: Parameters<DeploymentRepository["updateOne"]>[1],
-  ): "deployments.create" | "deployments.redeploy" {
-    return deployment.toState().triggerKind.value === "redeploy"
-      ? "deployments.redeploy"
-      : "deployments.create";
+  ): "deployments.create" | "deployments.redeploy" | "deployments.force-redeploy" {
+    const triggerKind = deployment.toState().triggerKind.value;
+    if (triggerKind === "force-redeploy") {
+      return "deployments.force-redeploy";
+    }
+    return triggerKind === "redeploy" ? "deployments.redeploy" : "deployments.create";
   }
 }
 
