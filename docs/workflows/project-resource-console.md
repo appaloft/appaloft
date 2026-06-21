@@ -236,7 +236,7 @@ Allowed entry differences:
 | Resource page runtime settings | Dispatches `resources.configure-runtime`; must not mutate health policy, source, network, or deployments. |
 | Resource page network settings | Dispatches `resources.configure-network`; must not mutate domains, certificates, proxy routes, or current runtime. |
 | Resource page diagnostic summary | Queries `resources.diagnostic-summary` with `resourceId` and optional `deploymentId`; copies structured support/debug context. |
-| Resource page terminal | Dispatches `terminal-sessions.open` with resource scope and attaches to the returned terminal transport; starts in the resolved deployment workspace. |
+| Resource page terminal | Dispatches `terminal-sessions.open` with resource scope and attaches to the returned terminal transport; starts in the resolved deployment workspace or retained runtime container/service target. |
 | Resource page archive | Dispatches `resources.archive` after confirmation; must not stop runtime or delete retained state. |
 | Resource page delete | Dispatches `resources.delete` only for archived resources after typed slug confirmation and deletion guards. |
 | Sidebar resource item | Navigates to resource detail and displays read-model status. |
