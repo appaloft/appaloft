@@ -25,9 +25,14 @@
     DropdownMenuTrigger,
   } from "$lib/components/ui/dropdown-menu";
   import { webDocsHrefs } from "$lib/console/docs-help";
+  import {
+    instanceAccessCapabilityKey,
+    preloadInstanceAccessCapability,
+  } from "$lib/console/instance-access";
   import { createConsoleQueries, defaultAuthSession } from "$lib/console/queries";
   import { initials, readSessionIdentity } from "$lib/console/utils";
   import { i18nKeys, locale, setLocale, t } from "$lib/i18n";
+  import { capabilities } from "$lib/capabilities";
 
   const { authSessionQuery } = createConsoleQueries(browser, {
     readiness: false,
@@ -50,6 +55,15 @@
   );
   const githubConnected = $derived(Boolean(githubProvider?.connected));
   const authIdentity = $derived(readSessionIdentity(authSession.session));
+  const showInstanceManagementLink = $derived(
+    $capabilities.capabilities[instanceAccessCapabilityKey]?.allowed === true,
+  );
+
+  $effect(() => {
+    if (browser && authSession.session) {
+      void preloadInstanceAccessCapability();
+    }
+  });
 
   async function connectGitHub(): Promise<void> {
     const response = await request<{ redirect: boolean; url?: string }>(
@@ -137,10 +151,12 @@
       <UserRound class="size-4" />
       {$t(i18nKeys.console.accountSettings.introTitle)}
     </DropdownMenuItem>
-    <DropdownMenuItem onclick={() => navigateTo("/instance")}>
-      <Settings2 class="size-4" />
-      {$t(i18nKeys.console.nav.instance)}
-    </DropdownMenuItem>
+    {#if showInstanceManagementLink}
+      <DropdownMenuItem onclick={() => navigateTo("/instance")}>
+        <Settings2 class="size-4" />
+        {$t(i18nKeys.console.nav.instance)}
+      </DropdownMenuItem>
+    {/if}
     <DropdownMenuItem onclick={() => navigateTo("/deployments")}>
       <Rocket class="size-4" />
       {$t(i18nKeys.console.deployments.records)}

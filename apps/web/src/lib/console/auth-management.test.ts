@@ -52,11 +52,17 @@ describe("organization auth management console surface", () => {
     expect(shellSource).toContain("ConsoleOrganizationSwitcher");
     expect(organizationSwitcherSource).toContain('navigateTo("/organization")');
     expect(organizationSwitcherSource).toContain('navigateTo("/instance")');
+    expect(organizationSwitcherSource).toContain("showInstanceManagementLink");
+    expect(organizationSwitcherSource).toContain("preloadInstanceAccessCapability");
+    expect(organizationSwitcherSource).toContain("instanceAccessCapabilityKey");
     expect(organizationSwitcherSource).toContain("i18nKeys.console.nav.organization");
     expect(organizationSwitcherSource).toContain("i18nKeys.console.nav.instance");
     expect(organizationSwitcherSource).toContain("data-console-organization-switcher-trigger");
     expect(shellSource).toContain("ConsoleUserMenu");
     expect(userMenuSource).toContain('"/api/auth/sign-out"');
+    expect(userMenuSource).toContain("showInstanceManagementLink");
+    expect(userMenuSource).toContain("preloadInstanceAccessCapability");
+    expect(userMenuSource).toContain("instanceAccessCapabilityKey");
     expect(userMenuSource).toContain("i18nKeys.common.actions.signOut");
     expect(userMenuSource).toContain("data-console-sign-out-action");
     expect(userMenuSource).toContain("DropdownMenuSeparator");
@@ -97,6 +103,8 @@ describe("organization auth management console surface", () => {
       instancePageSource,
       instanceWorkersRouteSource,
       instanceExtensionRouteSource,
+      instanceAccessGateSource,
+      instanceAccessSource,
       managementShellSource,
       settingsNavSource,
     ] = await Promise.all([
@@ -107,6 +115,11 @@ describe("organization auth management console surface", () => {
         new URL("../../routes/instance/[...extensionPath]/+page.svelte", import.meta.url),
         "utf8",
       ),
+      readFile(
+        new URL("../../lib/components/console/InstanceAccessGate.svelte", import.meta.url),
+        "utf8",
+      ),
+      readFile(new URL("../../lib/console/instance-access.ts", import.meta.url), "utf8"),
       readFile(
         new URL("../../lib/components/console/ManagementShell.svelte", import.meta.url),
         "utf8",
@@ -122,6 +135,10 @@ describe("organization auth management console surface", () => {
     expect(instancePageSource).not.toContain("ConsoleShell");
     expect(instancePageSource).not.toContain("ConsoleResourceCanvas");
     expect(instancePageSource).toContain("instanceSettingsItems");
+    expect(instancePageSource).toContain("preloadInstanceAccessCapability");
+    expect(instancePageSource).toContain("instanceAccessAllowed");
+    expect(instancePageSource).toContain('void goto("/")');
+    expect(instancePageSource).toContain("browser && instanceAccessAllowed && activeSection");
     expect(instancePageSource).toContain("ConsoleOrganizationSwitcher");
     expect(instancePageSource).toContain("orpc.system.doctor.queryOptions");
     expect(instancePageSource).toContain("maintenanceWorkers");
@@ -130,7 +147,12 @@ describe("organization auth management console surface", () => {
     expect(instanceWorkersRouteSource).toContain("findConsolePageExtensionByPath");
     expect(instanceWorkersRouteSource).toContain("ConsoleExtensionPage");
     expect(instanceWorkersRouteSource).toContain('<InstancePage section="workers" />');
+    expect(instanceExtensionRouteSource).toContain("InstanceAccessGate");
     expect(instanceExtensionRouteSource).toContain('settingsScope="instance"');
+    expect(instanceAccessGateSource).toContain("preloadInstanceAccessCapability");
+    expect(instanceAccessGateSource).toContain('void goto("/")');
+    expect(instanceAccessSource).toContain('operationKey: "system.db-status"');
+    expect(instanceAccessSource).toContain(".fetch([instanceAccessCapabilityQuery])");
     expect(instancePageSource).not.toContain("ManagementShell");
     expect(settingsNavSource).toContain('href: "/organization/members"');
     expect(settingsNavSource).toContain('href: "/organization/invitations"');
