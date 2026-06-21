@@ -402,6 +402,7 @@
       resourceSupportsServerBackedRuntimeSurfaces,
   );
   let storageBackupVolumeId = $state("");
+  let runtimeControlHealthPolling = $state(false);
   const resourceDetailQuery = createQuery(() =>
     orpc.resources.show.queryOptions({
       input: {
@@ -432,6 +433,7 @@
         includePublicAccessProbe: true,
       },
       enabled: browser && resourceId.length > 0,
+      refetchInterval: runtimeControlHealthPolling ? 2_000 : false,
       staleTime: 5_000,
     }),
   );
@@ -785,6 +787,20 @@
       : [],
   );
   const resourceHealth = $derived(resourceHealthQuery.data ?? null);
+  const latestRuntimeControl = $derived(resourceHealth?.latestRuntimeControl ?? null);
+  const latestRuntimeControlActive = $derived(
+    latestRuntimeControl ? runtimeControlAttemptIsActive(latestRuntimeControl) : false,
+  );
+  $effect(() => {
+    if (latestRuntimeControlActive) {
+      runtimeControlHealthPolling = true;
+      return;
+    }
+
+    if (latestRuntimeControl && !latestRuntimeControlActive) {
+      runtimeControlHealthPolling = false;
+    }
+  });
   const resourceEffectiveConfig = $derived<ResourceEffectiveConfig | null>(
     resourceEffectiveConfigQuery.data ?? null,
   );
@@ -925,6 +941,10 @@
   const autoDeployPolicy = $derived(resourceDetail?.autoDeployPolicy ?? null);
   const profileDiagnostics = $derived(resourceDetail?.diagnostics ?? []);
   const resourceHealthOverall = $derived.by((): ResourceHealthViewStatus => {
+    if (latestRuntimeControlActive) {
+      return "loading";
+    }
+
     if (
       resourceHealthQuery.isPending ||
       (resourceHealthQuery.isFetching && resourceHealth?.overall === "unknown")
@@ -2554,12 +2574,16 @@
       runtimeControlFeedback = {
         kind: "success",
         title: $t(i18nKeys.console.resources.runtimeControlStopSuccess),
-        detail: result.runtimeControlAttemptId,
+        detail: $t(i18nKeys.console.resources.runtimeControlAcceptedDetail, {
+          attemptId: result.runtimeControlAttemptId,
+        }),
       };
       runtimeControlDialogOpen = false;
       selectedRuntimeControlOperation = null;
+      runtimeControlHealthPolling = true;
+      void resourceHealthQuery.refetch();
       void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
-                      },
+    },
     onError: (error) => {
       runtimeControlFeedback = {
         kind: "error",
@@ -2574,12 +2598,16 @@
       runtimeControlFeedback = {
         kind: "success",
         title: $t(i18nKeys.console.resources.runtimeControlStartSuccess),
-        detail: result.runtimeControlAttemptId,
+        detail: $t(i18nKeys.console.resources.runtimeControlAcceptedDetail, {
+          attemptId: result.runtimeControlAttemptId,
+        }),
       };
       runtimeControlDialogOpen = false;
       selectedRuntimeControlOperation = null;
+      runtimeControlHealthPolling = true;
+      void resourceHealthQuery.refetch();
       void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
-                      },
+    },
     onError: (error) => {
       runtimeControlFeedback = {
         kind: "error",
@@ -2594,12 +2622,16 @@
       runtimeControlFeedback = {
         kind: "success",
         title: $t(i18nKeys.console.resources.runtimeControlRestartSuccess),
-        detail: result.runtimeControlAttemptId,
+        detail: $t(i18nKeys.console.resources.runtimeControlAcceptedDetail, {
+          attemptId: result.runtimeControlAttemptId,
+        }),
       };
       runtimeControlDialogOpen = false;
       selectedRuntimeControlOperation = null;
+      runtimeControlHealthPolling = true;
+      void resourceHealthQuery.refetch();
       void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
-                },
+    },
     onError: (error) => {
       runtimeControlFeedback = {
         kind: "error",
@@ -4844,6 +4876,63 @@
     restartResourceRuntimeMutation.mutate(input);
   }
 
+  type RuntimeControlSummary = NonNullable<ResourceHealthSummary["latestRuntimeControl"]>;
+
+  function runtimeControlAttemptIsActive(attempt: RuntimeControlSummary): boolean {
+    return attempt.status === "accepted" || attempt.status === "running";
+  }
+
+  function runtimeControlOperationLabel(operation: RuntimeControlSummary["operation"]): string {
+    switch (operation) {
+      case "stop":
+        return $t(i18nKeys.console.resources.runtimeControlStop);
+      case "start":
+        return $t(i18nKeys.console.resources.runtimeControlStart);
+      case "restart":
+      default:
+        return $t(i18nKeys.console.resources.runtimeControlRestart);
+    }
+  }
+
+  function runtimeControlStatusLabel(status: RuntimeControlSummary["status"]): string {
+    switch (status) {
+      case "accepted":
+        return $t(i18nKeys.console.resources.runtimeControlStatusAccepted);
+      case "running":
+        return $t(i18nKeys.console.resources.runtimeControlStatusRunning);
+      case "succeeded":
+        return $t(i18nKeys.console.resources.runtimeControlStatusSucceeded);
+      case "failed":
+        return $t(i18nKeys.console.resources.runtimeControlStatusFailed);
+      case "blocked":
+      default:
+        return $t(i18nKeys.console.resources.runtimeControlStatusBlocked);
+    }
+  }
+
+  function runtimeControlStatusVariant(
+    status: RuntimeControlSummary["status"],
+  ): "default" | "secondary" | "outline" | "destructive" {
+    switch (status) {
+      case "succeeded":
+        return "default";
+      case "accepted":
+      case "running":
+        return "secondary";
+      case "failed":
+      case "blocked":
+        return "destructive";
+      default:
+        return "outline";
+    }
+  }
+
+  function runtimeControlPhaseLabel(phase: "stop" | "start"): string {
+    return phase === "stop"
+      ? $t(i18nKeys.console.resources.runtimeControlStop)
+      : $t(i18nKeys.console.resources.runtimeControlStart);
+  }
+
   function redeployResource(force: boolean): void {
     if (!resource || !canRedeployResource || resourceRedeployPending) {
       return;
@@ -6537,6 +6626,8 @@
         return $t(i18nKeys.common.status.passed);
       case "skipped":
         return $t(i18nKeys.common.status.skipped);
+      case "pending":
+        return $t(i18nKeys.common.status.requested);
       case "unknown":
       default:
         return $t(i18nKeys.common.status.unknown);
@@ -6555,6 +6646,9 @@
         return "default";
       case "degraded":
       case "starting":
+      case "restarting":
+      case "stopping":
+      case "pending":
       case "not-ready":
         return "secondary";
       case "unhealthy":
@@ -6700,14 +6794,6 @@
             <p class="mt-1 text-sm text-muted-foreground">
               {$t(i18nKeys.console.resources.runtimeControlsDescription)}
             </p>
-            {#if resourceHealth?.latestRuntimeControl}
-              <p class="mt-2 text-xs text-muted-foreground">
-                {$t(i18nKeys.console.resources.runtimeControlsLatest)}:
-                {resourceHealth.latestRuntimeControl.operation} ·
-                {resourceHealth.latestRuntimeControl.status} ·
-                {resourceHealth.latestRuntimeControl.runtimeState}
-              </p>
-            {/if}
           </div>
           <div class="flex flex-wrap gap-2">
             <Button
@@ -6721,6 +6807,57 @@
             </Button>
           </div>
         </div>
+        {#if latestRuntimeControl}
+          <div
+            class={[
+              "mt-4 rounded-md border px-3 py-3 text-sm",
+              latestRuntimeControlActive
+                ? "border-sky-500/30 bg-sky-500/5 text-sky-950"
+                : "bg-muted/20",
+            ]}
+          >
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div class="min-w-0">
+                <p class="flex items-center gap-2 font-medium">
+                  {#if latestRuntimeControlActive}
+                    <RefreshCw class="size-4 animate-spin text-sky-600" />
+                  {/if}
+                  {$t(i18nKeys.console.resources.runtimeControlsLatest)}
+                </p>
+                <p class="mt-1 text-xs text-muted-foreground">
+                  {$t(i18nKeys.console.resources.runtimeControlStartedAt)}
+                  {formatTime(latestRuntimeControl.startedAt)}
+                </p>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <Badge variant={runtimeControlStatusVariant(latestRuntimeControl.status)}>
+                  {runtimeControlOperationLabel(latestRuntimeControl.operation)}
+                </Badge>
+                <Badge variant={runtimeControlStatusVariant(latestRuntimeControl.status)}>
+                  {runtimeControlStatusLabel(latestRuntimeControl.status)}
+                </Badge>
+                <Badge variant="outline">
+                  {resourceHealthSectionStatusLabel(latestRuntimeControl.runtimeState)}
+                </Badge>
+              </div>
+            </div>
+            {#if latestRuntimeControl.phases?.length}
+              <div class="mt-3 flex flex-wrap gap-2">
+                {#each latestRuntimeControl.phases as phase (`${phase.phase}-${phase.status}`)}
+                  <Badge variant={resourceHealthSectionStatusVariant(phase.status)}>
+                    {runtimeControlPhaseLabel(phase.phase)} ·
+                    {resourceHealthSectionStatusLabel(phase.status)}
+                  </Badge>
+                {/each}
+              </div>
+            {/if}
+            {#if latestRuntimeControl.operation === "restart"}
+              <p class="mt-3 text-xs leading-5 text-muted-foreground">
+                {$t(i18nKeys.console.resources.runtimeControlDoesNotApplyConfig)}
+              </p>
+            {/if}
+          </div>
+        {/if}
         {#if runtimeControlFeedback}
           <div
             class={[
@@ -7171,6 +7308,52 @@
                   </p>
                 {:else if resourceHealth}
                   <div class="mt-3 space-y-2">
+                    {#if latestRuntimeControl}
+                      <div
+                        class={[
+                          "rounded-md border px-3 py-2 text-sm",
+                          latestRuntimeControlActive
+                            ? "border-sky-500/30 bg-sky-500/5"
+                            : "bg-muted/20",
+                        ]}
+                      >
+                        <div class="flex items-start justify-between gap-3">
+                          <div class="min-w-0">
+                            <p class="flex items-center gap-2 font-medium">
+                              {#if latestRuntimeControlActive}
+                                <RefreshCw class="size-4 animate-spin text-sky-600" />
+                              {/if}
+                              {$t(i18nKeys.console.resources.runtimeControlsLatest)}
+                            </p>
+                            <p class="mt-1 text-xs text-muted-foreground">
+                              {$t(i18nKeys.console.resources.runtimeControlStartedAt)}
+                              {formatTime(latestRuntimeControl.startedAt)}
+                            </p>
+                          </div>
+                          <Badge variant={runtimeControlStatusVariant(latestRuntimeControl.status)}>
+                            {runtimeControlStatusLabel(latestRuntimeControl.status)}
+                          </Badge>
+                        </div>
+                        <div class="mt-2 flex flex-wrap gap-2">
+                          <Badge variant="outline">
+                            {runtimeControlOperationLabel(latestRuntimeControl.operation)}
+                          </Badge>
+                          <Badge variant="outline">
+                            {resourceHealthSectionStatusLabel(latestRuntimeControl.runtimeState)}
+                          </Badge>
+                        </div>
+                        {#if latestRuntimeControl.phases?.length}
+                          <div class="mt-2 flex flex-wrap gap-2">
+                            {#each latestRuntimeControl.phases as phase (`${phase.phase}-${phase.status}`)}
+                              <Badge variant={resourceHealthSectionStatusVariant(phase.status)}>
+                                {runtimeControlPhaseLabel(phase.phase)} ·
+                                {resourceHealthSectionStatusLabel(phase.status)}
+                              </Badge>
+                            {/each}
+                          </div>
+                        {/if}
+                      </div>
+                    {/if}
                     <div
                       class="flex items-center justify-between gap-3 rounded-md border bg-muted/20 px-3 py-2 text-sm"
                     >
@@ -7221,6 +7404,15 @@
                 {/if}
               </Popover.Content>
             </Popover.Root>
+            {#if latestRuntimeControlActive && latestRuntimeControl}
+              <div class="inline-flex h-11 items-center gap-2 rounded-md border border-sky-500/30 bg-sky-500/5 px-4 text-sm font-medium text-sky-950">
+                <RefreshCw class="size-4 animate-spin text-sky-600" />
+                <span>{runtimeControlOperationLabel(latestRuntimeControl.operation)}</span>
+                <span class="text-muted-foreground">
+                  {runtimeControlStatusLabel(latestRuntimeControl.status)}
+                </span>
+              </div>
+            {/if}
             <Button
               type="button"
               disabled={!canRedeployResource || resourceRedeployPending}
@@ -7248,7 +7440,14 @@
                   onclick={() => controlResourceRuntime("restart")}
                 >
                   <RotateCw class={["size-4", runtimeControlPending ? "animate-spin" : ""]} />
-                  {$t(i18nKeys.console.resources.runtimeControlRestart)}
+                  <span class="min-w-0">
+                    <span class="block">
+                      {$t(i18nKeys.console.resources.runtimeControlRestart)}
+                    </span>
+                    <span class="block text-xs text-muted-foreground">
+                      {$t(i18nKeys.console.resources.runtimeControlRestartHint)}
+                    </span>
+                  </span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   disabled={!canStopRuntimeByCapability || isResourceArchived || runtimeControlPending}
@@ -11071,19 +11270,33 @@
             </Dialog.Description>
           </Dialog.Header>
           <div class="space-y-5 px-5 pb-5" data-resource-runtime-control-dialog>
+            <div class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-950">
+              {$t(i18nKeys.console.resources.runtimeControlDoesNotApplyConfig)}
+              {$t(i18nKeys.console.resources.runtimeControlApplyConfigWithRedeploy)}
+            </div>
             <div class="rounded-md border bg-muted/20 px-3 py-2 text-sm">
               <p class="font-medium">{resource.name}</p>
               <p class="mt-1 font-mono text-xs text-muted-foreground">{resource.slug}</p>
             </div>
             {#if resourceHealth?.latestRuntimeControl}
-              <div class="rounded-md border bg-background px-3 py-2 text-xs text-muted-foreground">
-                <p class="font-medium text-foreground">
-                  {$t(i18nKeys.console.resources.runtimeControlsLatest)}
-                </p>
-                <p class="mt-1">
-                  {resourceHealth.latestRuntimeControl.operation} ·
-                  {resourceHealth.latestRuntimeControl.status} ·
-                  {resourceHealth.latestRuntimeControl.runtimeState}
+              <div class="rounded-md border bg-background px-3 py-2 text-sm">
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="font-medium">
+                    {$t(i18nKeys.console.resources.runtimeControlsLatest)}
+                  </span>
+                  <Badge variant={runtimeControlStatusVariant(resourceHealth.latestRuntimeControl.status)}>
+                    {runtimeControlStatusLabel(resourceHealth.latestRuntimeControl.status)}
+                  </Badge>
+                  <Badge variant="outline">
+                    {runtimeControlOperationLabel(resourceHealth.latestRuntimeControl.operation)}
+                  </Badge>
+                  <Badge variant="outline">
+                    {resourceHealthSectionStatusLabel(resourceHealth.latestRuntimeControl.runtimeState)}
+                  </Badge>
+                </div>
+                <p class="mt-2 text-xs text-muted-foreground">
+                  {$t(i18nKeys.console.resources.runtimeControlStartedAt)}
+                  {formatTime(resourceHealth.latestRuntimeControl.startedAt)}
                 </p>
               </div>
             {/if}

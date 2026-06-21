@@ -1554,6 +1554,15 @@ describe("console page structure", () => {
     expect(resourceDetailPageSource).toContain("openRuntimeControlDialog");
     expect(resourceDetailPageSource).toContain("confirmSelectedRuntimeControl");
     expect(resourceDetailPageSource).toContain("data-resource-runtime-control-dialog");
+    expect(resourceDetailPageSource).toContain("runtimeControlAttemptIsActive");
+    expect(resourceDetailPageSource).toContain("latestRuntimeControlActive");
+    expect(resourceDetailPageSource).toContain("runtimeControlHealthPolling");
+    expect(resourceDetailPageSource).toContain(
+      "refetchInterval: runtimeControlHealthPolling ? 2_000 : false",
+    );
+    expect(resourceDetailPageSource).toContain("runtimeControlDoesNotApplyConfig");
+    expect(resourceDetailPageSource).toContain("runtimeControlApplyConfigWithRedeploy");
+    expect(resourceDetailPageSource).toContain("runtimeControlRestartHint");
     expect(runtimeControlPanelSource).toContain(
       '<section id="resource-runtime-control" class="space-y-4">',
     );
@@ -1562,6 +1571,8 @@ describe("console page structure", () => {
     );
     expect(runtimeControlPanelSource).toContain("onclick={openRuntimeControlDialog}");
     expect(runtimeControlPanelSource).toContain("runtimeControlManageAction");
+    expect(runtimeControlPanelSource).toContain("runtimeControlStartedAt");
+    expect(runtimeControlPanelSource).toContain("runtimeControlPhaseLabel");
     expect(resourceDetailActionsMenuSource).toContain("DropdownMenuContent");
     expect(resourceDetailActionsMenuSource).toContain("resourceActionsMenu");
     expect(resourceDetailPageSource).toContain("onclick={() => redeployResource(false)}");

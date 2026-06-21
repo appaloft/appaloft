@@ -33,6 +33,7 @@
 - [x] Bind `RUNTIME-CTRL-BLOCK-001` to missing/stale runtime metadata tests.
 - [x] Bind `RUNTIME-CTRL-COORD-001` to `resource-runtime` coordination tests.
 - [x] Bind `RUNTIME-CTRL-READ-001` to `resources.health.latestRuntimeControl` readback tests.
+- [x] Bind `RUNTIME-CTRL-READ-002` to Web Resource detail active readback and restart copy tests.
 - [x] Bind `RUNTIME-CTRL-DOCS-001` to public docs/help anchor checks.
 - [x] Bind `RUNTIME-CTRL-SURFACE-001` to CLI/HTTP/Web/docs coverage.
 

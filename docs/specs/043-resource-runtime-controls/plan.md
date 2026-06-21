@@ -77,6 +77,8 @@ Minimum stable test ids:
 - `RUNTIME-CTRL-BLOCK-001`: missing runtime metadata blocks.
 - `RUNTIME-CTRL-COORD-001`: active deployment/runtime mutation blocks or times out.
 - `RUNTIME-CTRL-READ-001`: `resources.health` exposes latest runtime-control attempt readback.
+- `RUNTIME-CTRL-READ-002`: Web Resource detail surfaces active runtime-control readback outside
+  the action menu and short-polls health while the attempt is active.
 - `RUNTIME-CTRL-DOCS-001`: public runtime-control anchors resolve and explain restart versus
   redeploy.
 - `RUNTIME-CTRL-SURFACE-001`: CLI/HTTP/Web use same schemas and docs links.
@@ -87,7 +89,9 @@ Minimum stable test ids:
   retained-runtime identity.
 - Phase 8 durable outbox/job state may replace first synchronous attempt processing.
 - Cluster runtime targets must not require public command schema changes.
-- User copy must avoid implying restart picks up new config or source.
+- User copy must avoid implying restart picks up new config or source. Web restart affordances
+  should direct operators to redeploy or force redeploy when they want saved variables, secrets,
+  source, or runtime profile changes applied.
 
 ## Code Round Readiness
 
