@@ -1519,11 +1519,15 @@ describe("console page structure", () => {
     expect(resourceDetailPageSource).not.toContain("requestConsolePrompt");
   });
 
-  test("[RESOURCE-RUNTIME-IA-001] keeps runtime controls behind an intent dialog", () => {
+  test("[RESOURCE-RUNTIME-IA-001] exposes resource runtime actions from the detail header", () => {
     const runtimeControlPanelSource = resourceDetailPageSource.slice(
       resourceDetailPageSource.indexOf("{#snippet resourceRuntimeControlPanel()}"),
       resourceDetailPageSource.indexOf("{#snippet resourceRuntimeLogsPanel()}"),
     );
+    const resourceDetailActionsMenuSource =
+      resourceDetailPageSource.match(
+        /<DropdownMenu>[\s\S]*?resourceActionsMenu[\s\S]*?<\/DropdownMenu>/,
+      )?.[0] ?? "";
     const runtimeControlDialogSource =
       resourceDetailPageSource.match(
         /<Dialog\.Root bind:open={runtimeControlDialogOpen}[\s\S]*?<\/Dialog\.Root>/,
@@ -1542,15 +1546,13 @@ describe("console page structure", () => {
     );
     expect(runtimeControlPanelSource).toContain("onclick={openRuntimeControlDialog}");
     expect(runtimeControlPanelSource).toContain("runtimeControlManageAction");
-    expect(runtimeControlPanelSource).not.toContain('openRuntimeControlDialog("stop")');
-    expect(runtimeControlPanelSource).not.toContain('openRuntimeControlDialog("start")');
-    expect(runtimeControlPanelSource).not.toContain('openRuntimeControlDialog("restart")');
-    expect(runtimeControlPanelSource).not.toContain("runtimeControlStop}");
-    expect(runtimeControlPanelSource).not.toContain("runtimeControlStart}");
-    expect(runtimeControlPanelSource).not.toContain("runtimeControlRestart}");
-    expect(runtimeControlPanelSource).not.toContain('controlResourceRuntime("stop")');
-    expect(runtimeControlPanelSource).not.toContain('controlResourceRuntime("start")');
-    expect(runtimeControlPanelSource).not.toContain('controlResourceRuntime("restart")');
+    expect(resourceDetailActionsMenuSource).toContain("DropdownMenuContent");
+    expect(resourceDetailActionsMenuSource).toContain("resourceActionsMenu");
+    expect(resourceDetailPageSource).toContain("onclick={() => redeployResource(false)}");
+    expect(resourceDetailActionsMenuSource).toContain("onclick={() => redeployResource(true)}");
+    expect(resourceDetailActionsMenuSource).toContain('controlResourceRuntime("stop")');
+    expect(resourceDetailActionsMenuSource).toContain('controlResourceRuntime("restart")');
+    expect(resourceDetailActionsMenuSource).toContain("forceRedeploy");
     expect(runtimeControlDialogSource).toContain("data-resource-runtime-control-intent-picker");
     expect(runtimeControlDialogSource).toContain('selectedRuntimeControlOperation = "stop"');
     expect(runtimeControlDialogSource).toContain('selectedRuntimeControlOperation = "start"');
