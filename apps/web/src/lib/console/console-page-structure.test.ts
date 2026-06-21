@@ -1776,13 +1776,19 @@ describe("console page structure", () => {
       deploymentDetailPageSource.match(
         /<Dialog\.Root bind:open={recoveryDialogOpen}[\s\S]*?<\/Dialog\.Root>/,
       )?.[0] ?? "";
-    const deploymentHeaderActionsSource =
-      deploymentDetailPageSource.match(
-        /data-deployment-header-owner-actions[\s\S]*?<\/div>\n\s*<\/div>\n\s*\n\s*<\/section>/,
-      )?.[0] ?? "";
+    const deploymentHeaderActionsSource = sourceBetweenLast(
+      deploymentDetailPageSource,
+      "data-deployment-header-owner-actions",
+      "\n          </div>\n        </div>",
+    );
     const deploymentAttemptObservationSource = deploymentOverviewSource.slice(
       deploymentOverviewSource.indexOf("data-deployment-attempt-observation"),
       deploymentOverviewSource.indexOf("data-deployment-current-resource-observation"),
+    );
+    const deploymentAccessSnapshotSource = sourceBetweenLast(
+      deploymentDetailPageSource,
+      "data-deployment-access-snapshot",
+      "data-deployment-current-resource-handoff",
     );
     const deploymentCurrentResourceHandoffSource = sourceBetweenLast(
       deploymentOverviewSource,
@@ -1796,6 +1802,12 @@ describe("console page structure", () => {
     expect(deploymentHeaderActionsSource).not.toContain("handleViewProgress");
     expect(deploymentHeaderActionsSource).not.toContain("deployment-diagnostic-summary-copy");
     expect(deploymentHeaderActionsSource).not.toContain("handleCopyDeploymentDiagnosticSummary");
+    expect(deploymentHeaderActionsSource).not.toContain("openAccessUrl");
+    expect(deploymentHeaderActionsSource).not.toContain("handleCopyAccessUrl");
+    expect(deploymentHeaderActionsSource).not.toContain("accessUrlCopyLabel");
+    expect(deploymentAccessSnapshotSource).toContain("openAccessUrl");
+    expect(deploymentAccessSnapshotSource).toContain("handleCopyAccessUrl");
+    expect(deploymentAccessSnapshotSource).toContain("accessUrlCopyLabel");
     expect(deploymentCurrentResourceHandoffSource).toContain("currentResourceStateTitle");
     expect(deploymentCurrentResourceHandoffSource).not.toContain("resourceOverviewHref");
     expect(deploymentCurrentResourceHandoffSource).not.toContain("resourceLogsHref");
