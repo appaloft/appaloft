@@ -1687,6 +1687,11 @@ describe("console page structure", () => {
     expect(resourceDetailActionsMenuSource).toContain("resourceActionsMenu");
     expect(resourceDetailPageSource).toContain("onclick={() => redeployResource(false)}");
     expect(resourceDetailActionsMenuSource).toContain("onclick={() => redeployResource(true)}");
+    expect(resourceDetailPageSource).toContain("observeDeploymentProgressAfterAcceptance");
+    expect(resourceDetailPageSource).toContain("startDeploymentProgressDialog();");
+    expect(resourceDetailPageSource).toContain("observeAcceptedResourceDeployment(result.id)");
+    expect(resourceDetailPageSource).toContain("deploymentProgressDeploymentId = deploymentId;");
+    expect(resourceDetailPageSource).toContain("deploymentProgressStreamError = message;");
     expect(resourceDetailActionsMenuSource).toContain('controlResourceRuntime("stop")');
     expect(resourceDetailActionsMenuSource).toContain('controlResourceRuntime("restart")');
     expect(resourceDetailActionsMenuSource).toContain("forceRedeploy");

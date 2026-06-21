@@ -51,6 +51,7 @@
     ConnectorCapabilityApplyResponse,
     ConnectorCapabilityPlanResponse,
     CreateDeploymentInput,
+    CreateDeploymentResponse,
     ForceRedeployDeploymentInput,
     RedeployDeploymentInput,
     CreateDomainBindingInput,
@@ -128,6 +129,7 @@
   import { Textarea } from "$lib/components/ui/textarea";
   import {
     createDeploymentWithProgress,
+    observeDeploymentProgressAfterAcceptance,
     type DeploymentProgressDialogStatus,
   } from "$lib/console/deployment-progress";
   import { webDocsHrefs } from "$lib/console/docs-help";
@@ -2033,6 +2035,39 @@
     }
   }
 
+  function startDeploymentProgressDialog(): void {
+    deploymentProgressDialogOpen = true;
+    deploymentProgressDialogStatus = "running";
+    deploymentProgressEvents = [];
+    deploymentProgressStreamError = "";
+    deploymentProgressDeploymentId = "";
+    deploymentProgressRequestId = "";
+    deploymentProgressTraceLink = "";
+  }
+
+  async function observeAcceptedResourceDeployment(deploymentId: string): Promise<void> {
+    deploymentProgressDeploymentId = deploymentId;
+    await observeDeploymentProgressAfterAcceptance(deploymentId, appendDeploymentProgressEvent, {
+      onStreamError: (message) => {
+        deploymentProgressStreamError = message;
+      },
+    });
+  }
+
+  async function handleRedeployAccepted(
+    result: CreateDeploymentResponse,
+    title: string,
+  ): Promise<void> {
+    deploymentFeedback = {
+      kind: "success",
+      title,
+      detail: result.id,
+    };
+    await refreshResourceDeploymentData();
+    await observeAcceptedResourceDeployment(result.id);
+    await refreshResourceDeploymentData();
+  }
+
   async function refreshResourceDeploymentData(): Promise<void> {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) }),
@@ -2525,13 +2560,7 @@
 
     deploymentCreatePending = true;
     deploymentFeedback = null;
-    deploymentProgressDialogOpen = true;
-    deploymentProgressDialogStatus = "running";
-    deploymentProgressEvents = [];
-    deploymentProgressStreamError = "";
-    deploymentProgressDeploymentId = "";
-    deploymentProgressRequestId = "";
-    deploymentProgressTraceLink = "";
+    startDeploymentProgressDialog();
 
     try {
       const result = await createDeploymentWithProgress(input, appendDeploymentProgressEvent, {
@@ -2790,15 +2819,11 @@
   const redeployResourceMutation = createMutation(() => ({
     mutationFn: (input: RedeployDeploymentInput) => orpcClient.deployments.redeploy(input),
     onSuccess: async (result) => {
-      deploymentFeedback = {
-        kind: "success",
-        title: $t(i18nKeys.console.resources.redeploySuccessTitle),
-        detail: result.id,
-      };
-      deploymentProgressDeploymentId = result.id;
-      await refreshResourceDeploymentData();
+      await handleRedeployAccepted(result, $t(i18nKeys.console.resources.redeploySuccessTitle));
     },
     onError: (error) => {
+      deploymentProgressDialogStatus = "failed";
+      deploymentProgressStreamError = readErrorMessage(error);
       deploymentFeedback = {
         kind: "error",
         title: $t(i18nKeys.console.resources.redeployErrorTitle),
@@ -2810,15 +2835,14 @@
     mutationFn: (input: ForceRedeployDeploymentInput) =>
       orpcClient.deployments.forceRedeploy(input),
     onSuccess: async (result) => {
-      deploymentFeedback = {
-        kind: "success",
-        title: $t(i18nKeys.console.resources.forceRedeploySuccessTitle),
-        detail: result.id,
-      };
-      deploymentProgressDeploymentId = result.id;
-      await refreshResourceDeploymentData();
+      await handleRedeployAccepted(
+        result,
+        $t(i18nKeys.console.resources.forceRedeploySuccessTitle),
+      );
     },
     onError: (error) => {
+      deploymentProgressDialogStatus = "failed";
+      deploymentProgressStreamError = readErrorMessage(error);
       deploymentFeedback = {
         kind: "error",
         title: $t(i18nKeys.console.resources.forceRedeployErrorTitle),
@@ -5164,6 +5188,7 @@
     }
 
     deploymentFeedback = null;
+    startDeploymentProgressDialog();
     const input = {
       resourceId: resource.id,
       projectId: resource.projectId,
