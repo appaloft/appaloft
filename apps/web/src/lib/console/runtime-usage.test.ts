@@ -91,6 +91,8 @@ describe("runtime usage console readback", () => {
     expect(componentSource).toContain("i18nKeys.console.runtimeUsage");
     expect(monitorSource).toContain("runtimeMonitoringTimeRangeOptions");
     expect(monitorSource).toContain("runtimeMonitoringRefreshIntervalMs");
+    expect(monitorSource).toContain("hasRetainedChartData");
+    expect(monitorSource).toContain("showTimeRangeControls");
     expect(monitorSource).toContain('viewBox="0 0 360 150"');
     expect(monitorSource).toContain("icon: Cpu");
     expect(monitorSource).toContain("icon: MemoryStick");
@@ -110,6 +112,9 @@ describe("runtime usage console readback", () => {
     expect(monitorSource).toContain("data-runtime-threshold-dialog");
     expect(monitorSource).toContain("openLogs");
     expect(monitorSource).toContain("refreshNow");
+    expect(monitorSource).toContain("retainedMonitoringDisabled");
+    expect(monitorSource).toContain("snapshotObservedAt");
+    expect(monitorSource).toContain("snapshotOnly");
     expect(monitorSource).toContain("onTimeRangeChange");
     const timeRangeControlSource = sourceBetween(
       monitorSource,

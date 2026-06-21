@@ -132,6 +132,13 @@
 
   const latestSample = $derived(samples.at(-1) ?? null);
   const retainedChartSamples = $derived(retainedRuntimeMonitoringSamples(retainedSamples));
+  const hasRetainedChartData = $derived(
+    retainedChartSamples.length > 0 ||
+      Boolean(rollup?.series.some((series) => series.points.length > 0)),
+  );
+  const showTimeRangeControls = $derived(
+    hasRetainedChartData || retainedSamplesLoading || rollupLoading,
+  );
   const chartSamples = $derived(mergeRuntimeMonitoringSamples(retainedChartSamples, samples));
   const latestChartSample = $derived(chartSamples.at(-1) ?? latestSample);
   const currentUsage = $derived(usage);
@@ -255,7 +262,9 @@
       icon: Cpu,
       label: $t(i18nKeys.console.runtimeUsage.cpu),
       value: formatRuntimeMonitoringPercent(latestSignalValue("cpu", latestChartSample?.cpuLoadPercent)),
-      data: runtimeMonitoringSignalChartPoints(rollup, chartSamples, "cpu"),
+      data: hasRetainedChartData
+        ? runtimeMonitoringSignalChartPoints(rollup, retainedChartSamples, "cpu")
+        : [],
       color: "hsl(217 91% 60%)",
       fillColor: "hsl(217 91% 60% / 0.14)",
     },
@@ -264,7 +273,9 @@
       icon: MemoryStick,
       label: $t(i18nKeys.console.runtimeUsage.memory),
       value: formatRuntimeMonitoringPercent(latestSignalValue("memory", latestChartSample?.memoryPercent)),
-      data: runtimeMonitoringSignalChartPoints(rollup, chartSamples, "memory"),
+      data: hasRetainedChartData
+        ? runtimeMonitoringSignalChartPoints(rollup, retainedChartSamples, "memory")
+        : [],
       color: "hsl(173 58% 39%)",
       fillColor: "hsl(173 58% 39% / 0.14)",
     },
@@ -273,7 +284,9 @@
       icon: HardDrive,
       label: $t(i18nKeys.console.runtimeUsage.disk),
       value: formatRuntimeMonitoringPercent(latestSignalValue("disk", latestChartSample?.diskPercent)),
-      data: runtimeMonitoringSignalChartPoints(rollup, chartSamples, "disk"),
+      data: hasRetainedChartData
+        ? runtimeMonitoringSignalChartPoints(rollup, retainedChartSamples, "disk")
+        : [],
       color: "hsl(38 92% 50%)",
       fillColor: "hsl(38 92% 50% / 0.14)",
     },
@@ -449,27 +462,29 @@
         </p>
       </div>
       <div class="flex flex-wrap items-center gap-2">
-        <div
-          class="inline-flex h-8 items-center gap-1 rounded-md border bg-background px-1 text-sm text-muted-foreground"
-          aria-label={$t(i18nKeys.console.runtimeUsage.timeRange)}
-        >
-          <Clock3 class="size-4" />
-          <span class="sr-only">{$t(i18nKeys.console.runtimeUsage.timeRange)}</span>
-          {#each runtimeMonitoringTimeRangeOptions as option (option)}
-            <Button
-              type="button"
-              variant="ghost"
-              class={timeRange === option
-                ? "h-6 border-primary/30 bg-primary/10 px-2 text-primary shadow-none hover:bg-primary/15 hover:text-primary"
-                : "h-6 bg-transparent px-2 text-muted-foreground hover:bg-primary/5 hover:text-foreground"}
-              aria-pressed={timeRange === option}
-              data-runtime-time-range-option={option}
-              onclick={() => selectTimeRange(option)}
-            >
-              {timeRangeLabel(option)}
-            </Button>
-          {/each}
-        </div>
+        {#if showTimeRangeControls}
+          <div
+            class="inline-flex h-8 items-center gap-1 rounded-md border bg-background px-1 text-sm text-muted-foreground"
+            aria-label={$t(i18nKeys.console.runtimeUsage.timeRange)}
+          >
+            <Clock3 class="size-4" />
+            <span class="sr-only">{$t(i18nKeys.console.runtimeUsage.timeRange)}</span>
+            {#each runtimeMonitoringTimeRangeOptions as option (option)}
+              <Button
+                type="button"
+                variant="ghost"
+                class={timeRange === option
+                  ? "h-6 border-primary/30 bg-primary/10 px-2 text-primary shadow-none hover:bg-primary/15 hover:text-primary"
+                  : "h-6 bg-transparent px-2 text-muted-foreground hover:bg-primary/5 hover:text-foreground"}
+                aria-pressed={timeRange === option}
+                data-runtime-time-range-option={option}
+                onclick={() => selectTimeRange(option)}
+              >
+                {timeRangeLabel(option)}
+              </Button>
+            {/each}
+          </div>
+        {/if}
         <Button type="button" variant="outline" onclick={() => onRefresh?.()} disabled={refreshing}>
           <RefreshCw class="size-4" />
           {refreshing
@@ -512,8 +527,9 @@
                   : $t(i18nKeys.console.runtimeUsage.unavailable))}
             </p>
           </div>
-          <div class="mt-3 h-36 w-full">
-            {#if signal.data.length > 0}
+          {#if hasRetainedChartData}
+            <div class="mt-3 h-36 w-full">
+              {#if signal.data.length > 0}
               <svg
                 aria-label={`${signal.label} ${signal.value ?? ""}`}
                 class="h-full w-full overflow-visible font-sans text-[11px] tabular-nums"
@@ -587,16 +603,27 @@
                   </text>
                 {/each}
               </svg>
-            {:else}
-              <div
-                class="flex h-full items-center justify-center border-y border-dashed border-border text-xs text-muted-foreground"
-              >
-                {currentLoading
-                  ? $t(i18nKeys.common.status.loading)
-                  : $t(i18nKeys.console.runtimeUsage.unavailable)}
-              </div>
-            {/if}
-          </div>
+              {:else}
+                <div
+                  class="flex h-full items-center justify-center border-y border-dashed border-border text-xs text-muted-foreground"
+                >
+                  {currentLoading
+                    ? $t(i18nKeys.common.status.loading)
+                    : $t(i18nKeys.console.runtimeUsage.unavailable)}
+                </div>
+              {/if}
+            </div>
+          {:else}
+            <div class="mt-3 rounded-md border bg-background/70 px-3 py-2 text-xs leading-5 text-muted-foreground">
+              <p>
+                {latestSample?.observedAt
+                  ? $t(i18nKeys.console.runtimeUsage.snapshotObservedAt, {
+                      observedAt: formatTime(latestSample.observedAt),
+                    })
+                  : $t(i18nKeys.console.runtimeUsage.snapshotOnly)}
+              </p>
+            </div>
+          {/if}
         </article>
       {/each}
     </div>
@@ -604,12 +631,12 @@
     <div class="mt-3 flex flex-col gap-2 text-xs text-muted-foreground md:flex-row md:items-center md:justify-between">
       <p class="inline-flex items-center gap-1.5">
         <RefreshCw class="size-3.5" />
-        {#if retainedChartSamples.length > 0}
+        {#if hasRetainedChartData}
           {$t(i18nKeys.console.runtimeUsage.retainedSampleCount, { count: retainedChartSamples.length })}
         {:else if retainedSamplesLoading}
           {$t(i18nKeys.console.runtimeUsage.retainedSamplesLoading)}
         {:else}
-          {$t(i18nKeys.console.runtimeUsage.retainedSampleCount, { count: chartSamples.length })}
+          {$t(i18nKeys.console.runtimeUsage.retainedMonitoringDisabled)}
         {/if}
         · {refreshIntervalLabel()}
       </p>
