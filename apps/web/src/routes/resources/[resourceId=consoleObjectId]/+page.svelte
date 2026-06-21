@@ -7452,24 +7452,24 @@
               </Button>
             </div>
 
-            <div class="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(20rem,0.9fr)]">
+            <div class="grid gap-4">
               <section class="rounded-md border bg-background p-4">
-                <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  <div class="min-w-0 space-y-2">
-                    <p class="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                      <Link2 class="size-4" />
-                      {$t(i18nKeys.console.resources.overviewCurrentAccess)}
-                    </p>
+                <div class="space-y-2">
+                  <p class="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                    <Link2 class="size-4" />
+                    {$t(i18nKeys.console.resources.overviewCurrentAccess)}
+                  </p>
+                  <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                     <Skeleton class="h-7 w-full max-w-lg" />
-                    <div class="flex flex-wrap items-center gap-2">
-                      <Skeleton class="h-5 w-24 rounded-md" />
-                      <Skeleton class="h-5 w-20 rounded-md" />
-                    </div>
+                    <Button type="button" variant="outline" class="shrink-0" disabled>
+                      <Copy class="size-4" />
+                      {$t(i18nKeys.console.resources.copyAccessUrl)}
+                    </Button>
                   </div>
-                  <Button type="button" variant="outline" disabled>
-                    <Copy class="size-4" />
-                    {$t(i18nKeys.console.resources.copyAccessUrl)}
-                  </Button>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <Skeleton class="h-5 w-24 rounded-md" />
+                    <Skeleton class="h-5 w-20 rounded-md" />
+                  </div>
                 </div>
               </section>
 
@@ -8550,41 +8550,23 @@
                 </div>
               </div>
 
-              <div class="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(20rem,0.9fr)]">
+              <div class="grid gap-4">
                 <section class="rounded-md border bg-background p-4">
-                  <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <div class="min-w-0 space-y-2">
-                      <p class="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                        <Link2 class="size-4" />
-                        {$t(i18nKeys.console.resources.overviewCurrentAccess)}
-                      </p>
+                  <div class="space-y-2">
+                    <p class="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                      <Link2 class="size-4" />
+                      {$t(i18nKeys.console.resources.overviewCurrentAccess)}
+                    </p>
+                    <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                       {#if primaryAccessHref}
                         <a
-                          class="block break-all text-lg font-semibold text-primary underline-offset-4 hover:underline"
+                          class="min-w-0 break-all text-lg font-semibold text-primary underline-offset-4 hover:underline md:flex-1"
                           href={primaryAccessHref}
                           target="_blank"
                           rel="noreferrer"
                         >
                           {primaryAccessHref}
                         </a>
-                        <div class="flex flex-wrap items-center gap-2">
-                          {#if primaryAccessKind}
-                            <Badge variant="outline">{resourceAccessKindLabel(primaryAccessKind)}</Badge>
-                          {/if}
-                          {#if primaryDomainBinding}
-                            <Badge variant={domainBindingStatusVariant(primaryDomainBinding.status)}>
-                              {domainBindingStatusLabel(primaryDomainBinding.status)}
-                            </Badge>
-                          {:else}
-                            <Badge
-                              variant={resourceAccessStatusVariant(
-                                resource?.accessSummary?.proxyRouteStatus,
-                              )}
-                            >
-                              {resourceAccessStatusLabel(resource?.accessSummary?.proxyRouteStatus)}
-                            </Badge>
-                          {/if}
-                        </div>
                       {:else}
                         <div class="rounded-md border border-dashed bg-muted/25 px-4 py-5">
                           <p class="font-medium">{$t(i18nKeys.console.resources.overviewNoAccessTitle)}</p>
@@ -8593,48 +8575,65 @@
                           </p>
                         </div>
                       {/if}
-                      {#if latestAccessFailure}
-                        <div class="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
-                          <div class="flex flex-wrap items-center gap-2">
-                            <p class="font-medium text-destructive">
-                              {$t(i18nKeys.console.resources.accessFailureTitle)}
-                            </p>
-                            <Badge variant="destructive">{latestAccessFailure.code}</Badge>
-                          </div>
-                          <p class="mt-2 break-words text-xs text-muted-foreground">
-                            {latestAccessFailure.nextAction}
-                          </p>
-                        </div>
+                      {#if primaryAccessHref}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          class="shrink-0"
+                          aria-label={accessUrlCopyLabel}
+                          title={accessUrlCopyLabel}
+                          onclick={handleCopyAccessUrl}
+                        >
+                          {#if accessUrlCopyState === "copied"}
+                            <Check class="size-4" />
+                          {:else}
+                            <Copy class="size-4" />
+                          {/if}
+                          {accessUrlCopyLabel}
+                        </Button>
                       {/if}
                     </div>
-                    {#if primaryAccessHref || primaryDomainBinding?.status === "pending_verification"}
-                      <div class="flex shrink-0 flex-wrap gap-2">
-                        {#if primaryDomainBinding?.status === "pending_verification"}
-                          <DomainBindingVerifyDnsButton
-                            binding={primaryDomainBinding}
-                            variant="default"
-                            onFeedback={(feedback) => {
-                              createFeedback = feedback;
-                            }}
-                          />
+                    {#if primaryAccessHref}
+                      <div class="flex flex-wrap items-center gap-2">
+                        {#if primaryAccessKind}
+                          <Badge variant="outline">{resourceAccessKindLabel(primaryAccessKind)}</Badge>
                         {/if}
-                        {#if primaryAccessHref}
-                          <Button
-                            type="button"
-                            variant="outline"
-                            aria-label={accessUrlCopyLabel}
-                            title={accessUrlCopyLabel}
-                            onclick={handleCopyAccessUrl}
+                        {#if primaryDomainBinding}
+                          <Badge variant={domainBindingStatusVariant(primaryDomainBinding.status)}>
+                            {domainBindingStatusLabel(primaryDomainBinding.status)}
+                          </Badge>
+                        {:else}
+                          <Badge
+                            variant={resourceAccessStatusVariant(
+                              resource?.accessSummary?.proxyRouteStatus,
+                            )}
                           >
-                            {#if accessUrlCopyState === "copied"}
-                              <Check class="size-4" />
-                            {:else}
-                              <Copy class="size-4" />
-                            {/if}
-                            {accessUrlCopyLabel}
-                          </Button>
+                            {resourceAccessStatusLabel(resource?.accessSummary?.proxyRouteStatus)}
+                          </Badge>
                         {/if}
                       </div>
+                    {/if}
+                    {#if latestAccessFailure}
+                      <div class="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
+                        <div class="flex flex-wrap items-center gap-2">
+                          <p class="font-medium text-destructive">
+                            {$t(i18nKeys.console.resources.accessFailureTitle)}
+                          </p>
+                          <Badge variant="destructive">{latestAccessFailure.code}</Badge>
+                        </div>
+                        <p class="mt-2 break-words text-xs text-muted-foreground">
+                          {latestAccessFailure.nextAction}
+                        </p>
+                      </div>
+                    {/if}
+                    {#if primaryDomainBinding?.status === "pending_verification"}
+                      <DomainBindingVerifyDnsButton
+                        binding={primaryDomainBinding}
+                        variant="default"
+                        onFeedback={(feedback) => {
+                          createFeedback = feedback;
+                        }}
+                      />
                     {/if}
                   </div>
                 </section>
