@@ -1277,6 +1277,12 @@ export class MemoryResourceReadModel implements ResourceReadModel {
       slug: resource.slug.value,
       kind: resource.kind.value,
       ...(resource.description ? { description: resource.description.value } : {}),
+      lifecycleStatus: resource.lifecycleStatus.value as Exclude<
+        ResourceSummary["lifecycleStatus"],
+        undefined
+      >,
+      ...(resource.archivedAt ? { archivedAt: resource.archivedAt.value } : {}),
+      ...(resource.archiveReason ? { archiveReason: resource.archiveReason.value } : {}),
       services: resource.services.map((service) => ({
         name: service.name.value,
         kind: service.kind.value,

@@ -68,6 +68,9 @@ describe("project detail page structure", () => {
     expect(projectSource).toContain("selectProjectSettingsSection(section, event)");
     expect(projectSource).toContain("data-project-settings-display-surface");
     expect(projectSource).toContain("data-project-settings-general");
+    expect(projectSource).toContain("data-project-settings-archived-resources");
+    expect(projectSource).toContain("projectArchivedResources");
+    expect(projectSource).toContain('resource.lifecycleStatus === "archived"');
     expect(projectSource).toContain("detailTabPanelSubnavClass");
     expect(projectSource).toContain("detailSubnavLayoutClass");
     expect(projectSource).toContain("detailSubnavClass");
@@ -91,13 +94,18 @@ describe("project detail page structure", () => {
       "{resource.lastDeploymentStatus ?? latestDeployment?.status ?? $t(i18nKeys.console.projects.noDeploymentShort)}",
     );
     expect(i18nKeysSource).toContain('activityTitle: "console:projects.activityTitle"');
+    expect(i18nKeysSource).toContain(
+      'archivedResourcesTitle: "console:projects.archivedResourcesTitle"',
+    );
     expect(i18nKeysSource).toContain('healthSummaryGap: "console:projects.healthSummaryGap"');
     expect(englishLocaleSource).toContain(
       "Project health is shown from deployment status and access state.",
     );
     expect(chineseLocaleSource).toContain("这里按部署状态和访问状态展示项目健康。");
     expect(englishLocaleSource).toContain("Activity summary");
+    expect(englishLocaleSource).toContain("Archived resources");
     expect(chineseLocaleSource).toContain("活动汇总");
+    expect(chineseLocaleSource).toContain("已归档资源");
     expect(englishLocaleSource).not.toContain("Health summary is not available yet");
     expect(chineseLocaleSource).not.toContain("健康汇总暂不可用");
     expect(englishLocaleSource).not.toContain("Project activity is not available yet");
