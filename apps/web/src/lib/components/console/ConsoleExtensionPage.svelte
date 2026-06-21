@@ -791,7 +791,7 @@
 </svelte:head>
 
 {#snippet content()}
-  <ConsoleResourceCanvas class="max-w-6xl">
+  <ConsoleResourceCanvas class="max-w-7xl">
     {#if loading}
       <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {#each Array.from({ length: 4 }) as _}
