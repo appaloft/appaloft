@@ -13,6 +13,7 @@
     requestId?: string;
     deploymentId?: string;
     traceLink?: string;
+    accessUrl?: string;
     title?: string;
     description?: string;
     onClose?: () => void;
@@ -27,6 +28,7 @@
     requestId = "",
     deploymentId = "",
     traceLink = "",
+    accessUrl = "",
     title,
     description,
     onClose,
@@ -49,6 +51,7 @@
         {requestId}
         {deploymentId}
         {traceLink}
+        {accessUrl}
         {title}
         {description}
         {onClose}

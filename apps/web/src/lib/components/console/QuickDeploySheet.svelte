@@ -4281,6 +4281,21 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     };
   }
 
+  async function readResourceCurrentAccessUrl(resourceId: string): Promise<string> {
+    if (!resourceId) {
+      return "";
+    }
+
+    const refreshedResource = await orpcClient.resources.show({
+      resourceId,
+      includeLatestDeployment: false,
+      includeAccessSummary: true,
+      includeProfileDiagnostics: false,
+    });
+
+    return selectCurrentResourceAccessRoute(refreshedResource.accessSummary)?.route.url ?? "";
+  }
+
   function blueprintInstallIdempotencyKey(slug: string): string {
     const suffix =
       browser && typeof crypto.randomUUID === "function"
@@ -4528,7 +4543,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
         : await orpcClient.blueprints.install(installInput);
       let installSummary = summarizeBlueprintInstallProgress(installResult);
       const deploymentId = installSummary.deploymentId || installSummary.deploymentIds[0] || "";
-      lastAccessUrl = installSummary.accessUrl;
+      lastAccessUrl = "";
       lastCreatedDeploymentId = deploymentId;
       selectedResourceId = installSummary.resourceId || selectedResourceId;
       recordBlueprintInstallResourceOwner(target, installSummary.resourceId);
@@ -4539,12 +4554,14 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
         installSummary,
         await readBlueprintInstallFinalSummary(installSummary.applicationId),
       );
-      lastAccessUrl = installSummary.accessUrl || lastAccessUrl;
       lastCreatedDeploymentId = installSummary.deploymentId || lastCreatedDeploymentId;
       selectedResourceId = installSummary.resourceId || selectedResourceId;
       recordBlueprintInstallResourceOwner(target, installSummary.resourceId);
 
       await refreshWorkspaceData();
+      lastAccessUrl = await readResourceCurrentAccessUrl(
+        installSummary.resourceId || selectedResourceId,
+      );
 
       const terminalStatus = blueprintDeploymentTerminalStatus();
       const failureReason =
@@ -5089,15 +5106,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       };
 
       await refreshWorkspaceData();
-      const refreshedResources = await orpcClient.resources.list({
-        projectId: workflowResult.projectId,
-        environmentId: workflowResult.environmentId,
-      });
-      const refreshedResource = refreshedResources.items.find(
-        (candidate) => candidate.id === workflowResult.resourceId,
-      );
-      lastAccessUrl =
-        selectCurrentResourceAccessRoute(refreshedResource?.accessSummary)?.route.url ?? "";
+      lastAccessUrl = await readResourceCurrentAccessUrl(workflowResult.resourceId);
       const quickDeployOutcome = createQuickDeployOutcomePacket(workflowResult, {
         access: lastAccessUrl
           ? { status: "available", url: lastAccessUrl }

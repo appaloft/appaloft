@@ -17,7 +17,7 @@ import {
 
 import { i18nKeys } from "$lib/i18n";
 import {
-  systemPluginExtensionIcon,
+  systemPluginExtensionIconPresentation,
   systemPluginExtensionTitle,
 } from "./web-extension-presentation";
 
@@ -141,7 +141,7 @@ function settingsExtensionItems(
     .map((extension) => ({
       href: normalizePath(extension.path),
       label: systemPluginExtensionTitle(extension, locale),
-      icon: systemPluginExtensionIcon(extension),
+      icon: systemPluginExtensionIconPresentation(extension),
       matchPrefix: normalizePath(extension.path),
     }));
 }

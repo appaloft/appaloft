@@ -434,7 +434,7 @@ export const pluginSummarySchema = z.object({
   configuration: systemConfigurationSummarySchema.optional(),
 });
 
-export const systemPluginWebExtensionIconSchema = z.enum([
+export const systemPluginWebExtensionIconNameSchema = z.enum([
   "activity",
   "archive",
   "building",
@@ -451,6 +451,16 @@ export const systemPluginWebExtensionIconSchema = z.enum([
   "shield",
   "terminal",
   "wallet",
+]);
+
+export const systemPluginWebExtensionCustomIconSchema = z.object({
+  src: z.string().min(1),
+  label: z.string().min(1).optional(),
+});
+
+export const systemPluginWebExtensionIconSchema = z.union([
+  systemPluginWebExtensionIconNameSchema,
+  systemPluginWebExtensionCustomIconSchema,
 ]);
 
 export const systemPluginWebExtensionLocalizationSchema = z.object({

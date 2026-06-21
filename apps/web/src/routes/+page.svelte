@@ -534,12 +534,15 @@
                 <div class="nothing-attention-list" aria-hidden="true">
                   {#each Array.from({ length: 3 }) as _, index (index)}
                     <div class="nothing-attention-card">
-                      <Skeleton class="size-10 rounded-md" />
-                      <span class="nothing-attention-copy">
+                      <div class="nothing-attention-row">
+                        <Skeleton class="size-5 rounded-md" />
                         <Skeleton class="h-4 w-48" />
+                        <Skeleton class="h-8 w-28" />
+                      </div>
+                      <span class="nothing-attention-copy">
                         <Skeleton class="h-3 w-full max-w-xl" />
+                        <Skeleton class="h-3 w-72 max-w-full" />
                       </span>
-                      <Skeleton class="h-8 w-28" />
                     </div>
                   {/each}
                 </div>
@@ -547,20 +550,30 @@
                 <div class="nothing-attention-list">
                   {#each attentionItems as item (item.project.id + item.reason)}
                     <article class="nothing-attention-card" data-tone={item.tone}>
-                      <span class="nothing-attention-icon" aria-hidden="true">
-                        {#if item.tone === "critical"}
-                          <AlertCircle class="size-4" />
-                        {:else if item.tone === "progress"}
-                          <Zap class="size-4" />
-                        {:else}
-                          <Clock3 class="size-4" />
-                        {/if}
-                      </span>
-                      <div class="nothing-attention-copy">
+                      <div class="nothing-attention-row">
+                        <span class="nothing-attention-icon" aria-hidden="true">
+                          {#if item.tone === "critical"}
+                            <AlertCircle class="size-4" />
+                          {:else if item.tone === "progress"}
+                            <Zap class="size-4" />
+                          {:else}
+                            <Clock3 class="size-4" />
+                          {/if}
+                        </span>
                         <div class="nothing-attention-title">
                           <strong>{$t(attentionTitleKey(item.reason))}</strong>
                           <span>{$t(attentionToneLabelKey(item.tone))}</span>
                         </div>
+                        <Button
+                          href={item.href}
+                          variant="outline"
+                          class="nothing-attention-action justify-self-start md:justify-self-end"
+                        >
+                          {$t(item.actionLabelKey)}
+                          <ArrowRight class="size-4" />
+                        </Button>
+                      </div>
+                      <div class="nothing-attention-copy">
                         <p>
                           {$t(attentionDescriptionKey(item.reason), {
                             count: item.count,
@@ -577,10 +590,6 @@
                           {/if}
                         </small>
                       </div>
-                      <Button href={item.href} variant="outline" class="justify-self-start md:justify-self-end">
-                        {$t(item.actionLabelKey)}
-                        <ArrowRight class="size-4" />
-                      </Button>
                     </article>
                   {/each}
                 </div>
@@ -881,8 +890,7 @@
   .nothing-attention-card {
     display: grid;
     min-width: 0;
-    grid-template-columns: auto minmax(0, 1fr);
-    gap: 12px;
+    gap: 8px;
     border-top: 1px solid var(--input);
     padding: 14px 0;
   }
@@ -902,26 +910,16 @@
     padding-bottom: 0;
   }
 
-  @media (min-width: 760px) {
-    .nothing-attention-card {
-      grid-template-columns: auto minmax(0, 1fr) auto;
-      align-items: center;
-    }
-  }
-
   .nothing-attention-icon {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid var(--input);
-    border-radius: var(--radius-md);
-    background: color-mix(in oklch, var(--muted) 45%, var(--surface));
     color: var(--primary);
   }
 
   .nothing-attention-icon {
-    width: 40px;
-    height: 40px;
+    width: 20px;
+    height: 20px;
   }
 
   .nothing-attention-card[data-tone="critical"] .nothing-attention-icon {
@@ -933,6 +931,7 @@
   }
 
   .nothing-attention-copy,
+  .nothing-attention-row,
   .nothing-attention-title,
   .nothing-deployment-row,
   .nothing-deployment-row > span,
@@ -940,6 +939,28 @@
   .nothing-deployment-rollup-row > span,
   .nothing-next-row {
     min-width: 0;
+  }
+
+  .nothing-attention-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+  }
+
+  .nothing-attention-row > :global(.nothing-attention-action) {
+    grid-column: 1 / -1;
+  }
+
+  @media (min-width: 760px) {
+    .nothing-attention-row {
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      gap: 10px;
+    }
+
+    .nothing-attention-row > :global(.nothing-attention-action) {
+      grid-column: auto;
+    }
   }
 
   .nothing-attention-copy {

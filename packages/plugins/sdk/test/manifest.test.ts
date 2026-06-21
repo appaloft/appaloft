@@ -95,7 +95,10 @@ describe("plugin manifest contract", () => {
           },
         },
         path: "/marketplace",
-        icon: "package",
+        icon: {
+          src: "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%2F%3E",
+          label: "Marketplace",
+        },
         placement: "navigation",
         target: "console-route",
         requiresAuth: false,
@@ -106,7 +109,10 @@ describe("plugin manifest contract", () => {
       }),
     ).toMatchObject({
       key: "example-marketplace",
-      icon: "package",
+      icon: {
+        src: "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%2F%3E",
+        label: "Marketplace",
+      },
       localizations: {
         "zh-CN": {
           title: "应用市场",

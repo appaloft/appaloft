@@ -62,7 +62,7 @@
     readBrowserConsoleSidebarOpen,
   } from "$lib/console/sidebar-state";
   import {
-    systemPluginExtensionIcon,
+    systemPluginExtensionIconPresentation,
     systemPluginExtensionTitle,
   } from "$lib/console/web-extension-presentation";
   import { modalIsOpen, setModalOpen } from "$lib/console/url-modal";
@@ -173,6 +173,7 @@
   const navigationExtensions = $derived.by(() =>
     (webExtensionsQuery.data?.items ?? [])
       .filter((extension) => extension.placement === "navigation")
+      .filter(isWorkspaceNavigationExtension)
       .toSorted((a, b) =>
         systemPluginExtensionTitle(a, $locale).localeCompare(
           systemPluginExtensionTitle(b, $locale),
@@ -285,6 +286,17 @@
     return href === "/" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
   }
 
+  function isWorkspaceNavigationExtension(extension: SystemPluginWebExtension): boolean {
+    const path = extension.path.split("?")[0] ?? extension.path;
+    const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+    return (
+      normalizedPath !== "/instance" &&
+      !normalizedPath.startsWith("/instance/") &&
+      normalizedPath !== "/organization" &&
+      !normalizedPath.startsWith("/organization/")
+    );
+  }
+
   function toggleColorMode(): void {
     colorMode = colorMode === "dark" ? "light" : "dark";
   }
@@ -355,7 +367,7 @@
             {/each}
             {#each navigationExtensions as extension (extension.key)}
               {@const extensionLabel = systemPluginExtensionTitle(extension, $locale)}
-              {@const ExtensionIcon = systemPluginExtensionIcon(extension)}
+              {@const extensionIcon = systemPluginExtensionIconPresentation(extension)}
               <SidebarMenuItem>
                 <SidebarMenuButton
                   isActive={isNavigationActive(extension.path)}
@@ -368,7 +380,20 @@
                       rel={extension.target === "external-page" ? "noreferrer" : undefined}
                       {...props}
                     >
-                      <ExtensionIcon class="size-4" />
+                      {#if extensionIcon.kind === "image"}
+                        <img
+                          class="size-4 shrink-0 rounded-sm object-contain"
+                          src={extensionIcon.src}
+                          alt=""
+                          aria-hidden="true"
+                          loading="lazy"
+                          decoding="async"
+                          data-system-plugin-extension-icon-image
+                        />
+                      {:else}
+                        {@const ExtensionIcon = extensionIcon.component}
+                        <ExtensionIcon class="size-4" />
+                      {/if}
                       <span>{extensionLabel}</span>
                     </a>
                   {/snippet}
