@@ -41,6 +41,10 @@ const runtimeMonitorPanelSource = readFileSync(
   fileURLToPath(new URL("../components/console/RuntimeMonitorPanel.svelte", import.meta.url)),
   "utf8",
 );
+const runtimeUsagePanelSource = readFileSync(
+  fileURLToPath(new URL("../components/console/RuntimeUsagePanel.svelte", import.meta.url)),
+  "utf8",
+);
 const resourceDetailRouteSource = readFileSync(
   fileURLToPath(
     new URL("../../routes/resources/[resourceId=consoleObjectId]/+page.ts", import.meta.url),
@@ -2633,6 +2637,12 @@ describe("console page structure", () => {
     expect(dependencyResourceDeleteDialogSource).toContain('variant="destructive"');
     expect(dependencyResourceDeleteDialogSource).toContain(
       "disabled={!canDeleteSelectedDependencyResource || deleteDependencyResourceMutation.isPending}",
+    );
+  });
+
+  test("[RT-USAGE-UI-001] renders runtime usage metric tiles with visible card borders", () => {
+    expect(runtimeUsagePanelSource).toContain(
+      'class="rounded-md border bg-muted/30 px-3 py-2"',
     );
   });
 
