@@ -178,7 +178,7 @@ describe("deployment progress helpers", () => {
       status: "succeeded",
     } satisfies Partial<DeploymentProgressEvent>);
     expect(latestDeploymentTimelineCursor(envelopes)).toBe("dep_demo:3");
-    expect(deploymentTimelineProgressStatus(envelopes, "running")).toBe("running");
+    expect(deploymentTimelineProgressStatus(envelopes, "running")).toBe("succeeded");
     expect(deploymentTimelineProgressStatus(envelopes, "succeeded")).toBe("succeeded");
   });
 
@@ -442,7 +442,44 @@ describe("deployment progress helpers", () => {
     expect(deploymentTimelineProgressStatus(reachableEnvelopes, "running")).toBe("succeeded");
   });
 
-  test("[DEP-TIMELINE-WEB-003C] sorts displayed timeline rows by occurrence time", () => {
+  test("[DEP-TIMELINE-WEB-003C] keeps redeploy completion after post-release cleanup logs", () => {
+    const envelopes: DeploymentTimelineEnvelope[] = [
+      {
+        schemaVersion: "deployments.timeline/v1",
+        kind: "entry",
+        entry: {
+          deploymentId: "dep_demo",
+          sequence: 1,
+          cursor: "dep_demo:1",
+          occurredAt: "2026-01-01T00:00:01.000Z",
+          source: "appaloft",
+          kind: "health-check",
+          phase: "verify",
+          level: "info",
+          message: "SSH public route is reachable at https://n8n.example.test/",
+        },
+      },
+      {
+        schemaVersion: "deployments.timeline/v1",
+        kind: "entry",
+        entry: {
+          deploymentId: "dep_demo",
+          sequence: 2,
+          cursor: "dep_demo:2",
+          occurredAt: "2026-01-01T00:00:02.000Z",
+          source: "appaloft",
+          kind: "lifecycle",
+          phase: "deploy",
+          level: "info",
+          message: "Released superseded SSH containers for resource res_demo",
+        },
+      },
+    ];
+
+    expect(deploymentTimelineProgressStatus(envelopes, "running")).toBe("succeeded");
+  });
+
+  test("[DEP-TIMELINE-WEB-003D] sorts displayed timeline rows by occurrence time", () => {
     const envelopes: DeploymentTimelineEnvelope[] = [
       {
         schemaVersion: "deployments.timeline/v1",
@@ -748,7 +785,7 @@ describe("deployment progress helpers", () => {
     ]);
   });
 
-  test("[QUICK-DEPLOY-TIMELINE-001] confirms terminal replay with the follow stream", async () => {
+  test("[QUICK-DEPLOY-TIMELINE-001] treats verify succeeded replay as terminal", async () => {
     timelineMock.mockResolvedValue({
       schemaVersion: "deployments.timeline/v1",
       deploymentId: "dep_demo",
@@ -803,14 +840,7 @@ describe("deployment progress helpers", () => {
       "latest: Pulling from muchobien/pocketbase",
       "Deployment succeeded",
     ]);
-    expect(timelineStreamMock).toHaveBeenCalledWith({
-      deploymentId: "dep_demo",
-      limit: 0,
-      includeHistory: false,
-      follow: true,
-      untilTerminal: true,
-      cursor: "dep_demo:2",
-    });
+    expect(timelineStreamMock).not.toHaveBeenCalled();
   });
 
   test("[DEP-REDEPLOY-WEB-001] follows accepted redeploy timeline without injecting skipped phases", async () => {

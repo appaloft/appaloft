@@ -80,6 +80,7 @@
   import * as Tabs from "$lib/components/ui/tabs";
   import {
     createDeploymentWithProgress,
+    isTerminalDeploymentProgressEvent,
     type DeploymentProgressDialogStatus,
   } from "$lib/console/deployment-progress";
   import { selectCurrentResourceAccessRoute } from "$lib/console/resource-access-route";
@@ -1481,9 +1482,12 @@
 
     if (event.status === "failed") {
       projectResourceDeploymentProgressDialogStatus = "failed";
-    } else if (event.status === "succeeded") {
+    } else if (isTerminalDeploymentProgressEvent(event)) {
       projectResourceDeploymentProgressDialogStatus = "succeeded";
-    } else {
+    } else if (
+      projectResourceDeploymentProgressDialogStatus !== "succeeded" &&
+      projectResourceDeploymentProgressDialogStatus !== "failed"
+    ) {
       projectResourceDeploymentProgressDialogStatus = "running";
     }
   }

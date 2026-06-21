@@ -55,6 +55,7 @@
     deploymentTimelineProgressEvents,
     deploymentTimelineProgressStatus,
     deploymentTimelineEntries,
+    isTerminalDeploymentProgressEvent,
     isTerminalDeploymentStatus,
     latestDeploymentTimelineCursor,
     mergeDeploymentTimelineEnvelopes,
@@ -522,9 +523,12 @@
 
     if (event.status === "failed") {
       recoveryDeploymentProgressStatus = "failed";
-    } else if (event.status === "succeeded") {
+    } else if (isTerminalDeploymentProgressEvent(event)) {
       recoveryDeploymentProgressStatus = "succeeded";
-    } else {
+    } else if (
+      recoveryDeploymentProgressStatus !== "succeeded" &&
+      recoveryDeploymentProgressStatus !== "failed"
+    ) {
       recoveryDeploymentProgressStatus = "running";
     }
   }
