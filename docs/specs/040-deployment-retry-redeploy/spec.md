@@ -15,6 +15,7 @@ Operators can start a new deployment attempt from either:
 
 - a failed deployment attempt's retained immutable snapshot intent (`deployments.retry`); or
 - the current Resource profile and current effective configuration (`deployments.redeploy`).
+- the current Resource profile while forcing runtime artifact refresh (`deployments.force-redeploy`).
 
 This slice reintroduced retry and redeploy under ADR-016. Rollback is governed by the separate
 Phase 7 rollback spec.
@@ -25,6 +26,7 @@ Phase 7 rollback spec.
 | --- | --- | --- |
 | Retry | New deployment attempt from the selected failed/interrupted/canceled/superseded attempt's retained immutable snapshot intent. | Release orchestration |
 | Redeploy | New deployment attempt from the current Resource profile, current effective configuration, current environment, and selected runtime target context. | Release orchestration / Workload Delivery |
+| Force redeploy | New deployment attempt from the current Resource profile that asks runtime adapters to refresh image/build artifacts instead of reusing local build cache or already-present image tags. | Release orchestration / Workload Delivery |
 | Source deployment | Existing deployment detail from which an operator initiated retry or redeploy. Retry uses it as runtime truth; redeploy uses it only as optional UX/audit context. | Release orchestration |
 | Recovery admission | Write-side re-evaluation of readiness and coordination before accepting retry/redeploy work. | Application |
 | Recovery trigger | Safe metadata on the new attempt identifying whether it was created by `create`, `retry`, or `redeploy`. | Deployment attempt |
@@ -41,6 +43,9 @@ Phase 7 rollback spec.
 | DEP-REDEPLOY-002 | Redeploy does not reuse old snapshot | Source deployment has a retained snapshot but current Resource profile differs | `deployments.redeploy` runs with `sourceDeploymentId` | New attempt uses current Resource profile/current effective config; the source deployment is only recorded as optional audit context. |
 | DEP-REDEPLOY-003 | Redeploy rejected when current profile is invalid | Current Resource profile, lifecycle, environment, target, destination, or profile-drift policy blocks deployment admission | `deployments.redeploy` runs | Command returns `deployment_not_redeployable` or the existing owning admission error; it does not fall back to retry semantics. |
 | DEP-REDEPLOY-004 | Redeploy coordinates resource runtime | Same resource/target/destination has active deployment work | `deployments.redeploy` runs | Command waits or rejects according to resource-runtime coordination policy; it does not bypass `deployments.create` supersede/fencing rules. |
+| DEP-FORCE-REDEPLOY-001 | Force redeploy admitted from current profile | Resource, environment, target, destination, source, runtime profile, network/access profile, and effective config are currently deployable | `deployments.force-redeploy` runs | A new deployment attempt id is created, `triggerKind = force-redeploy`, runtime plan is resolved from current Resource profile, and runtime execution refreshes image/build artifacts where supported. |
+| DEP-FORCE-REDEPLOY-002 | Force redeploy refreshes Docker builds | Accepted runtime execution uses Docker image build | Runtime adapter renders package commands | Docker build uses `--pull --no-cache` instead of relying on local build cache. |
+| DEP-FORCE-REDEPLOY-003 | Force redeploy refreshes Compose builds | Accepted runtime execution uses Docker Compose build | Runtime adapter renders deploy commands | Compose execution runs `docker compose build --pull --no-cache` before `docker compose up --build`. |
 | DEP-RECOVERY-ENTRY-001 | Retry/redeploy entrypoints are explicit | Operation catalog, CLI, HTTP/oRPC, Web, and docs are inspected after Code Round | Retry/redeploy are active | Each surface dispatches explicit command messages, reuses application schemas, links to public docs/help anchors, and does not expose rollback or cancel. |
 
 ## Public Surfaces
@@ -48,9 +53,11 @@ Phase 7 rollback spec.
 - CLI:
   - `appaloft deployments retry <deploymentId>`
   - `appaloft deployments redeploy <resourceId>`
+  - `appaloft deployments force-redeploy <resourceId>`
 - HTTP/oRPC:
   - `POST /api/deployments/{deploymentId}/retry`
   - `POST /api/resources/{resourceId}/redeploy`
+  - `POST /api/resources/{resourceId}/force-redeploy`
 - Web:
   - Deployment detail recovery panel may enable retry/redeploy actions only when
     `deployments.recovery-readiness` says the action is technically ready and the operation catalog
@@ -93,6 +100,15 @@ Phase 7 rollback spec.
   `deployments.create`.
 - `sourceDeploymentId` is optional context only. It never becomes the source of runtime truth.
 - Does not accept source/runtime/network/profile override fields.
+
+### `deployments.force-redeploy`
+
+- Uses the same current-profile admission path as `deployments.redeploy`.
+- Records `triggerKind = force-redeploy` on the new attempt.
+- Does not accept source/runtime/network/profile override fields.
+- Runtime adapters must refresh build/image artifacts where supported: Docker build uses
+  `--pull --no-cache`, Docker Compose runs an explicit forced build before up, and prebuilt image
+  paths pull the image before runtime start instead of trusting an already-present tag.
 
 ## Failure Semantics
 

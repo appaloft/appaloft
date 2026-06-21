@@ -123,6 +123,10 @@ export const cliCommandDescriptions = {
     "Redeploy the current resource profile",
     "deployment.recovery-readiness",
   ),
+  deploymentForceRedeploy: withDocs(
+    "Force redeploy the current resource profile with refreshed runtime artifacts",
+    "deployment.recovery-readiness",
+  ),
   deploymentRollback: withDocs(
     "Roll back to a retained successful deployment candidate",
     "deployment.recovery-readiness",

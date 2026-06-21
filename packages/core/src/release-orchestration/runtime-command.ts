@@ -77,6 +77,8 @@ export interface DockerBuildImageCommandSpec {
   contextPath: FilePathText;
   labels: readonly RuntimeCommandLabel[];
   workingDirectory?: FilePathText;
+  pull: boolean;
+  noCache: boolean;
 }
 
 export interface DockerRunContainerCommandSpec {
@@ -102,6 +104,8 @@ export interface DockerComposeUpCommandSpec {
   portableDockerCompose?: boolean;
   detach: boolean;
   build: boolean;
+  pull: boolean;
+  noCache: boolean;
 }
 
 export interface DockerComposeScaleSpec {

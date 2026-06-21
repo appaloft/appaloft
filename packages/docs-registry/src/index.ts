@@ -846,6 +846,7 @@ export const publicDocsHelpTopics = {
       "docs/queries/deployments.recovery-readiness.md",
       "docs/commands/deployments.retry.md",
       "docs/commands/deployments.redeploy.md",
+      "docs/commands/deployments.force-redeploy.md",
       "docs/commands/deployments.rollback.md",
       "docs/commands/deployments.cancel.md",
       "docs/commands/deployments.archive.md",
@@ -1944,6 +1945,7 @@ export const publicDocsHelpTopics = {
       "docs/specs/043-resource-runtime-controls/spec.md",
       "docs/commands/resources.runtime.restart.md",
       "docs/commands/deployments.redeploy.md",
+      "docs/commands/deployments.force-redeploy.md",
       "docs/queries/deployments.recovery-readiness.md",
       "docs/testing/resource-runtime-controls-test-matrix.md",
     ],
@@ -3876,6 +3878,11 @@ export const publicDocsOperationCoverage = [
   },
   {
     operationKey: "deployments.redeploy",
+    status: "documented",
+    topicId: "deployment.recovery-readiness",
+  },
+  {
+    operationKey: "deployments.force-redeploy",
     status: "documented",
     topicId: "deployment.recovery-readiness",
   },

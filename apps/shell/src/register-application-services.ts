@@ -206,6 +206,8 @@ import {
   ExportAuditEventsQueryService,
   ExportGlobalAuditEventsQueryHandler,
   ExportGlobalAuditEventsQueryService,
+  ForceRedeployDeploymentCommandHandler,
+  ForceRedeployDeploymentUseCase,
   GenericSignedSourceEventVerifier,
   GetAuthBootstrapStatusQueryHandler,
   GetAuthBootstrapStatusQueryService,
@@ -1702,6 +1704,7 @@ export function registerApplicationServices(
   container.registerSingleton(DeploymentRecoveryReadinessQueryHandler);
   container.registerSingleton(RetryDeploymentCommandHandler);
   container.registerSingleton(RedeployDeploymentCommandHandler);
+  container.registerSingleton(ForceRedeployDeploymentCommandHandler);
   container.registerSingleton(RollbackDeploymentCommandHandler);
   container.registerSingleton(CancelDeploymentCommandHandler);
   container.registerSingleton(ArchiveDeploymentCommandHandler);
@@ -2436,6 +2439,10 @@ export function registerApplicationServices(
   container.registerSingleton(tokens.createDeploymentUseCase, CreateDeploymentUseCase);
   container.registerSingleton(tokens.retryDeploymentUseCase, RetryDeploymentUseCase);
   container.registerSingleton(tokens.redeployDeploymentUseCase, RedeployDeploymentUseCase);
+  container.registerSingleton(
+    tokens.forceRedeployDeploymentUseCase,
+    ForceRedeployDeploymentUseCase,
+  );
   container.registerSingleton(tokens.rollbackDeploymentUseCase, RollbackDeploymentUseCase);
   container.registerSingleton(tokens.cancelDeploymentUseCase, CancelDeploymentUseCase);
   container.registerSingleton(tokens.archiveDeploymentUseCase, ArchiveDeploymentUseCase);

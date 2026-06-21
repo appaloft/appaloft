@@ -39,6 +39,20 @@ describe("runtime command builder", () => {
     );
   });
 
+  test("[DEP-FORCE-REDEPLOY-002] renders forced Docker image builds without cache and with base image pull", () => {
+    const spec = RuntimeCommandBuilder.docker().buildImage({
+      image: "appaloft-image-dep_1:latest",
+      dockerfilePath: "/srv/app/Dockerfile.appaloft",
+      contextPath: "/srv/app",
+      pull: true,
+      noCache: true,
+    });
+
+    expect(renderRuntimeCommandString(spec, { quote: shellQuote })).toBe(
+      "docker build --pull --no-cache -t 'appaloft-image-dep_1:latest' -f '/srv/app/Dockerfile.appaloft' '/srv/app'",
+    );
+  });
+
   test("renders Docker container runs with structured env labels ports and network", () => {
     const docker = RuntimeCommandBuilder.docker();
     const spec = docker.runContainer({
@@ -186,5 +200,20 @@ describe("runtime command builder", () => {
       "$appaloft_docker_compose_cmd -p 'preview-123-dep-1' -f '/srv/app/docker-compose.yml'",
     );
     expect(command).toContain("--scale 'worker=4'");
+  });
+
+  test("[DEP-FORCE-REDEPLOY-003] renders forced Compose builds before compose up", () => {
+    const spec = RuntimeCommandBuilder.docker().composeUp({
+      composeFile: "/srv/app/docker-compose.yml",
+      additionalComposeFiles: ["/srv/app/.appaloft.compose.labels.override.yml"],
+      projectName: "preview-123-dep-1",
+      workingDirectory: "/srv/app",
+      pull: true,
+      noCache: true,
+    });
+
+    expect(renderRuntimeCommandString(spec, { quote: shellQuote })).toBe(
+      "cd '/srv/app' && docker compose -p 'preview-123-dep-1' -f '/srv/app/docker-compose.yml' -f '/srv/app/.appaloft.compose.labels.override.yml' build --pull --no-cache && docker compose -p 'preview-123-dep-1' -f '/srv/app/docker-compose.yml' -f '/srv/app/.appaloft.compose.labels.override.yml' up -d --build",
+    );
   });
 });

@@ -10,6 +10,7 @@ export * from "./operations/deployments/deployment-plan.handler";
 export * from "./operations/deployments/deployment-recovery-readiness.handler";
 export * from "./operations/deployments/deployment-timeline.handler";
 export * from "./operations/deployments/deployment-timeline.query-service";
+export * from "./operations/deployments/force-redeploy-deployment.handler";
 export * from "./operations/deployments/list-deployments.handler";
 export * from "./operations/deployments/mark-server-applied-route-status-on-deployment-finished.handler";
 export * from "./operations/deployments/prune-deployments.handler";
