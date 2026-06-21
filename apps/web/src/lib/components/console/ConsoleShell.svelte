@@ -509,7 +509,7 @@
                             <a
                               data-console-header-switcher-link
                               href={item.href}
-                              class="group/link inline-flex h-8 min-w-0 flex-1 items-center gap-2 px-1.5 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              class="group/link inline-flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 transition-colors hover:bg-primary/5 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             >
                               {#if item.kind === "project"}
                                 <FolderOpen class="size-4 shrink-0 text-muted-foreground transition-colors group-hover/link:text-foreground" />
@@ -543,7 +543,7 @@
                             data-console-header-switcher-trigger
                             aria-label={item.switcherLabel ?? item.label}
                             title={item.switcherLabel ?? item.label}
-                            class="group/dropdown-trigger inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            class="group/dropdown-trigger inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-primary/5 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:bg-primary/5"
                           >
                             <ChevronDown class="size-3.5 transition-transform group-data-[state=open]/dropdown-trigger:rotate-180" />
                           </DropdownMenuTrigger>
