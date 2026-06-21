@@ -816,6 +816,87 @@ describe("ResourceHealthQueryService", () => {
     });
   });
 
+  test("[RES-HEALTH-QRY-023][HEALTH-ACCESS-004] accepts live public access evidence for provider-local TLS bound domains", async () => {
+    const probeRunner = new StaticResourceHealthProbeRunner({
+      name: "public-access",
+      target: "public-access",
+      status: "passed",
+      observedAt: "2026-01-01T00:00:10.200Z",
+      durationMs: 24,
+      statusCode: 200,
+    });
+    const service = createService({
+      domainBindings: [
+        {
+          id: "dmb_bound",
+          projectId: "prj_demo",
+          environmentId: "env_demo",
+          resourceId: "res_web",
+          serverId: "srv_demo",
+          destinationId: "dst_demo",
+          domainName: "bound.example.test",
+          pathPrefix: "/",
+          proxyKind: "traefik",
+          tlsMode: "auto",
+          certificatePolicy: "auto",
+          status: "bound",
+          dnsObservation: {
+            status: "matched",
+            expectedTargets: ["203.0.113.10"],
+            observedTargets: ["203.0.113.10"],
+            checkedAt: "2026-01-01T00:00:07.000Z",
+          },
+          verificationAttemptCount: 1,
+          createdAt: "2026-01-01T00:00:06.000Z",
+        },
+      ],
+      probeRunner,
+    });
+
+    const result = await service.execute(
+      createTestContext(),
+      createQuery({
+        mode: "live",
+        includeChecks: true,
+        includePublicAccessProbe: true,
+      }),
+    );
+
+    expect(result.isOk()).toBe(true);
+    const summary = result._unsafeUnwrap();
+    expect(summary.publicAccess).toMatchObject({
+      status: "ready",
+      url: "https://bound.example.test",
+      kind: "durable-domain",
+    });
+    expect(summary.publicAccess.reasonCode).toBeUndefined();
+    expect(summary.publicAccess.routeIntentStatus).toBeUndefined();
+    expect(summary.overall).toBe("unknown");
+    expect(summary.sourceErrors).not.toContainEqual(
+      expect.objectContaining({
+        source: "domain-binding",
+        code: "resource_domain_binding_not_ready",
+      }),
+    );
+    expect(summary.checks).toContainEqual(
+      expect.objectContaining({
+        name: "public-access",
+        target: "public-access",
+        status: "passed",
+        statusCode: 200,
+      }),
+    );
+    expect(probeRunner.requests).toContainEqual(
+      expect.objectContaining({
+        name: "public-access",
+        target: "public-access",
+        url: "https://bound.example.test/",
+        method: "GET",
+        expectedStatusCode: 200,
+      }),
+    );
+  });
+
   test("[ACCESS-DIAG-002][HEALTH-ACCESS-001][HEALTH-ACCESS-003] degrades current health when public access or proxy route state failed", async () => {
     const service = createService({
       resources: [

@@ -927,6 +927,51 @@ function publicAccessProbeUrl(
   return withPolicyPath(publicAccess.url, policy.path);
 }
 
+function defaultPublicAccessProbePolicy(): ResolvedHttpHealthPolicy {
+  return {
+    enabled: true,
+    type: "http",
+    method: "GET",
+    scheme: "https",
+    host: "public-access",
+    path: "/",
+    expectedStatusCode: 200,
+    intervalSeconds: 5,
+    timeoutSeconds: 5,
+    retries: 1,
+    startPeriodSeconds: 0,
+  };
+}
+
+function removeResolvedPublicAccessSourceErrors(
+  publicAccess: ResourcePublicAccessHealthSection,
+  sourceErrors: ResourceHealthSourceError[],
+): void {
+  for (let index = sourceErrors.length - 1; index >= 0; index -= 1) {
+    const error = sourceErrors[index];
+    if (!error) {
+      continue;
+    }
+
+    if (
+      publicAccess.kind === "durable-domain" &&
+      error.source === "domain-binding" &&
+      error.code === "resource_domain_binding_not_ready"
+    ) {
+      sourceErrors.splice(index, 1);
+      continue;
+    }
+
+    if (
+      error.source === "public-access" &&
+      (error.code === "resource_public_access_unavailable" ||
+        error.code === "resource_public_access_probe_failed")
+    ) {
+      sourceErrors.splice(index, 1);
+    }
+  }
+}
+
 function isDockerSwarmDeployment(deployment: DeploymentSummary): boolean {
   return (
     deployment.runtimePlan.target.providerKey === "docker-swarm" &&
@@ -1182,13 +1227,12 @@ export class ResourceHealthQueryService {
       }
     }
 
-    if (
-      query.mode === "live" &&
-      query.includePublicAccessProbe &&
-      resolvedPolicy?.enabled &&
-      healthPolicy.status === "configured"
-    ) {
-      const request = this.publicAccessProbeRequest(publicAccess, resolvedPolicy);
+    if (query.mode === "live" && query.includePublicAccessProbe) {
+      const publicAccessPolicy =
+        resolvedPolicy?.enabled && healthPolicy.status === "configured"
+          ? resolvedPolicy
+          : defaultPublicAccessProbePolicy();
+      const request = this.publicAccessProbeRequest(publicAccess, publicAccessPolicy);
       if (request) {
         const probeResult = await this.probeRunner.probe(context, request);
         if (probeResult.isOk()) {
@@ -1196,9 +1240,11 @@ export class ResourceHealthQueryService {
           liveChecks.push(check);
 
           if (probeResult.value.status === "passed") {
-            const { phase, reasonCode, ...readyPublicAccess } = publicAccess;
+            const { phase, reasonCode, routeIntentStatus, ...readyPublicAccess } = publicAccess;
             void phase;
             void reasonCode;
+            void routeIntentStatus;
+            removeResolvedPublicAccessSourceErrors(publicAccess, sourceErrors);
             publicAccess = {
               ...readyPublicAccess,
               status: "ready",

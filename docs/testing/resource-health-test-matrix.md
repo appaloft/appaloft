@@ -91,6 +91,7 @@ Then:
 | RES-HEALTH-QRY-019 | integration | Edge proxy route unavailable observed | Latest deployment exists, edge failure is `resource_access_route_unavailable` or `resource_access_proxy_unavailable` | `ok(overall = "degraded")` | Proxy/public access sections use `resource_access_*` code and keep category out of `domain`. |
 | RES-HEALTH-QRY-020 | integration | Server-applied route ready | Server-applied config domain and generated route both exist, with no ready durable binding | `ok` uses server-applied domain as public access target | Server-applied route precedes generated default route and reports `kind = server-applied-domain`. |
 | RES-HEALTH-QRY-021 | integration | Health failure visibility sanitizer | Live health or public access probe failure includes auth headers, cookies, sensitive query values, private key material, provider raw payload hints, or raw remote command output in its message | `ok` with degraded/unhealthy/unknown health according to the source failure | Health source errors preserve stable code/phase/retriable fields and redact unsafe adjacent text. |
+| RES-HEALTH-QRY-023 | integration | Live public access proves bound durable domain reachable | Durable domain binding is `bound` with matched DNS, no ready durable route projection exists, no application health policy is configured, and explicit live public access probe succeeds | `ok(overall = "unknown")` with `publicAccess.status = "ready"` | The successful public access probe removes the stale domain-binding source error without treating missing health policy as healthy. |
 
 ## Shared Route/Access Health Matrix
 
@@ -102,6 +103,7 @@ These rows are governed by
 | HEALTH-ACCESS-001 | integration | Shared selected route and blocking reason | Access summary/proxy/domain state selects a route with a blocking reason | `resources.health` public/proxy/check/source-error sections use the same route source and reason vocabulary as diagnostics | Health and diagnostic summaries do not disagree on current route. |
 | HEALTH-ACCESS-002 | integration | Runtime logs unavailable | Runtime log observation is unsupported or no instance can be resolved | Health/access state remains based on runtime/proxy/access facts and records log unavailability only as diagnostic context | Missing logs do not prove runtime failure by themselves. |
 | HEALTH-ACCESS-003 | integration | Edge access failure degrades health | Latest safe edge failure envelope is associated with the resource | Health reports degraded public/proxy access without mutating deployment state | Source errors preserve `resource_access_*` code, phase, request id, and retriable flag. |
+| HEALTH-ACCESS-004 | integration | Live public access overrides stale durable-domain readiness | A selected durable domain is still `bound` in the read model, but an explicit live public access probe reaches the URL successfully | Health reports public access as ready for the current response without mutating the binding or hiding missing application health policy | The response does not keep `resource_domain_binding_not_ready` after the successful public access probe. |
 
 ## Status Aggregation Matrix
 
@@ -162,6 +164,8 @@ Current covered cases:
 - health/probe failure message sanitization for unsafe headers, cookies, sensitive query values,
   private key material, SSH credential URLs, and remote raw output is covered by
   `RES-HEALTH-QRY-021` and `ACCESS-DIAG-005`;
+- live public access probing for provider-local TLS durable domains that are still `bound` in the
+  read model is covered by `RES-HEALTH-QRY-023` and `HEALTH-ACCESS-004`;
 - `resources.configure-health` is covered by application integration tests, HTTP/oRPC entrypoint
   tests, CLI dispatch tests, and Web resource detail WebView coverage.
 - `resources.reset-health` is covered by application integration tests plus CLI and HTTP/oRPC
