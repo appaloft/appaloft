@@ -2531,6 +2531,11 @@ describe("console page structure", () => {
     const dependencyResourceDetailDisplaySource = sourceBetween(
       dependencyResourceDetailPageSource,
       "data-dependency-resource-detail-display-surface",
+      "data-dependency-resource-danger-zone",
+    );
+    const dependencyResourceDangerZoneSource = sourceBetween(
+      dependencyResourceDetailPageSource,
+      "data-dependency-resource-danger-zone",
       "{#if selectedDependencyResource}",
     );
     expect(dependencyResourceListSource).not.toContain("dependency-resource-delete-action");
@@ -2567,7 +2572,9 @@ describe("console page structure", () => {
     expect(dependencyResourceDetailDisplaySource).not.toContain("deleteDialogTitle");
     expect(dependencyResourceDetailDisplaySource).toContain("lifecycleDescription");
     expect(dependencyResourceDetailDisplaySource).not.toContain("deleteDialogDescription");
-    expect(dependencyResourceDetailDisplaySource).toContain("lifecycleManageAction");
+    expect(dependencyResourceDetailDisplaySource).toContain(
+      "data-dependency-resource-lifecycle-handoff",
+    );
     expect(dependencyResourceDetailDisplaySource).toContain("backupManageAction");
     expect(dependencyResourceDetailDisplaySource).toContain("restoreManageAction");
     expect(dependencyResourceDetailDisplaySource).not.toContain("restoreAction");
@@ -2580,7 +2587,13 @@ describe("console page structure", () => {
     expect(dependencyResourceDetailDisplaySource).not.toContain('type="submit"');
     expect(dependencyResourceDetailDisplaySource).toContain("openRestoreBackupDialog");
     expect(dependencyResourceDetailDisplaySource).toContain("openBackupPolicyDialog");
-    expect(dependencyResourceDetailDisplaySource).toContain("openDeleteDependencyResourceDialog");
+    expect(dependencyResourceDetailDisplaySource).not.toContain(
+      "openDeleteDependencyResourceDialog",
+    );
+    expect(dependencyResourceDangerZoneSource).toContain("dangerZoneTitle");
+    expect(dependencyResourceDangerZoneSource).toContain("deleteBlockedTitle");
+    expect(dependencyResourceDangerZoneSource).toContain("openDeleteDependencyResourceDialog");
+    expect(dependencyResourceDangerZoneSource).not.toContain('variant="destructive"');
     const dependencyResourceDeleteDialogSource =
       dependencyResourceDetailPageSource.match(
         /<Dialog\.Root bind:open={deleteDependencyResourceDialogOpen}[\s\S]*?<\/Dialog\.Root>/,
