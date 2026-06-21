@@ -219,7 +219,9 @@ tokens, and environment secret values are not persisted.
 
 ## Open Questions
 
-- Should resource terminals later support `container-exec` and compose service shells, or should v1
-  stay limited to host/SSH workspace shells?
+- Resource terminals support retained Docker container and Docker Compose service shells through the
+  runtime terminal gateway when the selected deployment exposes safe runtime target metadata.
+  Workspace shells remain required for source/host-process deployments and for `relativeDirectory`
+  requests.
 - Should server profiles gain a durable default terminal directory operation before server-scope
   terminals are exposed beyond login-directory shells?

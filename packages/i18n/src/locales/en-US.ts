@@ -1463,10 +1463,10 @@ export const enUS = {
       lifecycleScopeServer: "Server",
       lifecycleTitle: "Active terminal sessions",
       resourceUnavailableBody:
-        "This resource does not have a deployment workspace that can open a terminal yet. Check deployments or use a server terminal when you need host-level access.",
+        "This resource does not have a deployment workspace or retained container target that can open a terminal yet. Check deployments or use a server terminal when you need host-level access.",
       resourceUnavailableTitle: "No resource terminal target yet",
       resourceDescription:
-        "Starts in the latest deployment workspace resolved from runtime metadata.",
+        "Starts in the latest deployment workspace or retained container target resolved from runtime metadata.",
       resourceTitle: "Resource terminal",
       serverDescription: "Starts on the selected server target.",
       serverTitle: "Server terminal",
@@ -1475,7 +1475,7 @@ export const enUS = {
       title: "Terminal",
       workspace: "Workspace",
       workspaceUnavailable:
-        "Resource terminal needs a successful deployment with workspace metadata. Pick a deployment that recorded its workspace, redeploy the resource, or use the server terminal.",
+        "Resource terminal needs a successful deployment with workspace metadata or a retained container target. Pick a compatible deployment, redeploy the resource, or use the server terminal.",
     },
     projects: {
       activityDescription:

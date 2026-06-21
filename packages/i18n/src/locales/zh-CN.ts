@@ -1333,9 +1333,9 @@ export const zhCN = {
       lifecycleScopeServer: "服务器",
       lifecycleTitle: "活跃终端会话",
       resourceUnavailableBody:
-        "这个资源还没有可打开终端的部署工作目录。需要排查时先查看部署记录，或者使用服务器终端进入主机级别上下文。",
+        "这个资源还没有可打开终端的部署工作目录或保留的容器目标。需要排查时先查看部署记录，或者使用服务器终端进入主机级别上下文。",
       resourceUnavailableTitle: "暂无资源终端目标",
-      resourceDescription: "进入由运行时元数据解析出来的最新部署工作目录。",
+      resourceDescription: "进入由运行时元数据解析出来的最新部署工作目录或保留的容器目标。",
       resourceTitle: "资源终端",
       serverDescription: "进入选中的服务器目标。",
       serverTitle: "服务器终端",
@@ -1344,7 +1344,7 @@ export const zhCN = {
       title: "终端",
       workspace: "工作目录",
       workspaceUnavailable:
-        "资源终端需要一个记录了工作目录元数据的成功部署。请选择带工作目录的部署、重新部署这个资源，或者改用服务器终端。",
+        "资源终端需要一个记录了工作目录元数据的成功部署，或者保留了容器目标的部署。请选择兼容的部署、重新部署这个资源，或者改用服务器终端。",
     },
     projects: {
       activityDescription: "项目里的部署、配置和自动化事件会在这里汇总。",

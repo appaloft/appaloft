@@ -109,6 +109,12 @@ function resolveDeploymentWorkspace(deployment: DeploymentSummary): string | und
   return sourceWorkspace ? appendSourceBaseDirectory(sourceWorkspace, baseDirectory) : undefined;
 }
 
+function runtimeTargetCanOpenWithoutWorkspace(deployment: DeploymentSummary): boolean {
+  return ["docker-container", "docker-compose-stack"].includes(
+    deployment.runtimePlan.execution.kind,
+  );
+}
+
 @injectable()
 export class OpenTerminalSessionUseCase {
   constructor(
@@ -251,7 +257,13 @@ export class OpenTerminalSessionUseCase {
     }
 
     const workspace = resolveDeploymentWorkspace(deployment);
-    if (!workspace) {
+    const workingDirectory = workspace
+      ? appendRelativeDirectory(workspace, command.relativeDirectory)
+      : undefined;
+    if (
+      !workingDirectory &&
+      (!runtimeTargetCanOpenWithoutWorkspace(deployment) || command.relativeDirectory)
+    ) {
       return err(
         domainError.terminalSessionWorkspaceUnavailable(
           "Deployment workspace metadata is not available",
@@ -270,7 +282,7 @@ export class OpenTerminalSessionUseCase {
         resource,
         deployment,
         server,
-        workingDirectory: appendRelativeDirectory(workspace, command.relativeDirectory),
+        ...(workingDirectory ? { workingDirectory } : {}),
       },
       initialRows: command.initialRows,
       initialCols: command.initialCols,
