@@ -631,6 +631,7 @@ export const zhCN = {
       inFlight: "进行中",
       installCommand: "安装命令",
       listDescription: "按时间展示来源、状态、项目和环境；点击进入详情查看运行计划。",
+      listRange: "第 {{start}}-{{end}} 个，共 {{total}} 个",
       listTitle: "部署列表",
       metadataTitle: "元数据",
       needsAttention: "需要关注",

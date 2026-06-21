@@ -49,7 +49,7 @@
   }: Props = $props();
 </script>
 
-<div class="console-record-list lg:hidden" data-deployment-record-list>
+<div class="console-record-list md:hidden" data-deployment-record-list>
   {#each deployments as deployment (deployment.id)}
     {@const project = findProject(projects, deployment.projectId)}
     {@const environment = findEnvironment(environments, deployment.environmentId)}
@@ -146,7 +146,7 @@
 </div>
 
 <div
-  class="hidden overflow-hidden rounded-lg border bg-card shadow-2xs lg:block"
+  class="hidden overflow-hidden rounded-lg border bg-card shadow-2xs md:block"
   data-deployment-table-display-surface
 >
   <Table.Root>
