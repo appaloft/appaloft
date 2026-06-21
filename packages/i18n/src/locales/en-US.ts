@@ -2377,6 +2377,8 @@ export const enUS = {
       healthProxy: "Proxy route",
       healthPublicAccess: "Public access",
       healthRecommendedCheckHealth: "Run resource health checks again.",
+      healthRecommendedConfigureHealth:
+        "Configure an application-level health policy so Appaloft can decide whether the app is usable.",
       healthRecommendedFixDns:
         "Check that DNS records point to the target address Appaloft expects.",
       healthRecommendedInspectLogs: "Inspect runtime logs to confirm the app started correctly.",
@@ -2390,6 +2392,12 @@ export const enUS = {
       healthRuntime: "Runtime",
       healthSourceIssues: "Source issues",
       healthTitle: "Resource health",
+      healthActionConfigureHealth: "Configure health policy",
+      healthActionInspectProxy: "Inspect proxy",
+      healthActionManageAccess: "Manage access",
+      healthActionOpenLogs: "Open logs",
+      healthActionRefreshStatus: "Refresh status",
+      healthActionReviewDiagnostics: "Review diagnostics",
       jobsTab: "Jobs",
       logsTab: "Logs",
       networkingTab: "Networking",
