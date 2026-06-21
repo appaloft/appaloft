@@ -1338,6 +1338,11 @@ describe("console page structure", () => {
 
     expect(overviewSource).toContain("data-resource-initial-access-credentials");
     expect(overviewSource).toContain("data-resource-initial-access-credential");
+    expect(overviewSource).toContain("visibleResourceInitialAccessCredentials");
+    expect(resourceDetailPageSource).toContain('credential.status === "pending"');
+    expect(resourceDetailPageSource).toContain(
+      "Boolean(revealedInitialAccessCredentials[credential.credentialId])",
+    );
     expect(resourceDetailPageSource).toContain(
       "/api/resources/${encodeURIComponent(resourceId)}/initial-access-credentials",
     );
