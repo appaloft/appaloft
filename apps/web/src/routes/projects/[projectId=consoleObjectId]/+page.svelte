@@ -114,6 +114,7 @@
     findResource,
     findServer,
     formatTime,
+    hrefWithSearchParams,
     latestResourceDeployment,
     previewEnvironmentDetailHref,
     projectDetailHref,
@@ -254,7 +255,7 @@
   const projectHeaderSwitchItems = $derived(
     projects.map((projectItem) => ({
       label: projectItem.name,
-      href: projectDetailHref(projectItem.id),
+      href: projectDetailHrefWithActiveSearch(projectItem.id),
       selected: projectItem.id === projectId,
     })),
   );
@@ -1336,6 +1337,20 @@
     return `${page.url.pathname}${search ? `?${search}` : ""}`;
   }
 
+  function projectDetailHrefWithActiveSearch(projectId: string): string {
+    const params = new URLSearchParams();
+
+    if (activeProjectTab !== "overview") {
+      params.set("tab", activeProjectTab);
+    }
+
+    if (activeProjectTab === "settings" && activeProjectSettingsSection !== "general") {
+      params.set("section", activeProjectSettingsSection);
+    }
+
+    return hrefWithSearchParams(projectDetailHref(projectId), params);
+  }
+
   function projectSettingsSectionHref(section: ProjectSettingsSection): string {
     const params = new URLSearchParams();
     params.set("tab", "settings");
@@ -1917,7 +1932,7 @@
       label: project?.name ?? $t(i18nKeys.console.projects.pageTitle),
       kind: "project",
       loading: projectHeaderLoading,
-      href: project ? projectDetailHref(project.id) : undefined,
+      href: project ? projectDetailHrefWithActiveSearch(project.id) : undefined,
       switcherLabel: $t(i18nKeys.console.projects.pageTitle),
       switcherItems: projectHeaderSwitchItems,
     },

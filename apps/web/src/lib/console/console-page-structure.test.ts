@@ -3519,7 +3519,7 @@ describe("console page structure", () => {
     const projectSettingsSource = sourceBetween(
       projectDetailPageSource,
       'value="settings"',
-      "<Dialog.Root bind:open={quickDeployDialogOpen}",
+      "</Tabs.Root>",
     );
     const environmentsTabSource = sourceBetween(
       projectDetailPageSource,

@@ -179,6 +179,7 @@
     findProject,
     findServer,
     formatTime,
+    hrefWithSearchParams,
     projectDetailHref,
     resourceDetailHref,
     resourcePreviewEnvironmentDetailHref,
@@ -683,7 +684,7 @@
       )
       .map((resourceItem) => ({
         label: resourceItem.name,
-        href: resourceDetailHref(resourceItem),
+        href: resourceDetailHrefWithActiveSearch(resourceItem),
         selected: resourceItem.id === resourceId,
       })),
   );
@@ -5592,6 +5593,27 @@
     return `${page.url.pathname}${search ? `?${search}` : ""}`;
   }
 
+  function resourceDetailHrefWithActiveSearch(
+    resource: Parameters<typeof resourceDetailHref>[0],
+  ): string {
+    const params = new URLSearchParams();
+    const defaultSection = resourceDefaultSectionForTab(activeTab);
+
+    if (activeTab !== "overview") {
+      params.set("tab", activeTab);
+    }
+
+    if (
+      activeTab !== "overview" &&
+      resourceSectionsForTab(activeTab).length > 0 &&
+      activeResourceSection !== defaultSection
+    ) {
+      params.set("section", activeResourceSection);
+    }
+
+    return hrefWithSearchParams(resourceDetailHref(resource), params);
+  }
+
   function resourceSectionTab(section: ResourceDetailSection): ResourceDetailTab {
     switch (section) {
       case "access":
@@ -7281,7 +7303,7 @@
       label: resource?.name ?? $t(i18nKeys.common.domain.resource),
       kind: "resource",
       loading: resourceHeaderLoading,
-      href: resource ? resourceDetailHref(resource) : undefined,
+      href: resource ? resourceDetailHrefWithActiveSearch(resource) : undefined,
       switcherLabel: $t(i18nKeys.console.resources.pageTitle),
       switcherItems: resourceHeaderSwitchItems,
     },

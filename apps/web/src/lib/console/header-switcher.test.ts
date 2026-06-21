@@ -45,9 +45,10 @@ describe("console header switcher", () => {
   });
 
   test("[CONSOLE-HEADER-SWITCHER-002] exposes project resource and deployment switchers", async () => {
-    const [shellSource, projectPageSource, resourcePageSource, deploymentPageSource] =
+    const [shellSource, utilsSource, projectPageSource, resourcePageSource, deploymentPageSource] =
       await Promise.all([
         readFile(new URL("../components/console/ConsoleShell.svelte", import.meta.url), "utf8"),
+        readFile(new URL("./utils.ts", import.meta.url), "utf8"),
         readFile(
           new URL(
             "../../routes/projects/[projectId=consoleObjectId]/+page.svelte",
@@ -88,18 +89,22 @@ describe("console header switcher", () => {
     expect(shellSource.indexOf("data-console-header-switcher-link")).toBeLessThan(
       shellSource.indexOf("data-console-header-switcher-trigger"),
     );
+    expect(utilsSource).toContain("function hrefWithSearchParams");
     expect(projectPageSource).toContain("projectHeaderSwitchItems");
+    expect(projectPageSource).toContain("projectDetailHrefWithActiveSearch(projectItem.id)");
     expect(projectPageSource).toContain(
-      "href: project ? projectDetailHref(project.id) : undefined",
+      "href: project ? projectDetailHrefWithActiveSearch(project.id) : undefined",
     );
     expect(resourcePageSource).toContain("resourceHeaderSwitchItems");
+    expect(resourcePageSource).toContain("resourceDetailHrefWithActiveSearch(resourceItem)");
     expect(resourcePageSource).toContain(
-      "href: resource ? resourceDetailHref(resource) : undefined",
+      "href: resource ? resourceDetailHrefWithActiveSearch(resource) : undefined",
     );
     expect(deploymentPageSource).toContain("deploymentHeaderSwitchItems");
     expect(deploymentPageSource).toContain("createConsoleQueries(browser");
+    expect(deploymentPageSource).toContain("deploymentDetailHrefWithActiveSearch(deploymentItem)");
     expect(deploymentPageSource).toContain(
-      "href: headerDeployment ? deploymentDetailHref(headerDeployment) : undefined",
+      "href: headerDeployment ? deploymentDetailHrefWithActiveSearch(headerDeployment) : undefined",
     );
   });
 });
