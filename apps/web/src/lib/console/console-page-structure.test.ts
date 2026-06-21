@@ -2566,6 +2566,18 @@ describe("console page structure", () => {
     expect(domainBindingDeleteDialogSource).toContain("deleteSafety");
     expect(domainBindingDeleteDialogSource).toContain("deleteCheckFirst");
     expect(domainBindingDeleteDialogSource).toContain("deleteConfirmationDraft");
+    const resourceDomainBindingsSource = sourceBetween(
+      resourceDetailPageSource,
+      'id="resource-domain-bindings"',
+      'id="resource-proxy-configuration"',
+    );
+    expect(resourceDomainBindingsSource).toContain(
+      "openResourceDomainBindingDeleteDialog(binding)",
+    );
+    expect(resourceDomainBindingsSource).toContain("resource-domain-binding-delete-action");
+    expect(resourceDetailPageSource).toContain("data-resource-domain-binding-delete-dialog");
+    expect(resourceDetailPageSource).toContain("orpcClient.domainBindings.deleteCheck");
+    expect(resourceDetailPageSource).toContain("orpcClient.domainBindings.delete");
 
     expect(serversDisplaySurface).toContain("openServerCreateDialog");
     expect(serversDisplaySurface).not.toContain("<ServerCreateForm");

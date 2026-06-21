@@ -1750,7 +1750,7 @@ export const enUS = {
       deleteCheckSafeTitle: "Safe to delete",
       deleteConfirmLabel: "Enter the domain binding id to confirm deletion",
       deleteDialogDescription:
-        "Deletion affects only this domain binding active lifecycle. Generated access, deployment snapshots, and audit remain preserved.",
+        "Deletion affects only this domain binding active lifecycle. Generated access, deployment snapshots, and audit remain preserved. Manual DNS records are not removed automatically; clean up managed records through the DNS connector flow or delete manual records at the DNS provider.",
       deleteDialogTitle: "Delete domain binding",
       deleteErrorTitle: "Unable to delete domain binding",
       dangerZoneDescription:
@@ -1758,7 +1758,7 @@ export const enUS = {
       dangerZoneTitle: "Danger zone",
       deleteSafety: "Delete safety",
       deleteSafetyPreserves:
-        "Generated access, deployment snapshots, and route audit are preserved.",
+        "Generated access, deployment snapshots, and route audit are preserved. This delete operation does not automatically remove DNS records maintained by the user.",
       deleteSuccessTitle: "Domain binding deleted",
       detailDescription:
         "Review one domain binding's identity, resource ownership, routing, DNS, and lifecycle state.",

@@ -56,10 +56,12 @@
     RedeployDeploymentInput,
     CreateDomainBindingInput,
     CreateStorageVolumeInput,
+    DeleteDomainBindingInput,
     DeleteResourceInput,
     DependencyResourceSummary,
     DeploymentPlanResponse,
     DeploymentProgressEvent,
+    DomainBindingDeleteSafety,
     DomainBindingSummary,
     ImportCertificateInput,
     InspectRuntimeUsageResponse,
@@ -1096,6 +1098,10 @@
   let domainBindingCreateDialogOpen = $state(false);
   let domainBindingDialogInitializedForResourceId = $state("");
   let domainBindingDialogOpenedLocally = $state(false);
+  let domainBindingDeleteDialogOpen = $state(false);
+  let domainBindingDeleteCandidateId = $state("");
+  let domainBindingDeleteConfirmation = $state("");
+  let domainBindingDeleteSafety = $state<DomainBindingDeleteSafety | null>(null);
   let serverId = $state("");
   let destinationId = $state("");
   let domainName = $state("");
@@ -1773,6 +1779,9 @@
   const selectedDnsConnectorBinding = $derived(
     resourceDomainBindings.find((binding) => binding.id === dnsConnectorBindingId) ?? null,
   );
+  const selectedDomainBindingDeleteCandidate = $derived(
+    resourceDomainBindings.find((binding) => binding.id === domainBindingDeleteCandidateId) ?? null,
+  );
   const dnsConnectorMatchedZoneName = $derived(
     dnsConnectorReadiness?.zoneMatch.zoneName ?? "",
   );
@@ -1863,6 +1872,48 @@
       createFeedback = {
         kind: "error",
         title: $t(i18nKeys.console.domainBindings.confirmOwnershipErrorTitle),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const checkDomainBindingDeleteSafetyMutation = createMutation(() => ({
+    mutationFn: (input: { domainBindingId: string }) => orpcClient.domainBindings.deleteCheck(input),
+    onSuccess: (deleteSafety) => {
+      domainBindingDeleteSafety = deleteSafety;
+      createFeedback = {
+        kind: deleteSafety.safeToDelete ? "success" : "error",
+        title: deleteSafety.safeToDelete
+          ? $t(i18nKeys.console.domainBindings.deleteCheckSafeTitle)
+          : $t(i18nKeys.console.domainBindings.deleteCheckBlockedTitle),
+        detail: deleteSafety.safeToDelete
+          ? $t(i18nKeys.console.domainBindings.deleteSafetyPreserves)
+          : deleteSafety.blockers.map((blocker) => blocker.message).join(" "),
+      };
+    },
+    onError: (error) => {
+      createFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.domainBindings.deleteCheckErrorTitle),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const deleteDomainBindingMutation = createMutation(() => ({
+    mutationFn: (input: DeleteDomainBindingInput) => orpcClient.domainBindings.delete(input),
+    onSuccess: (_result, variables) => {
+      createFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.domainBindings.deleteSuccessTitle),
+        detail: variables.domainBindingId,
+      };
+      closeResourceDomainBindingDeleteDialog();
+      void queryClient.invalidateQueries({ queryKey: orpc.domainBindings.key({ type: "query" }) });
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
+    },
+    onError: (error) => {
+      createFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.domainBindings.deleteErrorTitle),
         detail: readErrorMessage(error),
       };
     },
@@ -2170,6 +2221,25 @@
     if (modalIsOpen(page, "domain-binding")) {
       void setModalOpen(page, "domain-binding", false);
     }
+  }
+
+  function openResourceDomainBindingDeleteDialog(binding: DomainBindingSummary): void {
+    if (isResourceArchived || binding.status === "deleted") {
+      return;
+    }
+
+    domainBindingDeleteCandidateId = binding.id;
+    domainBindingDeleteConfirmation = "";
+    domainBindingDeleteSafety = null;
+    createFeedback = null;
+    domainBindingDeleteDialogOpen = true;
+  }
+
+  function closeResourceDomainBindingDeleteDialog(): void {
+    domainBindingDeleteDialogOpen = false;
+    domainBindingDeleteCandidateId = "";
+    domainBindingDeleteConfirmation = "";
+    domainBindingDeleteSafety = null;
   }
 
   function openDnsConnectorDialog(binding: DomainBindingSummary): void {
@@ -5654,6 +5724,31 @@
     createFeedback = null;
     confirmDomainBindingOwnershipMutation.mutate({
       domainBindingId: binding.id,
+    });
+  }
+
+  function checkResourceDomainBindingDeleteSafety(binding: DomainBindingSummary): void {
+    if (checkDomainBindingDeleteSafetyMutation.isPending) {
+      return;
+    }
+
+    createFeedback = null;
+    checkDomainBindingDeleteSafetyMutation.mutate({ domainBindingId: binding.id });
+  }
+
+  function deleteResourceDomainBinding(binding: DomainBindingSummary): void {
+    if (
+      deleteDomainBindingMutation.isPending ||
+      !domainBindingDeleteSafety?.safeToDelete ||
+      domainBindingDeleteConfirmation.trim() !== binding.id
+    ) {
+      return;
+    }
+
+    createFeedback = null;
+    deleteDomainBindingMutation.mutate({
+      domainBindingId: binding.id,
+      confirmation: { domainBindingId: domainBindingDeleteConfirmation.trim() },
     });
   }
 
@@ -9343,6 +9438,17 @@
                                     <Globe2 class="size-4" />
                                     {$t(i18nKeys.console.domainBindings.dnsConnectorConfigure)}
                                   </Button>
+                                  <Button
+                                    id={`resource-domain-binding-delete-action-${binding.id}`}
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={isResourceArchived || binding.status === "deleted"}
+                                    onclick={() => openResourceDomainBindingDeleteDialog(binding)}
+                                  >
+                                    <Trash2 class="size-4" />
+                                    {$t(i18nKeys.console.domainBindings.deleteBinding)}
+                                  </Button>
                                 </div>
                               </div>
 
@@ -11693,6 +11799,109 @@
               </Button>
             </Dialog.Footer>
           </form>
+        </Dialog.Content>
+      </Dialog.Root>
+
+      <Dialog.Root
+        bind:open={domainBindingDeleteDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeResourceDomainBindingDeleteDialog();
+          }
+        }}
+      >
+        <Dialog.Content
+          closeLabel={$t(i18nKeys.common.actions.close)}
+          data-resource-domain-binding-delete-dialog
+          class="sm:max-w-lg"
+        >
+          <Dialog.Header>
+            <Dialog.Title>{$t(i18nKeys.console.domainBindings.deleteDialogTitle)}</Dialog.Title>
+            <Dialog.Description>
+              {$t(i18nKeys.console.domainBindings.deleteDialogDescription)}
+            </Dialog.Description>
+          </Dialog.Header>
+
+          {#if selectedDomainBindingDeleteCandidate}
+            <div class="space-y-4 px-5 pb-5">
+              <div class="rounded-md border bg-muted/20 px-3 py-2 text-sm">
+                <p class="break-all font-medium">{domainBindingHref(selectedDomainBindingDeleteCandidate)}</p>
+                <p class="mt-1 font-mono text-xs text-muted-foreground">
+                  {selectedDomainBindingDeleteCandidate.id}
+                </p>
+              </div>
+
+              <div class="rounded-md border bg-muted/15 px-3 py-2 text-sm">
+                <p class="font-medium">{$t(i18nKeys.console.domainBindings.deleteSafety)}</p>
+                <p class="mt-1 text-xs text-muted-foreground">
+                  {#if domainBindingDeleteSafety}
+                    {domainBindingDeleteSafety.safeToDelete
+                      ? $t(i18nKeys.console.domainBindings.deleteCheckSafeTitle)
+                      : $t(i18nKeys.console.domainBindings.deleteCheckBlockedTitle)}
+                  {:else}
+                    {$t(i18nKeys.console.domainBindings.deleteCheckFirst)}
+                  {/if}
+                </p>
+                {#if domainBindingDeleteSafety?.blockers.length}
+                  <ul class="mt-2 list-disc space-y-1 pl-4 text-xs text-destructive">
+                    {#each domainBindingDeleteSafety.blockers as blocker}
+                      <li>{blocker.message}</li>
+                    {/each}
+                  </ul>
+                {/if}
+                {#if domainBindingDeleteSafety?.warnings.length}
+                  <ul class="mt-2 list-disc space-y-1 pl-4 text-xs text-muted-foreground">
+                    {#each domainBindingDeleteSafety.warnings as warning}
+                      <li>{warning.message}</li>
+                    {/each}
+                  </ul>
+                {/if}
+              </div>
+
+              <label class="grid gap-2 text-sm" for="resource-domain-binding-delete-confirmation">
+                <span class="font-medium">{$t(i18nKeys.console.domainBindings.deleteConfirmLabel)}</span>
+                <Input
+                  id="resource-domain-binding-delete-confirmation"
+                  bind:value={domainBindingDeleteConfirmation}
+                  autocomplete="off"
+                  placeholder={selectedDomainBindingDeleteCandidate.id}
+                />
+              </label>
+            </div>
+          {/if}
+
+          <Dialog.Footer>
+            <Button type="button" variant="ghost" onclick={closeResourceDomainBindingDeleteDialog}>
+              {$t(i18nKeys.common.actions.cancel)}
+            </Button>
+            {#if selectedDomainBindingDeleteCandidate}
+              <Button
+                id="resource-domain-binding-delete-check"
+                type="button"
+                variant="outline"
+                disabled={checkDomainBindingDeleteSafetyMutation.isPending}
+                onclick={() => checkResourceDomainBindingDeleteSafety(selectedDomainBindingDeleteCandidate)}
+              >
+                <ShieldCheck class="size-4" />
+                {$t(i18nKeys.console.domainBindings.deleteCheck)}
+              </Button>
+              <Button
+                id="resource-domain-binding-delete-confirm"
+                type="button"
+                variant="destructive"
+                disabled={
+                  deleteDomainBindingMutation.isPending ||
+                  checkDomainBindingDeleteSafetyMutation.isPending ||
+                  !domainBindingDeleteSafety?.safeToDelete ||
+                  domainBindingDeleteConfirmation.trim() !== selectedDomainBindingDeleteCandidate.id
+                }
+                onclick={() => deleteResourceDomainBinding(selectedDomainBindingDeleteCandidate)}
+              >
+                <Trash2 class="size-4" />
+                {$t(i18nKeys.console.domainBindings.deleteBinding)}
+              </Button>
+            {/if}
+          </Dialog.Footer>
         </Dialog.Content>
       </Dialog.Root>
 
