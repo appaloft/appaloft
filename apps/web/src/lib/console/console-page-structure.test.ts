@@ -2198,6 +2198,8 @@ describe("console page structure", () => {
     expect(domainBindingsPageSource).not.toContain("deleteConfirmationDrafts");
     expect(domainBindingsListSource).toContain("selectDomainBinding(binding)");
     expect(domainBindingsListSource).toContain("data-domain-binding-row");
+    expect(domainBindingsListSource).toContain("data-domain-binding-pending-dns-notice");
+    expect(domainBindingsListSource).toContain("DomainBindingVerifyDnsButton");
     expect(domainBindingsListSource).not.toContain("openDomainBindingVerificationDialog(binding)");
     expect(domainBindingsListSource).not.toContain("openDomainBindingRouteDialog(binding)");
     expect(domainBindingsListSource).not.toContain("openDomainBindingDeleteDialog(binding)");
@@ -3496,7 +3498,7 @@ describe("console page structure", () => {
     );
     const projectConsoleQueriesSource = sourceBetween(
       projectDetailPageSource,
-      "const { projectsQuery, serversQuery, environmentsQuery, resourcesQuery, deploymentsQuery }",
+      "const {\n    projectsQuery",
       "const projectId = $derived",
     );
     const projectPreviewEnvironmentsQuerySource = sourceBetween(
@@ -3542,9 +3544,12 @@ describe("console page structure", () => {
     expect(projectConsoleQueriesSource).toContain("serversQuery");
     expect(projectConsoleQueriesSource).not.toContain("servers: false");
     expect(projectConsoleQueriesSource).toContain("previewEnvironments: false");
-    expect(projectConsoleQueriesSource).toContain("domainBindings: false");
+    expect(projectConsoleQueriesSource).toContain("domainBindingsQuery");
+    expect(projectConsoleQueriesSource).not.toContain("domainBindings: false");
     expect(projectConsoleQueriesSource).toContain("certificates: false");
     expect(projectConsoleQueriesSource).toContain("providers: false");
+    expect(projectDetailPageSource).toContain("projectDomainBindings");
+    expect(projectDetailPageSource).toContain("onDomainBindingVerificationFeedback");
     expect(projectPreviewEnvironmentsQuerySource).toContain('activeProjectTab === "previews"');
     expect(projectPreviewResourcesQuerySource).toContain('activeProjectTab === "previews"');
     expect(environmentsTabSource).toContain("openEnvironmentLifecycleDialog(environment)");

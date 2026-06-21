@@ -1696,6 +1696,13 @@ export const zhCN = {
       showErrorTitle: "无法读取域名绑定",
       showSuccessTitle: "已读取域名绑定",
       verificationAttempts: "{{count}} 次验证尝试",
+      verifyDnsAction: "验证 DNS 并继续激活",
+      verifyDnsShortAction: "验证 DNS",
+      pendingDnsActionDescription: "手动添加 DNS 记录后，验证 DNS 以继续激活路由和 TLS。",
+      pendingDnsNoticeTitle: "DNS 验证等待中",
+      pendingDnsNoticeBody:
+        "请先在 DNS 提供商里添加记录，生效后点击验证，Appaloft 会继续激活路由和 TLS。",
+      pendingDnsProjectSummary: "{{count}} 个域名绑定需要 DNS 验证。",
     },
     runtimeUsage: {
       artifacts: "产物",
