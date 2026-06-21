@@ -1639,6 +1639,9 @@ export const enUS = {
       previewResourcesDescription:
         "Resources whose environment kind is preview. These include previews without a source-driven preview record.",
       previewResourcesTitle: "Preview resources",
+      previewPolicyAction: "Open preview policy",
+      previewPolicyDescription: "Manage the default product-grade preview rules for this project.",
+      previewPolicyTitle: "Preview policy",
       previewTitle: "Preview",
       previewsTitle: "Previews",
       allEnvironments: "All environments",
@@ -2579,6 +2582,7 @@ export const enUS = {
       runtimeStrategyWorkspaceCommands: "Workspace commands",
       serviceTopologyDescription: "Declared service boundaries inside this resource.",
       serviceTopologyTitle: "Service topology",
+      previewPolicyAction: "Preview policy",
       settingsDescription:
         "Identity, placement, lifecycle, and links to the resource areas that own detailed changes.",
       settingsHandoffsDescription:

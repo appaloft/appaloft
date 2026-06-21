@@ -1,5 +1,6 @@
 <script lang="ts">
   import { browser } from "$app/environment";
+  import { page } from "$app/state";
   import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
   import { Settings2, ShieldCheck } from "@lucide/svelte";
   import type { PreviewPolicyScope, PreviewPolicySettings } from "@appaloft/contracts";
@@ -56,6 +57,7 @@
   let scopeDialogOpen = $state(false);
   let policyEditDialogOpen = $state(false);
   let feedback = $state<Feedback | null>(null);
+  let initialScopeApplied = $state(false);
 
   const projects = $derived(projectsQuery.data?.items ?? []);
   const resources = $derived(resourcesQuery.data?.items ?? []);
@@ -135,6 +137,18 @@
       };
     },
   }));
+
+  $effect(() => {
+    if (!browser || initialScopeApplied) {
+      return;
+    }
+
+    const searchParams = page.url.searchParams;
+    selectedScopeKind = searchParams.get("scope") === "resource" ? "resource" : "project";
+    selectedProjectId = searchParams.get("projectId") ?? "";
+    selectedResourceId = searchParams.get("resourceId") ?? "";
+    initialScopeApplied = true;
+  });
 
   $effect(() => {
     if (selectedProjectId || projects.length === 0) {

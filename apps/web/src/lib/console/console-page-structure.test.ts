@@ -957,6 +957,20 @@ describe("console page structure", () => {
     }
   });
 
+  test("[CONSOLE-NAV-IA-002] keeps preview policies contextual instead of workspace primary navigation", () => {
+    expect(consoleShellSource).not.toContain('href: "/preview-policies"');
+    expect(consoleShellSource).not.toContain("i18nKeys.console.nav.previewPolicies");
+    expect(projectDetailPageSource).toContain("function projectPreviewPolicyHref()");
+    expect(projectDetailPageSource).toContain("data-project-preview-policy-link");
+    expect(projectDetailPageSource).toContain('scope: "project"');
+    expect(resourceDetailPageSource).toContain("function resourcePreviewPolicyHref()");
+    expect(resourceDetailPageSource).toContain("data-resource-preview-policy-link");
+    expect(resourceDetailPageSource).toContain('scope: "resource"');
+    expect(previewPoliciesPageSource).toContain("const searchParams = page.url.searchParams");
+    expect(previewPoliciesPageSource).toContain('searchParams.get("projectId")');
+    expect(previewPoliciesPageSource).toContain('searchParams.get("resourceId")');
+  });
+
   test("[PROJECT-NAV-IA-001] uses the plural Previews tab contract for project previews", () => {
     const projectDetailTabModelSource = sourceBetween(
       projectDetailPageSource,

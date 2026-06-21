@@ -1495,6 +1495,9 @@ export const zhCN = {
       previewResourcesDescription:
         "环境类型为 preview 的资源。这里也会包含没有来源预览记录的 preview 资源。",
       previewResourcesTitle: "Preview 资源",
+      previewPolicyAction: "打开预览策略",
+      previewPolicyDescription: "管理这个项目默认使用的产品级预览规则。",
+      previewPolicyTitle: "预览策略",
       previewTitle: "Preview",
       previewsTitle: "Previews",
       allEnvironments: "全部环境",
@@ -2363,6 +2366,7 @@ export const zhCN = {
       runtimeStrategyWorkspaceCommands: "工作区命令",
       serviceTopologyDescription: "资源内声明的服务边界。",
       serviceTopologyTitle: "服务拓扑",
+      previewPolicyAction: "预览策略",
       settingsDescription: "资源身份、归属、生命周期，以及进入详细配置区域的入口。",
       settingsHandoffsDescription: "需要修改具体配置时，进入对应区域；设置概览不直接展示长表单。",
       settingsHandoffsTitle: "相关区域",
