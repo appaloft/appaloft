@@ -178,9 +178,17 @@
     redirectUrlField?: string;
   };
 
+  type ConsolePageDateTimeValue = {
+    kind: "datetime";
+    value: string;
+    format?: "short" | "date-time";
+  };
+
+  type ConsolePageDisplayValue = string | number | ConsolePageDateTimeValue;
+
   type ConsolePageKeyValue = {
     label: string;
-    value: string;
+    value: ConsolePageDisplayValue;
     tone?: ConsolePageTone;
     calculation?: ConsolePageRowCalculation;
   };
@@ -250,7 +258,7 @@
   };
 
   type ConsolePageTableCell = {
-    text: string;
+    text: ConsolePageDisplayValue;
     tone?: ConsolePageTone;
   };
 
@@ -261,7 +269,7 @@
     rows: ConsolePageKeyValue[];
   };
 
-  type ConsolePageTableCellValue = string | number | ConsolePageTableCell;
+  type ConsolePageTableCellValue = ConsolePageDisplayValue | ConsolePageTableCell;
   type ConsolePageTableRow = {
     details?: ConsolePageTableDetails;
     [key: string]: ConsolePageTableCellValue | ConsolePageTableDetails | undefined;
@@ -400,8 +408,45 @@
     if (value && typeof value === "object" && "text" in value) {
       return value;
     }
+    if (value && typeof value === "object" && "kind" in value && value.kind === "datetime") {
+      return { text: value };
+    }
 
     return { text: String(value ?? "") };
+  }
+
+  function formatConsoleDateTime(value: ConsolePageDateTimeValue): string {
+    const date = new Date(value.value);
+    if (!Number.isFinite(date.getTime())) {
+      return value.value;
+    }
+
+    const options: Intl.DateTimeFormatOptions =
+      value.format === "date-time"
+        ? {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          }
+        : {
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          };
+
+    return new Intl.DateTimeFormat($locale || undefined, options).format(date);
+  }
+
+  function displayValueText(value: ConsolePageDisplayValue): string {
+    if (value && typeof value === "object" && value.kind === "datetime") {
+      return formatConsoleDateTime(value);
+    }
+
+    return String(value);
   }
 
   function openTableDetails(details: ConsolePageTableDetails | undefined): void {
@@ -560,24 +605,24 @@
 
   function panelRowValue(item: ConsolePagePanelItem, row: ConsolePageKeyValue): string {
     const calculation = row.calculation;
-    if (!calculation) return row.value;
+    if (!calculation) return displayValueText(row.value);
     if (calculation.kind === "field-money") {
       const fieldValue = panelFieldValueByName(item, calculation.field);
       return fieldValue === null
-        ? row.value
+        ? displayValueText(row.value)
         : formatConsoleMoney(fieldValue, calculation.currency, fieldValue % 100 === 0 ? 0 : 2);
     }
     if (calculation.kind === "tiered-multiple") {
       const calculated = calculatedTieredValue(item, calculation);
-      return calculated ? String(calculated.units) : row.value;
+      return calculated ? String(calculated.units) : displayValueText(row.value);
     }
     if (calculation.kind === "tiered-unit-rate") {
       const calculated = calculatedTieredValue(item, calculation);
       return calculated
         ? `${formatConsoleUnitRate(calculated.fieldValue, calculated.units, calculation.currency)}${calculation.suffix ?? ""}`
-        : row.value;
+        : displayValueText(row.value);
     }
-    return row.value;
+    return displayValueText(row.value);
   }
 
   function requestActionBody(
@@ -1239,9 +1284,9 @@
                                 "block truncate font-medium",
                                 toneClass(cell.tone),
                               ]}
-                              title={cell.text}
+                              title={displayValueText(cell.text)}
                             >
-                              {cell.text}
+                              {displayValueText(cell.text)}
                             </span>
                           </td>
                         {/each}
@@ -1365,7 +1410,9 @@
             {#each selectedIntegrationDetails.rows as row (row.label)}
               <div class="grid gap-1 px-4 py-3 text-sm sm:grid-cols-[12rem_1fr] sm:gap-4">
                 <dt class="text-muted-foreground">{row.label}</dt>
-                <dd class={["break-words font-medium", toneClass(row.tone)]}>{row.value}</dd>
+                <dd class={["break-words font-medium", toneClass(row.tone)]}>
+                  {displayValueText(row.value)}
+                </dd>
               </div>
             {/each}
           </dl>
@@ -1404,7 +1451,9 @@
         {#each selectedTableDetails.rows as row (row.label)}
           <div class="grid gap-1 px-4 py-3 text-sm sm:grid-cols-[12rem_1fr] sm:gap-4">
             <dt class="text-muted-foreground">{row.label}</dt>
-            <dd class={["break-words font-medium", toneClass(row.tone)]}>{row.value}</dd>
+            <dd class={["break-words font-medium", toneClass(row.tone)]}>
+              {displayValueText(row.value)}
+            </dd>
           </div>
         {/each}
       </dl>
