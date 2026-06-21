@@ -1305,6 +1305,23 @@ describe("console page structure", () => {
     expect(healthPopoverSource).toContain("issue.action");
   });
 
+  test("[RESOURCE-INITIAL-CREDENTIALS-IA-001] keeps initial credentials on the resource overview", () => {
+    const overviewSource = sourceBetween(
+      resourceDetailPageSource,
+      'id="resource-overview"',
+      "{$t(i18nKeys.console.resources.overviewLatestDeployment)}",
+    );
+
+    expect(overviewSource).toContain("data-resource-initial-access-credentials");
+    expect(overviewSource).toContain("data-resource-initial-access-credential");
+    expect(resourceDetailPageSource).toContain(
+      "/api/resources/${encodeURIComponent(resourceId)}/initial-access-credentials",
+    );
+    expect(resourceDetailPageSource).toContain("initialAccessCredentialsTitle");
+    expect(resourceDetailPageSource).toContain("claimInitialAccessCredential");
+    expect(resourceDetailPageSource).not.toContain("/cloud/installed-applications/");
+  });
+
   test("[RESOURCE-NETWORKING-IA-001] owns domain binding creation from a focused dialog", () => {
     const resourceDomainBindingsSectionSource =
       resourceDetailPageSource.match(
