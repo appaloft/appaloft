@@ -1243,6 +1243,11 @@
   let diagnosticSummaryCopyResetTimeout: ReturnType<typeof setTimeout> | undefined;
   let accessUrlCopyState = $state<"idle" | "copied" | "failed">("idle");
   let accessUrlCopyResetTimeout: ReturnType<typeof setTimeout> | undefined;
+  let resourceConfigCopyState = $state<{
+    key: string;
+    state: "copied" | "failed";
+  } | null>(null);
+  let resourceConfigCopyResetTimeout: ReturnType<typeof setTimeout> | undefined;
   let manualDnsCopyState = $state<{
     key: string;
     state: "copied" | "failed";
@@ -3360,6 +3365,25 @@
     }, 1800);
   }
 
+  function resourceConfigCopyKey(
+    entry: ResourceConfigEntry,
+    tableKind: "owned" | "effective",
+  ): string {
+    return `${tableKind}:${entry.scope}:${entry.key}:${entry.exposure}:${entry.kind}`;
+  }
+
+  function markResourceConfigCopyState(key: string, state: "copied" | "failed"): void {
+    if (resourceConfigCopyResetTimeout) {
+      clearTimeout(resourceConfigCopyResetTimeout);
+    }
+
+    resourceConfigCopyState = { key, state };
+    resourceConfigCopyResetTimeout = setTimeout(() => {
+      resourceConfigCopyState = null;
+      resourceConfigCopyResetTimeout = undefined;
+    }, 1800);
+  }
+
   function markManualDnsCopyState(key: string, state: "copied" | "failed"): void {
     if (manualDnsCopyResetTimeout) {
       clearTimeout(manualDnsCopyResetTimeout);
@@ -3483,6 +3507,38 @@
     return field === "name"
       ? $t(i18nKeys.console.domainBindings.dnsConnectorCopyDomain)
       : $t(i18nKeys.console.domainBindings.dnsConnectorCopyTarget);
+  }
+
+  function resourceConfigCopyLabel(
+    entry: ResourceConfigEntry,
+    tableKind: "owned" | "effective",
+  ): string {
+    const key = resourceConfigCopyKey(entry, tableKind);
+    if (resourceConfigCopyState?.key === key) {
+      if (resourceConfigCopyState.state === "copied") {
+        return $t(i18nKeys.console.resources.configurationValueCopied);
+      }
+      return $t(i18nKeys.console.resources.configurationValueCopyFailed);
+    }
+
+    return $t(i18nKeys.console.resources.configurationCopyValue);
+  }
+
+  async function copyResourceConfigValue(
+    entry: ResourceConfigEntry,
+    tableKind: "owned" | "effective",
+  ): Promise<void> {
+    if (!browser || entry.isSecret) {
+      return;
+    }
+
+    const key = resourceConfigCopyKey(entry, tableKind);
+    try {
+      await copyTextToClipboard(entry.value);
+      markResourceConfigCopyState(key, "copied");
+    } catch {
+      markResourceConfigCopyState(key, "failed");
+    }
   }
 
   async function copyManualDnsRecord(
@@ -4176,6 +4232,9 @@
     }
     if (accessUrlCopyResetTimeout) {
       clearTimeout(accessUrlCopyResetTimeout);
+    }
+    if (resourceConfigCopyResetTimeout) {
+      clearTimeout(resourceConfigCopyResetTimeout);
     }
     if (manualDnsCopyResetTimeout) {
       clearTimeout(manualDnsCopyResetTimeout);
@@ -6344,6 +6403,83 @@
       </div>
     </nav>
   </aside>
+{/snippet}
+
+{#snippet resourceConfigTable(entries: ResourceConfigEntry[], tableId: string, tableKind: "owned" | "effective")}
+  <div class="mt-4 overflow-hidden rounded-md border">
+    <div class="overflow-x-auto">
+      <table id={tableId} class="w-full min-w-[760px] text-left text-sm">
+        <thead class="bg-muted/35 text-xs text-muted-foreground">
+          <tr>
+            <th class="px-3 py-2 font-medium">
+              {$t(i18nKeys.console.resources.configurationColumnKey)}
+            </th>
+            <th class="px-3 py-2 font-medium">
+              {$t(i18nKeys.console.resources.configurationColumnValue)}
+            </th>
+            <th class="px-3 py-2 font-medium">
+              {$t(i18nKeys.console.resources.configurationColumnScope)}
+            </th>
+            <th class="px-3 py-2 font-medium">
+              {$t(i18nKeys.console.resources.configurationColumnExposure)}
+            </th>
+            <th class="px-3 py-2 font-medium">
+              {$t(i18nKeys.console.resources.configurationColumnKind)}
+            </th>
+          </tr>
+        </thead>
+        <tbody class="divide-y bg-background">
+          {#each entries as entry (`${tableKind}-${entry.scope}-${entry.key}-${entry.exposure}-${entry.kind}`)}
+            <tr>
+              <td class="min-w-0 px-3 py-2.5 align-middle">
+                <span class="block truncate font-medium">{entry.key}</span>
+              </td>
+              <td class="min-w-0 px-3 py-2.5 align-middle">
+                <div class="flex min-w-0 items-center gap-2">
+                  <span class="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">
+                    {entry.isSecret ? "****" : entry.value}
+                  </span>
+                  {#if !entry.isSecret}
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      class="h-7 w-7 shrink-0"
+                      aria-label={`${resourceConfigCopyLabel(entry, tableKind)}: ${entry.key}`}
+                      title={resourceConfigCopyLabel(entry, tableKind)}
+                      data-resource-config-copy-button={entry.key}
+                      onclick={() => void copyResourceConfigValue(entry, tableKind)}
+                    >
+                      {#if resourceConfigCopyState?.key === resourceConfigCopyKey(entry, tableKind) && resourceConfigCopyState.state === "copied"}
+                        <Check class="size-3.5" />
+                      {:else}
+                        <Copy class="size-3.5" />
+                      {/if}
+                    </Button>
+                  {/if}
+                </div>
+              </td>
+              <td class="px-3 py-2.5 align-middle">
+                <Badge class="w-fit" variant={configScopeBadgeVariant(entry.scope)}>
+                  {entry.scope}
+                </Badge>
+              </td>
+              <td class="px-3 py-2.5 align-middle">
+                <Badge class="w-fit" variant="outline">
+                  {configExposureLabel(entry.exposure)}
+                </Badge>
+              </td>
+              <td class="px-3 py-2.5 align-middle">
+                <Badge class="w-fit" variant={entry.isSecret ? "secondary" : "outline"}>
+                  {entry.kind}
+                </Badge>
+              </td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    </div>
+  </div>
 {/snippet}
 
 {#snippet resourceRuntimeControlPanel()}
@@ -8559,27 +8695,7 @@
                             {$t(i18nKeys.console.resources.configurationOwnedEmpty)}
                           </div>
                         {:else}
-                          <div class="mt-4 divide-y rounded-md border">
-                            {#each resourceEffectiveConfig.ownedEntries as entry (`${entry.key}-${entry.exposure}`)}
-                              <div class="grid gap-2 px-3 py-3 text-sm md:grid-cols-[minmax(0,1fr)_8rem_8rem_8rem]">
-                                <div class="min-w-0">
-                                  <p class="truncate font-medium">{entry.key}</p>
-                                  <p class="mt-1 truncate font-mono text-xs text-muted-foreground">
-                                    {entry.isSecret ? "****" : entry.value}
-                                  </p>
-                                </div>
-                                <Badge class="w-fit" variant={configScopeBadgeVariant(entry.scope)}>
-                                  {entry.scope}
-                                </Badge>
-                                <Badge class="w-fit" variant="outline">
-                                  {configExposureLabel(entry.exposure)}
-                                </Badge>
-                                <Badge class="w-fit" variant={entry.isSecret ? "secondary" : "outline"}>
-                                  {entry.kind}
-                                </Badge>
-                              </div>
-                            {/each}
-                          </div>
+                          {@render resourceConfigTable(resourceEffectiveConfig.ownedEntries, "resource-owned-configuration-table", "owned")}
                         {/if}
                       </section>
 
@@ -8661,27 +8777,11 @@
                             {$t(i18nKeys.console.resources.configurationEffectiveEmpty)}
                           </div>
                         {:else}
-                          <div class="mt-4 divide-y rounded-md border">
-                            {#each resourceEffectiveConfig.effectiveEntries.slice(0, 12) as entry (`${entry.scope}-${entry.key}-${entry.exposure}`)}
-                              <div class="grid gap-2 px-3 py-3 text-sm md:grid-cols-[minmax(0,1fr)_8rem_8rem_8rem]">
-                                <div class="min-w-0">
-                                  <p class="truncate font-medium">{entry.key}</p>
-                                  <p class="mt-1 truncate font-mono text-xs text-muted-foreground">
-                                    {entry.isSecret ? "****" : entry.value}
-                                  </p>
-                                </div>
-                                <Badge class="w-fit" variant={configScopeBadgeVariant(entry.scope)}>
-                                  {entry.scope}
-                                </Badge>
-                                <Badge class="w-fit" variant="outline">
-                                  {configExposureLabel(entry.exposure)}
-                                </Badge>
-                                <Badge class="w-fit" variant={entry.isSecret ? "secondary" : "outline"}>
-                                  {entry.kind}
-                                </Badge>
-                              </div>
-                            {/each}
-                          </div>
+                          {@render resourceConfigTable(
+                            resourceEffectiveConfig.effectiveEntries.slice(0, 12),
+                            "resource-effective-configuration-table",
+                            "effective",
+                          )}
                         {/if}
                       </section>
                     {/if}
