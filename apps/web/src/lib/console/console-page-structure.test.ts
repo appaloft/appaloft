@@ -1666,14 +1666,17 @@ describe("console page structure", () => {
 
   test("[DEPLOYMENTS-FEED-IA-001] keeps the global deployment feed read-only", () => {
     expect(deploymentsPageSource).toContain("DeploymentTable");
-    expect(deploymentsPageSource).toContain("filtersTitle");
     expect(deploymentsPageSource).toContain("selectedOwnerHref");
     expect(deploymentsPageSource).toContain("data-deployments-feed-display-surface");
+    expect(deploymentsPageSource).not.toContain("filtersDescription");
+    expect(deploymentsPageSource).not.toContain("console-panel p-4");
     expect(deploymentTableSource).toContain("data-deployment-record-list");
     expect(deploymentTableSource).toContain("data-deployment-record-row");
     expect(deploymentTableSource).toContain("data-deployment-owner-summary");
-    expect(deploymentTableSource).not.toContain('from "$lib/components/ui/table"');
-    expect(deploymentTableSource).not.toContain("<Table.Root");
+    expect(deploymentTableSource).toContain('from "$lib/components/ui/table"');
+    expect(deploymentTableSource).toContain("data-deployment-table-display-surface");
+    expect(deploymentTableSource).toContain("<Table.Root");
+    expect(deploymentTableSource).toContain("<Table.Head");
     expect(deploymentsPageSource).toContain('import * as Select from "$lib/components/ui/select"');
     expect(deploymentsPageSource).toContain("<Select.Root bind:value={projectFilter}");
     expect(deploymentsPageSource).toContain("<Select.Root bind:value={environmentFilter}");
@@ -3589,7 +3592,7 @@ describe("console page structure", () => {
     const projectSettingsSource = sourceBetween(
       projectDetailPageSource,
       'value="settings"',
-      "<Dialog.Root bind:open={quickDeployDialogOpen}",
+      "</Tabs.Root>",
     );
     const environmentsTabSource = sourceBetween(
       projectDetailPageSource,
