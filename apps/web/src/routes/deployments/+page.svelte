@@ -1,7 +1,7 @@
 <script lang="ts">
   import { browser } from "$app/environment";
   import { page } from "$app/state";
-  import { ArrowRight, FolderOpen } from "@lucide/svelte";
+  import { ArrowRight, ChevronLeft, ChevronRight, FolderOpen } from "@lucide/svelte";
   import type { DeploymentSummary } from "@appaloft/contracts";
 
   import ConsoleEmptyState from "$lib/components/console/ConsoleEmptyState.svelte";
@@ -26,6 +26,7 @@
   const { projectsQuery, environmentsQuery, resourcesQuery, deploymentsQuery } =
     createConsoleQueries(browser);
 
+  const deploymentPageSize = 12;
   const projects = $derived(projectsQuery.data?.items ?? []);
   const environments = $derived(environmentsQuery.data?.items ?? []);
   const resources = $derived(resourcesQuery.data?.items ?? []);
@@ -44,6 +45,8 @@
   let environmentFilter = $state("all");
   let resourceFilter = $state("all");
   let statusFilter = $state("all");
+  let deploymentOffset = $state(0);
+  let deploymentFilterSignature = $state("");
 
   const inFlightDeploymentStatuses = new Set<DeploymentSummary["status"]>([
     "created",
@@ -92,6 +95,16 @@
   const visibleSucceededDeployments = $derived(
     visibleDeployments.filter((deployment) => deployment.status === "succeeded"),
   );
+  const deploymentTotal = $derived(visibleDeployments.length);
+  const deploymentPageStart = $derived(deploymentTotal === 0 ? 0 : deploymentOffset + 1);
+  const deploymentPageEnd = $derived(
+    Math.min(deploymentOffset + deploymentPageSize, deploymentTotal),
+  );
+  const paginatedDeployments = $derived(
+    visibleDeployments.slice(deploymentOffset, deploymentOffset + deploymentPageSize),
+  );
+  const canGoPrevious = $derived(deploymentOffset > 0);
+  const canGoNext = $derived(deploymentOffset + deploymentPageSize < deploymentTotal);
   const selectedEnvironment = $derived(
     environmentFilter === "all" ? null : findEnvironment(environments, environmentFilter),
   );
@@ -135,6 +148,20 @@
   });
 
   $effect(() => {
+    const nextSignature = [projectFilter, environmentFilter, resourceFilter, statusFilter].join("|");
+    if (nextSignature !== deploymentFilterSignature) {
+      deploymentOffset = 0;
+      deploymentFilterSignature = nextSignature;
+    }
+  });
+
+  $effect(() => {
+    if (deploymentOffset >= deploymentTotal && deploymentTotal > 0) {
+      deploymentOffset = Math.max(0, Math.floor((deploymentTotal - 1) / deploymentPageSize) * deploymentPageSize);
+    }
+  });
+
+  $effect(() => {
     if (
       environmentFilter !== "all" &&
       !filteredEnvironments.some((environment) => environment.id === environmentFilter)
@@ -152,6 +179,14 @@
 
   function statusLabel(status: string): string {
     return status;
+  }
+
+  function setDeploymentPage(offset: number): void {
+    const maxOffset =
+      deploymentTotal === 0
+        ? 0
+        : Math.floor((deploymentTotal - 1) / deploymentPageSize) * deploymentPageSize;
+    deploymentOffset = Math.min(Math.max(offset, 0), maxOffset);
   }
 </script>
 
@@ -355,9 +390,45 @@
               {$t(i18nKeys.console.deployments.listDescription)}
             </p>
           </div>
+          {#if visibleDeployments.length > 0}
+            <div
+              class="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
+              data-deployment-pagination
+            >
+              <span>
+                {$t(i18nKeys.console.deployments.listRange, {
+                  start: deploymentPageStart,
+                  end: deploymentPageEnd,
+                  total: deploymentTotal,
+                })}
+              </span>
+              <div class="flex items-center gap-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  aria-label={$t(i18nKeys.common.actions.previous)}
+                  disabled={!canGoPrevious}
+                  onclick={() => setDeploymentPage(deploymentOffset - deploymentPageSize)}
+                >
+                  <ChevronLeft class="size-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  aria-label={$t(i18nKeys.common.actions.next)}
+                  disabled={!canGoNext}
+                  onclick={() => setDeploymentPage(deploymentOffset + deploymentPageSize)}
+                >
+                  <ChevronRight class="size-4" />
+                </Button>
+              </div>
+            </div>
+          {/if}
         </div>
         {#if visibleDeployments.length > 0}
-          <DeploymentTable deployments={visibleDeployments} {projects} {environments} {resources} />
+          <DeploymentTable deployments={paginatedDeployments} {projects} {environments} {resources} />
         {:else}
           <div class="console-subtle-panel px-4 py-6 text-sm text-muted-foreground">
             {$t(i18nKeys.console.deployments.noFilteredDeployments)}

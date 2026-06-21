@@ -701,6 +701,7 @@ export const enUS = {
       installCommand: "Install command",
       listDescription:
         "Show source, status, project, and environment by time. Open details for the runtime plan.",
+      listRange: "{{start}}-{{end}} of {{total}}",
       listTitle: "Deployment list",
       metadataTitle: "Metadata",
       needsAttention: "Needs attention",
