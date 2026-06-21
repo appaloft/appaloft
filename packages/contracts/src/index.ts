@@ -434,12 +434,40 @@ export const pluginSummarySchema = z.object({
   configuration: systemConfigurationSummarySchema.optional(),
 });
 
+export const systemPluginWebExtensionIconSchema = z.enum([
+  "activity",
+  "archive",
+  "building",
+  "clipboard-list",
+  "database",
+  "file-text",
+  "git-pull-request",
+  "globe",
+  "key",
+  "package",
+  "plug",
+  "puzzle",
+  "server",
+  "shield",
+  "terminal",
+  "wallet",
+]);
+
+export const systemPluginWebExtensionLocalizationSchema = z.object({
+  title: z.string().min(1).optional(),
+  description: z.string().min(1).optional(),
+});
+
 export const systemPluginWebExtensionSchema = z.object({
   key: z.string(),
   pluginName: z.string(),
   pluginDisplayName: z.string(),
   title: z.string(),
+  localizations: z
+    .partialRecord(z.enum(["zh-CN", "en-US"]), systemPluginWebExtensionLocalizationSchema)
+    .optional(),
   description: z.string().optional(),
+  icon: systemPluginWebExtensionIconSchema.optional(),
   path: z.string(),
   placement: z.enum([
     "auth",
@@ -6976,6 +7004,10 @@ export type ConnectorCapabilityPlanPreview = z.infer<typeof connectorCapabilityP
 export type AcceptedConnectorCapabilityPlan = z.infer<typeof acceptedConnectorCapabilityPlanSchema>;
 export type ConnectorCapabilityApplyResult = z.infer<typeof connectorCapabilityApplyResultSchema>;
 export type PluginSummary = z.infer<typeof pluginSummarySchema>;
+export type SystemPluginWebExtensionIcon = z.infer<typeof systemPluginWebExtensionIconSchema>;
+export type SystemPluginWebExtensionLocalization = z.infer<
+  typeof systemPluginWebExtensionLocalizationSchema
+>;
 export type SystemPluginWebExtension = z.infer<typeof systemPluginWebExtensionSchema>;
 export type MaintenanceWorkerActivation = z.infer<typeof maintenanceWorkerActivationSchema>;
 export type MaintenanceWorkerSafetyMode = z.infer<typeof maintenanceWorkerSafetyModeSchema>;

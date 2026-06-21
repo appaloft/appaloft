@@ -28,12 +28,16 @@
     readConsolePageExtensionMetadata,
     resolveConsolePageEndpoint,
   } from "$lib/console/console-page-extension";
+  import {
+    systemPluginExtensionDescription,
+    systemPluginExtensionTitle,
+  } from "$lib/console/web-extension-presentation";
   import ConsoleResourceCanvas from "$lib/components/console/ConsoleResourceCanvas.svelte";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import SettingsShell from "$lib/components/console/SettingsShell.svelte";
   import { instanceSettingsItems, organizationSettingsItems } from "$lib/console/settings-nav";
   import { orpc } from "$lib/orpc";
-  import { i18nKeys, t } from "$lib/i18n";
+  import { i18nKeys, locale, t } from "$lib/i18n";
   import type { SystemPluginWebExtension } from "@appaloft/contracts";
 
   type ConsolePageDocument = {
@@ -337,11 +341,13 @@
 
   const pageDocument = $derived(pageDocumentQuery.data ?? null);
   const shellTitle = $derived(
-    pageDocument?.title ?? extension?.title ?? $t(i18nKeys.console.nav.extensions),
+    pageDocument?.title ??
+      (extension ? systemPluginExtensionTitle(extension, $locale) : undefined) ??
+      $t(i18nKeys.console.nav.extensions),
   );
   const shellDescription = $derived(
     pageDocument?.description ??
-      extension?.description ??
+      (extension ? systemPluginExtensionDescription(extension, $locale) : undefined) ??
       $t(i18nKeys.common.status.loading),
   );
   const loading = $derived(
@@ -1412,7 +1418,7 @@
     description={shellDescription}
     groupLabel={$t(i18nKeys.console.organization.pageTitle)}
     activePath={pathname}
-    items={organizationSettingsItems(webExtensionsQuery.data?.items ?? [])}
+    items={organizationSettingsItems(webExtensionsQuery.data?.items ?? [], $locale)}
     breadcrumbs={[
       { label: $t(i18nKeys.console.nav.home), href: "/" },
       { label: $t(i18nKeys.console.organization.pageTitle), href: "/organization" },
@@ -1427,7 +1433,7 @@
     description={shellDescription}
     groupLabel={$t(i18nKeys.console.instance.pageTitle)}
     activePath={pathname}
-    items={instanceSettingsItems(webExtensionsQuery.data?.items ?? [])}
+    items={instanceSettingsItems(webExtensionsQuery.data?.items ?? [], $locale)}
     breadcrumbs={[
       { label: $t(i18nKeys.console.nav.home), href: "/" },
       { label: $t(i18nKeys.console.instance.pageTitle), href: "/instance" },

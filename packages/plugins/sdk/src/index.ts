@@ -27,10 +27,38 @@ export const pluginManifestSchema = z.object({
   entrypoint: z.string().min(1),
 });
 
+export const systemPluginWebExtensionIconSchema = z.enum([
+  "activity",
+  "archive",
+  "building",
+  "clipboard-list",
+  "database",
+  "file-text",
+  "git-pull-request",
+  "globe",
+  "key",
+  "package",
+  "plug",
+  "puzzle",
+  "server",
+  "shield",
+  "terminal",
+  "wallet",
+]);
+
+export const systemPluginWebExtensionLocalizationSchema = z.object({
+  title: z.string().min(1).optional(),
+  description: z.string().min(1).optional(),
+});
+
 export const systemPluginWebExtensionSchema = z.object({
   key: z.string().min(1),
   title: z.string().min(1),
+  localizations: z
+    .partialRecord(z.enum(["zh-CN", "en-US"]), systemPluginWebExtensionLocalizationSchema)
+    .optional(),
   description: z.string().min(1).optional(),
+  icon: systemPluginWebExtensionIconSchema.optional(),
   path: z.string().min(1),
   placement: z.enum([
     "auth",
@@ -48,6 +76,10 @@ export const systemPluginWebExtensionSchema = z.object({
 export type PluginManifest = z.infer<typeof pluginManifestSchema>;
 export type PluginCapability = z.infer<typeof pluginCapabilitySchema>;
 export type PluginKind = z.infer<typeof pluginKindSchema>;
+export type SystemPluginWebExtensionIcon = z.infer<typeof systemPluginWebExtensionIconSchema>;
+export type SystemPluginWebExtensionLocalization = z.infer<
+  typeof systemPluginWebExtensionLocalizationSchema
+>;
 export type SystemPluginWebExtension = z.infer<typeof systemPluginWebExtensionSchema>;
 
 export type SystemPluginRouteMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
