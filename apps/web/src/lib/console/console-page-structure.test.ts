@@ -59,6 +59,14 @@ const deploymentTableSource = readFileSync(
   fileURLToPath(new URL("../components/console/DeploymentTable.svelte", import.meta.url)),
   "utf8",
 );
+const deploymentProgressDialogSource = readFileSync(
+  fileURLToPath(new URL("../components/console/DeploymentProgressDialog.svelte", import.meta.url)),
+  "utf8",
+);
+const operationProgressPanelSource = readFileSync(
+  fileURLToPath(new URL("../components/console/OperationProgressPanel.svelte", import.meta.url)),
+  "utf8",
+);
 const deploymentDetailRouteSource = readFileSync(
   fileURLToPath(
     new URL("../../routes/deployments/[deploymentId=deploymentId]/+page.ts", import.meta.url),
@@ -1692,6 +1700,17 @@ describe("console page structure", () => {
     expect(resourceDetailPageSource).toContain("observeAcceptedResourceDeployment(result.id)");
     expect(resourceDetailPageSource).toContain("deploymentProgressDeploymentId = deploymentId;");
     expect(resourceDetailPageSource).toContain("deploymentProgressStreamError = message;");
+    expect(resourceDetailPageSource).toContain("isTerminalDeploymentProgressEvent(event)");
+    expect(deploymentProgressDialogSource).toContain("{onClose}");
+    expect(deploymentProgressDialogSource).toContain('class="max-h-[86vh] shadow-lg"');
+    expect(deploymentProgressDialogSource).not.toContain(
+      "flex-col overflow-hidden rounded-lg border bg-background",
+    );
+    expect(deploymentProgressDialogSource).not.toContain("min-h-0 flex-1 overflow-auto p-5");
+    expect(operationProgressPanelSource).toContain("onclick={() => onClose?.()}");
+    expect(operationProgressPanelSource).toContain("deployment-progress-spinner");
+    expect(operationProgressPanelSource).toContain("deployment-progress-confetti");
+    expect(operationProgressPanelSource).toContain("data-deployment-progress-success-access-url");
     expect(resourceDetailActionsMenuSource).toContain('controlResourceRuntime("stop")');
     expect(resourceDetailActionsMenuSource).toContain('controlResourceRuntime("restart")');
     expect(resourceDetailActionsMenuSource).toContain("forceRedeploy");

@@ -2,7 +2,6 @@
   import type { DeploymentProgressEvent } from "@appaloft/contracts";
 
   import OperationProgressPanel from "$lib/components/console/OperationProgressPanel.svelte";
-  import { Button } from "$lib/components/ui/button";
   import { type DeploymentProgressDialogStatus } from "$lib/console/deployment-progress";
   import { i18nKeys, t } from "$lib/i18n";
 
@@ -41,33 +40,21 @@
       aria-label={title ?? $t(i18nKeys.console.deployments.progressTitle)}
       aria-modal="true"
       role="dialog"
-      class="flex max-h-[86vh] w-full max-w-5xl flex-col overflow-hidden rounded-lg border bg-background shadow-lg"
+      class="w-full max-w-5xl"
     >
-      <div class="flex items-center justify-end border-b px-5 py-3">
-        <div class="flex gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onclick={() => onClose?.()}
-          >
-            {$t(i18nKeys.common.actions.close)}
-          </Button>
-        </div>
-      </div>
-      <div class="min-h-0 flex-1 overflow-auto p-5">
-        <OperationProgressPanel
-          {status}
-          {events}
-          {streamError}
-          {requestId}
-          {deploymentId}
-          {traceLink}
-          {title}
-          {description}
-          {onOpenDeployment}
-        />
-      </div>
+      <OperationProgressPanel
+        {status}
+        {events}
+        {streamError}
+        {requestId}
+        {deploymentId}
+        {traceLink}
+        {title}
+        {description}
+        {onClose}
+        {onOpenDeployment}
+        class="max-h-[86vh] shadow-lg"
+      />
     </div>
   </div>
 {/if}
