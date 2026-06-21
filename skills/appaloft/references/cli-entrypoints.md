@@ -209,6 +209,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft deploy [path-or-source] [--config appaloft.yml] [--env KEY=VALUE] [--secret KEY=ci-env:NAME] [--preview pull-request]` - `deployments.create`
 - `appaloft deployments retry <deploymentId>` - `deployments.retry`
 - `appaloft deployments redeploy <resourceId>` - `deployments.redeploy`
+- `appaloft deployments force-redeploy <resourceId>` - `deployments.force-redeploy`
 - `appaloft deployments rollback <deploymentId> --candidate <rollbackCandidateDeploymentId>` - `deployments.rollback`
 - `appaloft deployments cancel <deploymentId> --confirm <deploymentId>` - `deployments.cancel`
 - `appaloft deployments archive <deploymentId> --confirm <deploymentId>` - `deployments.archive`
@@ -268,6 +269,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft domain-binding list` - `domain-bindings.list`
 - `appaloft domain-binding show <domainBindingId>` - `domain-bindings.show`
 - `appaloft domain-binding dns-plan <domainBindingId> [--connector cloudflare-dns]` - `domain-bindings.dns-plan`
+- `appaloft domain-binding dns-readiness <domainBindingId>` - `domain-bindings.dns-readiness.inspect`
 - `appaloft domain-binding configure-route <domainBindingId>` - `domain-bindings.configure-route`
 - `appaloft domain-binding delete-check <domainBindingId>` - `domain-bindings.delete-check`
 - `appaloft domain-binding delete <domainBindingId> --confirm <domainBindingId>` - `domain-bindings.delete`

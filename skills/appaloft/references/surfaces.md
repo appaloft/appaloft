@@ -55,9 +55,10 @@ the npm package is actually published and verified in the user's environment.
    apply only during ordinary trusted deploys and are skipped during PR preview deploy mutation.
    Supported secret resolvers are `ci-env:<NAME>` and same-key
    `resource-secret:<KEY>`.
-5. MCP/tools: use when an MCP host has `appaloft mcp stdio` or an equivalent configured server
-   available. MCP tools mirror existing operations and must not introduce MCP-only mutations. Use
-   [mcp-tools.md](mcp-tools.md) for tool naming, resources, prompts, and setup.
+5. MCP/tools: use when an MCP host has `appaloft mcp stdio`, `appaloft mcp serve`,
+   `appaloft-mcp`, or an equivalent configured server available. MCP tools mirror existing
+   operations and must not introduce MCP-only mutations. Use [mcp-tools.md](mcp-tools.md) for tool
+   naming, resources, prompts, and setup.
 
 ## GitHub Action Boundary
 

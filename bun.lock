@@ -165,6 +165,7 @@
     "packages/adapters/http-elysia": {
       "name": "@appaloft/adapter-http-elysia",
       "dependencies": {
+        "@appaloft/ai-mcp": "workspace:*",
         "@appaloft/application": "workspace:*",
         "@appaloft/contracts": "workspace:*",
         "@appaloft/deployment-config": "workspace:*",

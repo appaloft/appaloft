@@ -5,7 +5,7 @@ Appaloft MCP. The skill remains the procedural guide; MCP is the callable transp
 
 ## Setup
 
-Current user-facing path: use the same Appaloft runtime as the CLI:
+Use the same Appaloft runtime as the CLI for stdio:
 
 ```bash
 appaloft mcp stdio
@@ -14,9 +14,24 @@ appaloft mcp stdio
 This starts a stdio MCP server and composes the real Appaloft command/query buses. It does not
 deploy anything until the MCP client calls a tool.
 
-The source package `@appaloft/ai-mcp` owns transport code, descriptors, resources, prompts, and
-tests. A standalone `appaloft-mcp` package/bin is deferred until release packaging is wired; do not
-present it as the current install path.
+For local remote-HTTP clients:
+
+```bash
+appaloft mcp serve --host 127.0.0.1 --port 3939
+```
+
+This serves MCP JSON-RPC over HTTP at `/mcp`. Keep the default localhost bind unless a trusted
+reverse proxy or private network supplies the security boundary.
+
+For a dedicated package command:
+
+```bash
+npx appaloft-mcp
+npx appaloft-mcp serve --host 127.0.0.1 --port 3939
+```
+
+The standalone package delegates to the Appaloft CLI/runtime. It does not define another operation
+list or bypass the application buses.
 
 ## Tool Naming
 

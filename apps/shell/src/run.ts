@@ -6,7 +6,11 @@ import {
   resolveCliExecutionTarget,
   runStandaloneControlPlaneCli,
 } from "@appaloft/adapter-cli";
-import { createAppaloftMcpServer, runAppaloftMcpStdioServer } from "@appaloft/ai-mcp";
+import {
+  createAppaloftMcpServer,
+  runAppaloftMcpStdioServer,
+  startAppaloftMcpHttpServer,
+} from "@appaloft/ai-mcp";
 import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
 import { type AppComposition, createAppComposition, type ShellRuntimeOptions } from "./composition";
 import {
@@ -234,7 +238,59 @@ function commandArgs(argv: readonly string[]): readonly string[] {
 
 function isMcpCommand(argv: readonly string[]): boolean {
   const args = commandArgs(argv);
-  return args[0] === "mcp" && (args.length === 1 || args[1] === "stdio");
+  return args[0] === "mcp" && (args.length === 1 || args[1] === "stdio" || args[1] === "serve");
+}
+
+function mcpMode(argv: readonly string[]): "stdio" | "serve" | null {
+  const args = commandArgs(argv);
+  if (args[0] !== "mcp") {
+    return null;
+  }
+
+  if (args.length === 1 || args[1] === "stdio") {
+    return "stdio";
+  }
+
+  return args[1] === "serve" ? "serve" : null;
+}
+
+function readOptionValue(args: readonly string[], name: string): string | null {
+  const longName = `--${name}`;
+  const equalsPrefix = `${longName}=`;
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (!arg) {
+      continue;
+    }
+    if (arg === longName) {
+      return args[index + 1] ?? null;
+    }
+    if (arg.startsWith(equalsPrefix)) {
+      return arg.slice(equalsPrefix.length);
+    }
+  }
+
+  return null;
+}
+
+function readMcpHttpOptions(
+  argv: readonly string[],
+): Result<{ hostname: string; port: number }, DomainError> {
+  const args = commandArgs(argv);
+  const hostname =
+    readOptionValue(args, "host") ?? readOptionValue(args, "hostname") ?? "127.0.0.1";
+  const portValue = readOptionValue(args, "port") ?? "3939";
+  const port = Number(portValue);
+
+  if (!Number.isInteger(port) || port < 1 || port > 65_535) {
+    return err(
+      domainError.validation("MCP HTTP port must be an integer between 1 and 65535", {
+        port: portValue,
+      }),
+    );
+  }
+
+  return ok({ hostname, port });
 }
 
 async function runShellMcpStdio(app: AppComposition): Promise<void> {
@@ -245,6 +301,30 @@ async function runShellMcpStdio(app: AppComposition): Promise<void> {
   });
 
   await runAppaloftMcpStdioServer({ server });
+}
+
+async function runShellMcpHttp(app: AppComposition, argv: readonly string[]): Promise<void> {
+  const options = readMcpHttpOptions(argv);
+  if (options.isErr()) {
+    writeDomainError(options.error);
+    process.exit(1);
+  }
+
+  const server = createAppaloftMcpServer({
+    commandBus: app.commandBus,
+    queryBus: app.queryBus,
+    executionContextFactory: app.executionContextFactory,
+  });
+  const handle = startAppaloftMcpHttpServer({
+    server,
+    hostname: options.value.hostname,
+    port: options.value.port,
+  });
+  process.stdout.write(
+    `Appaloft MCP HTTP server listening at http://${options.value.hostname}:${handle.port}/mcp\n`,
+  );
+
+  await new Promise<void>(() => {});
 }
 
 export async function runShellCli(options?: ShellRuntimeOptions): Promise<void> {
@@ -334,7 +414,12 @@ export async function runShellCli(options?: ShellRuntimeOptions): Promise<void> 
     }
 
     if (mcpCommand) {
-      await runShellMcpStdio(app);
+      const mode = mcpMode(argv);
+      if (mode === "serve") {
+        await runShellMcpHttp(app, argv);
+      } else {
+        await runShellMcpStdio(app);
+      }
     } else {
       await app.cliProgram.parseAsync(cliArgv);
     }
