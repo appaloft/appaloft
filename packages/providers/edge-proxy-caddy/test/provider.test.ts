@@ -232,6 +232,45 @@ describe("CaddyEdgeProxyProvider", () => {
     expect(labels).not.toContain("caddy_1.reverse_proxy");
   });
 
+  test("[EDGE-PROXY-ROUTE-009] renders preserve and strip path handling distinctly", async () => {
+    const provider = new CaddyEdgeProxyProvider();
+    const realized = await provider.realizeRoutes(
+      { correlationId: "req_caddy_path_handling_test" },
+      {
+        deploymentId: "dep_path",
+        port: 3000,
+        accessRoutes: [
+          {
+            proxyKind: "caddy",
+            domains: ["preserve.example.test"],
+            pathPrefix: "/nocodb",
+            pathHandling: "preserve",
+            tlsMode: "disabled",
+            targetPort: 3000,
+          },
+          {
+            proxyKind: "caddy",
+            domains: ["strip.example.test"],
+            pathPrefix: "/n8n",
+            pathHandling: "strip",
+            tlsMode: "disabled",
+            targetPort: 3000,
+          },
+        ],
+      },
+    );
+
+    expect(realized.isOk()).toBe(true);
+    expect(realized._unsafeUnwrap().labels).toEqual(
+      expect.arrayContaining([
+        "caddy.handle=/nocodb*",
+        "caddy.handle.reverse_proxy={{upstreams 3000}}",
+        "caddy_1.handle_path=/n8n*",
+        "caddy_1.handle_path.reverse_proxy={{upstreams 3000}}",
+      ]),
+    );
+  });
+
   test("[EDGE-PROXY-QRY-007] exposes canonical redirect route views", async () => {
     const provider = new CaddyEdgeProxyProvider();
     const accessRoutes = [

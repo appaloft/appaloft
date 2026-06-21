@@ -33,6 +33,7 @@ import {
   type LogLevelValue,
   type PackagingModeValue,
   type packagingModes,
+  RoutePathHandlingValue,
   type SourceKindValue,
   type sourceKinds,
   type TargetKindValue,
@@ -264,6 +265,7 @@ export interface AccessRouteState {
   proxyKind: EdgeProxyKindValue;
   domains: PublicDomainName[];
   pathPrefix: RoutePathPrefix;
+  pathHandling?: RoutePathHandlingValue;
   tlsMode: TlsModeValue;
   targetPort?: PortNumber;
   redirectTo?: PublicDomainName;
@@ -830,6 +832,10 @@ export class AccessRoute extends ValueObject<AccessRouteState> {
     return this.state.pathPrefix.value;
   }
 
+  get pathHandling(): "preserve" | "strip" {
+    return (this.state.pathHandling ?? RoutePathHandlingValue.default()).value;
+  }
+
   get tlsMode(): (typeof tlsModes)[number] {
     return this.state.tlsMode.value;
   }
@@ -863,6 +869,7 @@ export class AccessRoute extends ValueObject<AccessRouteState> {
       proxyKind: this.state.proxyKind,
       domains: [...this.state.domains],
       pathPrefix: this.state.pathPrefix,
+      pathHandling: this.state.pathHandling ?? RoutePathHandlingValue.default(),
       tlsMode: this.state.tlsMode,
       ...(this.state.targetPort ? { targetPort: this.state.targetPort } : {}),
       ...(this.state.redirectTo ? { redirectTo: this.state.redirectTo } : {}),

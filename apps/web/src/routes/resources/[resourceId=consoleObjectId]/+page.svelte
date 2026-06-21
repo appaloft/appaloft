@@ -1106,6 +1106,7 @@
   let destinationId = $state("");
   let domainName = $state("");
   let pathPrefix = $state("/");
+  let pathHandling = $state<NonNullable<CreateDomainBindingInput["pathHandling"]>>("preserve");
   let tlsMode = $state<NonNullable<CreateDomainBindingInput["tlsMode"]>>("auto");
   let routeMode = $state<DomainRouteMode>("serve");
   let redirectTo = $state("");
@@ -2187,6 +2188,7 @@
     destinationId = domainBindingUsesResourceRouteProvider ? "" : defaultDestinationId || destinationId;
     domainName = "";
     pathPrefix = "/";
+    pathHandling = "preserve";
     tlsMode = "auto";
     routeMode = "serve";
     redirectTo = "";
@@ -4734,6 +4736,7 @@
         : {}),
       domainName: submittedDomainName,
       pathPrefix: submittedPathPrefix,
+      pathHandling: routeMode === "serve" ? pathHandling : "preserve",
       proxyKind: "traefik",
       tlsMode,
       ...(routeMode === "redirect"
@@ -9375,6 +9378,7 @@
                                   </Badge>
                                   <Badge variant="outline">{binding.proxyKind}</Badge>
                                   <Badge variant="secondary">{binding.tlsMode}</Badge>
+                                  <Badge variant="outline">{binding.pathHandling ?? "preserve"}</Badge>
                                 </div>
                                 <div class="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2 xl:grid-cols-4">
                                   <span>
@@ -9626,7 +9630,7 @@
                                     {route.url}
                                   </a>
                                   <p class="mt-1 text-xs text-muted-foreground">
-                                    {route.source} · {route.scheme} · {route.pathPrefix}
+                                    {route.source} · {route.scheme} · {route.pathPrefix} · {route.pathHandling ?? "preserve"}
                                   </p>
                                 </div>
                                 <div class="flex flex-wrap gap-2">
@@ -11616,6 +11620,21 @@
                       placeholder="/"
                     />
                   </label>
+
+                  {#if routeMode === "serve"}
+                    <label class="space-y-1.5 text-sm font-medium">
+                      <span>路径转发</span>
+                      <Select.Root bind:value={pathHandling} type="single">
+                        <Select.Trigger class="w-full">
+                          {pathHandling === "strip" ? "剥离前缀" : "保留路径"}
+                        </Select.Trigger>
+                        <Select.Content>
+                          <Select.Item value="preserve">保留路径</Select.Item>
+                          <Select.Item value="strip">剥离前缀</Select.Item>
+                        </Select.Content>
+                      </Select.Root>
+                    </label>
+                  {/if}
 
                   <label class="space-y-1.5 text-sm font-medium">
                     <span>{$t(i18nKeys.common.domain.routeBehavior)}</span>
