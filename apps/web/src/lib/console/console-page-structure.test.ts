@@ -509,10 +509,6 @@ describe("console page structure", () => {
           const lastDialogClose = beforeForm.lastIndexOf("</Dialog.Root>");
 
           if (lastDialogOpen <= lastDialogClose) {
-            const formOpeningSource = source.slice(formIndex, formIndex + 500);
-            if (formOpeningSource.includes("data-resource-storage-backup-form")) {
-              continue;
-            }
             return true;
           }
         }
@@ -1492,14 +1488,25 @@ describe("console page structure", () => {
       '<section id="resource-storage"',
       '{:else if activeResourceSection === "diagnostics"}',
     );
+    const storageBackupDialogSource = sourceBetween(
+      resourceDetailPageSource,
+      "<Dialog.Root bind:open={storageBackupDialogOpen}>",
+      "<Dialog.Root bind:open={configEditorDialogOpen}>",
+    );
 
-    expect(resourceStorageSectionSource).toContain("data-resource-storage-backup-form");
-    expect(resourceStorageSectionSource).toContain("onsubmit={(event) =>");
-    expect(resourceStorageSectionSource).toContain("planStorageBackup()");
-    expect(resourceStorageSectionSource).toContain("<Input");
-    expect(resourceStorageSectionSource).toContain("<Select.Root");
-    expect(resourceStorageSectionSource).toContain('type="submit"');
-    expect(resourceStorageSectionSource).toContain("onclick={createStorageBackup}");
+    expect(resourceStorageSectionSource).not.toContain("data-resource-storage-backup-form");
+    expect(resourceStorageSectionSource).toContain("openStorageBackupDialog()");
+    expect(resourceStorageSectionSource).toContain("storageBackupAttachmentOptionLabel");
+    expect(resourceStorageSectionSource).toContain("storageBackupDataFormat");
+    expect(storageBackupDialogSource).toContain("data-resource-storage-backup-form");
+    expect(storageBackupDialogSource).toContain("onsubmit={(event) =>");
+    expect(storageBackupDialogSource).toContain("planStorageBackup()");
+    expect(storageBackupDialogSource).toContain("<Input");
+    expect(storageBackupDialogSource).toContain("<Select.Root");
+    expect(storageBackupDialogSource).toContain('id="resource-storage-backup-data-format"');
+    expect(storageBackupDialogSource).not.toContain("bind:value={storageBackupDataFormat}");
+    expect(storageBackupDialogSource).toContain('type="submit"');
+    expect(storageBackupDialogSource).toContain("onclick={createStorageBackup}");
     expect(resourceStorageSectionSource).toContain("restoreStorageBackup(backup)");
     expect(resourceStorageSectionSource).toContain("pruneStorageBackup(backup)");
   });

@@ -6733,6 +6733,30 @@ describe.serial("console e2e with Bun.WebView", () => {
         ],
         createdAt: "2026-01-01T00:00:00.000Z",
       },
+      {
+        id: "stv_other_resource",
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        name: "other-pocketbase-data",
+        slug: "other-pocketbase-data",
+        kind: "named-volume",
+        lifecycleStatus: "active",
+        attachmentCount: 1,
+        attachments: [
+          {
+            attachmentId: "att_other",
+            resourceId: "res_other",
+            resourceName: "Other PocketBase",
+            resourceSlug: "other-pocketbase",
+            destinationPath: "/pb_data",
+            mountMode: "read-write",
+            dataFormat: "sqlite",
+            applicationDataLabel: "Other PocketBase data",
+            attachedAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
+        createdAt: "2026-01-01T00:00:00.000Z",
+      },
     ];
     let storageAttachments: Array<{
       id: string;
@@ -7090,22 +7114,28 @@ describe.serial("console e2e with Bun.WebView", () => {
           attachFormVisible: Boolean(document.querySelector("#resource-storage-attachment-form")),
           backupFormVisible: Boolean(document.querySelector("[data-resource-storage-backup-form]")),
           backupDestinationPathVisible: Boolean(document.querySelector("#resource-storage-backup-destination-path")),
+          backupDataFormatSelectVisible: Boolean(document.querySelector('[data-resource-storage-backup-form] [aria-label="数据格式"], [data-resource-storage-backup-form] [aria-label="Data format"]')),
           cleanupFieldVisible: Boolean(document.querySelector("#resource-storage-runtime-cleanup-before")),
           createFormVisible: Boolean(document.querySelector("#resource-storage-volume-form")),
+          otherResourceVolumeVisible: (document.body.textContent ?? '').includes("other-pocketbase-data"),
         })`),
       ) as {
         attachFormVisible: boolean;
+        backupDataFormatSelectVisible: boolean;
         backupFormVisible: boolean;
         backupDestinationPathVisible: boolean;
         cleanupFieldVisible: boolean;
         createFormVisible: boolean;
+        otherResourceVolumeVisible: boolean;
       };
       expect(storagePageDefaultState).toEqual({
         attachFormVisible: false,
-        backupFormVisible: true,
-        backupDestinationPathVisible: true,
+        backupDataFormatSelectVisible: false,
+        backupFormVisible: false,
+        backupDestinationPathVisible: false,
         cleanupFieldVisible: false,
         createFormVisible: false,
+        otherResourceVolumeVisible: false,
       });
 
       const listRequest = await waitForRecordedRequest("/api/rpc/storageVolumes/list");
@@ -7129,7 +7159,28 @@ describe.serial("console e2e with Bun.WebView", () => {
         false,
       );
 
-      await clickButtonByAnyText(view, ["Plan backup", "预览备份"]);
+      await clickButtonByAnyText(view, ["Create backup", "创建备份"]);
+      const storageBackupDialogState = JSON.parse(
+        await view.evaluate<string>(`JSON.stringify({
+          backupFormVisible: Boolean(document.querySelector("[data-resource-storage-backup-form]")),
+          backupDestinationPathText: document.querySelector("#resource-storage-backup-destination-path")?.textContent?.trim() ?? "",
+          backupDataFormatText: document.querySelector("#resource-storage-backup-data-format")?.textContent?.trim() ?? "",
+          otherResourceVolumeVisible: (document.querySelector('[role="dialog"]')?.textContent ?? '').includes("other-pocketbase-data"),
+        })`),
+      ) as {
+        backupDataFormatText: string;
+        backupDestinationPathText: string;
+        backupFormVisible: boolean;
+        otherResourceVolumeVisible: boolean;
+      };
+      expect(storageBackupDialogState).toEqual({
+        backupDataFormatText: "sqlite",
+        backupDestinationPathText: "/pb_data",
+        backupFormVisible: true,
+        otherResourceVolumeVisible: false,
+      });
+
+      await clickDialogButtonByAnyText(view, ["Plan backup", "预览备份"]);
       const planRequest = await waitForRecordedRequest("/api/rpc/storageVolumes/backups/plan");
       expect(readOrpcJsonPayload(planRequest.body)).toMatchObject({
         requestedConsistency: "application-consistent",
@@ -7145,7 +7196,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       });
       await expectAnyText(view, ["Backup plan ready", "备份预览已就绪"]);
 
-      await clickButtonByAnyText(view, ["Create backup", "创建备份"]);
+      await clickDialogButtonByAnyText(view, ["Create backup", "创建备份"]);
       await waitForRecordedRequest("/api/rpc/storageVolumes/backups/create");
       await expectText(view, "svb_created");
 
