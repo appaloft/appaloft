@@ -2098,6 +2098,9 @@ describe("console page structure", () => {
     expect(serverConnectivityTabSource).toContain("onclick={testConnectivity}");
     expect(serverConnectivityTabSource).toContain("connectivityMutation.isPending");
     expect(serverConnectivityTabSource).toContain("connectivityResult");
+    expect(serverConnectivityTabSource).toContain(
+      'class="rounded-md border bg-muted/25 px-4 py-4 text-sm text-muted-foreground"',
+    );
   });
 
   test("[SERVER-DETAIL-IA-002] keeps rename editing behind a single-intent dialog", () => {
