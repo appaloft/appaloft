@@ -64,6 +64,7 @@
     ResourceDetail,
     ResourceEffectiveConfig,
     ResourceHealthOverall,
+    ResourceHealthSummary,
     ResourceRuntimeLogEvent,
     ResourceRuntimeLogLine,
     ResourceDependencyBindingSummary,
@@ -218,6 +219,12 @@
   type ResourceAccessKind = "domain-binding" | CurrentResourceAccessRouteKind;
   type ResourceAccessStatus = NonNullable<ResourceAccessSummary["proxyRouteStatus"]>;
   type ResourceHealthViewStatus = ResourceHealthOverall | "loading";
+  type ResourceHealthIssue = {
+    key: string;
+    title: string;
+    detail?: string;
+    code?: string;
+  };
   type HealthCheckHttpInput = NonNullable<ConfigureResourceHealthInput["healthCheck"]["http"]>;
   type HealthCheckMethod = HealthCheckHttpInput["method"];
   type HealthCheckScheme = HealthCheckHttpInput["scheme"];
@@ -916,6 +923,8 @@
 
     return resourceHealth?.overall ?? "unknown";
   });
+  const resourceHealthIssues = $derived.by(() => resourceHealthIssueList(resourceHealth));
+  const primaryResourceHealthIssues = $derived(resourceHealthIssues.slice(0, 3));
   const currentAccessRoute = $derived(selectCurrentResourceAccessRoute(resource?.accessSummary));
   const latestAccessFailure = $derived(resource?.accessSummary?.latestAccessFailureDiagnostic);
   const defaultDestinationId = $derived(
@@ -6251,6 +6260,118 @@
     }
   }
 
+  function resourceHealthRecommendedActionLabel(
+    action: NonNullable<
+      ResourceHealthSummary["publicAccess"]["routeIntentStatus"]
+    >["recommendedAction"],
+  ): string {
+    switch (action) {
+      case "verify-domain":
+        return $t(i18nKeys.console.resources.healthRecommendedVerifyDomain);
+      case "fix-dns":
+        return $t(i18nKeys.console.resources.healthRecommendedFixDns);
+      case "inspect-proxy-preview":
+        return $t(i18nKeys.console.resources.healthRecommendedInspectProxy);
+      case "inspect-logs":
+        return $t(i18nKeys.console.resources.healthRecommendedInspectLogs);
+      case "check-health":
+        return $t(i18nKeys.console.resources.healthRecommendedCheckHealth);
+      case "wait":
+        return $t(i18nKeys.console.resources.healthRecommendedWait);
+      case "provide-certificate":
+        return $t(i18nKeys.console.resources.healthRecommendedProvideCertificate);
+      case "repair-proxy":
+      case "diagnostic-summary":
+      case "manual-review":
+      case "none":
+        return "";
+    }
+  }
+
+  function resourceHealthIssueTitle(code: string): string {
+    switch (code) {
+      case "domain_not_verified":
+      case "resource_domain_binding_not_ready":
+        return $t(i18nKeys.console.resources.healthIssueDomainNotVerified);
+      case "resource_public_access_probe_failed":
+      case "resource_health_check_failed":
+        return $t(i18nKeys.console.resources.healthIssuePublicAccessProbeFailed);
+      case "resource_proxy_route_unavailable":
+      case "resource_public_access_not_ready":
+      case "resource_public_access_unavailable":
+        return $t(i18nKeys.console.resources.healthIssueProxyRouteUnavailable);
+      case "resource_health_policy_not_configured":
+        return $t(i18nKeys.console.resources.healthIssueHealthPolicyMissing);
+      case "resource_health_check_unavailable":
+      case "resource_runtime_live_probe_unavailable":
+      case "runtime_probe_not_available":
+        return $t(i18nKeys.console.resources.healthIssueRuntimeUnavailable);
+      default:
+        return $t(i18nKeys.console.resources.healthIssueNeedsAttention);
+    }
+  }
+
+  function resourceHealthIssueList(health: ResourceHealthSummary | null): ResourceHealthIssue[] {
+    if (!health) {
+      return [];
+    }
+
+    const issues: ResourceHealthIssue[] = [];
+    const seen = new Set<string>();
+    const selectedRoute = health.publicAccess.routeIntentStatus;
+    const blockingCode = selectedRoute?.blockingReason;
+    if (blockingCode) {
+      const recommendedAction = resourceHealthRecommendedActionLabel(
+        selectedRoute.recommendedAction,
+      );
+      issues.push({
+        key: `route-${blockingCode}`,
+        title: resourceHealthIssueTitle(blockingCode),
+        detail: recommendedAction || selectedRoute.copySafeSummary.message,
+        code: blockingCode,
+      });
+      seen.add(blockingCode);
+    }
+
+    for (const error of health.sourceErrors) {
+      if (seen.has(error.code)) {
+        continue;
+      }
+      issues.push({
+        key: `source-${error.source}-${error.code}-${error.phase}`,
+        title: resourceHealthIssueTitle(error.code),
+        detail:
+          error.message ??
+          $t(i18nKeys.console.resources.healthIssueTechnicalCode, {
+            code: error.code,
+            phase: error.phase,
+          }),
+        code: error.code,
+      });
+      seen.add(error.code);
+    }
+
+    for (const check of health.checks) {
+      if (check.status !== "failed" || !check.reasonCode || seen.has(check.reasonCode)) {
+        continue;
+      }
+      issues.push({
+        key: `check-${check.name}-${check.reasonCode}`,
+        title: resourceHealthIssueTitle(check.reasonCode),
+        detail:
+          check.message ??
+          $t(i18nKeys.console.resources.healthIssueTechnicalCode, {
+            code: check.reasonCode,
+            phase: check.phase ?? check.name,
+          }),
+        code: check.reasonCode,
+      });
+      seen.add(check.reasonCode);
+    }
+
+    return issues;
+  }
+
   function resourceLatestDeploymentTime(deployment: typeof latestDeployment): string {
     if (!deployment) {
       return "-";
@@ -6998,6 +7119,25 @@
                         </p>
                       {/if}
                     </div>
+                    {#if primaryResourceHealthIssues.length > 0}
+                      <div class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+                        <p class="font-medium">
+                          {$t(i18nKeys.console.resources.healthIssueTitle)}
+                        </p>
+                        <div class="mt-2 space-y-2">
+                          {#each primaryResourceHealthIssues as issue (issue.key)}
+                            <div>
+                              <p class="font-medium">{issue.title}</p>
+                              {#if issue.detail}
+                                <p class="mt-0.5 break-words text-xs text-amber-900">
+                                  {issue.detail}
+                                </p>
+                              {/if}
+                            </div>
+                          {/each}
+                        </div>
+                      </div>
+                    {/if}
                   </div>
                 {/if}
               </Popover.Content>
@@ -7807,7 +7947,50 @@
                         {resourceHealthSectionStatusLabel(resourceHealth?.healthPolicy.status)}
                       </p>
                     </div>
+                    <div class="rounded-md border border-border bg-muted/25 px-3 py-2">
+                      <p class="text-xs text-muted-foreground">
+                        {$t(i18nKeys.console.resources.healthPublicAccess)}
+                      </p>
+                      <p class="mt-1 text-sm font-medium">
+                        {resourceHealthSectionStatusLabel(resourceHealth?.publicAccess.status)}
+                      </p>
+                    </div>
+                    <div class="rounded-md border border-border bg-muted/25 px-3 py-2">
+                      <p class="text-xs text-muted-foreground">
+                        {$t(i18nKeys.console.resources.healthProxy)}
+                      </p>
+                      <p class="mt-1 text-sm font-medium">
+                        {resourceHealthSectionStatusLabel(resourceHealth?.proxy.status)}
+                      </p>
+                    </div>
                   </div>
+                  {#if primaryResourceHealthIssues.length > 0}
+                    <div
+                      class="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950"
+                      data-resource-health-primary-issues
+                    >
+                      <p class="font-medium">
+                        {$t(i18nKeys.console.resources.healthIssueTitle)}
+                      </p>
+                      <div class="mt-2 space-y-2">
+                        {#each primaryResourceHealthIssues as issue (issue.key)}
+                          <div class="min-w-0">
+                            <div class="flex flex-wrap items-center gap-2">
+                              <p class="font-medium">{issue.title}</p>
+                              {#if issue.code}
+                                <Badge variant="outline">{issue.code}</Badge>
+                              {/if}
+                            </div>
+                            {#if issue.detail}
+                              <p class="mt-1 break-words text-xs text-amber-900">
+                                {issue.detail}
+                              </p>
+                            {/if}
+                          </div>
+                        {/each}
+                      </div>
+                    </div>
+                  {/if}
                 </section>
               </div>
 

@@ -5840,6 +5840,154 @@ describe.serial("console e2e with Bun.WebView", () => {
     });
   }, 30_000);
 
+  test("[RES-HEALTH-ENTRY-001] explains degraded health reasons on resource overview", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    const previousHealthRoute = apiResponses.dashboard["/api/rpc/resources/health"];
+    apiResponses.dashboard["/api/rpc/resources/health"] = {
+      json: {
+        schemaVersion: "resources.health/v1",
+        resourceId: "res_demo",
+        generatedAt: "2026-01-01T00:00:00.000Z",
+        observedAt: "2026-01-01T00:00:00.000Z",
+        overall: "degraded",
+        runtime: {
+          lifecycle: "running",
+          health: "healthy",
+          observedAt: "2026-01-01T00:00:00.000Z",
+          runtimeKind: "docker-container",
+          reasonCode: "resource_health_check_passed",
+        },
+        healthPolicy: {
+          status: "configured",
+          enabled: true,
+          type: "http",
+          path: "/health",
+          expectedStatusCode: 200,
+          intervalSeconds: 5,
+          timeoutSeconds: 5,
+          retries: 10,
+          startPeriodSeconds: 5,
+          reasonCode: "resource_health_check_passed",
+        },
+        publicAccess: {
+          status: "failed",
+          url: "https://workspace.example.test",
+          kind: "durable-domain",
+          reasonCode: "resource_public_access_probe_failed",
+          phase: "public-access-observation",
+          routeIntentStatus: {
+            schemaVersion: "route-intent-status/v1",
+            routeId: "durable_domain_binding:workspace.example.test:/:dmb_demo",
+            diagnosticId: "durable_domain_binding:workspace.example.test:/:dmb_demo",
+            source: "durable-domain-binding",
+            intent: {
+              host: "workspace.example.test",
+              pathPrefix: "/",
+              protocol: "https",
+              routeBehavior: "serve",
+            },
+            context: {
+              resourceId: "res_demo",
+              serverId: "srv_demo",
+              destinationId: "dst_demo",
+            },
+            proxy: {
+              intent: "required",
+              applied: "not-ready",
+            },
+            domainVerification: "pending",
+            tls: "pending",
+            runtimeHealth: "unknown",
+            latestObservation: {
+              source: "resource-access-summary",
+            },
+            blockingReason: "domain_not_verified",
+            recommendedAction: "verify-domain",
+            copySafeSummary: {
+              status: "not-ready",
+              code: "domain_not_verified",
+              phase: "route-status-observation",
+              message: "Durable domain route is selected but not ready.",
+            },
+          },
+        },
+        proxy: {
+          status: "ready",
+          providerKey: "traefik",
+          lastRouteRealizationDeploymentId: "dep_demo",
+        },
+        checks: [
+          {
+            name: "public-access",
+            target: "public-access",
+            status: "failed",
+            observedAt: "2026-01-01T00:00:00.000Z",
+            message: "Resource health probe could not reach the target.",
+            reasonCode: "resource_public_access_probe_failed",
+            retriable: true,
+          },
+        ],
+        sourceErrors: [
+          {
+            source: "domain-binding",
+            code: "resource_domain_binding_not_ready",
+            category: "user",
+            phase: "public-access-observation",
+            retriable: true,
+            relatedEntityId: "dmb_demo",
+            relatedState: "pending_verification",
+            message:
+              "Durable domain binding workspace.example.test is pending_verification and not ready for traffic.",
+          },
+          {
+            source: "public-access",
+            code: "resource_public_access_probe_failed",
+            category: "infra",
+            phase: "public-access-observation",
+            retriable: true,
+            relatedEntityId: "res_demo",
+            message: "Resource health probe could not reach the target.",
+          },
+        ],
+      },
+    };
+
+    try {
+      await using view = createWebView();
+      await view.navigate(`${previewUrl}${demoResourcePath}`);
+      await expectAnyText(view, ["Why this is not healthy", "为什么不是健康"]);
+      await expectAnyText(view, ["The domain has not been verified yet", "域名尚未完成验证"]);
+      await expectAnyText(view, ["Public access", "公网访问"]);
+      await expectAnyText(view, ["Proxy route", "代理路由"]);
+
+      const desktopState = JSON.parse(
+        await view.evaluate<string>(`JSON.stringify((() => ({
+          hasIssuePanel: Boolean(document.querySelector("[data-resource-health-primary-issues]")),
+          bodyOverflows: document.documentElement.scrollWidth > window.innerWidth + 1,
+        }))())`),
+      ) as {
+        hasIssuePanel: boolean;
+        bodyOverflows: boolean;
+      };
+      expect(desktopState).toEqual({
+        hasIssuePanel: true,
+        bodyOverflows: false,
+      });
+
+      await using mobileView = createWebView({ width: 390, height: 900 });
+      await mobileView.navigate(`${previewUrl}${demoResourcePath}`);
+      await expectAnyText(mobileView, ["Why this is not healthy", "为什么不是健康"]);
+      const mobileOverflows = await mobileView.evaluate<boolean>(
+        "document.documentElement.scrollWidth > window.innerWidth + 1",
+      );
+      expect(mobileOverflows).toBe(false);
+    } finally {
+      apiResponses.dashboard["/api/rpc/resources/health"] = previousHealthRoute;
+    }
+  }, 30_000);
+
   test("[RES-DETAIL-IA-001] exposes resource owner tabs and nested section navigation", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();
