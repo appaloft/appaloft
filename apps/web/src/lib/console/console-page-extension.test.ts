@@ -122,6 +122,10 @@ describe("Console page extension surface", () => {
     expect(rendererSource).toContain("data-console-page-panel-field");
     expect(rendererSource).toContain("data-console-page-record-list");
     expect(rendererSource).toContain("data-console-page-record-row");
+    expect(rendererSource).toContain("href?: string");
+    expect(rendererSource).toContain("row.details?.href");
+    expect(rendererSource).toContain("navigateConsolePageHref(row.details.href)");
+    expect(rendererSource).toContain("align-middle");
     expect(rendererSource).toContain('kind: "datetime"');
     expect(rendererSource).toContain('format?: "short" | "date-time"');
     expect(rendererSource).toContain("formatConsoleDateTime(value)");
