@@ -23,6 +23,7 @@
     Save,
     Search,
     Server,
+    ShieldCheck,
     Trash2,
     Unlock,
   } from "@lucide/svelte";
@@ -1346,6 +1347,15 @@
 
     const search = params.toString();
     return `${page.url.pathname}${search ? `?${search}` : ""}`;
+  }
+
+  function projectPreviewPolicyHref(): string {
+    const params = new URLSearchParams({
+      projectId,
+      scope: "project",
+    });
+
+    return `/preview-policies?${params.toString()}`;
   }
 
   function projectModalBaseSearch(): string {
@@ -3220,6 +3230,23 @@
                           {$t(i18nKeys.console.projects.archivedAt)} · {formatTime(project.archivedAt)}
                         </span>
                       {/if}
+                    </div>
+                  </section>
+
+                  <section class="console-panel space-y-4 p-5" data-project-preview-policy-link>
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div class="min-w-0 space-y-1">
+                        <h2 class="text-lg font-semibold">
+                          {$t(i18nKeys.console.projects.previewPolicyTitle)}
+                        </h2>
+                        <p class="text-sm leading-6 text-muted-foreground">
+                          {$t(i18nKeys.console.projects.previewPolicyDescription)}
+                        </p>
+                      </div>
+                      <Button href={projectPreviewPolicyHref()} variant="outline">
+                        <ShieldCheck class="size-4" />
+                        {$t(i18nKeys.console.projects.previewPolicyAction)}
+                      </Button>
                     </div>
                   </section>
                 </section>

@@ -16,8 +16,10 @@ describe("preview policies console page", () => {
     expect(pageSource).toContain("scopeDialogOpen");
     expect(pageSource).toContain("data-preview-policy-scope-display-surface");
     expect(pageSource).toContain("data-preview-policy-scope-dialog");
-    expect(shellSource).toContain('href: "/preview-policies"');
-    expect(shellSource).toContain("i18nKeys.console.nav.previewPolicies");
+    expect(pageSource).toContain('page.url.searchParams.get("projectId")');
+    expect(pageSource).toContain('page.url.searchParams.get("resourceId")');
+    expect(shellSource).not.toContain('href: "/preview-policies"');
+    expect(shellSource).not.toContain("i18nKeys.console.nav.previewPolicies");
   });
 
   test("[PGP-WEB-003] keeps preview policy editing behind an intent dialog", async () => {
