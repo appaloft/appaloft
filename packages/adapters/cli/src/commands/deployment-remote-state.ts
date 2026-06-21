@@ -133,6 +133,7 @@ export type ServerAppliedRouteTlsMode = "auto" | "disabled";
 export interface ServerAppliedRouteDomainIntent {
   host: string;
   pathPrefix: string;
+  pathHandling?: "preserve" | "strip";
   tlsMode: ServerAppliedRouteTlsMode;
   redirectTo?: string;
   redirectStatus?: 301 | 302 | 307 | 308;
@@ -1466,6 +1467,7 @@ export class FileSystemServerAppliedRouteDesiredStateStore
       domains: input.domains.map((domain) => ({
         host: domain.host,
         pathPrefix: domain.pathPrefix,
+        pathHandling: domain.pathHandling ?? "preserve",
         tlsMode: domain.tlsMode,
         ...(domain.redirectTo ? { redirectTo: domain.redirectTo } : {}),
         ...(domain.redirectStatus ? { redirectStatus: domain.redirectStatus } : {}),

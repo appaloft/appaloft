@@ -12,7 +12,11 @@ import {
 } from "../shared/identifiers";
 import { CanonicalRedirectStatusCode } from "../shared/numeric-values";
 import { err, ok, type Result } from "../shared/result";
-import { type EdgeProxyKindValue, type TlsModeValue } from "../shared/state-machine";
+import {
+  type EdgeProxyKindValue,
+  RoutePathHandlingValue,
+  type TlsModeValue,
+} from "../shared/state-machine";
 import { type CreatedAt } from "../shared/temporal";
 import {
   type ErrorCodeText,
@@ -399,6 +403,7 @@ export interface DomainBindingState {
   destinationId?: DestinationId;
   domainName: PublicDomainName;
   pathPrefix: RoutePathPrefix;
+  pathHandling?: RoutePathHandlingValue;
   proxyKind: EdgeProxyKindValue;
   tlsMode: TlsModeValue;
   redirectTo?: PublicDomainName;
@@ -455,6 +460,7 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
     destinationId?: DestinationId;
     domainName: PublicDomainName;
     pathPrefix: RoutePathPrefix;
+    pathHandling?: RoutePathHandlingValue;
     proxyKind: EdgeProxyKindValue;
     tlsMode: TlsModeValue;
     redirectTo?: PublicDomainName;
@@ -512,6 +518,7 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
       ...(input.destinationId ? { destinationId: input.destinationId } : {}),
       domainName: input.domainName,
       pathPrefix: input.pathPrefix,
+      pathHandling: input.pathHandling ?? RoutePathHandlingValue.default(),
       proxyKind: input.proxyKind,
       tlsMode: input.tlsMode,
       ...(input.redirectTo ? { redirectTo: input.redirectTo } : {}),
@@ -550,6 +557,7 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
       ...(input.destinationId ? { destinationId: input.destinationId.value } : {}),
       domainName: input.domainName.value,
       pathPrefix: input.pathPrefix.value,
+      pathHandling: (input.pathHandling ?? RoutePathHandlingValue.default()).value,
       proxyKind: input.proxyKind.value,
       tlsMode: input.tlsMode.value,
       ...(input.redirectTo
@@ -683,6 +691,10 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
 
   get pathPrefix(): RoutePathPrefix {
     return this.state.pathPrefix;
+  }
+
+  get pathHandling(): RoutePathHandlingValue {
+    return this.state.pathHandling ?? RoutePathHandlingValue.default();
   }
 
   canServeCanonicalRedirectTarget(): boolean {
@@ -1164,6 +1176,7 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
   toState(): DomainBindingState {
     return {
       ...this.state,
+      pathHandling: this.pathHandling,
       verificationAttempts: [...this.state.verificationAttempts],
       ...(this.state.dnsObservation
         ? {

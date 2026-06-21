@@ -93,6 +93,10 @@ export const edgeProxyKinds = ["none", "traefik", "caddy"] as const;
 
 export type EdgeProxyKind = (typeof edgeProxyKinds)[number];
 
+export const routePathHandlingModes = ["preserve", "strip"] as const;
+
+export type RoutePathHandlingMode = (typeof routePathHandlingModes)[number];
+
 export const edgeProxyStatuses = ["pending", "starting", "ready", "failed", "disabled"] as const;
 
 export type EdgeProxyStatus = (typeof edgeProxyStatuses)[number];

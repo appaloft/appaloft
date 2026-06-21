@@ -38,6 +38,7 @@ import {
   PortNumber,
   ProviderKey,
   PublicDomainName,
+  RoutePathHandlingValue,
   RoutePathPrefix,
   RuntimeArtifactIntentValue,
   RuntimeArtifactKindValue,
@@ -425,6 +426,9 @@ function createAccessRoutes(input: {
             proxyKind: EdgeProxyKindValue.rehydrate(requestedAccessRoute.proxyKind),
             domains: publicDomains,
             pathPrefix: yield* RoutePathPrefix.create(requestedAccessRoute.pathPrefix),
+            pathHandling: RoutePathHandlingValue.rehydrate(
+              requestedAccessRoute.pathHandling ?? "preserve",
+            ),
             tlsMode: TlsModeValue.rehydrate(requestedAccessRoute.tlsMode),
             ...(input.fallbackPort ? { targetPort: PortNumber.rehydrate(input.fallbackPort) } : {}),
             ...(requestedAccessRoute.redirectTo
@@ -464,6 +468,9 @@ function createAccessRoutes(input: {
         proxyKind: EdgeProxyKindValue.rehydrate("none"),
         domains: [],
         pathPrefix: yield* RoutePathPrefix.create(input.requestedDeployment.pathPrefix ?? "/"),
+        pathHandling: RoutePathHandlingValue.rehydrate(
+          input.requestedDeployment.pathHandling ?? "preserve",
+        ),
         tlsMode: TlsModeValue.rehydrate("disabled"),
         targetPort: PortNumber.rehydrate(targetPort),
       });
@@ -486,6 +493,9 @@ function createAccessRoutes(input: {
       proxyKind: EdgeProxyKindValue.rehydrate(proxyKind),
       domains: publicDomains,
       pathPrefix: yield* RoutePathPrefix.create(input.requestedDeployment.pathPrefix ?? "/"),
+      pathHandling: RoutePathHandlingValue.rehydrate(
+        input.requestedDeployment.pathHandling ?? "preserve",
+      ),
       tlsMode: TlsModeValue.rehydrate(input.requestedDeployment.tlsMode ?? "auto"),
       ...(input.fallbackPort ? { targetPort: PortNumber.rehydrate(input.fallbackPort) } : {}),
     });

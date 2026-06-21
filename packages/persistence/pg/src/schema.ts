@@ -427,6 +427,7 @@ export interface DomainBindingsTable {
   destination_id: string | null;
   domain_name: string;
   path_prefix: string;
+  path_handling: string;
   proxy_kind: string;
   tls_mode: string;
   redirect_to: string | null;

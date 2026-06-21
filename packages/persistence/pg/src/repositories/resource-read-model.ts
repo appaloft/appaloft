@@ -52,6 +52,7 @@ type ResourceDomainBindingRow = {
   status: string;
   domain_name: string;
   path_prefix: string;
+  path_handling: string;
   proxy_kind: string;
   tls_mode: string;
   created_at: string;
@@ -185,6 +186,7 @@ function toResourceSummary(
       createdAt: normalizeTimestamp(domainBinding.created_at) ?? domainBinding.created_at,
       domainName: domainBinding.domain_name,
       pathPrefix: domainBinding.path_prefix,
+      pathHandling: domainBinding.path_handling === "strip" ? "strip" : "preserve",
       proxyKind: domainBinding.proxy_kind as ResourceAccessSummaryDomainBinding["proxyKind"],
       tlsMode: domainBinding.tls_mode as ResourceAccessSummaryDomainBinding["tlsMode"],
     })),
@@ -405,6 +407,7 @@ export class PgResourceReadModel implements ResourceReadModel {
                   "status",
                   "domain_name",
                   "path_prefix",
+                  "path_handling",
                   "proxy_kind",
                   "tls_mode",
                   "created_at",
@@ -532,6 +535,7 @@ export class PgResourceReadModel implements ResourceReadModel {
               "status",
               "domain_name",
               "path_prefix",
+              "path_handling",
               "proxy_kind",
               "tls_mode",
               "created_at",

@@ -78,6 +78,7 @@ export interface DockerSwarmRouteIntent {
   proxyKind: string;
   domains: string[];
   pathPrefix: string;
+  pathHandling: "preserve" | "strip";
   tlsMode: string;
   targetPort?: number;
   routeBehavior: "serve" | "redirect";
@@ -725,6 +726,7 @@ function renderRoutes(input: {
         proxyKind: route.proxyKind,
         domains: route.domains,
         pathPrefix: route.pathPrefix,
+        pathHandling: route.pathHandling,
         tlsMode: route.tlsMode,
         ...(targetPort ? { targetPort } : {}),
         routeBehavior: route.routeBehavior,
@@ -828,14 +830,25 @@ function routeLabels(input: {
     const router = proxyRouteName({ serviceName: input.serviceName, index });
     const service = `${router}-svc`;
     const entrypoint = route.tlsMode === "auto" ? "websecure" : "web";
+    const pathHandlingMiddleware =
+      route.pathHandling === "strip" && route.pathPrefix !== "/" ? `${router}-strip-prefix` : null;
+    const middlewares = [
+      ...(pathHandlingMiddleware ? [pathHandlingMiddleware] : []),
+      ...(accessFailureMiddleware ? [accessFailureMiddleware.middlewareName] : []),
+    ];
 
     return [
       "traefik.enable=true",
       `traefik.docker.network=${route.networkName}`,
       `traefik.http.routers.${router}.rule=${traefikRule(route)}`,
       `traefik.http.routers.${router}.entrypoints=${entrypoint}`,
-      ...(accessFailureMiddleware
-        ? [`traefik.http.routers.${router}.middlewares=${accessFailureMiddleware.middlewareName}`]
+      ...(middlewares.length > 0
+        ? [`traefik.http.routers.${router}.middlewares=${middlewares.join(",")}`]
+        : []),
+      ...(pathHandlingMiddleware
+        ? [
+            `traefik.http.middlewares.${pathHandlingMiddleware}.stripprefix.prefixes=${route.pathPrefix}`,
+          ]
         : []),
       ...(route.tlsMode === "auto"
         ? [

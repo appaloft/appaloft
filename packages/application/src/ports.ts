@@ -1013,6 +1013,7 @@ export interface DomainRouteBindingCandidate {
   id: string;
   domainName: string;
   pathPrefix: string;
+  pathHandling?: "preserve" | "strip";
   proxyKind: EdgeProxyKind;
   tlsMode: TlsMode;
   redirectTo?: string;
@@ -1045,6 +1046,7 @@ export interface ServerAppliedRouteDesiredStateTarget {
 export interface ServerAppliedRouteDesiredStateDomain {
   host: string;
   pathPrefix: string;
+  pathHandling?: "preserve" | "strip";
   tlsMode: TlsMode;
   redirectTo?: string;
   redirectStatus?: 301 | 302 | 307 | 308;
@@ -2521,6 +2523,7 @@ export interface EdgeProxyRouteInput {
   proxyKind: EdgeProxyKind;
   domains: string[];
   pathPrefix: string;
+  pathHandling?: "preserve" | "strip";
   tlsMode: TlsMode;
   targetPort?: number;
   providerKey?: string;
@@ -2601,6 +2604,7 @@ export interface ProxyConfigurationRouteView {
   scheme: "http" | "https";
   url: string;
   pathPrefix: string;
+  pathHandling?: "preserve" | "strip";
   tlsMode: TlsMode;
   targetPort?: number;
   source: "generated-default" | "domain-binding" | "deployment-snapshot" | "server-applied";
@@ -6279,6 +6283,7 @@ export interface DomainBindingSummary {
   destinationId?: string;
   domainName: string;
   pathPrefix: string;
+  pathHandling?: "preserve" | "strip";
   proxyKind: EdgeProxyKind;
   tlsMode: TlsMode;
   redirectTo?: string;
@@ -9180,6 +9185,7 @@ export interface RequestedAccessRouteConfig {
   proxyKind: EdgeProxyKind;
   domains: string[];
   pathPrefix: string;
+  pathHandling?: "preserve" | "strip";
   tlsMode: TlsMode;
   routeBehavior?: "serve" | "redirect";
   redirectTo?: string;
@@ -9209,6 +9215,7 @@ export interface RequestedDeploymentConfig {
   proxyKind?: EdgeProxyKind;
   domains?: string[];
   pathPrefix?: string;
+  pathHandling?: "preserve" | "strip";
   tlsMode?: TlsMode;
   accessRoutes?: RequestedAccessRouteConfig[];
   storageMounts?: RequestedDeploymentStorageMount[];

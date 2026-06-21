@@ -881,6 +881,7 @@ async function insertDomainBinding(
     tlsMode?: "auto" | "disabled";
     proxyKind?: "traefik" | "caddy";
     pathPrefix?: string;
+    pathHandling?: "preserve" | "strip";
     redirectTo?: string;
     redirectStatus?: 301 | 302 | 307 | 308;
   },
@@ -896,6 +897,7 @@ async function insertDomainBinding(
       destination_id: target.destinationId,
       domain_name: input.domainName,
       path_prefix: input.pathPrefix ?? "/",
+      path_handling: input.pathHandling ?? "preserve",
       proxy_kind: input.proxyKind ?? "traefik",
       tls_mode: input.tlsMode ?? "disabled",
       redirect_to: input.redirectTo ?? null,
@@ -1992,11 +1994,13 @@ describe("pglite persistence integration", () => {
         {
           host: "example.test",
           pathPrefix: "/",
+          pathHandling: "preserve",
           tlsMode: "auto",
         },
         {
           host: "www.example.test",
           pathPrefix: "/",
+          pathHandling: "preserve",
           tlsMode: "auto",
           redirectTo: "example.test",
           redirectStatus: 308,

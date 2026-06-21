@@ -292,6 +292,7 @@ describe("renderDockerSwarmRuntimeIntent", () => {
         proxyKind: "traefik",
         domains: ["pr-1.example.com"],
         pathPrefix: "/",
+        pathHandling: "preserve",
         tlsMode: "auto",
         targetPort: 3000,
         routeBehavior: "serve",

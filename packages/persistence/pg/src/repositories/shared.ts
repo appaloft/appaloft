@@ -150,6 +150,7 @@ import {
   ResourceStorageAttachmentId,
   ResourceStorageMountModeValue,
   RotatedAt,
+  RoutePathHandlingValue,
   RoutePathPrefix,
   RuntimeArtifactIntentValue,
   RuntimeArtifactKindValue,
@@ -1346,6 +1347,9 @@ export function rehydrateDomainBindingRow(row: Selectable<Database["domain_bindi
     ...(row.destination_id ? { destinationId: DestinationId.rehydrate(row.destination_id) } : {}),
     domainName: PublicDomainName.rehydrate(row.domain_name),
     pathPrefix: RoutePathPrefix.rehydrate(row.path_prefix),
+    pathHandling: RoutePathHandlingValue.rehydrate(
+      row.path_handling === "strip" ? "strip" : "preserve",
+    ),
     proxyKind: EdgeProxyKindValue.rehydrate(row.proxy_kind as EdgeProxyKindInput),
     tlsMode: TlsModeValue.rehydrate(row.tls_mode as TlsModeInput),
     ...(row.redirect_to ? { redirectTo: PublicDomainName.rehydrate(row.redirect_to) } : {}),

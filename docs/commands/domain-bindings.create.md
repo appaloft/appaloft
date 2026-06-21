@@ -82,6 +82,7 @@ command.
 | `destinationId` | Optional with `serverId` | Destination route placement hint for server-backed resources. |
 | `domainName` | Required | Public DNS hostname. Must not include scheme, path, or port. |
 | `pathPrefix` | Optional | Route path prefix. Defaults to `/`. |
+| `pathHandling` | Optional | `preserve` or `strip`. Defaults to `preserve`. `strip` removes `pathPrefix` before proxying served traffic upstream. |
 | `edgeProxyProviderKey` | Optional | Opaque provider key. When omitted, the binding uses the target/server's resolved edge proxy provider. |
 | `tlsMode` | Optional | `auto` or `disabled`. Defaults to `auto`. |
 | `redirectTo` | Optional | Existing served domain binding target for a managed canonical redirect. Must be a hostname in the same project/environment/resource/path owner scope. |
@@ -99,7 +100,7 @@ The command must:
 
 1. Validate command input.
 2. Normalize and validate `domainName`.
-3. Validate `pathPrefix`, optional edge proxy provider key, and `tlsMode`.
+3. Validate `pathPrefix`, `pathHandling`, optional edge proxy provider key, and `tlsMode`.
 4. Resolve project, environment, resource, and any supplied server/destination target hints.
 5. Reject cross-project/environment/destination mismatches when server target hints are supplied.
 6. Reject duplicate active bindings for the same normalized `domainName`, `pathPrefix`, and environment/resource scope.
