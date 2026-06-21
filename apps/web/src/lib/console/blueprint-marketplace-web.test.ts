@@ -44,6 +44,7 @@ describe("Blueprint marketplace console surface", () => {
     );
 
     expect(shellSource).toContain("{#each navigationExtensions as extension");
+    expect(shellSource).toContain("isWorkspaceNavigationExtension");
     expect(shellSource).not.toContain("i18nKeys.console.nav.extensions");
   });
 
