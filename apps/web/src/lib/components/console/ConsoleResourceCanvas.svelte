@@ -12,7 +12,7 @@
 </script>
 
 <div
-  class={cn("mx-auto w-full max-w-5xl space-y-6", consolePageContentClass, className)}
+  class={cn("mx-auto w-full max-w-7xl space-y-6", consolePageContentClass, className)}
   data-console-resource-canvas
   {...restProps}
 >

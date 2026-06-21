@@ -11,6 +11,14 @@ const consoleStatePanelSource = readFileSync(
   fileURLToPath(new URL("../components/console/ConsoleStatePanel.svelte", import.meta.url)),
   "utf8",
 );
+const consoleResourceCanvasSource = readFileSync(
+  fileURLToPath(new URL("../components/console/ConsoleResourceCanvas.svelte", import.meta.url)),
+  "utf8",
+);
+const consoleExtensionPageSource = readFileSync(
+  fileURLToPath(new URL("../components/console/ConsoleExtensionPage.svelte", import.meta.url)),
+  "utf8",
+);
 const resourceListTableSource = readFileSync(
   fileURLToPath(new URL("../components/console/ResourceListTable.svelte", import.meta.url)),
   "utf8",
@@ -503,6 +511,13 @@ function functionBody(source: string, signature: string): string {
 }
 
 describe("console page structure", () => {
+  test("[CONSOLE-LAYOUT-001] gives collection pages a wider centered canvas", () => {
+    expect(consoleResourceCanvasSource).toContain("mx-auto w-full max-w-7xl space-y-6");
+    expect(consoleResourceCanvasSource).toContain("consolePageContentClass");
+    expect(consoleResourceCanvasSource).not.toContain("max-w-5xl");
+    expect(consoleExtensionPageSource).toContain('<ConsoleResourceCanvas class="max-w-7xl">');
+  });
+
   test("[CONSOLE-DISPLAY-STATE-IA-000] keeps console routes free of default-page forms", () => {
     const pagesWithDefaultForms = routePageSources(routesRootPath)
       .filter(({ path }) => focusedFlowRouteSegments.every((segment) => !path.includes(segment)))
