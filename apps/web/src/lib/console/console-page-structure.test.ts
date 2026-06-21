@@ -41,6 +41,10 @@ const runtimeMonitorPanelSource = readFileSync(
   fileURLToPath(new URL("../components/console/RuntimeMonitorPanel.svelte", import.meta.url)),
   "utf8",
 );
+const runtimeUsagePanelSource = readFileSync(
+  fileURLToPath(new URL("../components/console/RuntimeUsagePanel.svelte", import.meta.url)),
+  "utf8",
+);
 const resourceDetailRouteSource = readFileSync(
   fileURLToPath(
     new URL("../../routes/resources/[resourceId=consoleObjectId]/+page.ts", import.meta.url),
@@ -1418,6 +1422,18 @@ describe("console page structure", () => {
     expect(resourceDetailPageSource).toContain('id="resource-domain-binding-dns-apply"');
   });
 
+  test("[RESOURCE-PROXY-UI-001] keeps proxy configuration summary tiles visually bounded", () => {
+    const proxyConfigurationSource = sourceBetween(
+      resourceDetailPageSource,
+      'id="resource-proxy-configuration"',
+      'id="resource-configuration-profile"',
+    );
+
+    expect(
+      proxyConfigurationSource.match(/class="rounded-md border bg-muted\/25 px-3 py-2"/g),
+    ).toHaveLength(4);
+  });
+
   test("[RESOURCE-DEPENDENCIES-IA-001] keeps dependency binding forms behind a focused dialog", () => {
     const resourceDependencyBindingsSectionSource = sourceBetween(
       resourceDetailPageSource,
@@ -2094,6 +2110,9 @@ describe("console page structure", () => {
     expect(serverConnectivityTabSource).toContain("onclick={testConnectivity}");
     expect(serverConnectivityTabSource).toContain("connectivityMutation.isPending");
     expect(serverConnectivityTabSource).toContain("connectivityResult");
+    expect(serverConnectivityTabSource).toContain(
+      'class="rounded-md border bg-muted/25 px-4 py-4 text-sm text-muted-foreground"',
+    );
   });
 
   test("[SERVER-DETAIL-IA-002] keeps rename editing behind a single-intent dialog", () => {
@@ -2578,6 +2597,12 @@ describe("console page structure", () => {
     );
     expect(dependencyResourceListSource).toContain("resource.bindingReadiness.status");
     expect(dependencyResourceListSource).toContain("resource.sourceMode");
+    expect(dependencyResourceListSource).toContain(
+      'class="console-record-row rounded-md border bg-background lg:grid-cols-[minmax(0,1fr)_auto]"',
+    );
+    expect(
+      dependencyResourceListSource.match(/class="rounded-md border bg-muted\/20 px-3 py-2"/g),
+    ).toHaveLength(4);
     expect(dependencyResourcesPageSource).not.toContain(
       "data-dependency-resource-detail-display-surface",
     );
@@ -2634,6 +2659,10 @@ describe("console page structure", () => {
     expect(dependencyResourceDeleteDialogSource).toContain(
       "disabled={!canDeleteSelectedDependencyResource || deleteDependencyResourceMutation.isPending}",
     );
+  });
+
+  test("[RT-USAGE-UI-001] renders runtime usage metric tiles with visible card borders", () => {
+    expect(runtimeUsagePanelSource).toContain('class="rounded-md border bg-muted/30 px-3 py-2"');
   });
 
   test("[BLUEPRINT-INSTALL-IA-001] keeps Blueprint install inputs behind intent dialogs", () => {

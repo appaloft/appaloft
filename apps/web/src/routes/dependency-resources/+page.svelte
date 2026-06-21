@@ -656,9 +656,9 @@
               </p>
             </section>
           {:else}
-            <div class="console-record-list" data-dependency-resource-list-display-surface>
+            <div class="space-y-3" data-dependency-resource-list-display-surface>
               {#each filteredDependencyResources as resource (resource.id)}
-                <article class="console-record-row lg:grid-cols-[minmax(0,1fr)_auto]">
+                <article class="console-record-row rounded-md border bg-background lg:grid-cols-[minmax(0,1fr)_auto]">
                   <div class="min-w-0 space-y-3">
                     <div class="flex min-w-0 flex-wrap items-center gap-2">
                       <Badge variant="outline">{kindLabel(resource.kind)}</Badge>
@@ -671,7 +671,7 @@
                       </Badge>
                     </div>
                     <div class="grid gap-2 text-xs text-muted-foreground md:grid-cols-2 xl:grid-cols-4">
-                      <div class="rounded-md bg-muted/20 px-3 py-2">
+                      <div class="rounded-md border bg-muted/20 px-3 py-2">
                         <p class="uppercase tracking-wide">
                           {$t(i18nKeys.common.domain.project)}
                         </p>
@@ -679,7 +679,7 @@
                           {projectName(resource.projectId)}
                         </p>
                       </div>
-                      <div class="rounded-md bg-muted/20 px-3 py-2">
+                      <div class="rounded-md border bg-muted/20 px-3 py-2">
                         <p class="uppercase tracking-wide">
                           {$t(i18nKeys.common.domain.environment)}
                         </p>
@@ -687,7 +687,7 @@
                           {environmentName(resource.environmentId)}
                         </p>
                       </div>
-                      <div class="rounded-md bg-muted/20 px-3 py-2">
+                      <div class="rounded-md border bg-muted/20 px-3 py-2">
                         <p class="uppercase tracking-wide">
                           {$t(i18nKeys.console.dependencyResources.sourceMode)}
                         </p>
@@ -695,7 +695,7 @@
                           {resource.sourceMode}
                         </p>
                       </div>
-                      <div class="rounded-md bg-muted/20 px-3 py-2">
+                      <div class="rounded-md border bg-muted/20 px-3 py-2">
                         <p class="uppercase tracking-wide">
                           {$t(i18nKeys.console.dependencyResources.backupRetention)}
                         </p>
