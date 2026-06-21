@@ -486,7 +486,13 @@ describe("console page structure", () => {
           const lastDialogOpen = beforeForm.lastIndexOf("<Dialog.Root");
           const lastDialogClose = beforeForm.lastIndexOf("</Dialog.Root>");
 
-          if (lastDialogOpen <= lastDialogClose) return true;
+          if (lastDialogOpen <= lastDialogClose) {
+            const formOpeningSource = source.slice(formIndex, formIndex + 500);
+            if (formOpeningSource.includes("data-resource-storage-backup-form")) {
+              continue;
+            }
+            return true;
+          }
         }
 
         return false;
@@ -997,13 +1003,18 @@ describe("console page structure", () => {
         resourceDetailPageSource.indexOf("<div class={detailBodyClass}>"),
       ),
     );
+    const resourceOverviewSource = sourceBetween(
+      resourceDetailPageSource,
+      '{:else if activeTab === "overview"}',
+      '{:else if activeTab === "networking"',
+    );
 
-    expect(resourceDetailBodySource).not.toContain("<form");
-    expect(resourceDetailBodySource).not.toContain('type="submit"');
-    expect(resourceDetailBodySource).not.toContain("<Input");
-    expect(resourceDetailBodySource).not.toContain("<Textarea");
-    expect(resourceDetailBodySource).not.toContain("<select");
-    expect(resourceDetailBodySource).not.toContain("<Select.Root");
+    expect(resourceOverviewSource).not.toContain("<form");
+    expect(resourceOverviewSource).not.toContain('type="submit"');
+    expect(resourceOverviewSource).not.toContain("<Input");
+    expect(resourceOverviewSource).not.toContain("<Textarea");
+    expect(resourceOverviewSource).not.toContain("<select");
+    expect(resourceOverviewSource).not.toContain("<Select.Root");
     expect(resourceDetailBodySource).toContain("onclick={openResourceDeploymentDialog}");
     expect(resourceDetailBodySource).toContain("onclick={openResourceDomainBindingCreateDialog}");
     expect(resourceDetailBodySource).toContain("onclick={openScheduledTaskCreateDialog}");
@@ -1408,6 +1419,24 @@ describe("console page structure", () => {
     expect(dependencyUnbindDialogSource).toContain("unbindDependencyResource");
     expect(dependencyUnbindDialogSource).toContain("selectedDependencyBindingForUnbind");
     expect(dependencyUnbindDialogSource).toContain("dependencyUnbindWarning");
+  });
+
+  test("[RESOURCE-STORAGE-IA-001] exposes storage backup actions inside the storage workflow", () => {
+    const resourceStorageSectionSource = sourceBetween(
+      resourceDetailPageSource,
+      '<section id="resource-storage"',
+      '{:else if activeResourceSection === "diagnostics"}',
+    );
+
+    expect(resourceStorageSectionSource).toContain("data-resource-storage-backup-form");
+    expect(resourceStorageSectionSource).toContain("onsubmit={(event) =>");
+    expect(resourceStorageSectionSource).toContain("planStorageBackup()");
+    expect(resourceStorageSectionSource).toContain("<Input");
+    expect(resourceStorageSectionSource).toContain("<Select.Root");
+    expect(resourceStorageSectionSource).toContain('type="submit"');
+    expect(resourceStorageSectionSource).toContain("onclick={createStorageBackup}");
+    expect(resourceStorageSectionSource).toContain("restoreStorageBackup(backup)");
+    expect(resourceStorageSectionSource).toContain("pruneStorageBackup(backup)");
   });
 
   test("[RESOURCE-DETAIL-IA-002] keeps resource destructive actions behind intent dialogs", () => {

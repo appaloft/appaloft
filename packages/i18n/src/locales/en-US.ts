@@ -2105,7 +2105,7 @@ export const enUS = {
       storageVolume: "Storage volume",
       storageVolumeAttachmentCount: "{{count}} attachments",
       storageVolumeBackupSummaryDescription:
-        "Restore points belong to storage volumes. This page shows the current owner summary; backup and cleanup controls stay in focused governance flows.",
+        "Restore points belong to storage volumes. Use the volume backup flow to plan, create, restore to a new volume, or prune backup artifacts.",
       storageVolumeBackupSummaryTitle: "Backup restore points",
       storageBackupRestorePointCount: "{{count}} restore points",
       storageBackupPolicyOptional: "Optional",
@@ -2143,7 +2143,7 @@ export const enUS = {
       storageVolumesLoading: "Loading storage volumes...",
       storageBackupTitle: "Volume backups",
       storageBackupDescription:
-        "Plan, create, inspect, restore, and prune backups for mounted application data. This does not use dependency-resource backup commands.",
+        "Plan, create, inspect, restore, and prune backups for mounted application data. Local filesystem targets stay on the runtime host and are not disaster recovery.",
       storageBackupDataFormat: "Data format",
       storageBackupDestinationPath: "Mounted path",
       storageBackupConsistency: "Consistency",
