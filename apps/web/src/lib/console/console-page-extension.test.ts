@@ -126,6 +126,12 @@ describe("Console page extension surface", () => {
     expect(rendererSource).toContain("row.details?.href");
     expect(rendererSource).toContain("navigateConsolePageHref(row.details.href)");
     expect(rendererSource).toContain("align-middle");
+    expect(rendererSource).toContain('kind: "datetime"');
+    expect(rendererSource).toContain('format?: "short" | "date-time"');
+    expect(rendererSource).toContain("formatConsoleDateTime(value)");
+    expect(rendererSource).toContain("new Intl.DateTimeFormat($locale || undefined");
+    expect(rendererSource).toContain("displayValueText(cell.text)");
+    expect(rendererSource).toContain("displayValueText(row.value)");
     expect(rendererSource).toContain('kind: "dialog-panel-grid"');
     expect(rendererSource).toContain('kind: "integration-catalog"');
     expect(rendererSource).toContain('layout?: "catalog-grid" | "settings-list"');
