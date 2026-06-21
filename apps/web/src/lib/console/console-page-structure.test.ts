@@ -1047,6 +1047,12 @@ describe("console page structure", () => {
     expect(resourceOverviewSource).not.toContain("<Textarea");
     expect(resourceOverviewSource).not.toContain("<select");
     expect(resourceOverviewSource).not.toContain("<Select.Root");
+    expect(resourceOverviewSource).not.toContain(
+      "xl:grid-cols-[minmax(0,1.1fr)_minmax(20rem,0.9fr)]",
+    );
+    expect(resourceDetailPageSource).not.toContain(
+      "xl:grid-cols-[minmax(0,1.1fr)_minmax(20rem,0.9fr)]",
+    );
     expect(resourceDetailBodySource).toContain("onclick={openResourceDeploymentDialog}");
     expect(resourceDetailBodySource).toContain("onclick={openResourceDomainBindingCreateDialog}");
     expect(resourceDetailBodySource).toContain("onclick={openScheduledTaskCreateDialog}");
