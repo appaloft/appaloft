@@ -1593,13 +1593,14 @@ export const zhCN = {
       deleteCheckSafeTitle: "可以删除",
       deleteConfirmLabel: "输入域名绑定 ID 确认删除",
       deleteDialogDescription:
-        "删除只影响这个域名绑定的活跃生命周期；生成访问、部署快照和审计仍会保留。",
+        "删除只影响这个域名绑定的活跃生命周期；生成访问、部署快照和审计仍会保留。手动 DNS 记录不会自动删除；如需清理托管记录，请使用 DNS 连接器清理流程或到 DNS 提供商删除。",
       deleteDialogTitle: "删除域名绑定",
       deleteErrorTitle: "无法删除域名绑定",
       dangerZoneDescription: "删除只应在检查绑定安全性后执行；日常治理列表不直接暴露破坏性操作。",
       dangerZoneTitle: "危险区",
       deleteSafety: "删除安全性",
-      deleteSafetyPreserves: "生成访问地址、部署快照和路由审计都会保留。",
+      deleteSafetyPreserves:
+        "生成访问地址、部署快照和路由审计都会保留；这个删除操作不会自动删除用户手动维护的 DNS 记录。",
       deleteSuccessTitle: "域名绑定已删除",
       detailDescription: "查看单个域名绑定的身份、资源归属、路由、DNS 和生命周期状态。",
       detailIdentityDescription: "稳定标识、域名和当前绑定状态。",

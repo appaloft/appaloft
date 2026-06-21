@@ -18,6 +18,8 @@
 - [x] Add `domain-bindings.configure-route` as the specific route-behavior update operation.
 - [x] Add `domain-bindings.delete-check`.
 - [x] Add guarded `domain-bindings.delete`.
+- [x] Expose resource-scoped Web delete action that runs delete-check before the guarded delete
+      command.
 - [x] Add `domain-bindings.retry-verification`.
 - [x] Keep certificate readiness read-only and do not add certificate revoke/delete/retry.
 - [x] Keep `deployments.create` ids-only and do not add deployment retry/redeploy/rollback.
