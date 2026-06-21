@@ -957,6 +957,20 @@ describe("console page structure", () => {
     }
   });
 
+  test("[CONSOLE-NAV-IA-002] keeps preview policies contextual instead of workspace primary navigation", () => {
+    expect(consoleShellSource).not.toContain('href: "/preview-policies"');
+    expect(consoleShellSource).not.toContain("i18nKeys.console.nav.previewPolicies");
+    expect(projectDetailPageSource).toContain("function projectPreviewPolicyHref()");
+    expect(projectDetailPageSource).toContain("data-project-preview-policy-link");
+    expect(projectDetailPageSource).toContain('scope: "project"');
+    expect(resourceDetailPageSource).toContain("function resourcePreviewPolicyHref()");
+    expect(resourceDetailPageSource).toContain("data-resource-preview-policy-link");
+    expect(resourceDetailPageSource).toContain('scope: "resource"');
+    expect(previewPoliciesPageSource).toContain("const searchParams = page.url.searchParams");
+    expect(previewPoliciesPageSource).toContain('searchParams.get("projectId")');
+    expect(previewPoliciesPageSource).toContain('searchParams.get("resourceId")');
+  });
+
   test("[PROJECT-NAV-IA-001] uses the plural Previews tab contract for project previews", () => {
     const projectDetailTabModelSource = sourceBetween(
       projectDetailPageSource,
@@ -2531,6 +2545,11 @@ describe("console page structure", () => {
     const dependencyResourceDetailDisplaySource = sourceBetween(
       dependencyResourceDetailPageSource,
       "data-dependency-resource-detail-display-surface",
+      "data-dependency-resource-danger-zone",
+    );
+    const dependencyResourceDangerZoneSource = sourceBetween(
+      dependencyResourceDetailPageSource,
+      "data-dependency-resource-danger-zone",
       "{#if selectedDependencyResource}",
     );
     expect(dependencyResourceListSource).not.toContain("dependency-resource-delete-action");
@@ -2567,7 +2586,9 @@ describe("console page structure", () => {
     expect(dependencyResourceDetailDisplaySource).not.toContain("deleteDialogTitle");
     expect(dependencyResourceDetailDisplaySource).toContain("lifecycleDescription");
     expect(dependencyResourceDetailDisplaySource).not.toContain("deleteDialogDescription");
-    expect(dependencyResourceDetailDisplaySource).toContain("lifecycleManageAction");
+    expect(dependencyResourceDetailDisplaySource).toContain(
+      "data-dependency-resource-lifecycle-handoff",
+    );
     expect(dependencyResourceDetailDisplaySource).toContain("backupManageAction");
     expect(dependencyResourceDetailDisplaySource).toContain("restoreManageAction");
     expect(dependencyResourceDetailDisplaySource).not.toContain("restoreAction");
@@ -2580,7 +2601,13 @@ describe("console page structure", () => {
     expect(dependencyResourceDetailDisplaySource).not.toContain('type="submit"');
     expect(dependencyResourceDetailDisplaySource).toContain("openRestoreBackupDialog");
     expect(dependencyResourceDetailDisplaySource).toContain("openBackupPolicyDialog");
-    expect(dependencyResourceDetailDisplaySource).toContain("openDeleteDependencyResourceDialog");
+    expect(dependencyResourceDetailDisplaySource).not.toContain(
+      "openDeleteDependencyResourceDialog",
+    );
+    expect(dependencyResourceDangerZoneSource).toContain("dangerZoneTitle");
+    expect(dependencyResourceDangerZoneSource).toContain("deleteBlockedTitle");
+    expect(dependencyResourceDangerZoneSource).toContain("openDeleteDependencyResourceDialog");
+    expect(dependencyResourceDangerZoneSource).not.toContain('variant="destructive"');
     const dependencyResourceDeleteDialogSource =
       dependencyResourceDetailPageSource.match(
         /<Dialog\.Root bind:open={deleteDependencyResourceDialogOpen}[\s\S]*?<\/Dialog\.Root>/,

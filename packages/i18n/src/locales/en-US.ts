@@ -497,6 +497,7 @@ export const enUS = {
       backupDescription:
         "Create a provider backup for the selected dependency resource. Lists show only safe backup references.",
       backupFailed: "Backup failed",
+      backupHistorySection: "Backup history",
       backupListTitle: "Backups and restore",
       backupManageAction: "Open backup flow",
       backupRetention: "Require backup retention",
@@ -594,9 +595,12 @@ export const enUS = {
       modeReuseDescription: "Register an existing external dependency resource.",
       createUnavailable: "This dependency kind cannot be created yet.",
       namePlaceholder: "Main database",
+      overviewTab: "Overview",
       pageDescription:
         "Provision, backup, restore, and delete managed database, cache, object storage, and search services.",
       pageTitle: "Dependency resources",
+      backupsTab: "Backups",
+      settingsTab: "Settings",
       planCreated: "Provisioning plan created",
       planFailed: "Provisioning plan failed",
       planReady: "Provisioning plan",
@@ -1640,6 +1644,9 @@ export const enUS = {
       previewResourcesDescription:
         "Resources whose environment kind is preview. These include previews without a source-driven preview record.",
       previewResourcesTitle: "Preview resources",
+      previewPolicyAction: "Open preview policy",
+      previewPolicyDescription: "Manage the default product-grade preview rules for this project.",
+      previewPolicyTitle: "Preview policy",
       previewTitle: "Preview",
       previewsTitle: "Previews",
       allEnvironments: "All environments",
@@ -2580,6 +2587,7 @@ export const enUS = {
       runtimeStrategyWorkspaceCommands: "Workspace commands",
       serviceTopologyDescription: "Declared service boundaries inside this resource.",
       serviceTopologyTitle: "Service topology",
+      previewPolicyAction: "Preview policy",
       settingsDescription:
         "Identity, placement, lifecycle, and links to the resource areas that own detailed changes.",
       settingsHandoffsDescription:
