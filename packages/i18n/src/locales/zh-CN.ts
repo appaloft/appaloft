@@ -665,6 +665,8 @@ export const zhCN = {
       progressColumnPhase: "阶段",
       progressColumnSource: "来源",
       progressColumnTime: "时间",
+      progressCompletionDescription: "最新部署已经完成，公网访问入口已就绪。",
+      progressCompletionTitle: "部署完成",
       progressDescription: "这里显示和 CLI 同源的部署阶段、Appaloft 日志和应用输出。",
       progressParseError: "无法解析部署进度。",
       progressPhaseDeploy: "部署",

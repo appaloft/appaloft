@@ -129,6 +129,7 @@
   import { Textarea } from "$lib/components/ui/textarea";
   import {
     createDeploymentWithProgress,
+    isTerminalDeploymentProgressEvent,
     observeDeploymentProgressAfterAcceptance,
     type DeploymentProgressDialogStatus,
   } from "$lib/console/deployment-progress";
@@ -2028,9 +2029,12 @@
 
     if (event.status === "failed") {
       deploymentProgressDialogStatus = "failed";
-    } else if (event.status === "succeeded") {
+    } else if (isTerminalDeploymentProgressEvent(event)) {
       deploymentProgressDialogStatus = "succeeded";
-    } else {
+    } else if (
+      deploymentProgressDialogStatus !== "succeeded" &&
+      deploymentProgressDialogStatus !== "failed"
+    ) {
       deploymentProgressDialogStatus = "running";
     }
   }
