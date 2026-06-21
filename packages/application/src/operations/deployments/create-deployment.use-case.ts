@@ -146,6 +146,9 @@ function compactMetadata(input: Record<string, string | undefined>): Record<stri
 
 const createDeploymentOperation = findOperationCatalogEntryByKey("deployments.create");
 const redeployDeploymentOperation = findOperationCatalogEntryByKey("deployments.redeploy");
+const forceRedeployDeploymentOperation = findOperationCatalogEntryByKey(
+  "deployments.force-redeploy",
+);
 const defaultOperationGuardPort = new AllowAllOperationGuardPort();
 
 function previewMetadataForEnvironment(input: {
@@ -725,7 +728,7 @@ export class CreateDeploymentUseCase {
     recovery?: {
       triggerKind: DeploymentTriggerKindValue;
       sourceDeploymentId?: string;
-      ownerLabel: "deployments.create" | "deployments.redeploy";
+      ownerLabel: "deployments.create" | "deployments.redeploy" | "deployments.force-redeploy";
     },
   ): Promise<Result<{ id: string }>> {
     const {
@@ -805,9 +808,11 @@ export class CreateDeploymentUseCase {
       const serverState = server.toState();
       const destinationState = destination.toState();
       const operationEntry =
-        recovery?.ownerLabel === "deployments.redeploy"
-          ? redeployDeploymentOperation
-          : createDeploymentOperation;
+        recovery?.ownerLabel === "deployments.force-redeploy"
+          ? forceRedeployDeploymentOperation
+          : recovery?.ownerLabel === "deployments.redeploy"
+            ? redeployDeploymentOperation
+            : createDeploymentOperation;
       if (operationEntry) {
         const checked = await checkOperationGuards({
           context,
@@ -1033,7 +1038,8 @@ export class CreateDeploymentUseCase {
       const admittedDeploymentResult = await mutationCoordinator.runExclusive({
         context,
         policy:
-          recovery?.ownerLabel === "deployments.redeploy"
+          recovery?.ownerLabel === "deployments.redeploy" ||
+          recovery?.ownerLabel === "deployments.force-redeploy"
             ? mutationCoordinationPolicies.redeployDeployment
             : mutationCoordinationPolicies.createDeployment,
         scope: deploymentResourceRuntimeScope({ resource, server, destination }),

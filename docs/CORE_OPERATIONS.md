@@ -970,6 +970,7 @@ Implemented operations:
 | Read deployment recovery readiness | Query | `deployments.recovery-readiness` | `DeploymentRecoveryReadinessQuery` | `DeploymentRecoveryReadinessQueryInput` | `appaloft deployments recovery-readiness <deploymentId>` | `GET /api/deployments/{deploymentId}/recovery-readiness` |
 | Retry deployment attempt | Command | `deployments.retry` | `RetryDeploymentCommand` | `RetryDeploymentCommandInput` | `appaloft deployments retry <deploymentId>` | `POST /api/deployments/{deploymentId}/retry` |
 | Redeploy current resource profile | Command | `deployments.redeploy` | `RedeployDeploymentCommand` | `RedeployDeploymentCommandInput` | `appaloft deployments redeploy <resourceId>` | `POST /api/resources/{resourceId}/redeploy` |
+| Force redeploy current resource profile | Command | `deployments.force-redeploy` | `ForceRedeployDeploymentCommand` | `ForceRedeployDeploymentCommandInput` | `appaloft deployments force-redeploy <resourceId>` | `POST /api/resources/{resourceId}/force-redeploy` |
 | Roll back deployment | Command | `deployments.rollback` | `RollbackDeploymentCommand` | `RollbackDeploymentCommandInput` | `appaloft deployments rollback <deploymentId> --candidate <rollbackCandidateDeploymentId>` | `POST /api/deployments/{deploymentId}/rollback` |
 | Cancel active deployment attempt | Command | `deployments.cancel` | `CancelDeploymentCommand` | `CancelDeploymentCommandInput` | `appaloft deployments cancel <deploymentId> --confirm <deploymentId>` | `POST /api/deployments/{deploymentId}/cancel` |
 | Archive deployment attempt | Command | `deployments.archive` | `ArchiveDeploymentCommand` | `ArchiveDeploymentCommandInput` | `appaloft deployments archive <deploymentId> --confirm <deploymentId>` | `POST /api/deployments/{deploymentId}/archive` |
@@ -1286,6 +1287,10 @@ Product-grade preview policy operations:
   [Deployment Retry And Redeploy](./specs/040-deployment-retry-redeploy/spec.md). Redeploy
   delegates through `deployments.create` and uses the create-deployment process-attempt projection
   path with operation key `deployments.redeploy`.
+- `deployments.force-redeploy` follows the same current-profile admission path as
+  `deployments.redeploy`, records `triggerKind = force-redeploy`, and asks runtime adapters to
+  refresh runtime artifacts with Docker image pull/no-cache behavior where supported. It does not
+  mutate Resource profile fields or automatically deploy after configuration writes.
 - `deployments.rollback` creates a new rollback deployment attempt from a retained successful
   candidate's immutable snapshot and Docker/OCI artifact identity. It does not re-plan from the
   current Resource profile and does not roll back databases, volumes, or external dependencies. Its

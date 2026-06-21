@@ -574,6 +574,7 @@ function highValueToolSummary(): JsonObject[] {
     "deployments.recovery-readiness",
     "deployments.retry",
     "deployments.redeploy",
+    "deployments.force-redeploy",
     "deployments.rollback",
     "static-artifacts.publish-payload",
     "static-artifacts.publish-archive",

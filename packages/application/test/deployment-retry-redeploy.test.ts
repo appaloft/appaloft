@@ -62,6 +62,7 @@ import {
   type CreateDeploymentUseCase,
   DeploymentFactory,
   DeploymentLifecycleService,
+  ForceRedeployDeploymentUseCase,
   RedeployDeploymentUseCase,
   RetryDeploymentUseCase,
 } from "../src/use-cases";
@@ -550,6 +551,49 @@ describe("RedeployDeploymentUseCase", () => {
       },
     });
     expect(createDeploymentUseCase.calls[0]?.recovery?.triggerKind.value).toBe("redeploy");
+  });
+});
+
+describe("ForceRedeployDeploymentUseCase", () => {
+  test("[DEP-FORCE-REDEPLOY-001] creates a force redeploy from the current profile", async () => {
+    const repository = new MemoryDeploymentRepository();
+    repository.items.set("dep_source", sourceDeployment("failed"));
+    const createDeploymentUseCase = new RecordingCreateDeploymentUseCase();
+    const context = createExecutionContext({
+      requestId: "req_force_redeploy_deployment_test",
+      entrypoint: "system",
+    });
+    const useCase = new ForceRedeployDeploymentUseCase(
+      repository,
+      createDeploymentUseCase as unknown as CreateDeploymentUseCase,
+    );
+
+    const result = await useCase.execute(context, {
+      resourceId: "res_demo",
+      projectId: "prj_current",
+      environmentId: "env_current",
+      serverId: "srv_current",
+      destinationId: "dst_current",
+      sourceDeploymentId: "dep_source",
+      readinessGeneratedAt: "2026-01-01T00:00:12.000Z",
+    });
+
+    expect(result).toEqual(ok({ id: "dep_redeploy" }));
+    expect(createDeploymentUseCase.calls).toHaveLength(1);
+    expect(createDeploymentUseCase.calls[0]).toMatchObject({
+      input: {
+        projectId: "prj_current",
+        environmentId: "env_current",
+        serverId: "srv_current",
+        destinationId: "dst_current",
+        resourceId: "res_demo",
+      },
+    });
+    expect(createDeploymentUseCase.calls[0]?.recovery?.triggerKind.value).toBe("force-redeploy");
+    expect(createDeploymentUseCase.calls[0]?.recovery).toMatchObject({
+      sourceDeploymentId: "dep_source",
+      ownerLabel: "deployments.force-redeploy",
+    });
   });
 });
 

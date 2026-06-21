@@ -310,6 +310,10 @@ function isRemoteGitSourceKind(kind: string): boolean {
   );
 }
 
+function isForceRedeployDeployment(state: DeploymentState): boolean {
+  return state.triggerKind.value === "force-redeploy";
+}
+
 function isLocalWorkspaceSourceKind(kind: string): boolean {
   return kind === "local-folder" || kind === "local-git" || kind === "compose";
 }
@@ -1296,7 +1300,7 @@ export class SshExecutionBackend implements ExecutionBackend {
     | { status: "resolved"; metadata: Record<string, string> }
     | { status: "failed"; message: string; retryable: boolean }
   > {
-    if (!requiresRemoteDockerImageDigest(input.state)) {
+    if (!requiresRemoteDockerImageDigest(input.state) && !isForceRedeployDeployment(input.state)) {
       return { status: "not-required", metadata: {} };
     }
 
@@ -2049,6 +2053,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         state.runtimePlan.buildStrategy === "dockerfile" ||
         state.runtimePlan.buildStrategy === "workspace-commands" ||
         state.runtimePlan.buildStrategy === "static-artifact";
+      const forceRedeploy = isForceRedeployDeployment(state);
 
       if (shouldBuildImage) {
         image = runtimeInstanceNames.imageName;
@@ -2206,6 +2211,8 @@ export class SshExecutionBackend implements ExecutionBackend {
               labels: dockerLabelsFromAssignments(
                 appaloftDockerContainerLabelsForDeployment(state),
               ),
+              pull: forceRedeploy,
+              noCache: forceRedeploy,
             }),
             { quote: shellQuote },
           );
@@ -3652,6 +3659,8 @@ export class SshExecutionBackend implements ExecutionBackend {
           workingDirectory: remoteWorkdir,
           scales: composeScaleFromRuntimeMetadata(state.runtimePlan.execution.metadata),
           portableDockerCompose: true,
+          pull: isForceRedeployDeployment(state),
+          noCache: isForceRedeployDeployment(state),
         }),
         { quote: shellQuote },
       );

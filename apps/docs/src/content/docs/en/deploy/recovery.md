@@ -85,6 +85,12 @@ If the current Resource profile is missing, drifted, or no longer admissible, re
 
 Run `appaloft deployments redeploy <resourceId>` or call `POST /api/resources/{resourceId}/redeploy` after checking readiness.
 
+<h2 id="deployment-recovery-force-redeploy">Force redeploy</h2>
+
+Force redeploy means deploying the current Resource profile again while forcing runtime artifact refresh. Docker builds use pull/no-cache behavior; Compose builds run a forced build first; prebuilt images are explicitly pulled.
+
+It does not change the Resource profile and it does not deploy automatically after variable saves. Run `appaloft deployments force-redeploy <resourceId>` or call `POST /api/resources/{resourceId}/force-redeploy`.
+
 <h2 id="deployment-recovery-rollback">Rollback</h2>
 
 Rollback means creating a new rollback attempt from a historical successful deployment snapshot and Docker/OCI artifact. It does not re-plan from the current Resource profile and does not restore databases, volumes, queues, or external dependency state.

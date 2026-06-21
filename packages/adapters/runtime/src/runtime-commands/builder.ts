@@ -55,6 +55,8 @@ export interface DockerBuildImageInput {
   contextPath: string;
   labels?: readonly RuntimeCommandLabel[];
   workingDirectory?: string;
+  pull?: boolean;
+  noCache?: boolean;
 }
 
 export interface DockerComposeUpInput {
@@ -69,6 +71,8 @@ export interface DockerComposeUpInput {
   portableDockerCompose?: boolean;
   detach?: boolean;
   build?: boolean;
+  pull?: boolean;
+  noCache?: boolean;
 }
 
 export class RuntimeCommandBuilder {
@@ -96,6 +100,8 @@ export class DockerCommandBuilder {
       ...(input.workingDirectory
         ? { workingDirectory: FilePathText.rehydrate(input.workingDirectory) }
         : {}),
+      pull: input.pull ?? false,
+      noCache: input.noCache ?? false,
     };
   }
 
@@ -146,6 +152,8 @@ export class DockerCommandBuilder {
         : {}),
       detach: input.detach ?? true,
       build: input.build ?? true,
+      pull: input.pull ?? false,
+      noCache: input.noCache ?? false,
     };
   }
 

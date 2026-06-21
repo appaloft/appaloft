@@ -9,6 +9,7 @@ export * from "./operations/deployments/deployment-plan.query";
 export * from "./operations/deployments/deployment-preview-access";
 export * from "./operations/deployments/deployment-recovery-readiness.query";
 export * from "./operations/deployments/deployment-timeline.query";
+export * from "./operations/deployments/force-redeploy-deployment.command";
 export * from "./operations/deployments/list-deployments.query";
 export * from "./operations/deployments/prune-deployments.command";
 export * from "./operations/deployments/redeploy-deployment.command";

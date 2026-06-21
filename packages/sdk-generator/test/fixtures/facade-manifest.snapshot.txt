@@ -31,6 +31,17 @@ appaloft.certificates.list -> certificates.list GET /certificates
 appaloft.certificates.retry -> certificates.retry POST /certificates/{certificateId}/retries
 appaloft.certificates.revoke -> certificates.revoke POST /certificates/{certificateId}/revoke
 appaloft.certificates.show -> certificates.show GET /certificates/{certificateId}
+appaloft.connections.capability.accept -> connections.capability.accept POST /connections/capabilities/accept
+appaloft.connections.capability.apply -> connections.capability.apply POST /connections/capabilities/apply
+appaloft.connections.capability.plan -> connections.capability.plan POST /connections/capabilities/plan
+appaloft.connections.catalog.list -> connections.catalog.list GET /connections/catalog
+appaloft.connections.categories.list -> connections.categories.list GET /connections/categories
+appaloft.connections.connect.callback -> connections.connect.callback POST /connections/connect/callback
+appaloft.connections.connect.start -> connections.connect.start POST /connections/connect/start
+appaloft.connections.list -> connections.list GET /connections
+appaloft.connections.revoke -> connections.revoke POST /connections/{connectionId}/revoke
+appaloft.connections.show -> connections.show GET /connections/{connectionId}
+appaloft.connections.status.show -> connections.status.show GET /connections/{connectionId}/status
 appaloft.credentials.createSsh -> credentials.create-ssh POST /credentials/ssh
 appaloft.credentials.deleteSsh -> credentials.delete-ssh DELETE /credentials/ssh/{credentialId}
 appaloft.credentials.listSsh -> credentials.list-ssh GET /credentials/ssh
@@ -66,6 +77,7 @@ appaloft.deployments.cancel -> deployments.cancel POST /deployments/{deploymentI
 appaloft.deployments.cleanupPreview -> deployments.cleanup-preview POST /deployments/cleanup-preview
 appaloft.deployments.count -> deployments.count GET /deployments/count
 appaloft.deployments.create -> deployments.create POST /deployments
+appaloft.deployments.forceRedeploy -> deployments.force-redeploy POST /resources/{resourceId}/force-redeploy
 appaloft.deployments.list -> deployments.list GET /deployments
 appaloft.deployments.plan -> deployments.plan GET /deployments/plan
 appaloft.deployments.prune -> deployments.prune POST /deployments/prune
@@ -81,6 +93,8 @@ appaloft.domainBindings.confirmOwnership -> domain-bindings.confirm-ownership PO
 appaloft.domainBindings.create -> domain-bindings.create POST /domain-bindings
 appaloft.domainBindings.delete -> domain-bindings.delete DELETE /domain-bindings/{domainBindingId}
 appaloft.domainBindings.deleteCheck -> domain-bindings.delete-check GET /domain-bindings/{domainBindingId}/delete-check
+appaloft.domainBindings.dnsPlan -> domain-bindings.dns-plan POST /domain-bindings/{domainBindingId}/dns-plan
+appaloft.domainBindings.dnsReadiness.inspect -> domain-bindings.dns-readiness.inspect POST /domain-bindings/dns-readiness/inspect
 appaloft.domainBindings.list -> domain-bindings.list GET /domain-bindings
 appaloft.domainBindings.retryVerification -> domain-bindings.retry-verification POST /domain-bindings/{domainBindingId}/verification-retries
 appaloft.domainBindings.show -> domain-bindings.show GET /domain-bindings/{domainBindingId}
@@ -91,6 +105,7 @@ appaloft.environments.clone -> environments.clone POST /environments/{environmen
 appaloft.environments.count -> environments.count GET /environments/count
 appaloft.environments.create -> environments.create POST /environments
 appaloft.environments.diff -> environments.diff GET /environments/{environmentId}/diff/{otherEnvironmentId}
+appaloft.environments.diffProfile -> environments.diff-profile GET /environments/{environmentId}/diff-profile/{targetEnvironmentId}
 appaloft.environments.duplicateProfile -> environments.duplicate-profile POST /environments/{environmentId}/duplicate-profile
 appaloft.environments.effectivePrecedence -> environments.effective-precedence GET /environments/{environmentId}/effective-precedence
 appaloft.environments.list -> environments.list GET /environments
@@ -100,6 +115,7 @@ appaloft.environments.promote -> environments.promote POST /environments/{enviro
 appaloft.environments.rename -> environments.rename POST /environments/{environmentId}/rename
 appaloft.environments.setVariable -> environments.set-variable POST /environments/{environmentId}/variables
 appaloft.environments.show -> environments.show GET /environments/{environmentId}
+appaloft.environments.syncProfile -> environments.sync-profile POST /environments/{environmentId}/sync-profile/{targetEnvironmentId}
 appaloft.environments.unlock -> environments.unlock POST /environments/{environmentId}/unlock
 appaloft.environments.unsetVariable -> environments.unset-variable DELETE /environments/{environmentId}/variables/{key}
 appaloft.operatorWork.cancel -> operator-work.cancel POST /operator-work/{workId}/cancel

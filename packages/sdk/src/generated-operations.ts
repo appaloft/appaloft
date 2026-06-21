@@ -1602,6 +1602,25 @@ export const generatedSdkOperations = [
     facadeDefault: true,
   },
   {
+    operationKey: "deployments.force-redeploy",
+    operationGroup: "deployments",
+    operationMethod: "forceRedeploy",
+    facadePath: ["deployments", "forceRedeploy"],
+    operationId: "deployments.forceRedeploy",
+    kind: "command",
+    domain: "deployments",
+    messageName: "ForceRedeployDeploymentCommand",
+    route: {
+      method: "POST",
+      path: "/resources/{resourceId}/force-redeploy",
+    },
+    docsHref: "/docs/deploy/recovery/#deployment-recovery-force-redeploy",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
     operationKey: "deployments.retry",
     operationGroup: "deployments",
     operationMethod: "retry",
@@ -5436,6 +5455,7 @@ export interface GeneratedAppaloftClient {
     readonly cleanupPreview: AppaloftSdkFacadeMethod;
     readonly count: AppaloftSdkFacadeMethod;
     readonly create: AppaloftSdkFacadeMethod;
+    readonly forceRedeploy: AppaloftSdkFacadeMethod;
     readonly list: AppaloftSdkFacadeMethod;
     readonly plan: AppaloftSdkFacadeMethod;
     readonly prune: AppaloftSdkFacadeMethod;

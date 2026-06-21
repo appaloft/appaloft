@@ -90,6 +90,7 @@ export * from "./operations/deployments/create-deployment.schema";
 export * from "./operations/deployments/deployment-plan.schema";
 export * from "./operations/deployments/deployment-recovery-readiness.schema";
 export * from "./operations/deployments/deployment-timeline.schema";
+export * from "./operations/deployments/force-redeploy-deployment.schema";
 export * from "./operations/deployments/list-deployments.schema";
 export * from "./operations/deployments/prune-deployments.schema";
 export * from "./operations/deployments/redeploy-deployment.schema";

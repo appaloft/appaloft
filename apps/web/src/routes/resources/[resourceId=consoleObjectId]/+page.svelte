@@ -11,6 +11,7 @@
     ArrowRight,
     Archive,
     Check,
+    ChevronDown,
     Clipboard,
     Copy,
     Database,
@@ -49,6 +50,8 @@
     ConnectorCapabilityApplyResponse,
     ConnectorCapabilityPlanResponse,
     CreateDeploymentInput,
+    ForceRedeployDeploymentInput,
+    RedeployDeploymentInput,
     CreateDomainBindingInput,
     CreateStorageVolumeInput,
     DeleteResourceInput,
@@ -107,6 +110,14 @@
   import { Badge } from "$lib/components/ui/badge";
   import { Button, buttonVariants } from "$lib/components/ui/button";
   import * as Dialog from "$lib/components/ui/dialog";
+  import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+  } from "$lib/components/ui/dropdown-menu";
   import { Input } from "$lib/components/ui/input";
   import * as Popover from "$lib/components/ui/popover";
   import { ScrollArea } from "$lib/components/ui/scroll-area";
@@ -1274,6 +1285,11 @@
   );
   const canCreateDeployment = $derived(
     Boolean(resource && deploymentServerId && !isResourceArchived && !deploymentCreatePending),
+  );
+  const resourceRedeployServerId = $derived(latestDeployment?.serverId ?? deploymentServerId ?? servers[0]?.id ?? "");
+  const resourceRedeployDestinationId = $derived(latestDeployment?.destinationId ?? defaultDestinationId);
+  const canRedeployResource = $derived(
+    Boolean(resource && resourceRedeployServerId && !isResourceArchived && !isPreviewEnvironmentResource),
   );
   const canPreviewDeploymentPlan = $derived(
     Boolean(resource && deploymentServerId && !isResourceArchived && !deploymentPlanPending),
@@ -2592,6 +2608,45 @@
       };
     },
   }));
+  const redeployResourceMutation = createMutation(() => ({
+    mutationFn: (input: RedeployDeploymentInput) => orpcClient.deployments.redeploy(input),
+    onSuccess: async (result) => {
+      deploymentFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.redeploySuccessTitle),
+        detail: result.id,
+      };
+      deploymentProgressDeploymentId = result.id;
+      await refreshResourceDeploymentData();
+    },
+    onError: (error) => {
+      deploymentFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.redeployErrorTitle),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const forceRedeployResourceMutation = createMutation(() => ({
+    mutationFn: (input: ForceRedeployDeploymentInput) =>
+      orpcClient.deployments.forceRedeploy(input),
+    onSuccess: async (result) => {
+      deploymentFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.forceRedeploySuccessTitle),
+        detail: result.id,
+      };
+      deploymentProgressDeploymentId = result.id;
+      await refreshResourceDeploymentData();
+    },
+    onError: (error) => {
+      deploymentFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.forceRedeployErrorTitle),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
   const configureResourceNetworkMutation = createMutation(() => ({
     mutationFn: (input: ConfigureResourceNetworkInput) =>
       orpcClient.resources.configureNetwork(input),
@@ -2939,6 +2994,9 @@
     stopResourceRuntimeMutation.isPending ||
       startResourceRuntimeMutation.isPending ||
       restartResourceRuntimeMutation.isPending,
+  );
+  const resourceRedeployPending = $derived(
+    redeployResourceMutation.isPending || forceRedeployResourceMutation.isPending,
   );
   let archiveFeedback = $state<{
     kind: "success" | "error";
@@ -4784,6 +4842,27 @@
     }
 
     restartResourceRuntimeMutation.mutate(input);
+  }
+
+  function redeployResource(force: boolean): void {
+    if (!resource || !canRedeployResource || resourceRedeployPending) {
+      return;
+    }
+
+    deploymentFeedback = null;
+    const input = {
+      resourceId: resource.id,
+      projectId: resource.projectId,
+      environmentId: resource.environmentId,
+      serverId: resourceRedeployServerId,
+      ...(resourceRedeployDestinationId ? { destinationId: resourceRedeployDestinationId } : {}),
+      ...(latestDeployment?.id ? { sourceDeploymentId: latestDeployment.id } : {}),
+    };
+    if (force) {
+      forceRedeployResourceMutation.mutate(input);
+      return;
+    }
+    redeployResourceMutation.mutate(input);
   }
 
   function configureResourceNetwork(event: SubmitEvent): void {
@@ -6800,8 +6879,8 @@
             <span class="text-muted-foreground">{$t(i18nKeys.common.status.loading)}</span>
           </Button>
           <Button type="button" disabled>
-            <Play class="size-4" />
-            {$t(i18nKeys.common.actions.createDeployment)}
+            <RotateCw class="size-4" />
+            {$t(i18nKeys.common.actions.redeploy)}
           </Button>
         </div>
       </div>
@@ -6837,8 +6916,8 @@
                 </p>
               </div>
               <Button type="button" disabled>
-                <Play class="size-4" />
-                {$t(i18nKeys.common.actions.createDeployment)}
+                <RotateCw class="size-4" />
+                {$t(i18nKeys.common.actions.redeploy)}
               </Button>
             </div>
             <div class="rounded-md border bg-background">
@@ -7144,12 +7223,57 @@
             </Popover.Root>
             <Button
               type="button"
-              disabled={isResourceArchived || isPreviewEnvironmentResource}
-              onclick={openResourceDeploymentDialog}
+              disabled={!canRedeployResource || resourceRedeployPending}
+              onclick={() => redeployResource(false)}
             >
-              <Play class="size-4" />
-              {$t(i18nKeys.common.actions.createDeployment)}
+              <RotateCw class={["size-4", resourceRedeployPending ? "animate-spin" : ""]} />
+              {resourceRedeployPending
+                ? $t(i18nKeys.common.actions.redeploying)
+                : $t(i18nKeys.common.actions.redeploy)}
             </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                class={buttonVariants({ variant: "outline", size: "icon" })}
+                aria-label={$t(i18nKeys.console.resources.resourceActionsMenu)}
+              >
+                <ChevronDown class="size-4" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" sideOffset={6} class="w-64">
+                <DropdownMenuLabel>
+                  {$t(i18nKeys.console.resources.resourceActionsMenu)}
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  disabled={!canRestartRuntimeByCapability || isResourceArchived || runtimeControlPending}
+                  onclick={() => controlResourceRuntime("restart")}
+                >
+                  <RotateCw class={["size-4", runtimeControlPending ? "animate-spin" : ""]} />
+                  {$t(i18nKeys.console.resources.runtimeControlRestart)}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={!canStopRuntimeByCapability || isResourceArchived || runtimeControlPending}
+                  onclick={() => controlResourceRuntime("stop")}
+                >
+                  <Square class="size-4" />
+                  {$t(i18nKeys.console.resources.runtimeControlStop)}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  disabled={!canRedeployResource || resourceRedeployPending}
+                  onclick={() => redeployResource(true)}
+                >
+                  <RefreshCw class={["size-4", resourceRedeployPending ? "animate-spin" : ""]} />
+                  {$t(i18nKeys.console.resources.forceRedeploy)}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={isResourceArchived || isPreviewEnvironmentResource}
+                  onclick={openResourceDeploymentDialog}
+                >
+                  <Play class="size-4" />
+                  {$t(i18nKeys.console.resources.deployWithTargetSelection)}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </section>
@@ -7199,11 +7323,13 @@
               </div>
               <Button
                 type="button"
-                disabled={isResourceArchived || isPreviewEnvironmentResource}
-                onclick={openResourceDeploymentDialog}
+                disabled={!canRedeployResource || resourceRedeployPending}
+                onclick={() => redeployResource(false)}
               >
-                <Play class="size-4" />
-                {$t(i18nKeys.common.actions.createDeployment)}
+                <RotateCw class={["size-4", resourceRedeployPending ? "animate-spin" : ""]} />
+                {resourceRedeployPending
+                  ? $t(i18nKeys.common.actions.redeploying)
+                  : $t(i18nKeys.common.actions.redeploy)}
               </Button>
             </div>
 

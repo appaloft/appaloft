@@ -581,6 +581,7 @@ export const tokens = {
   createDeploymentUseCase: Symbol.for("appaloft.create_deployment_use_case"),
   retryDeploymentUseCase: Symbol.for("appaloft.retry_deployment_use_case"),
   redeployDeploymentUseCase: Symbol.for("appaloft.redeploy_deployment_use_case"),
+  forceRedeployDeploymentUseCase: Symbol.for("appaloft.force_redeploy_deployment_use_case"),
   rollbackDeploymentUseCase: Symbol.for("appaloft.rollback_deployment_use_case"),
   cancelDeploymentUseCase: Symbol.for("appaloft.cancel_deployment_use_case"),
   archiveDeploymentUseCase: Symbol.for("appaloft.archive_deployment_use_case"),
