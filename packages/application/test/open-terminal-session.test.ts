@@ -585,7 +585,7 @@ describe("OpenTerminalSessionUseCase", () => {
               displayName: "coolify examples",
             },
             execution: {
-              kind: "docker-container",
+              kind: "host-process",
               workingDirectory: "https://github.com/coollabsio/coolify-examples",
             },
           },
@@ -597,6 +597,111 @@ describe("OpenTerminalSessionUseCase", () => {
         kind: "resource",
         resourceId: "res_web",
       },
+    })._unsafeUnwrap();
+
+    const result = await useCase.execute(context, command);
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr().code).toBe("terminal_session_workspace_unavailable");
+    expect(gateway.calls).toHaveLength(0);
+  });
+
+  test("[TERM-SESSION-WORKSPACE-009] opens a docker resource terminal without deployment workspace metadata", async () => {
+    const context = createExecutionContext({ entrypoint: "http" });
+    const runtimePlan = deploymentSummary().runtimePlan;
+    const { gateway, useCase } = createUseCase({
+      deployments: [
+        deploymentSummary({
+          runtimePlan: {
+            ...runtimePlan,
+            source: {
+              kind: "docker-image",
+              locator: "ghcr.io/appaloft/example:latest",
+              displayName: "example image",
+            },
+            buildStrategy: "prebuilt-image",
+            packagingMode: "all-in-one-docker",
+            execution: {
+              kind: "docker-container",
+              image: "ghcr.io/appaloft/example:latest",
+              metadata: {
+                containerName: "appaloft-dep_new",
+              },
+            },
+          },
+        }),
+      ],
+    });
+    const command = OpenTerminalSessionCommand.create({
+      scope: {
+        kind: "resource",
+        resourceId: "res_web",
+      },
+    })._unsafeUnwrap();
+
+    const result = await useCase.execute(context, command);
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      scope: "resource",
+      resourceId: "res_web",
+      deploymentId: "dep_new",
+      serverId: "srv_demo",
+    });
+    expect(result._unsafeUnwrap().workingDirectory).toBeUndefined();
+    expect(gateway.calls[0]?.scope).toMatchObject({
+      kind: "resource",
+      deployment: expect.objectContaining({
+        id: "dep_new",
+        runtimePlan: expect.objectContaining({
+          execution: expect.objectContaining({
+            kind: "docker-container",
+            metadata: expect.objectContaining({
+              containerName: "appaloft-dep_new",
+            }),
+          }),
+        }),
+      }),
+    });
+    expect(
+      gateway.calls[0]?.scope.kind === "resource"
+        ? gateway.calls[0].scope.workingDirectory
+        : "server",
+    ).toBeUndefined();
+  });
+
+  test("[TERM-SESSION-WORKSPACE-009] rejects a docker resource relative directory without workspace metadata", async () => {
+    const context = createExecutionContext({ entrypoint: "http" });
+    const runtimePlan = deploymentSummary().runtimePlan;
+    const { gateway, useCase } = createUseCase({
+      deployments: [
+        deploymentSummary({
+          runtimePlan: {
+            ...runtimePlan,
+            source: {
+              kind: "docker-image",
+              locator: "ghcr.io/appaloft/example:latest",
+              displayName: "example image",
+            },
+            buildStrategy: "prebuilt-image",
+            packagingMode: "all-in-one-docker",
+            execution: {
+              kind: "docker-container",
+              image: "ghcr.io/appaloft/example:latest",
+              metadata: {
+                containerName: "appaloft-dep_new",
+              },
+            },
+          },
+        }),
+      ],
+    });
+    const command = OpenTerminalSessionCommand.create({
+      scope: {
+        kind: "resource",
+        resourceId: "res_web",
+      },
+      relativeDirectory: "app",
     })._unsafeUnwrap();
 
     const result = await useCase.execute(context, command);
