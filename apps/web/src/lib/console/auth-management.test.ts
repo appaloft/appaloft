@@ -50,6 +50,9 @@ describe("organization auth management console surface", () => {
     expect(shellSource).not.toContain('href: "/organization"');
     expect(shellSource).not.toContain('href: "/instance"');
     expect(shellSource).toContain("ConsoleOrganizationSwitcher");
+    expect(shellSource).toContain("isWorkspaceNavigationExtension");
+    expect(shellSource).toContain('!normalizedPath.startsWith("/instance/")');
+    expect(shellSource).toContain('!normalizedPath.startsWith("/organization/")');
     expect(organizationSwitcherSource).toContain('navigateTo("/organization")');
     expect(organizationSwitcherSource).toContain('navigateTo("/instance")');
     expect(organizationSwitcherSource).toContain("showInstanceManagementLink");
@@ -102,6 +105,7 @@ describe("organization auth management console surface", () => {
       organizationPageSource,
       instancePageSource,
       instanceWorkersRouteSource,
+      instanceWorkersRouteContentSource,
       instanceExtensionRouteSource,
       instanceAccessGateSource,
       instanceAccessSource,
@@ -111,6 +115,10 @@ describe("organization auth management console surface", () => {
       readFile(new URL("../../routes/organization/+page.svelte", import.meta.url), "utf8"),
       readFile(new URL("../../routes/instance/+page.svelte", import.meta.url), "utf8"),
       readFile(new URL("../../routes/instance/workers/+page.svelte", import.meta.url), "utf8"),
+      readFile(
+        new URL("../../routes/instance/workers/InstanceWorkersRoute.svelte", import.meta.url),
+        "utf8",
+      ),
       readFile(
         new URL("../../routes/instance/[...extensionPath]/+page.svelte", import.meta.url),
         "utf8",
@@ -144,9 +152,13 @@ describe("organization auth management console surface", () => {
     expect(instancePageSource).toContain("maintenanceWorkers");
     expect(instancePageSource).toContain("workerSafetyLabelKey");
     expect(instancePageSource).toContain("i18nKeys.console.instance.maintenanceWorkersTitle");
-    expect(instanceWorkersRouteSource).toContain("findConsolePageExtensionByPath");
-    expect(instanceWorkersRouteSource).toContain("ConsoleExtensionPage");
-    expect(instanceWorkersRouteSource).toContain('<InstancePage section="workers" />');
+    expect(instanceWorkersRouteSource).toContain("InstanceAccessGate");
+    expect(instanceWorkersRouteSource).toContain("InstanceWorkersRoute");
+    expect(instanceWorkersRouteSource).not.toContain("createQuery");
+    expect(instanceWorkersRouteSource).not.toContain("findConsolePageExtensionByPath");
+    expect(instanceWorkersRouteContentSource).toContain("findConsolePageExtensionByPath");
+    expect(instanceWorkersRouteContentSource).toContain("ConsoleExtensionPage");
+    expect(instanceWorkersRouteContentSource).toContain('<InstancePage section="workers" />');
     expect(instanceExtensionRouteSource).toContain("InstanceAccessGate");
     expect(instanceExtensionRouteSource).toContain('settingsScope="instance"');
     expect(instanceAccessGateSource).toContain("preloadInstanceAccessCapability");

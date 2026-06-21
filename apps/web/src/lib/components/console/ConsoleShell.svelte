@@ -173,6 +173,7 @@
   const navigationExtensions = $derived.by(() =>
     (webExtensionsQuery.data?.items ?? [])
       .filter((extension) => extension.placement === "navigation")
+      .filter(isWorkspaceNavigationExtension)
       .toSorted((a, b) =>
         systemPluginExtensionTitle(a, $locale).localeCompare(
           systemPluginExtensionTitle(b, $locale),
@@ -283,6 +284,17 @@
 
   function isNavigationActive(href: string): boolean {
     return href === "/" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
+  }
+
+  function isWorkspaceNavigationExtension(extension: SystemPluginWebExtension): boolean {
+    const path = extension.path.split("?")[0] ?? extension.path;
+    const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+    return (
+      normalizedPath !== "/instance" &&
+      !normalizedPath.startsWith("/instance/") &&
+      normalizedPath !== "/organization" &&
+      !normalizedPath.startsWith("/organization/")
+    );
   }
 
   function toggleColorMode(): void {
