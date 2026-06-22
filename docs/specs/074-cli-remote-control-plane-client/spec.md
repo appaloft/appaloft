@@ -69,6 +69,8 @@ Initial accepted command shapes:
   organization
 - `appaloft auth mcp login [--url <url>] [--profile <name>] [--no-browser]` for remote MCP
   browser handoff that stores a bearer-backed `mcp` profile by default
+- `appaloft auth mcp codex install [--profile <name>] [--server-name <name>]` for writing a
+  token-free Codex stdio MCP bridge entry after MCP login
 - `appaloft auth token login [--stdin | --token-file <path>] [--url <url>] [--profile <name>]`
   for noninteractive scoped token handoff without browser/user-code auth
 - `appaloft auth status [--profile <name>]`
@@ -328,6 +330,7 @@ cookies, database URLs, SSH keys, credential payloads, or secret values.
 | CLI-RCPC-SPEC-013 | Browser auth session failure writes no profile | The auth session is pending, denied, expired, times out, is interrupted, exchange fails, or current context verification fails | The operator runs login | The CLI returns a structured auth error, attempts cancellation on interruption, and does not create, update, or activate a profile. |
 | CLI-RCPC-SPEC-014 | Self-hosted auth exchange is capability-gated | A self-hosted URL is supplied and no local credential is present | The operator runs `appaloft login --url <self-hosted-url>` | The CLI uses the same neutral auth-session contract against that endpoint, or returns `control_plane_auth_unsupported` when the endpoint does not support it. |
 | CLI-RCPC-SPEC-015 | MCP login requests bearer material | A remote HTTP MCP client needs bearer auth | The operator runs `appaloft auth mcp login` | The CLI creates the same browser auth session with `requestedCredential: "bearer"`, exchanges only after authorization, verifies current context with the bearer, writes a redacted local `mcp` profile by default, and never prints raw credential material. |
+| CLI-RCPC-SPEC-016 | Codex MCP install keeps bearer outside Codex config | A local bearer-backed `mcp` profile exists | The operator runs `appaloft auth mcp codex install` | The CLI writes or updates a Codex MCP stdio entry that launches `appaloft mcp remote-stdio --profile mcp`, does not copy bearer material into Codex config or stdout, and fails if the profile is missing or not bearer-backed. |
 
 ## Public Surfaces
 
@@ -345,7 +348,8 @@ cookies, database URLs, SSH keys, credential payloads, or secret values.
   `@appaloft/orpc/client` with auth support. It must not create CLI-only schemas.
 - MCP/tools: no new tool semantics; generated tools continue to use operation catalog entries and
   remote API auth. Remote HTTP MCP bootstrap can use `appaloft auth mcp login` to obtain a local
-  bearer profile through the same auth-session exchange contract.
+  bearer profile through the same auth-session exchange contract, then `appaloft auth mcp codex
+  install` to configure Codex through a token-free local stdio bridge.
 - Public docs/help: covered by the CLI reference anchors
   `#cli-remote-control-plane-login` and `#cli-remote-control-plane-dispatch`.
 

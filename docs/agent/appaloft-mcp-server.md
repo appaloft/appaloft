@@ -61,6 +61,21 @@ material, verifies current organization context, and writes a redacted local `mc
 default. It does not print raw bearer material. Noninteractive automation can still use
 `APPALOFT_TOKEN` or `appaloft auth token login --stdin` through a trusted local secret channel.
 
+For Codex, install the remote MCP bridge after the `mcp` profile exists:
+
+```bash
+appaloft auth mcp codex install
+```
+
+The installer writes a token-free `~/.codex/config.toml` MCP entry that launches:
+
+```bash
+appaloft mcp remote-stdio --profile mcp
+```
+
+The local stdio bridge reads the Appaloft MCP profile at startup and forwards JSON-RPC to the
+remote `/mcp` endpoint with bearer auth. Codex config stores the launcher command, not the bearer.
+
 ## Tool Contract
 
 - Tool names are derived from operation keys: `deployments.create` becomes `deployments_create`.

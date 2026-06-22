@@ -33,6 +33,18 @@ npx @appaloft/mcp serve --host 127.0.0.1 --port 3939
 The standalone `@appaloft/mcp` package exposes the `appaloft-mcp` launcher and delegates to the
 Appaloft CLI/runtime. It does not define another operation list or bypass the application buses.
 
+For Codex connecting to hosted Appaloft Cloud, use the browser handoff and local bridge:
+
+```bash
+appaloft auth mcp login
+appaloft auth mcp codex install
+```
+
+The installer adds a token-free Codex MCP config entry that launches
+`appaloft mcp remote-stdio --profile mcp`. The bridge reads the local Appaloft MCP profile and
+forwards JSON-RPC to the hosted `/mcp` endpoint with bearer auth; Codex config does not store the
+bearer value.
+
 ## Tool Naming
 
 Each MCP tool maps one-to-one to an operation catalog key:

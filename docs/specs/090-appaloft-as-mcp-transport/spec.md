@@ -32,6 +32,7 @@ agents configured with an Appaloft server.
 | APPALOFT-MCP-013 | HTTP MCP rejects unauthenticated product calls | Product session auth is enabled | A MCP client calls a write or read tool without valid auth | The request is rejected before CommandBus or QueryBus dispatch. |
 | APPALOFT-MCP-014 | Standalone launcher delegates to Appaloft runtime | A user installs `@appaloft/mcp` | They run `appaloft-mcp` or `appaloft-mcp serve` | The launcher invokes the same `appaloft mcp stdio` or `appaloft mcp serve` runtime path and does not maintain another operation list. |
 | APPALOFT-MCP-015 | HTTP MCP accepts bearer product auth | A hosted or self-hosted control plane has bearer-capable product session auth | A MCP client calls a tool through `/mcp` with `Authorization: Bearer <token>` | The endpoint passes the bearer header to product-session authorization, dispatches through the same buses after authorization, and uses `entrypoint: "mcp"` with the authenticated actor and organization principal. |
+| APPALOFT-MCP-016 | Remote stdio bridge keeps bearer out of MCP host config | A MCP host supports stdio but needs to call a hosted `/mcp` endpoint | The host launches `appaloft mcp remote-stdio --profile mcp` | The bridge reads the local Appaloft bearer profile, forwards JSON-RPC over HTTP with `Authorization: Bearer <token>`, writes only remote JSON-RPC responses to stdout, and never stores bearer material in the MCP host config. |
 
 ## Public Boundary
 
@@ -49,6 +50,7 @@ Public MCP concepts:
 - `createAppaloftMcpHttpFetchHandler`
 - `startAppaloftMcpHttpServer`
 - `runAppaloftMcpStdioServer`
+- `runAppaloftMcpRemoteStdioProxy`
 
 Non-goals:
 
