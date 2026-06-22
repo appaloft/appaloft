@@ -176,6 +176,7 @@
     disabled?: boolean;
     disabledReason?: string;
     redirectUrlField?: string;
+    autoRun?: boolean;
   };
 
   type ConsolePageDateTimeValue = {
@@ -307,6 +308,7 @@
   let integrationDetailsOpen = $state(false);
   let selectedTableDetails = $state<ConsolePageTableDetails | null>(null);
   let tableDetailsOpen = $state(false);
+  let autoRunActionKey = $state<string | null>(null);
 
   const webExtensionsQuery = createQuery(() =>
     queryOptions({
@@ -373,6 +375,17 @@
           ? readErrorMessage(pageDocumentQuery.error)
           : "",
   );
+
+  $effect(() => {
+    if (!browser || !pageDocument || loading) return;
+    const entry = findAutoRunRequestAction(pageDocument);
+    if (!entry) return;
+
+    const actionKey = requestActionKey(entry.action, entry.item);
+    if (autoRunActionKey === actionKey || pendingActionKey === actionKey) return;
+    autoRunActionKey = actionKey;
+    void runRequestAction(entry.action, entry.item);
+  });
 
   function iconComponent(icon: ConsolePageIcon | undefined): Component {
     if (icon === "activity") return Activity;
@@ -639,6 +652,21 @@
       }
     }
     return body;
+  }
+
+  function findAutoRunRequestAction(
+    document: ConsolePageDocument,
+  ): { action: ConsolePageRequestAction; item: ConsolePagePanelItem } | null {
+    for (const section of document.sections) {
+      if (section.kind !== "panel-grid" && section.kind !== "dialog-panel-grid") continue;
+      for (const item of section.items) {
+        const action = item.actions?.find((candidate) => candidate.autoRun);
+        if (action && !action.disabled) {
+          return { action, item };
+        }
+      }
+    }
+    return null;
   }
 
   async function runRequestAction(
