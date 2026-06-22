@@ -154,6 +154,9 @@ describe("Console page extension surface", () => {
     expect(rendererSource).toContain("data-console-page-dialog-panel-body");
     expect(rendererSource).toContain("px-5 pb-5 sm:px-8 sm:pb-8");
     expect(rendererSource).toContain("fieldBindings?: Record<string, string>");
+    expect(rendererSource).toContain("autoRun?: boolean");
+    expect(rendererSource).toContain("findAutoRunRequestAction(pageDocument)");
+    expect(rendererSource).toContain("void runRequestAction(entry.action, entry.item)");
     expect(rendererSource).toContain("requestActionBody(action, item)");
     expect(rendererSource).toContain('kind: "tiered-unit-rate"');
     expect(rendererSource).toContain("<table");
