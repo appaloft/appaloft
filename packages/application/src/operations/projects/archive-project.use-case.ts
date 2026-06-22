@@ -19,6 +19,7 @@ import { checkOperationGuards } from "../../operation-guard";
 import {
   AllowAllOperationGuardPort,
   type AppLogger,
+  type AuditEventRecorder,
   type Clock,
   type EventBus,
   type OperationGuardPort,
@@ -44,13 +45,16 @@ export class ArchiveProjectUseCase {
     private readonly logger: AppLogger,
     @inject(tokens.operationGuardPort)
     private readonly operationGuardPort?: OperationGuardPort,
+    @inject(tokens.auditEventRecorder, { isOptional: true })
+    private readonly auditEventRecorder?: AuditEventRecorder,
   ) {}
 
   async execute(
     context: ExecutionContext,
     input: ArchiveProjectCommandInput,
   ): Promise<Result<{ id: string }>> {
-    const { clock, eventBus, logger, operationGuardPort, projectRepository } = this;
+    const { auditEventRecorder, clock, eventBus, logger, operationGuardPort, projectRepository } =
+      this;
     const repositoryContext = toRepositoryContext(context);
 
     return safeTry(async function* () {
@@ -99,6 +103,32 @@ export class ArchiveProjectUseCase {
         UpsertProjectSpec.fromProject(project),
       );
       await publishDomainEventsAndReturn(context, eventBus, logger, project, undefined);
+      try {
+        const auditResult = await auditEventRecorder?.record(repositoryContext, {
+          id: `aud_${projectId.value}_${Date.parse(archivedAt.value)}`,
+          aggregateId: projectId.value,
+          eventType: "projects.archive",
+          payload: {
+            operationKey: "projects.archive",
+            actorId: context.principal?.userId ?? null,
+            organizationId,
+            projectId: projectId.value,
+            result: "success",
+          },
+          createdAt: archivedAt.value,
+        });
+        if (auditResult?.isErr()) {
+          logger.warn("Project archive audit event could not be recorded", {
+            operationKey: "projects.archive",
+            projectId: projectId.value,
+          });
+        }
+      } catch {
+        logger.warn("Project archive audit event could not be recorded", {
+          operationKey: "projects.archive",
+          projectId: projectId.value,
+        });
+      }
 
       return ok({ id: projectId.value });
     });

@@ -22,6 +22,7 @@ import {
   ProjectLifecycleStatusValue,
   ProjectName,
   ProjectSlug,
+  type Result,
   UpsertEnvironmentSpec,
   UpsertProjectSpec,
 } from "@appaloft/core";
@@ -37,12 +38,15 @@ import {
 } from "@appaloft/testkit";
 
 import {
+  type AuditEventRecorder,
+  type AuditEventRecordInput,
   createExecutionContext,
   ListProjectsQuery,
   type OperationCheckRequest,
   type OperationGuardDecision,
   type OperationGuardPort,
   type OperationScopePort,
+  type RepositoryContext,
   toRepositoryContext,
 } from "../src";
 import {
@@ -176,6 +180,15 @@ class DenyingOperationGuardPort implements OperationGuardPort {
       details: this.details,
       reason: "test-operation-denied",
     };
+  }
+}
+
+class MemoryAuditEventRecorder implements AuditEventRecorder {
+  readonly records: AuditEventRecordInput[] = [];
+
+  async record(_context: RepositoryContext, input: AuditEventRecordInput): Promise<Result<void>> {
+    this.records.push(input);
+    return ok(undefined);
   }
 }
 
@@ -634,6 +647,41 @@ describe("project lifecycle operations", () => {
     expect(eventBus.events).toHaveLength(0);
   });
 
+  test("[PROJ-LIFE-AUDIT-001] records a neutral audit event after project creation", async () => {
+    const { clock, context, eventBus, logger, projects } = await createHarness([]);
+    const auditRecorder = new MemoryAuditEventRecorder();
+    const useCase = new CreateProjectUseCase(
+      projects,
+      clock,
+      new SequenceIdGenerator(),
+      eventBus,
+      logger,
+      undefined,
+      new MemoryProjectReadModel(projects),
+      auditRecorder,
+    );
+
+    const result = await useCase.execute(context, {
+      name: "Customer API",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const projectId = result._unsafeUnwrap().id;
+    expect(auditRecorder.records).toHaveLength(1);
+    expect(auditRecorder.records[0]).toMatchObject({
+      aggregateId: projectId,
+      eventType: "projects.create",
+      payload: {
+        operationKey: "projects.create",
+        actorId: null,
+        organizationId: "org_self_hosted",
+        projectId,
+        result: "success",
+      },
+      createdAt: "2026-01-01T00:00:10.000Z",
+    });
+  });
+
   test("[PROJ-LIFE-AUTHZ-001] create project can be denied by the generic operation guard", async () => {
     const { clock, context, eventBus, logger, projects } = await createHarness([]);
     const guard = new DenyingOperationGuardPort({
@@ -730,6 +778,39 @@ describe("project lifecycle operations", () => {
       projectSlug: "demo-project",
       archivedAt: "2026-01-01T00:00:10.000Z",
       reason: "Retired after migration",
+    });
+  });
+
+  test("[PROJ-LIFE-AUDIT-002] records a neutral audit event after project archive", async () => {
+    const { clock, context, eventBus, logger, projects } = await createHarness();
+    const auditRecorder = new MemoryAuditEventRecorder();
+    const useCase = new ArchiveProjectUseCase(
+      projects,
+      clock,
+      eventBus,
+      logger,
+      undefined,
+      auditRecorder,
+    );
+
+    const result = await useCase.execute(context, {
+      projectId: "prj_demo",
+      reason: "Retired after migration",
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(auditRecorder.records).toHaveLength(1);
+    expect(auditRecorder.records[0]).toMatchObject({
+      aggregateId: "prj_demo",
+      eventType: "projects.archive",
+      payload: {
+        operationKey: "projects.archive",
+        actorId: null,
+        organizationId: "org_self_hosted",
+        projectId: "prj_demo",
+        result: "success",
+      },
+      createdAt: "2026-01-01T00:00:10.000Z",
     });
   });
 
