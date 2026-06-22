@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1-rc.17](https://github.com/appaloft/appaloft/compare/v1.0.0-rc.17...v1.0.1-rc.17) (2026-06-22)
+
+
+### Bug Fixes
+
+* **mcp:** clarify scoped package launcher metadata ([85f92aa](https://github.com/appaloft/appaloft/commit/85f92aaa6b4b2d997740c1219d8da5eb2ff63ce5))
+
 ## [1.0.0-rc.17](https://github.com/appaloft/appaloft/compare/v1.0.0-rc.15...v1.0.0-rc.17) (2026-06-22)
 
 
