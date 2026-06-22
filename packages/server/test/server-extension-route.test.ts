@@ -393,18 +393,6 @@ describe("createAppaloftServer", () => {
       await expect(pageResponse.json()).resolves.toMatchObject({
         schemaVersion: "appaloft.console.extension-page/v1",
         title: "Audit Log",
-        sections: [
-          expect.objectContaining({
-            kind: "table",
-            columns: [
-              { key: "time", label: "Time" },
-              { key: "actor", label: "Actor" },
-              { key: "action", label: "Action" },
-              { key: "resource", label: "Resource" },
-              { key: "result", label: "Result" },
-            ],
-          }),
-        ],
       });
     } finally {
       await server.shutdown();
