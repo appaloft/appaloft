@@ -120,9 +120,10 @@ Add `--dry-run` to verify prompt construction without calling a model.
 <h2 id="appaloft-skill-mcp">MCP Tools</h2>
 
 MCP is Appaloft's machine-callable tool layer. Run `appaloft mcp stdio` to start the stdio MCP
-server. Each tool is generated from an operation key, for example `deployments.create` becomes
-`deployments_create`. Tool input schemas come from the same command/query schemas, and calls still
-enter the Appaloft command/query buses.
+server, `appaloft mcp serve` to start a local HTTP `/mcp` endpoint, or `npx appaloft-mcp` for the
+standalone launcher. Each tool is generated from an operation key, for example
+`deployments.create` becomes `deployments_create`. Tool input schemas come from the same
+command/query schemas, and calls still enter the Appaloft command/query buses.
 
 See [Appaloft MCP server](/docs/en/agent/mcp-server/#appaloft-mcp-server) for tool naming,
 resources, prompts, and safety boundaries.

@@ -298,7 +298,8 @@ describe("public docs operation coverage", () => {
     expect(surfaces).toContain("MCP/tools");
     expect(surfaces).toContain("Do not suggest an Appaloft-owned npm");
     expect(mcpTools).toContain("appaloft mcp stdio");
-    expect(mcpTools).toContain("standalone `appaloft-mcp` package/bin is deferred");
+    expect(mcpTools).toContain("appaloft mcp serve --host 127.0.0.1 --port 3939");
+    expect(mcpTools).toContain("npx appaloft-mcp");
     expect(mcpTools).toContain("operation catalog");
     expect(packagedSkill).toContain("references/mcp-tools.md");
     for (const operation of operationCatalog) {

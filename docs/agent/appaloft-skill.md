@@ -36,8 +36,8 @@ Treat the skill as an AI-oriented peer to these Appaloft surfaces:
 - CLI: local shell-capable agent sessions;
 - HTTP/API: agents running beside or integrating with a hosted or self-hosted Appaloft API;
 - Web: human-guided console workflows;
-- MCP/tools: callable descriptors over the same operation catalog when `appaloft mcp stdio` is
-  configured;
+- MCP/tools: callable descriptors over the same operation catalog when `appaloft mcp stdio`,
+  `appaloft mcp serve`, or `appaloft-mcp` is configured;
 - repository config: source-controlled deployment intent.
 
 The skill chooses among those surfaces based on the current agent environment. It must not invent
