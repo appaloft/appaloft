@@ -36,9 +36,22 @@ appaloft mcp stdio
 启动 server 本身不会部署应用、创建资源或修改状态。只有 MCP client 调用具体 tool 时才会进入
 Appaloft command/query bus。
 
-`@appaloft/ai-mcp` 是仓库内负责 MCP transport、descriptor、resources、prompts 和测试的 source
-package。独立 `appaloft-mcp` package/bin 等 release packaging 接好后再发布；当前文档化入口是
-`appaloft mcp stdio`。
+启动本地 HTTP endpoint：
+
+```bash
+appaloft mcp serve --host 127.0.0.1 --port 3939
+```
+
+这会在 `/mcp` 暴露 HTTP JSON-RPC MCP endpoint。默认只绑定 localhost；只有在可信 reverse proxy 或私有网络提供安全边界时才显式改 host。
+
+使用独立 launcher：
+
+```bash
+npx appaloft-mcp
+npx appaloft-mcp serve --host 127.0.0.1 --port 3939
+```
+
+`appaloft-mcp` 会委托给同一套 Appaloft runtime，不维护第二套 operation list 或业务实现。
 
 <h2 id="appaloft-mcp-tools">工具模型</h2>
 

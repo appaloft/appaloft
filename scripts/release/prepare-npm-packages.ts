@@ -15,6 +15,7 @@ const version = normalizeReleaseVersion(
 const releaseDir = resolve(stringArg(args, "release-dir") ?? join(root, "dist", "release"));
 const tempDir = join(root, "dist", ".tmp-npm-binaries");
 const mainPackageDir = join(root, "packages", "npm", "cli");
+const mcpPackageDir = join(root, "packages", "npm", "mcp");
 const sdkPackageDir = join(root, "packages", "sdk");
 const sdkOnly = args.get("sdk-only") === true;
 
@@ -77,6 +78,23 @@ async function prepareMainPackage(): Promise<void> {
   await chmodExecutable(join(mainPackageDir, "bin", "appaloft.js"));
 }
 
+async function prepareMcpPackage(): Promise<void> {
+  const packageJsonPath = join(mcpPackageDir, "package.json");
+  const packageJson = await readPackageJson(packageJsonPath);
+  packageJson.version = version;
+  packageJson.dependencies = {
+    ...(packageJson.dependencies &&
+    typeof packageJson.dependencies === "object" &&
+    !Array.isArray(packageJson.dependencies)
+      ? packageJson.dependencies
+      : {}),
+    "@appaloft/cli": version,
+  };
+  assertPublishablePackageJson(packageJson, mcpPackageDir);
+  await writePackageJson(packageJsonPath, packageJson);
+  await chmodExecutable(join(mcpPackageDir, "bin", "appaloft-mcp.js"));
+}
+
 function assertPublishablePackageJson(
   packageJson: Record<string, unknown>,
   packageDir: string,
@@ -129,6 +147,7 @@ if (!sdkOnly) {
     await preparePlatformPackage(target);
   }
   await prepareMainPackage();
+  await prepareMcpPackage();
 }
 await prepareSdkPackage();
 

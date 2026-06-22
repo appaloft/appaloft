@@ -1,0 +1,22 @@
+{
+  "name": "appaloft-mcp",
+  "version": "0.1.0",
+  "description": "Standalone Appaloft MCP server launcher.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": {
+    "appaloft-mcp": "bin/appaloft-mcp.js"
+  },
+  "files": [
+    "bin"
+  ],
+  "dependencies": {
+    "@appaloft/cli": "0.1.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

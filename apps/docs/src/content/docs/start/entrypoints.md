@@ -38,6 +38,7 @@ Self-hosted Server Action 使用 HTTP API 表面：`control-plane-url` 显式选
 
 <h2 id="entrypoint-mcp-tools">MCP tools</h2>
 
-当 agent host 配置 Appaloft MCP 时，使用 `appaloft mcp stdio` 暴露同一 operation catalog。
+当 agent host 配置 Appaloft MCP 时，使用 `appaloft mcp stdio`、`appaloft mcp serve` 或
+`npx appaloft-mcp` 暴露同一 operation catalog。
 MCP tools 应复用相同 topic id、输入解释和恢复说明；查看
 [Appaloft MCP server](/docs/agent/mcp-server/#appaloft-mcp-server)。

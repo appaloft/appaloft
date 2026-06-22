@@ -3977,6 +3977,11 @@ export const publicDocsOperationCoverage = [
     topicId: "domain.ownership-check",
   },
   {
+    operationKey: "domain-bindings.dns-readiness.inspect",
+    status: "documented",
+    topicId: "domain.ownership-check",
+  },
+  {
     operationKey: "domain-bindings.list",
     status: "documented",
     topicId: "domain.custom-domain-binding",
