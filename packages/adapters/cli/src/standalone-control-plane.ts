@@ -12,6 +12,7 @@ import {
   controlPlaneStatus,
   loginControlPlane,
   logoutControlPlane,
+  mcpLoginControlPlane,
   tokenLoginControlPlane,
   useControlPlaneProfile,
 } from "./control-plane-service.js";
@@ -183,6 +184,7 @@ function renderRootHelp(stdout: Pick<NodeJS.WriteStream, "write">): void {
 
 Usage:
   appaloft login [--url <url>] [--mode cloud|self-hosted] [--no-browser]
+  appaloft auth mcp login [--url <url>] [--mode cloud|self-hosted] [--profile <name>] [--no-browser]
   appaloft auth token login [--stdin | --token-file <path>] [--url <url>] [--profile <name>]
   appaloft auth status
   appaloft context show
@@ -273,6 +275,48 @@ async function handleLogin(
   try {
     return await finish(
       loginControlPlane(
+        {
+          ...(url ? { url } : {}),
+          ...(mode.value ? { mode: mode.value } : {}),
+          ...(parsed.value.booleans["no-browser"] ? { openBrowser: false } : {}),
+          ...(parsed.value.values.profile ? { profile: parsed.value.values.profile } : {}),
+          signal: abortController.signal,
+        },
+        deps({
+          ...input,
+          onLoginSession:
+            input.onLoginSession ?? ((session) => renderLoginSession(stderr, session)),
+          confirmOpenBrowser: input.confirmOpenBrowser ?? confirmBrowserOpen,
+        }),
+      ),
+      input,
+    );
+  } finally {
+    process.off("SIGINT", abort);
+  }
+}
+
+async function handleMcpLogin(
+  args: readonly string[],
+  input: StandaloneControlPlaneCliInput,
+): Promise<StandaloneControlPlaneCliResult> {
+  const parsed = parseOptions(args, ["url", "mode", "profile"], ["no-browser"]);
+  if (parsed.isErr()) {
+    return finish(parsed, input);
+  }
+  const mode = modeValue(parsed.value.values.mode);
+  if (mode.isErr()) {
+    return finish(mode, input);
+  }
+  const url = parsed.value.values.url;
+  const abortController = new AbortController();
+  const abort = () => abortController.abort();
+  process.once("SIGINT", abort);
+  const stderr = input.stderr ?? process.stderr;
+
+  try {
+    return await finish(
+      mcpLoginControlPlane(
         {
           ...(url ? { url } : {}),
           ...(mode.value ? { mode: mode.value } : {}),
@@ -403,6 +447,9 @@ export async function runStandaloneControlPlaneCli(
     }
     if (subcommand === "token" && args[2] === "login") {
       return handleTokenLogin(args.slice(3), input);
+    }
+    if (subcommand === "mcp" && args[2] === "login") {
+      return handleMcpLogin(args.slice(3), input);
     }
     if (subcommand === "status") {
       return handleStatus(args.slice(2), input);

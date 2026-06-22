@@ -137,6 +137,7 @@ export interface AuthRuntime
   getPublicConfig(): AuthPublicConfig;
   getSessionStatus(request: Request): Promise<AuthSessionStatus>;
   getProviderAccessToken(request: Request, providerKey: "github"): Promise<string | null>;
+  issueCliProductSessionBearer(request: Request): Promise<string | null>;
   issueCliProductSessionCookie(request: Request): Promise<string | null>;
   handle(request: Request): Promise<Response>;
 }
@@ -399,6 +400,16 @@ export class BetterAuthRuntime implements AuthRuntime {
   }
 
   async issueCliProductSessionCookie(request: Request): Promise<string | null> {
+    const signedToken = await this.issueCliProductSessionBearer(request);
+    if (!signedToken) {
+      return null;
+    }
+
+    const authContext = await this.auth.$context;
+    return `${authContext.authCookies.sessionToken.name}=${signedToken}`;
+  }
+
+  async issueCliProductSessionBearer(request: Request): Promise<string | null> {
     if (!this.config.enabled) {
       return null;
     }
@@ -424,7 +435,7 @@ export class BetterAuthRuntime implements AuthRuntime {
       userAgent: "appaloft-cli browser-auth-exchange",
     });
     const signedToken = `${cliSession.token}.${await makeSignature(cliSession.token, this.config.secret)}`;
-    return `${authContext.authCookies.sessionToken.name}=${signedToken}`;
+    return signedToken;
   }
 
   async handle(request: Request): Promise<Response> {

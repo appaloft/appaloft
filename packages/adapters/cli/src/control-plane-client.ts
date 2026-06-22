@@ -65,6 +65,8 @@ export interface CliAuthSessionExchangeResult {
   readonly auth: CliControlPlaneAuth;
 }
 
+export type CliAuthSessionRequestedCredential = "product-session" | "bearer";
+
 type JsonApiReadError = {
   readonly code: string;
   readonly category: DomainError["category"];
@@ -586,6 +588,7 @@ export async function performControlPlaneHandshake(input: {
 export async function createCliAuthSession(input: {
   readonly baseUrl: string;
   readonly fetch?: AppaloftSdkFetch;
+  readonly requestedCredential?: CliAuthSessionRequestedCredential;
 }): Promise<Result<CliAuthSession>> {
   const fetchImplementation = input.fetch ?? defaultControlPlaneFetch;
   let request: Request;
@@ -599,6 +602,7 @@ export async function createCliAuthSession(input: {
       },
       body: JSON.stringify({
         client: "appaloft-cli",
+        ...(input.requestedCredential ? { requestedCredential: input.requestedCredential } : {}),
       }),
     });
     response = await fetchImplementation(request);
