@@ -55,6 +55,10 @@ describe("organization auth management console surface", () => {
     expect(shellSource).toContain('!normalizedPath.startsWith("/organization/")');
     expect(organizationSwitcherSource).toContain('navigateTo("/organization")');
     expect(organizationSwitcherSource).toContain('navigateTo("/instance")');
+    expect(organizationSwitcherSource).toContain('navigateTo("/")');
+    expect(organizationSwitcherSource).toContain("organizationId === currentOrganization?.organizationId");
+    expect(organizationSwitcherSource).toContain("disabled={pending}");
+    expect(organizationSwitcherSource).not.toContain("disabled={organizationIsCurrent || pending}");
     expect(organizationSwitcherSource).toContain("showInstanceManagementLink");
     expect(organizationSwitcherSource).toContain("preloadInstanceAccessCapability");
     expect(organizationSwitcherSource).toContain("instanceAccessCapabilityKey");

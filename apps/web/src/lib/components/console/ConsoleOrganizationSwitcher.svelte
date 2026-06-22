@@ -80,7 +80,12 @@
   }
 
   function switchOrganization(organizationId: string): void {
-    if (!organizationId || organizationId === currentOrganization?.organizationId || pending) {
+    if (!organizationId || pending) {
+      return;
+    }
+
+    if (organizationId === currentOrganization?.organizationId) {
+      navigateTo("/");
       return;
     }
 
@@ -129,7 +134,7 @@
       {#each organizations as organization (organization.organizationId)}
         {@const organizationIsCurrent = organization.organizationId === currentOrganization?.organizationId}
         <DropdownMenuItem
-          disabled={organizationIsCurrent || pending}
+          disabled={pending}
           onclick={() => switchOrganization(organization.organizationId)}
           class="gap-2"
         >
