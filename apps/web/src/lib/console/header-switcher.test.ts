@@ -77,7 +77,13 @@ describe("console header switcher", () => {
     expect(shellSource).toContain("DropdownMenuTrigger");
     expect(shellSource).toContain("switcherItems(item).length > 0");
     expect(shellSource).toContain(
-      'class="inline-flex h-8 min-w-0 max-w-[12rem] items-center gap-1',
+      '<Breadcrumb.List class="flex-nowrap gap-px overflow-hidden sm:gap-px">',
+    );
+    expect(shellSource).toContain(
+      '<Breadcrumb.Item class="group/breadcrumb-item peer/breadcrumb-item min-w-0">',
+    );
+    expect(shellSource).toContain(
+      'class="group/switcher inline-flex h-8 min-w-0 max-w-[12rem] items-center gap-px',
     );
     expect(shellSource).toContain(
       'class="group/link inline-flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2',
@@ -85,7 +91,10 @@ describe("console header switcher", () => {
     expect(shellSource).toContain(
       'class="group/dropdown-trigger inline-flex size-8 shrink-0 items-center justify-center rounded-md',
     );
-    expect(shellSource).toContain("hover:bg-primary/5");
+    expect(shellSource).toContain("group-hover/switcher:bg-primary/5");
+    expect(shellSource).toContain("hover:bg-primary/10");
+    expect(shellSource).toContain("group-hover/link:!text-primary");
+    expect(shellSource).toContain("peer-hover/breadcrumb-item:text-foreground");
     expect(shellSource).toContain("data-[state=open]:bg-primary/5");
     expect(shellSource).not.toContain("border-l border-border/70");
     expect(shellSource.indexOf("data-console-header-switcher-link")).toBeLessThan(
