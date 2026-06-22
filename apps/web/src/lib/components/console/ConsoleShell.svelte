@@ -487,9 +487,9 @@
         <div class="flex min-w-0 flex-1 items-center">
           {#if visibleBreadcrumbs.length > 0}
             <Breadcrumb.Root class="min-w-0">
-              <Breadcrumb.List class="flex-nowrap gap-1 overflow-hidden sm:gap-1.5">
+              <Breadcrumb.List class="flex-nowrap gap-px overflow-hidden sm:gap-px">
                 {#each visibleBreadcrumbs as item, index (`${item.label}-${index}`)}
-                  <Breadcrumb.Item class="min-w-0">
+                  <Breadcrumb.Item class="group/breadcrumb-item peer/breadcrumb-item min-w-0">
                     {#if item.loading}
                       <div
                         class="flex h-8 min-w-24 items-center gap-2 rounded-md px-2"
@@ -503,22 +503,22 @@
                       <DropdownMenu>
                         <div
                           data-console-header-switcher
-                          class="inline-flex h-8 min-w-0 max-w-[12rem] items-center gap-1 text-sm font-medium text-foreground sm:max-w-[16rem]"
+                          class="group/switcher inline-flex h-8 min-w-0 max-w-[12rem] items-center gap-px text-sm font-medium text-foreground sm:max-w-[16rem]"
                         >
                           {#if item.href}
                             <a
                               data-console-header-switcher-link
                               href={item.href}
-                              class="group/link inline-flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 transition-colors hover:bg-primary/5 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              class="group/link inline-flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 transition-colors group-hover/switcher:bg-primary/5 hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             >
                               {#if item.kind === "project"}
-                                <FolderOpen class="size-4 shrink-0 text-muted-foreground transition-colors group-hover/link:text-foreground" />
+                                <FolderOpen class="size-4 shrink-0 text-muted-foreground transition-colors group-hover/switcher:text-foreground group-hover/link:!text-primary" />
                               {:else if item.kind === "resource"}
-                                <Package class="size-4 shrink-0 text-muted-foreground transition-colors group-hover/link:text-foreground" />
+                                <Package class="size-4 shrink-0 text-muted-foreground transition-colors group-hover/switcher:text-foreground group-hover/link:!text-primary" />
                               {:else if item.kind === "deployment"}
-                                <Rocket class="size-4 shrink-0 text-muted-foreground transition-colors group-hover/link:text-foreground" />
+                                <Rocket class="size-4 shrink-0 text-muted-foreground transition-colors group-hover/switcher:text-foreground group-hover/link:!text-primary" />
                               {:else if item.kind === "environment"}
-                                <ServerCrash class="size-4 shrink-0 text-muted-foreground transition-colors group-hover/link:text-foreground" />
+                                <ServerCrash class="size-4 shrink-0 text-muted-foreground transition-colors group-hover/switcher:text-foreground group-hover/link:!text-primary" />
                               {/if}
                               <span class="min-w-0 truncate">{item.label}</span>
                             </a>
@@ -543,7 +543,7 @@
                             data-console-header-switcher-trigger
                             aria-label={item.switcherLabel ?? item.label}
                             title={item.switcherLabel ?? item.label}
-                            class="group/dropdown-trigger inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-primary/5 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:bg-primary/5"
+                            class="group/dropdown-trigger inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors group-hover/switcher:bg-primary/5 group-hover/switcher:text-foreground hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:bg-primary/5 data-[state=open]:text-foreground"
                           >
                             <ChevronDown class="size-3.5 transition-transform group-data-[state=open]/dropdown-trigger:rotate-180" />
                           </DropdownMenuTrigger>
@@ -574,7 +574,10 @@
                         </DropdownMenuContent>
                       </DropdownMenu>
                     {:else if item.href && index < visibleBreadcrumbs.length - 1}
-                      <Breadcrumb.Link class="truncate" href={item.href}>
+                      <Breadcrumb.Link
+                        class="truncate group-hover/breadcrumb-item:bg-primary/5 hover:bg-primary/10 hover:text-primary"
+                        href={item.href}
+                      >
                         {item.label}
                       </Breadcrumb.Link>
                     {:else}
@@ -584,7 +587,7 @@
                     {/if}
                   </Breadcrumb.Item>
                   {#if index < visibleBreadcrumbs.length - 1}
-                    <Breadcrumb.Separator class="shrink-0" />
+                    <Breadcrumb.Separator class="shrink-0 text-muted-foreground transition-colors peer-hover/breadcrumb-item:text-foreground hover:text-foreground" />
                   {/if}
                 {/each}
               </Breadcrumb.List>
