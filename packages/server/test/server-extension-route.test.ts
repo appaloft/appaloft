@@ -344,6 +344,116 @@ describe("createAppaloftServer", () => {
     }
   }, 45_000);
 
+  test("[AUDIT-LOG-CONSOLE-001] exposes neutral Audit Log console route and default self-hosted navigation", async () => {
+    const dataDir = await createTempDataDir();
+    const server = await createAppaloftServer({
+      flags: {
+        appVersion: "0.1.0-test",
+        authProvider: "none",
+        dataDir,
+        docsStaticDir: "",
+        httpPort: 0,
+        pgliteDataDir: join(dataDir, "pglite"),
+        webStaticDir: "",
+      },
+    });
+
+    try {
+      const extensionResponse = await server.httpApp.handle(
+        new Request("http://localhost/api/system-plugins/web-extensions"),
+      );
+      expect(extensionResponse.status).toBe(200);
+      const extensions = (await extensionResponse.json()) as {
+        items: Array<{
+          key: string;
+          metadata?: Record<string, unknown>;
+          path?: string;
+          placement?: string;
+          surface?: string;
+        }>;
+      };
+      expect(extensions.items).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            key: "appaloft-audit-log.navigation",
+            path: "/audit-log",
+            placement: "navigation",
+            metadata: expect.objectContaining({
+              renderer: "console-page",
+              pageEndpoint: "/audit-log/console-page?query={query}",
+            }),
+          }),
+        ]),
+      );
+
+      const pageResponse = await server.httpApp.handle(
+        new Request("http://localhost/audit-log/console-page"),
+      );
+      expect(pageResponse.status).toBe(200);
+      await expect(pageResponse.json()).resolves.toMatchObject({
+        schemaVersion: "appaloft.console.extension-page/v1",
+        title: "Audit Log",
+        sections: [
+          expect.objectContaining({
+            kind: "table",
+            columns: [
+              { key: "time", label: "Time" },
+              { key: "actor", label: "Actor" },
+              { key: "action", label: "Action" },
+              { key: "resource", label: "Resource" },
+              { key: "result", label: "Result" },
+            ],
+          }),
+        ],
+      });
+    } finally {
+      await server.shutdown();
+    }
+  }, 45_000);
+
+  test("[AUDIT-LOG-CONSOLE-002] lets hosted Cloud disable public nav while retaining the neutral route", async () => {
+    const dataDir = await createTempDataDir();
+    const server = await createAppaloftServer({
+      flags: {
+        appVersion: "0.1.0-test",
+        authProvider: "none",
+        dataDir,
+        docsStaticDir: "",
+        httpPort: 0,
+        pgliteDataDir: join(dataDir, "pglite"),
+        webStaticDir: "",
+      },
+      auditLogConsole: {
+        routeEnabled: true,
+        webExtensionEnabled: false,
+      },
+    });
+
+    try {
+      const extensionResponse = await server.httpApp.handle(
+        new Request("http://localhost/api/system-plugins/web-extensions"),
+      );
+      expect(extensionResponse.status).toBe(200);
+      const extensions = (await extensionResponse.json()) as {
+        items: Array<{ key: string }>;
+      };
+      expect(extensions.items.map((item) => item.key)).not.toContain(
+        "appaloft-audit-log.navigation",
+      );
+
+      const pageResponse = await server.httpApp.handle(
+        new Request("http://localhost/audit-log/console-page"),
+      );
+      expect(pageResponse.status).toBe(200);
+      await expect(pageResponse.json()).resolves.toMatchObject({
+        schemaVersion: "appaloft.console.extension-page/v1",
+        title: "Audit Log",
+      });
+    } finally {
+      await server.shutdown();
+    }
+  }, 45_000);
+
   test("keeps configured HTTP routes active when app version is a deployment SHA", async () => {
     const dataDir = await createTempDataDir();
     const server = await createAppaloftServer({

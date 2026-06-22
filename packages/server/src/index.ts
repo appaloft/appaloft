@@ -30,6 +30,7 @@ import {
   type ExecutionContext,
   type ExecutionContextFactory,
   type ExecutionProviderAccessTokens,
+  ExportGlobalAuditEventsQuery,
   type GitHubPreviewPullRequestWebhookVerifier,
   type GitHubSourceEventWebhookVerifier,
   type IdGenerator,
@@ -251,6 +252,11 @@ export interface AppaloftServerOptions {
   embeddedDocsAssets?: Readonly<Record<string, Blob>>;
   pgliteRuntimeAssets?: PgliteRuntimeAssets;
   remotePgliteStateSyncSession?: AppaloftRemotePgliteStateSyncSession;
+  auditLogConsole?: {
+    enabled?: boolean;
+    routeEnabled?: boolean;
+    webExtensionEnabled?: boolean;
+  };
   authRuntime?: AuthRuntime;
   extensions?: readonly AppaloftServerExtension[];
   systemPlugins?: readonly SystemPluginDefinition[];
@@ -577,6 +583,243 @@ async function configureServerExtensions(input: {
   return http;
 }
 
+function configurePublicAuditLogConsoleExtension(input: {
+  http: AppaloftServerHttpContext["http"];
+  resolveExecutionContextFactory: () => ExecutionContextFactory | undefined;
+  resolveQueryBus: () => QueryBus | undefined;
+  routeEnabled: boolean;
+  webExtensionEnabled: boolean;
+}): void {
+  if (input.webExtensionEnabled) {
+    input.http.webExtensions.push({
+      key: "appaloft-audit-log.navigation",
+      title: "Audit Log",
+      localizations: {
+        "zh-CN": {
+          title: "审计日志",
+          description: "查看 Appaloft 实例保留的审计事件。",
+        },
+        "en-US": {
+          title: "Audit Log",
+          description: "View retained audit events for this Appaloft instance.",
+        },
+      },
+      description: "View retained audit events for this Appaloft instance.",
+      icon: "shield",
+      path: "/audit-log",
+      placement: "navigation",
+      target: "console-route",
+      requiresAuth: true,
+      metadata: {
+        renderer: "console-page",
+        pageEndpoint: "/audit-log/console-page?query={query}",
+      },
+    });
+  }
+
+  if (!input.routeEnabled) {
+    return;
+  }
+
+  input.http.routes.push({
+    method: "GET",
+    path: "/audit-log/console-page",
+    handle: async ({ request, query }) => {
+      const executionContextFactory = input.resolveExecutionContextFactory();
+      const queryBus = input.resolveQueryBus();
+      if (!executionContextFactory || !queryBus) {
+        return auditLogConsoleErrorPage("Audit log runtime is not ready.");
+      }
+
+      const range = stringQuery(query, "range");
+      const days = range === "7d" ? 7 : 30;
+      const to = new Date();
+      const from = new Date(to.getTime() - days * 24 * 60 * 60 * 1000);
+      const auditQuery = ExportGlobalAuditEventsQuery.create({
+        from: from.toISOString(),
+        to: to.toISOString(),
+        limit: 100,
+        ...(stringQuery(query, "aggregateId")
+          ? { aggregateId: stringQuery(query, "aggregateId") }
+          : {}),
+        ...(stringQuery(query, "eventType") ? { eventType: stringQuery(query, "eventType") } : {}),
+      });
+
+      if (auditQuery.isErr()) {
+        return auditLogConsoleErrorPage(auditQuery.error.message);
+      }
+
+      const locale = request.headers.get("accept-language") ?? undefined;
+      const requestId = request.headers.get("x-request-id") ?? undefined;
+      const context = executionContextFactory.create({
+        entrypoint: "http",
+        ...(locale ? { locale } : {}),
+        ...(requestId ? { requestId } : {}),
+      });
+      const result = await queryBus
+        .execute(context, auditQuery.value)
+        .catch((error: unknown) => err(error));
+
+      return result.match(
+        (readback) =>
+          auditLogConsolePage({
+            activeRange: range === "7d" ? "7d" : "30d",
+            events: readback.items
+              .toSorted((left, right) => right.createdAt.localeCompare(left.createdAt))
+              .map((event) => ({
+                id: event.auditEventId,
+                time: event.createdAt,
+                actor: auditPayloadString(event.payload, ["actor", "actorId", "userId"]) ?? "-",
+                action: event.eventType,
+                resource: event.aggregateId,
+                result:
+                  auditPayloadString(event.payload, ["result", "outcome", "status"]) ?? "recorded",
+              })),
+          }),
+        (error) => auditLogConsoleErrorPage(errorMessage(error)),
+      );
+    },
+  });
+}
+
+function createPublicAuditLogConsoleServerExtension(input: {
+  resolveExecutionContextFactory: () => ExecutionContextFactory | undefined;
+  resolveQueryBus: () => QueryBus | undefined;
+  routeEnabled: boolean;
+  webExtensionEnabled: boolean;
+}): AppaloftServerExtension {
+  return {
+    name: "public-audit-log-console",
+    configureHttp({ http }) {
+      configurePublicAuditLogConsoleExtension({
+        http,
+        resolveExecutionContextFactory: input.resolveExecutionContextFactory,
+        resolveQueryBus: input.resolveQueryBus,
+        routeEnabled: input.routeEnabled,
+        webExtensionEnabled: input.webExtensionEnabled,
+      });
+    },
+  };
+}
+
+function auditLogConsolePage(input: {
+  activeRange: "7d" | "30d";
+  events: Array<{
+    id: string;
+    time: string;
+    actor: string;
+    action: string;
+    resource: string;
+    result: string;
+  }>;
+}): Record<string, unknown> {
+  return {
+    schemaVersion: "appaloft.console.extension-page/v1",
+    title: "Audit Log",
+    description: "Recent retained audit events for this Appaloft instance.",
+    sections: [
+      {
+        kind: "table",
+        title: "Audit events",
+        description: "Newest events first.",
+        height: "tall",
+        filters: [
+          {
+            label: "Time range",
+            items: [
+              {
+                label: "Last 30 days",
+                href: "/audit-log",
+                active: input.activeRange === "30d",
+              },
+              {
+                label: "Last 7 days",
+                href: "/audit-log?range=7d",
+                active: input.activeRange === "7d",
+              },
+            ],
+          },
+        ],
+        columns: [
+          { key: "time", label: "Time" },
+          { key: "actor", label: "Actor" },
+          { key: "action", label: "Action" },
+          { key: "resource", label: "Resource" },
+          { key: "result", label: "Result" },
+        ],
+        rows: input.events.map((event) => ({
+          key: event.id,
+          cells: {
+            time: event.time,
+            actor: event.actor,
+            action: event.action,
+            resource: event.resource,
+            result: event.result,
+          },
+        })),
+        emptyLabel: "No audit events in the selected time range.",
+      },
+    ],
+  };
+}
+
+function auditLogConsoleErrorPage(message: string): Record<string, unknown> {
+  return {
+    schemaVersion: "appaloft.console.extension-page/v1",
+    title: "Audit Log",
+    description: "Audit events could not be loaded.",
+    badge: "Unavailable",
+    sections: [
+      {
+        kind: "callouts",
+        items: [
+          {
+            title: "Audit events unavailable",
+            description: message,
+            tone: "danger",
+          },
+        ],
+      },
+    ],
+  };
+}
+
+function errorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof error.message === "string"
+  ) {
+    return error.message;
+  }
+  return "Audit events could not be loaded.";
+}
+
+function auditPayloadString(
+  payload: Record<string, unknown>,
+  keys: readonly string[],
+): string | undefined {
+  for (const key of keys) {
+    const value = payload[key];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value;
+    }
+    if (typeof value === "number" || typeof value === "boolean") {
+      return String(value);
+    }
+  }
+  return undefined;
+}
+
+function stringQuery(query: URLSearchParams, name: string): string | undefined {
+  const value = query.get(name)?.trim();
+  return value ? value : undefined;
+}
+
 export async function createAppaloftServer(
   options: AppaloftServerOptions = {},
 ): Promise<AppaloftServer> {
@@ -597,7 +840,20 @@ export async function createAppaloftServer(
     await migrator.migrateToLatest();
   }
 
-  const extensions = options.extensions ?? [];
+  let auditLogConsoleExecutionContextFactory: ExecutionContextFactory | undefined;
+  let auditLogConsoleQueryBus: QueryBus | undefined;
+  const auditLogConsoleExtensions =
+    options.auditLogConsole?.enabled === false
+      ? []
+      : [
+          createPublicAuditLogConsoleServerExtension({
+            resolveExecutionContextFactory: () => auditLogConsoleExecutionContextFactory,
+            resolveQueryBus: () => auditLogConsoleQueryBus,
+            routeEnabled: options.auditLogConsole?.routeEnabled !== false,
+            webExtensionEnabled: options.auditLogConsole?.webExtensionEnabled !== false,
+          }),
+        ];
+  const extensions = [...auditLogConsoleExtensions, ...(options.extensions ?? [])];
   const compositionContext: AppaloftServerCompositionContext = {
     config,
     database,
@@ -738,6 +994,7 @@ export async function createAppaloftServer(
     idGenerator,
     tracer: telemetry.tracer,
   });
+  auditLogConsoleExecutionContextFactory = executionContextFactory;
   const durableWorkHeartbeatStore = resolveToken<DurableWorkWorkerHeartbeatStore>(
     childContainer,
     tokens.durableWorkWorkerHeartbeatStore,
@@ -760,6 +1017,7 @@ export async function createAppaloftServer(
 
   const commandBus = resolveToken<CommandBus>(childContainer, tokens.commandBus);
   const queryBus = resolveToken<QueryBus>(childContainer, tokens.queryBus);
+  auditLogConsoleQueryBus = queryBus;
   const sourceEventVerificationPort = resolveToken<SourceEventVerificationPort>(
     childContainer,
     tokens.sourceEventVerificationPort,

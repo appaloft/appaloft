@@ -98,6 +98,9 @@
   type SystemPluginWebExtensionsResponse = {
     items: SystemPluginWebExtension[];
   };
+  type SystemPluginWebExtensionVisibilityResponse = {
+    visible?: boolean;
+  };
 
   const navigationItems = [
     { href: "/", labelKey: i18nKeys.console.nav.home, icon: Gauge },
@@ -170,10 +173,43 @@
   const organizations = $derived(organizationContext?.organizations ?? []);
   const projects = $derived(projectsQuery.data?.items ?? []);
   const projectsLoading = $derived(projectsQuery.isPending && projects.length === 0);
+  const visibilityExtensionEndpoints = $derived.by(() =>
+    (webExtensionsQuery.data?.items ?? [])
+      .map((extension) => {
+        const endpoint = resolveExtensionVisibilityEndpoint(extension);
+        return endpoint ? { key: extension.key, endpoint } : null;
+      })
+      .filter((entry): entry is { key: string; endpoint: string } => entry !== null),
+  );
+  const extensionVisibilityQuery = createQuery(() =>
+    queryOptions({
+      queryKey: [
+        "system-plugins",
+        "web-extension-visibility",
+        currentOrganization?.organizationId ?? "",
+        visibilityExtensionEndpoints
+          .map((entry) => `${entry.key}:${entry.endpoint}`)
+          .join("|"),
+      ],
+      queryFn: async () => {
+        const entries = await Promise.all(
+          visibilityExtensionEndpoints.map(async (entry) => {
+            const result = await request<SystemPluginWebExtensionVisibilityResponse>(entry.endpoint);
+            return [entry.key, result.visible === true] as const;
+          }),
+        );
+        return Object.fromEntries(entries);
+      },
+      enabled: browser && visibilityExtensionEndpoints.length > 0,
+      staleTime: 30_000,
+    }),
+  );
+  const extensionVisibility = $derived(extensionVisibilityQuery.data ?? {});
   const navigationExtensions = $derived.by(() =>
     (webExtensionsQuery.data?.items ?? [])
       .filter((extension) => extension.placement === "navigation")
       .filter(isWorkspaceNavigationExtension)
+      .filter(isExtensionVisible)
       .toSorted((a, b) =>
         systemPluginExtensionTitle(a, $locale).localeCompare(
           systemPluginExtensionTitle(b, $locale),
@@ -295,6 +331,37 @@
       normalizedPath !== "/organization" &&
       !normalizedPath.startsWith("/organization/")
     );
+  }
+
+  function isExtensionVisible(extension: SystemPluginWebExtension): boolean {
+    const endpoint = resolveExtensionVisibilityEndpoint(extension);
+    if (!endpoint) {
+      return true;
+    }
+    return extensionVisibility[extension.key] === true;
+  }
+
+  function resolveExtensionVisibilityEndpoint(
+    extension: SystemPluginWebExtension,
+  ): string | null {
+    const endpoint = readVisibilityEndpoint(extension);
+    if (!endpoint) {
+      return null;
+    }
+    return endpoint
+      .replaceAll("{organizationId}", encodeURIComponent(currentOrganization?.organizationId ?? ""))
+      .replaceAll("{organizationSlug}", encodeURIComponent(currentOrganization?.slug ?? ""))
+      .replaceAll("{organizationName}", encodeURIComponent(currentOrganization?.name ?? ""))
+      .replaceAll("{organizationRole}", encodeURIComponent(currentOrganization?.role ?? ""));
+  }
+
+  function readVisibilityEndpoint(extension: SystemPluginWebExtension): string | null {
+    const metadata = extension.metadata;
+    if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+      return null;
+    }
+    const endpoint = metadata.visibilityEndpoint;
+    return typeof endpoint === "string" && endpoint.length > 0 ? endpoint : null;
   }
 
   function toggleColorMode(): void {
