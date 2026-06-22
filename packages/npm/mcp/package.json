@@ -1,7 +1,7 @@
 {
   "name": "@appaloft/mcp",
   "version": "0.1.0",
-  "description": "Standalone Appaloft MCP server launcher.",
+  "description": "Scoped Appaloft MCP server launcher for stdio and HTTP transports.",
   "license": "Apache-2.0",
   "type": "module",
   "bin": {
