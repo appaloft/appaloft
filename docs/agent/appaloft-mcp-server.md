@@ -47,6 +47,20 @@ npx @appaloft/mcp serve --host 127.0.0.1 --port 3939
 The `@appaloft/mcp` package exposes the `appaloft-mcp` launcher and delegates to the same Appaloft
 runtime. It does not ship a second operation list or business implementation.
 
+## Remote Auth
+
+Remote HTTP MCP clients should authenticate with the same product auth contract as the HTTP/API
+surface. For browser handoff, run:
+
+```bash
+appaloft auth mcp login
+```
+
+The command creates a short-lived browser authorization session, requests bearer credential
+material, verifies current organization context, and writes a redacted local `mcp` profile by
+default. It does not print raw bearer material. Noninteractive automation can still use
+`APPALOFT_TOKEN` or `appaloft auth token login --stdin` through a trusted local secret channel.
+
 ## Tool Contract
 
 - Tool names are derived from operation keys: `deployments.create` becomes `deployments_create`.

@@ -1,6 +1,7 @@
 import { type DomainError, err, ok, type Result } from "@appaloft/core";
 import { type AppaloftSdkFetch } from "@appaloft/sdk";
 import {
+  type CliAuthSessionRequestedCredential,
   type CliRemoteProjectOperationKey,
   cancelCliAuthSession,
   createCliAuthSession,
@@ -49,6 +50,7 @@ export interface CliControlPlaneLoginInput {
   readonly openBrowser?: boolean;
   readonly pollTimeoutMs?: number;
   readonly profile?: string;
+  readonly requestedCredential?: CliAuthSessionRequestedCredential;
   readonly signal?: AbortSignal;
 }
 
@@ -273,6 +275,7 @@ async function acquireBrowserAuth(input: {
   readonly openBrowser: (url: string) => Promise<boolean> | boolean;
   readonly onLoginSession: (session: CliControlPlaneLoginSessionView) => Promise<void> | void;
   readonly monotonicNow: () => number;
+  readonly requestedCredential?: CliAuthSessionRequestedCredential;
   readonly shouldOpenBrowser: boolean;
   readonly signal?: AbortSignal;
   readonly sleep: (milliseconds: number) => Promise<void>;
@@ -283,6 +286,7 @@ async function acquireBrowserAuth(input: {
   const session = await createCliAuthSession({
     baseUrl: input.baseUrl,
     fetch: input.fetch,
+    ...(input.requestedCredential ? { requestedCredential: input.requestedCredential } : {}),
   });
   if (session.isErr()) {
     return err(session.error);
@@ -538,6 +542,7 @@ export async function loginControlPlane(
         monotonicNow: resolved.monotonicNow,
         onLoginSession: resolved.onLoginSession,
         openBrowser: resolved.openBrowser,
+        ...(input.requestedCredential ? { requestedCredential: input.requestedCredential } : {}),
         shouldOpenBrowser,
         ...(input.signal ? { signal: input.signal } : {}),
         sleep: resolved.sleep,
@@ -555,6 +560,20 @@ export async function loginControlPlane(
     normalizedUrl: target.value.normalizedUrl,
     profileName: target.value.profileName,
   });
+}
+
+export function mcpLoginControlPlane(
+  input: Omit<CliControlPlaneLoginInput, "requestedCredential">,
+  deps?: CliControlPlaneDependencies,
+): Promise<Result<CliControlPlaneLoginProfileView>> {
+  return loginControlPlane(
+    {
+      ...input,
+      profile: input.profile ?? "mcp",
+      requestedCredential: "bearer",
+    },
+    deps,
+  );
 }
 
 export async function tokenLoginControlPlane(

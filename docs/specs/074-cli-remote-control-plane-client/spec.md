@@ -6,8 +6,8 @@
 - Artifact state: local profile/context, explicit target resolution, pre-dispatch shell routing,
   handshake, default public Cloud endpoint selection, neutral browser auth-session exchange, and
   generic generated SDK non-streaming operation dispatch are implemented and synchronized. OS
-  keychain storage, SSH PGlite adoption,
-  source-package quick deploy, streaming/watch, and future MCP exposure remain deferred.
+  keychain storage, SSH PGlite adoption, source-package quick deploy, streaming/watch, and
+  advanced MCP gateway discovery remain deferred.
 - Roadmap target: Control-plane mode Phase 1/3 bridge. It makes local CLI login/profile, target
   resolution, and ordinary generated SDK remote operation dispatch concrete without completing
   Cloud-assisted Action, self-hosted adoption, or control-plane-owned source-package execution.
@@ -67,6 +67,8 @@ Initial accepted command shapes:
 - `appaloft login [--url <url>] [--profile <name>] [--no-browser]`
 - `appaloft auth login [--url <url>] [--profile <name>] [--no-browser]` as a namespaced alias when useful for CLI
   organization
+- `appaloft auth mcp login [--url <url>] [--profile <name>] [--no-browser]` for remote MCP
+  browser handoff that stores a bearer-backed `mcp` profile by default
 - `appaloft auth token login [--stdin | --token-file <path>] [--url <url>] [--profile <name>]`
   for noninteractive scoped token handoff without browser/user-code auth
 - `appaloft auth status [--profile <name>]`
@@ -100,7 +102,9 @@ The implemented auth acquisition mechanisms are:
 - bearer token input from `APPALOFT_TOKEN`, `APPALOFT_AUTHORIZATION`, stdin, or a user-controlled
   token file for noninteractive automation and AI-agent handoff;
 - legacy trusted local product-session cookie compatibility for local operator diagnostics only;
-- neutral CLI browser auth-session exchange against the selected endpoint for human login.
+- neutral CLI browser auth-session exchange against the selected endpoint for human login;
+- MCP browser auth-session exchange that requests bearer credential material, verifies current
+  organization context, and writes a redacted local profile named `mcp` unless `--profile` is set.
 
 `APPALOFT_TOKEN` takes precedence over legacy cookie material. AI-agent guidance must not ask the
 agent to drive browser/user-code login, read cookies, or open token file contents. If no profile or
@@ -323,6 +327,7 @@ cookies, database URLs, SSH keys, credential payloads, or secret values.
 | CLI-RCPC-SPEC-012 | Browser auth session completes login | No local credential is present and the selected control plane supports CLI auth exchange | The operator runs `appaloft login` | The CLI creates an auth session, prints `verificationUriComplete` and the user code, waits for explicit Enter before opening the browser unless disabled, polls pending states, exchanges only after authorization, verifies current context, writes the active profile, and never prints raw credential material. |
 | CLI-RCPC-SPEC-013 | Browser auth session failure writes no profile | The auth session is pending, denied, expired, times out, is interrupted, exchange fails, or current context verification fails | The operator runs login | The CLI returns a structured auth error, attempts cancellation on interruption, and does not create, update, or activate a profile. |
 | CLI-RCPC-SPEC-014 | Self-hosted auth exchange is capability-gated | A self-hosted URL is supplied and no local credential is present | The operator runs `appaloft login --url <self-hosted-url>` | The CLI uses the same neutral auth-session contract against that endpoint, or returns `control_plane_auth_unsupported` when the endpoint does not support it. |
+| CLI-RCPC-SPEC-015 | MCP login requests bearer material | A remote HTTP MCP client needs bearer auth | The operator runs `appaloft auth mcp login` | The CLI creates the same browser auth session with `requestedCredential: "bearer"`, exchanges only after authorization, verifies current context with the bearer, writes a redacted local `mcp` profile by default, and never prints raw credential material. |
 
 ## Public Surfaces
 
@@ -338,8 +343,9 @@ cookies, database URLs, SSH keys, credential payloads, or secret values.
   by ADR-025.
 - SDK: remote dispatch should reuse `@appaloft/sdk` generated operation descriptors or an extended
   `@appaloft/orpc/client` with auth support. It must not create CLI-only schemas.
-- Future MCP/tools: no new tool semantics; future generated tools continue to use operation catalog
-  entries and remote API auth.
+- MCP/tools: no new tool semantics; generated tools continue to use operation catalog entries and
+  remote API auth. Remote HTTP MCP bootstrap can use `appaloft auth mcp login` to obtain a local
+  bearer profile through the same auth-session exchange contract.
 - Public docs/help: covered by the CLI reference anchors
   `#cli-remote-control-plane-login` and `#cli-remote-control-plane-dispatch`.
 
