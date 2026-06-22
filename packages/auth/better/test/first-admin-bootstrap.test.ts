@@ -1124,6 +1124,27 @@ describe("Better Auth first-admin bootstrap adapter", () => {
     });
     expect(cliAuthorizationResult.isOk()).toBe(true);
 
+    const cliSessionBearer = await runtime.issueCliProductSessionBearer(
+      new Request("http://localhost:3721/cli-auth/authorize", {
+        headers: {
+          cookie: sessionCookie,
+          "x-forwarded-for": "203.0.113.9",
+        },
+      }),
+    );
+    expect(cliSessionBearer).toContain(".");
+    expect(cliSessionBearer).not.toContain("better-auth.session_token=");
+    if (!cliSessionBearer) {
+      throw new Error("Expected CLI product session bearer after browser authorization");
+    }
+    const cliBearerAuthorizationResult = await runtime.authorizeProductSession(context, {
+      method: "POST",
+      path: "/mcp",
+      requiredRole: "member",
+      authorizationHeader: `Bearer ${cliSessionBearer}`,
+    });
+    expect(cliBearerAuthorizationResult.isOk()).toBe(true);
+
     const shown = await runtime.showAccountProfile(portContext);
     const updated = await runtime.changeAccountProfile(portContext, {
       displayName: "Renamed Settings User",

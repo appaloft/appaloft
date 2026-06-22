@@ -189,6 +189,94 @@ describe("MCP HTTP transport", () => {
     });
   });
 
+  test("[APPALOFT-MCP-015] dispatches /mcp tool calls with bearer authorization", async () => {
+    let capturedAuthInput:
+      | Parameters<
+          NonNullable<Parameters<typeof createHttpApp>[0]["authRuntime"]>["authorizeProductSession"]
+        >[1]
+      | undefined;
+    const commandBus = {
+      execute: async <T>(): Promise<Result<T>> => ok({ id: "prj_mcp_bearer" } as T),
+    } as CommandBus;
+    const authRuntime: Parameters<typeof createHttpApp>[0]["authRuntime"] = {
+      authorizeProductSession: async (_context, input) => {
+        capturedAuthInput = input;
+        return ok({
+          actor: {
+            kind: "user",
+            id: "usr_mcp_bearer",
+            label: "mcp-bearer@example.com",
+          },
+          email: "mcp-bearer@example.com",
+          organizationId: "org_mcp_bearer",
+          role: input.requiredRole,
+          userId: "usr_mcp_bearer",
+        });
+      },
+      getPublicConfig: () => ({
+        provider: "better-auth",
+        loginRequired: true,
+        deferredAuth: false,
+        providers: [],
+      }),
+      getSessionStatus: async () => ({
+        accountSecurity: {
+          enabled: true,
+          passwordState: "set",
+        },
+        accountRecovery: {
+          enabled: false,
+        },
+        enabled: true,
+        emailVerification: {
+          enabled: false,
+          otpEnabled: false,
+          required: false,
+        },
+        provider: "better-auth",
+        loginRequired: true,
+        deferredAuth: false,
+        session: null,
+        providers: [],
+      }),
+      handle: () => new Response("not used", { status: 404 }),
+    };
+    const app = createTestApp({
+      authRuntime,
+      commandBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/mcp", {
+        method: "POST",
+        headers: {
+          authorization: "Bearer signed-session-token",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: "call-bearer",
+          method: "tools/call",
+          params: {
+            name: "projects_create",
+            arguments: {
+              name: "MCP Bearer Demo",
+            },
+          },
+        }),
+      }),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.result.structuredContent).toEqual({ id: "prj_mcp_bearer" });
+    expect(capturedAuthInput).toMatchObject({
+      authorizationHeader: "Bearer signed-session-token",
+      path: "/mcp",
+      requiredRole: "member",
+    });
+  });
+
   test("[APPALOFT-MCP-013] rejects /mcp tool calls without a product session before dispatch", async () => {
     const commandBus = {
       execute: async () => {

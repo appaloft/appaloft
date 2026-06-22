@@ -1308,6 +1308,45 @@ describe("CLI remote control-plane client", () => {
     expect(rendered.stderr).toBe("");
   });
 
+  test("[CONTROL-PLANE-CLI-017] auth mcp login requests bearer material and writes an mcp profile", async () => {
+    const requests: Request[] = [];
+    const store = new MemoryCliControlPlaneProfileStore();
+    const output = captureOutput();
+
+    const result = await runStandaloneControlPlaneCli({
+      argv: ["node", "appaloft", "auth", "mcp", "login", "--no-browser"],
+      env: {},
+      fetch: createCliAuthExchangeFetch(requests),
+      now: () => "2026-05-17T00:00:00.000Z",
+      openBrowser: () => false,
+      sleep: async () => undefined,
+      store,
+      stderr: output.stderr,
+      stdout: output.stdout,
+    });
+
+    const stored = await store.read();
+    const rendered = output.read();
+    const sessionRequestBody = (await requests[0]?.json()) as { requestedCredential?: string };
+
+    expect(result).toEqual({ handled: true, exitCode: 0 });
+    expect(sessionRequestBody).toMatchObject({
+      requestedCredential: "bearer",
+    });
+    expect(stored._unsafeUnwrap().activeProfile).toBe("mcp");
+    expect(stored._unsafeUnwrap().profiles.mcp).toMatchObject({
+      auth: {
+        kind: "bearer",
+        token: "tok_exchanged_secret_5678",
+      },
+      baseUrl: defaultPublicCloudControlPlaneUrl,
+      mode: "cloud",
+      name: "mcp",
+    });
+    expect(rendered.stdout).toContain("***5678");
+    expect(rendered.stdout).not.toContain("tok_exchanged_secret_5678");
+  });
+
   test("[CONTROL-PLANE-CLI-002] failed login does not write a profile", async () => {
     const requests: Request[] = [];
     const store = new MemoryCliControlPlaneProfileStore();
