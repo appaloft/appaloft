@@ -28,18 +28,19 @@ security boundary.
 For a standalone package launcher:
 
 ```bash
-npx appaloft-mcp
-npx appaloft-mcp serve --host 127.0.0.1 --port 3939
+npx @appaloft/mcp
+npx @appaloft/mcp serve --host 127.0.0.1 --port 3939
 ```
 
-The standalone `appaloft-mcp` package delegates to the same Appaloft CLI/runtime instead of
-shipping a second business implementation.
+The standalone `@appaloft/mcp` package exposes the `appaloft-mcp` launcher and delegates to the same
+Appaloft CLI/runtime instead of shipping a second business implementation.
 
 ## Release Status
 
 This package is the public MCP transport boundary. `@appaloft/ai-mcp` remains workspace source, and
-the publishable user-facing launcher is `appaloft-mcp`. Release validation must pack and execute the
-launcher artifact before publish. Public skill discovery metadata remains a separate release task.
+the publishable user-facing launcher package is `@appaloft/mcp`. Release validation must pack and
+execute the launcher artifact before publish. Public skill discovery metadata remains a separate
+release task.
 
 ## Tool Contract
 

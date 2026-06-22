@@ -1,5 +1,5 @@
 {
-  "name": "appaloft-mcp",
+  "name": "@appaloft/mcp",
   "version": "0.1.0",
   "description": "Standalone Appaloft MCP server launcher.",
   "license": "Apache-2.0",

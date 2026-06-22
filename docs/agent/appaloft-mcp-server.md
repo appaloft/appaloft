@@ -40,12 +40,12 @@ only behind a trusted reverse proxy or private network boundary.
 Use the standalone launcher when an MCP host expects a dedicated package command:
 
 ```bash
-npx appaloft-mcp
-npx appaloft-mcp serve --host 127.0.0.1 --port 3939
+npx @appaloft/mcp
+npx @appaloft/mcp serve --host 127.0.0.1 --port 3939
 ```
 
-`appaloft-mcp` delegates to the same Appaloft runtime. It does not ship a second operation list or
-business implementation.
+The `@appaloft/mcp` package exposes the `appaloft-mcp` launcher and delegates to the same Appaloft
+runtime. It does not ship a second operation list or business implementation.
 
 ## Tool Contract
 

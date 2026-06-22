@@ -18,7 +18,7 @@
 - [x] Add MCP JSON-RPC request handler and stdio runner.
 - [x] Add MCP HTTP JSON-RPC request handler and `/mcp` HTTP adapter route.
 - [x] Add `appaloft mcp serve` for a localhost HTTP MCP endpoint.
-- [x] Add standalone `appaloft-mcp` launcher package.
+- [x] Add standalone `@appaloft/mcp` launcher package.
 - [x] Add package exports and package docs for future install/release.
 
 ## Documentation
@@ -39,7 +39,7 @@
 ## Release Preparation
 
 - [x] Document the current supported MCP run path as `appaloft mcp stdio`.
-- [x] Add standalone `appaloft-mcp` package/bin as a delegating launcher.
+- [x] Add standalone `@appaloft/mcp` package/bin as a delegating launcher.
 - [x] Record pre-publish checks for packed artifact validation and discovery metadata.
 - [ ] Run release build or package validation from a clean checkout before publishing.
 - [ ] Add `.well-known/agent-skills` or equivalent public discovery index in a dedicated release round.

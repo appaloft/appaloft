@@ -30,7 +30,7 @@ agents configured with an Appaloft server.
 | APPALOFT-MCP-011 | HTTP MCP endpoint exposes metadata and JSON-RPC | A self-hosted Appaloft HTTP runtime mounts `/mcp` | A MCP client sends GET metadata or POST JSON-RPC | The endpoint returns MCP capability metadata and handles JSON-RPC methods such as `tools/list`. |
 | APPALOFT-MCP-012 | HTTP MCP calls preserve MCP entrypoint and product auth | A hosted or self-hosted control plane has product session auth | A MCP client calls a tool through `/mcp` | The call authorizes the product session, dispatches through the same buses, and uses an execution context with `entrypoint: "mcp"` plus the authenticated actor and organization principal. |
 | APPALOFT-MCP-013 | HTTP MCP rejects unauthenticated product calls | Product session auth is enabled | A MCP client calls a write or read tool without valid auth | The request is rejected before CommandBus or QueryBus dispatch. |
-| APPALOFT-MCP-014 | Standalone launcher delegates to Appaloft runtime | A user installs `appaloft-mcp` | They run `appaloft-mcp` or `appaloft-mcp serve` | The launcher invokes the same `appaloft mcp stdio` or `appaloft mcp serve` runtime path and does not maintain another operation list. |
+| APPALOFT-MCP-014 | Standalone launcher delegates to Appaloft runtime | A user installs `@appaloft/mcp` | They run `appaloft-mcp` or `appaloft-mcp serve` | The launcher invokes the same `appaloft mcp stdio` or `appaloft mcp serve` runtime path and does not maintain another operation list. |
 
 ## Public Boundary
 
