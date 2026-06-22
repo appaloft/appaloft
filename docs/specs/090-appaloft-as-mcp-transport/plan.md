@@ -16,7 +16,8 @@
   and static artifact publishing.
 - Add a minimal MCP JSON-RPC stdio adapter without introducing a second business protocol.
 - Add a minimal HTTP JSON-RPC MCP adapter for self-hosted or reverse-proxied `/mcp` endpoints.
-- Add a standalone `appaloft-mcp` launcher package that delegates to the same Appaloft runtime.
+- Add a standalone `@appaloft/mcp` launcher package that exposes the `appaloft-mcp` bin and
+  delegates to the same Appaloft runtime.
 - Let shell/server composition provide real buses and context; `@appaloft/ai-mcp` stays independent
   from persistence and runtime composition.
 
@@ -39,11 +40,12 @@ This slice is source-, docs-, and launcher-ready for review. Supported user-faci
 
 - `appaloft mcp stdio`
 - `appaloft mcp serve --host 127.0.0.1 --port 3939`
-- `npx appaloft-mcp`
-- `npx appaloft-mcp serve --host 127.0.0.1 --port 3939`
+- `npx @appaloft/mcp`
+- `npx @appaloft/mcp serve --host 127.0.0.1 --port 3939`
 
-Before publishing a release, validate the `appaloft-mcp` bin from a packed release artifact, not
-only from source. Keep hosted gateway policy, audit, and entitlement outside public Appaloft.
+Before publishing a release, validate the `@appaloft/mcp` package bin from a packed release
+artifact, not only from source. Keep hosted gateway policy, audit, and entitlement outside public
+Appaloft.
 
 ## Follow-Up Rounds
 
