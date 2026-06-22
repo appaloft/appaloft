@@ -1,4 +1,7 @@
-import { readFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { dirname, join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { type DomainError, err, ok, type Result } from "@appaloft/core";
 import { type AppaloftSdkFetch } from "@appaloft/sdk";
@@ -6,6 +9,7 @@ import {
   type CliControlPlaneEnvironment,
   type CliControlPlaneMode,
   type CliControlPlaneProfileStore,
+  defaultCliControlPlaneProfileStore,
 } from "./control-plane-profile.js";
 import {
   type CliControlPlaneDependencies,
@@ -185,6 +189,7 @@ function renderRootHelp(stdout: Pick<NodeJS.WriteStream, "write">): void {
 Usage:
   appaloft login [--url <url>] [--mode cloud|self-hosted] [--no-browser]
   appaloft auth mcp login [--url <url>] [--mode cloud|self-hosted] [--profile <name>] [--no-browser]
+  appaloft auth mcp codex install [--profile <name>] [--server-name <name>] [--codex-home <path>] [--command <command>]
   appaloft auth token login [--stdin | --token-file <path>] [--url <url>] [--profile <name>]
   appaloft auth status
   appaloft context show
@@ -338,6 +343,159 @@ async function handleMcpLogin(
   }
 }
 
+function tomlString(value: string): string {
+  return JSON.stringify(value);
+}
+
+function tomlStringArray(values: readonly string[]): string {
+  return `[${values.map((value) => tomlString(value)).join(", ")}]`;
+}
+
+function escapeTomlTableSegment(value: string): string {
+  return /^[A-Za-z0-9_-]+$/.test(value) ? value : tomlString(value);
+}
+
+function upsertCodexMcpServerConfig(input: {
+  readonly existing: string;
+  readonly serverName: string;
+  readonly command: string;
+  readonly args: readonly string[];
+}): string {
+  const tablePrefix = `[mcp_servers.${escapeTomlTableSegment(input.serverName)}`;
+  const lines = input.existing.split(/\r?\n/);
+  const kept: string[] = [];
+  let skipping = false;
+
+  for (const line of lines) {
+    if (/^\s*\[/.test(line)) {
+      skipping = line.startsWith(tablePrefix);
+    }
+    if (!skipping) {
+      kept.push(line);
+    }
+  }
+
+  while (kept.length > 0 && kept.at(-1)?.trim() === "") {
+    kept.pop();
+  }
+
+  kept.push(
+    "",
+    `[mcp_servers.${escapeTomlTableSegment(input.serverName)}]`,
+    `command = ${tomlString(input.command)}`,
+    `args = ${tomlStringArray(input.args)}`,
+    "startup_timeout_sec = 30",
+    "tool_timeout_sec = 120",
+    "",
+  );
+
+  return `${kept.join("\n")}`;
+}
+
+async function handleMcpCodexInstall(
+  args: readonly string[],
+  input: StandaloneControlPlaneCliInput,
+): Promise<StandaloneControlPlaneCliResult> {
+  const parsed = parseOptions(args, ["profile", "server-name", "codex-home", "command"]);
+  if (parsed.isErr()) {
+    return finish(parsed, input);
+  }
+
+  const profileName = parsed.value.values.profile ?? "mcp";
+  const serverName = parsed.value.values["server-name"] ?? "appaloft";
+  const command = parsed.value.values.command ?? "appaloft";
+  const codexHome =
+    parsed.value.values["codex-home"] ??
+    input.env?.CODEX_HOME?.trim() ??
+    process.env.CODEX_HOME?.trim() ??
+    join(homedir(), ".codex");
+  const configPath = join(codexHome, "config.toml");
+  const store = input.store ?? defaultCliControlPlaneProfileStore(input.env);
+  const storeData = await store.read();
+  if (storeData.isErr()) {
+    return finish(storeData, input);
+  }
+
+  const profile = storeData.value.profiles[profileName];
+  if (!profile) {
+    return finish(
+      err({
+        code: "control_plane_profile_not_found",
+        category: "user",
+        message: "Appaloft MCP profile was not found; run appaloft auth mcp login first",
+        retryable: false,
+        details: {
+          phase: "codex-mcp-install",
+          profile: profileName,
+        },
+      } satisfies DomainError),
+      input,
+    );
+  }
+  if (profile.auth.kind !== "bearer") {
+    return finish(
+      err({
+        code: "validation_error",
+        category: "user",
+        message: "Codex MCP install requires a bearer MCP profile; run appaloft auth mcp login",
+        retryable: false,
+        details: {
+          phase: "codex-mcp-install",
+          profile: profileName,
+        },
+      } satisfies DomainError),
+      input,
+    );
+  }
+
+  try {
+    const existing = existsSync(configPath) ? await readFile(configPath, "utf8") : "";
+    const next = upsertCodexMcpServerConfig({
+      existing,
+      serverName,
+      command,
+      args: ["mcp", "remote-stdio", "--profile", profileName],
+    });
+    await mkdir(dirname(configPath), { recursive: true, mode: 0o700 });
+    await writeFile(configPath, next, { mode: 0o600 });
+    await chmod(configPath, 0o600).catch(() => undefined);
+
+    return finish(
+      ok({
+        schemaVersion: "appaloft.codex.mcp-install/v1",
+        serverName,
+        configPath,
+        command,
+        args: ["mcp", "remote-stdio", "--profile", profileName],
+        profile: {
+          name: profile.name,
+          baseUrl: profile.baseUrl,
+          auth: {
+            kind: profile.auth.kind,
+            redacted: "***",
+          },
+        },
+      }),
+      input,
+    );
+  } catch (error) {
+    return finish(
+      err({
+        code: "codex_mcp_config_write_failed",
+        category: "infra",
+        message: "Codex MCP config could not be written",
+        retryable: true,
+        details: {
+          phase: "codex-mcp-install",
+          configPath,
+          message: error instanceof Error ? error.message : String(error),
+        },
+      } satisfies DomainError),
+      input,
+    );
+  }
+}
+
 function handleStatus(
   args: readonly string[],
   input: StandaloneControlPlaneCliInput,
@@ -450,6 +608,9 @@ export async function runStandaloneControlPlaneCli(
     }
     if (subcommand === "mcp" && args[2] === "login") {
       return handleMcpLogin(args.slice(3), input);
+    }
+    if (subcommand === "mcp" && args[2] === "codex" && args[3] === "install") {
+      return handleMcpCodexInstall(args.slice(4), input);
     }
     if (subcommand === "status") {
       return handleStatus(args.slice(2), input);

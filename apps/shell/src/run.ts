@@ -3,11 +3,13 @@ import { mkdir, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import {
   createRemoteCliProgram,
+  defaultCliControlPlaneProfileStore,
   resolveCliExecutionTarget,
   runStandaloneControlPlaneCli,
 } from "@appaloft/adapter-cli";
 import {
   createAppaloftMcpServer,
+  runAppaloftMcpRemoteStdioProxy,
   runAppaloftMcpStdioServer,
   startAppaloftMcpHttpServer,
 } from "@appaloft/ai-mcp";
@@ -238,10 +240,13 @@ function commandArgs(argv: readonly string[]): readonly string[] {
 
 function isMcpCommand(argv: readonly string[]): boolean {
   const args = commandArgs(argv);
-  return args[0] === "mcp" && (args.length === 1 || args[1] === "stdio" || args[1] === "serve");
+  return (
+    args[0] === "mcp" &&
+    (args.length === 1 || args[1] === "stdio" || args[1] === "serve" || args[1] === "remote-stdio")
+  );
 }
 
-function mcpMode(argv: readonly string[]): "stdio" | "serve" | null {
+function mcpMode(argv: readonly string[]): "stdio" | "serve" | "remote-stdio" | null {
   const args = commandArgs(argv);
   if (args[0] !== "mcp") {
     return null;
@@ -251,7 +256,11 @@ function mcpMode(argv: readonly string[]): "stdio" | "serve" | null {
     return "stdio";
   }
 
-  return args[1] === "serve" ? "serve" : null;
+  if (args[1] === "serve" || args[1] === "remote-stdio") {
+    return args[1];
+  }
+
+  return null;
 }
 
 function readOptionValue(args: readonly string[], name: string): string | null {
@@ -327,6 +336,47 @@ async function runShellMcpHttp(app: AppComposition, argv: readonly string[]): Pr
   await new Promise<void>(() => {});
 }
 
+async function runShellMcpRemoteStdio(argv: readonly string[]): Promise<void> {
+  const args = commandArgs(argv);
+  const profileName = readOptionValue(args, "profile") ?? "mcp";
+  const store = defaultCliControlPlaneProfileStore(process.env);
+  const data = await store.read();
+  if (data.isErr()) {
+    writeDomainError(data.error);
+    process.exit(1);
+  }
+
+  const profile = data.value.profiles[profileName];
+  if (!profile) {
+    writeDomainError(
+      domainError.validation("Appaloft MCP profile was not found; run appaloft auth mcp login", {
+        phase: "mcp-remote-stdio-profile",
+        profile: profileName,
+      }),
+    );
+    process.exit(1);
+  }
+
+  if (profile.auth.kind !== "bearer") {
+    writeDomainError(
+      domainError.validation(
+        "Appaloft MCP remote stdio requires a bearer profile; run appaloft auth mcp login",
+        {
+          phase: "mcp-remote-stdio-profile",
+          profile: profileName,
+        },
+      ),
+    );
+    process.exit(1);
+  }
+
+  const endpoint = new URL("/mcp", profile.baseUrl).toString();
+  await runAppaloftMcpRemoteStdioProxy({
+    endpoint,
+    authorization: `Bearer ${profile.auth.token}`,
+  });
+}
+
 export async function runShellCli(options?: ShellRuntimeOptions): Promise<void> {
   const argv = process.argv;
   const mcpCommand = isMcpCommand(argv);
@@ -370,6 +420,11 @@ export async function runShellCli(options?: ShellRuntimeOptions): Promise<void> 
     if (exitCode !== 0) {
       process.exit(exitCode);
     }
+    return;
+  }
+
+  if (mcpCommand && mcpMode(argv) === "remote-stdio") {
+    await runShellMcpRemoteStdio(argv);
     return;
   }
 
@@ -417,6 +472,8 @@ export async function runShellCli(options?: ShellRuntimeOptions): Promise<void> 
       const mode = mcpMode(argv);
       if (mode === "serve") {
         await runShellMcpHttp(app, argv);
+      } else if (mode === "remote-stdio") {
+        await runShellMcpRemoteStdio(argv);
       } else {
         await runShellMcpStdio(app);
       }

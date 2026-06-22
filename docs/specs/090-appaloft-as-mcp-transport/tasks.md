@@ -20,6 +20,7 @@
 - [x] Add `appaloft mcp serve` for a localhost HTTP MCP endpoint.
 - [x] Add standalone `@appaloft/mcp` launcher package.
 - [x] Add HTTP MCP bearer product-auth forwarding for remote clients.
+- [x] Add remote stdio bridge for MCP hosts that should call hosted `/mcp` without storing bearer in host config.
 - [x] Add package exports and package docs for future install/release.
 
 ## Documentation
@@ -31,7 +32,7 @@
 
 ## Verification
 
-- [x] Add `APPALOFT-MCP-001` through `APPALOFT-MCP-015` tests.
+- [x] Add `APPALOFT-MCP-001` through `APPALOFT-MCP-016` tests.
 - [x] Run focused MCP and docs registry tests.
 - [x] Add Appaloft skill eval validation coverage for MCP setup, tool/resource/prompt boundaries,
   and operation-catalog-backed deploy/recover usage.

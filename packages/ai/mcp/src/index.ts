@@ -1204,3 +1204,55 @@ export async function runAppaloftMcpStdioServer(input: {
     }
   }
 }
+
+export async function runAppaloftMcpRemoteStdioProxy(input: {
+  endpoint: string;
+  authorization: string;
+  fetch?: typeof fetch;
+  stdin?: ReadableStream<Uint8Array>;
+  stdout?: { write(data: string): void };
+}): Promise<void> {
+  const stdin = input.stdin ?? Bun.stdin.stream();
+  const stdout = input.stdout ?? process.stdout;
+  const requestFetch = input.fetch ?? fetch;
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  async function forward(line: string): Promise<void> {
+    const response = await requestFetch(input.endpoint, {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        authorization: input.authorization,
+        "content-type": "application/json",
+      },
+      body: line,
+    });
+
+    if (response.status === 202 || response.status === 204) {
+      return;
+    }
+
+    const text = await response.text();
+    if (text.trim()) {
+      stdout.write(`${text.trimEnd()}\n`);
+    }
+  }
+
+  for await (const chunk of stdin) {
+    buffer += decoder.decode(chunk, { stream: true });
+    const lines = buffer.split(/\r?\n/);
+    buffer = lines.pop() ?? "";
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed) {
+        await forward(trimmed);
+      }
+    }
+  }
+
+  if (buffer.trim()) {
+    await forward(buffer.trim());
+  }
+}
