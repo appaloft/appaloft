@@ -26,12 +26,12 @@ reverse proxy or private network supplies the security boundary.
 For a dedicated package command:
 
 ```bash
-npx appaloft-mcp
-npx appaloft-mcp serve --host 127.0.0.1 --port 3939
+npx @appaloft/mcp
+npx @appaloft/mcp serve --host 127.0.0.1 --port 3939
 ```
 
-The standalone package delegates to the Appaloft CLI/runtime. It does not define another operation
-list or bypass the application buses.
+The standalone `@appaloft/mcp` package exposes the `appaloft-mcp` launcher and delegates to the
+Appaloft CLI/runtime. It does not define another operation list or bypass the application buses.
 
 ## Tool Naming
 
