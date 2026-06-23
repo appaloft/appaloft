@@ -1450,8 +1450,13 @@
             </Button>
           </section>
         {:else if section.kind === "table"}
-          <section class={["console-panel overflow-hidden", tableSectionClass(section)]}>
-            <div class="space-y-1 p-5">
+          <section
+            class={[
+              embedded ? "overflow-hidden" : "console-panel overflow-hidden",
+              tableSectionClass(section),
+            ]}
+          >
+            <div class={embedded ? "space-y-1 pb-4" : "space-y-1 p-5"}>
               <h2 class="text-lg font-semibold">{section.title}</h2>
               {#if section.description}
                 <p class="text-sm text-muted-foreground">{section.description}</p>
@@ -1488,7 +1493,10 @@
               {/if}
             </div>
             {#if section.rows.length > 0}
-              <div class="overflow-x-auto border-t" data-console-page-table-body>
+              <div
+                class={embedded ? "overflow-x-auto" : "overflow-x-auto border-t"}
+                data-console-page-table-body
+              >
                 <table class="w-full min-w-[760px] text-sm" data-console-page-record-list>
                   <thead class="bg-muted/40 text-xs font-medium text-muted-foreground">
                     <tr>
@@ -1608,12 +1616,16 @@
                 </table>
               </div>
             {:else}
-              <div class="border-t p-5 text-sm text-muted-foreground">
+              <div class={embedded ? "py-5 text-sm text-muted-foreground" : "border-t p-5 text-sm text-muted-foreground"}>
                 {section.emptyLabel ?? $t(i18nKeys.common.status.unknown)}
               </div>
             {/if}
             {#if section.pagination}
-              <div class="flex flex-wrap items-center justify-between gap-3 border-t px-5 py-3">
+              <div
+                class={embedded
+                  ? "flex flex-wrap items-center justify-between gap-3 py-3"
+                  : "flex flex-wrap items-center justify-between gap-3 border-t px-5 py-3"}
+              >
                 <p class="text-sm text-muted-foreground">{section.pagination.label}</p>
                 <div class="flex items-center gap-2">
                   {#if section.pagination.previousHref}
