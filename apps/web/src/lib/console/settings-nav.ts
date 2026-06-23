@@ -7,6 +7,7 @@ import {
   ClipboardList,
   Globe2,
   KeyRound,
+  Link2,
   MailPlus,
   ShieldAlert,
   ShieldCheck,
@@ -32,6 +33,11 @@ export function accountSettingsItems() {
       href: "/account/security",
       labelKey: i18nKeys.console.authAccountSecurity.introTitle,
       icon: KeyRound,
+    },
+    {
+      href: "/account/connections",
+      labelKey: i18nKeys.console.accountSettings.connectionsTitle,
+      icon: Link2,
     },
     {
       href: "/account/sessions",

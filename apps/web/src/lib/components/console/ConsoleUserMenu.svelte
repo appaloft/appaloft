@@ -5,16 +5,14 @@
   import {
     BookOpen,
     ChevronUp,
-    GitBranch,
     House,
     LogOut,
-    PlugZap,
     Rocket,
     Settings2,
     UserRound,
   } from "@lucide/svelte";
 
-  import { API_BASE, request } from "$lib/api/client";
+  import { request } from "$lib/api/client";
   import { Avatar, AvatarFallback } from "$lib/components/ui/avatar";
   import {
     DropdownMenu,
@@ -24,9 +22,6 @@
     DropdownMenuRadioGroup,
     DropdownMenuRadioItem,
     DropdownMenuSeparator,
-    DropdownMenuSub,
-    DropdownMenuSubContent,
-    DropdownMenuSubTrigger,
     DropdownMenuTrigger,
   } from "$lib/components/ui/dropdown-menu";
   import { webDocsHrefs } from "$lib/console/docs-help";
@@ -81,28 +76,6 @@
       void preloadInstanceAccessCapability();
     }
   });
-
-  async function connectGitHub(): Promise<void> {
-    const response = await request<{ redirect: boolean; url?: string }>(
-      authSession.session && !githubConnected ? "/api/auth/link-social" : "/api/auth/sign-in/social",
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          provider: "github",
-          callbackURL: browser ? window.location.href : API_BASE,
-          scopes: ["repo", "read:user"],
-          disableRedirect: true,
-        }),
-      },
-    );
-
-    if (response.url && browser) {
-      window.location.href = response.url;
-    }
-  }
 
   async function signOut(): Promise<void> {
     await request<{ success?: boolean }>("/api/auth/sign-out", {
@@ -160,23 +133,6 @@
       <House class="size-4" />
       {$t(i18nKeys.console.nav.home)}
     </DropdownMenuItem>
-    <DropdownMenuSub>
-      <DropdownMenuSubTrigger>
-        <PlugZap class="size-4" />
-        {$t(i18nKeys.console.shell.connections)}
-      </DropdownMenuSubTrigger>
-      <DropdownMenuSubContent class="min-w-64">
-        <DropdownMenuItem disabled={!githubProvider?.configured || githubConnected} onclick={connectGitHub}>
-          <GitBranch class="size-4 shrink-0" />
-          <span class="min-w-0 flex-1">
-            <span class="block truncate">
-              {githubConnected ? "GitHub" : $t(i18nKeys.console.shell.linkGitHubAccount)}
-            </span>
-            <span class="block truncate text-xs text-muted-foreground">{githubConnectionSummary}</span>
-          </span>
-        </DropdownMenuItem>
-      </DropdownMenuSubContent>
-    </DropdownMenuSub>
     <DropdownMenuItem onclick={() => navigateTo("/organization")}>
       <UserRound class="size-4" />
       {$t(i18nKeys.console.nav.organization)}

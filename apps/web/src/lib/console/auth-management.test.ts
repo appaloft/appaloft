@@ -73,9 +73,9 @@ describe("organization auth management console surface", () => {
     expect(userMenuSource).toContain("preloadInstanceAccessCapability");
     expect(userMenuSource).toContain("instanceAccessCapabilityKey");
     expect(userMenuSource).toContain('navigateTo("/")');
-    expect(userMenuSource).toContain("DropdownMenuSubTrigger");
-    expect(userMenuSource).toContain("i18nKeys.console.shell.connections");
-    expect(userMenuSource).toContain("i18nKeys.console.shell.linkGitHubAccount");
+    expect(userMenuSource).not.toContain("DropdownMenuSubTrigger");
+    expect(userMenuSource).not.toContain("/api/auth/link-social");
+    expect(userMenuSource).not.toContain("i18nKeys.console.shell.linkGitHubAccount");
     expect(userMenuSource).toContain("i18nKeys.console.shell.githubConnectedAs");
     expect(userMenuSource).not.toContain("$t(i18nKeys.common.actions.connectGitHub)");
     expect(userMenuSource).toContain("i18nKeys.common.actions.signOut");
@@ -304,6 +304,7 @@ describe("organization auth management console surface", () => {
       organizationInvitationsSource,
       accountProfileSource,
       accountSecuritySource,
+      accountConnectionsSource,
       accountSessionsSource,
       accountDangerSource,
       settingsShellSource,
@@ -329,6 +330,7 @@ describe("organization auth management console surface", () => {
       ),
       readFile(new URL("../../routes/account/profile/+page.svelte", import.meta.url), "utf8"),
       readFile(new URL("../../routes/account/security/+page.svelte", import.meta.url), "utf8"),
+      readFile(new URL("../../routes/account/connections/+page.svelte", import.meta.url), "utf8"),
       readFile(new URL("../../routes/account/sessions/+page.svelte", import.meta.url), "utf8"),
       readFile(new URL("../../routes/account/danger-zone/+page.svelte", import.meta.url), "utf8"),
       readFile(
@@ -381,6 +383,7 @@ describe("organization auth management console surface", () => {
     expect(settingsNavSource).toContain('extension.target === "console-route"');
     expect(settingsNavSource).toContain('href: "/account/profile"');
     expect(settingsNavSource).toContain('href: "/account/security"');
+    expect(settingsNavSource).toContain('href: "/account/connections"');
     expect(settingsNavSource).toContain('href: "/account/sessions"');
     expect(settingsNavSource).toContain('href: "/account/danger-zone"');
     expect(settingsNavSource).toContain('href: "/organization/danger-zone"');
@@ -388,6 +391,7 @@ describe("organization auth management console surface", () => {
     expect(accountProfileSource).toContain("SettingsShell");
     expect(accountProfileSource).toContain("orpc.account.showProfile.queryOptions");
     expect(accountProfileSource).toContain("orpcClient.account.changeProfile");
+    expect(accountProfileSource).toContain('href="/account/connections"');
     expect(accountSecuritySource).toContain("SettingsShell");
     expect(accountSecuritySource).toContain("accountSettingsItems");
     expect(accountSecuritySource).toContain('page.url.searchParams.get("section")');
@@ -398,6 +402,17 @@ describe("organization auth management console surface", () => {
     expect(accountSecuritySource).not.toContain("ConsoleResourceCanvas");
     expect(accountSecuritySource).not.toContain("console-subnav-");
     expect(layoutCssSource).not.toContain(".console-subnav");
+    expect(accountConnectionsSource).toContain("SettingsShell");
+    expect(accountConnectionsSource).toContain('activePath="/account/connections"');
+    expect(accountConnectionsSource).toContain("data-account-github-connection");
+    expect(accountConnectionsSource).toContain("/api/auth/link-social");
+    expect(accountConnectionsSource).toContain("githubProvider?.accountLabel");
+    expect(accountConnectionsSource).toContain(
+      "i18nKeys.console.accountSettings.githubConnectedAs",
+    );
+    expect(accountConnectionsSource).toContain(
+      "i18nKeys.console.accountSettings.linkGitHubAccount",
+    );
     expect(accountSessionsSource).toContain("orpc.account.listSessions.queryOptions");
     expect(accountSessionsSource).toContain("orpcClient.account.revokeSession");
     expect(accountSessionsSource).toContain("clientKind");
