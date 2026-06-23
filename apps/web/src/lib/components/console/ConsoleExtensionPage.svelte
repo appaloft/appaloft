@@ -5,14 +5,31 @@
   import {
     Activity,
     AlertTriangle,
+    Archive,
     ArrowUpRight,
+    Box,
     CheckCircle2,
     CircleDashed,
     CreditCard,
+    Database,
+    FolderPlus,
     FileText,
+    Globe2,
+    HardDrive,
+    Layers3,
+    Pencil,
     PlugZap,
+    PlusCircle,
+    RefreshCcw,
+    Rocket,
     Search,
+    Server,
+    SlidersHorizontal,
+    Trash2,
+    Undo2,
+    UploadCloud,
     WalletCards,
+    XCircle,
   } from "@lucide/svelte";
   import { createQuery, queryOptions } from "@tanstack/svelte-query";
   import type { Component } from "svelte";
@@ -23,6 +40,7 @@
   import * as Card from "$lib/components/ui/card";
   import * as Dialog from "$lib/components/ui/dialog";
   import { Skeleton } from "$lib/components/ui/skeleton";
+  import ConsoleTableFilterSelect from "$lib/components/console/ConsoleTableFilterSelect.svelte";
   import {
     findConsolePageExtensionByPath,
     readConsolePageExtensionMetadata,
@@ -32,6 +50,7 @@
     systemPluginExtensionDescription,
     systemPluginExtensionTitle,
   } from "$lib/console/web-extension-presentation";
+  import { cn } from "$lib/utils";
   import ConsoleResourceCanvas from "$lib/components/console/ConsoleResourceCanvas.svelte";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import SettingsShell from "$lib/components/console/SettingsShell.svelte";
@@ -185,7 +204,41 @@
     format?: "short" | "date-time";
   };
 
-  type ConsolePageDisplayValue = string | number | ConsolePageDateTimeValue;
+  type ConsolePageActorValue = {
+    kind: "actor";
+    label: string;
+    description?: string;
+    initials?: string;
+  };
+
+  type ConsolePageBadgeValue = {
+    kind: "badge";
+    label: string;
+    tone?: ConsolePageTone;
+  };
+
+  type ConsolePageLinkValue = {
+    kind: "link";
+    label: string;
+    href: string;
+    description?: string;
+  };
+
+  type ConsolePageIconLabelValue = {
+    kind: "icon-label";
+    label: string;
+    icon?: ConsolePageIcon;
+    tone?: ConsolePageTone;
+  };
+
+  type ConsolePageDisplayValue =
+    | string
+    | number
+    | ConsolePageDateTimeValue
+    | ConsolePageActorValue
+    | ConsolePageBadgeValue
+    | ConsolePageLinkValue
+    | ConsolePageIconLabelValue;
 
   type ConsolePageKeyValue = {
     label: string;
@@ -243,6 +296,7 @@
 
   type ConsolePageTableFilterGroup = {
     label: string;
+    type?: "buttons" | "multi-select";
     items: ConsolePageFilterLink[];
   };
 
@@ -250,6 +304,7 @@
     label: string;
     href: string;
     active?: boolean;
+    icon?: ConsolePageIcon;
   };
 
   type ConsolePageTableColumn = {
@@ -273,9 +328,10 @@
 
   type ConsolePageTableCellValue = ConsolePageDisplayValue | ConsolePageTableCell;
   type ConsolePageTableRow = {
+    key?: string;
+    cells?: Record<string, ConsolePageTableCellValue>;
     details?: ConsolePageTableDetails;
-    [key: string]: ConsolePageTableCellValue | ConsolePageTableDetails | undefined;
-  };
+  } & Record<string, unknown>;
 
   type ConsolePageCalloutSection = {
     kind: "callouts";
@@ -289,7 +345,30 @@
   };
 
   type ConsolePageTone = "default" | "muted" | "positive" | "warning" | "danger";
-  type ConsolePageIcon = "activity" | "card" | "file" | "wallet";
+  type ConsolePageIcon =
+    | "activity"
+    | "archive"
+    | "box"
+    | "card"
+    | "check"
+    | "database"
+    | "file"
+    | "folder-plus"
+    | "globe"
+    | "hard-drive"
+    | "layers"
+    | "pencil"
+    | "plug"
+    | "plus"
+    | "refresh"
+    | "rocket"
+    | "server"
+    | "sliders"
+    | "trash"
+    | "undo"
+    | "upload"
+    | "wallet"
+    | "x";
 
   type SystemPluginWebExtensionsResponse = {
     items: SystemPluginWebExtension[];
@@ -389,8 +468,27 @@
 
   function iconComponent(icon: ConsolePageIcon | undefined): Component {
     if (icon === "activity") return Activity;
+    if (icon === "archive") return Archive;
+    if (icon === "box") return Box;
     if (icon === "card") return CreditCard;
+    if (icon === "check") return CheckCircle2;
+    if (icon === "database") return Database;
     if (icon === "file") return FileText;
+    if (icon === "folder-plus") return FolderPlus;
+    if (icon === "globe") return Globe2;
+    if (icon === "hard-drive") return HardDrive;
+    if (icon === "layers") return Layers3;
+    if (icon === "pencil") return Pencil;
+    if (icon === "plug") return PlugZap;
+    if (icon === "plus") return PlusCircle;
+    if (icon === "refresh") return RefreshCcw;
+    if (icon === "rocket") return Rocket;
+    if (icon === "server") return Server;
+    if (icon === "sliders") return SlidersHorizontal;
+    if (icon === "trash") return Trash2;
+    if (icon === "undo") return Undo2;
+    if (icon === "upload") return UploadCloud;
+    if (icon === "x") return XCircle;
     return WalletCards;
   }
 
@@ -418,15 +516,63 @@
   }
 
   function readTableCell(row: ConsolePageTableRow, key: string): ConsolePageTableCell {
-    const value = row[key];
-    if (value && typeof value === "object" && "text" in value) {
+    const value = row.cells?.[key] ?? row[key];
+    if (isConsolePageTableCell(value)) {
       return value;
     }
-    if (value && typeof value === "object" && "kind" in value && value.kind === "datetime") {
+    if (isConsolePageDateTimeValue(value)) {
+      return { text: value };
+    }
+    if (isConsolePageDisplayValue(value)) {
       return { text: value };
     }
 
     return { text: String(value ?? "") };
+  }
+
+  function isConsolePageTableCell(value: unknown): value is ConsolePageTableCell {
+    return Boolean(value && typeof value === "object" && "text" in value);
+  }
+
+  function isConsolePageDateTimeValue(value: unknown): value is ConsolePageDateTimeValue {
+    return Boolean(value && typeof value === "object" && "kind" in value && value.kind === "datetime");
+  }
+
+  function isConsolePageDisplayValue(value: unknown): value is ConsolePageDisplayValue {
+    return (
+      typeof value === "string" ||
+      typeof value === "number" ||
+      isConsolePageDateTimeValue(value) ||
+      Boolean(
+        value &&
+          typeof value === "object" &&
+          "kind" in value &&
+          (value.kind === "actor" ||
+            value.kind === "badge" ||
+            value.kind === "icon-label" ||
+            value.kind === "link"),
+      )
+    );
+  }
+
+  function isConsolePageActorValue(value: ConsolePageDisplayValue): value is ConsolePageActorValue {
+    return Boolean(value && typeof value === "object" && "kind" in value && value.kind === "actor");
+  }
+
+  function isConsolePageBadgeValue(value: ConsolePageDisplayValue): value is ConsolePageBadgeValue {
+    return Boolean(value && typeof value === "object" && "kind" in value && value.kind === "badge");
+  }
+
+  function isConsolePageLinkValue(value: ConsolePageDisplayValue): value is ConsolePageLinkValue {
+    return Boolean(value && typeof value === "object" && "kind" in value && value.kind === "link");
+  }
+
+  function isConsolePageIconLabelValue(
+    value: ConsolePageDisplayValue,
+  ): value is ConsolePageIconLabelValue {
+    return Boolean(
+      value && typeof value === "object" && "kind" in value && value.kind === "icon-label",
+    );
   }
 
   function formatConsoleDateTime(value: ConsolePageDateTimeValue): string {
@@ -459,8 +605,43 @@
     if (value && typeof value === "object" && value.kind === "datetime") {
       return formatConsoleDateTime(value);
     }
+    if (value && typeof value === "object" && "label" in value) {
+      return value.label;
+    }
 
     return String(value);
+  }
+
+  function badgeClass(tone: ConsolePageTone | undefined): string {
+    if (tone === "positive") {
+      return "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-300";
+    }
+    if (tone === "warning") {
+      return "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-300";
+    }
+    if (tone === "danger") {
+      return "border-destructive/30 bg-destructive/5 text-destructive";
+    }
+    if (tone === "muted") {
+      return "border-border bg-muted/60 text-muted-foreground";
+    }
+    return "border-border bg-background text-foreground";
+  }
+
+  function actorInitials(actor: ConsolePageActorValue): string {
+    if (actor.initials?.trim()) {
+      return actor.initials.trim().slice(0, 3).toUpperCase();
+    }
+    const words = actor.label
+      .split(/[\s@._-]+/)
+      .map((word) => word.trim())
+      .filter(Boolean);
+    return (
+      words
+        .slice(0, 2)
+        .map((word) => word[0]?.toUpperCase() ?? "")
+        .join("") || "AP"
+    );
   }
 
   function openTableDetails(details: ConsolePageTableDetails | undefined): void {
@@ -1257,22 +1438,29 @@
               {#if section.filters?.length}
                 <div class="flex flex-wrap gap-3 pt-3">
                   {#each section.filters as filterGroup (filterGroup.label)}
-                    <div class="flex min-w-0 flex-wrap items-center gap-2">
+                    <div
+                      class="flex min-w-0 flex-wrap items-center gap-2"
+                      data-console-page-table-filter
+                    >
                       <span class="text-xs font-medium text-muted-foreground">
                         {filterGroup.label}
                       </span>
-                      <div class="flex flex-wrap gap-1.5">
-                        {#each filterGroup.items as filter (filter.href)}
-                          <Button
-                            type="button"
-                            variant={filter.active ? "default" : "outline"}
-                            size="sm"
-                            onclick={() => navigateConsolePageHref(filter.href)}
-                          >
-                            {filter.label}
-                          </Button>
-                        {/each}
-                      </div>
+                      {#if filterGroup.type === "multi-select"}
+                        <ConsoleTableFilterSelect {filterGroup} />
+                      {:else}
+                        <div class="flex flex-wrap gap-1.5">
+                          {#each filterGroup.items as filter (`${filter.label}:${filter.href}`)}
+                            <Button
+                              type="button"
+                              variant={filter.active ? "default" : "outline"}
+                              size="sm"
+                              onclick={() => navigateConsolePageHref(filter.href)}
+                            >
+                              {filter.label}
+                            </Button>
+                          {/each}
+                        </div>
+                      {/if}
                     </div>
                   {/each}
                 </div>
@@ -1308,15 +1496,74 @@
                               column.align === "right" ? "text-right tabular-nums" : "text-left",
                             ]}
                           >
-                            <span
-                              class={[
-                                "block truncate font-medium",
-                                toneClass(cell.tone),
-                              ]}
-                              title={displayValueText(cell.text)}
-                            >
-                              {displayValueText(cell.text)}
-                            </span>
+                            {#if isConsolePageActorValue(cell.text)}
+                              <div
+                                class="flex min-w-0 items-center gap-2"
+                                title={displayValueText(cell.text)}
+                              >
+                                <span
+                                  class="flex size-7 shrink-0 items-center justify-center rounded-full border bg-muted text-[11px] font-semibold text-muted-foreground"
+                                >
+                                  {actorInitials(cell.text)}
+                                </span>
+                                <span
+                                  class={[
+                                    "inline-flex min-w-0 max-w-full items-center rounded-full border px-2 py-1 text-xs font-medium",
+                                    badgeClass(cell.tone ?? "muted"),
+                                  ]}
+                                >
+                                  <span class="truncate">{cell.text.label}</span>
+                                </span>
+                              </div>
+                            {:else if isConsolePageBadgeValue(cell.text)}
+                              <span
+                                class={[
+                                  "inline-flex max-w-full items-center rounded-full border px-2 py-1 text-xs font-medium",
+                                  badgeClass(cell.text.tone ?? cell.tone),
+                                ]}
+                                title={displayValueText(cell.text)}
+                              >
+                                <span class="truncate">{cell.text.label}</span>
+                              </span>
+                            {:else if isConsolePageLinkValue(cell.text)}
+                              <a
+                                href={cell.text.href}
+                                class={[
+                                  "inline-flex max-w-full items-center gap-1 truncate font-medium text-primary underline-offset-4 hover:underline",
+                                  toneClass(cell.tone),
+                                ]}
+                                title={displayValueText(cell.text)}
+                              >
+                                <span class="truncate">{cell.text.label}</span>
+                                <ArrowUpRight class="size-3 shrink-0" />
+                              </a>
+                            {:else if isConsolePageIconLabelValue(cell.text)}
+                              {@const Icon = iconComponent(cell.text.icon)}
+                              <span
+                                class={[
+                                  "inline-flex max-w-full items-center gap-2 font-medium",
+                                  toneClass(cell.text.tone ?? cell.tone),
+                                ]}
+                                title={displayValueText(cell.text)}
+                              >
+                                <span
+                                  class={[
+                                    "flex size-7 shrink-0 items-center justify-center rounded-full border",
+                                    badgeClass(cell.text.tone ?? cell.tone ?? "muted"),
+                                  ]}
+                                >
+                                  <Icon class="size-3.5" />
+                                </span>
+                                <span class="truncate">{cell.text.label}</span>
+                              </span>
+                            {:else}
+                              <span
+                                class={["block truncate font-medium", toneClass(cell.tone)]}
+                                title={displayValueText(cell.text)}
+                              >
+                                {displayValueText(cell.text)}
+                              </span>
+                            {/if}
                           </td>
                         {/each}
                         <td class="px-5 py-4 text-right align-middle">

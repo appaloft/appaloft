@@ -117,11 +117,35 @@ describe("Console page extension surface", () => {
       new URL("../components/console/ConsoleExtensionPage.svelte", import.meta.url),
       "utf8",
     );
+    const tableFilterSelectSource = readFileSync(
+      new URL("../components/console/ConsoleTableFilterSelect.svelte", import.meta.url),
+      "utf8",
+    );
+    const rendererSurface = `${rendererSource}\n${tableFilterSelectSource}`;
 
     expect(rendererSource).toContain('type: "number" | "range" | "range-number"');
     expect(rendererSource).toContain("data-console-page-panel-field");
     expect(rendererSource).toContain("data-console-page-record-list");
     expect(rendererSource).toContain("data-console-page-record-row");
+    expect(rendererSource).toContain("cells?: Record<string, ConsolePageTableCellValue>");
+    expect(rendererSource).toContain("row.cells?.[key] ?? row[key]");
+    expect(rendererSource).toContain("isConsolePageDisplayValue(value)");
+    expect(rendererSource).toContain('type?: "buttons" | "multi-select"');
+    expect(rendererSource).toContain("icon?: ConsolePageIcon");
+    expect(rendererSurface).toContain("data-console-page-table-filter-select");
+    expect(rendererSurface).toContain('role="menuitemcheckbox"');
+    expect(rendererSurface).toContain("event.stopPropagation()");
+    expect(rendererSurface).toContain("iconComponent(filter.icon)");
+    expect(rendererSurface).toContain("<DropdownMenu.Root bind:open>");
+    expect(rendererSource).toContain('kind: "actor"');
+    expect(rendererSource).toContain('kind: "badge"');
+    expect(rendererSource).toContain('kind: "icon-label"');
+    expect(rendererSource).toContain('kind: "link"');
+    expect(rendererSource).toContain("isConsolePageIconLabelValue(cell.text)");
+    expect(rendererSource).toContain("iconComponent(cell.text.icon)");
+    expect(rendererSource).toContain("actorInitials(cell.text)");
+    expect(rendererSource).toContain("badgeClass(cell.text.tone ?? cell.tone)");
+    expect(rendererSource).toContain("href={cell.text.href}");
     expect(rendererSource).toContain("href?: string");
     expect(rendererSource).toContain("row.details?.href");
     expect(rendererSource).toContain("navigateConsolePageHref(row.details.href)");

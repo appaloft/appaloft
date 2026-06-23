@@ -17,6 +17,7 @@ import {
   ListAuditEventsQuery,
   PruneAuditEventArchivesCommand,
   PruneAuditEventsCommand,
+  type ProductSessionAuthorizationPort,
   type Query,
   type QueryBus,
   ReleaseAuditEventLegalHoldCommand,
@@ -46,6 +47,25 @@ class TestExecutionContextFactory implements ExecutionContextFactory {
     });
   }
 }
+
+const testProductSessionAuthorizationPort = {
+  authorizeProductSession: async (_context, input) =>
+    ok({
+      actor: {
+        kind: "user",
+        id: "usr_audit_http_test",
+        label: "audit@example.com",
+      },
+      email: "audit@example.com",
+      organizationId: "org_audit_http_test",
+      role: input.requiredRole,
+      userId: "usr_audit_http_test",
+    }),
+} satisfies ProductSessionAuthorizationPort;
+
+const testProductSessionHeaders = {
+  cookie: "better-auth.session_token=audit-http-test",
+} as const;
 
 describe("audit event HTTP routes", () => {
   test("[AUDIT-EVENT-ENTRY-002] dispatches shared audit event queries", async () => {
@@ -90,14 +110,19 @@ describe("audit event HTTP routes", () => {
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
       logger: new NoopLogger(),
+      productSessionAuthorizationPort: testProductSessionAuthorizationPort,
       queryBus,
     });
 
     const listResponse = await app.handle(
-      new Request("http://localhost/api/audit-events?aggregateId=res_web"),
+      new Request("http://localhost/api/audit-events?aggregateId=res_web", {
+        headers: testProductSessionHeaders,
+      }),
     );
     const showResponse = await app.handle(
-      new Request("http://localhost/api/audit-events/aud_res_1?aggregateId=res_web"),
+      new Request("http://localhost/api/audit-events/aud_res_1?aggregateId=res_web", {
+        headers: testProductSessionHeaders,
+      }),
     );
 
     expect(listResponse.status).toBe(200);
@@ -164,13 +189,14 @@ describe("audit event HTTP routes", () => {
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
       logger: new NoopLogger(),
+      productSessionAuthorizationPort: testProductSessionAuthorizationPort,
       queryBus,
     });
 
     const response = await app.handle(
       new Request("http://localhost/api/audit-events/prune", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { ...testProductSessionHeaders, "content-type": "application/json" },
         body: JSON.stringify({
           before: "2026-01-01T00:05:00.000Z",
           aggregateId: "res_web",
@@ -222,10 +248,11 @@ describe("audit event HTTP routes", () => {
           aggregateId: "res_web",
           filters: {
             eventType: "resource-variable-set",
-            from: "2026-01-01T00:00:00.000Z",
-            to: "2026-01-01T00:02:00.000Z",
-            limit: 10,
-          },
+          from: "2026-01-01T00:00:00.000Z",
+          to: "2026-01-01T00:02:00.000Z",
+          limit: 10,
+          order: "asc",
+        },
           items: [
             {
               auditEventId: "aud_res_1",
@@ -248,12 +275,16 @@ describe("audit event HTTP routes", () => {
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
       logger: new NoopLogger(),
+      productSessionAuthorizationPort: testProductSessionAuthorizationPort,
       queryBus,
     });
 
     const response = await app.handle(
       new Request(
         "http://localhost/api/audit-events/export?aggregateId=res_web&eventType=resource-variable-set&from=2026-01-01T00%3A00%3A00.000Z&to=2026-01-01T00%3A02%3A00.000Z&limit=10",
+        {
+          headers: testProductSessionHeaders,
+        },
       ),
     );
 
@@ -309,6 +340,7 @@ describe("audit event HTTP routes", () => {
             from: "2026-01-01T00:00:00.000Z",
             to: "2026-01-01T00:02:00.000Z",
             limit: 10,
+            order: "asc",
           },
           items: [
             {
@@ -332,12 +364,16 @@ describe("audit event HTTP routes", () => {
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
       logger: new NoopLogger(),
+      productSessionAuthorizationPort: testProductSessionAuthorizationPort,
       queryBus,
     });
 
     const response = await app.handle(
       new Request(
         "http://localhost/api/audit-events/export-global?aggregateId=res_web&eventType=resource-variable-set&from=2026-01-01T00%3A00%3A00.000Z&to=2026-01-01T00%3A02%3A00.000Z&limit=10",
+        {
+          headers: testProductSessionHeaders,
+        },
       ),
     );
 
@@ -350,6 +386,7 @@ describe("audit event HTTP routes", () => {
         from: "2026-01-01T00:00:00.000Z",
         to: "2026-01-01T00:02:00.000Z",
         limit: 10,
+        order: "asc",
       },
       items: [
         {
@@ -374,6 +411,7 @@ describe("audit event HTTP routes", () => {
       from: "2026-01-01T00:00:00.000Z",
       to: "2026-01-01T00:02:00.000Z",
       limit: 10,
+      order: "asc",
     });
   });
 
@@ -423,13 +461,14 @@ describe("audit event HTTP routes", () => {
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
       logger: new NoopLogger(),
+      productSessionAuthorizationPort: testProductSessionAuthorizationPort,
       queryBus,
     });
 
     const configureResponse = await app.handle(
       new Request("http://localhost/api/audit-events/legal-holds", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { ...testProductSessionHeaders, "content-type": "application/json" },
         body: JSON.stringify({
           aggregateId: "res_web",
           eventType: "resource-variable-set",
@@ -441,15 +480,20 @@ describe("audit event HTTP routes", () => {
     const listResponse = await app.handle(
       new Request(
         "http://localhost/api/audit-events/legal-holds?status=active&aggregateId=res_web",
+        {
+          headers: testProductSessionHeaders,
+        },
       ),
     );
     const showResponse = await app.handle(
-      new Request("http://localhost/api/audit-events/legal-holds/ahl_support"),
+      new Request("http://localhost/api/audit-events/legal-holds/ahl_support", {
+        headers: testProductSessionHeaders,
+      }),
     );
     const releaseResponse = await app.handle(
       new Request("http://localhost/api/audit-events/legal-holds/ahl_support/release", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { ...testProductSessionHeaders, "content-type": "application/json" },
         body: JSON.stringify({
           holdId: "ahl_support",
           releaseReason: "case closed",
@@ -555,13 +599,14 @@ describe("audit event HTTP routes", () => {
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
       logger: new NoopLogger(),
+      productSessionAuthorizationPort: testProductSessionAuthorizationPort,
       queryBus,
     });
 
     const createResponse = await app.handle(
       new Request("http://localhost/api/audit-events/archives", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { ...testProductSessionHeaders, "content-type": "application/json" },
         body: JSON.stringify({
           aggregateId: "res_web",
           eventType: "resource-variable-set",
@@ -571,15 +616,19 @@ describe("audit event HTTP routes", () => {
       }),
     );
     const listResponse = await app.handle(
-      new Request("http://localhost/api/audit-events/archives?aggregateId=res_web"),
+      new Request("http://localhost/api/audit-events/archives?aggregateId=res_web", {
+        headers: testProductSessionHeaders,
+      }),
     );
     const showResponse = await app.handle(
-      new Request("http://localhost/api/audit-events/archives/aar_support"),
+      new Request("http://localhost/api/audit-events/archives/aar_support", {
+        headers: testProductSessionHeaders,
+      }),
     );
     const pruneResponse = await app.handle(
       new Request("http://localhost/api/audit-events/archives/prune", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { ...testProductSessionHeaders, "content-type": "application/json" },
         body: JSON.stringify({
           before: "2026-01-01T00:20:00.000Z",
           dryRun: false,

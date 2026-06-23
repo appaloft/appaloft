@@ -3349,6 +3349,8 @@ export const exportGlobalAuditEventsInputSchema = z.object({
   from: z.string(),
   to: z.string(),
   limit: z.coerce.number().int().positive().max(500).default(100),
+  cursor: z.string().min(1).optional(),
+  order: z.enum(["asc", "desc"]).default("asc"),
 });
 
 export const pruneAuditEventsInputSchema = z.object({
@@ -3473,10 +3475,13 @@ export const exportGlobalAuditEventsResponseSchema = z.object({
     from: z.string(),
     to: z.string(),
     limit: z.number(),
+    cursor: z.string().optional(),
+    order: z.enum(["asc", "desc"]),
   }),
   items: z.array(auditEventDetailSchema),
   itemCount: z.number(),
   truncated: z.boolean(),
+  nextCursor: z.string().optional(),
   generatedAt: z.string(),
 });
 

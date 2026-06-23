@@ -126,6 +126,7 @@ export class PgAuditEventReadModel
       .where("created_at", ">=", input.from)
       .where("created_at", "<", input.to)
       .limit(limit + 1);
+    const order = input.order ?? "asc";
 
     if (input.aggregateId) {
       query = query.where("aggregate_id", "=", input.aggregateId);
@@ -139,24 +140,54 @@ export class PgAuditEventReadModel
       query = query.where("payload", "@>", { organizationId: input.organizationId });
     }
 
-    if (input.action) {
-      query = query.where("payload", "@>", { action: input.action });
+    const actionValues = filterValues(input.action);
+    if (actionValues.length > 0) {
+      query = query.where((eb) =>
+        eb.or(actionValues.map((action) => eb("payload", "@>", { action }))),
+      );
     }
 
-    if (input.resourceType) {
-      query = query.where("payload", "@>", { resourceType: input.resourceType });
+    const resourceTypeValues = filterValues(input.resourceType);
+    if (resourceTypeValues.length > 0) {
+      query = query.where((eb) =>
+        eb.or(resourceTypeValues.map((resourceType) => eb("payload", "@>", { resourceType }))),
+      );
     }
 
-    if (input.actorId) {
-      query = query.where("payload", "@>", { actorId: input.actorId });
+    const actorIdValues = filterValues(input.actorId);
+    if (actorIdValues.length > 0) {
+      query = query.where((eb) =>
+        eb.or(actorIdValues.map((actorId) => eb("payload", "@>", { actorId }))),
+      );
     }
 
-    const rows = await query.orderBy("created_at", "asc").orderBy("id", "asc").execute();
+    const cursor = input.cursor ? parseAuditEventCursor(input.cursor) : undefined;
+    if (cursor) {
+      query = query.where((eb) => {
+        if (!cursor.auditEventId) {
+          return eb("created_at", order === "desc" ? "<" : ">", cursor.createdAt);
+        }
+
+        return eb.or([
+          eb("created_at", order === "desc" ? "<" : ">", cursor.createdAt),
+          eb.and([
+            eb("created_at", "=", cursor.createdAt),
+            eb("id", order === "desc" ? "<" : ">", cursor.auditEventId),
+          ]),
+        ]);
+      });
+    }
+
+    const rows = await query.orderBy("created_at", order).orderBy("id", order).execute();
     const pageRows = rows.slice(0, limit);
+    const nextCursorRow = rows.length > limit ? pageRows.at(-1) : undefined;
 
     return {
       items: pageRows.map(detailFromRow),
       truncated: rows.length > limit,
+      ...(nextCursorRow
+        ? { nextCursor: serializeAuditEventCursor(nextCursorRow.created_at, nextCursorRow.id) }
+        : {}),
     };
   }
 
@@ -348,6 +379,11 @@ function redactPayload(payload: Record<string, unknown>): {
   return { payload: safePayload, redactedFields };
 }
 
+function filterValues(value: string | readonly string[] | undefined): readonly string[] {
+  if (!value) return [];
+  return typeof value === "string" ? [value] : value;
+}
+
 function safeAuditPayloadValue(value: unknown): AuditEventPayloadValue | undefined {
   if (
     typeof value === "string" ||
@@ -376,4 +412,16 @@ export function auditEventSummaryFromRow(row: AuditLogRow): AuditEventSummary {
 
 function serializeTimestamp(value: string | Date): string {
   return value instanceof Date ? value.toISOString() : value;
+}
+
+function serializeAuditEventCursor(createdAt: string | Date, auditEventId: string): string {
+  return `${serializeTimestamp(createdAt)}|${auditEventId}`;
+}
+
+function parseAuditEventCursor(cursor: string): { createdAt: string; auditEventId?: string } {
+  const [createdAt = cursor, auditEventId] = cursor.split("|", 2);
+  return {
+    createdAt,
+    ...(auditEventId ? { auditEventId } : {}),
+  };
 }

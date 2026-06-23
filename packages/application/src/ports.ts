@@ -6584,10 +6584,12 @@ export interface AuditEventGlobalExportInput {
   aggregateId?: string;
   eventType?: string;
   organizationId?: string;
-  action?: string;
-  resourceType?: string;
-  actorId?: string;
+  action?: string | readonly string[];
+  resourceType?: string | readonly string[];
+  actorId?: string | readonly string[];
   limit?: number;
+  cursor?: string;
+  order?: "asc" | "desc";
 }
 
 export interface AuditEventSummary {
@@ -6625,6 +6627,7 @@ export interface AuditEventShowResult {
 export interface AuditEventExportPage {
   items: AuditEventDetail[];
   truncated: boolean;
+  nextCursor?: string;
 }
 
 export interface AuditEventExportResult extends AuditEventExportPage {
@@ -6648,10 +6651,12 @@ export interface AuditEventGlobalExportResult extends AuditEventExportPage {
     aggregateId?: string;
     eventType?: string;
     organizationId?: string;
-    action?: string;
-    resourceType?: string;
-    actorId?: string;
+    action?: string | readonly string[];
+    resourceType?: string | readonly string[];
+    actorId?: string | readonly string[];
     limit: number;
+    cursor?: string;
+    order: "asc" | "desc";
   };
   itemCount: number;
   generatedAt: string;

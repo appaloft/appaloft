@@ -33,6 +33,8 @@ export class ExportGlobalAuditEventsQueryService {
       ...(query.resourceType ? { resourceType: query.resourceType } : {}),
       ...(query.actorId ? { actorId: query.actorId } : {}),
       limit: query.limit,
+      ...(query.cursor ? { cursor: query.cursor } : {}),
+      order: query.order,
     });
 
     return ok({
@@ -47,6 +49,8 @@ export class ExportGlobalAuditEventsQueryService {
         ...(query.resourceType ? { resourceType: query.resourceType } : {}),
         ...(query.actorId ? { actorId: query.actorId } : {}),
         limit: query.limit,
+        ...(query.cursor ? { cursor: query.cursor } : {}),
+        order: query.order,
       },
       itemCount: page.items.length,
       ...page,

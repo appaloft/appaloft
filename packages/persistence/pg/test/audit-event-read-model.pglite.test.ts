@@ -236,6 +236,60 @@ describe("audit event read model persistence", () => {
       });
 
       expect(exported.items.map((event) => event.auditEventId)).toEqual(["aud_project_match"]);
+
+      const multiValueExported = await readModel.exportGlobal(context, {
+        from: "2026-01-01T00:00:00.000Z",
+        to: "2026-01-01T00:01:00.000Z",
+        organizationId: "org_1",
+        action: ["create"],
+        resourceType: ["project", "resource"],
+        actorId: ["usr_1", "usr_2"],
+        limit: 10,
+      });
+
+      expect(multiValueExported.items.map((event) => event.auditEventId)).toEqual([
+        "aud_project_match",
+        "aud_project_other_actor",
+        "aud_resource_other_type",
+      ]);
+
+      const pagedDescending = await readModel.exportGlobal(context, {
+        from: "2026-01-01T00:00:00.000Z",
+        to: "2026-01-01T00:01:00.000Z",
+        organizationId: "org_1",
+        action: ["create"],
+        resourceType: ["project", "resource"],
+        actorId: ["usr_1", "usr_2"],
+        order: "desc",
+        limit: 2,
+      });
+
+      expect(pagedDescending.items.map((event) => event.auditEventId)).toEqual([
+        "aud_resource_other_type",
+        "aud_project_other_actor",
+      ]);
+      expect(pagedDescending.nextCursor).toBe(
+        "2026-01-01T00:00:01.000Z|aud_project_other_actor",
+      );
+      expect(pagedDescending.truncated).toBe(true);
+
+      const pagedDescendingNext = await readModel.exportGlobal(context, {
+        from: "2026-01-01T00:00:00.000Z",
+        to: "2026-01-01T00:01:00.000Z",
+        organizationId: "org_1",
+        action: ["create"],
+        resourceType: ["project", "resource"],
+        actorId: ["usr_1", "usr_2"],
+        order: "desc",
+        cursor: pagedDescending.nextCursor ?? "",
+        limit: 2,
+      });
+
+      expect(pagedDescendingNext.items.map((event) => event.auditEventId)).toEqual([
+        "aud_project_match",
+      ]);
+      expect(pagedDescendingNext.nextCursor).toBeUndefined();
+      expect(pagedDescendingNext.truncated).toBe(false);
     } finally {
       await database.close();
       rmSync(dataDir, { force: true, recursive: true });
@@ -447,6 +501,7 @@ describe("audit event read model persistence", () => {
             createdAt: "2026-01-01T00:01:00.000Z",
           },
         ],
+        nextCursor: "2026-01-01T00:01:00.000Z|aud_first_match",
         truncated: true,
       });
       expect(narrowed).toEqual({

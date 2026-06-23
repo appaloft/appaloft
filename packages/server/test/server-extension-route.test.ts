@@ -515,10 +515,46 @@ describe("createAppaloftServer", () => {
         },
       );
       expect(recorded.isOk()).toBe(true);
+      const recordedResource = await recorder.record(
+        toRepositoryContext(server.executionContextFactory.create({ entrypoint: "system" })),
+        {
+          id: "aud_console_filter_resource",
+          aggregateId: "res_console_filter",
+          eventType: "resources.create",
+          createdAt: new Date().toISOString(),
+          payload: {
+            schemaVersion: "operation-audit/v1",
+            operationKey: "resources.create",
+            operationName: "CreateResourceCommand",
+            action: "resource-created",
+            domain: "resources",
+            result: "success",
+            organizationId: "org_console_filter",
+            actorKind: "user",
+            actorId: "usr_console_operator",
+            actorLabel: "Console Operator",
+            resourceType: "resource",
+            resourceId: "res_console_filter",
+            requestId: "req_console_filter_resource",
+            entrypoint: "http",
+            tenantId: "tenant_console_filter",
+            tenantMode: "single-tenant",
+          },
+        },
+      );
+      expect(recordedResource.isOk()).toBe(true);
 
+      const auditLogQuery = new URLSearchParams();
+      auditLogQuery.append("range", "7d");
+      auditLogQuery.append("resourceType", "project");
+      auditLogQuery.append("resourceType", "resource");
+      auditLogQuery.append("action", "create");
+      auditLogQuery.append("action", "resource-created");
+      auditLogQuery.append("actorId", "usr_console_admin");
+      auditLogQuery.append("actorId", "usr_console_operator");
       const pageResponse = await server.httpApp.handle(
         new Request(
-          "http://localhost/audit-log/console-page?query=range%3D7d%26resourceType%3Dproject%26action%3Dcreate%26actorId%3Dusr_console_admin",
+          `http://localhost/audit-log/console-page?query=${encodeURIComponent(auditLogQuery.toString())}`,
           {
             headers: {
               "x-appaloft-locale": "zh-CN",
@@ -532,6 +568,69 @@ describe("createAppaloftServer", () => {
         schemaVersion: "appaloft.console.extension-page/v1",
         title: "审计日志",
       });
+      const tableSection = page.sections[0];
+      expect(tableSection.rows).toHaveLength(2);
+      expect(tableSection.rows).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            cells: expect.objectContaining({
+              actor: expect.objectContaining({
+                kind: "actor",
+                label: "Console Admin",
+              }),
+              action: expect.objectContaining({
+                kind: "icon-label",
+                label: "创建项目",
+                icon: "folder-plus",
+              }),
+              resource: expect.objectContaining({
+                kind: "link",
+                label: "项目:prj_console_filter",
+                href: "/projects/prj_console_filter",
+              }),
+              result: expect.objectContaining({
+                kind: "badge",
+                label: "成功",
+                tone: "positive",
+              }),
+            }),
+          }),
+          expect.objectContaining({
+            cells: expect.objectContaining({
+              actor: expect.objectContaining({
+                kind: "actor",
+                label: "Console Operator",
+              }),
+              action: expect.objectContaining({
+                kind: "icon-label",
+                label: "创建资源",
+                icon: "box",
+              }),
+              resource: expect.objectContaining({
+                kind: "link",
+                label: "资源:res_console_filter",
+                href: "/resources/res_console_filter",
+              }),
+            }),
+          }),
+        ]),
+      );
+      expect(tableSection.filters.slice(1).map((filter: { type?: string }) => filter.type)).toEqual(
+        ["multi-select", "multi-select", "multi-select"],
+      );
+      expect(tableSection.filters[1].items).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ label: "全部资源", icon: "layers" }),
+          expect.objectContaining({ label: "项目", icon: "folder-plus" }),
+          expect.objectContaining({ label: "资源", icon: "box" }),
+          expect.objectContaining({ label: "部署", icon: "rocket" }),
+          expect.objectContaining({ label: "依赖资源", icon: "database" }),
+          expect.objectContaining({ label: "域名绑定", icon: "globe" }),
+          expect.objectContaining({ label: "服务器", icon: "server" }),
+          expect.objectContaining({ label: "静态产物", icon: "file" }),
+          expect.objectContaining({ label: "存储卷", icon: "hard-drive" }),
+        ]),
+      );
       const serialized = JSON.stringify(page);
       expect(serialized).toContain("时间范围");
       expect(serialized).toContain("资源类型");
@@ -540,14 +639,129 @@ describe("createAppaloftServer", () => {
       expect(serialized).toContain("项目");
       expect(serialized).toContain("创建");
       expect(serialized).toContain("Console Admin");
+      expect(serialized).toContain("Console Operator");
       expect(serialized).toContain(
-        "/audit-log?range=7d&resourceType=project&action=create&actorId=usr_console_admin",
+        "/audit-log?range=7d&resourceType=resource&action=create&action=resource-created&actorId=usr_console_admin&actorId=usr_console_operator",
       );
       expect(serialized).toContain(
-        "/audit-log?range=7d&resourceType=project&actorId=usr_console_admin",
+        "/audit-log?range=7d&resourceType=project&resourceType=resource&action=resource-created&actorId=usr_console_admin&actorId=usr_console_operator",
       );
       expect(serialized).not.toContain("All resources");
       expect(serialized).not.toContain("All actions");
+    } finally {
+      await server.shutdown();
+    }
+  }, 45_000);
+
+  test("[AUDIT-LOG-CONSOLE-004] paginates audit log rows with next and previous cursors", async () => {
+    const dataDir = await createTempDataDir();
+    const server = await createAppaloftServer({
+      flags: {
+        appVersion: "0.1.0-test",
+        authProvider: "none",
+        dataDir,
+        databaseDriver: "pglite",
+        docsStaticDir: "",
+        httpPort: 0,
+        pgliteDataDir: join(dataDir, "pglite"),
+        webStaticDir: "",
+      },
+    });
+
+    try {
+      const recorder = server.container.resolve(tokens.auditEventRecorder) as AuditEventRecorder;
+      const repositoryContext = toRepositoryContext(
+        server.executionContextFactory.create({ entrypoint: "system" }),
+      );
+      const baseTime = Date.now();
+      for (let index = 0; index < 11; index += 1) {
+        const recorded = await recorder.record(repositoryContext, {
+          id: `aud_console_page_${index.toString().padStart(2, "0")}`,
+          aggregateId: `prj_console_page_${index.toString().padStart(2, "0")}`,
+          eventType: "projects.create",
+          createdAt: new Date(baseTime - index * 1_000).toISOString(),
+          payload: {
+            schemaVersion: "operation-audit/v1",
+            operationKey: "projects.create",
+            operationName: "CreateProjectCommand",
+            action: "create",
+            domain: "projects",
+            result: "success",
+            organizationId: "org_console_page",
+            actorKind: "user",
+            actorId: "usr_console_page",
+            actorLabel: "Console Pager",
+            resourceType: "project",
+            resourceId: `prj_console_page_${index.toString().padStart(2, "0")}`,
+            requestId: `req_console_page_${index}`,
+            entrypoint: "http",
+            tenantId: "tenant_console_page",
+            tenantMode: "single-tenant",
+          },
+        });
+        expect(recorded.isOk()).toBe(true);
+      }
+
+      const auditLogQuery = new URLSearchParams();
+      auditLogQuery.append("range", "30d");
+      auditLogQuery.append("resourceType", "project");
+      const pageResponse = await server.httpApp.handle(
+        new Request(
+          `http://localhost/audit-log/console-page?query=${encodeURIComponent(auditLogQuery.toString())}`,
+          {
+            headers: {
+              "x-appaloft-locale": "zh-CN",
+            },
+          },
+        ),
+      );
+      expect(pageResponse.status).toBe(200);
+      const page = (await pageResponse.json()) as {
+        sections: Array<{
+          rows: unknown[];
+          pagination?: {
+            label?: string;
+            previousHref?: string;
+            nextHref?: string;
+          };
+        }>;
+      };
+      const tableSection = page.sections[0];
+
+      expect(tableSection.rows).toHaveLength(10);
+      expect(tableSection.pagination).toMatchObject({
+        label: "本页显示 10 条，最多 10 条",
+      });
+      expect(tableSection.pagination?.previousHref).toBeUndefined();
+      expect(tableSection.pagination?.nextHref).toContain("cursor=");
+
+      const nextHref = tableSection.pagination?.nextHref ?? "";
+      const nextQuery = nextHref.includes("?") ? nextHref.slice(nextHref.indexOf("?") + 1) : "";
+      const nextPageResponse = await server.httpApp.handle(
+        new Request(
+          `http://localhost/audit-log/console-page?query=${encodeURIComponent(nextQuery)}`,
+          {
+            headers: {
+              "x-appaloft-locale": "zh-CN",
+            },
+          },
+        ),
+      );
+      expect(nextPageResponse.status).toBe(200);
+      const nextPage = (await nextPageResponse.json()) as {
+        sections: Array<{
+          rows: unknown[];
+          pagination?: {
+            previousHref?: string;
+            nextHref?: string;
+          };
+        }>;
+      };
+      const nextTableSection = nextPage.sections[0];
+
+      expect(nextTableSection.rows).toHaveLength(1);
+      expect(nextTableSection.pagination?.previousHref).toBe("/audit-log?resourceType=project");
+      expect(nextTableSection.pagination?.nextHref).toBeUndefined();
     } finally {
       await server.shutdown();
     }
