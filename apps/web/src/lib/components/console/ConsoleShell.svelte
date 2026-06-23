@@ -503,7 +503,7 @@
                       <DropdownMenu>
                         <div
                           data-console-header-switcher
-                          class="group/switcher inline-flex h-8 min-w-0 max-w-[12rem] items-center gap-0 rounded-md text-sm font-medium text-foreground transition-colors hover:bg-primary/5 focus-within:bg-primary/5 sm:max-w-[16rem]"
+                          class="group/switcher inline-flex h-8 min-w-0 max-w-[12rem] items-center gap-0 rounded-md text-sm font-medium text-foreground transition-colors hover:bg-primary/5 focus-within:bg-primary/5 has-data-[state=open]:bg-primary/5 sm:max-w-[16rem]"
                         >
                           {#if item.href}
                             <a
