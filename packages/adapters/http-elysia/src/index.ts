@@ -107,6 +107,7 @@ interface AuthRuntime extends ProductSessionAuthorizationPort {
     providers: Array<{
       key: "github" | "google" | "oidc";
       title: string;
+      accountLabel?: string;
       configured: boolean;
       connected: boolean;
       requiresSignIn: boolean;
