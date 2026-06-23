@@ -1243,12 +1243,16 @@ function auditActionLabel(t: AppaloftTranslate, eventType: string): string {
       return t(i18nKeys.console.auditLog.actionFilters.cancel);
     case "set-variable":
       return t(i18nKeys.console.auditLog.actionFilters.setVariable);
+    case "set-description":
+      return t(i18nKeys.console.auditLog.actions.projectsSetDescription);
     case "deployment-succeeded":
       return t(i18nKeys.console.auditLog.actionFilters.succeeded);
     case "deployment-failed":
       return t(i18nKeys.console.auditLog.actionFilters.failed);
     case "projects.create":
       return t(i18nKeys.console.auditLog.actions.projectsCreate);
+    case "projects.set-description":
+      return t(i18nKeys.console.auditLog.actions.projectsSetDescription);
     case "projects.archive":
       return t(i18nKeys.console.auditLog.actions.projectsArchive);
     case "resources.create":
@@ -1287,6 +1291,8 @@ function auditActionIcon(eventType: string): string {
   switch (eventType) {
     case "projects.create":
       return "folder-plus";
+    case "projects.set-description":
+      return "pencil";
     case "resources.create":
     case "resource-created":
       return "box";
@@ -1314,6 +1320,7 @@ function auditActionIcon(eventType: string): string {
     case "rename":
     case "server-renamed":
     case "servers.rename":
+    case "set-description":
       return "pencil";
     case "retry":
       return "refresh";

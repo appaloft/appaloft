@@ -294,6 +294,7 @@ export const zhCN = {
       resultSkipped: "已跳过",
       actions: {
         projectsCreate: "创建项目",
+        projectsSetDescription: "更新项目描述",
         projectsArchive: "归档项目",
         deploymentsCreate: "创建部署",
         dependencyResourcesCreate: "创建依赖资源",

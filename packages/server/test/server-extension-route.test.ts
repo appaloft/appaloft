@@ -563,6 +563,35 @@ describe("createAppaloftServer", () => {
         },
       );
       expect(recordedResource.isOk()).toBe(true);
+      const recordedProjectDescription = await recorder.record(
+        toRepositoryContext(server.executionContextFactory.create({ entrypoint: "system" })),
+        {
+          id: "aud_console_filter_project_description",
+          aggregateId: "prj_console_filter",
+          eventType: "projects.set-description",
+          createdAt: new Date().toISOString(),
+          payload: {
+            schemaVersion: "operation-audit/v1",
+            operationKey: "projects.set-description",
+            operationName: "SetProjectDescriptionCommand",
+            action: "set-description",
+            domain: "projects",
+            result: "success",
+            organizationId: "org_console_filter",
+            actorKind: "user",
+            actorId: "usr_console_admin",
+            actorLabel: "Console Admin",
+            resourceType: "project",
+            resourceId: "prj_console_filter",
+            projectId: "prj_console_filter",
+            requestId: "req_console_filter_project_description",
+            entrypoint: "http",
+            tenantId: "tenant_console_filter",
+            tenantMode: "single-tenant",
+          },
+        },
+      );
+      expect(recordedProjectDescription.isOk()).toBe(true);
 
       const auditLogQuery = new URLSearchParams();
       auditLogQuery.append("range", "7d");
@@ -570,6 +599,7 @@ describe("createAppaloftServer", () => {
       auditLogQuery.append("resourceType", "resource");
       auditLogQuery.append("action", "create");
       auditLogQuery.append("action", "resource-created");
+      auditLogQuery.append("action", "set-description");
       auditLogQuery.append("actorId", "usr_console_admin");
       auditLogQuery.append("actorId", "usr_console_operator");
       const pageResponse = await server.httpApp.handle(
@@ -589,7 +619,7 @@ describe("createAppaloftServer", () => {
         title: "审计日志",
       });
       const tableSection = page.sections[0];
-      expect(tableSection.rows).toHaveLength(2);
+      expect(tableSection.rows).toHaveLength(3);
       expect(tableSection.rows).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
@@ -612,6 +642,24 @@ describe("createAppaloftServer", () => {
                 kind: "badge",
                 label: "成功",
                 tone: "positive",
+              }),
+            }),
+          }),
+          expect.objectContaining({
+            cells: expect.objectContaining({
+              actor: expect.objectContaining({
+                kind: "actor",
+                label: "Console Admin",
+              }),
+              action: expect.objectContaining({
+                kind: "icon-label",
+                label: "更新项目描述",
+                icon: "pencil",
+              }),
+              resource: expect.objectContaining({
+                kind: "link",
+                label: "项目:prj_console_filter",
+                href: "/projects/prj_console_filter",
               }),
             }),
           }),
@@ -658,13 +706,14 @@ describe("createAppaloftServer", () => {
       expect(serialized).toContain("操作者");
       expect(serialized).toContain("项目");
       expect(serialized).toContain("创建");
+      expect(serialized).toContain("更新项目描述");
       expect(serialized).toContain("Console Admin");
       expect(serialized).toContain("Console Operator");
       expect(serialized).toContain(
-        "/audit-log?range=7d&resourceType=resource&action=create&action=resource-created&actorId=usr_console_admin&actorId=usr_console_operator",
+        "/audit-log?range=7d&resourceType=resource&action=create&action=resource-created&action=set-description&actorId=usr_console_admin&actorId=usr_console_operator",
       );
       expect(serialized).toContain(
-        "/audit-log?range=7d&resourceType=project&resourceType=resource&action=resource-created&actorId=usr_console_admin&actorId=usr_console_operator",
+        "/audit-log?range=7d&resourceType=project&resourceType=resource&action=resource-created&action=set-description&actorId=usr_console_admin&actorId=usr_console_operator",
       );
       expect(serialized).not.toContain("All resources");
       expect(serialized).not.toContain("All actions");
@@ -682,7 +731,7 @@ describe("createAppaloftServer", () => {
       expect(scopedPageResponse.status).toBe(200);
       const scopedPage = await scopedPageResponse.json();
       const scopedTableSection = scopedPage.sections[0];
-      expect(scopedTableSection.rows).toHaveLength(2);
+      expect(scopedTableSection.rows).toHaveLength(3);
       expect(JSON.stringify(scopedPage)).toContain(
         "/projects/prj_console_filter/audit-log?resourceType=resource",
       );

@@ -335,6 +335,7 @@ export const enUS = {
       resultSkipped: "Skipped",
       actions: {
         projectsCreate: "Create project",
+        projectsSetDescription: "Update project description",
         projectsArchive: "Archive project",
         deploymentsCreate: "Create deployment",
         dependencyResourcesCreate: "Create dependency resource",

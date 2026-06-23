@@ -286,6 +286,7 @@ export const i18nKeys = {
       resultSkipped: "console:auditLog.resultSkipped",
       actions: {
         projectsCreate: "console:auditLog.actions.projectsCreate",
+        projectsSetDescription: "console:auditLog.actions.projectsSetDescription",
         projectsArchive: "console:auditLog.actions.projectsArchive",
         deploymentsCreate: "console:auditLog.actions.deploymentsCreate",
         dependencyResourcesCreate: "console:auditLog.actions.dependencyResourcesCreate",
