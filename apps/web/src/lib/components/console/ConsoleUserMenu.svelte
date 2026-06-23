@@ -5,6 +5,7 @@
   import {
     BookOpen,
     ChevronUp,
+    Globe2,
     House,
     LogOut,
     Rocket,
@@ -93,6 +94,12 @@
     }
   }
 
+  function openWebsite(): void {
+    if (browser) {
+      window.open("https://appaloft.com", "_blank", "noreferrer");
+    }
+  }
+
   function navigateTo(path: string): void {
     if (browser) {
       void goto(path);
@@ -150,6 +157,10 @@
     <DropdownMenuItem onclick={() => navigateTo("/deployments")}>
       <Rocket class="size-4" />
       {$t(i18nKeys.console.deployments.records)}
+    </DropdownMenuItem>
+    <DropdownMenuItem onclick={openWebsite}>
+      <Globe2 class="size-4" />
+      {$t(i18nKeys.common.actions.openWebsite)}
     </DropdownMenuItem>
     <DropdownMenuItem onclick={openDocumentation}>
       <BookOpen class="size-4" />

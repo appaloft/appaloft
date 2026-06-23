@@ -30,6 +30,7 @@ export const enUS = {
       openProject: "Open project",
       openResource: "Open resource",
       openTerminal: "Open terminal",
+      openWebsite: "Website",
       previous: "Previous",
       quickDeploy: "Quick deploy",
       redeploy: "Redeploy",
