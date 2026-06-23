@@ -374,6 +374,7 @@ import {
   PreviewExpiryCleanupScheduler,
   PreviewFeedbackService,
   PreviewLifecycleService,
+  PreviewOperableScopeResolver,
   PreviewPullRequestEventIngestService,
   PromoteEnvironmentUseCase,
   ProvisionDependencyResourceCommandHandler,
@@ -2850,6 +2851,7 @@ export function registerApplicationServices(
   );
   container.registerSingleton(tokens.previewLifecycleService, PreviewLifecycleService);
   container.registerSingleton(tokens.previewFeedbackService, PreviewFeedbackService);
+  container.registerSingleton(tokens.previewOperableScopeResolver, PreviewOperableScopeResolver);
   container.registerSingleton(
     tokens.previewDeploymentProcessManager,
     PreviewDeploymentProcessManager,
