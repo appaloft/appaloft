@@ -117,11 +117,35 @@ describe("Console page extension surface", () => {
       new URL("../components/console/ConsoleExtensionPage.svelte", import.meta.url),
       "utf8",
     );
+    const tableFilterSelectSource = readFileSync(
+      new URL("../components/console/ConsoleTableFilterSelect.svelte", import.meta.url),
+      "utf8",
+    );
+    const rendererSurface = `${rendererSource}\n${tableFilterSelectSource}`;
 
     expect(rendererSource).toContain('type: "number" | "range" | "range-number"');
     expect(rendererSource).toContain("data-console-page-panel-field");
     expect(rendererSource).toContain("data-console-page-record-list");
     expect(rendererSource).toContain("data-console-page-record-row");
+    expect(rendererSource).toContain("cells?: Record<string, ConsolePageTableCellValue>");
+    expect(rendererSource).toContain("row.cells?.[key] ?? row[key]");
+    expect(rendererSource).toContain("isConsolePageDisplayValue(value)");
+    expect(rendererSource).toContain('type?: "buttons" | "multi-select"');
+    expect(rendererSource).toContain("icon?: ConsolePageIcon");
+    expect(rendererSurface).toContain("data-console-page-table-filter-select");
+    expect(rendererSurface).toContain('role="menuitemcheckbox"');
+    expect(rendererSurface).toContain("event.stopPropagation()");
+    expect(rendererSurface).toContain("iconComponent(filter.icon)");
+    expect(rendererSurface).toContain("<DropdownMenu.Root bind:open>");
+    expect(rendererSource).toContain('kind: "actor"');
+    expect(rendererSource).toContain('kind: "badge"');
+    expect(rendererSource).toContain('kind: "icon-label"');
+    expect(rendererSource).toContain('kind: "link"');
+    expect(rendererSource).toContain("isConsolePageIconLabelValue(cell.text)");
+    expect(rendererSource).toContain("iconComponent(cell.text.icon)");
+    expect(rendererSource).toContain("actorInitials(cell.text)");
+    expect(rendererSource).toContain("badgeClass(cell.text.tone ?? cell.tone)");
+    expect(rendererSource).toContain("href={cell.text.href}");
     expect(rendererSource).toContain("href?: string");
     expect(rendererSource).toContain("row.details?.href");
     expect(rendererSource).toContain("navigateConsolePageHref(row.details.href)");
@@ -161,8 +185,23 @@ describe("Console page extension surface", () => {
     expect(rendererSource).toContain('kind: "tiered-unit-rate"');
     expect(rendererSource).toContain("<table");
     expect(rendererSource).toContain("<thead");
+    expect(rendererSource).toContain("title?: string");
     expect(rendererSource).toContain('import { goto } from "$app/navigation";');
     expect(rendererSource).toContain('settingsScope?: "organization" | "instance" | null');
+    expect(rendererSource).toContain("embedded?: boolean");
+    expect(rendererSource).toContain('class={embedded ? "max-w-none p-0" : "max-w-7xl"}');
+    expect(rendererSource).toContain('"space-y-4"');
+    expect(rendererSource).toContain("{#if section.title || section.description}");
+    expect(rendererSource).toContain('<div class="console-panel overflow-hidden">');
+    expect(rendererSource).toContain('class="overflow-x-auto" data-console-page-table-body');
+    expect(rendererSource).toContain('<div class="p-5 text-sm text-muted-foreground">');
+    expect(rendererSource).toContain(
+      '<div class="flex flex-wrap items-center justify-between gap-3 border-t px-5 py-3">',
+    );
+    expect(rendererSource).toContain("{#if !embedded}");
+    expect(rendererSource).toContain("{#if embedded}");
+    expect(rendererSource).toContain("projectId?: string");
+    expect(rendererSource).toContain("resourceId?: string");
     expect(rendererSource).toContain("items={instanceSettingsItems");
     expect(rendererSource).toContain("placeholderData: (previousData) => previousData");
     expect(rendererSource).toContain("navigateConsolePageHref(filter.href)");
@@ -194,13 +233,57 @@ describe("Console page extension surface", () => {
     expect(panelHostSource).toContain("type ConsolePageRequestAction");
     expect(panelHostSource).toContain("collapsedByDefault?: boolean");
     expect(panelHostSource).toContain("expandedPanelKeys");
+    expect(panelHostSource).toContain("resolvePanelExtensionVisibilityEndpoint");
     expect(panelHostSource).toContain("togglePanel(result)");
     expect(panelHostSource).toContain("runRequestAction(action, item)");
     expect(panelHostSource).toContain("data-console-extension-panel-host");
     expect(projectPageSource).toContain('placement="project-environment-panel"');
+    expect(projectPageSource).toContain('"audit-log"');
+    expect(projectPageSource).toContain("visibleProjectDetailTabs");
+    expect(projectPageSource).toContain("detailTabPanelFlushClass");
+    expect(projectPageSource).toContain(
+      '<Tabs.Content value="audit-log" class={detailTabPanelFlushClass}>',
+    );
+    expect(projectPageSource).toContain("<ConsoleExtensionPage {projectId} embedded />");
     expect(projectPageSource).toContain("environmentId={environment.id}");
     expect(resourcePageSource).toContain('placement="resource-detail-panel"');
+    expect(resourcePageSource).toContain('"audit-log"');
+    expect(resourcePageSource).toContain("visibleResourceDetailTabs");
+    expect(resourcePageSource).toContain("detailTabPanelFlushClass");
+    expect(resourcePageSource).toContain("<div class={detailTabPanelFlushClass}>");
+    expect(resourcePageSource).toContain("<ConsoleExtensionPage");
+    expect(resourcePageSource).toContain("embedded");
     expect(resourcePageSource).toContain("projectId={resourceProjectId}");
     expect(resourcePageSource).toContain("environmentId={resourceEnvironmentId}");
+  });
+
+  test("[CONSOLE-EXT-PAGE-004] includes owner-scoped route pages for audit-style console pages", () => {
+    const projectAuditRouteSource = readFileSync(
+      new URL(
+        "../../routes/projects/[projectId=consoleObjectId]/audit-log/+page.svelte",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+    const resourceAuditRouteSource = readFileSync(
+      new URL(
+        "../../routes/resources/[resourceId=consoleObjectId]/audit-log/+page.svelte",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+    const nestedResourceAuditRouteSource = readFileSync(
+      new URL(
+        "../../routes/projects/[projectId=consoleObjectId]/environments/[environmentId=consoleObjectId]/resources/[resourceId=consoleObjectId]/audit-log/+page.svelte",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+
+    expect(projectAuditRouteSource).toContain("<ConsoleExtensionPage {projectId} />");
+    expect(resourceAuditRouteSource).toContain("<ConsoleExtensionPage {resourceId} />");
+    expect(nestedResourceAuditRouteSource).toContain(
+      "<ConsoleExtensionPage {projectId} {environmentId} {resourceId} />",
+    );
   });
 });

@@ -17,6 +17,7 @@
     "@appaloft/config": "workspace:*",
     "@appaloft/contracts": "workspace:*",
     "@appaloft/core": "workspace:*",
+    "@appaloft/i18n": "workspace:*",
     "@appaloft/integration-core": "workspace:*",
     "@appaloft/integration-github": "workspace:*",
     "@appaloft/integration-gitlab": "workspace:*",

@@ -49,6 +49,7 @@ import {
   createDefaultConnectorDefinitions,
   type DefaultAccessDomainPolicyRepository,
   DefaultAccessDomainRuntimePlanResolver,
+  DefaultOperationAuditSink,
   type DependencyResourceBackupPolicyRepository,
   type DeploymentProgressReporter,
   DeploymentTimelineProgressRecorder,
@@ -68,6 +69,7 @@ import {
   InMemoryEdgeProxyProviderRegistry,
   type IntegrationAuthPort,
   type MutationCoordinator,
+  type OperationAuditSink,
   type OperationGuardPort,
   PortBackedStaticArtifactPublisher,
   type PreviewFeedbackWriter,
@@ -1278,6 +1280,17 @@ export function registerRuntimeDependencies(
   container.register(tokens.auditEventRecorder, {
     useFactory: instanceCachingFactory(() => new PgAuditEventReadModel(input.database.db)),
   });
+  container.register(tokens.operationAuditSink, {
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new DefaultOperationAuditSink(
+          dependencyContainer.resolve(tokens.auditEventRecorder),
+          dependencyContainer.resolve(tokens.clock),
+          dependencyContainer.resolve(tokens.idGenerator),
+          dependencyContainer.resolve(tokens.logger),
+        ),
+    ),
+  });
   container.register(tokens.auditEventReadModel, {
     useFactory: instanceCachingFactory(() => new PgAuditEventReadModel(input.database.db)),
   });
@@ -1841,6 +1854,7 @@ export function registerRuntimeDependencies(
           dependencyContainer,
           dependencyContainer.resolve(tokens.logger),
           dependencyContainer.resolve<OperationGuardPort>(tokens.operationGuardPort),
+          dependencyContainer.resolve<OperationAuditSink>(tokens.operationAuditSink),
         ),
     ),
   });

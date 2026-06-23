@@ -171,6 +171,10 @@ describe("CLI audit event commands", () => {
         "2026-01-01T00:02:00.000Z",
         "--limit",
         "10",
+        "--cursor",
+        "2026-01-01T00:01:00.000Z|aud_res_1",
+        "--order",
+        "desc",
       ]);
     } finally {
       process.stdout.write = writeStdout;
@@ -184,6 +188,8 @@ describe("CLI audit event commands", () => {
       from: "2026-01-01T00:00:00.000Z",
       to: "2026-01-01T00:02:00.000Z",
       limit: 10,
+      cursor: "2026-01-01T00:01:00.000Z|aud_res_1",
+      order: "desc",
     });
   });
 

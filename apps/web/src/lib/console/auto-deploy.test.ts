@@ -37,7 +37,7 @@ describe("resource auto-deploy console settings", () => {
     expect(source).toContain('"general",\n    "diagnostics",\n    "danger"');
     expect(source).not.toContain("resourceLegacyTabSections");
     expect(source).not.toContain("resourceLegacyQuerySections");
-    expect(source).toContain("{#each resourceDetailTabs as tab (tab)}");
+    expect(source).toContain("{#each visibleResourceDetailTabs as tab (tab)}");
     expect(source).toContain("href={resourceTabHref(tab)}");
     expect(source).toContain("onclick={(event) => selectResourceTab(tab, event)}");
     expect(source).toContain('from "$lib/console/layout-classes"');

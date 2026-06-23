@@ -55,9 +55,13 @@ describe("docker container command helpers", () => {
       quote,
     });
 
-    expect(command).toContain("--filter 'label=appaloft.managed=true'");
+    expect(command).toContain("docker ps -aq");
+    expect(command).toContain("docker inspect -f '{{ json .Config.Labels }}'");
     expect(command).toContain(
       "docker inspect -f '{{ index .Config.Labels \"appaloft.deployment-id\" }}'",
+    );
+    expect(command).toContain(
+      "docker inspect -f '{{ index .Config.Labels \"appaloft.preview-id\" }}'",
     );
     expect(command).toContain(
       "docker inspect -f '{{ index .Config.Labels \"appaloft.access-host\" }}'",
@@ -69,10 +73,27 @@ describe("docker container command helpers", () => {
       "docker inspect -f '{{ index .Config.Labels \"appaloft.access-path-prefix\" }}'",
     );
     expect(command).toContain("grep -F ',app.example.com,'");
+    expect(command).toContain("grep -F 'Host(`app.example.com`)'");
+    expect(command).toContain('[ "$traefik_host_matches" = "1" ]');
+    expect(command).toContain('[ "$appaloft_candidate" = "1" ]');
     expect(command).toContain("if [ \"$deployment_id\" != 'dep_current' ]");
     expect(command).toContain('[ \'/\' = "/" ] && [ -z "$access_path_prefix" ]');
     expect(command).toContain('docker rm -f "$container_id"');
-    expect(command.match(/app.example.com/g)).toHaveLength(2);
+  });
+
+  test("matches legacy Traefik route labels for non-root paths", () => {
+    const command = dockerRemoveConflictingRouteContainersCommand({
+      deploymentId: "dep_current",
+      accessRoutes: [{ host: "app.example.com", pathPrefix: "/api" }],
+      quote,
+    });
+
+    expect(command).toContain("grep -F 'Host(`app.example.com`)'");
+    expect(command).toContain("grep -F 'PathPrefix(`/api`)'");
+    expect(command).toContain(
+      'if [ "$traefik_host_matches" = "1" ] && [ "$traefik_path_matches" = "1" ]; then path_matches=1; fi;',
+    );
+    expect(command).toContain('docker rm -f "$container_id"');
   });
 
   test("renders stable Appaloft identity labels", () => {

@@ -3646,7 +3646,7 @@ export const operationCatalog = [
     inputSchema: exportGlobalAuditEventsQueryInputSchema,
     serviceToken: tokens.exportGlobalAuditEventsQueryService,
     transports: {
-      cli: "appaloft audit-event export-global --from <iso> --to <iso>",
+      cli: "appaloft audit-event export-global --from <iso> --to <iso> [--cursor <iso>] [--order asc|desc]",
       orpc: { method: "GET", path: "/api/audit-events/export-global" },
     },
   },

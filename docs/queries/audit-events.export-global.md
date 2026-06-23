@@ -29,7 +29,14 @@ routes, dependency data, storage volumes, or compatibility ledger rows.
 | `to` | Required | Includes rows with `createdAt < to`. |
 | `aggregateId` | Optional | Narrows export to one aggregate while preserving global export metadata and operation identity. |
 | `eventType` | Optional | Narrows export to one exact event type. |
+| `organizationId` | Optional | Narrows export to audit rows whose operation payload belongs to one organization. Hosted Cloud uses this with subscription admission. |
+| `projectId` | Optional | Narrows export to audit rows whose operation payload belongs to one project. Console project audit pages use this to include child resource/deployment rows for the project. |
+| `action` | Optional | One or more operation action labels from the audit payload. |
+| `resourceType` | Optional | One or more resource type labels from the audit payload. |
+| `actorId` | Optional | One or more actor ids from the audit payload. |
 | `limit` | Optional | Positive integer capped at 500. Defaults to 100. |
+| `cursor` | Optional | Continues from a prior page boundary. Cursor values are opaque strings returned by `nextCursor`; ISO timestamp cursors are still accepted for compatibility. |
+| `order` | Optional | `asc` or `desc`. Defaults to `asc` for deterministic exports. Console audit log uses `desc` for newest-first display. |
 
 ## Result Model
 
@@ -37,6 +44,7 @@ The result uses schema version `audit-events.export-global/v1` and includes:
 
 - `filters` with the effective required and optional filters;
 - redacted `items`;
+- `nextCursor` when more rows are available;
 - `itemCount`;
 - `truncated`, true when more matching rows exist beyond the limit;
 - `generatedAt`.
@@ -50,6 +58,9 @@ listed in `redactedFields`.
 - `from` and `to` are required for every global export.
 - Rows are ordered by `createdAt` ascending and then stable audit event id for deterministic
   copy/export output.
+- When `order` is `desc`, rows are returned newest first for Console-style browsing.
+- `nextCursor` is an opaque stable boundary derived from the last returned row's `createdAt` and id;
+  pass it back as `cursor` to continue the same ordered scan.
 - `to` is exclusive so exports can be chained without overlap.
 - `from` must be earlier than `to`.
 - The query must never return raw shell output, credentials, environment values, private keys,
@@ -61,7 +72,7 @@ listed in `redactedFields`.
 
 | Entrypoint | Contract |
 | --- | --- |
-| CLI | `appaloft audit-event export-global --from <iso> --to <iso> [--aggregate <aggregateId>] [--event-type <eventType>] [--limit <n>]` dispatches this query. |
+| CLI | `appaloft audit-event export-global --from <iso> --to <iso> [--aggregate <aggregateId>] [--event-type <eventType>] [--limit <n>] [--cursor <iso>] [--order asc\|desc]` dispatches this query. |
 | API/oRPC | `GET /api/audit-events/export-global` uses the same query schema. |
 | Web | Future operator maintenance UI may call the same query for incident triage or support handoff. |
 
