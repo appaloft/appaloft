@@ -387,12 +387,35 @@ describe("createAppaloftServer", () => {
       );
 
       const pageResponse = await server.httpApp.handle(
-        new Request("http://localhost/audit-log/console-page"),
+        new Request("http://localhost/audit-log/console-page", {
+          headers: {
+            "x-appaloft-locale": "en-US",
+          },
+        }),
       );
       expect(pageResponse.status).toBe(200);
       await expect(pageResponse.json()).resolves.toMatchObject({
         schemaVersion: "appaloft.console.extension-page/v1",
         title: "Audit Log",
+      });
+
+      const zhPageResponse = await server.httpApp.handle(
+        new Request("http://localhost/audit-log/console-page", {
+          headers: {
+            "x-appaloft-locale": "zh-CN",
+          },
+        }),
+      );
+      expect(zhPageResponse.status).toBe(200);
+      await expect(zhPageResponse.json()).resolves.toMatchObject({
+        schemaVersion: "appaloft.console.extension-page/v1",
+        title: "审计日志",
+        sections: [
+          expect.objectContaining({
+            title: "审计事件",
+            emptyLabel: "所选时间范围内没有审计事件。",
+          }),
+        ],
       });
     } finally {
       await server.shutdown();
@@ -430,7 +453,11 @@ describe("createAppaloftServer", () => {
       );
 
       const pageResponse = await server.httpApp.handle(
-        new Request("http://localhost/audit-log/console-page"),
+        new Request("http://localhost/audit-log/console-page", {
+          headers: {
+            "x-appaloft-locale": "en-US",
+          },
+        }),
       );
       expect(pageResponse.status).toBe(200);
       await expect(pageResponse.json()).resolves.toMatchObject({

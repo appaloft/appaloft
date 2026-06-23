@@ -77,6 +77,12 @@ import {
 } from "@appaloft/auth-better";
 import { type AppConfig, resolveConfig } from "@appaloft/config";
 import { domainError, err, ok, type Result } from "@appaloft/core";
+import {
+  type AppaloftTranslate,
+  createAppaloftTranslator,
+  i18nKeys,
+  resolveAppaloftLocaleFromHeaders,
+} from "@appaloft/i18n";
 import { createGitHubActionSourcePackageConfigReader } from "@appaloft/integration-github";
 import {
   bootstrapOpenTelemetry,
@@ -625,10 +631,12 @@ function configurePublicAuditLogConsoleExtension(input: {
     method: "GET",
     path: "/audit-log/console-page",
     handle: async ({ request, query }) => {
+      const locale = resolveAppaloftLocaleFromHeaders(request.headers);
+      const t = createAppaloftTranslator({ locale });
       const executionContextFactory = input.resolveExecutionContextFactory();
       const queryBus = input.resolveQueryBus();
       if (!executionContextFactory || !queryBus) {
-        return auditLogConsoleErrorPage("Audit log runtime is not ready.");
+        return auditLogConsoleErrorPage(t, t(i18nKeys.console.auditLog.runtimeNotReady));
       }
 
       const range = stringQuery(query, "range");
@@ -646,14 +654,13 @@ function configurePublicAuditLogConsoleExtension(input: {
       });
 
       if (auditQuery.isErr()) {
-        return auditLogConsoleErrorPage(auditQuery.error.message);
+        return auditLogConsoleErrorPage(t, auditQuery.error.message);
       }
 
-      const locale = request.headers.get("accept-language") ?? undefined;
       const requestId = request.headers.get("x-request-id") ?? undefined;
       const context = executionContextFactory.create({
         entrypoint: "http",
-        ...(locale ? { locale } : {}),
+        locale,
         ...(requestId ? { requestId } : {}),
       });
       const result = await queryBus
@@ -664,19 +671,22 @@ function configurePublicAuditLogConsoleExtension(input: {
         (readback) =>
           auditLogConsolePage({
             activeRange: range === "7d" ? "7d" : "30d",
+            t,
             events: readback.items
               .toSorted((left, right) => right.createdAt.localeCompare(left.createdAt))
               .map((event) => ({
                 id: event.auditEventId,
                 time: event.createdAt,
                 actor: auditPayloadString(event.payload, ["actor", "actorId", "userId"]) ?? "-",
-                action: event.eventType,
+                action: auditActionLabel(t, event.eventType),
                 resource: event.aggregateId,
-                result:
+                result: auditResultLabel(
+                  t,
                   auditPayloadString(event.payload, ["result", "outcome", "status"]) ?? "recorded",
+                ),
               })),
           }),
-        (error) => auditLogConsoleErrorPage(errorMessage(error)),
+        (error) => auditLogConsoleErrorPage(t, errorMessage(t, error)),
       );
     },
   });
@@ -704,6 +714,7 @@ function createPublicAuditLogConsoleServerExtension(input: {
 
 function auditLogConsolePage(input: {
   activeRange: "7d" | "30d";
+  t: AppaloftTranslate;
   events: Array<{
     id: string;
     time: string;
@@ -713,27 +724,29 @@ function auditLogConsolePage(input: {
     result: string;
   }>;
 }): Record<string, unknown> {
+  const { t } = input;
+
   return {
     schemaVersion: "appaloft.console.extension-page/v1",
-    title: "Audit Log",
-    description: "Recent retained audit events for this Appaloft instance.",
+    title: t(i18nKeys.console.auditLog.title),
+    description: t(i18nKeys.console.auditLog.description),
     sections: [
       {
         kind: "table",
-        title: "Audit events",
-        description: "Newest events first.",
+        title: t(i18nKeys.console.auditLog.eventsTitle),
+        description: t(i18nKeys.console.auditLog.eventsDescription),
         height: "tall",
         filters: [
           {
-            label: "Time range",
+            label: t(i18nKeys.console.auditLog.timeRange),
             items: [
               {
-                label: "Last 30 days",
+                label: t(i18nKeys.console.auditLog.last30Days),
                 href: "/audit-log",
                 active: input.activeRange === "30d",
               },
               {
-                label: "Last 7 days",
+                label: t(i18nKeys.console.auditLog.last7Days),
                 href: "/audit-log?range=7d",
                 active: input.activeRange === "7d",
               },
@@ -741,11 +754,11 @@ function auditLogConsolePage(input: {
           },
         ],
         columns: [
-          { key: "time", label: "Time" },
-          { key: "actor", label: "Actor" },
-          { key: "action", label: "Action" },
-          { key: "resource", label: "Resource" },
-          { key: "result", label: "Result" },
+          { key: "time", label: t(i18nKeys.console.auditLog.columnTime) },
+          { key: "actor", label: t(i18nKeys.console.auditLog.columnActor) },
+          { key: "action", label: t(i18nKeys.console.auditLog.columnAction) },
+          { key: "resource", label: t(i18nKeys.console.auditLog.columnResource) },
+          { key: "result", label: t(i18nKeys.console.auditLog.columnResult) },
         ],
         rows: input.events.map((event) => ({
           key: event.id,
@@ -757,24 +770,24 @@ function auditLogConsolePage(input: {
             result: event.result,
           },
         })),
-        emptyLabel: "No audit events in the selected time range.",
+        emptyLabel: t(i18nKeys.console.auditLog.empty),
       },
     ],
   };
 }
 
-function auditLogConsoleErrorPage(message: string): Record<string, unknown> {
+function auditLogConsoleErrorPage(t: AppaloftTranslate, message: string): Record<string, unknown> {
   return {
     schemaVersion: "appaloft.console.extension-page/v1",
-    title: "Audit Log",
-    description: "Audit events could not be loaded.",
-    badge: "Unavailable",
+    title: t(i18nKeys.console.auditLog.title),
+    description: t(i18nKeys.console.auditLog.unavailableDescription),
+    badge: t(i18nKeys.console.auditLog.unavailableBadge),
     sections: [
       {
         kind: "callouts",
         items: [
           {
-            title: "Audit events unavailable",
+            title: t(i18nKeys.console.auditLog.unavailableTitle),
             description: message,
             tone: "danger",
           },
@@ -784,7 +797,7 @@ function auditLogConsoleErrorPage(message: string): Record<string, unknown> {
   };
 }
 
-function errorMessage(error: unknown): string {
+function errorMessage(t: AppaloftTranslate, error: unknown): string {
   if (error instanceof Error) {
     return error.message;
   }
@@ -796,7 +809,50 @@ function errorMessage(error: unknown): string {
   ) {
     return error.message;
   }
-  return "Audit events could not be loaded.";
+  return t(i18nKeys.console.auditLog.errorFallback);
+}
+
+function auditActionLabel(t: AppaloftTranslate, eventType: string): string {
+  switch (eventType) {
+    case "projects.create":
+      return t(i18nKeys.console.auditLog.actions.projectsCreate);
+    case "projects.archive":
+      return t(i18nKeys.console.auditLog.actions.projectsArchive);
+    case "server-capacity-pruned":
+      return t(i18nKeys.console.auditLog.actions.serverCapacityPruned);
+    case "storage-volume-runtime-cleaned":
+      return t(i18nKeys.console.auditLog.actions.storageVolumeRuntimeCleaned);
+    case "terminal-session-opened":
+      return t(i18nKeys.console.auditLog.actions.terminalSessionOpened);
+    case "terminal-session-closed":
+      return t(i18nKeys.console.auditLog.actions.terminalSessionClosed);
+    case "resource-variable-set":
+      return t(i18nKeys.console.auditLog.actions.resourceVariableSet);
+    case "resource-created":
+      return t(i18nKeys.console.auditLog.actions.resourceCreated);
+    case "server-renamed":
+      return t(i18nKeys.console.auditLog.actions.serverRenamed);
+    default:
+      return eventType;
+  }
+}
+
+function auditResultLabel(t: AppaloftTranslate, result: string): string {
+  switch (result.toLowerCase()) {
+    case "success":
+    case "succeeded":
+      return t(i18nKeys.console.auditLog.resultSuccess);
+    case "failure":
+    case "failed":
+    case "error":
+      return t(i18nKeys.console.auditLog.resultFailure);
+    case "skipped":
+      return t(i18nKeys.console.auditLog.resultSkipped);
+    case "recorded":
+      return t(i18nKeys.console.auditLog.resultRecorded);
+    default:
+      return result;
+  }
 }
 
 function auditPayloadString(
