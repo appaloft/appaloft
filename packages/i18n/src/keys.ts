@@ -258,6 +258,8 @@ export const i18nKeys = {
       eventsTitle: "console:auditLog.eventsTitle",
       eventsDescription: "console:auditLog.eventsDescription",
       timeRange: "console:auditLog.timeRange",
+      resourceType: "console:auditLog.resourceType",
+      allResourceTypes: "console:auditLog.allResourceTypes",
       last30Days: "console:auditLog.last30Days",
       last7Days: "console:auditLog.last7Days",
       columnTime: "console:auditLog.columnTime",

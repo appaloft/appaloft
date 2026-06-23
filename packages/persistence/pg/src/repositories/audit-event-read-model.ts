@@ -135,6 +135,22 @@ export class PgAuditEventReadModel
       query = query.where("event_type", "=", input.eventType);
     }
 
+    if (input.organizationId) {
+      query = query.where("payload", "@>", { organizationId: input.organizationId });
+    }
+
+    if (input.action) {
+      query = query.where("payload", "@>", { action: input.action });
+    }
+
+    if (input.resourceType) {
+      query = query.where("payload", "@>", { resourceType: input.resourceType });
+    }
+
+    if (input.actorId) {
+      query = query.where("payload", "@>", { actorId: input.actorId });
+    }
+
     const rows = await query.orderBy("created_at", "asc").orderBy("id", "asc").execute();
     const pageRows = rows.slice(0, limit);
 

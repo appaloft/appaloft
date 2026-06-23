@@ -307,6 +307,8 @@ export const enUS = {
       eventsTitle: "Audit events",
       eventsDescription: "Newest events first.",
       timeRange: "Time range",
+      resourceType: "Resource type",
+      allResourceTypes: "All resources",
       last30Days: "Last 30 days",
       last7Days: "Last 7 days",
       columnTime: "Time",

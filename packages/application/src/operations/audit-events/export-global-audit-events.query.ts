@@ -16,6 +16,10 @@ export class ExportGlobalAuditEventsQuery extends Query<AuditEventGlobalExportRe
     public readonly to: string,
     public readonly aggregateId?: string,
     public readonly eventType?: string,
+    public readonly organizationId?: string,
+    public readonly action?: string,
+    public readonly resourceType?: string,
+    public readonly actorId?: string,
     public readonly limit: number = 100,
   ) {
     super();
@@ -29,6 +33,10 @@ export class ExportGlobalAuditEventsQuery extends Query<AuditEventGlobalExportRe
           parsed.to,
           trimToUndefined(parsed.aggregateId),
           trimToUndefined(parsed.eventType),
+          trimToUndefined(parsed.organizationId),
+          trimToUndefined(parsed.action),
+          trimToUndefined(parsed.resourceType),
+          trimToUndefined(parsed.actorId),
           parsed.limit,
         ),
     );

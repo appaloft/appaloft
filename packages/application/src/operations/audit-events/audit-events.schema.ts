@@ -39,6 +39,10 @@ export const exportGlobalAuditEventsQueryInputSchema = z
   .object({
     aggregateId: nonEmptyTrimmedString("Aggregate id").optional(),
     eventType: nonEmptyTrimmedString("Event type").optional(),
+    organizationId: nonEmptyTrimmedString("Organization id").optional(),
+    action: nonEmptyTrimmedString("Action").optional(),
+    resourceType: nonEmptyTrimmedString("Resource type").optional(),
+    actorId: nonEmptyTrimmedString("Actor id").optional(),
     from: z.string().datetime(),
     to: z.string().datetime(),
     limit: z.coerce.number().int().positive().max(500).default(100),

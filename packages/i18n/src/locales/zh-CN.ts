@@ -266,6 +266,8 @@ export const zhCN = {
       eventsTitle: "审计事件",
       eventsDescription: "按时间倒序显示。",
       timeRange: "时间范围",
+      resourceType: "资源类型",
+      allResourceTypes: "全部资源",
       last30Days: "最近 30 天",
       last7Days: "最近 7 天",
       columnTime: "时间",

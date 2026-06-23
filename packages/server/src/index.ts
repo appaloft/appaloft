@@ -631,6 +631,7 @@ function configurePublicAuditLogConsoleExtension(input: {
     method: "GET",
     path: "/audit-log/console-page",
     handle: async ({ request, query }) => {
+      const pageQuery = consolePageQuery(query);
       const locale = resolveAppaloftLocaleFromHeaders(request.headers);
       const t = createAppaloftTranslator({ locale });
       const executionContextFactory = input.resolveExecutionContextFactory();
@@ -639,18 +640,28 @@ function configurePublicAuditLogConsoleExtension(input: {
         return auditLogConsoleErrorPage(t, t(i18nKeys.console.auditLog.runtimeNotReady));
       }
 
-      const range = stringQuery(query, "range");
+      const range = stringQuery(pageQuery, "range");
       const days = range === "7d" ? 7 : 30;
       const to = new Date();
       const from = new Date(to.getTime() - days * 24 * 60 * 60 * 1000);
+      const organizationId = stringQuery(pageQuery, "organizationId");
+      const action = stringQuery(pageQuery, "action");
+      const resourceType = stringQuery(pageQuery, "resourceType");
+      const actorId = stringQuery(pageQuery, "actorId");
       const auditQuery = ExportGlobalAuditEventsQuery.create({
         from: from.toISOString(),
         to: to.toISOString(),
         limit: 100,
-        ...(stringQuery(query, "aggregateId")
-          ? { aggregateId: stringQuery(query, "aggregateId") }
+        ...(stringQuery(pageQuery, "aggregateId")
+          ? { aggregateId: stringQuery(pageQuery, "aggregateId") }
           : {}),
-        ...(stringQuery(query, "eventType") ? { eventType: stringQuery(query, "eventType") } : {}),
+        ...(stringQuery(pageQuery, "eventType")
+          ? { eventType: stringQuery(pageQuery, "eventType") }
+          : {}),
+        ...(organizationId ? { organizationId } : {}),
+        ...(action ? { action } : {}),
+        ...(resourceType ? { resourceType } : {}),
+        ...(actorId ? { actorId } : {}),
       });
 
       if (auditQuery.isErr()) {
@@ -671,15 +682,24 @@ function configurePublicAuditLogConsoleExtension(input: {
         (readback) =>
           auditLogConsolePage({
             activeRange: range === "7d" ? "7d" : "30d",
+            ...(resourceType ? { activeResourceType: resourceType } : {}),
             t,
             events: readback.items
               .toSorted((left, right) => right.createdAt.localeCompare(left.createdAt))
               .map((event) => ({
                 id: event.auditEventId,
                 time: event.createdAt,
-                actor: auditPayloadString(event.payload, ["actor", "actorId", "userId"]) ?? "-",
-                action: auditActionLabel(t, event.eventType),
-                resource: event.aggregateId,
+                actor:
+                  auditPayloadString(event.payload, ["actorLabel", "actor", "actorId", "userId"]) ??
+                  "-",
+                action: auditActionLabel(
+                  t,
+                  auditPayloadString(event.payload, ["operationKey", "action"]) ?? event.eventType,
+                ),
+                resource:
+                  auditResourceLabel(event.payload) ??
+                  auditPayloadString(event.payload, ["resourceId"]) ??
+                  event.aggregateId,
                 result: auditResultLabel(
                   t,
                   auditPayloadString(event.payload, ["result", "outcome", "status"]) ?? "recorded",
@@ -714,6 +734,7 @@ function createPublicAuditLogConsoleServerExtension(input: {
 
 function auditLogConsolePage(input: {
   activeRange: "7d" | "30d";
+  activeResourceType?: string;
   t: AppaloftTranslate;
   events: Array<{
     id: string;
@@ -752,6 +773,10 @@ function auditLogConsolePage(input: {
               },
             ],
           },
+          {
+            label: t(i18nKeys.console.auditLog.resourceType),
+            items: auditLogResourceTypeFilters(input.activeRange, input.activeResourceType, t),
+          },
         ],
         columns: [
           { key: "time", label: t(i18nKeys.console.auditLog.columnTime) },
@@ -774,6 +799,45 @@ function auditLogConsolePage(input: {
       },
     ],
   };
+}
+
+function auditLogResourceTypeFilters(
+  activeRange: "7d" | "30d",
+  activeResourceType: string | undefined,
+  t: AppaloftTranslate,
+) {
+  const resourceTypes = [
+    { value: undefined, label: t(i18nKeys.console.auditLog.allResourceTypes) },
+    { value: "project", label: "Project" },
+    { value: "resource", label: "Resource" },
+    { value: "deployment", label: "Deployment" },
+    { value: "dependency_resource", label: "Dependency resource" },
+    { value: "domain_binding", label: "Domain binding" },
+    { value: "server", label: "Server" },
+    { value: "static_artifact", label: "Static artifact" },
+    { value: "storage_volume", label: "Storage volume" },
+  ];
+
+  return resourceTypes.map((item) => ({
+    label: item.label,
+    href: auditLogHref({
+      range: activeRange,
+      ...(item.value ? { resourceType: item.value } : {}),
+    }),
+    active: activeResourceType === item.value || (!activeResourceType && !item.value),
+  }));
+}
+
+function auditLogHref(input: { range: "7d" | "30d"; resourceType?: string }): string {
+  const query = new URLSearchParams();
+  if (input.range === "7d") {
+    query.set("range", "7d");
+  }
+  if (input.resourceType) {
+    query.set("resourceType", input.resourceType);
+  }
+  const serialized = query.toString();
+  return serialized ? `/audit-log?${serialized}` : "/audit-log";
 }
 
 function auditLogConsoleErrorPage(t: AppaloftTranslate, message: string): Record<string, unknown> {
@@ -837,6 +901,15 @@ function auditActionLabel(t: AppaloftTranslate, eventType: string): string {
   }
 }
 
+function auditResourceLabel(payload: Record<string, unknown>): string | undefined {
+  const resourceType = auditPayloadString(payload, ["resourceType"]);
+  const resourceId = auditPayloadString(payload, ["resourceId"]);
+  if (!resourceType || !resourceId) {
+    return undefined;
+  }
+  return `${resourceType}:${resourceId}`;
+}
+
 function auditResultLabel(t: AppaloftTranslate, result: string): string {
   switch (result.toLowerCase()) {
     case "success":
@@ -874,6 +947,20 @@ function auditPayloadString(
 function stringQuery(query: URLSearchParams, name: string): string | undefined {
   const value = query.get(name)?.trim();
   return value ? value : undefined;
+}
+
+function consolePageQuery(query: URLSearchParams): URLSearchParams {
+  const nested = stringQuery(query, "query");
+  if (!nested) {
+    return query;
+  }
+  const merged = new URLSearchParams(nested);
+  for (const [key, value] of query.entries()) {
+    if (key !== "query" && !merged.has(key)) {
+      merged.set(key, value);
+    }
+  }
+  return merged;
 }
 
 export async function createAppaloftServer(

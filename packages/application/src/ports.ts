@@ -6583,6 +6583,10 @@ export interface AuditEventGlobalExportInput {
   to: string;
   aggregateId?: string;
   eventType?: string;
+  organizationId?: string;
+  action?: string;
+  resourceType?: string;
+  actorId?: string;
   limit?: number;
 }
 
@@ -6643,6 +6647,10 @@ export interface AuditEventGlobalExportResult extends AuditEventExportPage {
     to: string;
     aggregateId?: string;
     eventType?: string;
+    organizationId?: string;
+    action?: string;
+    resourceType?: string;
+    actorId?: string;
     limit: number;
   };
   itemCount: number;
@@ -6937,6 +6945,41 @@ export interface AuditEventRecordInput {
   eventType: string;
   payload: Record<string, AuditEventPayloadValue>;
   createdAt: string;
+}
+
+export type OperationAuditResult = "failure" | "success";
+
+export interface OperationAuditActorRef {
+  kind: "deploy-token" | "system" | "user" | "unknown";
+  id?: string;
+  label?: string;
+}
+
+export interface OperationAuditTargetRef {
+  resourceType: string;
+  resourceId: string;
+}
+
+export interface OperationAuditRecordInput {
+  operationKey: string;
+  operationName: string;
+  domain: string;
+  action: string;
+  result: OperationAuditResult;
+  organizationId?: string;
+  actor?: OperationAuditActorRef;
+  primaryTarget?: OperationAuditTargetRef;
+  relatedTargets?: readonly OperationAuditTargetRef[];
+  occurredAt?: string;
+  errorReason?: string;
+  metadata?: Record<string, AuditEventPayloadValue>;
+}
+
+export interface OperationAuditSink {
+  recordOperation(
+    context: ExecutionContext,
+    input: OperationAuditRecordInput,
+  ): Promise<Result<void>>;
 }
 
 export interface IngestSourceEventResult {

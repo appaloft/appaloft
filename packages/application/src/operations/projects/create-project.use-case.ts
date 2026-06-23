@@ -21,7 +21,6 @@ import { checkOperationGuards } from "../../operation-guard";
 import {
   AllowAllOperationGuardPort,
   type AppLogger,
-  type AuditEventRecorder,
   type Clock,
   type EventBus,
   type IdGenerator,
@@ -53,8 +52,6 @@ export class CreateProjectUseCase {
     private readonly operationGuardPort?: OperationGuardPort,
     @inject(tokens.projectReadModel, { isOptional: true })
     private readonly projectReadModel?: ProjectReadModel,
-    @inject(tokens.auditEventRecorder, { isOptional: true })
-    private readonly auditEventRecorder?: AuditEventRecorder,
   ) {}
 
   async execute(
@@ -63,7 +60,6 @@ export class CreateProjectUseCase {
   ): Promise<Result<{ id: string }>> {
     const {
       clock,
-      auditEventRecorder,
       eventBus,
       idGenerator,
       logger,
@@ -130,32 +126,6 @@ export class CreateProjectUseCase {
       );
       await publishDomainEventsAndReturn(context, eventBus, logger, project, undefined);
       const createdProjectId = project.toState().id.value;
-      try {
-        const auditResult = await auditEventRecorder?.record(repositoryContext, {
-          id: idGenerator.next("aud"),
-          aggregateId: createdProjectId,
-          eventType: "projects.create",
-          payload: {
-            operationKey: "projects.create",
-            actorId: context.principal?.userId ?? null,
-            organizationId,
-            projectId: createdProjectId,
-            result: "success",
-          },
-          createdAt: clock.now(),
-        });
-        if (auditResult?.isErr()) {
-          logger.warn("Project creation audit event could not be recorded", {
-            operationKey: "projects.create",
-            projectId: createdProjectId,
-          });
-        }
-      } catch {
-        logger.warn("Project creation audit event could not be recorded", {
-          operationKey: "projects.create",
-          projectId: createdProjectId,
-        });
-      }
 
       return ok({ id: createdProjectId });
     });

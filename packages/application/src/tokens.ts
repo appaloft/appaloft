@@ -3,6 +3,7 @@ export const tokens = {
   idGenerator: Symbol.for("appaloft.id_generator"),
   logger: Symbol.for("appaloft.logger"),
   eventBus: Symbol.for("appaloft.event_bus"),
+  operationAuditSink: Symbol.for("appaloft.operation_audit_sink"),
   operationGuardPort: Symbol.for("appaloft.operation_guard_port"),
   operationAuthorizationPort: Symbol.for("appaloft.operation_guard_port"),
   operationScopePort: Symbol.for("appaloft.operation_scope_port"),

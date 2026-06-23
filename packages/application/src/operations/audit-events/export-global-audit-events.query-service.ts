@@ -28,6 +28,10 @@ export class ExportGlobalAuditEventsQueryService {
       to: query.to,
       ...(query.aggregateId ? { aggregateId: query.aggregateId } : {}),
       ...(query.eventType ? { eventType: query.eventType } : {}),
+      ...(query.organizationId ? { organizationId: query.organizationId } : {}),
+      ...(query.action ? { action: query.action } : {}),
+      ...(query.resourceType ? { resourceType: query.resourceType } : {}),
+      ...(query.actorId ? { actorId: query.actorId } : {}),
       limit: query.limit,
     });
 
@@ -38,6 +42,10 @@ export class ExportGlobalAuditEventsQueryService {
         to: query.to,
         ...(query.aggregateId ? { aggregateId: query.aggregateId } : {}),
         ...(query.eventType ? { eventType: query.eventType } : {}),
+        ...(query.organizationId ? { organizationId: query.organizationId } : {}),
+        ...(query.action ? { action: query.action } : {}),
+        ...(query.resourceType ? { resourceType: query.resourceType } : {}),
+        ...(query.actorId ? { actorId: query.actorId } : {}),
         limit: query.limit,
       },
       itemCount: page.items.length,

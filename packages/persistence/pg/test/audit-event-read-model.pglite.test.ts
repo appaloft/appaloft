@@ -139,6 +139,109 @@ describe("audit event read model persistence", () => {
     }
   });
 
+  test("[AUDIT-EVENT-GLOBAL-EXPORT-003] filters operation audit payload fields", async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), "appaloft-audit-global-filters-"));
+    const { createDatabase, createMigrator, PgAuditEventReadModel } = await import("../src");
+    const database = await createDatabase({
+      driver: "pglite",
+      pgliteDataDir: dataDir,
+    });
+
+    try {
+      const migrationResult = await createMigrator(database.db).migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      await database.db
+        .insertInto("audit_logs")
+        .values([
+          {
+            id: "aud_project_match",
+            aggregate_id: "prj_1",
+            event_type: "projects.create",
+            payload: {
+              schemaVersion: "operation-audit/v1",
+              organizationId: "org_1",
+              action: "create",
+              resourceType: "project",
+              resourceId: "prj_1",
+              actorId: "usr_1",
+              result: "success",
+            },
+            created_at: "2026-01-01T00:00:00.000Z",
+          },
+          {
+            id: "aud_project_other_actor",
+            aggregate_id: "prj_2",
+            event_type: "projects.create",
+            payload: {
+              schemaVersion: "operation-audit/v1",
+              organizationId: "org_1",
+              action: "create",
+              resourceType: "project",
+              resourceId: "prj_2",
+              actorId: "usr_2",
+              result: "success",
+            },
+            created_at: "2026-01-01T00:00:01.000Z",
+          },
+          {
+            id: "aud_resource_other_type",
+            aggregate_id: "res_1",
+            event_type: "resources.create",
+            payload: {
+              schemaVersion: "operation-audit/v1",
+              organizationId: "org_1",
+              action: "create",
+              resourceType: "resource",
+              resourceId: "res_1",
+              actorId: "usr_1",
+              result: "success",
+            },
+            created_at: "2026-01-01T00:00:02.000Z",
+          },
+          {
+            id: "aud_project_other_org",
+            aggregate_id: "prj_3",
+            event_type: "projects.create",
+            payload: {
+              schemaVersion: "operation-audit/v1",
+              organizationId: "org_2",
+              action: "create",
+              resourceType: "project",
+              resourceId: "prj_3",
+              actorId: "usr_1",
+              result: "success",
+            },
+            created_at: "2026-01-01T00:00:03.000Z",
+          },
+        ])
+        .execute();
+
+      const context = toRepositoryContext(
+        createExecutionContext({
+          requestId: "req_audit_event_global_filter_pg_test",
+          entrypoint: "system",
+        }),
+      );
+      const readModel = new PgAuditEventReadModel(database.db);
+
+      const exported = await readModel.exportGlobal(context, {
+        from: "2026-01-01T00:00:00.000Z",
+        to: "2026-01-01T00:01:00.000Z",
+        organizationId: "org_1",
+        action: "create",
+        resourceType: "project",
+        actorId: "usr_1",
+        limit: 10,
+      });
+
+      expect(exported.items.map((event) => event.auditEventId)).toEqual(["aud_project_match"]);
+    } finally {
+      await database.close();
+      rmSync(dataDir, { force: true, recursive: true });
+    }
+  });
+
   test("[AUDIT-EVENT-EXPORT-002] exports bounded redacted events with truncation metadata", async () => {
     const dataDir = mkdtempSync(join(tmpdir(), "appaloft-audit-export-"));
     const { createDatabase, createMigrator, PgAuditEventReadModel } = await import("../src");
