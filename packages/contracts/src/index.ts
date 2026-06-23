@@ -115,6 +115,7 @@ export const instanceUpgradeApplyResponseSchema = z.object({
 export const authProviderStatusSchema = z.object({
   key: z.enum(["github", "google", "oidc"]),
   title: z.string(),
+  accountLabel: z.string().optional(),
   configured: z.boolean(),
   connected: z.boolean(),
   requiresSignIn: z.boolean(),
