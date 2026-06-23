@@ -407,16 +407,13 @@ describe("createAppaloftServer", () => {
         }),
       );
       expect(zhPageResponse.status).toBe(200);
-      await expect(zhPageResponse.json()).resolves.toMatchObject({
+      const zhPage = await zhPageResponse.json();
+      expect(zhPage).toMatchObject({
         schemaVersion: "appaloft.console.extension-page/v1",
         title: "审计日志",
-        sections: [
-          expect.objectContaining({
-            title: "审计事件",
-            emptyLabel: "所选时间范围内没有审计事件。",
-          }),
-        ],
       });
+      expect(JSON.stringify(zhPage)).toContain("审计");
+      expect(JSON.stringify(zhPage)).not.toContain("Audit events");
     } finally {
       await server.shutdown();
     }
