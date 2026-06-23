@@ -145,6 +145,12 @@ class MemoryAuditEventReadModel implements AuditEventReadModel {
       })
       .filter((event) => !input.aggregateId || event.aggregateId === input.aggregateId)
       .filter((event) => !input.eventType || event.eventType === input.eventType)
+      .filter(
+        (event) =>
+          !input.projectId ||
+          event.aggregateId === input.projectId ||
+          (event.payload && event.payload["projectId"] === input.projectId),
+      )
       .toSorted(
         (a, b) => {
           const timestampOrder =
@@ -627,6 +633,7 @@ describe("audit event queries", () => {
         payload: {
           key: "PORT",
           value: "[redacted]",
+          projectId: "prj_web",
         },
         redactedFields: ["value"],
         createdAt: "2026-01-01T00:02:00.000Z",
@@ -715,6 +722,25 @@ describe("audit event queries", () => {
         }),
       ],
       truncated: true,
+    });
+
+    const projectScoped = await service.execute(
+      context,
+      ExportGlobalAuditEventsQuery.create({
+        from: "2026-01-01T00:00:00.000Z",
+        to: "2026-01-01T00:03:00.000Z",
+        projectId: "prj_web",
+        limit: 10,
+      })._unsafeUnwrap(),
+    );
+    expect(projectScoped.isOk()).toBe(true);
+    expect(projectScoped._unsafeUnwrap()).toMatchObject({
+      filters: {
+        projectId: "prj_web",
+      },
+      items: [
+        expect.objectContaining({ auditEventId: "aud_res_2" }),
+      ],
     });
   });
 

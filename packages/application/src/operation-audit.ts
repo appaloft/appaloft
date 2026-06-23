@@ -254,6 +254,7 @@ function operationAuditPayload(
   primaryTarget: OperationAuditTargetRef,
 ): Record<string, AuditEventPayloadValue> {
   const relatedTargets = input.relatedTargets ?? [];
+  const projectId = projectIdFromTargets(primaryTarget, relatedTargets);
   return compactAuditPayload({
     schemaVersion: "operation-audit/v1",
     operationKey: input.operationKey,
@@ -267,6 +268,7 @@ function operationAuditPayload(
     actorLabel: input.actor?.label ?? null,
     resourceType: primaryTarget.resourceType,
     resourceId: primaryTarget.resourceId,
+    projectId: projectId ?? null,
     relatedResourceIds: relatedTargets.map(
       (target) => `${target.resourceType}:${target.resourceId}`,
     ),
@@ -277,6 +279,16 @@ function operationAuditPayload(
     errorReason: input.errorReason ?? null,
     ...(input.metadata ?? {}),
   });
+}
+
+function projectIdFromTargets(
+  primaryTarget: OperationAuditTargetRef,
+  relatedTargets: readonly OperationAuditTargetRef[],
+): string | undefined {
+  if (primaryTarget.resourceType === "project") {
+    return primaryTarget.resourceId;
+  }
+  return relatedTargets.find((target) => target.resourceType === "project")?.resourceId;
 }
 
 function compactAuditPayload(

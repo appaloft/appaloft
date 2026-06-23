@@ -164,6 +164,7 @@ describe("audit event read model persistence", () => {
               action: "create",
               resourceType: "project",
               resourceId: "prj_1",
+              projectId: "prj_1",
               actorId: "usr_1",
               result: "success",
             },
@@ -194,6 +195,7 @@ describe("audit event read model persistence", () => {
               action: "create",
               resourceType: "resource",
               resourceId: "res_1",
+              projectId: "prj_1",
               actorId: "usr_1",
               result: "success",
             },
@@ -250,6 +252,19 @@ describe("audit event read model persistence", () => {
       expect(multiValueExported.items.map((event) => event.auditEventId)).toEqual([
         "aud_project_match",
         "aud_project_other_actor",
+        "aud_resource_other_type",
+      ]);
+
+      const projectScoped = await readModel.exportGlobal(context, {
+        from: "2026-01-01T00:00:00.000Z",
+        to: "2026-01-01T00:01:00.000Z",
+        organizationId: "org_1",
+        projectId: "prj_1",
+        limit: 10,
+      });
+
+      expect(projectScoped.items.map((event) => event.auditEventId)).toEqual([
+        "aud_project_match",
         "aud_resource_other_type",
       ]);
 

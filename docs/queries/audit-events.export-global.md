@@ -29,6 +29,11 @@ routes, dependency data, storage volumes, or compatibility ledger rows.
 | `to` | Required | Includes rows with `createdAt < to`. |
 | `aggregateId` | Optional | Narrows export to one aggregate while preserving global export metadata and operation identity. |
 | `eventType` | Optional | Narrows export to one exact event type. |
+| `organizationId` | Optional | Narrows export to audit rows whose operation payload belongs to one organization. Hosted Cloud uses this with subscription admission. |
+| `projectId` | Optional | Narrows export to audit rows whose operation payload belongs to one project. Console project audit pages use this to include child resource/deployment rows for the project. |
+| `action` | Optional | One or more operation action labels from the audit payload. |
+| `resourceType` | Optional | One or more resource type labels from the audit payload. |
+| `actorId` | Optional | One or more actor ids from the audit payload. |
 | `limit` | Optional | Positive integer capped at 500. Defaults to 100. |
 | `cursor` | Optional | Continues from a prior page boundary. Cursor values are opaque strings returned by `nextCursor`; ISO timestamp cursors are still accepted for compatibility. |
 | `order` | Optional | `asc` or `desc`. Defaults to `asc` for deterministic exports. Console audit log uses `desc` for newest-first display. |

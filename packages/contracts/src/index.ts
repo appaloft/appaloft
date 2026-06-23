@@ -485,6 +485,8 @@ export const systemPluginWebExtensionSchema = z.object({
     "navigation",
     "settings",
     "quick-deploy-source",
+    "route",
+    "project-detail-panel",
     "project-environment-panel",
     "resource-detail-panel",
   ]),
@@ -3346,6 +3348,17 @@ export const exportAuditEventsInputSchema = z.object({
 export const exportGlobalAuditEventsInputSchema = z.object({
   aggregateId: z.string().min(1).optional(),
   eventType: z.string().min(1).optional(),
+  organizationId: z.string().min(1).optional(),
+  projectId: z.string().min(1).optional(),
+  action: z
+    .union([z.string().min(1), z.array(z.string().min(1)).min(1).max(20).readonly()])
+    .optional(),
+  resourceType: z
+    .union([z.string().min(1), z.array(z.string().min(1)).min(1).max(20).readonly()])
+    .optional(),
+  actorId: z
+    .union([z.string().min(1), z.array(z.string().min(1)).min(1).max(20).readonly()])
+    .optional(),
   from: z.string(),
   to: z.string(),
   limit: z.coerce.number().int().positive().max(500).default(100),
@@ -3472,6 +3485,11 @@ export const exportGlobalAuditEventsResponseSchema = z.object({
   filters: z.object({
     aggregateId: z.string().optional(),
     eventType: z.string().optional(),
+    organizationId: z.string().optional(),
+    projectId: z.string().optional(),
+    action: z.union([z.string(), z.array(z.string()).readonly()]).optional(),
+    resourceType: z.union([z.string(), z.array(z.string()).readonly()]).optional(),
+    actorId: z.union([z.string(), z.array(z.string()).readonly()]).optional(),
     from: z.string(),
     to: z.string(),
     limit: z.number(),

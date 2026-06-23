@@ -56,6 +56,7 @@ export const exportGlobalAuditEventsQueryInputSchema = z
     aggregateId: nonEmptyTrimmedString("Aggregate id").optional(),
     eventType: nonEmptyTrimmedString("Event type").optional(),
     organizationId: nonEmptyTrimmedString("Organization id").optional(),
+    projectId: nonEmptyTrimmedString("Project id").optional(),
     action: auditEventFilterValueSchema("Action"),
     resourceType: auditEventFilterValueSchema("Resource type"),
     actorId: auditEventFilterValueSchema("Actor id"),

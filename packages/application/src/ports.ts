@@ -6584,6 +6584,7 @@ export interface AuditEventGlobalExportInput {
   aggregateId?: string;
   eventType?: string;
   organizationId?: string;
+  projectId?: string;
   action?: string | readonly string[];
   resourceType?: string | readonly string[];
   actorId?: string | readonly string[];
@@ -6651,6 +6652,7 @@ export interface AuditEventGlobalExportResult extends AuditEventExportPage {
     aggregateId?: string;
     eventType?: string;
     organizationId?: string;
+    projectId?: string;
     action?: string | readonly string[];
     resourceType?: string | readonly string[];
     actorId?: string | readonly string[];

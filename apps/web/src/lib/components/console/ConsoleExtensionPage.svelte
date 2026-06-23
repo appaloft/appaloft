@@ -375,9 +375,21 @@
   };
   type Props = {
     settingsScope?: "organization" | "instance" | null;
+    projectId?: string;
+    environmentId?: string;
+    resourceId?: string;
+    deploymentId?: string;
+    previewEnvironmentId?: string;
   };
 
-  let { settingsScope = null }: Props = $props();
+  let {
+    settingsScope = null,
+    projectId = "",
+    environmentId = "",
+    resourceId = "",
+    deploymentId = "",
+    previewEnvironmentId = "",
+  }: Props = $props();
   let pendingActionKey = $state<string | null>(null);
   let actionErrorMessage = $state("");
   let panelFieldValues = $state<Record<string, number>>({});
@@ -417,6 +429,11 @@
       pathname,
       query: page.url.searchParams.toString(),
       organization: currentOrganization,
+      projectId,
+      environmentId,
+      resourceId,
+      deploymentId,
+      previewEnvironmentId,
     }),
   );
   const pageDocumentQuery = createQuery(() =>

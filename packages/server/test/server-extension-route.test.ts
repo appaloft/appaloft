@@ -387,6 +387,30 @@ describe("createAppaloftServer", () => {
               pageEndpoint: "/audit-log/console-page?query={query}",
             }),
           }),
+          expect.objectContaining({
+            key: "appaloft-audit-log.project-route",
+            path: "/projects",
+            placement: "route",
+            metadata: expect.objectContaining({
+              pageEndpoint: expect.stringContaining("projectId={projectId}"),
+            }),
+          }),
+          expect.objectContaining({
+            key: "appaloft-audit-log.project-detail",
+            path: "/projects",
+            placement: "project-detail-panel",
+            metadata: expect.objectContaining({
+              pageEndpoint: expect.stringContaining("/audit-log/scope-panel"),
+            }),
+          }),
+          expect.objectContaining({
+            key: "appaloft-audit-log.resource-detail",
+            path: "/resources",
+            placement: "resource-detail-panel",
+            metadata: expect.objectContaining({
+              pageEndpoint: expect.stringContaining("resourceId={resourceId}"),
+            }),
+          }),
         ]),
       );
 
@@ -418,6 +442,27 @@ describe("createAppaloftServer", () => {
       });
       expect(JSON.stringify(zhPage)).toContain("审计");
       expect(JSON.stringify(zhPage)).not.toContain("Audit events");
+
+      const scopePanelResponse = await server.httpApp.handle(
+        new Request(
+          "http://localhost/audit-log/scope-panel?projectId=prj_console_scope&basePath=%2Fprojects%2Fprj_console_scope%2Faudit-log",
+          {
+            headers: {
+              "x-appaloft-locale": "zh-CN",
+            },
+          },
+        ),
+      );
+      expect(scopePanelResponse.status).toBe(200);
+      await expect(scopePanelResponse.json()).resolves.toMatchObject({
+        schemaVersion: "appaloft.console.extension-page/v1",
+        title: "审计日志",
+        actions: [
+          expect.objectContaining({
+            href: "/projects/prj_console_scope/audit-log",
+          }),
+        ],
+      });
     } finally {
       await server.shutdown();
     }
@@ -507,6 +552,7 @@ describe("createAppaloftServer", () => {
             actorLabel: "Console Admin",
             resourceType: "project",
             resourceId: "prj_console_filter",
+            projectId: "prj_console_filter",
             requestId: "req_console_filter",
             entrypoint: "http",
             tenantId: "tenant_console_filter",
@@ -535,6 +581,7 @@ describe("createAppaloftServer", () => {
             actorLabel: "Console Operator",
             resourceType: "resource",
             resourceId: "res_console_filter",
+            projectId: "prj_console_filter",
             requestId: "req_console_filter_resource",
             entrypoint: "http",
             tenantId: "tenant_console_filter",
@@ -648,6 +695,38 @@ describe("createAppaloftServer", () => {
       );
       expect(serialized).not.toContain("All resources");
       expect(serialized).not.toContain("All actions");
+
+      const scopedPageResponse = await server.httpApp.handle(
+        new Request(
+          "http://localhost/audit-log/console-page?projectId=prj_console_filter&basePath=%2Fprojects%2Fprj_console_filter%2Faudit-log",
+          {
+            headers: {
+              "x-appaloft-locale": "zh-CN",
+            },
+          },
+        ),
+      );
+      expect(scopedPageResponse.status).toBe(200);
+      const scopedPage = await scopedPageResponse.json();
+      const scopedTableSection = scopedPage.sections[0];
+      expect(scopedTableSection.rows).toHaveLength(2);
+      expect(JSON.stringify(scopedPage)).toContain(
+        "/projects/prj_console_filter/audit-log?resourceType=resource",
+      );
+
+      const resourceScopedPageResponse = await server.httpApp.handle(
+        new Request(
+          "http://localhost/audit-log/console-page?aggregateId=res_console_filter&basePath=%2Fresources%2Fres_console_filter%2Faudit-log",
+          {
+            headers: {
+              "x-appaloft-locale": "zh-CN",
+            },
+          },
+        ),
+      );
+      expect(resourceScopedPageResponse.status).toBe(200);
+      const resourceScopedPage = await resourceScopedPageResponse.json();
+      expect(resourceScopedPage.sections[0].rows).toHaveLength(1);
     } finally {
       await server.shutdown();
     }

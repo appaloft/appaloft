@@ -513,6 +513,7 @@ describe("operation audit pipeline", () => {
         resourceType: "resource",
         resourceId: "res_1",
       },
+      relatedTargets: [{ resourceType: "project", resourceId: "prj_1" }],
       metadata: {
         safeNote: "retained",
         token: "raw-token",
@@ -534,6 +535,7 @@ describe("operation audit pipeline", () => {
           action: "set-variable",
           resourceType: "resource",
           resourceId: "res_1",
+          projectId: "prj_1",
           safeNote: "retained",
         }),
       }),

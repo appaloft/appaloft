@@ -75,6 +75,8 @@ export const systemPluginWebExtensionSchema = z.object({
     "navigation",
     "settings",
     "quick-deploy-source",
+    "route",
+    "project-detail-panel",
     "project-environment-panel",
     "resource-detail-panel",
   ]),

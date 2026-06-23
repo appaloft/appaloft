@@ -187,6 +187,8 @@ describe("Console page extension surface", () => {
     expect(rendererSource).toContain("<thead");
     expect(rendererSource).toContain('import { goto } from "$app/navigation";');
     expect(rendererSource).toContain('settingsScope?: "organization" | "instance" | null');
+    expect(rendererSource).toContain("projectId?: string");
+    expect(rendererSource).toContain("resourceId?: string");
     expect(rendererSource).toContain("items={instanceSettingsItems");
     expect(rendererSource).toContain("placeholderData: (previousData) => previousData");
     expect(rendererSource).toContain("navigateConsolePageHref(filter.href)");
@@ -218,13 +220,45 @@ describe("Console page extension surface", () => {
     expect(panelHostSource).toContain("type ConsolePageRequestAction");
     expect(panelHostSource).toContain("collapsedByDefault?: boolean");
     expect(panelHostSource).toContain("expandedPanelKeys");
+    expect(panelHostSource).toContain("resolvePanelExtensionVisibilityEndpoint");
     expect(panelHostSource).toContain("togglePanel(result)");
     expect(panelHostSource).toContain("runRequestAction(action, item)");
     expect(panelHostSource).toContain("data-console-extension-panel-host");
+    expect(projectPageSource).toContain('placement="project-detail-panel"');
     expect(projectPageSource).toContain('placement="project-environment-panel"');
     expect(projectPageSource).toContain("environmentId={environment.id}");
     expect(resourcePageSource).toContain('placement="resource-detail-panel"');
     expect(resourcePageSource).toContain("projectId={resourceProjectId}");
     expect(resourcePageSource).toContain("environmentId={resourceEnvironmentId}");
+  });
+
+  test("[CONSOLE-EXT-PAGE-004] includes owner-scoped route pages for audit-style console pages", () => {
+    const projectAuditRouteSource = readFileSync(
+      new URL(
+        "../../routes/projects/[projectId=consoleObjectId]/audit-log/+page.svelte",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+    const resourceAuditRouteSource = readFileSync(
+      new URL(
+        "../../routes/resources/[resourceId=consoleObjectId]/audit-log/+page.svelte",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+    const nestedResourceAuditRouteSource = readFileSync(
+      new URL(
+        "../../routes/projects/[projectId=consoleObjectId]/environments/[environmentId=consoleObjectId]/resources/[resourceId=consoleObjectId]/audit-log/+page.svelte",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+
+    expect(projectAuditRouteSource).toContain("<ConsoleExtensionPage {projectId} />");
+    expect(resourceAuditRouteSource).toContain("<ConsoleExtensionPage {resourceId} />");
+    expect(nestedResourceAuditRouteSource).toContain(
+      "<ConsoleExtensionPage {projectId} {environmentId} {resourceId} />",
+    );
   });
 });

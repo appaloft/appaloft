@@ -75,6 +75,7 @@ describe("operation audit domain event projector", () => {
           actorLabel: null,
           resourceType: "deployment",
           resourceId: "dep_123",
+          projectId: "prj_123",
           relatedResourceIds: [
             "project:prj_123",
             "environment:env_123",

@@ -2120,6 +2120,8 @@
         </section>
       </section>
 
+      <ConsoleExtensionPanelHost placement="project-detail-panel" {projectId} />
+
       <Tabs.Root value={activeProjectTab} class={detailBodyClass}>
         <ConsoleDetailTabs
           ariaLabel={$t(i18nKeys.console.projects.pageTitle)}

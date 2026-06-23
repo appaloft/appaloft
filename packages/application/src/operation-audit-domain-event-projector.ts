@@ -153,6 +153,7 @@ export class OperationAuditDomainEventProjector implements EventHandlerContract<
   async handle(context: ExecutionContext, event: DomainEvent): Promise<Result<void>> {
     const primaryTarget = primaryTargetFromEvent(event);
     const relatedTargets = relatedTargetsFromPayload(event.payload, primaryTarget);
+    const projectId = projectIdFromTargets(primaryTarget, relatedTargets);
     const organizationId =
       stringValue(event.payload.organizationId) ?? context.tenant?.organizationId;
     const occurredAt = event.occurredAt || this.clock.now();
@@ -173,6 +174,7 @@ export class OperationAuditDomainEventProjector implements EventHandlerContract<
         actorLabel: context.actor?.label ?? context.principal?.email ?? null,
         resourceType: primaryTarget.resourceType,
         resourceId: primaryTarget.resourceId,
+        projectId: projectId ?? null,
         relatedResourceIds: relatedTargets.map(
           (target) => `${target.resourceType}:${target.resourceId}`,
         ),
@@ -241,6 +243,16 @@ function relatedTargetsFromPayload(
     targets.push({ resourceType, resourceId: value });
   }
   return uniqueTargets(targets);
+}
+
+function projectIdFromTargets(
+  primaryTarget: OperationAuditTargetRef,
+  relatedTargets: readonly OperationAuditTargetRef[],
+): string | undefined {
+  if (primaryTarget.resourceType === "project") {
+    return primaryTarget.resourceId;
+  }
+  return relatedTargets.find((target) => target.resourceType === "project")?.resourceId;
 }
 
 function compactAuditPayload(

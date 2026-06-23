@@ -140,6 +140,16 @@ export class PgAuditEventReadModel
       query = query.where("payload", "@>", { organizationId: input.organizationId });
     }
 
+    const projectId = input.projectId;
+    if (projectId) {
+      query = query.where((eb) =>
+        eb.or([
+          eb("aggregate_id", "=", projectId),
+          eb("payload", "@>", { projectId }),
+        ]),
+      );
+    }
+
     const actionValues = filterValues(input.action);
     if (actionValues.length > 0) {
       query = query.where((eb) =>
