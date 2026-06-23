@@ -3594,6 +3594,45 @@ export interface ShowDependencyResourceResult {
   generatedAt: string;
 }
 
+export interface InspectDependencyResourceResult {
+  schemaVersion: "dependency-resources.inspect/v1";
+  dependencyResourceId: string;
+  kind: DependencyResourceKind;
+  providerKey: string;
+  providerManaged: boolean;
+  sourceMode: DependencyResourceSourceMode;
+  lifecycleStatus: DependencyResourceLifecycleStatus;
+  connection?: DependencyResourceConnectionSummary;
+  providerRealization?: DependencyResourceProviderRealizationSummary;
+  desiredCapabilities: DependencyResourceCapabilityRequirement[];
+  capabilityReadbacks: DependencyResourceCapabilityReadback[];
+  safeQuery: {
+    status: "supported" | "not-supported" | "not-configured";
+    allowedFamilies: string[];
+    maxRows: number;
+    timeoutMs: number;
+  };
+  generatedAt: string;
+}
+
+export interface DependencyResourceSafeQueryColumn {
+  name: string;
+  type?: string;
+}
+
+export interface DependencyResourceSafeQueryResult {
+  schemaVersion: "dependency-resources.query/v1";
+  dependencyResourceId: string;
+  kind: DependencyResourceKind;
+  providerKey: string;
+  statement: string;
+  columns: DependencyResourceSafeQueryColumn[];
+  rows: Record<string, string | number | boolean | null>[];
+  rowCount: number;
+  truncated: boolean;
+  executedAt: string;
+}
+
 export interface DependencyResourceRestoreAttemptSummary {
   attemptId: string;
   status: "pending" | "completed" | "failed";
@@ -8710,6 +8749,13 @@ export interface PreviewPolicyDecisionReadModel {
       sourceEventId: string;
     },
   ): Promise<PreviewPolicyDecisionProjection | null>;
+  findLatestForPreviewEnvironment(
+    context: RepositoryContext,
+    input: {
+      previewEnvironmentId: string;
+      resourceId?: string;
+    },
+  ): Promise<PreviewPolicyDecisionProjection | null>;
 }
 
 export interface ProjectReadModel {
@@ -8860,6 +8906,20 @@ export interface DependencyResourceReadModel {
     context: RepositoryContext,
     spec: ResourceInstanceSelectionSpec,
   ): Promise<DependencyResourceSummary | null>;
+}
+
+export interface DependencyResourceSafeQueryInput {
+  dependencyResource: DependencyResourceSummary;
+  statement: string;
+  maxRows: number;
+  timeoutMs: number;
+}
+
+export interface DependencyResourceSafeQueryPort {
+  execute(
+    context: ExecutionContext,
+    input: DependencyResourceSafeQueryInput,
+  ): Promise<Result<Omit<DependencyResourceSafeQueryResult, "schemaVersion">, DomainError>>;
 }
 
 export interface DependencyResourceBackupReadModel {

@@ -147,6 +147,7 @@ export * from "./operations/preview-deployments/preview-deployment-process.manag
 export * from "./operations/preview-deployments/preview-expiry-cleanup-scheduler";
 export * from "./operations/preview-deployments/preview-feedback.service";
 export * from "./operations/preview-deployments/preview-lifecycle.service";
+export * from "./operations/preview-deployments/preview-operable-scope.resolver";
 export * from "./operations/preview-deployments/preview-policy.evaluator";
 export * from "./operations/preview-deployments/preview-policy.schema";
 export * from "./operations/preview-deployments/preview-pull-request-event-ingest.service";

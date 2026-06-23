@@ -97,6 +97,36 @@ export class PgPreviewPolicyDecisionProjection
       },
     );
   }
+
+  async findLatestForPreviewEnvironment(
+    context: RepositoryContext,
+    input: { previewEnvironmentId: string; resourceId?: string },
+  ): Promise<PreviewPolicyDecisionProjection | null> {
+    const executor = resolveRepositoryExecutor(this.db, context);
+    return context.tracer.startActiveSpan(
+      createReadModelSpanName("preview_policy_decision", "find_latest_for_preview_environment"),
+      {
+        attributes: {
+          [appaloftTraceAttributes.readModelName]: "preview_policy_decision",
+        },
+      },
+      async () => {
+        let query = executor
+          .selectFrom("preview_policy_decisions")
+          .selectAll()
+          .where("preview_environment_id", "=", input.previewEnvironmentId)
+          .where("status", "=", "allowed");
+
+        if (input.resourceId) {
+          query = query.where("resource_id", "=", input.resourceId);
+        }
+
+        const row = await query.orderBy("evaluated_at", "desc").executeTakeFirst();
+
+        return row ? projectionFromRow(row) : null;
+      },
+    );
+  }
 }
 
 function rowFromProjection(

@@ -15,7 +15,7 @@ export {
 
 export class ResourceDiagnosticSummaryQuery extends Query<ResourceDiagnosticSummary> {
   constructor(
-    public readonly resourceId: string,
+    public readonly resourceId: string | undefined,
     public readonly includeDeploymentTimelineTail: boolean,
     public readonly includeRuntimeLogTail: boolean,
     public readonly includeProxyConfiguration: boolean,
@@ -24,6 +24,7 @@ export class ResourceDiagnosticSummaryQuery extends Query<ResourceDiagnosticSumm
     public readonly observationFrom?: string,
     public readonly observationTo?: string,
     public readonly locale?: string,
+    public readonly previewEnvironmentId?: string,
   ) {
     super();
   }
@@ -43,6 +44,7 @@ export class ResourceDiagnosticSummaryQuery extends Query<ResourceDiagnosticSumm
           trimToUndefined(parsed.observationFrom),
           trimToUndefined(parsed.observationTo),
           trimToUndefined(parsed.locale),
+          trimToUndefined(parsed.previewEnvironmentId),
         ),
     );
   }

@@ -22,6 +22,7 @@ import {
   type ResourceSummary,
 } from "../../ports";
 import { tokens } from "../../tokens";
+import { type PreviewOperableScopeResolver } from "../preview-deployments/preview-operable-scope.resolver";
 import { type ResourceRuntimeLogsQuery } from "./resource-runtime-logs.query";
 
 const defaultBoundedOpenTimeoutMs = 10_000;
@@ -235,6 +236,8 @@ export class ResourceRuntimeLogsQueryService {
     @inject(tokens.deploymentReadModel) private readonly deploymentReadModel: DeploymentReadModel,
     @inject(tokens.resourceRuntimeLogReader)
     private readonly runtimeLogReader: ResourceRuntimeLogReader,
+    @inject(tokens.previewOperableScopeResolver)
+    private readonly previewOperableScopeResolver?: PreviewOperableScopeResolver,
   ) {}
 
   async execute(
@@ -242,18 +245,39 @@ export class ResourceRuntimeLogsQueryService {
     query: ResourceRuntimeLogsQuery,
   ): Promise<Result<ResourceRuntimeLogsResult>> {
     const repositoryContext = toRepositoryContext(context);
+    const previewScopeResult = await this.previewOperableScopeResolver?.resolve(context, {
+      previewEnvironmentId: query.previewEnvironmentId,
+      resourceId: query.resourceId,
+      deploymentId: query.deploymentId,
+      requireDeployment: Boolean(query.previewEnvironmentId),
+    });
+    if (previewScopeResult?.isErr()) {
+      return err(previewScopeResult.error);
+    }
+    const previewScope = previewScopeResult?.isOk() ? previewScopeResult.value : null;
+
+    const resourceId = previewScope?.resourceId ?? query.resourceId;
+    const deploymentId = previewScope?.deploymentId ?? query.deploymentId;
+    if (!resourceId) {
+      return err(
+        domainError.validation("Either resourceId or previewEnvironmentId is required", {
+          phase: "runtime-instance-resolution",
+        }),
+      );
+    }
+
     const resources = await this.resourceReadModel.list(repositoryContext);
-    const resource = resources.find((candidate) => candidate.id === query.resourceId);
+    const resource = resources.find((candidate) => candidate.id === resourceId);
 
     if (!resource) {
-      return err(domainError.notFound("resource", query.resourceId));
+      return err(domainError.notFound("resource", resourceId));
     }
 
     const deployments = await this.deploymentReadModel.list(repositoryContext, {
       resourceId: resource.id,
     });
-    const deploymentResult = query.deploymentId
-      ? await this.resolveSelectedDeployment(context, query.deploymentId, resource, deployments)
+    const deploymentResult = deploymentId
+      ? await this.resolveSelectedDeployment(context, deploymentId, resource, deployments)
       : ok(deployments.sort(compareCreatedAtDesc)[0] ?? null);
 
     if (deploymentResult.isErr()) {

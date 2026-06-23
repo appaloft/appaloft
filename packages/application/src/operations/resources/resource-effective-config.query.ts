@@ -11,13 +11,16 @@ import {
 export { type ResourceEffectiveConfigQueryInput, resourceEffectiveConfigQueryInputSchema };
 
 export class ResourceEffectiveConfigQuery extends Query<ResourceEffectiveConfigView> {
-  constructor(public readonly resourceId: string) {
+  constructor(
+    public readonly resourceId?: string,
+    public readonly previewEnvironmentId?: string,
+  ) {
     super();
   }
 
   static create(input: ResourceEffectiveConfigQueryInput): Result<ResourceEffectiveConfigQuery> {
     return parseOperationInput(resourceEffectiveConfigQueryInputSchema, input).map(
-      (parsed) => new ResourceEffectiveConfigQuery(parsed.resourceId),
+      (parsed) => new ResourceEffectiveConfigQuery(parsed.resourceId, parsed.previewEnvironmentId),
     );
   }
 }
