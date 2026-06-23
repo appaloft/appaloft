@@ -839,8 +839,6 @@ function auditLogConsolePage(
     sections: [
       {
         kind: "table",
-        title: t(i18nKeys.console.auditLog.eventsTitle),
-        description: t(i18nKeys.console.auditLog.eventsDescription),
         height: "tall",
         filters: [
           {

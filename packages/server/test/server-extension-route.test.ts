@@ -433,6 +433,8 @@ describe("createAppaloftServer", () => {
         title: "审计日志",
       });
       expect(JSON.stringify(zhPage)).toContain("审计");
+      expect(zhPage.sections[0]).not.toHaveProperty("title");
+      expect(zhPage.sections[0]).not.toHaveProperty("description");
       expect(JSON.stringify(zhPage)).not.toContain("Audit events");
     } finally {
       await server.shutdown();
@@ -794,6 +796,9 @@ describe("createAppaloftServer", () => {
       const tableSection = page.sections[0];
 
       expect(tableSection.rows).toHaveLength(10);
+      expect(tableSection).not.toHaveProperty("title");
+      expect(tableSection).not.toHaveProperty("description");
+      expect(JSON.stringify(tableSection)).toContain("资源类型");
       expect(tableSection.pagination).toMatchObject({
         label: "本页显示 10 条，最多 10 条",
       });

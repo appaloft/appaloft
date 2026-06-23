@@ -185,15 +185,19 @@ describe("Console page extension surface", () => {
     expect(rendererSource).toContain('kind: "tiered-unit-rate"');
     expect(rendererSource).toContain("<table");
     expect(rendererSource).toContain("<thead");
+    expect(rendererSource).toContain("title?: string");
     expect(rendererSource).toContain('import { goto } from "$app/navigation";');
     expect(rendererSource).toContain('settingsScope?: "organization" | "instance" | null');
     expect(rendererSource).toContain("embedded?: boolean");
     expect(rendererSource).toContain('class={embedded ? "max-w-none p-0" : "max-w-7xl"}');
-    expect(rendererSource).toContain('"console-panel overflow-hidden"');
-    expect(rendererSource).toContain('embedded ? "space-y-1 pb-4" : "space-y-1 p-5"');
-    expect(rendererSource).toContain('class="overflow-x-auto border-t"');
-    expect(rendererSource).toContain('embedded ? "border-t py-5 text-sm text-muted-foreground"');
-    expect(rendererSource).toContain('embedded\n                  ? "flex flex-wrap items-center justify-between gap-3 border-t py-3"');
+    expect(rendererSource).toContain('"space-y-4"');
+    expect(rendererSource).toContain("{#if section.title || section.description}");
+    expect(rendererSource).toContain('<div class="console-panel overflow-hidden">');
+    expect(rendererSource).toContain('class="overflow-x-auto" data-console-page-table-body');
+    expect(rendererSource).toContain('<div class="p-5 text-sm text-muted-foreground">');
+    expect(rendererSource).toContain(
+      '<div class="flex flex-wrap items-center justify-between gap-3 border-t px-5 py-3">',
+    );
     expect(rendererSource).toContain("{#if !embedded}");
     expect(rendererSource).toContain("{#if embedded}");
     expect(rendererSource).toContain("projectId?: string");

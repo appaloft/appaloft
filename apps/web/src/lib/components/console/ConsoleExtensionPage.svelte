@@ -276,7 +276,7 @@
 
   type ConsolePageTableSection = {
     kind: "table";
-    title: string;
+    title?: string;
     description?: string;
     columns: ConsolePageTableColumn[];
     rows: ConsolePageTableRow[];
@@ -1452,17 +1452,23 @@
         {:else if section.kind === "table"}
           <section
             class={[
-              "console-panel overflow-hidden",
+              "space-y-4",
               tableSectionClass(section),
             ]}
           >
-            <div class={embedded ? "space-y-1 pb-4" : "space-y-1 p-5"}>
-              <h2 class="text-lg font-semibold">{section.title}</h2>
-              {#if section.description}
-                <p class="text-sm text-muted-foreground">{section.description}</p>
+            <div class="space-y-3">
+              {#if section.title || section.description}
+                <div class="space-y-1">
+                  {#if section.title}
+                    <h2 class="text-lg font-semibold">{section.title}</h2>
+                  {/if}
+                  {#if section.description}
+                    <p class="text-sm text-muted-foreground">{section.description}</p>
+                  {/if}
+                </div>
               {/if}
               {#if section.filters?.length}
-                <div class="flex flex-wrap gap-3 pt-3">
+                <div class="flex flex-wrap gap-3">
                   {#each section.filters as filterGroup (filterGroup.label)}
                     <div
                       class="flex min-w-0 flex-wrap items-center gap-2"
@@ -1492,173 +1498,168 @@
                 </div>
               {/if}
             </div>
-            {#if section.rows.length > 0}
-              <div
-                class="overflow-x-auto border-t"
-                data-console-page-table-body
-              >
-                <table class="w-full min-w-[760px] text-sm" data-console-page-record-list>
-                  <thead class="bg-muted/40 text-xs font-medium text-muted-foreground">
-                    <tr>
-                      {#each section.columns as column (column.key)}
-                        <th
-                          scope="col"
-                          class={[
-                            "px-5 py-3 font-medium",
-                            column.align === "right" ? "text-right" : "text-left",
-                          ]}
-                        >
-                          {column.label}
-                        </th>
-                      {/each}
-                      <th scope="col" class="w-24 px-5 py-3 text-right font-medium"></th>
-                    </tr>
-                  </thead>
-                  <tbody class="divide-y">
-                    {#each section.rows as row, rowIndex (rowIndex)}
-                      <tr class="transition-colors hover:bg-muted/30" data-console-page-record-row>
+            <div class="console-panel overflow-hidden">
+              {#if section.rows.length > 0}
+                <div class="overflow-x-auto" data-console-page-table-body>
+                  <table class="w-full min-w-[760px] text-sm" data-console-page-record-list>
+                    <thead class="bg-muted/40 text-xs font-medium text-muted-foreground">
+                      <tr>
                         {#each section.columns as column (column.key)}
-                          {@const cell = readTableCell(row, column.key)}
-                          <td
+                          <th
+                            scope="col"
                             class={[
-                              "max-w-64 px-5 py-4 align-middle",
-                              column.align === "right" ? "text-right tabular-nums" : "text-left",
+                              "px-5 py-3 font-medium",
+                              column.align === "right" ? "text-right" : "text-left",
                             ]}
                           >
-                            {#if isConsolePageActorValue(cell.text)}
-                              <div
-                                class="flex min-w-0 items-center gap-2"
-                                title={displayValueText(cell.text)}
-                              >
-                                <span
-                                  class="flex size-7 shrink-0 items-center justify-center rounded-full border bg-muted text-[11px] font-semibold text-muted-foreground"
+                            {column.label}
+                          </th>
+                        {/each}
+                        <th scope="col" class="w-24 px-5 py-3 text-right font-medium"></th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y">
+                      {#each section.rows as row, rowIndex (rowIndex)}
+                        <tr class="transition-colors hover:bg-muted/30" data-console-page-record-row>
+                          {#each section.columns as column (column.key)}
+                            {@const cell = readTableCell(row, column.key)}
+                            <td
+                              class={[
+                                "max-w-64 px-5 py-4 align-middle",
+                                column.align === "right" ? "text-right tabular-nums" : "text-left",
+                              ]}
+                            >
+                              {#if isConsolePageActorValue(cell.text)}
+                                <div
+                                  class="flex min-w-0 items-center gap-2"
+                                  title={displayValueText(cell.text)}
                                 >
-                                  {actorInitials(cell.text)}
-                                </span>
+                                  <span
+                                    class="flex size-7 shrink-0 items-center justify-center rounded-full border bg-muted text-[11px] font-semibold text-muted-foreground"
+                                  >
+                                    {actorInitials(cell.text)}
+                                  </span>
+                                  <span
+                                    class={[
+                                      "inline-flex min-w-0 max-w-full items-center rounded-full border px-2 py-1 text-xs font-medium",
+                                      badgeClass(cell.tone ?? "muted"),
+                                    ]}
+                                  >
+                                    <span class="truncate">{cell.text.label}</span>
+                                  </span>
+                                </div>
+                              {:else if isConsolePageBadgeValue(cell.text)}
                                 <span
                                   class={[
-                                    "inline-flex min-w-0 max-w-full items-center rounded-full border px-2 py-1 text-xs font-medium",
-                                    badgeClass(cell.tone ?? "muted"),
+                                    "inline-flex max-w-full items-center rounded-full border px-2 py-1 text-xs font-medium",
+                                    badgeClass(cell.text.tone ?? cell.tone),
                                   ]}
+                                  title={displayValueText(cell.text)}
                                 >
                                   <span class="truncate">{cell.text.label}</span>
                                 </span>
-                              </div>
-                            {:else if isConsolePageBadgeValue(cell.text)}
-                              <span
-                                class={[
-                                  "inline-flex max-w-full items-center rounded-full border px-2 py-1 text-xs font-medium",
-                                  badgeClass(cell.text.tone ?? cell.tone),
-                                ]}
-                                title={displayValueText(cell.text)}
-                              >
-                                <span class="truncate">{cell.text.label}</span>
-                              </span>
-                            {:else if isConsolePageLinkValue(cell.text)}
-                              <a
-                                href={cell.text.href}
-                                class={[
-                                  "inline-flex max-w-full items-center gap-1 truncate font-medium text-primary underline-offset-4 hover:underline",
-                                  toneClass(cell.tone),
-                                ]}
-                                title={displayValueText(cell.text)}
-                              >
-                                <span class="truncate">{cell.text.label}</span>
-                                <ArrowUpRight class="size-3 shrink-0" />
-                              </a>
-                            {:else if isConsolePageIconLabelValue(cell.text)}
-                              {@const Icon = iconComponent(cell.text.icon)}
-                              <span
-                                class={[
-                                  "inline-flex max-w-full items-center gap-2 font-medium",
-                                  toneClass(cell.text.tone ?? cell.tone),
-                                ]}
-                                title={displayValueText(cell.text)}
-                              >
+                              {:else if isConsolePageLinkValue(cell.text)}
+                                <a
+                                  href={cell.text.href}
+                                  class={[
+                                    "inline-flex max-w-full items-center gap-1 truncate font-medium text-primary underline-offset-4 hover:underline",
+                                    toneClass(cell.tone),
+                                  ]}
+                                  title={displayValueText(cell.text)}
+                                >
+                                  <span class="truncate">{cell.text.label}</span>
+                                  <ArrowUpRight class="size-3 shrink-0" />
+                                </a>
+                              {:else if isConsolePageIconLabelValue(cell.text)}
+                                {@const Icon = iconComponent(cell.text.icon)}
                                 <span
                                   class={[
-                                    "flex size-7 shrink-0 items-center justify-center rounded-full border",
-                                    badgeClass(cell.text.tone ?? cell.tone ?? "muted"),
+                                    "inline-flex max-w-full items-center gap-2 font-medium",
+                                    toneClass(cell.text.tone ?? cell.tone),
                                   ]}
+                                  title={displayValueText(cell.text)}
                                 >
-                                  <Icon class="size-3.5" />
+                                  <span
+                                    class={[
+                                      "flex size-7 shrink-0 items-center justify-center rounded-full border",
+                                      badgeClass(cell.text.tone ?? cell.tone ?? "muted"),
+                                    ]}
+                                  >
+                                    <Icon class="size-3.5" />
+                                  </span>
+                                  <span class="truncate">{cell.text.label}</span>
                                 </span>
-                                <span class="truncate">{cell.text.label}</span>
-                              </span>
-                            {:else}
-                              <span
-                                class={["block truncate font-medium", toneClass(cell.tone)]}
-                                title={displayValueText(cell.text)}
+                              {:else}
+                                <span
+                                  class={["block truncate font-medium", toneClass(cell.tone)]}
+                                  title={displayValueText(cell.text)}
+                                >
+                                  {displayValueText(cell.text)}
+                                </span>
+                              {/if}
+                            </td>
+                          {/each}
+                          <td class="px-5 py-4 text-right align-middle">
+                            {#if row.details}
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onclick={() =>
+                                  row.details?.href
+                                    ? navigateConsolePageHref(row.details.href)
+                                    : openTableDetails(row.details)}
                               >
-                                {displayValueText(cell.text)}
-                              </span>
+                                {row.details.label}
+                              </Button>
                             {/if}
                           </td>
-                        {/each}
-                        <td class="px-5 py-4 text-right align-middle">
-                          {#if row.details}
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onclick={() =>
-                                row.details?.href
-                                  ? navigateConsolePageHref(row.details.href)
-                                  : openTableDetails(row.details)}
-                            >
-                              {row.details.label}
-                            </Button>
-                          {/if}
-                        </td>
-                      </tr>
-                    {/each}
-                  </tbody>
-                </table>
-              </div>
-            {:else}
-              <div class={embedded ? "border-t py-5 text-sm text-muted-foreground" : "border-t p-5 text-sm text-muted-foreground"}>
-                {section.emptyLabel ?? $t(i18nKeys.common.status.unknown)}
-              </div>
-            {/if}
-            {#if section.pagination}
-              <div
-                class={embedded
-                  ? "flex flex-wrap items-center justify-between gap-3 border-t py-3"
-                  : "flex flex-wrap items-center justify-between gap-3 border-t px-5 py-3"}
-              >
-                <p class="text-sm text-muted-foreground">{section.pagination.label}</p>
-                <div class="flex items-center gap-2">
-                  {#if section.pagination.previousHref}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onclick={() => navigateConsolePageHref(section.pagination?.previousHref)}
-                    >
-                      {section.pagination.previousLabel}
-                    </Button>
-                  {:else}
-                    <Button variant="outline" size="sm" disabled>
-                      {section.pagination.previousLabel}
-                    </Button>
-                  {/if}
-                  {#if section.pagination.nextHref}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onclick={() => navigateConsolePageHref(section.pagination?.nextHref)}
-                    >
-                      {section.pagination.nextLabel}
-                    </Button>
-                  {:else}
-                    <Button variant="outline" size="sm" disabled>
-                      {section.pagination.nextLabel}
-                    </Button>
-                  {/if}
+                        </tr>
+                      {/each}
+                    </tbody>
+                  </table>
                 </div>
-              </div>
-            {/if}
+              {:else}
+                <div class="p-5 text-sm text-muted-foreground">
+                  {section.emptyLabel ?? $t(i18nKeys.common.status.unknown)}
+                </div>
+              {/if}
+              {#if section.pagination}
+                <div class="flex flex-wrap items-center justify-between gap-3 border-t px-5 py-3">
+                  <p class="text-sm text-muted-foreground">{section.pagination.label}</p>
+                  <div class="flex items-center gap-2">
+                    {#if section.pagination.previousHref}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onclick={() => navigateConsolePageHref(section.pagination?.previousHref)}
+                      >
+                        {section.pagination.previousLabel}
+                      </Button>
+                    {:else}
+                      <Button variant="outline" size="sm" disabled>
+                        {section.pagination.previousLabel}
+                      </Button>
+                    {/if}
+                    {#if section.pagination.nextHref}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onclick={() => navigateConsolePageHref(section.pagination?.nextHref)}
+                      >
+                        {section.pagination.nextLabel}
+                      </Button>
+                    {:else}
+                      <Button variant="outline" size="sm" disabled>
+                        {section.pagination.nextLabel}
+                      </Button>
+                    {/if}
+                  </div>
+                </div>
+              {/if}
+            </div>
           </section>
         {:else if section.kind === "callouts"}
           <section class="grid gap-3 md:grid-cols-3">
