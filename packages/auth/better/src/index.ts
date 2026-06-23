@@ -85,6 +85,7 @@ type AuthProviderKey = "github" | "google" | "oidc";
 export interface AuthProviderStatus {
   key: AuthProviderKey;
   title: string;
+  accountLabel?: string;
   configured: boolean;
   connected: boolean;
   requiresSignIn: boolean;
@@ -216,6 +217,7 @@ type DirectMemberListReadback =
 function buildProviderStatus(
   key: AuthProviderKey,
   input: {
+    accountLabel?: string;
     configured: boolean;
     connected: boolean;
   },
@@ -223,6 +225,7 @@ function buildProviderStatus(
   return {
     key,
     title: providerTitle(key),
+    ...(input.accountLabel ? { accountLabel: input.accountLabel } : {}),
     configured: input.configured,
     connected: input.connected,
     requiresSignIn: true,
@@ -312,6 +315,7 @@ export class BetterAuthRuntime implements AuthRuntime {
             providerId === "github" || providerId === "google" || providerId === "oidc",
         ),
     );
+    const providerAccountLabels = providerAccountLabelsByProvider(accounts);
 
     return {
       accountSecurity: resolveAppaloftBetterAuthAccountSecurityStatus({ passwordState }),
@@ -331,6 +335,7 @@ export class BetterAuthRuntime implements AuthRuntime {
           oidc: this.oidcConfigured,
         },
         connectedProviders,
+        providerAccountLabels,
       ),
     };
   }
@@ -2362,16 +2367,55 @@ function providerNotConfiguredReason(key: AuthProviderKey): string {
   return "Configure APPALOFT_OIDC_CLIENT_ID, APPALOFT_OIDC_CLIENT_SECRET, APPALOFT_OIDC_DISCOVERY_URL, and APPALOFT_OIDC_REDIRECT_URI to enable OIDC login.";
 }
 
+function providerAccountLabelsByProvider(
+  accounts: readonly unknown[],
+): ReadonlyMap<AuthProviderKey, string> {
+  const labels = new Map<AuthProviderKey, string>();
+
+  for (const account of accounts) {
+    if (!account || typeof account !== "object") {
+      continue;
+    }
+
+    const providerId = (account as { providerId?: unknown }).providerId;
+    if (providerId !== "github" && providerId !== "google" && providerId !== "oidc") {
+      continue;
+    }
+
+    const label = providerAccountLabel(account);
+    if (label) {
+      labels.set(providerId, label);
+    }
+  }
+
+  return labels;
+}
+
+function providerAccountLabel(account: object): string | null {
+  for (const key of ["accountId", "providerAccountId", "email", "name"] as const) {
+    const value = (account as Record<string, unknown>)[key];
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return null;
+}
+
 function providerStatuses(
   configured: Record<AuthProviderKey, boolean>,
   connectedProviders: ReadonlySet<AuthProviderKey> = new Set<AuthProviderKey>(),
+  providerAccountLabels: ReadonlyMap<AuthProviderKey, string> = new Map<AuthProviderKey, string>(),
 ): AuthProviderStatus[] {
-  return (["github", "google", "oidc"] as const).map((key) =>
-    buildProviderStatus(key, {
+  return (["github", "google", "oidc"] as const).map((key) => {
+    const accountLabel = providerAccountLabels.get(key);
+
+    return buildProviderStatus(key, {
+      ...(accountLabel ? { accountLabel } : {}),
       configured: configured[key],
       connected: connectedProviders.has(key),
-    }),
-  );
+    });
+  });
 }
 
 function publicProviderStatuses(configured: Record<AuthProviderKey, boolean>) {

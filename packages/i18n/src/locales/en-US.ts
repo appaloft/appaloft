@@ -3300,6 +3300,9 @@ export const enUS = {
       savedCredentialLibraryTitle: "Saved SSH credentials",
     },
     shell: {
+      connections: "Connections",
+      githubConnectedAs: "GitHub connected: {{account}}",
+      linkGitHubAccount: "Link GitHub account",
       noProjects: "No projects",
       projectSearch: "Search projects",
       userSettings: "User settings",

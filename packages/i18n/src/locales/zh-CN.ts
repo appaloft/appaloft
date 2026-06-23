@@ -3035,6 +3035,9 @@ export const zhCN = {
       savedCredentialLibraryTitle: "已保存 SSH 凭据",
     },
     shell: {
+      connections: "连接",
+      githubConnectedAs: "GitHub 已连接：{{account}}",
+      linkGitHubAccount: "链接 GitHub 账号",
       noProjects: "暂无项目",
       projectSearch: "搜索项目",
       userSettings: "用户设置",

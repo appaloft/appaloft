@@ -6,7 +6,9 @@
     BookOpen,
     ChevronUp,
     GitBranch,
+    House,
     LogOut,
+    PlugZap,
     Rocket,
     Settings2,
     UserRound,
@@ -22,6 +24,9 @@
     DropdownMenuRadioGroup,
     DropdownMenuRadioItem,
     DropdownMenuSeparator,
+    DropdownMenuSub,
+    DropdownMenuSubContent,
+    DropdownMenuSubTrigger,
     DropdownMenuTrigger,
   } from "$lib/components/ui/dropdown-menu";
   import { webDocsHrefs } from "$lib/console/docs-help";
@@ -54,7 +59,19 @@
     authSession.providers.find((provider) => provider.key === "github") ?? null,
   );
   const githubConnected = $derived(Boolean(githubProvider?.connected));
+  const githubAccountLabel = $derived(githubProvider?.accountLabel?.trim() ?? "");
   const authIdentity = $derived(readSessionIdentity(authSession.session));
+  const githubConnectionSummary = $derived.by(() => {
+    if (githubConnected && githubAccountLabel) {
+      return $t(i18nKeys.console.shell.githubConnectedAs, { account: githubAccountLabel });
+    }
+
+    return githubConnected
+      ? `GitHub ${$t(i18nKeys.common.status.connected)}`
+      : authIdentity
+        ? $t(i18nKeys.common.status.pendingAuthorization)
+        : $t(i18nKeys.common.status.onDemandAuthorization);
+  });
   const showInstanceManagementLink = $derived(
     $capabilities.capabilities[instanceAccessCapabilityKey]?.allowed === true,
   );
@@ -121,7 +138,7 @@
     <span class="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
       <span class="block truncate text-sm font-medium">{authIdentity ?? $t(i18nKeys.common.status.unauthenticated)}</span>
       <span class="block truncate text-xs text-muted-foreground">
-        GitHub {githubConnected ? $t(i18nKeys.common.status.connected) : authIdentity ? $t(i18nKeys.common.status.pendingAuthorization) : $t(i18nKeys.common.status.onDemandAuthorization)}
+        {githubConnectionSummary}
       </span>
     </span>
     <ChevronUp class="size-4 text-muted-foreground group-data-[collapsible=icon]:hidden" />
@@ -139,10 +156,27 @@
       </div>
     </DropdownMenuLabel>
     <DropdownMenuSeparator />
-    <DropdownMenuItem disabled={!githubProvider?.configured || githubConnected} onclick={connectGitHub}>
-      <GitBranch class="size-4" />
-      {githubConnected ? `GitHub ${$t(i18nKeys.common.status.connected)}` : $t(i18nKeys.common.actions.connectGitHub)}
+    <DropdownMenuItem onclick={() => navigateTo("/")}>
+      <House class="size-4" />
+      {$t(i18nKeys.console.nav.home)}
     </DropdownMenuItem>
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger>
+        <PlugZap class="size-4" />
+        {$t(i18nKeys.console.shell.connections)}
+      </DropdownMenuSubTrigger>
+      <DropdownMenuSubContent class="min-w-64">
+        <DropdownMenuItem disabled={!githubProvider?.configured || githubConnected} onclick={connectGitHub}>
+          <GitBranch class="size-4 shrink-0" />
+          <span class="min-w-0 flex-1">
+            <span class="block truncate">
+              {githubConnected ? "GitHub" : $t(i18nKeys.console.shell.linkGitHubAccount)}
+            </span>
+            <span class="block truncate text-xs text-muted-foreground">{githubConnectionSummary}</span>
+          </span>
+        </DropdownMenuItem>
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
     <DropdownMenuItem onclick={() => navigateTo("/organization")}>
       <UserRound class="size-4" />
       {$t(i18nKeys.console.nav.organization)}

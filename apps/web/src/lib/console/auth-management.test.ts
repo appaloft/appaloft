@@ -56,7 +56,9 @@ describe("organization auth management console surface", () => {
     expect(organizationSwitcherSource).toContain('navigateTo("/organization")');
     expect(organizationSwitcherSource).toContain('navigateTo("/instance")');
     expect(organizationSwitcherSource).toContain('navigateTo("/")');
-    expect(organizationSwitcherSource).toContain("organizationId === currentOrganization?.organizationId");
+    expect(organizationSwitcherSource).toContain(
+      "organizationId === currentOrganization?.organizationId",
+    );
     expect(organizationSwitcherSource).toContain("disabled={pending}");
     expect(organizationSwitcherSource).not.toContain("disabled={organizationIsCurrent || pending}");
     expect(organizationSwitcherSource).toContain("showInstanceManagementLink");
@@ -70,6 +72,12 @@ describe("organization auth management console surface", () => {
     expect(userMenuSource).toContain("showInstanceManagementLink");
     expect(userMenuSource).toContain("preloadInstanceAccessCapability");
     expect(userMenuSource).toContain("instanceAccessCapabilityKey");
+    expect(userMenuSource).toContain('navigateTo("/")');
+    expect(userMenuSource).toContain("DropdownMenuSubTrigger");
+    expect(userMenuSource).toContain("i18nKeys.console.shell.connections");
+    expect(userMenuSource).toContain("i18nKeys.console.shell.linkGitHubAccount");
+    expect(userMenuSource).toContain("i18nKeys.console.shell.githubConnectedAs");
+    expect(userMenuSource).not.toContain("$t(i18nKeys.common.actions.connectGitHub)");
     expect(userMenuSource).toContain("i18nKeys.common.actions.signOut");
     expect(userMenuSource).toContain("data-console-sign-out-action");
     expect(userMenuSource).toContain("DropdownMenuSeparator");

@@ -2914,6 +2914,9 @@ export const i18nKeys = {
       savedCredentialLibraryTitle: "console:servers.savedCredentialLibraryTitle",
     },
     shell: {
+      connections: "console:shell.connections",
+      githubConnectedAs: "console:shell.githubConnectedAs",
+      linkGitHubAccount: "console:shell.linkGitHubAccount",
       noProjects: "console:shell.noProjects",
       projectSearch: "console:shell.projectSearch",
       userSettings: "console:shell.userSettings",

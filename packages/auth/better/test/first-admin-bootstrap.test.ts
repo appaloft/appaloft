@@ -1023,7 +1023,7 @@ describe("Better Auth first-admin bootstrap adapter", () => {
       name: "OAuth Only",
     });
     await context.internalAdapter.createAccount({
-      accountId: oauthOnlyUser.id,
+      accountId: "octocat",
       providerId: "github",
       userId: oauthOnlyUser.id,
     });
@@ -1039,6 +1039,15 @@ describe("Better Auth first-admin bootstrap adapter", () => {
       }),
     );
     expect(oauthOnlyStatus.accountSecurity.passwordState).toBe("not-set");
+    expect(oauthOnlyStatus.providers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          accountLabel: "octocat",
+          connected: true,
+          key: "github",
+        }),
+      ]),
+    );
 
     const setPassword = await runtime.handle(
       new Request("http://localhost:3721/api/auth/set-password", {
