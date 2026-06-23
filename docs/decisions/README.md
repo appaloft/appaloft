@@ -106,6 +106,7 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-080: Appaloft As MCP Transport Boundary](./ADR-080-appaloft-as-mcp-transport-boundary.md) | Accepted | Defines public Appaloft-as-MCP as an operation-catalog-backed transport with tools, resources, prompts, and stdio dispatch through shared command/query buses. |
 | [ADR-081: Source Version Value Object Boundary](./ADR-081-source-version-value-object-boundary.md) | Accepted | Defines neutral public source version value objects, source-specific reference rules, fixed deployment version snapshots, aliases, and detection ownership. |
 | [ADR-083: Storage Volume, Dependency Resource, And Backup Boundary](./ADR-083-storage-volume-dependency-resource-and-backup-boundary.md) | Accepted | Keeps mounted StorageVolume data separate from service DependencyResource lifecycle and defines the public storage backup source/target boundary. |
+| [ADR-086: Preview Operable Runtime Scope](./ADR-086-preview-operable-runtime-scope.md) | Accepted | Defines Preview Environment as a Resource-derived operable runtime scope for service/runtime operations, without creating preview-only operation shortcuts. |
 
 ## Authoring Rules
 
