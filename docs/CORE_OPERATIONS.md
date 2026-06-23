@@ -379,7 +379,7 @@ Implemented operations:
 | Read resource effective configuration | Query | `resources.effective-config` | `ResourceEffectiveConfigQuery` | `ResourceEffectiveConfigQueryInput` | `appaloft resource effective-config <resourceId>` | `GET /api/resources/{resourceId}/effective-config` |
 | List resource secret references | Query | `resources.secrets.list` | `ListResourceSecretReferencesQuery` | `ListResourceSecretReferencesQueryInput` | `appaloft resource secrets list <resourceId>` | `GET /api/resources/{resourceId}/secrets` |
 | Show resource secret reference | Query | `resources.secrets.show` | `ShowResourceSecretReferenceQuery` | `ShowResourceSecretReferenceQueryInput` | `appaloft resource secrets show <resourceId> <key>` | `GET /api/resources/{resourceId}/secrets/{key}` |
-| Read resource runtime logs | Query | `resources.runtime-logs` | `ResourceRuntimeLogsQuery` | `ResourceRuntimeLogsQueryInput` | `appaloft resource logs <resourceId>` | `GET /api/resources/{resourceId}/runtime-logs`; stream: `GET /api/resources/{resourceId}/runtime-logs/stream` |
+| Read resource runtime logs | Query | `resources.runtime-logs` | `ResourceRuntimeLogsQuery` | `ResourceRuntimeLogsQueryInput` | `appaloft resource logs <resourceId>`; preview selector: `appaloft resource logs --preview <previewEnvironmentId>` | `GET /api/resources/{resourceId}/runtime-logs`; stream: `GET /api/resources/{resourceId}/runtime-logs/stream` |
 | Stop resource runtime | Command | `resources.runtime.stop` | `StopResourceRuntimeCommand` | `StopResourceRuntimeCommandInput` | `appaloft resource runtime stop <resourceId>` | `POST /api/resources/{resourceId}/runtime/stop` |
 | Start resource runtime | Command | `resources.runtime.start` | `StartResourceRuntimeCommand` | `StartResourceRuntimeCommandInput` | `appaloft resource runtime start <resourceId>` | `POST /api/resources/{resourceId}/runtime/start` |
 | Restart resource runtime | Command | `resources.runtime.restart` | `RestartResourceRuntimeCommand` | `RestartResourceRuntimeCommandInput` | `appaloft resource runtime restart <resourceId>` | `POST /api/resources/{resourceId}/runtime/restart` |
@@ -663,6 +663,15 @@ Current boundary:
   `resources.runtime.stop`, `resources.runtime.start`, and `resources.runtime.restart` coordinate
   through `resource-runtime`, persist runtime-control attempts, and dispatch normalized target
   requests without creating new Deployment attempts.
+- preview operable runtime scope is governed by
+  [ADR-086](./decisions/ADR-086-preview-operable-runtime-scope.md) and
+  [spec 101](./specs/101-preview-operable-runtime-scope/spec.md). It is an additive selector on
+  existing service/runtime operations, not a new preview command namespace. Preview selectors may
+  target read-only logs, health, diagnostics, effective config, deployment readback, runtime
+  control, terminal sessions, dependency binding readback, dependency inspect, and safe dependency
+  query only after the corresponding operation schema, CLI/API/Web/MCP surface, and tests are
+  aligned. Preview scope must not automatically inherit billing, preview policy mutation, project,
+  environment, resource, server, domain, certificate, retention, or provider-account operations.
 - edge proxy provider behavior is resource-observable through
   `resources.proxy-configuration.preview`, governed by
   [ADR-019: Edge Proxy Provider And Observable Configuration](./decisions/ADR-019-edge-proxy-provider-and-observable-configuration.md);

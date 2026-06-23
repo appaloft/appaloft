@@ -470,6 +470,22 @@ class InMemoryPreviewPolicyDecisionProjection
   ): Promise<PreviewPolicyDecisionProjection | null> {
     return this.projections.get(input.sourceEventId) ?? null;
   }
+
+  async findLatestForPreviewEnvironment(
+    _context: RepositoryContext,
+    input: { previewEnvironmentId: string; resourceId?: string },
+  ): Promise<PreviewPolicyDecisionProjection | null> {
+    return (
+      [...this.projections.values()]
+        .filter(
+          (projection) =>
+            projection.status === "allowed" &&
+            projection.previewEnvironmentId === input.previewEnvironmentId &&
+            (!input.resourceId || projection.resourceId === input.resourceId),
+        )
+        .sort((left, right) => right.evaluatedAt.localeCompare(left.evaluatedAt))[0] ?? null
+    );
+  }
 }
 
 class InMemoryPreviewFeedbackRecorder implements PreviewFeedbackRecorder {

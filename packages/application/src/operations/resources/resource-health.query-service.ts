@@ -38,6 +38,7 @@ import {
   type ResourceSummary,
 } from "../../ports";
 import { tokens } from "../../tokens";
+import { type PreviewOperableScopeResolver } from "../preview-deployments/preview-operable-scope.resolver";
 import {
   currentNonReadyDurableDomainBinding,
   durableDomainBindingNotReadyCategory,
@@ -1000,13 +1001,34 @@ export class ResourceHealthQueryService {
     private readonly probeRunner: ResourceHealthProbeRunner,
     @inject(tokens.clock)
     private readonly clock: Clock,
+    @inject(tokens.previewOperableScopeResolver)
+    private readonly previewOperableScopeResolver?: PreviewOperableScopeResolver,
   ) {}
 
   async execute(
     context: ExecutionContext,
     query: ResourceHealthQuery,
   ): Promise<Result<ResourceHealthSummary>> {
-    const resourceResult = await this.resolveResource(context, query.resourceId);
+    const previewScopeResult = await this.previewOperableScopeResolver?.resolve(context, {
+      previewEnvironmentId: query.previewEnvironmentId,
+      resourceId: query.resourceId,
+      requireDeployment: Boolean(query.previewEnvironmentId),
+    });
+    if (previewScopeResult?.isErr()) {
+      return err(previewScopeResult.error);
+    }
+    const previewScope = previewScopeResult?.isOk() ? previewScopeResult.value : null;
+
+    const resourceId = previewScope?.resourceId ?? query.resourceId;
+    if (!resourceId) {
+      return err(
+        domainError.validation("Either resourceId or previewEnvironmentId is required", {
+          phase: "resource-health-resolution",
+        }),
+      );
+    }
+
+    const resourceResult = await this.resolveResource(context, resourceId);
     if (resourceResult.isErr()) {
       return err(resourceResult.error);
     }
@@ -1028,7 +1050,10 @@ export class ResourceHealthQueryService {
     }
 
     const deployments = deploymentsResult.value;
-    const latestDeployment = this.latestDeployment(resource, deployments);
+    const previewDeploymentId = previewScope?.deploymentId;
+    const latestDeployment = previewDeploymentId
+      ? deployments.find((deployment) => deployment.id === previewDeploymentId)
+      : this.latestDeployment(resource, deployments);
     const generatedAt = this.clock.now();
     const observedAt = generatedAt;
     const sourceErrors: ResourceHealthSourceError[] = [];

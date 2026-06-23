@@ -34,14 +34,20 @@ import { NoopProcessAttemptRecorder } from "../../process-attempt-journal";
 import { tokens } from "../../tokens";
 import { deploymentResourceRuntimeScopeForIds } from "../deployments/deployment-mutation-scopes";
 import { isServerBackedDeploymentSummary } from "../deployments/deployment-target-guards";
+import { type PreviewOperableScopeResolver } from "../preview-deployments/preview-operable-scope.resolver";
 
 type ResourceRuntimeControlInput = {
   operation: ResourceRuntimeControlOperation;
-  resourceId: string;
+  resourceId?: string;
+  previewEnvironmentId?: string;
   deploymentId?: string;
   acknowledgeRetainedRuntimeMetadata?: boolean;
   reason?: string;
   idempotencyKey?: string;
+};
+
+type ResolvedResourceRuntimeControlInput = ResourceRuntimeControlInput & {
+  resourceId: string;
 };
 
 type ResourceRuntimeControlPolicyKey =
@@ -307,11 +313,13 @@ export class ResourceRuntimeControlUseCase {
     private readonly mutationCoordinator: MutationCoordinator,
     @inject(tokens.processAttemptRecorder)
     private readonly processAttemptRecorder: ProcessAttemptRecorder = new NoopProcessAttemptRecorder(),
+    @inject(tokens.previewOperableScopeResolver)
+    private readonly previewOperableScopeResolver?: PreviewOperableScopeResolver,
   ) {}
 
   async execute(
     context: ExecutionContext,
-    input: ResourceRuntimeControlInput,
+    rawInput: ResourceRuntimeControlInput,
   ): Promise<Result<ResourceRuntimeControlCommandResult>> {
     const repositoryContext = toRepositoryContext(context);
     const {
@@ -324,9 +332,36 @@ export class ResourceRuntimeControlUseCase {
       resourceRepository,
       targetPort,
     } = this;
+    const { previewOperableScopeResolver } = this;
     const useCase = this;
 
     return safeTry(async function* () {
+      const previewScope = await previewOperableScopeResolver?.resolve(context, {
+        previewEnvironmentId: rawInput.previewEnvironmentId,
+        resourceId: rawInput.resourceId,
+        deploymentId: rawInput.deploymentId,
+        requireDeployment: Boolean(rawInput.previewEnvironmentId),
+      });
+      if (previewScope?.isErr()) {
+        return err(previewScope.error);
+      }
+      const resolvedPreviewScope = previewScope?.isOk() ? previewScope.value : null;
+
+      const resolvedResourceId = resolvedPreviewScope?.resourceId ?? rawInput.resourceId;
+      if (!resolvedResourceId) {
+        return err(
+          domainError.validation("Either resourceId or previewEnvironmentId is required", {
+            phase: "resource-runtime-control-resolution",
+          }),
+        );
+      }
+      const input: ResolvedResourceRuntimeControlInput = {
+        ...rawInput,
+        resourceId: resolvedResourceId,
+        ...(resolvedPreviewScope?.deploymentId || rawInput.deploymentId
+          ? { deploymentId: resolvedPreviewScope?.deploymentId ?? rawInput.deploymentId }
+          : {}),
+      };
       const resourceId = yield* ResourceId.create(input.resourceId);
       const resource = await resourceRepository.findOne(
         repositoryContext,
@@ -545,7 +580,7 @@ export class ResourceRuntimeControlUseCase {
 
   private async resolveDeployment(
     context: ExecutionContext,
-    input: ResourceRuntimeControlInput,
+    input: ResolvedResourceRuntimeControlInput,
     resource: ResourceSummary | null,
   ): Promise<Result<DeploymentSummary, DomainError>> {
     const repositoryContext = toRepositoryContext(context);
@@ -574,7 +609,7 @@ export class ResourceRuntimeControlUseCase {
   }
 
   private admitControl(
-    input: ResourceRuntimeControlInput,
+    input: ResolvedResourceRuntimeControlInput,
     runtimeState: ResourceRuntimeControlRuntimeState,
   ): Result<void, DomainError> {
     if (runtimeState === "unknown") {

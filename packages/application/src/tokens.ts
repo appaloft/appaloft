@@ -134,6 +134,7 @@ export const tokens = {
   scheduledTaskRunReadModel: Symbol.for("appaloft.scheduled_task_run_read_model"),
   scheduledTaskRunLogReadModel: Symbol.for("appaloft.scheduled_task_run_log_read_model"),
   dependencyResourceReadModel: Symbol.for("appaloft.dependency_resource_read_model"),
+  dependencyResourceSafeQueryPort: Symbol.for("appaloft.dependency_resource_safe_query_port"),
   dependencyResourceBackupReadModel: Symbol.for("appaloft.dependency_resource_backup_read_model"),
   resourceDependencyBindingReadModel: Symbol.for("appaloft.resource_dependency_binding_read_model"),
   environmentProfileDecisionReadModel: Symbol.for(
@@ -177,6 +178,7 @@ export const tokens = {
   retentionDefaultRepository: Symbol.for("appaloft.retention_default_repository"),
   previewLifecycleService: Symbol.for("appaloft.preview_lifecycle_service"),
   previewFeedbackService: Symbol.for("appaloft.preview_feedback_service"),
+  previewOperableScopeResolver: Symbol.for("appaloft.preview_operable_scope_resolver"),
   previewDeploymentProcessManager: Symbol.for("appaloft.preview_deployment_process_manager"),
   previewExpiryCleanupScheduler: Symbol.for("appaloft.preview_expiry_cleanup_scheduler"),
   previewPullRequestEventIngestService: Symbol.for(
@@ -439,6 +441,12 @@ export const tokens = {
     "appaloft.list_dependency_resources_query_service",
   ),
   showDependencyResourceQueryService: Symbol.for("appaloft.show_dependency_resource_query_service"),
+  inspectDependencyResourceQueryService: Symbol.for(
+    "appaloft.inspect_dependency_resource_query_service",
+  ),
+  queryDependencyResourceQueryService: Symbol.for(
+    "appaloft.query_dependency_resource_query_service",
+  ),
   listDependencyResourceBackupsQueryService: Symbol.for(
     "appaloft.list_dependency_resource_backups_query_service",
   ),

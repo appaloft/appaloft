@@ -222,6 +222,8 @@ import {
   IngestSourceEventCommandHandler,
   IngestSourceEventUseCase,
   InMemoryDependencyResourceProvisioningPlanStore,
+  InspectDependencyResourceQueryHandler,
+  InspectDependencyResourceQueryService,
   InspectRuntimeUsageQueryHandler,
   InspectServerCapacityQueryHandler,
   InspectServerCapacityQueryService,
@@ -328,6 +330,7 @@ import {
   PreviewExpiryCleanupScheduler,
   PreviewFeedbackService,
   PreviewLifecycleService,
+  PreviewOperableScopeResolver,
   PreviewPullRequestEventIngestService,
   PromoteEnvironmentUseCase,
   ProvisionDependencyResourceCommandHandler,
@@ -354,6 +357,8 @@ import {
   PruneSourceEventsUseCase,
   PruneStorageVolumeBackupCommandHandler,
   PruneStorageVolumeBackupUseCase,
+  QueryDependencyResourceQueryHandler,
+  QueryDependencyResourceQueryService,
   ReactivateOrganizationMemberCommandHandler,
   ReactivateOrganizationMemberUseCase,
   RedeployDeploymentCommandHandler,
@@ -1798,6 +1803,8 @@ export function registerApplicationServices(
   container.registerSingleton(RestoreDependencyResourceBackupCommandHandler);
   container.registerSingleton(ListDependencyResourcesQueryHandler);
   container.registerSingleton(ShowDependencyResourceQueryHandler);
+  container.registerSingleton(InspectDependencyResourceQueryHandler);
+  container.registerSingleton(QueryDependencyResourceQueryHandler);
   container.registerSingleton(ListDependencyResourceBackupPoliciesQueryHandler);
   container.registerSingleton(ShowDependencyResourceBackupPolicyQueryHandler);
   container.registerSingleton(ListDependencyResourceBackupsQueryHandler);
@@ -2037,6 +2044,7 @@ export function registerApplicationServices(
     tokens.configureResourceRuntimeUseCase,
     ConfigureResourceRuntimeUseCase,
   );
+  container.registerSingleton(tokens.previewOperableScopeResolver, PreviewOperableScopeResolver);
   container.registerSingleton(tokens.resourceRuntimeControlUseCase, ResourceRuntimeControlUseCase);
   container.registerSingleton(
     tokens.createResourceSecretReferenceUseCase,
@@ -2129,6 +2137,14 @@ export function registerApplicationServices(
   container.registerSingleton(
     tokens.showDependencyResourceQueryService,
     ShowDependencyResourceQueryService,
+  );
+  container.registerSingleton(
+    tokens.inspectDependencyResourceQueryService,
+    InspectDependencyResourceQueryService,
+  );
+  container.registerSingleton(
+    tokens.queryDependencyResourceQueryService,
+    QueryDependencyResourceQueryService,
   );
   container.registerSingleton(
     tokens.createDependencyResourceBackupUseCase,

@@ -24,6 +24,7 @@ export class ResourceEffectiveConfigQueryHandler
   ): Promise<Result<ResourceEffectiveConfigView>> {
     return this.service.execute(context, {
       resourceId: query.resourceId,
+      previewEnvironmentId: query.previewEnvironmentId,
     });
   }
 }

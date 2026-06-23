@@ -70,6 +70,10 @@ the npm package is actually published and verified in the user's environment.
 - Product-grade preview belongs to Appaloft Cloud or a self-hosted control plane with preview
   policy, GitHub App webhook intake, cleanup retry, scheduler, audit, and quota. Do not collapse it
   into Action-only PR preview guidance.
+- Preview environments inherit service-operation surfaces as a selector for the parent
+  resource/deployment runtime: logs, health, diagnostics, effective config, runtime control, and
+  terminal. They do not inherit project/resource/server/domain/certificate/billing/provider-account
+  mutation surfaces.
 
 ## Boundary Rules
 

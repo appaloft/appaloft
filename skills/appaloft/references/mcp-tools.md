@@ -52,6 +52,10 @@ Each MCP tool maps one-to-one to an operation catalog key:
 - `deployments.create` -> `deployments_create`
 - `deployments.plan` -> `deployments_plan`
 - `resources.configure-source` -> `resources_configure_source`
+- `resources.runtime-logs` -> `resources_runtime_logs` with either `resourceId` or
+  `previewEnvironmentId`
+- `dependency-resources.inspect` -> `dependency_resources_inspect`
+- `dependency-resources.query` -> `dependency_resources_query`
 - `runtime-monitoring.samples.list` -> `runtime_monitoring_samples_list`
 - `system.doctor` -> `system_doctor`
 
@@ -91,6 +95,11 @@ Prompts sequence existing tools only. They do not create new operations.
 
 - Preserve the same secret rules as CLI/API/Web: never read or print `.env`, private keys, tokens,
   SSH material, cookies, raw connection strings, or unmasked logs.
+- Preview environments are selectors for existing service operations. Use `previewEnvironmentId`
+  on logs, health, diagnostics, effective config, runtime control, and terminal tools; do not infer
+  parent resource latest deployment as preview evidence.
+- Dependency safe query tools are allowlisted read-only inspection only. They must fail closed when
+  the provider adapter is unavailable or when the statement/command is outside the allowlist.
 - For destructive operations, inspect readback or delete-safety tools first and pass exact
   confirmation fields when the operation schema requires them.
 - Keep auth, tenant context, operation guards, redaction, confirmations, and structured errors in

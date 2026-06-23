@@ -728,6 +728,14 @@ export const cliCommandDescriptions = {
   ),
   dependencyList: withDocs("List dependency resources", "dependency.resource-lifecycle"),
   dependencyShow: withDocs("Show dependency resource detail", "dependency.resource-lifecycle"),
+  dependencyInspect: withDocs(
+    "Inspect dependency resource connection, provider, capability, and safe query readiness",
+    "dependency.resource-lifecycle",
+  ),
+  dependencyQuery: withDocs(
+    "Run an allowlisted read-only dependency resource query",
+    "dependency.resource-lifecycle",
+  ),
   dependencyRename: withDocs("Rename a dependency resource", "dependency.resource-lifecycle"),
   dependencyDelete: withDocs(
     "Delete a dependency resource after safety checks",
