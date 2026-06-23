@@ -2,8 +2,8 @@
 @import "./tokens.css";
 
 :root {
-  --fd-layout-width: 1500px;
-  --appaloft-docs-grid: color-mix(in oklch, var(--border) 44%, transparent);
+  --fd-layout-width: 100vw;
+  --appaloft-docs-sidebar: var(--background);
 }
 
 :root,
@@ -17,7 +17,7 @@
   --color-fd-muted-foreground: var(--muted-foreground);
   --color-fd-popover: var(--popover);
   --color-fd-popover-foreground: var(--popover-foreground);
-  --color-fd-card: var(--sidebar);
+  --color-fd-card: var(--appaloft-docs-sidebar);
   --color-fd-card-foreground: var(--sidebar-foreground);
   --color-fd-border: color-mix(in oklch, var(--border) 78%, transparent);
   --color-fd-primary: var(--primary);
@@ -31,16 +31,7 @@
 }
 
 body {
-  background:
-    linear-gradient(90deg, var(--appaloft-docs-grid) 1px, transparent 1px),
-    linear-gradient(0deg, var(--appaloft-docs-grid) 1px, transparent 1px),
-    linear-gradient(180deg, color-mix(in oklch, var(--primary) 5%, transparent), transparent 22rem),
-    var(--background);
-  background-size:
-    3.5rem 3.5rem,
-    3.5rem 3.5rem,
-    auto,
-    auto;
+  background: var(--background);
   color: var(--foreground);
   font-family: var(--appaloft-font-sans);
   font-feature-settings:
@@ -72,12 +63,14 @@ a {
 
 #nd-docs-layout {
   --fd-sidebar-width: 19rem;
+  grid-template:
+    "sidebar header toc"
+    "sidebar toc-popover toc"
+    "sidebar main toc" 1fr / var(--fd-sidebar-col) minmax(0, 1fr) var(--fd-toc-width) !important;
 }
 
 #nd-sidebar {
-  background:
-    linear-gradient(180deg, color-mix(in oklch, var(--primary) 5%, transparent), transparent 18rem),
-    color-mix(in oklch, var(--sidebar) 94%, var(--primary));
+  background: var(--appaloft-docs-sidebar);
   border-color: color-mix(in oklch, var(--sidebar-border) 82%, transparent);
 }
 
@@ -105,6 +98,15 @@ a {
 
 .fd-page {
   color: var(--foreground);
+}
+
+#nd-page[data-full="false"] {
+  max-width: none;
+  margin-inline: 0;
+}
+
+#nd-page[data-full="false"] > :where(p, .prose) {
+  max-width: min(100%, 76rem);
 }
 
 .fd-page article {
@@ -158,10 +160,6 @@ a {
 }
 
 @media (max-width: 767px) {
-  :root {
-    --fd-layout-width: 100vw;
-  }
-
   #nd-docs-layout {
     grid-template:
       "header" var(--fd-header-height)
