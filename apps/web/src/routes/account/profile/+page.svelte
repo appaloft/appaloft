@@ -1,6 +1,14 @@
 <script lang="ts">
   import { browser } from "$app/environment";
-  import { CheckCircle2, KeyRound, Pencil, ShieldAlert, ShieldCheck, UserRound } from "@lucide/svelte";
+  import {
+    CheckCircle2,
+    KeyRound,
+    Link2,
+    Pencil,
+    ShieldAlert,
+    ShieldCheck,
+    UserRound,
+  } from "@lucide/svelte";
   import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
 
   import SettingsShell from "$lib/components/console/SettingsShell.svelte";
@@ -206,6 +214,10 @@
         <Button href="/account/security" variant="outline" class="w-full justify-start">
           <KeyRound class="size-4" />
           {$t(i18nKeys.console.authAccountSecurity.introTitle)}
+        </Button>
+        <Button href="/account/connections" variant="outline" class="w-full justify-start">
+          <Link2 class="size-4" />
+          {$t(i18nKeys.console.accountSettings.connectionsTitle)}
         </Button>
         <Button href="/account/sessions" variant="outline" class="w-full justify-start">
           <ShieldCheck class="size-4" />

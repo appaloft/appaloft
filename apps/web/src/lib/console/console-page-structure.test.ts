@@ -237,6 +237,10 @@ const accountSecurityPageSource = readFileSync(
   fileURLToPath(new URL("../../routes/account/security/+page.svelte", import.meta.url)),
   "utf8",
 );
+const accountConnectionsPageSource = readFileSync(
+  fileURLToPath(new URL("../../routes/account/connections/+page.svelte", import.meta.url)),
+  "utf8",
+);
 const accountSessionsPageSource = readFileSync(
   fileURLToPath(new URL("../../routes/account/sessions/+page.svelte", import.meta.url)),
   "utf8",
@@ -3200,11 +3204,22 @@ describe("console page structure", () => {
     assertDisplaySurfaceIsFormFree(profileSummarySource);
     assertDisplaySurfaceIsFormFree(accountSettingsHandoffSource);
     expect(accountSettingsHandoffSource).toContain('href="/account/security"');
+    expect(accountSettingsHandoffSource).toContain('href="/account/connections"');
     expect(accountSettingsHandoffSource).toContain('href="/account/sessions"');
     expect(accountSettingsHandoffSource).toContain('href="/account/danger-zone"');
     expect(profileDialogSource).toContain("<form");
     expect(profileDialogSource).toContain("<Input");
     expect(profileDialogSource).toContain('type="submit"');
+  });
+
+  test("[ACCOUNT-SETTINGS-IA-004] keeps provider linking inside the account connections page", () => {
+    expect(accountConnectionsPageSource).toContain("data-account-connections-summary");
+    expect(accountConnectionsPageSource).toContain("data-account-github-connection");
+    expect(accountConnectionsPageSource).toContain('activePath="/account/connections"');
+    expect(accountConnectionsPageSource).toContain("/api/auth/link-social");
+    expect(accountConnectionsPageSource).toContain("githubProvider?.accountLabel");
+    expect(accountConnectionsPageSource).toContain("linkGitHubAccount");
+    expect(consoleShellSource).not.toContain("/api/auth/link-social");
   });
 
   test("[ACCOUNT-SETTINGS-IA-002] keeps account security forms behind intent dialogs", () => {
