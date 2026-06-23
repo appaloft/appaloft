@@ -231,6 +231,20 @@ describe("deploy-action wrapper reference", () => {
         "#!/usr/bin/env bash",
         "set -euo pipefail",
         'printf "%s\\n" "$*" >> "$APPALOFT_TEST_BUN_LOG"',
+        'if [ "$1" = "install" ] && [ "${APPALOFT_TEST_BUN_FAIL_INSTALL_ONCE:-}" = "1" ]; then',
+        '  install_count_file="${APPALOFT_TEST_BUN_INSTALL_COUNT_FILE:-}"',
+        '  install_count="0"',
+        '  if [ -n "$install_count_file" ] && [ -f "$install_count_file" ]; then',
+        '    install_count="$(cat "$install_count_file")"',
+        "  fi",
+        '  if [ "$install_count" = "0" ]; then',
+        '    if [ -n "$install_count_file" ]; then',
+        '      printf "1" > "$install_count_file"',
+        "    fi",
+        '    echo "simulated transient install failure" >&2',
+        "    exit 1",
+        "  fi",
+        "fi",
         'if [ "$1" = "run" ] && [ "$2" = "package:deploy-cli-bundle" ]; then',
         '  out_dir=""',
         '  while [ "$#" -gt 0 ]; do',
@@ -255,6 +269,9 @@ describe("deploy-action wrapper reference", () => {
         APPALOFT_DEPLOY_ACTION_SOURCE_ROOT: sourceRoot,
         APPALOFT_TEST_BUN_LOG: bunLogPath,
         GITHUB_OUTPUT: outputPath,
+        APPALOFT_DEPLOY_ACTION_INSTALL_RETRY_DELAY_SECONDS: "0",
+        APPALOFT_TEST_BUN_FAIL_INSTALL_ONCE: "1",
+        APPALOFT_TEST_BUN_INSTALL_COUNT_FILE: join(workspace, "bun-install-count"),
         PATH: `${binDir}:${Bun.env.PATH ?? ""}`,
         RUNNER_TEMP: workspace,
         INPUT_VERSION: "source",
@@ -271,6 +288,7 @@ describe("deploy-action wrapper reference", () => {
       expect(output).toContain("source-binary-bundle/appaloft");
       const bunLog = readFileSync(bunLogPath, "utf8");
       expect(bunLog).toContain("install --frozen-lockfile");
+      expect(bunLog.match(/install --frozen-lockfile/g)?.length).toBe(2);
       expect(bunLog).toContain("run package:deploy-cli-bundle");
       expect(bunLog).toContain("--out-dir");
     } finally {

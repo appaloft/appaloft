@@ -11,6 +11,29 @@ error() {
   echo "::error::$*" >&2
 }
 
+retry_command() {
+  local label="$1"
+  shift
+  local max_attempts="${APPALOFT_DEPLOY_ACTION_INSTALL_RETRY_ATTEMPTS:-3}"
+  local delay_seconds="${APPALOFT_DEPLOY_ACTION_INSTALL_RETRY_DELAY_SECONDS:-5}"
+  local attempt
+  local status
+
+  for attempt in $(seq 1 "$max_attempts"); do
+    if "$@"; then
+      return 0
+    fi
+
+    status="$?"
+    if [ "$attempt" -eq "$max_attempts" ]; then
+      return "$status"
+    fi
+
+    echo "${label} failed on attempt ${attempt}/${max_attempts}; retrying..." >&2
+    sleep "$delay_seconds"
+  done
+}
+
 detect_target() {
   local os
   local arch
@@ -110,7 +133,7 @@ install_from_source() {
 
   (
     cd "$source_root"
-    bun install --frozen-lockfile
+    retry_command "bun install --frozen-lockfile" bun install --frozen-lockfile
     bun run package:deploy-cli-bundle -- --version "$source_version" --out-dir "$bundle_dir"
   )
 
