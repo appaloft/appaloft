@@ -3219,6 +3219,10 @@ describe("console page structure", () => {
   test("[ACCOUNT-SETTINGS-IA-004] keeps provider linking inside the account connections page", () => {
     expect(accountConnectionsPageSource).toContain("data-account-connections-summary");
     expect(accountConnectionsPageSource).toContain("data-account-github-connection");
+    expect(accountConnectionsPageSource).toContain("GitHubIcon");
+    expect(accountConnectionsPageSource).not.toContain(
+      'class="console-panel space-y-5 p-5" data-account-connections-summary',
+    );
     expect(accountConnectionsPageSource).toContain('activePath="/account/connections"');
     expect(accountConnectionsPageSource).toContain("/api/auth/link-social");
     expect(accountConnectionsPageSource).toContain("githubProvider?.accountLabel");

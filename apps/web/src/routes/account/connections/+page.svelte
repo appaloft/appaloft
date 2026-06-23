@@ -1,8 +1,9 @@
 <script lang="ts">
   import { browser } from "$app/environment";
-  import { GitBranch, Link2 } from "@lucide/svelte";
+  import { Link2 } from "@lucide/svelte";
 
   import { API_BASE, readErrorMessage, request } from "$lib/api/client";
+  import GitHubIcon from "$lib/components/console/GitHubIcon.svelte";
   import SettingsShell from "$lib/components/console/SettingsShell.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
@@ -99,66 +100,64 @@
     { label: $t(i18nKeys.console.accountSettings.connectionsTitle) },
   ]}
 >
-  <div class="mx-auto max-w-5xl space-y-6 p-4 md:p-6">
-    <section class="console-panel space-y-5 p-5" data-account-connections-summary>
-      <div class="flex items-start gap-3">
-        <div class="rounded-[calc(var(--radius-lg)-2px)] border bg-muted/30 p-2">
-          <Link2 class="size-5 text-primary" />
-        </div>
-        <div class="min-w-0 space-y-1">
-          <h1 class="text-lg font-semibold">{$t(i18nKeys.console.accountSettings.connectionsTitle)}</h1>
-          <p class="text-sm leading-6 text-muted-foreground">
-            {$t(i18nKeys.console.accountSettings.connectionsDescription)}
-          </p>
-        </div>
+  <section class="mx-auto max-w-5xl space-y-5 p-4 md:p-6" data-account-connections-summary>
+    <div class="flex items-start gap-3">
+      <div class="rounded-[calc(var(--radius-lg)-2px)] border bg-muted/30 p-2">
+        <Link2 class="size-5 text-primary" />
       </div>
+      <div class="min-w-0 space-y-1">
+        <h1 class="text-lg font-semibold">{$t(i18nKeys.console.accountSettings.connectionsTitle)}</h1>
+        <p class="text-sm leading-6 text-muted-foreground">
+          {$t(i18nKeys.console.accountSettings.connectionsDescription)}
+        </p>
+      </div>
+    </div>
 
-      {#if authSessionQuery.isLoading}
-        <div class="rounded-[calc(var(--radius-lg)-2px)] border bg-muted/30 p-4 text-sm text-muted-foreground">
-          {$t(i18nKeys.common.status.loading)}
-        </div>
-      {:else}
-        <div
-          class="flex flex-col gap-4 rounded-[calc(var(--radius-lg)-2px)] border bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between"
-          data-account-github-connection
-        >
-          <div class="flex min-w-0 items-start gap-3">
-            <div class="rounded-md border bg-card p-2">
-              <GitBranch class="size-4 text-muted-foreground" />
-            </div>
-            <div class="min-w-0 space-y-1">
-              <div class="flex flex-wrap items-center gap-2">
-                <h2 class="text-sm font-semibold">
-                  {$t(i18nKeys.console.accountSettings.githubAccountTitle)}
-                </h2>
-                <Badge variant={githubConnected ? "outline" : "secondary"}>
-                  {githubConnected
-                    ? $t(i18nKeys.common.status.connected)
-                    : githubConfigured
-                      ? $t(i18nKeys.common.status.pendingAuthorization)
-                      : $t(i18nKeys.common.status.notConfigured)}
-                </Badge>
-              </div>
-              <p class="break-words text-sm text-muted-foreground">{githubConnectionSummary}</p>
-            </div>
+    {#if authSessionQuery.isLoading}
+      <div class="rounded-[calc(var(--radius-lg)-2px)] border bg-muted/30 p-4 text-sm text-muted-foreground">
+        {$t(i18nKeys.common.status.loading)}
+      </div>
+    {:else}
+      <div
+        class="flex flex-col gap-4 rounded-[calc(var(--radius-lg)-2px)] border bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between"
+        data-account-github-connection
+      >
+        <div class="flex min-w-0 items-start gap-3">
+          <div class="rounded-md border bg-card p-2">
+            <GitHubIcon class="size-4 text-foreground" />
           </div>
-          <Button type="button" class="w-fit shrink-0" disabled={!canLinkGitHub} onclick={connectGitHub}>
-            <GitBranch class="size-4" />
-            {linkingGitHub
-              ? $t(i18nKeys.console.accountSettings.linkingGitHubAccount)
-              : githubConnected
-                ? $t(i18nKeys.common.status.connected)
-                : $t(i18nKeys.console.accountSettings.linkGitHubAccount)}
-          </Button>
+          <div class="min-w-0 space-y-1">
+            <div class="flex flex-wrap items-center gap-2">
+              <h2 class="text-sm font-semibold">
+                {$t(i18nKeys.console.accountSettings.githubAccountTitle)}
+              </h2>
+              <Badge variant={githubConnected ? "outline" : "secondary"}>
+                {githubConnected
+                  ? $t(i18nKeys.common.status.connected)
+                  : githubConfigured
+                    ? $t(i18nKeys.common.status.pendingAuthorization)
+                    : $t(i18nKeys.common.status.notConfigured)}
+              </Badge>
+            </div>
+            <p class="break-words text-sm text-muted-foreground">{githubConnectionSummary}</p>
+          </div>
         </div>
-      {/if}
+        <Button type="button" class="w-fit shrink-0" disabled={!canLinkGitHub} onclick={connectGitHub}>
+          <GitHubIcon class="size-4" />
+          {linkingGitHub
+            ? $t(i18nKeys.console.accountSettings.linkingGitHubAccount)
+            : githubConnected
+              ? $t(i18nKeys.common.status.connected)
+              : $t(i18nKeys.console.accountSettings.linkGitHubAccount)}
+        </Button>
+      </div>
+    {/if}
 
-      {#if operationError}
-        <div class="rounded-[calc(var(--radius-lg)-2px)] border border-destructive/30 bg-destructive/5 p-4 text-sm">
-          <p class="font-medium text-destructive">{$t(i18nKeys.console.accountSettings.operationFailed)}</p>
-          <p class="mt-1.5 break-words text-muted-foreground">{operationError}</p>
-        </div>
-      {/if}
-    </section>
-  </div>
+    {#if operationError}
+      <div class="rounded-[calc(var(--radius-lg)-2px)] border border-destructive/30 bg-destructive/5 p-4 text-sm">
+        <p class="font-medium text-destructive">{$t(i18nKeys.console.accountSettings.operationFailed)}</p>
+        <p class="mt-1.5 break-words text-muted-foreground">{operationError}</p>
+      </div>
+    {/if}
+  </section>
 </SettingsShell>
