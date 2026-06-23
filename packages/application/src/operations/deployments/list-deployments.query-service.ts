@@ -17,6 +17,7 @@ export class ListDeploymentsQueryService {
       projectId?: string;
       resourceId?: string;
       includeArchived?: boolean;
+      activeResourcesOnly?: boolean;
       limit?: number;
     },
   ): Promise<{ items: Awaited<ReturnType<DeploymentReadModel["list"]>> }> {
@@ -24,6 +25,9 @@ export class ListDeploymentsQueryService {
       ...(input?.projectId ? { projectId: input.projectId } : {}),
       ...(input?.resourceId ? { resourceId: input.resourceId } : {}),
       ...(input?.includeArchived !== undefined ? { includeArchived: input.includeArchived } : {}),
+      ...(input?.activeResourcesOnly !== undefined
+        ? { activeResourcesOnly: input.activeResourcesOnly }
+        : {}),
       limit: boundedListLimit(input?.limit),
     });
 

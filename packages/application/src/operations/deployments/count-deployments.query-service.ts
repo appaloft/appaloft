@@ -20,6 +20,9 @@ export class CountDeploymentsQueryService {
         ...(query?.projectId ? { projectId: query.projectId } : {}),
         ...(query?.resourceId ? { resourceId: query.resourceId } : {}),
         ...(query?.includeArchived !== undefined ? { includeArchived: query.includeArchived } : {}),
+        ...(query?.activeResourcesOnly !== undefined
+          ? { activeResourcesOnly: query.activeResourcesOnly }
+          : {}),
         ...(query?.status ? { status: query.status } : {}),
         ...(query?.statuses?.length ? { statuses: query.statuses } : {}),
       }),

@@ -5,6 +5,7 @@ import { CountDependencyResourcesQuery } from "../src/operations/dependency-reso
 import { CountDependencyResourcesQueryService } from "../src/operations/dependency-resources/count-dependency-resources.query-service";
 import { CountDeploymentsQuery } from "../src/operations/deployments/count-deployments.query";
 import { CountDeploymentsQueryService } from "../src/operations/deployments/count-deployments.query-service";
+import { ListDeploymentsQueryService } from "../src/operations/deployments/list-deployments.query-service";
 import { CountEnvironmentsQuery } from "../src/operations/environments/count-environments.query";
 import { CountEnvironmentsQueryService } from "../src/operations/environments/count-environments.query-service";
 import { CountProjectsQueryService } from "../src/operations/projects/count-projects.query-service";
@@ -89,7 +90,7 @@ describe("read model count queries", () => {
     await expect(
       new CountDeploymentsQueryService(deployments).execute(
         context,
-        new CountDeploymentsQuery(undefined, undefined, false, undefined, ["running"]),
+        new CountDeploymentsQuery(undefined, undefined, false, false, undefined, ["running"]),
       ),
     ).resolves.toEqual({ count: 7 });
   });
@@ -108,13 +109,44 @@ describe("read model count queries", () => {
 
     await new CountDeploymentsQueryService(deployments).execute(
       context,
-      new CountDeploymentsQuery("prj_demo", undefined, false, undefined, ["created", "running"]),
+      new CountDeploymentsQuery("prj_demo", undefined, false, true, undefined, [
+        "created",
+        "running",
+      ]),
     );
 
     expect(capturedInput).toEqual({
       projectId: "prj_demo",
       includeArchived: false,
+      activeResourcesOnly: true,
       statuses: ["created", "running"],
+    });
+  });
+
+  test("[READ-MODEL-COUNT-003] deployment list query can require active resources at the read model boundary", async () => {
+    let capturedInput: Parameters<DeploymentReadModel["list"]>[1];
+    const deployments: DeploymentReadModel = {
+      count: async () => 0,
+      list: async (_context: RepositoryContext, input) => {
+        capturedInput = input;
+        return [];
+      },
+      findOne: async () => null,
+      findTimeline: async () => [],
+    };
+
+    await new ListDeploymentsQueryService(deployments).execute(context, {
+      projectId: "prj_demo",
+      includeArchived: false,
+      activeResourcesOnly: true,
+      limit: 25,
+    });
+
+    expect(capturedInput).toEqual({
+      projectId: "prj_demo",
+      includeArchived: false,
+      activeResourcesOnly: true,
+      limit: 25,
     });
   });
 });

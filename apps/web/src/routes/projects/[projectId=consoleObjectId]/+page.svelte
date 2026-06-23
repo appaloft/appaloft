@@ -176,7 +176,6 @@
     serversQuery,
     environmentsQuery,
     resourcesQuery,
-    deploymentsQuery,
     domainBindingsQuery,
   } =
     createConsoleQueries(browser, {
@@ -184,6 +183,7 @@
       readiness: false,
       version: false,
       previewEnvironments: false,
+      deployments: false,
       certificates: false,
       providers: false,
     });
@@ -266,18 +266,29 @@
       refetchInterval: 5_000,
     }),
   );
+  const projectDeploymentsQuery = createQuery(() =>
+    orpc.deployments.list.queryOptions({
+      input: {
+        projectId,
+        activeResourcesOnly: true,
+        limit: 100,
+      },
+      enabled: browser && projectId.length > 0,
+      staleTime: 5_000,
+    }),
+  );
   const projects = $derived(projectsQuery.data?.items ?? []);
   const servers = $derived(serversQuery.data?.items ?? []);
   const environments = $derived(environmentsQuery.data?.items ?? []);
   const resources = $derived(resourcesQuery.data?.items ?? []);
-  const deployments = $derived(deploymentsQuery.data?.items ?? []);
+  const deployments = $derived(projectDeploymentsQuery.data?.items ?? []);
   const domainBindings = $derived(domainBindingsQuery.data?.items ?? []);
   const pageLoading = $derived(
     projectsQuery.isPending ||
       environmentsQuery.isPending ||
       resourcesQuery.isPending ||
       domainBindingsQuery.isPending ||
-      deploymentsQuery.isPending ||
+      projectDeploymentsQuery.isPending ||
       projectDetailQuery.isPending,
   );
   const project = $derived(projectDetailQuery.data ?? findProject(projects, projectId));

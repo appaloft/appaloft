@@ -483,6 +483,28 @@ describe("pglite deployment repository", () => {
     const legacyLogs = await deploymentReadModel.findTimeline(context, "dep_active");
     expect(legacyLogs[0]?.source).toBe("appaloft");
 
+    await database.db
+      .updateTable("resources")
+      .set({ lifecycle_status: "deleted" })
+      .where("id", "=", "res_repo")
+      .execute();
+
+    const historicalDeploymentCount = await deploymentReadModel.count(context, {
+      projectId: "prj_repo",
+    });
+    const currentResourceDeploymentCount = await deploymentReadModel.count(context, {
+      projectId: "prj_repo",
+      activeResourcesOnly: true,
+    });
+    const currentResourceDeployments = await deploymentReadModel.list(context, {
+      projectId: "prj_repo",
+      activeResourcesOnly: true,
+    });
+
+    expect(historicalDeploymentCount).toBeGreaterThan(0);
+    expect(currentResourceDeploymentCount).toBe(0);
+    expect(currentResourceDeployments).toEqual([]);
+
     await database.close();
   });
 

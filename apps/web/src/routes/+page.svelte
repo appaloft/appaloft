@@ -102,7 +102,7 @@
   );
   const deploymentsQuery = createQuery(() =>
     orpc.deployments.list.queryOptions({
-      input: { limit: homeDeploymentListLimit },
+      input: { activeResourcesOnly: true, limit: homeDeploymentListLimit },
       enabled: productQueryEnabled,
       refetchInterval: 10_000,
     }),
@@ -123,14 +123,14 @@
   );
   const activeDeploymentCountQuery = createQuery(() =>
     orpc.deployments.count.queryOptions({
-      input: { statuses: activeDeploymentStatuses },
+      input: { activeResourcesOnly: true, statuses: activeDeploymentStatuses },
       enabled: productQueryEnabled,
       refetchInterval: 10_000,
     }),
   );
   const failedDeploymentCountQuery = createQuery(() =>
     orpc.deployments.count.queryOptions({
-      input: { status: "failed" },
+      input: { activeResourcesOnly: true, status: "failed" },
       enabled: productQueryEnabled,
       refetchInterval: 10_000,
     }),

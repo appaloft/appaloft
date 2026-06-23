@@ -9122,6 +9122,7 @@ export interface DeploymentReadModel {
       projectId?: string;
       resourceId?: string;
       includeArchived?: boolean;
+      activeResourcesOnly?: boolean;
       status?: DeploymentStatus;
       statuses?: readonly DeploymentStatus[];
     },
@@ -9132,6 +9133,7 @@ export interface DeploymentReadModel {
       projectId?: string;
       resourceId?: string;
       includeArchived?: boolean;
+      activeResourcesOnly?: boolean;
       limit?: number;
     },
   ): Promise<DeploymentSummary[]>;
