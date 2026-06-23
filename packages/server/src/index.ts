@@ -672,56 +672,6 @@ function configurePublicAuditLogConsoleExtension(input: {
             "/audit-log/console-page?aggregateId={resourceId}&basePath={pathname}&query={query}",
         },
       },
-      {
-        key: "appaloft-audit-log.project-detail",
-        title: "Audit Log",
-        localizations: {
-          "zh-CN": {
-            title: "审计日志",
-            description: "打开当前项目相关的审计日志。",
-          },
-          "en-US": {
-            title: "Audit Log",
-            description: "Open audit events related to the current project.",
-          },
-        },
-        description: "Open audit events related to the current project.",
-        icon: "shield",
-        path: "/projects",
-        placement: "project-detail-panel",
-        target: "console-route",
-        requiresAuth: true,
-        metadata: {
-          renderer: "console-page",
-          pageEndpoint:
-            "/audit-log/scope-panel?projectId={projectId}&basePath={pathname}%2Faudit-log",
-        },
-      },
-      {
-        key: "appaloft-audit-log.resource-detail",
-        title: "Audit Log",
-        localizations: {
-          "zh-CN": {
-            title: "审计日志",
-            description: "打开当前资源相关的审计日志。",
-          },
-          "en-US": {
-            title: "Audit Log",
-            description: "Open audit events related to the current resource.",
-          },
-        },
-        description: "Open audit events related to the current resource.",
-        icon: "shield",
-        path: "/resources",
-        placement: "resource-detail-panel",
-        target: "console-route",
-        requiresAuth: true,
-        metadata: {
-          renderer: "console-page",
-          pageEndpoint:
-            "/audit-log/scope-panel?resourceId={resourceId}&basePath={pathname}%2Faudit-log",
-        },
-      },
     );
   }
 
@@ -733,6 +683,7 @@ function configurePublicAuditLogConsoleExtension(input: {
     method: "GET",
     path: "/audit-log/console-page",
     handle: async ({ request, query }) => {
+      const sourcePageQuery = stringQuery(query, "query");
       const pageQuery = consolePageQuery(query);
       const locale = resolveAppaloftLocaleFromHeaders(request.headers);
       const t = createAppaloftTranslator({ locale });
@@ -755,6 +706,7 @@ function configurePublicAuditLogConsoleExtension(input: {
       const cursor = stringQuery(pageQuery, "cursor");
       const cursorStack = stringQueries(pageQuery, "cursorStack");
       const basePath = stringQuery(pageQuery, "basePath") ?? "/audit-log";
+      const baseQuery = auditLogBaseQuery(sourcePageQuery);
       const pageLimit = 10;
       const auditQuery = ExportGlobalAuditEventsQuery.create({
         from: from.toISOString(),
@@ -796,6 +748,7 @@ function configurePublicAuditLogConsoleExtension(input: {
             activeActions: actions,
             activeActorIds: actorIds,
             basePath,
+            baseQuery,
           } satisfies AuditLogFilterState;
           const pagination = auditLogPagination({
             ...(cursor ? { cursor } : {}),
@@ -830,43 +783,6 @@ function configurePublicAuditLogConsoleExtension(input: {
       );
     },
   });
-  input.http.routes.push({
-    method: "GET",
-    path: "/audit-log/scope-panel",
-    handle: ({ request, query }) => {
-      const locale = resolveAppaloftLocaleFromHeaders(request.headers);
-      const t = createAppaloftTranslator({ locale });
-      const basePath = stringQuery(query, "basePath");
-      const projectId = stringQuery(query, "projectId");
-      const resourceId = stringQuery(query, "resourceId");
-      if (!basePath || (!projectId && !resourceId)) {
-        return {
-          schemaVersion: "appaloft.console.extension-page/v1",
-          title: t(i18nKeys.console.auditLog.title),
-          description: t(i18nKeys.console.auditLog.unavailableDescription),
-          badge: t(i18nKeys.console.auditLog.unavailableBadge),
-          sections: [],
-        };
-      }
-
-      return {
-        schemaVersion: "appaloft.console.extension-page/v1",
-        title: t(i18nKeys.console.auditLog.title),
-        description: t(i18nKeys.console.auditLog.description),
-        collapsedByDefault: true,
-        expandLabel: t(i18nKeys.common.actions.viewAll),
-        collapseLabel: t(i18nKeys.common.actions.close),
-        actions: [
-          {
-            label: t(i18nKeys.console.auditLog.title),
-            href: basePath,
-            variant: "secondary",
-          },
-        ],
-        sections: [],
-      };
-    },
-  });
 }
 
 function createPublicAuditLogConsoleServerExtension(input: {
@@ -895,6 +811,7 @@ type AuditLogFilterState = {
   activeActions: readonly string[];
   activeActorIds: readonly string[];
   basePath: string;
+  baseQuery: string;
 };
 
 function auditLogConsolePage(
@@ -1139,7 +1056,7 @@ function auditLogHref(
   input: AuditLogFilterState,
   page?: { cursor?: string; cursorStack?: readonly string[] },
 ): string {
-  const query = new URLSearchParams();
+  const query = new URLSearchParams(input.baseQuery);
   if (input.activeRange === "7d") {
     query.set("range", "7d");
   }
@@ -1161,6 +1078,26 @@ function auditLogHref(
   const serialized = query.toString();
   const basePath = input.basePath || "/audit-log";
   return serialized ? `${basePath}?${serialized}` : basePath;
+}
+
+const auditLogOwnedQueryKeys = new Set([
+  "range",
+  "resourceType",
+  "action",
+  "actorId",
+  "cursor",
+  "cursorStack",
+]);
+
+function auditLogBaseQuery(serializedQuery: string | undefined): string {
+  const source = new URLSearchParams(serializedQuery ?? "");
+  const preserved = new URLSearchParams();
+  for (const [key, value] of source.entries()) {
+    if (!auditLogOwnedQueryKeys.has(key)) {
+      preserved.append(key, value);
+    }
+  }
+  return preserved.toString();
 }
 
 function toggleFilterValue(values: readonly string[], value: string): readonly string[] {

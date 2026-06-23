@@ -224,10 +224,15 @@ describe("Console page extension surface", () => {
     expect(panelHostSource).toContain("togglePanel(result)");
     expect(panelHostSource).toContain("runRequestAction(action, item)");
     expect(panelHostSource).toContain("data-console-extension-panel-host");
-    expect(projectPageSource).toContain('placement="project-detail-panel"');
     expect(projectPageSource).toContain('placement="project-environment-panel"');
+    expect(projectPageSource).toContain('"audit-log"');
+    expect(projectPageSource).toContain("visibleProjectDetailTabs");
+    expect(projectPageSource).toContain("<ConsoleExtensionPage {projectId} />");
     expect(projectPageSource).toContain("environmentId={environment.id}");
     expect(resourcePageSource).toContain('placement="resource-detail-panel"');
+    expect(resourcePageSource).toContain('"audit-log"');
+    expect(resourcePageSource).toContain("visibleResourceDetailTabs");
+    expect(resourcePageSource).toContain("<ConsoleExtensionPage");
     expect(resourcePageSource).toContain("projectId={resourceProjectId}");
     expect(resourcePageSource).toContain("environmentId={resourceEnvironmentId}");
   });

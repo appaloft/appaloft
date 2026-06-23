@@ -396,19 +396,11 @@ describe("createAppaloftServer", () => {
             }),
           }),
           expect.objectContaining({
-            key: "appaloft-audit-log.project-detail",
-            path: "/projects",
-            placement: "project-detail-panel",
-            metadata: expect.objectContaining({
-              pageEndpoint: expect.stringContaining("/audit-log/scope-panel"),
-            }),
-          }),
-          expect.objectContaining({
-            key: "appaloft-audit-log.resource-detail",
+            key: "appaloft-audit-log.resource-route",
             path: "/resources",
-            placement: "resource-detail-panel",
+            placement: "route",
             metadata: expect.objectContaining({
-              pageEndpoint: expect.stringContaining("resourceId={resourceId}"),
+              pageEndpoint: expect.stringContaining("aggregateId={resourceId}"),
             }),
           }),
         ]),
@@ -442,27 +434,6 @@ describe("createAppaloftServer", () => {
       });
       expect(JSON.stringify(zhPage)).toContain("审计");
       expect(JSON.stringify(zhPage)).not.toContain("Audit events");
-
-      const scopePanelResponse = await server.httpApp.handle(
-        new Request(
-          "http://localhost/audit-log/scope-panel?projectId=prj_console_scope&basePath=%2Fprojects%2Fprj_console_scope%2Faudit-log",
-          {
-            headers: {
-              "x-appaloft-locale": "zh-CN",
-            },
-          },
-        ),
-      );
-      expect(scopePanelResponse.status).toBe(200);
-      await expect(scopePanelResponse.json()).resolves.toMatchObject({
-        schemaVersion: "appaloft.console.extension-page/v1",
-        title: "审计日志",
-        actions: [
-          expect.objectContaining({
-            href: "/projects/prj_console_scope/audit-log",
-          }),
-        ],
-      });
     } finally {
       await server.shutdown();
     }
@@ -712,6 +683,21 @@ describe("createAppaloftServer", () => {
       expect(scopedTableSection.rows).toHaveLength(2);
       expect(JSON.stringify(scopedPage)).toContain(
         "/projects/prj_console_filter/audit-log?resourceType=resource",
+      );
+      const tabScopedPageResponse = await server.httpApp.handle(
+        new Request(
+          "http://localhost/audit-log/console-page?projectId=prj_console_filter&basePath=%2Fprojects%2Fprj_console_filter&query=tab%3Daudit-log",
+          {
+            headers: {
+              "x-appaloft-locale": "zh-CN",
+            },
+          },
+        ),
+      );
+      expect(tabScopedPageResponse.status).toBe(200);
+      const tabScopedPage = await tabScopedPageResponse.json();
+      expect(JSON.stringify(tabScopedPage)).toContain(
+        "/projects/prj_console_filter?tab=audit-log&resourceType=resource",
       );
 
       const resourceScopedPageResponse = await server.httpApp.handle(
