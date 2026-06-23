@@ -679,33 +679,43 @@ function configurePublicAuditLogConsoleExtension(input: {
         .catch((error: unknown) => err(error));
 
       return result.match(
-        (readback) =>
-          auditLogConsolePage({
+        (readback) => {
+          const events = readback.items.toSorted((left, right) =>
+            right.createdAt.localeCompare(left.createdAt),
+          );
+          const filterState = {
             activeRange: range === "7d" ? "7d" : "30d",
-            ...(resourceType ? { activeResourceType: resourceType } : {}),
+            activeResourceType: resourceType,
+            activeAction: action,
+            activeActorId: actorId,
+          } satisfies AuditLogFilterState;
+
+          return auditLogConsolePage({
+            ...filterState,
             t,
-            events: readback.items
-              .toSorted((left, right) => right.createdAt.localeCompare(left.createdAt))
-              .map((event) => ({
-                id: event.auditEventId,
-                time: event.createdAt,
-                actor:
-                  auditPayloadString(event.payload, ["actorLabel", "actor", "actorId", "userId"]) ??
-                  "-",
-                action: auditActionLabel(
-                  t,
-                  auditPayloadString(event.payload, ["operationKey", "action"]) ?? event.eventType,
-                ),
-                resource:
-                  auditResourceLabel(event.payload) ??
-                  auditPayloadString(event.payload, ["resourceId"]) ??
-                  event.aggregateId,
-                result: auditResultLabel(
-                  t,
-                  auditPayloadString(event.payload, ["result", "outcome", "status"]) ?? "recorded",
-                ),
-              })),
-          }),
+            actionFilters: auditLogActionFilters(events, filterState, t),
+            actorFilters: auditLogActorFilters(events, filterState, t),
+            events: events.map((event) => ({
+              id: event.auditEventId,
+              time: event.createdAt,
+              actor:
+                auditPayloadString(event.payload, ["actorLabel", "actor", "actorId", "userId"]) ??
+                "-",
+              action: auditActionLabel(
+                t,
+                auditPayloadString(event.payload, ["operationKey", "action"]) ?? event.eventType,
+              ),
+              resource:
+                auditResourceLabel(event.payload) ??
+                auditPayloadString(event.payload, ["resourceId"]) ??
+                event.aggregateId,
+              result: auditResultLabel(
+                t,
+                auditPayloadString(event.payload, ["result", "outcome", "status"]) ?? "recorded",
+              ),
+            })),
+          });
+        },
         (error) => auditLogConsoleErrorPage(t, errorMessage(t, error)),
       );
     },
@@ -732,19 +742,28 @@ function createPublicAuditLogConsoleServerExtension(input: {
   };
 }
 
-function auditLogConsolePage(input: {
+type AuditLogFilterState = {
   activeRange: "7d" | "30d";
-  activeResourceType?: string;
-  t: AppaloftTranslate;
-  events: Array<{
-    id: string;
-    time: string;
-    actor: string;
-    action: string;
-    resource: string;
-    result: string;
-  }>;
-}): Record<string, unknown> {
+  activeResourceType: string | undefined;
+  activeAction: string | undefined;
+  activeActorId: string | undefined;
+};
+
+function auditLogConsolePage(
+  input: AuditLogFilterState & {
+    actionFilters: ReturnType<typeof auditLogActionFilters>;
+    actorFilters: ReturnType<typeof auditLogActorFilters>;
+    t: AppaloftTranslate;
+    events: Array<{
+      id: string;
+      time: string;
+      actor: string;
+      action: string;
+      resource: string;
+      result: string;
+    }>;
+  },
+): Record<string, unknown> {
   const { t } = input;
 
   return {
@@ -760,22 +779,19 @@ function auditLogConsolePage(input: {
         filters: [
           {
             label: t(i18nKeys.console.auditLog.timeRange),
-            items: [
-              {
-                label: t(i18nKeys.console.auditLog.last30Days),
-                href: "/audit-log",
-                active: input.activeRange === "30d",
-              },
-              {
-                label: t(i18nKeys.console.auditLog.last7Days),
-                href: "/audit-log?range=7d",
-                active: input.activeRange === "7d",
-              },
-            ],
+            items: auditLogRangeFilters(input, t),
           },
           {
             label: t(i18nKeys.console.auditLog.resourceType),
-            items: auditLogResourceTypeFilters(input.activeRange, input.activeResourceType, t),
+            items: auditLogResourceTypeFilters(input, t),
+          },
+          {
+            label: t(i18nKeys.console.auditLog.actionFilter),
+            items: input.actionFilters,
+          },
+          {
+            label: t(i18nKeys.console.auditLog.actorFilter),
+            items: input.actorFilters,
           },
         ],
         columns: [
@@ -801,40 +817,125 @@ function auditLogConsolePage(input: {
   };
 }
 
-function auditLogResourceTypeFilters(
-  activeRange: "7d" | "30d",
-  activeResourceType: string | undefined,
-  t: AppaloftTranslate,
-) {
+function auditLogRangeFilters(filterState: AuditLogFilterState, t: AppaloftTranslate) {
+  return [
+    {
+      label: t(i18nKeys.console.auditLog.last30Days),
+      href: auditLogHref({ ...filterState, activeRange: "30d" }),
+      active: filterState.activeRange === "30d",
+    },
+    {
+      label: t(i18nKeys.console.auditLog.last7Days),
+      href: auditLogHref({ ...filterState, activeRange: "7d" }),
+      active: filterState.activeRange === "7d",
+    },
+  ];
+}
+
+function auditLogResourceTypeFilters(filterState: AuditLogFilterState, t: AppaloftTranslate) {
   const resourceTypes = [
     { value: undefined, label: t(i18nKeys.console.auditLog.allResourceTypes) },
-    { value: "project", label: "Project" },
-    { value: "resource", label: "Resource" },
-    { value: "deployment", label: "Deployment" },
-    { value: "dependency_resource", label: "Dependency resource" },
-    { value: "domain_binding", label: "Domain binding" },
-    { value: "server", label: "Server" },
-    { value: "static_artifact", label: "Static artifact" },
-    { value: "storage_volume", label: "Storage volume" },
+    { value: "project", label: t(i18nKeys.console.auditLog.resourceTypes.project) },
+    { value: "resource", label: t(i18nKeys.console.auditLog.resourceTypes.resource) },
+    { value: "deployment", label: t(i18nKeys.console.auditLog.resourceTypes.deployment) },
+    {
+      value: "dependency_resource",
+      label: t(i18nKeys.console.auditLog.resourceTypes.dependencyResource),
+    },
+    { value: "domain_binding", label: t(i18nKeys.console.auditLog.resourceTypes.domainBinding) },
+    { value: "server", label: t(i18nKeys.console.auditLog.resourceTypes.server) },
+    { value: "static_artifact", label: t(i18nKeys.console.auditLog.resourceTypes.staticArtifact) },
+    { value: "storage_volume", label: t(i18nKeys.console.auditLog.resourceTypes.storageVolume) },
   ];
 
   return resourceTypes.map((item) => ({
     label: item.label,
     href: auditLogHref({
-      range: activeRange,
-      ...(item.value ? { resourceType: item.value } : {}),
+      ...filterState,
+      activeResourceType: item.value,
     }),
-    active: activeResourceType === item.value || (!activeResourceType && !item.value),
+    active:
+      filterState.activeResourceType === item.value ||
+      (!filterState.activeResourceType && !item.value),
   }));
 }
 
-function auditLogHref(input: { range: "7d" | "30d"; resourceType?: string }): string {
+function auditLogActionFilters(
+  events: readonly { eventType: string; payload: Record<string, unknown> }[],
+  filterState: AuditLogFilterState,
+  t: AppaloftTranslate,
+) {
+  const actions = new Set<string>();
+  for (const event of events) {
+    const action = auditPayloadString(event.payload, ["action"]) ?? event.eventType;
+    if (action) {
+      actions.add(action);
+    }
+  }
+  if (filterState.activeAction) {
+    actions.add(filterState.activeAction);
+  }
+
+  return [
+    {
+      label: t(i18nKeys.console.auditLog.allActions),
+      href: auditLogHref({ ...filterState, activeAction: undefined }),
+      active: !filterState.activeAction,
+    },
+    ...Array.from(actions)
+      .sort()
+      .map((action) => ({
+        label: auditActionLabel(t, action),
+        href: auditLogHref({ ...filterState, activeAction: action }),
+        active: filterState.activeAction === action,
+      })),
+  ];
+}
+
+function auditLogActorFilters(
+  events: readonly { payload: Record<string, unknown> }[],
+  filterState: AuditLogFilterState,
+  t: AppaloftTranslate,
+) {
+  const actors = new Map<string, string>();
+  for (const event of events) {
+    const actorId = auditPayloadString(event.payload, ["actorId", "userId"]);
+    if (!actorId) {
+      continue;
+    }
+    actors.set(actorId, auditPayloadString(event.payload, ["actorLabel", "actor"]) ?? actorId);
+  }
+  if (filterState.activeActorId && !actors.has(filterState.activeActorId)) {
+    actors.set(filterState.activeActorId, filterState.activeActorId);
+  }
+
+  return [
+    {
+      label: t(i18nKeys.console.auditLog.allActors),
+      href: auditLogHref({ ...filterState, activeActorId: undefined }),
+      active: !filterState.activeActorId,
+    },
+    ...Array.from(actors.entries()).map(([actorId, label]) => ({
+      label,
+      href: auditLogHref({ ...filterState, activeActorId: actorId }),
+      active: filterState.activeActorId === actorId,
+    })),
+  ];
+}
+
+function auditLogHref(input: AuditLogFilterState): string {
   const query = new URLSearchParams();
-  if (input.range === "7d") {
+  if (input.activeRange === "7d") {
     query.set("range", "7d");
   }
-  if (input.resourceType) {
-    query.set("resourceType", input.resourceType);
+  if (input.activeResourceType) {
+    query.set("resourceType", input.activeResourceType);
+  }
+  if (input.activeAction) {
+    query.set("action", input.activeAction);
+  }
+  if (input.activeActorId) {
+    query.set("actorId", input.activeActorId);
   }
   const serialized = query.toString();
   return serialized ? `/audit-log?${serialized}` : "/audit-log";
@@ -878,6 +979,32 @@ function errorMessage(t: AppaloftTranslate, error: unknown): string {
 
 function auditActionLabel(t: AppaloftTranslate, eventType: string): string {
   switch (eventType) {
+    case "create":
+      return t(i18nKeys.console.auditLog.actionFilters.create);
+    case "archive":
+      return t(i18nKeys.console.auditLog.actionFilters.archive);
+    case "restore":
+      return t(i18nKeys.console.auditLog.actionFilters.restore);
+    case "delete":
+      return t(i18nKeys.console.auditLog.actionFilters.delete);
+    case "rename":
+      return t(i18nKeys.console.auditLog.actionFilters.rename);
+    case "publish":
+      return t(i18nKeys.console.auditLog.actionFilters.publish);
+    case "retry":
+      return t(i18nKeys.console.auditLog.actionFilters.retry);
+    case "redeploy":
+      return t(i18nKeys.console.auditLog.actionFilters.redeploy);
+    case "rollback":
+      return t(i18nKeys.console.auditLog.actionFilters.rollback);
+    case "cancel":
+      return t(i18nKeys.console.auditLog.actionFilters.cancel);
+    case "set-variable":
+      return t(i18nKeys.console.auditLog.actionFilters.setVariable);
+    case "deployment-succeeded":
+      return t(i18nKeys.console.auditLog.actionFilters.succeeded);
+    case "deployment-failed":
+      return t(i18nKeys.console.auditLog.actionFilters.failed);
     case "projects.create":
       return t(i18nKeys.console.auditLog.actions.projectsCreate);
     case "projects.archive":

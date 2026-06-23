@@ -80,6 +80,9 @@ const relatedTargetFields: Record<string, string> = {
   storageVolumeId: "storage_volume",
 };
 
+const secretLikeKeyPattern =
+  /(authorization|certificate|credential|env|password|payload|private|secret|signature|token|value)/i;
+
 function LifecycleEventHandler(eventType: (typeof lifecycleEventTypes)[number]) {
   return EventHandler(eventType);
 }
@@ -245,9 +248,10 @@ function compactAuditPayload(
 ): Record<string, AuditEventPayloadValue> {
   const payload: Record<string, AuditEventPayloadValue> = {};
   for (const [key, value] of Object.entries(input)) {
-    if (value !== undefined) {
-      payload[key] = value;
+    if (value === undefined || secretLikeKeyPattern.test(key)) {
+      continue;
     }
+    payload[key] = value;
   }
   return payload;
 }

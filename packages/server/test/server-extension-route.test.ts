@@ -8,6 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   type AppQuery,
+  type AuditEventRecorder,
   type CommandBus,
   type ExecutionContext,
   type OperationCheckRequest,
@@ -19,6 +20,7 @@ import {
   type TerminalSession,
   type TerminalSessionGateway,
   tokens,
+  toRepositoryContext,
 } from "@appaloft/application";
 import { type AuthRuntime } from "@appaloft/auth-better";
 import { ok } from "@appaloft/core";
@@ -461,6 +463,88 @@ describe("createAppaloftServer", () => {
         schemaVersion: "appaloft.console.extension-page/v1",
         title: "Audit Log",
       });
+    } finally {
+      await server.shutdown();
+    }
+  }, 45_000);
+
+  test("[AUDIT-LOG-CONSOLE-003] renders time, resource, action, and actor filters from audit rows", async () => {
+    const dataDir = await createTempDataDir();
+    const server = await createAppaloftServer({
+      flags: {
+        appVersion: "0.1.0-test",
+        authProvider: "none",
+        dataDir,
+        docsStaticDir: "",
+        httpPort: 0,
+        pgliteDataDir: join(dataDir, "pglite"),
+        webStaticDir: "",
+      },
+    });
+
+    try {
+      const recorder = server.container.resolve(tokens.auditEventRecorder) as AuditEventRecorder;
+      const recorded = await recorder.record(
+        toRepositoryContext(server.executionContextFactory.create({ entrypoint: "system" })),
+        {
+          id: "aud_console_filter",
+          aggregateId: "prj_console_filter",
+          eventType: "projects.create",
+          createdAt: new Date().toISOString(),
+          payload: {
+            schemaVersion: "operation-audit/v1",
+            operationKey: "projects.create",
+            operationName: "CreateProjectCommand",
+            action: "create",
+            domain: "projects",
+            result: "success",
+            organizationId: "org_console_filter",
+            actorKind: "user",
+            actorId: "usr_console_admin",
+            actorLabel: "Console Admin",
+            resourceType: "project",
+            resourceId: "prj_console_filter",
+            requestId: "req_console_filter",
+            entrypoint: "http",
+            tenantId: "tenant_console_filter",
+            tenantMode: "single-tenant",
+          },
+        },
+      );
+      expect(recorded.isOk()).toBe(true);
+
+      const pageResponse = await server.httpApp.handle(
+        new Request(
+          "http://localhost/audit-log/console-page?query=range%3D7d%26resourceType%3Dproject%26action%3Dcreate%26actorId%3Dusr_console_admin",
+          {
+            headers: {
+              "x-appaloft-locale": "zh-CN",
+            },
+          },
+        ),
+      );
+      expect(pageResponse.status).toBe(200);
+      const page = await pageResponse.json();
+      expect(page).toMatchObject({
+        schemaVersion: "appaloft.console.extension-page/v1",
+        title: "审计日志",
+      });
+      const serialized = JSON.stringify(page);
+      expect(serialized).toContain("时间范围");
+      expect(serialized).toContain("资源类型");
+      expect(serialized).toContain("操作类型");
+      expect(serialized).toContain("操作者");
+      expect(serialized).toContain("项目");
+      expect(serialized).toContain("创建");
+      expect(serialized).toContain("Console Admin");
+      expect(serialized).toContain(
+        "/audit-log?range=7d&resourceType=project&action=create&actorId=usr_console_admin",
+      );
+      expect(serialized).toContain(
+        "/audit-log?range=7d&resourceType=project&actorId=usr_console_admin",
+      );
+      expect(serialized).not.toContain("All resources");
+      expect(serialized).not.toContain("All actions");
     } finally {
       await server.shutdown();
     }

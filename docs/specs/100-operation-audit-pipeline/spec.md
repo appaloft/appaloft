@@ -53,9 +53,9 @@ composition time without changing public core behavior.
 
 - API/CLI: existing `audit-events.list`, `audit-events.export`, and
   `audit-events.export-global` read retained audit rows.
-- Web/UI: public Audit Log Console page reads `audit-events.export-global` and supports time range
-  plus resource type filtering. Hosted distributions may hide navigation through their own
-  entitlement overlays.
+- Web/UI: public Audit Log Console page reads `audit-events.export-global` and supports time
+  range, resource type, action, and actor filtering. Hosted distributions may hide navigation
+  through their own entitlement overlays.
 - Events: selected domain lifecycle facts feed the audit projector. Audit Log is not itself a
   domain event and not a billing event.
 - Persistence: first implementation stores normalized operation audit fields in the existing
