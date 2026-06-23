@@ -9149,6 +9149,7 @@
               projectId={resourceProjectId}
               environmentId={resourceEnvironmentId}
               {resourceId}
+              embedded
             />
           </div>
         {:else if activeTab === "networking" || activeTab === "configuration" || activeTab === "dependencies" || activeTab === "settings"}

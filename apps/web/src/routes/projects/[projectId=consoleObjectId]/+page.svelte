@@ -2696,7 +2696,7 @@
 
         {#if projectAuditLogTabVisible}
           <Tabs.Content value="audit-log" class={detailTabPanelScrollClass}>
-            <ConsoleExtensionPage {projectId} />
+            <ConsoleExtensionPage {projectId} embedded />
           </Tabs.Content>
         {/if}
 

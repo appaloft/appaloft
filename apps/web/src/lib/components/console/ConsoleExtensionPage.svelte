@@ -375,6 +375,7 @@
   };
   type Props = {
     settingsScope?: "organization" | "instance" | null;
+    embedded?: boolean;
     projectId?: string;
     environmentId?: string;
     resourceId?: string;
@@ -384,6 +385,7 @@
 
   let {
     settingsScope = null,
+    embedded = false,
     projectId = "",
     environmentId = "",
     resourceId = "",
@@ -1017,7 +1019,7 @@
 </svelte:head>
 
 {#snippet content()}
-  <ConsoleResourceCanvas class="max-w-7xl">
+  <ConsoleResourceCanvas class={embedded ? "max-w-none p-0" : "max-w-7xl"}>
     {#if loading}
       <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {#each Array.from({ length: 4 }) as _}
@@ -1044,35 +1046,37 @@
         </section>
       {/if}
 
-      <section class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div class="min-w-0 max-w-2xl space-y-2">
-          <h1 class="truncate text-2xl font-semibold">{pageDocument.title}</h1>
-          {#if pageDocument.description}
-            <p class="text-sm leading-6 text-muted-foreground">{pageDocument.description}</p>
-          {/if}
-          {#if pageDocument.badge}
-            <Badge variant="outline">{pageDocument.badge}</Badge>
-          {/if}
-        </div>
-        {#if pageDocument.actions?.length}
-          <div class="flex shrink-0 flex-wrap gap-2">
-            {#each pageDocument.actions as action (action.href)}
-              <Button
-                href={action.href}
-                target={action.external ? "_blank" : undefined}
-                rel={action.external ? "noreferrer" : undefined}
-                variant={action.variant === "primary" ? "default" : "outline"}
-                size="sm"
-              >
-                {action.label}
-                {#if action.external}
-                  <ArrowUpRight class="size-4" />
-                {/if}
-              </Button>
-            {/each}
+      {#if !embedded}
+        <section class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div class="min-w-0 max-w-2xl space-y-2">
+            <h1 class="truncate text-2xl font-semibold">{pageDocument.title}</h1>
+            {#if pageDocument.description}
+              <p class="text-sm leading-6 text-muted-foreground">{pageDocument.description}</p>
+            {/if}
+            {#if pageDocument.badge}
+              <Badge variant="outline">{pageDocument.badge}</Badge>
+            {/if}
           </div>
-        {/if}
-      </section>
+          {#if pageDocument.actions?.length}
+            <div class="flex shrink-0 flex-wrap gap-2">
+              {#each pageDocument.actions as action (action.href)}
+                <Button
+                  href={action.href}
+                  target={action.external ? "_blank" : undefined}
+                  rel={action.external ? "noreferrer" : undefined}
+                  variant={action.variant === "primary" ? "default" : "outline"}
+                  size="sm"
+                >
+                  {action.label}
+                  {#if action.external}
+                    <ArrowUpRight class="size-4" />
+                  {/if}
+                </Button>
+              {/each}
+            </div>
+          {/if}
+        </section>
+      {/if}
 
       {#each pageDocument.sections as section, sectionIndex (`${section.kind}-${sectionIndex}`)}
         {#if section.kind === "summary-grid"}
@@ -1757,7 +1761,9 @@
   </Dialog.Content>
 </Dialog.Root>
 
-{#if settingsScope === "organization"}
+{#if embedded}
+  {@render content()}
+{:else if settingsScope === "organization"}
   <SettingsShell
     title={$t(i18nKeys.console.organization.pageTitle)}
     description={shellDescription}
