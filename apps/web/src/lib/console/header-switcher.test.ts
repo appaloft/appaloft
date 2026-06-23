@@ -83,19 +83,24 @@ describe("console header switcher", () => {
       '<Breadcrumb.Item class="group/breadcrumb-item peer/breadcrumb-item min-w-0">',
     );
     expect(shellSource).toContain(
-      'class="group/switcher inline-flex h-8 min-w-0 max-w-[12rem] items-center gap-px',
+      'class="group/switcher inline-flex h-8 min-w-0 max-w-[12rem] items-center gap-0 rounded-md',
     );
     expect(shellSource).toContain(
-      'class="group/link inline-flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2',
+      'class="group/link inline-flex h-8 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-l-md rounded-r-none px-2',
     );
     expect(shellSource).toContain(
-      'class="group/dropdown-trigger inline-flex size-8 shrink-0 items-center justify-center rounded-md',
+      'class="group/dropdown-trigger inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-l-none rounded-r-md',
     );
-    expect(shellSource).toContain("group-hover/switcher:bg-primary/5");
-    expect(shellSource).toContain("hover:bg-primary/10");
+    expect(shellSource).toContain("hover:bg-primary/5");
     expect(shellSource).toContain("group-hover/link:!text-primary");
     expect(shellSource).toContain("peer-hover/breadcrumb-item:text-foreground");
-    expect(shellSource).toContain("data-[state=open]:bg-primary/5");
+    expect(shellSource).not.toContain("gap-px text-sm font-medium text-foreground sm:max-w");
+    expect(shellSource).not.toContain(
+      "rounded-md px-2 transition-colors group-hover/switcher:bg-primary/5",
+    );
+    expect(shellSource).not.toContain(
+      "rounded-md text-muted-foreground transition-colors group-hover/switcher:bg-primary/5",
+    );
     expect(shellSource).not.toContain("border-l border-border/70");
     expect(shellSource.indexOf("data-console-header-switcher-link")).toBeLessThan(
       shellSource.indexOf("data-console-header-switcher-trigger"),

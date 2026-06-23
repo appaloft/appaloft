@@ -503,13 +503,13 @@
                       <DropdownMenu>
                         <div
                           data-console-header-switcher
-                          class="group/switcher inline-flex h-8 min-w-0 max-w-[12rem] items-center gap-px text-sm font-medium text-foreground sm:max-w-[16rem]"
+                          class="group/switcher inline-flex h-8 min-w-0 max-w-[12rem] items-center gap-0 rounded-md text-sm font-medium text-foreground transition-colors hover:bg-primary/5 focus-within:bg-primary/5 sm:max-w-[16rem]"
                         >
                           {#if item.href}
                             <a
                               data-console-header-switcher-link
                               href={item.href}
-                              class="group/link inline-flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 transition-colors group-hover/switcher:bg-primary/5 hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              class="group/link inline-flex h-8 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-l-md rounded-r-none px-2 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             >
                               {#if item.kind === "project"}
                                 <FolderOpen class="size-4 shrink-0 text-muted-foreground transition-colors group-hover/switcher:text-foreground group-hover/link:!text-primary" />
@@ -543,7 +543,7 @@
                             data-console-header-switcher-trigger
                             aria-label={item.switcherLabel ?? item.label}
                             title={item.switcherLabel ?? item.label}
-                            class="group/dropdown-trigger inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors group-hover/switcher:bg-primary/5 group-hover/switcher:text-foreground hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:bg-primary/5 data-[state=open]:text-foreground"
+                            class="group/dropdown-trigger inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-l-none rounded-r-md text-muted-foreground transition-colors group-hover/switcher:text-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:text-foreground"
                           >
                             <ChevronDown class="size-3.5 transition-transform group-data-[state=open]/dropdown-trigger:rotate-180" />
                           </DropdownMenuTrigger>
