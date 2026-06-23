@@ -8,4 +8,7 @@
 - [x] Extend global audit export filters.
 - [x] Keep query operations non-audited by default.
 - [x] Add application and persistence tests.
+- [x] Add representative lifecycle command mapping tests for resource, deployment, dependency
+      resource, domain binding, server, static artifact, storage volume, and credential audit
+      targets.
 - [ ] Add broader end-to-end smoke coverage for deployment/resource/domain flows.
