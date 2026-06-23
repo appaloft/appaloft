@@ -2902,6 +2902,7 @@ export class MemoryDeploymentReadModel implements DeploymentReadModel {
       projectId?: string;
       resourceId?: string;
       includeArchived?: boolean;
+      activeResourcesOnly?: boolean;
       limit?: number;
     },
   ) {

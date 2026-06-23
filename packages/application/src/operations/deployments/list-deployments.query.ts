@@ -18,6 +18,7 @@ export class ListDeploymentsQuery extends Query<{ items: DeploymentSummary[] }> 
     public readonly projectId?: string,
     public readonly resourceId?: string,
     public readonly includeArchived = false,
+    public readonly activeResourcesOnly = false,
     public readonly limit: number = boundedListLimit(),
   ) {
     super();
@@ -30,6 +31,7 @@ export class ListDeploymentsQuery extends Query<{ items: DeploymentSummary[] }> 
           trimToUndefined(parsed.projectId),
           trimToUndefined(parsed.resourceId),
           parsed.includeArchived,
+          parsed.activeResourcesOnly,
           boundedListLimit(parsed.limit),
         ),
     );
