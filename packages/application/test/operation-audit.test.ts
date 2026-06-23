@@ -59,6 +59,17 @@ class CapturingAuditEventRecorder implements AuditEventRecorder {
   }
 }
 
+class FixedResultUseCase<TResult extends { id: string }> {
+  readonly inputs: unknown[] = [];
+
+  constructor(private readonly result: TResult) {}
+
+  async execute(_context: unknown, input: unknown) {
+    this.inputs.push(input);
+    return ok(this.result);
+  }
+}
+
 describe("operation audit pipeline", () => {
   test("[AUDIT-LIFECYCLE-PROJECT-001] command bus records project lifecycle audit intent", async () => {
     const child = container.createChildContainer();
@@ -125,6 +136,133 @@ describe("operation audit pipeline", () => {
       }),
     ]);
     expect(JSON.stringify(auditSink.records)).not.toContain("should-not-be-recorded");
+  });
+
+  test("[AUDIT-LIFECYCLE-SMOKE-010] command bus records resource, deployment, and domain lifecycle operations through the shared audit sink", async () => {
+    const child = container.createChildContainer();
+    const logger = new NoopLogger();
+    const auditSink = new CapturingOperationAuditSink();
+    const resourceUseCase = new FixedResultUseCase({ id: "res_smoke" });
+    const deploymentUseCase = new FixedResultUseCase({ id: "dep_smoke" });
+    const domainBindingUseCase = new FixedResultUseCase({ id: "dom_smoke" });
+
+    child.registerInstance(tokens.createResourceUseCase, resourceUseCase);
+    child.registerInstance(tokens.createDeploymentUseCase, deploymentUseCase);
+    child.registerInstance(tokens.createDomainBindingUseCase, domainBindingUseCase);
+
+    const context = createExecutionContext({
+      requestId: "req_audit_lifecycle_smoke",
+      entrypoint: "http",
+      principal: {
+        kind: "user",
+        actorId: "usr_admin",
+        userId: "usr_admin",
+        email: "admin@example.com",
+        activeOrganization: {
+          organizationId: "org_business",
+          role: "owner",
+          productRole: "owner",
+        },
+      },
+    });
+    const bus = new CommandBus(child, logger, undefined, auditSink);
+
+    const resourceResult = await bus.execute(
+      context,
+      CreateResourceCommand.create({
+        projectId: "prj_smoke",
+        environmentId: "env_smoke",
+        destinationId: "dst_smoke",
+        name: "Web",
+        kind: "application",
+      })._unsafeUnwrap(),
+    );
+    const deploymentResult = await bus.execute(
+      context,
+      CreateDeploymentCommand.create({
+        projectId: "prj_smoke",
+        environmentId: "env_smoke",
+        resourceId: "res_smoke",
+        serverId: "srv_smoke",
+        destinationId: "dst_smoke",
+      })._unsafeUnwrap(),
+    );
+    const domainBindingResult = await bus.execute(
+      context,
+      CreateDomainBindingCommand.create({
+        projectId: "prj_smoke",
+        environmentId: "env_smoke",
+        resourceId: "res_smoke",
+        serverId: "srv_smoke",
+        destinationId: "dst_smoke",
+        domainName: "app.example.com",
+        pathPrefix: "/",
+        proxyKind: "traefik",
+      })._unsafeUnwrap(),
+    );
+
+    expect(resourceResult.isOk()).toBe(true);
+    expect(deploymentResult.isOk()).toBe(true);
+    expect(domainBindingResult.isOk()).toBe(true);
+    expect(resourceUseCase.inputs).toHaveLength(1);
+    expect(deploymentUseCase.inputs).toHaveLength(1);
+    expect(domainBindingUseCase.inputs).toHaveLength(1);
+    expect(auditSink.records).toEqual([
+      expect.objectContaining({
+        operationKey: "resources.create",
+        operationName: "CreateResourceCommand",
+        domain: "resources",
+        action: "create",
+        result: "success",
+        organizationId: "org_business",
+        primaryTarget: { resourceType: "resource", resourceId: "res_smoke" },
+        relatedTargets: [
+          { resourceType: "project", resourceId: "prj_smoke" },
+          { resourceType: "environment", resourceId: "env_smoke" },
+          { resourceType: "destination", resourceId: "dst_smoke" },
+        ],
+      }),
+      expect.objectContaining({
+        operationKey: "deployments.create",
+        operationName: "CreateDeploymentCommand",
+        domain: "deployments",
+        action: "create",
+        result: "success",
+        organizationId: "org_business",
+        primaryTarget: { resourceType: "deployment", resourceId: "dep_smoke" },
+        relatedTargets: [
+          { resourceType: "project", resourceId: "prj_smoke" },
+          { resourceType: "environment", resourceId: "env_smoke" },
+          { resourceType: "resource", resourceId: "res_smoke" },
+          { resourceType: "server", resourceId: "srv_smoke" },
+          { resourceType: "destination", resourceId: "dst_smoke" },
+        ],
+      }),
+      expect.objectContaining({
+        operationKey: "domain-bindings.create",
+        operationName: "CreateDomainBindingCommand",
+        domain: "domain-bindings",
+        action: "create",
+        result: "success",
+        organizationId: "org_business",
+        primaryTarget: { resourceType: "domain_binding", resourceId: "dom_smoke" },
+        relatedTargets: [
+          { resourceType: "project", resourceId: "prj_smoke" },
+          { resourceType: "environment", resourceId: "env_smoke" },
+          { resourceType: "resource", resourceId: "res_smoke" },
+          { resourceType: "server", resourceId: "srv_smoke" },
+          { resourceType: "destination", resourceId: "dst_smoke" },
+        ],
+      }),
+    ]);
+    for (const record of auditSink.records) {
+      expect(record.actor).toEqual(
+        expect.objectContaining({
+          kind: "user",
+          id: "usr_admin",
+        }),
+      );
+    }
   });
 
   test("[AUDIT-LIFECYCLE-RESOURCE-002][AUDIT-LIFECYCLE-DEPLOYMENT-003][AUDIT-LIFECYCLE-DEPENDENCY-004][AUDIT-LIFECYCLE-DOMAIN-005][AUDIT-LIFECYCLE-SERVER-006][AUDIT-LIFECYCLE-STATIC-007] maps lifecycle commands to resource and related targets", () => {

@@ -39,6 +39,7 @@ composition time without changing public core behavior.
 | AUDIT-LIFECYCLE-STATIC-007 | Static artifact lifecycle audit | static artifact publish commands return | the command returns through `CommandBus` | Appaloft records static artifact audit rows with artifact/resource ids and publish result. |
 | AUDIT-LIFECYCLE-QUERY-008 | Query policy | a query operation returns | query dispatch completes | Appaloft does not record operation audit by default. |
 | AUDIT-LIFECYCLE-REDACTION-009 | Safe metadata | a command contains secret-like fields or raw env values | audit metadata is projected | Secret-like fields are omitted or redacted; safe secret references may be retained. |
+| AUDIT-LIFECYCLE-SMOKE-010 | Command-bus lifecycle smoke | representative resource, deployment, and domain binding commands succeed through registered command handlers | the commands return through `CommandBus` with an audit sink installed | Appaloft records operation audit rows for each command with actor, organization, primary target, and related aggregate ids. |
 
 ## Domain Ownership
 
