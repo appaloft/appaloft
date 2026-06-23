@@ -1452,7 +1452,7 @@
         {:else if section.kind === "table"}
           <section
             class={[
-              embedded ? "overflow-hidden" : "console-panel overflow-hidden",
+              "console-panel overflow-hidden",
               tableSectionClass(section),
             ]}
           >
@@ -1494,7 +1494,7 @@
             </div>
             {#if section.rows.length > 0}
               <div
-                class={embedded ? "overflow-x-auto" : "overflow-x-auto border-t"}
+                class="overflow-x-auto border-t"
                 data-console-page-table-body
               >
                 <table class="w-full min-w-[760px] text-sm" data-console-page-record-list>
@@ -1616,14 +1616,14 @@
                 </table>
               </div>
             {:else}
-              <div class={embedded ? "py-5 text-sm text-muted-foreground" : "border-t p-5 text-sm text-muted-foreground"}>
+              <div class={embedded ? "border-t py-5 text-sm text-muted-foreground" : "border-t p-5 text-sm text-muted-foreground"}>
                 {section.emptyLabel ?? $t(i18nKeys.common.status.unknown)}
               </div>
             {/if}
             {#if section.pagination}
               <div
                 class={embedded
-                  ? "flex flex-wrap items-center justify-between gap-3 py-3"
+                  ? "flex flex-wrap items-center justify-between gap-3 border-t py-3"
                   : "flex flex-wrap items-center justify-between gap-3 border-t px-5 py-3"}
               >
                 <p class="text-sm text-muted-foreground">{section.pagination.label}</p>
