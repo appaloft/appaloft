@@ -25,6 +25,9 @@ describe("project detail page structure", () => {
 
     expect(projectSource).toContain('"activity"');
     expect(projectSource).toContain("projectAttentionItems");
+    expect(projectSource).toContain("projectDeploymentsQuery");
+    expect(projectSource).toContain("activeResourcesOnly: true");
+    expect(projectSource).not.toContain("filterDeploymentsByKnownResources");
     expect(projectSource).toContain("projectNextAction");
     expect(projectSource).toContain("nonEmptyProjectResourceGroups");
     expect(projectSource).toContain("DeploymentStatusBadge");

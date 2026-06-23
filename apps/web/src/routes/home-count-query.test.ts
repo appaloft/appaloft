@@ -17,11 +17,15 @@ describe("operations workbench home", () => {
     expect(homePageSource).toContain("orpc.environments.list.queryOptions({");
     expect(homePageSource).toContain("input: { limit: homeEnvironmentListLimit }");
     expect(homePageSource).toContain("orpc.deployments.list.queryOptions({");
-    expect(homePageSource).toContain("input: { limit: homeDeploymentListLimit }");
+    expect(homePageSource).toContain(
+      "input: { activeResourcesOnly: true, limit: homeDeploymentListLimit }",
+    );
     expect(homePageSource).toContain("orpc.servers.count.queryOptions({");
     expect(homePageSource).toContain("orpc.deployments.count.queryOptions({");
-    expect(homePageSource).toContain("input: { statuses: activeDeploymentStatuses }");
-    expect(homePageSource).toContain('input: { status: "failed" }');
+    expect(homePageSource).toContain(
+      "input: { activeResourcesOnly: true, statuses: activeDeploymentStatuses }",
+    );
+    expect(homePageSource).toContain('input: { activeResourcesOnly: true, status: "failed" }');
     expect(homePageSource).toContain("orpc.resources.count.queryOptions({");
   });
 
@@ -68,6 +72,9 @@ describe("operations workbench home", () => {
       'type HomeAttentionReason = "failed" | "running" | "no-access" | "no-deployment"',
     );
     expect(homePageSource).toContain("const attentionItems = $derived.by");
+    expect(homePageSource).toContain("activeResourcesOnly: true");
+    expect(homePageSource).not.toContain("filterDeploymentsByKnownResources");
+    expect(homePageSource).not.toContain("deploymentsWithKnownResources");
     expect(homePageSource).toContain("failedDeployment");
     expect(homePageSource).toContain("runningDeployment");
     expect(homePageSource).toContain("resourceWithoutAccess");
