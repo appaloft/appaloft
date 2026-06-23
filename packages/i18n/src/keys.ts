@@ -30,6 +30,7 @@ export const i18nKeys = {
       openProject: "common:actions.openProject",
       openResource: "common:actions.openResource",
       openTerminal: "common:actions.openTerminal",
+      openWebsite: "common:actions.openWebsite",
       previous: "common:actions.previous",
       quickDeploy: "common:actions.quickDeploy",
       redeploy: "common:actions.redeploy",

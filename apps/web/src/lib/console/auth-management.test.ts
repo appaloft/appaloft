@@ -12,6 +12,8 @@ describe("organization auth management console surface", () => {
       organizationSwitcherSource,
       userMenuSource,
       clientContractSource,
+      enUSSource,
+      zhCNSource,
     ] = await Promise.all([
       readFile(new URL("../../routes/organization/+page.svelte", import.meta.url), "utf8"),
       readFile(
@@ -28,6 +30,14 @@ describe("organization auth management console surface", () => {
       ),
       readFile(
         new URL("../../../../../packages/orpc/src/client-contract.ts", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../../../../../packages/i18n/src/locales/en-US.ts", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../../../../../packages/i18n/src/locales/zh-CN.ts", import.meta.url),
         "utf8",
       ),
     ]);
@@ -73,12 +83,16 @@ describe("organization auth management console surface", () => {
     expect(userMenuSource).toContain("preloadInstanceAccessCapability");
     expect(userMenuSource).toContain("instanceAccessCapabilityKey");
     expect(userMenuSource).toContain('navigateTo("/")');
+    expect(userMenuSource).toContain('"https://appaloft.com"');
+    expect(userMenuSource).toContain("i18nKeys.common.actions.openWebsite");
     expect(userMenuSource).not.toContain("DropdownMenuSubTrigger");
     expect(userMenuSource).not.toContain("/api/auth/link-social");
     expect(userMenuSource).not.toContain("i18nKeys.console.shell.linkGitHubAccount");
     expect(userMenuSource).toContain("i18nKeys.console.shell.githubConnectedAs");
     expect(userMenuSource).not.toContain("$t(i18nKeys.common.actions.connectGitHub)");
     expect(userMenuSource).toContain("i18nKeys.common.actions.signOut");
+    expect(enUSSource).toContain('openWebsite: "Website"');
+    expect(zhCNSource).toContain('openWebsite: "官网"');
     expect(userMenuSource).toContain("data-console-sign-out-action");
     expect(userMenuSource).toContain("DropdownMenuSeparator");
     expect(userMenuSource.indexOf("i18nKeys.common.language.label")).toBeLessThan(
