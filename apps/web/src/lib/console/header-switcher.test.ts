@@ -92,6 +92,8 @@ describe("console header switcher", () => {
       'class="group/dropdown-trigger inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-l-none rounded-r-md',
     );
     expect(shellSource).toContain("hover:bg-primary/5");
+    expect(shellSource).toContain("hover:bg-primary/10");
+    expect(shellSource).toContain("data-[state=open]:bg-primary/10");
     expect(shellSource).toContain("group-hover/link:!text-primary");
     expect(shellSource).toContain("peer-hover/breadcrumb-item:text-foreground");
     expect(shellSource).not.toContain("gap-px text-sm font-medium text-foreground sm:max-w");
