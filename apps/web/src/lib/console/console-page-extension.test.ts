@@ -233,11 +233,15 @@ describe("Console page extension surface", () => {
     expect(projectPageSource).toContain('placement="project-environment-panel"');
     expect(projectPageSource).toContain('"audit-log"');
     expect(projectPageSource).toContain("visibleProjectDetailTabs");
+    expect(projectPageSource).toContain("detailTabPanelFlushClass");
+    expect(projectPageSource).toContain('<Tabs.Content value="audit-log" class={detailTabPanelFlushClass}>');
     expect(projectPageSource).toContain("<ConsoleExtensionPage {projectId} embedded />");
     expect(projectPageSource).toContain("environmentId={environment.id}");
     expect(resourcePageSource).toContain('placement="resource-detail-panel"');
     expect(resourcePageSource).toContain('"audit-log"');
     expect(resourcePageSource).toContain("visibleResourceDetailTabs");
+    expect(resourcePageSource).toContain("detailTabPanelFlushClass");
+    expect(resourcePageSource).toContain('<div class={detailTabPanelFlushClass}>');
     expect(resourcePageSource).toContain("<ConsoleExtensionPage");
     expect(resourcePageSource).toContain("embedded");
     expect(resourcePageSource).toContain("projectId={resourceProjectId}");

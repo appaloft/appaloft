@@ -21,6 +21,9 @@ export const detailTabPanelScrollClass =
 export const detailTabPanelScrollNoTopClass =
   "mt-0 min-w-0 px-4 md:min-h-0 md:flex-1 md:overflow-x-hidden md:overflow-y-auto md:px-6 md:pb-6";
 
+export const detailTabPanelFlushClass =
+  "mt-0 min-w-0 md:min-h-0 md:flex-1 md:overflow-x-hidden md:overflow-y-auto";
+
 export const detailTabPanelSubnavClass = "mt-0 min-w-0 overflow-hidden md:min-h-0 md:flex-1";
 
 export const subnavLayoutClass =

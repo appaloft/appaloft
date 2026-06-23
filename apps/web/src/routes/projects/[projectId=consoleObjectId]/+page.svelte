@@ -93,6 +93,7 @@
     detailPageClass,
     detailSubnavContentClass,
     detailSubnavLayoutClass,
+    detailTabPanelFlushClass,
     detailTabPanelSubnavClass,
     detailTabPanelScrollClass,
   } from "$lib/console/layout-classes";
@@ -2695,7 +2696,7 @@
         </Tabs.Content>
 
         {#if projectAuditLogTabVisible}
-          <Tabs.Content value="audit-log" class={detailTabPanelScrollClass}>
+          <Tabs.Content value="audit-log" class={detailTabPanelFlushClass}>
             <ConsoleExtensionPage {projectId} embedded />
           </Tabs.Content>
         {/if}
