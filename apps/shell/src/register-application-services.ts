@@ -319,6 +319,7 @@ import {
   MarkOperatorWorkRecoveredUseCase,
   MarkServerAppliedRouteStatusOnDeploymentFinishedHandler,
   OpenTerminalSessionUseCase,
+  OperationAuditDomainEventProjector,
   OperatorWorkQueryService,
   PlanConnectorCapabilityQueryHandler,
   PlanConnectorCapabilityQueryService,
@@ -1611,6 +1612,7 @@ export function registerApplicationServices(
   container.registerSingleton(MarkDomainReadyOnDeploymentFinishedHandler);
   container.registerSingleton(MarkDomainRouteFailedOnDeploymentFinishedHandler);
   container.registerSingleton(MarkServerAppliedRouteStatusOnDeploymentFinishedHandler);
+  container.registerSingleton(OperationAuditDomainEventProjector);
   container.registerSingleton(IssueCertificateOnCertificateRequestedHandler);
   container.registerSingleton(ListConnectorCategoriesQueryHandler);
   container.registerSingleton(ListConnectionsQueryHandler);

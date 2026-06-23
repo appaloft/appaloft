@@ -261,7 +261,6 @@ export function dockerRemoveConflictingRouteContainersCommand(input: {
     return "";
   }
 
-  const managedLabelFilter = input.quote("label=appaloft.managed=true");
   const currentDeploymentId = input.quote(input.deploymentId);
 
   return routeKeys
@@ -270,16 +269,32 @@ export function dockerRemoveConflictingRouteContainersCommand(input: {
       const quotedAccessHost = input.quote(accessHost);
       const quotedPathPrefix = input.quote(pathPrefix || "/");
       const quotedDelimitedAccessHost = input.quote(`,${accessHost},`);
+      const quotedTraefikHostRule = input.quote(`Host(\`${accessHost}\`)`);
+      const normalizedPathPrefix = pathPrefix || "/";
+      const traefikPathMatchCommand =
+        normalizedPathPrefix === "/"
+          ? "traefik_path_matches=1;"
+          : `traefik_path_matches=0; if printf '%s' "$labels_json" | grep -F ${input.quote(
+              `PathPrefix(\`${normalizedPathPrefix}\`)`,
+            )} >/dev/null 2>&1; then traefik_path_matches=1; fi;`;
       return [
-        `docker ps -aq --filter ${managedLabelFilter}`,
+        `docker ps -aq`,
         "| while read -r container_id; do",
+        'labels_json="$(docker inspect -f \'{{ json .Config.Labels }}\' "$container_id" 2>/dev/null || true)";',
         'deployment_id="$(docker inspect -f \'{{ index .Config.Labels "appaloft.deployment-id" }}\' "$container_id" 2>/dev/null || true)";',
+        'managed="$(docker inspect -f \'{{ index .Config.Labels "appaloft.managed" }}\' "$container_id" 2>/dev/null || true)";',
+        'preview_id="$(docker inspect -f \'{{ index .Config.Labels "appaloft.preview-id" }}\' "$container_id" 2>/dev/null || true)";',
+        'source_fingerprint="$(docker inspect -f \'{{ index .Config.Labels "appaloft.source-fingerprint" }}\' "$container_id" 2>/dev/null || true)";',
         'access_host="$(docker inspect -f \'{{ index .Config.Labels "appaloft.access-host" }}\' "$container_id" 2>/dev/null || true)";',
         'access_hosts="$(docker inspect -f \'{{ index .Config.Labels "appaloft.access-hosts" }}\' "$container_id" 2>/dev/null || true)";',
         'access_path_prefix="$(docker inspect -f \'{{ index .Config.Labels "appaloft.access-path-prefix" }}\' "$container_id" 2>/dev/null || true)";',
-        `host_matches=0; if [ "$access_host" = ${quotedAccessHost} ] || printf '%s' ",$access_hosts," | grep -F ${quotedDelimitedAccessHost} >/dev/null 2>&1; then host_matches=1; fi;`,
+        `traefik_host_matches=0; if printf '%s' "$labels_json" | grep -F ${quotedTraefikHostRule} >/dev/null 2>&1; then traefik_host_matches=1; fi;`,
+        traefikPathMatchCommand,
+        `host_matches=0; if [ "$access_host" = ${quotedAccessHost} ] || printf '%s' ",$access_hosts," | grep -F ${quotedDelimitedAccessHost} >/dev/null 2>&1 || [ "$traefik_host_matches" = "1" ]; then host_matches=1; fi;`,
         `path_matches=0; if [ "$access_path_prefix" = ${quotedPathPrefix} ] || { [ ${quotedPathPrefix} = "/" ] && [ -z "$access_path_prefix" ]; }; then path_matches=1; fi;`,
-        `if [ "$deployment_id" != ${currentDeploymentId} ] && [ "$host_matches" = "1" ] && [ "$path_matches" = "1" ]; then docker rm -f "$container_id"; fi;`,
+        'if [ "$traefik_host_matches" = "1" ] && [ "$traefik_path_matches" = "1" ]; then path_matches=1; fi;',
+        'appaloft_candidate=0; if [ "$managed" = "true" ] || [ -n "$deployment_id" ] || [ -n "$preview_id" ] || [ -n "$source_fingerprint" ] || [ "$traefik_host_matches" = "1" ]; then appaloft_candidate=1; fi;',
+        `if [ "$deployment_id" != ${currentDeploymentId} ] && [ "$appaloft_candidate" = "1" ] && [ "$host_matches" = "1" ] && [ "$path_matches" = "1" ]; then docker rm -f "$container_id"; fi;`,
         "done",
       ].join(" ");
     })

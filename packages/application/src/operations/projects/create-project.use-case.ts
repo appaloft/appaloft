@@ -125,8 +125,9 @@ export class CreateProjectUseCase {
         UpsertProjectSpec.fromProject(project),
       );
       await publishDomainEventsAndReturn(context, eventBus, logger, project, undefined);
+      const createdProjectId = project.toState().id.value;
 
-      return ok({ id: project.toState().id.value });
+      return ok({ id: createdProjectId });
     });
   }
 }

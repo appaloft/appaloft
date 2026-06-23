@@ -16,7 +16,14 @@ export class ExportGlobalAuditEventsQuery extends Query<AuditEventGlobalExportRe
     public readonly to: string,
     public readonly aggregateId?: string,
     public readonly eventType?: string,
+    public readonly organizationId?: string,
+    public readonly projectId?: string,
+    public readonly action?: readonly string[],
+    public readonly resourceType?: readonly string[],
+    public readonly actorId?: readonly string[],
     public readonly limit: number = 100,
+    public readonly cursor?: string,
+    public readonly order: "asc" | "desc" = "asc",
   ) {
     super();
   }
@@ -29,7 +36,14 @@ export class ExportGlobalAuditEventsQuery extends Query<AuditEventGlobalExportRe
           parsed.to,
           trimToUndefined(parsed.aggregateId),
           trimToUndefined(parsed.eventType),
+          trimToUndefined(parsed.organizationId),
+          trimToUndefined(parsed.projectId),
+          parsed.action,
+          parsed.resourceType,
+          parsed.actorId,
           parsed.limit,
+          trimToUndefined(parsed.cursor),
+          parsed.order,
         ),
     );
   }

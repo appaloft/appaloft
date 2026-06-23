@@ -519,7 +519,11 @@ describe("console page structure", () => {
     expect(consoleResourceCanvasSource).toContain("mx-auto w-full max-w-7xl space-y-6");
     expect(consoleResourceCanvasSource).toContain("consolePageContentClass");
     expect(consoleResourceCanvasSource).not.toContain("max-w-5xl");
-    expect(consoleExtensionPageSource).toContain('<ConsoleResourceCanvas class="max-w-7xl">');
+    expect(consoleExtensionPageSource).toContain(
+      '<ConsoleResourceCanvas class={embedded ? "max-w-none p-0" : "max-w-7xl"}>',
+    );
+    expect(consoleExtensionPageSource).toContain("{#if embedded}");
+    expect(consoleExtensionPageSource).toContain("{@render content()}");
   });
 
   test("[CONSOLE-DISPLAY-STATE-IA-000] keeps console routes free of default-page forms", () => {

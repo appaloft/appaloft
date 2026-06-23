@@ -35,13 +35,36 @@ export const exportAuditEventsQueryInputSchema = z
     message: "to must be later than from",
   });
 
+const auditEventFilterValueSchema = (label: string) =>
+  z
+    .union([
+      nonEmptyTrimmedString(label),
+      z.array(nonEmptyTrimmedString(label)).min(1).max(20).readonly(),
+    ])
+    .optional()
+    .transform((value) => {
+      if (!value) {
+        return undefined;
+      }
+      const values = Array.isArray(value) ? value : [value];
+      const normalized = Array.from(new Set(values.map((item) => item.trim()).filter(Boolean)));
+      return normalized.length > 0 ? normalized : undefined;
+    });
+
 export const exportGlobalAuditEventsQueryInputSchema = z
   .object({
     aggregateId: nonEmptyTrimmedString("Aggregate id").optional(),
     eventType: nonEmptyTrimmedString("Event type").optional(),
+    organizationId: nonEmptyTrimmedString("Organization id").optional(),
+    projectId: nonEmptyTrimmedString("Project id").optional(),
+    action: auditEventFilterValueSchema("Action"),
+    resourceType: auditEventFilterValueSchema("Resource type"),
+    actorId: auditEventFilterValueSchema("Actor id"),
     from: z.string().datetime(),
     to: z.string().datetime(),
     limit: z.coerce.number().int().positive().max(500).default(100),
+    cursor: nonEmptyTrimmedString("Cursor").optional(),
+    order: z.enum(["asc", "desc"]).default("asc"),
   })
   .refine((value) => value.from < value.to, {
     path: ["to"],

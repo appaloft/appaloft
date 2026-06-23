@@ -46,13 +46,15 @@
     EnvironmentSummary,
     OperatorWorkItem,
     ResourceSummary,
+    SystemPluginWebExtension,
   } from "@appaloft/contracts";
 
-  import { readErrorMessage } from "$lib/api/client";
+  import { readErrorMessage, request } from "$lib/api/client";
   import { capabilities, capabilityKey, type CapabilityQuery } from "$lib/capabilities";
   import CapabilityGate from "$lib/components/console/CapabilityGate.svelte";
   import ConsoleDetailSubnav from "$lib/components/console/ConsoleDetailSubnav.svelte";
   import ConsoleDetailTabs from "$lib/components/console/ConsoleDetailTabs.svelte";
+  import ConsoleExtensionPage from "$lib/components/console/ConsoleExtensionPage.svelte";
   import ConsoleExtensionPanelHost from "$lib/components/console/ConsoleExtensionPanelHost.svelte";
   import DeploymentProgressDialog from "$lib/components/console/DeploymentProgressDialog.svelte";
   import DeploymentTable from "$lib/components/console/DeploymentTable.svelte";
@@ -91,9 +93,15 @@
     detailPageClass,
     detailSubnavContentClass,
     detailSubnavLayoutClass,
+    detailTabPanelFlushClass,
     detailTabPanelSubnavClass,
     detailTabPanelScrollClass,
   } from "$lib/console/layout-classes";
+  import {
+    findConsolePageExtensionByPath,
+    isConsolePageExtensionVisible,
+    resolveConsolePageVisibilityEndpoint,
+  } from "$lib/console/console-page-extension";
   import { modalIsOpen, setModalOpen } from "$lib/console/url-modal";
   import { createConsoleQueries } from "$lib/console/queries";
   import { runtimeMonitoringRollupQueryOptions } from "$lib/console/runtime-usage-query";
@@ -130,6 +138,7 @@
     | "environments"
     | "previews"
     | "activity"
+    | "audit-log"
     | "settings";
   type ProjectSettingsSection = "general" | "archivedResources" | "danger";
   const projectDetailTabs = [
@@ -139,8 +148,15 @@
     "environments",
     "previews",
     "activity",
+    "audit-log",
     "settings",
   ] as const;
+  type SystemPluginWebExtensionsResponse = {
+    items: SystemPluginWebExtension[];
+  };
+  type SystemPluginWebExtensionVisibilityResponse = {
+    visible?: boolean;
+  };
   const projectSettingsSections = ["general", "archivedResources", "danger"] as const;
   type ProjectAttentionItem = {
     key: string;
@@ -187,14 +203,78 @@
       certificates: false,
       providers: false,
     });
+  const webExtensionsQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["system-plugins", "web-extensions"],
+      queryFn: () => request<SystemPluginWebExtensionsResponse>("/api/system-plugins/web-extensions"),
+      enabled: browser,
+      staleTime: 30_000,
+    }),
+  );
+  const organizationContextQuery = createQuery(() =>
+    orpc.organizations.currentContext.queryOptions({
+      input: {},
+      enabled: browser,
+      retry: 0,
+      staleTime: 30_000,
+    }),
+  );
 
   const projectId = $derived(page.params.projectId ?? "");
+  const currentOrganization = $derived(
+    organizationContextQuery.data?.currentOrganization ?? null,
+  );
+  const projectAuditLogPath = $derived(
+    projectId ? `/projects/${encodeURIComponent(projectId)}/audit-log` : page.url.pathname,
+  );
+  const projectAuditLogExtension = $derived(
+    findConsolePageExtensionByPath(webExtensionsQuery.data?.items ?? [], projectAuditLogPath),
+  );
+  const projectAuditLogVisibilityEndpoint = $derived(
+    resolveConsolePageVisibilityEndpoint(projectAuditLogExtension, {
+      pathname: projectAuditLogPath,
+      query: page.url.searchParams.toString(),
+      organization: currentOrganization,
+      projectId,
+    }),
+  );
+  const projectAuditLogVisibilityQuery = createQuery(() =>
+    queryOptions({
+      queryKey: [
+        "console-extension-route-visibility",
+        "project-audit-log",
+        currentOrganization?.organizationId ?? "",
+        projectId,
+        projectAuditLogVisibilityEndpoint ?? "",
+      ],
+      queryFn: () =>
+        request<SystemPluginWebExtensionVisibilityResponse>(
+          projectAuditLogVisibilityEndpoint ?? "/",
+        ),
+      enabled:
+        browser &&
+        Boolean(projectAuditLogVisibilityEndpoint) &&
+        !organizationContextQuery.isPending,
+      staleTime: 30_000,
+    }),
+  );
+  const projectAuditLogVisibility = $derived(
+    projectAuditLogExtension && projectAuditLogVisibilityEndpoint
+      ? { [projectAuditLogExtension.key]: projectAuditLogVisibilityQuery.data?.visible === true }
+      : {},
+  );
+  const projectAuditLogTabVisible = $derived(
+    isConsolePageExtensionVisible(projectAuditLogExtension, projectAuditLogVisibility),
+  );
   const activeProjectTab = $derived(parseProjectDetailTab(page.url.searchParams.get("tab")));
+  const visibleProjectDetailTabs = $derived(
+    projectDetailTabs.filter((tab) => tab !== "audit-log" || projectAuditLogTabVisible),
+  );
   const activeProjectSettingsSection = $derived(
     parseProjectSettingsSection(page.url.searchParams.get("section")),
   );
   const projectDetailTabItems = $derived(
-    projectDetailTabs.map((tab) => ({
+    visibleProjectDetailTabs.map((tab) => ({
       id: tab,
       label: projectTabLabel(tab),
       href: projectTabHref(tab),
@@ -1744,6 +1824,8 @@
         return $t(i18nKeys.console.projects.previewsTitle);
       case "activity":
         return $t(i18nKeys.console.projects.activityTitle);
+      case "audit-log":
+        return $t(i18nKeys.console.auditLog.title);
       case "settings":
         return $t(i18nKeys.console.projects.settingsTitle);
     }
@@ -2612,6 +2694,12 @@
             </div>
           </section>
         </Tabs.Content>
+
+        {#if projectAuditLogTabVisible}
+          <Tabs.Content value="audit-log" class={detailTabPanelFlushClass}>
+            <ConsoleExtensionPage {projectId} embedded />
+          </Tabs.Content>
+        {/if}
 
         <Tabs.Content
           value="resources"

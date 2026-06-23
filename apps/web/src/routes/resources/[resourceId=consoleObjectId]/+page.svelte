@@ -3,7 +3,7 @@
   import { afterNavigate, goto } from "$app/navigation";
   import { page } from "$app/state";
   import { onDestroy, onMount, untrack } from "svelte";
-  import { createMutation, createQuery } from "@tanstack/svelte-query";
+  import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
   import type { IconModule as BrandIconModule } from "@thesvg/icons";
   import cloudflareIcon from "@thesvg/icons/cloudflare";
   import {
@@ -90,6 +90,7 @@
     SetResourceVariableInput,
     StartResourceRuntimeInput,
     StopResourceRuntimeInput,
+    SystemPluginWebExtension,
     StorageVolumeBackupPlanResponse,
     StorageVolumeBackupSummary,
     StorageVolumeSummary,
@@ -100,6 +101,7 @@
   import { capabilities, capabilityKey, type CapabilityQuery } from "$lib/capabilities";
   import CapabilityGate from "$lib/components/console/CapabilityGate.svelte";
   import ConsoleStatePanel from "$lib/components/console/ConsoleStatePanel.svelte";
+  import ConsoleExtensionPage from "$lib/components/console/ConsoleExtensionPage.svelte";
   import ConsoleExtensionPanelHost from "$lib/components/console/ConsoleExtensionPanelHost.svelte";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import DeploymentProgressDialog from "$lib/components/console/DeploymentProgressDialog.svelte";
@@ -144,6 +146,7 @@
     detailSubnavContentClass,
     detailSubnavLayoutClass,
     detailTabClass,
+    detailTabPanelFlushClass,
     detailTabPanelScrollClass,
     detailTabPanelSubnavClass,
     detailTabsClass,
@@ -190,6 +193,11 @@
     resourceDetailHref,
     resourcePreviewEnvironmentDetailHref,
   } from "$lib/console/utils";
+  import {
+    findConsolePageExtensionByPath,
+    isConsolePageExtensionVisible,
+    resolveConsolePageVisibilityEndpoint,
+  } from "$lib/console/console-page-extension";
   import { i18nKeys, t } from "$lib/i18n";
   import { orpc, orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
@@ -231,6 +239,7 @@
     | "dependencies"
     | "previews"
     | "jobs"
+    | "audit-log"
     | "settings";
   let runtimeMonitoringTimeRange = $state<RuntimeMonitoringTimeRangeId>("1h");
   type ResourceAccessSummary = NonNullable<ResourceSummary["accessSummary"]>;
@@ -356,8 +365,15 @@
     "dependencies",
     "previews",
     "jobs",
+    "audit-log",
     "settings",
   ] as const;
+  type SystemPluginWebExtensionsResponse = {
+    items: SystemPluginWebExtension[];
+  };
+  type SystemPluginWebExtensionVisibilityResponse = {
+    visible?: boolean;
+  };
   const resourceNetworkingSections = ["access", "domains", "proxy"] as const;
   const resourceConfigurationSections = [
     "profile",
@@ -389,6 +405,22 @@
     domainBindingsQuery,
     certificatesQuery,
   } = createConsoleQueries(browser);
+  const webExtensionsQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["system-plugins", "web-extensions"],
+      queryFn: () => request<SystemPluginWebExtensionsResponse>("/api/system-plugins/web-extensions"),
+      enabled: browser,
+      staleTime: 30_000,
+    }),
+  );
+  const organizationContextQuery = createQuery(() =>
+    orpc.organizations.currentContext.queryOptions({
+      input: {},
+      enabled: browser,
+      retry: 0,
+      staleTime: 30_000,
+    }),
+  );
   const resourceId = $derived(page.params.resourceId ?? "");
   let resourceLocationSearch = $state(page.url.search);
   $effect(() => {
@@ -416,6 +448,59 @@
   );
   const activeResourceSection = $derived(
     parseResourceDetailSection(activeTab, resourceSearchParams.get("section")),
+  );
+  const currentOrganization = $derived(
+    organizationContextQuery.data?.currentOrganization ?? null,
+  );
+  const resourceAuditLogPath = $derived(
+    resourceId
+      ? page.params.projectId && page.params.environmentId
+        ? `/projects/${encodeURIComponent(page.params.projectId)}/environments/${encodeURIComponent(page.params.environmentId)}/resources/${encodeURIComponent(resourceId)}/audit-log`
+        : `/resources/${encodeURIComponent(resourceId)}/audit-log`
+      : page.url.pathname,
+  );
+  const resourceAuditLogExtension = $derived(
+    findConsolePageExtensionByPath(webExtensionsQuery.data?.items ?? [], resourceAuditLogPath),
+  );
+  const resourceAuditLogVisibilityEndpoint = $derived(
+    resolveConsolePageVisibilityEndpoint(resourceAuditLogExtension, {
+      pathname: resourceAuditLogPath,
+      query: resourceSearchParams.toString(),
+      organization: currentOrganization,
+      projectId: page.params.projectId ?? "",
+      environmentId: page.params.environmentId ?? "",
+      resourceId,
+    }),
+  );
+  const resourceAuditLogVisibilityQuery = createQuery(() =>
+    queryOptions({
+      queryKey: [
+        "console-extension-route-visibility",
+        "resource-audit-log",
+        currentOrganization?.organizationId ?? "",
+        page.params.projectId ?? "",
+        page.params.environmentId ?? "",
+        resourceId,
+        resourceAuditLogVisibilityEndpoint ?? "",
+      ],
+      queryFn: () =>
+        request<SystemPluginWebExtensionVisibilityResponse>(
+          resourceAuditLogVisibilityEndpoint ?? "/",
+        ),
+      enabled:
+        browser &&
+        Boolean(resourceAuditLogVisibilityEndpoint) &&
+        !organizationContextQuery.isPending,
+      staleTime: 30_000,
+    }),
+  );
+  const resourceAuditLogVisibility = $derived(
+    resourceAuditLogExtension && resourceAuditLogVisibilityEndpoint
+      ? { [resourceAuditLogExtension.key]: resourceAuditLogVisibilityQuery.data?.visible === true }
+      : {},
+  );
+  const resourceAuditLogTabVisible = $derived(
+    isConsolePageExtensionVisible(resourceAuditLogExtension, resourceAuditLogVisibility),
   );
   const resourceRuntimeMonitorActive = $derived(
     activeTab === "monitor",
@@ -1486,8 +1571,9 @@
   const visibleResourceDetailTabs = $derived(
     resourceDetailTabs.filter(
       (tab) =>
-        resourceSupportsServerBackedRuntimeSurfaces ||
-        (tab !== "monitor" && tab !== "logs" && tab !== "terminal" && tab !== "jobs"),
+        (tab !== "audit-log" || resourceAuditLogTabVisible) &&
+        (resourceSupportsServerBackedRuntimeSurfaces ||
+          (tab !== "monitor" && tab !== "logs" && tab !== "terminal" && tab !== "jobs")),
     ),
   );
   const shouldShowServerField = $derived(
@@ -5909,6 +5995,7 @@
       case "logs":
       case "terminal":
       case "previews":
+      case "audit-log":
         return [];
     }
   }
@@ -6022,6 +6109,8 @@
         return $t(i18nKeys.console.resources.previewEnvironmentsTab);
       case "jobs":
         return $t(i18nKeys.console.resources.jobsTab);
+      case "audit-log":
+        return $t(i18nKeys.console.auditLog.title);
       case "settings":
         return $t(i18nKeys.console.resources.settingsTab);
     }
@@ -7496,7 +7585,7 @@
     <div class={detailBodyClass}>
       <ScrollArea class={detailTabsScrollAreaClass}>
         <nav aria-label={$t(i18nKeys.console.resources.overviewTitle)} class={detailTabsClass}>
-          {#each resourceDetailTabs as tab (tab)}
+          {#each visibleResourceDetailTabs as tab (tab)}
             <a
               id={`resource-tab-${tab}`}
               href={resourceTabHref(tab)}
@@ -9054,6 +9143,15 @@
                 {resourceId}
               />
             </section>
+          </div>
+        {:else if activeTab === "audit-log" && resourceAuditLogTabVisible}
+          <div class={detailTabPanelFlushClass}>
+            <ConsoleExtensionPage
+              projectId={resourceProjectId}
+              environmentId={resourceEnvironmentId}
+              {resourceId}
+              embedded
+            />
           </div>
         {:else if activeTab === "networking" || activeTab === "configuration" || activeTab === "dependencies" || activeTab === "settings"}
           <div class={detailTabPanelSubnavClass}>

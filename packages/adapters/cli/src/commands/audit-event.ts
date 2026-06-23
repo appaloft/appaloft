@@ -26,6 +26,7 @@ const eventTypeOption = Options.text("event-type").pipe(Options.optional);
 const limitOption = Options.text("limit").pipe(Options.optional);
 const cursorOption = Options.text("cursor").pipe(Options.optional);
 const fromOption = Options.text("from").pipe(Options.optional);
+const orderOption = Options.choice("order", ["asc", "desc"] as const).pipe(Options.optional);
 const toOption = Options.text("to").pipe(Options.optional);
 const beforeOption = Options.text("before");
 const dryRunOption = Options.boolean("dry-run").pipe(Options.withDefault(true));
@@ -117,8 +118,10 @@ const exportGlobalCommand = EffectCommand.make(
     from: fromOption,
     to: toOption,
     limit: limitOption,
+    cursor: cursorOption,
+    order: orderOption,
   },
-  ({ aggregate, eventType, from, limit, to }) => {
+  ({ aggregate, cursor, eventType, from, limit, order, to }) => {
     const parsedLimit = optionalLimit(optionalValue(limit));
 
     return runQuery(
@@ -128,6 +131,8 @@ const exportGlobalCommand = EffectCommand.make(
         ...(optionalValue(aggregate) ? { aggregateId: optionalValue(aggregate) } : {}),
         ...(optionalValue(eventType) ? { eventType: optionalValue(eventType) } : {}),
         ...(parsedLimit ? { limit: parsedLimit } : {}),
+        ...(optionalValue(cursor) ? { cursor: optionalValue(cursor) } : {}),
+        ...(optionalValue(order) ? { order: optionalValue(order) as "asc" | "desc" } : {}),
       }),
     );
   },
