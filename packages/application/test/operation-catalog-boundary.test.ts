@@ -1009,7 +1009,7 @@ describe("operation catalog aggregate mutation boundary", () => {
       handlerName: "ExportGlobalAuditEventsQueryHandler",
       serviceName: "ExportGlobalAuditEventsQueryService",
       transports: {
-        cli: "appaloft audit-event export-global --from <iso> --to <iso>",
+        cli: "appaloft audit-event export-global --from <iso> --to <iso> [--cursor <iso>] [--order asc|desc]",
         orpc: { method: "GET", path: "/api/audit-events/export-global" },
       },
     });

@@ -283,9 +283,7 @@ describe("audit event read model persistence", () => {
         "aud_resource_other_type",
         "aud_project_other_actor",
       ]);
-      expect(pagedDescending.nextCursor).toBe(
-        "2026-01-01T00:00:01.000Z|aud_project_other_actor",
-      );
+      expect(pagedDescending.nextCursor).toBe("2026-01-01T00:00:01.000Z|aud_project_other_actor");
       expect(pagedDescending.truncated).toBe(true);
 
       const pagedDescendingNext = await readModel.exportGlobal(context, {

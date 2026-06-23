@@ -149,23 +149,21 @@ class MemoryAuditEventReadModel implements AuditEventReadModel {
         (event) =>
           !input.projectId ||
           event.aggregateId === input.projectId ||
-          (event.payload && event.payload["projectId"] === input.projectId),
+          (event.payload && event.payload.projectId === input.projectId),
       )
-      .toSorted(
-        (a, b) => {
-          const timestampOrder =
-            order === "desc"
-              ? b.createdAt.localeCompare(a.createdAt)
-              : a.createdAt.localeCompare(b.createdAt);
-          if (timestampOrder !== 0) {
-            return timestampOrder;
-          }
+      .toSorted((a, b) => {
+        const timestampOrder =
+          order === "desc"
+            ? b.createdAt.localeCompare(a.createdAt)
+            : a.createdAt.localeCompare(b.createdAt);
+        if (timestampOrder !== 0) {
+          return timestampOrder;
+        }
 
-          return order === "desc"
-            ? b.auditEventId.localeCompare(a.auditEventId)
-            : a.auditEventId.localeCompare(b.auditEventId);
-        },
-      );
+        return order === "desc"
+          ? b.auditEventId.localeCompare(a.auditEventId)
+          : a.auditEventId.localeCompare(b.auditEventId);
+      });
     const pageRows = rows.slice(0, limit);
     const nextCursorRow = rows.length > limit ? pageRows.at(-1) : undefined;
 
@@ -738,9 +736,7 @@ describe("audit event queries", () => {
       filters: {
         projectId: "prj_web",
       },
-      items: [
-        expect.objectContaining({ auditEventId: "aud_res_2" }),
-      ],
+      items: [expect.objectContaining({ auditEventId: "aud_res_2" })],
     });
   });
 

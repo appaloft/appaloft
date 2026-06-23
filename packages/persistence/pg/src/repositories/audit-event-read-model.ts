@@ -143,10 +143,7 @@ export class PgAuditEventReadModel
     const projectId = input.projectId;
     if (projectId) {
       query = query.where((eb) =>
-        eb.or([
-          eb("aggregate_id", "=", projectId),
-          eb("payload", "@>", { projectId }),
-        ]),
+        eb.or([eb("aggregate_id", "=", projectId), eb("payload", "@>", { projectId })]),
       );
     }
 

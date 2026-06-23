@@ -15,9 +15,9 @@ import {
   ListAuditEventArchivesQuery,
   ListAuditEventLegalHoldsQuery,
   ListAuditEventsQuery,
+  type ProductSessionAuthorizationPort,
   PruneAuditEventArchivesCommand,
   PruneAuditEventsCommand,
-  type ProductSessionAuthorizationPort,
   type Query,
   type QueryBus,
   ReleaseAuditEventLegalHoldCommand,
@@ -248,11 +248,11 @@ describe("audit event HTTP routes", () => {
           aggregateId: "res_web",
           filters: {
             eventType: "resource-variable-set",
-          from: "2026-01-01T00:00:00.000Z",
-          to: "2026-01-01T00:02:00.000Z",
-          limit: 10,
-          order: "asc",
-        },
+            from: "2026-01-01T00:00:00.000Z",
+            to: "2026-01-01T00:02:00.000Z",
+            limit: 10,
+            order: "asc",
+          },
           items: [
             {
               auditEventId: "aud_res_1",

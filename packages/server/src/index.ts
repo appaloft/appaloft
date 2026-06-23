@@ -952,18 +952,38 @@ function auditLogPagination(input: {
 function auditLogResourceTypeFilters(filterState: AuditLogFilterState, t: AppaloftTranslate) {
   const resourceTypes = [
     { value: undefined, label: t(i18nKeys.console.auditLog.allResourceTypes), icon: "layers" },
-    { value: "project", label: t(i18nKeys.console.auditLog.resourceTypes.project), icon: "folder-plus" },
+    {
+      value: "project",
+      label: t(i18nKeys.console.auditLog.resourceTypes.project),
+      icon: "folder-plus",
+    },
     { value: "resource", label: t(i18nKeys.console.auditLog.resourceTypes.resource), icon: "box" },
-    { value: "deployment", label: t(i18nKeys.console.auditLog.resourceTypes.deployment), icon: "rocket" },
+    {
+      value: "deployment",
+      label: t(i18nKeys.console.auditLog.resourceTypes.deployment),
+      icon: "rocket",
+    },
     {
       value: "dependency_resource",
       label: t(i18nKeys.console.auditLog.resourceTypes.dependencyResource),
       icon: "database",
     },
-    { value: "domain_binding", label: t(i18nKeys.console.auditLog.resourceTypes.domainBinding), icon: "globe" },
+    {
+      value: "domain_binding",
+      label: t(i18nKeys.console.auditLog.resourceTypes.domainBinding),
+      icon: "globe",
+    },
     { value: "server", label: t(i18nKeys.console.auditLog.resourceTypes.server), icon: "server" },
-    { value: "static_artifact", label: t(i18nKeys.console.auditLog.resourceTypes.staticArtifact), icon: "file" },
-    { value: "storage_volume", label: t(i18nKeys.console.auditLog.resourceTypes.storageVolume), icon: "hard-drive" },
+    {
+      value: "static_artifact",
+      label: t(i18nKeys.console.auditLog.resourceTypes.staticArtifact),
+      icon: "file",
+    },
+    {
+      value: "storage_volume",
+      label: t(i18nKeys.console.auditLog.resourceTypes.storageVolume),
+      icon: "hard-drive",
+    },
   ];
 
   return resourceTypes.map((item) => ({
