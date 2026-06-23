@@ -243,6 +243,8 @@ import {
   IngestSourceEventCommandHandler,
   IngestSourceEventUseCase,
   InMemoryDependencyResourceProvisioningPlanStore,
+  InspectDependencyResourceQueryHandler,
+  InspectDependencyResourceQueryService,
   InspectDomainBindingDnsReadinessQueryHandler,
   InspectDomainBindingDnsReadinessQueryService,
   InspectRuntimeUsageQueryHandler,
@@ -372,6 +374,7 @@ import {
   PreviewExpiryCleanupScheduler,
   PreviewFeedbackService,
   PreviewLifecycleService,
+  PreviewOperableScopeResolver,
   PreviewPullRequestEventIngestService,
   PromoteEnvironmentUseCase,
   ProvisionDependencyResourceCommandHandler,
@@ -403,6 +406,8 @@ import {
   PublishStaticArtifactPayloadCommandHandler,
   QueryCapabilitiesQueryHandler,
   QueryCapabilitiesQueryService,
+  QueryDependencyResourceQueryHandler,
+  QueryDependencyResourceQueryService,
   QueryEntitlementsQueryHandler,
   QueryEntitlementsQueryService,
   ReactivateOrganizationMemberCommandHandler,
@@ -2613,6 +2618,8 @@ export function registerApplicationServices(
   container.registerSingleton(RestoreDependencyResourceBackupCommandHandler);
   container.registerSingleton(ListDependencyResourcesQueryHandler);
   container.registerSingleton(ShowDependencyResourceQueryHandler);
+  container.registerSingleton(InspectDependencyResourceQueryHandler);
+  container.registerSingleton(QueryDependencyResourceQueryHandler);
   container.registerSingleton(ListDependencyResourceBackupPoliciesQueryHandler);
   container.registerSingleton(ShowDependencyResourceBackupPolicyQueryHandler);
   container.registerSingleton(ListDependencyResourceBackupsQueryHandler);
@@ -2844,6 +2851,7 @@ export function registerApplicationServices(
   );
   container.registerSingleton(tokens.previewLifecycleService, PreviewLifecycleService);
   container.registerSingleton(tokens.previewFeedbackService, PreviewFeedbackService);
+  container.registerSingleton(tokens.previewOperableScopeResolver, PreviewOperableScopeResolver);
   container.registerSingleton(
     tokens.previewDeploymentProcessManager,
     PreviewDeploymentProcessManager,
@@ -3006,6 +3014,14 @@ export function registerApplicationServices(
   container.registerSingleton(
     tokens.showDependencyResourceQueryService,
     ShowDependencyResourceQueryService,
+  );
+  container.registerSingleton(
+    tokens.inspectDependencyResourceQueryService,
+    InspectDependencyResourceQueryService,
+  );
+  container.registerSingleton(
+    tokens.queryDependencyResourceQueryService,
+    QueryDependencyResourceQueryService,
   );
   container.registerSingleton(
     tokens.createDependencyResourceBackupUseCase,

@@ -12,6 +12,7 @@ import {
   type ExecutionContextFactory,
   ImportResourceVariablesCommand,
   ListResourceSecretReferencesQuery,
+  type ProductSessionAuthorizationPort,
   type Query,
   type QueryBus,
   ResourceEffectiveConfigQuery,
@@ -39,9 +40,25 @@ class TestExecutionContextFactory implements ExecutionContextFactory {
       entrypoint: input.entrypoint,
       locale: input.locale,
       actor: input.actor,
+      principal: input.principal,
     });
   }
 }
+
+const productSessionAuthorizationPort: ProductSessionAuthorizationPort = {
+  authorizeProductSession: async (_context, input) =>
+    ok({
+      actor: {
+        kind: "user",
+        id: "usr_resource_config",
+        label: "resource-config@example.test",
+      },
+      email: "resource-config@example.test",
+      organizationId: input.organizationId ?? "org_resource_config_test",
+      role: input.requiredRole,
+      userId: "usr_resource_config",
+    }),
+};
 
 describe("resource config HTTP routes", () => {
   test("[RES-PROFILE-ENTRY-004] dispatches SetResourceVariableCommand through oRPC", async () => {
@@ -311,12 +328,16 @@ describe("resource config HTTP routes", () => {
       commandBus,
       executionContextFactory: new TestExecutionContextFactory(),
       logger: new NoopLogger(),
+      productSessionAuthorizationPort,
       queryBus,
     });
 
     const response = await app.handle(
       new Request("http://localhost/api/resources/res_web/effective-config", {
         method: "GET",
+        headers: {
+          cookie: "better-auth.session_token=resource-config-test",
+        },
       }),
     );
 

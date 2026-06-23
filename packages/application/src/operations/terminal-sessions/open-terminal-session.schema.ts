@@ -40,6 +40,13 @@ export const openTerminalSessionCommandInputSchema = z
           deploymentId: z.string().trim().min(1, "Deployment id is required").optional(),
         })
         .strict(),
+      z
+        .object({
+          kind: z.literal("preview"),
+          previewEnvironmentId: z.string().trim().min(1, "Preview environment id is required"),
+          deploymentId: z.string().trim().min(1, "Deployment id is required").optional(),
+        })
+        .strict(),
     ]),
     relativeDirectory: safeRelativeDirectory("Relative directory").optional(),
     initialRows: z.number().int().min(10).max(120).default(24),
