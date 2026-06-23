@@ -2,18 +2,36 @@
 @import "./tokens.css";
 
 :root {
-  --fd-layout-width: 1500px;
-  --appaloft-docs-grid: color-mix(in oklch, var(--border) 44%, transparent);
+  --fd-layout-width: 100vw;
+  --appaloft-docs-sidebar: var(--background);
+}
+
+:root,
+:root[data-theme="light"],
+.light,
+:root[data-theme="dark"],
+.dark {
+  --color-fd-background: var(--background);
+  --color-fd-foreground: var(--foreground);
+  --color-fd-muted: var(--muted);
+  --color-fd-muted-foreground: var(--muted-foreground);
+  --color-fd-popover: var(--popover);
+  --color-fd-popover-foreground: var(--popover-foreground);
+  --color-fd-card: var(--appaloft-docs-sidebar);
+  --color-fd-card-foreground: var(--sidebar-foreground);
+  --color-fd-border: color-mix(in oklch, var(--border) 78%, transparent);
+  --color-fd-primary: var(--primary);
+  --color-fd-primary-foreground: var(--primary-foreground);
+  --color-fd-secondary: var(--secondary);
+  --color-fd-secondary-foreground: var(--secondary-foreground);
+  --color-fd-accent: color-mix(in oklch, var(--primary) 9%, var(--background));
+  --color-fd-accent-foreground: var(--accent-foreground);
+  --color-fd-ring: var(--ring);
+  --color-fd-overlay: color-mix(in oklch, var(--foreground) 18%, transparent);
 }
 
 body {
-  background:
-    linear-gradient(90deg, var(--appaloft-docs-grid) 1px, transparent 1px),
-    linear-gradient(0deg, var(--appaloft-docs-grid) 1px, transparent 1px), var(--background);
-  background-size:
-    3.5rem 3.5rem,
-    3.5rem 3.5rem,
-    auto;
+  background: var(--background);
   color: var(--foreground);
   font-family: var(--appaloft-font-sans);
   font-feature-settings:
@@ -43,22 +61,119 @@ a {
   text-underline-offset: 0.2em;
 }
 
-.appaloft-docs-title {
-  align-items: center;
-  display: inline-flex;
-  gap: 0.625rem;
-  min-width: 0;
+#nd-docs-layout {
+  --fd-sidebar-width: 19rem;
+  grid-template:
+    "sidebar header toc"
+    "sidebar toc-popover toc"
+    "sidebar main toc" 1fr / var(--fd-sidebar-col) minmax(0, 1fr) var(--fd-toc-width) !important;
 }
 
-.appaloft-version-badge {
-  border: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
+#nd-sidebar {
+  background: var(--appaloft-docs-sidebar);
+  border-color: color-mix(in oklch, var(--sidebar-border) 82%, transparent);
+}
+
+#nd-sidebar a,
+#nd-sidebar button {
   border-radius: calc(var(--radius) - 0.125rem);
-  color: var(--muted-foreground);
-  font-family: var(--appaloft-font-mono);
-  font-size: 0.72rem;
-  font-weight: 500;
-  line-height: 1;
-  padding: 0.2rem 0.35rem;
+}
+
+#nd-sidebar :where(a, button)[data-active="true"] {
+  background: color-mix(in oklch, var(--primary) 12%, var(--background));
+  color: var(--accent-foreground);
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--primary) 34%, transparent);
+}
+
+#nd-sidebar :where(a, button):hover {
+  background: color-mix(in oklch, var(--primary) 7%, var(--background));
+  color: var(--foreground);
+}
+
+#nd-subnav {
+  background: color-mix(in oklch, var(--background) 88%, transparent);
+  border-color: color-mix(in oklch, var(--border) 78%, transparent);
+  backdrop-filter: blur(18px);
+}
+
+.fd-page {
+  color: var(--foreground);
+}
+
+#nd-page[data-full="false"] {
+  max-width: none;
+  margin-inline: 0;
+}
+
+#nd-page[data-full="false"] > :where(p, .prose) {
+  max-width: min(100%, 76rem);
+}
+
+.fd-page article {
+  font-size: 0.965rem;
+  line-height: 1.85;
+}
+
+.fd-page article :where(p, li) {
+  color: color-mix(in oklch, var(--foreground) 84%, var(--muted-foreground));
+}
+
+.fd-page article :where(strong, a) {
+  color: var(--foreground);
+}
+
+.fd-page article a {
+  font-weight: 650;
+  text-decoration-color: color-mix(in oklch, var(--primary) 48%, transparent);
+  transition:
+    color 160ms ease,
+    text-decoration-color 160ms ease;
+}
+
+.fd-page article a:hover {
+  color: var(--accent-foreground);
+  text-decoration-color: color-mix(in oklch, var(--primary) 74%, transparent);
+}
+
+.fd-page article :where(code):not(pre code) {
+  border: 1px solid color-mix(in oklch, var(--border) 74%, transparent);
+  border-radius: calc(var(--radius) - 0.25rem);
+  background: color-mix(in oklch, var(--primary) 6%, var(--card));
+  color: color-mix(in oklch, var(--foreground) 86%, var(--primary));
+  font-size: 0.86em;
+  padding: 0.12rem 0.32rem;
+}
+
+.fd-page article :where(blockquote) {
+  border-color: color-mix(in oklch, var(--primary) 42%, var(--border));
+  border-radius: var(--radius);
+  background: color-mix(in oklch, var(--primary) 5%, transparent);
+  padding: 0.85rem 1rem;
+}
+
+.fd-page article :where(table) {
+  overflow: hidden;
+  border-color: color-mix(in oklch, var(--border) 82%, transparent);
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: var(--shadow-2xs);
+}
+
+@media (max-width: 767px) {
+  #nd-docs-layout {
+    grid-template:
+      "header" var(--fd-header-height)
+      "main" 1fr / minmax(0, 1fr) !important;
+  }
+}
+
+.appaloft-docs-title {
+  align-items: center;
+  color: var(--foreground);
+  display: inline-flex;
+  gap: 0.625rem;
+  font-weight: 700;
+  min-width: 0;
 }
 
 .fd-page article img {
