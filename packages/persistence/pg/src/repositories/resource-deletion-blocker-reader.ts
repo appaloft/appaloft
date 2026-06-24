@@ -29,6 +29,20 @@ function blockerFromRows(
   };
 }
 
+function runtimeInstanceBlocker(input: {
+  deploymentId: string;
+  runtimeControlAttemptId?: string;
+}): ResourceDeletionBlocker {
+  return {
+    kind: "runtime-instance",
+    relatedEntityType: input.runtimeControlAttemptId
+      ? "resource-runtime-control-attempt"
+      : "deployment",
+    relatedEntityId: input.runtimeControlAttemptId ?? input.deploymentId,
+    count: 1,
+  };
+}
+
 export class PgResourceDeletionBlockerReader implements ResourceDeletionBlockerReader {
   constructor(private readonly db: Kysely<Database>) {}
 
@@ -90,8 +104,41 @@ export class PgResourceDeletionBlockerReader implements ResourceDeletionBlockerR
             .select("route_set_id as id")
             .where("resource_id", "=", input.resourceId)
             .execute();
+          const currentRuntimeDeployment = await executor
+            .selectFrom("deployments")
+            .select("id")
+            .where("resource_id", "=", input.resourceId)
+            .where("status", "=", "succeeded")
+            .where("target_kind", "!=", "serverless-static-artifact")
+            .where("server_id", "is not", null)
+            .where("archived_at", "is", null)
+            .orderBy("created_at", "desc")
+            .executeTakeFirst();
+          const latestRuntimeControl = currentRuntimeDeployment
+            ? await executor
+                .selectFrom("resource_runtime_control_attempts")
+                .select(["id", "runtime_state", "status"])
+                .where("resource_id", "=", input.resourceId)
+                .where("deployment_id", "=", currentRuntimeDeployment.id)
+                .orderBy("updated_at", "desc")
+                .orderBy("started_at", "desc")
+                .executeTakeFirst()
+            : null;
+          const currentRuntimeStopped =
+            latestRuntimeControl?.status === "succeeded" &&
+            latestRuntimeControl.runtime_state === "stopped";
+          const currentRuntimeBlocker =
+            currentRuntimeDeployment && !currentRuntimeStopped
+              ? runtimeInstanceBlocker({
+                  deploymentId: currentRuntimeDeployment.id,
+                  ...(latestRuntimeControl?.id
+                    ? { runtimeControlAttemptId: latestRuntimeControl.id }
+                    : {}),
+                })
+              : null;
 
           const blockers = [
+            currentRuntimeBlocker,
             blockerFromRows("domain-binding", "domain-binding", domainBindingRows),
             blockerFromRows("certificate", "certificate", certificateRows),
             blockerFromRows("runtime-log-retention", "runtime-log-archive", runtimeLogRows),

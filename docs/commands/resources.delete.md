@@ -34,7 +34,9 @@ The command contract is:
   so normal read paths omit it;
 - accepted success publishes or records `resource-deleted` only for the first archived-to-deleted
   transition;
-- deletion is allowed only for archived resources that pass all deletion guards.
+- deletion is allowed only for archived resources that pass all deletion guards;
+- deletion never stops or removes runtime instances implicitly; callers must stop the runtime first
+  and then rely on delete-check/delete blockers to prove the runtime instance is no longer retained.
 
 ## Global References
 
@@ -218,7 +220,9 @@ future MCP tools must remain intention-revealing and must not expose `resources.
 Delete is intentionally narrower than archive. Most real deployed resources should be archived,
 not deleted, because domain/TLS state, source links, runtime state, retained logs, and support
 context are product data. Deployment history and audit history are retained by their owning
-contexts and do not block deletion by themselves.
+contexts and do not block deletion by themselves. The current runtime instance is different from
+historical deployment or audit records: a retained running, starting, stopping, restarting, or
+unknown runtime-control state blocks deletion as `runtime-instance`.
 
 The command must never perform implicit cleanup of runtime containers, proxy routes, domains,
 certificates, source links, dependency resources, or logs. Each cleanup path needs its own explicit

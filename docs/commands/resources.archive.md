@@ -14,7 +14,8 @@
 ## Normative Contract
 
 `resources.archive` is the source-of-truth command for marking a resource unavailable for new
-profile mutations and deployments while retaining its history and observable support context.
+profile mutations and deployments while stopping the current runtime instance when one is
+authoritatively known, and retaining its history and observable support context.
 
 Command success means the resource lifecycle status is durably `archived`.
 
@@ -28,6 +29,8 @@ The command contract is:
 - accepted success returns `ok({ id })`;
 - accepted success persists the `Resource` aggregate with archived lifecycle status;
 - accepted success publishes or records `resource-archived`;
+- accepted success has either stopped the current server-backed runtime instance through
+  `resources.runtime.stop`, or proved there is no supported current runtime placement to stop;
 - archived resources remain readable through resource read queries where retained;
 - archived resources cannot receive new deployments or profile mutation commands.
 
@@ -53,7 +56,7 @@ summaries, or deployment records.
 It is not:
 
 - a generic resource update command;
-- a runtime stop command;
+- a direct runtime adapter command;
 - a deployment cancel command;
 - a rollback or redeploy command;
 - a domain binding deletion command;
@@ -99,11 +102,15 @@ raw strings:
 New resources start as `active`. An active resource can transition to `archived` exactly once.
 Archiving preserves the resource identity, slug, project/environment ownership, source profile,
 runtime profile, network profile, health policy, service declarations, deployment history, access
-summaries, diagnostics, logs, and audit context.
+summaries, diagnostics, logs, and audit context. When a current server-backed runtime placement is
+known, archive first coordinates `resources.runtime.stop` for that placement. Unsupported static
+publishing targets, resources without runtime placement metadata, and resources whose retained
+runtime state is already stopped do not block the lifecycle archive.
 
-Already archived resources are idempotent for this command: the command returns `ok({ id })`,
-does not change `archivedAt` or `reason`, and does not publish a duplicate `resource-archived`
-event.
+Already archived resources are idempotent for this command's lifecycle mutation: the command
+returns `ok({ id })`, does not change `archivedAt` or `reason`, and does not publish a duplicate
+`resource-archived` event. The command may still re-run the runtime stop coordination so retries can
+repair an older archived resource whose retained runtime instance is still running.
 
 ## Admission Flow
 
@@ -115,16 +122,22 @@ The command must:
 4. Reject missing or invisible resource with `not_found`.
 5. Treat an already archived resource as idempotent success.
 6. Reject deletion-only or corrupted lifecycle states with `invariant_violation`.
-7. Capture archive time through the injected clock.
-8. Persist archived lifecycle status, archive timestamp, and optional safe reason.
-9. Publish or record `resource-archived` when the state changes.
-10. Return `ok({ id })`.
+7. Coordinate runtime stop through `resources.runtime.stop` when retained placement metadata
+   identifies a current server-backed runtime instance.
+8. Treat missing runtime placement metadata, unsupported runtime-control target metadata, and
+   already-stopped runtime state as no runtime side effect needed.
+9. Fail before mutating lifecycle state when a supported runtime stop is attempted but does not
+   complete successfully.
+10. Capture archive time through the injected clock.
+11. Persist archived lifecycle status, archive timestamp, and optional safe reason.
+12. Publish or record `resource-archived` when the state changes.
+13. Return `ok({ id })`.
 
 ## Resource-Specific Rules
 
-Archiving is a management lifecycle change. It does not stop current runtime, delete containers,
-remove proxy routes, unbind domains, revoke certificates, delete source links, delete deployment
-history, or clear logs.
+Archiving is a management lifecycle change with an explicit runtime-stop coordination step. It does
+not delete containers, prune images, remove proxy routes, unbind domains, revoke certificates,
+delete source links, delete deployment history, or clear logs.
 
 After archive:
 
@@ -133,11 +146,9 @@ After archive:
 - `deployments.create` must reject the resource;
 - `resources.configure-source`, `resources.configure-runtime`, `resources.configure-network`, and
   `resources.configure-health` must reject the resource;
-- domain/TLS and access cleanup require their own explicit commands;
+- stopped runtime containers, domain/TLS state, access routes, and source/dependency cleanup require
+  their own explicit commands or maintenance workflows;
 - hard deletion requires `resources.delete` and deletion guards.
-
-If a future runtime stop command exists, archive workflows may recommend running it first, but
-`resources.archive` must not hide that runtime side effect.
 
 ## Error Contract
 

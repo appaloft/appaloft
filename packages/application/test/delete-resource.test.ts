@@ -223,6 +223,40 @@ describe("DeleteResourceUseCase", () => {
     });
   });
 
+  test("[RES-PROFILE-DELETE-CHECK-002A] archived resource delete-check reports retained runtime-instance blocker", async () => {
+    const { context, resources } = await createHarness();
+    const service = new CheckResourceDeleteSafetyQueryService(
+      resources,
+      new FixedDeletionBlockerReader([
+        {
+          kind: "runtime-instance",
+          relatedEntityId: "rtc_running",
+          relatedEntityType: "resource-runtime-control-attempt",
+          count: 1,
+        },
+      ]),
+      new FixedClock("2026-01-01T00:00:10.000Z"),
+    );
+
+    const result = await service.execute(context, new CheckResourceDeleteSafetyQuery("res_web"));
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      schemaVersion: "resources.delete-check/v1",
+      resourceId: "res_web",
+      lifecycleStatus: "archived",
+      eligible: false,
+      blockers: [
+        {
+          kind: "runtime-instance",
+          relatedEntityId: "rtc_running",
+          relatedEntityType: "resource-runtime-control-attempt",
+          count: 1,
+        },
+      ],
+    });
+  });
+
   test("[RES-PROFILE-DELETE-CHECK-003] archived resource delete-check is eligible without retained blockers", async () => {
     const { context, resources } = await createHarness();
     const service = new CheckResourceDeleteSafetyQueryService(
@@ -397,6 +431,45 @@ describe("DeleteResourceUseCase", () => {
       "terminal-session",
       "runtime-log-retention",
     ]);
+    expect(eventBus.events).toHaveLength(0);
+  });
+
+  test("[RES-PROFILE-DELETE-006A] blocks archived resource deletion while a runtime instance is retained", async () => {
+    const { context, eventBus, repositoryContext, resources, useCase } = await createHarness({
+      blockers: [
+        {
+          kind: "runtime-instance",
+          relatedEntityId: "rtc_running",
+          relatedEntityType: "resource-runtime-control-attempt",
+          count: 1,
+        },
+      ],
+    });
+
+    const result = await useCase.execute(context, {
+      resourceId: "res_web",
+      confirmation: {
+        resourceSlug: "web",
+      },
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "resource_delete_blocked",
+      details: {
+        phase: "resource-deletion-guard",
+        lifecycleStatus: "archived",
+        deletionBlockers: ["runtime-instance"],
+        relatedEntityId: "rtc_running",
+        relatedEntityType: "resource-runtime-control-attempt",
+        blockerCount: 1,
+      },
+    });
+    const persisted = await resources.findOne(
+      repositoryContext,
+      ResourceByIdSpec.create(ResourceId.rehydrate("res_web")),
+    );
+    expect(persisted?.toState().lifecycleStatus.value).toBe("archived");
     expect(eventBus.events).toHaveLength(0);
   });
 
