@@ -30,6 +30,7 @@ import {
   type ExecutionContext,
   type ExecutionContextFactory,
   type ExecutionProviderAccessTokens,
+  ExportGlobalAuditEventsQuery,
   type GitHubPreviewPullRequestWebhookVerifier,
   type GitHubSourceEventWebhookVerifier,
   type IdGenerator,
@@ -76,6 +77,12 @@ import {
 } from "@appaloft/auth-better";
 import { type AppConfig, resolveConfig } from "@appaloft/config";
 import { domainError, err, ok, type Result } from "@appaloft/core";
+import {
+  type AppaloftTranslate,
+  createAppaloftTranslator,
+  i18nKeys,
+  resolveAppaloftLocaleFromHeaders,
+} from "@appaloft/i18n";
 import { createGitHubActionSourcePackageConfigReader } from "@appaloft/integration-github";
 import {
   bootstrapOpenTelemetry,
@@ -251,6 +258,11 @@ export interface AppaloftServerOptions {
   embeddedDocsAssets?: Readonly<Record<string, Blob>>;
   pgliteRuntimeAssets?: PgliteRuntimeAssets;
   remotePgliteStateSyncSession?: AppaloftRemotePgliteStateSyncSession;
+  auditLogConsole?: {
+    enabled?: boolean;
+    routeEnabled?: boolean;
+    webExtensionEnabled?: boolean;
+  };
   authRuntime?: AuthRuntime;
   extensions?: readonly AppaloftServerExtension[];
   systemPlugins?: readonly SystemPluginDefinition[];
@@ -577,6 +589,942 @@ async function configureServerExtensions(input: {
   return http;
 }
 
+function configurePublicAuditLogConsoleExtension(input: {
+  http: AppaloftServerHttpContext["http"];
+  resolveExecutionContextFactory: () => ExecutionContextFactory | undefined;
+  resolveQueryBus: () => QueryBus | undefined;
+  routeEnabled: boolean;
+  webExtensionEnabled: boolean;
+}): void {
+  if (input.webExtensionEnabled) {
+    input.http.webExtensions.push(
+      {
+        key: "appaloft-audit-log.navigation",
+        title: "Audit Log",
+        localizations: {
+          "zh-CN": {
+            title: "审计日志",
+            description: "查看 Appaloft 实例保留的审计事件。",
+          },
+          "en-US": {
+            title: "Audit Log",
+            description: "View retained audit events for this Appaloft instance.",
+          },
+        },
+        description: "View retained audit events for this Appaloft instance.",
+        icon: "shield",
+        path: "/audit-log",
+        placement: "navigation",
+        target: "console-route",
+        requiresAuth: true,
+        metadata: {
+          renderer: "console-page",
+          pageEndpoint: "/audit-log/console-page?query={query}",
+        },
+      },
+      {
+        key: "appaloft-audit-log.project-route",
+        title: "Audit Log",
+        localizations: {
+          "zh-CN": {
+            title: "审计日志",
+            description: "查看当前项目或资源相关的审计事件。",
+          },
+          "en-US": {
+            title: "Audit Log",
+            description: "View audit events related to the current project or resource.",
+          },
+        },
+        description: "View audit events related to the current project or resource.",
+        icon: "shield",
+        path: "/projects",
+        placement: "route",
+        target: "console-route",
+        requiresAuth: true,
+        metadata: {
+          renderer: "console-page",
+          pageEndpoint:
+            "/audit-log/console-page?projectId={projectId}&aggregateId={resourceId}&basePath={pathname}&query={query}",
+        },
+      },
+      {
+        key: "appaloft-audit-log.resource-route",
+        title: "Audit Log",
+        localizations: {
+          "zh-CN": {
+            title: "审计日志",
+            description: "查看当前资源相关的审计事件。",
+          },
+          "en-US": {
+            title: "Audit Log",
+            description: "View audit events related to the current resource.",
+          },
+        },
+        description: "View audit events related to the current resource.",
+        icon: "shield",
+        path: "/resources",
+        placement: "route",
+        target: "console-route",
+        requiresAuth: true,
+        metadata: {
+          renderer: "console-page",
+          pageEndpoint:
+            "/audit-log/console-page?aggregateId={resourceId}&basePath={pathname}&query={query}",
+        },
+      },
+    );
+  }
+
+  if (!input.routeEnabled) {
+    return;
+  }
+
+  input.http.routes.push({
+    method: "GET",
+    path: "/audit-log/console-page",
+    handle: async ({ request, query }) => {
+      const sourcePageQuery = stringQuery(query, "query");
+      const pageQuery = consolePageQuery(query);
+      const locale = resolveAppaloftLocaleFromHeaders(request.headers);
+      const t = createAppaloftTranslator({ locale });
+      const executionContextFactory = input.resolveExecutionContextFactory();
+      const queryBus = input.resolveQueryBus();
+      if (!executionContextFactory || !queryBus) {
+        return auditLogConsoleErrorPage(t, t(i18nKeys.console.auditLog.runtimeNotReady));
+      }
+
+      const range = stringQuery(pageQuery, "range");
+      const days = range === "7d" ? 7 : 30;
+      const to = new Date();
+      const from = new Date(to.getTime() - days * 24 * 60 * 60 * 1000);
+      const organizationId = stringQuery(pageQuery, "organizationId");
+      const aggregateId = stringQuery(pageQuery, "aggregateId");
+      const projectId = stringQuery(pageQuery, "projectId");
+      const actions = stringQueries(pageQuery, "action");
+      const resourceTypes = stringQueries(pageQuery, "resourceType");
+      const actorIds = stringQueries(pageQuery, "actorId");
+      const cursor = stringQuery(pageQuery, "cursor");
+      const cursorStack = stringQueries(pageQuery, "cursorStack");
+      const basePath = stringQuery(pageQuery, "basePath") ?? "/audit-log";
+      const baseQuery = auditLogBaseQuery(sourcePageQuery);
+      const pageLimit = 10;
+      const auditQuery = ExportGlobalAuditEventsQuery.create({
+        from: from.toISOString(),
+        to: to.toISOString(),
+        limit: pageLimit,
+        order: "desc",
+        ...(cursor ? { cursor } : {}),
+        ...(aggregateId ? { aggregateId } : {}),
+        ...(projectId && !aggregateId ? { projectId } : {}),
+        ...(stringQuery(pageQuery, "eventType")
+          ? { eventType: stringQuery(pageQuery, "eventType") }
+          : {}),
+        ...(organizationId ? { organizationId } : {}),
+        ...(actions.length > 0 ? { action: actions } : {}),
+        ...(resourceTypes.length > 0 ? { resourceType: resourceTypes } : {}),
+        ...(actorIds.length > 0 ? { actorId: actorIds } : {}),
+      });
+
+      if (auditQuery.isErr()) {
+        return auditLogConsoleErrorPage(t, auditQuery.error.message);
+      }
+
+      const requestId = request.headers.get("x-request-id") ?? undefined;
+      const context = executionContextFactory.create({
+        entrypoint: "http",
+        locale,
+        ...(requestId ? { requestId } : {}),
+      });
+      const result = await queryBus
+        .execute(context, auditQuery.value)
+        .catch((error: unknown) => err(error));
+
+      return result.match(
+        (readback) => {
+          const events = readback.items;
+          const filterState = {
+            activeRange: range === "7d" ? "7d" : "30d",
+            activeResourceTypes: resourceTypes,
+            activeActions: actions,
+            activeActorIds: actorIds,
+            basePath,
+            baseQuery,
+          } satisfies AuditLogFilterState;
+          const pagination = auditLogPagination({
+            ...(cursor ? { cursor } : {}),
+            cursorStack,
+            filterState,
+            limit: pageLimit,
+            ...(readback.nextCursor ? { nextCursor: readback.nextCursor } : {}),
+            rowCount: events.length,
+            t,
+          });
+
+          return auditLogConsolePage({
+            ...filterState,
+            t,
+            actionFilters: auditLogActionFilters(events, filterState, t),
+            actorFilters: auditLogActorFilters(events, filterState, t),
+            ...(pagination ? { pagination } : {}),
+            events: events.map((event) => ({
+              id: event.auditEventId,
+              time: auditTimeCell(event.createdAt),
+              actor: auditActorCell(event.payload),
+              action: auditActionCell(t, event.eventType, event.payload),
+              resource: auditResourceCell(t, event.aggregateId, event.payload),
+              result: auditResultCell(
+                t,
+                auditPayloadString(event.payload, ["result", "outcome", "status"]) ?? "recorded",
+              ),
+            })),
+          });
+        },
+        (error) => auditLogConsoleErrorPage(t, errorMessage(t, error)),
+      );
+    },
+  });
+}
+
+function createPublicAuditLogConsoleServerExtension(input: {
+  resolveExecutionContextFactory: () => ExecutionContextFactory | undefined;
+  resolveQueryBus: () => QueryBus | undefined;
+  routeEnabled: boolean;
+  webExtensionEnabled: boolean;
+}): AppaloftServerExtension {
+  return {
+    name: "public-audit-log-console",
+    configureHttp({ http }) {
+      configurePublicAuditLogConsoleExtension({
+        http,
+        resolveExecutionContextFactory: input.resolveExecutionContextFactory,
+        resolveQueryBus: input.resolveQueryBus,
+        routeEnabled: input.routeEnabled,
+        webExtensionEnabled: input.webExtensionEnabled,
+      });
+    },
+  };
+}
+
+type AuditLogFilterState = {
+  activeRange: "7d" | "30d";
+  activeResourceTypes: readonly string[];
+  activeActions: readonly string[];
+  activeActorIds: readonly string[];
+  basePath: string;
+  baseQuery: string;
+};
+
+function auditLogConsolePage(
+  input: AuditLogFilterState & {
+    actionFilters: ReturnType<typeof auditLogActionFilters>;
+    actorFilters: ReturnType<typeof auditLogActorFilters>;
+    pagination?: Record<string, unknown>;
+    t: AppaloftTranslate;
+    events: Array<{
+      id: string;
+      time: Record<string, unknown>;
+      actor: Record<string, unknown>;
+      action: Record<string, unknown>;
+      resource: string | Record<string, unknown>;
+      result: Record<string, unknown>;
+    }>;
+  },
+): Record<string, unknown> {
+  const { t } = input;
+
+  return {
+    schemaVersion: "appaloft.console.extension-page/v1",
+    title: t(i18nKeys.console.auditLog.title),
+    description: t(i18nKeys.console.auditLog.description),
+    sections: [
+      {
+        kind: "table",
+        height: "tall",
+        filters: [
+          {
+            label: t(i18nKeys.console.auditLog.timeRange),
+            items: auditLogRangeFilters(input, t),
+          },
+          {
+            label: t(i18nKeys.console.auditLog.resourceType),
+            type: "multi-select",
+            items: auditLogResourceTypeFilters(input, t),
+          },
+          {
+            label: t(i18nKeys.console.auditLog.actionFilter),
+            type: "multi-select",
+            items: input.actionFilters,
+          },
+          {
+            label: t(i18nKeys.console.auditLog.actorFilter),
+            type: "multi-select",
+            items: input.actorFilters,
+          },
+        ],
+        columns: [
+          { key: "time", label: t(i18nKeys.console.auditLog.columnTime) },
+          { key: "actor", label: t(i18nKeys.console.auditLog.columnActor) },
+          { key: "action", label: t(i18nKeys.console.auditLog.columnAction) },
+          { key: "resource", label: t(i18nKeys.console.auditLog.columnResource) },
+          { key: "result", label: t(i18nKeys.console.auditLog.columnResult) },
+        ],
+        rows: input.events.map((event) => ({
+          key: event.id,
+          cells: {
+            time: event.time,
+            actor: event.actor,
+            action: event.action,
+            resource: event.resource,
+            result: event.result,
+          },
+        })),
+        ...(input.pagination ? { pagination: input.pagination } : {}),
+        emptyLabel: t(i18nKeys.console.auditLog.empty),
+      },
+    ],
+  };
+}
+
+function auditLogRangeFilters(filterState: AuditLogFilterState, t: AppaloftTranslate) {
+  return [
+    {
+      label: t(i18nKeys.console.auditLog.last30Days),
+      href: auditLogHref({ ...filterState, activeRange: "30d" }),
+      active: filterState.activeRange === "30d",
+    },
+    {
+      label: t(i18nKeys.console.auditLog.last7Days),
+      href: auditLogHref({ ...filterState, activeRange: "7d" }),
+      active: filterState.activeRange === "7d",
+    },
+  ];
+}
+
+function auditLogPagination(input: {
+  cursor?: string;
+  cursorStack: readonly string[];
+  filterState: AuditLogFilterState;
+  limit: number;
+  nextCursor?: string;
+  rowCount: number;
+  t: AppaloftTranslate;
+}): Record<string, unknown> | undefined {
+  const { cursor, cursorStack, filterState, limit, nextCursor, rowCount, t } = input;
+  if (!cursor && !nextCursor) {
+    return undefined;
+  }
+  const previousCursor = cursor ? cursorStack.at(-1) : undefined;
+  const previousStack = cursor ? cursorStack.slice(0, -1) : [];
+  const nextStack = cursor ? [...cursorStack, cursor] : cursorStack;
+
+  return {
+    label: t(i18nKeys.console.auditLog.paginationLabel, { count: rowCount, limit }),
+    previousLabel: t(i18nKeys.console.auditLog.previousPage),
+    nextLabel: t(i18nKeys.console.auditLog.nextPage),
+    ...(cursor
+      ? {
+          previousHref: auditLogHref(
+            filterState,
+            previousCursor
+              ? {
+                  cursor: previousCursor,
+                  cursorStack: previousStack,
+                }
+              : {
+                  cursorStack: previousStack,
+                },
+          ),
+        }
+      : {}),
+    ...(nextCursor
+      ? {
+          nextHref: auditLogHref(filterState, {
+            cursor: nextCursor,
+            cursorStack: nextStack,
+          }),
+        }
+      : {}),
+  };
+}
+
+function auditLogResourceTypeFilters(filterState: AuditLogFilterState, t: AppaloftTranslate) {
+  const resourceTypes = [
+    { value: undefined, label: t(i18nKeys.console.auditLog.allResourceTypes), icon: "layers" },
+    {
+      value: "project",
+      label: t(i18nKeys.console.auditLog.resourceTypes.project),
+      icon: "folder-plus",
+    },
+    { value: "resource", label: t(i18nKeys.console.auditLog.resourceTypes.resource), icon: "box" },
+    {
+      value: "deployment",
+      label: t(i18nKeys.console.auditLog.resourceTypes.deployment),
+      icon: "rocket",
+    },
+    {
+      value: "dependency_resource",
+      label: t(i18nKeys.console.auditLog.resourceTypes.dependencyResource),
+      icon: "database",
+    },
+    {
+      value: "domain_binding",
+      label: t(i18nKeys.console.auditLog.resourceTypes.domainBinding),
+      icon: "globe",
+    },
+    { value: "server", label: t(i18nKeys.console.auditLog.resourceTypes.server), icon: "server" },
+    {
+      value: "static_artifact",
+      label: t(i18nKeys.console.auditLog.resourceTypes.staticArtifact),
+      icon: "file",
+    },
+    {
+      value: "storage_volume",
+      label: t(i18nKeys.console.auditLog.resourceTypes.storageVolume),
+      icon: "hard-drive",
+    },
+  ];
+
+  return resourceTypes.map((item) => ({
+    label: item.label,
+    icon: item.icon,
+    href: auditLogHref({
+      ...filterState,
+      activeResourceTypes: item.value
+        ? toggleFilterValue(filterState.activeResourceTypes, item.value)
+        : [],
+    }),
+    active:
+      (item.value ? filterState.activeResourceTypes.includes(item.value) : false) ||
+      (filterState.activeResourceTypes.length === 0 && !item.value),
+  }));
+}
+
+function auditLogActionFilters(
+  events: readonly { eventType: string; payload: Record<string, unknown> }[],
+  filterState: AuditLogFilterState,
+  t: AppaloftTranslate,
+) {
+  const actions = new Set<string>();
+  for (const event of events) {
+    const action = auditPayloadString(event.payload, ["action"]) ?? event.eventType;
+    if (action) {
+      actions.add(action);
+    }
+  }
+  for (const activeAction of filterState.activeActions) {
+    actions.add(activeAction);
+  }
+
+  return [
+    {
+      label: t(i18nKeys.console.auditLog.allActions),
+      href: auditLogHref({ ...filterState, activeActions: [] }),
+      active: filterState.activeActions.length === 0,
+    },
+    ...Array.from(actions)
+      .sort()
+      .map((action) => ({
+        label: auditActionLabel(t, action),
+        href: auditLogHref({
+          ...filterState,
+          activeActions: toggleFilterValue(filterState.activeActions, action),
+        }),
+        active: filterState.activeActions.includes(action),
+      })),
+  ];
+}
+
+function auditLogActorFilters(
+  events: readonly { payload: Record<string, unknown> }[],
+  filterState: AuditLogFilterState,
+  t: AppaloftTranslate,
+) {
+  const actors = new Map<string, string>();
+  for (const event of events) {
+    const actorId = auditPayloadString(event.payload, ["actorId", "userId"]);
+    if (!actorId) {
+      continue;
+    }
+    actors.set(actorId, auditPayloadString(event.payload, ["actorLabel", "actor"]) ?? actorId);
+  }
+  for (const activeActorId of filterState.activeActorIds) {
+    if (!actors.has(activeActorId)) {
+      actors.set(activeActorId, activeActorId);
+    }
+  }
+
+  return [
+    {
+      label: t(i18nKeys.console.auditLog.allActors),
+      href: auditLogHref({ ...filterState, activeActorIds: [] }),
+      active: filterState.activeActorIds.length === 0,
+    },
+    ...Array.from(actors.entries()).map(([actorId, label]) => ({
+      label,
+      href: auditLogHref({
+        ...filterState,
+        activeActorIds: toggleFilterValue(filterState.activeActorIds, actorId),
+      }),
+      active: filterState.activeActorIds.includes(actorId),
+    })),
+  ];
+}
+
+function auditLogHref(
+  input: AuditLogFilterState,
+  page?: { cursor?: string; cursorStack?: readonly string[] },
+): string {
+  const query = new URLSearchParams(input.baseQuery);
+  if (input.activeRange === "7d") {
+    query.set("range", "7d");
+  }
+  for (const resourceType of input.activeResourceTypes) {
+    query.append("resourceType", resourceType);
+  }
+  for (const action of input.activeActions) {
+    query.append("action", action);
+  }
+  for (const actorId of input.activeActorIds) {
+    query.append("actorId", actorId);
+  }
+  if (page?.cursor) {
+    query.set("cursor", page.cursor);
+  }
+  for (const cursorStackEntry of page?.cursorStack ?? []) {
+    query.append("cursorStack", cursorStackEntry);
+  }
+  const serialized = query.toString();
+  const basePath = input.basePath || "/audit-log";
+  return serialized ? `${basePath}?${serialized}` : basePath;
+}
+
+const auditLogOwnedQueryKeys = new Set([
+  "range",
+  "resourceType",
+  "action",
+  "actorId",
+  "cursor",
+  "cursorStack",
+]);
+
+function auditLogBaseQuery(serializedQuery: string | undefined): string {
+  const source = new URLSearchParams(serializedQuery ?? "");
+  const preserved = new URLSearchParams();
+  for (const [key, value] of source.entries()) {
+    if (!auditLogOwnedQueryKeys.has(key)) {
+      preserved.append(key, value);
+    }
+  }
+  return preserved.toString();
+}
+
+function toggleFilterValue(values: readonly string[], value: string): readonly string[] {
+  if (values.includes(value)) {
+    return values.filter((item) => item !== value);
+  }
+  return [...values, value].sort();
+}
+
+function auditLogConsoleErrorPage(t: AppaloftTranslate, message: string): Record<string, unknown> {
+  return {
+    schemaVersion: "appaloft.console.extension-page/v1",
+    title: t(i18nKeys.console.auditLog.title),
+    description: t(i18nKeys.console.auditLog.unavailableDescription),
+    badge: t(i18nKeys.console.auditLog.unavailableBadge),
+    sections: [
+      {
+        kind: "callouts",
+        items: [
+          {
+            title: t(i18nKeys.console.auditLog.unavailableTitle),
+            description: message,
+            tone: "danger",
+          },
+        ],
+      },
+    ],
+  };
+}
+
+function errorMessage(t: AppaloftTranslate, error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof error.message === "string"
+  ) {
+    return error.message;
+  }
+  return t(i18nKeys.console.auditLog.errorFallback);
+}
+
+function auditTimeCell(createdAt: string): Record<string, unknown> {
+  return {
+    kind: "datetime",
+    value: createdAt,
+    format: "date-time",
+  };
+}
+
+function auditActorCell(payload: Record<string, unknown>): Record<string, unknown> {
+  const label =
+    auditPayloadString(payload, ["actorLabel", "actor", "actorId", "userId"]) ??
+    auditPayloadString(payload, ["actorKind"]) ??
+    "-";
+  const description = auditPayloadString(payload, ["actorKind", "entrypoint"]);
+  return {
+    kind: "actor",
+    label,
+    ...(description ? { description } : {}),
+    initials: auditInitials(label),
+  };
+}
+
+function auditActionCell(
+  t: AppaloftTranslate,
+  eventType: string,
+  payload: Record<string, unknown>,
+): Record<string, unknown> {
+  const actionKey = auditActionKey(t, eventType, payload);
+  return {
+    kind: "icon-label",
+    label: auditActionLabel(t, actionKey),
+    icon: auditActionIcon(actionKey),
+    tone: auditActionTone(actionKey),
+  };
+}
+
+function auditActionKey(
+  t: AppaloftTranslate,
+  eventType: string,
+  payload: Record<string, unknown>,
+): string {
+  const operationKey = auditPayloadString(payload, ["operationKey"]);
+  if (operationKey) {
+    const operationLabel = auditActionLabel(t, operationKey);
+    if (operationLabel !== operationKey) {
+      return operationKey;
+    }
+  }
+  const action = auditPayloadString(payload, ["action"]);
+  if (action) {
+    const actionLabel = auditActionLabel(t, action);
+    if (actionLabel !== action) {
+      return action;
+    }
+  }
+  return operationKey ?? action ?? eventType;
+}
+
+function auditActionLabel(t: AppaloftTranslate, eventType: string): string {
+  switch (eventType) {
+    case "create":
+      return t(i18nKeys.console.auditLog.actionFilters.create);
+    case "archive":
+      return t(i18nKeys.console.auditLog.actionFilters.archive);
+    case "restore":
+      return t(i18nKeys.console.auditLog.actionFilters.restore);
+    case "delete":
+      return t(i18nKeys.console.auditLog.actionFilters.delete);
+    case "rename":
+      return t(i18nKeys.console.auditLog.actionFilters.rename);
+    case "publish":
+      return t(i18nKeys.console.auditLog.actionFilters.publish);
+    case "retry":
+      return t(i18nKeys.console.auditLog.actionFilters.retry);
+    case "redeploy":
+      return t(i18nKeys.console.auditLog.actionFilters.redeploy);
+    case "rollback":
+      return t(i18nKeys.console.auditLog.actionFilters.rollback);
+    case "cancel":
+      return t(i18nKeys.console.auditLog.actionFilters.cancel);
+    case "set-variable":
+      return t(i18nKeys.console.auditLog.actionFilters.setVariable);
+    case "set-description":
+      return t(i18nKeys.console.auditLog.actions.projectsSetDescription);
+    case "deployment-succeeded":
+      return t(i18nKeys.console.auditLog.actionFilters.succeeded);
+    case "deployment-failed":
+      return t(i18nKeys.console.auditLog.actionFilters.failed);
+    case "projects.create":
+      return t(i18nKeys.console.auditLog.actions.projectsCreate);
+    case "projects.set-description":
+      return t(i18nKeys.console.auditLog.actions.projectsSetDescription);
+    case "projects.archive":
+      return t(i18nKeys.console.auditLog.actions.projectsArchive);
+    case "resources.create":
+    case "resource-created":
+      return t(i18nKeys.console.auditLog.actions.resourceCreated);
+    case "deployments.create":
+      return t(i18nKeys.console.auditLog.actions.deploymentsCreate);
+    case "dependency-resources.create":
+    case "dependency-resources.create-backup":
+      return t(i18nKeys.console.auditLog.actions.dependencyResourcesCreate);
+    case "domain-bindings.create":
+      return t(i18nKeys.console.auditLog.actions.domainBindingsCreate);
+    case "servers.create":
+      return t(i18nKeys.console.auditLog.actions.serversCreate);
+    case "static-artifacts.publish":
+      return t(i18nKeys.console.auditLog.actions.staticArtifactsPublish);
+    case "server-capacity-pruned":
+      return t(i18nKeys.console.auditLog.actions.serverCapacityPruned);
+    case "storage-volume-runtime-cleaned":
+      return t(i18nKeys.console.auditLog.actions.storageVolumeRuntimeCleaned);
+    case "terminal-session-opened":
+      return t(i18nKeys.console.auditLog.actions.terminalSessionOpened);
+    case "terminal-session-closed":
+      return t(i18nKeys.console.auditLog.actions.terminalSessionClosed);
+    case "resource-variable-set":
+      return t(i18nKeys.console.auditLog.actions.resourceVariableSet);
+    case "server-renamed":
+    case "servers.rename":
+      return t(i18nKeys.console.auditLog.actions.serverRenamed);
+    default:
+      return eventType;
+  }
+}
+
+function auditActionIcon(eventType: string): string {
+  switch (eventType) {
+    case "projects.create":
+      return "folder-plus";
+    case "projects.set-description":
+      return "pencil";
+    case "resources.create":
+    case "resource-created":
+      return "box";
+    case "deployments.create":
+    case "redeploy":
+      return "rocket";
+    case "dependency-resources.create":
+    case "dependency-resources.create-backup":
+      return "plug";
+    case "domain-bindings.create":
+      return "plug";
+    case "servers.create":
+      return "plus";
+    case "static-artifacts.publish":
+    case "publish":
+      return "upload";
+    case "projects.archive":
+    case "archive":
+      return "archive";
+    case "restore":
+    case "rollback":
+      return "undo";
+    case "delete":
+      return "trash";
+    case "rename":
+    case "server-renamed":
+    case "servers.rename":
+    case "set-description":
+      return "pencil";
+    case "retry":
+      return "refresh";
+    case "set-variable":
+    case "resource-variable-set":
+      return "sliders";
+    case "deployment-succeeded":
+      return "check";
+    case "deployment-failed":
+    case "cancel":
+      return "x";
+    default:
+      return eventType.endsWith(".create") || eventType === "create" ? "plus" : "activity";
+  }
+}
+
+function auditActionTone(eventType: string): "positive" | "warning" | "danger" | "muted" {
+  switch (eventType) {
+    case "deployment-succeeded":
+      return "positive";
+    case "deployment-failed":
+    case "delete":
+    case "cancel":
+      return "danger";
+    case "archive":
+    case "projects.archive":
+    case "rollback":
+      return "warning";
+    default:
+      return "muted";
+  }
+}
+
+function auditResourceCell(
+  t: AppaloftTranslate,
+  aggregateId: string,
+  payload: Record<string, unknown>,
+): string | Record<string, unknown> {
+  const resourceType = auditPayloadString(payload, ["resourceType"]);
+  const resourceId =
+    auditPayloadString(payload, ["resourceId"]) ??
+    auditPayloadString(payload, ["projectId", "deploymentId", "serverId", "domainBindingId"]) ??
+    aggregateId;
+  if (!resourceType || !resourceId) {
+    return aggregateId;
+  }
+
+  const typeLabel = auditResourceTypeLabel(t, resourceType);
+  const label = `${typeLabel}:${resourceId}`;
+  const href = auditResourceHref(resourceType, resourceId);
+  if (!href) {
+    return label;
+  }
+
+  return {
+    kind: "link",
+    label,
+    href,
+  };
+}
+
+function auditResourceTypeLabel(t: AppaloftTranslate, resourceType: string): string {
+  switch (resourceType) {
+    case "project":
+      return t(i18nKeys.console.auditLog.resourceTypes.project);
+    case "resource":
+      return t(i18nKeys.console.auditLog.resourceTypes.resource);
+    case "deployment":
+      return t(i18nKeys.console.auditLog.resourceTypes.deployment);
+    case "dependency_resource":
+      return t(i18nKeys.console.auditLog.resourceTypes.dependencyResource);
+    case "domain_binding":
+      return t(i18nKeys.console.auditLog.resourceTypes.domainBinding);
+    case "server":
+      return t(i18nKeys.console.auditLog.resourceTypes.server);
+    case "static_artifact":
+      return t(i18nKeys.console.auditLog.resourceTypes.staticArtifact);
+    case "storage_volume":
+      return t(i18nKeys.console.auditLog.resourceTypes.storageVolume);
+    default:
+      return resourceType;
+  }
+}
+
+function auditResourceHref(resourceType: string, resourceId: string): string | undefined {
+  switch (resourceType) {
+    case "project":
+      return `/projects/${encodeURIComponent(resourceId)}`;
+    case "resource":
+      return `/resources/${encodeURIComponent(resourceId)}`;
+    case "deployment":
+      return `/deployments/${encodeURIComponent(resourceId)}`;
+    case "dependency_resource":
+      return `/dependency-resources/${encodeURIComponent(resourceId)}`;
+    case "domain_binding":
+      return `/domain-bindings/${encodeURIComponent(resourceId)}`;
+    case "server":
+      return `/servers/${encodeURIComponent(resourceId)}`;
+    default:
+      return undefined;
+  }
+}
+
+function auditResultCell(t: AppaloftTranslate, result: string): Record<string, unknown> {
+  return {
+    kind: "badge",
+    label: auditResultLabel(t, result),
+    tone: auditResultTone(result),
+  };
+}
+
+function auditResultLabel(t: AppaloftTranslate, result: string): string {
+  switch (result.toLowerCase()) {
+    case "success":
+    case "succeeded":
+      return t(i18nKeys.console.auditLog.resultSuccess);
+    case "failure":
+    case "failed":
+    case "error":
+      return t(i18nKeys.console.auditLog.resultFailure);
+    case "skipped":
+      return t(i18nKeys.console.auditLog.resultSkipped);
+    case "recorded":
+      return t(i18nKeys.console.auditLog.resultRecorded);
+    default:
+      return result;
+  }
+}
+
+function auditResultTone(result: string): "positive" | "warning" | "danger" | "muted" {
+  switch (result.toLowerCase()) {
+    case "success":
+    case "succeeded":
+      return "positive";
+    case "failure":
+    case "failed":
+    case "error":
+      return "danger";
+    case "skipped":
+      return "warning";
+    default:
+      return "muted";
+  }
+}
+
+function auditInitials(label: string): string {
+  const words = label
+    .split(/[\s@._-]+/)
+    .map((word) => word.trim())
+    .filter(Boolean);
+  return (
+    words
+      .slice(0, 2)
+      .map((word) => word[0]?.toUpperCase() ?? "")
+      .join("") || "AP"
+  );
+}
+
+function auditPayloadString(
+  payload: Record<string, unknown>,
+  keys: readonly string[],
+): string | undefined {
+  for (const key of keys) {
+    const value = payload[key];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value;
+    }
+    if (typeof value === "number" || typeof value === "boolean") {
+      return String(value);
+    }
+  }
+  return undefined;
+}
+
+function stringQuery(query: URLSearchParams, name: string): string | undefined {
+  const value = query.get(name)?.trim();
+  return value ? value : undefined;
+}
+
+function stringQueries(query: URLSearchParams, name: string): readonly string[] {
+  return Array.from(
+    new Set(
+      query
+        .getAll(name)
+        .map((value) => value.trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
+function consolePageQuery(query: URLSearchParams): URLSearchParams {
+  const nested = stringQuery(query, "query");
+  if (!nested) {
+    return query;
+  }
+  const merged = new URLSearchParams(nested);
+  for (const [key, value] of query.entries()) {
+    if (key !== "query" && !merged.has(key)) {
+      merged.append(key, value);
+    }
+  }
+  return merged;
+}
+
 export async function createAppaloftServer(
   options: AppaloftServerOptions = {},
 ): Promise<AppaloftServer> {
@@ -597,7 +1545,20 @@ export async function createAppaloftServer(
     await migrator.migrateToLatest();
   }
 
-  const extensions = options.extensions ?? [];
+  let auditLogConsoleExecutionContextFactory: ExecutionContextFactory | undefined;
+  let auditLogConsoleQueryBus: QueryBus | undefined;
+  const auditLogConsoleExtensions =
+    options.auditLogConsole?.enabled === false
+      ? []
+      : [
+          createPublicAuditLogConsoleServerExtension({
+            resolveExecutionContextFactory: () => auditLogConsoleExecutionContextFactory,
+            resolveQueryBus: () => auditLogConsoleQueryBus,
+            routeEnabled: options.auditLogConsole?.routeEnabled !== false,
+            webExtensionEnabled: options.auditLogConsole?.webExtensionEnabled !== false,
+          }),
+        ];
+  const extensions = [...auditLogConsoleExtensions, ...(options.extensions ?? [])];
   const compositionContext: AppaloftServerCompositionContext = {
     config,
     database,
@@ -738,6 +1699,7 @@ export async function createAppaloftServer(
     idGenerator,
     tracer: telemetry.tracer,
   });
+  auditLogConsoleExecutionContextFactory = executionContextFactory;
   const durableWorkHeartbeatStore = resolveToken<DurableWorkWorkerHeartbeatStore>(
     childContainer,
     tokens.durableWorkWorkerHeartbeatStore,
@@ -760,6 +1722,7 @@ export async function createAppaloftServer(
 
   const commandBus = resolveToken<CommandBus>(childContainer, tokens.commandBus);
   const queryBus = resolveToken<QueryBus>(childContainer, tokens.queryBus);
+  auditLogConsoleQueryBus = queryBus;
   const sourceEventVerificationPort = resolveToken<SourceEventVerificationPort>(
     childContainer,
     tokens.sourceEventVerificationPort,

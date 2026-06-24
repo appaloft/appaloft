@@ -7,6 +7,8 @@ export interface ConsolePageExtensionMetadata {
   readonly pageEndpoint: string;
 }
 
+export type ConsolePageExtensionVisibilityMap = Record<string, boolean>;
+
 export interface ConsolePageEndpointContext {
   readonly pathname: string;
   readonly query?: string;
@@ -101,6 +103,59 @@ export function resolveConsolePageEndpoint(
     (endpoint, [key, value]) => endpoint.replaceAll(`{${key}}`, encodeURIComponent(value)),
     metadata.pageEndpoint,
   );
+}
+
+export function readConsolePageExtensionVisibilityEndpoint(
+  extension: SystemPluginWebExtension | null | undefined,
+): string | null {
+  const metadata = extension?.metadata;
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return null;
+  }
+  const endpoint = metadata.visibilityEndpoint;
+  return typeof endpoint === "string" && endpoint.length > 0 ? endpoint : null;
+}
+
+export function resolveConsolePageVisibilityEndpoint(
+  extension: SystemPluginWebExtension | null | undefined,
+  context: ConsolePageEndpointContext,
+): string | null {
+  const endpoint = readConsolePageExtensionVisibilityEndpoint(extension);
+  if (!endpoint) {
+    return null;
+  }
+
+  const replacements: Record<string, string> = {
+    pathname: context.pathname,
+    query: context.query ?? "",
+    organizationId: context.organization?.organizationId ?? "",
+    organizationSlug: context.organization?.slug ?? "",
+    organizationName: context.organization?.name ?? "",
+    organizationRole: context.organization?.role ?? "",
+    projectId: context.projectId ?? "",
+    environmentId: context.environmentId ?? "",
+    resourceId: context.resourceId ?? "",
+    deploymentId: context.deploymentId ?? "",
+    previewEnvironmentId: context.previewEnvironmentId ?? "",
+  };
+
+  return Object.entries(replacements).reduce(
+    (resolved, [key, value]) => resolved.replaceAll(`{${key}}`, encodeURIComponent(value)),
+    endpoint,
+  );
+}
+
+export function isConsolePageExtensionVisible(
+  extension: SystemPluginWebExtension | null | undefined,
+  visibility: ConsolePageExtensionVisibilityMap,
+): boolean {
+  if (!extension) {
+    return false;
+  }
+  if (!readConsolePageExtensionVisibilityEndpoint(extension)) {
+    return true;
+  }
+  return visibility[extension.key] === true;
 }
 
 function normalizePath(path: string): string {

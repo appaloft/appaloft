@@ -111,6 +111,7 @@ Then:
 | TERM-SESSION-ENTRY-009 | source/unit | Web deployment detail | Operator opens terminal from a deployment detail page. | Deployment detail links to the Resource terminal tab with `deploymentId`; Resource terminal passes that selected deployment id to `terminal-sessions.open` while preserving resource ownership. |
 | TERM-SESSION-ENTRY-010 | e2e-preferred | Web close action | Operator clicks the terminal panel close action while attached. | Web sends a terminal transport close frame, closes the socket, and renders normal close as disconnected rather than as a terminal error. |
 | TERM-SESSION-WEB-001 | source/unit + WebView | Web Instance lifecycle | Operator opens Instance management. | Web lists active terminal sessions through `terminal-sessions.list`, can close one active session, can expire old active sessions, and never renders terminal input/output or attaches to a terminal transport from the lifecycle view. |
+| TERM-SESSION-WORKSPACE-009 | application unit | Resource Docker runtime without source workspace | Resource deployment is server-backed, `docker-container` or `docker-compose-stack`, and has no safe deployment workspace | `terminal-sessions.open` accepts the resource session without `workingDirectory` so the runtime gateway can enter the retained container/service target; if `relativeDirectory` is requested without a workspace, it rejects with `terminal_session_workspace_unavailable`. |
 
 ## Current Implementation Notes And Governed Follow-Ups
 

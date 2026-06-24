@@ -22,6 +22,7 @@ import {
   type ResourceRepository,
 } from "../../ports";
 import { tokens } from "../../tokens";
+import { type PreviewOperableScopeResolver } from "../preview-deployments/preview-operable-scope.resolver";
 import { type ResourceEffectiveConfigQueryInput } from "./resource-effective-config.query";
 
 const secretMask = "****";
@@ -98,6 +99,8 @@ export class ResourceEffectiveConfigQueryService {
     private readonly environmentRepository: EnvironmentRepository,
     @inject(tokens.clock)
     private readonly clock: Clock,
+    @inject(tokens.previewOperableScopeResolver)
+    private readonly previewOperableScopeResolver?: PreviewOperableScopeResolver,
   ) {}
 
   async execute(
@@ -105,17 +108,35 @@ export class ResourceEffectiveConfigQueryService {
     input: ResourceEffectiveConfigQueryInput,
   ): Promise<Result<ResourceEffectiveConfigView>> {
     const repositoryContext = toRepositoryContext(context);
-    const { clock, environmentRepository, resourceRepository } = this;
+    const { clock, environmentRepository, previewOperableScopeResolver, resourceRepository } = this;
 
     return safeTry(async function* () {
-      const resourceId = yield* ResourceId.create(input.resourceId);
+      const previewScope = await previewOperableScopeResolver?.resolve(context, {
+        previewEnvironmentId: input.previewEnvironmentId,
+        resourceId: input.resourceId,
+      });
+      if (previewScope?.isErr()) {
+        return err(previewScope.error);
+      }
+      const resolvedPreviewScope = previewScope?.isOk() ? previewScope.value : null;
+
+      const resolvedResourceId = resolvedPreviewScope?.resourceId ?? input.resourceId;
+      if (!resolvedResourceId) {
+        return err(
+          domainError.validation("Either resourceId or previewEnvironmentId is required", {
+            phase: "resource-effective-config-resolution",
+          }),
+        );
+      }
+
+      const resourceId = yield* ResourceId.create(resolvedResourceId);
       const resource = await resourceRepository.findOne(
         repositoryContext,
         ResourceByIdSpec.create(resourceId),
       );
 
       if (!resource) {
-        return err(resourceReadNotFound(input.resourceId));
+        return err(resourceReadNotFound(resolvedResourceId));
       }
 
       const resourceState = resource.toState();
@@ -125,7 +146,7 @@ export class ResourceEffectiveConfigQueryService {
       );
 
       if (!environment) {
-        return err(resourceReadNotFound(input.resourceId));
+        return err(resourceReadNotFound(resolvedResourceId));
       }
 
       const generatedAt = yield* GeneratedAt.create(clock.now());

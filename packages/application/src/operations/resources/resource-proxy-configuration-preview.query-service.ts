@@ -292,6 +292,7 @@ function routeFromDomainBinding(
     proxyKind: binding.proxyKind,
     domains: [binding.domainName],
     pathPrefix: binding.pathPrefix,
+    pathHandling: binding.pathHandling ?? "preserve",
     tlsMode: binding.tlsMode,
     ...(targetPort === undefined || binding.redirectTo ? {} : { targetPort }),
     source: "domain-binding",

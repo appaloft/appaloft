@@ -85,10 +85,22 @@ export interface ResourceSummary {
   id: string;
 }
 
+export interface RoutingDomainResourceContext {
+  environmentId: string;
+  projectId: string;
+  resourceId: string;
+  serverId: string;
+}
+
 export interface RoutingDomainTlsFixture {
   addDeploymentId: (deploymentId: string) => void;
   cleanup: () => void;
   cliOptions: ShellCliOptions;
+  createResource: (input: {
+    internalPort?: number;
+    resourceName?: string;
+    suffix: string;
+  }) => RoutingDomainResourceContext;
   deployWorkspaceResource: (input: {
     appPort: number;
     resourceName?: string;
@@ -151,6 +163,34 @@ export function createRoutingDomainTlsFixture(input: {
       cleanupWorkspace(workspace.workspaceDir);
     },
     cliOptions: workspace.cliOptions,
+    createResource(resourceInput) {
+      const resource = runShellCli(
+        [
+          "resource",
+          "create",
+          "--project",
+          projectId,
+          "--environment",
+          environmentId,
+          "--name",
+          resourceInput.resourceName ?? `app-${resourceInput.suffix}`,
+          "--kind",
+          "application",
+          "--internal-port",
+          String(resourceInput.internalPort ?? 8080),
+        ],
+        workspace.cliOptions,
+      );
+      expectCliSuccess(resource, "create routing/domain resource");
+      const resourceId = parseJson<{ id: string }>(resource.stdout).id;
+
+      return {
+        environmentId,
+        projectId,
+        resourceId,
+        serverId,
+      };
+    },
     deployWorkspaceResource(resourceInput) {
       const deployment = runShellCli(
         [

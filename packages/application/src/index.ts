@@ -35,6 +35,8 @@ export * from "./environment-handlers";
 export * from "./environment-messages";
 export * from "./execution-context";
 export * from "./extensibility";
+export * from "./operation-audit";
+export * from "./operation-audit-domain-event-projector";
 export * from "./operation-catalog";
 export * from "./operation-guard";
 export * from "./operator-work-handlers";

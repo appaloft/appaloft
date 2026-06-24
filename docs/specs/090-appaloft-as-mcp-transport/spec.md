@@ -27,6 +27,12 @@ agents configured with an Appaloft server.
 | APPALOFT-MCP-008 | Skill and MCP stay connected but separate | A user asks an agent to use `/appaloft` style help | The Appaloft skill is loaded and MCP is available | The skill chooses MCP as the active callable surface, but still follows the same safe deploy/observe/recover protocol and existing operation boundaries. |
 | APPALOFT-MCP-009 | Protocol-level missing tools are invalid calls | A MCP client calls `tools/call` with an unknown tool name | The JSON-RPC adapter validates the request | It returns JSON-RPC `-32602` instead of reporting a tool execution result. |
 | APPALOFT-MCP-010 | Tool metadata carries host safety hints | MCP descriptors are listed | The host reads tool metadata | Descriptors include title and annotations for read-only queries, destructive commands, idempotent queries, and external-system operations, and successful tool calls return structured content plus text. |
+| APPALOFT-MCP-011 | HTTP MCP endpoint exposes metadata and JSON-RPC | A self-hosted Appaloft HTTP runtime mounts `/mcp` | A MCP client sends GET metadata or POST JSON-RPC | The endpoint returns MCP capability metadata and handles JSON-RPC methods such as `tools/list`. |
+| APPALOFT-MCP-012 | HTTP MCP calls preserve MCP entrypoint and product auth | A hosted or self-hosted control plane has product session auth | A MCP client calls a tool through `/mcp` | The call authorizes the product session, dispatches through the same buses, and uses an execution context with `entrypoint: "mcp"` plus the authenticated actor and organization principal. |
+| APPALOFT-MCP-013 | HTTP MCP rejects unauthenticated product calls | Product session auth is enabled | A MCP client calls a write or read tool without valid auth | The request is rejected before CommandBus or QueryBus dispatch. |
+| APPALOFT-MCP-014 | Standalone launcher delegates to Appaloft runtime | A user installs `@appaloft/mcp` | They run `appaloft-mcp` or `appaloft-mcp serve` | The launcher invokes the same `appaloft mcp stdio` or `appaloft mcp serve` runtime path and does not maintain another operation list. |
+| APPALOFT-MCP-015 | HTTP MCP accepts bearer product auth | A hosted or self-hosted control plane has bearer-capable product session auth | A MCP client calls a tool through `/mcp` with `Authorization: Bearer <token>` | The endpoint passes the bearer header to product-session authorization, dispatches through the same buses after authorization, and uses `entrypoint: "mcp"` with the authenticated actor and organization principal. |
+| APPALOFT-MCP-016 | Remote stdio bridge keeps bearer out of MCP host config | A MCP host supports stdio but needs to call a hosted `/mcp` endpoint | The host launches `appaloft mcp remote-stdio --profile mcp` | The bridge reads the local Appaloft bearer profile, forwards JSON-RPC over HTTP with `Authorization: Bearer <token>`, writes only remote JSON-RPC responses to stdout, and never stores bearer material in the MCP host config. |
 
 ## Public Boundary
 
@@ -40,11 +46,15 @@ Public MCP concepts:
 - `createAppaloftMcpPrompts`
 - `createAppaloftMcpServer`
 - `handleAppaloftMcpJsonRpcRequest`
+- `handleAppaloftMcpHttpRequest`
+- `createAppaloftMcpHttpFetchHandler`
+- `startAppaloftMcpHttpServer`
 - `runAppaloftMcpStdioServer`
+- `runAppaloftMcpRemoteStdioProxy`
 
 Non-goals:
 
-- no hosted gateway or marketplace integration;
+- no Cloud hosted gateway or marketplace integration;
 - no Cloud/private policy, billing, quota, or entitlement strategy;
 - no new operation such as `quick-deploy.create`;
 - no direct repository/provider/runtime/database mutation;
@@ -75,6 +85,7 @@ Non-goals:
 
 ## Migration Gaps
 
-- Release packaging and hosted gateway configuration remain follow-up work.
+- SSE streaming, resumable sessions, and a separate hosted gateway service remain follow-up work.
+- Public skill discovery metadata remains a follow-up release task.
 - Existing public docs that still describe MCP as only a future transport should be updated in the
   same round.

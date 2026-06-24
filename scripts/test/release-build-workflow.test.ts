@@ -36,6 +36,7 @@ describe("release build workflow", () => {
     expect(workflow).toContain("run-appaloft.sh doctor");
     expect(workflow).toContain("Build Desktop App");
     expect(workflow).toContain("docker/build-push-action");
+    expect(workflow).toContain("publish_package packages/npm/mcp");
     expect(workflow).toContain("publish_package packages/sdk");
     expect(workflow).toContain("Generate Manifest And Checksums");
     expect(workflow).toContain("bun run release:manifest");

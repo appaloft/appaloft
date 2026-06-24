@@ -20,7 +20,10 @@ export class StopResourceRuntimeCommandHandler
   handle(context: ExecutionContext, command: StopResourceRuntimeCommand) {
     return this.useCase.execute(context, {
       operation: "stop",
-      resourceId: command.resourceId,
+      ...(command.resourceId ? { resourceId: command.resourceId } : {}),
+      ...(command.previewEnvironmentId
+        ? { previewEnvironmentId: command.previewEnvironmentId }
+        : {}),
       ...(command.deploymentId ? { deploymentId: command.deploymentId } : {}),
       ...(command.reason ? { reason: command.reason } : {}),
       ...(command.idempotencyKey ? { idempotencyKey: command.idempotencyKey } : {}),

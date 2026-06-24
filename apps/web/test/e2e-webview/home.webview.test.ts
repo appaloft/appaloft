@@ -6733,6 +6733,30 @@ describe.serial("console e2e with Bun.WebView", () => {
         ],
         createdAt: "2026-01-01T00:00:00.000Z",
       },
+      {
+        id: "stv_other_resource",
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        name: "other-pocketbase-data",
+        slug: "other-pocketbase-data",
+        kind: "named-volume",
+        lifecycleStatus: "active",
+        attachmentCount: 1,
+        attachments: [
+          {
+            attachmentId: "att_other",
+            resourceId: "res_other",
+            resourceName: "Other PocketBase",
+            resourceSlug: "other-pocketbase",
+            destinationPath: "/pb_data",
+            mountMode: "read-write",
+            dataFormat: "sqlite",
+            applicationDataLabel: "Other PocketBase data",
+            attachedAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
+        createdAt: "2026-01-01T00:00:00.000Z",
+      },
     ];
     let storageAttachments: Array<{
       id: string;
@@ -7090,22 +7114,28 @@ describe.serial("console e2e with Bun.WebView", () => {
           attachFormVisible: Boolean(document.querySelector("#resource-storage-attachment-form")),
           backupFormVisible: Boolean(document.querySelector("[data-resource-storage-backup-form]")),
           backupDestinationPathVisible: Boolean(document.querySelector("#resource-storage-backup-destination-path")),
+          backupDataFormatSelectVisible: Boolean(document.querySelector('[data-resource-storage-backup-form] [aria-label="数据格式"], [data-resource-storage-backup-form] [aria-label="Data format"]')),
           cleanupFieldVisible: Boolean(document.querySelector("#resource-storage-runtime-cleanup-before")),
           createFormVisible: Boolean(document.querySelector("#resource-storage-volume-form")),
+          otherResourceVolumeVisible: (document.body.textContent ?? '').includes("other-pocketbase-data"),
         })`),
       ) as {
         attachFormVisible: boolean;
+        backupDataFormatSelectVisible: boolean;
         backupFormVisible: boolean;
         backupDestinationPathVisible: boolean;
         cleanupFieldVisible: boolean;
         createFormVisible: boolean;
+        otherResourceVolumeVisible: boolean;
       };
       expect(storagePageDefaultState).toEqual({
         attachFormVisible: false,
-        backupFormVisible: true,
-        backupDestinationPathVisible: true,
+        backupDataFormatSelectVisible: false,
+        backupFormVisible: false,
+        backupDestinationPathVisible: false,
         cleanupFieldVisible: false,
         createFormVisible: false,
+        otherResourceVolumeVisible: false,
       });
 
       const listRequest = await waitForRecordedRequest("/api/rpc/storageVolumes/list");
@@ -7129,7 +7159,28 @@ describe.serial("console e2e with Bun.WebView", () => {
         false,
       );
 
-      await clickButtonByAnyText(view, ["Plan backup", "预览备份"]);
+      await clickButtonByAnyText(view, ["Create backup", "创建备份"]);
+      const storageBackupDialogState = JSON.parse(
+        await view.evaluate<string>(`JSON.stringify({
+          backupFormVisible: Boolean(document.querySelector("[data-resource-storage-backup-form]")),
+          backupDestinationPathText: document.querySelector("#resource-storage-backup-destination-path")?.textContent?.trim() ?? "",
+          backupDataFormatText: document.querySelector("#resource-storage-backup-data-format")?.textContent?.trim() ?? "",
+          otherResourceVolumeVisible: (document.querySelector('[role="dialog"]')?.textContent ?? '').includes("other-pocketbase-data"),
+        })`),
+      ) as {
+        backupDataFormatText: string;
+        backupDestinationPathText: string;
+        backupFormVisible: boolean;
+        otherResourceVolumeVisible: boolean;
+      };
+      expect(storageBackupDialogState).toEqual({
+        backupDataFormatText: "sqlite",
+        backupDestinationPathText: "/pb_data",
+        backupFormVisible: true,
+        otherResourceVolumeVisible: false,
+      });
+
+      await clickDialogButtonByAnyText(view, ["Plan backup", "预览备份"]);
       const planRequest = await waitForRecordedRequest("/api/rpc/storageVolumes/backups/plan");
       expect(readOrpcJsonPayload(planRequest.body)).toMatchObject({
         requestedConsistency: "application-consistent",
@@ -7145,7 +7196,7 @@ describe.serial("console e2e with Bun.WebView", () => {
       });
       await expectAnyText(view, ["Backup plan ready", "备份预览已就绪"]);
 
-      await clickButtonByAnyText(view, ["Create backup", "创建备份"]);
+      await clickDialogButtonByAnyText(view, ["Create backup", "创建备份"]);
       await waitForRecordedRequest("/api/rpc/storageVolumes/backups/create");
       await expectText(view, "svb_created");
 
@@ -9598,6 +9649,105 @@ describe.serial("console e2e with Bun.WebView", () => {
       apiResponses.dashboard["/api/rpc/resources/show"] = previousShowRoute;
       apiResponses.dashboard["/api/rpc/resources/deleteCheck"] = previousDeleteCheckRoute;
       apiResponses.dashboard["/api/rpc/resources/delete"] = previousDeleteRoute;
+    }
+  }, 30_000);
+
+  test("[ROUTE-TLS-ENTRY-026] deletes a resource-scoped domain binding through delete-check gated Web action", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    const previousDomainBindingsRoute = apiResponses.dashboard["/api/rpc/domainBindings/list"];
+    const previousDeleteCheckRoute = apiResponses.dashboard["/api/rpc/domainBindings/deleteCheck"];
+    const previousDeleteRoute = apiResponses.dashboard["/api/rpc/domainBindings/delete"];
+    let deleted = false;
+
+    apiResponses.dashboard["/api/rpc/domainBindings/list"] = () => ({
+      json: {
+        items: deleted
+          ? []
+          : [
+              {
+                id: "dbn_delete_web",
+                projectId: "prj_demo",
+                environmentId: "env_demo",
+                resourceId: "res_demo",
+                serverId: "srv_demo",
+                destinationId: "dst_demo",
+                domainName: "delete-web.example.test",
+                pathPrefix: "/",
+                proxyKind: "traefik",
+                tlsMode: "auto",
+                certificatePolicy: "auto",
+                status: "pending_verification",
+                verificationAttemptCount: 0,
+                createdAt: "2026-01-01T00:00:00.000Z",
+              },
+            ],
+      },
+    });
+    apiResponses.dashboard["/api/rpc/domainBindings/deleteCheck"] = () => ({
+      json: {
+        domainBindingId: "dbn_delete_web",
+        safeToDelete: true,
+        blockers: [],
+        warnings: [],
+        preservesGeneratedAccess: true,
+        preservesDeploymentSnapshots: true,
+        preservesServerAppliedRouteAudit: true,
+      },
+    });
+    apiResponses.dashboard["/api/rpc/domainBindings/delete"] = () => {
+      deleted = true;
+      return {
+        json: {
+          id: "dbn_delete_web",
+        },
+      };
+    };
+
+    try {
+      await using view = createWebView();
+      await view.navigate(`${previewUrl}${demoResourcePath}?tab=networking&section=domains`);
+      await ensureResourceSection(view, {
+        tab: "networking",
+        section: "domains",
+        sectionSelector: "#resource-domain-bindings",
+      });
+
+      await expectText(view, "delete-web.example.test");
+      await clickElementBySelector(view, "#resource-domain-binding-delete-action-dbn_delete_web");
+      await expectAnyText(view, ["Delete domain binding", "删除域名绑定"]);
+      await clickElementBySelector(view, "#resource-domain-binding-delete-check");
+
+      const deleteCheckRequest = await waitForRecordedRequest(
+        "/api/rpc/domainBindings/deleteCheck",
+      );
+      expect(readOrpcJsonPayload(deleteCheckRequest.body)).toEqual({
+        domainBindingId: "dbn_delete_web",
+      });
+      await expectAnyText(view, ["Safe to delete", "可以删除"]);
+
+      await setInputValue(view, "#resource-domain-binding-delete-confirmation", "dbn_delete_web");
+      await clickElementBySelector(view, "#resource-domain-binding-delete-confirm");
+
+      const deleteRequest = await waitForRecordedRequest("/api/rpc/domainBindings/delete");
+      expect(readOrpcJsonPayload(deleteRequest.body)).toEqual({
+        domainBindingId: "dbn_delete_web",
+        confirmation: { domainBindingId: "dbn_delete_web" },
+      });
+      expect(deleted).toBe(true);
+    } finally {
+      apiResponses.dashboard["/api/rpc/domainBindings/list"] = previousDomainBindingsRoute;
+      if (previousDeleteCheckRoute === undefined) {
+        delete apiResponses.dashboard["/api/rpc/domainBindings/deleteCheck"];
+      } else {
+        apiResponses.dashboard["/api/rpc/domainBindings/deleteCheck"] = previousDeleteCheckRoute;
+      }
+      if (previousDeleteRoute === undefined) {
+        delete apiResponses.dashboard["/api/rpc/domainBindings/delete"];
+      } else {
+        apiResponses.dashboard["/api/rpc/domainBindings/delete"] = previousDeleteRoute;
+      }
     }
   }, 30_000);
 

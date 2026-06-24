@@ -127,21 +127,64 @@ class MemoryAuditEventReadModel implements AuditEventReadModel {
     input: AuditEventGlobalExportInput,
   ): Promise<AuditEventExportPage> {
     const limit = input.limit ?? 100;
+    const order = input.order ?? "asc";
+    const cursor = input.cursor ? parseMemoryAuditEventCursor(input.cursor) : undefined;
     const rows = this.events
       .filter((event) => event.createdAt >= input.from)
       .filter((event) => event.createdAt < input.to)
+      .filter((event) => {
+        if (!cursor) {
+          return true;
+        }
+        const timestampComparison = event.createdAt.localeCompare(cursor.createdAt);
+        if (timestampComparison !== 0 || !cursor.auditEventId) {
+          return order === "desc" ? timestampComparison < 0 : timestampComparison > 0;
+        }
+        const idComparison = event.auditEventId.localeCompare(cursor.auditEventId);
+        return order === "desc" ? idComparison < 0 : idComparison > 0;
+      })
       .filter((event) => !input.aggregateId || event.aggregateId === input.aggregateId)
       .filter((event) => !input.eventType || event.eventType === input.eventType)
-      .toSorted(
-        (a, b) =>
-          a.createdAt.localeCompare(b.createdAt) || a.auditEventId.localeCompare(b.auditEventId),
-      );
+      .filter(
+        (event) =>
+          !input.projectId ||
+          event.aggregateId === input.projectId ||
+          (event.payload && event.payload.projectId === input.projectId),
+      )
+      .toSorted((a, b) => {
+        const timestampOrder =
+          order === "desc"
+            ? b.createdAt.localeCompare(a.createdAt)
+            : a.createdAt.localeCompare(b.createdAt);
+        if (timestampOrder !== 0) {
+          return timestampOrder;
+        }
+
+        return order === "desc"
+          ? b.auditEventId.localeCompare(a.auditEventId)
+          : a.auditEventId.localeCompare(b.auditEventId);
+      });
+    const pageRows = rows.slice(0, limit);
+    const nextCursorRow = rows.length > limit ? pageRows.at(-1) : undefined;
 
     return {
-      items: rows.slice(0, limit),
+      items: pageRows,
       truncated: rows.length > limit,
+      ...(nextCursorRow
+        ? {
+            nextCursor: `${nextCursorRow.createdAt}|${nextCursorRow.auditEventId}`,
+          }
+        : {}),
     };
   }
+}
+
+function parseMemoryAuditEventCursor(cursor: string): { createdAt: string; auditEventId?: string } {
+  const [createdAt = cursor, auditEventId] = cursor.split("|", 2);
+  return {
+    createdAt,
+    ...(auditEventId ? { auditEventId } : {}),
+  };
 }
 
 class MemoryAuditEventRetentionStore implements AuditEventRetentionStore {
@@ -588,6 +631,7 @@ describe("audit event queries", () => {
         payload: {
           key: "PORT",
           value: "[redacted]",
+          projectId: "prj_web",
         },
         redactedFields: ["value"],
         createdAt: "2026-01-01T00:02:00.000Z",
@@ -619,6 +663,7 @@ describe("audit event queries", () => {
         from: "2026-01-01T00:00:00.000Z",
         to: "2026-01-01T00:03:00.000Z",
         limit: 2,
+        order: "asc",
       },
       itemCount: 2,
       items: [
@@ -644,8 +689,54 @@ describe("audit event queries", () => {
           createdAt: "2026-01-01T00:01:00.000Z",
         },
       ],
+      nextCursor: "2026-01-01T00:01:00.000Z|aud_srv_1",
       truncated: true,
       generatedAt: "2026-01-01T00:03:00.000Z",
+    });
+
+    const nextPage = await service.execute(
+      context,
+      ExportGlobalAuditEventsQuery.create({
+        from: "2026-01-01T00:00:00.000Z",
+        to: "2026-01-01T00:03:00.000Z",
+        limit: 1,
+        order: "desc",
+        cursor: "2026-01-01T00:02:00.000Z",
+      })._unsafeUnwrap(),
+    );
+    expect(nextPage.isOk()).toBe(true);
+    expect(nextPage._unsafeUnwrap()).toMatchObject({
+      filters: {
+        from: "2026-01-01T00:00:00.000Z",
+        to: "2026-01-01T00:03:00.000Z",
+        limit: 1,
+        order: "desc",
+        cursor: "2026-01-01T00:02:00.000Z",
+      },
+      items: [
+        expect.objectContaining({
+          auditEventId: "aud_srv_1",
+          createdAt: "2026-01-01T00:01:00.000Z",
+        }),
+      ],
+      truncated: true,
+    });
+
+    const projectScoped = await service.execute(
+      context,
+      ExportGlobalAuditEventsQuery.create({
+        from: "2026-01-01T00:00:00.000Z",
+        to: "2026-01-01T00:03:00.000Z",
+        projectId: "prj_web",
+        limit: 10,
+      })._unsafeUnwrap(),
+    );
+    expect(projectScoped.isOk()).toBe(true);
+    expect(projectScoped._unsafeUnwrap()).toMatchObject({
+      filters: {
+        projectId: "prj_web",
+      },
+      items: [expect.objectContaining({ auditEventId: "aud_res_2" })],
     });
   });
 

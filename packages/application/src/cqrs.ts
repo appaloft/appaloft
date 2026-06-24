@@ -10,7 +10,7 @@ import {
   createQuerySpanName,
   type ExecutionContext,
 } from "./execution-context";
-import { type AppLogger, type OperationGuardPort } from "./ports";
+import { type AppLogger, type OperationAuditSink, type OperationGuardPort } from "./ports";
 
 type MessageConstructor<TMessage, TArgs extends unknown[] = unknown[]> = new (
   ...args: TArgs
@@ -107,6 +107,7 @@ export class CommandBus {
     private readonly container: DependencyContainer,
     private readonly logger: AppLogger,
     private readonly operationGuardPort?: OperationGuardPort,
+    private readonly operationAuditSink?: OperationAuditSink,
   ) {}
 
   async execute<TResult>(
@@ -185,6 +186,23 @@ export class CommandBus {
               span.setAttributes(createDomainErrorTraceAttributes(error));
             },
           );
+
+          if (this.operationAuditSink) {
+            const { operationAuditRecordFromCommand } = await import("./operation-audit");
+            const auditInput = operationAuditRecordFromCommand({ context, command, result });
+            if (auditInput) {
+              const auditResult = await this.operationAuditSink.recordOperation(
+                context,
+                auditInput,
+              );
+              if (auditResult.isErr()) {
+                this.logger.warn("command_bus.audit_record_failed", {
+                  command: command.constructor.name,
+                  reason: auditResult.error.message,
+                });
+              }
+            }
+          }
 
           return result;
         } catch (error) {

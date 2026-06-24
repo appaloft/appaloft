@@ -5,14 +5,15 @@
   import {
     BookOpen,
     ChevronUp,
-    GitBranch,
+    Globe2,
+    House,
     LogOut,
     Rocket,
     Settings2,
     UserRound,
   } from "@lucide/svelte";
 
-  import { API_BASE, request } from "$lib/api/client";
+  import { request } from "$lib/api/client";
   import { Avatar, AvatarFallback } from "$lib/components/ui/avatar";
   import {
     DropdownMenu,
@@ -25,9 +26,14 @@
     DropdownMenuTrigger,
   } from "$lib/components/ui/dropdown-menu";
   import { webDocsHrefs } from "$lib/console/docs-help";
+  import {
+    instanceAccessCapabilityKey,
+    preloadInstanceAccessCapability,
+  } from "$lib/console/instance-access";
   import { createConsoleQueries, defaultAuthSession } from "$lib/console/queries";
   import { initials, readSessionIdentity } from "$lib/console/utils";
   import { i18nKeys, locale, setLocale, t } from "$lib/i18n";
+  import { capabilities } from "$lib/capabilities";
 
   const { authSessionQuery } = createConsoleQueries(browser, {
     readiness: false,
@@ -49,29 +55,28 @@
     authSession.providers.find((provider) => provider.key === "github") ?? null,
   );
   const githubConnected = $derived(Boolean(githubProvider?.connected));
+  const githubAccountLabel = $derived(githubProvider?.accountLabel?.trim() ?? "");
   const authIdentity = $derived(readSessionIdentity(authSession.session));
-
-  async function connectGitHub(): Promise<void> {
-    const response = await request<{ redirect: boolean; url?: string }>(
-      authSession.session && !githubConnected ? "/api/auth/link-social" : "/api/auth/sign-in/social",
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          provider: "github",
-          callbackURL: browser ? window.location.href : API_BASE,
-          scopes: ["repo", "read:user"],
-          disableRedirect: true,
-        }),
-      },
-    );
-
-    if (response.url && browser) {
-      window.location.href = response.url;
+  const githubConnectionSummary = $derived.by(() => {
+    if (githubConnected && githubAccountLabel) {
+      return $t(i18nKeys.console.shell.githubConnectedAs, { account: githubAccountLabel });
     }
-  }
+
+    return githubConnected
+      ? `GitHub ${$t(i18nKeys.common.status.connected)}`
+      : authIdentity
+        ? $t(i18nKeys.common.status.pendingAuthorization)
+        : $t(i18nKeys.common.status.onDemandAuthorization);
+  });
+  const showInstanceManagementLink = $derived(
+    $capabilities.capabilities[instanceAccessCapabilityKey]?.allowed === true,
+  );
+
+  $effect(() => {
+    if (browser && authSession.session) {
+      void preloadInstanceAccessCapability();
+    }
+  });
 
   async function signOut(): Promise<void> {
     await request<{ success?: boolean }>("/api/auth/sign-out", {
@@ -86,6 +91,12 @@
   function openDocumentation(): void {
     if (browser) {
       window.open(webDocsHrefs.docsHome, "_blank", "noreferrer");
+    }
+  }
+
+  function openWebsite(): void {
+    if (browser) {
+      window.open("https://appaloft.com", "_blank", "noreferrer");
     }
   }
 
@@ -107,7 +118,7 @@
     <span class="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
       <span class="block truncate text-sm font-medium">{authIdentity ?? $t(i18nKeys.common.status.unauthenticated)}</span>
       <span class="block truncate text-xs text-muted-foreground">
-        GitHub {githubConnected ? $t(i18nKeys.common.status.connected) : authIdentity ? $t(i18nKeys.common.status.pendingAuthorization) : $t(i18nKeys.common.status.onDemandAuthorization)}
+        {githubConnectionSummary}
       </span>
     </span>
     <ChevronUp class="size-4 text-muted-foreground group-data-[collapsible=icon]:hidden" />
@@ -125,9 +136,9 @@
       </div>
     </DropdownMenuLabel>
     <DropdownMenuSeparator />
-    <DropdownMenuItem disabled={!githubProvider?.configured || githubConnected} onclick={connectGitHub}>
-      <GitBranch class="size-4" />
-      {githubConnected ? `GitHub ${$t(i18nKeys.common.status.connected)}` : $t(i18nKeys.common.actions.connectGitHub)}
+    <DropdownMenuItem onclick={() => navigateTo("/")}>
+      <House class="size-4" />
+      {$t(i18nKeys.console.nav.home)}
     </DropdownMenuItem>
     <DropdownMenuItem onclick={() => navigateTo("/organization")}>
       <UserRound class="size-4" />
@@ -137,13 +148,19 @@
       <UserRound class="size-4" />
       {$t(i18nKeys.console.accountSettings.introTitle)}
     </DropdownMenuItem>
-    <DropdownMenuItem onclick={() => navigateTo("/instance")}>
-      <Settings2 class="size-4" />
-      {$t(i18nKeys.console.nav.instance)}
-    </DropdownMenuItem>
+    {#if showInstanceManagementLink}
+      <DropdownMenuItem onclick={() => navigateTo("/instance")}>
+        <Settings2 class="size-4" />
+        {$t(i18nKeys.console.nav.instance)}
+      </DropdownMenuItem>
+    {/if}
     <DropdownMenuItem onclick={() => navigateTo("/deployments")}>
       <Rocket class="size-4" />
       {$t(i18nKeys.console.deployments.records)}
+    </DropdownMenuItem>
+    <DropdownMenuItem onclick={openWebsite}>
+      <Globe2 class="size-4" />
+      {$t(i18nKeys.common.actions.openWebsite)}
     </DropdownMenuItem>
     <DropdownMenuItem onclick={openDocumentation}>
       <BookOpen class="size-4" />

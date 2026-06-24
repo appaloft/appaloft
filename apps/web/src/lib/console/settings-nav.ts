@@ -7,6 +7,7 @@ import {
   ClipboardList,
   Globe2,
   KeyRound,
+  Link2,
   MailPlus,
   ShieldAlert,
   ShieldCheck,
@@ -17,7 +18,7 @@ import {
 
 import { i18nKeys } from "$lib/i18n";
 import {
-  systemPluginExtensionIcon,
+  systemPluginExtensionIconPresentation,
   systemPluginExtensionTitle,
 } from "./web-extension-presentation";
 
@@ -32,6 +33,11 @@ export function accountSettingsItems() {
       href: "/account/security",
       labelKey: i18nKeys.console.authAccountSecurity.introTitle,
       icon: KeyRound,
+    },
+    {
+      href: "/account/connections",
+      labelKey: i18nKeys.console.accountSettings.connectionsTitle,
+      icon: Link2,
     },
     {
       href: "/account/sessions",
@@ -141,7 +147,7 @@ function settingsExtensionItems(
     .map((extension) => ({
       href: normalizePath(extension.path),
       label: systemPluginExtensionTitle(extension, locale),
-      icon: systemPluginExtensionIcon(extension),
+      icon: systemPluginExtensionIconPresentation(extension),
       matchPrefix: normalizePath(extension.path),
     }));
 }

@@ -908,6 +908,81 @@ interface AppaloftOrpcRequestContext extends AppaloftOrpcContext {
 
 const runtimeUsageInspectStreamIntervalMs = 5_000;
 const runtimeUsageInspectStreamResponseSchema = z.object({});
+const httpResourceId = z.string().trim().min(1);
+const optionalHttpString = z.string().trim().min(1).optional();
+const optionalHttpBoolean = z
+  .union([
+    z.boolean(),
+    z.literal("true").transform(() => true),
+    z.literal("false").transform(() => false),
+  ])
+  .optional();
+const optionalHttpIsoTimestamp = optionalHttpString.refine(
+  (value) => !value || Number.isFinite(Date.parse(value)),
+  "Value must be an ISO timestamp",
+);
+
+const resourceEffectiveConfigHttpInputSchema = z.object({
+  resourceId: httpResourceId,
+  previewEnvironmentId: optionalHttpString,
+});
+
+const resourceRuntimeLogsHttpInputSchema = z.object({
+  resourceId: httpResourceId,
+  previewEnvironmentId: optionalHttpString,
+  deploymentId: optionalHttpString,
+  serviceName: optionalHttpString,
+  tailLines: z.coerce.number().int().min(0).max(1000).optional(),
+  since: optionalHttpString,
+  cursor: optionalHttpString,
+  follow: optionalHttpBoolean,
+});
+
+const resourceRuntimeControlHttpInputSchema = z.object({
+  resourceId: httpResourceId,
+  previewEnvironmentId: optionalHttpString,
+  deploymentId: optionalHttpString,
+  reason: optionalHttpString,
+  idempotencyKey: optionalHttpString,
+});
+
+const resourceRuntimeStartHttpInputSchema = resourceRuntimeControlHttpInputSchema.extend({
+  acknowledgeRetainedRuntimeMetadata: z.boolean().optional(),
+});
+
+const resourceDiagnosticSummaryHttpInputSchema = z
+  .object({
+    resourceId: httpResourceId,
+    previewEnvironmentId: optionalHttpString,
+    deploymentId: optionalHttpString,
+    observationFrom: optionalHttpIsoTimestamp,
+    observationTo: optionalHttpIsoTimestamp,
+    includeDeploymentTimelineTail: optionalHttpBoolean,
+    includeRuntimeLogTail: optionalHttpBoolean,
+    includeProxyConfiguration: optionalHttpBoolean,
+    tailLines: z.coerce.number().int().min(0).max(50).optional(),
+    locale: optionalHttpString,
+  })
+  .superRefine((value, context) => {
+    if (Boolean(value.observationFrom) === Boolean(value.observationTo)) {
+      return;
+    }
+
+    context.addIssue({
+      code: "custom",
+      message: "Observation window requires both observationFrom and observationTo",
+      path: value.observationFrom ? ["observationTo"] : ["observationFrom"],
+    });
+  });
+
+const resourceHealthHttpInputSchema = z.object({
+  resourceId: httpResourceId,
+  previewEnvironmentId: optionalHttpString,
+  mode: z.enum(["cached", "live"]).optional(),
+  includeChecks: optionalHttpBoolean,
+  includePublicAccessProbe: optionalHttpBoolean,
+  includeRuntimeProbe: optionalHttpBoolean,
+});
 
 type DeploymentProgressStreamEvent = DeploymentProgressEvent & {
   step: NonNullable<DeploymentProgressEvent["step"]>;
@@ -4659,7 +4734,7 @@ export const resourceEffectiveConfigProcedure = base
     description: apiRouteDescriptions.resourceEffectiveConfig,
     successStatus: 200,
   })
-  .input(resourceEffectiveConfigQueryInputSchema)
+  .input(resourceEffectiveConfigHttpInputSchema)
   .output(resourceEffectiveConfigResponseSchema)
   .handler(async ({ input, context }) =>
     executeQuery(context, ResourceEffectiveConfigQuery.create(input)),
@@ -5769,7 +5844,7 @@ export const resourceRuntimeLogsProcedure = base
     description: apiRouteDescriptions.resourceRuntimeLogs,
     successStatus: 200,
   })
-  .input(resourceRuntimeLogsQueryInputSchema)
+  .input(resourceRuntimeLogsHttpInputSchema)
   .output(resourceRuntimeLogsResponseSchema)
   .handler(async ({ input, context }) => {
     const result: ResourceRuntimeLogsResult = await executeQuery(
@@ -5866,7 +5941,7 @@ export const resourceRuntimeLogsStreamProcedure = base
     description: apiRouteDescriptions.resourceRuntimeLogs,
     successStatus: 200,
   })
-  .input(resourceRuntimeLogsQueryInputSchema)
+  .input(resourceRuntimeLogsHttpInputSchema)
   .output(eventIterator(resourceRuntimeLogEventSchema, resourceRuntimeLogsStreamResponseSchema))
   .handler(({ input, context }) => createResourceRuntimeLogStream(context, input));
 
@@ -5877,7 +5952,7 @@ export const stopResourceRuntimeProcedure = base
     description: apiRouteDescriptions.resourceRuntimeControl,
     successStatus: 202,
   })
-  .input(stopResourceRuntimeCommandInputSchema)
+  .input(resourceRuntimeControlHttpInputSchema)
   .output(stopResourceRuntimeResponseSchema)
   .handler(async ({ input, context }) =>
     executeCommand(context, StopResourceRuntimeCommand.create(input)),
@@ -5890,7 +5965,7 @@ export const startResourceRuntimeProcedure = base
     description: apiRouteDescriptions.resourceRuntimeControl,
     successStatus: 202,
   })
-  .input(startResourceRuntimeCommandInputSchema)
+  .input(resourceRuntimeStartHttpInputSchema)
   .output(startResourceRuntimeResponseSchema)
   .handler(async ({ input, context }) =>
     executeCommand(context, StartResourceRuntimeCommand.create(input)),
@@ -5903,7 +5978,7 @@ export const restartResourceRuntimeProcedure = base
     description: apiRouteDescriptions.resourceRuntimeControl,
     successStatus: 202,
   })
-  .input(restartResourceRuntimeCommandInputSchema)
+  .input(resourceRuntimeStartHttpInputSchema)
   .output(restartResourceRuntimeResponseSchema)
   .handler(async ({ input, context }) =>
     executeCommand(context, RestartResourceRuntimeCommand.create(input)),
@@ -5916,7 +5991,7 @@ export const resourceDiagnosticSummaryProcedure = base
     description: apiRouteDescriptions.resourceDiagnosticSummary,
     successStatus: 200,
   })
-  .input(resourceDiagnosticSummaryQueryInputSchema)
+  .input(resourceDiagnosticSummaryHttpInputSchema)
   .output(resourceDiagnosticSummarySchema)
   .handler(async ({ input, context }) =>
     executeQuery(context, ResourceDiagnosticSummaryQuery.create(input)),
@@ -5942,7 +6017,7 @@ export const resourceHealthProcedure = base
     description: apiRouteDescriptions.resourceHealth,
     successStatus: 200,
   })
-  .input(resourceHealthQueryInputSchema)
+  .input(resourceHealthHttpInputSchema)
   .output(resourceHealthSummarySchema)
   .handler(async ({ input, context }) => executeQuery(context, ResourceHealthQuery.create(input)));
 
@@ -8414,6 +8489,7 @@ function actionServerConfigDomainIdempotencyKey(input: {
     input.sourceFingerprint,
     input.domain.host,
     input.domain.pathPrefix,
+    input.domain.pathHandling ?? "preserve",
     input.domain.tlsMode,
     input.domain.redirectTo ?? "serve",
     String(input.domain.redirectStatus ?? "serve"),
@@ -8807,6 +8883,7 @@ async function applyActionServerConfigProfileCommands(input: {
         destinationId: domainContext.value.destinationId,
         domainName: domain.host,
         pathPrefix: domain.pathPrefix,
+        pathHandling: domain.pathHandling ?? "preserve",
         proxyKind: domainContext.value.proxyKind,
         tlsMode: domain.tlsMode,
         ...(domain.redirectTo ? { redirectTo: domain.redirectTo } : {}),

@@ -13,18 +13,34 @@ From the Appaloft CLI/runtime:
 appaloft mcp stdio
 ```
 
-This is the current user-facing run path. It starts a stdio JSON-RPC MCP server and composes the
-real Appaloft runtime.
+This starts a stdio JSON-RPC MCP server and composes the real Appaloft runtime.
 
-`@appaloft/ai-mcp` is private workspace source for now because it depends on internal workspace
-packages. Publishing a standalone package/bin such as `appaloft-mcp` is a separate release task.
+For local remote-HTTP clients:
+
+```bash
+appaloft mcp serve --host 127.0.0.1 --port 3939
+```
+
+This starts an HTTP JSON-RPC MCP endpoint at `/mcp`. It is intentionally bound to localhost by
+default. Use an explicit host only when a trusted reverse proxy or private network is providing the
+security boundary.
+
+For a standalone package launcher:
+
+```bash
+npx @appaloft/mcp
+npx @appaloft/mcp serve --host 127.0.0.1 --port 3939
+```
+
+The standalone `@appaloft/mcp` package exposes the `appaloft-mcp` launcher and delegates to the same
+Appaloft CLI/runtime instead of shipping a second business implementation.
 
 ## Release Status
 
-This package is ready for source review as the public MCP transport boundary, but it is not yet a
-standalone distribution artifact. Before publishing `appaloft-mcp`, validate the bin from a packed
-artifact, remove workspace-only blockers, add public skill discovery metadata, and document the
-published install path only after it can compose a real Appaloft runtime.
+This package is the public MCP transport boundary. `@appaloft/ai-mcp` remains workspace source, and
+the publishable user-facing launcher package is `@appaloft/mcp`. Release validation must pack and
+execute the launcher artifact before publish. Public skill discovery metadata remains a separate
+release task.
 
 ## Tool Contract
 
@@ -68,6 +84,9 @@ Prompts are workflow starters over existing tools:
 - `createAppaloftMcpPrompts()`
 - `createAppaloftMcpServer(...)`
 - `handleAppaloftMcpJsonRpcRequest(...)`
+- `handleAppaloftMcpHttpRequest(...)`
+- `createAppaloftMcpHttpFetchHandler(...)`
+- `startAppaloftMcpHttpServer(...)`
 - `runAppaloftMcpStdioServer(...)`
 
 Filtered compatibility wrappers remain available:

@@ -86,6 +86,9 @@
   type SystemPluginWebExtensionsResponse = {
     items: SystemPluginWebExtension[];
   };
+  type SystemPluginWebExtensionVisibilityResponse = {
+    visible: boolean;
+  };
 
   type ConsolePanelDocumentResult = {
     extension: SystemPluginWebExtension;
@@ -141,8 +144,52 @@
   const extensions = $derived(
     findConsolePanelExtensionsByPlacement(webExtensionsQuery.data?.items ?? [], placement),
   );
-  const endpointEntries = $derived<ConsolePanelEndpoint[]>(
+  const visibilityExtensionEndpoints = $derived.by(() =>
     extensions
+      .map((extension) => {
+        const endpoint = resolvePanelExtensionVisibilityEndpoint(extension);
+        return endpoint ? { key: extension.key, endpoint } : null;
+      })
+      .filter((entry): entry is { key: string; endpoint: string } => entry !== null),
+  );
+  const extensionVisibilityQuery = createQuery(() =>
+    queryOptions({
+      queryKey: [
+        "console-extension-panel-visibility",
+        placement,
+        projectId,
+        environmentId,
+        resourceId,
+        deploymentId,
+        previewEnvironmentId,
+        currentOrganization?.organizationId ?? "",
+        visibilityExtensionEndpoints
+          .map((entry) => `${entry.key}:${entry.endpoint}`)
+          .join("|"),
+      ],
+      queryFn: async () => {
+        const entries = await Promise.all(
+          visibilityExtensionEndpoints.map(async (entry) => {
+            const result = await request<SystemPluginWebExtensionVisibilityResponse>(entry.endpoint);
+            return [entry.key, result.visible === true] as const;
+          }),
+        );
+        return Object.fromEntries(entries);
+      },
+      enabled:
+        browser &&
+        visibilityExtensionEndpoints.length > 0 &&
+        !organizationContextQuery.isPending,
+      staleTime: 30_000,
+    }),
+  );
+  const extensionVisibility = $derived(extensionVisibilityQuery.data ?? {});
+  const visibilityPending = $derived(
+    visibilityExtensionEndpoints.length > 0 && extensionVisibilityQuery.isPending,
+  );
+  const visibleExtensions = $derived(extensions.filter(isPanelExtensionVisible));
+  const endpointEntries = $derived<ConsolePanelEndpoint[]>(
+    visibleExtensions
       .map((extension) => {
         const metadata = readConsolePageExtensionMetadata(extension);
         const endpoint = resolveConsolePageEndpoint(metadata, {
@@ -184,7 +231,8 @@
         browser &&
         endpointEntries.length > 0 &&
         !organizationContextQuery.isPending &&
-        !webExtensionsQuery.isPending,
+        !webExtensionsQuery.isPending &&
+        !visibilityPending,
       placeholderData: (previousData) => previousData,
       staleTime: 15_000,
     }),
@@ -199,16 +247,19 @@
   const loading = $derived(
     webExtensionsQuery.isPending ||
       organizationContextQuery.isPending ||
+      visibilityPending ||
       (endpointEntries.length > 0 && panelDocumentsQuery.isPending && !panelDocumentsQuery.data),
   );
   const errorMessage = $derived(
     webExtensionsQuery.error
       ? readErrorMessage(webExtensionsQuery.error)
-      : organizationContextQuery.error
-        ? readErrorMessage(organizationContextQuery.error)
-        : panelDocumentsQuery.error
-          ? readErrorMessage(panelDocumentsQuery.error)
-          : "",
+        : organizationContextQuery.error
+          ? readErrorMessage(organizationContextQuery.error)
+          : extensionVisibilityQuery.error
+            ? readErrorMessage(extensionVisibilityQuery.error)
+            : panelDocumentsQuery.error
+              ? readErrorMessage(panelDocumentsQuery.error)
+              : "",
   );
 
   function toneClass(tone: ConsolePageTone | undefined): string {
@@ -237,6 +288,44 @@
   function isPanelExpanded(result: ConsolePanelDocumentResult): boolean {
     const key = panelKey(result);
     return !result.document.collapsedByDefault || expandedPanelKeys[key] === true;
+  }
+
+  function isPanelExtensionVisible(extension: SystemPluginWebExtension): boolean {
+    const endpoint = resolvePanelExtensionVisibilityEndpoint(extension);
+    if (!endpoint) {
+      return true;
+    }
+    return extensionVisibility[extension.key] === true;
+  }
+
+  function resolvePanelExtensionVisibilityEndpoint(
+    extension: SystemPluginWebExtension,
+  ): string | null {
+    const endpoint = readVisibilityEndpoint(extension);
+    if (!endpoint) {
+      return null;
+    }
+    return endpoint
+      .replaceAll("{pathname}", encodeURIComponent(page.url.pathname))
+      .replaceAll("{query}", encodeURIComponent(page.url.searchParams.toString()))
+      .replaceAll("{organizationId}", encodeURIComponent(currentOrganization?.organizationId ?? ""))
+      .replaceAll("{organizationSlug}", encodeURIComponent(currentOrganization?.slug ?? ""))
+      .replaceAll("{organizationName}", encodeURIComponent(currentOrganization?.name ?? ""))
+      .replaceAll("{organizationRole}", encodeURIComponent(currentOrganization?.role ?? ""))
+      .replaceAll("{projectId}", encodeURIComponent(projectId))
+      .replaceAll("{environmentId}", encodeURIComponent(environmentId))
+      .replaceAll("{resourceId}", encodeURIComponent(resourceId))
+      .replaceAll("{deploymentId}", encodeURIComponent(deploymentId))
+      .replaceAll("{previewEnvironmentId}", encodeURIComponent(previewEnvironmentId));
+  }
+
+  function readVisibilityEndpoint(extension: SystemPluginWebExtension): string | null {
+    const metadata = extension.metadata;
+    if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+      return null;
+    }
+    const endpoint = metadata.visibilityEndpoint;
+    return typeof endpoint === "string" && endpoint.length > 0 ? endpoint : null;
   }
 
   function togglePanel(result: ConsolePanelDocumentResult): void {

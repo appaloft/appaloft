@@ -51,6 +51,7 @@ function labelsForCaddy(input: {
   const scheme = input.route.tlsMode === "auto" ? "https" : "http";
   const site = input.route.domains.map((domain) => `${scheme}://${domain}`).join(", ");
   const path = input.route.pathPrefix === "/" ? "" : `${input.route.pathPrefix}*`;
+  const pathDirective = input.route.pathHandling === "strip" ? "handle_path" : "handle";
   const redirect = input.route.routeBehavior === "redirect" || Boolean(input.route.redirectTo);
 
   if (redirect && input.route.redirectTo) {
@@ -58,8 +59,8 @@ function labelsForCaddy(input: {
     return path
       ? [
           `caddy${suffix}=${site}`,
-          `caddy${suffix}.handle_path=${path}`,
-          `caddy${suffix}.handle_path.redir=${target}`,
+          `caddy${suffix}.handle=${path}`,
+          `caddy${suffix}.handle.redir=${target}`,
         ]
       : [`caddy${suffix}=${site}`, `caddy${suffix}.redir=${target}`];
   }
@@ -69,8 +70,8 @@ function labelsForCaddy(input: {
   return path
     ? [
         `caddy${suffix}=${site}`,
-        `caddy${suffix}.handle_path=${path}`,
-        `caddy${suffix}.handle_path.reverse_proxy=${reverseProxy}`,
+        `caddy${suffix}.${pathDirective}=${path}`,
+        `caddy${suffix}.${pathDirective}.reverse_proxy=${reverseProxy}`,
       ]
     : [`caddy${suffix}=${site}`, `caddy${suffix}.reverse_proxy=${reverseProxy}`];
 }
@@ -111,6 +112,7 @@ function routeViews(input: ProxyConfigurationViewInput): ProxyConfigurationRoute
         scheme,
         url: routeUrl({ hostname, scheme, pathPrefix: route.pathPrefix }),
         pathPrefix: route.pathPrefix,
+        pathHandling: route.pathHandling ?? "preserve",
         tlsMode: route.tlsMode,
         ...(route.targetPort === undefined ? {} : { targetPort: route.targetPort }),
         source,

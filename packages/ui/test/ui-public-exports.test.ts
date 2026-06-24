@@ -91,4 +91,16 @@ describe("@appaloft/ui public exports", () => {
     expect(headerSource).toContain("{@render children?.()}");
     expect(footerSource).toContain("{@render children?.()}");
   });
+
+  test("keeps breadcrumb links as hoverable navigation targets", async () => {
+    const [linkSource, pageSource] = await Promise.all([
+      readFile(new URL("../src/breadcrumb/breadcrumb-link.svelte", import.meta.url), "utf8"),
+      readFile(new URL("../src/breadcrumb/breadcrumb-page.svelte", import.meta.url), "utf8"),
+    ]);
+
+    expect(linkSource).toContain("inline-flex h-8 min-w-0 items-center rounded-md px-2");
+    expect(linkSource).toContain("hover:bg-primary/5");
+    expect(linkSource).toContain("focus-visible:ring-2 focus-visible:ring-ring");
+    expect(pageSource).toContain("inline-flex h-8 min-w-0 items-center rounded-md px-2");
+  });
 });

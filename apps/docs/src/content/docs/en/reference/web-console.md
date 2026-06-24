@@ -38,4 +38,4 @@ When running the Web Vite dev server by itself, `/docs/*` redirects to the local
 
 <h2 id="web-product-version">Product version</h2>
 
-The Web console displays the Appaloft product version returned by backend `/api/version`. The docs site displays the same product version at build time; release and binary packaging inject it through `APPALOFT_APP_VERSION`, while development falls back to the repository root `package.json` version.
+The Web console displays the Appaloft product version returned by backend `/api/version`. Release and binary packaging inject it through `APPALOFT_APP_VERSION`, while development falls back to the repository root `package.json` version.

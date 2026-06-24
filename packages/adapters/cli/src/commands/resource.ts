@@ -70,6 +70,7 @@ import {
 import { cliCommandDescriptions } from "./docs-help.js";
 
 const resourceIdArg = Args.text({ name: "resourceId" });
+const optionalResourceIdArg = Args.text({ name: "resourceId" }).pipe(Args.withDefault(""));
 const storageVolumeIdArg = Args.text({ name: "storageVolumeId" });
 const dependencyResourceIdArg = Args.text({ name: "dependencyResourceId" });
 const dependencyBindingIdArg = Args.text({ name: "bindingId" });
@@ -86,6 +87,7 @@ const descriptionOption = Options.text("description").pipe(Options.optional);
 const archiveReasonOption = Options.text("reason").pipe(Options.optional);
 const runtimeControlReasonOption = Options.text("reason").pipe(Options.optional);
 const runtimeControlDeploymentOption = Options.text("deployment").pipe(Options.optional);
+const previewEnvironmentOption = Options.text("preview").pipe(Options.optional);
 const acknowledgeRetainedRuntimeMetadataOption = Options.boolean(
   "acknowledge-retained-runtime-metadata",
 ).pipe(Options.withDefault(false));
@@ -258,6 +260,11 @@ const confirmHistoricalSnapshotsOption = Options.boolean(
   "confirm-historical-snapshots-remain-unchanged",
 ).pipe(Options.withDefault(false));
 
+const optionalArgValue = (value: string): string | undefined => {
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+};
+
 const listCommand = EffectCommand.make(
   "list",
   {
@@ -295,9 +302,16 @@ const showCommand = EffectCommand.make(
 const effectiveConfigCommand = EffectCommand.make(
   "effective-config",
   {
-    resourceId: resourceIdArg,
+    resourceId: optionalResourceIdArg,
+    preview: previewEnvironmentOption,
   },
-  ({ resourceId }) => runQuery(ResourceEffectiveConfigQuery.create({ resourceId })),
+  ({ preview, resourceId }) =>
+    runQuery(
+      ResourceEffectiveConfigQuery.create({
+        resourceId: optionalArgValue(resourceId),
+        previewEnvironmentId: optionalValue(preview),
+      }),
+    ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceEffectiveConfig));
 
 const dependencyBindCommand = EffectCommand.make(
@@ -421,16 +435,18 @@ const createCommand = EffectCommand.make(
 const logsCommand = EffectCommand.make(
   "logs",
   {
-    resourceId: resourceIdArg,
+    resourceId: optionalResourceIdArg,
+    preview: previewEnvironmentOption,
     deployment: deploymentOption,
     service: serviceOption,
     tail: tailOption,
     follow: followOption,
   },
-  ({ deployment, follow, resourceId, service, tail }) =>
+  ({ deployment, follow, preview, resourceId, service, tail }) =>
     runResourceRuntimeLogsQuery(
       ResourceRuntimeLogsQuery.create({
-        resourceId,
+        resourceId: optionalArgValue(resourceId),
+        previewEnvironmentId: optionalValue(preview),
         deploymentId: optionalValue(deployment),
         serviceName: optionalValue(service),
         tailLines: Number(tail),
@@ -532,14 +548,16 @@ const logArchivesCommand = EffectCommand.make("log-archives").pipe(
 const runtimeStopCommand = EffectCommand.make(
   "stop",
   {
-    resourceId: resourceIdArg,
+    resourceId: optionalResourceIdArg,
+    preview: previewEnvironmentOption,
     deployment: runtimeControlDeploymentOption,
     reason: runtimeControlReasonOption,
   },
-  ({ deployment, reason, resourceId }) =>
+  ({ deployment, preview, reason, resourceId }) =>
     runCommand(
       StopResourceRuntimeCommand.create({
-        resourceId,
+        resourceId: optionalArgValue(resourceId),
+        previewEnvironmentId: optionalValue(preview),
         deploymentId: optionalValue(deployment),
         reason: optionalValue(reason),
       }),
@@ -549,15 +567,17 @@ const runtimeStopCommand = EffectCommand.make(
 const runtimeStartCommand = EffectCommand.make(
   "start",
   {
-    resourceId: resourceIdArg,
+    resourceId: optionalResourceIdArg,
+    preview: previewEnvironmentOption,
     deployment: runtimeControlDeploymentOption,
     reason: runtimeControlReasonOption,
     acknowledgeRetainedRuntimeMetadata: acknowledgeRetainedRuntimeMetadataOption,
   },
-  ({ acknowledgeRetainedRuntimeMetadata, deployment, reason, resourceId }) =>
+  ({ acknowledgeRetainedRuntimeMetadata, deployment, preview, reason, resourceId }) =>
     runCommand(
       StartResourceRuntimeCommand.create({
-        resourceId,
+        resourceId: optionalArgValue(resourceId),
+        previewEnvironmentId: optionalValue(preview),
         deploymentId: optionalValue(deployment),
         reason: optionalValue(reason),
         acknowledgeRetainedRuntimeMetadata,
@@ -568,15 +588,17 @@ const runtimeStartCommand = EffectCommand.make(
 const runtimeRestartCommand = EffectCommand.make(
   "restart",
   {
-    resourceId: resourceIdArg,
+    resourceId: optionalResourceIdArg,
+    preview: previewEnvironmentOption,
     deployment: runtimeControlDeploymentOption,
     reason: runtimeControlReasonOption,
     acknowledgeRetainedRuntimeMetadata: acknowledgeRetainedRuntimeMetadataOption,
   },
-  ({ acknowledgeRetainedRuntimeMetadata, deployment, reason, resourceId }) =>
+  ({ acknowledgeRetainedRuntimeMetadata, deployment, preview, reason, resourceId }) =>
     runCommand(
       RestartResourceRuntimeCommand.create({
-        resourceId,
+        resourceId: optionalArgValue(resourceId),
+        previewEnvironmentId: optionalValue(preview),
         deploymentId: optionalValue(deployment),
         reason: optionalValue(reason),
         acknowledgeRetainedRuntimeMetadata,
@@ -823,21 +845,28 @@ const secretsCommand = EffectCommand.make("secrets").pipe(
 const terminalCommand = EffectCommand.make(
   "terminal",
   {
-    resourceId: resourceIdArg,
+    resourceId: optionalResourceIdArg,
+    preview: previewEnvironmentOption,
     deployment: deploymentOption,
     directory: directoryOption,
     rows: rowsOption,
     cols: colsOption,
     attach: attachTerminalOption,
   },
-  ({ attach, cols, deployment, directory, resourceId, rows }) =>
+  ({ attach, cols, deployment, directory, preview, resourceId, rows }) =>
     runTerminalCommand(
       OpenTerminalSessionCommand.create({
-        scope: {
-          kind: "resource",
-          resourceId,
-          deploymentId: optionalValue(deployment),
-        },
+        scope: optionalValue(preview)
+          ? {
+              kind: "preview",
+              previewEnvironmentId: optionalValue(preview) ?? "",
+              deploymentId: optionalValue(deployment),
+            }
+          : {
+              kind: "resource",
+              resourceId: optionalArgValue(resourceId) ?? "",
+              deploymentId: optionalValue(deployment),
+            },
         relativeDirectory: optionalValue(directory),
         initialRows: Number(rows),
         initialCols: Number(cols),
@@ -872,7 +901,8 @@ const proxyConfigCommand = EffectCommand.make(
 const diagnoseCommand = EffectCommand.make(
   "diagnose",
   {
-    resourceId: resourceIdArg,
+    resourceId: optionalResourceIdArg,
+    preview: previewEnvironmentOption,
     deployment: deploymentOption,
     deploymentTimeline: includeDeploymentTimelineOption,
     runtimeLogs: includeRuntimeLogsOption,
@@ -889,6 +919,7 @@ const diagnoseCommand = EffectCommand.make(
     from,
     json,
     proxyConfiguration,
+    preview,
     resourceId,
     runtimeLogs,
     summary,
@@ -898,7 +929,8 @@ const diagnoseCommand = EffectCommand.make(
     void json;
     return runResourceDiagnosticSummaryQuery(
       ResourceDiagnosticSummaryQuery.create({
-        resourceId,
+        resourceId: optionalArgValue(resourceId),
+        previewEnvironmentId: optionalValue(preview),
         deploymentId: optionalValue(deployment),
         includeDeploymentTimelineTail: deploymentTimeline,
         includeRuntimeLogTail: runtimeLogs,
@@ -937,18 +969,20 @@ const accessFailureCommand = EffectCommand.make(
 const healthCommand = EffectCommand.make(
   "health",
   {
-    resourceId: resourceIdArg,
+    resourceId: optionalResourceIdArg,
+    preview: previewEnvironmentOption,
     live: liveOption,
     checks: includeChecksOption,
     publicAccessProbe: publicAccessProbeOption,
     runtimeProbe: runtimeProbeOption,
     json: jsonOption,
   },
-  ({ checks, json, live, publicAccessProbe, resourceId, runtimeProbe }) => {
+  ({ checks, json, live, preview, publicAccessProbe, resourceId, runtimeProbe }) => {
     void json;
     return runQuery(
       ResourceHealthQuery.create({
-        resourceId,
+        resourceId: optionalArgValue(resourceId),
+        previewEnvironmentId: optionalValue(preview),
         mode: live ? "live" : "cached",
         includeChecks: checks,
         includePublicAccessProbe: publicAccessProbe,

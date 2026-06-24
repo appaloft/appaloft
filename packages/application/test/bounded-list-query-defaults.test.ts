@@ -19,6 +19,7 @@ describe("bounded list query defaults", () => {
     expect(ListServersQuery.create()._unsafeUnwrap().runtimeAvailability).toBe("all");
     expect(ListEnvironmentsQuery.create({})._unsafeUnwrap().limit).toBe(100);
     expect(ListResourcesQuery.create({})._unsafeUnwrap().limit).toBe(100);
+    expect(ListResourcesQuery.create({})._unsafeUnwrap().lifecycleStatus).toBe("active");
     expect(ListDeploymentsQuery.create({})._unsafeUnwrap().limit).toBe(100);
     expect(ListDependencyResourcesQuery.create({})._unsafeUnwrap().limit).toBe(100);
   });
@@ -38,5 +39,15 @@ describe("bounded list query defaults", () => {
       ListServersQuery.create({ runtimeAvailability: "available" })._unsafeUnwrap()
         .runtimeAvailability,
     ).toBe("available");
+  });
+
+  test("[CQRS-LIST-BOUND-004] resource list filters materialize before handlers run", () => {
+    const query = ListResourcesQuery.create({
+      includePreviewResources: "true",
+      lifecycleStatus: "archived",
+    })._unsafeUnwrap();
+
+    expect(query.includePreviewResources).toBe(true);
+    expect(query.lifecycleStatus).toBe("archived");
   });
 });

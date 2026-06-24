@@ -12,6 +12,8 @@ describe("organization auth management console surface", () => {
       organizationSwitcherSource,
       userMenuSource,
       clientContractSource,
+      enUSSource,
+      zhCNSource,
     ] = await Promise.all([
       readFile(new URL("../../routes/organization/+page.svelte", import.meta.url), "utf8"),
       readFile(
@@ -28,6 +30,14 @@ describe("organization auth management console surface", () => {
       ),
       readFile(
         new URL("../../../../../packages/orpc/src/client-contract.ts", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../../../../../packages/i18n/src/locales/en-US.ts", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../../../../../packages/i18n/src/locales/zh-CN.ts", import.meta.url),
         "utf8",
       ),
     ]);
@@ -50,14 +60,39 @@ describe("organization auth management console surface", () => {
     expect(shellSource).not.toContain('href: "/organization"');
     expect(shellSource).not.toContain('href: "/instance"');
     expect(shellSource).toContain("ConsoleOrganizationSwitcher");
+    expect(shellSource).toContain("isWorkspaceNavigationExtension");
+    expect(shellSource).toContain('!normalizedPath.startsWith("/instance/")');
+    expect(shellSource).toContain('!normalizedPath.startsWith("/organization/")');
     expect(organizationSwitcherSource).toContain('navigateTo("/organization")');
     expect(organizationSwitcherSource).toContain('navigateTo("/instance")');
+    expect(organizationSwitcherSource).toContain('navigateTo("/")');
+    expect(organizationSwitcherSource).toContain(
+      "organizationId === currentOrganization?.organizationId",
+    );
+    expect(organizationSwitcherSource).toContain("disabled={pending}");
+    expect(organizationSwitcherSource).not.toContain("disabled={organizationIsCurrent || pending}");
+    expect(organizationSwitcherSource).toContain("showInstanceManagementLink");
+    expect(organizationSwitcherSource).toContain("preloadInstanceAccessCapability");
+    expect(organizationSwitcherSource).toContain("instanceAccessCapabilityKey");
     expect(organizationSwitcherSource).toContain("i18nKeys.console.nav.organization");
     expect(organizationSwitcherSource).toContain("i18nKeys.console.nav.instance");
     expect(organizationSwitcherSource).toContain("data-console-organization-switcher-trigger");
     expect(shellSource).toContain("ConsoleUserMenu");
     expect(userMenuSource).toContain('"/api/auth/sign-out"');
+    expect(userMenuSource).toContain("showInstanceManagementLink");
+    expect(userMenuSource).toContain("preloadInstanceAccessCapability");
+    expect(userMenuSource).toContain("instanceAccessCapabilityKey");
+    expect(userMenuSource).toContain('navigateTo("/")');
+    expect(userMenuSource).toContain('"https://appaloft.com"');
+    expect(userMenuSource).toContain("i18nKeys.common.actions.openWebsite");
+    expect(userMenuSource).not.toContain("DropdownMenuSubTrigger");
+    expect(userMenuSource).not.toContain("/api/auth/link-social");
+    expect(userMenuSource).not.toContain("i18nKeys.console.shell.linkGitHubAccount");
+    expect(userMenuSource).toContain("i18nKeys.console.shell.githubConnectedAs");
+    expect(userMenuSource).not.toContain("$t(i18nKeys.common.actions.connectGitHub)");
     expect(userMenuSource).toContain("i18nKeys.common.actions.signOut");
+    expect(enUSSource).toContain('openWebsite: "Website"');
+    expect(zhCNSource).toContain('openWebsite: "官网"');
     expect(userMenuSource).toContain("data-console-sign-out-action");
     expect(userMenuSource).toContain("DropdownMenuSeparator");
     expect(userMenuSource.indexOf("i18nKeys.common.language.label")).toBeLessThan(
@@ -96,7 +131,10 @@ describe("organization auth management console surface", () => {
       organizationPageSource,
       instancePageSource,
       instanceWorkersRouteSource,
+      instanceWorkersRouteContentSource,
       instanceExtensionRouteSource,
+      instanceAccessGateSource,
+      instanceAccessSource,
       managementShellSource,
       settingsNavSource,
     ] = await Promise.all([
@@ -104,9 +142,18 @@ describe("organization auth management console surface", () => {
       readFile(new URL("../../routes/instance/+page.svelte", import.meta.url), "utf8"),
       readFile(new URL("../../routes/instance/workers/+page.svelte", import.meta.url), "utf8"),
       readFile(
+        new URL("../../routes/instance/workers/InstanceWorkersRoute.svelte", import.meta.url),
+        "utf8",
+      ),
+      readFile(
         new URL("../../routes/instance/[...extensionPath]/+page.svelte", import.meta.url),
         "utf8",
       ),
+      readFile(
+        new URL("../../lib/components/console/InstanceAccessGate.svelte", import.meta.url),
+        "utf8",
+      ),
+      readFile(new URL("../../lib/console/instance-access.ts", import.meta.url), "utf8"),
       readFile(
         new URL("../../lib/components/console/ManagementShell.svelte", import.meta.url),
         "utf8",
@@ -122,20 +169,35 @@ describe("organization auth management console surface", () => {
     expect(instancePageSource).not.toContain("ConsoleShell");
     expect(instancePageSource).not.toContain("ConsoleResourceCanvas");
     expect(instancePageSource).toContain("instanceSettingsItems");
+    expect(instancePageSource).toContain("preloadInstanceAccessCapability");
+    expect(instancePageSource).toContain("instanceAccessAllowed");
+    expect(instancePageSource).toContain('void goto("/")');
+    expect(instancePageSource).toContain("browser && instanceAccessAllowed && activeSection");
     expect(instancePageSource).toContain("ConsoleOrganizationSwitcher");
     expect(instancePageSource).toContain("orpc.system.doctor.queryOptions");
     expect(instancePageSource).toContain("maintenanceWorkers");
     expect(instancePageSource).toContain("workerSafetyLabelKey");
     expect(instancePageSource).toContain("i18nKeys.console.instance.maintenanceWorkersTitle");
-    expect(instanceWorkersRouteSource).toContain('<InstancePage section="workers" />');
+    expect(instanceWorkersRouteSource).toContain("InstanceAccessGate");
+    expect(instanceWorkersRouteSource).toContain("InstanceWorkersRoute");
+    expect(instanceWorkersRouteSource).not.toContain("createQuery");
+    expect(instanceWorkersRouteSource).not.toContain("findConsolePageExtensionByPath");
+    expect(instanceWorkersRouteContentSource).toContain("findConsolePageExtensionByPath");
+    expect(instanceWorkersRouteContentSource).toContain("ConsoleExtensionPage");
+    expect(instanceWorkersRouteContentSource).toContain('<InstancePage section="workers" />');
+    expect(instanceExtensionRouteSource).toContain("InstanceAccessGate");
     expect(instanceExtensionRouteSource).toContain('settingsScope="instance"');
+    expect(instanceAccessGateSource).toContain("preloadInstanceAccessCapability");
+    expect(instanceAccessGateSource).toContain('void goto("/")');
+    expect(instanceAccessSource).toContain('operationKey: "system.db-status"');
+    expect(instanceAccessSource).toContain(".fetch([instanceAccessCapabilityQuery])");
     expect(instancePageSource).not.toContain("ManagementShell");
     expect(settingsNavSource).toContain('href: "/organization/members"');
     expect(settingsNavSource).toContain('href: "/organization/invitations"');
     expect(settingsNavSource).toContain('href: "/organization/deploy-tokens"');
     expect(settingsNavSource).toContain("instanceSettingsItems");
     expect(settingsNavSource).toContain('settingsExtensionItems(extensions, "/instance", locale)');
-    expect(settingsNavSource).toContain("systemPluginExtensionIcon(extension)");
+    expect(settingsNavSource).toContain("systemPluginExtensionIconPresentation(extension)");
     expect(settingsNavSource).toContain("systemPluginExtensionTitle(extension, locale)");
     expect(settingsNavSource).toContain('href: "/instance/workers"');
     expect(settingsNavSource).toContain("i18nKeys.console.instance.workerManagementTitle");
@@ -256,6 +318,7 @@ describe("organization auth management console surface", () => {
       organizationInvitationsSource,
       accountProfileSource,
       accountSecuritySource,
+      accountConnectionsSource,
       accountSessionsSource,
       accountDangerSource,
       settingsShellSource,
@@ -281,6 +344,7 @@ describe("organization auth management console surface", () => {
       ),
       readFile(new URL("../../routes/account/profile/+page.svelte", import.meta.url), "utf8"),
       readFile(new URL("../../routes/account/security/+page.svelte", import.meta.url), "utf8"),
+      readFile(new URL("../../routes/account/connections/+page.svelte", import.meta.url), "utf8"),
       readFile(new URL("../../routes/account/sessions/+page.svelte", import.meta.url), "utf8"),
       readFile(new URL("../../routes/account/danger-zone/+page.svelte", import.meta.url), "utf8"),
       readFile(
@@ -333,6 +397,7 @@ describe("organization auth management console surface", () => {
     expect(settingsNavSource).toContain('extension.target === "console-route"');
     expect(settingsNavSource).toContain('href: "/account/profile"');
     expect(settingsNavSource).toContain('href: "/account/security"');
+    expect(settingsNavSource).toContain('href: "/account/connections"');
     expect(settingsNavSource).toContain('href: "/account/sessions"');
     expect(settingsNavSource).toContain('href: "/account/danger-zone"');
     expect(settingsNavSource).toContain('href: "/organization/danger-zone"');
@@ -340,6 +405,7 @@ describe("organization auth management console surface", () => {
     expect(accountProfileSource).toContain("SettingsShell");
     expect(accountProfileSource).toContain("orpc.account.showProfile.queryOptions");
     expect(accountProfileSource).toContain("orpcClient.account.changeProfile");
+    expect(accountProfileSource).toContain('href="/account/connections"');
     expect(accountSecuritySource).toContain("SettingsShell");
     expect(accountSecuritySource).toContain("accountSettingsItems");
     expect(accountSecuritySource).toContain('page.url.searchParams.get("section")');
@@ -350,6 +416,17 @@ describe("organization auth management console surface", () => {
     expect(accountSecuritySource).not.toContain("ConsoleResourceCanvas");
     expect(accountSecuritySource).not.toContain("console-subnav-");
     expect(layoutCssSource).not.toContain(".console-subnav");
+    expect(accountConnectionsSource).toContain("SettingsShell");
+    expect(accountConnectionsSource).toContain('activePath="/account/connections"');
+    expect(accountConnectionsSource).toContain("data-account-github-connection");
+    expect(accountConnectionsSource).toContain("/api/auth/link-social");
+    expect(accountConnectionsSource).toContain("githubProvider?.accountLabel");
+    expect(accountConnectionsSource).toContain(
+      "i18nKeys.console.accountSettings.githubConnectedAs",
+    );
+    expect(accountConnectionsSource).toContain(
+      "i18nKeys.console.accountSettings.linkGitHubAccount",
+    );
     expect(accountSessionsSource).toContain("orpc.account.listSessions.queryOptions");
     expect(accountSessionsSource).toContain("orpcClient.account.revokeSession");
     expect(accountSessionsSource).toContain("clientKind");

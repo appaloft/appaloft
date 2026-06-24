@@ -71,10 +71,11 @@ Server terminal entrypoints link into the server Runtime information domain with
 Server scope starts in the target account's login directory unless a later server profile operation
 defines a safe default terminal directory.
 
-Resource scope starts in the project workspace directory resolved from deployment runtime metadata.
-The user-facing resource id, resource name, or slug must never be used as the checkout directory.
-Source locators such as HTTPS Git URLs and SSH-style Git remotes must not be used as terminal
-working directories when adapter workspace metadata is missing.
+Resource scope starts in the project workspace directory resolved from deployment runtime metadata,
+or enters the retained runtime container/service target directly when a containerized deployment has
+no source workspace. The user-facing resource id, resource name, or slug must never be used as the
+checkout directory. Source locators such as HTTPS Git URLs and SSH-style Git remotes must not be
+used as terminal working directories when adapter workspace metadata is missing.
 
 For current runtime adapters, expected mappings are:
 
@@ -85,7 +86,8 @@ For current runtime adapters, expected mappings are:
 | Local Docker Compose | Execution metadata `workdir` or execution `workingDirectory`. |
 | SSH Git source | `<remoteRuntimeRoot>/ssh-deployments/<deploymentId>/source` plus source `baseDirectory`; default root is `/var/lib/appaloft/runtime`. |
 | SSH uploaded local workspace | Remote `remoteWorkdir` recorded by source preparation. |
-| Docker image without source workspace | No resource workspace; reject with `terminal_session_workspace_unavailable` unless future container shell scope is accepted. |
+| Docker image without source workspace | No resource workspace; open the retained container target directly when runtime metadata or deterministic runtime names resolve the container. |
+| Docker image with `relativeDirectory` but no source workspace | Reject with `terminal_session_workspace_unavailable`; relative directories are only below a resolved workspace root, not arbitrary container paths. |
 
 ## Transport Rules
 

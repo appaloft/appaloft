@@ -27,6 +27,10 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - Product-grade preview operations are the `preview-policies.*` and `preview-environments.*`
   catalog entries. They are control-plane-owned and are not the same as Action-only PR preview
   workflow files.
+- A preview environment can be used as a selector for existing service operations. Prefer
+  `--preview <previewEnvironmentId>` on logs, health, diagnostics, effective config, runtime
+  control, and terminal commands when the user is operating a preview rather than its parent
+  resource.
 
 ## Catalog
 
@@ -126,21 +130,21 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft resource secrets show <resourceId> <key>` - `resources.secrets.show`
 - `appaloft resource import-variables <resourceId> --content <dotenv>` - `resources.import-variables`
 - `appaloft resource unset-variable <resourceId> <key>` - `resources.unset-variable`
-- `appaloft resource effective-config <resourceId>` - `resources.effective-config`
-- `appaloft resource logs <resourceId>` - `resources.runtime-logs`
+- `appaloft resource effective-config [resourceId] [--preview <previewEnvironmentId>]` - `resources.effective-config`
+- `appaloft resource logs [resourceId] [--preview <previewEnvironmentId>]` - `resources.runtime-logs`
 - `appaloft resource log-archives archive <resourceId>` - `resources.runtime-logs.archive`
 - `appaloft resource log-archives list` - `resources.runtime-log-archives.list`
 - `appaloft resource log-archives show <archiveId>` - `resources.runtime-log-archives.show`
 - `appaloft resource log-archives prune --before <iso>` - `resources.runtime-log-archives.prune`
 - `appaloft resource runtime-control-attempts prune --before <iso>` - `resources.runtime-control-attempts.prune`
-- `appaloft server terminal <serverId>; appaloft resource terminal <resourceId>` - `terminal-sessions.open`
+- `appaloft server terminal <serverId>; appaloft resource terminal [resourceId] [--preview <previewEnvironmentId>]` - `terminal-sessions.open`
 - `appaloft terminal-session list` - `terminal-sessions.list`
 - `appaloft terminal-session show <sessionId>` - `terminal-sessions.show`
 - `appaloft terminal-session close <sessionId>` - `terminal-sessions.close`
 - `appaloft terminal-session expire` - `terminal-sessions.expire`
-- `appaloft resource diagnose <resourceId>` - `resources.diagnostic-summary`
+- `appaloft resource diagnose [resourceId] [--preview <previewEnvironmentId>]` - `resources.diagnostic-summary`
 - `appaloft resource access-failure <requestId>` - `resources.access-failure-evidence.lookup`
-- `appaloft resource health <resourceId>` - `resources.health`
+- `appaloft resource health [resourceId] [--preview <previewEnvironmentId>]` - `resources.health`
 - `appaloft resource health-history <resourceId> --from <iso> --to <iso>` - `resources.health-history`
 - `appaloft resource proxy-config <resourceId>` - `resources.proxy-configuration.preview`
 - `appaloft dependency provision --kind <kind>` - `dependency-resources.provision`
@@ -151,6 +155,8 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft dependency list` - `dependency-resources.list`
 - `appaloft dependency count` - `dependency-resources.count`
 - `appaloft dependency show <dependencyResourceId>` - `dependency-resources.show`
+- `appaloft dependency inspect <dependencyResourceId>` - `dependency-resources.inspect`
+- `appaloft dependency query <dependencyResourceId> --statement <statement>` - `dependency-resources.query`
 - `appaloft dependency rename <dependencyResourceId>` - `dependency-resources.rename`
 - `appaloft dependency delete <dependencyResourceId>` - `dependency-resources.delete`
 - `appaloft dependency backup create <dependencyResourceId>` - `dependency-resources.create-backup`
@@ -209,13 +215,14 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft deploy [path-or-source] [--config appaloft.yml] [--env KEY=VALUE] [--secret KEY=ci-env:NAME] [--preview pull-request]` - `deployments.create`
 - `appaloft deployments retry <deploymentId>` - `deployments.retry`
 - `appaloft deployments redeploy <resourceId>` - `deployments.redeploy`
+- `appaloft deployments force-redeploy <resourceId>` - `deployments.force-redeploy`
 - `appaloft deployments rollback <deploymentId> --candidate <rollbackCandidateDeploymentId>` - `deployments.rollback`
 - `appaloft deployments cancel <deploymentId> --confirm <deploymentId>` - `deployments.cancel`
 - `appaloft deployments archive <deploymentId> --confirm <deploymentId>` - `deployments.archive`
 - `appaloft deployments prune --before <iso>` - `deployments.prune`
-- `appaloft resource runtime stop <resourceId>` - `resources.runtime.stop`
-- `appaloft resource runtime start <resourceId>` - `resources.runtime.start`
-- `appaloft resource runtime restart <resourceId>` - `resources.runtime.restart`
+- `appaloft resource runtime stop [resourceId] [--preview <previewEnvironmentId>]` - `resources.runtime.stop`
+- `appaloft resource runtime start [resourceId] [--preview <previewEnvironmentId>]` - `resources.runtime.start`
+- `appaloft resource runtime restart [resourceId] [--preview <previewEnvironmentId>]` - `resources.runtime.restart`
 - `appaloft deployments list` - `deployments.list`
 - `appaloft deployments count` - `deployments.count`
 - `appaloft deployments show <deploymentId>` - `deployments.show`
@@ -268,6 +275,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft domain-binding list` - `domain-bindings.list`
 - `appaloft domain-binding show <domainBindingId>` - `domain-bindings.show`
 - `appaloft domain-binding dns-plan <domainBindingId> [--connector cloudflare-dns]` - `domain-bindings.dns-plan`
+- `appaloft domain-binding dns-readiness <domainBindingId>` - `domain-bindings.dns-readiness.inspect`
 - `appaloft domain-binding configure-route <domainBindingId>` - `domain-bindings.configure-route`
 - `appaloft domain-binding delete-check <domainBindingId>` - `domain-bindings.delete-check`
 - `appaloft domain-binding delete <domainBindingId> --confirm <domainBindingId>` - `domain-bindings.delete`

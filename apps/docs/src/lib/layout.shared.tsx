@@ -1,5 +1,5 @@
 import { type BaseLayoutProps } from "fumadocs-ui/layouts/shared";
-import { appaloftVersion, withDocsBase } from "@/lib/config";
+import { withDocsBase } from "@/lib/config";
 
 type Locale = "zh-CN" | "en-US";
 
@@ -9,7 +9,6 @@ export function baseOptions(locale: Locale): BaseLayoutProps {
       title: (
         <span className="appaloft-docs-title">
           <span>Appaloft Docs</span>
-          <span className="appaloft-version-badge">v{appaloftVersion}</span>
         </span>
       ),
     },

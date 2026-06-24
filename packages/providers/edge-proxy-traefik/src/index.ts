@@ -297,6 +297,51 @@ function redirectReplacement(route: EdgeProxyRouteInput): string {
   return [`${scheme}://${route.redirectTo}/$$`, "{1}"].join("");
 }
 
+function httpToHttpsRedirectRule(route: EdgeProxyRouteInput): string {
+  return `(${traefikRule(route)}) && !PathPrefix(\`/.well-known/acme-challenge/\`)`;
+}
+
+function httpToHttpsRedirectLabels(input: {
+  route: EdgeProxyRouteInput;
+  router: string;
+}): string[] {
+  if (input.route.tlsMode !== "auto") {
+    return [];
+  }
+
+  const router = `${input.router}-http-redirect`;
+  const middleware = `${router}-scheme`;
+
+  return [
+    `traefik.http.routers.${router}.rule=${httpToHttpsRedirectRule(input.route)}`,
+    `traefik.http.routers.${router}.entrypoints=web`,
+    `traefik.http.routers.${router}.middlewares=${middleware}`,
+    `traefik.http.routers.${router}.service=noop@internal`,
+    `traefik.http.middlewares.${middleware}.redirectscheme.scheme=https`,
+    `traefik.http.middlewares.${middleware}.redirectscheme.permanent=true`,
+  ];
+}
+
+function routePathHandlingMiddlewareName(input: {
+  route: EdgeProxyRouteInput;
+  router: string;
+}): string | null {
+  if ((input.route.pathHandling ?? "preserve") !== "strip" || input.route.pathPrefix === "/") {
+    return null;
+  }
+
+  return `${input.router}-strip-prefix`;
+}
+
+function routePathHandlingLabels(input: {
+  route: EdgeProxyRouteInput;
+  middleware: string;
+}): string[] {
+  return [
+    `traefik.http.middlewares.${input.middleware}.stripprefix.prefixes=${input.route.pathPrefix}`,
+  ];
+}
+
 function routeProbeCommand(input: {
   httpPort: number;
   networkName: string;
@@ -396,6 +441,7 @@ function labelsForTraefik(input: {
       `traefik.http.routers.${router}.rule=${traefikRule(input.route)}`,
       `traefik.http.routers.${router}.entrypoints=${entrypoint}`,
       ...autoTlsLabels,
+      ...httpToHttpsRedirectLabels({ route: input.route, router }),
       `traefik.http.routers.${router}.middlewares=${middleware}`,
       `traefik.http.routers.${router}.service=noop@internal`,
       `traefik.http.middlewares.${middleware}.redirectregex.regex=${regex}`,
@@ -407,6 +453,11 @@ function labelsForTraefik(input: {
 
   const service = `${router}-svc`;
   const entrypoint = input.route.tlsMode === "auto" ? "websecure" : "web";
+  const pathHandlingMiddleware = routePathHandlingMiddlewareName({ route: input.route, router });
+  const middlewares = [
+    ...(pathHandlingMiddleware ? [pathHandlingMiddleware] : []),
+    ...(input.accessFailureMiddlewareName ? [input.accessFailureMiddlewareName] : []),
+  ];
 
   return [
     "traefik.enable=true",
@@ -414,8 +465,12 @@ function labelsForTraefik(input: {
     `traefik.http.routers.${router}.rule=${traefikRule(input.route)}`,
     `traefik.http.routers.${router}.entrypoints=${entrypoint}`,
     ...autoTlsLabels,
-    ...(input.accessFailureMiddlewareName
-      ? [`traefik.http.routers.${router}.middlewares=${input.accessFailureMiddlewareName}`]
+    ...httpToHttpsRedirectLabels({ route: input.route, router }),
+    ...(middlewares.length > 0
+      ? [`traefik.http.routers.${router}.middlewares=${middlewares.join(",")}`]
+      : []),
+    ...(pathHandlingMiddleware
+      ? routePathHandlingLabels({ route: input.route, middleware: pathHandlingMiddleware })
       : []),
     `traefik.http.routers.${router}.service=${service}`,
     `traefik.http.services.${service}.loadbalancer.server.port=${input.route.targetPort ?? input.port}`,
@@ -458,6 +513,7 @@ function routeViews(input: ProxyConfigurationViewInput): ProxyConfigurationRoute
         scheme,
         url: routeUrl({ hostname, scheme, pathPrefix: route.pathPrefix }),
         pathPrefix: route.pathPrefix,
+        pathHandling: route.pathHandling ?? "preserve",
         tlsMode: route.tlsMode,
         ...(route.targetPort === undefined ? {} : { targetPort: route.targetPort }),
         source,

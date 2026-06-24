@@ -36,9 +36,24 @@ appaloft mcp stdio
 Starting the server does not deploy apps, create resources, or mutate state. State changes only
 happen when an MCP client calls a concrete Appaloft operation tool.
 
-`@appaloft/ai-mcp` is the repository source package that owns MCP transport code, descriptors,
-resources, prompts, and tests. A standalone `appaloft-mcp` package/bin is deferred until release
-packaging is wired; the current documented entrypoint is `appaloft mcp stdio`.
+Start a local HTTP endpoint:
+
+```bash
+appaloft mcp serve --host 127.0.0.1 --port 3939
+```
+
+This exposes HTTP JSON-RPC MCP at `/mcp`. It binds to localhost by default; expose it on another
+host only behind a trusted reverse proxy or private network boundary.
+
+Use the standalone launcher:
+
+```bash
+npx appaloft-mcp
+npx appaloft-mcp serve --host 127.0.0.1 --port 3939
+```
+
+`appaloft-mcp` delegates to the same Appaloft runtime. It does not maintain a second operation list
+or business implementation.
 
 <h2 id="appaloft-mcp-tools">Tool Model</h2>
 

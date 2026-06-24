@@ -62,7 +62,7 @@
     readBrowserConsoleSidebarOpen,
   } from "$lib/console/sidebar-state";
   import {
-    systemPluginExtensionIcon,
+    systemPluginExtensionIconPresentation,
     systemPluginExtensionTitle,
   } from "$lib/console/web-extension-presentation";
   import { modalIsOpen, setModalOpen } from "$lib/console/url-modal";
@@ -97,6 +97,9 @@
 
   type SystemPluginWebExtensionsResponse = {
     items: SystemPluginWebExtension[];
+  };
+  type SystemPluginWebExtensionVisibilityResponse = {
+    visible?: boolean;
   };
 
   const navigationItems = [
@@ -170,9 +173,43 @@
   const organizations = $derived(organizationContext?.organizations ?? []);
   const projects = $derived(projectsQuery.data?.items ?? []);
   const projectsLoading = $derived(projectsQuery.isPending && projects.length === 0);
+  const visibilityExtensionEndpoints = $derived.by(() =>
+    (webExtensionsQuery.data?.items ?? [])
+      .map((extension) => {
+        const endpoint = resolveExtensionVisibilityEndpoint(extension);
+        return endpoint ? { key: extension.key, endpoint } : null;
+      })
+      .filter((entry): entry is { key: string; endpoint: string } => entry !== null),
+  );
+  const extensionVisibilityQuery = createQuery(() =>
+    queryOptions({
+      queryKey: [
+        "system-plugins",
+        "web-extension-visibility",
+        currentOrganization?.organizationId ?? "",
+        visibilityExtensionEndpoints
+          .map((entry) => `${entry.key}:${entry.endpoint}`)
+          .join("|"),
+      ],
+      queryFn: async () => {
+        const entries = await Promise.all(
+          visibilityExtensionEndpoints.map(async (entry) => {
+            const result = await request<SystemPluginWebExtensionVisibilityResponse>(entry.endpoint);
+            return [entry.key, result.visible === true] as const;
+          }),
+        );
+        return Object.fromEntries(entries);
+      },
+      enabled: browser && visibilityExtensionEndpoints.length > 0,
+      staleTime: 30_000,
+    }),
+  );
+  const extensionVisibility = $derived(extensionVisibilityQuery.data ?? {});
   const navigationExtensions = $derived.by(() =>
     (webExtensionsQuery.data?.items ?? [])
       .filter((extension) => extension.placement === "navigation")
+      .filter(isWorkspaceNavigationExtension)
+      .filter(isExtensionVisible)
       .toSorted((a, b) =>
         systemPluginExtensionTitle(a, $locale).localeCompare(
           systemPluginExtensionTitle(b, $locale),
@@ -285,6 +322,48 @@
     return href === "/" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
   }
 
+  function isWorkspaceNavigationExtension(extension: SystemPluginWebExtension): boolean {
+    const path = extension.path.split("?")[0] ?? extension.path;
+    const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+    return (
+      normalizedPath !== "/instance" &&
+      !normalizedPath.startsWith("/instance/") &&
+      normalizedPath !== "/organization" &&
+      !normalizedPath.startsWith("/organization/")
+    );
+  }
+
+  function isExtensionVisible(extension: SystemPluginWebExtension): boolean {
+    const endpoint = resolveExtensionVisibilityEndpoint(extension);
+    if (!endpoint) {
+      return true;
+    }
+    return extensionVisibility[extension.key] === true;
+  }
+
+  function resolveExtensionVisibilityEndpoint(
+    extension: SystemPluginWebExtension,
+  ): string | null {
+    const endpoint = readVisibilityEndpoint(extension);
+    if (!endpoint) {
+      return null;
+    }
+    return endpoint
+      .replaceAll("{organizationId}", encodeURIComponent(currentOrganization?.organizationId ?? ""))
+      .replaceAll("{organizationSlug}", encodeURIComponent(currentOrganization?.slug ?? ""))
+      .replaceAll("{organizationName}", encodeURIComponent(currentOrganization?.name ?? ""))
+      .replaceAll("{organizationRole}", encodeURIComponent(currentOrganization?.role ?? ""));
+  }
+
+  function readVisibilityEndpoint(extension: SystemPluginWebExtension): string | null {
+    const metadata = extension.metadata;
+    if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+      return null;
+    }
+    const endpoint = metadata.visibilityEndpoint;
+    return typeof endpoint === "string" && endpoint.length > 0 ? endpoint : null;
+  }
+
   function toggleColorMode(): void {
     colorMode = colorMode === "dark" ? "light" : "dark";
   }
@@ -355,7 +434,7 @@
             {/each}
             {#each navigationExtensions as extension (extension.key)}
               {@const extensionLabel = systemPluginExtensionTitle(extension, $locale)}
-              {@const ExtensionIcon = systemPluginExtensionIcon(extension)}
+              {@const extensionIcon = systemPluginExtensionIconPresentation(extension)}
               <SidebarMenuItem>
                 <SidebarMenuButton
                   isActive={isNavigationActive(extension.path)}
@@ -368,7 +447,20 @@
                       rel={extension.target === "external-page" ? "noreferrer" : undefined}
                       {...props}
                     >
-                      <ExtensionIcon class="size-4" />
+                      {#if extensionIcon.kind === "image"}
+                        <img
+                          class="size-4 shrink-0 rounded-sm object-contain"
+                          src={extensionIcon.src}
+                          alt=""
+                          aria-hidden="true"
+                          loading="lazy"
+                          decoding="async"
+                          data-system-plugin-extension-icon-image
+                        />
+                      {:else}
+                        {@const ExtensionIcon = extensionIcon.component}
+                        <ExtensionIcon class="size-4" />
+                      {/if}
                       <span>{extensionLabel}</span>
                     </a>
                   {/snippet}
@@ -462,9 +554,9 @@
         <div class="flex min-w-0 flex-1 items-center">
           {#if visibleBreadcrumbs.length > 0}
             <Breadcrumb.Root class="min-w-0">
-              <Breadcrumb.List class="flex-nowrap gap-1 overflow-hidden sm:gap-1.5">
+              <Breadcrumb.List class="flex-nowrap gap-px overflow-hidden sm:gap-px">
                 {#each visibleBreadcrumbs as item, index (`${item.label}-${index}`)}
-                  <Breadcrumb.Item class="min-w-0">
+                  <Breadcrumb.Item class="group/breadcrumb-item peer/breadcrumb-item min-w-0">
                     {#if item.loading}
                       <div
                         class="flex h-8 min-w-24 items-center gap-2 rounded-md px-2"
@@ -478,22 +570,22 @@
                       <DropdownMenu>
                         <div
                           data-console-header-switcher
-                          class="inline-flex h-8 min-w-0 max-w-[12rem] items-center gap-1 text-sm font-medium text-foreground sm:max-w-[16rem]"
+                          class="group/switcher inline-flex h-8 min-w-0 max-w-[12rem] items-center gap-0 rounded-md text-sm font-medium text-foreground transition-colors hover:bg-primary/5 focus-within:bg-primary/5 has-data-[state=open]:bg-primary/5 sm:max-w-[16rem]"
                         >
                           {#if item.href}
                             <a
                               data-console-header-switcher-link
                               href={item.href}
-                              class="group/link inline-flex h-8 min-w-0 flex-1 items-center gap-2 px-1.5 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              class="group/link inline-flex h-8 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-l-md rounded-r-none px-2 transition-colors hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             >
                               {#if item.kind === "project"}
-                                <FolderOpen class="size-4 shrink-0 text-muted-foreground transition-colors group-hover/link:text-foreground" />
+                                <FolderOpen class="size-4 shrink-0 text-muted-foreground transition-colors group-hover/switcher:text-foreground group-hover/link:!text-primary" />
                               {:else if item.kind === "resource"}
-                                <Package class="size-4 shrink-0 text-muted-foreground transition-colors group-hover/link:text-foreground" />
+                                <Package class="size-4 shrink-0 text-muted-foreground transition-colors group-hover/switcher:text-foreground group-hover/link:!text-primary" />
                               {:else if item.kind === "deployment"}
-                                <Rocket class="size-4 shrink-0 text-muted-foreground transition-colors group-hover/link:text-foreground" />
+                                <Rocket class="size-4 shrink-0 text-muted-foreground transition-colors group-hover/switcher:text-foreground group-hover/link:!text-primary" />
                               {:else if item.kind === "environment"}
-                                <ServerCrash class="size-4 shrink-0 text-muted-foreground transition-colors group-hover/link:text-foreground" />
+                                <ServerCrash class="size-4 shrink-0 text-muted-foreground transition-colors group-hover/switcher:text-foreground group-hover/link:!text-primary" />
                               {/if}
                               <span class="min-w-0 truncate">{item.label}</span>
                             </a>
@@ -518,7 +610,7 @@
                             data-console-header-switcher-trigger
                             aria-label={item.switcherLabel ?? item.label}
                             title={item.switcherLabel ?? item.label}
-                            class="group/dropdown-trigger inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            class="group/dropdown-trigger inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-l-none rounded-r-md text-muted-foreground transition-colors group-hover/switcher:text-foreground hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:bg-primary/10 data-[state=open]:text-foreground"
                           >
                             <ChevronDown class="size-3.5 transition-transform group-data-[state=open]/dropdown-trigger:rotate-180" />
                           </DropdownMenuTrigger>
@@ -549,7 +641,10 @@
                         </DropdownMenuContent>
                       </DropdownMenu>
                     {:else if item.href && index < visibleBreadcrumbs.length - 1}
-                      <Breadcrumb.Link class="truncate" href={item.href}>
+                      <Breadcrumb.Link
+                        class="truncate group-hover/breadcrumb-item:bg-primary/5 hover:bg-primary/10 hover:text-primary"
+                        href={item.href}
+                      >
                         {item.label}
                       </Breadcrumb.Link>
                     {:else}
@@ -559,7 +654,7 @@
                     {/if}
                   </Breadcrumb.Item>
                   {#if index < visibleBreadcrumbs.length - 1}
-                    <Breadcrumb.Separator class="shrink-0" />
+                    <Breadcrumb.Separator class="shrink-0 text-muted-foreground transition-colors peer-hover/breadcrumb-item:text-foreground hover:text-foreground" />
                   {/if}
                 {/each}
               </Breadcrumb.List>

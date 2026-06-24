@@ -139,6 +139,176 @@ describe("audit event read model persistence", () => {
     }
   });
 
+  test("[AUDIT-EVENT-GLOBAL-EXPORT-003] filters operation audit payload fields", async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), "appaloft-audit-global-filters-"));
+    const { createDatabase, createMigrator, PgAuditEventReadModel } = await import("../src");
+    const database = await createDatabase({
+      driver: "pglite",
+      pgliteDataDir: dataDir,
+    });
+
+    try {
+      const migrationResult = await createMigrator(database.db).migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      await database.db
+        .insertInto("audit_logs")
+        .values([
+          {
+            id: "aud_project_match",
+            aggregate_id: "prj_1",
+            event_type: "projects.create",
+            payload: {
+              schemaVersion: "operation-audit/v1",
+              organizationId: "org_1",
+              action: "create",
+              resourceType: "project",
+              resourceId: "prj_1",
+              projectId: "prj_1",
+              actorId: "usr_1",
+              result: "success",
+            },
+            created_at: "2026-01-01T00:00:00.000Z",
+          },
+          {
+            id: "aud_project_other_actor",
+            aggregate_id: "prj_2",
+            event_type: "projects.create",
+            payload: {
+              schemaVersion: "operation-audit/v1",
+              organizationId: "org_1",
+              action: "create",
+              resourceType: "project",
+              resourceId: "prj_2",
+              actorId: "usr_2",
+              result: "success",
+            },
+            created_at: "2026-01-01T00:00:01.000Z",
+          },
+          {
+            id: "aud_resource_other_type",
+            aggregate_id: "res_1",
+            event_type: "resources.create",
+            payload: {
+              schemaVersion: "operation-audit/v1",
+              organizationId: "org_1",
+              action: "create",
+              resourceType: "resource",
+              resourceId: "res_1",
+              projectId: "prj_1",
+              actorId: "usr_1",
+              result: "success",
+            },
+            created_at: "2026-01-01T00:00:02.000Z",
+          },
+          {
+            id: "aud_project_other_org",
+            aggregate_id: "prj_3",
+            event_type: "projects.create",
+            payload: {
+              schemaVersion: "operation-audit/v1",
+              organizationId: "org_2",
+              action: "create",
+              resourceType: "project",
+              resourceId: "prj_3",
+              actorId: "usr_1",
+              result: "success",
+            },
+            created_at: "2026-01-01T00:00:03.000Z",
+          },
+        ])
+        .execute();
+
+      const context = toRepositoryContext(
+        createExecutionContext({
+          requestId: "req_audit_event_global_filter_pg_test",
+          entrypoint: "system",
+        }),
+      );
+      const readModel = new PgAuditEventReadModel(database.db);
+
+      const exported = await readModel.exportGlobal(context, {
+        from: "2026-01-01T00:00:00.000Z",
+        to: "2026-01-01T00:01:00.000Z",
+        organizationId: "org_1",
+        action: "create",
+        resourceType: "project",
+        actorId: "usr_1",
+        limit: 10,
+      });
+
+      expect(exported.items.map((event) => event.auditEventId)).toEqual(["aud_project_match"]);
+
+      const multiValueExported = await readModel.exportGlobal(context, {
+        from: "2026-01-01T00:00:00.000Z",
+        to: "2026-01-01T00:01:00.000Z",
+        organizationId: "org_1",
+        action: ["create"],
+        resourceType: ["project", "resource"],
+        actorId: ["usr_1", "usr_2"],
+        limit: 10,
+      });
+
+      expect(multiValueExported.items.map((event) => event.auditEventId)).toEqual([
+        "aud_project_match",
+        "aud_project_other_actor",
+        "aud_resource_other_type",
+      ]);
+
+      const projectScoped = await readModel.exportGlobal(context, {
+        from: "2026-01-01T00:00:00.000Z",
+        to: "2026-01-01T00:01:00.000Z",
+        organizationId: "org_1",
+        projectId: "prj_1",
+        limit: 10,
+      });
+
+      expect(projectScoped.items.map((event) => event.auditEventId)).toEqual([
+        "aud_project_match",
+        "aud_resource_other_type",
+      ]);
+
+      const pagedDescending = await readModel.exportGlobal(context, {
+        from: "2026-01-01T00:00:00.000Z",
+        to: "2026-01-01T00:01:00.000Z",
+        organizationId: "org_1",
+        action: ["create"],
+        resourceType: ["project", "resource"],
+        actorId: ["usr_1", "usr_2"],
+        order: "desc",
+        limit: 2,
+      });
+
+      expect(pagedDescending.items.map((event) => event.auditEventId)).toEqual([
+        "aud_resource_other_type",
+        "aud_project_other_actor",
+      ]);
+      expect(pagedDescending.nextCursor).toBe("2026-01-01T00:00:01.000Z|aud_project_other_actor");
+      expect(pagedDescending.truncated).toBe(true);
+
+      const pagedDescendingNext = await readModel.exportGlobal(context, {
+        from: "2026-01-01T00:00:00.000Z",
+        to: "2026-01-01T00:01:00.000Z",
+        organizationId: "org_1",
+        action: ["create"],
+        resourceType: ["project", "resource"],
+        actorId: ["usr_1", "usr_2"],
+        order: "desc",
+        cursor: pagedDescending.nextCursor ?? "",
+        limit: 2,
+      });
+
+      expect(pagedDescendingNext.items.map((event) => event.auditEventId)).toEqual([
+        "aud_project_match",
+      ]);
+      expect(pagedDescendingNext.nextCursor).toBeUndefined();
+      expect(pagedDescendingNext.truncated).toBe(false);
+    } finally {
+      await database.close();
+      rmSync(dataDir, { force: true, recursive: true });
+    }
+  });
+
   test("[AUDIT-EVENT-EXPORT-002] exports bounded redacted events with truncation metadata", async () => {
     const dataDir = mkdtempSync(join(tmpdir(), "appaloft-audit-export-"));
     const { createDatabase, createMigrator, PgAuditEventReadModel } = await import("../src");
@@ -344,6 +514,7 @@ describe("audit event read model persistence", () => {
             createdAt: "2026-01-01T00:01:00.000Z",
           },
         ],
+        nextCursor: "2026-01-01T00:01:00.000Z|aud_first_match",
         truncated: true,
       });
       expect(narrowed).toEqual({

@@ -43,6 +43,7 @@ export function routeInputsFromAccessRoutes(accessRoutes: AccessRoute[]): EdgePr
     proxyKind: route.proxyKind,
     domains: route.domains,
     pathPrefix: route.pathPrefix,
+    pathHandling: route.pathHandling,
     tlsMode: route.tlsMode,
     ...(route.targetPort === undefined ? {} : { targetPort: route.targetPort }),
     ...(route.routeBehavior === "redirect" ? { routeBehavior: route.routeBehavior } : {}),

@@ -382,6 +382,12 @@ function tlsModeField(record: JsonRecord): ServerAppliedRouteDesiredStateDomain[
   return record.tlsMode === "auto" ? "auto" : "disabled";
 }
 
+function pathHandlingField(
+  record: JsonRecord,
+): NonNullable<ServerAppliedRouteDesiredStateDomain["pathHandling"]> {
+  return record.pathHandling === "strip" ? "strip" : "preserve";
+}
+
 function edgeProxyKindField(
   record: JsonRecord,
   key: string,
@@ -398,6 +404,7 @@ function domainToJson(domain: ServerAppliedRouteDesiredStateDomain): JsonRecord 
   return {
     host: domain.host,
     pathPrefix: domain.pathPrefix,
+    pathHandling: domain.pathHandling ?? "preserve",
     tlsMode: domain.tlsMode,
     ...(domain.redirectTo ? { redirectTo: domain.redirectTo } : {}),
     ...(domain.redirectStatus ? { redirectStatus: domain.redirectStatus } : {}),
@@ -413,6 +420,7 @@ function domainFromJson(domain: JsonRecord): ServerAppliedRouteDesiredStateDomai
   return {
     host,
     pathPrefix,
+    pathHandling: pathHandlingField(domain),
     tlsMode: tlsModeField(domain),
     ...(redirectTo ? { redirectTo } : {}),
     ...(redirectStatus ? { redirectStatus } : {}),

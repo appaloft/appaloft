@@ -28,10 +28,15 @@ import {
 } from "../../ports";
 import { tokens } from "../../tokens";
 import { isServerBackedDeploymentSummary } from "../deployments/deployment-target-guards";
+import { type PreviewOperableScopeResolver } from "../preview-deployments/preview-operable-scope.resolver";
 import { type OpenTerminalSessionCommand } from "./open-terminal-session.command";
 
 const openTerminalSessionOperation = findOperationCatalogEntryByKey("terminal-sessions.open");
 const defaultOperationGuardPort = new AllowAllOperationGuardPort();
+
+type ResolvedTerminalScope =
+  | { kind: "server"; serverId: string }
+  | { kind: "resource"; resourceId: string; deploymentId?: string };
 
 function metadataValue(deployment: DeploymentSummary, key: string): string | undefined {
   const value = deployment.runtimePlan.execution.metadata?.[key];
@@ -109,6 +114,12 @@ function resolveDeploymentWorkspace(deployment: DeploymentSummary): string | und
   return sourceWorkspace ? appendSourceBaseDirectory(sourceWorkspace, baseDirectory) : undefined;
 }
 
+function runtimeTargetCanOpenWithoutWorkspace(deployment: DeploymentSummary): boolean {
+  return ["docker-container", "docker-compose-stack"].includes(
+    deployment.runtimePlan.execution.kind,
+  );
+}
+
 @injectable()
 export class OpenTerminalSessionUseCase {
   constructor(
@@ -124,6 +135,8 @@ export class OpenTerminalSessionUseCase {
     private readonly terminalSessionGateway: TerminalSessionGateway,
     @inject(tokens.operationGuardPort)
     private readonly operationGuardPort?: OperationGuardPort,
+    @inject(tokens.previewOperableScopeResolver)
+    private readonly previewOperableScopeResolver?: PreviewOperableScopeResolver,
   ) {}
 
   async execute(
@@ -131,7 +144,50 @@ export class OpenTerminalSessionUseCase {
     command: OpenTerminalSessionCommand,
   ): Promise<Result<TerminalSessionDescriptor>> {
     const repositoryContext = toRepositoryContext(context);
-    const scope = command.scope;
+    let scope: ResolvedTerminalScope;
+    if (command.scope.kind === "preview") {
+      const previewScope = await this.previewOperableScopeResolver?.resolve(context, {
+        previewEnvironmentId: command.scope.previewEnvironmentId,
+        deploymentId: command.scope.deploymentId,
+        requireDeployment: true,
+      });
+      if (!previewScope) {
+        return err(
+          domainError.validation("Preview terminal scope resolver is unavailable", {
+            phase: "terminal-session-preview-scope-resolution",
+            previewEnvironmentId: command.scope.previewEnvironmentId,
+          }),
+        );
+      }
+      if (previewScope.isErr()) {
+        return err(previewScope.error);
+      }
+      const resolvedPreviewScope = previewScope.value;
+      if (!resolvedPreviewScope) {
+        return err(
+          domainError.validation("Preview terminal scope could not be resolved", {
+            phase: "terminal-session-preview-scope-resolution",
+            previewEnvironmentId: command.scope.previewEnvironmentId,
+          }),
+        );
+      }
+      scope = {
+        kind: "resource",
+        resourceId: resolvedPreviewScope.resourceId,
+        ...(resolvedPreviewScope.deploymentId
+          ? { deploymentId: resolvedPreviewScope.deploymentId }
+          : {}),
+      };
+    } else {
+      scope =
+        command.scope.kind === "server"
+          ? command.scope
+          : {
+              kind: "resource",
+              resourceId: command.scope.resourceId,
+              ...(command.scope.deploymentId ? { deploymentId: command.scope.deploymentId } : {}),
+            };
+    }
 
     if (openTerminalSessionOperation) {
       const checked = await checkOperationGuards({
@@ -251,7 +307,13 @@ export class OpenTerminalSessionUseCase {
     }
 
     const workspace = resolveDeploymentWorkspace(deployment);
-    if (!workspace) {
+    const workingDirectory = workspace
+      ? appendRelativeDirectory(workspace, command.relativeDirectory)
+      : undefined;
+    if (
+      !workingDirectory &&
+      (!runtimeTargetCanOpenWithoutWorkspace(deployment) || command.relativeDirectory)
+    ) {
       return err(
         domainError.terminalSessionWorkspaceUnavailable(
           "Deployment workspace metadata is not available",
@@ -270,7 +332,7 @@ export class OpenTerminalSessionUseCase {
         resource,
         deployment,
         server,
-        workingDirectory: appendRelativeDirectory(workspace, command.relativeDirectory),
+        ...(workingDirectory ? { workingDirectory } : {}),
       },
       initialRows: command.initialRows,
       initialCols: command.initialCols,

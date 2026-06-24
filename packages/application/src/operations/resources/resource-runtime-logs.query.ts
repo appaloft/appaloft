@@ -15,7 +15,7 @@ export {
 
 export class ResourceRuntimeLogsQuery extends Query<ResourceRuntimeLogsResult> {
   constructor(
-    public readonly resourceId: string,
+    public readonly resourceId: string | undefined,
     public readonly tailLines: number,
     public readonly follow: boolean,
     public readonly signal?: AbortSignal,
@@ -23,6 +23,7 @@ export class ResourceRuntimeLogsQuery extends Query<ResourceRuntimeLogsResult> {
     public readonly serviceName?: string,
     public readonly since?: string,
     public readonly cursor?: string,
+    public readonly previewEnvironmentId?: string,
   ) {
     super();
   }
@@ -44,6 +45,7 @@ export class ResourceRuntimeLogsQuery extends Query<ResourceRuntimeLogsResult> {
           trimToUndefined(parsed.serviceName),
           trimToUndefined(parsed.since),
           trimToUndefined(parsed.cursor),
+          trimToUndefined(parsed.previewEnvironmentId),
         ),
     );
   }

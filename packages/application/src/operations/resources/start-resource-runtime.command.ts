@@ -15,11 +15,12 @@ export {
 
 export class StartResourceRuntimeCommand extends Command<ResourceRuntimeControlCommandResult> {
   constructor(
-    public readonly resourceId: string,
+    public readonly resourceId: string | undefined,
     public readonly deploymentId?: string,
     public readonly acknowledgeRetainedRuntimeMetadata?: boolean,
     public readonly reason?: string,
     public readonly idempotencyKey?: string,
+    public readonly previewEnvironmentId?: string,
   ) {
     super();
   }
@@ -33,6 +34,7 @@ export class StartResourceRuntimeCommand extends Command<ResourceRuntimeControlC
           parsed.acknowledgeRetainedRuntimeMetadata,
           trimToUndefined(parsed.reason),
           trimToUndefined(parsed.idempotencyKey),
+          trimToUndefined(parsed.previewEnvironmentId),
         ),
     );
   }

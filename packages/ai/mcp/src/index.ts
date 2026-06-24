@@ -957,6 +957,9 @@ function jsonRpcError(
 export async function handleAppaloftMcpJsonRpcRequest(
   server: AppaloftMcpServer,
   value: unknown,
+  options?: {
+    context?: ExecutionContext;
+  },
 ): Promise<JsonRpcResponse | null> {
   const request = parseRequest(value);
   if (!request) {
@@ -1005,6 +1008,7 @@ export async function handleAppaloftMcpJsonRpcRequest(
           await server.callTool({
             name,
             arguments: params.arguments,
+            ...(options?.context ? { context: options.context } : {}),
           }),
         );
       }
@@ -1044,6 +1048,127 @@ export async function handleAppaloftMcpJsonRpcRequest(
   }
 }
 
+async function jsonRpcResponsesForHttpRequest(
+  server: AppaloftMcpServer,
+  value: unknown,
+  options?: {
+    context?: ExecutionContext;
+  },
+): Promise<JsonRpcResponse | JsonRpcResponse[] | null> {
+  if (!Array.isArray(value)) {
+    return handleAppaloftMcpJsonRpcRequest(server, value, options);
+  }
+
+  const responses = await Promise.all(
+    value.map((request) => handleAppaloftMcpJsonRpcRequest(server, request, options)),
+  );
+
+  return responses.filter((response): response is JsonRpcResponse => Boolean(response));
+}
+
+function mcpHttpHeaders(protocolVersion = defaultProtocolVersion): Headers {
+  return new Headers({
+    "content-type": "application/json; charset=utf-8",
+    "mcp-protocol-version": protocolVersion,
+  });
+}
+
+export async function handleAppaloftMcpHttpRequest(input: {
+  server: AppaloftMcpServer;
+  request: Request;
+  context?: ExecutionContext;
+}): Promise<Response> {
+  const headers = mcpHttpHeaders(input.request.headers.get("mcp-protocol-version") ?? undefined);
+
+  if (input.request.method === "GET") {
+    return new Response(
+      JSON.stringify(
+        {
+          schemaVersion: "appaloft.mcp.http-endpoint/v1",
+          protocolVersion: defaultProtocolVersion,
+          transport: "streamable-http",
+          methods: ["POST"],
+          capabilities: {
+            tools: {},
+            resources: {},
+            prompts: {},
+          },
+          serverInfo: {
+            name: "appaloft-mcp",
+            version: "0.1.0",
+          },
+        },
+        null,
+        2,
+      ),
+      { headers },
+    );
+  }
+
+  if (input.request.method !== "POST") {
+    return new Response(
+      JSON.stringify({
+        error: {
+          code: "mcp_method_not_allowed",
+          message: "Appaloft MCP HTTP transport accepts GET metadata and POST JSON-RPC requests.",
+        },
+      }),
+      { status: 405, headers },
+    );
+  }
+
+  const body = await input.request.json().catch(() => null);
+  const response = await jsonRpcResponsesForHttpRequest(input.server, body, {
+    ...(input.context ? { context: input.context } : {}),
+  });
+
+  if (response === null || (Array.isArray(response) && response.length === 0)) {
+    return new Response(null, { status: 202, headers });
+  }
+
+  return new Response(JSON.stringify(response), { headers });
+}
+
+export function createAppaloftMcpHttpFetchHandler(input: {
+  server: AppaloftMcpServer;
+  contextFactory?: (request: Request) => ExecutionContext | Promise<ExecutionContext>;
+  endpointPath?: string;
+}): (request: Request) => Promise<Response> {
+  const endpointPath = input.endpointPath ?? "/mcp";
+
+  return async (request) => {
+    const url = new URL(request.url);
+    if (url.pathname !== endpointPath) {
+      return new Response("Not found", { status: 404 });
+    }
+
+    const context = input.contextFactory ? await input.contextFactory(request) : undefined;
+    return handleAppaloftMcpHttpRequest({
+      server: input.server,
+      request,
+      ...(context ? { context } : {}),
+    });
+  };
+}
+
+export function startAppaloftMcpHttpServer(input: {
+  server: AppaloftMcpServer;
+  hostname?: string;
+  port?: number;
+  contextFactory?: (request: Request) => ExecutionContext | Promise<ExecutionContext>;
+  endpointPath?: string;
+}): ReturnType<typeof Bun.serve> {
+  return Bun.serve({
+    hostname: input.hostname ?? "127.0.0.1",
+    port: input.port ?? 3939,
+    fetch: createAppaloftMcpHttpFetchHandler({
+      server: input.server,
+      ...(input.contextFactory ? { contextFactory: input.contextFactory } : {}),
+      ...(input.endpointPath ? { endpointPath: input.endpointPath } : {}),
+    }),
+  });
+}
+
 export async function runAppaloftMcpStdioServer(input: {
   server: AppaloftMcpServer;
   stdin?: ReadableStream<Uint8Array>;
@@ -1077,5 +1202,57 @@ export async function runAppaloftMcpStdioServer(input: {
     if (response) {
       stdout.write(`${JSON.stringify(response)}\n`);
     }
+  }
+}
+
+export async function runAppaloftMcpRemoteStdioProxy(input: {
+  endpoint: string;
+  authorization: string;
+  fetch?: typeof fetch;
+  stdin?: ReadableStream<Uint8Array>;
+  stdout?: { write(data: string): void };
+}): Promise<void> {
+  const stdin = input.stdin ?? Bun.stdin.stream();
+  const stdout = input.stdout ?? process.stdout;
+  const requestFetch = input.fetch ?? fetch;
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  async function forward(line: string): Promise<void> {
+    const response = await requestFetch(input.endpoint, {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        authorization: input.authorization,
+        "content-type": "application/json",
+      },
+      body: line,
+    });
+
+    if (response.status === 202 || response.status === 204) {
+      return;
+    }
+
+    const text = await response.text();
+    if (text.trim()) {
+      stdout.write(`${text.trimEnd()}\n`);
+    }
+  }
+
+  for await (const chunk of stdin) {
+    buffer += decoder.decode(chunk, { stream: true });
+    const lines = buffer.split(/\r?\n/);
+    buffer = lines.pop() ?? "";
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed) {
+        await forward(trimmed);
+      }
+    }
+  }
+
+  if (buffer.trim()) {
+    await forward(buffer.trim());
   }
 }

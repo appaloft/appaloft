@@ -1,5 +1,9 @@
 <script lang="ts">
-  import InstancePage from "../+page.svelte";
+  import InstanceAccessGate from "$lib/components/console/InstanceAccessGate.svelte";
+
+  import InstanceWorkersRoute from "./InstanceWorkersRoute.svelte";
 </script>
 
-<InstancePage section="workers" />
+<InstanceAccessGate>
+  <InstanceWorkersRoute />
+</InstanceAccessGate>

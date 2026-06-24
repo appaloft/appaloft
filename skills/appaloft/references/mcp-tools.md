@@ -5,7 +5,7 @@ Appaloft MCP. The skill remains the procedural guide; MCP is the callable transp
 
 ## Setup
 
-Current user-facing path: use the same Appaloft runtime as the CLI:
+Use the same Appaloft runtime as the CLI for stdio:
 
 ```bash
 appaloft mcp stdio
@@ -14,9 +14,36 @@ appaloft mcp stdio
 This starts a stdio MCP server and composes the real Appaloft command/query buses. It does not
 deploy anything until the MCP client calls a tool.
 
-The source package `@appaloft/ai-mcp` owns transport code, descriptors, resources, prompts, and
-tests. A standalone `appaloft-mcp` package/bin is deferred until release packaging is wired; do not
-present it as the current install path.
+For local remote-HTTP clients:
+
+```bash
+appaloft mcp serve --host 127.0.0.1 --port 3939
+```
+
+This serves MCP JSON-RPC over HTTP at `/mcp`. Keep the default localhost bind unless a trusted
+reverse proxy or private network supplies the security boundary.
+
+For a dedicated package command:
+
+```bash
+npx @appaloft/mcp
+npx @appaloft/mcp serve --host 127.0.0.1 --port 3939
+```
+
+The standalone `@appaloft/mcp` package exposes the `appaloft-mcp` launcher and delegates to the
+Appaloft CLI/runtime. It does not define another operation list or bypass the application buses.
+
+For Codex connecting to hosted Appaloft Cloud, use the browser handoff and local bridge:
+
+```bash
+appaloft auth mcp login
+appaloft auth mcp codex install
+```
+
+The installer adds a token-free Codex MCP config entry that launches
+`appaloft mcp remote-stdio --profile mcp`. The bridge reads the local Appaloft MCP profile and
+forwards JSON-RPC to the hosted `/mcp` endpoint with bearer auth; Codex config does not store the
+bearer value.
 
 ## Tool Naming
 
@@ -25,6 +52,10 @@ Each MCP tool maps one-to-one to an operation catalog key:
 - `deployments.create` -> `deployments_create`
 - `deployments.plan` -> `deployments_plan`
 - `resources.configure-source` -> `resources_configure_source`
+- `resources.runtime-logs` -> `resources_runtime_logs` with either `resourceId` or
+  `previewEnvironmentId`
+- `dependency-resources.inspect` -> `dependency_resources_inspect`
+- `dependency-resources.query` -> `dependency_resources_query`
 - `runtime-monitoring.samples.list` -> `runtime_monitoring_samples_list`
 - `system.doctor` -> `system_doctor`
 
@@ -64,6 +95,11 @@ Prompts sequence existing tools only. They do not create new operations.
 
 - Preserve the same secret rules as CLI/API/Web: never read or print `.env`, private keys, tokens,
   SSH material, cookies, raw connection strings, or unmasked logs.
+- Preview environments are selectors for existing service operations. Use `previewEnvironmentId`
+  on logs, health, diagnostics, effective config, runtime control, and terminal tools; do not infer
+  parent resource latest deployment as preview evidence.
+- Dependency safe query tools are allowlisted read-only inspection only. They must fail closed when
+  the provider adapter is unavailable or when the statement/command is outside the allowlist.
 - For destructive operations, inspect readback or delete-safety tools first and pass exact
   confirmation fields when the operation schema requires them.
 - Keep auth, tenant context, operation guards, redaction, confirmations, and structured errors in

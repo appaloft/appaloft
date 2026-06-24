@@ -115,6 +115,7 @@ export const instanceUpgradeApplyResponseSchema = z.object({
 export const authProviderStatusSchema = z.object({
   key: z.enum(["github", "google", "oidc"]),
   title: z.string(),
+  accountLabel: z.string().optional(),
   configured: z.boolean(),
   connected: z.boolean(),
   requiresSignIn: z.boolean(),
@@ -434,7 +435,7 @@ export const pluginSummarySchema = z.object({
   configuration: systemConfigurationSummarySchema.optional(),
 });
 
-export const systemPluginWebExtensionIconSchema = z.enum([
+export const systemPluginWebExtensionIconNameSchema = z.enum([
   "activity",
   "archive",
   "building",
@@ -451,6 +452,16 @@ export const systemPluginWebExtensionIconSchema = z.enum([
   "shield",
   "terminal",
   "wallet",
+]);
+
+export const systemPluginWebExtensionCustomIconSchema = z.object({
+  src: z.string().min(1),
+  label: z.string().min(1).optional(),
+});
+
+export const systemPluginWebExtensionIconSchema = z.union([
+  systemPluginWebExtensionIconNameSchema,
+  systemPluginWebExtensionCustomIconSchema,
 ]);
 
 export const systemPluginWebExtensionLocalizationSchema = z.object({
@@ -474,6 +485,8 @@ export const systemPluginWebExtensionSchema = z.object({
     "navigation",
     "settings",
     "quick-deploy-source",
+    "route",
+    "project-detail-panel",
     "project-environment-panel",
     "resource-detail-panel",
   ]),
@@ -3335,9 +3348,22 @@ export const exportAuditEventsInputSchema = z.object({
 export const exportGlobalAuditEventsInputSchema = z.object({
   aggregateId: z.string().min(1).optional(),
   eventType: z.string().min(1).optional(),
+  organizationId: z.string().min(1).optional(),
+  projectId: z.string().min(1).optional(),
+  action: z
+    .union([z.string().min(1), z.array(z.string().min(1)).min(1).max(20).readonly()])
+    .optional(),
+  resourceType: z
+    .union([z.string().min(1), z.array(z.string().min(1)).min(1).max(20).readonly()])
+    .optional(),
+  actorId: z
+    .union([z.string().min(1), z.array(z.string().min(1)).min(1).max(20).readonly()])
+    .optional(),
   from: z.string(),
   to: z.string(),
   limit: z.coerce.number().int().positive().max(500).default(100),
+  cursor: z.string().min(1).optional(),
+  order: z.enum(["asc", "desc"]).default("asc"),
 });
 
 export const pruneAuditEventsInputSchema = z.object({
@@ -3459,13 +3485,21 @@ export const exportGlobalAuditEventsResponseSchema = z.object({
   filters: z.object({
     aggregateId: z.string().optional(),
     eventType: z.string().optional(),
+    organizationId: z.string().optional(),
+    projectId: z.string().optional(),
+    action: z.union([z.string(), z.array(z.string()).readonly()]).optional(),
+    resourceType: z.union([z.string(), z.array(z.string()).readonly()]).optional(),
+    actorId: z.union([z.string(), z.array(z.string()).readonly()]).optional(),
     from: z.string(),
     to: z.string(),
     limit: z.number(),
+    cursor: z.string().optional(),
+    order: z.enum(["asc", "desc"]),
   }),
   items: z.array(auditEventDetailSchema),
   itemCount: z.number(),
   truncated: z.boolean(),
+  nextCursor: z.string().optional(),
   generatedAt: z.string(),
 });
 
@@ -4243,6 +4277,7 @@ export const proxyConfigurationRouteViewSchema = z.object({
   scheme: z.enum(["http", "https"]),
   url: z.string(),
   pathPrefix: z.string(),
+  pathHandling: z.enum(["preserve", "strip"]).optional(),
   tlsMode: z.enum(["auto", "disabled"]),
   targetPort: z.number().int().positive().optional(),
   source: z.enum(["generated-default", "domain-binding", "deployment-snapshot", "server-applied"]),
@@ -4318,6 +4353,7 @@ export const createDomainBindingInputSchema = z
     destinationId: z.string().min(1).optional(),
     domainName: z.string().min(1),
     pathPrefix: z.string().min(1).default("/"),
+    pathHandling: z.enum(["preserve", "strip"]).default("preserve"),
     proxyKind: z.enum(["none", "traefik", "caddy"]),
     tlsMode: z.enum(["auto", "disabled"]).default("auto"),
     redirectTo: z.string().min(1).optional(),
@@ -4364,6 +4400,7 @@ export const domainBindingSummarySchema = z.object({
   destinationId: z.string().optional(),
   domainName: z.string(),
   pathPrefix: z.string(),
+  pathHandling: z.enum(["preserve", "strip"]).optional(),
   proxyKind: z.enum(["none", "traefik", "caddy"]),
   tlsMode: z.enum(["auto", "disabled"]),
   redirectTo: z.string().optional(),

@@ -55,6 +55,7 @@
     deploymentTimelineProgressEvents,
     deploymentTimelineProgressStatus,
     deploymentTimelineEntries,
+    isTerminalDeploymentProgressEvent,
     isTerminalDeploymentStatus,
     latestDeploymentTimelineCursor,
     mergeDeploymentTimelineEnvelopes,
@@ -74,6 +75,7 @@
     findProject,
     findResource,
     formatTime,
+    hrefWithSearchParams,
     projectDetailHref,
     resourceDetailHref,
     resourceTerminalHref,
@@ -360,7 +362,7 @@
       )
       .map((deploymentItem) => ({
         label: deploymentItem.runtimePlan.source.displayName,
-        href: deploymentDetailHref(deploymentItem),
+        href: deploymentDetailHrefWithActiveSearch(deploymentItem),
         selected: deploymentItem.id === deploymentId,
       })),
   );
@@ -521,9 +523,12 @@
 
     if (event.status === "failed") {
       recoveryDeploymentProgressStatus = "failed";
-    } else if (event.status === "succeeded") {
+    } else if (isTerminalDeploymentProgressEvent(event)) {
       recoveryDeploymentProgressStatus = "succeeded";
-    } else {
+    } else if (
+      recoveryDeploymentProgressStatus !== "succeeded" &&
+      recoveryDeploymentProgressStatus !== "failed"
+    ) {
       recoveryDeploymentProgressStatus = "running";
     }
   }
@@ -1156,6 +1161,18 @@
     return `${page.url.pathname}${search ? `?${search}` : ""}`;
   }
 
+  function deploymentDetailHrefWithActiveSearch(
+    deployment: Parameters<typeof deploymentDetailHref>[0],
+  ): string {
+    const params = new URLSearchParams();
+
+    if (activeTab !== "overview") {
+      params.set("tab", activeTab);
+    }
+
+    return hrefWithSearchParams(deploymentDetailHref(deployment), params);
+  }
+
   function selectDeploymentTab(tab: DeploymentDetailTab, event: MouseEvent): void {
     event.preventDefault();
     void goto(deploymentTabHref(tab), { noScroll: true, keepFocus: true });
@@ -1521,7 +1538,7 @@
       label: headerDeployment?.runtimePlan.source.displayName ?? $t(i18nKeys.common.domain.deployment),
       kind: "deployment",
       loading: deploymentHeaderLoading,
-      href: headerDeployment ? deploymentDetailHref(headerDeployment) : undefined,
+      href: headerDeployment ? deploymentDetailHrefWithActiveSearch(headerDeployment) : undefined,
       switcherLabel: $t(i18nKeys.console.deployments.pageTitle),
       switcherItems: deploymentHeaderSwitchItems,
     },

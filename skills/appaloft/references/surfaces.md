@@ -55,9 +55,10 @@ the npm package is actually published and verified in the user's environment.
    apply only during ordinary trusted deploys and are skipped during PR preview deploy mutation.
    Supported secret resolvers are `ci-env:<NAME>` and same-key
    `resource-secret:<KEY>`.
-5. MCP/tools: use when an MCP host has `appaloft mcp stdio` or an equivalent configured server
-   available. MCP tools mirror existing operations and must not introduce MCP-only mutations. Use
-   [mcp-tools.md](mcp-tools.md) for tool naming, resources, prompts, and setup.
+5. MCP/tools: use when an MCP host has `appaloft mcp stdio`, `appaloft mcp serve`,
+   `appaloft-mcp`, or an equivalent configured server available. MCP tools mirror existing
+   operations and must not introduce MCP-only mutations. Use [mcp-tools.md](mcp-tools.md) for tool
+   naming, resources, prompts, and setup.
 
 ## GitHub Action Boundary
 
@@ -69,6 +70,10 @@ the npm package is actually published and verified in the user's environment.
 - Product-grade preview belongs to Appaloft Cloud or a self-hosted control plane with preview
   policy, GitHub App webhook intake, cleanup retry, scheduler, audit, and quota. Do not collapse it
   into Action-only PR preview guidance.
+- Preview environments inherit service-operation surfaces as a selector for the parent
+  resource/deployment runtime: logs, health, diagnostics, effective config, runtime control, and
+  terminal. They do not inherit project/resource/server/domain/certificate/billing/provider-account
+  mutation surfaces.
 
 ## Boundary Rules
 

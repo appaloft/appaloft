@@ -19,7 +19,8 @@ const booleanInput = (defaultValue: boolean) =>
 
 export const resourceDiagnosticSummaryQueryInputSchema = z
   .object({
-    resourceId: nonEmptyTrimmedString("Resource id"),
+    resourceId: optionalNonEmptyTrimmedString("Resource id"),
+    previewEnvironmentId: optionalNonEmptyTrimmedString("Preview environment id"),
     deploymentId: optionalNonEmptyTrimmedString("Deployment id"),
     observationFrom: optionalIsoTimestamp("Observation from"),
     observationTo: optionalIsoTimestamp("Observation to"),
@@ -30,6 +31,14 @@ export const resourceDiagnosticSummaryQueryInputSchema = z
     locale: optionalNonEmptyTrimmedString("Locale"),
   })
   .superRefine((value, context) => {
+    if (!value.resourceId && !value.previewEnvironmentId) {
+      context.addIssue({
+        code: "custom",
+        message: "Either resourceId or previewEnvironmentId is required",
+        path: ["resourceId"],
+      });
+    }
+
     if (Boolean(value.observationFrom) === Boolean(value.observationTo)) {
       return;
     }
