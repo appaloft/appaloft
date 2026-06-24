@@ -104,8 +104,9 @@ Current boundary:
 - project lifecycle state is explicit; archived projects remain readable, reject new
   project-scoped mutations and deployment admission, and can be restored through `projects.restore`
 - `projects.delete-check` and guarded `projects.delete` soft-delete only archived projects with no
-  retained blockers; empty environments are auto-archived through the environment lifecycle and
-  delete does not cascade other child cleanup or erase support/audit history
+  retained non-audit blockers; empty environments are auto-archived through the environment
+  lifecycle and delete does not cascade other child cleanup, prune audit rows, or erase
+  support/audit history
 - project detail surfaces should make resources the primary list and resource creation the primary
   write affordance
 - project-level "view deployments" is a secondary rollup over resources

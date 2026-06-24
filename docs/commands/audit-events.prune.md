@@ -53,8 +53,8 @@ The command must:
   remains retained.
 - Rows outside the aggregate/event filters are retained.
 - Server delete safety may change after destructive prune because retained audit rows are one
-  blocker source. Resource delete safety must not require audit prune, because retained audit rows
-  are past-tense facts that may continue to reference a tombstoned resource id.
+  blocker source. Project and Resource delete safety must not require audit prune, because retained
+  audit rows are past-tense facts that may continue to reference tombstoned project/resource ids.
 
 ## Entrypoints
 

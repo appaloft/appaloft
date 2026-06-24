@@ -38,7 +38,7 @@ exports or legal holds as immutable archive records.
   write-side aggregate behavior.
 - Upstream/downstream contexts: `audit-events.prune` observes retained archive source-row
   references before deleting audit rows; server delete safety continues to observe retained audit
-  rows as blockers, while resource delete safety does not.
+  rows as blockers, while project and resource delete safety do not.
 
 ## Public Surfaces
 

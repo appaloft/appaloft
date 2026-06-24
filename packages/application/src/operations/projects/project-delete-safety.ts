@@ -20,7 +20,7 @@ export function buildProjectDeleteBlockers(input: {
 }): ProjectDeleteBlocker[] {
   return [
     ...(input.lifecycleStatus === "active" ? [activeProjectDeleteBlocker(input.projectId)] : []),
-    ...input.retainedBlockers,
+    ...input.retainedBlockers.filter((blocker) => blocker.kind !== "audit-retention"),
   ];
 }
 
