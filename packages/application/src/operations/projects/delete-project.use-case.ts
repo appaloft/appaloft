@@ -31,6 +31,7 @@ import { publishDomainEventsAndReturn } from "../publish-domain-events";
 import { type DeleteProjectCommandInput } from "./delete-project.command";
 import {
   activeProjectDeleteBlocker,
+  buildProjectDeleteBlockers,
   uniqueProjectDeleteBlockerKinds,
 } from "./project-delete-safety";
 
@@ -191,8 +192,13 @@ export class DeleteProjectUseCase {
         await publishDomainEventsAndReturn(context, eventBus, logger, environment, undefined);
       }
 
-      const blockers = yield* await deletionBlockerReader.findBlockers(repositoryContext, {
+      const retainedBlockers = yield* await deletionBlockerReader.findBlockers(repositoryContext, {
         projectId: projectId.value,
+      });
+      const blockers = buildProjectDeleteBlockers({
+        projectId: projectId.value,
+        lifecycleStatus: "archived",
+        retainedBlockers,
       });
       if (blockers.length > 0) {
         return err(

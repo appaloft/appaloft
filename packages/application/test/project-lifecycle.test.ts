@@ -838,7 +838,7 @@ describe("project lifecycle operations", () => {
     });
   });
 
-  test("[PROJ-LIFE-DELETE-CHECK-002] archived project delete-check reports retained blockers", async () => {
+  test("[PROJ-LIFE-DELETE-CHECK-002] archived project delete-check reports retained blockers without treating audit history as a blocker", async () => {
     const { clock, context, projectReadModel } = await createHarness([
       projectFixture({
         lifecycleStatus: "archived",
@@ -852,6 +852,12 @@ describe("project lifecycle operations", () => {
           kind: "resource",
           relatedEntityId: "res_demo",
           relatedEntityType: "resource",
+          count: 1,
+        },
+        {
+          kind: "audit-retention",
+          relatedEntityId: "aud_project",
+          relatedEntityType: "audit-log",
           count: 1,
         },
       ]),
@@ -888,7 +894,14 @@ describe("project lifecycle operations", () => {
       ]);
     const useCase = new DeleteProjectUseCase(
       projects,
-      new FakeProjectDeletionBlockerReader(),
+      new FakeProjectDeletionBlockerReader([
+        {
+          kind: "audit-retention",
+          relatedEntityId: "aud_project",
+          relatedEntityType: "audit-log",
+          count: 1,
+        },
+      ]),
       new MemoryEnvironmentRepository(),
       clock,
       eventBus,

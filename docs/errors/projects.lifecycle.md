@@ -74,7 +74,7 @@ metadata.
 | `not_found` | `not-found` | `context-resolution` | No | Project cannot be found or is not visible. |
 | `project_slug_conflict` | `conflict` | `project-admission` | No | Derived project slug is already owned by another project. |
 | `project_archived` | `conflict` | `project-lifecycle-guard` | No | Mutation or deployment admission targeted an archived project. |
-| `project_delete_blocked` | `conflict` | `project-lifecycle-guard` | No | Project delete was requested before archive or while retained delete-check blockers remain. |
+| `project_delete_blocked` | `conflict` | `project-lifecycle-guard` | No | Project delete was requested before archive or while retained non-audit delete-check blockers remain. Audit history is retained as a past-tense fact and is not a project deletion blocker. |
 | `invariant_violation` | `domain` | `project-lifecycle-guard` | No | Project aggregate lifecycle transition rejected the requested change. |
 | `infra_error` | `infra` | `project-delete-check-read` | Conditional | Project delete blocker checks could not be safely assembled. |
 | `infra_error` | `infra` | `project-persistence` | Conditional | Project state could not be safely persisted. |
