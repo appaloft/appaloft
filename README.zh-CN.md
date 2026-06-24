@@ -19,10 +19,8 @@
 </div>
 
 <p align="center">
-  <img src="https://www.appaloft.com/images/appaloft-hero-cloud-980.webp" alt="Appaloft 官网首页 hero visual" width="920" />
+  <img src="https://www.appaloft.com/images/appaloft-www-hero-overview.png" alt="Appaloft 控制台总览" width="920" />
 </p>
-
-![Appaloft deployment lifecycle](./apps/docs/public/diagrams/deployment-lifecycle.svg)
 
 ## Appaloft 是什么？
 
