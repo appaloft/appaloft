@@ -3,10 +3,14 @@ import { type SystemPluginWebExtension } from "@appaloft/contracts";
 import { describe, expect, test } from "vitest";
 
 import {
+  consoleDomainErrorModalRenderer,
   consolePageRenderer,
+  findConsoleDomainErrorModalExtension,
   findConsolePageExtensionByPath,
   findConsolePanelExtensionsByPlacement,
+  readConsoleDomainErrorModalExtensionMetadata,
   readConsolePageExtensionMetadata,
+  resolveConsoleDomainErrorModalEndpoint,
   resolveConsolePageEndpoint,
 } from "./console-page-extension";
 
@@ -36,6 +40,20 @@ const resourcePanelExtension: SystemPluginWebExtension = {
     renderer: consolePageRenderer,
     pageEndpoint:
       "/example/resource-panel?projectId={projectId}&environmentId={environmentId}&resourceId={resourceId}",
+  },
+};
+
+const domainErrorModalExtension: SystemPluginWebExtension = {
+  ...consolePageExtension,
+  key: "example-domain-error-modal",
+  title: "Resolve error",
+  path: "/settings",
+  placement: "domain-error-modal",
+  metadata: {
+    renderer: consoleDomainErrorModalRenderer,
+    pageEndpoint:
+      "/example/domain-error-modal?organizationId={organizationId}&errorCode={errorCode}&requestPath={requestPath}",
+    errorCodes: ["plan_limit_exceeded"],
   },
 };
 
@@ -94,6 +112,38 @@ describe("Console page extension surface", () => {
       }),
     ).toBe(
       "/example/resource-panel?projectId=proj_123&environmentId=env_staging&resourceId=res_123",
+    );
+  });
+
+  test("[CONSOLE-EXT-PAGE-004] resolves neutral domain-error modal extensions", () => {
+    expect(
+      findConsoleDomainErrorModalExtension([domainErrorModalExtension], "plan_limit_exceeded"),
+    ).toEqual(domainErrorModalExtension);
+    expect(
+      findConsoleDomainErrorModalExtension([domainErrorModalExtension], "other_error"),
+    ).toBeNull();
+
+    const metadata = readConsoleDomainErrorModalExtensionMetadata(domainErrorModalExtension);
+    expect(metadata).toEqual({
+      renderer: "console-domain-error-modal",
+      pageEndpoint:
+        "/example/domain-error-modal?organizationId={organizationId}&errorCode={errorCode}&requestPath={requestPath}",
+      errorCodes: ["plan_limit_exceeded"],
+    });
+    expect(
+      resolveConsoleDomainErrorModalEndpoint(metadata, {
+        pathname: "/servers",
+        organization: {
+          organizationId: "org_123",
+        },
+        error: {
+          code: "plan_limit_exceeded",
+          status: 400,
+          requestPath: "/api/servers",
+        },
+      }),
+    ).toBe(
+      "/example/domain-error-modal?organizationId=org_123&errorCode=plan_limit_exceeded&requestPath=%2Fapi%2Fservers",
     );
   });
 
@@ -157,6 +207,13 @@ describe("Console page extension surface", () => {
     expect(rendererSource).toContain("displayValueText(cell.text)");
     expect(rendererSource).toContain("displayValueText(row.value)");
     expect(rendererSource).toContain('kind: "dialog-panel-grid"');
+    expect(rendererSource).toContain('layout?: "grid" | "comparison-table"');
+    expect(rendererSource).toContain("data-console-page-dialog-comparison-table");
+    expect(rendererSource).toContain('{#if section.layout === "comparison-table"}');
+    expect(rendererSource).toContain("{@render panelGridComparisonTable(section)}");
+    expect(rendererSource).toContain(
+      '{@render panelGridItems(section.items, "grid gap-4 md:grid-cols-2 xl:grid-cols-3")}',
+    );
     expect(rendererSource).toContain('kind: "integration-catalog"');
     expect(rendererSource).toContain('layout?: "catalog-grid" | "settings-list"');
     expect(rendererSource).toContain("src?: string");
@@ -185,6 +242,11 @@ describe("Console page extension surface", () => {
     expect(rendererSource).toContain('kind: "tiered-unit-rate"');
     expect(rendererSource).toContain("<table");
     expect(rendererSource).toContain("<thead");
+    expect(rendererSource).toContain("<tfoot");
+    expect(rendererSource.indexOf("<tfoot")).toBeGreaterThan(rendererSource.indexOf("</tbody>"));
+    expect(rendererSource).not.toContain(
+      '<p class="text-xs leading-5 text-muted-foreground">{item.description}</p>',
+    );
     expect(rendererSource).toContain("title?: string");
     expect(rendererSource).toContain('import { goto } from "$app/navigation";');
     expect(rendererSource).toContain('settingsScope?: "organization" | "instance" | null');

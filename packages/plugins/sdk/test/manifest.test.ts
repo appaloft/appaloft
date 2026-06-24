@@ -79,6 +79,33 @@ describe("plugin manifest contract", () => {
     }
   });
 
+  test("accepts injected domain error modal web extension placement", () => {
+    expect(
+      systemPluginWebExtensionSchema.parse({
+        key: "example-domain-error-modal",
+        title: "Domain error help",
+        description: "Shows a domain-specific recovery path for handled console errors.",
+        path: "/domain-error-help",
+        placement: "domain-error-modal",
+        target: "console-route",
+        requiresAuth: true,
+        metadata: {
+          renderer: "console-domain-error-modal",
+          errorCodes: ["plan_limit_exceeded"],
+          pageEndpoint:
+            "/example/domain-error-help?organizationId={organizationId}&errorCode={errorCode}",
+        },
+      }),
+    ).toMatchObject({
+      key: "example-domain-error-modal",
+      placement: "domain-error-modal",
+      target: "console-route",
+      metadata: {
+        renderer: "console-domain-error-modal",
+      },
+    });
+  });
+
   test("accepts console route web extension metadata", () => {
     expect(
       systemPluginWebExtensionSchema.parse({
