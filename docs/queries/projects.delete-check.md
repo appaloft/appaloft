@@ -43,9 +43,13 @@ type ProjectDeleteSafety = {
 Canonical blockers are `active-project`, `environment`, `resource`, `deployment-history`,
 `domain-binding`, `certificate`, `source-link`, `source-event`, `dependency-resource`,
 `storage-volume`, `scheduled-task`, `preview-environment`, `runtime-monitoring`,
-`runtime-log-retention`, `provider-job-log`, `domain-event-retention`, and `audit-retention`.
+`runtime-log-retention`, `provider-job-log`, and `domain-event-retention`.
 
 `environment` blockers represent non-archived environments that are not empty.
+
+Retained audit rows are not project delete-check blockers. They describe past facts and may keep
+referencing the project id after the project is tombstoned; deleting a project must not require
+pruning audit history first.
 
 Blockers expose only safe kind/id/type/count fields.
 

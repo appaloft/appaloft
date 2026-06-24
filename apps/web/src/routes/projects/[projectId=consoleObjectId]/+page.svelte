@@ -158,6 +158,8 @@
     visible?: boolean;
   };
   const projectSettingsSections = ["general", "archivedResources", "danger"] as const;
+  const projectDetailScrollablePageClass = "flex min-h-0 min-w-0 flex-col";
+  const projectDetailScrollableBodyClass = "flex min-h-0 min-w-0 flex-col";
   type ProjectAttentionItem = {
     key: string;
     kind:
@@ -2087,7 +2089,7 @@
       </div>
     </section>
   {:else}
-    <div class={detailPageClass}>
+    <div class={projectDetailScrollablePageClass}>
       <section class={detailHeaderClass}>
         <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div class="max-w-3xl space-y-3">
@@ -2202,7 +2204,7 @@
         </section>
       </section>
 
-      <Tabs.Root value={activeProjectTab} class={detailBodyClass}>
+      <Tabs.Root value={activeProjectTab} class={projectDetailScrollableBodyClass}>
         <ConsoleDetailTabs
           ariaLabel={$t(i18nKeys.console.projects.pageTitle)}
           items={projectDetailTabItems}
@@ -2547,7 +2549,7 @@
             </aside>
           </section>
 
-          <section class="console-panel space-y-5 p-5">
+          <section class="console-panel space-y-5 p-5" data-project-runtime-monitor>
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div class="space-y-1">
                 <div class="flex items-center gap-2">

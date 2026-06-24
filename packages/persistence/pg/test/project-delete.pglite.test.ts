@@ -106,6 +106,18 @@ describe("project delete persistence", () => {
         configuredEnvironment,
         UpsertEnvironmentSpec.fromEnvironment(configuredEnvironment),
       );
+      await database.db
+        .insertInto("audit_logs")
+        .values({
+          id: "aud_prj_blocked",
+          aggregate_id: "prj_blocked",
+          event_type: "project-archived",
+          payload: {
+            projectId: "prj_blocked",
+          },
+          created_at: "2026-01-01T00:00:15.000Z",
+        })
+        .execute();
 
       const autoArchiveCandidates = await blockerReader.findEmptyEnvironmentArchiveCandidates(
         context,
@@ -127,6 +139,11 @@ describe("project delete persistence", () => {
         relatedEntityType: "environment",
         count: 1,
       });
+      expect(blockers._unsafeUnwrap()).not.toContainEqual(
+        expect.objectContaining({
+          kind: "audit-retention",
+        }),
+      );
 
       const deletableProject = Project.create({
         id: ProjectId.rehydrate("prj_deletable"),
