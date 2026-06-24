@@ -49,8 +49,8 @@ or scheduled retention automation.
   application schemas.
 - Public docs/help must describe holds as retention blockers, not immutable archives or legal
   discovery products.
-- Delete safety may continue to report retained audit rows; holds explain why old rows are still
-  retained after prune.
+- Server delete safety may continue to report retained audit rows; holds explain why old rows are
+  still retained after prune. Resource delete safety does not treat retained audit rows as blockers.
 
 ## Governed Specs
 

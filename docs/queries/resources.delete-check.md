@@ -35,6 +35,10 @@ Deployment history is not a resource delete-check blocker. Historical deployment
 and logs keep their own retention and audit ownership; deleting an archived resource only tombstones
 the normal resource identity and must not cascade historical deployment cleanup.
 
+Audit history is also not a resource delete-check blocker. Retained audit rows describe past facts
+and may keep referencing the resource id after the resource is tombstoned; deleting a resource must
+not require pruning audit history first.
+
 ## Entrypoints
 
 | Entrypoint | Mapping | Status |
