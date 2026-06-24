@@ -9,6 +9,8 @@ import {
   DisplayNameText,
   type DomainEvent,
   EnvironmentId,
+  err,
+  ok,
   PortNumber,
   ProjectId,
   Resource,
@@ -20,6 +22,7 @@ import {
   ResourceName,
   ResourceNetworkProtocolValue,
   ResourceSlug,
+  type Result,
   RuntimePlanStrategyValue,
   SourceKindValue,
   SourceLocator,
@@ -33,6 +36,10 @@ import {
 } from "@appaloft/testkit";
 
 import { createExecutionContext, toRepositoryContext } from "../src";
+import {
+  type ResourceRuntimeControlCommandResult,
+  type ResourceRuntimeControlOperation,
+} from "../src/ports";
 import { ArchiveResourceUseCase } from "../src/use-cases";
 
 function resourceFixture(): Resource {
@@ -86,7 +93,41 @@ function archivedEvent(events: unknown[]): DomainEvent {
   return event;
 }
 
-async function createHarness(resource: Resource = resourceFixture()) {
+type RuntimeStopInput = {
+  operation: ResourceRuntimeControlOperation;
+  resourceId: string;
+  reason?: string;
+  idempotencyKey?: string;
+};
+
+class RecordingRuntimeStopper {
+  readonly requests: RuntimeStopInput[] = [];
+
+  constructor(
+    private readonly result: Result<ResourceRuntimeControlCommandResult> = ok({
+      runtimeControlAttemptId: "rtc_archive_stop",
+      resourceId: "res_web",
+      deploymentId: "dep_web",
+      operation: "stop",
+      status: "succeeded",
+      startedAt: "2026-01-01T00:00:09.000Z",
+      completedAt: "2026-01-01T00:00:09.500Z",
+      runtimeState: "stopped",
+    }),
+  ) {}
+
+  async execute(_context: unknown, input: RuntimeStopInput) {
+    this.requests.push(input);
+    return this.result;
+  }
+}
+
+async function createHarness(
+  resource: Resource = resourceFixture(),
+  input?: {
+    runtimeStopper?: RecordingRuntimeStopper;
+  },
+) {
   const context = createExecutionContext({
     requestId: "req_archive_resource_test",
     entrypoint: "system",
@@ -96,6 +137,7 @@ async function createHarness(resource: Resource = resourceFixture()) {
   const eventBus = new CapturedEventBus();
   const clock = new FixedClock("2026-01-01T00:00:10.000Z");
   const logger = new NoopLogger();
+  const runtimeStopper = input?.runtimeStopper ?? new RecordingRuntimeStopper();
 
   await resources.upsert(repositoryContext, resource, UpsertResourceSpec.fromResource(resource));
 
@@ -104,13 +146,15 @@ async function createHarness(resource: Resource = resourceFixture()) {
     repositoryContext,
     resources,
     eventBus,
-    useCase: new ArchiveResourceUseCase(resources, clock, eventBus, logger),
+    runtimeStopper,
+    useCase: new ArchiveResourceUseCase(resources, clock, eventBus, logger, runtimeStopper),
   };
 }
 
 describe("ArchiveResourceUseCase", () => {
   test("[RES-PROFILE-ARCHIVE-001] archives an active resource and publishes resource-archived", async () => {
-    const { context, eventBus, repositoryContext, resources, useCase } = await createHarness();
+    const { context, eventBus, repositoryContext, resources, runtimeStopper, useCase } =
+      await createHarness();
 
     const result = await useCase.execute(context, {
       resourceId: "res_web",
@@ -137,12 +181,18 @@ describe("ArchiveResourceUseCase", () => {
       archivedAt: "2026-01-01T00:00:10.000Z",
       reason: "Retired after migration",
     });
+    expect(runtimeStopper.requests).toEqual([
+      {
+        operation: "stop",
+        resourceId: "res_web",
+        reason: "archive: Retired after migration",
+      },
+    ]);
   });
 
-  test("[RES-PROFILE-ARCHIVE-002] treats an already archived resource as idempotent", async () => {
-    const { context, eventBus, repositoryContext, resources, useCase } = await createHarness(
-      archivedResourceFixture(),
-    );
+  test("[RES-PROFILE-ARCHIVE-002] treats an already archived resource as lifecycle-idempotent while stopping retained runtime", async () => {
+    const { context, eventBus, repositoryContext, resources, runtimeStopper, useCase } =
+      await createHarness(archivedResourceFixture());
 
     const result = await useCase.execute(context, {
       resourceId: "res_web",
@@ -158,6 +208,13 @@ describe("ArchiveResourceUseCase", () => {
     const state = persisted?.toState();
     expect(state?.archivedAt?.value).toBe("2026-01-01T00:00:05.000Z");
     expect(state?.archiveReason?.value).toBe("Old test resource");
+    expect(runtimeStopper.requests).toEqual([
+      {
+        operation: "stop",
+        resourceId: "res_web",
+        reason: "archive: New reason must not overwrite",
+      },
+    ]);
   });
 
   test("[RES-PROFILE-ARCHIVE-003] keeps durable profile state after archive", async () => {
@@ -176,6 +233,39 @@ describe("ArchiveResourceUseCase", () => {
     expect(state?.sourceBinding?.locator.value).toBe("https://github.com/acme/web.git");
     expect(state?.runtimeProfile?.startCommand?.value).toBe("bun run start");
     expect(state?.networkProfile?.internalPort.value).toBe(3000);
+  });
+
+  test("[RES-PROFILE-ARCHIVE-003A] archives when no current runtime placement is retained", async () => {
+    const runtimeStopper = new RecordingRuntimeStopper(
+      err({
+        code: "resource_runtime_metadata_missing",
+        category: "user",
+        message: "Resource runtime placement metadata is missing",
+        retryable: false,
+        details: {
+          phase: "runtime-control-admission",
+          resourceId: "res_web",
+          operation: "stop",
+          missingMetadataKind: "runtime-placement",
+        },
+      }),
+    );
+    const { context, eventBus, repositoryContext, resources, useCase } = await createHarness(
+      resourceFixture(),
+      { runtimeStopper },
+    );
+
+    const result = await useCase.execute(context, {
+      resourceId: "res_web",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const persisted = await resources.findOne(
+      repositoryContext,
+      ResourceByIdSpec.create(ResourceId.rehydrate("res_web")),
+    );
+    expect(persisted?.toState().lifecycleStatus.value).toBe("archived");
+    expect(archivedEvent(eventBus.events).aggregateId).toBe("res_web");
   });
 
   test("[RES-PROFILE-ARCHIVE-005] rejects archive reasons containing obvious secret material", async () => {
@@ -197,6 +287,51 @@ describe("ArchiveResourceUseCase", () => {
       },
     });
     expect(JSON.stringify(error)).not.toContain(secretValue);
+    expect(eventBus.events).toHaveLength(0);
+  });
+
+  test("[RES-PROFILE-ARCHIVE-006] blocks archive when runtime stop fails", async () => {
+    const runtimeStopper = new RecordingRuntimeStopper(
+      ok({
+        runtimeControlAttemptId: "rtc_archive_stop_failed",
+        resourceId: "res_web",
+        deploymentId: "dep_web",
+        operation: "stop",
+        status: "failed",
+        startedAt: "2026-01-01T00:00:09.000Z",
+        completedAt: "2026-01-01T00:00:09.500Z",
+        runtimeState: "unknown",
+        errorCode: "runtime_control_adapter_failed",
+      }),
+    );
+    const { context, eventBus, repositoryContext, resources, useCase } = await createHarness(
+      resourceFixture(),
+      { runtimeStopper },
+    );
+
+    const result = await useCase.execute(context, {
+      resourceId: "res_web",
+      reason: "Retired after migration",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "provider_error",
+      retryable: true,
+      details: {
+        phase: "resource-archive-runtime-stop",
+        resourceId: "res_web",
+        runtimeControlAttemptId: "rtc_archive_stop_failed",
+        runtimeControlStatus: "failed",
+        runtimeState: "unknown",
+        safeAdapterErrorCode: "runtime_control_adapter_failed",
+      },
+    });
+    const persisted = await resources.findOne(
+      repositoryContext,
+      ResourceByIdSpec.create(ResourceId.rehydrate("res_web")),
+    );
+    expect(persisted?.toState().lifecycleStatus.value).toBe("active");
     expect(eventBus.events).toHaveLength(0);
   });
 });

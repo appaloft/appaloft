@@ -33,8 +33,10 @@ describe("project detail page structure", () => {
     expect(projectSource).toContain("DeploymentStatusBadge");
     expect(projectSource).toContain("i18nKeys.console.projects.healthSummaryGap");
     expect(projectSource).toContain('from "$lib/console/layout-classes"');
-    expect(projectSource).toContain("<div class={detailPageClass}>");
-    expect(projectSource).toContain("<Tabs.Root value={activeProjectTab} class={detailBodyClass}>");
+    expect(projectSource).toContain("<div class={projectDetailScrollablePageClass}>");
+    expect(projectSource).toContain(
+      "<Tabs.Root value={activeProjectTab} class={projectDetailScrollableBodyClass}>",
+    );
     expect(projectSource).toContain("detailTabPanelScrollClass");
     expect(projectSource.match(/detailTabPanelScrollClass/g)?.length).toBeGreaterThanOrEqual(7);
     expect(projectSource).not.toContain("console-detail-");
