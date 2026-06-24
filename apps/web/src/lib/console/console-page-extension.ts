@@ -1,10 +1,17 @@
 import { type SystemPluginWebExtension } from "@appaloft/contracts";
 
 export const consolePageRenderer = "console-page" as const;
+export const consoleDomainErrorModalRenderer = "console-domain-error-modal" as const;
 
 export interface ConsolePageExtensionMetadata {
   readonly renderer: typeof consolePageRenderer;
   readonly pageEndpoint: string;
+}
+
+export interface ConsoleDomainErrorModalExtensionMetadata {
+  readonly renderer: typeof consoleDomainErrorModalRenderer;
+  readonly pageEndpoint: string;
+  readonly errorCodes?: readonly string[];
 }
 
 export type ConsolePageExtensionVisibilityMap = Record<string, boolean>;
@@ -23,6 +30,15 @@ export interface ConsolePageEndpointContext {
   readonly resourceId?: string;
   readonly deploymentId?: string;
   readonly previewEnvironmentId?: string;
+}
+
+export interface ConsoleDomainErrorModalEndpointContext extends ConsolePageEndpointContext {
+  readonly error: {
+    readonly code: string;
+    readonly message?: string;
+    readonly status?: number;
+    readonly requestPath?: string;
+  };
 }
 
 export function findConsolePageExtensionByPath(
@@ -65,6 +81,47 @@ export function readConsolePageExtensionMetadata(
   };
 }
 
+export function findConsoleDomainErrorModalExtension(
+  extensions: readonly SystemPluginWebExtension[],
+  errorCode: string,
+): SystemPluginWebExtension | null {
+  return (
+    extensions.find((extension) => {
+      const metadata = readConsoleDomainErrorModalExtensionMetadata(extension);
+      return (
+        extension.target === "console-route" &&
+        extension.placement === "domain-error-modal" &&
+        metadata !== null &&
+        (!metadata.errorCodes?.length || metadata.errorCodes.includes(errorCode))
+      );
+    }) ?? null
+  );
+}
+
+export function readConsoleDomainErrorModalExtensionMetadata(
+  extension: SystemPluginWebExtension | null | undefined,
+): ConsoleDomainErrorModalExtensionMetadata | null {
+  const metadata = extension?.metadata;
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return null;
+  }
+
+  if (
+    metadata.renderer !== consoleDomainErrorModalRenderer ||
+    typeof metadata.pageEndpoint !== "string"
+  ) {
+    return null;
+  }
+
+  return {
+    renderer: consoleDomainErrorModalRenderer,
+    pageEndpoint: metadata.pageEndpoint,
+    ...(Array.isArray(metadata.errorCodes) && metadata.errorCodes.every(isString)
+      ? { errorCodes: metadata.errorCodes }
+      : {}),
+  };
+}
+
 export function findConsolePanelExtensionsByPlacement(
   extensions: readonly SystemPluginWebExtension[],
   placement: SystemPluginWebExtension["placement"],
@@ -97,6 +154,38 @@ export function resolveConsolePageEndpoint(
     resourceId: context.resourceId ?? "",
     deploymentId: context.deploymentId ?? "",
     previewEnvironmentId: context.previewEnvironmentId ?? "",
+  };
+
+  return Object.entries(replacements).reduce(
+    (endpoint, [key, value]) => endpoint.replaceAll(`{${key}}`, encodeURIComponent(value)),
+    metadata.pageEndpoint,
+  );
+}
+
+export function resolveConsoleDomainErrorModalEndpoint(
+  metadata: ConsoleDomainErrorModalExtensionMetadata | null | undefined,
+  context: ConsoleDomainErrorModalEndpointContext,
+): string | null {
+  if (!metadata) {
+    return null;
+  }
+
+  const replacements: Record<string, string> = {
+    pathname: context.pathname,
+    query: context.query ?? "",
+    organizationId: context.organization?.organizationId ?? "",
+    organizationSlug: context.organization?.slug ?? "",
+    organizationName: context.organization?.name ?? "",
+    organizationRole: context.organization?.role ?? "",
+    projectId: context.projectId ?? "",
+    environmentId: context.environmentId ?? "",
+    resourceId: context.resourceId ?? "",
+    deploymentId: context.deploymentId ?? "",
+    previewEnvironmentId: context.previewEnvironmentId ?? "",
+    errorCode: context.error.code,
+    errorMessage: context.error.message ?? "",
+    errorStatus: context.error.status ? String(context.error.status) : "",
+    requestPath: context.error.requestPath ?? "",
   };
 
   return Object.entries(replacements).reduce(
@@ -166,4 +255,8 @@ function normalizePath(path: string): string {
   const withoutQuery = path.split("?")[0] ?? path;
   const normalized = withoutQuery.startsWith("/") ? withoutQuery : `/${withoutQuery}`;
   return normalized.length > 1 && normalized.endsWith("/") ? normalized.slice(0, -1) : normalized;
+}
+
+function isString(value: unknown): value is string {
+  return typeof value === "string";
 }

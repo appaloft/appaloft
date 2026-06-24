@@ -7,6 +7,7 @@
   import { readErrorMessage, request } from "$lib/api/client";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
+  import * as Dialog from "$lib/components/ui/dialog";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import {
     findConsolePanelExtensionsByPlacement,
@@ -62,6 +63,9 @@
     disabled?: boolean;
     disabledReason?: string;
     redirectUrlField?: string;
+    confirmation?: {
+      message: string;
+    };
   };
 
   type ConsolePageKeyValue = {
@@ -121,6 +125,11 @@
   }: Props = $props();
   let pendingActionKey = $state<string | null>(null);
   let actionErrorMessage = $state("");
+  let confirmationAction = $state<{
+    action: ConsolePageRequestAction;
+    item?: ConsolePagePanelItem;
+  } | null>(null);
+  let confirmationOpen = $state(false);
   let expandedPanelKeys = $state<Record<string, boolean>>({});
 
   const webExtensionsQuery = createQuery(() =>
@@ -339,9 +348,15 @@
   async function runRequestAction(
     action: ConsolePageRequestAction,
     item?: ConsolePagePanelItem,
+    options: { confirmed?: boolean } = {},
   ): Promise<void> {
     if (action.disabled) {
       actionErrorMessage = action.disabledReason ?? "";
+      return;
+    }
+    if (action.confirmation && !options.confirmed) {
+      confirmationAction = { action, item };
+      confirmationOpen = true;
       return;
     }
 
@@ -375,6 +390,21 @@
     } finally {
       pendingActionKey = null;
     }
+  }
+
+  function cancelRequestActionConfirmation(): void {
+    confirmationOpen = false;
+    confirmationAction = null;
+  }
+
+  function confirmRequestAction(): void {
+    const entry = confirmationAction;
+    if (!entry) {
+      return;
+    }
+    confirmationOpen = false;
+    confirmationAction = null;
+    void runRequestAction(entry.action, entry.item, { confirmed: true });
   }
 </script>
 
@@ -524,3 +554,24 @@
     {/each}
   </div>
 {/if}
+
+<Dialog.Root bind:open={confirmationOpen}>
+  <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-md">
+    {#if confirmationAction?.action.confirmation}
+      <Dialog.Header>
+        <Dialog.Title>{confirmationAction.action.label}</Dialog.Title>
+        <Dialog.Description>
+          {confirmationAction.action.confirmation.message}
+        </Dialog.Description>
+      </Dialog.Header>
+      <div class="flex justify-end gap-2 px-5 pb-5 sm:px-8 sm:pb-8">
+        <Button type="button" variant="outline" onclick={cancelRequestActionConfirmation}>
+          {$t(i18nKeys.common.actions.cancel)}
+        </Button>
+        <Button type="button" onclick={confirmRequestAction}>
+          {confirmationAction.action.label}
+        </Button>
+      </div>
+    {/if}
+  </Dialog.Content>
+</Dialog.Root>
