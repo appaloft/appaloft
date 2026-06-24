@@ -36,6 +36,7 @@ export const zhCN = {
       openProject: "打开项目",
       openResource: "打开资源",
       openTerminal: "打开终端",
+      openWebsite: "官网",
       previous: "上一步",
       quickDeploy: "快速部署",
       redeploy: "重新部署",
