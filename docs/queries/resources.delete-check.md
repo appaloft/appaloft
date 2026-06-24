@@ -29,11 +29,14 @@ type ResourceDeleteSafety = {
 ```
 
 Active resources return `eligible = false` with an `active-resource` blocker. Archived resources
-return `eligible = true` only when retained blocker checks return no blockers.
+return `eligible = true` only when retained blocker checks return no blockers, including no
+retained current runtime instance.
 
 Deployment history is not a resource delete-check blocker. Historical deployment records, snapshots,
 and logs keep their own retention and audit ownership; deleting an archived resource only tombstones
-the normal resource identity and must not cascade historical deployment cleanup.
+the normal resource identity and must not cascade historical deployment cleanup. A retained current
+runtime instance is a delete-check blocker and must be reported as `runtime-instance` until runtime
+control state proves it is stopped or the runtime placement is no longer retained.
 
 Audit history is also not a resource delete-check blocker. Retained audit rows describe past facts
 and may keep referencing the resource id after the resource is tombstoned; deleting a resource must

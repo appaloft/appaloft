@@ -833,12 +833,13 @@ Current boundary:
   secret material.
 - resource archive is resource-owned through `resources.archive`; the command moves lifecycle
   state to `archived`, publishes `resource-archived` on the first transition, and blocks future
-  profile mutations and deployments without stopping runtime or deleting retained history,
+  profile mutations and deployments after coordinating `resources.runtime.stop` for any retained
+  supported current runtime placement, without deleting retained history, containers, images,
   domains, logs, diagnostics, or source links.
 - resource delete safety is resource-owned through `resources.delete-check`; it returns the same
   retained blockers used by `resources.delete` without mutating lifecycle state. Deployment history
   and audit history are retained by their owning contexts and are not by themselves resource delete
-  blockers.
+  blockers; a retained current runtime instance is a `runtime-instance` blocker.
 - resource delete is resource-owned through `resources.delete`; the command moves an archived,
   unreferenced resource to deleted/tombstone lifecycle state after typed slug confirmation and
   deletion blocker checks, publishes `resource-deleted` on the first transition, and omits deleted
