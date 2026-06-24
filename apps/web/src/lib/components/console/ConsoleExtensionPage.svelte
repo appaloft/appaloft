@@ -1095,9 +1095,9 @@
             {section.comparisonFeatureLabel ?? "Feature"}
           </th>
           {#each section.items as item (item.title)}
-            <th scope="col" class="min-w-40 border-l px-4 py-4 text-left align-top">
-              <div class="flex min-h-10 items-center">
-                <div class="flex flex-wrap items-center gap-2">
+            <th scope="col" class="min-w-40 border-l px-4 py-4 text-center align-top">
+              <div class="flex min-h-10 items-center justify-center">
+                <div class="flex flex-wrap items-center justify-center gap-2">
                   <span class="text-base font-semibold text-foreground">{item.title}</span>
                   {#if item.badge}
                     <span

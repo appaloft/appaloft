@@ -211,6 +211,8 @@ describe("Console page extension surface", () => {
     expect(rendererSource).toContain("data-console-page-dialog-comparison-table");
     expect(rendererSource).toContain('{#if section.layout === "comparison-table"}');
     expect(rendererSource).toContain("{@render panelGridComparisonTable(section)}");
+    expect(rendererSource).toContain('class="min-w-40 border-l px-4 py-4 text-center align-top"');
+    expect(rendererSource).toContain('class="flex min-h-10 items-center justify-center"');
     expect(rendererSource).toContain(
       '{@render panelGridItems(section.items, "grid gap-4 md:grid-cols-2 xl:grid-cols-3")}',
     );
