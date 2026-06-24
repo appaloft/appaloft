@@ -238,6 +238,10 @@ describe("Console page extension surface", () => {
     expect(rendererSource).toContain("px-5 pb-5 sm:px-8 sm:pb-8");
     expect(rendererSource).toContain("fieldBindings?: Record<string, string>");
     expect(rendererSource).toContain("autoRun?: boolean");
+    expect(rendererSource).toContain("confirmation?:");
+    expect(rendererSource).toContain("confirmationOpen = true");
+    expect(rendererSource).toContain("confirmRequestAction");
+    expect(rendererSource).not.toContain("window.confirm");
     expect(rendererSource).toContain("findAutoRunRequestAction(pageDocument)");
     expect(rendererSource).toContain("void runRequestAction(entry.action, entry.item)");
     expect(rendererSource).toContain("requestActionBody(action, item)");
