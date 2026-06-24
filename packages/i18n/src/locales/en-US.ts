@@ -1277,6 +1277,14 @@ export const enUS = {
         "Archived projects will appear here without crowding the daily workspace.",
       archivedProjectsEmptyTitle: "No archived projects yet.",
       archivedProjectsTitle: "Archived projects",
+      createOrganizationAction: "New organization",
+      createOrganizationDescription:
+        "Create another organization for this account. Appaloft will switch the current product session to it after creation.",
+      createOrganizationNamePlaceholder: "Acme Workspace",
+      createOrganizationSlugDescription:
+        "Used in product URLs and organization search. Lowercase letters, numbers, and dashes work best.",
+      createOrganizationSucceeded: "Organization created and selected",
+      createOrganizationTitle: "Create organization",
       createdAt: "Created",
       createToken: "Create token",
       creatingToken: "Creating token",

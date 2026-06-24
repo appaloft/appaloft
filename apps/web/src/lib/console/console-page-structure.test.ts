@@ -599,6 +599,7 @@ describe("console page structure", () => {
     const formComponentNames = new Set([
       "ProjectCreateForm.svelte",
       "EnvironmentCreateForm.svelte",
+      "OrganizationCreateForm.svelte",
       "ServerCreateForm.svelte",
       "ServerRegistrationForm.svelte",
     ]);
