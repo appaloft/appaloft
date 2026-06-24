@@ -2652,8 +2652,53 @@
     }
   }
 
+  async function verifyDnsAfterDomainConnect(bindingId: string): Promise<void> {
+    try {
+      await orpcClient.domainBindings.confirmOwnership({ domainBindingId: bindingId });
+      dnsConnectorFeedback = {
+        bindingId,
+        kind: "success",
+        title: $t(i18nKeys.console.domainBindings.confirmOwnershipSuccessTitle),
+        detail: $t(i18nKeys.common.status.bound),
+      };
+      void queryClient.invalidateQueries({ queryKey: orpc.domainBindings.key({ type: "query" }) });
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
+      void queryClient.invalidateQueries({ queryKey: orpc.certificates.key({ type: "query" }) });
+    } catch (error) {
+      dnsConnectorFeedback = {
+        bindingId,
+        kind: "error",
+        title: $t(i18nKeys.console.domainBindings.confirmOwnershipErrorTitle),
+        detail: readErrorMessage(error),
+      };
+    }
+  }
+
+  function openDomainConnectWindow(redirectUrl: string, bindingId: string): void {
+    const openedWindow = window.open(
+      redirectUrl,
+      dnsConnectorAuthWindowName,
+      dnsConnectorAuthorizationPopupFeatures(),
+    );
+    if (!openedWindow) {
+      window.location.assign(redirectUrl);
+      return;
+    }
+
+    dnsConnectorAuthWindow = openedWindow;
+    openedWindow.focus();
+    const timer = window.setInterval(() => {
+      if (!openedWindow.closed) {
+        return;
+      }
+      window.clearInterval(timer);
+      void verifyDnsAfterDomainConnect(bindingId);
+    }, 1000);
+  }
+
   async function connectDnsProviderForSelectedBinding(): Promise<void> {
     const binding = selectedDnsConnectorBinding;
+    const readiness = dnsConnectorReadiness;
     if (!browser || !binding || dnsConnectorConnectPending) {
       return;
     }
@@ -2670,34 +2715,23 @@
     dnsConnectorConnectPending = true;
     dnsConnectorFeedback = null;
     try {
-      const started = await orpcClient.connections.connect.start({
+      const plan = await orpcClient.domainBindings.dnsPlan({
+        domainBindingId: binding.id,
         connectorKey: dnsConnectorSelectedConnectorKey,
-        returnUrl: `/resources/${resourceId}?tab=networking&section=domains&dnsBindingId=${encodeURIComponent(binding.id)}`,
-        requestedCapabilityKey: "dns.records.apply",
-        originalHostname: binding.domainName,
+        capabilityKey: "dns.domain-connect.start",
+        zoneName: readiness?.providerDiscovery.baseDomain ?? binding.domainName,
       });
-      if (started.authorizationUrl) {
-        dnsConnectorAuthWindow = window.open(
-          started.authorizationUrl,
-          dnsConnectorAuthWindowName,
-          dnsConnectorAuthorizationPopupFeatures(),
-        );
-        if (dnsConnectorAuthWindow) {
-          dnsConnectorAuthWindow.focus();
-          return;
-        }
-        window.location.assign(started.authorizationUrl);
-        return;
-      }
-      if (started.nextAction === "already-connected" || started.nextAction === "ready") {
-        await refreshDnsConnectorPlan();
+      dnsConnectorPlan = plan;
+      const redirectUrl = plan.providerPlan?.domainConnectSetup?.redirectUrl;
+      if (redirectUrl) {
+        openDomainConnectWindow(redirectUrl, binding.id);
         return;
       }
       dnsConnectorFeedback = {
         bindingId: binding.id,
         kind: "error",
         title: $t(i18nKeys.console.domainBindings.dnsConnectorPlanErrorTitle),
-        detail: started.nextAction,
+        detail: plan.summary,
       };
     } catch (error) {
       dnsConnectorFeedback = {
@@ -9460,7 +9494,7 @@
                         {#each resourceDomainBindings as binding (binding.id)}
                           {@const certificate = latestCertificateForBinding(binding.id)}
                           <article class="rounded-md border bg-background p-4">
-                            <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                            <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:gap-6">
                               <div class="min-w-0 space-y-2">
                                 <div class="flex flex-wrap items-center gap-2">
                                   <a
@@ -9497,7 +9531,7 @@
                                   </span>
                                 </div>
                                 {#if binding.dnsObservation}
-                                  <div class="rounded-md bg-muted/25 px-3 py-2 text-xs">
+                                  <div class="rounded-md border bg-muted/15 px-3 py-2 text-xs">
                                     <div class="flex flex-wrap items-center gap-2">
                                       <span class="font-medium">
                                         {$t(i18nKeys.console.domainBindings.dnsStepTitle)}
@@ -9554,7 +9588,7 @@
                                 </div>
                               </div>
 
-                              <div class="min-w-0 space-y-2 lg:w-64">
+                              <div class="min-w-0 space-y-2 xl:w-72">
                                 <div class="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                                   <p>{$t(i18nKeys.console.domainBindings.tlsStepTitle)}</p>
                                   <DocsHelpLink
@@ -12037,15 +12071,10 @@
           {#if selectedDnsConnectorBinding}
             <div class="max-h-[calc(100vh-12rem)] space-y-5 overflow-y-auto px-5 pb-5" data-resource-domain-binding-dns-dialog>
               <section class="rounded-md border bg-muted/15 p-4">
-                <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                  <div class="min-w-0">
-                    <p class="break-all font-medium">{selectedDnsConnectorBinding.domainName}</p>
-                    <p class="mt-1 font-mono text-xs text-muted-foreground">
-                      {selectedDnsConnectorBinding.id}
-                    </p>
-                  </div>
-                  <div class="flex flex-col items-start gap-1 sm:items-end">
-                    <Badge variant="outline" class="gap-1.5">
+                <div class="min-w-0">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <p class="min-w-0 break-all font-medium">{selectedDnsConnectorBinding.domainName}</p>
+                    <Badge variant="outline" class="w-fit gap-1.5">
                       {#if dnsConnectorReadiness?.providerDiscovery.providerId === "cloudflare"}
                         <span
                           class="inline-flex h-4 w-5 items-center justify-center [&_svg]:h-3.5 [&_svg]:w-5"
@@ -12057,19 +12086,22 @@
                       {/if}
                       <span>{dnsConnectorProviderLabel()}</span>
                     </Badge>
-                    {#if dnsConnectorReadiness}
-                      <p class="max-w-xs break-all text-xs text-muted-foreground sm:text-right">
-                        {dnsConnectorProviderDetail()}
-                      </p>
-                    {/if}
                   </div>
+                  <p class="mt-1 font-mono text-xs text-muted-foreground">
+                    {selectedDnsConnectorBinding.id}
+                  </p>
+                  {#if dnsConnectorReadiness}
+                    <p class="mt-1 break-all text-xs text-muted-foreground">
+                      {dnsConnectorProviderDetail()}
+                    </p>
+                  {/if}
                 </div>
                 <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
                   <div class="min-w-0 flex-1 space-y-1.5 text-sm">
                     <span class="font-medium">
                       {$t(i18nKeys.console.domainBindings.dnsConnectorReadinessTitle)}
                     </span>
-                    <div class="rounded-md bg-background px-3 py-2 text-xs text-muted-foreground">
+                    <div class="rounded-md border bg-background px-3 py-2 text-xs text-muted-foreground">
                       {#if dnsConnectorReadiness}
                         <p class="break-all">
                           {$t(i18nKeys.console.domainBindings.dnsConnectorReadinessZone)}:
