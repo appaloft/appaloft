@@ -214,12 +214,6 @@ export class PgProjectDeletionBlockerReader implements ProjectDeletionBlockerRea
             .select("id")
             .where("aggregate_id", "=", input.projectId)
             .execute();
-          const auditRows = await executor
-            .selectFrom("audit_logs")
-            .select("id")
-            .where("aggregate_id", "=", input.projectId)
-            .execute();
-
           const blockers = [
             blockerFromRows("environment", "environment", environmentRows),
             blockerFromRows("resource", "resource", resourceRows),
@@ -240,7 +234,6 @@ export class PgProjectDeletionBlockerReader implements ProjectDeletionBlockerRea
             blockerFromRows("runtime-log-retention", "runtime-log-archive", runtimeLogRows),
             blockerFromRows("provider-job-log", "provider-job-log", providerJobLogRows),
             blockerFromRows("domain-event-retention", "domain-event", domainEventRows),
-            blockerFromRows("audit-retention", "audit-log", auditRows),
           ].filter((blocker): blocker is ProjectDeletionBlocker => blocker !== null);
 
           return ok(blockers);

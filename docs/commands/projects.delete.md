@@ -14,7 +14,7 @@
 ## Normative Contract
 
 `projects.delete` soft-deletes an archived project only after `projects.delete-check` proves no
-retained project-scoped state remains.
+active child or retained support state owned by the project lifecycle remains.
 
 Success removes the project from normal project list/show read paths through a tombstone lifecycle
 state and records `project-deleted` once.
@@ -26,7 +26,8 @@ records `environment-archived` for each environment whose state changes.
 
 Except for this empty-environment auto-archive, project delete does not cascade child cleanup, delete
 runtime state, delete deployment history, prune logs, remove source events, revoke
-domains/certificates, or erase audit/event retention.
+domains/certificates, or erase audit/event retention. Retained audit rows are past-tense facts owned
+by operator audit history and may continue to reference the deleted project id.
 
 ## Input Model
 

@@ -8,9 +8,9 @@ Date: 2026-05-12
 
 Appaloft now exposes aggregate-scoped audit history through `audit-events.list` and
 `audit-events.show`, but those read surfaces intentionally do not mutate retention. Server delete
-safety treats retained audit rows as blockers through the `audit-retention` blocker kind. Resource
-delete safety does not treat retained audit rows as blockers, because audit rows are past-tense
-facts and may continue to reference a tombstoned resource id.
+safety treats retained audit rows as blockers through the `audit-retention` blocker kind. Project
+and Resource delete safety do not treat retained audit rows as blockers, because audit rows are
+past-tense facts and may continue to reference tombstoned project/resource ids.
 
 Phase 9 requires explicit retention/prune behavior instead of leaving audit rows as permanent
 opaque blockers. Audit retention is distinct from domain event streams, outbox/inbox processing,
@@ -43,8 +43,8 @@ operator must supply the cutoff explicitly.
 - Server delete safety blockers continue to report retained audit rows. After a destructive
   `audit-events.prune` removes older rows, server delete-check results may change because the
   retained audit blocker source changed.
-- Resource delete safety does not require audit prune. Resource audit rows remain queryable by
-  aggregate id after the resource boundary is tombstoned.
+- Project and Resource delete safety do not require audit prune. Project/resource audit rows remain
+  queryable by aggregate id after the project/resource boundary is tombstoned.
 - Event stream, outbox/inbox, provider-log, runtime-log, and deployment-log retention require
   separate specs and commands.
 - CLI, HTTP/oRPC, and future MCP/tool surfaces must dispatch the same application command schema.
