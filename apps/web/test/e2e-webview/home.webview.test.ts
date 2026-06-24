@@ -8723,6 +8723,43 @@ describe.serial("console e2e with Bun.WebView", () => {
     await expectAnyText(view, ["Public access", "公共访问", "公开访问"]);
     await expectAnyText(view, ["Latest deployment", "最新部署", "最近部署"]);
     await expectAnyText(view, ["Health", "健康", "状态"]);
+    const projectRuntimeMonitorLayout = await view.evaluate<{
+      panelBottom: number;
+      mainBottom: number;
+      mainScrollTop: number;
+      mainScrollHeight: number;
+      mainClientHeight: number;
+    } | null>(
+      `(() => {
+        const main = document.querySelector("[data-console-main]");
+        const panel = document.querySelector("[data-project-runtime-monitor]");
+        if (!(main instanceof HTMLElement) || !(panel instanceof HTMLElement)) {
+          return null;
+        }
+
+        main.scrollTop = main.scrollHeight;
+        const panelRect = panel.getBoundingClientRect();
+        const mainRect = main.getBoundingClientRect();
+        return {
+          panelBottom: panelRect.bottom,
+          mainBottom: mainRect.bottom,
+          mainScrollTop: main.scrollTop,
+          mainScrollHeight: main.scrollHeight,
+          mainClientHeight: main.clientHeight,
+        };
+      })()`,
+    );
+    if (!projectRuntimeMonitorLayout) {
+      throw new Error("Expected project runtime monitor layout to be measurable");
+    }
+    expect(projectRuntimeMonitorLayout.panelBottom).toBeLessThanOrEqual(
+      projectRuntimeMonitorLayout.mainBottom + 1,
+    );
+    expect(
+      Math.ceil(
+        projectRuntimeMonitorLayout.mainScrollTop + projectRuntimeMonitorLayout.mainClientHeight,
+      ),
+    ).toBeGreaterThanOrEqual(projectRuntimeMonitorLayout.mainScrollHeight - 1);
     expect(
       recordedApiRequests.some((request) => {
         if (request.pathname !== "/api/rpc/runtimeMonitoring/rollup") {
