@@ -12,6 +12,7 @@
   </p>
   <p>
     <a href="https://www.appaloft.com/en-US/">Website</a> ·
+    <a href="https://app.appaloft.com">Cloud</a> ·
     <a href="https://docs.appaloft.com/en/">Docs</a> ·
     <a href="https://github.com/appaloft/appaloft/releases/latest">Releases</a> ·
     <a href="./README.zh-CN.md">中文</a>
