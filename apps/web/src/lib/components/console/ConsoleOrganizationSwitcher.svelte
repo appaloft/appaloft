@@ -1,6 +1,6 @@
 <script lang="ts">
   import { browser } from "$app/environment";
-  import { Check, ChevronDown, Settings2, UserRound } from "@lucide/svelte";
+  import { Building2, Check, ChevronDown, Settings2, UserRound } from "@lucide/svelte";
   import appaloftIcon from "@appaloft/design/assets/appaloft-icon-light.svg";
   import type { OrganizationContextOrganizationSummary } from "@appaloft/contracts";
 
@@ -167,6 +167,10 @@
     {/if}
     {#if showManagementLinks}
       <DropdownMenuSeparator />
+      <DropdownMenuItem onclick={() => navigateTo("/organization/new")}>
+        <Building2 class="size-4" />
+        {$t(i18nKeys.console.organization.createOrganizationAction)}
+      </DropdownMenuItem>
       <DropdownMenuItem onclick={() => navigateTo("/organization")}>
         <UserRound class="size-4" />
         {$t(i18nKeys.console.nav.organization)}
