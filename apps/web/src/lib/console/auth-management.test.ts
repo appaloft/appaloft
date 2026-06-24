@@ -313,6 +313,8 @@ describe("organization auth management console surface", () => {
   test("[SETTINGS-WEB-001] account and organization settings use sidebar shell and neutral contracts", async () => {
     const [
       organizationPageSource,
+      organizationCreateSource,
+      organizationCreateFormSource,
       organizationDangerSource,
       organizationMembersSource,
       organizationInvitationsSource,
@@ -333,6 +335,11 @@ describe("organization auth management console surface", () => {
       layoutCssSource,
     ] = await Promise.all([
       readFile(new URL("../../routes/organization/+page.svelte", import.meta.url), "utf8"),
+      readFile(new URL("../../routes/organization/new/+page.svelte", import.meta.url), "utf8"),
+      readFile(
+        new URL("../../lib/components/console/OrganizationCreateForm.svelte", import.meta.url),
+        "utf8",
+      ),
       readFile(
         new URL("../../routes/organization/danger-zone/+page.svelte", import.meta.url),
         "utf8",
@@ -401,6 +408,7 @@ describe("organization auth management console surface", () => {
     expect(settingsNavSource).toContain('href: "/account/sessions"');
     expect(settingsNavSource).toContain('href: "/account/danger-zone"');
     expect(settingsNavSource).toContain('href: "/organization/danger-zone"');
+    expect(settingsNavSource).not.toContain('href: "/organization/new"');
 
     expect(accountProfileSource).toContain("SettingsShell");
     expect(accountProfileSource).toContain("orpc.account.showProfile.queryOptions");
@@ -575,9 +583,24 @@ describe("organization auth management console surface", () => {
     expect(organizationPageSource).toContain("invitationStatusLabel(invitation.status)");
     expect(organizationPageSource).not.toContain("{method.key} ·");
     expect(organizationPageSource).not.toContain("{invitation.status} ·");
+    expect(organizationSwitcherSource).toContain('navigateTo("/organization/new")');
+    expect(organizationSwitcherSource).toContain("createOrganizationAction");
+    expect(organizationCreateSource).toContain("SettingsShell");
+    expect(organizationCreateSource).toContain('activePath="/organization/new"');
+    expect(organizationCreateSource).toContain("OrganizationCreateForm");
+    expect(organizationCreateSource).toContain("data-organization-create-surface");
+    expect(organizationCreateSource).toContain("createOrganizationDescription");
+    expect(organizationCreateFormSource).toContain("/api/auth/organization/create");
+    expect(organizationCreateFormSource).toContain("keepCurrentActiveOrganization: false");
+    expect(organizationCreateFormSource).toContain("readOrganizationId(created)");
+    expect(organizationCreateFormSource).toContain("orpcClient.organizations.switchCurrent");
+    expect(organizationCreateFormSource).toContain("await queryClient.invalidateQueries()");
+    expect(organizationCreateFormSource).toContain('await goto("/")');
 
     for (const source of [
       organizationPageSource,
+      organizationCreateSource,
+      organizationCreateFormSource,
       accountProfileSource,
       accountSecuritySource,
       accountSessionsSource,
@@ -627,6 +650,9 @@ describe("organization auth management console surface", () => {
 
     expect(zhCN.console.organization).toMatchObject({
       pageTitle: "组织",
+      createOrganizationAction: "新建组织",
+      createOrganizationTitle: "创建组织",
+      createOrganizationSucceeded: "组织已创建并切换",
       profileTitle: "资料",
       deployTokensTitle: "部署令牌",
       dangerZoneTitle: "危险区域",

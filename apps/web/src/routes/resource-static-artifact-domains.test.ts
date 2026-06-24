@@ -41,7 +41,9 @@ describe("resource static artifact domains panel", () => {
     expect(resourcePageSource).toContain("serverId: effectiveDomainBindingServerId");
     expect(resourcePageSource).toContain("destinationId: effectiveDomainBindingDestinationId");
     expect(resourcePageSource).toContain("connectDnsProviderForSelectedBinding");
-    expect(resourcePageSource).toContain("orpcClient.connections.connect.start");
+    expect(resourcePageSource).toContain("orpcClient.domainBindings.dnsPlan");
+    expect(resourcePageSource).toContain('capabilityKey: "dns.domain-connect.start"');
+    expect(resourcePageSource).toContain("providerPlan?.domainConnectSetup?.redirectUrl");
     expect(resourcePageSource).toContain("dnsConnectorSelectedConnectorKey");
     expect(resourcePageSource).toContain("dnsConnectorProviderLabel()");
     expect(resourcePageSource).toContain("dnsConnectorUnsupportedProviderLabel()");
@@ -53,9 +55,10 @@ describe("resource static artifact domains panel", () => {
     );
     expect(resourcePageSource).not.toContain('connectorKey: "cloudflare-dns"');
     expect(resourcePageSource).not.toContain("<span>Cloudflare DNS</span>");
-    expect(resourcePageSource).toContain('requestedCapabilityKey: "dns.records.apply"');
-    expect(resourcePageSource).toContain("originalHostname: binding.domainName");
-    expect(resourcePageSource).toContain("dnsBindingId=");
+    expect(resourcePageSource).toContain('capabilityKey: "dns.domain-connect.start"');
+    expect(resourcePageSource).toContain("verifyDnsAfterDomainConnect");
+    expect(resourcePageSource).toContain("orpcClient.domainBindings.confirmOwnership");
+    expect(resourcePageSource).toContain('searchParams.get("dnsBindingId")');
     expect(resourcePageSource).toContain('searchParams.get("connectionStatus")');
     expect(resourcePageSource).toContain('searchParams.get("connectionErrorPhase")');
     expect(resourcePageSource).toContain('searchParams.get("connectionErrorStatusCode")');

@@ -161,7 +161,6 @@ certificates, source links, environment variables, dependency resources, or logs
    - dependency bindings;
    - terminal sessions;
    - runtime-log retention;
-   - audit-retention requirements;
    - generated access routes, server-applied routes, and proxy routes.
 4. Persist deleted lifecycle/tombstone state through the Resource repository and
    PostgreSQL/PGlite adapter. Normal `resources.show`, `resources.list`, and navigation reads must

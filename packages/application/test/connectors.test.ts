@@ -1,5 +1,6 @@
 import "reflect-metadata";
 import { describe, expect, test } from "bun:test";
+import { generateKeyPairSync } from "node:crypto";
 import { ok } from "@appaloft/core";
 
 import {
@@ -629,6 +630,8 @@ describe("connector catalog", () => {
   });
 
   test("[APP-CONN-003][APP-CONN-016] starts temporary Domain Connect setup without storing provider tokens", async () => {
+    const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+    const privateKeyPem = privateKey.export({ format: "pem", type: "pkcs8" }).toString();
     const registry = new InMemoryConnectorRegistry(
       createDefaultConnectorDefinitions({
         cloudflareDns: {
@@ -643,7 +646,12 @@ describe("connector catalog", () => {
           connectorKey: "cloudflare-dns",
           providerTitle: "Cloudflare DNS",
           domainConnect: {
+            providerKey: "appaloft.com",
+            serviceId: "appaloft-domain",
+            templateId: "appaloft-domain",
             consentBaseUrl: "https://domainconnect.test/providers",
+            signatureKey: "_dcpubkeyv1",
+            privateKeyPem,
           },
         }),
       ]),
@@ -666,10 +674,10 @@ describe("connector catalog", () => {
     expect(plan.requiresExplicitAcceptance).toBe(false);
     expect(plan.providerPlan?.kind).toBe("domain-connect-setup");
     expect(plan.providerPlan?.domainConnectSetup).toMatchObject({
-      providerKey: "cloudflare",
+      providerKey: "appaloft.com",
       zoneName: "example.com",
       hostname: "app.example.com",
-      serviceId: "appaloft",
+      serviceId: "appaloft-domain",
       templateId: "appaloft-domain",
       records: [
         {
@@ -681,10 +689,19 @@ describe("connector catalog", () => {
       ],
     });
     expect(plan.providerPlan?.domainConnectSetup?.redirectUrl).toContain(
-      "https://domainconnect.test/providers/cloudflare/services/appaloft/templates/appaloft-domain/apply",
+      "https://domainconnect.test/providers/appaloft.com/services/appaloft-domain/apply",
     );
+    expect(plan.providerPlan?.domainConnectSetup?.redirectUrl).toContain("domain=example.com");
+    expect(plan.providerPlan?.domainConnectSetup?.redirectUrl).toContain("host=app");
+    expect(plan.providerPlan?.domainConnectSetup?.redirectUrl).toContain(
+      "target=edge.appaloft.dev",
+    );
+    expect(plan.providerPlan?.domainConnectSetup?.redirectUrl).toContain("key=_dcpubkeyv1");
+    const redirectUrl = plan.providerPlan?.domainConnectSetup?.redirectUrl ?? "";
+    expect(redirectUrl).toMatch(/&sig=[^&]+$/);
     expect(JSON.stringify(plan)).not.toContain("provider_token_value");
     expect(JSON.stringify(plan)).not.toContain("secret");
+    expect(JSON.stringify(plan)).not.toContain("PRIVATE KEY");
   });
 
   test("[APP-CONN-003][APP-CONN-016] completes temporary Domain Connect setup through DNS readback", async () => {
@@ -724,7 +741,8 @@ describe("connector catalog", () => {
     );
     expect(completed.providerResult?.kind).toBe("domain-connect-apply");
     expect(completed.providerResult?.domainConnectApply).toMatchObject({
-      providerKey: "cloudflare",
+      providerKey: "example-service.test",
+      serviceId: "custom-domain",
       zoneName: "example.com",
       hostname: "app.example.com",
       status: "applied",

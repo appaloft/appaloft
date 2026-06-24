@@ -20,7 +20,7 @@ export function buildResourceDeleteBlockers(input: {
 }): ResourceDeleteBlocker[] {
   return [
     ...(input.lifecycleStatus === "active" ? [activeResourceDeleteBlocker(input.resourceId)] : []),
-    ...input.retainedBlockers,
+    ...input.retainedBlockers.filter((blocker) => blocker.kind !== "audit-retention"),
   ];
 }
 

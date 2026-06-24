@@ -1166,6 +1166,13 @@ export const zhCN = {
       archivedProjectsEmptyDescription: "归档项目会集中显示在这里，不会干扰日常工作台。",
       archivedProjectsEmptyTitle: "还没有已归档项目。",
       archivedProjectsTitle: "已归档项目",
+      createOrganizationAction: "新建组织",
+      createOrganizationDescription:
+        "为当前账号创建另一个组织。创建完成后，Appaloft 会把当前产品会话切换到新组织。",
+      createOrganizationNamePlaceholder: "Acme 工作区",
+      createOrganizationSlugDescription: "用于产品地址和组织检索。建议使用小写字母、数字和短横线。",
+      createOrganizationSucceeded: "组织已创建并切换",
+      createOrganizationTitle: "创建组织",
       createdAt: "创建时间",
       createToken: "创建部署令牌",
       creatingToken: "正在创建部署令牌",
