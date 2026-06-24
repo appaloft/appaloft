@@ -38,6 +38,7 @@ run the CLI, open SSH, or scan target machines to discover a control plane.
 
 <h2 id="entrypoint-mcp-tools">MCP tools</h2>
 
-When an agent host configures Appaloft MCP, use `appaloft mcp stdio` to expose the same operation
-catalog. MCP tools reuse the same topic ids, input explanations, and recovery guidance. See
+When an agent host configures Appaloft MCP, use `appaloft mcp stdio`, `appaloft mcp serve`, or
+`npx appaloft-mcp` to expose the same operation catalog. MCP tools reuse the same topic ids, input
+explanations, and recovery guidance. See
 [Appaloft MCP server](/docs/en/agent/mcp-server/#appaloft-mcp-server).

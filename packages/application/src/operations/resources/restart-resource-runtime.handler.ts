@@ -21,7 +21,10 @@ export class RestartResourceRuntimeCommandHandler
   handle(context: ExecutionContext, command: RestartResourceRuntimeCommand) {
     return this.useCase.execute(context, {
       operation: "restart",
-      resourceId: command.resourceId,
+      ...(command.resourceId ? { resourceId: command.resourceId } : {}),
+      ...(command.previewEnvironmentId
+        ? { previewEnvironmentId: command.previewEnvironmentId }
+        : {}),
       ...(command.deploymentId ? { deploymentId: command.deploymentId } : {}),
       ...(command.acknowledgeRetainedRuntimeMetadata === undefined
         ? {}

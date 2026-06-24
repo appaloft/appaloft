@@ -9,7 +9,7 @@ import {
   RetryDomainBindingVerificationCommand,
   ShowDomainBindingQuery,
 } from "@appaloft/application";
-import { certificatePolicies, tlsModes } from "@appaloft/core";
+import { certificatePolicies, routePathHandlingModes, tlsModes } from "@appaloft/core";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
 
 import { optionalValue, runCommand, runQuery } from "../runtime.js";
@@ -23,6 +23,9 @@ const destinationIdOption = Options.text("destination-id");
 const domainNameArg = Args.text({ name: "domainName" });
 const domainBindingIdArg = Args.text({ name: "domainBindingId" });
 const pathPrefixOption = Options.text("path-prefix").pipe(Options.withDefault("/"));
+const pathHandlingOption = Options.choice("path-handling", routePathHandlingModes).pipe(
+  Options.withDefault("preserve"),
+);
 const tlsModeOption = Options.choice("tls-mode", tlsModes).pipe(Options.withDefault("auto"));
 const redirectToOption = Options.text("redirect-to").pipe(Options.optional);
 const redirectStatusOption = Options.choice("redirect-status", [
@@ -71,6 +74,7 @@ const createCommand = EffectCommand.make(
     destinationId: destinationIdOption,
     domainName: domainNameArg,
     pathPrefix: pathPrefixOption,
+    pathHandling: pathHandlingOption,
     tlsMode: tlsModeOption,
     redirectTo: redirectToOption,
     redirectStatus: redirectStatusOption,
@@ -83,6 +87,7 @@ const createCommand = EffectCommand.make(
     domainName,
     environmentId,
     idempotencyKey,
+    pathHandling,
     pathPrefix,
     projectId,
     redirectStatus,
@@ -105,6 +110,7 @@ const createCommand = EffectCommand.make(
         destinationId,
         domainName,
         pathPrefix,
+        pathHandling,
         proxyKind: "traefik",
         tlsMode,
         ...(redirectToValue ? { redirectTo: redirectToValue } : {}),

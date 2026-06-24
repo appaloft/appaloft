@@ -52,6 +52,7 @@ export {
   dispatchRemoteProjectOperation,
   loginControlPlane,
   logoutControlPlane,
+  mcpLoginControlPlane,
   tokenLoginControlPlane,
   unsupportedRemoteProjectOperation,
   useControlPlaneProfile,

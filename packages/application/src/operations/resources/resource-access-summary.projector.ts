@@ -42,6 +42,7 @@ export interface ResourceAccessSummaryDomainBinding {
   createdAt: string;
   domainName: string;
   pathPrefix: string;
+  pathHandling?: "preserve" | "strip";
   proxyKind: EdgeProxyKind;
   tlsMode: TlsMode;
 }

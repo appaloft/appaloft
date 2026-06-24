@@ -1023,7 +1023,7 @@ describe("Better Auth first-admin bootstrap adapter", () => {
       name: "OAuth Only",
     });
     await context.internalAdapter.createAccount({
-      accountId: oauthOnlyUser.id,
+      accountId: "octocat",
       providerId: "github",
       userId: oauthOnlyUser.id,
     });
@@ -1039,6 +1039,15 @@ describe("Better Auth first-admin bootstrap adapter", () => {
       }),
     );
     expect(oauthOnlyStatus.accountSecurity.passwordState).toBe("not-set");
+    expect(oauthOnlyStatus.providers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          accountLabel: "octocat",
+          connected: true,
+          key: "github",
+        }),
+      ]),
+    );
 
     const setPassword = await runtime.handle(
       new Request("http://localhost:3721/api/auth/set-password", {
@@ -1123,6 +1132,27 @@ describe("Better Auth first-admin bootstrap adapter", () => {
       cookieHeader: cliSessionCookie,
     });
     expect(cliAuthorizationResult.isOk()).toBe(true);
+
+    const cliSessionBearer = await runtime.issueCliProductSessionBearer(
+      new Request("http://localhost:3721/cli-auth/authorize", {
+        headers: {
+          cookie: sessionCookie,
+          "x-forwarded-for": "203.0.113.9",
+        },
+      }),
+    );
+    expect(cliSessionBearer).toContain(".");
+    expect(cliSessionBearer).not.toContain("better-auth.session_token=");
+    if (!cliSessionBearer) {
+      throw new Error("Expected CLI product session bearer after browser authorization");
+    }
+    const cliBearerAuthorizationResult = await runtime.authorizeProductSession(context, {
+      method: "POST",
+      path: "/mcp",
+      requiredRole: "member",
+      authorizationHeader: `Bearer ${cliSessionBearer}`,
+    });
+    expect(cliBearerAuthorizationResult.isOk()).toBe(true);
 
     const shown = await runtime.showAccountProfile(portContext);
     const updated = await runtime.changeAccountProfile(portContext, {

@@ -1,4 +1,9 @@
-import { certificatePolicies, edgeProxyKinds, tlsModes } from "@appaloft/core";
+import {
+  certificatePolicies,
+  edgeProxyKinds,
+  routePathHandlingModes,
+  tlsModes,
+} from "@appaloft/core";
 import { z } from "zod";
 
 import { nonEmptyTrimmedString } from "../shared-schema";
@@ -12,6 +17,7 @@ export const createDomainBindingCommandInputSchema = z
     destinationId: nonEmptyTrimmedString("Destination id").optional(),
     domainName: nonEmptyTrimmedString("Domain name"),
     pathPrefix: nonEmptyTrimmedString("Path prefix").default("/"),
+    pathHandling: z.enum(routePathHandlingModes).default("preserve"),
     proxyKind: z.enum(edgeProxyKinds),
     tlsMode: z.enum(tlsModes).default("auto"),
     redirectTo: nonEmptyTrimmedString("Canonical redirect target").optional(),

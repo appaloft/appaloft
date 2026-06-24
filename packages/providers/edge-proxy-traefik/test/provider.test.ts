@@ -209,6 +209,12 @@ describe("TraefikEdgeProxyProvider", () => {
         "traefik.http.routers.dep-tls.entrypoints=websecure",
         "traefik.http.routers.dep-tls.tls=true",
         "traefik.http.routers.dep-tls.tls.certresolver=appaloft",
+        "traefik.http.routers.dep-tls-http-redirect.rule=(Host(`www.example.test`)) && !PathPrefix(`/.well-known/acme-challenge/`)",
+        "traefik.http.routers.dep-tls-http-redirect.entrypoints=web",
+        "traefik.http.routers.dep-tls-http-redirect.middlewares=dep-tls-http-redirect-scheme",
+        "traefik.http.routers.dep-tls-http-redirect.service=noop@internal",
+        "traefik.http.middlewares.dep-tls-http-redirect-scheme.redirectscheme.scheme=https",
+        "traefik.http.middlewares.dep-tls-http-redirect-scheme.redirectscheme.permanent=true",
       ]),
     );
     expect(view.isOk()).toBe(true);
@@ -262,7 +268,44 @@ describe("TraefikEdgeProxyProvider", () => {
     expect(labels).toContain("308");
     expect(labels).toContain("traefik.http.routers.dep-canonical.tls.certresolver=appaloft");
     expect(labels).toContain("traefik.http.routers.dep-canonical-1.tls.certresolver=appaloft");
+    expect(labels).toContain("traefik.http.routers.dep-canonical-http-redirect.entrypoints=web");
+    expect(labels).toContain("traefik.http.routers.dep-canonical-1-http-redirect.entrypoints=web");
+    expect(labels).toContain(
+      "traefik.http.middlewares.dep-canonical-http-redirect-scheme.redirectscheme.scheme=https",
+    );
+    expect(labels).toContain(
+      "traefik.http.middlewares.dep-canonical-1-http-redirect-scheme.redirectscheme.scheme=https",
+    );
     expect(labels).not.toContain("dep-canonical-1-svc.loadbalancer");
+  });
+
+  test("[EDGE-PROXY-ROUTE-009] renders strip-prefix middleware for explicit strip path handling", async () => {
+    const provider = new TraefikEdgeProxyProvider();
+    const realized = await provider.realizeRoutes(
+      { correlationId: "req_traefik_path_handling_test" },
+      {
+        deploymentId: "dep_path",
+        port: 3000,
+        accessRoutes: [
+          {
+            proxyKind: "traefik",
+            domains: ["app.example.test"],
+            pathPrefix: "/nocodb",
+            pathHandling: "strip",
+            tlsMode: "disabled",
+            targetPort: 3000,
+          },
+        ],
+      },
+    );
+
+    expect(realized.isOk()).toBe(true);
+    expect(realized._unsafeUnwrap().labels).toEqual(
+      expect.arrayContaining([
+        "traefik.http.routers.dep-path.middlewares=dep-path-strip-prefix",
+        "traefik.http.middlewares.dep-path-strip-prefix.stripprefix.prefixes=/nocodb",
+      ]),
+    );
   });
 
   test("[EDGE-PROXY-QRY-007] exposes canonical redirect route views", async () => {

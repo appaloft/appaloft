@@ -17,11 +17,15 @@ describe("operations workbench home", () => {
     expect(homePageSource).toContain("orpc.environments.list.queryOptions({");
     expect(homePageSource).toContain("input: { limit: homeEnvironmentListLimit }");
     expect(homePageSource).toContain("orpc.deployments.list.queryOptions({");
-    expect(homePageSource).toContain("input: { limit: homeDeploymentListLimit }");
+    expect(homePageSource).toContain(
+      "input: { activeResourcesOnly: true, limit: homeDeploymentListLimit }",
+    );
     expect(homePageSource).toContain("orpc.servers.count.queryOptions({");
     expect(homePageSource).toContain("orpc.deployments.count.queryOptions({");
-    expect(homePageSource).toContain("input: { statuses: activeDeploymentStatuses }");
-    expect(homePageSource).toContain('input: { status: "failed" }');
+    expect(homePageSource).toContain(
+      "input: { activeResourcesOnly: true, statuses: activeDeploymentStatuses }",
+    );
+    expect(homePageSource).toContain('input: { activeResourcesOnly: true, status: "failed" }');
     expect(homePageSource).toContain("orpc.resources.count.queryOptions({");
   });
 
@@ -68,6 +72,9 @@ describe("operations workbench home", () => {
       'type HomeAttentionReason = "failed" | "running" | "no-access" | "no-deployment"',
     );
     expect(homePageSource).toContain("const attentionItems = $derived.by");
+    expect(homePageSource).toContain("activeResourcesOnly: true");
+    expect(homePageSource).not.toContain("filterDeploymentsByKnownResources");
+    expect(homePageSource).not.toContain("deploymentsWithKnownResources");
     expect(homePageSource).toContain("failedDeployment");
     expect(homePageSource).toContain("runningDeployment");
     expect(homePageSource).toContain("resourceWithoutAccess");
@@ -108,6 +115,24 @@ describe("operations workbench home", () => {
     expect(homePageSource).toContain("nothing-side-stack");
     expect(homePageSource).not.toContain("@media (min-width: 1320px)");
     expect(homePageSource).not.toContain("letter-spacing: 0.08em");
+  });
+
+  test("[HOME-ATTENTION-LAYOUT-001] keeps attention icon, title, and action on a compact row", () => {
+    expect(homePageSource).toContain('<div class="nothing-attention-row">');
+    expect(homePageSource).toContain('<span class="nothing-attention-icon" aria-hidden="true">');
+    expect(homePageSource).toContain(
+      'class="nothing-attention-action justify-self-start md:justify-self-end"',
+    );
+    expect(homePageSource).toContain(".nothing-attention-row {");
+    expect(homePageSource).toContain("grid-template-columns: auto minmax(0, 1fr) auto;");
+    expect(homePageSource).toContain(".nothing-attention-row > :global(.nothing-attention-action)");
+
+    expect(homePageSource.indexOf('<div class="nothing-attention-row">')).toBeLessThan(
+      homePageSource.indexOf('<div class="nothing-attention-copy">'),
+    );
+    expect(homePageSource.indexOf(".nothing-attention-icon {")).toBeLessThan(
+      homePageSource.indexOf(".nothing-attention-copy {"),
+    );
   });
 
   test("[HOME-SKELETON-001] uses the shared shadcn skeleton primitive", () => {

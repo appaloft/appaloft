@@ -40,4 +40,4 @@ Web console 只收集输入、显示状态并调用 HTTP/oRPC 合同。部署规
 
 <h2 id="web-product-version">产品版本</h2>
 
-Web console 会显示后端 `/api/version` 返回的 Appaloft 产品版本。Docs 站点显示构建时的同一产品版本；release 和 binary 打包会通过 `APPALOFT_APP_VERSION` 注入，开发环境默认使用仓库根 `package.json` 的版本。
+Web console 会显示后端 `/api/version` 返回的 Appaloft 产品版本。release 和 binary 打包会通过 `APPALOFT_APP_VERSION` 注入，开发环境默认使用仓库根 `package.json` 的版本。

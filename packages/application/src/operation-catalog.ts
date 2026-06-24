@@ -44,10 +44,12 @@ import { createDependencyResourceBackupCommandInputSchema } from "./operations/d
 import { createDependencyResourceProvisioningPlanInputSchema } from "./operations/dependency-resources/create-dependency-resource-provisioning-plan.command";
 import { deleteDependencyResourceCommandInputSchema } from "./operations/dependency-resources/delete-dependency-resource.command";
 import { importDependencyResourceCommandInputSchema } from "./operations/dependency-resources/import-dependency-resource.command";
+import { inspectDependencyResourceQueryInputSchema } from "./operations/dependency-resources/inspect-dependency-resource.query";
 import { listDependencyResourceBackupPoliciesQueryInputSchema } from "./operations/dependency-resources/list-dependency-resource-backup-policies.query";
 import { listDependencyResourceBackupsQueryInputSchema } from "./operations/dependency-resources/list-dependency-resource-backups.query";
 import { listDependencyResourcesQueryInputSchema } from "./operations/dependency-resources/list-dependency-resources.query";
 import { provisionDependencyResourceCommandInputSchema } from "./operations/dependency-resources/provision-dependency-resource.command";
+import { queryDependencyResourceQueryInputSchema } from "./operations/dependency-resources/query-dependency-resource.query";
 import { renameDependencyResourceCommandInputSchema } from "./operations/dependency-resources/rename-dependency-resource.command";
 import { restoreDependencyResourceBackupCommandInputSchema } from "./operations/dependency-resources/restore-dependency-resource-backup.command";
 import { showDependencyResourceQueryInputSchema } from "./operations/dependency-resources/show-dependency-resource.query";
@@ -1945,7 +1947,7 @@ export const operationCatalog = [
     inputSchema: resourceEffectiveConfigQueryInputSchema,
     serviceToken: tokens.resourceEffectiveConfigQueryService,
     transports: {
-      cli: "appaloft resource effective-config <resourceId>",
+      cli: "appaloft resource effective-config [resourceId] [--preview <previewEnvironmentId>]",
       orpc: { method: "GET", path: "/api/resources/{resourceId}/effective-config" },
     },
   },
@@ -1959,7 +1961,7 @@ export const operationCatalog = [
     inputSchema: resourceRuntimeLogsQueryInputSchema,
     serviceToken: tokens.resourceRuntimeLogsQueryService,
     transports: {
-      cli: "appaloft resource logs <resourceId>",
+      cli: "appaloft resource logs [resourceId] [--preview <previewEnvironmentId>]",
       orpc: { method: "GET", path: "/api/resources/{resourceId}/runtime-logs" },
       orpcStream: { method: "GET", path: "/api/resources/{resourceId}/runtime-logs/stream" },
     },
@@ -2044,7 +2046,7 @@ export const operationCatalog = [
     inputSchema: openTerminalSessionCommandInputSchema,
     serviceToken: tokens.openTerminalSessionUseCase,
     transports: {
-      cli: "appaloft server terminal <serverId>; appaloft resource terminal <resourceId>",
+      cli: "appaloft server terminal <serverId>; appaloft resource terminal [resourceId] [--preview <previewEnvironmentId>]",
       orpc: { method: "POST", path: "/api/terminal-sessions" },
     },
   },
@@ -2114,7 +2116,7 @@ export const operationCatalog = [
     inputSchema: resourceDiagnosticSummaryQueryInputSchema,
     serviceToken: tokens.resourceDiagnosticSummaryQueryService,
     transports: {
-      cli: "appaloft resource diagnose <resourceId>",
+      cli: "appaloft resource diagnose [resourceId] [--preview <previewEnvironmentId>]",
       orpc: { method: "GET", path: "/api/resources/{resourceId}/diagnostic-summary" },
     },
   },
@@ -2142,7 +2144,7 @@ export const operationCatalog = [
     inputSchema: resourceHealthQueryInputSchema,
     serviceToken: tokens.resourceHealthQueryService,
     transports: {
-      cli: "appaloft resource health <resourceId>",
+      cli: "appaloft resource health [resourceId] [--preview <previewEnvironmentId>]",
       orpc: { method: "GET", path: "/api/resources/{resourceId}/health" },
     },
   },
@@ -2284,6 +2286,34 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft dependency show <dependencyResourceId>",
       orpc: { method: "GET", path: "/api/dependency-resources/{dependencyResourceId}" },
+    },
+  },
+  {
+    key: "dependency-resources.inspect",
+    kind: "query",
+    domain: "dependency-resources",
+    messageName: "InspectDependencyResourceQuery",
+    handlerName: "InspectDependencyResourceQueryHandler",
+    serviceName: "InspectDependencyResourceQueryService",
+    inputSchema: inspectDependencyResourceQueryInputSchema,
+    serviceToken: tokens.inspectDependencyResourceQueryService,
+    transports: {
+      cli: "appaloft dependency inspect <dependencyResourceId>",
+      orpc: { method: "GET", path: "/api/dependency-resources/{dependencyResourceId}/inspect" },
+    },
+  },
+  {
+    key: "dependency-resources.query",
+    kind: "query",
+    domain: "dependency-resources",
+    messageName: "QueryDependencyResourceQuery",
+    handlerName: "QueryDependencyResourceQueryHandler",
+    serviceName: "QueryDependencyResourceQueryService",
+    inputSchema: queryDependencyResourceQueryInputSchema,
+    serviceToken: tokens.queryDependencyResourceQueryService,
+    transports: {
+      cli: "appaloft dependency query <dependencyResourceId> --statement <statement>",
+      orpc: { method: "POST", path: "/api/dependency-resources/{dependencyResourceId}/query" },
     },
   },
   {
@@ -3197,7 +3227,7 @@ export const operationCatalog = [
     inputSchema: stopResourceRuntimeCommandInputSchema,
     serviceToken: tokens.resourceRuntimeControlUseCase,
     transports: {
-      cli: "appaloft resource runtime stop <resourceId>",
+      cli: "appaloft resource runtime stop [resourceId] [--preview <previewEnvironmentId>]",
       orpc: { method: "POST", path: "/api/resources/{resourceId}/runtime/stop" },
     },
   },
@@ -3211,7 +3241,7 @@ export const operationCatalog = [
     inputSchema: startResourceRuntimeCommandInputSchema,
     serviceToken: tokens.resourceRuntimeControlUseCase,
     transports: {
-      cli: "appaloft resource runtime start <resourceId>",
+      cli: "appaloft resource runtime start [resourceId] [--preview <previewEnvironmentId>]",
       orpc: { method: "POST", path: "/api/resources/{resourceId}/runtime/start" },
     },
   },
@@ -3225,7 +3255,7 @@ export const operationCatalog = [
     inputSchema: restartResourceRuntimeCommandInputSchema,
     serviceToken: tokens.resourceRuntimeControlUseCase,
     transports: {
-      cli: "appaloft resource runtime restart <resourceId>",
+      cli: "appaloft resource runtime restart [resourceId] [--preview <previewEnvironmentId>]",
       orpc: { method: "POST", path: "/api/resources/{resourceId}/runtime/restart" },
     },
   },
@@ -3616,7 +3646,7 @@ export const operationCatalog = [
     inputSchema: exportGlobalAuditEventsQueryInputSchema,
     serviceToken: tokens.exportGlobalAuditEventsQueryService,
     transports: {
-      cli: "appaloft audit-event export-global --from <iso> --to <iso>",
+      cli: "appaloft audit-event export-global --from <iso> --to <iso> [--cursor <iso>] [--order asc|desc]",
       orpc: { method: "GET", path: "/api/audit-events/export-global" },
     },
   },

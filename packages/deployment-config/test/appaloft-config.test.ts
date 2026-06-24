@@ -2014,6 +2014,7 @@ describe("Appaloft deployment config schema", () => {
           {
             host: "api.example.com",
             pathPrefix: "/api",
+            pathHandling: "strip",
             tlsMode: "disabled",
           },
         ],
@@ -2026,11 +2027,13 @@ describe("Appaloft deployment config schema", () => {
         {
           host: "www.example.com",
           pathPrefix: "/",
+          pathHandling: "preserve",
           tlsMode: "auto",
         },
         {
           host: "api.example.com",
           pathPrefix: "/api",
+          pathHandling: "strip",
           tlsMode: "disabled",
         },
       ]);
@@ -2142,11 +2145,13 @@ describe("Appaloft deployment config schema", () => {
         {
           host: "example.com",
           pathPrefix: "/",
+          pathHandling: "preserve",
           tlsMode: "auto",
         },
         {
           host: "www.example.com",
           pathPrefix: "/",
+          pathHandling: "preserve",
           tlsMode: "auto",
           redirectTo: "example.com",
           redirectStatus: 308,

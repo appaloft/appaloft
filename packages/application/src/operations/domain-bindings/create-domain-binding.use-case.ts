@@ -25,6 +25,7 @@ import {
   ResourceByIdSpec,
   ResourceId,
   type Result,
+  RoutePathHandlingValue,
   RoutePathPrefix,
   safeTry,
   TlsModeValue,
@@ -183,6 +184,7 @@ export class CreateDomainBindingUseCase {
         : undefined;
       const domainName = yield* PublicDomainName.create(input.domainName);
       const pathPrefix = yield* RoutePathPrefix.create(input.pathPrefix ?? "/");
+      const pathHandling = yield* RoutePathHandlingValue.create(input.pathHandling ?? "preserve");
       const proxyKind = yield* EdgeProxyKindValue.create(input.proxyKind);
       const tlsMode = yield* TlsModeValue.create(input.tlsMode ?? "auto");
       if (input.redirectStatus && !input.redirectTo) {
@@ -394,6 +396,7 @@ export class CreateDomainBindingUseCase {
         ...(destinationId ? { destinationId } : {}),
         domainName,
         pathPrefix,
+        pathHandling,
         proxyKind,
         tlsMode,
         ...(redirectTo ? { redirectTo } : {}),

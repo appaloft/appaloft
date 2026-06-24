@@ -25,6 +25,7 @@ import {
   createRuntimeUsageToolHandlers,
   handleAppaloftMcpJsonRpcRequest,
   operationMessageFactoryNames,
+  runAppaloftMcpRemoteStdioProxy,
   toolContractSchema,
   toolContracts,
   toolContractsByOperationKey,
@@ -46,6 +47,44 @@ function mcpText(result: { content: { type: "text"; text: string }[] }): string 
 }
 
 describe("MCP tool descriptors", () => {
+  test("[MCP-REMOTE-STDIO-001] remote stdio proxy forwards JSON-RPC over HTTP with bearer auth", async () => {
+    const requests: Request[] = [];
+    let stdout = "";
+    const stdin = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('{"jsonrpc":"2.0","id":1,"method":"ping"}\n'));
+        controller.close();
+      },
+    });
+
+    await runAppaloftMcpRemoteStdioProxy({
+      endpoint: "https://app.appaloft.com/mcp",
+      authorization: "Bearer tok_remote_mcp_secret_1234",
+      stdin,
+      stdout: {
+        write(data) {
+          stdout += data;
+        },
+      },
+      fetch: async (input, init) => {
+        requests.push(new Request(input, init));
+        return new Response('{"jsonrpc":"2.0","id":1,"result":{}}', {
+          headers: {
+            "content-type": "application/json",
+          },
+        });
+      },
+    });
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.url).toBe("https://app.appaloft.com/mcp");
+    expect(requests[0]?.method).toBe("POST");
+    expect(requests[0]?.headers.get("authorization")).toBe("Bearer tok_remote_mcp_secret_1234");
+    expect(await requests[0]?.text()).toBe('{"jsonrpc":"2.0","id":1,"method":"ping"}');
+    expect(stdout).toBe('{"jsonrpc":"2.0","id":1,"result":{}}\n');
+    expect(stdout).not.toContain("tok_remote_mcp_secret_1234");
+  });
+
   test("[MCP-TOOL-DESC-001] every operation catalog entry has one generated tool descriptor", () => {
     expect(toolContracts).toHaveLength(operationCatalog.length);
 

@@ -29,6 +29,7 @@ import {
   type ResourceSummary,
 } from "../../ports";
 import { tokens } from "../../tokens";
+import { type PreviewOperableScopeResolver } from "../preview-deployments/preview-operable-scope.resolver";
 import {
   currentNonReadyDurableDomainBinding,
   durableDomainBindingNotReadyCategory,
@@ -328,13 +329,41 @@ export class ResourceDiagnosticSummaryQueryService {
     private readonly diagnostics: DiagnosticsPort,
     @inject(tokens.clock)
     private readonly clock: Clock,
+    @inject(tokens.previewOperableScopeResolver)
+    private readonly previewOperableScopeResolver?: PreviewOperableScopeResolver,
   ) {}
 
   async execute(
     context: ExecutionContext,
     query: ResourceDiagnosticSummaryQuery,
   ): Promise<Result<ResourceDiagnosticSummary>> {
-    const resourceResult = await this.resolveResource(context, query.resourceId);
+    const previewScopeResult = await this.previewOperableScopeResolver?.resolve(context, {
+      previewEnvironmentId: query.previewEnvironmentId,
+      resourceId: query.resourceId,
+      deploymentId: query.deploymentId,
+      requireDeployment: Boolean(query.previewEnvironmentId),
+    });
+    if (previewScopeResult?.isErr()) {
+      return err(previewScopeResult.error);
+    }
+    const previewScope = previewScopeResult?.isOk() ? previewScopeResult.value : null;
+
+    const resourceId = previewScope?.resourceId ?? query.resourceId;
+    if (!resourceId) {
+      return err(
+        domainError.validation("Either resourceId or previewEnvironmentId is required", {
+          phase: "resource-diagnostic-summary-resolution",
+        }),
+      );
+    }
+
+    const effectiveQuery = {
+      ...query,
+      resourceId,
+      deploymentId: previewScope?.deploymentId ?? query.deploymentId,
+    } as ResourceDiagnosticSummaryQuery;
+
+    const resourceResult = await this.resolveResource(context, resourceId);
     if (resourceResult.isErr()) {
       return err(resourceResult.error);
     }
@@ -345,7 +374,7 @@ export class ResourceDiagnosticSummaryQueryService {
       return err(domainBindingsResult.error);
     }
     const domainBindings = domainBindingsResult.value;
-    const deploymentResult = await this.resolveDeployment(context, query, resource);
+    const deploymentResult = await this.resolveDeployment(context, effectiveQuery, resource);
     if (deploymentResult.isErr()) {
       return err(deploymentResult.error);
     }
@@ -355,14 +384,14 @@ export class ResourceDiagnosticSummaryQueryService {
     const sourceErrors: ResourceDiagnosticSourceError[] = [];
     const deploymentTimeline = await this.buildDeploymentTimelineSection(
       context,
-      query,
+      effectiveQuery,
       deployment,
       redactions,
       sourceErrors,
     );
     const runtimeLogs = await this.buildRuntimeLogSection(
       context,
-      query,
+      effectiveQuery,
       deployment,
       redactions,
       sourceErrors,
@@ -370,7 +399,7 @@ export class ResourceDiagnosticSummaryQueryService {
     const access = this.buildAccessSection(resource, domainBindings, redactions, sourceErrors);
     const proxy = await this.buildProxySection(
       context,
-      query,
+      effectiveQuery,
       resource,
       deployment,
       redactions,
@@ -382,10 +411,12 @@ export class ResourceDiagnosticSummaryQueryService {
       generatedAt: this.clock.now(),
       focus: {
         resourceId: resource.id,
-        ...(query.deploymentId ? { requestedDeploymentId: query.deploymentId } : {}),
+        ...(effectiveQuery.deploymentId
+          ? { requestedDeploymentId: effectiveQuery.deploymentId }
+          : {}),
         ...(deployment ? { deploymentId: deployment.id } : {}),
       },
-      context: this.buildContext(resource, deployment, observationWindowFromQuery(query)),
+      context: this.buildContext(resource, deployment, observationWindowFromQuery(effectiveQuery)),
       ...(deployment ? { deployment: this.buildDeployment(deployment, redactions) } : {}),
       access,
       proxy,

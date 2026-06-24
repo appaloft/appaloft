@@ -101,6 +101,7 @@ import { deploymentTimelineJournalMigration } from "./migrations/092_deployment_
 import { environmentProfileDecisionsMigration } from "./migrations/093_environment_profile_decisions";
 import { previewPolicyEnvironmentProfileBaseMigration } from "./migrations/094_preview_policy_environment_profile_base";
 import { connectorLifecycleMigration } from "./migrations/095_connector_lifecycle";
+import { domainBindingPathHandlingMigration } from "./migrations/096_domain_binding_path_handling";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -294,6 +295,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "093_environment_profile_decisions": environmentProfileDecisionsMigration,
       "094_preview_policy_environment_profile_base": previewPolicyEnvironmentProfileBaseMigration,
       "095_connector_lifecycle": connectorLifecycleMigration,
+      "096_domain_binding_path_handling": domainBindingPathHandlingMigration,
     };
   }
 }

@@ -15,11 +15,12 @@ export {
 
 export class ResourceHealthQuery extends Query<ResourceHealthSummary> {
   constructor(
-    public readonly resourceId: string,
+    public readonly resourceId: string | undefined,
     public readonly mode: "cached" | "live",
     public readonly includeChecks: boolean,
     public readonly includePublicAccessProbe: boolean,
     public readonly includeRuntimeProbe: boolean,
+    public readonly previewEnvironmentId?: string,
   ) {
     super();
   }
@@ -33,6 +34,7 @@ export class ResourceHealthQuery extends Query<ResourceHealthSummary> {
           parsed.includeChecks,
           parsed.includePublicAccessProbe,
           parsed.includeRuntimeProbe,
+          parsed.previewEnvironmentId,
         ),
     );
   }

@@ -46,11 +46,15 @@
     EnvironmentSummary,
     OperatorWorkItem,
     ResourceSummary,
+    SystemPluginWebExtension,
   } from "@appaloft/contracts";
 
-  import { readErrorMessage } from "$lib/api/client";
+  import { readErrorMessage, request } from "$lib/api/client";
   import { capabilities, capabilityKey, type CapabilityQuery } from "$lib/capabilities";
   import CapabilityGate from "$lib/components/console/CapabilityGate.svelte";
+  import ConsoleDetailSubnav from "$lib/components/console/ConsoleDetailSubnav.svelte";
+  import ConsoleDetailTabs from "$lib/components/console/ConsoleDetailTabs.svelte";
+  import ConsoleExtensionPage from "$lib/components/console/ConsoleExtensionPage.svelte";
   import ConsoleExtensionPanelHost from "$lib/components/console/ConsoleExtensionPanelHost.svelte";
   import DeploymentProgressDialog from "$lib/components/console/DeploymentProgressDialog.svelte";
   import DeploymentTable from "$lib/components/console/DeploymentTable.svelte";
@@ -73,12 +77,12 @@
     DropdownMenuTrigger,
   } from "$lib/components/ui/dropdown-menu";
   import { Input } from "$lib/components/ui/input";
-  import { ScrollArea } from "$lib/components/ui/scroll-area";
   import * as Select from "$lib/components/ui/select";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import * as Tabs from "$lib/components/ui/tabs";
   import {
     createDeploymentWithProgress,
+    isTerminalDeploymentProgressEvent,
     type DeploymentProgressDialogStatus,
   } from "$lib/console/deployment-progress";
   import { selectCurrentResourceAccessRoute } from "$lib/console/resource-access-route";
@@ -87,17 +91,17 @@
     detailBodyClass,
     detailHeaderClass,
     detailPageClass,
-    detailSubnavClass,
     detailSubnavContentClass,
     detailSubnavLayoutClass,
-    detailTabClass,
+    detailTabPanelFlushClass,
     detailTabPanelSubnavClass,
     detailTabPanelScrollClass,
-    detailTabsClass,
-    detailTabsScrollAreaClass,
-    subnavItemClass,
-    subnavListClass,
   } from "$lib/console/layout-classes";
+  import {
+    findConsolePageExtensionByPath,
+    isConsolePageExtensionVisible,
+    resolveConsolePageVisibilityEndpoint,
+  } from "$lib/console/console-page-extension";
   import { modalIsOpen, setModalOpen } from "$lib/console/url-modal";
   import { createConsoleQueries } from "$lib/console/queries";
   import { runtimeMonitoringRollupQueryOptions } from "$lib/console/runtime-usage-query";
@@ -115,6 +119,7 @@
     findResource,
     findServer,
     formatTime,
+    hrefWithSearchParams,
     latestResourceDeployment,
     previewEnvironmentDetailHref,
     projectDetailHref,
@@ -133,8 +138,9 @@
     | "environments"
     | "previews"
     | "activity"
+    | "audit-log"
     | "settings";
-  type ProjectSettingsSection = "general" | "danger";
+  type ProjectSettingsSection = "general" | "archivedResources" | "danger";
   const projectDetailTabs = [
     "overview",
     "resources",
@@ -142,9 +148,16 @@
     "environments",
     "previews",
     "activity",
+    "audit-log",
     "settings",
   ] as const;
-  const projectSettingsSections = ["general", "danger"] as const;
+  type SystemPluginWebExtensionsResponse = {
+    items: SystemPluginWebExtension[];
+  };
+  type SystemPluginWebExtensionVisibilityResponse = {
+    visible?: boolean;
+  };
+  const projectSettingsSections = ["general", "archivedResources", "danger"] as const;
   type ProjectAttentionItem = {
     key: string;
     kind:
@@ -179,7 +192,6 @@
     serversQuery,
     environmentsQuery,
     resourcesQuery,
-    deploymentsQuery,
     domainBindingsQuery,
   } =
     createConsoleQueries(browser, {
@@ -187,14 +199,97 @@
       readiness: false,
       version: false,
       previewEnvironments: false,
+      deployments: false,
       certificates: false,
       providers: false,
     });
+  const webExtensionsQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["system-plugins", "web-extensions"],
+      queryFn: () => request<SystemPluginWebExtensionsResponse>("/api/system-plugins/web-extensions"),
+      enabled: browser,
+      staleTime: 30_000,
+    }),
+  );
+  const organizationContextQuery = createQuery(() =>
+    orpc.organizations.currentContext.queryOptions({
+      input: {},
+      enabled: browser,
+      retry: 0,
+      staleTime: 30_000,
+    }),
+  );
 
   const projectId = $derived(page.params.projectId ?? "");
+  const currentOrganization = $derived(
+    organizationContextQuery.data?.currentOrganization ?? null,
+  );
+  const projectAuditLogPath = $derived(
+    projectId ? `/projects/${encodeURIComponent(projectId)}/audit-log` : page.url.pathname,
+  );
+  const projectAuditLogExtension = $derived(
+    findConsolePageExtensionByPath(webExtensionsQuery.data?.items ?? [], projectAuditLogPath),
+  );
+  const projectAuditLogVisibilityEndpoint = $derived(
+    resolveConsolePageVisibilityEndpoint(projectAuditLogExtension, {
+      pathname: projectAuditLogPath,
+      query: page.url.searchParams.toString(),
+      organization: currentOrganization,
+      projectId,
+    }),
+  );
+  const projectAuditLogVisibilityQuery = createQuery(() =>
+    queryOptions({
+      queryKey: [
+        "console-extension-route-visibility",
+        "project-audit-log",
+        currentOrganization?.organizationId ?? "",
+        projectId,
+        projectAuditLogVisibilityEndpoint ?? "",
+      ],
+      queryFn: () =>
+        request<SystemPluginWebExtensionVisibilityResponse>(
+          projectAuditLogVisibilityEndpoint ?? "/",
+        ),
+      enabled:
+        browser &&
+        Boolean(projectAuditLogVisibilityEndpoint) &&
+        !organizationContextQuery.isPending,
+      staleTime: 30_000,
+    }),
+  );
+  const projectAuditLogVisibility = $derived(
+    projectAuditLogExtension && projectAuditLogVisibilityEndpoint
+      ? { [projectAuditLogExtension.key]: projectAuditLogVisibilityQuery.data?.visible === true }
+      : {},
+  );
+  const projectAuditLogTabVisible = $derived(
+    isConsolePageExtensionVisible(projectAuditLogExtension, projectAuditLogVisibility),
+  );
   const activeProjectTab = $derived(parseProjectDetailTab(page.url.searchParams.get("tab")));
+  const visibleProjectDetailTabs = $derived(
+    projectDetailTabs.filter((tab) => tab !== "audit-log" || projectAuditLogTabVisible),
+  );
   const activeProjectSettingsSection = $derived(
     parseProjectSettingsSection(page.url.searchParams.get("section")),
+  );
+  const projectDetailTabItems = $derived(
+    visibleProjectDetailTabs.map((tab) => ({
+      id: tab,
+      label: projectTabLabel(tab),
+      href: projectTabHref(tab),
+      active: activeProjectTab === tab,
+      onSelect: (event: MouseEvent) => selectProjectTab(tab, event),
+    })),
+  );
+  const projectSettingsSubnavItems = $derived(
+    projectSettingsSections.map((section) => ({
+      id: section,
+      label: projectSettingsSectionLabel(section),
+      href: projectSettingsSectionHref(section),
+      active: activeProjectSettingsSection === section,
+      onSelect: (event: MouseEvent) => selectProjectSettingsSection(section, event),
+    })),
   );
   let projectLifecycleDialogOpen = $state(false);
   const projectDetailQuery = createQuery(() =>
@@ -225,6 +320,21 @@
       staleTime: 5_000,
     }),
   );
+  const projectArchivedResourcesQuery = createQuery(() =>
+    orpc.resources.list.queryOptions({
+      input: {
+        projectId,
+        lifecycleStatus: "archived",
+        limit: 100,
+      },
+      enabled:
+        browser &&
+        projectId.length > 0 &&
+        activeProjectTab === "settings" &&
+        activeProjectSettingsSection === "archivedResources",
+      staleTime: 5_000,
+    }),
+  );
   const projectOperatorWorkQuery = createQuery(() =>
     orpc.operatorWork.list.queryOptions({
       input: {
@@ -236,18 +346,29 @@
       refetchInterval: 5_000,
     }),
   );
+  const projectDeploymentsQuery = createQuery(() =>
+    orpc.deployments.list.queryOptions({
+      input: {
+        projectId,
+        activeResourcesOnly: true,
+        limit: 100,
+      },
+      enabled: browser && projectId.length > 0,
+      staleTime: 5_000,
+    }),
+  );
   const projects = $derived(projectsQuery.data?.items ?? []);
   const servers = $derived(serversQuery.data?.items ?? []);
   const environments = $derived(environmentsQuery.data?.items ?? []);
   const resources = $derived(resourcesQuery.data?.items ?? []);
-  const deployments = $derived(deploymentsQuery.data?.items ?? []);
+  const deployments = $derived(projectDeploymentsQuery.data?.items ?? []);
   const domainBindings = $derived(domainBindingsQuery.data?.items ?? []);
   const pageLoading = $derived(
     projectsQuery.isPending ||
       environmentsQuery.isPending ||
       resourcesQuery.isPending ||
       domainBindingsQuery.isPending ||
-      deploymentsQuery.isPending ||
+      projectDeploymentsQuery.isPending ||
       projectDetailQuery.isPending,
   );
   const project = $derived(projectDetailQuery.data ?? findProject(projects, projectId));
@@ -255,7 +376,7 @@
   const projectHeaderSwitchItems = $derived(
     projects.map((projectItem) => ({
       label: projectItem.name,
-      href: projectDetailHref(projectItem.id),
+      href: projectDetailHrefWithActiveSearch(projectItem.id),
       selected: projectItem.id === projectId,
     })),
   );
@@ -343,9 +464,7 @@
   const projectResources = $derived(
     project ? resources.filter((resource) => resource.projectId === project.id) : [],
   );
-  const projectArchivedResources = $derived(
-    projectResources.filter((resource) => resource.lifecycleStatus === "archived"),
-  );
+  const projectArchivedResources = $derived(projectArchivedResourcesQuery.data?.items ?? []);
   const projectDomainBindings = $derived(
     project ? domainBindings.filter((binding) => binding.projectId === project.id) : [],
   );
@@ -1340,6 +1459,20 @@
     return `${page.url.pathname}${search ? `?${search}` : ""}`;
   }
 
+  function projectDetailHrefWithActiveSearch(projectId: string): string {
+    const params = new URLSearchParams();
+
+    if (activeProjectTab !== "overview") {
+      params.set("tab", activeProjectTab);
+    }
+
+    if (activeProjectTab === "settings" && activeProjectSettingsSection !== "general") {
+      params.set("section", activeProjectSettingsSection);
+    }
+
+    return hrefWithSearchParams(projectDetailHref(projectId), params);
+  }
+
   function projectSettingsSectionHref(section: ProjectSettingsSection): string {
     const params = new URLSearchParams();
     params.set("tab", "settings");
@@ -1440,9 +1573,12 @@
 
     if (event.status === "failed") {
       projectResourceDeploymentProgressDialogStatus = "failed";
-    } else if (event.status === "succeeded") {
+    } else if (isTerminalDeploymentProgressEvent(event)) {
       projectResourceDeploymentProgressDialogStatus = "succeeded";
-    } else {
+    } else if (
+      projectResourceDeploymentProgressDialogStatus !== "succeeded" &&
+      projectResourceDeploymentProgressDialogStatus !== "failed"
+    ) {
       projectResourceDeploymentProgressDialogStatus = "running";
     }
   }
@@ -1688,6 +1824,8 @@
         return $t(i18nKeys.console.projects.previewsTitle);
       case "activity":
         return $t(i18nKeys.console.projects.activityTitle);
+      case "audit-log":
+        return $t(i18nKeys.console.auditLog.title);
       case "settings":
         return $t(i18nKeys.console.projects.settingsTitle);
     }
@@ -1697,6 +1835,8 @@
     switch (section) {
       case "general":
         return $t(i18nKeys.console.projects.generalSettingsTitle);
+      case "archivedResources":
+        return $t(i18nKeys.console.projects.archivedResourcesTitle);
       case "danger":
         return $t(i18nKeys.console.projects.dangerZoneTitle);
     }
@@ -1775,20 +1915,10 @@
     </section>
 
     <Tabs.Root value={activeProjectTab} class={detailBodyClass}>
-      <ScrollArea class={detailTabsScrollAreaClass}>
-        <nav aria-label={$t(i18nKeys.console.projects.pageTitle)} class={detailTabsClass}>
-          {#each projectDetailTabs as tab (tab)}
-            <a
-              href={projectTabHref(tab)}
-              class={detailTabClass}
-              aria-current={activeProjectTab === tab ? "page" : undefined}
-              onclick={(event) => selectProjectTab(tab, event)}
-            >
-              {projectTabLabel(tab)}
-            </a>
-          {/each}
-        </nav>
-      </ScrollArea>
+      <ConsoleDetailTabs
+        ariaLabel={$t(i18nKeys.console.projects.pageTitle)}
+        items={projectDetailTabItems}
+      />
 
       <Tabs.Content value="overview" class={[detailTabPanelScrollClass, "flex flex-col gap-6"]}>
         <section class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
@@ -1930,7 +2060,7 @@
       label: project?.name ?? $t(i18nKeys.console.projects.pageTitle),
       kind: "project",
       loading: projectHeaderLoading,
-      href: project ? projectDetailHref(project.id) : undefined,
+      href: project ? projectDetailHrefWithActiveSearch(project.id) : undefined,
       switcherLabel: $t(i18nKeys.console.projects.pageTitle),
       switcherItems: projectHeaderSwitchItems,
     },
@@ -2073,23 +2203,10 @@
       </section>
 
       <Tabs.Root value={activeProjectTab} class={detailBodyClass}>
-        <ScrollArea class={detailTabsScrollAreaClass}>
-          <nav
-            aria-label={$t(i18nKeys.console.projects.pageTitle)}
-            class={detailTabsClass}
-          >
-            {#each projectDetailTabs as tab (tab)}
-              <a
-                href={projectTabHref(tab)}
-                class={detailTabClass}
-                aria-current={activeProjectTab === tab ? "page" : undefined}
-                onclick={(event) => selectProjectTab(tab, event)}
-              >
-                {projectTabLabel(tab)}
-              </a>
-            {/each}
-          </nav>
-        </ScrollArea>
+        <ConsoleDetailTabs
+          ariaLabel={$t(i18nKeys.console.projects.pageTitle)}
+          items={projectDetailTabItems}
+        />
 
         <Tabs.Content
           value="overview"
@@ -2577,6 +2694,12 @@
             </div>
           </section>
         </Tabs.Content>
+
+        {#if projectAuditLogTabVisible}
+          <Tabs.Content value="audit-log" class={detailTabPanelFlushClass}>
+            <ConsoleExtensionPage {projectId} embedded />
+          </Tabs.Content>
+        {/if}
 
         <Tabs.Content
           value="resources"
@@ -3119,22 +3242,10 @@
           data-project-settings-display-surface
         >
           <div class={[detailSubnavLayoutClass, "md:grid-cols-[13rem_minmax(0,1fr)]"]}>
-            <aside class={detailSubnavClass}>
-              <nav class="min-w-0" aria-label={$t(i18nKeys.console.projects.settingsTitle)}>
-                <div class={subnavListClass}>
-                  {#each projectSettingsSections as section (section)}
-                    <a
-                      class={[subnavItemClass, "min-h-10"]}
-                      href={projectSettingsSectionHref(section)}
-                      aria-current={activeProjectSettingsSection === section ? "page" : undefined}
-                      onclick={(event) => selectProjectSettingsSection(section, event)}
-                    >
-                      <span class="min-w-0 truncate">{projectSettingsSectionLabel(section)}</span>
-                    </a>
-                  {/each}
-                </div>
-              </nav>
-            </aside>
+            <ConsoleDetailSubnav
+              ariaLabel={$t(i18nKeys.console.projects.settingsTitle)}
+              items={projectSettingsSubnavItems}
+            />
 
             <div class={detailSubnavContentClass}>
               {#if activeProjectSettingsSection === "general"}
@@ -3236,62 +3347,6 @@
                     </div>
                   </section>
 
-                  <section class="console-panel space-y-4 p-5" data-project-settings-archived-resources>
-                    <div class="space-y-1">
-                      <div class="flex flex-wrap items-center justify-between gap-2">
-                        <h2 class="text-lg font-semibold">
-                          {$t(i18nKeys.console.projects.archivedResourcesTitle)}
-                        </h2>
-                        <Badge variant="outline">
-                          {$t(i18nKeys.console.projects.archivedResourcesCount, {
-                            count: projectArchivedResources.length,
-                          })}
-                        </Badge>
-                      </div>
-                      <p class="text-sm text-muted-foreground">
-                        {$t(i18nKeys.console.projects.archivedResourcesDescription)}
-                      </p>
-                    </div>
-
-                    {#if projectArchivedResources.length > 0}
-                      <div class="console-record-list">
-                        {#each projectArchivedResources as resource (resource.id)}
-                          {@const environment = findEnvironment(projectEnvironments, resource.environmentId)}
-                          <a
-                            href={resourceDetailHref(resource)}
-                            class="console-record-row block underline-offset-4 hover:underline"
-                          >
-                            <div class="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                              <div class="min-w-0">
-                                <div class="flex min-w-0 flex-wrap items-center gap-2">
-                                  <span class="truncate text-sm font-medium">{resource.name}</span>
-                                  <Badge variant="secondary">{resource.kind}</Badge>
-                                  <Badge variant="destructive">
-                                    {$t(i18nKeys.console.projects.archived)}
-                                  </Badge>
-                                </div>
-                                <p class="mt-1 truncate text-xs text-muted-foreground">
-                                  {environment?.name ?? resource.environmentId}
-                                </p>
-                              </div>
-                              <div class="shrink-0 text-xs text-muted-foreground">
-                                {#if resource.archivedAt}
-                                  {$t(i18nKeys.console.projects.archivedAt)} · {formatTime(resource.archivedAt)}
-                                {:else}
-                                  {resource.id}
-                                {/if}
-                              </div>
-                            </div>
-                          </a>
-                        {/each}
-                      </div>
-                    {:else}
-                      <div class="rounded-md border border-dashed px-4 py-4 text-sm text-muted-foreground">
-                        {$t(i18nKeys.console.projects.archivedResourcesEmpty)}
-                      </div>
-                    {/if}
-                  </section>
-
                   <section class="console-panel space-y-4 p-5" data-project-preview-policy-link>
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div class="min-w-0 space-y-1">
@@ -3308,6 +3363,65 @@
                       </Button>
                     </div>
                   </section>
+                </section>
+              {:else if activeProjectSettingsSection === "archivedResources"}
+                <section
+                  class="console-panel space-y-4 p-5"
+                  data-project-settings-archived-resources
+                >
+                  <div class="space-y-1">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                      <h2 class="text-lg font-semibold">
+                        {$t(i18nKeys.console.projects.archivedResourcesTitle)}
+                      </h2>
+                      <Badge variant="outline">
+                        {$t(i18nKeys.console.projects.archivedResourcesCount, {
+                          count: projectArchivedResources.length,
+                        })}
+                      </Badge>
+                    </div>
+                    <p class="text-sm text-muted-foreground">
+                      {$t(i18nKeys.console.projects.archivedResourcesDescription)}
+                    </p>
+                  </div>
+
+                  {#if projectArchivedResources.length > 0}
+                    <div class="console-record-list">
+                      {#each projectArchivedResources as resource (resource.id)}
+                        {@const environment = findEnvironment(projectEnvironments, resource.environmentId)}
+                        <a
+                          href={resourceDetailHref(resource)}
+                          class="console-record-row block underline-offset-4 hover:underline"
+                        >
+                          <div class="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <div class="min-w-0">
+                              <div class="flex min-w-0 flex-wrap items-center gap-2">
+                                <span class="truncate text-sm font-medium">{resource.name}</span>
+                                <Badge variant="secondary">{resource.kind}</Badge>
+                                <Badge variant="destructive">
+                                  {$t(i18nKeys.console.projects.archived)}
+                                </Badge>
+                              </div>
+                              <p class="mt-1 truncate text-xs text-muted-foreground">
+                                {environment?.name ?? resource.environmentId}
+                              </p>
+                            </div>
+                            <div class="shrink-0 text-xs text-muted-foreground">
+                              {#if resource.archivedAt}
+                                {$t(i18nKeys.console.projects.archivedAt)} · {formatTime(resource.archivedAt)}
+                              {:else}
+                                {resource.id}
+                              {/if}
+                            </div>
+                          </div>
+                        </a>
+                      {/each}
+                    </div>
+                  {:else}
+                    <div class="rounded-md border border-dashed px-4 py-4 text-sm text-muted-foreground">
+                      {$t(i18nKeys.console.projects.archivedResourcesEmpty)}
+                    </div>
+                  {/if}
                 </section>
               {:else if activeProjectSettingsSection === "danger"}
                 <section

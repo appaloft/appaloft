@@ -13,6 +13,8 @@
   import type { TranslationKey } from "@appaloft/i18n";
 
   import { readErrorMessage } from "$lib/api/client";
+  import ConsoleDetailSubnav from "$lib/components/console/ConsoleDetailSubnav.svelte";
+  import ConsoleDetailTabs from "$lib/components/console/ConsoleDetailTabs.svelte";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import ConsoleStatePanel from "$lib/components/console/ConsoleStatePanel.svelte";
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
@@ -20,17 +22,19 @@
   import { Button } from "$lib/components/ui/button";
   import * as Dialog from "$lib/components/ui/dialog";
   import { Input } from "$lib/components/ui/input";
-  import { ScrollArea } from "$lib/components/ui/scroll-area";
   import * as Select from "$lib/components/ui/select";
   import { Skeleton } from "$lib/components/ui/skeleton";
+  import * as Tabs from "$lib/components/ui/tabs";
   import { webDocsHrefs } from "$lib/console/docs-help";
   import { canRunProductQueries } from "$lib/console/auth-query-gate";
   import {
-    detailTabClass,
-    detailTabsClass,
-    subnavItemClass,
-    subnavItemTitleClass,
-    subnavListClass,
+    detailBodyClass,
+    detailHeaderClass,
+    detailPageClass,
+    detailSubnavContentClass,
+    detailSubnavLayoutClass,
+    detailTabPanelScrollClass,
+    detailTabPanelSubnavClass,
   } from "$lib/console/layout-classes";
   import { createConsoleQueries } from "$lib/console/queries";
   import { formatTime } from "$lib/console/utils";
@@ -163,6 +167,24 @@
   );
   const activeDependencyResourceBackupSection = $derived(
     parseDependencyResourceBackupSection(dependencyResourceSearchParams.get("section")),
+  );
+  const dependencyResourceDetailTabItems = $derived(
+    dependencyResourceDetailTabs.map((tab) => ({
+      id: tab,
+      label: dependencyResourceTabLabel(tab),
+      href: dependencyResourceTabHref(tab),
+      active: activeDependencyResourceTab === tab,
+      onSelect: (event: MouseEvent) => selectDependencyResourceTab(tab, event),
+    })),
+  );
+  const dependencyResourceBackupSubnavItems = $derived(
+    dependencyResourceBackupSections.map((section) => ({
+      id: section,
+      label: dependencyResourceBackupSectionLabel(section),
+      href: dependencyResourceBackupSectionHref(section),
+      active: activeDependencyResourceBackupSection === section,
+      onSelect: (event: MouseEvent) => selectDependencyResourceBackupSection(section, event),
+    })),
   );
 
   const createBackupMutation = createMutation(() => ({
@@ -546,24 +568,26 @@
   title={selectedDependencyResource?.name ?? $t(i18nKeys.console.dependencyResources.pageTitle)}
   description={$t(i18nKeys.console.dependencyResources.pageDescription)}
 >
-  <div class="p-4 md:p-6">
   {#if pageLoading}
-    <div class="space-y-5">
+    <div class="space-y-5 p-4 md:p-6">
       <Skeleton class="h-8 w-72" />
       <Skeleton class="h-44 w-full" />
       <Skeleton class="h-80 w-full" />
     </div>
   {:else if dependencyResourceError}
-    <ConsoleStatePanel
-      tone="error"
-      title={$t(i18nKeys.errors.web.backendUnavailable)}
-      description={$t(i18nKeys.console.dependencyResources.pageDescription)}
-      detail={dependencyResourceError}
-      actionLabel={$t(i18nKeys.console.runtimeUsage.refreshNow)}
-      actionOnclick={() => dependencyResourceQuery.refetch()}
-    />
+    <div class="p-4 md:p-6">
+      <ConsoleStatePanel
+        tone="error"
+        title={$t(i18nKeys.errors.web.backendUnavailable)}
+        description={$t(i18nKeys.console.dependencyResources.pageDescription)}
+        detail={dependencyResourceError}
+        actionLabel={$t(i18nKeys.console.runtimeUsage.refreshNow)}
+        actionOnclick={() => dependencyResourceQuery.refetch()}
+      />
+    </div>
   {:else if selectedDependencyResource}
-    <section class="space-y-5" data-dependency-resource-detail-display-surface>
+    <section class={detailPageClass} data-dependency-resource-detail-display-surface>
+      <section class={detailHeaderClass}>
       <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div class="min-w-0 space-y-2">
           <div class="flex min-w-0 flex-wrap items-center gap-2">
@@ -599,29 +623,16 @@
           <p class="mt-1 break-words text-muted-foreground">{feedback.detail}</p>
         </section>
       {/if}
+      </section>
 
-      <ScrollArea class="rounded-md border bg-background">
-        <nav
-          aria-label={$t(i18nKeys.console.dependencyResources.pageTitle)}
-          class={detailTabsClass}
-        >
-          {#each dependencyResourceDetailTabs as tab (tab)}
-            <a
-              id={`dependency-resource-tab-${tab}`}
-              href={dependencyResourceTabHref(tab)}
-              class={detailTabClass}
-              aria-current={activeDependencyResourceTab === tab ? "page" : undefined}
-              onclick={(event) => selectDependencyResourceTab(tab, event)}
-            >
-              {dependencyResourceTabLabel(tab)}
-            </a>
-          {/each}
-        </nav>
-      </ScrollArea>
+      <Tabs.Root value={activeDependencyResourceTab} class={detailBodyClass}>
+        <ConsoleDetailTabs
+          ariaLabel={$t(i18nKeys.console.dependencyResources.pageTitle)}
+          idPrefix="dependency-resource-tab"
+          items={dependencyResourceDetailTabItems}
+        />
 
-      <section class="space-y-5">
-        <div class="space-y-5">
-          {#if activeDependencyResourceTab === "overview"}
+        <Tabs.Content value="overview" class={[detailTabPanelScrollClass, "space-y-5"]}>
           <section class="console-panel space-y-4 p-5" data-dependency-resource-identity-summary>
             <div class="flex flex-wrap items-center gap-2">
               <Badge variant="outline">
@@ -671,40 +682,17 @@
               </div>
             </dl>
           </section>
-          {/if}
+        </Tabs.Content>
 
-          {#if activeDependencyResourceTab === "backups"}
-          <section class="console-panel overflow-hidden p-0">
-            <nav
-              aria-label={$t(i18nKeys.console.dependencyResources.backupsTab)}
-              class="border-b bg-sidebar text-sidebar-foreground"
-            >
-              <div
-                role="tablist"
-                class={[subnavListClass, "flex min-w-0 overflow-x-auto lg:grid lg:overflow-visible"]}
-              >
-                {#each dependencyResourceBackupSections as section (section)}
-                  <a
-                    id={`dependency-resource-backup-section-${section}`}
-                    href={dependencyResourceBackupSectionHref(section)}
-                    role="tab"
-                    aria-selected={activeDependencyResourceBackupSection === section}
-                    aria-current={activeDependencyResourceBackupSection === section ? "page" : undefined}
-                    class={[
-                      subnavItemClass,
-                      "min-h-10 flex-none whitespace-nowrap lg:flex lg:w-full lg:whitespace-normal",
-                    ]}
-                    onclick={(event) => selectDependencyResourceBackupSection(section, event)}
-                  >
-                    <span class={[subnavItemTitleClass, "lg:whitespace-normal"]}>
-                      {dependencyResourceBackupSectionLabel(section)}
-                    </span>
-                  </a>
-                {/each}
-              </div>
-            </nav>
-          </section>
+        <Tabs.Content value="backups" class={detailTabPanelSubnavClass}>
+          <div class={[detailSubnavLayoutClass, "md:grid-cols-[13rem_minmax(0,1fr)]"]}>
+            <ConsoleDetailSubnav
+              ariaLabel={$t(i18nKeys.console.dependencyResources.backupsTab)}
+              idPrefix="dependency-resource-backup-section"
+              items={dependencyResourceBackupSubnavItems}
+            />
 
+            <div class={detailSubnavContentClass}>
           {#if activeDependencyResourceBackupSection === "backup-history"}
           <section class="console-panel space-y-4 p-5" data-dependency-resource-backup-summary>
             <div class="space-y-1">
@@ -797,11 +785,12 @@
             </Button>
           </section>
           {/if}
-          {/if}
-        </div>
+            </div>
+          </div>
+        </Tabs.Content>
 
-        {#if activeDependencyResourceTab === "settings"}
-        <aside class="console-side-panel space-y-5" data-dependency-resource-lifecycle-handoff>
+        <Tabs.Content value="settings" class={[detailTabPanelScrollClass, "space-y-5"]}>
+        <section class="console-side-panel space-y-5" data-dependency-resource-lifecycle-handoff>
           <div class="space-y-1">
             <h2 class="flex items-center gap-2 font-semibold">
               <Settings2 class="size-4" />
@@ -834,11 +823,11 @@
               <dd class="font-medium">{selectedDependencyResource.sourceMode}</dd>
             </div>
           </dl>
-        </aside>
-        {/if}
+        </section>
+        </Tabs.Content>
 
-        {#if activeDependencyResourceTab === "danger"}
-        <aside
+        <Tabs.Content value="danger" class={[detailTabPanelScrollClass, "space-y-5"]}>
+        <section
           class="console-side-panel space-y-5 border-destructive/25 bg-destructive/5"
           data-dependency-resource-danger-zone
         >
@@ -870,9 +859,9 @@
             <Trash2 class="size-4" />
             {$t(i18nKeys.console.dependencyResources.deleteAction)}
           </Button>
-        </aside>
-        {/if}
-      </section>
+        </section>
+        </Tabs.Content>
+      </Tabs.Root>
     </section>
   {/if}
 
@@ -1123,5 +1112,4 @@
     </Dialog.Content>
   </Dialog.Root>
   {/if}
-  </div>
 </ConsoleShell>

@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
+import { createAppaloftMcpServer, handleAppaloftMcpHttpRequest } from "@appaloft/ai-mcp";
 import {
   type ActionDeployTokenAuthorizationPort,
   type AppLogger,
@@ -29,7 +30,7 @@ import {
 } from "@appaloft/application";
 import { type AppConfig } from "@appaloft/config";
 import { type AuthPublicConfig, apiVersion, type ReadinessResponse } from "@appaloft/contracts";
-import { type Result } from "@appaloft/core";
+import { err, ok, type Result } from "@appaloft/core";
 import { appaloftDeploymentConfigJsonSchema } from "@appaloft/deployment-config";
 import {
   createAppaloftTranslator,
@@ -106,6 +107,7 @@ interface AuthRuntime extends ProductSessionAuthorizationPort {
     providers: Array<{
       key: "github" | "google" | "oidc";
       title: string;
+      accountLabel?: string;
       configured: boolean;
       connected: boolean;
       requiresSignIn: boolean;
@@ -475,6 +477,10 @@ function isApiPath(pathname: string): boolean {
   return pathname === "/api" || pathname.startsWith("/api/");
 }
 
+function isMcpPath(pathname: string): boolean {
+  return pathname === "/mcp" || pathname.startsWith("/mcp/");
+}
+
 function pluginRouteMatchesPath(routePath: string, pathname: string): boolean {
   if (routePath === pathname) {
     return true;
@@ -538,6 +544,7 @@ function isCorsPath(input: {
 }): boolean {
   return (
     isApiPath(input.pathname) ||
+    isMcpPath(input.pathname) ||
     input.pluginRoutes.some((route) => pluginRouteMatchesPath(route.path, input.pathname)) ||
     input.orpcRoutePaths.some((routePath) => pluginRouteMatchesPath(routePath, input.pathname))
   );
@@ -548,7 +555,11 @@ function isDocsPath(pathname: string): boolean {
 }
 
 function isBackendLogPath(pathname: string): boolean {
-  return isApiPath(pathname) || pathname.startsWith("/.well-known/acme-challenge/");
+  return (
+    isApiPath(pathname) ||
+    isMcpPath(pathname) ||
+    pathname.startsWith("/.well-known/acme-challenge/")
+  );
 }
 
 function isFirstAdminBootstrapPath(pathname: string): boolean {
@@ -592,6 +603,7 @@ function isHtmlNavigationRequest(request: Request): boolean {
 function isConsoleNavigationPath(pathname: string): boolean {
   if (
     isApiPath(pathname) ||
+    isMcpPath(pathname) ||
     isDocsPath(pathname) ||
     isFirstAdminBootstrapPath(pathname) ||
     isLoginPath(pathname) ||
@@ -903,6 +915,22 @@ export function createHttpApp(input: {
     });
   }
 
+  function createMcpExecutionContext(request: Request): ExecutionContext {
+    const requestId = request.headers.get("x-request-id");
+    const requestSecurity = requestSecurityContextFromHeaders(request.headers);
+    return input.executionContextFactory.create({
+      entrypoint: "mcp",
+      locale: resolveAppaloftLocaleFromHeaders(request.headers),
+      actor: {
+        kind: "system",
+        id: "mcp",
+        label: "appaloft-mcp",
+      },
+      ...(requestSecurity ? { requestSecurity } : {}),
+      ...(requestId ? { requestId } : {}),
+    });
+  }
+
   async function authorizeAdminRequest(request: Request, context: ExecutionContext): Promise<void> {
     if (!input.authRuntime) {
       return;
@@ -968,6 +996,60 @@ export function createHttpApp(input: {
       ...(context.requestSecurity ? { requestSecurity: context.requestSecurity } : {}),
       requestId: context.requestId,
     });
+  }
+
+  async function authorizedMcpContext(
+    request: Request,
+    context: ExecutionContext,
+  ): Promise<Result<ExecutionContext>> {
+    if (!input.authRuntime) {
+      return ok(context);
+    }
+
+    const url = new URL(request.url);
+    const result = await input.authRuntime.authorizeProductSession(context, {
+      method: request.method,
+      path: url.pathname,
+      requiredRole: "member",
+      ...(request.headers.get("authorization")
+        ? { authorizationHeader: request.headers.get("authorization") as string }
+        : {}),
+      ...(request.headers.get("cookie")
+        ? { cookieHeader: request.headers.get("cookie") as string }
+        : {}),
+    });
+
+    if (result.isErr()) {
+      return err(result.error);
+    }
+
+    const authorized = result.value;
+    const principal: ExecutionPrincipal = {
+      kind: authorized.actor.kind,
+      actorId: authorized.actor.id,
+      userId: authorized.userId,
+      ...(authorized.email ? { email: authorized.email } : {}),
+      activeOrganization: {
+        organizationId: authorized.organizationId,
+        role:
+          authorized.organizationRole ??
+          (authorized.role === "owner" || authorized.role === "admin"
+            ? authorized.role
+            : "developer"),
+        productRole: authorized.role,
+      },
+    };
+
+    return ok(
+      input.executionContextFactory.create({
+        actor: authorized.actor,
+        entrypoint: "mcp",
+        locale: context.locale,
+        principal,
+        ...(context.requestSecurity ? { requestSecurity: context.requestSecurity } : {}),
+        requestId: context.requestId,
+      }),
+    );
   }
 
   function staticAssetResponse(pathname: string, source: StaticAssetSource): Response | null {
@@ -1522,6 +1604,12 @@ export function createHttpApp(input: {
     }
   }
 
+  const mcpServer = createAppaloftMcpServer({
+    commandBus: input.commandBus,
+    queryBus: input.queryBus,
+    executionContextFactory: input.executionContextFactory,
+  });
+
   const baseApp = new Elysia()
     .wrap((handle, request) => {
       requestStartTimes.set(request, performance.now());
@@ -1653,6 +1741,39 @@ export function createHttpApp(input: {
         serverSideConfigBootstrap: Boolean(input.actionSourcePackageConfigReader),
       },
     }))
+    .get("/mcp", async ({ request }) =>
+      handleAppaloftMcpHttpRequest({
+        server: mcpServer,
+        request,
+      }),
+    )
+    .post(
+      "/mcp",
+      async ({ request, set }) => {
+        const context = createMcpExecutionContext(request);
+        const executionContext = await authorizedMcpContext(request, context);
+        if (executionContext.isErr()) {
+          set.status = 401;
+          return {
+            error: {
+              code: executionContext.error.code,
+              category: executionContext.error.category,
+              message: executionContext.error.message,
+              retryable: executionContext.error.retryable,
+            },
+          };
+        }
+
+        return handleAppaloftMcpHttpRequest({
+          server: mcpServer,
+          request,
+          context: executionContext.value,
+        });
+      },
+      {
+        parse: "none",
+      },
+    )
     .get("/api/instance-upgrade/check", async ({ request }) => {
       const context = createHttpExecutionContext(request);
       const url = new URL(request.url);

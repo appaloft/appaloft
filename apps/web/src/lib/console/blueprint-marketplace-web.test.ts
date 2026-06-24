@@ -8,6 +8,7 @@ import {
   findBlueprintCatalogExtensionByKey,
   readBlueprintCatalogExtensionMetadata,
 } from "./blueprint-marketplace-extension";
+import { systemPluginExtensionIconPresentation } from "./web-extension-presentation";
 
 const marketplaceExtension: SystemPluginWebExtension = {
   key: "example-marketplace",
@@ -44,7 +45,25 @@ describe("Blueprint marketplace console surface", () => {
     );
 
     expect(shellSource).toContain("{#each navigationExtensions as extension");
+    expect(shellSource).toContain("isWorkspaceNavigationExtension");
+    expect(shellSource).toContain("data-system-plugin-extension-icon-image");
     expect(shellSource).not.toContain("i18nKeys.console.nav.extensions");
+  });
+
+  test("[CLOUD-BLUEPRINT-UI-NAV-026] accepts custom image icons for navigation extensions", () => {
+    expect(
+      systemPluginExtensionIconPresentation({
+        ...marketplaceExtension,
+        icon: {
+          src: "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%2F%3E",
+          label: "Marketplace",
+        },
+      }),
+    ).toEqual({
+      kind: "image",
+      src: "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%2F%3E",
+      label: "Marketplace",
+    });
   });
 
   test("[CLOUD-BLUEPRINT-SELECTOR-027] discovers neutral Blueprint catalog extension metadata", () => {
@@ -107,6 +126,7 @@ describe("Blueprint marketplace console surface", () => {
 
     expect(listPageSource).toContain("ConsoleShell");
     expect(listPageSource).toContain('title="应用市场"');
+    expect(listPageSource).toContain('class="max-w-7xl"');
     expect(detailPageSource).toContain("ConsoleShell");
     expect(detailPageSource).toContain('title={listing?.title ?? "蓝图详情"}');
     expect(detailPageSource).toContain("normalizeBlueprintDetailResponse");
@@ -130,6 +150,9 @@ describe("Blueprint marketplace console surface", () => {
     expect(selectorSource).not.toContain("@appaloft-cloud");
     expect(sharedPackageSource).toContain("data-blueprint-marketplace-page");
     expect(sharedPackageSource).toContain("marketplace-controls");
+    expect(sharedPackageSource).toContain("data-blueprint-marketplace-featured");
+    expect(sharedPackageSource).toContain("精选蓝图");
+    expect(sharedPackageSource).toContain("全部官方蓝图");
     expect(sharedPackageSource).toContain("data-marketplace-surface={surface}");
     expect(sharedPackageSource).toContain("data-blueprint-marketplace-skeleton");
     expect(sharedPackageSource).toContain('class="flex min-h-[760px] flex-col gap-7"');
@@ -159,7 +182,7 @@ describe("Blueprint marketplace console surface", () => {
     expect(detailPageSource).not.toContain('"resource pending"');
     expect(detailPageSource).not.toContain('"dependency pending"');
     expect(detailPageSource).not.toContain("Generate dry-run");
-    expect(detailPageSource).toContain("upgradePlanEndpoint");
+    expect(detailPageSource).not.toContain("upgradePlanEndpoint");
     expect(detailPageSource).toContain("installEndpoint");
     expect(detailPageSource).toContain("installedApplicationEndpoint");
     expect(detailPageSource).toContain("acceptInstall");
@@ -175,17 +198,20 @@ describe("Blueprint marketplace console surface", () => {
     expect(detailPageSource).toContain("progressBadgeLabel");
     expect(detailPageSource).not.toContain("workerId");
     expect(detailPageSource).not.toContain("leaseOwner");
-    expect(detailPageSource).toContain("generateUpgradePlan");
-    expect(detailPageSource).toContain("生成升级 dry-run");
-    expect(detailPageSource).toContain("data-blueprint-upgrade-from-installed-application");
-    expect(detailPageSource).toContain("{#if upgradePlanEndpoint}");
+    expect(detailPageSource).toContain("快速部署");
+    expect(detailPageSource).toContain("来源固定为当前 Blueprint");
+    expect(detailPageSource).toContain("开始部署");
+    expect(detailPageSource).not.toContain("generateUpgradePlan");
+    expect(detailPageSource).not.toContain("生成升级 dry-run");
+    expect(detailPageSource).not.toContain("data-blueprint-upgrade-from-installed-application");
+    expect(detailPageSource).not.toContain("{#if upgradePlanEndpoint}");
     expect(detailPageSource).toContain("applicationId");
-    expect(detailPageSource).toContain("preservedUserConfigurationWarnings");
-    expect(detailPageSource).toContain("upgradePlanOutput.nonExecution");
-    expect(detailPageSource).toContain("仅生成计划");
-    expect(detailPageSource).toContain("可执行计划");
+    expect(detailPageSource).not.toContain("preservedUserConfigurationWarnings");
+    expect(detailPageSource).not.toContain("upgradePlanOutput.nonExecution");
+    expect(detailPageSource).not.toContain("仅生成计划");
+    expect(detailPageSource).not.toContain("可执行计划");
     expect(detailPageSource).not.toContain("currentVersion:");
-    expect(detailPageSource).toContain("<details");
+    expect(detailPageSource).not.toContain("查看 upgrade plan JSON");
     expect(quickDeploySource).toContain("blueprintSlug");
     expect(quickDeploySource).toContain("blueprintUrl");
     expect(quickDeploySource).toContain("remoteDetailEndpoint");
@@ -298,6 +324,8 @@ describe("Blueprint marketplace console surface", () => {
     expect(sharedPackageSource).toContain("data-blueprint-marketplace-search");
     expect(sharedPackageSource).toContain("data-blueprint-marketplace-category-tabs");
     expect(sharedPackageSource).toContain("data-blueprint-marketplace-groups");
+    expect(sharedPackageSource).toContain("featuredListings");
+    expect(sharedPackageSource).toContain("xl:grid-cols-3");
     expect(sharedPackageSource).toContain("createBlueprintDetailHref");
     expect(sharedPackageSource).toContain("createBlueprintDeployHandoffUrl");
     expect(sharedPackageSource).toContain('primaryAction === "select"');

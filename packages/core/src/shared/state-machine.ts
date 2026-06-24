@@ -23,6 +23,7 @@ import {
   resourceInstanceKinds,
   resourceLifecycleStatuses,
   resourceNetworkProtocols,
+  routePathHandlingModes,
   runtimePlanStrategies,
   sourceKinds,
   targetKinds,
@@ -59,6 +60,7 @@ export {
   resourceInstanceKinds,
   resourceLifecycleStatuses,
   resourceNetworkProtocols,
+  routePathHandlingModes,
   runtimePlanStrategies,
   sourceKinds,
   targetKinds,
@@ -296,6 +298,38 @@ export class EdgeProxyKindValue extends EnumValueObject<(typeof edgeProxyKinds)[
 
   isProviderBacked(): boolean {
     return !this.isDisabled();
+  }
+}
+
+const routePathHandlingBrand: unique symbol = Symbol("RoutePathHandlingValue");
+export class RoutePathHandlingValue extends EnumValueObject<
+  (typeof routePathHandlingModes)[number]
+> {
+  private [routePathHandlingBrand]!: void;
+
+  private constructor(value: (typeof routePathHandlingModes)[number]) {
+    super(value);
+  }
+
+  static create(value: string): Result<RoutePathHandlingValue> {
+    return createEnumValue(
+      value,
+      routePathHandlingModes,
+      "Route path handling",
+      (validated) => new RoutePathHandlingValue(validated),
+    );
+  }
+
+  static rehydrate(value: (typeof routePathHandlingModes)[number]): RoutePathHandlingValue {
+    return new RoutePathHandlingValue(value);
+  }
+
+  static default(): RoutePathHandlingValue {
+    return new RoutePathHandlingValue("preserve");
+  }
+
+  isStrip(): boolean {
+    return this.value === "strip";
   }
 }
 

@@ -109,7 +109,8 @@ release readiness 检查。
 <h2 id="appaloft-skill-mcp">MCP 工具</h2>
 
 MCP 是 Appaloft 的机器可调用工具层。运行 `appaloft mcp stdio` 可以启动 stdio MCP server；
-每个 tool 都由 operation key 生成，例如 `deployments.create` 对应 `deployments_create`。
+运行 `appaloft mcp serve` 可以启动本地 HTTP `/mcp` endpoint；`npx appaloft-mcp` 则提供独立
+launcher。每个 tool 都由 operation key 生成，例如 `deployments.create` 对应 `deployments_create`。
 Tool 输入 schema 来自同一套 command/query schema，调用仍进入 Appaloft command/query bus。
 
 查看 [Appaloft MCP server](/docs/agent/mcp-server/#appaloft-mcp-server) 了解工具命名、resources、prompts

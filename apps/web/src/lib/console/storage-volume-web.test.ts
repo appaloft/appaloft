@@ -78,19 +78,29 @@ describe("storage volume Web console surface", () => {
       resourcePageSource.indexOf('id="resource-storage"'),
       resourcePageSource.indexOf('id="resource-diagnostics"'),
     );
-    expect(resourceStorageSource).toContain("<form");
-    expect(resourceStorageSource).toContain("data-resource-storage-backup-form");
-    expect(resourceStorageSource).toContain("<Input");
-    expect(resourceStorageSource).toContain("<Select.Root");
-    expect(resourceStorageSource).toContain('type="submit"');
+    const storageBackupDialogSource = resourcePageSource.slice(
+      resourcePageSource.indexOf("<Dialog.Root bind:open={storageBackupDialogOpen}>"),
+      resourcePageSource.indexOf("<Dialog.Root bind:open={configEditorDialogOpen}>"),
+    );
+    expect(resourceStorageSource).not.toContain("data-resource-storage-backup-form");
+    expect(resourceStorageSource).toContain("openStorageBackupDialog()");
+    expect(resourceStorageSource).toContain("storageBackupAttachmentOptionLabel");
+    expect(storageBackupDialogSource).toContain("<form");
+    expect(storageBackupDialogSource).toContain("data-resource-storage-backup-form");
+    expect(storageBackupDialogSource).toContain("<Input");
+    expect(storageBackupDialogSource).toContain("<Select.Root");
+    expect(storageBackupDialogSource).toContain('type="submit"');
+    expect(storageBackupDialogSource).toContain('id="resource-storage-backup-data-format"');
+    expect(storageBackupDialogSource).not.toContain("bind:value={storageBackupDataFormat}");
     expect(resourceStorageSource).toContain("storageBackupLocalOnly");
-    expect(resourceStorageSource).toContain("storageBackupPlanAction");
     expect(resourceStorageSource).toContain("storageBackupCreateAction");
+    expect(storageBackupDialogSource).toContain("storageBackupPlanAction");
+    expect(storageBackupDialogSource).toContain("storageBackupCreateAction");
     expect(resourceStorageSource).toContain("storageBackupRestoreAction");
     expect(resourceStorageSource).toContain("storageBackupPruneAction");
     expect(resourceStorageSource).toContain("restoreStorageBackup(backup)");
     expect(resourceStorageSource).toContain("pruneStorageBackup(backup)");
-    expect(resourceStorageSource).not.toContain("openStorageBackupDialog");
+    expect(resourceStorageSource).toContain("openStorageBackupDialog");
     expect(resourceStorageSource).not.toContain("openStorageRuntimeCleanupDialog");
     expect(resourceStorageSource).not.toContain("storageRuntimeCleanupApplyAction");
     expect(resourceStorageSource).not.toContain("storageRuntimeCleanupPreviewAction");

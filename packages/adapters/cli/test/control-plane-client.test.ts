@@ -1,7 +1,7 @@
 import "../../../application/node_modules/reflect-metadata/Reflect.js";
 
 import { describe, expect, test } from "bun:test";
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type AppaloftSdkFetch } from "@appaloft/sdk";
@@ -1304,6 +1304,92 @@ describe("CLI remote control-plane client", () => {
     ]);
     expect(requests[1]?.headers.get("authorization")).toBe("Bearer tok_remote_secret_1234");
     expect(rendered.stdout).toContain("***1234");
+    expect(rendered.stdout).not.toContain("tok_remote_secret_1234");
+    expect(rendered.stderr).toBe("");
+  });
+
+  test("[CONTROL-PLANE-CLI-017] auth mcp login requests bearer material and writes an mcp profile", async () => {
+    const requests: Request[] = [];
+    const store = new MemoryCliControlPlaneProfileStore();
+    const output = captureOutput();
+
+    const result = await runStandaloneControlPlaneCli({
+      argv: ["node", "appaloft", "auth", "mcp", "login", "--no-browser"],
+      env: {},
+      fetch: createCliAuthExchangeFetch(requests),
+      now: () => "2026-05-17T00:00:00.000Z",
+      openBrowser: () => false,
+      sleep: async () => undefined,
+      store,
+      stderr: output.stderr,
+      stdout: output.stdout,
+    });
+
+    const stored = await store.read();
+    const rendered = output.read();
+    const sessionRequestBody = (await requests[0]?.json()) as { requestedCredential?: string };
+
+    expect(result).toEqual({ handled: true, exitCode: 0 });
+    expect(sessionRequestBody).toMatchObject({
+      requestedCredential: "bearer",
+    });
+    expect(stored._unsafeUnwrap().activeProfile).toBe("mcp");
+    expect(stored._unsafeUnwrap().profiles.mcp).toMatchObject({
+      auth: {
+        kind: "bearer",
+        token: "tok_exchanged_secret_5678",
+      },
+      baseUrl: defaultPublicCloudControlPlaneUrl,
+      mode: "cloud",
+      name: "mcp",
+    });
+    expect(rendered.stdout).toContain("***5678");
+    expect(rendered.stdout).not.toContain("tok_exchanged_secret_5678");
+  });
+
+  test("[CONTROL-PLANE-CLI-018] auth mcp codex install writes a token-free Codex stdio bridge config", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "appaloft-codex-mcp-install-"));
+    const codexHome = join(directory, "codex");
+    await mkdir(codexHome, { recursive: true });
+    await writeFile(
+      join(codexHome, "config.toml"),
+      `[mcp_servers.existing]\ncommand = "existing-mcp"\n\n`,
+      "utf8",
+    );
+    const output = captureOutput();
+
+    const result = await runStandaloneControlPlaneCli({
+      argv: [
+        "node",
+        "appaloft",
+        "auth",
+        "mcp",
+        "codex",
+        "install",
+        "--profile",
+        "local",
+        "--codex-home",
+        codexHome,
+        "--command",
+        "/opt/appaloft/bin/appaloft",
+      ],
+      env: {},
+      store: activeStore("local"),
+      stderr: output.stderr,
+      stdout: output.stdout,
+    });
+
+    const config = await readFile(join(codexHome, "config.toml"), "utf8");
+    const rendered = output.read();
+
+    expect(result).toEqual({ handled: true, exitCode: 0 });
+    expect(config).toContain("[mcp_servers.existing]");
+    expect(config).toContain("[mcp_servers.appaloft]");
+    expect(config).toContain('command = "/opt/appaloft/bin/appaloft"');
+    expect(config).toContain('args = ["mcp", "remote-stdio", "--profile", "local"]');
+    expect(config).not.toContain("tok_remote_secret_1234");
+    expect(rendered.stdout).toContain("appaloft.codex.mcp-install/v1");
+    expect(rendered.stdout).toContain("/opt/appaloft/bin/appaloft");
     expect(rendered.stdout).not.toContain("tok_remote_secret_1234");
     expect(rendered.stderr).toBe("");
   });

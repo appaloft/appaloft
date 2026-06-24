@@ -159,7 +159,7 @@
   {:else if usage}
     <div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
       {#each metricTiles as tile (tile.key)}
-        <div class="rounded-md bg-muted/30 px-3 py-2">
+        <div class="rounded-md border bg-muted/30 px-3 py-2">
           <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
             <tile.icon class="size-4" />
             {tile.label}

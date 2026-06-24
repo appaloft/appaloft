@@ -27,6 +27,7 @@
   } from "@lucide/svelte";
 
   import { readErrorMessage, request } from "$lib/api/client";
+  import { capabilities } from "$lib/capabilities";
   import ConsoleOrganizationSwitcher from "$lib/components/console/ConsoleOrganizationSwitcher.svelte";
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
   import SettingsShell from "$lib/components/console/SettingsShell.svelte";
@@ -35,6 +36,10 @@
   import * as Dialog from "$lib/components/ui/dialog";
   import { operatorWorkReadableFailure } from "$lib/console/blueprint-install-progress";
   import { webDocsHrefs } from "$lib/console/docs-help";
+  import {
+    instanceAccessCapabilityKey,
+    preloadInstanceAccessCapability,
+  } from "$lib/console/instance-access";
   import { instanceSettingsItems } from "$lib/console/settings-nav";
   import { formatTime } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
@@ -74,6 +79,8 @@
   };
 
   const currentOrigin = $derived(page.url.origin);
+  let instanceAccessChecked = $state(false);
+  let instanceAccessRedirected = $state(false);
   let upgradeFeedback = $state<UpgradeFeedback | null>(null);
   let applyUpgradeDialogOpen = $state(false);
   let terminalSessionFeedback = $state<TerminalSessionFeedback | null>(null);
@@ -102,10 +109,13 @@
     return parseInstanceSection(page.url.searchParams.get("section"));
   });
   const selectedWorkId = $derived(page.url.searchParams.get("workId") ?? "");
+  const instanceAccessAllowed = $derived(
+    $capabilities.capabilities[instanceAccessCapabilityKey]?.allowed === true,
+  );
   const contextQuery = createQuery(() =>
     orpc.organizations.currentContext.queryOptions({
       input: {},
-      enabled: browser,
+      enabled: browser && instanceAccessAllowed,
       retry: 0,
       staleTime: 30_000,
     }),
@@ -114,7 +124,7 @@
     queryOptions({
       queryKey: ["bootstrap", "runtime-status"],
       queryFn: () => request<RuntimeStatusResponse>("/api/bootstrap/runtime/status"),
-      enabled: browser && activeSection === "overview",
+      enabled: browser && instanceAccessAllowed && activeSection === "overview",
       staleTime: 15_000,
       refetchInterval: 30_000,
       retry: 0,
@@ -124,14 +134,20 @@
     queryOptions({
       queryKey: ["instance-upgrade", "check"],
       queryFn: () => request<InstanceUpgradeCheckResponse>("/api/instance-upgrade/check"),
-      enabled: browser && (activeSection === "overview" || activeSection === "guidance"),
+      enabled:
+        browser &&
+        instanceAccessAllowed &&
+        (activeSection === "overview" || activeSection === "guidance"),
       staleTime: 60_000,
       retry: 0,
     }),
   );
   const doctorQuery = createQuery(() =>
     orpc.system.doctor.queryOptions({
-      enabled: browser && (activeSection === "maintenance" || activeSection === "workers"),
+      enabled:
+        browser &&
+        instanceAccessAllowed &&
+        (activeSection === "maintenance" || activeSection === "workers"),
       staleTime: 30_000,
       refetchInterval: 60_000,
       retry: 0,
@@ -140,7 +156,7 @@
   const operatorWorkQuery = createQuery(() =>
     orpc.operatorWork.list.queryOptions({
       input: { limit: 25 },
-      enabled: browser && activeSection === "workers",
+      enabled: browser && instanceAccessAllowed && activeSection === "workers",
       staleTime: 10_000,
       refetchInterval: 15_000,
       retry: 0,
@@ -149,7 +165,11 @@
   const selectedOperatorWorkQuery = createQuery(() =>
     orpc.operatorWork.show.queryOptions({
       input: { workId: selectedWorkId },
-      enabled: browser && activeSection === "workers" && selectedWorkId.length > 0,
+      enabled:
+        browser &&
+        instanceAccessAllowed &&
+        activeSection === "workers" &&
+        selectedWorkId.length > 0,
       staleTime: 5_000,
       refetchInterval: 10_000,
       retry: 0,
@@ -158,7 +178,7 @@
   const terminalSessionsQuery = createQuery(() =>
     orpc.terminalSessions.list.queryOptions({
       input: { limit: 50 },
-      enabled: browser && activeSection === "sessions",
+      enabled: browser && instanceAccessAllowed && activeSection === "sessions",
       staleTime: 15_000,
       refetchInterval: 30_000,
       retry: 0,
@@ -259,6 +279,23 @@
   const selectedTerminalSession = $derived(
     terminalSessions.find((session) => session.sessionId === selectedTerminalSessionId) ?? null,
   );
+
+  $effect(() => {
+    if (!browser) {
+      return;
+    }
+
+    void preloadInstanceAccessCapability().finally(() => {
+      instanceAccessChecked = true;
+    });
+  });
+
+  $effect(() => {
+    if (browser && instanceAccessChecked && !instanceAccessAllowed && !instanceAccessRedirected) {
+      instanceAccessRedirected = true;
+      void goto("/");
+    }
+  });
   const maintenanceWorkers = $derived(doctor?.maintenanceWorkers ?? []);
   const durableWorker = $derived(
     maintenanceWorkers.find((worker) => worker.key === "durable-worker-runtime") ?? null,
@@ -563,17 +600,18 @@ server-config-deploy: true`);
   <title>{$t(i18nKeys.console.instance.pageTitle)} · Appaloft</title>
 </svelte:head>
 
-<SettingsShell
-  title={$t(i18nKeys.console.instance.pageTitle)}
-  description={$t(i18nKeys.console.instance.pageDescription)}
-  groupLabel={$t(i18nKeys.console.instance.pageTitle)}
-  activePath={instanceSectionHref(activeSection)}
-  items={instanceSettingsItems()}
-  breadcrumbs={[
-    { label: $t(i18nKeys.console.nav.home), href: "/" },
-    { label: $t(i18nKeys.console.instance.pageTitle) },
-  ]}
->
+{#if instanceAccessAllowed}
+  <SettingsShell
+    title={$t(i18nKeys.console.instance.pageTitle)}
+    description={$t(i18nKeys.console.instance.pageDescription)}
+    groupLabel={$t(i18nKeys.console.instance.pageTitle)}
+    activePath={instanceSectionHref(activeSection)}
+    items={instanceSettingsItems()}
+    breadcrumbs={[
+      { label: $t(i18nKeys.console.nav.home), href: "/" },
+      { label: $t(i18nKeys.console.instance.pageTitle) },
+    ]}
+  >
   {#snippet sidebarHeader()}
     <ConsoleOrganizationSwitcher
       {currentOrganization}
@@ -1829,4 +1867,5 @@ server-config-deploy: true`);
       </Dialog.Content>
     {/if}
   </Dialog.Root>
-</SettingsShell>
+  </SettingsShell>
+{/if}

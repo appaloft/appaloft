@@ -433,13 +433,24 @@ describe("DeleteResourceUseCase", () => {
     expect(listed).toEqual([]);
   });
 
-  test("[RES-PROFILE-LIST-009] includes archived resource lifecycle metadata in resources.list read models", async () => {
+  test("[RES-PROFILE-LIST-009] omits archived resources from default resources.list read models", async () => {
     const { repositoryContext, resources } = await createHarness({
       resource: archivedResourceFixture(),
     });
     const readModel = new MemoryResourceReadModel(resources);
 
     const listed = await readModel.list(repositoryContext);
+
+    expect(listed).toEqual([]);
+  });
+
+  test("[RES-PROFILE-LIST-010] includes archived resource lifecycle metadata when resources.list asks for archived resources", async () => {
+    const { repositoryContext, resources } = await createHarness({
+      resource: archivedResourceFixture(),
+    });
+    const readModel = new MemoryResourceReadModel(resources);
+
+    const listed = await readModel.list(repositoryContext, { lifecycleStatus: "archived" });
 
     expect(listed).toMatchObject([
       {

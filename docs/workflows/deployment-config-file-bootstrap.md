@@ -901,6 +901,7 @@ access:
     - host: example.com
       pathPrefix: /
       tlsMode: auto
+      pathHandling: preserve
     - host: www.example.com
       redirectTo: example.com
       redirectStatus: 308
@@ -910,6 +911,9 @@ Rules:
 
 - `host` is a domain name only; schemes, ports, and path fragments are rejected.
 - `pathPrefix` defaults to `/` when omitted.
+- `pathHandling` defaults to `preserve`. Use `strip` only when the public route prefix should be
+  removed before proxying served traffic upstream; redirect entries always preserve the request path
+  and query.
 - `tlsMode` is provider-neutral and initially allows `auto` or `disabled`.
 - `redirectTo`, when present, is a domain name only and must point to another non-redirect domain
   entry in the same normalized route set for the same trusted resource/server/destination context.

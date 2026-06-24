@@ -1,7 +1,7 @@
 <script lang="ts">
   import { browser } from "$app/environment";
   import { page } from "$app/state";
-  import { ArrowRight, Filter, FolderOpen } from "@lucide/svelte";
+  import { ArrowRight, ChevronLeft, ChevronRight, FolderOpen } from "@lucide/svelte";
   import type { DeploymentSummary } from "@appaloft/contracts";
 
   import ConsoleEmptyState from "$lib/components/console/ConsoleEmptyState.svelte";
@@ -9,7 +9,6 @@
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import DeploymentTable from "$lib/components/console/DeploymentTable.svelte";
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
-  import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import * as Select from "$lib/components/ui/select";
   import { Skeleton } from "$lib/components/ui/skeleton";
@@ -27,6 +26,7 @@
   const { projectsQuery, environmentsQuery, resourcesQuery, deploymentsQuery } =
     createConsoleQueries(browser);
 
+  const deploymentPageSize = 12;
   const projects = $derived(projectsQuery.data?.items ?? []);
   const environments = $derived(environmentsQuery.data?.items ?? []);
   const resources = $derived(resourcesQuery.data?.items ?? []);
@@ -45,6 +45,8 @@
   let environmentFilter = $state("all");
   let resourceFilter = $state("all");
   let statusFilter = $state("all");
+  let deploymentOffset = $state(0);
+  let deploymentFilterSignature = $state("");
 
   const inFlightDeploymentStatuses = new Set<DeploymentSummary["status"]>([
     "created",
@@ -62,13 +64,15 @@
       : environments.filter((environment) => environment.projectId === projectFilter),
   );
   const filteredResourcesForProject = $derived.by(() =>
-    resources.filter((resource) => {
-      if (projectFilter !== "all" && resource.projectId !== projectFilter) return false;
-      if (environmentFilter !== "all" && resource.environmentId !== environmentFilter) {
-        return false;
-      }
-      return true;
-    }),
+    projectFilter === "all"
+      ? []
+      : resources.filter((resource) => {
+          if (resource.projectId !== projectFilter) return false;
+          if (environmentFilter !== "all" && resource.environmentId !== environmentFilter) {
+            return false;
+          }
+          return true;
+        }),
   );
   const deploymentStatuses = $derived.by(() =>
     Array.from(new Set(deployments.map((deployment) => deployment.status))).sort(),
@@ -93,6 +97,16 @@
   const visibleSucceededDeployments = $derived(
     visibleDeployments.filter((deployment) => deployment.status === "succeeded"),
   );
+  const deploymentTotal = $derived(visibleDeployments.length);
+  const deploymentPageStart = $derived(deploymentTotal === 0 ? 0 : deploymentOffset + 1);
+  const deploymentPageEnd = $derived(
+    Math.min(deploymentOffset + deploymentPageSize, deploymentTotal),
+  );
+  const paginatedDeployments = $derived(
+    visibleDeployments.slice(deploymentOffset, deploymentOffset + deploymentPageSize),
+  );
+  const canGoPrevious = $derived(deploymentOffset > 0);
+  const canGoNext = $derived(deploymentOffset + deploymentPageSize < deploymentTotal);
   const selectedEnvironment = $derived(
     environmentFilter === "all" ? null : findEnvironment(environments, environmentFilter),
   );
@@ -123,7 +137,10 @@
         : $t(i18nKeys.console.deployments.selectProjectFirst)),
   );
   const selectedResourceFilterLabel = $derived(
-    selectedResource?.name ?? $t(i18nKeys.console.deployments.filterAllResources),
+    selectedResource?.name ??
+      (selectedProject
+        ? $t(i18nKeys.console.deployments.filterAllResources)
+        : $t(i18nKeys.console.deployments.selectProjectFirst)),
   );
   const selectedStatusFilterLabel = $derived(
     statusFilter === "all" ? $t(i18nKeys.console.deployments.filterAllStatuses) : statusLabel(statusFilter),
@@ -133,6 +150,20 @@
     if (requestedProjectId === loadedRequestedProjectId) return;
     projectFilter = requestedProjectId || "all";
     loadedRequestedProjectId = requestedProjectId;
+  });
+
+  $effect(() => {
+    const nextSignature = [projectFilter, environmentFilter, resourceFilter, statusFilter].join("|");
+    if (nextSignature !== deploymentFilterSignature) {
+      deploymentOffset = 0;
+      deploymentFilterSignature = nextSignature;
+    }
+  });
+
+  $effect(() => {
+    if (deploymentOffset >= deploymentTotal && deploymentTotal > 0) {
+      deploymentOffset = Math.max(0, Math.floor((deploymentTotal - 1) / deploymentPageSize) * deploymentPageSize);
+    }
   });
 
   $effect(() => {
@@ -153,6 +184,14 @@
 
   function statusLabel(status: string): string {
     return status;
+  }
+
+  function setDeploymentPage(offset: number): void {
+    const maxOffset =
+      deploymentTotal === 0
+        ? 0
+        : Math.floor((deploymentTotal - 1) / deploymentPageSize) * deploymentPageSize;
+    deploymentOffset = Math.min(Math.max(offset, 0), maxOffset);
   }
 </script>
 
@@ -278,98 +317,74 @@
         </article>
       </section>
 
-      <section class="console-panel p-4" data-deployments-feed-display-surface>
-        <div class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-          <div class="max-w-2xl">
-            <div class="flex items-center gap-2">
-              <Filter class="size-4 text-muted-foreground" />
-              <h2 class="text-lg font-semibold">{$t(i18nKeys.console.deployments.filtersTitle)}</h2>
-            </div>
-            <p class="mt-1 text-sm text-muted-foreground">
-              {$t(i18nKeys.console.deployments.filtersDescription)}
-            </p>
-          </div>
-          <div class="grid w-full min-w-0 gap-2 sm:grid-cols-2 xl:w-auto xl:grid-cols-4">
-            <label class="space-y-1.5 text-sm font-medium">
-              {$t(i18nKeys.common.domain.project)}
-              <Select.Root bind:value={projectFilter} type="single">
-                <Select.Trigger class="w-full min-w-0 xl:w-44">
-                  {selectedProjectFilterLabel}
-                </Select.Trigger>
-                <Select.Content>
-                  <Select.Item value="all">
-                    {$t(i18nKeys.console.deployments.allProjects)}
-                  </Select.Item>
-                {#each projects as project (project.id)}
-                    <Select.Item value={project.id}>{project.name}</Select.Item>
-                {/each}
-                </Select.Content>
-              </Select.Root>
-            </label>
-            <label class="space-y-1.5 text-sm font-medium">
-              {$t(i18nKeys.common.domain.environment)}
-              <Select.Root bind:value={environmentFilter} disabled={!selectedProject} type="single">
-                <Select.Trigger class="w-full min-w-0 xl:w-44">
-                  {selectedEnvironmentFilterLabel}
-                </Select.Trigger>
-                <Select.Content>
-                  <Select.Item value="all">
-                    {$t(i18nKeys.console.deployments.filterAllEnvironments)}
-                  </Select.Item>
-                {#each filteredEnvironments as environment (environment.id)}
-                    <Select.Item value={environment.id}>{environment.name}</Select.Item>
-                {/each}
-                </Select.Content>
-              </Select.Root>
-            </label>
-            <label class="space-y-1.5 text-sm font-medium">
-              {$t(i18nKeys.common.domain.resource)}
-              <Select.Root bind:value={resourceFilter} type="single">
-                <Select.Trigger class="w-full min-w-0 xl:w-44">
-                  {selectedResourceFilterLabel}
-                </Select.Trigger>
-                <Select.Content>
-                  <Select.Item value="all">
-                    {$t(i18nKeys.console.deployments.filterAllResources)}
-                  </Select.Item>
-                {#each filteredResourcesForProject as resource (resource.id)}
-                    <Select.Item value={resource.id}>{resource.name}</Select.Item>
-                {/each}
-                </Select.Content>
-              </Select.Root>
-            </label>
-            <label class="space-y-1.5 text-sm font-medium">
-              {$t(i18nKeys.common.domain.status)}
-              <Select.Root bind:value={statusFilter} type="single">
-                <Select.Trigger class="w-full min-w-0 xl:w-44">
-                  {selectedStatusFilterLabel}
-                </Select.Trigger>
-                <Select.Content>
-                  <Select.Item value="all">
-                    {$t(i18nKeys.console.deployments.filterAllStatuses)}
-                  </Select.Item>
-                {#each deploymentStatuses as status (status)}
-                    <Select.Item value={status}>{statusLabel(status)}</Select.Item>
-                {/each}
-                </Select.Content>
-              </Select.Root>
-            </label>
-          </div>
-        </div>
-        <div class="mt-4 flex flex-wrap gap-2">
-          {#if selectedProject}
-            <Badge variant="secondary">{selectedProject.name}</Badge>
-          {/if}
-          {#if selectedEnvironment}
-            <Badge variant="secondary">{selectedEnvironment.name}</Badge>
-          {/if}
-          {#if selectedResource}
-            <Badge variant="secondary">{selectedResource.name}</Badge>
-          {/if}
-          {#if statusFilter !== "all"}
-            <Badge variant="outline">{statusFilter}</Badge>
-          {/if}
-        </div>
+      <section
+        class="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4"
+        data-deployments-feed-display-surface
+      >
+        <label class="min-w-0 space-y-1.5 text-sm font-medium">
+          {$t(i18nKeys.common.domain.project)}
+          <Select.Root bind:value={projectFilter} type="single">
+            <Select.Trigger class="w-full min-w-0">
+              {selectedProjectFilterLabel}
+            </Select.Trigger>
+            <Select.Content>
+              <Select.Item value="all">
+                {$t(i18nKeys.console.deployments.allProjects)}
+              </Select.Item>
+              {#each projects as project (project.id)}
+                <Select.Item value={project.id}>{project.name}</Select.Item>
+              {/each}
+            </Select.Content>
+          </Select.Root>
+        </label>
+        <label class="min-w-0 space-y-1.5 text-sm font-medium">
+          {$t(i18nKeys.common.domain.environment)}
+          <Select.Root bind:value={environmentFilter} disabled={!selectedProject} type="single">
+            <Select.Trigger class="w-full min-w-0">
+              {selectedEnvironmentFilterLabel}
+            </Select.Trigger>
+            <Select.Content>
+              <Select.Item value="all">
+                {$t(i18nKeys.console.deployments.filterAllEnvironments)}
+              </Select.Item>
+              {#each filteredEnvironments as environment (environment.id)}
+                <Select.Item value={environment.id}>{environment.name}</Select.Item>
+              {/each}
+            </Select.Content>
+          </Select.Root>
+        </label>
+        <label class="min-w-0 space-y-1.5 text-sm font-medium">
+          {$t(i18nKeys.common.domain.resource)}
+          <Select.Root bind:value={resourceFilter} disabled={!selectedProject} type="single">
+            <Select.Trigger class="w-full min-w-0">
+              {selectedResourceFilterLabel}
+            </Select.Trigger>
+            <Select.Content>
+              <Select.Item value="all">
+                {$t(i18nKeys.console.deployments.filterAllResources)}
+              </Select.Item>
+              {#each filteredResourcesForProject as resource (resource.id)}
+                <Select.Item value={resource.id}>{resource.name}</Select.Item>
+              {/each}
+            </Select.Content>
+          </Select.Root>
+        </label>
+        <label class="min-w-0 space-y-1.5 text-sm font-medium">
+          {$t(i18nKeys.common.domain.status)}
+          <Select.Root bind:value={statusFilter} type="single">
+            <Select.Trigger class="w-full min-w-0">
+              {selectedStatusFilterLabel}
+            </Select.Trigger>
+            <Select.Content>
+              <Select.Item value="all">
+                {$t(i18nKeys.console.deployments.filterAllStatuses)}
+              </Select.Item>
+              {#each deploymentStatuses as status (status)}
+                <Select.Item value={status}>{statusLabel(status)}</Select.Item>
+              {/each}
+            </Select.Content>
+          </Select.Root>
+        </label>
       </section>
 
       <section class="space-y-3">
@@ -380,9 +395,45 @@
               {$t(i18nKeys.console.deployments.listDescription)}
             </p>
           </div>
+          {#if visibleDeployments.length > 0}
+            <div
+              class="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
+              data-deployment-pagination
+            >
+              <span>
+                {$t(i18nKeys.console.deployments.listRange, {
+                  start: deploymentPageStart,
+                  end: deploymentPageEnd,
+                  total: deploymentTotal,
+                })}
+              </span>
+              <div class="flex items-center gap-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  aria-label={$t(i18nKeys.common.actions.previous)}
+                  disabled={!canGoPrevious}
+                  onclick={() => setDeploymentPage(deploymentOffset - deploymentPageSize)}
+                >
+                  <ChevronLeft class="size-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  aria-label={$t(i18nKeys.common.actions.next)}
+                  disabled={!canGoNext}
+                  onclick={() => setDeploymentPage(deploymentOffset + deploymentPageSize)}
+                >
+                  <ChevronRight class="size-4" />
+                </Button>
+              </div>
+            </div>
+          {/if}
         </div>
         {#if visibleDeployments.length > 0}
-          <DeploymentTable deployments={visibleDeployments} {projects} {environments} {resources} />
+          <DeploymentTable deployments={paginatedDeployments} {projects} {environments} {resources} />
         {:else}
           <div class="console-subtle-panel px-4 py-6 text-sm text-muted-foreground">
             {$t(i18nKeys.console.deployments.noFilteredDeployments)}

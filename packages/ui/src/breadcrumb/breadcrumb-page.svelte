@@ -19,7 +19,10 @@
   role="link"
   aria-disabled="true"
   aria-current="page"
-  class={cn("text-foreground font-normal", className)}
+  class={cn(
+    "inline-flex h-8 min-w-0 items-center rounded-md px-2 font-normal text-foreground",
+    className,
+  )}
   {...restProps}
 >
   {@render children?.()}

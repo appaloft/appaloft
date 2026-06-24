@@ -1013,6 +1013,7 @@ export interface DomainRouteBindingCandidate {
   id: string;
   domainName: string;
   pathPrefix: string;
+  pathHandling?: "preserve" | "strip";
   proxyKind: EdgeProxyKind;
   tlsMode: TlsMode;
   redirectTo?: string;
@@ -1045,6 +1046,7 @@ export interface ServerAppliedRouteDesiredStateTarget {
 export interface ServerAppliedRouteDesiredStateDomain {
   host: string;
   pathPrefix: string;
+  pathHandling?: "preserve" | "strip";
   tlsMode: TlsMode;
   redirectTo?: string;
   redirectStatus?: 301 | 302 | 307 | 308;
@@ -2521,6 +2523,7 @@ export interface EdgeProxyRouteInput {
   proxyKind: EdgeProxyKind;
   domains: string[];
   pathPrefix: string;
+  pathHandling?: "preserve" | "strip";
   tlsMode: TlsMode;
   targetPort?: number;
   providerKey?: string;
@@ -2601,6 +2604,7 @@ export interface ProxyConfigurationRouteView {
   scheme: "http" | "https";
   url: string;
   pathPrefix: string;
+  pathHandling?: "preserve" | "strip";
   tlsMode: TlsMode;
   targetPort?: number;
   source: "generated-default" | "domain-binding" | "deployment-snapshot" | "server-applied";
@@ -3590,6 +3594,45 @@ export interface ShowDependencyResourceResult {
   generatedAt: string;
 }
 
+export interface InspectDependencyResourceResult {
+  schemaVersion: "dependency-resources.inspect/v1";
+  dependencyResourceId: string;
+  kind: DependencyResourceKind;
+  providerKey: string;
+  providerManaged: boolean;
+  sourceMode: DependencyResourceSourceMode;
+  lifecycleStatus: DependencyResourceLifecycleStatus;
+  connection?: DependencyResourceConnectionSummary;
+  providerRealization?: DependencyResourceProviderRealizationSummary;
+  desiredCapabilities: DependencyResourceCapabilityRequirement[];
+  capabilityReadbacks: DependencyResourceCapabilityReadback[];
+  safeQuery: {
+    status: "supported" | "not-supported" | "not-configured";
+    allowedFamilies: string[];
+    maxRows: number;
+    timeoutMs: number;
+  };
+  generatedAt: string;
+}
+
+export interface DependencyResourceSafeQueryColumn {
+  name: string;
+  type?: string;
+}
+
+export interface DependencyResourceSafeQueryResult {
+  schemaVersion: "dependency-resources.query/v1";
+  dependencyResourceId: string;
+  kind: DependencyResourceKind;
+  providerKey: string;
+  statement: string;
+  columns: DependencyResourceSafeQueryColumn[];
+  rows: Record<string, string | number | boolean | null>[];
+  rowCount: number;
+  truncated: boolean;
+  executedAt: string;
+}
+
 export interface DependencyResourceRestoreAttemptSummary {
   attemptId: string;
   status: "pending" | "completed" | "failed";
@@ -4409,7 +4452,7 @@ export type TerminalSessionTargetScope =
       resource: ResourceSummary;
       deployment: DeploymentSummary;
       server: ServerSummary;
-      workingDirectory: string;
+      workingDirectory?: string;
     };
 
 export interface TerminalSessionOpenRequest {
@@ -6279,6 +6322,7 @@ export interface DomainBindingSummary {
   destinationId?: string;
   domainName: string;
   pathPrefix: string;
+  pathHandling?: "preserve" | "strip";
   proxyKind: EdgeProxyKind;
   tlsMode: TlsMode;
   redirectTo?: string;
@@ -6539,7 +6583,14 @@ export interface AuditEventGlobalExportInput {
   to: string;
   aggregateId?: string;
   eventType?: string;
+  organizationId?: string;
+  projectId?: string;
+  action?: string | readonly string[];
+  resourceType?: string | readonly string[];
+  actorId?: string | readonly string[];
   limit?: number;
+  cursor?: string;
+  order?: "asc" | "desc";
 }
 
 export interface AuditEventSummary {
@@ -6577,6 +6628,7 @@ export interface AuditEventShowResult {
 export interface AuditEventExportPage {
   items: AuditEventDetail[];
   truncated: boolean;
+  nextCursor?: string;
 }
 
 export interface AuditEventExportResult extends AuditEventExportPage {
@@ -6599,7 +6651,14 @@ export interface AuditEventGlobalExportResult extends AuditEventExportPage {
     to: string;
     aggregateId?: string;
     eventType?: string;
+    organizationId?: string;
+    projectId?: string;
+    action?: string | readonly string[];
+    resourceType?: string | readonly string[];
+    actorId?: string | readonly string[];
     limit: number;
+    cursor?: string;
+    order: "asc" | "desc";
   };
   itemCount: number;
   generatedAt: string;
@@ -6893,6 +6952,41 @@ export interface AuditEventRecordInput {
   eventType: string;
   payload: Record<string, AuditEventPayloadValue>;
   createdAt: string;
+}
+
+export type OperationAuditResult = "failure" | "success";
+
+export interface OperationAuditActorRef {
+  kind: "deploy-token" | "system" | "user" | "unknown";
+  id?: string;
+  label?: string;
+}
+
+export interface OperationAuditTargetRef {
+  resourceType: string;
+  resourceId: string;
+}
+
+export interface OperationAuditRecordInput {
+  operationKey: string;
+  operationName: string;
+  domain: string;
+  action: string;
+  result: OperationAuditResult;
+  organizationId?: string;
+  actor?: OperationAuditActorRef;
+  primaryTarget?: OperationAuditTargetRef;
+  relatedTargets?: readonly OperationAuditTargetRef[];
+  occurredAt?: string;
+  errorReason?: string;
+  metadata?: Record<string, AuditEventPayloadValue>;
+}
+
+export interface OperationAuditSink {
+  recordOperation(
+    context: ExecutionContext,
+    input: OperationAuditRecordInput,
+  ): Promise<Result<void>>;
 }
 
 export interface IngestSourceEventResult {
@@ -8705,6 +8799,13 @@ export interface PreviewPolicyDecisionReadModel {
       sourceEventId: string;
     },
   ): Promise<PreviewPolicyDecisionProjection | null>;
+  findLatestForPreviewEnvironment(
+    context: RepositoryContext,
+    input: {
+      previewEnvironmentId: string;
+      resourceId?: string;
+    },
+  ): Promise<PreviewPolicyDecisionProjection | null>;
 }
 
 export interface ProjectReadModel {
@@ -8788,6 +8889,7 @@ export interface ResourceReadModel {
       projectId?: string;
       environmentId?: string;
       includePreviewResources?: boolean;
+      lifecycleStatus?: "active" | "archived" | "all";
     },
   ): Promise<number>;
   list(
@@ -8796,6 +8898,7 @@ export interface ResourceReadModel {
       projectId?: string;
       environmentId?: string;
       includePreviewResources?: boolean;
+      lifecycleStatus?: "active" | "archived" | "all";
       limit?: number;
     },
   ): Promise<ResourceSummary[]>;
@@ -8853,6 +8956,20 @@ export interface DependencyResourceReadModel {
     context: RepositoryContext,
     spec: ResourceInstanceSelectionSpec,
   ): Promise<DependencyResourceSummary | null>;
+}
+
+export interface DependencyResourceSafeQueryInput {
+  dependencyResource: DependencyResourceSummary;
+  statement: string;
+  maxRows: number;
+  timeoutMs: number;
+}
+
+export interface DependencyResourceSafeQueryPort {
+  execute(
+    context: ExecutionContext,
+    input: DependencyResourceSafeQueryInput,
+  ): Promise<Result<Omit<DependencyResourceSafeQueryResult, "schemaVersion">, DomainError>>;
 }
 
 export interface DependencyResourceBackupReadModel {
@@ -9115,6 +9232,7 @@ export interface DeploymentReadModel {
       projectId?: string;
       resourceId?: string;
       includeArchived?: boolean;
+      activeResourcesOnly?: boolean;
       status?: DeploymentStatus;
       statuses?: readonly DeploymentStatus[];
     },
@@ -9125,6 +9243,7 @@ export interface DeploymentReadModel {
       projectId?: string;
       resourceId?: string;
       includeArchived?: boolean;
+      activeResourcesOnly?: boolean;
       limit?: number;
     },
   ): Promise<DeploymentSummary[]>;
@@ -9178,6 +9297,7 @@ export interface RequestedAccessRouteConfig {
   proxyKind: EdgeProxyKind;
   domains: string[];
   pathPrefix: string;
+  pathHandling?: "preserve" | "strip";
   tlsMode: TlsMode;
   routeBehavior?: "serve" | "redirect";
   redirectTo?: string;
@@ -9207,6 +9327,7 @@ export interface RequestedDeploymentConfig {
   proxyKind?: EdgeProxyKind;
   domains?: string[];
   pathPrefix?: string;
+  pathHandling?: "preserve" | "strip";
   tlsMode?: TlsMode;
   accessRoutes?: RequestedAccessRouteConfig[];
   storageMounts?: RequestedDeploymentStorageMount[];

@@ -31,6 +31,7 @@ export class CountDeploymentsQuery extends Query<{ count: number }> {
     public readonly projectId?: string,
     public readonly resourceId?: string,
     public readonly includeArchived = false,
+    public readonly activeResourcesOnly = false,
     public readonly status?: CountDeploymentsQueryInput["status"],
     public readonly statuses?: readonly NonNullable<CountDeploymentsQueryInput["status"]>[],
   ) {
@@ -44,6 +45,7 @@ export class CountDeploymentsQuery extends Query<{ count: number }> {
           trimToUndefined(parsed.projectId),
           trimToUndefined(parsed.resourceId),
           parsed.includeArchived,
+          parsed.activeResourcesOnly,
           parsed.status,
           parsed.statuses,
         ),

@@ -5,14 +5,31 @@
   import {
     Activity,
     AlertTriangle,
+    Archive,
     ArrowUpRight,
+    Box,
     CheckCircle2,
     CircleDashed,
     CreditCard,
+    Database,
+    FolderPlus,
     FileText,
+    Globe2,
+    HardDrive,
+    Layers3,
+    Pencil,
     PlugZap,
+    PlusCircle,
+    RefreshCcw,
+    Rocket,
     Search,
+    Server,
+    SlidersHorizontal,
+    Trash2,
+    Undo2,
+    UploadCloud,
     WalletCards,
+    XCircle,
   } from "@lucide/svelte";
   import { createQuery, queryOptions } from "@tanstack/svelte-query";
   import type { Component } from "svelte";
@@ -23,6 +40,7 @@
   import * as Card from "$lib/components/ui/card";
   import * as Dialog from "$lib/components/ui/dialog";
   import { Skeleton } from "$lib/components/ui/skeleton";
+  import ConsoleTableFilterSelect from "$lib/components/console/ConsoleTableFilterSelect.svelte";
   import {
     findConsolePageExtensionByPath,
     readConsolePageExtensionMetadata,
@@ -32,6 +50,7 @@
     systemPluginExtensionDescription,
     systemPluginExtensionTitle,
   } from "$lib/console/web-extension-presentation";
+  import { cn } from "$lib/utils";
   import ConsoleResourceCanvas from "$lib/components/console/ConsoleResourceCanvas.svelte";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import SettingsShell from "$lib/components/console/SettingsShell.svelte";
@@ -176,11 +195,54 @@
     disabled?: boolean;
     disabledReason?: string;
     redirectUrlField?: string;
+    autoRun?: boolean;
   };
+
+  type ConsolePageDateTimeValue = {
+    kind: "datetime";
+    value: string;
+    format?: "short" | "date-time";
+  };
+
+  type ConsolePageActorValue = {
+    kind: "actor";
+    label: string;
+    description?: string;
+    initials?: string;
+  };
+
+  type ConsolePageBadgeValue = {
+    kind: "badge";
+    label: string;
+    tone?: ConsolePageTone;
+  };
+
+  type ConsolePageLinkValue = {
+    kind: "link";
+    label: string;
+    href: string;
+    description?: string;
+  };
+
+  type ConsolePageIconLabelValue = {
+    kind: "icon-label";
+    label: string;
+    icon?: ConsolePageIcon;
+    tone?: ConsolePageTone;
+  };
+
+  type ConsolePageDisplayValue =
+    | string
+    | number
+    | ConsolePageDateTimeValue
+    | ConsolePageActorValue
+    | ConsolePageBadgeValue
+    | ConsolePageLinkValue
+    | ConsolePageIconLabelValue;
 
   type ConsolePageKeyValue = {
     label: string;
-    value: string;
+    value: ConsolePageDisplayValue;
     tone?: ConsolePageTone;
     calculation?: ConsolePageRowCalculation;
   };
@@ -214,7 +276,7 @@
 
   type ConsolePageTableSection = {
     kind: "table";
-    title: string;
+    title?: string;
     description?: string;
     columns: ConsolePageTableColumn[];
     rows: ConsolePageTableRow[];
@@ -234,6 +296,7 @@
 
   type ConsolePageTableFilterGroup = {
     label: string;
+    type?: "buttons" | "multi-select";
     items: ConsolePageFilterLink[];
   };
 
@@ -241,6 +304,7 @@
     label: string;
     href: string;
     active?: boolean;
+    icon?: ConsolePageIcon;
   };
 
   type ConsolePageTableColumn = {
@@ -250,22 +314,24 @@
   };
 
   type ConsolePageTableCell = {
-    text: string;
+    text: ConsolePageDisplayValue;
     tone?: ConsolePageTone;
   };
 
   type ConsolePageTableDetails = {
     label: string;
+    href?: string;
     title: string;
     description?: string;
     rows: ConsolePageKeyValue[];
   };
 
-  type ConsolePageTableCellValue = string | number | ConsolePageTableCell;
+  type ConsolePageTableCellValue = ConsolePageDisplayValue | ConsolePageTableCell;
   type ConsolePageTableRow = {
+    key?: string;
+    cells?: Record<string, ConsolePageTableCellValue>;
     details?: ConsolePageTableDetails;
-    [key: string]: ConsolePageTableCellValue | ConsolePageTableDetails | undefined;
-  };
+  } & Record<string, unknown>;
 
   type ConsolePageCalloutSection = {
     kind: "callouts";
@@ -279,16 +345,53 @@
   };
 
   type ConsolePageTone = "default" | "muted" | "positive" | "warning" | "danger";
-  type ConsolePageIcon = "activity" | "card" | "file" | "wallet";
+  type ConsolePageIcon =
+    | "activity"
+    | "archive"
+    | "box"
+    | "card"
+    | "check"
+    | "database"
+    | "file"
+    | "folder-plus"
+    | "globe"
+    | "hard-drive"
+    | "layers"
+    | "pencil"
+    | "plug"
+    | "plus"
+    | "refresh"
+    | "rocket"
+    | "server"
+    | "sliders"
+    | "trash"
+    | "undo"
+    | "upload"
+    | "wallet"
+    | "x";
 
   type SystemPluginWebExtensionsResponse = {
     items: SystemPluginWebExtension[];
   };
   type Props = {
     settingsScope?: "organization" | "instance" | null;
+    embedded?: boolean;
+    projectId?: string;
+    environmentId?: string;
+    resourceId?: string;
+    deploymentId?: string;
+    previewEnvironmentId?: string;
   };
 
-  let { settingsScope = null }: Props = $props();
+  let {
+    settingsScope = null,
+    embedded = false,
+    projectId = "",
+    environmentId = "",
+    resourceId = "",
+    deploymentId = "",
+    previewEnvironmentId = "",
+  }: Props = $props();
   let pendingActionKey = $state<string | null>(null);
   let actionErrorMessage = $state("");
   let panelFieldValues = $state<Record<string, number>>({});
@@ -298,6 +401,7 @@
   let integrationDetailsOpen = $state(false);
   let selectedTableDetails = $state<ConsolePageTableDetails | null>(null);
   let tableDetailsOpen = $state(false);
+  let autoRunActionKey = $state<string | null>(null);
 
   const webExtensionsQuery = createQuery(() =>
     queryOptions({
@@ -327,6 +431,11 @@
       pathname,
       query: page.url.searchParams.toString(),
       organization: currentOrganization,
+      projectId,
+      environmentId,
+      resourceId,
+      deploymentId,
+      previewEnvironmentId,
     }),
   );
   const pageDocumentQuery = createQuery(() =>
@@ -365,10 +474,40 @@
           : "",
   );
 
+  $effect(() => {
+    if (!browser || !pageDocument || loading) return;
+    const entry = findAutoRunRequestAction(pageDocument);
+    if (!entry) return;
+
+    const actionKey = requestActionKey(entry.action, entry.item);
+    if (autoRunActionKey === actionKey || pendingActionKey === actionKey) return;
+    autoRunActionKey = actionKey;
+    void runRequestAction(entry.action, entry.item);
+  });
+
   function iconComponent(icon: ConsolePageIcon | undefined): Component {
     if (icon === "activity") return Activity;
+    if (icon === "archive") return Archive;
+    if (icon === "box") return Box;
     if (icon === "card") return CreditCard;
+    if (icon === "check") return CheckCircle2;
+    if (icon === "database") return Database;
     if (icon === "file") return FileText;
+    if (icon === "folder-plus") return FolderPlus;
+    if (icon === "globe") return Globe2;
+    if (icon === "hard-drive") return HardDrive;
+    if (icon === "layers") return Layers3;
+    if (icon === "pencil") return Pencil;
+    if (icon === "plug") return PlugZap;
+    if (icon === "plus") return PlusCircle;
+    if (icon === "refresh") return RefreshCcw;
+    if (icon === "rocket") return Rocket;
+    if (icon === "server") return Server;
+    if (icon === "sliders") return SlidersHorizontal;
+    if (icon === "trash") return Trash2;
+    if (icon === "undo") return Undo2;
+    if (icon === "upload") return UploadCloud;
+    if (icon === "x") return XCircle;
     return WalletCards;
   }
 
@@ -396,12 +535,132 @@
   }
 
   function readTableCell(row: ConsolePageTableRow, key: string): ConsolePageTableCell {
-    const value = row[key];
-    if (value && typeof value === "object" && "text" in value) {
+    const value = row.cells?.[key] ?? row[key];
+    if (isConsolePageTableCell(value)) {
       return value;
+    }
+    if (isConsolePageDateTimeValue(value)) {
+      return { text: value };
+    }
+    if (isConsolePageDisplayValue(value)) {
+      return { text: value };
     }
 
     return { text: String(value ?? "") };
+  }
+
+  function isConsolePageTableCell(value: unknown): value is ConsolePageTableCell {
+    return Boolean(value && typeof value === "object" && "text" in value);
+  }
+
+  function isConsolePageDateTimeValue(value: unknown): value is ConsolePageDateTimeValue {
+    return Boolean(value && typeof value === "object" && "kind" in value && value.kind === "datetime");
+  }
+
+  function isConsolePageDisplayValue(value: unknown): value is ConsolePageDisplayValue {
+    return (
+      typeof value === "string" ||
+      typeof value === "number" ||
+      isConsolePageDateTimeValue(value) ||
+      Boolean(
+        value &&
+          typeof value === "object" &&
+          "kind" in value &&
+          (value.kind === "actor" ||
+            value.kind === "badge" ||
+            value.kind === "icon-label" ||
+            value.kind === "link"),
+      )
+    );
+  }
+
+  function isConsolePageActorValue(value: ConsolePageDisplayValue): value is ConsolePageActorValue {
+    return Boolean(value && typeof value === "object" && "kind" in value && value.kind === "actor");
+  }
+
+  function isConsolePageBadgeValue(value: ConsolePageDisplayValue): value is ConsolePageBadgeValue {
+    return Boolean(value && typeof value === "object" && "kind" in value && value.kind === "badge");
+  }
+
+  function isConsolePageLinkValue(value: ConsolePageDisplayValue): value is ConsolePageLinkValue {
+    return Boolean(value && typeof value === "object" && "kind" in value && value.kind === "link");
+  }
+
+  function isConsolePageIconLabelValue(
+    value: ConsolePageDisplayValue,
+  ): value is ConsolePageIconLabelValue {
+    return Boolean(
+      value && typeof value === "object" && "kind" in value && value.kind === "icon-label",
+    );
+  }
+
+  function formatConsoleDateTime(value: ConsolePageDateTimeValue): string {
+    const date = new Date(value.value);
+    if (!Number.isFinite(date.getTime())) {
+      return value.value;
+    }
+
+    const options: Intl.DateTimeFormatOptions =
+      value.format === "date-time"
+        ? {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          }
+        : {
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          };
+
+    return new Intl.DateTimeFormat($locale || undefined, options).format(date);
+  }
+
+  function displayValueText(value: ConsolePageDisplayValue): string {
+    if (value && typeof value === "object" && value.kind === "datetime") {
+      return formatConsoleDateTime(value);
+    }
+    if (value && typeof value === "object" && "label" in value) {
+      return value.label;
+    }
+
+    return String(value);
+  }
+
+  function badgeClass(tone: ConsolePageTone | undefined): string {
+    if (tone === "positive") {
+      return "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-300";
+    }
+    if (tone === "warning") {
+      return "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-300";
+    }
+    if (tone === "danger") {
+      return "border-destructive/30 bg-destructive/5 text-destructive";
+    }
+    if (tone === "muted") {
+      return "border-border bg-muted/60 text-muted-foreground";
+    }
+    return "border-border bg-background text-foreground";
+  }
+
+  function actorInitials(actor: ConsolePageActorValue): string {
+    if (actor.initials?.trim()) {
+      return actor.initials.trim().slice(0, 3).toUpperCase();
+    }
+    const words = actor.label
+      .split(/[\s@._-]+/)
+      .map((word) => word.trim())
+      .filter(Boolean);
+    return (
+      words
+        .slice(0, 2)
+        .map((word) => word[0]?.toUpperCase() ?? "")
+        .join("") || "AP"
+    );
   }
 
   function openTableDetails(details: ConsolePageTableDetails | undefined): void {
@@ -560,24 +819,24 @@
 
   function panelRowValue(item: ConsolePagePanelItem, row: ConsolePageKeyValue): string {
     const calculation = row.calculation;
-    if (!calculation) return row.value;
+    if (!calculation) return displayValueText(row.value);
     if (calculation.kind === "field-money") {
       const fieldValue = panelFieldValueByName(item, calculation.field);
       return fieldValue === null
-        ? row.value
+        ? displayValueText(row.value)
         : formatConsoleMoney(fieldValue, calculation.currency, fieldValue % 100 === 0 ? 0 : 2);
     }
     if (calculation.kind === "tiered-multiple") {
       const calculated = calculatedTieredValue(item, calculation);
-      return calculated ? String(calculated.units) : row.value;
+      return calculated ? String(calculated.units) : displayValueText(row.value);
     }
     if (calculation.kind === "tiered-unit-rate") {
       const calculated = calculatedTieredValue(item, calculation);
       return calculated
         ? `${formatConsoleUnitRate(calculated.fieldValue, calculated.units, calculation.currency)}${calculation.suffix ?? ""}`
-        : row.value;
+        : displayValueText(row.value);
     }
-    return row.value;
+    return displayValueText(row.value);
   }
 
   function requestActionBody(
@@ -593,6 +852,21 @@
       }
     }
     return body;
+  }
+
+  function findAutoRunRequestAction(
+    document: ConsolePageDocument,
+  ): { action: ConsolePageRequestAction; item: ConsolePagePanelItem } | null {
+    for (const section of document.sections) {
+      if (section.kind !== "panel-grid" && section.kind !== "dialog-panel-grid") continue;
+      for (const item of section.items) {
+        const action = item.actions?.find((candidate) => candidate.autoRun);
+        if (action && !action.disabled) {
+          return { action, item };
+        }
+      }
+    }
+    return null;
   }
 
   async function runRequestAction(
@@ -745,7 +1019,7 @@
 </svelte:head>
 
 {#snippet content()}
-  <ConsoleResourceCanvas class="max-w-6xl">
+  <ConsoleResourceCanvas class={embedded ? "max-w-none p-0" : "max-w-7xl"}>
     {#if loading}
       <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {#each Array.from({ length: 4 }) as _}
@@ -772,35 +1046,37 @@
         </section>
       {/if}
 
-      <section class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div class="min-w-0 max-w-2xl space-y-2">
-          <h1 class="truncate text-2xl font-semibold">{pageDocument.title}</h1>
-          {#if pageDocument.description}
-            <p class="text-sm leading-6 text-muted-foreground">{pageDocument.description}</p>
-          {/if}
-          {#if pageDocument.badge}
-            <Badge variant="outline">{pageDocument.badge}</Badge>
-          {/if}
-        </div>
-        {#if pageDocument.actions?.length}
-          <div class="flex shrink-0 flex-wrap gap-2">
-            {#each pageDocument.actions as action (action.href)}
-              <Button
-                href={action.href}
-                target={action.external ? "_blank" : undefined}
-                rel={action.external ? "noreferrer" : undefined}
-                variant={action.variant === "primary" ? "default" : "outline"}
-                size="sm"
-              >
-                {action.label}
-                {#if action.external}
-                  <ArrowUpRight class="size-4" />
-                {/if}
-              </Button>
-            {/each}
+      {#if !embedded}
+        <section class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div class="min-w-0 max-w-2xl space-y-2">
+            <h1 class="truncate text-2xl font-semibold">{pageDocument.title}</h1>
+            {#if pageDocument.description}
+              <p class="text-sm leading-6 text-muted-foreground">{pageDocument.description}</p>
+            {/if}
+            {#if pageDocument.badge}
+              <Badge variant="outline">{pageDocument.badge}</Badge>
+            {/if}
           </div>
-        {/if}
-      </section>
+          {#if pageDocument.actions?.length}
+            <div class="flex shrink-0 flex-wrap gap-2">
+              {#each pageDocument.actions as action (action.href)}
+                <Button
+                  href={action.href}
+                  target={action.external ? "_blank" : undefined}
+                  rel={action.external ? "noreferrer" : undefined}
+                  variant={action.variant === "primary" ? "default" : "outline"}
+                  size="sm"
+                >
+                  {action.label}
+                  {#if action.external}
+                    <ArrowUpRight class="size-4" />
+                  {/if}
+                </Button>
+              {/each}
+            </div>
+          {/if}
+        </section>
+      {/if}
 
       {#each pageDocument.sections as section, sectionIndex (`${section.kind}-${sectionIndex}`)}
         {#if section.kind === "summary-grid"}
@@ -1174,134 +1450,216 @@
             </Button>
           </section>
         {:else if section.kind === "table"}
-          <section class={["console-panel overflow-hidden", tableSectionClass(section)]}>
-            <div class="space-y-1 p-5">
-              <h2 class="text-lg font-semibold">{section.title}</h2>
-              {#if section.description}
-                <p class="text-sm text-muted-foreground">{section.description}</p>
+          <section
+            class={[
+              "space-y-4",
+              tableSectionClass(section),
+            ]}
+          >
+            <div class="space-y-3">
+              {#if section.title || section.description}
+                <div class="space-y-1">
+                  {#if section.title}
+                    <h2 class="text-lg font-semibold">{section.title}</h2>
+                  {/if}
+                  {#if section.description}
+                    <p class="text-sm text-muted-foreground">{section.description}</p>
+                  {/if}
+                </div>
               {/if}
               {#if section.filters?.length}
-                <div class="flex flex-wrap gap-3 pt-3">
+                <div class="flex flex-wrap gap-3">
                   {#each section.filters as filterGroup (filterGroup.label)}
-                    <div class="flex min-w-0 flex-wrap items-center gap-2">
+                    <div
+                      class="flex min-w-0 flex-wrap items-center gap-2"
+                      data-console-page-table-filter
+                    >
                       <span class="text-xs font-medium text-muted-foreground">
                         {filterGroup.label}
                       </span>
-                      <div class="flex flex-wrap gap-1.5">
-                        {#each filterGroup.items as filter (filter.href)}
-                          <Button
-                            type="button"
-                            variant={filter.active ? "default" : "outline"}
-                            size="sm"
-                            onclick={() => navigateConsolePageHref(filter.href)}
-                          >
-                            {filter.label}
-                          </Button>
-                        {/each}
-                      </div>
+                      {#if filterGroup.type === "multi-select"}
+                        <ConsoleTableFilterSelect {filterGroup} />
+                      {:else}
+                        <div class="flex flex-wrap gap-1.5">
+                          {#each filterGroup.items as filter (`${filter.label}:${filter.href}`)}
+                            <Button
+                              type="button"
+                              variant={filter.active ? "default" : "outline"}
+                              size="sm"
+                              onclick={() => navigateConsolePageHref(filter.href)}
+                            >
+                              {filter.label}
+                            </Button>
+                          {/each}
+                        </div>
+                      {/if}
                     </div>
                   {/each}
                 </div>
               {/if}
             </div>
-            {#if section.rows.length > 0}
-              <div class="overflow-x-auto border-t" data-console-page-table-body>
-                <table class="w-full min-w-[760px] text-sm" data-console-page-record-list>
-                  <thead class="bg-muted/40 text-xs font-medium text-muted-foreground">
-                    <tr>
-                      {#each section.columns as column (column.key)}
-                        <th
-                          scope="col"
-                          class={[
-                            "px-5 py-3 font-medium",
-                            column.align === "right" ? "text-right" : "text-left",
-                          ]}
-                        >
-                          {column.label}
-                        </th>
-                      {/each}
-                      <th scope="col" class="w-24 px-5 py-3 text-right font-medium"></th>
-                    </tr>
-                  </thead>
-                  <tbody class="divide-y">
-                    {#each section.rows as row, rowIndex (rowIndex)}
-                      <tr class="transition-colors hover:bg-muted/30" data-console-page-record-row>
+            <div class="console-panel overflow-hidden">
+              {#if section.rows.length > 0}
+                <div class="overflow-x-auto" data-console-page-table-body>
+                  <table class="w-full min-w-[760px] text-sm" data-console-page-record-list>
+                    <thead class="bg-muted/40 text-xs font-medium text-muted-foreground">
+                      <tr>
                         {#each section.columns as column (column.key)}
-                          {@const cell = readTableCell(row, column.key)}
-                          <td
+                          <th
+                            scope="col"
                             class={[
-                              "max-w-64 px-5 py-4 align-top",
-                              column.align === "right" ? "text-right tabular-nums" : "text-left",
+                              "px-5 py-3 font-medium",
+                              column.align === "right" ? "text-right" : "text-left",
                             ]}
                           >
-                            <span
-                              class={[
-                                "block truncate font-medium",
-                                toneClass(cell.tone),
-                              ]}
-                              title={cell.text}
-                            >
-                              {cell.text}
-                            </span>
-                          </td>
+                            {column.label}
+                          </th>
                         {/each}
-                        <td class="px-5 py-4 text-right align-top">
-                          {#if row.details}
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onclick={() => openTableDetails(row.details)}
-                            >
-                              {row.details.label}
-                            </Button>
-                          {/if}
-                        </td>
+                        <th scope="col" class="w-24 px-5 py-3 text-right font-medium"></th>
                       </tr>
-                    {/each}
-                  </tbody>
-                </table>
-              </div>
-            {:else}
-              <div class="border-t p-5 text-sm text-muted-foreground">
-                {section.emptyLabel ?? $t(i18nKeys.common.status.unknown)}
-              </div>
-            {/if}
-            {#if section.pagination}
-              <div class="flex flex-wrap items-center justify-between gap-3 border-t px-5 py-3">
-                <p class="text-sm text-muted-foreground">{section.pagination.label}</p>
-                <div class="flex items-center gap-2">
-                  {#if section.pagination.previousHref}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onclick={() => navigateConsolePageHref(section.pagination?.previousHref)}
-                    >
-                      {section.pagination.previousLabel}
-                    </Button>
-                  {:else}
-                    <Button variant="outline" size="sm" disabled>
-                      {section.pagination.previousLabel}
-                    </Button>
-                  {/if}
-                  {#if section.pagination.nextHref}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onclick={() => navigateConsolePageHref(section.pagination?.nextHref)}
-                    >
-                      {section.pagination.nextLabel}
-                    </Button>
-                  {:else}
-                    <Button variant="outline" size="sm" disabled>
-                      {section.pagination.nextLabel}
-                    </Button>
-                  {/if}
+                    </thead>
+                    <tbody class="divide-y">
+                      {#each section.rows as row, rowIndex (rowIndex)}
+                        <tr class="transition-colors hover:bg-muted/30" data-console-page-record-row>
+                          {#each section.columns as column (column.key)}
+                            {@const cell = readTableCell(row, column.key)}
+                            <td
+                              class={[
+                                "max-w-64 px-5 py-4 align-middle",
+                                column.align === "right" ? "text-right tabular-nums" : "text-left",
+                              ]}
+                            >
+                              {#if isConsolePageActorValue(cell.text)}
+                                <div
+                                  class="flex min-w-0 items-center gap-2"
+                                  title={displayValueText(cell.text)}
+                                >
+                                  <span
+                                    class="flex size-7 shrink-0 items-center justify-center rounded-full border bg-muted text-[11px] font-semibold text-muted-foreground"
+                                  >
+                                    {actorInitials(cell.text)}
+                                  </span>
+                                  <span
+                                    class={[
+                                      "inline-flex min-w-0 max-w-full items-center rounded-full border px-2 py-1 text-xs font-medium",
+                                      badgeClass(cell.tone ?? "muted"),
+                                    ]}
+                                  >
+                                    <span class="truncate">{cell.text.label}</span>
+                                  </span>
+                                </div>
+                              {:else if isConsolePageBadgeValue(cell.text)}
+                                <span
+                                  class={[
+                                    "inline-flex max-w-full items-center rounded-full border px-2 py-1 text-xs font-medium",
+                                    badgeClass(cell.text.tone ?? cell.tone),
+                                  ]}
+                                  title={displayValueText(cell.text)}
+                                >
+                                  <span class="truncate">{cell.text.label}</span>
+                                </span>
+                              {:else if isConsolePageLinkValue(cell.text)}
+                                <a
+                                  href={cell.text.href}
+                                  class={[
+                                    "inline-flex max-w-full items-center gap-1 truncate font-medium text-primary underline-offset-4 hover:underline",
+                                    toneClass(cell.tone),
+                                  ]}
+                                  title={displayValueText(cell.text)}
+                                >
+                                  <span class="truncate">{cell.text.label}</span>
+                                  <ArrowUpRight class="size-3 shrink-0" />
+                                </a>
+                              {:else if isConsolePageIconLabelValue(cell.text)}
+                                {@const Icon = iconComponent(cell.text.icon)}
+                                <span
+                                  class={[
+                                    "inline-flex max-w-full items-center gap-2 font-medium",
+                                    toneClass(cell.text.tone ?? cell.tone),
+                                  ]}
+                                  title={displayValueText(cell.text)}
+                                >
+                                  <span
+                                    class={[
+                                      "flex size-7 shrink-0 items-center justify-center rounded-full border",
+                                      badgeClass(cell.text.tone ?? cell.tone ?? "muted"),
+                                    ]}
+                                  >
+                                    <Icon class="size-3.5" />
+                                  </span>
+                                  <span class="truncate">{cell.text.label}</span>
+                                </span>
+                              {:else}
+                                <span
+                                  class={["block truncate font-medium", toneClass(cell.tone)]}
+                                  title={displayValueText(cell.text)}
+                                >
+                                  {displayValueText(cell.text)}
+                                </span>
+                              {/if}
+                            </td>
+                          {/each}
+                          <td class="px-5 py-4 text-right align-middle">
+                            {#if row.details}
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onclick={() =>
+                                  row.details?.href
+                                    ? navigateConsolePageHref(row.details.href)
+                                    : openTableDetails(row.details)}
+                              >
+                                {row.details.label}
+                              </Button>
+                            {/if}
+                          </td>
+                        </tr>
+                      {/each}
+                    </tbody>
+                  </table>
                 </div>
-              </div>
-            {/if}
+              {:else}
+                <div class="p-5 text-sm text-muted-foreground">
+                  {section.emptyLabel ?? $t(i18nKeys.common.status.unknown)}
+                </div>
+              {/if}
+              {#if section.pagination}
+                <div class="flex flex-wrap items-center justify-between gap-3 border-t px-5 py-3">
+                  <p class="text-sm text-muted-foreground">{section.pagination.label}</p>
+                  <div class="flex items-center gap-2">
+                    {#if section.pagination.previousHref}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onclick={() => navigateConsolePageHref(section.pagination?.previousHref)}
+                      >
+                        {section.pagination.previousLabel}
+                      </Button>
+                    {:else}
+                      <Button variant="outline" size="sm" disabled>
+                        {section.pagination.previousLabel}
+                      </Button>
+                    {/if}
+                    {#if section.pagination.nextHref}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onclick={() => navigateConsolePageHref(section.pagination?.nextHref)}
+                      >
+                        {section.pagination.nextLabel}
+                      </Button>
+                    {:else}
+                      <Button variant="outline" size="sm" disabled>
+                        {section.pagination.nextLabel}
+                      </Button>
+                    {/if}
+                  </div>
+                </div>
+              {/if}
+            </div>
           </section>
         {:else if section.kind === "callouts"}
           <section class="grid gap-3 md:grid-cols-3">
@@ -1365,7 +1723,9 @@
             {#each selectedIntegrationDetails.rows as row (row.label)}
               <div class="grid gap-1 px-4 py-3 text-sm sm:grid-cols-[12rem_1fr] sm:gap-4">
                 <dt class="text-muted-foreground">{row.label}</dt>
-                <dd class={["break-words font-medium", toneClass(row.tone)]}>{row.value}</dd>
+                <dd class={["break-words font-medium", toneClass(row.tone)]}>
+                  {displayValueText(row.value)}
+                </dd>
               </div>
             {/each}
           </dl>
@@ -1404,7 +1764,9 @@
         {#each selectedTableDetails.rows as row (row.label)}
           <div class="grid gap-1 px-4 py-3 text-sm sm:grid-cols-[12rem_1fr] sm:gap-4">
             <dt class="text-muted-foreground">{row.label}</dt>
-            <dd class={["break-words font-medium", toneClass(row.tone)]}>{row.value}</dd>
+            <dd class={["break-words font-medium", toneClass(row.tone)]}>
+              {displayValueText(row.value)}
+            </dd>
           </div>
         {/each}
       </dl>
@@ -1412,7 +1774,9 @@
   </Dialog.Content>
 </Dialog.Root>
 
-{#if settingsScope === "organization"}
+{#if embedded}
+  {@render content()}
+{:else if settingsScope === "organization"}
   <SettingsShell
     title={$t(i18nKeys.console.organization.pageTitle)}
     description={shellDescription}

@@ -1,8 +1,10 @@
 <script lang="ts">
+  import { browser } from "$app/environment";
   import { Check, ChevronDown, Settings2, UserRound } from "@lucide/svelte";
   import appaloftIcon from "@appaloft/design/assets/appaloft-icon-light.svg";
   import type { OrganizationContextOrganizationSummary } from "@appaloft/contracts";
 
+  import { capabilities } from "$lib/capabilities";
   import { Avatar, AvatarFallback } from "$lib/components/ui/avatar";
   import {
     DropdownMenu,
@@ -13,6 +15,10 @@
     DropdownMenuTrigger,
   } from "$lib/components/ui/dropdown-menu";
   import { initials } from "$lib/console/utils";
+  import {
+    instanceAccessCapabilityKey,
+    preloadInstanceAccessCapability,
+  } from "$lib/console/instance-access";
   import { i18nKeys, t } from "$lib/i18n";
 
   type Props = {
@@ -47,6 +53,15 @@
       ? `${currentOrganization.slug} · ${roleLabel(currentOrganization.role)}`
       : $t(i18nKeys.common.app.consoleSubtitle),
   );
+  const showInstanceManagementLink = $derived(
+    $capabilities.capabilities[instanceAccessCapabilityKey]?.allowed === true,
+  );
+
+  $effect(() => {
+    if (browser && showManagementLinks) {
+      void preloadInstanceAccessCapability();
+    }
+  });
 
   function roleLabel(role: string): string {
     if (role === "owner") {
@@ -65,7 +80,12 @@
   }
 
   function switchOrganization(organizationId: string): void {
-    if (!organizationId || organizationId === currentOrganization?.organizationId || pending) {
+    if (!organizationId || pending) {
+      return;
+    }
+
+    if (organizationId === currentOrganization?.organizationId) {
+      navigateTo("/");
       return;
     }
 
@@ -114,7 +134,7 @@
       {#each organizations as organization (organization.organizationId)}
         {@const organizationIsCurrent = organization.organizationId === currentOrganization?.organizationId}
         <DropdownMenuItem
-          disabled={organizationIsCurrent || pending}
+          disabled={pending}
           onclick={() => switchOrganization(organization.organizationId)}
           class="gap-2"
         >
@@ -151,10 +171,12 @@
         <UserRound class="size-4" />
         {$t(i18nKeys.console.nav.organization)}
       </DropdownMenuItem>
-      <DropdownMenuItem onclick={() => navigateTo("/instance")}>
-        <Settings2 class="size-4" />
-        {$t(i18nKeys.console.nav.instance)}
-      </DropdownMenuItem>
+      {#if showInstanceManagementLink}
+        <DropdownMenuItem onclick={() => navigateTo("/instance")}>
+          <Settings2 class="size-4" />
+          {$t(i18nKeys.console.nav.instance)}
+        </DropdownMenuItem>
+      {/if}
     {/if}
   </DropdownMenuContent>
 </DropdownMenu>

@@ -1,6 +1,5 @@
 <script lang="ts">
   import { browser } from "$app/environment";
-  import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import {
     ArrowLeft,
@@ -181,46 +180,6 @@
       upgrade?: BlueprintUpgradePolicy;
     };
   };
-  type BlueprintUpgradePlanResponse = {
-    current?: {
-      applicationId: string;
-      status: string;
-      source: {
-        blueprintVersion: string;
-        blueprintVariant?: string;
-        profile: string;
-      };
-      dependencyBindings?: readonly { requirementId: string; bindingStatus: string; plannedMode: string }[];
-    };
-    target?: {
-      blueprint: {
-        version: string;
-        variant?: string;
-        profile: string;
-      };
-    };
-    plan?: {
-      classification: "non-breaking" | "potentially-breaking" | "breaking";
-      destructive: boolean;
-      requiresManualReview: boolean;
-      blueprint: {
-        fromVersion: string;
-        toVersion: string;
-        fromVariant?: string;
-        toVariant?: string;
-      };
-      operations?: readonly { kind: string; classification?: string }[];
-      warnings?: readonly string[];
-    };
-    changes?: readonly { kind: string; classification: string; requiresManualReview: boolean; summary: string }[];
-    preservedUserConfigurationWarnings?: readonly string[];
-    nonExecution?: {
-      marker: string;
-      createsExternalResources: false;
-      executesUpgrade: false;
-      applyCommandAvailable: false;
-    };
-  };
   type InstalledApplicationProgress = {
     schemaVersion: "appaloft.cloud.installed-application.progress/v1";
     applicationId: string;
@@ -297,26 +256,12 @@
   let profile = $state("");
   let selectedVariant = $state(browser ? (page.url.searchParams.get("blueprintVariant") ?? "") : "");
   let parameterValues = $state<Record<string, string>>({});
-  let planPending = $state(false);
-  let planError = $state("");
-  let planOutput = $state<unknown>(null);
   let secretValues = $state<Record<string, string>>({});
   let installPending = $state(false);
   let installRefreshPending = $state(false);
   let installError = $state("");
   let installResult = $state<InstalledApplicationInstallResult | null>(null);
-  let upgradeApplicationId = $state(
-    browser
-      ? (page.url.searchParams.get("applicationId") ??
-          page.url.searchParams.get("installedApplicationId") ??
-          "")
-      : "",
-  );
-  let upgradePlanPending = $state(false);
-  let upgradePlanError = $state("");
-  let upgradePlanOutput = $state<BlueprintUpgradePlanResponse | null>(null);
   let installDialogOpen = $state(false);
-  let upgradePlanDialogOpen = $state(false);
 
   const webExtensionsQuery = createQuery(() =>
     queryOptions({
@@ -355,14 +300,6 @@
       returnToSourceExtensionKey,
     ) ?? findBlueprintCatalogExtension(webExtensionsQuery.data?.items ?? [], "navigation"),
   );
-  const deploySourceExtension = $derived(
-    findBlueprintCatalogExtensionByKey(
-      webExtensionsQuery.data?.items ?? [],
-      returnToSourceExtensionKey,
-    ) ??
-      findBlueprintCatalogExtension(webExtensionsQuery.data?.items ?? [], "quick-deploy-source") ??
-      catalogExtension,
-  );
   const catalogMetadata = $derived(readBlueprintCatalogExtensionMetadata(catalogExtension));
   const detailEndpoint = $derived.by(() => {
     if (!catalogMetadata || !slug) {
@@ -372,15 +309,6 @@
       return endpointFromTemplate(catalogMetadata.detailEndpointTemplate, slug);
     }
     return `${catalogMetadata.listEndpoint.replace(/\/$/, "")}/${encodeURIComponent(slug)}`;
-  });
-  const installPlanEndpoint = $derived.by(() => {
-    if (!catalogMetadata || !slug) {
-      return "";
-    }
-    if (catalogMetadata.installPlanEndpointTemplate) {
-      return endpointFromTemplate(catalogMetadata.installPlanEndpointTemplate, slug);
-    }
-    return `${detailEndpoint}/install-plan`;
   });
   const installEndpoint = $derived.by(() => {
     if (!catalogMetadata || !slug || !catalogMetadata.installEndpointTemplate) {
@@ -401,15 +329,6 @@
       /\{applicationId\}/g,
       encodeURIComponent(applicationId),
     );
-  });
-  const upgradePlanEndpoint = $derived.by(() => {
-    if (!catalogMetadata || !slug) {
-      return "";
-    }
-    if (catalogMetadata.upgradePlanEndpointTemplate) {
-      return endpointFromTemplate(catalogMetadata.upgradePlanEndpointTemplate, slug);
-    }
-    return "";
   });
 
   const detailQuery = createQuery(() =>
@@ -597,7 +516,6 @@
 
   $effect(() => {
     installDialogOpen = modalIsOpen(page, "blueprint-install");
-    upgradePlanDialogOpen = modalIsOpen(page, "blueprint-upgrade-plan");
   });
 
   $effect(() => {
@@ -618,10 +536,6 @@
       return;
     }
 
-    if (!upgradeApplicationId && installedApplicationIdFromUrl) {
-      upgradeApplicationId = installedApplicationIdFromUrl;
-    }
-
     if (!profile || !profileNames.includes(profile)) {
       profile = selectedVariantDefinition?.defaultProfile ?? detail.install?.defaultProfile ?? "production";
     }
@@ -639,37 +553,6 @@
     }
   });
 
-  function quickDeployDialogHref(): string {
-    const params = new URLSearchParams(page.url.searchParams);
-    params.set("modal", "quick-deploy");
-    params.set("source", "blueprint");
-    const sourceExtensionKey =
-      deploySourceExtension?.key ?? params.get("sourceExtension") ?? "";
-    if (sourceExtensionKey) {
-      params.set("sourceExtension", sourceExtensionKey);
-    }
-    params.set("blueprintSlug", listing?.slug ?? slug);
-    params.set("blueprintTitle", listing?.title ?? slug);
-    if (selectedVariant) {
-      params.set("blueprintVariant", selectedVariant);
-    } else {
-      params.delete("blueprintVariant");
-    }
-    params.set("step", "project");
-    params.set("projectMode", "new");
-    params.set("projectName", listing?.title ?? slug);
-
-    const search = params.toString();
-    return `${page.url.pathname}${search ? `?${search}` : ""}`;
-  }
-
-  function openQuickDeployDialog(): void {
-    void goto(quickDeployDialogHref(), {
-      keepFocus: true,
-      noScroll: true,
-    });
-  }
-
   function setInstallDialogOpen(open: boolean): void {
     installDialogOpen = open;
     void setModalOpen(page, "blueprint-install", open);
@@ -677,15 +560,6 @@
 
   function openInstallDialog(): void {
     setInstallDialogOpen(true);
-  }
-
-  function setUpgradePlanDialogOpen(open: boolean): void {
-    upgradePlanDialogOpen = open;
-    void setModalOpen(page, "blueprint-upgrade-plan", open);
-  }
-
-  function openUpgradePlanDialog(): void {
-    setUpgradePlanDialogOpen(true);
   }
 
   function updateParameter(key: string, value: string): void {
@@ -906,93 +780,6 @@
     return value ? installPlanStatusLabel(value) : "等待处理";
   }
 
-  function upgradeClassificationLabel(classification: string | undefined): string {
-    switch (classification) {
-      case "non-breaking":
-        return "兼容变更";
-      case "potentially-breaking":
-        return "需要复核";
-      case "breaking":
-        return "破坏性变更";
-      default:
-        return "未评估";
-    }
-  }
-
-  function upgradeDestructiveLabel(destructive: boolean | undefined): string {
-    return destructive ? "可能破坏性" : "非破坏性";
-  }
-
-  function upgradeReviewLabel(requiresManualReview: boolean | undefined): string {
-    return requiresManualReview ? "需要人工复核" : "自动复核";
-  }
-
-  async function generatePlan(): Promise<void> {
-    if (!installPlanEndpoint || !listing) {
-      return;
-    }
-
-    planPending = true;
-    planError = "";
-    try {
-      planOutput = await request<unknown>(installPlanEndpoint, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          ...(selectedVariant ? { variant: selectedVariant } : {}),
-          profile,
-          parameters: Object.fromEntries(
-            Object.entries(parameterValues).filter(([, value]) => value.trim() !== ""),
-          ),
-          target: {
-            projectName: listing.title,
-            environmentName: profile || "production",
-            resourceSlugPrefix: listing.slug,
-          },
-        }),
-      });
-      setInstallDialogOpen(false);
-    } catch (error) {
-      planError = readErrorMessage(error);
-    } finally {
-      planPending = false;
-    }
-  }
-
-  async function generateUpgradePlan(): Promise<void> {
-    if (!upgradePlanEndpoint || !listing) {
-      return;
-    }
-    const applicationId = upgradeApplicationId.trim();
-    if (!applicationId) {
-      upgradePlanError = "需要已安装应用 ID 才能生成升级 dry-run。";
-      return;
-    }
-
-    upgradePlanPending = true;
-    upgradePlanError = "";
-    try {
-      upgradePlanOutput = await request<BlueprintUpgradePlanResponse>(upgradePlanEndpoint, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          applicationId,
-          ...(selectedVariant ? { targetVariant: selectedVariant } : {}),
-          ...(profile ? { targetProfile: profile } : {}),
-        }),
-      });
-      setUpgradePlanDialogOpen(false);
-    } catch (error) {
-      upgradePlanError = readErrorMessage(error);
-    } finally {
-      upgradePlanPending = false;
-    }
-  }
-
   function resolveEffectiveBlueprintManifest(
     baseManifest: BlueprintDetailResponse["manifest"],
     variantId: string,
@@ -1136,17 +923,15 @@
                 </div>
               </div>
             </div>
-            {#if installEndpoint}
-              <Button type="button" class="shrink-0 xl:hidden" onclick={openInstallDialog}>
-                配置安装
-                <ArrowRight class="size-4" />
-              </Button>
-            {:else}
-              <Button type="button" class="shrink-0 xl:hidden" onclick={openQuickDeployDialog}>
-                快速部署
-                <ArrowRight class="size-4" />
-              </Button>
-            {/if}
+            <Button
+              type="button"
+              class="shrink-0 xl:hidden"
+              onclick={openInstallDialog}
+              disabled={!installEndpoint}
+            >
+              快速部署
+              <ArrowRight class="size-4" />
+            </Button>
           </div>
         </section>
 
@@ -1178,7 +963,7 @@
                   <p class="text-sm leading-6 text-muted-foreground">这个 Blueprint 只有默认部署方案。</p>
                 {/if}
                 <p class="text-xs leading-5 text-muted-foreground">
-                  方案选择、Profile 和参数输入在配置安装弹窗内完成；默认页只展示 Blueprint 能创建什么。
+                  方案选择、Profile 和参数输入在部署弹窗内完成；来源固定为当前 Blueprint。
                 </p>
               </div>
               <div class="space-y-2">
@@ -1188,7 +973,7 @@
                   <p class="mt-1 text-xs leading-5 text-muted-foreground">
                     {selectedUpgrade?.instructions ??
                       selectedUpgrade?.steps?.[0]?.changes?.[0] ??
-                      "升级执行不在 dry-run plan 内自动触发。"}
+                      "升级需要在已安装应用的维护流程中单独确认。"}
                   </p>
                 </div>
               </div>
@@ -1271,7 +1056,7 @@
                   effectiveManifest.resources.length > 0
                     ? `${effectiveManifest.resources.map((resource) => resource.kind).join(" / ")} 依赖绑定`
                     : "无托管依赖资源",
-                  "项目、环境、资源、网络和部署 dry-run 计划",
+                  "项目、环境、资源、网络和部署计划",
                 ] as highlight (highlight)}
                   <li class="flex gap-2">
                     <span class="mt-2 size-1.5 shrink-0 rounded-full bg-foreground/55"></span>
@@ -1415,8 +1200,8 @@
         <section class="console-side-panel space-y-4" data-blueprint-install-summary>
           <div class="flex items-center justify-between gap-3">
             <div>
-              <h2 class="text-lg font-semibold">安装入口</h2>
-              <p class="text-sm text-muted-foreground">配置、dry-run 和接受安装在弹窗内完成。</p>
+              <h2 class="text-lg font-semibold">快速部署</h2>
+              <p class="text-sm text-muted-foreground">打开弹窗后直接部署当前 Blueprint。</p>
             </div>
             <Boxes class="size-5 text-muted-foreground" />
           </div>
@@ -1445,36 +1230,20 @@
               type="button"
               class="hidden xl:inline-flex"
               onclick={openInstallDialog}
-              disabled={!installPlanEndpoint}
+              disabled={!installEndpoint}
             >
-              {#if planPending || installPending}
+              {#if installPending}
                 <LoaderCircle class="size-4 animate-spin" />
               {/if}
-              配置安装
-            </Button>
-            <Button type="button" variant="outline" onclick={openQuickDeployDialog}>
-              打开快速部署
+              快速部署
               <ArrowRight class="size-4" />
             </Button>
           </div>
-
-          {#if planError}
-            <div class="console-subtle-panel border-destructive/30 px-3 py-2 text-sm text-destructive">
-              {planError}
-            </div>
-          {/if}
 
           {#if installError}
             <div class="console-subtle-panel border-destructive/30 px-3 py-2 text-sm text-destructive">
               {installError}
             </div>
-          {/if}
-
-          {#if planOutput}
-            <details class="console-subtle-panel p-3" data-blueprint-install-plan-result>
-              <summary class="cursor-pointer text-sm font-medium">查看 dry-run plan JSON</summary>
-              <pre class="mt-3 max-h-80 overflow-auto rounded-md bg-muted p-3 text-xs">{JSON.stringify(planOutput, null, 2)}</pre>
-            </details>
           {/if}
 
           {#if installResult?.progress}
@@ -1726,49 +1495,6 @@
           {/if}
         </section>
 
-        {#if upgradePlanEndpoint}
-          <section class="console-side-panel space-y-4" data-blueprint-upgrade-summary>
-            <div>
-              <h2 class="text-lg font-semibold">升级 dry-run</h2>
-              <p class="text-sm text-muted-foreground">输入已安装应用 ID 的操作在弹窗内完成。</p>
-            </div>
-
-            <div class="grid gap-2 rounded-md border border-border bg-muted/30 p-3 text-xs">
-              <div class="flex items-center justify-between gap-3">
-                <span class="text-muted-foreground">目标版本</span>
-                <span class="font-mono">{listing.blueprint.version}</span>
-              </div>
-              <div class="flex items-center justify-between gap-3">
-                <span class="text-muted-foreground">目标方案</span>
-                <span class="min-w-0 truncate font-medium">{selectedVariantLabel()}</span>
-              </div>
-              <div class="flex items-center justify-between gap-3">
-                <span class="text-muted-foreground">目标 Profile</span>
-                <span class="font-mono">{profile}</span>
-              </div>
-              {#if upgradeApplicationId}
-                <div class="flex items-center justify-between gap-3">
-                  <span class="text-muted-foreground">已安装应用</span>
-                  <span class="min-w-0 truncate font-mono">{upgradeApplicationId}</span>
-                </div>
-              {/if}
-            </div>
-
-            <Button
-              type="button"
-              onclick={openUpgradePlanDialog}
-              disabled={upgradePlanPending || !upgradePlanEndpoint}
-              variant="outline"
-              class="w-full"
-            >
-              {#if upgradePlanPending}
-                <LoaderCircle class="size-4 animate-spin" />
-              {/if}
-              配置升级 dry-run
-            </Button>
-          </section>
-        {/if}
-
         <Button href="/marketplace" variant="outline" class="w-full">
           <ArrowLeft class="size-4" />
           返回应用市场
@@ -1778,9 +1504,9 @@
       <Dialog.Root bind:open={installDialogOpen} onOpenChange={setInstallDialogOpen}>
         <Dialog.Content closeLabel="关闭" class="max-w-3xl">
           <Dialog.Header>
-            <Dialog.Title>配置 Blueprint 安装</Dialog.Title>
+            <Dialog.Title>快速部署 {listing.title}</Dialog.Title>
             <Dialog.Description>
-              选择本次安装的方案、Profile 和输入值。关闭后默认页只保留安装摘要和执行结果。
+              来源固定为当前 Blueprint。确认 Profile、参数和密钥后即可部署。
             </Dialog.Description>
           </Dialog.Header>
 
@@ -1825,7 +1551,7 @@
                 <div>
                   <h3 class="text-sm font-semibold">参数</h3>
                   <p class="mt-1 text-xs leading-5 text-muted-foreground">
-                    这些值只用于生成本次 install plan，不代表系统中已经存在的配置。
+                    这些值只用于本次部署计划，不代表系统中已经存在的配置。
                   </p>
                 </div>
                 <div class="grid gap-3 sm:grid-cols-2">
@@ -1849,9 +1575,9 @@
             {#if effectiveManifest.secrets.length > 0}
               <section class="space-y-3" data-blueprint-install-secret-inputs>
                 <div>
-                  <h3 class="text-sm font-semibold">安装密钥</h3>
+                  <h3 class="text-sm font-semibold">部署密钥</h3>
                   <p class="mt-1 text-xs leading-5 text-muted-foreground">
-                    只在接受安装时提交给运行时；安装进度和 dry-run 不会回显密钥值。
+                    只在开始部署时提交给运行时；安装进度不会回显密钥值。
                   </p>
                 </div>
                 <div class="grid gap-3 sm:grid-cols-2">
@@ -1893,17 +1619,6 @@
             </div>
 
             <Dialog.Footer>
-              <Button
-                type="button"
-                variant="outline"
-                onclick={generatePlan}
-                disabled={planPending || !installPlanEndpoint}
-              >
-                {#if planPending}
-                  <LoaderCircle class="size-4 animate-spin" />
-                {/if}
-                生成 dry-run
-              </Button>
               {#if installEndpoint}
                 <Button
                   type="button"
@@ -1914,146 +1629,13 @@
                   {#if installPending}
                     <LoaderCircle class="size-4 animate-spin" />
                   {/if}
-                  接受安装
+                  开始部署
                 </Button>
               {/if}
             </Dialog.Footer>
           </section>
         </Dialog.Content>
       </Dialog.Root>
-
-      {#if upgradePlanEndpoint}
-        <Dialog.Root bind:open={upgradePlanDialogOpen} onOpenChange={setUpgradePlanDialogOpen}>
-          <Dialog.Content closeLabel="关闭" class="max-w-xl">
-            <Dialog.Header>
-              <Dialog.Title>配置升级 dry-run</Dialog.Title>
-              <Dialog.Description>
-                从一个已安装应用读取当前状态，预览升级到当前 Blueprint 方案的风险和差异。
-              </Dialog.Description>
-            </Dialog.Header>
-
-            <section class="space-y-5 px-5 pb-5" data-blueprint-upgrade-plan-dialog>
-              <label class="space-y-1.5 text-sm" data-blueprint-upgrade-from-installed-application>
-                <span class="font-medium">已安装应用 ID</span>
-                <Input
-                  value={upgradeApplicationId}
-                  oninput={(event) => {
-                    upgradeApplicationId = event.currentTarget.value;
-                  }}
-                  placeholder="cia_..."
-                />
-              </label>
-
-              <div class="grid gap-2 rounded-md border border-border bg-muted/30 p-3 text-xs">
-                <div class="flex items-center justify-between gap-3">
-                  <span class="text-muted-foreground">目标版本</span>
-                  <span class="font-mono">{listing.blueprint.version}</span>
-                </div>
-                <div class="flex items-center justify-between gap-3">
-                  <span class="text-muted-foreground">目标方案</span>
-                  <span class="min-w-0 truncate font-medium">{selectedVariantLabel()}</span>
-                </div>
-                <div class="flex items-center justify-between gap-3">
-                  <span class="text-muted-foreground">目标 Profile</span>
-                  <span class="font-mono">{profile}</span>
-                </div>
-              </div>
-
-              <Dialog.Footer>
-                <Button
-                  type="button"
-                  onclick={generateUpgradePlan}
-                  disabled={upgradePlanPending || !upgradePlanEndpoint}
-                >
-                  {#if upgradePlanPending}
-                    <LoaderCircle class="size-4 animate-spin" />
-                  {/if}
-                  生成升级 dry-run
-                </Button>
-              </Dialog.Footer>
-
-              {#if upgradePlanError}
-                <div class="console-subtle-panel border-destructive/30 px-3 py-2 text-sm text-destructive">
-                  {upgradePlanError}
-                </div>
-              {/if}
-
-              {#if upgradePlanOutput}
-                <div class="grid gap-2 rounded-md border border-border p-3 text-xs">
-                  <div class="flex flex-wrap gap-2">
-                    <Badge variant="outline">{upgradeClassificationLabel(upgradePlanOutput.plan?.classification)}</Badge>
-                    <Badge variant="outline">
-                      {upgradeDestructiveLabel(upgradePlanOutput.plan?.destructive)}
-                    </Badge>
-                    <Badge variant="outline">
-                      {upgradeReviewLabel(upgradePlanOutput.plan?.requiresManualReview)}
-                    </Badge>
-                    <Badge variant="outline">
-                      {upgradePlanOutput.nonExecution ? "仅生成计划" : "可执行计划"}
-                    </Badge>
-                  </div>
-
-                  <div class="grid gap-2 sm:grid-cols-2">
-                    <div class="rounded-md bg-muted/40 p-2">
-                      <p class="text-muted-foreground">当前</p>
-                      <p class="mt-1 font-mono">
-                        {upgradePlanOutput.current?.source.blueprintVersion ??
-                          upgradePlanOutput.plan?.blueprint.fromVersion}
-                      </p>
-                      <p class="mt-1 truncate">
-                        {upgradePlanOutput.current?.source.blueprintVariant ??
-                          upgradePlanOutput.plan?.blueprint.fromVariant ??
-                          "default"}
-                        {" · "}
-                        {upgradePlanOutput.current?.source.profile ?? "profile"}
-                      </p>
-                    </div>
-                    <div class="rounded-md bg-muted/40 p-2">
-                      <p class="text-muted-foreground">目标</p>
-                      <p class="mt-1 font-mono">
-                        {upgradePlanOutput.target?.blueprint.version ??
-                          upgradePlanOutput.plan?.blueprint.toVersion}
-                      </p>
-                      <p class="mt-1 truncate">
-                        {upgradePlanOutput.target?.blueprint.variant ??
-                          upgradePlanOutput.plan?.blueprint.toVariant ??
-                          "default"}
-                        {" · "}
-                        {upgradePlanOutput.target?.blueprint.profile ?? profile}
-                      </p>
-                    </div>
-                  </div>
-
-                  {#if upgradePlanOutput.changes?.length}
-                    <ul class="space-y-1">
-                      {#each upgradePlanOutput.changes.slice(0, 5) as change (`${change.kind}-${change.summary}`)}
-                        <li class="leading-5">
-                          <span class="font-medium">{change.classification}</span>
-                          {" · "}
-                          <span>{change.summary}</span>
-                        </li>
-                      {/each}
-                    </ul>
-                  {/if}
-
-                  {#if upgradePlanOutput.preservedUserConfigurationWarnings?.length}
-                    <ul class="space-y-1 text-muted-foreground">
-                      {#each upgradePlanOutput.preservedUserConfigurationWarnings.slice(0, 4) as warning (warning)}
-                        <li>{warning}</li>
-                      {/each}
-                    </ul>
-                  {/if}
-                </div>
-
-                <details class="console-subtle-panel p-3">
-                  <summary class="cursor-pointer text-sm font-medium">查看 upgrade plan JSON</summary>
-                  <pre class="mt-3 max-h-80 overflow-auto rounded-md bg-muted p-3 text-xs">{JSON.stringify(upgradePlanOutput, null, 2)}</pre>
-                </details>
-              {/if}
-            </section>
-          </Dialog.Content>
-        </Dialog.Root>
-      {/if}
     </div>
   {/if}
   </div>

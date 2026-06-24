@@ -13,13 +13,26 @@ const booleanInput = (defaultValue: boolean) =>
     ])
     .default(defaultValue);
 
-export const resourceHealthQueryInputSchema = z.object({
-  resourceId: nonEmptyTrimmedString("Resource id"),
-  mode: z.enum(["cached", "live"]).default("cached"),
-  includeChecks: booleanInput(true),
-  includePublicAccessProbe: booleanInput(false),
-  includeRuntimeProbe: booleanInput(false),
-});
+export const resourceHealthQueryInputSchema = z
+  .object({
+    resourceId: nonEmptyTrimmedString("Resource id").optional(),
+    previewEnvironmentId: nonEmptyTrimmedString("Preview environment id").optional(),
+    mode: z.enum(["cached", "live"]).default("cached"),
+    includeChecks: booleanInput(true),
+    includePublicAccessProbe: booleanInput(false),
+    includeRuntimeProbe: booleanInput(false),
+  })
+  .superRefine((input, context) => {
+    if (input.resourceId || input.previewEnvironmentId) {
+      return;
+    }
+
+    context.addIssue({
+      code: "custom",
+      message: "Either resourceId or previewEnvironmentId is required",
+      path: ["resourceId"],
+    });
+  });
 
 const resourceHealthHistoryCanonicalInputSchema = z
   .object({

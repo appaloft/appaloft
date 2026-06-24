@@ -21,6 +21,9 @@ export class CreateDomainBindingCommand extends Command<{ id: string }> {
     public readonly destinationId: CreateDomainBindingCommandInput["destinationId"],
     public readonly domainName: string,
     public readonly pathPrefix: string,
+    public readonly pathHandling: NonNullable<
+      CreateDomainBindingCommandInput["pathHandling"]
+    > = "preserve",
     public readonly proxyKind: CreateDomainBindingCommandInput["proxyKind"],
     public readonly tlsMode: NonNullable<CreateDomainBindingCommandInput["tlsMode"]> = "auto",
     public readonly redirectTo?: CreateDomainBindingCommandInput["redirectTo"],
@@ -42,6 +45,7 @@ export class CreateDomainBindingCommand extends Command<{ id: string }> {
           parsed.destinationId,
           parsed.domainName,
           parsed.pathPrefix,
+          parsed.pathHandling,
           parsed.proxyKind,
           parsed.tlsMode,
           parsed.redirectTo,

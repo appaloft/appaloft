@@ -9,7 +9,7 @@
 </svelte:head>
 
 <ConsoleShell title="应用市场" description="选择 Blueprint 并进入部署流程。">
-  <ConsoleResourceCanvas data-marketplace-catalog-display-surface>
+  <ConsoleResourceCanvas class="max-w-7xl" data-marketplace-catalog-display-surface>
     <BlueprintCatalogSelector />
   </ConsoleResourceCanvas>
 </ConsoleShell>

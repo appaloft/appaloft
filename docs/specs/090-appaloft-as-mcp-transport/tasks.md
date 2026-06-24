@@ -16,6 +16,11 @@
 - [x] Add MCP prompts for deploy, recover, configure, observe, and static artifact publish.
 - [x] Add MCP tool annotations, structured tool results, and protocol-level unknown-tool errors.
 - [x] Add MCP JSON-RPC request handler and stdio runner.
+- [x] Add MCP HTTP JSON-RPC request handler and `/mcp` HTTP adapter route.
+- [x] Add `appaloft mcp serve` for a localhost HTTP MCP endpoint.
+- [x] Add standalone `@appaloft/mcp` launcher package.
+- [x] Add HTTP MCP bearer product-auth forwarding for remote clients.
+- [x] Add remote stdio bridge for MCP hosts that should call hosted `/mcp` without storing bearer in host config.
 - [x] Add package exports and package docs for future install/release.
 
 ## Documentation
@@ -27,7 +32,7 @@
 
 ## Verification
 
-- [x] Add `APPALOFT-MCP-001` through `APPALOFT-MCP-010` tests.
+- [x] Add `APPALOFT-MCP-001` through `APPALOFT-MCP-016` tests.
 - [x] Run focused MCP and docs registry tests.
 - [x] Add Appaloft skill eval validation coverage for MCP setup, tool/resource/prompt boundaries,
   and operation-catalog-backed deploy/recover usage.
@@ -36,13 +41,13 @@
 ## Release Preparation
 
 - [x] Document the current supported MCP run path as `appaloft mcp stdio`.
-- [x] Keep standalone `appaloft-mcp` package/bin publishing deferred until release packaging is wired.
+- [x] Add standalone `@appaloft/mcp` package/bin as a delegating launcher.
 - [x] Record pre-publish checks for packed artifact validation and discovery metadata.
-- [ ] Run release build or package validation from a clean checkout after this PR merges.
+- [ ] Run release build or package validation from a clean checkout before publishing.
 - [ ] Add `.well-known/agent-skills` or equivalent public discovery index in a dedicated release round.
 
 ## Deferred
 
-- [ ] Release publishing for a downloadable package.
 - [ ] Hosted MCP gateway and private policy wrapper.
-- [ ] HTTP/SSE MCP transport if a concrete MCP host requires it.
+- [ ] SSE streaming, resumable sessions, and separately scalable gateway service if a concrete MCP
+      host or production load requires it.

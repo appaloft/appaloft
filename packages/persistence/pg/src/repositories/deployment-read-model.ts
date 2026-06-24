@@ -358,6 +358,7 @@ export class PgDeploymentReadModel implements DeploymentReadModel {
       projectId?: string;
       resourceId?: string;
       includeArchived?: boolean;
+      activeResourcesOnly?: boolean;
       status?: Awaited<ReturnType<DeploymentReadModel["list"]>>[number]["status"];
       statuses?: readonly Awaited<ReturnType<DeploymentReadModel["list"]>>[number]["status"][];
     },
@@ -398,6 +399,14 @@ export class PgDeploymentReadModel implements DeploymentReadModel {
           query = query.where("archived_at", "is", null);
         }
 
+        if (input?.activeResourcesOnly) {
+          query = query.where(
+            "resource_id",
+            "in",
+            executor.selectFrom("resources").select("id").where("lifecycle_status", "=", "active"),
+          );
+        }
+
         if (input?.status) {
           query = query.where("status", "=", input.status);
         }
@@ -418,6 +427,7 @@ export class PgDeploymentReadModel implements DeploymentReadModel {
       projectId?: string;
       resourceId?: string;
       includeArchived?: boolean;
+      activeResourcesOnly?: boolean;
       limit?: number;
     },
   ) {
@@ -453,6 +463,14 @@ export class PgDeploymentReadModel implements DeploymentReadModel {
 
         if (!input?.includeArchived) {
           query = query.where("archived_at", "is", null);
+        }
+
+        if (input?.activeResourcesOnly) {
+          query = query.where(
+            "resource_id",
+            "in",
+            executor.selectFrom("resources").select("id").where("lifecycle_status", "=", "active"),
+          );
         }
 
         query = query.limit(input?.limit ?? defaultReadModelListLimit);

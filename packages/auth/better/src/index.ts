@@ -85,6 +85,7 @@ type AuthProviderKey = "github" | "google" | "oidc";
 export interface AuthProviderStatus {
   key: AuthProviderKey;
   title: string;
+  accountLabel?: string;
   configured: boolean;
   connected: boolean;
   requiresSignIn: boolean;
@@ -137,6 +138,7 @@ export interface AuthRuntime
   getPublicConfig(): AuthPublicConfig;
   getSessionStatus(request: Request): Promise<AuthSessionStatus>;
   getProviderAccessToken(request: Request, providerKey: "github"): Promise<string | null>;
+  issueCliProductSessionBearer(request: Request): Promise<string | null>;
   issueCliProductSessionCookie(request: Request): Promise<string | null>;
   handle(request: Request): Promise<Response>;
 }
@@ -215,6 +217,7 @@ type DirectMemberListReadback =
 function buildProviderStatus(
   key: AuthProviderKey,
   input: {
+    accountLabel?: string;
     configured: boolean;
     connected: boolean;
   },
@@ -222,6 +225,7 @@ function buildProviderStatus(
   return {
     key,
     title: providerTitle(key),
+    ...(input.accountLabel ? { accountLabel: input.accountLabel } : {}),
     configured: input.configured,
     connected: input.connected,
     requiresSignIn: true,
@@ -311,6 +315,7 @@ export class BetterAuthRuntime implements AuthRuntime {
             providerId === "github" || providerId === "google" || providerId === "oidc",
         ),
     );
+    const providerAccountLabels = providerAccountLabelsByProvider(accounts);
 
     return {
       accountSecurity: resolveAppaloftBetterAuthAccountSecurityStatus({ passwordState }),
@@ -330,6 +335,7 @@ export class BetterAuthRuntime implements AuthRuntime {
           oidc: this.oidcConfigured,
         },
         connectedProviders,
+        providerAccountLabels,
       ),
     };
   }
@@ -399,6 +405,16 @@ export class BetterAuthRuntime implements AuthRuntime {
   }
 
   async issueCliProductSessionCookie(request: Request): Promise<string | null> {
+    const signedToken = await this.issueCliProductSessionBearer(request);
+    if (!signedToken) {
+      return null;
+    }
+
+    const authContext = await this.auth.$context;
+    return `${authContext.authCookies.sessionToken.name}=${signedToken}`;
+  }
+
+  async issueCliProductSessionBearer(request: Request): Promise<string | null> {
     if (!this.config.enabled) {
       return null;
     }
@@ -424,7 +440,7 @@ export class BetterAuthRuntime implements AuthRuntime {
       userAgent: "appaloft-cli browser-auth-exchange",
     });
     const signedToken = `${cliSession.token}.${await makeSignature(cliSession.token, this.config.secret)}`;
-    return `${authContext.authCookies.sessionToken.name}=${signedToken}`;
+    return signedToken;
   }
 
   async handle(request: Request): Promise<Response> {
@@ -2351,16 +2367,55 @@ function providerNotConfiguredReason(key: AuthProviderKey): string {
   return "Configure APPALOFT_OIDC_CLIENT_ID, APPALOFT_OIDC_CLIENT_SECRET, APPALOFT_OIDC_DISCOVERY_URL, and APPALOFT_OIDC_REDIRECT_URI to enable OIDC login.";
 }
 
+function providerAccountLabelsByProvider(
+  accounts: readonly unknown[],
+): ReadonlyMap<AuthProviderKey, string> {
+  const labels = new Map<AuthProviderKey, string>();
+
+  for (const account of accounts) {
+    if (!account || typeof account !== "object") {
+      continue;
+    }
+
+    const providerId = (account as { providerId?: unknown }).providerId;
+    if (providerId !== "github" && providerId !== "google" && providerId !== "oidc") {
+      continue;
+    }
+
+    const label = providerAccountLabel(account);
+    if (label) {
+      labels.set(providerId, label);
+    }
+  }
+
+  return labels;
+}
+
+function providerAccountLabel(account: object): string | null {
+  for (const key of ["accountId", "providerAccountId", "email", "name"] as const) {
+    const value = (account as Record<string, unknown>)[key];
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return null;
+}
+
 function providerStatuses(
   configured: Record<AuthProviderKey, boolean>,
   connectedProviders: ReadonlySet<AuthProviderKey> = new Set<AuthProviderKey>(),
+  providerAccountLabels: ReadonlyMap<AuthProviderKey, string> = new Map<AuthProviderKey, string>(),
 ): AuthProviderStatus[] {
-  return (["github", "google", "oidc"] as const).map((key) =>
-    buildProviderStatus(key, {
+  return (["github", "google", "oidc"] as const).map((key) => {
+    const accountLabel = providerAccountLabels.get(key);
+
+    return buildProviderStatus(key, {
+      ...(accountLabel ? { accountLabel } : {}),
       configured: configured[key],
       connected: connectedProviders.has(key),
-    }),
-  );
+    });
+  });
 }
 
 function publicProviderStatuses(configured: Record<AuthProviderKey, boolean>) {

@@ -3,7 +3,7 @@
   import { afterNavigate, goto } from "$app/navigation";
   import { page } from "$app/state";
   import { onDestroy, onMount, untrack } from "svelte";
-  import { createMutation, createQuery } from "@tanstack/svelte-query";
+  import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
   import type { IconModule as BrandIconModule } from "@thesvg/icons";
   import cloudflareIcon from "@thesvg/icons/cloudflare";
   import {
@@ -19,6 +19,7 @@
     Gauge,
     HardDrive,
     Globe2,
+    KeyRound,
     Link2,
     Play,
     Plus,
@@ -50,14 +51,17 @@
     ConnectorCapabilityApplyResponse,
     ConnectorCapabilityPlanResponse,
     CreateDeploymentInput,
+    CreateDeploymentResponse,
     ForceRedeployDeploymentInput,
     RedeployDeploymentInput,
     CreateDomainBindingInput,
     CreateStorageVolumeInput,
+    DeleteDomainBindingInput,
     DeleteResourceInput,
     DependencyResourceSummary,
     DeploymentPlanResponse,
     DeploymentProgressEvent,
+    DomainBindingDeleteSafety,
     DomainBindingSummary,
     ImportCertificateInput,
     InspectRuntimeUsageResponse,
@@ -86,16 +90,18 @@
     SetResourceVariableInput,
     StartResourceRuntimeInput,
     StopResourceRuntimeInput,
+    SystemPluginWebExtension,
     StorageVolumeBackupPlanResponse,
     StorageVolumeBackupSummary,
     StorageVolumeSummary,
     DnsRecordRequirement,
   } from "@appaloft/contracts";
 
-  import { readErrorMessage } from "$lib/api/client";
+  import { readErrorMessage, request } from "$lib/api/client";
   import { capabilities, capabilityKey, type CapabilityQuery } from "$lib/capabilities";
   import CapabilityGate from "$lib/components/console/CapabilityGate.svelte";
   import ConsoleStatePanel from "$lib/components/console/ConsoleStatePanel.svelte";
+  import ConsoleExtensionPage from "$lib/components/console/ConsoleExtensionPage.svelte";
   import ConsoleExtensionPanelHost from "$lib/components/console/ConsoleExtensionPanelHost.svelte";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import DeploymentProgressDialog from "$lib/components/console/DeploymentProgressDialog.svelte";
@@ -127,6 +133,8 @@
   import { Textarea } from "$lib/components/ui/textarea";
   import {
     createDeploymentWithProgress,
+    isTerminalDeploymentProgressEvent,
+    observeDeploymentProgressAfterAcceptance,
     type DeploymentProgressDialogStatus,
   } from "$lib/console/deployment-progress";
   import { webDocsHrefs } from "$lib/console/docs-help";
@@ -138,6 +146,7 @@
     detailSubnavContentClass,
     detailSubnavLayoutClass,
     detailTabClass,
+    detailTabPanelFlushClass,
     detailTabPanelScrollClass,
     detailTabPanelSubnavClass,
     detailTabsClass,
@@ -179,10 +188,16 @@
     findProject,
     findServer,
     formatTime,
+    hrefWithSearchParams,
     projectDetailHref,
     resourceDetailHref,
     resourcePreviewEnvironmentDetailHref,
   } from "$lib/console/utils";
+  import {
+    findConsolePageExtensionByPath,
+    isConsolePageExtensionVisible,
+    resolveConsolePageVisibilityEndpoint,
+  } from "$lib/console/console-page-extension";
   import { i18nKeys, t } from "$lib/i18n";
   import { orpc, orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
@@ -224,6 +239,7 @@
     | "dependencies"
     | "previews"
     | "jobs"
+    | "audit-log"
     | "settings";
   let runtimeMonitoringTimeRange = $state<RuntimeMonitoringTimeRangeId>("1h");
   type ResourceAccessSummary = NonNullable<ResourceSummary["accessSummary"]>;
@@ -241,6 +257,34 @@
     title: string;
     detail?: string;
     action?: ResourceHealthIssueAction;
+  };
+  type ResourceInitialAccessCredential = {
+    credentialId: string;
+    applicationId: string;
+    applicationName?: string;
+    componentId?: string;
+    key: string;
+    status: "pending" | "revealed" | "expired";
+    createdAt?: string;
+    expiresAt?: string;
+    revealedAt?: string;
+    revealedBy?: string;
+    resetRequired?: boolean;
+    claimEndpoint?: string;
+  };
+  type ResourceInitialAccessCredentialsResponse = {
+    schemaVersion?: string;
+    resourceId: string;
+    items: ResourceInitialAccessCredential[];
+  };
+  type ResourceInitialAccessCredentialClaimResult = {
+    schemaVersion?: string;
+    applicationId?: string;
+    credential: {
+      credentialId: string;
+      key: string;
+      value: string;
+    };
   };
   type HealthCheckHttpInput = NonNullable<ConfigureResourceHealthInput["healthCheck"]["http"]>;
   type HealthCheckMethod = HealthCheckHttpInput["method"];
@@ -321,8 +365,15 @@
     "dependencies",
     "previews",
     "jobs",
+    "audit-log",
     "settings",
   ] as const;
+  type SystemPluginWebExtensionsResponse = {
+    items: SystemPluginWebExtension[];
+  };
+  type SystemPluginWebExtensionVisibilityResponse = {
+    visible?: boolean;
+  };
   const resourceNetworkingSections = ["access", "domains", "proxy"] as const;
   const resourceConfigurationSections = [
     "profile",
@@ -354,6 +405,22 @@
     domainBindingsQuery,
     certificatesQuery,
   } = createConsoleQueries(browser);
+  const webExtensionsQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["system-plugins", "web-extensions"],
+      queryFn: () => request<SystemPluginWebExtensionsResponse>("/api/system-plugins/web-extensions"),
+      enabled: browser,
+      staleTime: 30_000,
+    }),
+  );
+  const organizationContextQuery = createQuery(() =>
+    orpc.organizations.currentContext.queryOptions({
+      input: {},
+      enabled: browser,
+      retry: 0,
+      staleTime: 30_000,
+    }),
+  );
   const resourceId = $derived(page.params.resourceId ?? "");
   let resourceLocationSearch = $state(page.url.search);
   $effect(() => {
@@ -381,6 +448,59 @@
   );
   const activeResourceSection = $derived(
     parseResourceDetailSection(activeTab, resourceSearchParams.get("section")),
+  );
+  const currentOrganization = $derived(
+    organizationContextQuery.data?.currentOrganization ?? null,
+  );
+  const resourceAuditLogPath = $derived(
+    resourceId
+      ? page.params.projectId && page.params.environmentId
+        ? `/projects/${encodeURIComponent(page.params.projectId)}/environments/${encodeURIComponent(page.params.environmentId)}/resources/${encodeURIComponent(resourceId)}/audit-log`
+        : `/resources/${encodeURIComponent(resourceId)}/audit-log`
+      : page.url.pathname,
+  );
+  const resourceAuditLogExtension = $derived(
+    findConsolePageExtensionByPath(webExtensionsQuery.data?.items ?? [], resourceAuditLogPath),
+  );
+  const resourceAuditLogVisibilityEndpoint = $derived(
+    resolveConsolePageVisibilityEndpoint(resourceAuditLogExtension, {
+      pathname: resourceAuditLogPath,
+      query: resourceSearchParams.toString(),
+      organization: currentOrganization,
+      projectId: page.params.projectId ?? "",
+      environmentId: page.params.environmentId ?? "",
+      resourceId,
+    }),
+  );
+  const resourceAuditLogVisibilityQuery = createQuery(() =>
+    queryOptions({
+      queryKey: [
+        "console-extension-route-visibility",
+        "resource-audit-log",
+        currentOrganization?.organizationId ?? "",
+        page.params.projectId ?? "",
+        page.params.environmentId ?? "",
+        resourceId,
+        resourceAuditLogVisibilityEndpoint ?? "",
+      ],
+      queryFn: () =>
+        request<SystemPluginWebExtensionVisibilityResponse>(
+          resourceAuditLogVisibilityEndpoint ?? "/",
+        ),
+      enabled:
+        browser &&
+        Boolean(resourceAuditLogVisibilityEndpoint) &&
+        !organizationContextQuery.isPending,
+      staleTime: 30_000,
+    }),
+  );
+  const resourceAuditLogVisibility = $derived(
+    resourceAuditLogExtension && resourceAuditLogVisibilityEndpoint
+      ? { [resourceAuditLogExtension.key]: resourceAuditLogVisibilityQuery.data?.visible === true }
+      : {},
+  );
+  const resourceAuditLogTabVisible = $derived(
+    isConsolePageExtensionVisible(resourceAuditLogExtension, resourceAuditLogVisibility),
   );
   const resourceRuntimeMonitorActive = $derived(
     activeTab === "monitor",
@@ -452,6 +572,24 @@
       staleTime: 5_000,
     }),
   );
+  const resourceInitialAccessCredentialsQuery = createQuery(() => ({
+    queryKey: ["resources", "initial-access-credentials", resourceId],
+    queryFn: async (): Promise<ResourceInitialAccessCredentialsResponse> => {
+      try {
+        return await request<ResourceInitialAccessCredentialsResponse>(
+          `/api/resources/${encodeURIComponent(resourceId)}/initial-access-credentials`,
+        );
+      } catch {
+        return {
+          schemaVersion: "appaloft.resource.initial-access-credentials/v1",
+          resourceId,
+          items: [],
+        };
+      }
+    },
+    enabled: browser && resourceId.length > 0,
+    staleTime: 5_000,
+  }));
   const resourceSourceEventsQuery = createQuery(() =>
     orpc.sourceEvents.list.queryOptions({
       input: {
@@ -739,7 +877,7 @@
       )
       .map((resourceItem) => ({
         label: resourceItem.name,
-        href: resourceDetailHref(resourceItem),
+        href: resourceDetailHrefWithActiveSearch(resourceItem),
         selected: resourceItem.id === resourceId,
       })),
   );
@@ -1045,10 +1183,15 @@
   let domainBindingCreateDialogOpen = $state(false);
   let domainBindingDialogInitializedForResourceId = $state("");
   let domainBindingDialogOpenedLocally = $state(false);
+  let domainBindingDeleteDialogOpen = $state(false);
+  let domainBindingDeleteCandidateId = $state("");
+  let domainBindingDeleteConfirmation = $state("");
+  let domainBindingDeleteSafety = $state<DomainBindingDeleteSafety | null>(null);
   let serverId = $state("");
   let destinationId = $state("");
   let domainName = $state("");
   let pathPrefix = $state("/");
+  let pathHandling = $state<NonNullable<CreateDomainBindingInput["pathHandling"]>>("preserve");
   let tlsMode = $state<NonNullable<CreateDomainBindingInput["tlsMode"]>>("auto");
   let routeMode = $state<DomainRouteMode>("serve");
   let redirectTo = $state("");
@@ -1340,6 +1483,14 @@
   let diagnosticSummaryCopyResetTimeout: ReturnType<typeof setTimeout> | undefined;
   let accessUrlCopyState = $state<"idle" | "copied" | "failed">("idle");
   let accessUrlCopyResetTimeout: ReturnType<typeof setTimeout> | undefined;
+  let initialAccessCredentialFeedback = $state<Record<string, string>>({});
+  let initialAccessCredentialCopyState = $state<Record<string, "idle" | "copied" | "failed">>(
+    {},
+  );
+  let initialAccessCredentialCopyResetTimeout: ReturnType<typeof setTimeout> | undefined;
+  let revealedInitialAccessCredentials = $state<
+    Record<string, { readonly key: string; readonly value: string }>
+  >({});
   let resourceConfigCopyState = $state<{
     key: string;
     state: "copied" | "failed";
@@ -1420,8 +1571,9 @@
   const visibleResourceDetailTabs = $derived(
     resourceDetailTabs.filter(
       (tab) =>
-        resourceSupportsServerBackedRuntimeSurfaces ||
-        (tab !== "monitor" && tab !== "logs" && tab !== "terminal" && tab !== "jobs"),
+        (tab !== "audit-log" || resourceAuditLogTabVisible) &&
+        (resourceSupportsServerBackedRuntimeSurfaces ||
+          (tab !== "monitor" && tab !== "logs" && tab !== "terminal" && tab !== "jobs")),
     ),
   );
   const shouldShowServerField = $derived(
@@ -1471,6 +1623,48 @@
         ? $t(i18nKeys.console.resources.accessUrlCopyFailed)
         : $t(i18nKeys.console.resources.copyAccessUrl),
   );
+  const resourceInitialAccessCredentials = $derived(
+    resourceInitialAccessCredentialsQuery.data?.items ?? [],
+  );
+  const visibleResourceInitialAccessCredentials = $derived(
+    resourceInitialAccessCredentials.filter(
+      (credential) =>
+        credential.status === "pending" ||
+        Boolean(revealedInitialAccessCredentials[credential.credentialId]),
+    ),
+  );
+  const initialAccessCredentialClaimMutation = createMutation(() => ({
+    mutationFn: (credential: ResourceInitialAccessCredential) => {
+      if (!credential.claimEndpoint) {
+        throw new Error(
+          $t(i18nKeys.console.resources.initialAccessCredentialUnavailable),
+        );
+      }
+      return request<ResourceInitialAccessCredentialClaimResult>(credential.claimEndpoint, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({}),
+      });
+    },
+    onSuccess: (result) => {
+      revealedInitialAccessCredentials = {
+        ...revealedInitialAccessCredentials,
+        [result.credential.credentialId]: {
+          key: result.credential.key,
+          value: result.credential.value,
+        },
+      };
+      initialAccessCredentialFeedback = {
+        ...initialAccessCredentialFeedback,
+        [result.credential.credentialId]: $t(
+          i18nKeys.console.resources.initialAccessCredentialRevealedHint,
+        ),
+      };
+      void queryClient.invalidateQueries({
+        queryKey: ["resources", "initial-access-credentials", resourceId],
+      });
+    },
+  }));
   const sourceProfileStatusLabel = $derived(
     resourceDetail?.source
       ? $t(i18nKeys.common.status.configured)
@@ -1604,11 +1798,11 @@
   const selectedStorageVolume = $derived(
     storageVolumes.find((volume) => volume.id === storageAttachmentVolumeId) ?? null,
   );
-  const selectedStorageBackupVolume = $derived(
-    storageVolumes.find((volume) => volume.id === storageBackupVolumeId) ?? null,
+  const resourceStorageBackupAttachments = $derived(
+    resourceStorageAttachments.filter((attachment) => attachment.storageVolumeId),
   );
   const selectedStorageBackupAttachment = $derived(
-    resourceStorageAttachments.find(
+    resourceStorageBackupAttachments.find(
       (attachment) => attachment.storageVolumeId === storageBackupVolumeId,
     ) ?? null,
   );
@@ -1646,6 +1840,7 @@
         !isResourceArchived &&
         canPlanStorageBackupByCapability &&
         storageBackupVolumeId &&
+        selectedStorageBackupAttachment &&
         storageBackupTargetRef.trim() &&
         isPositiveIntegerText(storageBackupRetentionMaxCount) &&
         isPositiveIntegerText(storageBackupRetentionMinFreeBytes),
@@ -1670,6 +1865,9 @@
   );
   const selectedDnsConnectorBinding = $derived(
     resourceDomainBindings.find((binding) => binding.id === dnsConnectorBindingId) ?? null,
+  );
+  const selectedDomainBindingDeleteCandidate = $derived(
+    resourceDomainBindings.find((binding) => binding.id === domainBindingDeleteCandidateId) ?? null,
   );
   const dnsConnectorMatchedZoneName = $derived(
     dnsConnectorReadiness?.zoneMatch.zoneName ?? "",
@@ -1761,6 +1959,48 @@
       createFeedback = {
         kind: "error",
         title: $t(i18nKeys.console.domainBindings.confirmOwnershipErrorTitle),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const checkDomainBindingDeleteSafetyMutation = createMutation(() => ({
+    mutationFn: (input: { domainBindingId: string }) => orpcClient.domainBindings.deleteCheck(input),
+    onSuccess: (deleteSafety) => {
+      domainBindingDeleteSafety = deleteSafety;
+      createFeedback = {
+        kind: deleteSafety.safeToDelete ? "success" : "error",
+        title: deleteSafety.safeToDelete
+          ? $t(i18nKeys.console.domainBindings.deleteCheckSafeTitle)
+          : $t(i18nKeys.console.domainBindings.deleteCheckBlockedTitle),
+        detail: deleteSafety.safeToDelete
+          ? $t(i18nKeys.console.domainBindings.deleteSafetyPreserves)
+          : deleteSafety.blockers.map((blocker) => blocker.message).join(" "),
+      };
+    },
+    onError: (error) => {
+      createFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.domainBindings.deleteCheckErrorTitle),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const deleteDomainBindingMutation = createMutation(() => ({
+    mutationFn: (input: DeleteDomainBindingInput) => orpcClient.domainBindings.delete(input),
+    onSuccess: (_result, variables) => {
+      createFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.domainBindings.deleteSuccessTitle),
+        detail: variables.domainBindingId,
+      };
+      closeResourceDomainBindingDeleteDialog();
+      void queryClient.invalidateQueries({ queryKey: orpc.domainBindings.key({ type: "query" }) });
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
+    },
+    onError: (error) => {
+      createFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.domainBindings.deleteErrorTitle),
         detail: readErrorMessage(error),
       };
     },
@@ -1935,11 +2175,47 @@
 
     if (event.status === "failed") {
       deploymentProgressDialogStatus = "failed";
-    } else if (event.status === "succeeded") {
+    } else if (isTerminalDeploymentProgressEvent(event)) {
       deploymentProgressDialogStatus = "succeeded";
-    } else {
+    } else if (
+      deploymentProgressDialogStatus !== "succeeded" &&
+      deploymentProgressDialogStatus !== "failed"
+    ) {
       deploymentProgressDialogStatus = "running";
     }
+  }
+
+  function startDeploymentProgressDialog(): void {
+    deploymentProgressDialogOpen = true;
+    deploymentProgressDialogStatus = "running";
+    deploymentProgressEvents = [];
+    deploymentProgressStreamError = "";
+    deploymentProgressDeploymentId = "";
+    deploymentProgressRequestId = "";
+    deploymentProgressTraceLink = "";
+  }
+
+  async function observeAcceptedResourceDeployment(deploymentId: string): Promise<void> {
+    deploymentProgressDeploymentId = deploymentId;
+    await observeDeploymentProgressAfterAcceptance(deploymentId, appendDeploymentProgressEvent, {
+      onStreamError: (message) => {
+        deploymentProgressStreamError = message;
+      },
+    });
+  }
+
+  async function handleRedeployAccepted(
+    result: CreateDeploymentResponse,
+    title: string,
+  ): Promise<void> {
+    deploymentFeedback = {
+      kind: "success",
+      title,
+      detail: result.id,
+    };
+    await refreshResourceDeploymentData();
+    await observeAcceptedResourceDeployment(result.id);
+    await refreshResourceDeploymentData();
   }
 
   async function refreshResourceDeploymentData(): Promise<void> {
@@ -1998,6 +2274,7 @@
     destinationId = domainBindingUsesResourceRouteProvider ? "" : defaultDestinationId || destinationId;
     domainName = "";
     pathPrefix = "/";
+    pathHandling = "preserve";
     tlsMode = "auto";
     routeMode = "serve";
     redirectTo = "";
@@ -2032,6 +2309,25 @@
     if (modalIsOpen(page, "domain-binding")) {
       void setModalOpen(page, "domain-binding", false);
     }
+  }
+
+  function openResourceDomainBindingDeleteDialog(binding: DomainBindingSummary): void {
+    if (isResourceArchived || binding.status === "deleted") {
+      return;
+    }
+
+    domainBindingDeleteCandidateId = binding.id;
+    domainBindingDeleteConfirmation = "";
+    domainBindingDeleteSafety = null;
+    createFeedback = null;
+    domainBindingDeleteDialogOpen = true;
+  }
+
+  function closeResourceDomainBindingDeleteDialog(): void {
+    domainBindingDeleteDialogOpen = false;
+    domainBindingDeleteCandidateId = "";
+    domainBindingDeleteConfirmation = "";
+    domainBindingDeleteSafety = null;
   }
 
   function openDnsConnectorDialog(binding: DomainBindingSummary): void {
@@ -2434,13 +2730,7 @@
 
     deploymentCreatePending = true;
     deploymentFeedback = null;
-    deploymentProgressDialogOpen = true;
-    deploymentProgressDialogStatus = "running";
-    deploymentProgressEvents = [];
-    deploymentProgressStreamError = "";
-    deploymentProgressDeploymentId = "";
-    deploymentProgressRequestId = "";
-    deploymentProgressTraceLink = "";
+    startDeploymentProgressDialog();
 
     try {
       const result = await createDeploymentWithProgress(input, appendDeploymentProgressEvent, {
@@ -2699,15 +2989,11 @@
   const redeployResourceMutation = createMutation(() => ({
     mutationFn: (input: RedeployDeploymentInput) => orpcClient.deployments.redeploy(input),
     onSuccess: async (result) => {
-      deploymentFeedback = {
-        kind: "success",
-        title: $t(i18nKeys.console.resources.redeploySuccessTitle),
-        detail: result.id,
-      };
-      deploymentProgressDeploymentId = result.id;
-      await refreshResourceDeploymentData();
+      await handleRedeployAccepted(result, $t(i18nKeys.console.resources.redeploySuccessTitle));
     },
     onError: (error) => {
+      deploymentProgressDialogStatus = "failed";
+      deploymentProgressStreamError = readErrorMessage(error);
       deploymentFeedback = {
         kind: "error",
         title: $t(i18nKeys.console.resources.redeployErrorTitle),
@@ -2719,15 +3005,14 @@
     mutationFn: (input: ForceRedeployDeploymentInput) =>
       orpcClient.deployments.forceRedeploy(input),
     onSuccess: async (result) => {
-      deploymentFeedback = {
-        kind: "success",
-        title: $t(i18nKeys.console.resources.forceRedeploySuccessTitle),
-        detail: result.id,
-      };
-      deploymentProgressDeploymentId = result.id;
-      await refreshResourceDeploymentData();
+      await handleRedeployAccepted(
+        result,
+        $t(i18nKeys.console.resources.forceRedeploySuccessTitle),
+      );
     },
     onError: (error) => {
+      deploymentProgressDialogStatus = "failed";
+      deploymentProgressStreamError = readErrorMessage(error);
       deploymentFeedback = {
         kind: "error",
         title: $t(i18nKeys.console.resources.forceRedeployErrorTitle),
@@ -2962,6 +3247,7 @@
         detail: result.id,
       };
       storageBackupPlan = null;
+      storageBackupDialogOpen = false;
       void invalidateStorageBackupQueries();
     },
     onError: (error) => {
@@ -3551,6 +3837,27 @@
     }, 1800);
   }
 
+  function markInitialAccessCredentialCopyState(
+    credentialId: string,
+    state: "copied" | "failed",
+  ): void {
+    if (initialAccessCredentialCopyResetTimeout) {
+      clearTimeout(initialAccessCredentialCopyResetTimeout);
+    }
+
+    initialAccessCredentialCopyState = {
+      ...initialAccessCredentialCopyState,
+      [credentialId]: state,
+    };
+    initialAccessCredentialCopyResetTimeout = setTimeout(() => {
+      initialAccessCredentialCopyState = {
+        ...initialAccessCredentialCopyState,
+        [credentialId]: "idle",
+      };
+      initialAccessCredentialCopyResetTimeout = undefined;
+    }, 1800);
+  }
+
   async function copyTextToClipboard(text: string): Promise<void> {
     const desktopCopyText = (window as WindowWithAppaloftDesktopBridge).appaloftDesktop?.copyText;
     if (desktopCopyText) {
@@ -3643,6 +3950,64 @@
       markAccessUrlCopyState("copied");
     } catch {
       markAccessUrlCopyState("failed");
+    }
+  }
+
+  function initialAccessCredentialStatusLabel(
+    credential: ResourceInitialAccessCredential,
+  ): string {
+    if (credential.status === "pending") {
+      return $t(i18nKeys.console.resources.initialAccessCredentialPending);
+    }
+    if (credential.status === "expired") {
+      return $t(i18nKeys.console.resources.initialAccessCredentialExpired);
+    }
+    return $t(i18nKeys.console.resources.initialAccessCredentialRevealed);
+  }
+
+  function canClaimInitialAccessCredential(
+    credential: ResourceInitialAccessCredential,
+  ): boolean {
+    return credential.status === "pending" && Boolean(credential.claimEndpoint);
+  }
+
+  async function claimInitialAccessCredential(
+    credential: ResourceInitialAccessCredential,
+  ): Promise<void> {
+    initialAccessCredentialFeedback = {
+      ...initialAccessCredentialFeedback,
+      [credential.credentialId]: "",
+    };
+    try {
+      await initialAccessCredentialClaimMutation.mutateAsync(credential);
+    } catch (error) {
+      initialAccessCredentialFeedback = {
+        ...initialAccessCredentialFeedback,
+        [credential.credentialId]: readErrorMessage(error),
+      };
+    }
+  }
+
+  function initialAccessCredentialCopyLabel(credentialId: string): string {
+    const state = initialAccessCredentialCopyState[credentialId] ?? "idle";
+    if (state === "copied") {
+      return $t(i18nKeys.console.resources.initialAccessCredentialCopied);
+    }
+    if (state === "failed") {
+      return $t(i18nKeys.console.resources.initialAccessCredentialCopyFailed);
+    }
+    return $t(i18nKeys.console.resources.initialAccessCredentialCopy);
+  }
+
+  async function copyInitialAccessCredential(credentialId: string): Promise<void> {
+    const revealed = revealedInitialAccessCredentials[credentialId];
+    if (!browser || !revealed) return;
+
+    try {
+      await copyTextToClipboard(revealed.value);
+      markInitialAccessCredentialCopyState(credentialId, "copied");
+    } catch {
+      markInitialAccessCredentialCopyState(credentialId, "failed");
     }
   }
 
@@ -4154,9 +4519,8 @@
       storageRuntimeCleanupVolumeId = storageVolumes[0]?.id ?? "";
     }
 
-    if (!storageBackupVolumeId && storageVolumes.length > 0) {
-      storageBackupVolumeId =
-        resourceStorageAttachments[0]?.storageVolumeId ?? storageVolumes[0]?.id ?? "";
+    if (!storageBackupVolumeId && resourceStorageBackupAttachments.length > 0) {
+      storageBackupVolumeId = resourceStorageBackupAttachments[0]?.storageVolumeId ?? "";
     }
 
     if (
@@ -4169,30 +4533,21 @@
 
     if (
       storageBackupVolumeId &&
-      !storageVolumes.some((volume) => volume.id === storageBackupVolumeId)
+      !resourceStorageBackupAttachments.some(
+        (attachment) => attachment.storageVolumeId === storageBackupVolumeId,
+      )
     ) {
-      storageBackupVolumeId =
-        resourceStorageAttachments[0]?.storageVolumeId ?? storageVolumes[0]?.id ?? "";
+      storageBackupVolumeId = resourceStorageBackupAttachments[0]?.storageVolumeId ?? "";
       storageBackupPlan = null;
       storageBackupFeedback = null;
     }
 
-    const backupAttachment = resourceStorageAttachments.find(
+    const backupAttachment = resourceStorageBackupAttachments.find(
       (attachment) => attachment.storageVolumeId === storageBackupVolumeId,
     );
     if (backupAttachment) {
-      if (
-        backupAttachment.destinationPath &&
-        (!storageBackupDestinationPath || storageBackupDestinationPath === "/data")
-      ) {
-        storageBackupDestinationPath = backupAttachment.destinationPath;
-      }
-      if (
-        backupAttachment.dataFormat &&
-        (!storageBackupDataFormat || storageBackupDataFormat === "unknown")
-      ) {
-        storageBackupDataFormat = backupAttachment.dataFormat;
-      }
+      storageBackupDestinationPath = backupAttachment.destinationPath || "/data";
+      storageBackupDataFormat = backupAttachment.dataFormat ?? "unknown";
     }
 
     if (!storageRuntimeCleanupServerId) {
@@ -4467,6 +4822,7 @@
         : {}),
       domainName: submittedDomainName,
       pathPrefix: submittedPathPrefix,
+      pathHandling: routeMode === "serve" ? pathHandling : "preserve",
       proxyKind: "traefik",
       tlsMode,
       ...(routeMode === "redirect"
@@ -4994,6 +5350,7 @@
     }
 
     deploymentFeedback = null;
+    startDeploymentProgressDialog();
     const input = {
       resourceId: resource.id,
       projectId: resource.projectId,
@@ -5194,13 +5551,13 @@
 
   function openStorageBackupDialog(volume?: StorageVolumeSummary): void {
     const targetVolumeId =
-      volume?.id ?? storageBackupVolumeId ?? resourceStorageAttachments[0]?.storageVolumeId ?? "";
-    const attachment = resourceStorageAttachments.find(
+      volume?.id ?? storageBackupVolumeId ?? resourceStorageBackupAttachments[0]?.storageVolumeId ?? "";
+    const attachment = resourceStorageBackupAttachments.find(
       (candidate) => candidate.storageVolumeId === targetVolumeId,
     );
 
-    storageBackupVolumeId = targetVolumeId;
-    storageBackupDestinationPath = attachment?.destinationPath ?? "/data";
+    storageBackupVolumeId = attachment?.storageVolumeId ?? "";
+    storageBackupDestinationPath = attachment?.destinationPath || "/data";
     storageBackupDataFormat = attachment?.dataFormat ?? "unknown";
     storageBackupFeedback = null;
     storageBackupPlan = null;
@@ -5459,6 +5816,31 @@
     });
   }
 
+  function checkResourceDomainBindingDeleteSafety(binding: DomainBindingSummary): void {
+    if (checkDomainBindingDeleteSafetyMutation.isPending) {
+      return;
+    }
+
+    createFeedback = null;
+    checkDomainBindingDeleteSafetyMutation.mutate({ domainBindingId: binding.id });
+  }
+
+  function deleteResourceDomainBinding(binding: DomainBindingSummary): void {
+    if (
+      deleteDomainBindingMutation.isPending ||
+      !domainBindingDeleteSafety?.safeToDelete ||
+      domainBindingDeleteConfirmation.trim() !== binding.id
+    ) {
+      return;
+    }
+
+    createFeedback = null;
+    deleteDomainBindingMutation.mutate({
+      domainBindingId: binding.id,
+      confirmation: { domainBindingId: domainBindingDeleteConfirmation.trim() },
+    });
+  }
+
   const selectedImportBinding = $derived(
     resourceDomainBindings.find((binding) => binding.id === importBindingId) ?? null,
   );
@@ -5613,6 +5995,7 @@
       case "logs":
       case "terminal":
       case "previews":
+      case "audit-log":
         return [];
     }
   }
@@ -5650,6 +6033,27 @@
 
     const search = params.toString();
     return `${page.url.pathname}${search ? `?${search}` : ""}`;
+  }
+
+  function resourceDetailHrefWithActiveSearch(
+    resource: Parameters<typeof resourceDetailHref>[0],
+  ): string {
+    const params = new URLSearchParams();
+    const defaultSection = resourceDefaultSectionForTab(activeTab);
+
+    if (activeTab !== "overview") {
+      params.set("tab", activeTab);
+    }
+
+    if (
+      activeTab !== "overview" &&
+      resourceSectionsForTab(activeTab).length > 0 &&
+      activeResourceSection !== defaultSection
+    ) {
+      params.set("section", activeResourceSection);
+    }
+
+    return hrefWithSearchParams(resourceDetailHref(resource), params);
   }
 
   function resourceSectionTab(section: ResourceDetailSection): ResourceDetailTab {
@@ -5705,6 +6109,8 @@
         return $t(i18nKeys.console.resources.previewEnvironmentsTab);
       case "jobs":
         return $t(i18nKeys.console.resources.jobsTab);
+      case "audit-log":
+        return $t(i18nKeys.console.auditLog.title);
       case "settings":
         return $t(i18nKeys.console.resources.settingsTab);
     }
@@ -6033,6 +6439,10 @@
 
   function storageVolumeOptionLabel(volume: StorageVolumeSummary): string {
     return `${volume.name} (${storageVolumeKindLabel(volume.kind)})`;
+  }
+
+  function storageBackupAttachmentOptionLabel(attachment: ResourceStorageAttachmentSummary): string {
+    return `${storageAttachmentApplicationDataLabel(attachment)} (${storageAttachmentVolumeLabel(attachment)})`;
   }
 
   function storageVolumeCurrentResourceAttachments(
@@ -7175,7 +7585,7 @@
     <div class={detailBodyClass}>
       <ScrollArea class={detailTabsScrollAreaClass}>
         <nav aria-label={$t(i18nKeys.console.resources.overviewTitle)} class={detailTabsClass}>
-          {#each resourceDetailTabs as tab (tab)}
+          {#each visibleResourceDetailTabs as tab (tab)}
             <a
               id={`resource-tab-${tab}`}
               href={resourceTabHref(tab)}
@@ -7351,7 +7761,7 @@
       label: resource?.name ?? $t(i18nKeys.common.domain.resource),
       kind: "resource",
       loading: resourceHeaderLoading,
-      href: resource ? resourceDetailHref(resource) : undefined,
+      href: resource ? resourceDetailHrefWithActiveSearch(resource) : undefined,
       switcherLabel: $t(i18nKeys.console.resources.pageTitle),
       switcherItems: resourceHeaderSwitchItems,
     },
@@ -8494,6 +8904,106 @@
                 </section>
               </div>
 
+              {#if visibleResourceInitialAccessCredentials.length > 0}
+                <section
+                  class="rounded-md border bg-background p-4"
+                  data-resource-initial-access-credentials
+                >
+                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div class="min-w-0">
+                      <h3 class="flex items-center gap-2 text-base font-semibold">
+                        <KeyRound class="size-4 text-muted-foreground" />
+                        {$t(i18nKeys.console.resources.initialAccessCredentialsTitle)}
+                      </h3>
+                      <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                        {$t(i18nKeys.console.resources.initialAccessCredentialsDescription)}
+                      </p>
+                    </div>
+                  </div>
+                  <div class="mt-4 grid gap-3">
+                    {#each visibleResourceInitialAccessCredentials as credential (credential.credentialId)}
+                      {@const revealedCredential = revealedInitialAccessCredentials[credential.credentialId]}
+                      <article
+                        class="rounded-md border border-border bg-muted/25 p-3"
+                        data-resource-initial-access-credential
+                      >
+                        <div class="space-y-3">
+                          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div class="min-w-0 space-y-2">
+                              <div class="flex flex-wrap items-center gap-2">
+                                <p class="font-mono text-sm font-semibold">{credential.key}</p>
+                                {#if !revealedCredential}
+                                  <Badge variant="outline">
+                                    {initialAccessCredentialStatusLabel(credential)}
+                                  </Badge>
+                                {/if}
+                              </div>
+                              {#if !revealedCredential}
+                                <p class="text-xs leading-5 text-muted-foreground">
+                                  {#if credential.expiresAt && credential.status === "pending"}
+                                    {$t(i18nKeys.console.resources.initialAccessCredentialExpiresAt)}
+                                    <span class="font-mono">{formatTime(credential.expiresAt)}</span>
+                                  {:else if credential.resetRequired}
+                                    {$t(i18nKeys.console.resources.initialAccessCredentialResetRequired)}
+                                  {/if}
+                                </p>
+                              {/if}
+                            </div>
+                            {#if !revealedCredential && canClaimInitialAccessCredential(credential)}
+                              <Button
+                                type="button"
+                                size="sm"
+                                class="shrink-0"
+                                disabled={initialAccessCredentialClaimMutation.isPending}
+                                onclick={() => claimInitialAccessCredential(credential)}
+                              >
+                                <KeyRound class="size-4" />
+                                {$t(i18nKeys.console.resources.initialAccessCredentialReveal)}
+                              </Button>
+                            {/if}
+                          </div>
+
+                          {#if revealedCredential}
+                            <div
+                              class="flex flex-col gap-3 rounded-md border bg-background p-3 sm:flex-row sm:items-start sm:justify-between"
+                            >
+                              <div class="min-w-0 flex-1">
+                                <p class="text-xs text-muted-foreground">
+                                  {$t(i18nKeys.console.resources.initialAccessCredentialValueLabel)}
+                                </p>
+                                <p class="mt-1 break-all font-mono text-sm">
+                                  {revealedCredential.value}
+                                </p>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                class="shrink-0"
+                                onclick={() => copyInitialAccessCredential(credential.credentialId)}
+                              >
+                                {#if initialAccessCredentialCopyState[credential.credentialId] === "copied"}
+                                  <Check class="size-4" />
+                                {:else}
+                                  <Copy class="size-4" />
+                                {/if}
+                                {initialAccessCredentialCopyLabel(credential.credentialId)}
+                              </Button>
+                            </div>
+                          {/if}
+
+                          {#if initialAccessCredentialFeedback[credential.credentialId]}
+                            <p class="text-xs leading-5 text-muted-foreground">
+                              {initialAccessCredentialFeedback[credential.credentialId]}
+                            </p>
+                          {/if}
+                        </div>
+                      </article>
+                    {/each}
+                  </div>
+                </section>
+              {/if}
+
               <div class="grid gap-4 xl:grid-cols-3">
                 <section class="rounded-md border bg-background p-4 xl:col-span-2">
                   <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -8633,6 +9143,15 @@
                 {resourceId}
               />
             </section>
+          </div>
+        {:else if activeTab === "audit-log" && resourceAuditLogTabVisible}
+          <div class={detailTabPanelFlushClass}>
+            <ConsoleExtensionPage
+              projectId={resourceProjectId}
+              environmentId={resourceEnvironmentId}
+              {resourceId}
+              embedded
+            />
           </div>
         {:else if activeTab === "networking" || activeTab === "configuration" || activeTab === "dependencies" || activeTab === "settings"}
           <div class={detailTabPanelSubnavClass}>
@@ -8957,6 +9476,7 @@
                                   </Badge>
                                   <Badge variant="outline">{binding.proxyKind}</Badge>
                                   <Badge variant="secondary">{binding.tlsMode}</Badge>
+                                  <Badge variant="outline">{binding.pathHandling ?? "preserve"}</Badge>
                                 </div>
                                 <div class="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2 xl:grid-cols-4">
                                   <span>
@@ -9019,6 +9539,17 @@
                                   >
                                     <Globe2 class="size-4" />
                                     {$t(i18nKeys.console.domainBindings.dnsConnectorConfigure)}
+                                  </Button>
+                                  <Button
+                                    id={`resource-domain-binding-delete-action-${binding.id}`}
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={isResourceArchived || binding.status === "deleted"}
+                                    onclick={() => openResourceDomainBindingDeleteDialog(binding)}
+                                  >
+                                    <Trash2 class="size-4" />
+                                    {$t(i18nKeys.console.domainBindings.deleteBinding)}
                                   </Button>
                                 </div>
                               </div>
@@ -9151,7 +9682,7 @@
                           {/if}
                         </div>
                         <dl class="mt-4 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
-                          <div class="rounded-md bg-muted/25 px-3 py-2">
+                          <div class="rounded-md border bg-muted/25 px-3 py-2">
                             <dt class="text-xs text-muted-foreground">
                               {$t(i18nKeys.common.domain.deployment)}
                             </dt>
@@ -9159,7 +9690,7 @@
                               {proxyConfiguration.deploymentId ?? proxyConfiguration.lastAppliedDeploymentId ?? "-"}
                             </dd>
                           </div>
-                          <div class="rounded-md bg-muted/25 px-3 py-2">
+                          <div class="rounded-md border bg-muted/25 px-3 py-2">
                             <dt class="text-xs text-muted-foreground">
                               {$t(i18nKeys.console.resources.proxyConfigurationGeneratedAt)}
                             </dt>
@@ -9167,13 +9698,13 @@
                               {formatTime(proxyConfiguration.generatedAt)}
                             </dd>
                           </div>
-                          <div class="rounded-md bg-muted/25 px-3 py-2">
+                          <div class="rounded-md border bg-muted/25 px-3 py-2">
                             <dt class="text-xs text-muted-foreground">
                               {$t(i18nKeys.console.domainBindings.routeReadiness)}
                             </dt>
                             <dd class="mt-1 font-medium">{proxyConfiguration.routes.length}</dd>
                           </div>
-                          <div class="rounded-md bg-muted/25 px-3 py-2">
+                          <div class="rounded-md border bg-muted/25 px-3 py-2">
                             <dt class="text-xs text-muted-foreground">
                               {$t(i18nKeys.console.resources.profileDiagnosticsTitle)}
                             </dt>
@@ -9197,7 +9728,7 @@
                                     {route.url}
                                   </a>
                                   <p class="mt-1 text-xs text-muted-foreground">
-                                    {route.source} · {route.scheme} · {route.pathPrefix}
+                                    {route.source} · {route.scheme} · {route.pathPrefix} · {route.pathHandling ?? "preserve"}
                                   </p>
                                 </div>
                                 <div class="flex flex-wrap gap-2">
@@ -9977,124 +10508,56 @@
                           </p>
                         </div>
                         <div class="flex flex-wrap items-center gap-2">
-                          <Badge variant="outline">{storageVolumes.length}</Badge>
+                          <Badge variant="outline">{resourceStorageBackupAttachments.length}</Badge>
                           <Badge variant="secondary">
                             {$t(i18nKeys.console.resources.storageBackupLocalOnly)}
                           </Badge>
+                          <Button
+                            type="button"
+                            size="sm"
+                            disabled={resourceStorageBackupAttachments.length === 0 ||
+                              !canPlanStorageBackupByCapability ||
+                              isResourceArchived}
+                            onclick={() => openStorageBackupDialog()}
+                          >
+                            <Archive class="size-4" />
+                            {$t(i18nKeys.console.resources.storageBackupCreateAction)}
+                          </Button>
                         </div>
                       </div>
 
-                      {#if storageVolumes.length === 0}
+                      {#if resourceStorageBackupAttachments.length === 0}
                         <div class="mt-4 rounded-md border border-dashed bg-muted/25 px-4 py-6 text-sm text-muted-foreground">
                           {$t(i18nKeys.console.resources.storageVolumesEmpty)}
                         </div>
                       {:else}
-                        <form
-                          class="mt-4 space-y-4"
-                          onsubmit={(event) => {
-                            event.preventDefault();
-                            planStorageBackup();
-                          }}
-                          data-resource-storage-backup-form
-                        >
-                          <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                            <label class="space-y-1.5 text-sm font-medium">
-                              <span>{$t(i18nKeys.console.resources.storageVolumeSelect)}</span>
-                              <Select.Root bind:value={storageBackupVolumeId} type="single">
-                                <Select.Trigger class="w-full">
-                                  {selectedStorageBackupVolume
-                                    ? storageVolumeOptionLabel(selectedStorageBackupVolume)
-                                    : $t(i18nKeys.console.resources.storageVolumeSelect)}
-                                </Select.Trigger>
-                                <Select.Content>
-                                  {#each storageVolumes as volume (volume.id)}
-                                    <Select.Item value={volume.id}>
-                                      {storageVolumeOptionLabel(volume)}
-                                    </Select.Item>
-                                  {/each}
-                                </Select.Content>
-                              </Select.Root>
-                            </label>
-                            <label class="space-y-1.5 text-sm font-medium" for="resource-storage-backup-destination-path">
-                              <span>{$t(i18nKeys.console.resources.storageBackupDestinationPath)}</span>
-                              <Input
-                                id="resource-storage-backup-destination-path"
-                                bind:value={storageBackupDestinationPath}
-                                spellcheck={false}
-                                autocomplete="off"
-                                placeholder={selectedStorageBackupAttachment?.destinationPath ?? "/data"}
-                              />
-                            </label>
-                            <label class="space-y-1.5 text-sm font-medium">
-                              <span>{$t(i18nKeys.console.resources.storageBackupDataFormat)}</span>
-                              <Select.Root bind:value={storageBackupDataFormat} type="single">
-                                <Select.Trigger class="w-full">
-                                  {storageBackupDataFormat}
-                                </Select.Trigger>
-                                <Select.Content>
-                                  <Select.Item value="sqlite">sqlite</Select.Item>
-                                  <Select.Item value="filesystem">filesystem</Select.Item>
-                                  <Select.Item value="json-files">json-files</Select.Item>
-                                  <Select.Item value="application-export">application-export</Select.Item>
-                                  <Select.Item value="unknown">unknown</Select.Item>
-                                </Select.Content>
-                              </Select.Root>
-                            </label>
-                            <label class="space-y-1.5 text-sm font-medium">
-                              <span>{$t(i18nKeys.console.resources.storageBackupConsistency)}</span>
-                              <Select.Root bind:value={storageBackupConsistency} type="single">
-                                <Select.Trigger class="w-full">
-                                  {storageBackupConsistency}
-                                </Select.Trigger>
-                                <Select.Content>
-                                  <Select.Item value="application-consistent">application-consistent</Select.Item>
-                                  <Select.Item value="quiesced">quiesced</Select.Item>
-                                  <Select.Item value="crash-consistent">crash-consistent</Select.Item>
-                                  <Select.Item value="provider-snapshot-consistent">provider-snapshot-consistent</Select.Item>
-                                </Select.Content>
-                              </Select.Root>
-                            </label>
-                            <label class="space-y-1.5 text-sm font-medium" for="resource-storage-backup-target-ref">
-                              <span>{$t(i18nKeys.console.resources.storageBackupTargetRef)}</span>
-                              <Input
-                                id="resource-storage-backup-target-ref"
-                                bind:value={storageBackupTargetRef}
-                                spellcheck={false}
-                                autocomplete="off"
-                              />
-                            </label>
-                            <div class="grid gap-3 sm:grid-cols-2 xl:col-span-1">
-                              <label class="space-y-1.5 text-sm font-medium" for="resource-storage-backup-retention-max-count">
-                                <span>{$t(i18nKeys.console.resources.storageBackupRetentionMaxCount)}</span>
-                                <Input
-                                  id="resource-storage-backup-retention-max-count"
-                                  bind:value={storageBackupRetentionMaxCount}
-                                  inputmode="numeric"
-                                  autocomplete="off"
-                                />
-                              </label>
-                              <label class="space-y-1.5 text-sm font-medium" for="resource-storage-backup-retention-min-free-bytes">
-                                <span>{$t(i18nKeys.console.resources.storageBackupRetentionMinFreeBytes)}</span>
-                                <Input
-                                  id="resource-storage-backup-retention-min-free-bytes"
-                                  bind:value={storageBackupRetentionMinFreeBytes}
-                                  inputmode="numeric"
-                                  autocomplete="off"
-                                />
-                              </label>
+                        <div class="mt-5 space-y-3">
+                          {#if selectedStorageBackupAttachment}
+                            <div class="grid gap-3 rounded-md border bg-muted/15 p-3 text-sm md:grid-cols-3">
+                              <div class="min-w-0">
+                                <p class="text-xs text-muted-foreground">
+                                  {$t(i18nKeys.console.resources.storageVolumeSelect)}
+                                </p>
+                                <p class="truncate font-medium">
+                                  {storageBackupAttachmentOptionLabel(selectedStorageBackupAttachment)}
+                                </p>
+                              </div>
+                              <div>
+                                <p class="text-xs text-muted-foreground">
+                                  {$t(i18nKeys.console.resources.storageBackupDestinationPath)}
+                                </p>
+                                <p class="font-mono text-sm">{storageBackupDestinationPath}</p>
+                              </div>
+                              <div>
+                                <p class="text-xs text-muted-foreground">
+                                  {$t(i18nKeys.console.resources.storageBackupDataFormat)}
+                                </p>
+                                <p class="font-mono text-sm">{storageBackupDataFormat}</p>
+                              </div>
                             </div>
-                          </div>
+                          {/if}
 
-                          <label class="flex items-center gap-2 text-sm text-muted-foreground">
-                            <input
-                              bind:checked={storageBackupLiveWrites}
-                              type="checkbox"
-                              class="size-4 rounded border-border text-primary"
-                            />
-                            {$t(i18nKeys.console.resources.storageBackupLiveWrites)}
-                          </label>
-
-                          {#if storageBackupFeedback}
+                          {#if storageBackupFeedback && !storageBackupDialogOpen}
                             <div
                               class={[
                                 "rounded-md border px-3 py-2 text-sm",
@@ -10108,44 +10571,6 @@
                             </div>
                           {/if}
 
-                          {#if storageBackupPlan}
-                            <div class="rounded-md border bg-muted/20 px-3 py-2 text-sm">
-                              <div class="flex flex-wrap items-center gap-2">
-                                <Badge variant={storageBackupPlan.blockers.length > 0 ? "destructive" : "outline"}>
-                                  {storageBackupPlan.consistency}
-                                </Badge>
-                                <Badge variant="secondary">{storageBackupPlan.sourceAdapterKey}</Badge>
-                                <Badge variant={storageBackupPlan.localOnly ? "secondary" : "outline"}>
-                                  {storageBackupPlan.targetProviderKey}
-                                </Badge>
-                              </div>
-                              <p class="mt-2 break-all text-xs text-muted-foreground">
-                                {storageBackupPlanSummary(storageBackupPlan)}
-                              </p>
-                            </div>
-                          {/if}
-
-                          <div class="flex flex-wrap justify-end gap-2">
-                            <Button
-                              type="submit"
-                              variant="outline"
-                              disabled={!canPlanStorageBackup || planStorageVolumeBackupMutation.isPending}
-                            >
-                              <RefreshCw class={["size-4", planStorageVolumeBackupMutation.isPending ? "animate-spin" : ""]} />
-                              {$t(i18nKeys.console.resources.storageBackupPlanAction)}
-                            </Button>
-                            <Button
-                              type="button"
-                              disabled={!canCreateStorageBackup || createStorageVolumeBackupMutation.isPending}
-                              onclick={createStorageBackup}
-                            >
-                              <Archive class="size-4" />
-                              {$t(i18nKeys.console.resources.storageBackupCreateAction)}
-                            </Button>
-                          </div>
-                        </form>
-
-                        <div class="mt-5 space-y-3">
                           <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                             <p class="text-sm font-medium">
                               {$t(i18nKeys.console.resources.storageVolumeBackupSummaryTitle)}
@@ -10605,6 +11030,185 @@
           </div>
         {/if}
       </div>
+
+      <Dialog.Root bind:open={storageBackupDialogOpen}>
+        <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-2xl">
+          <Dialog.Header>
+            <Dialog.Title>{$t(i18nKeys.console.resources.storageBackupCreateAction)}</Dialog.Title>
+            <Dialog.Description>
+              {$t(i18nKeys.console.resources.storageBackupDescription)}
+            </Dialog.Description>
+          </Dialog.Header>
+
+          <form
+            class="space-y-5 px-5 pb-5"
+            onsubmit={(event) => {
+              event.preventDefault();
+              planStorageBackup();
+            }}
+            data-resource-storage-backup-form
+          >
+            <section class="grid gap-4 rounded-md border bg-background p-4 sm:grid-cols-2">
+              <div class="space-y-1.5 text-sm font-medium sm:col-span-2">
+                <span>{$t(i18nKeys.console.resources.storageVolumeSelect)}</span>
+                {#if resourceStorageBackupAttachments.length > 1}
+                  <Select.Root bind:value={storageBackupVolumeId} type="single">
+                    <Select.Trigger class="w-full min-w-0">
+                      <span class="block truncate">
+                        {selectedStorageBackupAttachment
+                          ? storageBackupAttachmentOptionLabel(selectedStorageBackupAttachment)
+                          : $t(i18nKeys.console.resources.storageVolumeSelect)}
+                      </span>
+                    </Select.Trigger>
+                    <Select.Content>
+                      {#each resourceStorageBackupAttachments as attachment (attachment.id)}
+                        <Select.Item value={attachment.storageVolumeId}>
+                          {storageBackupAttachmentOptionLabel(attachment)}
+                        </Select.Item>
+                      {/each}
+                    </Select.Content>
+                  </Select.Root>
+                {:else if selectedStorageBackupAttachment}
+                  <p class="truncate rounded-md border bg-muted/20 px-3 py-2 font-medium">
+                    {storageBackupAttachmentOptionLabel(selectedStorageBackupAttachment)}
+                  </p>
+                {:else}
+                  <p class="rounded-md border border-dashed bg-muted/25 px-3 py-2 text-muted-foreground">
+                    {$t(i18nKeys.console.resources.storageVolumesEmpty)}
+                  </p>
+                {/if}
+              </div>
+
+              <div class="space-y-1.5 text-sm font-medium">
+                <span>{$t(i18nKeys.console.resources.storageBackupDestinationPath)}</span>
+                <p
+                  id="resource-storage-backup-destination-path"
+                  class="rounded-md border bg-muted/20 px-3 py-2 font-mono text-sm"
+                >
+                  {storageBackupDestinationPath}
+                </p>
+              </div>
+
+              <div class="space-y-1.5 text-sm font-medium">
+                <span>{$t(i18nKeys.console.resources.storageBackupDataFormat)}</span>
+                <p
+                  id="resource-storage-backup-data-format"
+                  class="rounded-md border bg-muted/20 px-3 py-2 font-mono text-sm"
+                >
+                  {storageBackupDataFormat}
+                </p>
+              </div>
+
+              <label class="space-y-1.5 text-sm font-medium">
+                <span>{$t(i18nKeys.console.resources.storageBackupConsistency)}</span>
+                <Select.Root bind:value={storageBackupConsistency} type="single">
+                  <Select.Trigger class="w-full">
+                    {storageBackupConsistency}
+                  </Select.Trigger>
+                  <Select.Content>
+                    <Select.Item value="application-consistent">application-consistent</Select.Item>
+                    <Select.Item value="quiesced">quiesced</Select.Item>
+                    <Select.Item value="crash-consistent">crash-consistent</Select.Item>
+                    <Select.Item value="provider-snapshot-consistent">provider-snapshot-consistent</Select.Item>
+                  </Select.Content>
+                </Select.Root>
+              </label>
+
+              <label class="space-y-1.5 text-sm font-medium" for="resource-storage-backup-target-ref">
+                <span>{$t(i18nKeys.console.resources.storageBackupTargetRef)}</span>
+                <Input
+                  id="resource-storage-backup-target-ref"
+                  bind:value={storageBackupTargetRef}
+                  spellcheck={false}
+                  autocomplete="off"
+                />
+              </label>
+
+              <label class="space-y-1.5 text-sm font-medium" for="resource-storage-backup-retention-max-count">
+                <span>{$t(i18nKeys.console.resources.storageBackupRetentionMaxCount)}</span>
+                <Input
+                  id="resource-storage-backup-retention-max-count"
+                  bind:value={storageBackupRetentionMaxCount}
+                  inputmode="numeric"
+                  autocomplete="off"
+                />
+              </label>
+
+              <label class="space-y-1.5 text-sm font-medium" for="resource-storage-backup-retention-min-free-bytes">
+                <span>{$t(i18nKeys.console.resources.storageBackupRetentionMinFreeBytes)}</span>
+                <Input
+                  id="resource-storage-backup-retention-min-free-bytes"
+                  bind:value={storageBackupRetentionMinFreeBytes}
+                  inputmode="numeric"
+                  autocomplete="off"
+                />
+              </label>
+            </section>
+
+            <label class="flex items-center gap-2 text-sm text-muted-foreground">
+              <input
+                bind:checked={storageBackupLiveWrites}
+                type="checkbox"
+                class="size-4 rounded border-border text-primary"
+              />
+              {$t(i18nKeys.console.resources.storageBackupLiveWrites)}
+            </label>
+
+            {#if storageBackupFeedback}
+              <div
+                class={[
+                  "rounded-md border px-3 py-2 text-sm",
+                  storageBackupFeedback.kind === "success"
+                    ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-700"
+                    : "border-destructive/30 bg-destructive/5 text-destructive",
+                ]}
+              >
+                <p class="font-medium">{storageBackupFeedback.title}</p>
+                <p class="mt-1 break-all text-xs">{storageBackupFeedback.detail}</p>
+              </div>
+            {/if}
+
+            {#if storageBackupPlan}
+              <div class="rounded-md border bg-muted/20 px-3 py-2 text-sm">
+                <div class="flex flex-wrap items-center gap-2">
+                  <Badge variant={storageBackupPlan.blockers.length > 0 ? "destructive" : "outline"}>
+                    {storageBackupPlan.consistency}
+                  </Badge>
+                  <Badge variant="secondary">{storageBackupPlan.sourceAdapterKey}</Badge>
+                  <Badge variant={storageBackupPlan.localOnly ? "secondary" : "outline"}>
+                    {storageBackupPlan.targetProviderKey}
+                  </Badge>
+                </div>
+                <p class="mt-2 break-all text-xs text-muted-foreground">
+                  {storageBackupPlanSummary(storageBackupPlan)}
+                </p>
+              </div>
+            {/if}
+
+            <Dialog.Footer class="px-0 pb-0">
+              <Button type="button" variant="outline" onclick={() => (storageBackupDialogOpen = false)}>
+                {$t(i18nKeys.common.actions.cancel)}
+              </Button>
+              <Button
+                type="submit"
+                variant="outline"
+                disabled={!canPlanStorageBackup || planStorageVolumeBackupMutation.isPending}
+              >
+                <RefreshCw class={["size-4", planStorageVolumeBackupMutation.isPending ? "animate-spin" : ""]} />
+                {$t(i18nKeys.console.resources.storageBackupPlanAction)}
+              </Button>
+              <Button
+                type="button"
+                disabled={!canCreateStorageBackup || createStorageVolumeBackupMutation.isPending}
+                onclick={createStorageBackup}
+              >
+                <Archive class="size-4" />
+                {$t(i18nKeys.console.resources.storageBackupCreateAction)}
+              </Button>
+            </Dialog.Footer>
+          </form>
+        </Dialog.Content>
+      </Dialog.Root>
 
       <Dialog.Root bind:open={configEditorDialogOpen}>
         <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-3xl">
@@ -11115,6 +11719,21 @@
                     />
                   </label>
 
+                  {#if routeMode === "serve"}
+                    <label class="space-y-1.5 text-sm font-medium">
+                      <span>路径转发</span>
+                      <Select.Root bind:value={pathHandling} type="single">
+                        <Select.Trigger class="w-full">
+                          {pathHandling === "strip" ? "剥离前缀" : "保留路径"}
+                        </Select.Trigger>
+                        <Select.Content>
+                          <Select.Item value="preserve">保留路径</Select.Item>
+                          <Select.Item value="strip">剥离前缀</Select.Item>
+                        </Select.Content>
+                      </Select.Root>
+                    </label>
+                  {/if}
+
                   <label class="space-y-1.5 text-sm font-medium">
                     <span>{$t(i18nKeys.common.domain.routeBehavior)}</span>
                     <Select.Root bind:value={routeMode} type="single">
@@ -11297,6 +11916,109 @@
               </Button>
             </Dialog.Footer>
           </form>
+        </Dialog.Content>
+      </Dialog.Root>
+
+      <Dialog.Root
+        bind:open={domainBindingDeleteDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeResourceDomainBindingDeleteDialog();
+          }
+        }}
+      >
+        <Dialog.Content
+          closeLabel={$t(i18nKeys.common.actions.close)}
+          data-resource-domain-binding-delete-dialog
+          class="sm:max-w-lg"
+        >
+          <Dialog.Header>
+            <Dialog.Title>{$t(i18nKeys.console.domainBindings.deleteDialogTitle)}</Dialog.Title>
+            <Dialog.Description>
+              {$t(i18nKeys.console.domainBindings.deleteDialogDescription)}
+            </Dialog.Description>
+          </Dialog.Header>
+
+          {#if selectedDomainBindingDeleteCandidate}
+            <div class="space-y-4 px-5 pb-5">
+              <div class="rounded-md border bg-muted/20 px-3 py-2 text-sm">
+                <p class="break-all font-medium">{domainBindingHref(selectedDomainBindingDeleteCandidate)}</p>
+                <p class="mt-1 font-mono text-xs text-muted-foreground">
+                  {selectedDomainBindingDeleteCandidate.id}
+                </p>
+              </div>
+
+              <div class="rounded-md border bg-muted/15 px-3 py-2 text-sm">
+                <p class="font-medium">{$t(i18nKeys.console.domainBindings.deleteSafety)}</p>
+                <p class="mt-1 text-xs text-muted-foreground">
+                  {#if domainBindingDeleteSafety}
+                    {domainBindingDeleteSafety.safeToDelete
+                      ? $t(i18nKeys.console.domainBindings.deleteCheckSafeTitle)
+                      : $t(i18nKeys.console.domainBindings.deleteCheckBlockedTitle)}
+                  {:else}
+                    {$t(i18nKeys.console.domainBindings.deleteCheckFirst)}
+                  {/if}
+                </p>
+                {#if domainBindingDeleteSafety?.blockers.length}
+                  <ul class="mt-2 list-disc space-y-1 pl-4 text-xs text-destructive">
+                    {#each domainBindingDeleteSafety.blockers as blocker}
+                      <li>{blocker.message}</li>
+                    {/each}
+                  </ul>
+                {/if}
+                {#if domainBindingDeleteSafety?.warnings.length}
+                  <ul class="mt-2 list-disc space-y-1 pl-4 text-xs text-muted-foreground">
+                    {#each domainBindingDeleteSafety.warnings as warning}
+                      <li>{warning.message}</li>
+                    {/each}
+                  </ul>
+                {/if}
+              </div>
+
+              <label class="grid gap-2 text-sm" for="resource-domain-binding-delete-confirmation">
+                <span class="font-medium">{$t(i18nKeys.console.domainBindings.deleteConfirmLabel)}</span>
+                <Input
+                  id="resource-domain-binding-delete-confirmation"
+                  bind:value={domainBindingDeleteConfirmation}
+                  autocomplete="off"
+                  placeholder={selectedDomainBindingDeleteCandidate.id}
+                />
+              </label>
+            </div>
+          {/if}
+
+          <Dialog.Footer>
+            <Button type="button" variant="ghost" onclick={closeResourceDomainBindingDeleteDialog}>
+              {$t(i18nKeys.common.actions.cancel)}
+            </Button>
+            {#if selectedDomainBindingDeleteCandidate}
+              <Button
+                id="resource-domain-binding-delete-check"
+                type="button"
+                variant="outline"
+                disabled={checkDomainBindingDeleteSafetyMutation.isPending}
+                onclick={() => checkResourceDomainBindingDeleteSafety(selectedDomainBindingDeleteCandidate)}
+              >
+                <ShieldCheck class="size-4" />
+                {$t(i18nKeys.console.domainBindings.deleteCheck)}
+              </Button>
+              <Button
+                id="resource-domain-binding-delete-confirm"
+                type="button"
+                variant="destructive"
+                disabled={
+                  deleteDomainBindingMutation.isPending ||
+                  checkDomainBindingDeleteSafetyMutation.isPending ||
+                  !domainBindingDeleteSafety?.safeToDelete ||
+                  domainBindingDeleteConfirmation.trim() !== selectedDomainBindingDeleteCandidate.id
+                }
+                onclick={() => deleteResourceDomainBinding(selectedDomainBindingDeleteCandidate)}
+              >
+                <Trash2 class="size-4" />
+                {$t(i18nKeys.console.domainBindings.deleteBinding)}
+              </Button>
+            {/if}
+          </Dialog.Footer>
         </Dialog.Content>
       </Dialog.Root>
 
@@ -11720,6 +12442,7 @@
         requestId={deploymentProgressRequestId}
         deploymentId={deploymentProgressDeploymentId}
         traceLink={deploymentProgressTraceLink}
+        accessUrl={primaryAccessHref}
         title={$t(i18nKeys.console.deployments.progressTitle)}
         description={$t(i18nKeys.console.deployments.progressDescription)}
         onClose={() => {

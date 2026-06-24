@@ -13,6 +13,8 @@ export * from "./operations/dependency-resources/delete-dependency-resource.use-
 export * from "./operations/dependency-resources/dependency-resource-provisioning-plan.store";
 export * from "./operations/dependency-resources/import-dependency-resource.handler";
 export * from "./operations/dependency-resources/import-dependency-resource.use-case";
+export * from "./operations/dependency-resources/inspect-dependency-resource.handler";
+export * from "./operations/dependency-resources/inspect-dependency-resource.query-service";
 export * from "./operations/dependency-resources/list-dependency-resource-backup-policies.handler";
 export * from "./operations/dependency-resources/list-dependency-resource-backup-policies.query-service";
 export * from "./operations/dependency-resources/list-dependency-resource-backups.handler";
@@ -21,6 +23,8 @@ export * from "./operations/dependency-resources/list-dependency-resources.handl
 export * from "./operations/dependency-resources/list-dependency-resources.query-service";
 export * from "./operations/dependency-resources/provision-dependency-resource.handler";
 export * from "./operations/dependency-resources/provision-dependency-resource.use-case";
+export * from "./operations/dependency-resources/query-dependency-resource.handler";
+export * from "./operations/dependency-resources/query-dependency-resource.query-service";
 export * from "./operations/dependency-resources/rename-dependency-resource.handler";
 export * from "./operations/dependency-resources/rename-dependency-resource.use-case";
 export * from "./operations/dependency-resources/restore-dependency-resource-backup.handler";

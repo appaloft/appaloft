@@ -5,11 +5,13 @@ import {
   CreateDependencyResourceProvisioningPlanCommand,
   DeleteDependencyResourceCommand,
   ImportDependencyResourceCommand,
+  InspectDependencyResourceQuery,
   ListDependencyResourceBackupPoliciesQuery,
   ListDependencyResourceBackupsQuery,
   ListDependencyResourcesQuery,
   type ManagedDependencyResourceKind,
   ProvisionDependencyResourceCommand,
+  QueryDependencyResourceQuery,
   RenameDependencyResourceCommand,
   RestoreDependencyResourceBackupCommand,
   ShowDependencyResourceBackupPolicyQuery,
@@ -58,6 +60,9 @@ const retryOnFailureOption = Options.boolean("retry-on-failure").pipe(Options.wi
 const nextRunAtOption = Options.text("next-run-at").pipe(Options.optional);
 const enabledOnlyOption = Options.boolean("enabled-only").pipe(Options.withDefault(false));
 const dueAtOption = Options.text("due-at").pipe(Options.optional);
+const statementOption = Options.text("statement");
+const maxRowsOption = Options.integer("max-rows").pipe(Options.withDefault(100));
+const timeoutMsOption = Options.integer("timeout-ms").pipe(Options.withDefault(5000));
 
 function dependencyKindValue(kind: string): ManagedDependencyResourceKind {
   return kind as ManagedDependencyResourceKind;
@@ -277,6 +282,34 @@ const showCommand = EffectCommand.make(
     runQuery(ShowDependencyResourceQuery.create({ dependencyResourceId })),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.dependencyShow));
 
+const inspectCommand = EffectCommand.make(
+  "inspect",
+  {
+    dependencyResourceId: dependencyResourceIdArg,
+  },
+  ({ dependencyResourceId }) =>
+    runQuery(InspectDependencyResourceQuery.create({ dependencyResourceId })),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.dependencyInspect));
+
+const queryCommand = EffectCommand.make(
+  "query",
+  {
+    dependencyResourceId: dependencyResourceIdArg,
+    statement: statementOption,
+    maxRows: maxRowsOption,
+    timeoutMs: timeoutMsOption,
+  },
+  ({ dependencyResourceId, maxRows, statement, timeoutMs }) =>
+    runQuery(
+      QueryDependencyResourceQuery.create({
+        dependencyResourceId,
+        statement,
+        maxRows,
+        timeoutMs,
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.dependencyQuery));
+
 const renameCommand = EffectCommand.make(
   "rename",
   {
@@ -441,6 +474,8 @@ export const dependencyCommand = EffectCommand.make("dependency").pipe(
     backupCommand,
     listCommand,
     showCommand,
+    inspectCommand,
+    queryCommand,
     renameCommand,
     deleteCommand,
   ]),

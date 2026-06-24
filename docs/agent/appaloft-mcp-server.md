@@ -18,7 +18,7 @@ surface.
 
 ## Run
 
-Current user-facing path: use the Appaloft runtime:
+Use the Appaloft runtime for stdio:
 
 ```bash
 appaloft mcp stdio
@@ -28,9 +28,53 @@ This starts a stdio JSON-RPC MCP server. Starting the server does not deploy, cr
 call APIs, or mutate runtime state. Mutation starts only when an MCP client calls an Appaloft
 operation tool.
 
-The source package `@appaloft/ai-mcp` owns the transport implementation and tests. A standalone
-`appaloft-mcp` package/bin is deferred until release packaging is wired; do not document it as the
-current install path.
+Use the Appaloft runtime for a local HTTP endpoint:
+
+```bash
+appaloft mcp serve --host 127.0.0.1 --port 3939
+```
+
+This serves MCP JSON-RPC over HTTP at `/mcp`. It defaults to localhost; expose it beyond localhost
+only behind a trusted reverse proxy or private network boundary.
+
+Use the standalone launcher when an MCP host expects a dedicated package command:
+
+```bash
+npx @appaloft/mcp
+npx @appaloft/mcp serve --host 127.0.0.1 --port 3939
+```
+
+The `@appaloft/mcp` package exposes the `appaloft-mcp` launcher and delegates to the same Appaloft
+runtime. It does not ship a second operation list or business implementation.
+
+## Remote Auth
+
+Remote HTTP MCP clients should authenticate with the same product auth contract as the HTTP/API
+surface. For browser handoff, run:
+
+```bash
+appaloft auth mcp login
+```
+
+The command creates a short-lived browser authorization session, requests bearer credential
+material, verifies current organization context, and writes a redacted local `mcp` profile by
+default. It does not print raw bearer material. Noninteractive automation can still use
+`APPALOFT_TOKEN` or `appaloft auth token login --stdin` through a trusted local secret channel.
+
+For Codex, install the remote MCP bridge after the `mcp` profile exists:
+
+```bash
+appaloft auth mcp codex install
+```
+
+The installer writes a token-free `~/.codex/config.toml` MCP entry that launches:
+
+```bash
+appaloft mcp remote-stdio --profile mcp
+```
+
+The local stdio bridge reads the Appaloft MCP profile at startup and forwards JSON-RPC to the
+remote `/mcp` endpoint with bearer auth. Codex config stores the launcher command, not the bearer.
 
 ## Tool Contract
 
@@ -87,6 +131,7 @@ Prompts sequence existing tools. They do not add operations such as `quick-deplo
 
 - MCP package: `packages/ai/mcp`
 - Shell runtime entry: `apps/shell/src/run.ts`
+- Standalone launcher package: `packages/npm/mcp`
 - Skill reference: `skills/appaloft/references/mcp-tools.md`
 - Governing ADR: `docs/decisions/ADR-080-appaloft-as-mcp-transport-boundary.md`
 - Feature spec: `docs/specs/090-appaloft-as-mcp-transport/spec.md`

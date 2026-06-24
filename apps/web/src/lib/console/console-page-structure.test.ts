@@ -11,6 +11,14 @@ const consoleStatePanelSource = readFileSync(
   fileURLToPath(new URL("../components/console/ConsoleStatePanel.svelte", import.meta.url)),
   "utf8",
 );
+const consoleResourceCanvasSource = readFileSync(
+  fileURLToPath(new URL("../components/console/ConsoleResourceCanvas.svelte", import.meta.url)),
+  "utf8",
+);
+const consoleExtensionPageSource = readFileSync(
+  fileURLToPath(new URL("../components/console/ConsoleExtensionPage.svelte", import.meta.url)),
+  "utf8",
+);
 const resourceListTableSource = readFileSync(
   fileURLToPath(new URL("../components/console/ResourceListTable.svelte", import.meta.url)),
   "utf8",
@@ -41,6 +49,10 @@ const runtimeMonitorPanelSource = readFileSync(
   fileURLToPath(new URL("../components/console/RuntimeMonitorPanel.svelte", import.meta.url)),
   "utf8",
 );
+const runtimeUsagePanelSource = readFileSync(
+  fileURLToPath(new URL("../components/console/RuntimeUsagePanel.svelte", import.meta.url)),
+  "utf8",
+);
 const resourceDetailRouteSource = readFileSync(
   fileURLToPath(
     new URL("../../routes/resources/[resourceId=consoleObjectId]/+page.ts", import.meta.url),
@@ -53,6 +65,14 @@ const deploymentsPageSource = readFileSync(
 );
 const deploymentTableSource = readFileSync(
   fileURLToPath(new URL("../components/console/DeploymentTable.svelte", import.meta.url)),
+  "utf8",
+);
+const deploymentProgressDialogSource = readFileSync(
+  fileURLToPath(new URL("../components/console/DeploymentProgressDialog.svelte", import.meta.url)),
+  "utf8",
+);
+const operationProgressPanelSource = readFileSync(
+  fileURLToPath(new URL("../components/console/OperationProgressPanel.svelte", import.meta.url)),
   "utf8",
 );
 const deploymentDetailRouteSource = readFileSync(
@@ -143,6 +163,24 @@ const domainBindingsPageSource = readFileSync(
   fileURLToPath(new URL("../../routes/domain-bindings/+page.svelte", import.meta.url)),
   "utf8",
 );
+const domainBindingDetailPageSource = readFileSync(
+  fileURLToPath(
+    new URL(
+      "../../routes/domain-bindings/[domainBindingId=consoleObjectId]/+page.svelte",
+      import.meta.url,
+    ),
+  ),
+  "utf8",
+);
+const domainBindingDetailRouteSource = readFileSync(
+  fileURLToPath(
+    new URL(
+      "../../routes/domain-bindings/[domainBindingId=consoleObjectId]/+page.ts",
+      import.meta.url,
+    ),
+  ),
+  "utf8",
+);
 const marketplaceBlueprintDetailPageSource = readFileSync(
   fileURLToPath(new URL("../../routes/marketplace/[slug]/+page.svelte", import.meta.url)),
   "utf8",
@@ -197,6 +235,10 @@ const accountProfilePageSource = readFileSync(
 );
 const accountSecurityPageSource = readFileSync(
   fileURLToPath(new URL("../../routes/account/security/+page.svelte", import.meta.url)),
+  "utf8",
+);
+const accountConnectionsPageSource = readFileSync(
+  fileURLToPath(new URL("../../routes/account/connections/+page.svelte", import.meta.url)),
   "utf8",
 );
 const accountSessionsPageSource = readFileSync(
@@ -473,6 +515,17 @@ function functionBody(source: string, signature: string): string {
 }
 
 describe("console page structure", () => {
+  test("[CONSOLE-LAYOUT-001] gives collection pages a wider centered canvas", () => {
+    expect(consoleResourceCanvasSource).toContain("mx-auto w-full max-w-7xl space-y-6");
+    expect(consoleResourceCanvasSource).toContain("consolePageContentClass");
+    expect(consoleResourceCanvasSource).not.toContain("max-w-5xl");
+    expect(consoleExtensionPageSource).toContain(
+      '<ConsoleResourceCanvas class={embedded ? "max-w-none p-0" : "max-w-7xl"}>',
+    );
+    expect(consoleExtensionPageSource).toContain("{#if embedded}");
+    expect(consoleExtensionPageSource).toContain("{@render content()}");
+  });
+
   test("[CONSOLE-DISPLAY-STATE-IA-000] keeps console routes free of default-page forms", () => {
     const pagesWithDefaultForms = routePageSources(routesRootPath)
       .filter(({ path }) => focusedFlowRouteSegments.every((segment) => !path.includes(segment)))
@@ -487,10 +540,6 @@ describe("console page structure", () => {
           const lastDialogClose = beforeForm.lastIndexOf("</Dialog.Root>");
 
           if (lastDialogOpen <= lastDialogClose) {
-            const formOpeningSource = source.slice(formIndex, formIndex + 500);
-            if (formOpeningSource.includes("data-resource-storage-backup-form")) {
-              continue;
-            }
             return true;
           }
         }
@@ -1311,6 +1360,32 @@ describe("console page structure", () => {
     expect(healthPopoverSource).toContain("issue.action");
   });
 
+  test("[RESOURCE-INITIAL-CREDENTIALS-IA-001] keeps initial credentials on the resource overview", () => {
+    const overviewSource = sourceBetween(
+      resourceDetailPageSource,
+      'id="resource-overview"',
+      "{$t(i18nKeys.console.resources.overviewLatestDeployment)}",
+    );
+
+    expect(overviewSource).toContain("data-resource-initial-access-credentials");
+    expect(overviewSource).toContain("data-resource-initial-access-credential");
+    expect(overviewSource).toContain("visibleResourceInitialAccessCredentials");
+    expect(resourceDetailPageSource).toContain('credential.status === "pending"');
+    expect(resourceDetailPageSource).toContain(
+      "Boolean(revealedInitialAccessCredentials[credential.credentialId])",
+    );
+    const initialAccessCredentialsEndpointSource = [
+      "/api/resources/",
+      "$",
+      "{encodeURIComponent(resourceId)}",
+      "/initial-access-credentials",
+    ].join("");
+    expect(resourceDetailPageSource).toContain(initialAccessCredentialsEndpointSource);
+    expect(resourceDetailPageSource).toContain("initialAccessCredentialsTitle");
+    expect(resourceDetailPageSource).toContain("claimInitialAccessCredential");
+    expect(resourceDetailPageSource).not.toContain("/cloud/installed-applications/");
+  });
+
   test("[RESOURCE-NETWORKING-IA-001] owns domain binding creation from a focused dialog", () => {
     const resourceDomainBindingsSectionSource =
       resourceDetailPageSource.match(
@@ -1398,6 +1473,18 @@ describe("console page structure", () => {
     expect(resourceDetailPageSource).toContain('id="resource-domain-binding-dns-apply"');
   });
 
+  test("[RESOURCE-PROXY-UI-001] keeps proxy configuration summary tiles visually bounded", () => {
+    const proxyConfigurationSource = sourceBetween(
+      resourceDetailPageSource,
+      'id="resource-proxy-configuration"',
+      'id="resource-configuration-profile"',
+    );
+
+    expect(
+      proxyConfigurationSource.match(/class="rounded-md border bg-muted\/25 px-3 py-2"/g),
+    ).toHaveLength(4);
+  });
+
   test("[RESOURCE-DEPENDENCIES-IA-001] keeps dependency binding forms behind a focused dialog", () => {
     const resourceDependencyBindingsSectionSource = sourceBetween(
       resourceDetailPageSource,
@@ -1447,14 +1534,25 @@ describe("console page structure", () => {
       '<section id="resource-storage"',
       '{:else if activeResourceSection === "diagnostics"}',
     );
+    const storageBackupDialogSource = sourceBetween(
+      resourceDetailPageSource,
+      "<Dialog.Root bind:open={storageBackupDialogOpen}>",
+      "<Dialog.Root bind:open={configEditorDialogOpen}>",
+    );
 
-    expect(resourceStorageSectionSource).toContain("data-resource-storage-backup-form");
-    expect(resourceStorageSectionSource).toContain("onsubmit={(event) =>");
-    expect(resourceStorageSectionSource).toContain("planStorageBackup()");
-    expect(resourceStorageSectionSource).toContain("<Input");
-    expect(resourceStorageSectionSource).toContain("<Select.Root");
-    expect(resourceStorageSectionSource).toContain('type="submit"');
-    expect(resourceStorageSectionSource).toContain("onclick={createStorageBackup}");
+    expect(resourceStorageSectionSource).not.toContain("data-resource-storage-backup-form");
+    expect(resourceStorageSectionSource).toContain("openStorageBackupDialog()");
+    expect(resourceStorageSectionSource).toContain("storageBackupAttachmentOptionLabel");
+    expect(resourceStorageSectionSource).toContain("storageBackupDataFormat");
+    expect(storageBackupDialogSource).toContain("data-resource-storage-backup-form");
+    expect(storageBackupDialogSource).toContain("onsubmit={(event) =>");
+    expect(storageBackupDialogSource).toContain("planStorageBackup()");
+    expect(storageBackupDialogSource).toContain("<Input");
+    expect(storageBackupDialogSource).toContain("<Select.Root");
+    expect(storageBackupDialogSource).toContain('id="resource-storage-backup-data-format"');
+    expect(storageBackupDialogSource).not.toContain("bind:value={storageBackupDataFormat}");
+    expect(storageBackupDialogSource).toContain('type="submit"');
+    expect(storageBackupDialogSource).toContain("onclick={createStorageBackup}");
     expect(resourceStorageSectionSource).toContain("restoreStorageBackup(backup)");
     expect(resourceStorageSectionSource).toContain("pruneStorageBackup(backup)");
   });
@@ -1642,6 +1740,29 @@ describe("console page structure", () => {
     expect(resourceDetailActionsMenuSource).toContain("resourceActionsMenu");
     expect(resourceDetailPageSource).toContain("onclick={() => redeployResource(false)}");
     expect(resourceDetailActionsMenuSource).toContain("onclick={() => redeployResource(true)}");
+    expect(resourceDetailPageSource).toContain("observeDeploymentProgressAfterAcceptance");
+    expect(resourceDetailPageSource).toContain("startDeploymentProgressDialog();");
+    expect(resourceDetailPageSource).toContain("observeAcceptedResourceDeployment(result.id)");
+    expect(resourceDetailPageSource).toContain("deploymentProgressDeploymentId = deploymentId;");
+    expect(resourceDetailPageSource).toContain("deploymentProgressStreamError = message;");
+    expect(resourceDetailPageSource).toContain("isTerminalDeploymentProgressEvent(event)");
+    expect(deploymentProgressDialogSource).toContain("{onClose}");
+    expect(deploymentProgressDialogSource).toContain("accessUrl?: string");
+    expect(deploymentProgressDialogSource).toContain("{accessUrl}");
+    expect(resourceDetailPageSource).toContain("accessUrl={primaryAccessHref}");
+    expect(deploymentProgressDialogSource).toContain('class="max-h-[86vh] shadow-lg"');
+    expect(deploymentProgressDialogSource).not.toContain(
+      "flex-col overflow-hidden rounded-lg border bg-background",
+    );
+    expect(deploymentProgressDialogSource).not.toContain("min-h-0 flex-1 overflow-auto p-5");
+    expect(operationProgressPanelSource).toContain("onclick={() => onClose?.()}");
+    expect(operationProgressPanelSource).toContain("deployment-progress-spinner");
+    expect(operationProgressPanelSource).toContain(":global(.deployment-progress-spinner)");
+    expect(operationProgressPanelSource).toContain("deployment-progress-confetti");
+    expect(operationProgressPanelSource).toContain("data-deployment-progress-success-access-url");
+    expect(operationProgressPanelSource).toContain("const resolvedAccessUrl = $derived(accessUrl)");
+    expect(operationProgressPanelSource).not.toContain("accessUrlFromDeploymentProgressEvents");
+    expect(operationProgressPanelSource).not.toContain("/public route/i");
     expect(resourceDetailActionsMenuSource).toContain('controlResourceRuntime("stop")');
     expect(resourceDetailActionsMenuSource).toContain('controlResourceRuntime("restart")');
     expect(resourceDetailActionsMenuSource).toContain("forceRedeploy");
@@ -1655,14 +1776,17 @@ describe("console page structure", () => {
 
   test("[DEPLOYMENTS-FEED-IA-001] keeps the global deployment feed read-only", () => {
     expect(deploymentsPageSource).toContain("DeploymentTable");
-    expect(deploymentsPageSource).toContain("filtersTitle");
     expect(deploymentsPageSource).toContain("selectedOwnerHref");
     expect(deploymentsPageSource).toContain("data-deployments-feed-display-surface");
+    expect(deploymentsPageSource).not.toContain("filtersDescription");
+    expect(deploymentsPageSource).not.toContain("console-panel p-4");
     expect(deploymentTableSource).toContain("data-deployment-record-list");
     expect(deploymentTableSource).toContain("data-deployment-record-row");
     expect(deploymentTableSource).toContain("data-deployment-owner-summary");
-    expect(deploymentTableSource).not.toContain('from "$lib/components/ui/table"');
-    expect(deploymentTableSource).not.toContain("<Table.Root");
+    expect(deploymentTableSource).toContain('from "$lib/components/ui/table"');
+    expect(deploymentTableSource).toContain("data-deployment-table-display-surface");
+    expect(deploymentTableSource).toContain("<Table.Root");
+    expect(deploymentTableSource).toContain("<Table.Head");
     expect(deploymentsPageSource).toContain('import * as Select from "$lib/components/ui/select"');
     expect(deploymentsPageSource).toContain("<Select.Root bind:value={projectFilter}");
     expect(deploymentsPageSource).toContain("<Select.Root bind:value={environmentFilter}");
@@ -1938,8 +2062,9 @@ describe("console page structure", () => {
     expect(serverRowHeaderSource.indexOf("data-server-row-lifecycle")).toBeGreaterThan(
       serverRowHeaderSource.indexOf("<h3"),
     );
+    const serverHostPortTitleSource = "title={`" + "$" + "{server.host}:$" + "{server.port}`}";
     expect(serverRowHeaderSource.indexOf("data-server-row-lifecycle")).toBeLessThan(
-      serverRowHeaderSource.indexOf("title={`${server.host}:${server.port}`}"),
+      serverRowHeaderSource.indexOf(serverHostPortTitleSource),
     );
     expect(serverRowHeaderSource).toContain('class="shrink-0"');
     expect(serversDisplaySurface).toContain("data-server-row-readiness");
@@ -2070,6 +2195,9 @@ describe("console page structure", () => {
     expect(serverConnectivityTabSource).toContain("onclick={testConnectivity}");
     expect(serverConnectivityTabSource).toContain("connectivityMutation.isPending");
     expect(serverConnectivityTabSource).toContain("connectivityResult");
+    expect(serverConnectivityTabSource).toContain(
+      'class="rounded-md border bg-muted/25 px-4 py-4 text-sm text-muted-foreground"',
+    );
   });
 
   test("[SERVER-DETAIL-IA-002] keeps rename editing behind a single-intent dialog", () => {
@@ -2216,63 +2344,84 @@ describe("console page structure", () => {
     expect(domainBindingsPageSource).toContain("domainBindingEnrichmentLoading");
     expect(domainBindingsPageSource).not.toContain("const pageLoading = $derived");
     expect(domainBindingsPageSource).not.toContain("createFeedback");
-    expect(domainBindingsPageSource).toContain("selectedDomainBindingId");
-    expect(domainBindingsPageSource).toContain("selectedDomainBinding");
-    expect(domainBindingsPageSource).toContain("selectedDomainBindingDetail");
-    expect(domainBindingsPageSource).toContain("function selectDomainBinding");
-    expect(domainBindingsPageSource).toContain("function showSelectedDomainBindingDetail");
-    expect(domainBindingsPageSource).toContain("domainBindingVerificationDialogOpen");
-    expect(domainBindingsPageSource).toContain("domainBindingRouteDialogOpen");
-    expect(domainBindingsPageSource).toContain("domainBindingDeleteDialogOpen");
+    expect(domainBindingsPageSource).not.toContain("selectedDomainBindingId");
+    expect(domainBindingsPageSource).not.toContain("selectedDomainBindingDetail");
+    expect(domainBindingsPageSource).not.toContain("function selectDomainBinding");
+    expect(domainBindingsPageSource).not.toContain("function showSelectedDomainBindingDetail");
+    expect(domainBindingsPageSource).not.toContain("domainBindingVerificationDialogOpen");
+    expect(domainBindingsPageSource).not.toContain("domainBindingRouteDialogOpen");
+    expect(domainBindingsPageSource).not.toContain("domainBindingDeleteDialogOpen");
     expect(domainBindingsPageSource).toContain("data-domain-binding-list-display-surface");
-    expect(domainBindingsPageSource).toContain("data-domain-binding-detail-display-surface");
-    expect(domainBindingsPageSource).toContain("data-domain-binding-identity-summary");
-    expect(domainBindingsPageSource).toContain("data-domain-binding-owner-summary");
-    expect(domainBindingsPageSource).toContain("data-domain-binding-route-summary");
-    expect(domainBindingsPageSource).toContain("data-domain-binding-verification-summary");
-    expect(domainBindingsPageSource).toContain("data-domain-binding-lifecycle-handoff");
-    expect(domainBindingsPageSource).toContain("data-domain-binding-verification-dialog");
-    expect(domainBindingsPageSource).toContain("routeManagedInDialog");
-    expect(domainBindingsPageSource).toContain("routeDialogTitle");
-    expect(domainBindingsPageSource).toContain("deleteDialogTitle");
+    expect(domainBindingsPageSource).not.toContain("data-domain-binding-detail-display-surface");
+    expect(domainBindingsPageSource).toContain("function domainBindingDetailHref");
+    expect(domainBindingsPageSource).toContain("domainBindingDetailHref(binding)");
     expect(domainBindingsPageSource).not.toContain("dangerZoneTitle");
     expect(domainBindingsPageSource).not.toContain("dangerZoneDescription");
+    expect(domainBindingDetailRouteSource).toContain("export const prerender = false");
+    expect(domainBindingDetailRouteSource).toContain("export const ssr = false");
+    expect(domainBindingDetailPageSource).toContain("data-domain-binding-detail-display-surface");
+    expect(domainBindingDetailPageSource).toContain("type DomainBindingDetailTab =");
+    expect(domainBindingDetailPageSource).toContain('"overview" | "routing" | "dns" | "lifecycle"');
+    expect(domainBindingDetailPageSource).toContain("domainBindingOverviewSections");
+    expect(domainBindingDetailPageSource).toContain("class={detailTabsClass}");
+    expect(domainBindingDetailPageSource).toContain("class={detailTabClass}");
+    expect(domainBindingDetailPageSource).toContain("class={detailTabPanelSubnavClass}");
+    expect(domainBindingDetailPageSource).toContain("detailSubnavLayoutClass");
+    expect(domainBindingDetailPageSource).toContain("class={detailSubnavContentClass}");
+    expect(domainBindingDetailPageSource).toContain("data-domain-binding-identity-summary");
+    expect(domainBindingDetailPageSource).toContain("data-domain-binding-owner-summary");
+    expect(domainBindingDetailPageSource).toContain("data-domain-binding-route-summary");
+    expect(domainBindingDetailPageSource).toContain("data-domain-binding-verification-summary");
+    expect(domainBindingDetailPageSource).toContain("data-domain-binding-lifecycle-handoff");
+    expect(domainBindingDetailPageSource).toContain("data-domain-binding-verification-dialog");
+    expect(domainBindingDetailPageSource).toContain("routeManagedInDialog");
+    expect(domainBindingDetailPageSource).toContain("routeDialogTitle");
+    expect(domainBindingDetailPageSource).toContain("deleteDialogTitle");
 
     const domainBindingsListSource = sourceBetween(
       domainBindingsPageSource,
       "data-domain-binding-list-display-surface",
-      "data-domain-binding-detail-display-surface",
+      "{:else}",
     );
-    const domainBindingDetailSurface = sourceBetween(
+    const domainBindingLoadingSource = sourceBetween(
       domainBindingsPageSource,
-      "data-domain-binding-detail-display-surface",
-      "<Dialog.Root\n    bind:open={domainBindingVerificationDialogOpen}",
+      "data-domain-binding-list-skeleton",
+      "{:else}",
     );
     const domainBindingVerificationDialogSource = sourceBetween(
-      domainBindingsPageSource,
+      domainBindingDetailPageSource,
       "data-domain-binding-verification-dialog",
       "bind:open={domainBindingRouteDialogOpen}",
     );
     const domainBindingRouteDialogSource = sourceBetween(
-      domainBindingsPageSource,
+      domainBindingDetailPageSource,
       "data-domain-binding-route-dialog",
       "bind:open={domainBindingDeleteDialogOpen}",
     );
     const domainBindingDeleteDialogSource = sourceBetween(
-      domainBindingsPageSource,
+      domainBindingDetailPageSource,
       "data-domain-binding-delete-dialog",
       "</ConsoleShell>",
     );
 
-    expect(domainBindingsPageSource).toContain('let routeRedirectDraft = $state("")');
-    expect(domainBindingsPageSource).toContain(
+    expect(domainBindingDetailPageSource).toContain('let routeRedirectDraft = $state("")');
+    expect(domainBindingDetailPageSource).toContain(
       'let routeRedirectStatusDraft = $state<RedirectStatusText>("308")',
     );
-    expect(domainBindingsPageSource).toContain('let deleteConfirmationDraft = $state("")');
-    expect(domainBindingsPageSource).not.toContain("routeRedirectDrafts");
-    expect(domainBindingsPageSource).not.toContain("routeRedirectStatusDrafts");
-    expect(domainBindingsPageSource).not.toContain("deleteConfirmationDrafts");
-    expect(domainBindingsListSource).toContain("selectDomainBinding(binding)");
+    expect(domainBindingDetailPageSource).toContain('let deleteConfirmationDraft = $state("")');
+    expect(domainBindingDetailPageSource).not.toContain("routeRedirectDrafts");
+    expect(domainBindingDetailPageSource).not.toContain("routeRedirectStatusDrafts");
+    expect(domainBindingDetailPageSource).not.toContain("deleteConfirmationDrafts");
+    expect(
+      domainBindingsPageSource.indexOf(
+        "<ConsoleResourceCanvas data-domain-bindings-display-surface>",
+      ),
+    ).toBeLessThan(domainBindingsPageSource.indexOf("{#if domainBindingsLoading}"));
+    expect(domainBindingLoadingSource).toContain("console-record-list");
+    expect(domainBindingLoadingSource).toContain("console-record-row p-0");
+    expect(domainBindingLoadingSource).toContain("md:grid-cols-3");
+    expect(domainBindingLoadingSource).toContain("lg:absolute lg:right-4 lg:top-4");
+    expect(domainBindingsListSource).toContain("domainBindingDetailHref(binding)");
     expect(domainBindingsListSource).toContain("data-domain-binding-row");
     expect(domainBindingsListSource).toContain("data-domain-binding-pending-dns-notice");
     expect(domainBindingsListSource).toContain("DomainBindingVerifyDnsButton");
@@ -2288,34 +2437,16 @@ describe("console page structure", () => {
     expect(domainBindingsListSource).not.toContain("<Trash2");
     expect(domainBindingsListSource).not.toContain('variant="destructive"');
 
-    expect(domainBindingDetailSurface).toContain(
-      "showSelectedDomainBindingDetail(selectedDomainBinding)",
-    );
-    expect(domainBindingDetailSurface).toContain(
-      "openDomainBindingRouteDialog(selectedDomainBinding)",
-    );
-    expect(domainBindingDetailSurface).toContain(
-      "openDomainBindingVerificationDialog(selectedDomainBinding)",
-    );
-    expect(domainBindingDetailSurface).toContain(
-      "openDomainBindingDeleteDialog(selectedDomainBinding)",
-    );
-    expect(domainBindingDetailSurface).toContain("lifecycleStatus");
-    expect(domainBindingDetailSurface).toContain("lifecycleDescription");
-    expect(domainBindingDetailSurface).toContain("lifecycleManageAction");
-    expect(domainBindingDetailSurface).not.toContain("routeRedirectDraft");
-    expect(domainBindingDetailSurface).not.toContain("routeRedirectStatusDraft");
-    expect(domainBindingDetailSurface).not.toContain("deleteConfirmationDraft");
-    expect(domainBindingDetailSurface).not.toContain("deleteSafety");
-    expect(domainBindingDetailSurface).not.toContain("deleteDialogTitle");
-    expect(domainBindingDetailSurface).not.toContain("<Input");
-    expect(domainBindingDetailSurface).not.toContain("<Select.Root");
-    expect(domainBindingDetailSurface).not.toContain('variant="destructive"');
-    expect(domainBindingDetailSurface).not.toContain("<Trash2");
+    expect(domainBindingDetailPageSource).toContain("openDomainBindingRouteDialog()");
+    expect(domainBindingDetailPageSource).toContain("openDomainBindingVerificationDialog()");
+    expect(domainBindingDetailPageSource).toContain("openDomainBindingDeleteDialog()");
+    expect(domainBindingDetailPageSource).toContain("lifecycleStatus");
+    expect(domainBindingDetailPageSource).toContain("lifecycleDescription");
+    expect(domainBindingDetailPageSource).toContain("lifecycleManageAction");
 
     expect(domainBindingVerificationDialogSource).not.toContain("deleteDialogTitle");
     expect(domainBindingVerificationDialogSource).toContain(
-      "confirmDomainBindingOwnership(selectedVerificationBinding)",
+      "confirmDomainBindingOwnership(selectedDomainBinding)",
     );
     expect(domainBindingVerificationDialogSource).toContain(
       "retryDomainBindingVerificationMutation.mutate",
@@ -2337,6 +2468,7 @@ describe("console page structure", () => {
       'class="mt-3 grid gap-3 lg:grid-cols-[1fr_auto]"',
     );
     expect(domainBindingsPageSource).not.toContain("sm:grid-cols-[minmax(0,1fr)_auto_auto]");
+    expect(domainBindingDetailRouteSource).toContain("export const prerender = false;");
   });
 
   test("[CONSOLE-DISPLAY-STATE-IA-001] keeps collection display surfaces free of intent forms", () => {
@@ -2422,35 +2554,32 @@ describe("console page structure", () => {
     );
 
     expect(domainBindingDisplaySurface).toContain("data-domain-binding-list-display-surface");
-    expect(domainBindingDisplaySurface).toContain("data-domain-binding-detail-display-surface");
-    expect(domainBindingDisplaySurface).toContain("selectDomainBinding(binding)");
-    expect(domainBindingDisplaySurface).toContain(
-      "openDomainBindingVerificationDialog(selectedDomainBinding)",
-    );
-    expect(domainBindingDisplaySurface).toContain(
-      "openDomainBindingRouteDialog(selectedDomainBinding)",
-    );
-    expect(domainBindingDisplaySurface).toContain(
-      "openDomainBindingDeleteDialog(selectedDomainBinding)",
-    );
-    expect(domainBindingDisplaySurface).toContain("lifecycleStatus");
-    expect(domainBindingDisplaySurface).toContain("lifecycleDescription");
-    expect(domainBindingDisplaySurface).toContain("lifecycleManageAction");
+    expect(domainBindingDisplaySurface).toContain("domainBindingDetailHref(binding)");
+    expect(domainBindingDisplaySurface).not.toContain("data-domain-binding-detail-display-surface");
+    expect(domainBindingDisplaySurface).not.toContain("selectDomainBinding(binding)");
+    expect(domainBindingDetailPageSource).toContain("openDomainBindingVerificationDialog()");
+    expect(domainBindingDetailPageSource).toContain("openDomainBindingRouteDialog()");
+    expect(domainBindingDetailPageSource).toContain("openDomainBindingDeleteDialog()");
+    expect(domainBindingDetailPageSource).toContain("lifecycleStatus");
+    expect(domainBindingDetailPageSource).toContain("lifecycleDescription");
+    expect(domainBindingDetailPageSource).toContain("lifecycleManageAction");
     expect(domainBindingDisplaySurface).not.toContain("routeRedirectDraft");
     expect(domainBindingDisplaySurface).not.toContain("routeRedirectStatusDraft");
     expect(domainBindingDisplaySurface).not.toContain("deleteConfirmationDraft");
     expect(domainBindingDisplaySurface).not.toContain("deleteSafety");
     expect(domainBindingDisplaySurface).not.toContain("deleteDialogTitle");
-    expect(domainBindingsPageSource).toContain("bind:open={domainBindingVerificationDialogOpen}");
-    expect(domainBindingsPageSource).toContain("bind:open={domainBindingRouteDialogOpen}");
-    expect(domainBindingsPageSource).toContain("bind:open={domainBindingDeleteDialogOpen}");
+    expect(domainBindingDetailPageSource).toContain(
+      "bind:open={domainBindingVerificationDialogOpen}",
+    );
+    expect(domainBindingDetailPageSource).toContain("bind:open={domainBindingRouteDialogOpen}");
+    expect(domainBindingDetailPageSource).toContain("bind:open={domainBindingDeleteDialogOpen}");
     const domainBindingRouteDialogSource = sourceBetween(
-      domainBindingsPageSource,
+      domainBindingDetailPageSource,
       "data-domain-binding-route-dialog",
       "bind:open={domainBindingDeleteDialogOpen}",
     );
     const domainBindingDeleteDialogSource = sourceBetween(
-      domainBindingsPageSource,
+      domainBindingDetailPageSource,
       "data-domain-binding-delete-dialog",
       "</Dialog.Root>",
     );
@@ -2459,6 +2588,18 @@ describe("console page structure", () => {
     expect(domainBindingDeleteDialogSource).toContain("deleteSafety");
     expect(domainBindingDeleteDialogSource).toContain("deleteCheckFirst");
     expect(domainBindingDeleteDialogSource).toContain("deleteConfirmationDraft");
+    const resourceDomainBindingsSource = sourceBetween(
+      resourceDetailPageSource,
+      'id="resource-domain-bindings"',
+      'id="resource-proxy-configuration"',
+    );
+    expect(resourceDomainBindingsSource).toContain(
+      "openResourceDomainBindingDeleteDialog(binding)",
+    );
+    expect(resourceDomainBindingsSource).toContain("resource-domain-binding-delete-action");
+    expect(resourceDetailPageSource).toContain("data-resource-domain-binding-delete-dialog");
+    expect(resourceDetailPageSource).toContain("orpcClient.domainBindings.deleteCheck");
+    expect(resourceDetailPageSource).toContain("orpcClient.domainBindings.delete");
 
     expect(serversDisplaySurface).toContain("openServerCreateDialog");
     expect(serversDisplaySurface).not.toContain("<ServerCreateForm");
@@ -2570,6 +2711,12 @@ describe("console page structure", () => {
     );
     expect(dependencyResourceListSource).toContain("resource.bindingReadiness.status");
     expect(dependencyResourceListSource).toContain("resource.sourceMode");
+    expect(dependencyResourceListSource).toContain(
+      'class="console-record-row rounded-md border bg-background lg:grid-cols-[minmax(0,1fr)_auto]"',
+    );
+    expect(
+      dependencyResourceListSource.match(/class="rounded-md border bg-muted\/20 px-3 py-2"/g),
+    ).toHaveLength(4);
     expect(dependencyResourcesPageSource).not.toContain(
       "data-dependency-resource-detail-display-surface",
     );
@@ -2628,26 +2775,31 @@ describe("console page structure", () => {
     );
   });
 
+  test("[RT-USAGE-UI-001] renders runtime usage metric tiles with visible card borders", () => {
+    expect(runtimeUsagePanelSource).toContain('class="rounded-md border bg-muted/30 px-3 py-2"');
+  });
+
   test("[BLUEPRINT-INSTALL-IA-001] keeps Blueprint install inputs behind intent dialogs", () => {
     expect(marketplaceBlueprintDetailPageSource).toContain("installDialogOpen");
-    expect(marketplaceBlueprintDetailPageSource).toContain("upgradePlanDialogOpen");
     expect(marketplaceBlueprintDetailPageSource).toContain(
       'modalIsOpen(page, "blueprint-install")',
     );
-    expect(marketplaceBlueprintDetailPageSource).toContain(
-      'modalIsOpen(page, "blueprint-upgrade-plan")',
-    );
     expect(marketplaceBlueprintDetailPageSource).toContain("data-blueprint-install-summary");
-    expect(marketplaceBlueprintDetailPageSource).toContain("data-blueprint-upgrade-summary");
     expect(marketplaceBlueprintDetailPageSource).toContain("data-blueprint-detail-display-surface");
     expect(marketplaceBlueprintDetailPageSource).toContain(
       "data-blueprint-variant-display-surface",
     );
     expect(marketplaceBlueprintDetailPageSource).toContain("data-blueprint-variant-option");
     expect(marketplaceBlueprintDetailPageSource).toContain("data-blueprint-install-dialog");
-    expect(marketplaceBlueprintDetailPageSource).toContain("data-blueprint-upgrade-plan-dialog");
     expect(marketplaceBlueprintDetailPageSource).toContain("openInstallDialog");
-    expect(marketplaceBlueprintDetailPageSource).toContain("openUpgradePlanDialog");
+    expect(marketplaceBlueprintDetailPageSource).not.toContain("openQuickDeployDialog");
+    expect(marketplaceBlueprintDetailPageSource).not.toContain("data-blueprint-upgrade-summary");
+    expect(marketplaceBlueprintDetailPageSource).not.toContain(
+      "data-blueprint-upgrade-plan-dialog",
+    );
+    expect(marketplaceBlueprintDetailPageSource).not.toContain(
+      'modalIsOpen(page, "blueprint-upgrade-plan")',
+    );
     const blueprintDetailDisplaySurface = sourceBetween(
       marketplaceBlueprintDetailPageSource,
       "data-blueprint-detail-display-surface",
@@ -2662,17 +2814,9 @@ describe("console page structure", () => {
       marketplaceBlueprintDetailPageSource.match(
         /<section class="console-side-panel space-y-4" data-blueprint-install-summary>[\s\S]*?<\/section>/,
       )?.[0] ?? "";
-    const upgradeSummarySource =
-      marketplaceBlueprintDetailPageSource.match(
-        /<section class="console-side-panel space-y-4" data-blueprint-upgrade-summary>[\s\S]*?<\/section>/,
-      )?.[0] ?? "";
     const installDialogSource =
       marketplaceBlueprintDetailPageSource.match(
         /<Dialog\.Root bind:open={installDialogOpen}[\s\S]*?<\/Dialog\.Root>/,
-      )?.[0] ?? "";
-    const upgradeDialogSource =
-      marketplaceBlueprintDetailPageSource.match(
-        /<Dialog\.Root bind:open={upgradePlanDialogOpen}[\s\S]*?<\/Dialog\.Root>/,
       )?.[0] ?? "";
     expect(blueprintDetailDisplaySurface).not.toContain("<Input");
     expect(blueprintDetailDisplaySurface).not.toContain("<Textarea");
@@ -2681,35 +2825,30 @@ describe("console page structure", () => {
     expect(blueprintDetailDisplaySurface).not.toContain("<form");
     expect(blueprintDetailDisplaySurface).not.toContain('type="submit"');
     expect(blueprintDetailDisplaySurface).toContain("onclick={openInstallDialog}");
-    expect(blueprintDetailDisplaySurface).toContain("onclick={openQuickDeployDialog}");
+    expect(blueprintDetailDisplaySurface).toContain("快速部署");
     expect(blueprintVariantDisplaySurface).toContain("data-blueprint-variant-option");
     expect(blueprintVariantDisplaySurface).toContain(
-      "方案选择、Profile 和参数输入在配置安装弹窗内完成",
+      "方案选择、Profile 和参数输入在部署弹窗内完成；来源固定为当前 Blueprint。",
     );
     expect(blueprintVariantDisplaySurface).not.toContain("selectedVariant = variant.id");
     expect(blueprintVariantDisplaySurface).not.toContain("<button");
     expect(blueprintVariantDisplaySurface).not.toContain("<Select.Root");
-    expect(installSummarySource).toContain("配置安装");
+    expect(installSummarySource).toContain("快速部署");
+    expect(installSummarySource).toContain("打开弹窗后直接部署当前 Blueprint");
     expect(installSummarySource).not.toContain("<Input");
     expect(installSummarySource).not.toContain("<select");
     expect(installSummarySource).not.toContain("data-blueprint-install-secret-inputs");
-    expect(upgradeSummarySource).toContain("配置升级 dry-run");
-    expect(upgradeSummarySource).not.toContain("<Input");
-    expect(upgradeSummarySource).not.toContain("data-blueprint-upgrade-from-installed-application");
-    expect(upgradeSummarySource).not.toContain("upgradePlanError");
-    expect(upgradeSummarySource).not.toContain("upgradePlanOutput");
-    expect(upgradeSummarySource).not.toContain("查看 upgrade plan JSON");
+    expect(installSummarySource).not.toContain("dry-run");
+    expect(installSummarySource).not.toContain("openQuickDeployDialog");
     expect(installDialogSource).toContain("<Input");
     expect(installDialogSource).toContain("<Select.Root");
     expect(installDialogSource).not.toContain("<select");
     expect(installDialogSource).toContain("data-blueprint-install-secret-inputs");
     expect(installDialogSource).toContain("data-blueprint-accept-install");
-    expect(upgradeDialogSource).toContain("<Input");
-    expect(upgradeDialogSource).toContain("data-blueprint-upgrade-from-installed-application");
-    expect(upgradeDialogSource).toContain("onclick={generateUpgradePlan}");
-    expect(upgradeDialogSource).toContain("upgradePlanError");
-    expect(upgradeDialogSource).toContain("upgradePlanOutput");
-    expect(upgradeDialogSource).toContain("查看 upgrade plan JSON");
+    expect(installDialogSource).toContain("来源固定为当前 Blueprint");
+    expect(installDialogSource).toContain("开始部署");
+    expect(installDialogSource).not.toContain("生成 dry-run");
+    expect(installDialogSource).not.toContain("预览部署计划");
   });
 
   test("[BLUEPRINT-INSTALL-IA-002] presents install completion as a handoff, not a progress dump", () => {
@@ -2756,7 +2895,7 @@ describe("console page structure", () => {
 
     const installHandoffSource =
       marketplaceBlueprintDetailPageSource.match(
-        /data-blueprint-install-handoff[\s\S]*?data-blueprint-upgrade-summary/,
+        /data-blueprint-install-handoff[\s\S]*?<Button href="\/marketplace"/,
       )?.[0] ?? "";
 
     expect(installHandoffSource).toContain("installHandoffTitle(installResult.progress)");
@@ -3069,11 +3208,26 @@ describe("console page structure", () => {
     assertDisplaySurfaceIsFormFree(profileSummarySource);
     assertDisplaySurfaceIsFormFree(accountSettingsHandoffSource);
     expect(accountSettingsHandoffSource).toContain('href="/account/security"');
+    expect(accountSettingsHandoffSource).toContain('href="/account/connections"');
     expect(accountSettingsHandoffSource).toContain('href="/account/sessions"');
     expect(accountSettingsHandoffSource).toContain('href="/account/danger-zone"');
     expect(profileDialogSource).toContain("<form");
     expect(profileDialogSource).toContain("<Input");
     expect(profileDialogSource).toContain('type="submit"');
+  });
+
+  test("[ACCOUNT-SETTINGS-IA-004] keeps provider linking inside the account connections page", () => {
+    expect(accountConnectionsPageSource).toContain("data-account-connections-summary");
+    expect(accountConnectionsPageSource).toContain("data-account-github-connection");
+    expect(accountConnectionsPageSource).toContain("GitHubIcon");
+    expect(accountConnectionsPageSource).not.toContain(
+      'class="console-panel space-y-5 p-5" data-account-connections-summary',
+    );
+    expect(accountConnectionsPageSource).toContain('activePath="/account/connections"');
+    expect(accountConnectionsPageSource).toContain("/api/auth/link-social");
+    expect(accountConnectionsPageSource).toContain("githubProvider?.accountLabel");
+    expect(accountConnectionsPageSource).toContain("linkGitHubAccount");
+    expect(consoleShellSource).not.toContain("/api/auth/link-social");
   });
 
   test("[ACCOUNT-SETTINGS-IA-002] keeps account security forms behind intent dialogs", () => {
@@ -3578,7 +3732,7 @@ describe("console page structure", () => {
     const projectSettingsSource = sourceBetween(
       projectDetailPageSource,
       'value="settings"',
-      "<Dialog.Root bind:open={quickDeployDialogOpen}",
+      "</Tabs.Root>",
     );
     const environmentsTabSource = sourceBetween(
       projectDetailPageSource,
@@ -3620,7 +3774,7 @@ describe("console page structure", () => {
     expect(projectSettingsSource).not.toContain('openProjectLifecycleDialog("archive")');
     expect(projectSettingsSource).not.toContain('openProjectLifecycleDialog("restore")');
     expect(projectSettingsSource).not.toContain('openProjectLifecycleDialog("delete")');
-    expect(projectSettingsSource).not.toContain('variant="destructive"');
+    expect(projectSettingsSource).not.toMatch(/<Button\b(?=[^>]*variant="destructive")[^>]*>/);
     expect(projectSettingsSource).not.toContain('id="project-delete-button"');
     expect(projectSettingsSource).not.toContain('id="project-archive-button"');
     expect(projectSettingsSource).not.toContain('id="project-restore-button"');

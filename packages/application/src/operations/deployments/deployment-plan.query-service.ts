@@ -96,6 +96,7 @@ function requestedDeploymentWithRuntimeContextMetadata(
 interface DomainBindingRouteGroup {
   domains: string[];
   pathPrefix: DomainRouteBindingCandidate["pathPrefix"];
+  pathHandling?: DomainRouteBindingCandidate["pathHandling"];
   tlsMode: DomainRouteBindingCandidate["tlsMode"];
   redirectTo?: string;
   redirectStatus?: 301 | 302 | 307 | 308;
@@ -117,6 +118,7 @@ function domainBindingRouteGroups(
       groups.push({
         domains: [binding.domainName],
         pathPrefix: binding.pathPrefix,
+        pathHandling: binding.pathHandling ?? "preserve",
         tlsMode: binding.tlsMode,
         redirectTo: binding.redirectTo,
         redirectStatus: binding.redirectStatus ?? 308,
@@ -124,13 +126,15 @@ function domainBindingRouteGroups(
       continue;
     }
 
-    const groupKey = `${binding.pathPrefix}\u0000${binding.tlsMode}`;
+    const pathHandling = binding.pathHandling ?? "preserve";
+    const groupKey = `${binding.pathPrefix}\u0000${pathHandling}\u0000${binding.tlsMode}`;
     const existingIndex = groupIndexes.get(groupKey);
     if (existingIndex === undefined) {
       groupIndexes.set(groupKey, groups.length);
       groups.push({
         domains: [binding.domainName],
         pathPrefix: binding.pathPrefix,
+        pathHandling,
         tlsMode: binding.tlsMode,
       });
       continue;
@@ -193,11 +197,13 @@ function requestedDeploymentWithDurableDomainBindings(
     proxyKind: primaryBinding.proxyKind,
     domains: primaryRouteGroup.domains,
     pathPrefix: primaryBinding.pathPrefix,
+    pathHandling: primaryBinding.pathHandling ?? "preserve",
     tlsMode: primaryBinding.tlsMode,
     accessRoutes: routeGroups.map((group) => ({
       proxyKind: primaryBinding.proxyKind,
       domains: group.domains,
       pathPrefix: group.pathPrefix,
+      pathHandling: group.pathHandling ?? "preserve",
       tlsMode: group.tlsMode,
       ...(group.redirectTo
         ? {
@@ -228,6 +234,7 @@ function proxyKindFromServer(
 interface ServerAppliedRouteGroup {
   domains: string[];
   pathPrefix: string;
+  pathHandling?: ServerAppliedRouteDesiredStateDomain["pathHandling"];
   tlsMode: ServerAppliedRouteDesiredStateDomain["tlsMode"];
   redirectTo?: string;
   redirectStatus?: 301 | 302 | 307 | 308;
@@ -244,6 +251,7 @@ function serverAppliedRouteGroups(
       groups.push({
         domains: [domain.host],
         pathPrefix: domain.pathPrefix,
+        pathHandling: domain.pathHandling ?? "preserve",
         tlsMode: domain.tlsMode,
         redirectTo: domain.redirectTo,
         redirectStatus: domain.redirectStatus ?? 308,
@@ -251,13 +259,15 @@ function serverAppliedRouteGroups(
       continue;
     }
 
-    const groupKey = `${domain.pathPrefix}\u0000${domain.tlsMode}`;
+    const pathHandling = domain.pathHandling ?? "preserve";
+    const groupKey = `${domain.pathPrefix}\u0000${pathHandling}\u0000${domain.tlsMode}`;
     const existingIndex = groupIndexes.get(groupKey);
     if (existingIndex === undefined) {
       groupIndexes.set(groupKey, groups.length);
       groups.push({
         domains: [domain.host],
         pathPrefix: domain.pathPrefix,
+        pathHandling,
         tlsMode: domain.tlsMode,
       });
       continue;
@@ -302,11 +312,13 @@ function requestedDeploymentWithServerAppliedRoutes(input: {
     proxyKind,
     domains: primaryRouteGroup.domains,
     pathPrefix: primaryRouteGroup.pathPrefix,
+    pathHandling: primaryRouteGroup.pathHandling ?? "preserve",
     tlsMode: primaryRouteGroup.tlsMode,
     accessRoutes: routeGroups.map((group) => ({
       proxyKind,
       domains: group.domains,
       pathPrefix: group.pathPrefix,
+      pathHandling: group.pathHandling ?? "preserve",
       tlsMode: group.tlsMode,
       ...(group.redirectTo
         ? {

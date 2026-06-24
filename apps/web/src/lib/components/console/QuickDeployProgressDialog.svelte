@@ -53,7 +53,7 @@
   let accessUrlCopyResetTimeout: ReturnType<typeof setTimeout> | undefined;
   const panelStatus = $derived(deploymentPanelStatus());
   const deploymentSucceeded = $derived(panelStatus === "succeeded");
-  const resolvedAccessUrl = $derived(accessUrl || accessUrlFromDeploymentProgressEvents());
+  const resolvedAccessUrl = $derived(accessUrl);
   const accessUrlCopyLabel = $derived(
     accessUrlCopyState === "copied"
       ? $t(i18nKeys.console.deployments.accessUrlCopied)
@@ -160,15 +160,6 @@
       default:
         return $t(i18nKeys.console.deployments.progressStatusLog);
     }
-  }
-
-  function accessUrlFromDeploymentProgressEvents(): string {
-    const terminalAccessEvent = [...deploymentEvents]
-      .reverse()
-      .find((event) => event.phase === "verify" && /public route/i.test(event.message));
-    const match = terminalAccessEvent?.message.match(/https?:\/\/\S+/i);
-
-    return match?.[0]?.replace(/[),.;]+$/, "") ?? "";
   }
 
   function updateAccessUrlCopyState(state: typeof accessUrlCopyState): void {
@@ -338,7 +329,7 @@
               <Rows3 class="size-4 text-muted-foreground" />
               <h3 class="text-sm font-semibold">{$t(i18nKeys.console.deployments.progressStatusLog)}</h3>
               {#if panelStatus === "running"}
-                <LoaderCircle class="size-4 animate-spin text-primary" />
+                <LoaderCircle class="deployment-progress-spinner size-4 text-primary" />
               {/if}
               <Badge variant={progressStatusVariant(resolvedDeploymentPanelStatus())}>
                 {progressStatusLabel(resolvedDeploymentPanelStatus())}
@@ -354,6 +345,12 @@
 {/if}
 
 <style>
+  :global(.deployment-progress-spinner) {
+    animation: deployment-progress-spin 0.9s linear infinite;
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+
   .quick-deploy-confetti {
     position: absolute;
     top: -0.75rem;
@@ -364,6 +361,12 @@
     background: var(--confetti-color);
     transform: rotate(var(--confetti-rotation));
     animation: quick-deploy-confetti-fall 1.45s ease-out var(--confetti-delay) both;
+  }
+
+  @keyframes deployment-progress-spin {
+    to {
+      transform: rotate(360deg);
+    }
   }
 
   @keyframes quick-deploy-confetti-fall {
@@ -383,8 +386,12 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
+    :global(.deployment-progress-spinner),
     .quick-deploy-confetti {
       animation: none;
+    }
+
+    .quick-deploy-confetti {
       display: none;
     }
   }
