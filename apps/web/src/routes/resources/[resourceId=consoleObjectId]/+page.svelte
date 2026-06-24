@@ -2652,8 +2652,53 @@
     }
   }
 
+  async function verifyDnsAfterDomainConnect(bindingId: string): Promise<void> {
+    try {
+      await orpcClient.domainBindings.confirmOwnership({ domainBindingId: bindingId });
+      dnsConnectorFeedback = {
+        bindingId,
+        kind: "success",
+        title: $t(i18nKeys.console.domainBindings.confirmOwnershipSuccessTitle),
+        detail: $t(i18nKeys.common.status.bound),
+      };
+      void queryClient.invalidateQueries({ queryKey: orpc.domainBindings.key({ type: "query" }) });
+      void queryClient.invalidateQueries({ queryKey: orpc.resources.key({ type: "query" }) });
+      void queryClient.invalidateQueries({ queryKey: orpc.certificates.key({ type: "query" }) });
+    } catch (error) {
+      dnsConnectorFeedback = {
+        bindingId,
+        kind: "error",
+        title: $t(i18nKeys.console.domainBindings.confirmOwnershipErrorTitle),
+        detail: readErrorMessage(error),
+      };
+    }
+  }
+
+  function openDomainConnectWindow(redirectUrl: string, bindingId: string): void {
+    const openedWindow = window.open(
+      redirectUrl,
+      dnsConnectorAuthWindowName,
+      dnsConnectorAuthorizationPopupFeatures(),
+    );
+    if (!openedWindow) {
+      window.location.assign(redirectUrl);
+      return;
+    }
+
+    dnsConnectorAuthWindow = openedWindow;
+    openedWindow.focus();
+    const timer = window.setInterval(() => {
+      if (!openedWindow.closed) {
+        return;
+      }
+      window.clearInterval(timer);
+      void verifyDnsAfterDomainConnect(bindingId);
+    }, 1000);
+  }
+
   async function connectDnsProviderForSelectedBinding(): Promise<void> {
     const binding = selectedDnsConnectorBinding;
+    const readiness = dnsConnectorReadiness;
     if (!browser || !binding || dnsConnectorConnectPending) {
       return;
     }
@@ -2670,34 +2715,23 @@
     dnsConnectorConnectPending = true;
     dnsConnectorFeedback = null;
     try {
-      const started = await orpcClient.connections.connect.start({
+      const plan = await orpcClient.domainBindings.dnsPlan({
+        domainBindingId: binding.id,
         connectorKey: dnsConnectorSelectedConnectorKey,
-        returnUrl: `/resources/${resourceId}?tab=networking&section=domains&dnsBindingId=${encodeURIComponent(binding.id)}`,
-        requestedCapabilityKey: "dns.records.apply",
-        originalHostname: binding.domainName,
+        capabilityKey: "dns.domain-connect.start",
+        zoneName: readiness?.providerDiscovery.baseDomain ?? binding.domainName,
       });
-      if (started.authorizationUrl) {
-        dnsConnectorAuthWindow = window.open(
-          started.authorizationUrl,
-          dnsConnectorAuthWindowName,
-          dnsConnectorAuthorizationPopupFeatures(),
-        );
-        if (dnsConnectorAuthWindow) {
-          dnsConnectorAuthWindow.focus();
-          return;
-        }
-        window.location.assign(started.authorizationUrl);
-        return;
-      }
-      if (started.nextAction === "already-connected" || started.nextAction === "ready") {
-        await refreshDnsConnectorPlan();
+      dnsConnectorPlan = plan;
+      const redirectUrl = plan.providerPlan?.domainConnectSetup?.redirectUrl;
+      if (redirectUrl) {
+        openDomainConnectWindow(redirectUrl, binding.id);
         return;
       }
       dnsConnectorFeedback = {
         bindingId: binding.id,
         kind: "error",
         title: $t(i18nKeys.console.domainBindings.dnsConnectorPlanErrorTitle),
-        detail: started.nextAction,
+        detail: plan.summary,
       };
     } catch (error) {
       dnsConnectorFeedback = {

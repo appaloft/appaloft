@@ -1,3 +1,4 @@
+import { createSign } from "node:crypto";
 import {
   type DnsRecordApplySnapshot,
   type DnsRecordKind,
@@ -36,6 +37,10 @@ export interface FakeDnsConnectorProviderAdapterOptions {
     serviceId?: string;
     templateId?: string;
     consentBaseUrl?: string;
+    redirectUri?: string;
+    signatureKey?: string;
+    privateKeyPem?: string;
+    targetParameterName?: string;
   };
 }
 
@@ -252,6 +257,10 @@ export class FakeDnsConnectorProviderAdapter implements ConnectorProviderAdapter
   private readonly domainConnectServiceId: string;
   private readonly domainConnectTemplateId: string;
   private readonly domainConnectConsentBaseUrl: string;
+  private readonly domainConnectRedirectUri: string | undefined;
+  private readonly domainConnectSignatureKey: string | undefined;
+  private readonly domainConnectPrivateKeyPem: string | undefined;
+  private readonly domainConnectTargetParameterName: string;
 
   constructor(options: FakeDnsConnectorProviderAdapterOptions) {
     this.connectorKey = options.connectorKey;
@@ -260,12 +269,17 @@ export class FakeDnsConnectorProviderAdapter implements ConnectorProviderAdapter
       ...(options.failureMode ? { failureMode: options.failureMode } : {}),
     });
     this.zones = options.zones ?? [];
-    this.domainConnectProviderKey = options.domainConnect?.providerKey ?? "cloudflare";
-    this.domainConnectServiceId = options.domainConnect?.serviceId ?? "appaloft";
-    this.domainConnectTemplateId = options.domainConnect?.templateId ?? "appaloft-domain";
+    this.domainConnectProviderKey = options.domainConnect?.providerKey ?? "example-service.test";
+    this.domainConnectServiceId = options.domainConnect?.serviceId ?? "custom-domain";
+    this.domainConnectTemplateId = options.domainConnect?.templateId ?? this.domainConnectServiceId;
     this.domainConnectConsentBaseUrl =
       options.domainConnect?.consentBaseUrl ??
       "https://domainconnect.example.test/v2/domainTemplates/providers";
+    this.domainConnectRedirectUri = options.domainConnect?.redirectUri?.trim() || undefined;
+    this.domainConnectSignatureKey = options.domainConnect?.signatureKey?.trim() || undefined;
+    this.domainConnectPrivateKeyPem = options.domainConnect?.privateKeyPem?.trim() || undefined;
+    this.domainConnectTargetParameterName =
+      options.domainConnect?.targetParameterName?.trim() || "target";
   }
 
   async listZones(): Promise<Result<readonly DnsConnectorZoneSnapshot[]>> {
@@ -543,10 +557,18 @@ export class FakeDnsConnectorProviderAdapter implements ConnectorProviderAdapter
         baseUrl: this.domainConnectConsentBaseUrl,
         providerKey: this.domainConnectProviderKey,
         serviceId,
-        templateId,
         zoneName,
         hostname: firstRecord.name,
+        targetParameterName: this.domainConnectTargetParameterName,
+        targetValue: firstRecord.value,
+        ...(this.domainConnectRedirectUri ? { redirectUri: this.domainConnectRedirectUri } : {}),
         state,
+        ...(this.domainConnectSignatureKey && this.domainConnectPrivateKeyPem
+          ? {
+              signatureKey: this.domainConnectSignatureKey,
+              privateKeyPem: this.domainConnectPrivateKeyPem,
+            }
+          : {}),
       }),
       state,
       records: parameters.value.records,
@@ -734,18 +756,46 @@ function domainConnectRedirectUrl(input: {
   baseUrl: string;
   providerKey: string;
   serviceId: string;
-  templateId: string;
   zoneName: string;
   hostname: string;
+  targetParameterName: string;
+  targetValue: string;
+  redirectUri?: string;
   state: string;
+  signatureKey?: string;
+  privateKeyPem?: string;
 }): string {
   const baseUrl = input.baseUrl.replace(/\/$/, "");
+  const host = domainConnectHostParameter(input.hostname, input.zoneName);
   const query = new URLSearchParams({
     domain: input.zoneName,
-    host: input.hostname,
+    host,
+    [input.targetParameterName]: input.targetValue,
+    ...(input.redirectUri ? { redirect_uri: input.redirectUri } : {}),
     state: input.state,
   });
-  return `${baseUrl}/${encodeURIComponent(input.providerKey)}/services/${encodeURIComponent(input.serviceId)}/templates/${encodeURIComponent(input.templateId)}/apply?${query.toString()}`;
+  if (input.signatureKey && input.privateKeyPem) {
+    const unsignedQuery = query.toString();
+    const signature = createSign("RSA-SHA256")
+      .update(unsignedQuery)
+      .sign(input.privateKeyPem, "base64");
+    query.set("key", input.signatureKey);
+    query.set("sig", signature);
+  }
+  return `${baseUrl}/${encodeURIComponent(input.providerKey)}/services/${encodeURIComponent(input.serviceId)}/apply?${query.toString()}`;
+}
+
+function domainConnectHostParameter(hostname: string, zoneName: string): string {
+  const normalizedHostname = hostname.trim().replace(/\.$/, "").toLowerCase();
+  const normalizedZoneName = zoneName.trim().replace(/\.$/, "").toLowerCase();
+  if (normalizedHostname === normalizedZoneName) {
+    return "";
+  }
+  const zoneSuffix = `.${normalizedZoneName}`;
+  if (normalizedHostname.endsWith(zoneSuffix)) {
+    return normalizedHostname.slice(0, -zoneSuffix.length);
+  }
+  return normalizedHostname;
 }
 
 function stableHash(value: unknown): string {
