@@ -211,7 +211,7 @@ and `deployments.create` where deployment admission reads resource lifecycle or 
 | `validation_error` | `validation` | `config-secret-validation` | No | A resource variable requested secret storage for a build-time value or another forbidden secret combination. |
 | `validation_error` | `validation` | `config-profile-resolution` | No | Resource variable shape, exposure, or prefix policy is invalid for the requested override. |
 | `not_found` | `not-found` | `config-read` | No | Requested resource-scoped variable identity cannot be found for removal. |
-| `resource_delete_blocked` | `conflict` | `resource-deletion-guard` | No | Delete was requested for an active resource or an archived resource with retained blockers such as deployments, runtime instances, source links, domain bindings, certificates, terminal sessions, dependency bindings, routes, logs, or audit requirements. |
+| `resource_delete_blocked` | `conflict` | `resource-deletion-guard` | No | Delete was requested for an active resource or an archived resource with retained blockers such as runtime instances, source links, domain bindings, certificates, terminal sessions, dependency bindings, routes, or runtime log archives. Audit history is retained as a past-tense fact and is not a resource deletion blocker. |
 | `validation_error` | `validation` | `resource-deletion-guard` | No | Delete confirmation did not match the resource slug. |
 | `infra_error` | `infra` | `resource-persistence` | Conditional | Profile/lifecycle state could not be safely persisted. |
 | `infra_error` | `infra` | `event-publication` | Conditional | Profile/lifecycle event publication or outbox recording failed before command success could be safely returned. |

@@ -135,9 +135,9 @@ generic `resources.update`.
 | RES-PROFILE-DELETE-001 | `resources.delete` | Command use case | Archived resource has no blockers and matching slug confirmation. | Transitions/tombstones resource as deleted, publishes `resource-deleted`, returns `ok({ id })`. |
 | RES-PROFILE-DELETE-002 | `resources.delete` | Command use case | Active resource. | Rejects with `resource_delete_blocked`, `lifecycleStatus = "active"`, `deletionBlockers` includes `active-resource`, and no event. |
 | RES-PROFILE-DELETE-003 | `resources.delete` | Command use case | Confirmation slug mismatch. | Rejects with `validation_error`, `phase = resource-deletion-guard`, and no mutation. |
-| RES-PROFILE-DELETE-004 | `resources.delete` | Command use case | Archived resource has deployment history but no retained deletion blockers. | Delete succeeds and deployment history remains owned by deployment/audit retention. |
+| RES-PROFILE-DELETE-004 | `resources.delete` | Command use case | Archived resource has deployment or audit history but no retained deletion blockers. | Delete succeeds and deployment/audit history remains owned by its retention context. |
 | RES-PROFILE-DELETE-005 | `resources.delete` | Command use case | Archived resource has domain, certificate, access route, or proxy route state. | Rejects with `resource_delete_blocked` and safe blocker details. |
-| RES-PROFILE-DELETE-006 | `resources.delete` | Command use case | Archived resource has source link, dependency binding, terminal session, runtime-log retention, or audit retention. | Rejects with `resource_delete_blocked` and safe blocker details. |
+| RES-PROFILE-DELETE-006 | `resources.delete` | Command use case | Archived resource has source link, dependency binding, terminal session, runtime-log retention, and retained audit history. | Rejects with `resource_delete_blocked` for source/dependency/terminal/runtime-log blockers only; audit history remains retained but is not a resource delete blocker. |
 | DMBH-BINDING-001 | `ResourceBinding` | Core domain unit | Binding scope and injection mode vary across build-only/runtime-reference and allowed combinations. | `ResourceBinding` owns scope/injection coherence; public behavior is unchanged. |
 | RES-PROFILE-DELETE-007 | `resources.delete` | Command use case | Already deleted tombstone is retried. | Returns idempotent `ok({ id })` without duplicate state effect or duplicate event when tombstone can be resolved. |
 | RES-PROFILE-DELETE-008 | `resources.show` / `resources.list` | Read model | Deleted resource queried by normal active read paths. | `resources.show` returns `not_found`; list omits the resource. |
@@ -227,8 +227,8 @@ Automated coverage now exists for:
 - `RES-PROFILE-DELETE-001` through `RES-PROFILE-DELETE-008` and
   `RES-PROFILE-DELETE-CHECK-001` through `RES-PROFILE-DELETE-CHECK-003` in
   `packages/application/test/delete-resource.test.ts`;
-- PG audit-retention blocker coverage for `RES-PROFILE-DELETE-006` in
-  `packages/persistence/pg/test/pglite.integration.test.ts`;
+- PG coverage for `RES-PROFILE-DELETE-006` proves retained audit rows are not resource delete
+  blockers in `packages/persistence/pg/test/pglite.integration.test.ts`;
 - PG source-link blocker coverage for `RES-PROFILE-DELETE-006` is covered by
   `SOURCE-LINK-STATE-017` in `packages/persistence/pg/test/pglite.integration.test.ts`;
 - PG server-applied route blocker coverage for `RES-PROFILE-DELETE-005` is covered by

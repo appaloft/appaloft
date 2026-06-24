@@ -14,11 +14,13 @@
 ## Normative Contract
 
 `resources.delete` is the source-of-truth command for removing an archived resource from normal
-active resource state only after deletion guards prove the resource is unreferenced.
+active resource state only after deletion guards prove the resource has no active owner-bound
+runtime, route, domain, dependency, source, or log references.
 
 Command success means normal active resource reads no longer expose the resource. It does not mean
 deployments, domains, certificates, runtime instances, source links, dependency resources, logs, or
-audit records were cascaded or cleaned up.
+audit records were cascaded or cleaned up. Audit records remain retained historical facts and may
+continue to reference the deleted resource id.
 
 ```ts
 type DeleteResourceResult = Result<{ id: string }, DomainError>;
@@ -138,7 +140,6 @@ type ResourceDeletionBlockerKind =
   | "dependency-binding"
   | "terminal-session"
   | "runtime-log-retention"
-  | "audit-retention"
   | "generated-access-route"
   | "server-applied-route"
   | "proxy-route";
@@ -157,9 +158,12 @@ ambiguous or unsafe:
 - `terminal-session`: any open or retained terminal session references the resource.
 - `runtime-log-retention`: retained Appaloft-owned runtime log archive snapshots require the
   resource identity.
-- `audit-retention`: audit policy requires the resource identity to remain queryable.
 - `generated-access-route`, `server-applied-route`, or `proxy-route`: any durable desired/applied
   access route still references the resource.
+
+Retained audit rows are not resource deletion blockers. They are past-tense facts owned by the
+operator audit history context, and resource deletion must not require audit prune or weaken audit
+retention.
 
 The error payload must include only safe blocker kinds and safe identifiers/counts when available.
 It must not include logs, route provider configs, source credentials, certificate material,
@@ -213,8 +217,8 @@ future MCP tools must remain intention-revealing and must not expose `resources.
 
 Delete is intentionally narrower than archive. Most real deployed resources should be archived,
 not deleted, because domain/TLS state, source links, runtime state, retained logs, and support
-context are product data. Deployment history is retained by deployment/audit ownership and does not
-block deletion by itself.
+context are product data. Deployment history and audit history are retained by their owning
+contexts and do not block deletion by themselves.
 
 The command must never perform implicit cleanup of runtime containers, proxy routes, domains,
 certificates, source links, dependency resources, or logs. Each cleanup path needs its own explicit

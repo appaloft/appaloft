@@ -37,8 +37,8 @@ exports or legal holds as immutable archive records.
 - Aggregate/resource owner: none. Archives are retained audit-history records and do not own
   write-side aggregate behavior.
 - Upstream/downstream contexts: `audit-events.prune` observes retained archive source-row
-  references before deleting audit rows; delete safety continues to observe retained audit rows as
-  blockers.
+  references before deleting audit rows; server delete safety continues to observe retained audit
+  rows as blockers, while resource delete safety does not.
 
 ## Public Surfaces
 

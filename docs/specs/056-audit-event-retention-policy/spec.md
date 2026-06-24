@@ -8,15 +8,15 @@
 ## Business Outcome
 
 Operators can preview and prune old retained audit rows with an explicit cutoff, reducing stale
-delete blockers and bounded storage growth without mutating event streams, process state, runtime
-logs, deployment snapshots, or business aggregates.
+server delete blockers and bounded storage growth without mutating event streams, process state,
+runtime logs, deployment snapshots, or business aggregates.
 
 ## Ubiquitous Language
 
 | Term | Meaning | Context | Compatibility aliases |
 | --- | --- | --- | --- |
 | Audit event | A retained audit row describing one aggregate-scoped historical change. | Operator audit history | audit log |
-| Audit retention | The policy that keeps audit rows visible and delete-blocking until explicitly pruned. | Operator maintenance | audit history retention |
+| Audit retention | The policy that keeps audit rows visible until explicitly pruned. It may block lifecycle deletion for aggregates whose delete safety owns audit retention, but it does not block Resource deletion. | Operator maintenance | audit history retention |
 | Audit prune | A dry-run-first command that deletes only old audit rows selected by cutoff and optional scope. | Operator maintenance | audit cleanup |
 
 ## Scenarios And Acceptance Criteria
@@ -34,7 +34,8 @@ logs, deployment snapshots, or business aggregates.
 - Bounded context: Operator audit history.
 - Aggregate/resource owner: none; audit rows are retained read/history records scoped by aggregate
   id.
-- Upstream/downstream contexts: delete safety readers observe retained audit rows as blockers.
+- Upstream/downstream contexts: server delete safety observes retained audit rows as blockers;
+  resource delete safety keeps audit rows as retained facts without treating them as blockers.
 
 ## Public Surfaces
 

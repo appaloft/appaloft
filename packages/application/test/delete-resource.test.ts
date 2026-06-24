@@ -372,7 +372,7 @@ describe("DeleteResourceUseCase", () => {
     expect(eventBus.events).toHaveLength(0);
   });
 
-  test("[RES-PROFILE-DELETE-006] reports source, dependency, terminal, log, and audit blockers", async () => {
+  test("[RES-PROFILE-DELETE-006] reports source, dependency, terminal, and log blockers without treating audit history as a blocker", async () => {
     const { context, eventBus, useCase } = await createHarness({
       blockers: [
         { kind: "source-link" },
@@ -396,7 +396,6 @@ describe("DeleteResourceUseCase", () => {
       "dependency-binding",
       "terminal-session",
       "runtime-log-retention",
-      "audit-retention",
     ]);
     expect(eventBus.events).toHaveLength(0);
   });

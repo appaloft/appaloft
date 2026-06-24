@@ -52,8 +52,9 @@ The command must:
   source rows from destructive deletion and report archive-retained/skipped counts while the archive
   remains retained.
 - Rows outside the aggregate/event filters are retained.
-- Delete safety may change after destructive prune because retained audit rows are one blocker
-  source.
+- Server delete safety may change after destructive prune because retained audit rows are one
+  blocker source. Resource delete safety must not require audit prune, because retained audit rows
+  are past-tense facts that may continue to reference a tombstoned resource id.
 
 ## Entrypoints
 

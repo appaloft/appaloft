@@ -36,7 +36,8 @@ so destructive audit prune cannot remove them until an explicit release command 
 - Aggregate/resource owner: none. Legal holds guard retained audit history records and do not own
   write-side aggregate behavior.
 - Upstream/downstream contexts: `audit-events.prune` observes active holds before deleting retained
-  audit rows; delete safety continues to observe retained audit rows as blockers.
+  audit rows; server delete safety continues to observe retained audit rows as blockers, while
+  resource delete safety retains audit facts without using them as blockers.
 
 ## Public Surfaces
 
