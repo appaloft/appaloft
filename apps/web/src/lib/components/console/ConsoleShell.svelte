@@ -36,6 +36,7 @@
   } from "$lib/components/ui/dropdown-menu";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import ConsoleOrganizationSwitcher from "$lib/components/console/ConsoleOrganizationSwitcher.svelte";
+  import ConsoleDomainErrorModalHost from "$lib/components/console/ConsoleDomainErrorModalHost.svelte";
   import QuickDeploySheet from "$lib/components/console/QuickDeploySheet.svelte";
   import ConsoleUserMenu from "$lib/components/console/ConsoleUserMenu.svelte";
   import {
@@ -215,6 +216,11 @@
           systemPluginExtensionTitle(b, $locale),
         ),
       ),
+  );
+  const domainErrorModalExtensions = $derived.by(() =>
+    (webExtensionsQuery.data?.items ?? [])
+      .filter((extension) => extension.placement === "domain-error-modal")
+      .filter(isExtensionVisible),
   );
   const filteredProjects = $derived.by(() => {
     const query = projectSearch.trim().toLowerCase();
@@ -725,6 +731,11 @@
     </main>
   </SidebarInset>
 </SidebarProvider>
+
+<ConsoleDomainErrorModalHost
+  extensions={domainErrorModalExtensions}
+  organization={currentOrganization}
+/>
 
 {#if quickDeployModalEnabled && quickDeployDialogOpen}
   <Dialog.Root open={true} onOpenChange={setQuickDeployDialogOpen}>

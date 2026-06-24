@@ -1,10 +1,17 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-import { readErrorMessage, request, requestWithMetadata } from "./client";
+import {
+  ApiRequestError,
+  apiDomainErrorEventType,
+  readErrorMessage,
+  request,
+  requestWithMetadata,
+} from "./client";
 
 describe("api client helpers", () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   test("requests JSON data from the backend API", async () => {
@@ -70,5 +77,72 @@ describe("api client helpers", () => {
     );
     expect(readErrorMessage(new Error("boom"))).toBe("boom");
     expect(readErrorMessage("opaque")).toBe("未知请求失败");
+  });
+
+  test("dispatches structured domain errors for console extension hosts", async () => {
+    const fetchMock = vi.fn(async () => {
+      return new Response(
+        JSON.stringify({
+          error: {
+            code: "cloud-plan-limit-exceeded",
+            category: "user",
+            message: "Plan limit exceeded",
+            retryable: false,
+            details: {
+              planId: "free",
+              limitKind: "servers",
+              limit: 1,
+            },
+          },
+        }),
+        { status: 400 },
+      );
+    });
+    const dispatchEvent = vi.fn();
+
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("window", {
+      dispatchEvent,
+      navigator: {
+        language: "en-US",
+      },
+      localStorage: {
+        getItem: vi.fn(() => null),
+        setItem: vi.fn(),
+        removeItem: vi.fn(),
+      },
+    });
+    vi.stubGlobal(
+      "CustomEvent",
+      class TestCustomEvent {
+        readonly type: string;
+        readonly detail: unknown;
+
+        constructor(type: string, init?: { detail?: unknown }) {
+          this.type = type;
+          this.detail = init?.detail;
+        }
+      },
+    );
+
+    await expect(request("/api/servers")).rejects.toMatchObject({
+      domainError: {
+        code: "cloud-plan-limit-exceeded",
+        message: "Plan limit exceeded",
+      },
+    });
+    await expect(request("/api/servers")).rejects.toBeInstanceOf(ApiRequestError);
+    expect(dispatchEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: apiDomainErrorEventType,
+        detail: expect.objectContaining({
+          path: "/api/servers",
+          status: 400,
+          error: expect.objectContaining({
+            code: "cloud-plan-limit-exceeded",
+          }),
+        }),
+      }),
+    );
   });
 });

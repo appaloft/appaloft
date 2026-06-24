@@ -34,7 +34,7 @@
   import { createQuery, queryOptions } from "@tanstack/svelte-query";
   import type { Component } from "svelte";
 
-  import { readErrorMessage, request } from "$lib/api/client";
+  import { readErrorMessage, request, requestWithMetadata } from "$lib/api/client";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import * as Card from "$lib/components/ui/card";
@@ -80,6 +80,7 @@
     | ConsolePageIntegrationCatalogSection
     | ConsolePagePanelGridSection
     | ConsolePageDialogPanelGridSection
+    | ConsolePageTabsSection
     | ConsolePageTableSection
     | ConsolePageCalloutSection;
 
@@ -148,24 +149,43 @@
 
   type ConsolePagePanelGridSection = {
     kind: "panel-grid";
+    layout?: "grid" | "comparison-table";
     title?: string;
     description?: string;
+    comparisonFeatureLabel?: string;
     items: ConsolePagePanelItem[];
   };
 
   type ConsolePageDialogPanelGridSection = {
     kind: "dialog-panel-grid";
+    layout?: "grid" | "comparison-table";
     title: string;
     description?: string;
     triggerLabel: string;
     dialogTitle?: string;
     dialogDescription?: string;
+    comparisonFeatureLabel?: string;
     items: ConsolePagePanelItem[];
+  };
+
+  type ConsolePageTabsSection = {
+    kind: "tabs";
+    title?: string;
+    description?: string;
+    tabs: ConsolePageTab[];
+  };
+
+  type ConsolePageTab = {
+    id: string;
+    label: string;
+    description?: string;
+    sections: ConsolePageSection[];
   };
 
   type ConsolePagePanelItem = {
     title: string;
     description?: string;
+    badge?: string;
     fields?: ConsolePagePanelField[];
     rows?: ConsolePageKeyValue[];
     actions?: ConsolePageRequestAction[];
@@ -196,6 +216,9 @@
     disabledReason?: string;
     redirectUrlField?: string;
     autoRun?: boolean;
+    confirmation?: {
+      message: string;
+    };
   };
 
   type ConsolePageDateTimeValue = {
@@ -376,6 +399,7 @@
   type Props = {
     settingsScope?: "organization" | "instance" | null;
     embedded?: boolean;
+    pageEndpointOverride?: string | null;
     projectId?: string;
     environmentId?: string;
     resourceId?: string;
@@ -386,6 +410,7 @@
   let {
     settingsScope = null,
     embedded = false,
+    pageEndpointOverride = null,
     projectId = "",
     environmentId = "",
     resourceId = "",
@@ -394,6 +419,11 @@
   }: Props = $props();
   let pendingActionKey = $state<string | null>(null);
   let actionErrorMessage = $state("");
+  let confirmationAction = $state<{
+    action: ConsolePageRequestAction;
+    item?: ConsolePagePanelItem;
+  } | null>(null);
+  let confirmationOpen = $state(false);
   let panelFieldValues = $state<Record<string, number>>({});
   let selectedPanelGridSection = $state<ConsolePageDialogPanelGridSection | null>(null);
   let panelGridDialogOpen = $state(false);
@@ -402,19 +432,20 @@
   let selectedTableDetails = $state<ConsolePageTableDetails | null>(null);
   let tableDetailsOpen = $state(false);
   let autoRunActionKey = $state<string | null>(null);
+  let selectedTabIds = $state<Record<string, string>>({});
 
   const webExtensionsQuery = createQuery(() =>
     queryOptions({
       queryKey: ["system-plugins", "web-extensions"],
       queryFn: () => request<SystemPluginWebExtensionsResponse>("/api/system-plugins/web-extensions"),
-      enabled: browser,
+      enabled: browser && !pageEndpointOverride,
       staleTime: 30_000,
     }),
   );
   const organizationContextQuery = createQuery(() =>
     orpc.organizations.currentContext.queryOptions({
       input: {},
-      enabled: browser,
+      enabled: browser && !pageEndpointOverride,
       retry: 0,
       staleTime: 30_000,
     }),
@@ -427,21 +458,27 @@
   const metadata = $derived(readConsolePageExtensionMetadata(extension));
   const currentOrganization = $derived(organizationContextQuery.data?.currentOrganization ?? null);
   const pageEndpoint = $derived(
-    resolveConsolePageEndpoint(metadata, {
-      pathname,
-      query: page.url.searchParams.toString(),
-      organization: currentOrganization,
-      projectId,
-      environmentId,
-      resourceId,
-      deploymentId,
-      previewEnvironmentId,
-    }),
+    pageEndpointOverride ??
+      resolveConsolePageEndpoint(metadata, {
+        pathname,
+        query: page.url.searchParams.toString(),
+        organization: currentOrganization,
+        projectId,
+        environmentId,
+        resourceId,
+        deploymentId,
+        previewEnvironmentId,
+      }),
   );
   const pageDocumentQuery = createQuery(() =>
     queryOptions({
       queryKey: ["console-extension-page", pageEndpoint],
-      queryFn: () => request<ConsolePageDocument>(pageEndpoint ?? "/"),
+      queryFn: async () =>
+        (
+          await requestWithMetadata<ConsolePageDocument>(pageEndpoint ?? "/", undefined, {
+            suppressDomainErrorEvent: Boolean(pageEndpointOverride),
+          })
+        ).data,
       enabled: browser && Boolean(pageEndpoint),
       placeholderData: (previousData) => previousData,
       staleTime: 15_000,
@@ -460,14 +497,14 @@
       $t(i18nKeys.common.status.loading),
   );
   const loading = $derived(
-    webExtensionsQuery.isPending ||
-      organizationContextQuery.isPending ||
+    (!pageEndpointOverride && webExtensionsQuery.isPending) ||
+      (!pageEndpointOverride && organizationContextQuery.isPending) ||
       (Boolean(pageEndpoint) && pageDocumentQuery.isPending && !pageDocumentQuery.data),
   );
   const errorMessage = $derived(
-    webExtensionsQuery.error
+    !pageEndpointOverride && webExtensionsQuery.error
       ? readErrorMessage(webExtensionsQuery.error)
-      : organizationContextQuery.error
+      : !pageEndpointOverride && organizationContextQuery.error
         ? readErrorMessage(organizationContextQuery.error)
         : pageDocumentQuery.error
           ? readErrorMessage(pageDocumentQuery.error)
@@ -869,12 +906,58 @@
     return null;
   }
 
+  function comparisonRowLabels(items: ConsolePagePanelItem[]): string[] {
+    const labels: string[] = [];
+    const seen = new Set<string>();
+    for (const item of items) {
+      for (const row of item.rows ?? []) {
+        if (seen.has(row.label)) continue;
+        seen.add(row.label);
+        labels.push(row.label);
+      }
+    }
+    return labels;
+  }
+
+  function comparisonItemRow(
+    item: ConsolePagePanelItem,
+    label: string,
+  ): ConsolePageKeyValue | null {
+    return item.rows?.find((row) => row.label === label) ?? null;
+  }
+
+  function firstDisabledActionReason(item: ConsolePagePanelItem): string | null {
+    return item.actions?.find((action) => action.disabled && action.disabledReason)?.disabledReason ?? null;
+  }
+
+  function tabsSectionKey(section: ConsolePageTabsSection, index: number): string {
+    return `${section.title ?? "tabs"}:${index}`;
+  }
+
+  function selectedTab(section: ConsolePageTabsSection, index: number): ConsolePageTab | null {
+    const selectedId = selectedTabIds[tabsSectionKey(section, index)];
+    return section.tabs.find((tab) => tab.id === selectedId) ?? section.tabs[0] ?? null;
+  }
+
+  function selectTab(section: ConsolePageTabsSection, index: number, tabId: string): void {
+    selectedTabIds = {
+      ...selectedTabIds,
+      [tabsSectionKey(section, index)]: tabId,
+    };
+  }
+
   async function runRequestAction(
     action: ConsolePageRequestAction,
     item?: ConsolePagePanelItem,
+    options: { confirmed?: boolean } = {},
   ): Promise<void> {
     if (action.disabled) {
       actionErrorMessage = action.disabledReason ?? "";
+      return;
+    }
+    if (action.confirmation && !options.confirmed) {
+      confirmationAction = { action, item };
+      confirmationOpen = true;
       return;
     }
 
@@ -908,6 +991,21 @@
     } finally {
       pendingActionKey = null;
     }
+  }
+
+  function cancelRequestActionConfirmation(): void {
+    confirmationOpen = false;
+    confirmationAction = null;
+  }
+
+  function confirmRequestAction(): void {
+    const entry = confirmationAction;
+    if (!entry) {
+      return;
+    }
+    confirmationOpen = false;
+    confirmationAction = null;
+    void runRequestAction(entry.action, entry.item, { confirmed: true });
   }
 </script>
 
@@ -1011,6 +1109,95 @@
         {/if}
       </article>
     {/each}
+  </div>
+{/snippet}
+
+{#snippet panelGridComparisonTable(section: ConsolePageDialogPanelGridSection | ConsolePagePanelGridSection)}
+  <div
+    class="max-h-[70vh] overflow-auto rounded-lg border"
+    data-console-page-dialog-comparison-table
+  >
+    <table class="w-full min-w-[980px] border-collapse text-sm">
+      <thead class="bg-muted/40">
+        <tr>
+          <th scope="col" class="w-48 px-4 py-4 text-left font-semibold text-foreground">
+            {section.comparisonFeatureLabel ?? "Feature"}
+          </th>
+          {#each section.items as item (item.title)}
+            <th scope="col" class="min-w-40 border-l px-4 py-4 text-center align-top">
+              <div class="flex min-h-10 items-center justify-center">
+                <div class="flex flex-wrap items-center justify-center gap-2">
+                  <span class="text-base font-semibold text-foreground">{item.title}</span>
+                  {#if item.badge}
+                    <span
+                      class={[
+                        "inline-flex rounded-full border px-2 py-0.5 text-xs font-medium",
+                        badgeClass(item.tone ?? "muted"),
+                      ]}
+                    >
+                      {item.badge}
+                    </span>
+                  {/if}
+                </div>
+              </div>
+            </th>
+          {/each}
+        </tr>
+      </thead>
+      <tbody class="divide-y">
+        {#each comparisonRowLabels(section.items) as label (label)}
+          <tr>
+            <th scope="row" class="bg-background px-4 py-3 text-left font-medium text-muted-foreground">
+              {label}
+            </th>
+            {#each section.items as item (item.title)}
+              {@const row = comparisonItemRow(item, label)}
+              <td class="border-l px-4 py-3 text-center align-middle">
+                {#if row}
+                  <span class={["font-medium", toneClass(row.tone)]}>
+                    {panelRowValue(item, row)}
+                  </span>
+                {:else}
+                  <span class="text-muted-foreground">—</span>
+                {/if}
+              </td>
+            {/each}
+          </tr>
+        {/each}
+      </tbody>
+      <tfoot class="border-t bg-muted/20">
+        <tr>
+          <th scope="row" class="bg-background px-4 py-3 text-left font-medium text-muted-foreground">
+          </th>
+          {#each section.items as item (item.title)}
+            <td class="border-l px-4 py-4 align-middle">
+              {#if item.actions?.length}
+                <div class="flex flex-wrap justify-center gap-2">
+                  {#each item.actions as action (requestActionKey(action, item))}
+                    <Button
+                      type="button"
+                      variant={action.variant === "primary" ? "default" : "outline"}
+                      disabled={Boolean(action.disabled) ||
+                        pendingActionKey === requestActionKey(action, item)}
+                      onclick={() => runRequestAction(action, item)}
+                    >
+                      {pendingActionKey === requestActionKey(action, item)
+                        ? $t(i18nKeys.common.status.loading)
+                        : action.label}
+                    </Button>
+                  {/each}
+                </div>
+              {/if}
+              {#if firstDisabledActionReason(item)}
+                <p class="mt-2 text-center text-xs leading-5 text-muted-foreground">
+                  {firstDisabledActionReason(item)}
+                </p>
+              {/if}
+            </td>
+          {/each}
+        </tr>
+      </tfoot>
+    </table>
   </div>
 {/snippet}
 
@@ -1435,7 +1622,11 @@
                 {/if}
               </div>
             {/if}
-            {@render panelGridItems(section.items, "grid gap-4 md:grid-cols-2 xl:grid-cols-3")}
+            {#if section.layout === "comparison-table"}
+              {@render panelGridComparisonTable(section)}
+            {:else}
+              {@render panelGridItems(section.items, "grid gap-4 md:grid-cols-2 xl:grid-cols-3")}
+            {/if}
           </section>
         {:else if section.kind === "dialog-panel-grid"}
           <section class="console-panel flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between">
@@ -1448,6 +1639,92 @@
             <Button type="button" class="shrink-0" onclick={() => openPanelGridDialog(section)}>
               {section.triggerLabel}
             </Button>
+          </section>
+        {:else if section.kind === "tabs"}
+          {@const activeTab = selectedTab(section, sectionIndex)}
+          <section class="space-y-4">
+            {#if section.title || section.description}
+              <div class="space-y-1">
+                {#if section.title}
+                  <h2 class="text-lg font-semibold">{section.title}</h2>
+                {/if}
+                {#if section.description}
+                  <p class="text-sm text-muted-foreground">{section.description}</p>
+                {/if}
+              </div>
+            {/if}
+            <div class="flex flex-wrap gap-2 rounded-lg border bg-muted/30 p-1">
+              {#each section.tabs as tab (tab.id)}
+                <button
+                  type="button"
+                  class={[
+                    "inline-flex h-9 items-center rounded-md px-3 text-sm font-medium transition-colors",
+                    activeTab?.id === tab.id
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:bg-background/70 hover:text-foreground",
+                  ]}
+                  onclick={() => selectTab(section, sectionIndex, tab.id)}
+                >
+                  {tab.label}
+                </button>
+              {/each}
+            </div>
+            {#if activeTab}
+              <div class="space-y-4">
+                {#if activeTab.description}
+                  <p class="text-sm text-muted-foreground">{activeTab.description}</p>
+                {/if}
+                {#each activeTab.sections as tabSection, tabSectionIndex (`${tabSection.kind}-${tabSectionIndex}`)}
+                  {#if tabSection.kind === "panel-grid"}
+                    <section class="space-y-4">
+                      {#if tabSection.title || tabSection.description}
+                        <div class="space-y-1">
+                          {#if tabSection.title}
+                            <h3 class="text-base font-semibold">{tabSection.title}</h3>
+                          {/if}
+                          {#if tabSection.description}
+                            <p class="text-sm text-muted-foreground">{tabSection.description}</p>
+                          {/if}
+                        </div>
+                      {/if}
+                      {#if tabSection.layout === "comparison-table"}
+                        {@render panelGridComparisonTable(tabSection)}
+                      {:else}
+                        {@render panelGridItems(
+                          tabSection.items,
+                          "grid gap-4 md:grid-cols-2 xl:grid-cols-3",
+                        )}
+                      {/if}
+                    </section>
+                  {:else if tabSection.kind === "dialog-panel-grid"}
+                    <section class="console-panel flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between">
+                      <div class="min-w-0 space-y-1">
+                        <h3 class="text-base font-semibold">{tabSection.title}</h3>
+                        {#if tabSection.description}
+                          <p class="text-sm leading-6 text-muted-foreground">
+                            {tabSection.description}
+                          </p>
+                        {/if}
+                      </div>
+                      <Button type="button" class="shrink-0" onclick={() => openPanelGridDialog(tabSection)}>
+                        {tabSection.triggerLabel}
+                      </Button>
+                    </section>
+                  {:else if tabSection.kind === "callouts"}
+                    <section class="grid gap-3 md:grid-cols-3">
+                      {#each tabSection.items as item (item.title)}
+                        <article class={["console-panel space-y-2 p-4", panelToneClass(item.tone)]}>
+                          <h3 class="font-semibold">{item.title}</h3>
+                          {#if item.description}
+                            <p class="mt-1 leading-6">{item.description}</p>
+                          {/if}
+                        </article>
+                      {/each}
+                    </section>
+                  {/if}
+                {/each}
+              </div>
+            {/if}
           </section>
         {:else if section.kind === "table"}
           <section
@@ -1699,10 +1976,35 @@
         </div>
       {/if}
       <div class="mt-5 px-5 pb-5 sm:px-8 sm:pb-8" data-console-page-dialog-panel-body>
-        {@render panelGridItems(
-          selectedPanelGridSection.items,
-          "grid max-h-[70vh] gap-4 overflow-y-auto md:grid-cols-2 xl:grid-cols-3",
-        )}
+        {#if selectedPanelGridSection.layout === "comparison-table"}
+          {@render panelGridComparisonTable(selectedPanelGridSection)}
+        {:else}
+          {@render panelGridItems(
+            selectedPanelGridSection.items,
+            "grid max-h-[70vh] gap-4 overflow-y-auto md:grid-cols-2 xl:grid-cols-3",
+          )}
+        {/if}
+      </div>
+    {/if}
+  </Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={confirmationOpen}>
+  <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-md">
+    {#if confirmationAction?.action.confirmation}
+      <Dialog.Header>
+        <Dialog.Title>{confirmationAction.action.label}</Dialog.Title>
+        <Dialog.Description>
+          {confirmationAction.action.confirmation.message}
+        </Dialog.Description>
+      </Dialog.Header>
+      <div class="flex justify-end gap-2 px-5 pb-5 sm:px-8 sm:pb-8">
+        <Button type="button" variant="outline" onclick={cancelRequestActionConfirmation}>
+          {$t(i18nKeys.common.actions.cancel)}
+        </Button>
+        <Button type="button" onclick={confirmRequestAction}>
+          {confirmationAction.action.label}
+        </Button>
       </div>
     {/if}
   </Dialog.Content>
