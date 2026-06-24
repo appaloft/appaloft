@@ -1193,7 +1193,7 @@ describe("pglite persistence integration", () => {
     }
   }, 15000);
 
-  test("[RES-PROFILE-DELETE-006] reads dependency-binding and audit-retention deletion blockers", async () => {
+  test("[RES-PROFILE-DELETE-006] reads dependency-binding blockers without treating retained audit history as a resource blocker", async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-delete-blockers-"));
     const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
     const context = createRepositoryContext();
@@ -1267,12 +1267,11 @@ describe("pglite persistence integration", () => {
         relatedEntityType: "resource-dependency-binding",
         count: 1,
       });
-      expect(result._unsafeUnwrap()).toContainEqual({
-        kind: "audit-retention",
-        relatedEntityId: "audit_res_web",
-        relatedEntityType: "audit-log",
-        count: 1,
-      });
+      expect(result._unsafeUnwrap()).not.toContainEqual(
+        expect.objectContaining({
+          kind: "audit-retention",
+        }),
+      );
     } finally {
       await closeDatabase?.();
       rmSync(workspaceDir, { recursive: true, force: true });

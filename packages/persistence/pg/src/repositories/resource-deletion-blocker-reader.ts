@@ -74,11 +74,6 @@ export class PgResourceDeletionBlockerReader implements ResourceDeletionBlockerR
             .select("id")
             .where("resource_id", "=", input.resourceId)
             .execute();
-          const auditRows = await executor
-            .selectFrom("audit_logs")
-            .select("id")
-            .where("aggregate_id", "=", input.resourceId)
-            .execute();
           const sourceLinkRows = await executor
             .selectFrom("source_links")
             .select("source_fingerprint as id")
@@ -100,7 +95,6 @@ export class PgResourceDeletionBlockerReader implements ResourceDeletionBlockerR
             blockerFromRows("domain-binding", "domain-binding", domainBindingRows),
             blockerFromRows("certificate", "certificate", certificateRows),
             blockerFromRows("runtime-log-retention", "runtime-log-archive", runtimeLogRows),
-            blockerFromRows("audit-retention", "audit-log", auditRows),
             blockerFromRows("source-link", "source-link", sourceLinkRows),
             blockerFromRows(
               "dependency-binding",
