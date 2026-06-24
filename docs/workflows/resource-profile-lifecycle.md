@@ -121,7 +121,7 @@ cleanup.
 | Detach durable storage | `resources.detach-storage` | Resource storage attachment profile | Storage deletion, current runtime, historical deployment snapshots |
 | Bind dependency resource | `resources.bind-dependency` | ResourceBinding metadata | Dependency resource lifecycle, current runtime, historical deployment snapshots |
 | Unbind dependency resource | `resources.unbind-dependency` | ResourceBinding lifecycle/tombstone | Dependency resource deletion, current runtime, historical deployment snapshots |
-| Retire resource | `resources.archive` | Resource lifecycle status | Runtime stop, route/domain/certificate/source-link cleanup |
+| Retire resource | `resources.archive` | Resource lifecycle status and current runtime stop coordination | Route/domain/certificate/source-link/container/image cleanup |
 | Restore archived resource | `resources.restore` | Resource lifecycle status | Current runtime, historical deployment snapshots, retained routes or bindings |
 | Check delete safety | `resources.delete-check` | Nothing | Resource lifecycle, blockers, or cleanup side effects |
 | Remove unused archived resource from active state | `resources.delete` | Archived unreferenced resource identity | Cascading cleanup of blockers |
@@ -281,10 +281,11 @@ Archived resources:
   categories;
 - may be passed to `resources.delete` after deletion guards pass.
 
-`resources.archive` is synchronous lifecycle-state mutation. Command success means archived state
-was durably persisted and `resource-archived` was recorded or published. It does not mean runtime,
-domain, certificate, proxy, source-link, deployment, log, terminal-session, or dependency cleanup
-has happened.
+`resources.archive` is synchronous lifecycle-state mutation with current runtime stop coordination.
+Command success means any retained supported runtime placement has been stopped or no supported
+runtime placement needed stopping, archived state was durably persisted, and `resource-archived`
+was recorded or published. It does not mean container/image, domain, certificate, proxy,
+source-link, deployment, log, terminal-session, or dependency cleanup has happened.
 
 Deleted resources:
 

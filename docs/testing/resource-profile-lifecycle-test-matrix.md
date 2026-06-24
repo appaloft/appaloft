@@ -124,11 +124,13 @@ generic `resources.update`.
 | RES-SECRET-CRUD-009 | CLI | Entrypoint | Secret list/show commands submitted. | Dispatches the matching application query through `QueryBus` and returns masked output only. |
 | RES-SECRET-CRUD-010 | Operation catalog/docs | Catalog | Secret reference CRUD/list/show is public. | `CORE_OPERATIONS.md`, `BUSINESS_OPERATION_MAP.md`, `operation-catalog.ts`, CLI help, HTTP/oRPC, public docs registry, and future MCP-tool decision surfaces name the same operations. |
 | DMBH-RES-NET-001 | `Resource` | Core domain unit | Resource network exposure mode and health-check type vary across direct-port, reverse-proxy, HTTP, and unsupported health checks. | `Resource` owns admission while exposure mode and health-check type value objects answer single-value predicates. |
-| RES-PROFILE-ARCHIVE-001 | `resources.archive` | Command use case | Active resource archived. | Persists archived lifecycle, publishes `resource-archived`, returns `ok({ id })`. |
-| RES-PROFILE-ARCHIVE-002 | `resources.archive` | Command use case | Already archived resource. | Returns idempotent `ok({ id })` without duplicate state effect or duplicate event. |
-| RES-PROFILE-ARCHIVE-003 | `resources.archive` | Command use case | Resource has deployment history or runtime logs. | Archive succeeds and retains history; no cleanup side effects. |
+| RES-PROFILE-ARCHIVE-001 | `resources.archive` | Command use case | Active resource archived. | Coordinates runtime stop when a current supported runtime placement is retained, persists archived lifecycle, publishes `resource-archived`, returns `ok({ id })`. |
+| RES-PROFILE-ARCHIVE-002 | `resources.archive` | Command use case | Already archived resource. | Returns idempotent `ok({ id })` without duplicate lifecycle state effect or duplicate event, while still allowing runtime stop coordination to repair older archived resources whose runtime is retained. |
+| RES-PROFILE-ARCHIVE-003 | `resources.archive` | Command use case | Resource has deployment history or runtime logs. | Archive succeeds and retains history; runtime stop is limited to the current supported runtime instance and does not delete containers, images, logs, routes, or deployment records. |
+| RES-PROFILE-ARCHIVE-003A | `resources.archive` | Command use case | Resource has no retained current runtime placement metadata. | Archive succeeds and records lifecycle state without requiring a runtime-control side effect. |
 | RES-PROFILE-ARCHIVE-004 | `deployments.create` | Command guard | Archived resource selected for deployment. | Rejects with structured lifecycle error. |
 | RES-PROFILE-ARCHIVE-005 | `resource-archived` | Event payload | Archive has safe reason. | Event includes resource ids, `resourceSlug`, archived timestamp, and normalized reason; excludes secrets and logs. |
+| RES-PROFILE-ARCHIVE-006 | `resources.archive` / `resources.runtime.stop` | Command workflow | Runtime stop adapter reports failure for a retained supported runtime placement. | Archive returns a retryable provider error before mutating lifecycle state or publishing `resource-archived`; error details include safe runtime-control status/code only. |
 | RES-PROFILE-RESTORE-001 | `resources.restore` | Command use case | Archived resource restored. | Persists active lifecycle, clears archive metadata, preserves profile state, publishes `resource-restored`, and returns `ok({ id })`. |
 | RES-PROFILE-RESTORE-002 | `resources.restore` | Command use case | Already active resource. | Returns idempotent `ok({ id })` without duplicate state effect or duplicate event. |
 | RES-PROFILE-RESTORE-003 | `resources.restore` | Command use case | Deleted resource. | Rejects with the lifecycle state-machine invariant and no event. |
@@ -138,6 +140,7 @@ generic `resources.update`.
 | RES-PROFILE-DELETE-004 | `resources.delete` | Command use case | Archived resource has deployment or audit history but no retained deletion blockers. | Delete succeeds and deployment/audit history remains owned by its retention context. |
 | RES-PROFILE-DELETE-005 | `resources.delete` | Command use case | Archived resource has domain, certificate, access route, or proxy route state. | Rejects with `resource_delete_blocked` and safe blocker details. |
 | RES-PROFILE-DELETE-006 | `resources.delete` | Command use case | Archived resource has source link, dependency binding, terminal session, runtime-log retention, and retained audit history. | Rejects with `resource_delete_blocked` for source/dependency/terminal/runtime-log blockers only; audit history remains retained but is not a resource delete blocker. |
+| RES-PROFILE-DELETE-006A | `resources.delete` / `resources.delete-check` | Command/query service | Archived resource retains a current non-stopped runtime instance. | Delete-check returns `eligible = false` and delete rejects with `resource_delete_blocked`, `deletionBlockers` includes `runtime-instance`, and no lifecycle mutation or cleanup occurs. |
 | DMBH-BINDING-001 | `ResourceBinding` | Core domain unit | Binding scope and injection mode vary across build-only/runtime-reference and allowed combinations. | `ResourceBinding` owns scope/injection coherence; public behavior is unchanged. |
 | RES-PROFILE-DELETE-007 | `resources.delete` | Command use case | Already deleted tombstone is retried. | Returns idempotent `ok({ id })` without duplicate state effect or duplicate event when tombstone can be resolved. |
 | RES-PROFILE-DELETE-008 | `resources.show` / `resources.list` | Read model | Deleted resource queried by normal active read paths. | `resources.show` returns `not_found`; list omits the resource. |
@@ -146,7 +149,7 @@ generic `resources.update`.
 | RES-PROFILE-DELETE-009 | `resource-deleted` | Event payload | Delete succeeds. | Event includes resource ids, `resourceSlug`, deleted timestamp, and no secrets, logs, certificate material, or provider configs. |
 | RES-PROFILE-DELETE-CHECK-001 | `resources.delete-check` | Query service | Active resource. | Returns `eligible = false`, `lifecycleStatus = "active"`, and `blockers` includes `active-resource`. |
 | RES-PROFILE-DELETE-CHECK-002 | `resources.delete-check` | Query service | Archived resource has retained blockers. | Returns `eligible = false` with safe blocker kind/count/type/id details and no mutation. |
-| RES-PROFILE-DELETE-CHECK-003 | `resources.delete-check` | Query service | Archived resource has no retained blockers. | Returns `eligible = true`, empty blockers, and no mutation. |
+| RES-PROFILE-DELETE-CHECK-003 | `resources.delete-check` | Query service | Archived resource has no retained blockers and no retained current runtime instance. | Returns `eligible = true`, empty blockers, and no mutation. |
 | RES-PROFILE-ENTRY-001 | Web | Entrypoint | Resource detail page loads durable profile. | Dispatches `resources.show`; does not synthesize full detail from list-only data. |
 | RES-PROFILE-ENTRY-002 | Web | Entrypoint | Source/runtime/network/access/health/config/archive/delete actions submitted independently. | Each form/action dispatches its matching command and refetches detail/health/effective-config/list. |
 | RES-PROFILE-ENTRY-003 | CLI | Entrypoint | Resource profile commands are listed. | CLI exposes separate source/runtime/network/access/health/config/import/archive/delete subcommands and no generic `resource update`. |
@@ -172,11 +175,12 @@ generic `resources.update`.
 
 ## Required Non-Coverage Assertions
 
-Tests must assert that profile commands do not:
+Tests must assert that profile commands, except for the explicit `resources.archive` runtime-stop
+coordination step, do not:
 
 - create deployments;
 - mutate historical deployment snapshots;
-- restart or stop runtime;
+- restart runtime or stop runtime implicitly outside `resources.archive` / `resources.runtime.stop`;
 - bind or unbind domains;
 - issue or revoke certificates;
 - apply proxy routes;
@@ -218,17 +222,20 @@ Automated coverage now exists for:
   `packages/orpc/test/resource-config.http.test.ts`;
 - `RES-SECRET-CRUD-008` and `RES-SECRET-CRUD-009` in
   `packages/adapters/cli/test/resource-command.test.ts`;
-- `RES-PROFILE-ARCHIVE-001`, `RES-PROFILE-ARCHIVE-002`, `RES-PROFILE-ARCHIVE-003`, and
-  `RES-PROFILE-ARCHIVE-005` in `packages/application/test/archive-resource.test.ts`;
+- `RES-PROFILE-ARCHIVE-001`, `RES-PROFILE-ARCHIVE-002`, `RES-PROFILE-ARCHIVE-003`,
+  `RES-PROFILE-ARCHIVE-003A`, `RES-PROFILE-ARCHIVE-005`, and `RES-PROFILE-ARCHIVE-006` in
+  `packages/application/test/archive-resource.test.ts`;
 - `RES-PROFILE-ARCHIVE-004` in `packages/application/test/create-deployment.test.ts`;
 - `RES-PROFILE-RESTORE-001` through `RES-PROFILE-RESTORE-003` in
   `packages/application/test/restore-resource.test.ts`;
 - `RES-PROFILE-ENTRY-020` in `packages/orpc/test/resource-show.http.test.ts`;
-- `RES-PROFILE-DELETE-001` through `RES-PROFILE-DELETE-008` and
+- `RES-PROFILE-DELETE-001` through `RES-PROFILE-DELETE-008`, `RES-PROFILE-DELETE-006A`, and
   `RES-PROFILE-DELETE-CHECK-001` through `RES-PROFILE-DELETE-CHECK-003` in
   `packages/application/test/delete-resource.test.ts`;
 - PG coverage for `RES-PROFILE-DELETE-006` proves retained audit rows are not resource delete
   blockers in `packages/persistence/pg/test/pglite.integration.test.ts`;
+- PG runtime-instance blocker coverage for `RES-PROFILE-DELETE-006A` in
+  `packages/persistence/pg/test/pglite.integration.test.ts`;
 - PG source-link blocker coverage for `RES-PROFILE-DELETE-006` is covered by
   `SOURCE-LINK-STATE-017` in `packages/persistence/pg/test/pglite.integration.test.ts`;
 - PG server-applied route blocker coverage for `RES-PROFILE-DELETE-005` is covered by
