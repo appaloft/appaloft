@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.0](https://github.com/appaloft/appaloft/compare/v1.0.0-rc.18...v1.0.0) (2026-06-25)
+
+
+### Miscellaneous
+
+* promote Appaloft to the 1.0.0 GA release
+
 ## [1.0.0-rc.18](https://github.com/appaloft/appaloft/compare/v1.0.0-rc.17...v1.0.0-rc.18) (2026-06-22)
 
 

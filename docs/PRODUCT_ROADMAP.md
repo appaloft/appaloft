@@ -44,7 +44,7 @@ Version plan:
 - [x] `0.11.0` is Phase 9: Operator/Internal State Closure And Interface Parity.
 - [x] `0.12.0` is Phase 10: Runtime Usage Attribution And Monitoring.
 - [x] `1.0.0-rc` is the GA release-candidate gate after `0.12.0`, not a separate feature phase.
-- [ ] `1.0.0` is GA.
+- [x] `1.0.0` is GA.
 - [x] Post-`1.0.0` tracks do not reserve `0.x` versions. If maintainers deliberately pull a
   post-`1.0.0` track before GA, first retarget this roadmap by adding or replacing an explicit
   pre-GA phase; do not leave contradictory `post-1.0` and `0.x` labels on the same work.
@@ -52,11 +52,11 @@ Version plan:
 Current release alignment:
 
 <!-- release-alignment:start -->
-- [x] On 2026-06-22, the latest public release is `v0.12.4`; root package
-  and Release Please manifest on `main` are `1.0.0-rc.17`; the release PR target is
-  `1.0.0-rc.18`.
-- [x] On 2026-06-22, the roadmap gate allows `Release-As: 1.0.0-rc.18` because
-  Phase 0 through Phase 11 release rules, required items, and exit criteria are checked.
+- [x] On 2026-06-25, the latest public release is `v1.0.0-rc.18`; root package
+  and Release Please manifest on `main` are `1.0.0-rc.18`; the release PR target is
+  `1.0.0`.
+- [x] On 2026-06-25, the roadmap gate allows `Release-As: 1.0.0` because
+  Phase 0 through Phase 12 release rules, required items, and exit criteria are checked.
 <!-- release-alignment:end -->
 
 Historical alignment notes:
@@ -2453,25 +2453,27 @@ Exit criteria:
 
 ## Phase 12: 1.0.0 GA
 
+Target: `1.0.0`.
+
 Release rule:
-- [ ] Select `1.0.0` only when the full `1.0.0 Definition Of Done`, every phase exit criterion, and
+- [x] Select `1.0.0` only when the full `1.0.0 Definition Of Done`, every phase exit criterion, and
   every release gate item are checked.
 
 Required:
-- [ ] Freeze the `1.0.0` active operation catalog.
-- [ ] Close or explicitly defer every temporary implementation gap.
-- [ ] Verify every active operation has command/query docs.
-- [ ] Verify every active operation has workflow/error docs where needed.
-- [ ] Verify every active operation has test matrix rows.
-- [ ] Verify every active operation has executable tests or an explicit accepted gap.
-- [ ] Verify every active operation has Web/API/CLI surface decisions.
-- [ ] Verify every active operation has operation catalog entries.
-- [ ] Publish release notes describing supported deployment strategies, framework tiers, resource
+- [x] Freeze the `1.0.0` active operation catalog.
+- [x] Close or explicitly defer every temporary implementation gap.
+- [x] Verify every active operation has command/query docs.
+- [x] Verify every active operation has workflow/error docs where needed.
+- [x] Verify every active operation has test matrix rows.
+- [x] Verify every active operation has executable tests or an explicit accepted gap.
+- [x] Verify every active operation has Web/API/CLI surface decisions.
+- [x] Verify every active operation has operation catalog entries.
+- [x] Publish release notes describing supported deployment strategies, framework tiers, resource
   lifecycles, known unsupported behavior, and migration constraints.
 
 Exit criteria:
-- [ ] No active `1.0.0` feature relies on an undocumented migration gap.
-- [ ] New users can complete the v1 minimum loop from install to reachable deployed app and day-two
+- [x] No active `1.0.0` feature relies on an undocumented migration gap.
+- [x] New users can complete the v1 minimum loop from install to reachable deployed app and day-two
   recovery without private workarounds.
 
 ## Future AI-Native Blueprint And MCP Tracks
