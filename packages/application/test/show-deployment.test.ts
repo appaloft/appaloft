@@ -510,6 +510,38 @@ describe("ShowDeploymentQueryService", () => {
     expect(detail.generatedAt).toBe("2026-01-01T00:00:10.000Z");
   });
 
+  test("does not expose warning timeline entries as latest failure for succeeded deployments", async () => {
+    const result = await createService({
+      deployments: [
+        deploymentSummary({
+          status: "succeeded",
+          timeline: [
+            {
+              timestamp: "2026-01-01T00:00:08.000Z",
+              source: "provider",
+              level: "warn",
+              phase: "verify",
+              message: "Static artifact route readback pending external provider verification",
+            },
+            {
+              timestamp: "2026-01-01T00:00:09.000Z",
+              source: "appaloft",
+              level: "info",
+              phase: "verify",
+              message: "Static artifact publication succeeded",
+            },
+          ],
+          timelineCount: 2,
+        }),
+      ],
+    }).service.execute(createTestContext(), createQuery());
+
+    const detail = unwrap(result);
+
+    expect(detail.status.current).toBe("succeeded");
+    expect(detail.latestFailure).toBeUndefined();
+  });
+
   test("[DEP-BIND-SNAP-REF-006] returns immutable dependency binding snapshot references", async () => {
     const result = await createService({
       deployments: [
