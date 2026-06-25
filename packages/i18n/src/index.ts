@@ -8,10 +8,10 @@ export { i18nKeys } from "./keys";
 export type { AppaloftTranslationResource } from "./locales/zh-CN";
 export { appaloftI18nResources, enUS, zhCN } from "./resources";
 
-export const appaloftLocales = ["zh-CN", "en-US"] as const;
+export const appaloftLocales = ["en-US", "zh-CN"] as const;
 export type AppaloftLocale = (typeof appaloftLocales)[number];
 
-export const defaultAppaloftLocale: AppaloftLocale = "zh-CN";
+export const defaultAppaloftLocale: AppaloftLocale = "en-US";
 export const appaloftLocaleStorageKey = "appaloft.locale";
 export const appaloftLocaleHeader = "x-appaloft-locale";
 
@@ -42,30 +42,8 @@ export function normalizeAppaloftLocale(input?: string | null): AppaloftLocale {
   return defaultAppaloftLocale;
 }
 
-export function resolveAppaloftLocaleFromAcceptLanguage(header?: string | null): AppaloftLocale {
-  const candidates = (header ?? "")
-    .split(",")
-    .map((entry) => entry.trim())
-    .filter((entry) => entry.length > 0)
-    .map((entry) => {
-      const [tag, ...parameters] = entry.split(";").map((part) => part.trim());
-      const quality =
-        parameters
-          .find((parameter) => parameter.startsWith("q="))
-          ?.slice(2)
-          .trim() ?? "1";
-
-      return {
-        tag,
-        quality: Number(quality),
-      };
-    })
-    .filter((candidate): candidate is { tag: string; quality: number } =>
-      Boolean(candidate.tag && Number.isFinite(candidate.quality)),
-    )
-    .sort((left, right) => right.quality - left.quality);
-
-  return normalizeAppaloftLocale(candidates[0]?.tag);
+export function resolveAppaloftLocaleFromAcceptLanguage(_header?: string | null): AppaloftLocale {
+  return defaultAppaloftLocale;
 }
 
 export function resolveAppaloftLocaleFromHeaders(headers: Headers): AppaloftLocale {
