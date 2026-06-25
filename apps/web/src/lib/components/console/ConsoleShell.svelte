@@ -222,6 +222,16 @@
       .filter((extension) => extension.placement === "domain-error-modal")
       .filter(isExtensionVisible),
   );
+  const accountMenuExtensions = $derived.by(() =>
+    (webExtensionsQuery.data?.items ?? [])
+      .filter((extension) => extension.placement === "account-menu")
+      .filter(isExtensionVisible)
+      .toSorted((a, b) =>
+        systemPluginExtensionTitle(a, $locale).localeCompare(
+          systemPluginExtensionTitle(b, $locale),
+        ),
+      ),
+  );
   const filteredProjects = $derived.by(() => {
     const query = projectSearch.trim().toLowerCase();
     if (!query) {
@@ -546,7 +556,7 @@
     </SidebarContent>
 
     <SidebarFooter>
-      <ConsoleUserMenu />
+      <ConsoleUserMenu extensions={accountMenuExtensions} />
     </SidebarFooter>
   </Sidebar>
 
