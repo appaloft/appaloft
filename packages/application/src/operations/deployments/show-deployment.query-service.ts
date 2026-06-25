@@ -85,11 +85,12 @@ function toDeploymentDetailSummary(deployment: DeploymentSummary): DeploymentDet
 function latestFailureFromLogs(
   deployment: DeploymentSummary,
 ): DeploymentAttemptFailureSummary | undefined {
+  const reversedTimeline = [...deployment.timeline].reverse();
   const recentFailure =
-    [...deployment.timeline]
-      .reverse()
-      .find((entry) => entry.level === "error" || entry.level === "warn") ??
-    (deployment.status === "failed" ? deployment.timeline.at(-1) : undefined);
+    reversedTimeline.find((entry) => entry.level === "error") ??
+    (deployment.status === "failed"
+      ? (reversedTimeline.find((entry) => entry.level === "warn") ?? deployment.timeline.at(-1))
+      : undefined);
 
   if (!recentFailure) {
     return undefined;

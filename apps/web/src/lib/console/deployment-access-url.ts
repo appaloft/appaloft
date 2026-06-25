@@ -20,6 +20,10 @@ export interface DeploymentAccessRoute {
 }
 
 export interface DeploymentAccessUrlSource {
+  readonly target?: {
+    readonly kind: "server-backed" | "serverless-static-artifact";
+    readonly routeUrl?: string;
+  };
   readonly runtimePlan: {
     readonly execution: {
       readonly accessRoutes?: readonly DeploymentAccessRoute[];
@@ -81,8 +85,15 @@ export function deploymentAccessUrls(
   serverHost: string | undefined,
 ): DeploymentAccessUrl[] {
   const metadata = deployment.runtimePlan.execution.metadata ?? {};
-  const metadataUrl = metadata.publicUrl ?? metadata.url;
+  const metadataUrl = metadata.publicUrl ?? metadata.url ?? metadata["staticArtifact.routeUrl"];
   let urls: DeploymentAccessUrl[] = [];
+
+  if (deployment.target?.kind === "serverless-static-artifact" && deployment.target.routeUrl) {
+    urls = addUniqueAccessUrl(urls, {
+      url: deployment.target.routeUrl,
+      kind: "deployment",
+    });
+  }
 
   for (const route of deployment.runtimePlan.execution.accessRoutes ?? []) {
     for (const url of accessUrlsForRoute({
