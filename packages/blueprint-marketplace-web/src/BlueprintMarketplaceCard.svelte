@@ -81,10 +81,11 @@
   const cardClass = $derived(cn(
     "min-w-0 border-border/90 bg-card/95 py-0 text-card-foreground shadow-[0_18px_48px_rgba(20,31,47,0.07)] transition-colors hover:border-ring/35",
     "data-[density=default]:min-h-[300px] data-[density=compact]:min-h-[178px] data-[density=mini]:min-h-[158px]",
+    detailHref && "cursor-pointer",
     selected && "border-ring/50 ring-1 ring-ring/20",
   ));
   const contentClass = $derived(cn(
-    "flex min-h-0 flex-1 flex-col justify-between",
+    "relative flex min-h-0 flex-1 flex-col justify-between",
     isMini ? "gap-4 p-5" : isCompact ? "gap-3 p-4" : "gap-4 p-4",
   ));
   const iconClass = $derived(cn(
@@ -144,6 +145,10 @@
     onprimaryaction?.(event, item);
   }
 
+  function detailLinkLabel(): string {
+    return `${labels.detail}: ${item.title}`;
+  }
+
   function formatLabel(template: string, values: Record<string, string>): string {
     return Object.entries(values).reduce(
       (result, [key, value]) => result.replaceAll(`{{${key}}}`, value),
@@ -161,6 +166,14 @@
   data-density={density}
 >
   <CardContent class={contentClass}>
+    {#if detailHref}
+      <a
+        class="absolute inset-0 z-10 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        href={detailHref}
+        aria-label={detailLinkLabel()}
+        data-blueprint-marketplace-detail-link
+      ></a>
+    {/if}
     <div class="flex min-w-0 items-start justify-between gap-3">
       <div class={cn("grid min-w-0 gap-3", isCompact ? "grid-cols-[2.5rem_minmax(0,1fr)]" : "grid-cols-[2.75rem_minmax(0,1fr)]")}>
         <div class={iconClass} style={iconFallbackStyle()}>
@@ -232,7 +245,7 @@
     {/if}
 
     {#if !showFooter && actionHref}
-      <div class="flex justify-end">
+      <div class="relative z-20 flex justify-end">
         <Button href={actionHref} variant="outline" size="sm" data-marketplace-deploy-link onclick={handlePrimaryAction}>
           {actionLabel}
           <span aria-hidden="true">→</span>
