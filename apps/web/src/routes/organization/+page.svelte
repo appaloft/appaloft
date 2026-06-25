@@ -59,6 +59,24 @@
   type SystemPluginWebExtensionsResponse = {
     items: SystemPluginWebExtension[];
   };
+  type CloudBillingPlanContextResponse = {
+    schemaVersion?: "cloud-billing-plan-context/v1";
+    currentPlan?: {
+      id?: string;
+      name?: string;
+      limits?: {
+        users?: number | "custom" | "unlimited";
+      };
+    };
+    invitation?: {
+      limitKind?: "users";
+      limit?: number | "custom" | "unlimited";
+      actionHref?: string;
+      actionLabel?: string;
+      blockedTitle?: string;
+      blockedDescription?: string;
+    };
+  };
 
   const roleOptions = ["owner", "admin", "developer", "billing", "viewer"] as const;
   const memberRoleOptions = ["admin", "developer", "billing", "viewer"] as const;
@@ -118,6 +136,9 @@
   const currentOrganization = $derived(context?.currentOrganization ?? null);
   const currentOrganizationId = $derived(currentOrganization?.organizationId ?? "");
   const currentRole = $derived(currentOrganization?.role ?? "viewer");
+  const planContextEndpoint = $derived(
+    resolvePlanContextEndpoint(webExtensionsQuery.data?.items ?? []),
+  );
   const activeSection = $derived.by<OrganizationManagementSection>(() => {
     if (section) {
       return section;
@@ -143,7 +164,39 @@
   });
   const canManageByRole = $derived(currentRole === "owner" || currentRole === "admin");
   const canListMembers = $derived(context?.permissions?.canListMembers ?? canManageByRole);
-  const canInviteMembers = $derived(context?.permissions?.canInviteMembers ?? canManageByRole);
+  const canInviteMembersByRole = $derived(
+    context?.permissions?.canInviteMembers ?? canManageByRole,
+  );
+  const inviteCapabilityQuery = createQuery(() =>
+    orpc.capabilities.query.queryOptions({
+      input: {
+        queries: [{ operationKey: "organizations.invite-member", organizationId: currentOrganizationId }],
+      },
+      enabled: browser && Boolean(currentOrganizationId) && canInviteMembersByRole,
+      retry: 0,
+      staleTime: 30_000,
+    }),
+  );
+  const planContextQuery = createQuery(() =>
+    queryOptions({
+      queryKey: [
+        "system-plugins",
+        "plan-context",
+        currentOrganizationId,
+        currentOrganization?.slug ?? "",
+        currentRole,
+        planContextEndpoint ?? "",
+      ],
+      queryFn: () => request<CloudBillingPlanContextResponse>(planContextEndpoint ?? ""),
+      enabled:
+        browser &&
+        Boolean(planContextEndpoint) &&
+        Boolean(currentOrganizationId) &&
+        (activeSection === "profile" || activeSection === "invitations"),
+      retry: 0,
+      staleTime: 30_000,
+    }),
+  );
   const canUpdateMemberRoles = $derived(context?.permissions?.canUpdateMemberRoles ?? canManageByRole);
   const canRemoveMembers = $derived(context?.permissions?.canRemoveMembers ?? canManageByRole);
   const canTransferOwnership = $derived(
@@ -155,7 +208,9 @@
   const canChangeOrganizationProfile = $derived(currentRole === "owner" || currentRole === "admin");
   const canDeleteOrganization = $derived(currentRole === "owner");
   const shouldLoadOrganizationProfile = $derived(activeSection === "profile");
-  const shouldLoadMembers = $derived(activeSection === "profile" || activeSection === "members");
+  const shouldLoadMembers = $derived(
+    activeSection === "profile" || activeSection === "members" || activeSection === "invitations",
+  );
   const shouldLoadInvitations = $derived(
     activeSection === "profile" || activeSection === "invitations",
   );
@@ -169,6 +224,32 @@
       input: { organizationId: currentOrganizationId, limit: 100 },
       enabled: browser && Boolean(currentOrganizationId) && canListMembers && shouldLoadMembers,
     }),
+  );
+  const inviteCapability = $derived(inviteCapabilityQuery.data?.capabilities[0] ?? null);
+  const invitationPlanContext = $derived(planContextQuery.data?.invitation ?? null);
+  const invitePlanLimitReached = $derived(
+    typeof invitationPlanContext?.limit === "number" &&
+      (membersQuery.data?.items ?? []).filter((member) => member.status !== "deactivated")
+        .length >= invitationPlanContext.limit,
+  );
+  const invitePlanBlocked = $derived(
+    inviteCapability?.reason === "cloud-plan-limit-exceeded" || invitePlanLimitReached,
+  );
+  const inviteUpgradeHref = $derived(invitationPlanContext?.actionHref ?? "");
+  const canInviteMembers = $derived(
+    canInviteMembersByRole &&
+      Boolean(currentOrganizationId) &&
+      !invitePlanBlocked &&
+      inviteCapabilityQuery.isPending === false &&
+      inviteCapability?.allowed === true,
+  );
+  const inviteActionAvailable = $derived(
+    canInviteMembers || (invitePlanBlocked && Boolean(inviteUpgradeHref)),
+  );
+  const inviteActionLabel = $derived(
+    invitePlanBlocked && invitationPlanContext?.actionLabel
+      ? invitationPlanContext.actionLabel
+      : $t(i18nKeys.console.organization.inviteAction),
   );
 
   const invitationsQuery = createQuery(() =>
@@ -568,6 +649,10 @@
   });
 
   function openInviteDialog(): void {
+    if (invitePlanBlocked && inviteUpgradeHref) {
+      navigateTo(inviteUpgradeHref);
+      return;
+    }
     void setModalOpen(page, "invite-organization-member", true);
   }
 
@@ -851,6 +936,15 @@
     }
   }
 
+  function handleInviteAction(): void {
+    if (invitePlanBlocked && inviteUpgradeHref) {
+      navigateTo(inviteUpgradeHref);
+      return;
+    }
+
+    openInviteDialog();
+  }
+
   function submitDeployToken(event: SubmitEvent): void {
     event.preventDefault();
     if (canSubmitToken) {
@@ -874,6 +968,33 @@
     if (browser) {
       void goto(path);
     }
+  }
+
+  function resolvePlanContextEndpoint(
+    extensions: readonly SystemPluginWebExtension[],
+  ): string | null {
+    for (const extension of extensions) {
+      const endpoint = readPlanContextEndpoint(extension);
+      if (!endpoint) {
+        continue;
+      }
+      return endpoint
+        .replaceAll("{organizationId}", encodeURIComponent(currentOrganizationId))
+        .replaceAll("{organizationSlug}", encodeURIComponent(currentOrganization?.slug ?? ""))
+        .replaceAll("{organizationName}", encodeURIComponent(currentOrganization?.name ?? ""))
+        .replaceAll("{organizationRole}", encodeURIComponent(currentRole));
+    }
+    return null;
+  }
+
+  function readPlanContextEndpoint(extension: SystemPluginWebExtension): string | null {
+    const metadata = extension.metadata;
+    if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+      return null;
+    }
+
+    const endpoint = metadata.planContextEndpoint;
+    return typeof endpoint === "string" && endpoint.length > 0 ? endpoint : null;
   }
 
   function submitOrganizationProfile(event: SubmitEvent): void {
@@ -1385,13 +1506,26 @@
           </div>
           <Button
             type="button"
-            disabled={!canInviteMembers}
-            onclick={openInviteDialog}
+            disabled={!inviteActionAvailable}
+            onclick={handleInviteAction}
           >
             <UserPlus class="size-4" />
-            {$t(i18nKeys.console.organization.inviteAction)}
+            {inviteActionLabel}
           </Button>
         </div>
+        {#if invitePlanBlocked && invitationPlanContext?.blockedDescription}
+          <div
+            class="rounded-md border border-primary/20 bg-primary/5 px-4 py-3 text-sm leading-6"
+            data-organization-invite-plan-upgrade
+          >
+            <p class="font-medium">
+              {invitationPlanContext.blockedTitle ?? inviteActionLabel}
+            </p>
+            <p class="mt-1 text-muted-foreground">
+              {invitationPlanContext.blockedDescription}
+            </p>
+          </div>
+        {/if}
         {#if invitationsSectionLoading}
           <div class="console-record-list">
             <div class="console-record-row">
@@ -1404,11 +1538,15 @@
         {:else if invitations.length === 0}
           <ConsoleEmptyState
             tone="invitation"
-            title={$t(i18nKeys.console.organization.emptyInvitationsTitle)}
-            description={$t(i18nKeys.console.organization.emptyInvitationsDescription)}
-            actionLabel={$t(i18nKeys.console.organization.inviteAction)}
+            title={invitePlanBlocked && invitationPlanContext?.blockedTitle
+              ? invitationPlanContext.blockedTitle
+              : $t(i18nKeys.console.organization.emptyInvitationsTitle)}
+            description={invitePlanBlocked && invitationPlanContext?.blockedDescription
+              ? invitationPlanContext.blockedDescription
+              : $t(i18nKeys.console.organization.emptyInvitationsDescription)}
+            actionLabel={inviteActionLabel}
             learnMoreHref={webDocsHrefs.organizationTeamManagement}
-            onAction={openInviteDialog}
+            onAction={handleInviteAction}
           />
         {:else}
           <div class="console-record-list">

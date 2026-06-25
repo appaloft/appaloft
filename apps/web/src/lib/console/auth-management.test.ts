@@ -78,7 +78,12 @@ describe("organization auth management console surface", () => {
     expect(organizationSwitcherSource).toContain("i18nKeys.console.nav.instance");
     expect(organizationSwitcherSource).toContain("data-console-organization-switcher-trigger");
     expect(shellSource).toContain("ConsoleUserMenu");
+    expect(shellSource).toContain('extension.placement === "account-menu"');
+    expect(shellSource).toContain("extensions={accountMenuExtensions}");
     expect(userMenuSource).toContain('"/api/auth/sign-out"');
+    expect(userMenuSource).toContain("type Props = {");
+    expect(userMenuSource).toContain("systemPluginExtensionTitle(extension, $locale)");
+    expect(userMenuSource).toContain("activateExtension(extension)");
     expect(userMenuSource).toContain("showInstanceManagementLink");
     expect(userMenuSource).toContain("preloadInstanceAccessCapability");
     expect(userMenuSource).toContain("instanceAccessCapabilityKey");
@@ -562,13 +567,15 @@ describe("organization auth management console surface", () => {
       "bind:value={ownerTransferDrafts[selectedOwnerTransferMember.memberId]}",
     );
     expect(ownerTransferDialogSource).toContain("ownerTransferCandidates");
-    expect(invitationsSectionSource).toContain("openInviteDialog");
+    expect(organizationPageSource).toContain("orpc.capabilities.query.queryOptions");
+    expect(organizationPageSource).toContain("planContextEndpoint");
+    expect(organizationPageSource).toContain("invitePlanLimitReached");
+    expect(organizationPageSource).toContain("data-organization-invite-plan-upgrade");
+    expect(invitationsSectionSource).toContain("handleInviteAction");
     expect(invitationsSectionSource).toContain('tone="invitation"');
     expect(invitationsSectionSource).toContain("emptyInvitationsTitle");
-    expect(invitationsSectionSource).toContain(
-      "actionLabel={$t(i18nKeys.console.organization.inviteAction)}",
-    );
-    expect(invitationsSectionSource).toContain("onAction={openInviteDialog}");
+    expect(invitationsSectionSource).toContain("actionLabel={inviteActionLabel}");
+    expect(invitationsSectionSource).toContain("onAction={handleInviteAction}");
     expect(invitationsSectionSource).toContain("{:else if invitations.length === 0}");
     expect(invitationsSectionSource).not.toContain("submitInvite");
     expect(invitationsSectionSource).not.toContain("bind:value={inviteEmail}");
