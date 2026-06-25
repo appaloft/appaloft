@@ -484,6 +484,7 @@ export const systemPluginWebExtensionSchema = z.object({
     "auth",
     "navigation",
     "settings",
+    "account-menu",
     "quick-deploy-source",
     "route",
     "domain-error-modal",

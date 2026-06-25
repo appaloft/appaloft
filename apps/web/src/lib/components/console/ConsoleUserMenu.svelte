@@ -34,6 +34,17 @@
   import { initials, readSessionIdentity } from "$lib/console/utils";
   import { i18nKeys, locale, setLocale, t } from "$lib/i18n";
   import { capabilities } from "$lib/capabilities";
+  import {
+    systemPluginExtensionIconPresentation,
+    systemPluginExtensionTitle,
+  } from "$lib/console/web-extension-presentation";
+  import type { SystemPluginWebExtension } from "@appaloft/contracts";
+
+  type Props = {
+    extensions?: readonly SystemPluginWebExtension[];
+  };
+
+  let { extensions = [] }: Props = $props();
 
   const { authSessionQuery } = createConsoleQueries(browser, {
     readiness: false,
@@ -105,6 +116,19 @@
       void goto(path);
     }
   }
+
+  function activateExtension(extension: SystemPluginWebExtension): void {
+    if (!browser) {
+      return;
+    }
+
+    if (extension.target === "external-page") {
+      window.open(extension.path, "_blank", "noreferrer");
+      return;
+    }
+
+    void goto(extension.path);
+  }
 </script>
 
 <DropdownMenu>
@@ -166,6 +190,30 @@
       <BookOpen class="size-4" />
       {$t(i18nKeys.common.actions.openDocumentation)}
     </DropdownMenuItem>
+    {#if extensions.length > 0}
+      <DropdownMenuSeparator />
+      {#each extensions as extension (extension.key)}
+        {@const extensionLabel = systemPluginExtensionTitle(extension, $locale)}
+        {@const extensionIcon = systemPluginExtensionIconPresentation(extension)}
+        <DropdownMenuItem onclick={() => activateExtension(extension)}>
+          {#if extensionIcon.kind === "image"}
+            <img
+              class="size-4 shrink-0 rounded-sm object-contain"
+              src={extensionIcon.src}
+              alt=""
+              aria-hidden="true"
+              loading="lazy"
+              decoding="async"
+              data-system-plugin-extension-icon-image
+            />
+          {:else}
+            {@const ExtensionIcon = extensionIcon.component}
+            <ExtensionIcon class="size-4" />
+          {/if}
+          {extensionLabel}
+        </DropdownMenuItem>
+      {/each}
+    {/if}
     <DropdownMenuSeparator />
     <DropdownMenuLabel>{$t(i18nKeys.common.language.label)}</DropdownMenuLabel>
     <DropdownMenuRadioGroup value={$locale}>
