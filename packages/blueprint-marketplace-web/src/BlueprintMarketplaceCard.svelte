@@ -89,6 +89,8 @@
     isCompact ? "size-10" : "size-11",
     item.icon?.url && !iconFailed && "bg-card",
   ));
+  const compactFactClass = "grid grid-cols-[minmax(6.5rem,7rem)_minmax(0,1fr)] items-center gap-3";
+  const compactFactLabelClass = "min-w-0 truncate whitespace-nowrap text-xs font-bold text-muted-foreground";
 
   function dependencySummary(): string {
     return dependencies.length > 0 ? dependencies.join(" / ") : labels.noDependencies;
@@ -197,22 +199,22 @@
 
     {#if showFacts}
       <dl class={cn("grid gap-2", isCompact ? "grid-cols-1" : "grid-cols-2")} data-blueprint-marketplace-facts>
-        <div class={cn(isCompact ? "grid grid-cols-[3rem_minmax(0,1fr)] items-center gap-3" : "grid gap-1 rounded-lg border border-border/80 bg-muted/30 p-3")}>
-          <dt class="whitespace-nowrap text-xs font-bold text-muted-foreground">{labels.dependencies}</dt>
+        <div class={cn(isCompact ? compactFactClass : "grid gap-1 rounded-lg border border-border/80 bg-muted/30 p-3")}>
+          <dt class={isCompact ? compactFactLabelClass : "whitespace-nowrap text-xs font-bold text-muted-foreground"} title={labels.dependencies}>{labels.dependencies}</dt>
           <dd class={cn("min-w-0 truncate font-semibold text-foreground", isCompact && "font-mono text-sm")} title={dependencySummary()}>{dependencySummary()}</dd>
         </div>
         {#if !isMini}
-          <div class={cn(isCompact ? "grid grid-cols-[3rem_minmax(0,1fr)] items-center gap-3" : "grid gap-1 rounded-lg border border-border/80 bg-muted/30 p-3")}>
-            <dt class="whitespace-nowrap text-xs font-bold text-muted-foreground">{labels.components}</dt>
+          <div class={cn(isCompact ? compactFactClass : "grid gap-1 rounded-lg border border-border/80 bg-muted/30 p-3")}>
+            <dt class={isCompact ? compactFactLabelClass : "whitespace-nowrap text-xs font-bold text-muted-foreground"} title={labels.components}>{labels.components}</dt>
             <dd class="min-w-0 truncate font-semibold text-foreground">{componentSummary()}</dd>
           </div>
-          <div class={cn(isCompact ? "grid grid-cols-[3rem_minmax(0,1fr)] items-center gap-3" : "grid gap-1 rounded-lg border border-border/80 bg-muted/30 p-3")}>
-            <dt class="whitespace-nowrap text-xs font-bold text-muted-foreground">{labels.variants}</dt>
+          <div class={cn(isCompact ? compactFactClass : "grid gap-1 rounded-lg border border-border/80 bg-muted/30 p-3")}>
+            <dt class={isCompact ? compactFactLabelClass : "whitespace-nowrap text-xs font-bold text-muted-foreground"} title={labels.variants}>{labels.variants}</dt>
             <dd class="min-w-0 truncate font-semibold text-foreground">{variantSummary()}</dd>
           </div>
         {/if}
-        <div class={cn(isCompact ? "grid grid-cols-[3rem_minmax(0,1fr)] items-center gap-3" : "grid gap-1 rounded-lg border border-border/80 bg-muted/30 p-3")}>
-          <dt class="whitespace-nowrap text-xs font-bold text-muted-foreground">{labels.ports}</dt>
+        <div class={cn(isCompact ? compactFactClass : "grid gap-1 rounded-lg border border-border/80 bg-muted/30 p-3")}>
+          <dt class={isCompact ? compactFactLabelClass : "whitespace-nowrap text-xs font-bold text-muted-foreground"} title={labels.ports}>{labels.ports}</dt>
           <dd class={cn("min-w-0 truncate font-semibold text-foreground", isCompact && "font-mono text-sm")} title={portSummary()}>{portSummary()}</dd>
         </div>
       </dl>
