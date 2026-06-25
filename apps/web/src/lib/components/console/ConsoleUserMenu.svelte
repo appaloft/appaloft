@@ -51,23 +51,7 @@
 
   const pathname = $derived(page.url.pathname);
   const authSession = $derived(authSessionQuery.data ?? defaultAuthSession);
-  const githubProvider = $derived(
-    authSession.providers.find((provider) => provider.key === "github") ?? null,
-  );
-  const githubConnected = $derived(Boolean(githubProvider?.connected));
-  const githubAccountLabel = $derived(githubProvider?.accountLabel?.trim() ?? "");
   const authIdentity = $derived(readSessionIdentity(authSession.session));
-  const githubConnectionSummary = $derived.by(() => {
-    if (githubConnected && githubAccountLabel) {
-      return $t(i18nKeys.console.shell.githubConnectedAs, { account: githubAccountLabel });
-    }
-
-    return githubConnected
-      ? `GitHub ${$t(i18nKeys.common.status.connected)}`
-      : authIdentity
-        ? $t(i18nKeys.common.status.pendingAuthorization)
-        : $t(i18nKeys.common.status.onDemandAuthorization);
-  });
   const showInstanceManagementLink = $derived(
     $capabilities.capabilities[instanceAccessCapabilityKey]?.allowed === true,
   );
@@ -115,11 +99,8 @@
     <Avatar size="sm">
       <AvatarFallback>{initials(authIdentity ?? "Appaloft")}</AvatarFallback>
     </Avatar>
-    <span class="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
+    <span class="min-w-0 flex-1 self-center group-data-[collapsible=icon]:hidden">
       <span class="block truncate text-sm font-medium">{authIdentity ?? $t(i18nKeys.common.status.unauthenticated)}</span>
-      <span class="block truncate text-xs text-muted-foreground">
-        {githubConnectionSummary}
-      </span>
     </span>
     <ChevronUp class="size-4 text-muted-foreground group-data-[collapsible=icon]:hidden" />
   </DropdownMenuTrigger>

@@ -88,7 +88,12 @@ describe("organization auth management console surface", () => {
     expect(userMenuSource).not.toContain("DropdownMenuSubTrigger");
     expect(userMenuSource).not.toContain("/api/auth/link-social");
     expect(userMenuSource).not.toContain("i18nKeys.console.shell.linkGitHubAccount");
-    expect(userMenuSource).toContain("i18nKeys.console.shell.githubConnectedAs");
+    expect(userMenuSource).not.toContain("i18nKeys.console.shell.githubConnectedAs");
+    expect(userMenuSource).not.toContain("githubConnectionSummary");
+    expect(userMenuSource).not.toContain("githubProvider");
+    expect(userMenuSource).not.toContain("authSessionQuery.isLoading");
+    expect(userMenuSource).not.toContain("authSessionQuery.isPending");
+    expect(userMenuSource).not.toContain("disabled=");
     expect(userMenuSource).not.toContain("$t(i18nKeys.common.actions.connectGitHub)");
     expect(userMenuSource).toContain("i18nKeys.common.actions.signOut");
     expect(enUSSource).toContain('openWebsite: "Website"');
