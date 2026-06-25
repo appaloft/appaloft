@@ -17,9 +17,7 @@ function readInitialLocale(): AppaloftLocale {
     return defaultAppaloftLocale;
   }
 
-  return normalizeAppaloftLocale(
-    window.localStorage.getItem(appaloftLocaleStorageKey) ?? window.navigator.language,
-  );
+  return normalizeAppaloftLocale(window.localStorage.getItem(appaloftLocaleStorageKey));
 }
 
 export const locale = writable<AppaloftLocale>(readInitialLocale());
