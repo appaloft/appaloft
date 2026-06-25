@@ -93,6 +93,7 @@
     official: "官方",
     featured: "精选",
     selected: "已选择",
+    detail: "查看详情",
     website: "网站",
   };
 
@@ -272,6 +273,10 @@
     }
 
     return createBlueprintDetailHref(detailBasePath, item.slug);
+  }
+
+  function detailHref(item: BlueprintMarketplaceListing): string {
+    return primaryAction === "detail" ? "" : createBlueprintDetailHref(detailBasePath, item.slug);
   }
 
   function normalizeMarketplaceList(value: unknown): BlueprintMarketplaceListResponse {
@@ -507,6 +512,7 @@
                 {item}
                 actionHref={primaryAction === "select" ? "#" : actionHref(item)}
                 {actionLabel}
+                detailHref={detailHref(item)}
                 density="default"
                 labels={cardLabels}
                 selected={selectedSlug === item.slug}
@@ -547,6 +553,7 @@
                 {item}
                 actionHref={primaryAction === "select" ? "#" : actionHref(item)}
                 {actionLabel}
+                detailHref={detailHref(item)}
                 density={cardDensity}
                 labels={cardLabels}
                 selected={selectedSlug === item.slug}

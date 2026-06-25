@@ -84,5 +84,6 @@ export interface BlueprintMarketplaceCardLabels {
   readonly official: string;
   readonly featured: string;
   readonly selected: string;
+  readonly detail: string;
   readonly website: string;
 }

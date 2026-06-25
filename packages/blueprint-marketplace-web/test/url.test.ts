@@ -69,6 +69,8 @@ describe("Blueprint marketplace web URLs", () => {
     expect(cardSource).toContain("bg-card");
     expect(cardSource).toContain("data-blueprint-marketplace-card");
     expect(cardSource).toContain("data-blueprint-marketplace-facts");
+    expect(cardSource).toContain("readonly detailHref?: string");
+    expect(cardSource).toContain("{labels.detail}");
     expect(cardSource).toContain("grid-cols-[minmax(6.5rem,7rem)_minmax(0,1fr)]");
     expect(cardSource).toContain("compactFactLabelClass");
     expect(cardSource).not.toContain("grid-cols-[3rem_minmax(0,1fr)]");

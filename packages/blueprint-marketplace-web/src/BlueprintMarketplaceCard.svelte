@@ -13,6 +13,7 @@
     readonly item: BlueprintMarketplaceListing;
     readonly actionHref?: string;
     readonly actionLabel?: string;
+    readonly detailHref?: string;
     readonly density?: BlueprintMarketplaceCardDensity;
     readonly labels?: Partial<BlueprintMarketplaceCardLabels>;
     readonly selected?: boolean;
@@ -38,6 +39,7 @@
     official: "官方",
     featured: "精选",
     selected: "已选择",
+    detail: "查看详情",
     website: "网站",
   };
 
@@ -45,6 +47,7 @@
     item,
     actionHref = "",
     actionLabel = "部署",
+    detailHref = "",
     density = "default",
     labels: labelOverrides = {},
     selected = false,
@@ -256,6 +259,17 @@
             ↗
           </Button>
         {/if}
+        {#if detailHref}
+          <Button
+            href={detailHref}
+            variant="outline"
+            size="sm"
+            class={isCompact ? "h-8 px-2.5" : ""}
+          >
+            {labels.detail}
+            <span aria-hidden="true">→</span>
+          </Button>
+        {/if}
         {#if onview}
           <Button
             variant="outline"
@@ -263,7 +277,8 @@
             class={isCompact ? "h-8 px-2.5" : ""}
             onclick={() => onview?.(item)}
           >
-            查看 <span aria-hidden="true">↗</span>
+            {labels.detail}
+            <span aria-hidden="true">↗</span>
           </Button>
         {/if}
         {#if actionHref}
