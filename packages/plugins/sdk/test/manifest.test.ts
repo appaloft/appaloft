@@ -106,6 +106,38 @@ describe("plugin manifest contract", () => {
     });
   });
 
+  test("accepts operation intent modal web extension placement", () => {
+    expect(
+      systemPluginWebExtensionSchema.parse({
+        key: "example-operation-intent-modal",
+        title: "Operation intent",
+        description: "Shows a provider-owned modal before a handled console operation.",
+        path: "/operation-intent",
+        placement: "operation-intent-modal",
+        target: "console-route",
+        requiresAuth: true,
+        metadata: {
+          renderer: "console-operation-intent-modal",
+          operationKey: "servers.register",
+          intent: "create-server",
+          pageEndpoint:
+            "/example/operation-intent?organizationId={organizationId}&operationKey={operationKey}&intent={intent}",
+          visibilityEndpoint:
+            "/example/operation-intent/visibility?organizationId={organizationId}&currentServerCount={currentServerCount}",
+        },
+      }),
+    ).toMatchObject({
+      key: "example-operation-intent-modal",
+      placement: "operation-intent-modal",
+      target: "console-route",
+      metadata: {
+        renderer: "console-operation-intent-modal",
+        operationKey: "servers.register",
+        intent: "create-server",
+      },
+    });
+  });
+
   test("accepts console route web extension metadata", () => {
     expect(
       systemPluginWebExtensionSchema.parse({

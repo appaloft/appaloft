@@ -4,14 +4,19 @@ import { describe, expect, test } from "vitest";
 
 import {
   consoleDomainErrorModalRenderer,
+  consoleOperationIntentModalRenderer,
   consolePageRenderer,
   findConsoleDomainErrorModalExtension,
+  findConsoleOperationIntentModalExtension,
   findConsolePageExtensionByPath,
   findConsolePanelExtensionsByPlacement,
   readConsoleDomainErrorModalExtensionMetadata,
+  readConsoleOperationIntentModalExtensionMetadata,
   readConsolePageExtensionMetadata,
   resolveConsoleDomainErrorModalEndpoint,
+  resolveConsoleOperationIntentModalEndpoint,
   resolveConsolePageEndpoint,
+  resolveConsolePageVisibilityEndpoint,
 } from "./console-page-extension";
 
 const consolePageExtension: SystemPluginWebExtension = {
@@ -54,6 +59,23 @@ const domainErrorModalExtension: SystemPluginWebExtension = {
     pageEndpoint:
       "/example/domain-error-modal?organizationId={organizationId}&errorCode={errorCode}&requestPath={requestPath}",
     errorCodes: ["plan_limit_exceeded"],
+  },
+};
+
+const operationIntentModalExtension: SystemPluginWebExtension = {
+  ...consolePageExtension,
+  key: "example-operation-intent-modal",
+  title: "Operation intent",
+  path: "/operation-intent",
+  placement: "operation-intent-modal",
+  metadata: {
+    renderer: consoleOperationIntentModalRenderer,
+    operationKey: "servers.register",
+    intent: "create-server",
+    pageEndpoint:
+      "/example/operation-intent?organizationId={organizationId}&operationKey={operationKey}&intent={intent}",
+    visibilityEndpoint:
+      "/example/operation-intent/visibility?organizationId={organizationId}&currentServerCount={currentServerCount}",
   },
 };
 
@@ -145,6 +167,52 @@ describe("Console page extension surface", () => {
     ).toBe(
       "/example/domain-error-modal?organizationId=org_123&errorCode=plan_limit_exceeded&requestPath=%2Fapi%2Fservers",
     );
+  });
+
+  test("[CONSOLE-EXT-PAGE-005] resolves neutral operation intent modal extensions", () => {
+    expect(
+      findConsoleOperationIntentModalExtension([operationIntentModalExtension], {
+        operationKey: "servers.register",
+        intent: "create-server",
+      }),
+    ).toEqual(operationIntentModalExtension);
+    expect(
+      findConsoleOperationIntentModalExtension([operationIntentModalExtension], {
+        operationKey: "projects.create",
+        intent: "create-project",
+      }),
+    ).toBeNull();
+
+    const metadata = readConsoleOperationIntentModalExtensionMetadata(
+      operationIntentModalExtension,
+    );
+    expect(metadata).toEqual({
+      renderer: "console-operation-intent-modal",
+      pageEndpoint:
+        "/example/operation-intent?organizationId={organizationId}&operationKey={operationKey}&intent={intent}",
+      operationKey: "servers.register",
+      intent: "create-server",
+    });
+    expect(
+      resolveConsoleOperationIntentModalEndpoint(metadata, {
+        pathname: "/servers",
+        organization: {
+          organizationId: "org_123",
+        },
+        currentServerCount: 2,
+      }),
+    ).toBe(
+      "/example/operation-intent?organizationId=org_123&operationKey=servers.register&intent=create-server",
+    );
+    expect(
+      resolveConsolePageVisibilityEndpoint(operationIntentModalExtension, {
+        pathname: "/servers",
+        organization: {
+          organizationId: "org_123",
+        },
+        currentServerCount: 2,
+      }),
+    ).toBe("/example/operation-intent/visibility?organizationId=org_123&currentServerCount=2");
   });
 
   test("[CONSOLE-EXT-PAGE-003] discovers console panel extensions by placement", () => {
