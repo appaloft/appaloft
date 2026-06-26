@@ -31,6 +31,11 @@ export type SystemPluginExtensionIconPresentation =
       label?: string;
     };
 
+export interface SystemPluginExtensionAccountMenuBadgePresentation {
+  endpoint: string;
+  valuePath: string;
+}
+
 export function systemPluginExtensionTitle(
   extension: SystemPluginWebExtension,
   locale: AppaloftLocale,
@@ -61,6 +66,35 @@ export function systemPluginExtensionIconPresentation(
     kind: "component",
     component: systemPluginExtensionIcon(extension),
   };
+}
+
+export function systemPluginExtensionAccountMenuBadgePresentation(
+  extension: SystemPluginWebExtension,
+): SystemPluginExtensionAccountMenuBadgePresentation | null {
+  const metadata = extension.metadata;
+  if (!isRecord(metadata)) {
+    return null;
+  }
+
+  const badge = metadata.accountMenuBadge;
+  if (!isRecord(badge)) {
+    return null;
+  }
+
+  const endpoint = badge.endpoint;
+  if (typeof endpoint !== "string" || endpoint.length === 0) {
+    return null;
+  }
+
+  const valuePath = badge.valuePath;
+  return {
+    endpoint,
+    valuePath: typeof valuePath === "string" && valuePath.length > 0 ? valuePath : "label",
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
 
 export function systemPluginExtensionIcon(extension: SystemPluginWebExtension): Component {
