@@ -4,6 +4,42 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { bundleReadme, createBinaryEntryModule } from "../release/lib/binary-bundle";
+import {
+  createStaticAssetArchive,
+  loadEmbeddedStaticAssetsArchive,
+} from "../release/lib/static-asset-archive";
+
+describe("binary bundle static asset archives", () => {
+  test("round-trips static assets with route paths and content types", async () => {
+    const root = await mkdtemp(join(tmpdir(), "appaloft-static-archive-"));
+    try {
+      const staticDir = join(root, "build");
+      const archivePath = join(root, "assets.tar.gz");
+      await mkdir(join(staticDir, "_app", "immutable", "assets"), { recursive: true });
+      await Bun.write(join(staticDir, "index.html"), "<!doctype html><title>Appaloft</title>");
+      await Bun.write(join(staticDir, "_app", "immutable", "assets", "app.css"), "body{}");
+
+      await createStaticAssetArchive({
+        archivePath,
+        staticBuildDir: staticDir,
+        files: [
+          join(staticDir, "_app", "immutable", "assets", "app.css"),
+          join(staticDir, "index.html"),
+        ],
+      });
+
+      const assets = await loadEmbeddedStaticAssetsArchive(archivePath);
+
+      expect(Object.keys(assets).sort()).toEqual(["/_app/immutable/assets/app.css", "/index.html"]);
+      expect(await assets["/index.html"]?.text()).toContain("<!doctype html>");
+      expect(assets["/index.html"]?.type).toContain("text/html");
+      expect(await assets["/_app/immutable/assets/app.css"]?.text()).toBe("body{}");
+      expect(assets["/_app/immutable/assets/app.css"]?.type).toContain("text/css");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+});
 
 describe("binary bundle README", () => {
   test("[PUB-DOCS-013] documents embedded docs and override path", () => {
@@ -37,8 +73,8 @@ describe("Docker runtime image packaging", () => {
         entryPath,
         root,
         version: "0.1.0-test",
-        embeddedWebAssetsModulePath: join(entryDir, "embedded-web-assets.generated.ts"),
-        embeddedDocsAssetsModulePath: join(entryDir, "embedded-docs-assets.generated.ts"),
+        embeddedWebAssetsArchivePath: join(entryDir, "embedded-web-assets.tar.gz"),
+        embeddedDocsAssetsArchivePath: join(entryDir, "embedded-docs-assets.tar.gz"),
         pgliteFsBundlePath: join(root, "vendor", "pglite.data"),
         pgliteWasmPath: join(root, "vendor", "pglite.wasm"),
         initdbWasmPath: join(root, "vendor", "initdb.wasm"),
@@ -54,6 +90,10 @@ describe("Docker runtime image packaging", () => {
       expect(reflectIndex).toBe(0);
       expect(shellRuntimeIndex).toBeGreaterThan(reflectIndex);
       expect(source).not.toContain("import { runShellCli }");
+      expect(source).toContain('with { type: "file" }');
+      expect(source).toContain("embedded-web-assets.tar.gz");
+      expect(source).toContain("loadEmbeddedStaticAssetsArchive");
+      expect(source).not.toContain("embedded-web-assets.generated.ts");
     } finally {
       await rm(root, { recursive: true, force: true });
     }

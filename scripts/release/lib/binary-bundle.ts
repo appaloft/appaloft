@@ -9,6 +9,7 @@ import {
   run,
   runNothrow,
 } from "./release-utils";
+import { createStaticAssetArchive } from "./static-asset-archive";
 import { detectHostReleaseBinaryTarget, type ReleaseBinaryTarget } from "./targets";
 
 function toImportSpecifier(fromFile: string, toFile: string): string {
@@ -16,39 +17,12 @@ function toImportSpecifier(fromFile: string, toFile: string): string {
   return relativePath.startsWith(".") ? relativePath : `./${relativePath}`;
 }
 
-async function createEmbeddedStaticAssetsModule(input: {
-  exportName: string;
-  modulePath: string;
-  staticBuildDir: string;
-}): Promise<void> {
-  const files = await listFiles(input.staticBuildDir);
-
-  const imports = files.map((file, index) => {
-    const specifier = toImportSpecifier(input.modulePath, file);
-    return `import asset${index} from "${specifier}" with { type: "file" };`;
-  });
-  const entries = files.map((file, index) => {
-    const routePath = `/${relative(input.staticBuildDir, file).split(sep).join("/")}`;
-    return `\t"${routePath}": Bun.file(asset${index}),`;
-  });
-
-  await Bun.write(
-    input.modulePath,
-    `${imports.join("\n")}
-
-export const ${input.exportName} = {
-${entries.join("\n")}
-} as const satisfies Readonly<Record<string, Blob>>;
-`,
-  );
-}
-
 export async function createBinaryEntryModule(input: {
   entryPath: string;
   root: string;
   version: string;
-  embeddedWebAssetsModulePath: string;
-  embeddedDocsAssetsModulePath: string;
+  embeddedWebAssetsArchivePath: string;
+  embeddedDocsAssetsArchivePath: string;
   pgliteFsBundlePath: string;
   pgliteWasmPath: string;
   initdbWasmPath: string;
@@ -60,13 +34,24 @@ export async function createBinaryEntryModule(input: {
     input.reflectMetadataPath ??
     Bun.resolveSync("reflect-metadata", join(input.root, "apps", "shell", "src", "index.ts"));
   const reflectMetadataSpecifier = toImportSpecifier(input.entryPath, reflectMetadataPath);
-  const embeddedAssetsSpecifier = toImportSpecifier(
-    input.entryPath,
-    input.embeddedWebAssetsModulePath,
+  const staticAssetArchiveModulePath = join(
+    input.root,
+    "scripts",
+    "release",
+    "lib",
+    "static-asset-archive.ts",
   );
-  const embeddedDocsAssetsSpecifier = toImportSpecifier(
+  const staticAssetArchiveModuleSpecifier = toImportSpecifier(
     input.entryPath,
-    input.embeddedDocsAssetsModulePath,
+    staticAssetArchiveModulePath,
+  );
+  const embeddedWebAssetsArchiveSpecifier = toImportSpecifier(
+    input.entryPath,
+    input.embeddedWebAssetsArchivePath,
+  );
+  const embeddedDocsAssetsArchiveSpecifier = toImportSpecifier(
+    input.entryPath,
+    input.embeddedDocsAssetsArchivePath,
   );
   const pgliteFsBundleSpecifier = toImportSpecifier(input.entryPath, input.pgliteFsBundlePath);
   const pgliteWasmSpecifier = toImportSpecifier(input.entryPath, input.pgliteWasmPath);
@@ -79,9 +64,10 @@ export async function createBinaryEntryModule(input: {
 import pgliteFsBundlePath from "${pgliteFsBundleSpecifier}" with { type: "file" };
 import pgliteWasmPath from "${pgliteWasmSpecifier}" with { type: "file" };
 import initdbWasmPath from "${initdbWasmSpecifier}" with { type: "file" };
+import embeddedWebAssetsArchivePath from "${embeddedWebAssetsArchiveSpecifier}" with { type: "file" };
+import embeddedDocsAssetsArchivePath from "${embeddedDocsAssetsArchiveSpecifier}" with { type: "file" };
 
-import { embeddedWebAssets } from "${embeddedAssetsSpecifier}";
-import { embeddedDocsAssets } from "${embeddedDocsAssetsSpecifier}";
+import { loadEmbeddedStaticAssetsArchive } from "${staticAssetArchiveModuleSpecifier}";
 
 if (!process.env.APPALOFT_APP_VERSION) {
 	process.env.APPALOFT_APP_VERSION = ${JSON.stringify(input.version)};
@@ -110,6 +96,10 @@ function shouldUseEmbeddedPglite(): boolean {
 }
 
 const { runShellCli } = await import("${runModuleSpecifier}");
+const [embeddedWebAssets, embeddedDocsAssets] = await Promise.all([
+	loadEmbeddedStaticAssetsArchive(embeddedWebAssetsArchivePath),
+	loadEmbeddedStaticAssetsArchive(embeddedDocsAssetsArchivePath),
+]);
 
 await runShellCli({
 	embeddedWebAssets,
@@ -218,8 +208,8 @@ export async function createBinaryBundle(input: {
   const docsBuildDir = join(docsRoot, "dist");
   const binaryPath = join(input.outDir, target.executableName);
   const tempBuildRoot = join(input.root, "dist", ".tmp-binary-bundle");
-  const embeddedWebAssetsModulePath = join(tempBuildRoot, "embedded-web-assets.generated.ts");
-  const embeddedDocsAssetsModulePath = join(tempBuildRoot, "embedded-docs-assets.generated.ts");
+  const embeddedWebAssetsArchivePath = join(tempBuildRoot, "embedded-web-assets.tar.gz");
+  const embeddedDocsAssetsArchivePath = join(tempBuildRoot, "embedded-docs-assets.tar.gz");
   const binaryEntryPath = join(tempBuildRoot, "binary-entry.ts");
   const pglitePackageEntry = Bun.resolveSync(
     "@electric-sql/pglite",
@@ -243,29 +233,32 @@ export async function createBinaryBundle(input: {
     await run(["bun", "run", "build"], docsRoot);
   }
 
-  if ((await listFiles(webBuildDir)).length === 0) {
+  const webBuildFiles = await listFiles(webBuildDir);
+  const docsBuildFiles = await listFiles(docsBuildDir);
+
+  if (webBuildFiles.length === 0) {
     throw new Error(`Missing web build output at ${webBuildDir}`);
   }
-  if ((await listFiles(docsBuildDir)).length === 0) {
+  if (docsBuildFiles.length === 0) {
     throw new Error(`Missing docs build output at ${docsBuildDir}`);
   }
 
-  await createEmbeddedStaticAssetsModule({
-    exportName: "embeddedWebAssets",
-    modulePath: embeddedWebAssetsModulePath,
+  await createStaticAssetArchive({
+    archivePath: embeddedWebAssetsArchivePath,
+    files: webBuildFiles,
     staticBuildDir: webBuildDir,
   });
-  await createEmbeddedStaticAssetsModule({
-    exportName: "embeddedDocsAssets",
-    modulePath: embeddedDocsAssetsModulePath,
+  await createStaticAssetArchive({
+    archivePath: embeddedDocsAssetsArchivePath,
+    files: docsBuildFiles,
     staticBuildDir: docsBuildDir,
   });
   await createBinaryEntryModule({
     entryPath: binaryEntryPath,
     root: input.root,
     version,
-    embeddedWebAssetsModulePath,
-    embeddedDocsAssetsModulePath,
+    embeddedWebAssetsArchivePath,
+    embeddedDocsAssetsArchivePath,
     pgliteFsBundlePath,
     pgliteWasmPath,
     initdbWasmPath,
