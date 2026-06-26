@@ -17,11 +17,12 @@
     ShieldCheck,
     Terminal,
   } from "@lucide/svelte";
-  import type { ServerSummary } from "@appaloft/contracts";
+  import type { ServerSummary, SystemPluginWebExtension } from "@appaloft/contracts";
   import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
   import Sortable from "sortablejs";
 
   import ConsoleEmptyState from "$lib/components/console/ConsoleEmptyState.svelte";
+  import ConsoleExtensionPage from "$lib/components/console/ConsoleExtensionPage.svelte";
   import ConsoleResourceCanvas from "$lib/components/console/ConsoleResourceCanvas.svelte";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
@@ -30,18 +31,31 @@
   import { Button } from "$lib/components/ui/button";
   import * as Dialog from "$lib/components/ui/dialog";
   import { Skeleton } from "$lib/components/ui/skeleton";
-  import { readErrorMessage } from "$lib/api/client";
+  import { readErrorMessage, request } from "$lib/api/client";
   import { canRunProductQueries } from "$lib/console/auth-query-gate";
+  import {
+    findConsoleOperationIntentModalExtension,
+    isConsolePageExtensionVisible,
+    readConsoleOperationIntentModalExtensionMetadata,
+    resolveConsoleOperationIntentModalEndpoint,
+    resolveConsolePageVisibilityEndpoint,
+  } from "$lib/console/console-page-extension";
   import { webDocsHrefs } from "$lib/console/docs-help";
   import { createConsoleQueries } from "$lib/console/queries";
   import { serverProviderDisplayLabel } from "$lib/console/server-registration";
   import { modalIsOpen, setModalOpen } from "$lib/console/url-modal";
   import { formatTime } from "$lib/console/utils";
-  import { i18nKeys, t } from "$lib/i18n";
+  import {
+    systemPluginExtensionDescription,
+    systemPluginExtensionTitle,
+  } from "$lib/console/web-extension-presentation";
+  import { i18nKeys, locale, t } from "$lib/i18n";
   import { orpc, orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
 
   const serverPageSize = 12;
+  const createServerIntent = "create-server";
+  const registerServerOperationKey = "servers.register";
   let serverOffset = $state(0);
   let activeServerId = $state<string | null>(null);
   let serverListElement = $state<HTMLElement | null>(null);
@@ -56,6 +70,14 @@
   type SortableRowRect = {
     left: number;
     top: number;
+  };
+
+  type SystemPluginWebExtensionsResponse = {
+    items: SystemPluginWebExtension[];
+  };
+
+  type SystemPluginWebExtensionVisibilityResponse = {
+    visible?: boolean;
   };
 
   function captureSortableRowRects(root: HTMLElement): Map<string, SortableRowRect> {
@@ -117,6 +139,22 @@
       enabled: browser && canRunProductQueries(authSessionQuery.data),
     }),
   );
+  const organizationContextQuery = createQuery(() =>
+    orpc.organizations.currentContext.queryOptions({
+      input: {},
+      enabled: browser && canRunProductQueries(authSessionQuery.data),
+      retry: 0,
+      staleTime: 30_000,
+    }),
+  );
+  const webExtensionsQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["system-plugins", "web-extensions"],
+      queryFn: () => request<SystemPluginWebExtensionsResponse>("/api/system-plugins/web-extensions"),
+      enabled: browser,
+      staleTime: 30_000,
+    }),
+  );
   const servers = $derived(serversQuery.data?.items ?? []);
   const serverQueryOrderKey = $derived(servers.map((server) => server.id).join("|"));
   const serverVisibleOrderKey = $derived(visibleServers.map((server) => server.id).join("|"));
@@ -129,6 +167,82 @@
   const deployments = $derived(deploymentsQuery.data?.items ?? []);
   const pageLoading = $derived(serversQuery.isPending || deploymentsQuery.isPending);
   let serverCreateDialogOpen = $state(false);
+  const currentOrganization = $derived(
+    organizationContextQuery.data?.currentOrganization ?? null,
+  );
+  const serverCreateIntentExtension = $derived.by(() =>
+    findConsoleOperationIntentModalExtension(webExtensionsQuery.data?.items ?? [], {
+      operationKey: registerServerOperationKey,
+      intent: createServerIntent,
+    }),
+  );
+  const serverCreateIntentMetadata = $derived(
+    readConsoleOperationIntentModalExtensionMetadata(serverCreateIntentExtension),
+  );
+  const serverCreateIntentContext = $derived({
+    pathname: page.url.pathname,
+    query: page.url.searchParams.toString(),
+    organization: currentOrganization,
+    currentServerCount: serverTotal,
+  });
+  const serverCreateIntentVisibilityEndpoint = $derived(
+    currentOrganization && !serversQuery.isPending
+      ? resolveConsolePageVisibilityEndpoint(
+          serverCreateIntentExtension,
+          serverCreateIntentContext,
+        )
+      : null,
+  );
+  const serverCreateIntentEndpoint = $derived(
+    currentOrganization
+      ? resolveConsoleOperationIntentModalEndpoint(
+          serverCreateIntentMetadata,
+          serverCreateIntentContext,
+        )
+      : null,
+  );
+  const serverCreateIntentVisibilityQuery = createQuery(() =>
+    queryOptions({
+      queryKey: [
+        "system-plugins",
+        "operation-intent-visibility",
+        serverCreateIntentExtension?.key ?? "",
+        serverCreateIntentVisibilityEndpoint ?? "",
+      ],
+      queryFn: () =>
+        serverCreateIntentVisibilityEndpoint
+          ? request<SystemPluginWebExtensionVisibilityResponse>(
+              serverCreateIntentVisibilityEndpoint,
+            )
+          : Promise.resolve({ visible: false }),
+      enabled: browser && Boolean(serverCreateIntentVisibilityEndpoint),
+      staleTime: 30_000,
+    }),
+  );
+  const serverCreateIntentVisibility = $derived(
+    serverCreateIntentExtension
+      ? {
+          [serverCreateIntentExtension.key]:
+            serverCreateIntentVisibilityQuery.data?.visible === true,
+        }
+      : {},
+  );
+  const serverCreateIntentModalVisible = $derived(
+    isConsolePageExtensionVisible(serverCreateIntentExtension, serverCreateIntentVisibility),
+  );
+  const serverCreateIntentVisibilityPending = $derived(
+    Boolean(serverCreateIntentVisibilityEndpoint) && serverCreateIntentVisibilityQuery.isPending,
+  );
+  const serverCreateIntentTitle = $derived(
+    serverCreateIntentExtension
+      ? systemPluginExtensionTitle(serverCreateIntentExtension, $locale)
+      : "",
+  );
+  const serverCreateIntentDescription = $derived(
+    serverCreateIntentExtension
+      ? systemPluginExtensionDescription(serverCreateIntentExtension, $locale)
+      : undefined,
+  );
 
   const reorderServersMutation = createMutation(() => ({
     mutationFn: ({
@@ -733,16 +847,32 @@
   <Dialog.Root bind:open={serverCreateDialogOpen} onOpenChange={setServerCreateDialogOpen}>
     <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-5xl">
       <Dialog.Header>
-        <Dialog.Title>{$t(i18nKeys.console.servers.createFormTitle)}</Dialog.Title>
+        <Dialog.Title>
+          {serverCreateIntentModalVisible && serverCreateIntentExtension
+            ? serverCreateIntentTitle
+            : $t(i18nKeys.console.servers.createFormTitle)}
+        </Dialog.Title>
         <Dialog.Description>
-          {$t(i18nKeys.console.servers.createFormDescription)}
+          {serverCreateIntentModalVisible && serverCreateIntentDescription
+            ? serverCreateIntentDescription
+            : $t(i18nKeys.console.servers.createFormDescription)}
         </Dialog.Description>
       </Dialog.Header>
       <div class="px-5 pb-5">
-        <ServerCreateForm
-          idPrefix="servers-page-create"
-          onCreated={openCreatedServer}
-        />
+        {#if serverCreateIntentModalVisible && serverCreateIntentEndpoint}
+          <ConsoleExtensionPage embedded pageEndpointOverride={serverCreateIntentEndpoint} />
+        {:else if serverCreateIntentVisibilityPending}
+          <div class="space-y-3">
+            <Skeleton class="h-10 w-full" />
+            <Skeleton class="h-28 w-full" />
+            <Skeleton class="h-10 w-40" />
+          </div>
+        {:else}
+          <ServerCreateForm
+            idPrefix="servers-page-create"
+            onCreated={openCreatedServer}
+          />
+        {/if}
       </div>
     </Dialog.Content>
   </Dialog.Root>

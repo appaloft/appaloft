@@ -303,6 +303,8 @@ describe("dependency resource Web console surface", () => {
     expect(serversPageSource).toContain('modalIsOpen(page, "create-server")');
     expect(serversPageSource).toContain("bind:open={serverCreateDialogOpen}");
     expect(serversPageSource).toContain("onOpenChange={setServerCreateDialogOpen}");
+    expect(serversPageSource).toContain("findConsoleOperationIntentModalExtension");
+    expect(serversPageSource).toContain("<ConsoleExtensionPage embedded");
     expect(serversPageSource).toContain("onCreated={openCreatedServer}");
   });
 
