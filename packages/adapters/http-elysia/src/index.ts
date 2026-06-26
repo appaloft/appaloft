@@ -33,6 +33,7 @@ import { type AuthPublicConfig, apiVersion, type ReadinessResponse } from "@appa
 import { err, ok, type Result } from "@appaloft/core";
 import { appaloftDeploymentConfigJsonSchema } from "@appaloft/deployment-config";
 import {
+  type AppaloftLocale,
   createAppaloftTranslator,
   i18nKeys,
   resolveAppaloftLocaleFromHeaders,
@@ -384,6 +385,32 @@ function appendVaryHeader(headers: MutableHeaders, value: string): void {
   if (!values.includes(value.toLowerCase())) {
     headers.vary = `${current}, ${value}`;
   }
+}
+
+function appendResponseVaryHeader(headers: Headers, value: string): void {
+  const current = headers.get("vary");
+
+  if (!current) {
+    headers.set("vary", value);
+    return;
+  }
+
+  const values = current
+    .split(",")
+    .map((entry) => entry.trim().toLowerCase())
+    .filter((entry) => entry.length > 0);
+
+  if (!values.includes(value.toLowerCase())) {
+    headers.set("vary", `${current}, ${value}`);
+  }
+}
+
+function renderWebConsoleInitialLocaleHtml(html: string, locale: AppaloftLocale): string {
+  if (/<html\b[^>]*\blang=(["']).*?\1/i.test(html)) {
+    return html.replace(/<html\b([^>]*?)\s+lang=(["']).*?\2/i, `<html$1 lang="${locale}"`);
+  }
+
+  return html.replace(/<html\b/i, `<html lang="${locale}"`);
 }
 
 function appendCsvHeader(headers: MutableHeaders, name: string, values: string[]): void {
@@ -1175,6 +1202,35 @@ export function createHttpApp(input: {
     return `window.__APPALOFT_PUBLIC_CONFIG__=${escapeScriptJson(publicRuntimeConfig())};\n`;
   }
 
+  async function webConsoleInitialLocaleResponse(
+    request: Request,
+    response: Response,
+  ): Promise<Response> {
+    const pathname = new URL(request.url).pathname;
+    const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+    const shouldRenderInitialLocale =
+      response.status === 200 &&
+      (contentType.includes("text/html") ||
+        (isHtmlNavigationRequest(request) && !hasStaticAssetExtension(pathname)));
+
+    if (!shouldRenderInitialLocale) {
+      return response;
+    }
+
+    const locale = resolveAppaloftLocaleFromHeaders(request.headers);
+    const headers = new Headers(response.headers);
+    headers.set("content-type", "text/html; charset=utf-8");
+    appendResponseVaryHeader(headers, "Accept-Language");
+    appendResponseVaryHeader(headers, "Cookie");
+    appendResponseVaryHeader(headers, "X-Appaloft-Locale");
+
+    return new Response(renderWebConsoleInitialLocaleHtml(await response.text(), locale), {
+      headers,
+      status: response.status,
+      statusText: response.statusText,
+    });
+  }
+
   function staticArtifactResponse(pathname: string): Response | null {
     return staticArtifactImmutableResponse(pathname) ?? staticArtifactAliasResponse(pathname);
   }
@@ -1401,7 +1457,8 @@ export function createHttpApp(input: {
       return authRedirect;
     }
 
-    return webStaticResponse(new URL(request.url).pathname) ?? fallback;
+    const response = webStaticResponse(new URL(request.url).pathname);
+    return response ? webConsoleInitialLocaleResponse(request, response) : fallback;
   }
 
   function deploymentProgressStream(request: Request, requestId: string): Response {

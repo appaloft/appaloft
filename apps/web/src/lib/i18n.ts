@@ -1,6 +1,7 @@
 import {
   type AppaloftLocale,
   type AppaloftTranslate,
+  appaloftLocaleCookieName,
   appaloftLocaleHeader,
   appaloftLocaleStorageKey,
   createAppaloftTranslator,
@@ -12,12 +13,18 @@ import {
 } from "@appaloft/i18n";
 import { derived, writable } from "svelte/store";
 
+function readDocumentLocale(): string | null {
+  return typeof document !== "undefined" ? document.documentElement.lang : null;
+}
+
 function readInitialLocale(): AppaloftLocale {
   if (typeof window === "undefined") {
     return defaultAppaloftLocale;
   }
 
-  return normalizeAppaloftLocale(window.localStorage.getItem(appaloftLocaleStorageKey));
+  return normalizeAppaloftLocale(
+    readDocumentLocale() || window.localStorage.getItem(appaloftLocaleStorageKey),
+  );
 }
 
 export const locale = writable<AppaloftLocale>(readInitialLocale());
@@ -32,7 +39,9 @@ export function translate(key: TranslationKey, values?: TranslationValues): stri
 
 export function currentLocale(): AppaloftLocale {
   return typeof window !== "undefined"
-    ? normalizeAppaloftLocale(window.localStorage.getItem(appaloftLocaleStorageKey))
+    ? normalizeAppaloftLocale(
+        window.localStorage.getItem(appaloftLocaleStorageKey) || readDocumentLocale(),
+      )
     : defaultAppaloftLocale;
 }
 
@@ -45,7 +54,14 @@ export function setLocale(nextLocale: string): void {
   }
 
   window.localStorage.setItem(appaloftLocaleStorageKey, normalizedLocale);
-  document.documentElement.lang = normalizedLocale;
+  if (typeof document !== "undefined") {
+    // Server-rendered static HTML needs the cookie before the Cookie Store API is universal.
+    // biome-ignore lint/suspicious/noDocumentCookie: language preference must be sent with the next navigation request
+    document.cookie = `${appaloftLocaleCookieName}=${encodeURIComponent(
+      normalizedLocale,
+    )}; Path=/; Max-Age=31536000; SameSite=Lax`;
+    document.documentElement.lang = normalizedLocale;
+  }
   window.dispatchEvent(new CustomEvent("appaloft:locale-change", { detail: normalizedLocale }));
 }
 

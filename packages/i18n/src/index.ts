@@ -13,6 +13,7 @@ export type AppaloftLocale = (typeof appaloftLocales)[number];
 
 export const defaultAppaloftLocale: AppaloftLocale = "en-US";
 export const appaloftLocaleStorageKey = "appaloft.locale";
+export const appaloftLocaleCookieName = "appaloft.locale";
 export const appaloftLocaleHeader = "x-appaloft-locale";
 
 export type TranslationValues = Record<
@@ -23,10 +24,14 @@ export type TranslationValues = Record<
 export type AppaloftTranslate = (key: TranslationKey, values?: TranslationValues) => string;
 
 export function normalizeAppaloftLocale(input?: string | null): AppaloftLocale {
+  return normalizeAppaloftLocaleCandidate(input) ?? defaultAppaloftLocale;
+}
+
+function normalizeAppaloftLocaleCandidate(input?: string | null): AppaloftLocale | undefined {
   const value = input?.trim();
 
   if (!value) {
-    return defaultAppaloftLocale;
+    return undefined;
   }
 
   const normalized = value.toLowerCase().replace("_", "-");
@@ -39,10 +44,33 @@ export function normalizeAppaloftLocale(input?: string | null): AppaloftLocale {
     return "en-US";
   }
 
-  return defaultAppaloftLocale;
+  return undefined;
 }
 
-export function resolveAppaloftLocaleFromAcceptLanguage(_header?: string | null): AppaloftLocale {
+export function resolveAppaloftLocaleFromAcceptLanguage(header?: string | null): AppaloftLocale {
+  const ranges = header
+    ?.split(",")
+    .map((part, index) => {
+      const [rawTag, ...parameters] = part.trim().split(";");
+      const qParameter = parameters
+        .map((parameter) => parameter.trim())
+        .find((parameter) => parameter.toLowerCase().startsWith("q="));
+      const parsedQ = qParameter ? Number(qParameter.slice(2)) : 1;
+      const q = Number.isFinite(parsedQ) ? parsedQ : 0;
+
+      return { tag: rawTag?.trim(), q, index };
+    })
+    .filter((range) => range.tag && range.tag !== "*" && range.q > 0)
+    .sort((left, right) => right.q - left.q || left.index - right.index);
+
+  for (const range of ranges ?? []) {
+    const locale = normalizeAppaloftLocaleCandidate(range.tag);
+
+    if (locale) {
+      return locale;
+    }
+  }
+
   return defaultAppaloftLocale;
 }
 
@@ -53,7 +81,35 @@ export function resolveAppaloftLocaleFromHeaders(headers: Headers): AppaloftLoca
     return normalizeAppaloftLocale(explicitLocale);
   }
 
+  const cookieLocale = resolveAppaloftLocaleFromCookieHeader(headers.get("cookie"));
+
+  if (cookieLocale) {
+    return cookieLocale;
+  }
+
   return resolveAppaloftLocaleFromAcceptLanguage(headers.get("accept-language"));
+}
+
+export function resolveAppaloftLocaleFromCookieHeader(
+  header?: string | null,
+): AppaloftLocale | undefined {
+  for (const cookie of header?.split(";") ?? []) {
+    const [rawName, ...rawValueParts] = cookie.trim().split("=");
+
+    if (rawName !== appaloftLocaleCookieName) {
+      continue;
+    }
+
+    const value = rawValueParts.join("=");
+
+    try {
+      return normalizeAppaloftLocaleCandidate(decodeURIComponent(value));
+    } catch {
+      return normalizeAppaloftLocaleCandidate(value);
+    }
+  }
+
+  return undefined;
 }
 
 export function createAppaloftI18n(input?: {

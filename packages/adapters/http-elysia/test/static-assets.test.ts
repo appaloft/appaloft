@@ -276,6 +276,32 @@ describe("HTTP static assets", () => {
     });
   });
 
+  test("renders request locale into static console HTML before serving the SPA", async () => {
+    const app = createTestApp({
+      embeddedWebAssets: {
+        "/200.html": new Blob([
+          '<!doctype html><html lang="en-US"><head><title>Appaloft</title></head><body>web-spa-fallback</body></html>',
+        ]),
+      },
+    });
+
+    await withServer(app, async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/login`, {
+        headers: {
+          accept: "text/html",
+          "accept-language": "zh-CN,zh;q=0.9,en-US;q=0.4",
+        },
+      });
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("content-type")).toContain("text/html");
+      expect(response.headers.get("vary")).toContain("Accept-Language");
+      expect(response.headers.get("vary")).toContain("Cookie");
+      expect(response.headers.get("vary")).toContain("X-Appaloft-Locale");
+      await expect(response.text()).resolves.toContain('<html lang="zh-CN">');
+    });
+  });
+
   test("[FIRST-ADMIN-NAV-001] redirects console navigation to first-admin before serving SPA", async () => {
     const queries: Query<unknown>[] = [];
     const app = createTestApp({
