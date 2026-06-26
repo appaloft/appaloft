@@ -698,6 +698,40 @@ describe("HTTP static assets", () => {
     });
   });
 
+  test("[HTTP-STATIC-MIME-001] preserves embedded asset MIME types when middleware adds response headers", async () => {
+    const app = createTestApp({
+      embeddedWebAssets: {
+        "/index.html": new Blob(["<!doctype html><title>Appaloft</title>"], {
+          type: "text/html;charset=utf-8",
+        }),
+        "/_app/immutable/assets/app.css": new Blob(["body{}"], {
+          type: "text/css;charset=utf-8",
+        }),
+      },
+      middlewareHeaders: {
+        "x-content-type-options": "nosniff",
+        "x-test-static-header": "applied",
+      },
+    });
+
+    await withServer(app, async (baseUrl) => {
+      const rootResponse = await fetch(`${baseUrl}/`);
+      const cssResponse = await fetch(`${baseUrl}/_app/immutable/assets/app.css`);
+
+      expect(rootResponse.status).toBe(200);
+      expect(rootResponse.headers.get("content-type")).toContain("text/html");
+      expect(rootResponse.headers.get("x-content-type-options")).toBe("nosniff");
+      expect(rootResponse.headers.get("x-test-static-header")).toBe("applied");
+      expect(await rootResponse.text()).toContain("<!doctype html>");
+
+      expect(cssResponse.status).toBe(200);
+      expect(cssResponse.headers.get("content-type")).toContain("text/css");
+      expect(cssResponse.headers.get("x-content-type-options")).toBe("nosniff");
+      expect(cssResponse.headers.get("x-test-static-header")).toBe("applied");
+      expect(await cssResponse.text()).toBe("body{}");
+    });
+  });
+
   test("[PUB-DOCS-013] serves embedded docs under /docs without changing Web fallback", async () => {
     const app = createTestApp({
       embeddedWebAssets: {
