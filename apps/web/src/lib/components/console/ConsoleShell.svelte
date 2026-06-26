@@ -556,7 +556,17 @@
     </SidebarContent>
 
     <SidebarFooter>
-      <ConsoleUserMenu extensions={accountMenuExtensions} />
+      <ConsoleUserMenu
+        extensions={accountMenuExtensions}
+        organization={currentOrganization
+          ? {
+              organizationId: currentOrganization.organizationId,
+              slug: currentOrganization.slug,
+              name: currentOrganization.name,
+              role: currentOrganization.role,
+            }
+          : null}
+      />
     </SidebarFooter>
   </Sidebar>
 

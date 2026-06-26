@@ -12,9 +12,11 @@
     Settings2,
     UserRound,
   } from "@lucide/svelte";
+  import { createQuery, queryOptions } from "@tanstack/svelte-query";
 
   import { request } from "$lib/api/client";
   import { Avatar, AvatarFallback } from "$lib/components/ui/avatar";
+  import { Badge } from "$lib/components/ui/badge";
   import {
     DropdownMenu,
     DropdownMenuContent,
@@ -35,16 +37,25 @@
   import { i18nKeys, locale, setLocale, t } from "$lib/i18n";
   import { capabilities } from "$lib/capabilities";
   import {
+    systemPluginExtensionAccountMenuBadgePresentation,
     systemPluginExtensionIconPresentation,
     systemPluginExtensionTitle,
   } from "$lib/console/web-extension-presentation";
   import type { SystemPluginWebExtension } from "@appaloft/contracts";
 
-  type Props = {
-    extensions?: readonly SystemPluginWebExtension[];
+  type OrganizationBadgeContext = {
+    organizationId?: string;
+    slug?: string;
+    name?: string;
+    role?: string;
   };
 
-  let { extensions = [] }: Props = $props();
+  type Props = {
+    extensions?: readonly SystemPluginWebExtension[];
+    organization?: OrganizationBadgeContext | null;
+  };
+
+  let { extensions = [], organization = null }: Props = $props();
 
   const { authSessionQuery } = createConsoleQueries(browser, {
     readiness: false,
@@ -66,6 +77,52 @@
   const showInstanceManagementLink = $derived(
     $capabilities.capabilities[instanceAccessCapabilityKey]?.allowed === true,
   );
+  const extensionBadgeRequests = $derived.by(() =>
+    extensions
+      .map((extension) => {
+        const badge = systemPluginExtensionAccountMenuBadgePresentation(extension);
+        if (!badge) {
+          return null;
+        }
+
+        return {
+          key: extension.key,
+          endpoint: resolveOrganizationEndpoint(badge.endpoint),
+          valuePath: badge.valuePath,
+        };
+      })
+      .filter(
+        (entry): entry is { key: string; endpoint: string; valuePath: string } =>
+          entry !== null,
+      ),
+  );
+  const extensionBadgesQuery = createQuery(() =>
+    queryOptions({
+      queryKey: [
+        "system-plugins",
+        "account-menu-badges",
+        organization?.organizationId ?? "",
+        $locale,
+        extensionBadgeRequests
+          .map((entry) => `${entry.key}:${entry.endpoint}:${entry.valuePath}`)
+          .join("|"),
+      ],
+      queryFn: async () => {
+        const entries = await Promise.all(
+          extensionBadgeRequests.map(async (entry) => {
+            const result = await request<unknown>(entry.endpoint);
+            return [entry.key, readStringPath(result, entry.valuePath)] as const;
+          }),
+        );
+        return Object.fromEntries(
+          entries.filter((entry): entry is readonly [string, string] => entry[1] !== null),
+        );
+      },
+      enabled: browser && extensionBadgeRequests.length > 0,
+      staleTime: 30_000,
+    }),
+  );
+  const extensionBadges = $derived(extensionBadgesQuery.data ?? {});
 
   $effect(() => {
     if (browser && authSession.session) {
@@ -112,6 +169,26 @@
     }
 
     void goto(extension.path);
+  }
+
+  function resolveOrganizationEndpoint(endpoint: string): string {
+    return endpoint
+      .replaceAll("{organizationId}", encodeURIComponent(organization?.organizationId ?? ""))
+      .replaceAll("{organizationSlug}", encodeURIComponent(organization?.slug ?? ""))
+      .replaceAll("{organizationName}", encodeURIComponent(organization?.name ?? ""))
+      .replaceAll("{organizationRole}", encodeURIComponent(organization?.role ?? ""));
+  }
+
+  function readStringPath(value: unknown, path: string): string | null {
+    let current = value;
+    for (const segment of path.split(".").filter(Boolean)) {
+      if (!current || typeof current !== "object" || Array.isArray(current)) {
+        return null;
+      }
+      current = (current as Record<string, unknown>)[segment];
+    }
+
+    return typeof current === "string" && current.trim().length > 0 ? current : null;
   }
 </script>
 
@@ -191,7 +268,12 @@
             {@const ExtensionIcon = extensionIcon.component}
             <ExtensionIcon class="size-4" />
           {/if}
-          {extensionLabel}
+          <span class="min-w-0 truncate">{extensionLabel}</span>
+          {#if extensionBadges[extension.key]}
+            <Badge variant="outline" class="ml-auto max-w-28 shrink-0 truncate px-1.5 py-0 text-[0.6875rem]">
+              {extensionBadges[extension.key]}
+            </Badge>
+          {/if}
         </DropdownMenuItem>
       {/each}
     {/if}

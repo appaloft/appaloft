@@ -4,6 +4,7 @@ import { describe, expect, test } from "vitest";
 
 import { organizationSettingsItems } from "./settings-nav";
 import {
+  systemPluginExtensionAccountMenuBadgePresentation,
   systemPluginExtensionIcon,
   systemPluginExtensionTitle,
 } from "./web-extension-presentation";
@@ -53,5 +54,23 @@ describe("web extension presentation", () => {
 
     expect(systemPluginExtensionTitle(extensionWithoutPresentation, "zh-CN")).toBe("Example");
     expect(systemPluginExtensionIcon(extensionWithoutPresentation)).toBe(Puzzle);
+  });
+
+  test("[CONSOLE-EXT-PRESENTATION-002] reads neutral account menu badge metadata", () => {
+    expect(
+      systemPluginExtensionAccountMenuBadgePresentation({
+        ...billingExtension,
+        placement: "account-menu",
+        metadata: {
+          accountMenuBadge: {
+            endpoint: "/example/current-plan?organizationId={organizationId}",
+            valuePath: "currentPlan.name",
+          },
+        },
+      }),
+    ).toEqual({
+      endpoint: "/example/current-plan?organizationId={organizationId}",
+      valuePath: "currentPlan.name",
+    });
   });
 });
