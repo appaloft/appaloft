@@ -2031,6 +2031,10 @@ describe("console page structure", () => {
     expect(serversPageSource).toContain("function setServerCreateDialogOpen(open: boolean)");
     expect(serversPageSource).toContain("bind:open={serverCreateDialogOpen}");
     expect(serversPageSource).toContain("onOpenChange={setServerCreateDialogOpen}");
+    expect(serversPageSource).toContain("findConsoleOperationIntentModalExtension");
+    expect(serversPageSource).toContain("resolveConsoleOperationIntentModalEndpoint");
+    expect(serversPageSource).toContain("resolveConsolePageVisibilityEndpoint");
+    expect(serversPageSource).toContain("<ConsoleExtensionPage embedded");
     expect(serversPageSource).toContain("<ServerCreateForm");
     expect(serversPageSource).toContain("onCreated={openCreatedServer}");
     expect(serversPageSource).not.toContain('href="/servers/new"');
