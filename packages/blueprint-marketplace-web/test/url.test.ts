@@ -39,6 +39,10 @@ describe("Blueprint marketplace web URLs", () => {
 
     expect(pageSource).toContain("BlueprintMarketplaceCard");
     expect(pageSource).toContain("readonly surface?: BlueprintMarketplaceSurface");
+    expect(pageSource).toContain("readonly locale?: string");
+    expect(pageSource).toContain('locale = "en-US"');
+    expect(pageSource).toContain("marketplacePageCopy");
+    expect(pageSource).toContain('"x-appaloft-locale": locale');
     expect(pageSource).toContain("data-marketplace-surface={surface}");
     expect(pageSource).toContain('import { cn } from "@appaloft/ui/utils"');
     expect(pageSource).toContain("const controlsClass = $derived");
