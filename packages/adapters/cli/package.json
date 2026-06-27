@@ -14,9 +14,9 @@
     "@appaloft/deployment-config": "workspace:*",
     "@appaloft/docs-registry": "workspace:*",
     "@appaloft/sdk": "workspace:*",
-    "@effect/cli": "^0.75.1",
-    "@effect/platform-node": "^0.106.0",
-    "effect": "^3.21.2"
+    "@effect/cli": "^0.75.2",
+    "@effect/platform-node": "^0.107.0",
+    "effect": "^3.21.4"
   },
   "devDependencies": {
     "@appaloft/openapi": "workspace:*",
