@@ -26,7 +26,7 @@
   let {
     surface = "page",
     selectedSlug = "",
-    actionLabel = surface === "dialog" ? "选择" : "部署",
+    actionLabel,
     onselect,
     onview,
   }: {
@@ -90,7 +90,7 @@
         : "page",
   );
   const catalogTitle = $derived(
-    catalogExtension ? systemPluginExtensionTitle(catalogExtension, $locale) : "应用市场",
+    catalogExtension ? systemPluginExtensionTitle(catalogExtension, $locale) : undefined,
   );
 </script>
 
@@ -101,8 +101,7 @@
   <BlueprintMarketplacePage
     chrome="embedded"
     title={catalogTitle}
-    subtitle="选择官方 Blueprint，先看清应用组件、依赖资源和部署计划，再进入部署流程。"
-    badgeLabel="蓝图目录"
+    locale={$locale}
     loading={catalogMetadataLoading}
     surface={marketplaceSurface}
     listEndpoint={catalogMetadata?.listEndpoint ?? ""}

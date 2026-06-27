@@ -6893,9 +6893,9 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     class="grid h-[calc(100svh-0.75rem)] w-[calc(100%-0.75rem)] max-w-6xl grid-rows-[auto_minmax(0,1fr)] gap-3 overflow-hidden sm:h-auto sm:w-[calc(100%-2rem)] sm:max-h-[calc(100vh-2rem)] sm:gap-4"
   >
     <Dialog.Header>
-      <Dialog.Title>选择蓝图</Dialog.Title>
+      <Dialog.Title>{$t(i18nKeys.console.quickDeploy.sourceBlueprintOpenSelector)}</Dialog.Title>
       <Dialog.Description>
-        从蓝图市场选择应用，选择后会回到当前快速部署流程。
+        {$t(i18nKeys.console.quickDeploy.sourceBlueprintCatalogsHint)}
       </Dialog.Description>
     </Dialog.Header>
 
@@ -6903,7 +6903,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       <BlueprintCatalogSelector
         surface="dialog"
         selectedSlug={selectedBlueprintSlug}
-        actionLabel="选择蓝图"
+        actionLabel={$t(i18nKeys.console.quickDeploy.sourceBlueprintOpenSelector)}
         onselect={applyBlueprintListing}
         onview={openBlueprintListingDetail}
       />
