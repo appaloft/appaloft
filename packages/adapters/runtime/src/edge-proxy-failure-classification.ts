@@ -84,6 +84,18 @@ export function classifyEdgeProxyStartFailure(
   };
   const hostPortConflict = parseHostPortConflict(input.output);
 
+  if (/\b(timed out|timeout)\b/i.test(input.output)) {
+    return {
+      errorCode: input.defaultErrorCode,
+      message: `${input.defaultMessage}: command timed out`,
+      metadata: {
+        ...baseMetadata,
+        failureReason: "command-timeout",
+      },
+      retryable: true,
+    };
+  }
+
   if (hostPortConflict) {
     const portText = hostPortConflict.hostPort ? ` ${hostPortConflict.hostPort}` : "";
 
