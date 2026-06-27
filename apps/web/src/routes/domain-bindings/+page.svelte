@@ -10,6 +10,7 @@
   import DomainBindingVerifyDnsButton from "$lib/components/console/DomainBindingVerifyDnsButton.svelte";
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
   import { Badge } from "$lib/components/ui/badge";
+  import { Button } from "$lib/components/ui/button";
   import * as Select from "$lib/components/ui/select";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import { webDocsHrefs } from "$lib/console/docs-help";
@@ -19,6 +20,8 @@
     findProject,
     findResource,
     formatTime,
+    hrefWithSearchParams,
+    resourceDetailHref,
   } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
 
@@ -111,6 +114,30 @@
 
   function domainBindingDetailHref(binding: DomainBindingSummary): string {
     return `/domain-bindings/${encodeURIComponent(binding.id)}`;
+  }
+
+  function domainBindingConfigureDnsHref(
+    binding: DomainBindingSummary,
+    resource: ReturnType<typeof findResource>,
+  ): string {
+    const params = new URLSearchParams({
+      tab: "networking",
+      section: "domains",
+      dnsBindingId: binding.id,
+    });
+    const resourceHref = resource
+      ? resourceDetailHref(resource)
+      : `/resources/${encodeURIComponent(binding.resourceId)}`;
+    return hrefWithSearchParams(resourceHref, params);
+  }
+
+  function domainBindingNeedsDnsConfiguration(binding: DomainBindingSummary): boolean {
+    if (binding.status !== "pending_verification") {
+      return false;
+    }
+
+    const dnsStatus = binding.dnsObservation?.status;
+    return dnsStatus !== "matched" && dnsStatus !== "skipped";
   }
 </script>
 
@@ -279,7 +306,7 @@
                     <div
                       class={[
                         "flex min-w-0 flex-wrap items-center gap-2",
-                        binding.status === "pending_verification" ? "lg:pr-64" : "",
+                        binding.status === "pending_verification" ? "lg:pr-96" : "",
                       ]}
                     >
                       <Globe2 class="size-4 shrink-0 text-muted-foreground" />
@@ -333,7 +360,7 @@
                     {/if}
                   </a>
                   {#if binding.status === "pending_verification"}
-                    <div class="z-10 flex p-4 pt-0 lg:absolute lg:right-4 lg:top-4 lg:p-0">
+                    <div class="z-10 flex flex-wrap gap-2 p-4 pt-0 lg:absolute lg:right-4 lg:top-4 lg:max-w-80 lg:justify-end lg:p-0">
                       <DomainBindingVerifyDnsButton
                         {binding}
                         variant="default"
@@ -341,6 +368,16 @@
                           lifecycleFeedback = feedback;
                         }}
                       />
+                      {#if domainBindingNeedsDnsConfiguration(binding)}
+                        <Button
+                          href={domainBindingConfigureDnsHref(binding, resource)}
+                          size="sm"
+                          variant="outline"
+                        >
+                          <Globe2 class="size-4" />
+                          {$t(i18nKeys.console.domainBindings.dnsConnectorConfigure)}
+                        </Button>
+                      {/if}
                     </div>
                   {/if}
                 </article>
