@@ -7,6 +7,7 @@
     ChevronUp,
     Globe2,
     House,
+    Languages,
     LogOut,
     Moon,
     Rocket,
@@ -313,15 +314,22 @@
       </DropdownMenuSubContent>
     </DropdownMenuSub>
     <DropdownMenuSeparator />
-    <DropdownMenuLabel>{$t(i18nKeys.common.language.label)}</DropdownMenuLabel>
-    <DropdownMenuRadioGroup value={$locale}>
-      <DropdownMenuRadioItem value="zh-CN" onclick={() => setLocale("zh-CN")}>
-        {$t(i18nKeys.common.language.simplifiedChinese)}
-      </DropdownMenuRadioItem>
-      <DropdownMenuRadioItem value="en-US" onclick={() => setLocale("en-US")}>
-        {$t(i18nKeys.common.language.english)}
-      </DropdownMenuRadioItem>
-    </DropdownMenuRadioGroup>
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger>
+        <Languages class="size-4" />
+        {$t(i18nKeys.common.language.label)}
+      </DropdownMenuSubTrigger>
+      <DropdownMenuSubContent>
+        <DropdownMenuRadioGroup value={$locale}>
+          <DropdownMenuRadioItem value="zh-CN" onclick={() => setLocale("zh-CN")}>
+            {$t(i18nKeys.common.language.simplifiedChinese)}
+          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="en-US" onclick={() => setLocale("en-US")}>
+            {$t(i18nKeys.common.language.english)}
+          </DropdownMenuRadioItem>
+        </DropdownMenuRadioGroup>
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
     {#if authSession.session}
       <DropdownMenuSeparator />
       <DropdownMenuItem data-console-sign-out-action onclick={signOut}>
