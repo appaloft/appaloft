@@ -1658,13 +1658,27 @@
                 <button
                   type="button"
                   class={[
-                    "inline-flex h-9 items-center rounded-md px-3 text-sm font-medium transition-colors",
+                    "inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors",
                     activeTab?.id === tab.id
                       ? "bg-background text-foreground shadow-sm"
                       : "text-muted-foreground hover:bg-background/70 hover:text-foreground",
                   ]}
                   onclick={() => selectTab(section, sectionIndex, tab.id)}
                 >
+                  <span
+                    aria-hidden="true"
+                    class={[
+                      "grid size-3.5 place-items-center rounded-full border transition-colors",
+                      activeTab?.id === tab.id
+                        ? "border-primary"
+                        : "border-muted-foreground/40",
+                    ]}
+                    data-console-page-tab-radio
+                  >
+                    {#if activeTab?.id === tab.id}
+                      <span class="size-1.5 rounded-full bg-primary"></span>
+                    {/if}
+                  </span>
                   {tab.label}
                 </button>
               {/each}

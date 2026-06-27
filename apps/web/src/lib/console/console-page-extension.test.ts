@@ -328,6 +328,11 @@ describe("Console page extension surface", () => {
     expect(rendererSource).toContain('class={embedded ? "max-w-none p-0" : "max-w-7xl"}');
     expect(rendererSource).toContain('"space-y-4"');
     expect(rendererSource).toContain("{#if section.title || section.description}");
+    expect(rendererSource).toContain("data-console-page-tab-radio");
+    expect(rendererSource).toContain('"inline-flex h-9 items-center gap-2 rounded-md px-3');
+    expect(rendererSource).toContain('"border-primary"');
+    expect(rendererSource).toContain('"border-muted-foreground/40"');
+    expect(rendererSource).toContain('<span class="size-1.5 rounded-full bg-primary"></span>');
     expect(rendererSource).toContain('<div class="console-panel overflow-hidden">');
     expect(rendererSource).toContain('class="overflow-x-auto" data-console-page-table-body');
     expect(rendererSource).toContain('<div class="p-5 text-sm text-muted-foreground">');
