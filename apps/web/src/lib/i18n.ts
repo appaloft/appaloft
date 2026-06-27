@@ -23,11 +23,20 @@ function readInitialLocale(): AppaloftLocale {
   }
 
   return normalizeAppaloftLocale(
-    readDocumentLocale() || window.localStorage.getItem(appaloftLocaleStorageKey),
+    window.localStorage.getItem(appaloftLocaleStorageKey) || readDocumentLocale(),
   );
 }
 
-export const locale = writable<AppaloftLocale>(readInitialLocale());
+function syncDocumentLocale(nextLocale: AppaloftLocale): void {
+  if (typeof document !== "undefined") {
+    document.documentElement.lang = nextLocale;
+  }
+}
+
+const initialLocale = readInitialLocale();
+syncDocumentLocale(initialLocale);
+
+export const locale = writable<AppaloftLocale>(initialLocale);
 
 export const t = derived<typeof locale, AppaloftTranslate>(locale, ($locale) =>
   createAppaloftTranslator({ locale: $locale }),
@@ -60,7 +69,7 @@ export function setLocale(nextLocale: string): void {
     document.cookie = `${appaloftLocaleCookieName}=${encodeURIComponent(
       normalizedLocale,
     )}; Path=/; Max-Age=31536000; SameSite=Lax`;
-    document.documentElement.lang = normalizedLocale;
+    syncDocumentLocale(normalizedLocale);
   }
   window.dispatchEvent(new CustomEvent("appaloft:locale-change", { detail: normalizedLocale }));
 }

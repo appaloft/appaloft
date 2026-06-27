@@ -2779,6 +2779,7 @@ export const zhCN = {
       sourceBlueprintCatalogUnavailable: "当前没有为快速部署注册 Blueprint 目录来源。",
       sourceBlueprintHint: "从蓝图市场选择应用，不需要手动填写源码。",
       sourceBlueprintOpenSelector: "选择蓝图",
+      sourceBlueprintSelectAction: "选择蓝图",
       sourceBlueprintSelector: "已选蓝图",
       sourceCompose: "Compose",
       sourceComposeHint: "导入 compose 清单或仓库中的 compose 路径。",
