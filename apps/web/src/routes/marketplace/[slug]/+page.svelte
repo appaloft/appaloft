@@ -244,8 +244,257 @@
     "reviews-dependency-resource-bindings",
     "preserves-user-owned-configuration",
   ] as const;
+  const marketplaceDetailCopy = {
+    "en-US": {
+      catalogTitle: "Marketplace",
+      detailTitle: "Blueprint details",
+      detailDescription: "Review an official Blueprint's components, dependencies, environment variables, and deployment plan.",
+      catalogMissingTitle: "Blueprint catalog not registered",
+      catalogMissingDescription: "The current runtime did not provide renderable Blueprint catalog extension metadata.",
+      unavailableTitle: "Blueprint unavailable",
+      unavailableDescription: "This Blueprint could not be loaded.",
+      featured: "Featured",
+      planPrefix: "Plan:",
+      website: "Website",
+      docs: "Docs",
+      officialWebsite: "Official website",
+      deploymentDocs: "Deployment docs",
+      quickDeploy: "Quick deploy",
+      deploymentPlans: "Deployment plans",
+      currentPlan: "Current plan",
+      optionalTopology: "Optional topology for the same Blueprint.",
+      onlyDefaultPlan: "This Blueprint only has the default deployment plan.",
+      deploymentPlanHelp: "Plan selection, Profile, and parameters are completed in the deployment dialog; the source is fixed to the current Blueprint.",
+      upgradePolicy: "Upgrade policy",
+      upgradeRequiresMaintenance: "Upgrades require separate confirmation in the installed application's maintenance flow.",
+      components: "Components",
+      componentSummary: "App services, background workers, or static sites",
+      dependencies: "Dependencies",
+      publicEntry: "Public entry",
+      publicEntrySummary: "Access endpoints are generated after install",
+      overview: "Overview",
+      useCases: "Use cases",
+      appaloftCreates: "Appaloft will create",
+      deployAppUseCase: (title: string) => `Deploy a ${title} application`,
+      inspectTopologyUseCase: "Review topology and dependencies before deployment",
+      runtimeUnitsHighlight: (count: number) => `${count} runtime unit${count === 1 ? "" : "s"}`,
+      dependencyBindingsHighlight: (dependencies: string) => `${dependencies} dependency bindings`,
+      noManagedDependencies: "No managed dependencies",
+      projectEnvironmentPlanHighlight: "Project, environment, resources, networking, and deployment plan",
+      topology: "Application topology",
+      topologyDescription: "Runtime units that will be created after install.",
+      ports: "Ports",
+      routes: "Routes",
+      bindings: "Bindings",
+      dependencyResources: "Dependency resources",
+      noExternalDependencies: "This Blueprint does not declare external dependency resources.",
+      configurationAndSecrets: "Configuration and secrets",
+      parameters: "Parameters",
+      noParameters: "No parameters.",
+      secretPlaceholders: "Secret placeholders",
+      required: "Required",
+      optional: "Optional",
+      noSecretPlaceholders: "No secret placeholders.",
+      environmentVariables: "Environment variables",
+      noPlainVariables: "No plain environment variables are written by default; dependencies and secrets enter the plan through binding/ref.",
+      quickDeployDescription: "Open the dialog to deploy the current Blueprint.",
+      targetPlan: "Target plan",
+      defaultProfile: "Default Profile",
+      parametersAndSecrets: "Parameters / secrets",
+      componentsAndDependencies: "Components / dependencies",
+      currentStep: "Current step",
+      applicationStatus: "Application status",
+      applicationId: "Application ID",
+      createdResources: "Created resources",
+      openResource: "Open resource",
+      planned: "Planned",
+      createdResourcesEmpty: "Created resources have not been returned yet. Wait for install completion, or refresh install status.",
+      openGovernance: "Open governance",
+      dependencyGovernanceReady: "The dependency resource is recorded. Continue reviewing bindings, backups, and restore status from Dependency resources.",
+      installNoDependencies: "This install result has no dependency resources; it may not need dependencies, or the install is still running.",
+      publicUrl: "Public URL",
+      open: "Open",
+      publicUrlEmpty: "The current install result has no public access summary. Public URLs, domains, and certificates are still governed from resource networking or domain bindings.",
+      componentDeployments: "Component deployments",
+      viewDeployment: "View deployment",
+      componentDeploymentsEmpty: "The current install progress has no component deployments. Wait for install to continue, or refresh status.",
+      refreshInstallStatus: "Refresh install status",
+      openFirstResource: "Open first resource",
+      openPublicUrl: "Open public URL",
+      openLatestDeployment: "Open latest deployment",
+      viewInstalledApplication: "View installed application",
+      installedApplicationPending: "The install result page will appear after the application ID is returned. You can review resources or deployment records now.",
+      openProjects: "Open projects",
+      backToMarketplace: "Back to Marketplace",
+      close: "Close",
+      quickDeployDialogTitle: (title: string) => `Quick deploy ${title}`,
+      quickDeployDialogDescription: "The source is fixed to the current Blueprint. Confirm Profile, parameters, and secrets to deploy.",
+      variantDescriptionFallback: "Choose different dependency resources or runtime configuration for the same app.",
+      parameterHelp: "These values are only used for this deployment plan; they do not mean configuration already exists in the system.",
+      deploymentSecrets: "Deployment secrets",
+      deploymentSecretsHelp: "Submitted to the runtime only when deployment starts; install progress will never echo secret values.",
+      targetProject: "Target project",
+      targetEnvironment: "Target environment",
+      startDeployment: "Start deployment",
+      statusComplete: "Complete",
+      statusNeedsAttention: "Needs attention",
+      statusInProgress: "In progress",
+      installHandoffTitle: "Install handoff",
+      installHandoffNeedsAttentionTitle: "Install needs attention",
+      installHandoffInProgressTitle: "Install in progress",
+      installHandoffDone: "Review the confirmed results for this install; unavailable handoff information is explicitly marked.",
+      installHandoffFailed: "Review the failure reason and deployment work, then decide whether to retry, roll back, or open the related object page.",
+      installHandoffProgress: "Deployment work items keep updating; this area stays focused on status and next actions, not the install form.",
+      deploymentAttemptCreated: "Deployment started",
+      serviceKind: "App service",
+      workerKind: "Background worker",
+      staticKind: "Static site",
+      autoRuntime: "Auto-detect",
+      prebuiltImageRuntime: "Prebuilt image",
+      staticRuntime: "Static build",
+      workspaceCommandsRuntime: "Workspace commands",
+      runtimeConfig: "Runtime config",
+      none: "None",
+      bound: "Bound",
+      blocked: "Blocked",
+      realized: "Created",
+      pending: "Pending",
+      pendingResource: "Waiting to create",
+      pendingDependency: "Waiting for handling",
+      defaultPlan: "Default plan",
+      noUpgradePolicy: "No upgrade policy declared",
+      destructiveRisk: "Potentially destructive",
+      nonDestructiveRisk: "Non-destructive",
+      manualReviewRequired: "Manual review required",
+    },
+    "zh-CN": {
+      catalogTitle: "应用市场",
+      detailTitle: "蓝图详情",
+      detailDescription: "查看官方 Blueprint 的组件、依赖资源、环境变量与部署计划。",
+      catalogMissingTitle: "未注册蓝图目录",
+      catalogMissingDescription: "当前运行时没有提供可渲染的蓝图目录扩展元数据。",
+      unavailableTitle: "蓝图暂不可用",
+      unavailableDescription: "无法加载这个蓝图。",
+      featured: "精选",
+      planPrefix: "方案：",
+      website: "官网",
+      docs: "文档",
+      officialWebsite: "官方网站",
+      deploymentDocs: "部署文档",
+      quickDeploy: "快速部署",
+      deploymentPlans: "部署方案",
+      currentPlan: "当前方案",
+      optionalTopology: "同一 Blueprint 的可选拓扑。",
+      onlyDefaultPlan: "这个 Blueprint 只有默认部署方案。",
+      deploymentPlanHelp: "方案选择、Profile 和参数输入在部署弹窗内完成；来源固定为当前 Blueprint。",
+      upgradePolicy: "升级策略",
+      upgradeRequiresMaintenance: "升级需要在已安装应用的维护流程中单独确认。",
+      components: "组件",
+      componentSummary: "应用服务、后台任务或静态站点",
+      dependencies: "依赖资源",
+      publicEntry: "公开入口",
+      publicEntrySummary: "安装后生成访问入口",
+      overview: "介绍",
+      useCases: "适合场景",
+      appaloftCreates: "Appaloft 会创建",
+      deployAppUseCase: (title: string) => `部署 ${title} 应用`,
+      inspectTopologyUseCase: "先查看拓扑和依赖，再进入部署流程",
+      runtimeUnitsHighlight: (count: number) => `${count} 个应用运行单元`,
+      dependencyBindingsHighlight: (dependencies: string) => `${dependencies} 依赖绑定`,
+      noManagedDependencies: "无托管依赖资源",
+      projectEnvironmentPlanHighlight: "项目、环境、资源、网络和部署计划",
+      topology: "应用拓扑",
+      topologyDescription: "安装后会创建的应用运行单元。",
+      ports: "端口",
+      routes: "访问路径",
+      bindings: "依赖绑定",
+      dependencyResources: "依赖资源",
+      noExternalDependencies: "这个 Blueprint 不声明外部依赖资源。",
+      configurationAndSecrets: "配置与密钥",
+      parameters: "参数",
+      noParameters: "无参数。",
+      secretPlaceholders: "密钥占位",
+      required: "必填",
+      optional: "可选",
+      noSecretPlaceholders: "无密钥占位。",
+      environmentVariables: "环境变量",
+      noPlainVariables: "默认不写入普通环境变量；依赖和密钥通过 binding/ref 进入 plan。",
+      quickDeployDescription: "打开弹窗后直接部署当前 Blueprint。",
+      targetPlan: "目标方案",
+      defaultProfile: "默认 Profile",
+      parametersAndSecrets: "参数 / 密钥",
+      componentsAndDependencies: "组件 / 依赖",
+      currentStep: "当前步骤",
+      applicationStatus: "应用状态",
+      applicationId: "应用 ID",
+      createdResources: "创建的资源",
+      openResource: "打开资源",
+      planned: "计划中",
+      createdResourcesEmpty: "创建的资源还没有返回。等待安装完成，或刷新安装状态。",
+      openGovernance: "打开治理",
+      dependencyGovernanceReady: "依赖资源已记录，可以从依赖资源页面继续查看绑定、备份和恢复状态。",
+      installNoDependencies: "这个安装结果没有依赖资源；可能不需要依赖，或仍在安装中。",
+      publicUrl: "公开 URL",
+      open: "打开",
+      publicUrlEmpty: "当前安装结果没有公开访问摘要。公开 URL、域名和证书仍从资源网络页或域名绑定页治理。",
+      componentDeployments: "组件部署",
+      viewDeployment: "查看部署",
+      componentDeploymentsEmpty: "当前安装进度没有组件部署。等待安装继续，或刷新状态。",
+      refreshInstallStatus: "刷新安装状态",
+      openFirstResource: "打开首个资源",
+      openPublicUrl: "打开公开 URL",
+      openLatestDeployment: "打开最新部署",
+      viewInstalledApplication: "查看安装聚合",
+      installedApplicationPending: "安装结果页会在应用 ID 返回后出现。现在可以先查看资源或部署记录。",
+      openProjects: "打开项目列表",
+      backToMarketplace: "返回应用市场",
+      close: "关闭",
+      quickDeployDialogTitle: (title: string) => `快速部署 ${title}`,
+      quickDeployDialogDescription: "来源固定为当前 Blueprint。确认 Profile、参数和密钥后即可部署。",
+      variantDescriptionFallback: "选择同一应用的不同依赖资源或运行配置。",
+      parameterHelp: "这些值只用于本次部署计划，不代表系统中已经存在的配置。",
+      deploymentSecrets: "部署密钥",
+      deploymentSecretsHelp: "只在开始部署时提交给运行时；安装进度不会回显密钥值。",
+      targetProject: "目标项目",
+      targetEnvironment: "目标环境",
+      startDeployment: "开始部署",
+      statusComplete: "完成",
+      statusNeedsAttention: "需要处理",
+      statusInProgress: "进行中",
+      installHandoffTitle: "安装交接",
+      installHandoffNeedsAttentionTitle: "安装需要处理",
+      installHandoffInProgressTitle: "安装正在进行",
+      installHandoffDone: "查看这次安装已经能确认的结果；还未接入的交接信息会明确标出。",
+      installHandoffFailed: "先查看失败原因和部署尝试，再决定重试、回滚或打开对应对象页面。",
+      installHandoffProgress: "部署尝试和工作项会持续更新；这里保持为状态和下一步，不展示安装表单。",
+      deploymentAttemptCreated: "已开始部署",
+      serviceKind: "应用服务",
+      workerKind: "后台任务",
+      staticKind: "静态站点",
+      autoRuntime: "自动识别",
+      prebuiltImageRuntime: "预构建镜像",
+      staticRuntime: "静态构建",
+      workspaceCommandsRuntime: "工作区命令",
+      runtimeConfig: "运行配置",
+      none: "无",
+      bound: "已绑定",
+      blocked: "阻塞",
+      realized: "已创建",
+      pending: "等待中",
+      pendingResource: "等待创建",
+      pendingDependency: "等待处理",
+      defaultPlan: "默认方案",
+      noUpgradePolicy: "未声明升级策略",
+      destructiveRisk: "可能破坏性",
+      nonDestructiveRisk: "非破坏性",
+      manualReviewRequired: "需要人工确认",
+    },
+  } as const;
 
   const slug = $derived(page.params.slug ?? "");
+  const detailCopy = $derived(
+    $locale === "zh-CN" ? marketplaceDetailCopy["zh-CN"] : marketplaceDetailCopy["en-US"],
+  );
   const returnTo = $derived(browser ? page.url.searchParams.get("returnTo") : null);
   const installedApplicationIdFromUrl = $derived(
     browser
@@ -664,12 +913,12 @@
 
   function progressBadgeLabel(progress: InstalledApplicationProgress): string {
     if (progress.userStatus === "succeeded") {
-      return "完成";
+      return detailCopy.statusComplete;
     }
     if (progress.userStatus === "failed") {
-      return "需要处理";
+      return detailCopy.statusNeedsAttention;
     }
-    return "进行中";
+    return detailCopy.statusInProgress;
   }
 
   function progressDeploymentHref(deploymentId: string): string {
@@ -695,38 +944,38 @@
 
   function installHandoffTitle(progress: InstalledApplicationProgress): string {
     if (progress.userStatus === "succeeded") {
-      return "安装交接";
+      return detailCopy.installHandoffTitle;
     }
     if (progress.userStatus === "failed") {
-      return "安装需要处理";
+      return detailCopy.installHandoffNeedsAttentionTitle;
     }
-    return "安装正在进行";
+    return detailCopy.installHandoffInProgressTitle;
   }
 
   function installHandoffDescription(progress: InstalledApplicationProgress): string {
     if (progress.userStatus === "succeeded") {
-      return "查看这次安装已经能确认的结果；还未接入的交接信息会明确标出。";
+      return detailCopy.installHandoffDone;
     }
     if (progress.userStatus === "failed") {
-      return "先查看失败原因和部署尝试，再决定重试、回滚或打开对应对象页面。";
+      return detailCopy.installHandoffFailed;
     }
-    return "部署尝试和工作项会持续更新；这里保持为状态和下一步，不展示安装表单。";
+    return detailCopy.installHandoffProgress;
   }
 
   function componentDeploymentStatus(
     deployment: InstalledApplicationProgress["componentDeployments"][number]["deployment"],
   ): string {
-    return "deploymentId" in deployment ? "已创建部署尝试" : installPlanStatusLabel(deployment.status);
+    return "deploymentId" in deployment ? detailCopy.deploymentAttemptCreated : installPlanStatusLabel(deployment.status);
   }
 
   function blueprintComponentKindLabel(kind: string): string {
     switch (kind) {
       case "service":
-        return "应用服务";
+        return detailCopy.serviceKind;
       case "worker":
-        return "后台任务";
+        return detailCopy.workerKind;
       case "static":
-        return "静态站点";
+        return detailCopy.staticKind;
       default:
         return kind;
     }
@@ -735,58 +984,58 @@
   function blueprintRuntimeStrategyLabel(strategy: string): string {
     switch (strategy) {
       case "auto":
-        return "自动识别";
+        return detailCopy.autoRuntime;
       case "dockerfile":
         return "Dockerfile";
       case "docker-compose":
         return "Docker Compose";
       case "prebuilt-image":
-        return "预构建镜像";
+        return detailCopy.prebuiltImageRuntime;
       case "static":
-        return "静态构建";
+        return detailCopy.staticRuntime;
       case "workspace-commands":
-        return "工作区命令";
+        return detailCopy.workspaceCommandsRuntime;
       default:
         return strategy;
     }
   }
 
   function blueprintRuntimeSummary(component: BlueprintComponent): string {
-    return component.runtime.image ?? component.runtime.startCommand ?? component.runtime.outputDirectory ?? "运行配置";
+    return component.runtime.image ?? component.runtime.startCommand ?? component.runtime.outputDirectory ?? detailCopy.runtimeConfig;
   }
 
   function dependencyKindSummary(): string {
     const kinds = effectiveManifest?.resources.map((resource) => resource.kind) ?? [];
-    return kinds.length ? kinds.join(" / ") : "无";
+    return kinds.length ? kinds.join(" / ") : detailCopy.none;
   }
 
   function installPlanStatusLabel(status: string | undefined): string {
     switch (status) {
       case "planned":
-        return "计划中";
+        return detailCopy.planned;
       case "bound":
-        return "已绑定";
+        return detailCopy.bound;
       case "blocked":
-        return "阻塞";
+        return detailCopy.blocked;
       case "realized":
-        return "已创建";
+        return detailCopy.realized;
       case "pending":
-        return "等待中";
+        return detailCopy.pending;
       default:
-        return status ?? "等待中";
+        return status ?? detailCopy.pending;
     }
   }
 
   function countOrNoneLabel(count: number): string | number {
-    return count > 0 ? count : "无";
+    return count > 0 ? count : detailCopy.none;
   }
 
   function pendingResourceLabel(value: string | undefined): string {
-    return value ?? "等待创建";
+    return value ?? detailCopy.pendingResource;
   }
 
   function pendingDependencyLabel(value: string | undefined): string {
-    return value ? installPlanStatusLabel(value) : "等待处理";
+    return value ? installPlanStatusLabel(value) : detailCopy.pendingDependency;
   }
 
   function resolveEffectiveBlueprintManifest(
@@ -814,7 +1063,7 @@
 
   function selectedVariantLabel(): string {
     if (!selectedVariant) {
-      return "默认方案";
+      return detailCopy.defaultPlan;
     }
     return (
       variantOptions.find((variant) => variant.id === selectedVariant)?.label ??
@@ -825,14 +1074,14 @@
 
   function upgradeSummary(upgrade: BlueprintUpgradePolicy | undefined): string {
     if (!upgrade) {
-      return "未声明升级策略";
+      return detailCopy.noUpgradePolicy;
     }
     const firstRisk = upgrade.steps?.[0]?.classification ?? "non-breaking";
     return [
       upgrade.strategy,
       firstRisk,
-      upgrade.destructive ? "可能破坏性" : "非破坏性",
-      upgrade.steps?.some((step) => step.requiresManualReview) ? "需要人工确认" : "",
+      upgrade.destructive ? detailCopy.destructiveRisk : detailCopy.nonDestructiveRisk,
+      upgrade.steps?.some((step) => step.requiresManualReview) ? detailCopy.manualReviewRequired : "",
     ]
       .filter(Boolean)
       .join(" · ");
@@ -840,14 +1089,14 @@
 </script>
 
 <svelte:head>
-  <title>{listing?.title ?? "蓝图详情"} · 应用市场 · Appaloft</title>
+  <title>{listing?.title ?? detailCopy.detailTitle} · {detailCopy.catalogTitle} · Appaloft</title>
 </svelte:head>
 
 <ConsoleShell
-  title={listing?.title ?? "蓝图详情"}
-  description={listing?.subtitle ?? "查看官方 Blueprint 的组件、依赖资源、环境变量与部署计划。"}
+  title={listing?.title ?? detailCopy.detailTitle}
+  description={listing?.subtitle ?? detailCopy.detailDescription}
   breadcrumbs={[
-    { label: "应用市场", href: "/marketplace" },
+    { label: detailCopy.catalogTitle, href: "/marketplace" },
     { label: listing?.title ?? slug },
   ]}
 >
@@ -862,9 +1111,9 @@
       <div class="flex items-start gap-3">
         <Package class="mt-0.5 size-5 text-muted-foreground" />
         <div class="space-y-1">
-          <h1 class="text-lg font-semibold">未注册蓝图目录</h1>
+          <h1 class="text-lg font-semibold">{detailCopy.catalogMissingTitle}</h1>
           <p class="text-sm leading-6 text-muted-foreground">
-            当前运行时没有提供可渲染的蓝图目录扩展元数据。
+            {detailCopy.catalogMissingDescription}
           </p>
         </div>
       </div>
@@ -874,9 +1123,9 @@
       <div class="flex items-start gap-3">
         <Package class="mt-0.5 size-5 text-destructive" />
         <div class="space-y-1">
-          <h1 class="text-lg font-semibold">蓝图暂不可用</h1>
+          <h1 class="text-lg font-semibold">{detailCopy.unavailableTitle}</h1>
           <p class="text-sm leading-6 text-muted-foreground">
-            无法加载这个蓝图。
+            {detailCopy.unavailableDescription}
           </p>
         </div>
       </div>
@@ -901,13 +1150,13 @@
                   <div class="flex flex-wrap items-center gap-2">
                     <Badge variant="outline">{listing.category}</Badge>
                     {#if listing.featured}
-                      <Badge variant="outline">精选</Badge>
+                      <Badge variant="outline">{detailCopy.featured}</Badge>
                     {/if}
                     {#if listing.publisher}
                       <Badge variant="outline">{listing.publisher.name}</Badge>
                     {/if}
                     {#if variantOptions.length > 0}
-                      <Badge variant="outline">方案：{selectedVariantLabel()}</Badge>
+                      <Badge variant="outline">{detailCopy.planPrefix}{selectedVariantLabel()}</Badge>
                     {/if}
                     {#if selectedUpgrade}
                       <Badge variant="outline">{upgradeSummary(selectedUpgrade)}</Badge>
@@ -919,13 +1168,13 @@
                 <div class="flex flex-wrap gap-2">
                   {#if listing.websiteUrl}
                     <Button href={listing.websiteUrl} target="_blank" rel="noreferrer" variant="outline" size="sm">
-                      官网
+                      {detailCopy.website}
                       <ExternalLink class="size-4" />
                     </Button>
                   {/if}
                   {#if listing.documentationUrl}
                     <Button href={listing.documentationUrl} target="_blank" rel="noreferrer" variant="outline" size="sm">
-                      文档
+                      {detailCopy.docs}
                       <ExternalLink class="size-4" />
                     </Button>
                   {/if}
@@ -938,7 +1187,7 @@
               onclick={openInstallDialog}
               disabled={!installEndpoint}
             >
-              快速部署
+              {detailCopy.quickDeploy}
               <ArrowRight class="size-4" />
             </Button>
           </div>
@@ -948,7 +1197,7 @@
           <section class="console-panel p-5" data-blueprint-variant-display-surface>
             <div class="grid gap-4 lg:grid-cols-2">
               <div class="space-y-2">
-                <h2 class="text-lg font-semibold">部署方案</h2>
+                <h2 class="text-lg font-semibold">{detailCopy.deploymentPlans}</h2>
                 {#if variantOptions.length > 0}
                   <div class="grid gap-2">
                     {#each variantOptions as variant (variant.id)}
@@ -959,30 +1208,30 @@
                         <div class="flex items-start justify-between gap-3">
                           <span class="min-w-0 font-medium">{variant.label ?? variant.id}</span>
                           {#if selectedVariant === variant.id}
-                            <Badge variant="outline">当前方案</Badge>
+                            <Badge variant="outline">{detailCopy.currentPlan}</Badge>
                           {/if}
                         </div>
                         <span class="mt-1 block text-xs leading-5 text-muted-foreground">
-                          {variant.summary ?? "同一 Blueprint 的可选拓扑。"}
+                          {variant.summary ?? detailCopy.optionalTopology}
                         </span>
                       </article>
                     {/each}
                   </div>
                 {:else}
-                  <p class="text-sm leading-6 text-muted-foreground">这个 Blueprint 只有默认部署方案。</p>
+                  <p class="text-sm leading-6 text-muted-foreground">{detailCopy.onlyDefaultPlan}</p>
                 {/if}
                 <p class="text-xs leading-5 text-muted-foreground">
-                  方案选择、Profile 和参数输入在部署弹窗内完成；来源固定为当前 Blueprint。
+                  {detailCopy.deploymentPlanHelp}
                 </p>
               </div>
               <div class="space-y-2">
-                <h2 class="text-lg font-semibold">升级策略</h2>
+                <h2 class="text-lg font-semibold">{detailCopy.upgradePolicy}</h2>
                 <div class="console-subtle-panel px-3 py-2 text-sm">
                   <p class="font-medium">{upgradeSummary(selectedUpgrade)}</p>
                   <p class="mt-1 text-xs leading-5 text-muted-foreground">
                     {selectedUpgrade?.instructions ??
                       selectedUpgrade?.steps?.[0]?.changes?.[0] ??
-                      "升级需要在已安装应用的维护流程中单独确认。"}
+                      detailCopy.upgradeRequiresMaintenance}
                   </p>
                 </div>
               </div>
@@ -994,15 +1243,15 @@
           <article class="console-panel p-4">
             <div class="flex items-center gap-2 text-sm font-medium">
               <Server class="size-4 text-muted-foreground" />
-              组件
+              {detailCopy.components}
             </div>
             <p class="mt-3 text-2xl font-semibold">{effectiveManifest.components.length}</p>
-            <p class="mt-1 text-xs text-muted-foreground">应用服务、后台任务或静态站点</p>
+            <p class="mt-1 text-xs text-muted-foreground">{detailCopy.componentSummary}</p>
           </article>
           <article class="console-panel p-4">
             <div class="flex items-center gap-2 text-sm font-medium">
               <PlugZap class="size-4 text-muted-foreground" />
-              依赖资源
+              {detailCopy.dependencies}
             </div>
             <p class="mt-3 text-2xl font-semibold">{effectiveManifest.resources.length}</p>
             <p class="mt-1 truncate text-xs text-muted-foreground">
@@ -1012,19 +1261,19 @@
           <article class="console-panel p-4">
             <div class="flex items-center gap-2 text-sm font-medium">
               <Route class="size-4 text-muted-foreground" />
-              公开入口
+              {detailCopy.publicEntry}
             </div>
             <p class="mt-3 text-2xl font-semibold">
               {effectiveManifest.components.reduce((count, component) => count + component.routes.length, 0)}
             </p>
-            <p class="mt-1 text-xs text-muted-foreground">安装后生成访问入口</p>
+            <p class="mt-1 text-xs text-muted-foreground">{detailCopy.publicEntrySummary}</p>
           </article>
         </section>
 
         <section class="console-panel p-5">
           <div class="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div class="space-y-1">
-              <h2 class="text-lg font-semibold">介绍</h2>
+              <h2 class="text-lg font-semibold">{detailCopy.overview}</h2>
               <p class="max-w-3xl text-sm leading-6 text-muted-foreground">
                 {effectiveManifest.description ?? listing.blueprint.summary ?? listing.subtitle}
               </p>
@@ -1032,13 +1281,13 @@
             <div class="flex shrink-0 flex-wrap gap-2">
               {#if listing.websiteUrl}
                 <Button href={listing.websiteUrl} target="_blank" rel="noreferrer" variant="outline" size="sm">
-                  官方网站
+                  {detailCopy.officialWebsite}
                   <ExternalLink class="size-4" />
                 </Button>
               {/if}
               {#if listing.documentationUrl}
                 <Button href={listing.documentationUrl} target="_blank" rel="noreferrer" variant="outline" size="sm">
-                  部署文档
+                  {detailCopy.deploymentDocs}
                   <ExternalLink class="size-4" />
                 </Button>
               {/if}
@@ -1047,9 +1296,9 @@
 
           <div class="grid gap-5 md:grid-cols-2">
             <div class="space-y-2">
-              <h3 class="text-sm font-semibold">适合场景</h3>
+              <h3 class="text-sm font-semibold">{detailCopy.useCases}</h3>
               <ul class="space-y-2 text-sm leading-6 text-muted-foreground">
-                {#each listing.overview?.useCases ?? [`部署 ${listing.title} 应用`, "先查看拓扑和依赖，再进入部署流程"] as useCase (useCase)}
+                {#each listing.overview?.useCases ?? [detailCopy.deployAppUseCase(listing.title), detailCopy.inspectTopologyUseCase] as useCase (useCase)}
                   <li class="flex gap-2">
                     <span class="mt-2 size-1.5 shrink-0 rounded-full bg-foreground/55"></span>
                     <span>{useCase}</span>
@@ -1058,14 +1307,14 @@
               </ul>
             </div>
             <div class="space-y-2">
-              <h3 class="text-sm font-semibold">Appaloft 会创建</h3>
+              <h3 class="text-sm font-semibold">{detailCopy.appaloftCreates}</h3>
               <ul class="space-y-2 text-sm leading-6 text-muted-foreground">
                 {#each listing.overview?.highlights ?? [
-                  `${effectiveManifest.components.length} 个应用运行单元`,
+                  detailCopy.runtimeUnitsHighlight(effectiveManifest.components.length),
                   effectiveManifest.resources.length > 0
-                    ? `${effectiveManifest.resources.map((resource) => resource.kind).join(" / ")} 依赖绑定`
-                    : "无托管依赖资源",
-                  "项目、环境、资源、网络和部署计划",
+                    ? detailCopy.dependencyBindingsHighlight(effectiveManifest.resources.map((resource) => resource.kind).join(" / "))
+                    : detailCopy.noManagedDependencies,
+                  detailCopy.projectEnvironmentPlanHighlight,
                 ] as highlight (highlight)}
                   <li class="flex gap-2">
                     <span class="mt-2 size-1.5 shrink-0 rounded-full bg-foreground/55"></span>
@@ -1080,8 +1329,8 @@
         <section class="console-panel p-5">
           <div class="mb-4 flex items-center justify-between gap-3">
             <div>
-              <h2 class="text-lg font-semibold">应用拓扑</h2>
-              <p class="text-sm text-muted-foreground">安装后会创建的应用运行单元。</p>
+              <h2 class="text-lg font-semibold">{detailCopy.topology}</h2>
+              <p class="text-sm text-muted-foreground">{detailCopy.topologyDescription}</p>
             </div>
             <Badge variant="outline">{listing.blueprint.version}</Badge>
           </div>
@@ -1101,21 +1350,21 @@
                 </div>
                 <div class="mt-3 grid gap-2 text-xs md:grid-cols-3">
                   <div>
-                    <p class="text-muted-foreground">端口</p>
+                    <p class="text-muted-foreground">{detailCopy.ports}</p>
                     <p class="font-medium">
-                      {component.ports.map((port) => `${port.name}:${port.containerPort}/${port.protocol}`).join(", ") || "无"}
+                      {component.ports.map((port) => `${port.name}:${port.containerPort}/${port.protocol}`).join(", ") || detailCopy.none}
                     </p>
                   </div>
                   <div>
-                    <p class="text-muted-foreground">访问路径</p>
+                    <p class="text-muted-foreground">{detailCopy.routes}</p>
                     <p class="font-medium">
-                      {component.routes.map((route) => `${route.port}${route.pathPrefix}`).join(", ") || "无"}
+                      {component.routes.map((route) => `${route.port}${route.pathPrefix}`).join(", ") || detailCopy.none}
                     </p>
                   </div>
                   <div>
-                    <p class="text-muted-foreground">依赖绑定</p>
+                    <p class="text-muted-foreground">{detailCopy.bindings}</p>
                     <p class="font-medium">
-                      {[...component.usesResources, ...component.usesSecrets].join(", ") || "无"}
+                      {[...component.usesResources, ...component.usesSecrets].join(", ") || detailCopy.none}
                     </p>
                   </div>
                 </div>
@@ -1128,7 +1377,7 @@
           <article class="console-panel p-5">
             <div class="mb-4 flex items-center gap-2">
               <PlugZap class="size-4 text-muted-foreground" />
-              <h2 class="text-lg font-semibold">依赖资源</h2>
+              <h2 class="text-lg font-semibold">{detailCopy.dependencyResources}</h2>
             </div>
             <div class="space-y-2">
               {#each effectiveManifest.resources as resource (resource.id)}
@@ -1140,7 +1389,7 @@
                   <p class="mt-1 text-xs text-muted-foreground">{resource.id}</p>
                 </div>
               {:else}
-                <p class="text-sm text-muted-foreground">这个 Blueprint 不声明外部依赖资源。</p>
+                <p class="text-sm text-muted-foreground">{detailCopy.noExternalDependencies}</p>
               {/each}
             </div>
           </article>
@@ -1148,11 +1397,11 @@
           <article class="console-panel p-5">
             <div class="mb-4 flex items-center gap-2">
               <KeyRound class="size-4 text-muted-foreground" />
-              <h2 class="text-lg font-semibold">配置与密钥</h2>
+              <h2 class="text-lg font-semibold">{detailCopy.configurationAndSecrets}</h2>
             </div>
             <div class="space-y-3">
               <div>
-                <p class="mb-2 text-xs font-medium text-muted-foreground">参数</p>
+                <p class="mb-2 text-xs font-medium text-muted-foreground">{detailCopy.parameters}</p>
                 <div class="space-y-2">
                   {#each effectiveManifest.parameters as parameter (parameter.key)}
                     <div class="console-subtle-panel px-3 py-2 text-sm">
@@ -1163,23 +1412,23 @@
                       <p class="mt-1 font-mono text-xs text-muted-foreground">{parameter.key}</p>
                     </div>
                   {:else}
-                    <p class="text-sm text-muted-foreground">无参数。</p>
+                    <p class="text-sm text-muted-foreground">{detailCopy.noParameters}</p>
                   {/each}
                 </div>
               </div>
               <div>
-                <p class="mb-2 text-xs font-medium text-muted-foreground">密钥占位</p>
+                <p class="mb-2 text-xs font-medium text-muted-foreground">{detailCopy.secretPlaceholders}</p>
                 <div class="space-y-2">
                   {#each effectiveManifest.secrets as secret (secret.key)}
                     <div class="console-subtle-panel px-3 py-2 text-sm">
                       <div class="flex items-center justify-between gap-3">
                         <span class="font-medium">{secret.label}</span>
-                        <Badge variant="outline">{secret.required ? "必填" : "可选"}</Badge>
+                        <Badge variant="outline">{secret.required ? detailCopy.required : detailCopy.optional}</Badge>
                       </div>
                       <p class="mt-1 font-mono text-xs text-muted-foreground">{secret.key}</p>
                     </div>
                   {:else}
-                    <p class="text-sm text-muted-foreground">无密钥占位。</p>
+                    <p class="text-sm text-muted-foreground">{detailCopy.noSecretPlaceholders}</p>
                   {/each}
                 </div>
               </div>
@@ -1190,7 +1439,7 @@
         <section class="console-panel p-5">
           <div class="mb-4 flex items-center gap-2">
             <SlidersHorizontal class="size-4 text-muted-foreground" />
-            <h2 class="text-lg font-semibold">环境变量</h2>
+            <h2 class="text-lg font-semibold">{detailCopy.environmentVariables}</h2>
           </div>
           <div class="grid gap-2 md:grid-cols-2">
             {#each allVariables as variable (`${variable.key}-${variable.value}`)}
@@ -1199,7 +1448,7 @@
                 <p class="mt-1 truncate text-xs text-muted-foreground">{variable.value}</p>
               </div>
             {:else}
-              <p class="text-sm text-muted-foreground">默认不写入普通环境变量；依赖和密钥通过 binding/ref 进入 plan。</p>
+              <p class="text-sm text-muted-foreground">{detailCopy.noPlainVariables}</p>
             {/each}
           </div>
         </section>
@@ -1209,27 +1458,27 @@
         <section class="console-side-panel space-y-4" data-blueprint-install-summary>
           <div class="flex items-center justify-between gap-3">
             <div>
-              <h2 class="text-lg font-semibold">快速部署</h2>
-              <p class="text-sm text-muted-foreground">打开弹窗后直接部署当前 Blueprint。</p>
+              <h2 class="text-lg font-semibold">{detailCopy.quickDeploy}</h2>
+              <p class="text-sm text-muted-foreground">{detailCopy.quickDeployDescription}</p>
             </div>
             <Boxes class="size-5 text-muted-foreground" />
           </div>
 
           <div class="grid gap-2 rounded-md border border-border bg-muted/30 p-3 text-xs">
             <div class="flex items-center justify-between gap-3">
-              <span class="text-muted-foreground">目标方案</span>
+              <span class="text-muted-foreground">{detailCopy.targetPlan}</span>
               <span class="min-w-0 truncate font-medium">{selectedVariantLabel()}</span>
             </div>
             <div class="flex items-center justify-between gap-3">
-              <span class="text-muted-foreground">默认 Profile</span>
+              <span class="text-muted-foreground">{detailCopy.defaultProfile}</span>
               <span class="font-mono">{profile}</span>
             </div>
             <div class="flex items-center justify-between gap-3">
-              <span class="text-muted-foreground">参数 / 密钥</span>
+              <span class="text-muted-foreground">{detailCopy.parametersAndSecrets}</span>
               <span class="font-mono">{effectiveManifest.parameters.length} / {effectiveManifest.secrets.length}</span>
             </div>
             <div class="flex items-center justify-between gap-3">
-              <span class="text-muted-foreground">组件 / 依赖</span>
+              <span class="text-muted-foreground">{detailCopy.componentsAndDependencies}</span>
               <span class="font-mono">{effectiveManifest.components.length} / {effectiveManifest.resources.length}</span>
             </div>
           </div>
@@ -1244,7 +1493,7 @@
               {#if installPending}
                 <LoaderCircle class="size-4 animate-spin" />
               {/if}
-              快速部署
+              {detailCopy.quickDeploy}
               <ArrowRight class="size-4" />
             </Button>
           </div>
@@ -1275,15 +1524,15 @@
 
               <div class="grid gap-2 rounded-md border bg-background p-3 text-xs">
                 <div class="flex items-center justify-between gap-3">
-                  <span class="text-muted-foreground">当前步骤</span>
+                  <span class="text-muted-foreground">{detailCopy.currentStep}</span>
                   <span class="font-mono">{installResult.progress.currentStep}</span>
                 </div>
                 <div class="flex items-center justify-between gap-3">
-                  <span class="text-muted-foreground">应用状态</span>
+                  <span class="text-muted-foreground">{detailCopy.applicationStatus}</span>
                   <span class="font-mono">{installResult.progress.status}</span>
                 </div>
                 <div class="flex items-center justify-between gap-3">
-                  <span class="text-muted-foreground">应用 ID</span>
+                  <span class="text-muted-foreground">{detailCopy.applicationId}</span>
                   <span class="break-all font-mono">{installResult.progress.applicationId}</span>
                 </div>
                 <p class="border-t pt-2 leading-5 text-muted-foreground">
@@ -1293,7 +1542,7 @@
 
               <section class="space-y-2" data-blueprint-install-created-resources>
                 <div class="flex items-center justify-between gap-3">
-                  <p class="text-xs font-medium text-muted-foreground">创建的资源</p>
+                  <p class="text-xs font-medium text-muted-foreground">{detailCopy.createdResources}</p>
                   <Badge variant="outline">{countOrNoneLabel(installedApplicationComponents.length)}</Badge>
                 </div>
                 {#each installedApplicationComponents as component (component.componentId)}
@@ -1311,24 +1560,24 @@
                           variant="outline"
                           size="sm"
                         >
-                          打开资源
+                          {detailCopy.openResource}
                           <ArrowRight class="size-3.5" />
                         </Button>
                       {:else}
-                        <Badge variant="outline">计划中</Badge>
+                        <Badge variant="outline">{detailCopy.planned}</Badge>
                       {/if}
                     </div>
                   </div>
                 {:else}
                   <div class="rounded-md border border-dashed bg-background px-3 py-2 text-xs leading-5 text-muted-foreground">
-                    创建的资源还没有返回。等待安装完成，或刷新安装状态。
+                    {detailCopy.createdResourcesEmpty}
                   </div>
                 {/each}
               </section>
 
               <section class="space-y-2" data-blueprint-install-dependencies>
                 <div class="flex items-center justify-between gap-3">
-                  <p class="text-xs font-medium text-muted-foreground">依赖资源</p>
+                  <p class="text-xs font-medium text-muted-foreground">{detailCopy.dependencyResources}</p>
                   <Badge variant="outline">{countOrNoneLabel(installedApplicationDependencies.length)}</Badge>
                 </div>
                 {#each installedApplicationDependencies as dependency (dependency.requirementId)}
@@ -1346,7 +1595,7 @@
                           variant="outline"
                           size="sm"
                         >
-                          打开治理
+                          {detailCopy.openGovernance}
                           <ArrowRight class="size-3.5" />
                         </Button>
                       {:else}
@@ -1357,20 +1606,20 @@
                     </div>
                     {#if dependency.dependencyResourceId}
                       <p class="mt-2 border-t pt-2 leading-5 text-muted-foreground">
-                        依赖资源已记录，可以从依赖资源页面继续查看绑定、备份和恢复状态。
+                        {detailCopy.dependencyGovernanceReady}
                       </p>
                     {/if}
                   </div>
                 {:else}
                   <div class="rounded-md border border-dashed bg-background px-3 py-2 text-xs leading-5 text-muted-foreground">
-                    这个安装结果没有依赖资源；可能不需要依赖，或仍在安装中。
+                    {detailCopy.installNoDependencies}
                   </div>
                 {/each}
               </section>
 
               <section class="space-y-2" data-blueprint-install-public-urls>
                 <div class="flex items-center justify-between gap-3">
-                  <p class="text-xs font-medium text-muted-foreground">公开 URL</p>
+                  <p class="text-xs font-medium text-muted-foreground">{detailCopy.publicUrl}</p>
                   <Badge variant="outline">{countOrNoneLabel(installedApplicationPublicEndpoints.length)}</Badge>
                 </div>
                 {#each installedApplicationPublicEndpoints as endpoint (`${endpoint.componentId}-${endpoint.url}`)}
@@ -1381,20 +1630,20 @@
                         <p class="mt-1 truncate font-mono text-muted-foreground">{endpoint.url}</p>
                       </div>
                       <Button href={endpoint.url} target="_blank" rel="noreferrer" variant="outline" size="sm">
-                        打开
+                        {detailCopy.open}
                         <ExternalLink class="size-3.5" />
                       </Button>
                     </div>
                   </div>
                 {:else}
                   <div class="rounded-md border border-dashed bg-background px-3 py-2 text-xs leading-5 text-muted-foreground">
-                    当前安装结果没有公开访问摘要。公开 URL、域名和证书仍从资源网络页或域名绑定页治理。
+                    {detailCopy.publicUrlEmpty}
                   </div>
                 {/each}
               </section>
 
               <section class="space-y-2" data-blueprint-install-component-deployments>
-                <p class="text-xs font-medium text-muted-foreground">组件部署</p>
+                <p class="text-xs font-medium text-muted-foreground">{detailCopy.componentDeployments}</p>
                 {#each installResult.progress.componentDeployments as component (component.componentId)}
                   <div class="rounded-md border bg-background px-3 py-2 text-xs">
                     <div class="flex flex-wrap items-center justify-between gap-2">
@@ -1410,17 +1659,17 @@
                           variant="outline"
                           size="sm"
                         >
-                          查看部署
+                          {detailCopy.viewDeployment}
                           <ArrowRight class="size-3.5" />
                         </Button>
                       {:else}
-                        <Badge variant="outline">计划中</Badge>
+                        <Badge variant="outline">{detailCopy.planned}</Badge>
                       {/if}
                     </div>
                   </div>
                 {:else}
                   <div class="rounded-md border border-dashed bg-background px-3 py-2 text-xs leading-5 text-muted-foreground">
-                    当前安装进度没有组件部署。等待安装继续，或刷新状态。
+                    {detailCopy.componentDeploymentsEmpty}
                   </div>
                 {/each}
               </section>
@@ -1443,7 +1692,7 @@
                     {#if installRefreshPending}
                       <LoaderCircle class="size-4 animate-spin" />
                     {/if}
-                    刷新安装状态
+                    {detailCopy.refreshInstallStatus}
                   </Button>
                 {/if}
                 {#if installedApplicationComponents.find((component) => component.resource?.resourceId)?.resource?.resourceId}
@@ -1454,7 +1703,7 @@
                       variant="outline"
                       class="w-full"
                     >
-                      打开首个资源
+                      {detailCopy.openFirstResource}
                       <ArrowRight class="size-4" />
                     </Button>
                   {/if}
@@ -1467,7 +1716,7 @@
                     variant="outline"
                     class="w-full"
                   >
-                    打开公开 URL
+                    {detailCopy.openPublicUrl}
                     <ExternalLink class="size-4" />
                   </Button>
                 {/if}
@@ -1477,7 +1726,7 @@
                     variant="outline"
                     class="w-full"
                   >
-                    打开最新部署
+                    {detailCopy.openLatestDeployment}
                     <ArrowRight class="size-4" />
                   </Button>
                 {/if}
@@ -1487,16 +1736,16 @@
                     variant="outline"
                     class="w-full"
                   >
-                    查看安装聚合
+                    {detailCopy.viewInstalledApplication}
                     <ArrowRight class="size-4" />
                   </Button>
                 {:else}
                   <div class="rounded-md border border-dashed bg-background px-3 py-2 text-xs leading-5 text-muted-foreground">
-                    安装结果页会在应用 ID 返回后出现。现在可以先查看资源或部署记录。
+                    {detailCopy.installedApplicationPending}
                   </div>
                 {/if}
                 <Button href="/projects" variant="outline" class="w-full">
-                  打开项目列表
+                  {detailCopy.openProjects}
                   <ArrowRight class="size-4" />
                 </Button>
               </div>
@@ -1506,16 +1755,16 @@
 
         <Button href="/marketplace" variant="outline" class="w-full">
           <ArrowLeft class="size-4" />
-          返回应用市场
+          {detailCopy.backToMarketplace}
         </Button>
       </aside>
 
       <Dialog.Root bind:open={installDialogOpen} onOpenChange={setInstallDialogOpen}>
-        <Dialog.Content closeLabel="关闭" class="max-w-3xl">
+        <Dialog.Content closeLabel={detailCopy.close} class="max-w-3xl">
           <Dialog.Header>
-            <Dialog.Title>快速部署 {listing.title}</Dialog.Title>
+            <Dialog.Title>{detailCopy.quickDeployDialogTitle(listing.title)}</Dialog.Title>
             <Dialog.Description>
-              来源固定为当前 Blueprint。确认 Profile、参数和密钥后即可部署。
+              {detailCopy.quickDeployDialogDescription}
             </Dialog.Description>
           </Dialog.Header>
 
@@ -1537,7 +1786,7 @@
 
               {#if variantOptions.length > 0}
                 <label class="space-y-1.5 text-sm">
-                  <span class="font-medium">部署方案</span>
+                  <span class="font-medium">{detailCopy.deploymentPlans}</span>
                   <Select.Root bind:value={selectedVariant} type="single">
                     <Select.Trigger class="w-full">
                       {selectedVariantLabel()}
@@ -1549,7 +1798,7 @@
                     </Select.Content>
                   </Select.Root>
                   <span class="block text-xs leading-5 text-muted-foreground">
-                    {selectedVariantDefinition?.summary ?? "选择同一应用的不同依赖资源或运行配置。"}
+                    {selectedVariantDefinition?.summary ?? detailCopy.variantDescriptionFallback}
                   </span>
                 </label>
               {/if}
@@ -1558,9 +1807,9 @@
             {#if effectiveManifest.parameters.length > 0}
               <section class="space-y-3">
                 <div>
-                  <h3 class="text-sm font-semibold">参数</h3>
+                  <h3 class="text-sm font-semibold">{detailCopy.parameters}</h3>
                   <p class="mt-1 text-xs leading-5 text-muted-foreground">
-                    这些值只用于本次部署计划，不代表系统中已经存在的配置。
+                    {detailCopy.parameterHelp}
                   </p>
                 </div>
                 <div class="grid gap-3 sm:grid-cols-2">
@@ -1584,9 +1833,9 @@
             {#if effectiveManifest.secrets.length > 0}
               <section class="space-y-3" data-blueprint-install-secret-inputs>
                 <div>
-                  <h3 class="text-sm font-semibold">部署密钥</h3>
+                  <h3 class="text-sm font-semibold">{detailCopy.deploymentSecrets}</h3>
                   <p class="mt-1 text-xs leading-5 text-muted-foreground">
-                    只在开始部署时提交给运行时；安装进度不会回显密钥值。
+                    {detailCopy.deploymentSecretsHelp}
                   </p>
                 </div>
                 <div class="grid gap-3 sm:grid-cols-2">
@@ -1617,11 +1866,11 @@
             <div class="rounded-md border bg-muted/30 p-3 text-xs">
               <div class="grid gap-2 sm:grid-cols-2">
                 <div>
-                  <span class="text-muted-foreground">目标项目</span>
+                  <span class="text-muted-foreground">{detailCopy.targetProject}</span>
                   <p class="mt-1 font-medium">{listing.title}</p>
                 </div>
                 <div>
-                  <span class="text-muted-foreground">目标环境</span>
+                  <span class="text-muted-foreground">{detailCopy.targetEnvironment}</span>
                   <p class="mt-1 font-mono">{profile || "production"}</p>
                 </div>
               </div>
@@ -1638,7 +1887,7 @@
                   {#if installPending}
                     <LoaderCircle class="size-4 animate-spin" />
                   {/if}
-                  开始部署
+                  {detailCopy.startDeployment}
                 </Button>
               {/if}
             </Dialog.Footer>
