@@ -13,7 +13,7 @@
   import {
     createBlueprintDeployHandoffUrl,
     createBlueprintDetailHref,
-    createBlueprintMarketplaceEndpoint,
+    createBlueprintMarketplaceLocalizedEndpoint,
     defaultBlueprintMarketplaceListEndpoint,
   } from "./url";
   import { Skeleton } from "@appaloft/ui/skeleton";
@@ -343,12 +343,15 @@
     errorMessage = "";
 
     try {
-      const response = await fetch(createBlueprintMarketplaceEndpoint(baseUrl, endpoint), {
-        headers: {
-          accept: "application/json",
-          ...(locale ? { "x-appaloft-locale": locale } : {}),
+      const response = await fetch(
+        createBlueprintMarketplaceLocalizedEndpoint(baseUrl, endpoint, locale ?? ""),
+        {
+          headers: {
+            accept: "application/json",
+            ...(locale ? { "x-appaloft-locale": locale } : {}),
+          },
         },
-      });
+      );
 
       if (!response.ok) {
         throw new Error(copy.errorPrefix(response.status));
