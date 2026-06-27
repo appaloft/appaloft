@@ -422,4 +422,17 @@ describe("Console page extension surface", () => {
       "<ConsoleExtensionPage {projectId} {environmentId} {resourceId} />",
     );
   });
+
+  test("[CONSOLE-EXT-PAGE-006] endpoint overrides render without route extension metadata", () => {
+    const rendererSource = readFileSync(
+      new URL("../components/console/ConsoleExtensionPage.svelte", import.meta.url),
+      "utf8",
+    );
+
+    expect(rendererSource).toContain("enabled: browser && !pageEndpointOverride");
+    expect(rendererSource).toContain("pageEndpointOverride ??");
+    expect(rendererSource).toContain(
+      "!pageEndpointOverride && (!extension || !metadata || !pageEndpoint)",
+    );
+  });
 });
