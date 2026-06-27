@@ -90,7 +90,18 @@ describe("organization auth management console surface", () => {
     expect(userMenuSource).toContain('navigateTo("/")');
     expect(userMenuSource).toContain('"https://appaloft.com"');
     expect(userMenuSource).toContain("i18nKeys.common.actions.openWebsite");
-    expect(userMenuSource).not.toContain("DropdownMenuSubTrigger");
+    expect(shellSource).toContain("{colorMode}");
+    expect(shellSource).toContain("onColorModeChange={setColorMode}");
+    expect(shellSource).not.toContain("toggleColorMode");
+    expect(shellSource).not.toContain("i18nKeys.common.actions.switchToDarkMode");
+    expect(shellSource).not.toContain("i18nKeys.common.actions.switchToLightMode");
+    expect(userMenuSource).toContain("DropdownMenuSubTrigger");
+    expect(userMenuSource).toContain("DropdownMenuSubContent");
+    expect(userMenuSource).toContain("i18nKeys.common.theme.label");
+    expect(userMenuSource).toContain("i18nKeys.common.theme.light");
+    expect(userMenuSource).toContain("i18nKeys.common.theme.dark");
+    expect(userMenuSource).toContain('onColorModeChange?.("light")');
+    expect(userMenuSource).toContain('onColorModeChange?.("dark")');
     expect(userMenuSource).not.toContain("/api/auth/link-social");
     expect(userMenuSource).not.toContain("i18nKeys.console.shell.linkGitHubAccount");
     expect(userMenuSource).not.toContain("i18nKeys.console.shell.githubConnectedAs");
@@ -102,7 +113,13 @@ describe("organization auth management console surface", () => {
     expect(userMenuSource).not.toContain("$t(i18nKeys.common.actions.connectGitHub)");
     expect(userMenuSource).toContain("i18nKeys.common.actions.signOut");
     expect(enUSSource).toContain('openWebsite: "Website"');
+    expect(enUSSource).toContain('label: "Appearance"');
+    expect(enUSSource).toContain('light: "Light mode"');
+    expect(enUSSource).toContain('dark: "Dark mode"');
     expect(zhCNSource).toContain('openWebsite: "官网"');
+    expect(zhCNSource).toContain('label: "外观"');
+    expect(zhCNSource).toContain('light: "浅色模式"');
+    expect(zhCNSource).toContain('dark: "深色模式"');
     expect(userMenuSource).toContain("data-console-sign-out-action");
     expect(userMenuSource).toContain("DropdownMenuSeparator");
     expect(userMenuSource.indexOf("i18nKeys.common.language.label")).toBeLessThan(
