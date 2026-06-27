@@ -42,6 +42,7 @@
   import { Skeleton } from "$lib/components/ui/skeleton";
   import ConsoleTableFilterSelect from "$lib/components/console/ConsoleTableFilterSelect.svelte";
   import {
+    createLocalizedConsolePageEndpoint,
     findConsolePageExtensionByPath,
     readConsolePageExtensionMetadata,
     resolveConsolePageEndpoint,
@@ -470,16 +471,19 @@
         previewEnvironmentId,
       }),
   );
+  const localizedPageEndpoint = $derived(
+    createLocalizedConsolePageEndpoint(pageEndpoint, $locale),
+  );
   const pageDocumentQuery = createQuery(() =>
     queryOptions({
-      queryKey: ["console-extension-page", pageEndpoint, $locale],
+      queryKey: ["console-extension-page", localizedPageEndpoint],
       queryFn: async () =>
         (
-          await requestWithMetadata<ConsolePageDocument>(pageEndpoint ?? "/", undefined, {
+          await requestWithMetadata<ConsolePageDocument>(localizedPageEndpoint ?? "/", undefined, {
             suppressDomainErrorEvent: Boolean(pageEndpointOverride),
           })
         ).data,
-      enabled: browser && Boolean(pageEndpoint),
+      enabled: browser && Boolean(localizedPageEndpoint),
       placeholderData: (previousData) => previousData,
       staleTime: 15_000,
     }),

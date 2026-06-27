@@ -216,6 +216,37 @@ export function resolveConsolePageEndpoint(
   );
 }
 
+export function createLocalizedConsolePageEndpoint(
+  endpoint: string | null | undefined,
+  locale: string | null | undefined,
+): string | null {
+  if (!endpoint) {
+    return null;
+  }
+
+  const normalizedLocale = locale?.trim();
+  if (!normalizedLocale) {
+    return endpoint;
+  }
+
+  try {
+    const baseUrl = "https://appaloft.local";
+    const parsed = new URL(endpoint, baseUrl);
+    parsed.searchParams.set("locale", normalizedLocale);
+
+    if (/^[a-z][a-z\d+\-.]*:/i.test(endpoint)) {
+      return parsed.toString();
+    }
+
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    const [beforeHash, hash = ""] = endpoint.split("#", 2);
+    const separator = beforeHash.includes("?") ? "&" : "?";
+    const localized = `${beforeHash}${separator}locale=${encodeURIComponent(normalizedLocale)}`;
+    return hash ? `${localized}#${hash}` : localized;
+  }
+}
+
 export function resolveConsoleDomainErrorModalEndpoint(
   metadata: ConsoleDomainErrorModalExtensionMetadata | null | undefined,
   context: ConsoleDomainErrorModalEndpointContext,

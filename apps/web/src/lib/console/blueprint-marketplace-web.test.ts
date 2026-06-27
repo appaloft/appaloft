@@ -180,6 +180,11 @@ describe("Blueprint marketplace console surface", () => {
     expect(sharedPackageSource).toContain('title: "Marketplace"');
     expect(sharedPackageSource).toContain('title: "应用市场"');
     expect(sharedPackageSource).toContain('"x-appaloft-locale": locale');
+    expect(detailPageSource).toContain("createBlueprintMarketplaceLocalizedEndpoint");
+    expect(detailPageSource).toContain("localizedDetailEndpoint");
+    expect(detailPageSource).toContain(
+      'queryKey: ["blueprint-catalog-detail", localizedDetailEndpoint]',
+    );
     expect(detailPageSource).toContain("依赖资源");
     expect(detailPageSource).toContain("环境变量");
     expect(detailPageSource).toContain("官方网站");
@@ -237,6 +242,8 @@ describe("Blueprint marketplace console surface", () => {
     expect(quickDeploySource).toContain("blueprintUrl");
     expect(quickDeploySource).toContain("remoteDetailEndpoint");
     expect(quickDeploySource).toContain("remoteInstallEndpoint");
+    expect(quickDeploySource).toContain("createBlueprintMarketplaceLocalizedEndpoint");
+    expect(quickDeploySource).toContain("localizedSelectedBlueprintDetailEndpointValue");
     expect(quickDeploySource).toContain("selectedBlueprintSourceIsRemoteUrl");
     expect(quickDeploySource).toContain("自定义 Blueprint URL");
     expect(quickDeploySource).toContain("blueprintVariant");
