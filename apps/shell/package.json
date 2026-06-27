@@ -34,7 +34,6 @@
     "@appaloft/persistence-pg": "workspace:*",
     "@appaloft/plugin-builtins": "workspace:*",
     "@appaloft/plugin-host": "workspace:*",
-    "@appaloft/server": "workspace:*",
     "@appaloft/provider-certificate-acme": "workspace:*",
     "@appaloft/provider-core": "workspace:*",
     "@appaloft/provider-default-access-domain-sslip": "workspace:*",
@@ -42,7 +41,8 @@
     "@appaloft/provider-edge-proxy-traefik": "workspace:*",
     "@appaloft/provider-generic-ssh": "workspace:*",
     "@appaloft/provider-local-shell": "workspace:*",
-    "nanoid": "^5.1.11",
+    "@appaloft/server": "workspace:*",
+    "nanoid": "^5.1.16",
     "reflect-metadata": "^0.2.2",
     "tsyringe": "^4.10.0"
   }
