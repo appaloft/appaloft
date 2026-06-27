@@ -53,8 +53,117 @@
     readonly primaryAction?: BlueprintMarketplacePrimaryAction;
     readonly actionLabel?: string;
     readonly selectedSlug?: string;
+    readonly locale?: string;
     readonly onselect?: (item: BlueprintMarketplaceListing) => void;
     readonly onview?: (item: BlueprintMarketplaceListing) => void;
+  };
+
+  type MarketplacePageLocale = "en-US" | "zh-CN";
+  type MarketplacePageCopy = {
+    readonly title: string;
+    readonly subtitle: string;
+    readonly badgeLabel: string;
+    readonly openConsole: string;
+    readonly searchLabel: string;
+    readonly searchPlaceholder: string;
+    readonly loadingStatus: string;
+    readonly listingCount: (filtered: number, total: number) => string;
+    readonly allCategory: string;
+    readonly loadingAria: string;
+    readonly missingEndpoint: string;
+    readonly errorPrefix: (status: number) => string;
+    readonly unavailable: string;
+    readonly errorTitle: string;
+    readonly retry: string;
+    readonly featuredTitle: string;
+    readonly featuredSubtitle: string;
+    readonly allOfficialTitle: string;
+    readonly catalogSummary: (categories: number, listings: number) => string;
+    readonly actionLabels: Record<BlueprintMarketplacePrimaryAction, string>;
+    readonly cardLabels: Partial<BlueprintMarketplaceCardLabels>;
+  };
+
+  const marketplacePageCopy: Record<MarketplacePageLocale, MarketplacePageCopy> = {
+    "en-US": {
+      title: "Marketplace",
+      subtitle:
+        "Choose an official Blueprint, review its components, dependencies, and deployment plan, then continue into deployment.",
+      badgeLabel: "Blueprint catalog",
+      openConsole: "Open console",
+      searchLabel: "Search Blueprint catalog",
+      searchPlaceholder: "Search apps, categories, dependencies, or tags",
+      loadingStatus: "Loading Blueprints",
+      listingCount: (filtered, total) => `${filtered} / ${total} Blueprints`,
+      allCategory: "All",
+      loadingAria: "Loading Blueprint catalog",
+      missingEndpoint: "No Blueprint catalog endpoint is registered.",
+      errorPrefix: (status) => `Blueprint catalog endpoint returned ${status}`,
+      unavailable: "Blueprint catalog is temporarily unavailable.",
+      errorTitle: "Unable to load Blueprint catalog",
+      retry: "Retry",
+      featuredTitle: "Featured Blueprints",
+      featuredSubtitle:
+        "Sorted by Appaloft editorial priority, GitHub attention, and recent momentum.",
+      allOfficialTitle: "All official Blueprints",
+      catalogSummary: (categories, listings) => `${categories} categories · ${listings} entries`,
+      actionLabels: {
+        deploy: "Deploy",
+        detail: "View",
+        select: "Select",
+      },
+      cardLabels: {
+        dependencies: "Dependencies",
+        components: "Runtime units",
+        variants: "Deployment plans",
+        ports: "Public entry",
+        noDependencies: "No managed dependencies",
+        noPorts: "No public ports",
+        official: "Official",
+        featured: "Featured",
+        selected: "Selected",
+        detail: "View details",
+        website: "Website",
+      },
+    },
+    "zh-CN": {
+      title: "应用市场",
+      subtitle: "选择官方 Blueprint，先看清应用组件、依赖资源和部署计划，再进入部署流程。",
+      badgeLabel: "蓝图目录",
+      openConsole: "打开控制台",
+      searchLabel: "搜索 Blueprint 目录",
+      searchPlaceholder: "搜索应用、分类、依赖或标签",
+      loadingStatus: "正在加载 Blueprint",
+      listingCount: (filtered, total) => `${filtered} / ${total} 个 Blueprint`,
+      allCategory: "全部",
+      loadingAria: "正在加载 Blueprint 目录",
+      missingEndpoint: "没有注册 Blueprint 目录接口。",
+      errorPrefix: (status) => `Blueprint 目录接口返回 ${status}`,
+      unavailable: "Blueprint 目录暂时不可用。",
+      errorTitle: "无法加载 Blueprint 目录",
+      retry: "重试",
+      featuredTitle: "精选蓝图",
+      featuredSubtitle: "排序参考官方推荐优先级、GitHub 关注度和近期热度。",
+      allOfficialTitle: "全部官方蓝图",
+      catalogSummary: (categories, listings) => `${categories} 分类 · ${listings} 条目`,
+      actionLabels: {
+        deploy: "部署",
+        detail: "查看",
+        select: "选择",
+      },
+      cardLabels: {
+        dependencies: "依赖资源",
+        components: "运行单元",
+        variants: "部署方案",
+        ports: "公开入口",
+        noDependencies: "无托管依赖",
+        noPorts: "无公开端口",
+        official: "官方",
+        featured: "精选",
+        selected: "已选择",
+        detail: "查看详情",
+        website: "网站",
+      },
+    },
   };
 
   let {
@@ -63,16 +172,17 @@
     deployBaseUrl = "",
     detailBasePath = "/marketplace",
     sourceExtension = "blueprint-marketplace",
-    title = "应用市场",
-    subtitle = "选择官方 Blueprint，先看清应用组件、依赖资源和部署计划，再进入部署流程。",
-    badgeLabel = "蓝图目录",
+    title,
+    subtitle,
+    badgeLabel,
     pluginDisplayName = "",
     loading = false,
     chrome = "embedded",
     surface = "page",
     primaryAction = "detail",
-    actionLabel = primaryAction === "deploy" ? "部署" : primaryAction === "select" ? "选择" : "查看",
+    actionLabel,
     selectedSlug = "",
+    locale = "en-US",
     onselect,
     onview,
   }: Props = $props();
@@ -83,19 +193,13 @@
   let errorMessage = $state("");
   let marketplace = $state<BlueprintMarketplaceListResponse | null>(null);
   let loadRequestId = 0;
-  const cardLabels: Partial<BlueprintMarketplaceCardLabels> = {
-    dependencies: "依赖资源",
-    components: "运行单元",
-    variants: "部署方案",
-    ports: "公开入口",
-    noDependencies: "无托管依赖",
-    noPorts: "无公开端口",
-    official: "官方",
-    featured: "精选",
-    selected: "已选择",
-    detail: "查看详情",
-    website: "网站",
-  };
+  const normalizedLocale = $derived(normalizeMarketplacePageLocale(locale));
+  const copy = $derived(marketplacePageCopy[normalizedLocale]);
+  const pageTitle = $derived(title ?? copy.title);
+  const pageSubtitle = $derived(subtitle ?? copy.subtitle);
+  const pageBadgeLabel = $derived(badgeLabel ?? copy.badgeLabel);
+  const actionButtonLabel = $derived(actionLabel ?? copy.actionLabels[primaryAction]);
+  const cardLabels = $derived(copy.cardLabels);
 
   const categories = $derived(marketplace?.categories ?? []);
   const listings = $derived(marketplace?.items ?? []);
@@ -211,25 +315,27 @@
     if (!endpoint) {
       marketplace = null;
       isLoading = false;
-      errorMessage = "没有注册 Blueprint 目录接口。";
+      errorMessage = copy.missingEndpoint;
       return;
     }
 
-    void loadMarketplace({ baseUrl, endpoint, requestId });
+    void loadMarketplace({ baseUrl, endpoint, requestId, locale: normalizedLocale });
   });
 
   async function loadMarketplace({
     baseUrl = apiBaseUrl,
     endpoint = listEndpoint,
     requestId = ++loadRequestId,
+    locale = normalizedLocale,
   }: {
     readonly baseUrl?: string;
     readonly endpoint?: string;
     readonly requestId?: number;
+    readonly locale?: MarketplacePageLocale;
   } = {}): Promise<void> {
     if (!endpoint) {
       isLoading = false;
-      errorMessage = "没有注册 Blueprint 目录接口。";
+      errorMessage = copy.missingEndpoint;
       return;
     }
 
@@ -240,11 +346,12 @@
       const response = await fetch(createBlueprintMarketplaceEndpoint(baseUrl, endpoint), {
         headers: {
           accept: "application/json",
+          ...(locale ? { "x-appaloft-locale": locale } : {}),
         },
       });
 
       if (!response.ok) {
-        throw new Error(`Blueprint 目录接口返回 ${response.status}`);
+        throw new Error(copy.errorPrefix(response.status));
       }
 
       const result = normalizeMarketplaceList(await response.json());
@@ -253,7 +360,7 @@
       }
     } catch (error) {
       if (requestId === loadRequestId) {
-        errorMessage = error instanceof Error ? error.message : "Blueprint 目录暂时不可用。";
+        errorMessage = error instanceof Error ? error.message : copy.unavailable;
       }
     } finally {
       if (requestId === loadRequestId) {
@@ -358,6 +465,11 @@
       isDialogSurface && "max-[820px]:shrink-0",
     );
   }
+
+  function normalizeMarketplacePageLocale(value: string | null | undefined): MarketplacePageLocale {
+    const normalized = value?.trim().toLowerCase();
+    return normalized === "zh" || normalized?.startsWith("zh-") ? "zh-CN" : "en-US";
+  }
 </script>
 
 <section class={rootClass} data-marketplace-surface={surface} data-blueprint-marketplace-page>
@@ -369,13 +481,13 @@
     {/if}
     <div class="min-w-0">
       <div class="mb-3 flex flex-wrap gap-2">
-        <span class={primaryBadgeClass}>{badgeLabel}</span>
+        <span class={primaryBadgeClass}>{pageBadgeLabel}</span>
         {#if pluginDisplayName}
           <span class={badgeClass}>{pluginDisplayName}</span>
         {/if}
       </div>
-      <h1 class={heroTitleClass}>{title}</h1>
-      <p class={heroDescriptionClass}>{subtitle}</p>
+      <h1 class={heroTitleClass}>{pageTitle}</h1>
+      <p class={heroDescriptionClass}>{pageSubtitle}</p>
     </div>
     {#if chrome === "standalone" && deployBaseUrl}
       <div class="flex justify-end max-[820px]:justify-start">
@@ -383,7 +495,7 @@
           class="inline-flex min-h-8 items-center justify-center gap-1.5 rounded-lg border border-[#c9d3df] bg-white px-3 text-[0.82rem] font-extrabold text-[#172033] no-underline transition-transform duration-150 hover:-translate-y-px"
           href={deployBaseUrl}
         >
-          打开控制台
+          {copy.openConsole}
         </a>
       </div>
     {/if}
@@ -392,20 +504,20 @@
   <div class={controlsClass} data-blueprint-marketplace-controls>
     <div class={toolbarClass}>
       <label>
-        <span class="sr-only">搜索 Blueprint 目录</span>
+        <span class="sr-only">{copy.searchLabel}</span>
         <input
           class="min-h-[46px] w-full rounded-lg border border-[#c9d3df] bg-white px-4 font-sans text-[#172033] outline-none focus:border-[#4e84ff] focus:shadow-[0_0_0_3px_rgba(78,132,255,0.14)]"
           data-blueprint-marketplace-search
           type="search"
-          placeholder="搜索应用、分类、依赖或标签"
+          placeholder={copy.searchPlaceholder}
           bind:value={searchTerm}
         />
       </label>
       <div class="text-sm font-bold text-slate-500" aria-live="polite">
         {#if marketplace}
-          {filteredListings.length} / {listings.length} 个 Blueprint
+          {copy.listingCount(filteredListings.length, listings.length)}
         {:else}
-          正在加载 Blueprint
+          {copy.loadingStatus}
         {/if}
       </div>
     </div>
@@ -420,7 +532,7 @@
             selectedCategoryKey = "all";
           }}
         >
-          全部 {listings.length}
+          {copy.allCategory} {listings.length}
         </button>
         {#each categories as category (category.key)}
           <button
@@ -440,7 +552,7 @@
   </div>
 
   {#if isLoading}
-    <section class="flex min-h-[760px] flex-col gap-7" aria-label="正在加载 Blueprint 目录" data-blueprint-marketplace-skeleton>
+    <section class="flex min-h-[760px] flex-col gap-7" aria-label={copy.loadingAria} data-blueprint-marketplace-skeleton>
       <div class={cn(categoryTabsClass, "pointer-events-none")} aria-hidden="true">
         {#each Array.from({ length: 12 }) as _, index (index)}
           <Skeleton class={index === 1 || index === 8 ? "h-9 w-40 rounded-lg" : "h-9 w-28 rounded-lg"} />
@@ -478,14 +590,14 @@
     </section>
   {:else if errorMessage}
     <section class="rounded-lg border border-[#dbe2ea] bg-white/90 p-7 shadow-[0_18px_48px_rgba(20,31,47,0.07)]">
-      <h2 class="m-0 text-xl">无法加载 Blueprint 目录</h2>
+      <h2 class="m-0 text-xl">{copy.errorTitle}</h2>
       <p class="m-0 mt-2 text-[#526071]">{errorMessage}</p>
       <button
         class="mt-4 inline-flex min-h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-[#4e84ff] bg-[#4e84ff] px-3 font-sans text-[0.82rem] font-extrabold text-white transition-transform duration-150 hover:-translate-y-px"
         type="button"
         onclick={() => loadMarketplace()}
       >
-        重试
+        {copy.retry}
       </button>
     </section>
   {:else}
@@ -501,9 +613,9 @@
       {#if !isDialogSurface && featuredListings.length > 0}
         <section class="flex flex-col gap-3" data-blueprint-marketplace-featured>
           <div class="flex flex-col gap-1.5">
-            <h2 class="m-0 text-[1.2rem]">精选蓝图</h2>
+            <h2 class="m-0 text-[1.2rem]">{copy.featuredTitle}</h2>
             <p class="m-0 text-sm leading-6 text-[#526071]">
-              排序参考官方推荐优先级、GitHub 关注度和近期热度。
+              {copy.featuredSubtitle}
             </p>
           </div>
           <div class={gridClass}>
@@ -511,7 +623,7 @@
               <BlueprintMarketplaceCard
                 {item}
                 actionHref={primaryAction === "select" ? "#" : actionHref(item)}
-                {actionLabel}
+                actionLabel={actionButtonLabel}
                 detailHref={detailHref(item)}
                 density="default"
                 labels={cardLabels}
@@ -530,9 +642,9 @@
 
         <section class="flex flex-col gap-3" data-blueprint-marketplace-catalog-heading>
           <div class="flex flex-col gap-1.5">
-            <h2 class="m-0 text-[1.2rem]">全部官方蓝图</h2>
+            <h2 class="m-0 text-[1.2rem]">{copy.allOfficialTitle}</h2>
             <p class="m-0 text-sm leading-6 text-[#526071]">
-              {categories.length} 分类 · {filteredListings.length} 条目
+              {copy.catalogSummary(categories.length, filteredListings.length)}
             </p>
           </div>
         </section>
@@ -552,7 +664,7 @@
               <BlueprintMarketplaceCard
                 {item}
                 actionHref={primaryAction === "select" ? "#" : actionHref(item)}
-                {actionLabel}
+                actionLabel={actionButtonLabel}
                 detailHref={detailHref(item)}
                 density={cardDensity}
                 labels={cardLabels}

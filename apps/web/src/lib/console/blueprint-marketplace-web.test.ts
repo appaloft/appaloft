@@ -158,7 +158,11 @@ describe("Blueprint marketplace console surface", () => {
     expect(selectorSource).toContain("surface={marketplaceSurface}");
     expect(selectorSource).toContain("systemPluginExtensionTitle(catalogExtension, $locale)");
     expect(selectorSource).toContain("title={catalogTitle}");
-    expect(selectorSource).toContain('badgeLabel="蓝图目录"');
+    expect(selectorSource).toContain("locale={$locale}");
+    expect(selectorSource).not.toContain('badgeLabel="蓝图目录"');
+    expect(selectorSource).not.toContain(
+      'subtitle="选择官方 Blueprint，先看清应用组件、依赖资源和部署计划，再进入部署流程。"',
+    );
     expect(selectorSource).toContain("catalogMetadataLoading");
     expect(selectorSource).toContain("loading={catalogMetadataLoading}");
     expect(selectorSource).not.toContain("pluginDisplayName={catalogExtension");
@@ -172,8 +176,10 @@ describe("Blueprint marketplace console surface", () => {
     expect(sharedPackageSource).toContain("data-blueprint-marketplace-skeleton");
     expect(sharedPackageSource).toContain('class="flex min-h-[760px] flex-col gap-7"');
     expect(sharedPackageSource).toContain("readonly loading?: boolean");
-    expect(sharedPackageSource).toContain('title = "应用市场"');
-    expect(sharedPackageSource).not.toContain('title = "Marketplace"');
+    expect(sharedPackageSource).toContain('locale = "en-US"');
+    expect(sharedPackageSource).toContain('title: "Marketplace"');
+    expect(sharedPackageSource).toContain('title: "应用市场"');
+    expect(sharedPackageSource).toContain('"x-appaloft-locale": locale');
     expect(detailPageSource).toContain("依赖资源");
     expect(detailPageSource).toContain("环境变量");
     expect(detailPageSource).toContain("官方网站");
@@ -331,7 +337,8 @@ describe("Blueprint marketplace console surface", () => {
     expect(listPageSource).toContain("data-marketplace-catalog-display-surface");
     expect(selectorSource).toContain("data-blueprint-marketplace-selector");
     expect(selectorSource).toContain('primaryAction={onselect ? "select" : "detail"}');
-    expect(selectorSource).toContain(
+    expect(selectorSource).toContain("locale={$locale}");
+    expect(selectorSource).not.toContain(
       'subtitle="选择官方 Blueprint，先看清应用组件、依赖资源和部署计划，再进入部署流程。"',
     );
     expect(sharedPackageSource).toContain("data-blueprint-marketplace-page");
