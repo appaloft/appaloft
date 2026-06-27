@@ -436,6 +436,7 @@ describe("Console page extension surface", () => {
 
     expect(rendererSource).toContain("enabled: browser && !pageEndpointOverride");
     expect(rendererSource).toContain("pageEndpointOverride ??");
+    expect(rendererSource).toContain('queryKey: ["console-extension-page", pageEndpoint, $locale]');
     expect(rendererSource).toContain(
       "!pageEndpointOverride && (!extension || !metadata || !pageEndpoint)",
     );
