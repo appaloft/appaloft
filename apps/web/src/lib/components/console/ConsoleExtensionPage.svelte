@@ -472,7 +472,7 @@
   );
   const pageDocumentQuery = createQuery(() =>
     queryOptions({
-      queryKey: ["console-extension-page", pageEndpoint],
+      queryKey: ["console-extension-page", pageEndpoint, $locale],
       queryFn: async () =>
         (
           await requestWithMetadata<ConsolePageDocument>(pageEndpoint ?? "/", undefined, {
