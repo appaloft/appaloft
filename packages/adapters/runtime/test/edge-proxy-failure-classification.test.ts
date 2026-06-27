@@ -50,4 +50,24 @@ describe("edge proxy failure classification", () => {
       },
     });
   });
+
+  test("[EDGE-PROXY-RUNTIME-002] maps edge proxy command timeouts to diagnostic metadata", () => {
+    const failure = classifyEdgeProxyStartFailure({
+      ...baseInput,
+      output: "Traefik edge proxy container command timed out after 120000ms",
+    });
+
+    expect(failure).toMatchObject({
+      errorCode: "edge_proxy_start_failed",
+      message: "Traefik edge proxy failed to start: command timed out",
+      retryable: true,
+      metadata: {
+        containerName: "appaloft-traefik",
+        failureReason: "command-timeout",
+        networkName: "appaloft-edge",
+        providerKey: "traefik",
+        proxyKind: "traefik",
+      },
+    });
+  });
 });

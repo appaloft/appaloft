@@ -113,6 +113,8 @@ type LogPhase = "detect" | "plan" | "package" | "deploy" | "verify" | "rollback"
 type LogLevel = "debug" | "info" | "warn" | "error";
 type LogSource = "appaloft" | "ssh" | "docker" | "application" | "provider" | "health" | "domain-event";
 
+const defaultSshEdgeProxyCommandTimeoutMs = 120_000;
+
 function composeScaleFromRuntimeMetadata(
   metadata: Record<string, string> | undefined,
 ): Array<{ serviceName: string; replicas: number }> {
@@ -828,6 +830,20 @@ function parseOptionalPort(value: string | undefined): number | undefined {
   return Number.isInteger(port) && port > 0 && port <= 65535 ? port : undefined;
 }
 
+function positiveIntegerEnvMs(
+  env: NodeJS.ProcessEnv,
+  key: string,
+  fallbackMs: number,
+): number {
+  const raw = env[key]?.trim();
+  if (!raw) {
+    return fallbackMs;
+  }
+
+  const parsed = Number(raw);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallbackMs;
+}
+
 interface SshTarget {
   host: string;
   publicHost: string;
@@ -1273,6 +1289,8 @@ export class SshExecutionBackend implements ExecutionBackend {
     cwd: string;
     env: NodeJS.ProcessEnv;
     redactions?: readonly string[];
+    timeoutMs?: number;
+    timeoutMessage?: string;
     onOutput(line: string, level: LogLevel, stream: "stdout" | "stderr"): void;
   }) {
     return await runStreamingProcess({
@@ -1281,6 +1299,8 @@ export class SshExecutionBackend implements ExecutionBackend {
       cwd: input.cwd,
       env: input.env,
       ...(input.redactions ? { redactions: input.redactions } : {}),
+      ...(input.timeoutMs ? { timeoutMs: input.timeoutMs } : {}),
+      ...(input.timeoutMessage ? { timeoutMessage: input.timeoutMessage } : {}),
       onOutput: input.onOutput,
     });
   }
@@ -2324,6 +2344,11 @@ export class SshExecutionBackend implements ExecutionBackend {
 
       const proxyBootstrap = proxyBootstrapResult.value;
       if (proxyBootstrap) {
+        const proxyCommandTimeoutMs = positiveIntegerEnvMs(
+          env,
+          "APPALOFT_SSH_EDGE_PROXY_COMMAND_TIMEOUT_MS",
+          defaultSshEdgeProxyCommandTimeoutMs,
+        );
         const proxyMessage = `Ensure ${proxyBootstrap.displayName} edge proxy on Docker network ${proxyBootstrap.networkName}`;
         timeline.push(phaseLog("deploy", proxyMessage));
         await this.report(context, {
@@ -2338,6 +2363,8 @@ export class SshExecutionBackend implements ExecutionBackend {
           command: proxyBootstrap.networkCommand,
           cwd: runtimeDir,
           env,
+          timeoutMs: proxyCommandTimeoutMs,
+          timeoutMessage: `${proxyBootstrap.displayName} edge proxy network command timed out after ${proxyCommandTimeoutMs}ms`,
           onOutput: this.createStreamingOutputSink(timeline, {
             context,
             deploymentId: state.id.value,
@@ -2351,6 +2378,8 @@ export class SshExecutionBackend implements ExecutionBackend {
           command: proxyBootstrap.containerCommand,
           cwd: runtimeDir,
           env,
+          timeoutMs: proxyCommandTimeoutMs,
+          timeoutMessage: `${proxyBootstrap.displayName} edge proxy container command timed out after ${proxyCommandTimeoutMs}ms`,
           onOutput: this.createStreamingOutputSink(timeline, {
             context,
             deploymentId: state.id.value,

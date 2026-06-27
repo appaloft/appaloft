@@ -9,6 +9,7 @@ export interface StreamingProcessResult {
   stderr: string;
   failed: boolean;
   reason?: string;
+  timedOut?: boolean;
 }
 
 class LineBuffer {
@@ -55,6 +56,8 @@ export async function runStreamingProcess(input: {
   env: NodeJS.ProcessEnv;
   redactions?: readonly string[];
   shell?: boolean;
+  timeoutMs?: number;
+  timeoutMessage?: string;
   onOutput(line: string, level: LogLevel, stream: "stdout" | "stderr"): void;
 }): Promise<StreamingProcessResult> {
   if (!existsSync(input.cwd) || !statSync(input.cwd).isDirectory()) {
@@ -73,12 +76,15 @@ export async function runStreamingProcess(input: {
       env: input.env,
       shell: input.shell ?? false,
       stdio: ["ignore", "pipe", "pipe"],
+      detached: true,
     });
     const stdout = new LineBuffer();
     const stderr = new LineBuffer();
     let stdoutText = "";
     let stderrText = "";
     let spawnReason: string | undefined;
+    let timeoutReason: string | undefined;
+    let timeout: NodeJS.Timeout | undefined;
     let settled = false;
 
     const resolveOnce = (result: StreamingProcessResult): void => {
@@ -87,8 +93,26 @@ export async function runStreamingProcess(input: {
       }
 
       settled = true;
+      if (timeout) {
+        clearTimeout(timeout);
+      }
       resolveCommand(result);
     };
+
+    if (input.timeoutMs !== undefined) {
+      timeout = setTimeout(() => {
+        timeoutReason = input.timeoutMessage ?? "Process timed out";
+        if (child.pid) {
+          try {
+            process.kill(-child.pid, "SIGTERM");
+          } catch {
+            child.kill("SIGTERM");
+          }
+        } else {
+          child.kill("SIGTERM");
+        }
+      }, input.timeoutMs);
+    }
 
     child.stdout?.setEncoding("utf8");
     child.stderr?.setEncoding("utf8");
@@ -130,12 +154,19 @@ export async function runStreamingProcess(input: {
         input.onOutput(redactedLine, classifyOutputLogLevel(redactedLine, "warn"), "stderr");
       }
 
+      const redactedStdout = redactSecrets(stdoutText, input.redactions);
+      const stderrWithTimeout = timeoutReason
+        ? [stderrText.trim(), timeoutReason].filter(Boolean).join("\n")
+        : stderrText;
+      const redactedStderr = redactSecrets(stderrWithTimeout, input.redactions);
+
       resolveOnce({
         exitCode: code ?? 1,
-        stdout: redactSecrets(stdoutText, input.redactions),
-        stderr: redactSecrets(stderrText, input.redactions),
-        failed: code !== 0,
-        ...(signal ? { reason: `terminated by signal ${signal}` } : {}),
+        stdout: redactedStdout,
+        stderr: redactedStderr,
+        failed: timeoutReason !== undefined || code !== 0,
+        ...(signal && !timeoutReason ? { reason: `terminated by signal ${signal}` } : {}),
+        ...(timeoutReason ? { reason: timeoutReason, timedOut: true } : {}),
         ...(spawnReason ? { reason: spawnReason } : {}),
       });
     });

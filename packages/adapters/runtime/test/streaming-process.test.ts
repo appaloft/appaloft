@@ -28,6 +28,27 @@ describe("streaming process", () => {
     expect(result.failed).toBe(false);
     expect(lines).toEqual(["first", "second"]);
   });
+
+  test("[QUICK-DEPLOY-WF-039B] terminates a streaming process that exceeds its timeout", async () => {
+    const lines: string[] = [];
+    const result = await runStreamingProcess({
+      command: "sh",
+      args: ["-c", "printf 'first\\n'; sleep 5; printf 'second\\n'"],
+      cwd: tmpdir(),
+      env: process.env,
+      timeoutMs: 20,
+      timeoutMessage: "streaming command timed out",
+      onOutput: (line) => {
+        lines.push(line);
+      },
+    });
+
+    expect(result.failed).toBe(true);
+    expect(result.timedOut).toBe(true);
+    expect(result.reason).toBe("streaming command timed out");
+    expect(result.stderr).toContain("streaming command timed out");
+    expect(lines).toEqual(["first"]);
+  });
 });
 
 async function waitFor(predicate: () => boolean): Promise<void> {
