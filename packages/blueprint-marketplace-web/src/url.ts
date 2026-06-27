@@ -19,6 +19,30 @@ export function createBlueprintMarketplaceEndpoint(baseUrl: string, endpoint: st
   return `${trimmedBase}${normalizedPath}`;
 }
 
+export function createBlueprintMarketplaceLocalizedEndpoint(
+  baseUrl: string,
+  endpoint: string,
+  locale: string,
+): string {
+  const marketplaceEndpoint = createBlueprintMarketplaceEndpoint(baseUrl, endpoint);
+  const normalizedLocale = locale.trim();
+
+  if (!normalizedLocale) {
+    return marketplaceEndpoint;
+  }
+
+  const placeholderOrigin = "https://appaloft.local";
+  const isAbsoluteEndpoint = /^https?:\/\//.test(marketplaceEndpoint);
+  const parsedEndpoint = new URL(marketplaceEndpoint, placeholderOrigin);
+  parsedEndpoint.searchParams.set("locale", normalizedLocale);
+
+  if (isAbsoluteEndpoint) {
+    return parsedEndpoint.toString();
+  }
+
+  return `${parsedEndpoint.pathname}${parsedEndpoint.search}${parsedEndpoint.hash}`;
+}
+
 export function createBlueprintDeployHandoffUrl(
   input: BlueprintMarketplaceDeployHandoffInput,
 ): string {
