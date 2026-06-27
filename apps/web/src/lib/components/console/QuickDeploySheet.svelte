@@ -46,6 +46,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     type QuickDeployWorkflowStep,
     type QuickDeployWorkflowStepOutput,
   } from "@appaloft/contracts";
+  import { createBlueprintMarketplaceLocalizedEndpoint } from "@appaloft/blueprint-marketplace-web";
   import type { TranslationKey } from "@appaloft/i18n";
   import { onDestroy, type Component } from "svelte";
   import type {
@@ -122,7 +123,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     type DraftServerConnectivityInput,
   } from "$lib/console/server-registration";
   import { deploymentDetailHref, readSessionIdentity, resourceDetailHref } from "$lib/console/utils";
-  import { i18nKeys, t } from "$lib/i18n";
+  import { i18nKeys, locale, t } from "$lib/i18n";
   import { orpc, orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
 
@@ -1238,19 +1239,28 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
 
     return `${metadata.listEndpoint.replace(/\/$/, "")}/${encodeURIComponent(slug)}`;
   });
+  const localizedSelectedBlueprintDetailEndpointValue = $derived(
+    selectedBlueprintDetailEndpointValue
+      ? createBlueprintMarketplaceLocalizedEndpoint(
+          "",
+          selectedBlueprintDetailEndpointValue,
+          $locale,
+        )
+      : "",
+  );
   const selectedBlueprintDetailQuery = createQuery(() =>
     queryOptions({
-      queryKey: ["blueprint-catalog-detail", selectedBlueprintDetailEndpointValue],
+      queryKey: ["blueprint-catalog-detail", localizedSelectedBlueprintDetailEndpointValue],
       queryFn: async () =>
         normalizeBlueprintDetailResponse(
-          await request<BlueprintDetailResponse>(selectedBlueprintDetailEndpointValue),
+          await request<BlueprintDetailResponse>(localizedSelectedBlueprintDetailEndpointValue),
         ),
       enabled:
         browser &&
         enabled &&
         (blueprintDetailDialogOpen ||
           (sourceKind === "blueprint" && Boolean(selectedBlueprintIdentity))) &&
-        Boolean(selectedBlueprintDetailEndpointValue),
+        Boolean(localizedSelectedBlueprintDetailEndpointValue),
       staleTime: 30_000,
     }),
   );
