@@ -58,6 +58,7 @@
     findResource,
     findServer,
     formatTime,
+    hrefWithSearchParams,
     projectDetailHref,
     resourceDetailHref,
   } from "$lib/console/utils";
@@ -339,6 +340,27 @@
     );
   }
 
+  function domainBindingConfigureDnsHref(binding: DomainBindingSummary): string {
+    const params = new URLSearchParams({
+      tab: "networking",
+      section: "domains",
+      dnsBindingId: binding.id,
+    });
+    const resourceHref = selectedResource
+      ? resourceDetailHref(selectedResource)
+      : `/resources/${encodeURIComponent(binding.resourceId)}`;
+    return hrefWithSearchParams(resourceHref, params);
+  }
+
+  function domainBindingNeedsDnsConfiguration(binding: DomainBindingSummary): boolean {
+    if (binding.status !== "pending_verification") {
+      return false;
+    }
+
+    const dnsStatus = binding.dnsObservation?.status;
+    return dnsStatus !== "matched" && dnsStatus !== "skipped";
+  }
+
   function parseDomainBindingDetailTab(value: string | null): DomainBindingDetailTab {
     return domainBindingDetailTabs.includes(value as DomainBindingDetailTab)
       ? (value as DomainBindingDetailTab)
@@ -531,6 +553,15 @@
             </div>
           </div>
           <div class="flex flex-wrap gap-2">
+            {#if domainBindingNeedsDnsConfiguration(selectedDomainBinding)}
+              <Button
+                href={domainBindingConfigureDnsHref(selectedDomainBinding)}
+                variant="default"
+              >
+                <Globe2 class="size-4" />
+                {$t(i18nKeys.console.domainBindings.dnsConnectorConfigure)}
+              </Button>
+            {/if}
             <Button
               type="button"
               variant="outline"

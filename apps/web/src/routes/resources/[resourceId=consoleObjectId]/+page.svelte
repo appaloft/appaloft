@@ -1204,6 +1204,7 @@
   let dnsConnectorDialogOpen = $state(false);
   let dnsConnectorBindingId = $state("");
   let dnsConnectorCallbackHandledKey = $state("");
+  let dnsConnectorSearchBindingKey = $state("");
   let dnsConnectorPlanPending = $state(false);
   let dnsConnectorApplyPending = $state(false);
   let dnsConnectorConnectPending = $state(false);
@@ -1902,6 +1903,10 @@
     ),
   );
 
+  const primaryDomainBindingNeedsDnsConfiguration = $derived(
+    Boolean(primaryDomainBinding && domainBindingNeedsDnsConfiguration(primaryDomainBinding)),
+  );
+
   type DnsConnectorCallbackPayload = {
     type: typeof dnsConnectorCallbackMessageType;
     resourceId: string;
@@ -2343,6 +2348,15 @@
     dnsConnectorConnectPending = false;
     dnsConnectorDialogOpen = true;
     void refreshDnsConnectorPlan();
+  }
+
+  function domainBindingNeedsDnsConfiguration(binding: DomainBindingSummary): boolean {
+    if (binding.status !== "pending_verification") {
+      return false;
+    }
+
+    const dnsStatus = binding.dnsObservation?.status;
+    return dnsStatus !== "matched" && dnsStatus !== "skipped";
   }
 
   function readDnsConnectorCallbackPayload(
@@ -4265,6 +4279,33 @@
       deploymentDialogOpen = false;
       deploymentDialogInitializedForResourceId = "";
     }
+  });
+
+  $effect(() => {
+    if (!browser || !resource) {
+      return;
+    }
+
+    const requestedBindingId = resourceSearchParams.get("dnsBindingId") ?? "";
+    if (!requestedBindingId) {
+      dnsConnectorSearchBindingKey = "";
+      return;
+    }
+
+    const searchBindingKey = `${resource.id}:${requestedBindingId}`;
+    if (dnsConnectorSearchBindingKey === searchBindingKey) {
+      return;
+    }
+
+    const requestedBinding = resourceDomainBindings.find(
+      (binding) => binding.id === requestedBindingId,
+    );
+    if (!requestedBinding) {
+      return;
+    }
+
+    dnsConnectorSearchBindingKey = searchBindingKey;
+    openDnsConnectorDialog(requestedBinding);
   });
 
   $effect(() => {
@@ -8773,6 +8814,17 @@
                       }}
                     />
                   {/if}
+                  {#if primaryDomainBinding && primaryDomainBindingNeedsDnsConfiguration}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={isResourceArchived || primaryDomainBinding.status === "deleted"}
+                      onclick={() => openDnsConnectorDialog(primaryDomainBinding)}
+                    >
+                      <Globe2 class="size-4" />
+                      {$t(i18nKeys.console.domainBindings.dnsConnectorConfigure)}
+                    </Button>
+                  {/if}
                   {#if primaryAccessHref}
                     <Button href={primaryAccessHref} target="_blank" rel="noreferrer" variant="outline">
                       <Globe2 class="size-4" />
@@ -8859,13 +8911,26 @@
                       </div>
                     {/if}
                     {#if primaryDomainBinding?.status === "pending_verification"}
-                      <DomainBindingVerifyDnsButton
-                        binding={primaryDomainBinding}
-                        variant="default"
-                        onFeedback={(feedback) => {
-                          createFeedback = feedback;
-                        }}
-                      />
+                      <div class="flex flex-wrap gap-2">
+                        <DomainBindingVerifyDnsButton
+                          binding={primaryDomainBinding}
+                          variant="default"
+                          onFeedback={(feedback) => {
+                            createFeedback = feedback;
+                          }}
+                        />
+                        {#if primaryDomainBindingNeedsDnsConfiguration}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={isResourceArchived}
+                            onclick={() => openDnsConnectorDialog(primaryDomainBinding)}
+                          >
+                            <Globe2 class="size-4" />
+                            {$t(i18nKeys.console.domainBindings.dnsConnectorConfigure)}
+                          </Button>
+                        {/if}
+                      </div>
                     {/if}
                   </div>
                 </section>
@@ -9405,6 +9470,17 @@
                                 createFeedback = feedback;
                               }}
                             />
+                            {#if primaryDomainBindingNeedsDnsConfiguration}
+                              <Button
+                                type="button"
+                                variant="outline"
+                                disabled={isResourceArchived}
+                                onclick={() => openDnsConnectorDialog(primaryDomainBinding)}
+                              >
+                                <Globe2 class="size-4" />
+                                {$t(i18nKeys.console.domainBindings.dnsConnectorConfigure)}
+                              </Button>
+                            {/if}
                           {/if}
                           {#if primaryAccessHref}
                             <Button

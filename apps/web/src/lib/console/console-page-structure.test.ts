@@ -1465,6 +1465,15 @@ describe("console page structure", () => {
     expect(resourceDetailPageSource).toContain("dnsConnectorManualDns");
     expect(resourceDetailPageSource).toContain("dnsConnectorRecordDomain");
     expect(resourceDetailPageSource).toContain("dnsConnectorRecordTarget");
+    expect(resourceDetailPageSource).toContain("primaryDomainBindingNeedsDnsConfiguration");
+    expect(resourceDetailPageSource).toContain('resourceSearchParams.get("dnsBindingId")');
+    expect(resourceDetailPageSource).toContain("openDnsConnectorDialog(requestedBinding)");
+    expect(resourceDetailPageSource).toContain(
+      "domainBindingNeedsDnsConfiguration(primaryDomainBinding)",
+    );
+    expect(resourceDetailPageSource).toContain(
+      "onclick={() => openDnsConnectorDialog(primaryDomainBinding)}",
+    );
     expect(resourceDetailPageSource).toContain(
       'onclick={() => copyManualDnsRecord(record, "name")}',
     );
@@ -2430,6 +2439,11 @@ describe("console page structure", () => {
     expect(domainBindingsListSource).toContain("data-domain-binding-row");
     expect(domainBindingsListSource).toContain("data-domain-binding-pending-dns-notice");
     expect(domainBindingsListSource).toContain("DomainBindingVerifyDnsButton");
+    expect(domainBindingsPageSource).toContain("function domainBindingConfigureDnsHref");
+    expect(domainBindingsPageSource).toContain("dnsBindingId: binding.id");
+    expect(domainBindingsPageSource).toContain("domainBindingNeedsDnsConfiguration(binding)");
+    expect(domainBindingsListSource).toContain("domainBindingConfigureDnsHref(binding, resource)");
+    expect(domainBindingsListSource).toContain("dnsConnectorConfigure");
     expect(domainBindingsListSource).not.toContain("openDomainBindingVerificationDialog(binding)");
     expect(domainBindingsListSource).not.toContain("openDomainBindingRouteDialog(binding)");
     expect(domainBindingsListSource).not.toContain("openDomainBindingDeleteDialog(binding)");
@@ -2445,6 +2459,14 @@ describe("console page structure", () => {
     expect(domainBindingDetailPageSource).toContain("openDomainBindingRouteDialog()");
     expect(domainBindingDetailPageSource).toContain("openDomainBindingVerificationDialog()");
     expect(domainBindingDetailPageSource).toContain("openDomainBindingDeleteDialog()");
+    expect(domainBindingDetailPageSource).toContain("function domainBindingConfigureDnsHref");
+    expect(domainBindingDetailPageSource).toContain(
+      "domainBindingNeedsDnsConfiguration(selectedDomainBinding)",
+    );
+    expect(domainBindingDetailPageSource).toContain(
+      "domainBindingConfigureDnsHref(selectedDomainBinding)",
+    );
+    expect(domainBindingDetailPageSource).toContain("dnsConnectorConfigure");
     expect(domainBindingDetailPageSource).toContain("lifecycleStatus");
     expect(domainBindingDetailPageSource).toContain("lifecycleDescription");
     expect(domainBindingDetailPageSource).toContain("lifecycleManageAction");
