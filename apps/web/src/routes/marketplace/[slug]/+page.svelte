@@ -16,6 +16,7 @@
   } from "@lucide/svelte";
   import { createQuery, queryOptions } from "@tanstack/svelte-query";
   import type { SystemPluginWebExtension } from "@appaloft/contracts";
+  import { createBlueprintMarketplaceLocalizedEndpoint } from "@appaloft/blueprint-marketplace-web";
 
   import { request, readErrorMessage } from "$lib/api/client";
   import BlueprintProductIcon from "$lib/components/console/BlueprintProductIcon.svelte";
@@ -33,6 +34,7 @@
     readBlueprintCatalogExtensionMetadata,
   } from "$lib/console/blueprint-marketplace-extension";
   import { modalIsOpen, setModalOpen } from "$lib/console/url-modal";
+  import { locale } from "$lib/i18n";
 
   type SystemPluginWebExtensionsResponse = {
     items: SystemPluginWebExtension[];
@@ -310,6 +312,11 @@
     }
     return `${catalogMetadata.listEndpoint.replace(/\/$/, "")}/${encodeURIComponent(slug)}`;
   });
+  const localizedDetailEndpoint = $derived(
+    detailEndpoint
+      ? createBlueprintMarketplaceLocalizedEndpoint("", detailEndpoint, $locale)
+      : "",
+  );
   const installEndpoint = $derived.by(() => {
     if (!catalogMetadata || !slug || !catalogMetadata.installEndpointTemplate) {
       return "";
@@ -333,10 +340,12 @@
 
   const detailQuery = createQuery(() =>
     queryOptions({
-      queryKey: ["blueprint-catalog-detail", detailEndpoint],
+      queryKey: ["blueprint-catalog-detail", localizedDetailEndpoint],
       queryFn: async () =>
-        normalizeBlueprintDetailResponse(await request<BlueprintDetailResponse>(detailEndpoint)),
-      enabled: browser && Boolean(detailEndpoint),
+        normalizeBlueprintDetailResponse(
+          await request<BlueprintDetailResponse>(localizedDetailEndpoint),
+        ),
+      enabled: browser && Boolean(localizedDetailEndpoint),
       staleTime: 30_000,
     }),
   );

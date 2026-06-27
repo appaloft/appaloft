@@ -6,6 +6,7 @@ import {
   consoleDomainErrorModalRenderer,
   consoleOperationIntentModalRenderer,
   consolePageRenderer,
+  createLocalizedConsolePageEndpoint,
   findConsoleDomainErrorModalExtension,
   findConsoleOperationIntentModalExtension,
   findConsolePageExtensionByPath,
@@ -115,6 +116,21 @@ describe("Console page extension surface", () => {
     ).toBe(
       "/example/usage-page?organizationId=org_123&path=%2Fusage&query=range%3D30d%26type%3Ddebit",
     );
+  });
+
+  test("[CONSOLE-EXT-PAGE-001] appends locale to extension page endpoints", () => {
+    expect(
+      createLocalizedConsolePageEndpoint(
+        "/example/usage-page?organizationId=org_123&path=%2Fusage",
+        "en-US",
+      ),
+    ).toBe("/example/usage-page?organizationId=org_123&path=%2Fusage&locale=en-US");
+    expect(createLocalizedConsolePageEndpoint("/example/usage-page#panel", "zh-CN")).toBe(
+      "/example/usage-page?locale=zh-CN#panel",
+    );
+    expect(
+      createLocalizedConsolePageEndpoint("https://app.example.test/page?tab=connections", "en-US"),
+    ).toBe("https://app.example.test/page?tab=connections&locale=en-US");
   });
 
   test("[CONSOLE-EXT-PAGE-003] resolves owner-scoped console panel template variables", () => {
@@ -436,7 +452,8 @@ describe("Console page extension surface", () => {
 
     expect(rendererSource).toContain("enabled: browser && !pageEndpointOverride");
     expect(rendererSource).toContain("pageEndpointOverride ??");
-    expect(rendererSource).toContain('queryKey: ["console-extension-page", pageEndpoint, $locale]');
+    expect(rendererSource).toContain("createLocalizedConsolePageEndpoint(pageEndpoint, $locale)");
+    expect(rendererSource).toContain('queryKey: ["console-extension-page", localizedPageEndpoint]');
     expect(rendererSource).toContain(
       "!pageEndpointOverride && (!extension || !metadata || !pageEndpoint)",
     );
