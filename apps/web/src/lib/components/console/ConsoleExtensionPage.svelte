@@ -1222,7 +1222,7 @@
         </h2>
         <p class="text-sm text-muted-foreground">{errorMessage}</p>
       </section>
-    {:else if !extension || !metadata || !pageEndpoint}
+    {:else if !pageEndpointOverride && (!extension || !metadata || !pageEndpoint)}
       <section class="console-panel p-5 text-sm text-muted-foreground">
         {$t(i18nKeys.errors.backend.notFound)}
       </section>
