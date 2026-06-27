@@ -120,6 +120,11 @@ export const zhCN = {
       label: "语言",
       simplifiedChinese: "简体中文",
     },
+    theme: {
+      dark: "深色模式",
+      label: "外观",
+      light: "浅色模式",
+    },
     modes: {
       existing: "已有",
       newEnvironment: "新建环境",

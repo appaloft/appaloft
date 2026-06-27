@@ -10,14 +10,12 @@
     Gauge,
     Globe2,
     LogIn,
-    Moon,
     Package,
     ArrowRight,
     Rocket,
     Server,
     ServerCrash,
     ShieldCheck,
-    Sun,
   } from "@lucide/svelte";
   import type { Snippet } from "svelte";
 
@@ -249,11 +247,6 @@
   const loginRequired = $derived(authSession.loginRequired && !authSession.session);
   const loginHref = $derived(`/login?next=${encodeURIComponent(pathname)}`);
   const connectionError = $derived(healthQuery.error ? readErrorMessage(healthQuery.error) : "");
-  const colorModeLabel = $derived(
-    colorMode === "dark"
-      ? $t(i18nKeys.common.actions.switchToLightMode)
-      : $t(i18nKeys.common.actions.switchToDarkMode),
-  );
   const activeProjectId = $derived.by(() => {
     const projectMatch = pathname.match(/^\/projects\/([^/]+)/);
     return projectMatch?.[1] ? decodeURIComponent(projectMatch[1]) : "";
@@ -380,8 +373,8 @@
     return typeof endpoint === "string" && endpoint.length > 0 ? endpoint : null;
   }
 
-  function toggleColorMode(): void {
-    colorMode = colorMode === "dark" ? "light" : "dark";
+  function setColorMode(mode: "light" | "dark"): void {
+    colorMode = mode;
   }
 
   function switcherItems(item: BreadcrumbItem): BreadcrumbSwitcherItem[] {
@@ -557,6 +550,7 @@
 
     <SidebarFooter>
       <ConsoleUserMenu
+        {colorMode}
         extensions={accountMenuExtensions}
         organization={currentOrganization
           ? {
@@ -566,6 +560,7 @@
               role: currentOrganization.role,
             }
           : null}
+        onColorModeChange={setColorMode}
       />
     </SidebarFooter>
   </Sidebar>
@@ -687,21 +682,6 @@
             </Breadcrumb.Root>
           {/if}
         </div>
-      </div>
-      <div class="flex shrink-0 items-center gap-2">
-        <Button
-          aria-label={colorModeLabel}
-          title={colorModeLabel}
-          size="icon-sm"
-          variant="outline"
-          onclick={toggleColorMode}
-        >
-          {#if colorMode === "dark"}
-            <Sun class="size-4" />
-          {:else}
-            <Moon class="size-4" />
-          {/if}
-        </Button>
       </div>
     </header>
 

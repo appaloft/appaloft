@@ -114,6 +114,11 @@ export const enUS = {
       label: "Language",
       simplifiedChinese: "简体中文",
     },
+    theme: {
+      dark: "Dark mode",
+      label: "Appearance",
+      light: "Light mode",
+    },
     modes: {
       existing: "Existing",
       newEnvironment: "New environment",

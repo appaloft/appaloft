@@ -8,8 +8,10 @@
     Globe2,
     House,
     LogOut,
+    Moon,
     Rocket,
     Settings2,
+    Sun,
     UserRound,
   } from "@lucide/svelte";
   import { createQuery, queryOptions } from "@tanstack/svelte-query";
@@ -25,6 +27,9 @@
     DropdownMenuRadioGroup,
     DropdownMenuRadioItem,
     DropdownMenuSeparator,
+    DropdownMenuSub,
+    DropdownMenuSubContent,
+    DropdownMenuSubTrigger,
     DropdownMenuTrigger,
   } from "$lib/components/ui/dropdown-menu";
   import { webDocsHrefs } from "$lib/console/docs-help";
@@ -51,11 +56,18 @@
   };
 
   type Props = {
+    colorMode?: "light" | "dark";
     extensions?: readonly SystemPluginWebExtension[];
     organization?: OrganizationBadgeContext | null;
+    onColorModeChange?: (mode: "light" | "dark") => void;
   };
 
-  let { extensions = [], organization = null }: Props = $props();
+  let {
+    colorMode = "light",
+    extensions = [],
+    organization = null,
+    onColorModeChange,
+  }: Props = $props();
 
   const { authSessionQuery } = createConsoleQueries(browser, {
     readiness: false,
@@ -277,6 +289,29 @@
         </DropdownMenuItem>
       {/each}
     {/if}
+    <DropdownMenuSeparator />
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger>
+        {#if colorMode === "dark"}
+          <Moon class="size-4" />
+        {:else}
+          <Sun class="size-4" />
+        {/if}
+        {$t(i18nKeys.common.theme.label)}
+      </DropdownMenuSubTrigger>
+      <DropdownMenuSubContent class="min-w-44">
+        <DropdownMenuRadioGroup value={colorMode}>
+          <DropdownMenuRadioItem value="light" onclick={() => onColorModeChange?.("light")}>
+            <Sun class="size-4" />
+            {$t(i18nKeys.common.theme.light)}
+          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="dark" onclick={() => onColorModeChange?.("dark")}>
+            <Moon class="size-4" />
+            {$t(i18nKeys.common.theme.dark)}
+          </DropdownMenuRadioItem>
+        </DropdownMenuRadioGroup>
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
     <DropdownMenuSeparator />
     <DropdownMenuLabel>{$t(i18nKeys.common.language.label)}</DropdownMenuLabel>
     <DropdownMenuRadioGroup value={$locale}>

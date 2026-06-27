@@ -114,6 +114,11 @@ export const i18nKeys = {
       label: "common:language.label",
       simplifiedChinese: "common:language.simplifiedChinese",
     },
+    theme: {
+      dark: "common:theme.dark",
+      label: "common:theme.label",
+      light: "common:theme.light",
+    },
     modes: {
       existing: "common:modes.existing",
       newEnvironment: "common:modes.newEnvironment",
