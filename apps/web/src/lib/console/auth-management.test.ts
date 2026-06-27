@@ -107,6 +107,11 @@ describe("organization auth management console surface", () => {
     expect(userMenuSource).not.toContain(
       "<DropdownMenuLabel>{$t(i18nKeys.common.language.label)}</DropdownMenuLabel>",
     );
+    const preferenceMenuSource = userMenuSource.slice(
+      userMenuSource.indexOf("i18nKeys.common.theme.label"),
+      userMenuSource.indexOf("i18nKeys.common.language.label"),
+    );
+    expect(preferenceMenuSource).not.toContain("DropdownMenuSeparator");
     expect(userMenuSource.indexOf('<Languages class="size-4" />')).toBeLessThan(
       userMenuSource.indexOf("i18nKeys.common.language.simplifiedChinese"),
     );
