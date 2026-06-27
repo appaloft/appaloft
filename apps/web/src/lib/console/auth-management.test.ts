@@ -102,6 +102,14 @@ describe("organization auth management console surface", () => {
     expect(userMenuSource).toContain("i18nKeys.common.theme.dark");
     expect(userMenuSource).toContain('onColorModeChange?.("light")');
     expect(userMenuSource).toContain('onColorModeChange?.("dark")');
+    expect(userMenuSource).toContain('<Languages class="size-4" />');
+    expect(userMenuSource).toContain("i18nKeys.common.language.label");
+    expect(userMenuSource).not.toContain(
+      "<DropdownMenuLabel>{$t(i18nKeys.common.language.label)}</DropdownMenuLabel>",
+    );
+    expect(userMenuSource.indexOf('<Languages class="size-4" />')).toBeLessThan(
+      userMenuSource.indexOf("i18nKeys.common.language.simplifiedChinese"),
+    );
     expect(userMenuSource).not.toContain("/api/auth/link-social");
     expect(userMenuSource).not.toContain("i18nKeys.console.shell.linkGitHubAccount");
     expect(userMenuSource).not.toContain("i18nKeys.console.shell.githubConnectedAs");
