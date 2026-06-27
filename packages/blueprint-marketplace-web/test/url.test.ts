@@ -5,6 +5,7 @@ import {
   createBlueprintDeployHandoffUrl,
   createBlueprintDetailHref,
   createBlueprintMarketplaceEndpoint,
+  createBlueprintMarketplaceLocalizedEndpoint,
   defaultBlueprintMarketplaceListEndpoint,
 } from "../src/url";
 
@@ -15,6 +16,26 @@ describe("Blueprint marketplace web URLs", () => {
     expect(createBlueprintMarketplaceEndpoint("https://app.example.test/", "/api/blueprints")).toBe(
       "https://app.example.test/api/blueprints",
     );
+  });
+
+  test("builds locale-specific catalog endpoints", () => {
+    expect(createBlueprintMarketplaceLocalizedEndpoint("", "/api/blueprints", "en-US")).toBe(
+      "/api/blueprints?locale=en-US",
+    );
+    expect(
+      createBlueprintMarketplaceLocalizedEndpoint(
+        "",
+        "/api/blueprints?surface=quick-deploy",
+        "zh-CN",
+      ),
+    ).toBe("/api/blueprints?surface=quick-deploy&locale=zh-CN");
+    expect(
+      createBlueprintMarketplaceLocalizedEndpoint(
+        "https://app.example.test/",
+        "/api/blueprints?locale=zh-CN#list",
+        "en-US",
+      ),
+    ).toBe("https://app.example.test/api/blueprints?locale=en-US#list");
   });
 
   test("builds deploy handoff and detail URLs", () => {
@@ -43,6 +64,7 @@ describe("Blueprint marketplace web URLs", () => {
     expect(pageSource).toContain('locale = "en-US"');
     expect(pageSource).toContain("marketplacePageCopy");
     expect(pageSource).toContain('"x-appaloft-locale": locale');
+    expect(pageSource).toContain("createBlueprintMarketplaceLocalizedEndpoint");
     expect(pageSource).toContain("data-marketplace-surface={surface}");
     expect(pageSource).toContain('import { cn } from "@appaloft/ui/utils"');
     expect(pageSource).toContain("const controlsClass = $derived");

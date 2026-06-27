@@ -15,5 +15,6 @@ export {
   createBlueprintDeployHandoffUrl,
   createBlueprintDetailHref,
   createBlueprintMarketplaceEndpoint,
+  createBlueprintMarketplaceLocalizedEndpoint,
   defaultBlueprintMarketplaceListEndpoint,
 } from "./url";
