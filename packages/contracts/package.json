@@ -6,7 +6,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "nanoid": "^5.1.11",
+    "nanoid": "^5.1.16",
     "zod": "^4.4.3"
   },
   "scripts": {

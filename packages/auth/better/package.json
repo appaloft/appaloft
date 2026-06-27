@@ -9,7 +9,7 @@
   "dependencies": {
     "@appaloft/application": "workspace:*",
     "@appaloft/core": "workspace:*",
-    "better-auth": "^1.6.10",
+    "better-auth": "^1.6.22",
     "reflect-metadata": "^0.2.2"
   },
   "scripts": {

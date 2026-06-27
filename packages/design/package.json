@@ -24,7 +24,7 @@
     "@fontsource/ibm-plex-sans": "^5.2.8"
   },
   "devDependencies": {
-    "@types/node": "^22",
-    "vitest": "^4.1.6"
+    "@types/node": "^22.20.0",
+    "vitest": "^4.1.9"
   }
 }
