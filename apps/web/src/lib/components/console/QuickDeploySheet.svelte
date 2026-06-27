@@ -6913,7 +6913,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
       <BlueprintCatalogSelector
         surface="dialog"
         selectedSlug={selectedBlueprintSlug}
-        actionLabel={$t(i18nKeys.console.quickDeploy.sourceBlueprintOpenSelector)}
+        actionLabel={$t(i18nKeys.console.quickDeploy.sourceBlueprintSelectAction)}
         onselect={applyBlueprintListing}
         onview={openBlueprintListingDetail}
       />

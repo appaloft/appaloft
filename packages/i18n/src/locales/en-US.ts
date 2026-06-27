@@ -3020,6 +3020,7 @@ export const enUS = {
       sourceBlueprintHint:
         "Choose an application from the Blueprint marketplace instead of entering source code.",
       sourceBlueprintOpenSelector: "Choose Blueprint",
+      sourceBlueprintSelectAction: "Select Blueprint",
       sourceBlueprintSelector: "Selected Blueprint",
       sourceCompose: "Compose",
       sourceComposeHint: "Import a compose manifest or a compose path from a repository.",

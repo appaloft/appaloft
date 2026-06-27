@@ -2688,6 +2688,7 @@ export const i18nKeys = {
       sourceBlueprintCatalogUnavailable: "console:quickDeploy.sourceBlueprintCatalogUnavailable",
       sourceBlueprintHint: "console:quickDeploy.sourceBlueprintHint",
       sourceBlueprintOpenSelector: "console:quickDeploy.sourceBlueprintOpenSelector",
+      sourceBlueprintSelectAction: "console:quickDeploy.sourceBlueprintSelectAction",
       sourceBlueprintSelector: "console:quickDeploy.sourceBlueprintSelector",
       sourceCompose: "console:quickDeploy.sourceCompose",
       sourceComposeHint: "console:quickDeploy.sourceComposeHint",

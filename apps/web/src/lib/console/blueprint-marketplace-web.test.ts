@@ -142,7 +142,15 @@ describe("Blueprint marketplace console surface", () => {
     expect(listPageSource).toContain('title="应用市场"');
     expect(listPageSource).toContain('class="max-w-7xl"');
     expect(detailPageSource).toContain("ConsoleShell");
-    expect(detailPageSource).toContain('title={listing?.title ?? "蓝图详情"}');
+    expect(detailPageSource).toContain("marketplaceDetailCopy");
+    expect(detailPageSource).toContain('catalogTitle: "Marketplace"');
+    expect(detailPageSource).toContain('catalogTitle: "应用市场"');
+    expect(detailPageSource).toContain("title={listing?.title ?? detailCopy.detailTitle}");
+    expect(detailPageSource).toContain("detailCopy.deploymentPlans");
+    expect(detailPageSource).toContain("detailCopy.quickDeploy");
+    expect(detailPageSource).toContain("detailCopy.topology");
+    expect(detailPageSource).toContain("detailCopy.backToMarketplace");
+    expect(detailPageSource).not.toContain('title={listing?.title ?? "蓝图详情"}');
     expect(detailPageSource).toContain("normalizeBlueprintDetailResponse");
     expect(detailPageSource).toContain("response.entry");
     expect(detailPageSource).toContain("blueprintRegistryEntryToListing");

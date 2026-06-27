@@ -2852,16 +2852,14 @@ describe("console page structure", () => {
     expect(blueprintDetailDisplaySurface).not.toContain("<form");
     expect(blueprintDetailDisplaySurface).not.toContain('type="submit"');
     expect(blueprintDetailDisplaySurface).toContain("onclick={openInstallDialog}");
-    expect(blueprintDetailDisplaySurface).toContain("快速部署");
+    expect(blueprintDetailDisplaySurface).toContain("{detailCopy.quickDeploy}");
     expect(blueprintVariantDisplaySurface).toContain("data-blueprint-variant-option");
-    expect(blueprintVariantDisplaySurface).toContain(
-      "方案选择、Profile 和参数输入在部署弹窗内完成；来源固定为当前 Blueprint。",
-    );
+    expect(blueprintVariantDisplaySurface).toContain("{detailCopy.deploymentPlanHelp}");
     expect(blueprintVariantDisplaySurface).not.toContain("selectedVariant = variant.id");
     expect(blueprintVariantDisplaySurface).not.toContain("<button");
     expect(blueprintVariantDisplaySurface).not.toContain("<Select.Root");
-    expect(installSummarySource).toContain("快速部署");
-    expect(installSummarySource).toContain("打开弹窗后直接部署当前 Blueprint");
+    expect(installSummarySource).toContain("{detailCopy.quickDeploy}");
+    expect(installSummarySource).toContain("{detailCopy.quickDeployDescription}");
     expect(installSummarySource).not.toContain("<Input");
     expect(installSummarySource).not.toContain("<select");
     expect(installSummarySource).not.toContain("data-blueprint-install-secret-inputs");
@@ -2872,8 +2870,8 @@ describe("console page structure", () => {
     expect(installDialogSource).not.toContain("<select");
     expect(installDialogSource).toContain("data-blueprint-install-secret-inputs");
     expect(installDialogSource).toContain("data-blueprint-accept-install");
-    expect(installDialogSource).toContain("来源固定为当前 Blueprint");
-    expect(installDialogSource).toContain("开始部署");
+    expect(installDialogSource).toContain("{detailCopy.quickDeployDialogDescription}");
+    expect(installDialogSource).toContain("{detailCopy.startDeployment}");
     expect(installDialogSource).not.toContain("生成 dry-run");
     expect(installDialogSource).not.toContain("预览部署计划");
   });
@@ -2899,12 +2897,14 @@ describe("console page structure", () => {
     expect(marketplaceBlueprintDetailPageSource).toContain("progressResourceHref");
     expect(marketplaceBlueprintDetailPageSource).toContain("dependencyResourceCollectionHref");
     expect(marketplaceBlueprintDetailPageSource).toContain("installedApplicationHref");
-    expect(marketplaceBlueprintDetailPageSource).toContain("打开资源");
-    expect(marketplaceBlueprintDetailPageSource).toContain("打开治理");
-    expect(marketplaceBlueprintDetailPageSource).toContain("打开公开 URL");
-    expect(marketplaceBlueprintDetailPageSource).toContain("查看安装聚合");
+    expect(marketplaceBlueprintDetailPageSource).toContain("{detailCopy.openResource}");
+    expect(marketplaceBlueprintDetailPageSource).toContain("{detailCopy.openGovernance}");
+    expect(marketplaceBlueprintDetailPageSource).toContain("{detailCopy.openPublicUrl}");
+    expect(marketplaceBlueprintDetailPageSource).toContain("{detailCopy.viewInstalledApplication}");
     expect(marketplaceBlueprintDetailPageSource).toContain("/installed-applications/");
-    expect(marketplaceBlueprintDetailPageSource).toContain("安装结果页会在应用 ID 返回后出现");
+    expect(marketplaceBlueprintDetailPageSource).toContain(
+      "{detailCopy.installedApplicationPending}",
+    );
     expect(marketplaceBlueprintDetailPageSource).not.toContain("安装详情暂时还不能打开");
     expect(marketplaceBlueprintDetailPageSource).not.toContain("暂时还不能");
     expect(marketplaceBlueprintDetailPageSource).not.toContain("detail route");
@@ -2913,12 +2913,18 @@ describe("console page structure", () => {
     expect(marketplaceBlueprintDetailPageSource).not.toContain(
       "Installed Application detail route 仍是 route gap",
     );
-    expect(marketplaceBlueprintDetailPageSource).toContain("资源网络页或域名绑定页");
+    expect(marketplaceBlueprintDetailPageSource).toContain("detailCopy.publicUrlEmpty");
     expect(marketplaceBlueprintDetailPageSource).toContain("progressDeploymentHref");
     expect(marketplaceBlueprintDetailPageSource).toContain("componentDeploymentStatus");
-    expect(marketplaceBlueprintDetailPageSource).toContain('return "安装交接";');
-    expect(marketplaceBlueprintDetailPageSource).toContain('return "安装需要处理";');
-    expect(marketplaceBlueprintDetailPageSource).toContain('return "安装正在进行";');
+    expect(marketplaceBlueprintDetailPageSource).toContain(
+      "return detailCopy.installHandoffTitle;",
+    );
+    expect(marketplaceBlueprintDetailPageSource).toContain(
+      "return detailCopy.installHandoffNeedsAttentionTitle;",
+    );
+    expect(marketplaceBlueprintDetailPageSource).toContain(
+      "return detailCopy.installHandoffInProgressTitle;",
+    );
 
     const installHandoffSource =
       marketplaceBlueprintDetailPageSource.match(
@@ -2927,15 +2933,15 @@ describe("console page structure", () => {
 
     expect(installHandoffSource).toContain("installHandoffTitle(installResult.progress)");
     expect(installHandoffSource).toContain("installHandoffDescription(installResult.progress)");
-    expect(installHandoffSource).toContain("创建的资源");
-    expect(installHandoffSource).toContain("依赖资源");
-    expect(installHandoffSource).toContain("公开 URL");
-    expect(installHandoffSource).toContain("组件部署");
-    expect(installHandoffSource).toContain("打开首个资源");
-    expect(installHandoffSource).toContain("打开最新部署");
-    expect(installHandoffSource).toContain("查看安装聚合");
-    expect(installHandoffSource).toContain("打开项目列表");
-    expect(installHandoffSource).toContain("安装结果页会在应用 ID 返回后出现");
+    expect(installHandoffSource).toContain("{detailCopy.createdResources}");
+    expect(installHandoffSource).toContain("{detailCopy.dependencyResources}");
+    expect(installHandoffSource).toContain("{detailCopy.publicUrl}");
+    expect(installHandoffSource).toContain("{detailCopy.componentDeployments}");
+    expect(installHandoffSource).toContain("{detailCopy.openFirstResource}");
+    expect(installHandoffSource).toContain("{detailCopy.openLatestDeployment}");
+    expect(installHandoffSource).toContain("{detailCopy.viewInstalledApplication}");
+    expect(installHandoffSource).toContain("{detailCopy.openProjects}");
+    expect(installHandoffSource).toContain("{detailCopy.installedApplicationPending}");
     expect(installHandoffSource).not.toContain("暂时还不能");
     expect(installHandoffSource).not.toContain("detail route");
     expect(installHandoffSource).not.toContain("collection 进入治理");

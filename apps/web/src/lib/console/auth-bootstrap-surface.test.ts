@@ -32,6 +32,7 @@ describe("self-hosted auth bootstrap Web surfaces", () => {
       "utf8",
     );
     const appHtmlSource = await readFile(new URL("../../app.html", import.meta.url), "utf8");
+    const i18nSource = await readFile(new URL("../../lib/i18n.ts", import.meta.url), "utf8");
     const accountSecurityPageSource = await readFile(
       new URL("../../routes/account/security/+page.svelte", import.meta.url),
       "utf8",
@@ -122,6 +123,12 @@ describe("self-hosted auth bootstrap Web surfaces", () => {
     expect(authPublicConfigSource).toContain("VITE_APPALOFT_GITHUB_AUTH_ENABLED");
     expect(authPublicConfigSource).toContain("isPublicGitHubAuthConfigured");
     expect(appHtmlSource).toContain("/api/auth/public-config.js");
+    expect(appHtmlSource).toContain('<html lang="en-US">');
+    expect(i18nSource).toContain(
+      "window.localStorage.getItem(appaloftLocaleStorageKey) || readDocumentLocale()",
+    );
+    expect(i18nSource).toContain("const initialLocale = readInitialLocale();");
+    expect(i18nSource).toContain("syncDocumentLocale(initialLocale);");
   });
 
   test("[PRODUCT-AUTH-PUBLIC-CONFIG-001] auth entry pages render provider affordances from public runtime config", async () => {
