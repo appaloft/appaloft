@@ -15,6 +15,8 @@
     findBlueprintCatalogExtensionByKey,
     readBlueprintCatalogExtensionMetadata,
   } from "$lib/console/blueprint-marketplace-extension";
+  import { systemPluginExtensionTitle } from "$lib/console/web-extension-presentation";
+  import { locale } from "$lib/i18n";
 
   type CatalogSurface = Extract<BlueprintMarketplaceSurface, "page" | "dialog">;
   type SystemPluginWebExtensionsResponse = {
@@ -87,6 +89,9 @@
         ? "quick-deploy"
         : "page",
   );
+  const catalogTitle = $derived(
+    catalogExtension ? systemPluginExtensionTitle(catalogExtension, $locale) : "应用市场",
+  );
 </script>
 
 <div
@@ -95,7 +100,7 @@
 >
   <BlueprintMarketplacePage
     chrome="embedded"
-    title={catalogExtension?.title ?? "应用市场"}
+    title={catalogTitle}
     subtitle="选择官方 Blueprint，先看清应用组件、依赖资源和部署计划，再进入部署流程。"
     badgeLabel="蓝图目录"
     loading={catalogMetadataLoading}

@@ -8,13 +8,22 @@ import {
   findBlueprintCatalogExtensionByKey,
   readBlueprintCatalogExtensionMetadata,
 } from "./blueprint-marketplace-extension";
-import { systemPluginExtensionIconPresentation } from "./web-extension-presentation";
+import {
+  systemPluginExtensionIconPresentation,
+  systemPluginExtensionTitle,
+} from "./web-extension-presentation";
 
 const marketplaceExtension: SystemPluginWebExtension = {
   key: "example-marketplace",
   pluginName: "example",
   pluginDisplayName: "Example",
   title: "Marketplace",
+  localizations: {
+    "zh-CN": {
+      title: "应用市场",
+      description: "官方蓝图应用市场。",
+    },
+  },
   path: "/marketplace",
   placement: "navigation",
   target: "console-route",
@@ -90,6 +99,11 @@ describe("Blueprint marketplace console surface", () => {
     );
   });
 
+  test("[CLOUD-BLUEPRINT-SELECTOR-027] presents localized catalog extension title after hydration", () => {
+    expect(systemPluginExtensionTitle(marketplaceExtension, "zh-CN")).toBe("应用市场");
+    expect(systemPluginExtensionTitle(marketplaceExtension, "en-US")).toBe("Marketplace");
+  });
+
   test("[CLOUD-BLUEPRINT-DETAIL-UX-029] keeps Marketplace inside ConsoleShell and hides raw plan JSON behind details", async () => {
     const [
       listPageSource,
@@ -142,7 +156,8 @@ describe("Blueprint marketplace console surface", () => {
     expect(selectorSource).toContain("requestedSourceExtensionKey");
     expect(selectorSource).toContain('page.url.searchParams.get("surface") === "quick-deploy"');
     expect(selectorSource).toContain("surface={marketplaceSurface}");
-    expect(selectorSource).toContain('title={catalogExtension?.title ?? "应用市场"}');
+    expect(selectorSource).toContain("systemPluginExtensionTitle(catalogExtension, $locale)");
+    expect(selectorSource).toContain("title={catalogTitle}");
     expect(selectorSource).toContain('badgeLabel="蓝图目录"');
     expect(selectorSource).toContain("catalogMetadataLoading");
     expect(selectorSource).toContain("loading={catalogMetadataLoading}");
