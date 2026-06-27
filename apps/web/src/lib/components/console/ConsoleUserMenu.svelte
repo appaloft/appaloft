@@ -313,7 +313,6 @@
         </DropdownMenuRadioGroup>
       </DropdownMenuSubContent>
     </DropdownMenuSub>
-    <DropdownMenuSeparator />
     <DropdownMenuSub>
       <DropdownMenuSubTrigger>
         <Languages class="size-4" />
