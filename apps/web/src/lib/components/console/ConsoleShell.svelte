@@ -53,7 +53,12 @@
     SidebarProvider,
     SidebarTrigger,
   } from "$lib/components/ui/sidebar";
-  import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
+  import {
+    createMutation,
+    createQuery,
+    queryOptions,
+    useIsFetching,
+  } from "@tanstack/svelte-query";
   import { createConsoleQueries, defaultAuthSession } from "$lib/console/queries";
   import {
     consoleSidebarOpenStorageKey,
@@ -172,6 +177,10 @@
   const organizations = $derived(organizationContext?.organizations ?? []);
   const projects = $derived(projectsQuery.data?.items ?? []);
   const projectsLoading = $derived(projectsQuery.isPending && projects.length === 0);
+  const initialFetchingQueryCount = useIsFetching({
+    predicate: (query) => query.state.data === undefined,
+  });
+  const initialConsoleLoading = $derived(projectsLoading || initialFetchingQueryCount.current > 0);
   const visibilityExtensionEndpoints = $derived.by(() =>
     (webExtensionsQuery.data?.items ?? [])
       .map((extension) => {
@@ -552,6 +561,7 @@
       <ConsoleUserMenu
         {colorMode}
         extensions={accountMenuExtensions}
+        loading={initialConsoleLoading}
         organization={currentOrganization
           ? {
               organizationId: currentOrganization.organizationId,
