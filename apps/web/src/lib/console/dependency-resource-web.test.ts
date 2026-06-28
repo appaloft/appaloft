@@ -119,8 +119,16 @@ describe("dependency resource Web console surface", () => {
     expect(dependencyResourcePageSource).toContain("{@html icon.svg}");
     expect(dependencyResourcePageSource).not.toContain("background-color: ${iconColor");
     expect(dependencyResourcePageSource).not.toContain("simple-icons");
-    expect(dependencyResourcePageSource).toContain("aria-pressed={createKind === dependencyKind}");
-    expect(dependencyResourcePageSource).toContain("aria-pressed={provisioningMode === mode}");
+    expect(dependencyResourcePageSource).toContain("checked={createKind === dependencyKind}");
+    expect(dependencyResourcePageSource).toContain("checked={provisioningMode === mode}");
+    expect(dependencyResourcePageSource).toContain(
+      "onchange={() => selectDependencyKind(dependencyKind)}",
+    );
+    expect(dependencyResourcePageSource).toContain("onchange={() => selectProvisioningMode(mode)}");
+    expect(dependencyResourcePageSource).not.toContain(
+      "aria-pressed={createKind === dependencyKind}",
+    );
+    expect(dependencyResourcePageSource).not.toContain("aria-pressed={provisioningMode === mode}");
     expect(dependencyResourcePageSource).not.toContain("<Select.Item value={dependencyKind}");
     expect(dependencyResourcePageSource).toContain(
       "orpcClient.dependencyResources.provisioning.plan",
@@ -198,6 +206,20 @@ describe("dependency resource Web console surface", () => {
       "<Select.Content class={dependencyResourceSelectContentClass}>",
     );
     expect(dependencyResourcePageSource).toContain("class={dependencyResourceNestedDialogClass}");
+    expect(dependencyResourcePageSource).toContain(
+      '<Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-3xl">',
+    );
+    expect(dependencyResourcePageSource).toContain('name="dependency-resource-provisioning-mode"');
+    expect(dependencyResourcePageSource).toContain('name="dependency-resource-kind"');
+    expect(dependencyResourcePageSource).toContain(
+      '"flex cursor-pointer items-center gap-3 rounded-md border p-2.5 text-left transition focus-within:ring-2 focus-within:ring-ring"',
+    );
+    expect(dependencyResourcePageSource).not.toContain(
+      '"flex min-h-20 items-start gap-3 rounded-md border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"',
+    );
+    expect(dependencyResourcePageSource).not.toContain(
+      '<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">',
+    );
     const nestedDialogClassInterpolation = "$" + "{dependencyResourceNestedDialogClass}";
     expect(dependencyResourcePageSource).toContain(
       `class={\`max-w-5xl ${nestedDialogClassInterpolation}\`}`,
