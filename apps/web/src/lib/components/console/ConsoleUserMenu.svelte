@@ -89,9 +89,7 @@
 
   const pathname = $derived(page.url.pathname);
   const authSession = $derived(authSessionQuery.data ?? defaultAuthSession);
-  const authSessionLoading = $derived(
-    loading || (authSessionQuery.isLoading && !authSessionQuery.data),
-  );
+  const authSessionLoading = $derived(loading);
   const authIdentity = $derived(readSessionIdentity(authSession.session));
   const showInstanceManagementLink = $derived(
     $capabilities.capabilities[instanceAccessCapabilityKey]?.allowed === true,
