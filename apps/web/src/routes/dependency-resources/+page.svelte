@@ -730,7 +730,7 @@
     bind:open={dependencyResourceCreateDialogOpen}
     onOpenChange={setDependencyResourceCreateDialogOpen}
   >
-    <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-5xl">
+    <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-3xl">
       <Dialog.Header>
         <Dialog.Title>{provisioningActionLabel()}</Dialog.Title>
         <Dialog.Description>
@@ -745,30 +745,37 @@
         >
           <fieldset class="space-y-2">
             <legend class="console-field-label">{$t(i18nKeys.console.dependencyResources.provisioningMode)}</legend>
-            <div class="grid gap-3 sm:grid-cols-2">
+            <div class="space-y-2">
               {#each provisioningModes as mode (mode)}
-                <button
-                  type="button"
+                <label
                   class={[
-                    "rounded-md border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    "flex cursor-pointer items-start gap-3 rounded-md border p-3 text-left transition focus-within:ring-2 focus-within:ring-ring",
                     provisioningMode === mode
                       ? "border-primary bg-primary/5 text-foreground shadow-sm"
                       : "border-border bg-card text-foreground hover:border-primary/25 hover:bg-primary/5",
                   ]}
-                  aria-pressed={provisioningMode === mode}
-                  onclick={() => selectProvisioningMode(mode)}
                 >
-                  <span class="block text-sm font-semibold">
-                    {mode === "create"
-                      ? $t(i18nKeys.console.dependencyResources.modeCreate)
-                      : $t(i18nKeys.console.dependencyResources.modeReuse)}
+                  <input
+                    class="mt-0.5 size-4 shrink-0 accent-primary"
+                    type="radio"
+                    name="dependency-resource-provisioning-mode"
+                    value={mode}
+                    checked={provisioningMode === mode}
+                    onchange={() => selectProvisioningMode(mode)}
+                  />
+                  <span class="min-w-0">
+                    <span class="block text-sm font-semibold">
+                      {mode === "create"
+                        ? $t(i18nKeys.console.dependencyResources.modeCreate)
+                        : $t(i18nKeys.console.dependencyResources.modeReuse)}
+                    </span>
+                    <span class="mt-0.5 block text-xs text-muted-foreground">
+                      {mode === "create"
+                        ? $t(i18nKeys.console.dependencyResources.modeCreateDescription)
+                        : $t(i18nKeys.console.dependencyResources.modeReuseDescription)}
+                    </span>
                   </span>
-                  <span class="mt-1 block text-xs text-muted-foreground">
-                    {mode === "create"
-                      ? $t(i18nKeys.console.dependencyResources.modeCreateDescription)
-                      : $t(i18nKeys.console.dependencyResources.modeReuseDescription)}
-                  </span>
-                </button>
+                </label>
               {/each}
             </div>
           </fieldset>
@@ -897,22 +904,27 @@
 
           <fieldset class="space-y-2">
             <legend class="console-field-label">{$t(i18nKeys.common.domain.kind)}</legend>
-            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+            <div class="space-y-2">
               {#each dependencyKindOrder as dependencyKind (dependencyKind)}
                 {@const icon = kindIcon(dependencyKind)}
-                <button
-                  type="button"
+                <label
                   class={[
-                    "flex min-h-20 items-start gap-3 rounded-md border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    "flex cursor-pointer items-center gap-3 rounded-md border p-2.5 text-left transition focus-within:ring-2 focus-within:ring-ring",
                     createKind === dependencyKind
                       ? "border-primary bg-primary/5 text-foreground shadow-sm"
                       : "border-border bg-card text-foreground hover:border-primary/25 hover:bg-primary/5",
                   ]}
-                  aria-pressed={createKind === dependencyKind}
-                  onclick={() => selectDependencyKind(dependencyKind)}
                 >
+                  <input
+                    class="size-4 shrink-0 accent-primary"
+                    type="radio"
+                    name="dependency-resource-kind"
+                    value={dependencyKind}
+                    checked={createKind === dependencyKind}
+                    onchange={() => selectDependencyKind(dependencyKind)}
+                  />
                   <span
-                    class="flex size-10 shrink-0 items-center justify-center rounded-md border bg-background"
+                    class="flex size-9 shrink-0 items-center justify-center rounded-md border bg-background"
                   >
                     <span class="dependency-kind-logo" role="img" aria-label={icon.title}>
                       {@html icon.svg}
@@ -920,11 +932,11 @@
                   </span>
                   <span class="min-w-0">
                     <span class="block text-sm font-semibold">{kindLabel(dependencyKind)}</span>
-                    <span class="mt-1 block text-xs leading-5 text-muted-foreground">
+                    <span class="mt-0.5 block text-xs leading-5 text-muted-foreground">
                       {$t(dependencyKindOptions[dependencyKind].descriptionKey)}
                     </span>
                   </span>
-                </button>
+                </label>
               {/each}
             </div>
           </fieldset>
