@@ -116,6 +116,13 @@ describe("self-hosted auth bootstrap Web surfaces", () => {
     expect(consoleUserMenuSource).not.toContain("w-(--bits-dropdown-menu-anchor-width) min-w-0");
     expect(consoleUserMenuSource).toContain("/account/profile");
     expect(consoleUserMenuSource).toContain("accountSettings.introTitle");
+    expect(consoleUserMenuSource).toContain("authSessionLoading");
+    expect(consoleUserMenuSource).toContain("data-console-user-menu-loading-label");
+    expect(consoleUserMenuSource).toContain("{#if authSessionLoading}");
+    expect(consoleUserMenuSource).toContain("{:else if authSession.session}");
+    expect(consoleShellSource).toContain("useIsFetching");
+    expect(consoleShellSource).toContain("initialConsoleLoading");
+    expect(consoleShellSource).toContain("loading={initialConsoleLoading}");
     expect(consoleShellSource).not.toContain('navigateTo("/account/security")');
     expect(firstAdminPageSource).toContain("status?.bootstrapRequired === false");
     expect(firstAdminPageSource).toContain("goto(loginUrl)");
