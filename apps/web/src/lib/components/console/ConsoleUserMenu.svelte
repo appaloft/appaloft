@@ -20,6 +20,7 @@
   import { request } from "$lib/api/client";
   import { Avatar, AvatarFallback } from "$lib/components/ui/avatar";
   import { Badge } from "$lib/components/ui/badge";
+  import { Skeleton } from "$lib/components/ui/skeleton";
   import {
     DropdownMenu,
     DropdownMenuContent,
@@ -59,6 +60,7 @@
   type Props = {
     colorMode?: "light" | "dark";
     extensions?: readonly SystemPluginWebExtension[];
+    loading?: boolean;
     organization?: OrganizationBadgeContext | null;
     onColorModeChange?: (mode: "light" | "dark") => void;
   };
@@ -66,6 +68,7 @@
   let {
     colorMode = "light",
     extensions = [],
+    loading = false,
     organization = null,
     onColorModeChange,
   }: Props = $props();
@@ -86,6 +89,9 @@
 
   const pathname = $derived(page.url.pathname);
   const authSession = $derived(authSessionQuery.data ?? defaultAuthSession);
+  const authSessionLoading = $derived(
+    loading || (authSessionQuery.isLoading && !authSessionQuery.data),
+  );
   const authIdentity = $derived(readSessionIdentity(authSession.session));
   const showInstanceManagementLink = $derived(
     $capabilities.capabilities[instanceAccessCapabilityKey]?.allowed === true,
@@ -208,13 +214,22 @@
 <DropdownMenu>
   <DropdownMenuTrigger
     data-console-user-menu-trigger
+    aria-busy={authSessionLoading}
     class="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
   >
-    <Avatar size="sm">
-      <AvatarFallback>{initials(authIdentity ?? "Appaloft")}</AvatarFallback>
-    </Avatar>
+    {#if authSessionLoading}
+      <Skeleton class="size-8 shrink-0 rounded-full" data-console-user-menu-loading-avatar />
+    {:else}
+      <Avatar size="sm">
+        <AvatarFallback>{initials(authIdentity ?? "Appaloft")}</AvatarFallback>
+      </Avatar>
+    {/if}
     <span class="min-w-0 flex-1 self-center group-data-[collapsible=icon]:hidden">
-      <span class="block truncate text-sm font-medium">{authIdentity ?? $t(i18nKeys.common.status.unauthenticated)}</span>
+      {#if authSessionLoading}
+        <Skeleton class="h-4 w-24" data-console-user-menu-loading-label />
+      {:else}
+        <span class="block truncate text-sm font-medium">{authIdentity ?? $t(i18nKeys.common.status.unauthenticated)}</span>
+      {/if}
     </span>
     <ChevronUp class="size-4 text-muted-foreground group-data-[collapsible=icon]:hidden" />
   </DropdownMenuTrigger>
@@ -226,8 +241,13 @@
   >
     <DropdownMenuLabel>
       <div class="flex items-center gap-2">
-        <UserRound class="size-4" />
-        <span class="min-w-0 truncate">{authIdentity ?? $t(i18nKeys.console.shell.userSettings)}</span>
+        {#if authSessionLoading}
+          <Skeleton class="size-4 shrink-0 rounded-full" />
+          <Skeleton class="h-4 w-32" data-console-user-menu-loading-menu-label />
+        {:else}
+          <UserRound class="size-4" />
+          <span class="min-w-0 truncate">{authIdentity ?? $t(i18nKeys.console.shell.userSettings)}</span>
+        {/if}
       </div>
     </DropdownMenuLabel>
     <DropdownMenuSeparator />
@@ -329,7 +349,13 @@
         </DropdownMenuRadioGroup>
       </DropdownMenuSubContent>
     </DropdownMenuSub>
-    {#if authSession.session}
+    {#if authSessionLoading}
+      <DropdownMenuSeparator />
+      <DropdownMenuItem disabled>
+        <Skeleton class="size-4 shrink-0 rounded-sm" />
+        <Skeleton class="h-4 w-20" data-console-user-menu-loading-action />
+      </DropdownMenuItem>
+    {:else if authSession.session}
       <DropdownMenuSeparator />
       <DropdownMenuItem data-console-sign-out-action onclick={signOut}>
         <LogOut class="size-4" />
