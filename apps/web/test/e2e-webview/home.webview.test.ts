@@ -8725,10 +8725,10 @@ describe.serial("console e2e with Bun.WebView", () => {
     await expectAnyText(view, ["Health", "健康", "状态"]);
     const projectRuntimeMonitorLayout = await view.evaluate<{
       panelBottom: number;
-      mainBottom: number;
-      mainScrollTop: number;
-      mainScrollHeight: number;
-      mainClientHeight: number;
+      scrollerBottom: number;
+      scrollerScrollTop: number;
+      scrollerScrollHeight: number;
+      scrollerClientHeight: number;
     } | null>(
       `(() => {
         const main = document.querySelector("[data-console-main]");
@@ -8737,15 +8737,28 @@ describe.serial("console e2e with Bun.WebView", () => {
           return null;
         }
 
-        main.scrollTop = main.scrollHeight;
+        let scroller = main;
+        for (let element = panel.parentElement; element; element = element.parentElement) {
+          const style = window.getComputedStyle(element);
+          const canScroll = /auto|scroll/.test(style.overflowY) && element.scrollHeight > element.clientHeight;
+          if (canScroll) {
+            scroller = element;
+            break;
+          }
+          if (element === main) {
+            break;
+          }
+        }
+
+        scroller.scrollTop = scroller.scrollHeight;
         const panelRect = panel.getBoundingClientRect();
-        const mainRect = main.getBoundingClientRect();
+        const scrollerRect = scroller.getBoundingClientRect();
         return {
           panelBottom: panelRect.bottom,
-          mainBottom: mainRect.bottom,
-          mainScrollTop: main.scrollTop,
-          mainScrollHeight: main.scrollHeight,
-          mainClientHeight: main.clientHeight,
+          scrollerBottom: scrollerRect.bottom,
+          scrollerScrollTop: scroller.scrollTop,
+          scrollerScrollHeight: scroller.scrollHeight,
+          scrollerClientHeight: scroller.clientHeight,
         };
       })()`,
     );
@@ -8753,13 +8766,14 @@ describe.serial("console e2e with Bun.WebView", () => {
       throw new Error("Expected project runtime monitor layout to be measurable");
     }
     expect(projectRuntimeMonitorLayout.panelBottom).toBeLessThanOrEqual(
-      projectRuntimeMonitorLayout.mainBottom + 1,
+      projectRuntimeMonitorLayout.scrollerBottom + 1,
     );
     expect(
       Math.ceil(
-        projectRuntimeMonitorLayout.mainScrollTop + projectRuntimeMonitorLayout.mainClientHeight,
+        projectRuntimeMonitorLayout.scrollerScrollTop +
+          projectRuntimeMonitorLayout.scrollerClientHeight,
       ),
-    ).toBeGreaterThanOrEqual(projectRuntimeMonitorLayout.mainScrollHeight - 1);
+    ).toBeGreaterThanOrEqual(projectRuntimeMonitorLayout.scrollerScrollHeight - 1);
     expect(
       recordedApiRequests.some((request) => {
         if (request.pathname !== "/api/rpc/runtimeMonitoring/rollup") {
