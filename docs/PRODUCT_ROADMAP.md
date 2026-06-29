@@ -2320,12 +2320,14 @@ Required:
   smoke:swarm` passed 11 tests including the opt-in real Swarm apply/cleanup path after temporary
   Swarm initialization; and `bun run smoke:install-auth` passed the opt-in self-hosted PGlite
   install/auth/deploy-token smoke after `bun.lock` was synced. Required SSH evidence is now exposed
-  through GitHub Actions secret-gated/local explicit `bun run smoke:ssh`, its
-  `smoke:ssh:remote-state` and `smoke:ssh:quick-deploy` parts, `bun run smoke:ssh:evidence` for
-  redacted `dist/release/ssh-smoke-evidence.json` capture after both SSH suites pass, per-workflow
-  redacted evidence capture for the reusable release/nightly workflows. Local release preparation
-  can skip real SSH execution when no target server exists; the release workflow keeps manual
-  `require_ssh_remote_state_e2e` and `require_ssh_quick_deploy_e2e` inputs so a
+  through GitHub Actions secret-gated/local explicit `bun run smoke:ssh`, its public launch
+  `smoke:public-launch:basic-docker`, `smoke:public-launch:github-repo`, and
+  `smoke:public-launch:scheduled-task-cron` parts, `bun run smoke:ssh:evidence` for redacted
+  `dist/release/ssh-smoke-evidence.json` capture after the public launch suites pass, and
+  per-workflow redacted evidence capture for the reusable release/nightly workflows. Local release
+  preparation can skip real SSH execution when no target server exists; the release workflow keeps
+  manual `require_public_launch_basic_docker_smoke`,
+  `require_public_launch_github_repo_smoke`, and `require_public_launch_cron_smoke` inputs so a
   release-readiness run that needs SSH confidence fails closed when target secrets are absent.
 
 Exit criteria:
@@ -2361,12 +2363,12 @@ Exit criteria:
 - [x] Phase 9 release readiness passes the local, PGlite, PostgreSQL, Docker, and GitHub Actions
   secret-gated/local explicit SSH smoke gates required for a `0.11.0` minor release.
   Local, PGlite, PostgreSQL, Docker-backed local, Swarm, and install-auth evidence was recorded on
-  2026-05-12. SSH smoke is wired through aggregate `smoke:ssh`,
-  `smoke:ssh:remote-state`, `smoke:ssh:quick-deploy`, `smoke:ssh:evidence`, and per-workflow
+  2026-05-12. SSH smoke is wired through aggregate `smoke:ssh`, public launch basic Docker, public
+  launch GitHub repository, public launch scheduled task, `smoke:ssh:evidence`, and per-workflow
   evidence scripts; Release publish runs can require the SSH reusable workflows when the manual
-  `require_ssh_*` inputs are set, and those workflows upload redacted evidence artifacts after
-  success. Missing SSH target secrets fail the required reusable workflows instead of converting the
-  release-readiness path into a known-gap note.
+  `require_public_launch_*` inputs are set, and those workflows upload redacted evidence artifacts
+  after success. Missing SSH target secrets fail the required reusable workflows instead of
+  converting the release-readiness path into a known-gap note.
 
 ## Phase 10: Runtime Usage Attribution And Monitoring
 

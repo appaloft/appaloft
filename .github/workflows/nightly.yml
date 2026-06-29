@@ -11,14 +11,20 @@ env:
   APPALOFT_OTEL_ENABLED: "false"
 
 jobs:
-  ssh-remote-state-e2e:
-    uses: ./.github/workflows/ssh-remote-state-e2e.yml
+  public-launch-basic-docker-smoke:
+    uses: ./.github/workflows/public-launch-basic-docker-smoke.yml
     with:
       required: false
     secrets: inherit
 
-  ssh-quick-deploy-e2e:
-    uses: ./.github/workflows/ssh-quick-deploy-e2e.yml
+  public-launch-github-repo-smoke:
+    uses: ./.github/workflows/public-launch-github-repo-smoke.yml
+    with:
+      required: false
+    secrets: inherit
+
+  public-launch-cron-smoke:
+    uses: ./.github/workflows/public-launch-cron-smoke.yml
     with:
       required: false
     secrets: inherit

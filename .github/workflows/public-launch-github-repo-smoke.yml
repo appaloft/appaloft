@@ -1,0 +1,138 @@
+name: Public Launch GitHub Repo Smoke
+
+on:
+  workflow_call:
+    inputs:
+      required:
+        description: Fail when the public launch smoke SSH secrets are not configured.
+        required: false
+        default: false
+        type: boolean
+      github_tree_url:
+        description: Public GitHub tree URL to deploy.
+        required: false
+        default: https://github.com/coollabsio/coolify-examples/tree/v4.x/bun
+        type: string
+    secrets:
+      APPALOFT_PUBLIC_LAUNCH_SMOKE_SSH_HOST:
+        required: false
+      APPALOFT_PUBLIC_LAUNCH_SMOKE_SSH_PRIVATE_KEY:
+        required: false
+      APPALOFT_PUBLIC_LAUNCH_SMOKE_SSH_PORT:
+        required: false
+      APPALOFT_PUBLIC_LAUNCH_SMOKE_SSH_USERNAME:
+        required: false
+      APPALOFT_E2E_SSH_HOST:
+        required: false
+      APPALOFT_E2E_SSH_PRIVATE_KEY:
+        required: false
+      APPALOFT_E2E_SSH_PORT:
+        required: false
+      APPALOFT_E2E_SSH_USERNAME:
+        required: false
+  workflow_dispatch:
+    inputs:
+      confirm_live_ssh_smoke:
+        description: Type true to run the live public Appaloft GitHub repo smoke.
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      github_tree_url:
+        description: Public GitHub tree URL to deploy.
+        required: false
+        default: https://github.com/coollabsio/coolify-examples/tree/v4.x/bun
+        type: string
+      required:
+        description: Fail when the public launch smoke SSH secrets are not configured.
+        required: false
+        default: true
+        type: boolean
+
+concurrency:
+  group: public-launch-github-repo-smoke-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  APPALOFT_OTEL_ENABLED: "false"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      HAS_PUBLIC_LAUNCH_SMOKE_SECRETS: ${{ (secrets.APPALOFT_PUBLIC_LAUNCH_SMOKE_SSH_HOST != '' || secrets.APPALOFT_E2E_SSH_HOST != '') && (secrets.APPALOFT_PUBLIC_LAUNCH_SMOKE_SSH_PRIVATE_KEY != '' || secrets.APPALOFT_E2E_SSH_PRIVATE_KEY != '') }}
+    steps:
+      - name: Check live smoke confirmation
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          set -euo pipefail
+          if [ "${{ inputs.confirm_live_ssh_smoke }}" != "true" ]; then
+            echo "::error::This workflow uses a real SSH deployment target. Re-run with confirm_live_ssh_smoke=true."
+            exit 1
+          fi
+
+      - name: Require Public Launch Smoke Secrets
+        if: ${{ env.HAS_PUBLIC_LAUNCH_SMOKE_SECRETS != 'true' && inputs.required == true }}
+        run: |
+          echo "::error::Missing APPALOFT_PUBLIC_LAUNCH_SMOKE_SSH_HOST or APPALOFT_PUBLIC_LAUNCH_SMOKE_SSH_PRIVATE_KEY."
+          echo "::error::Configure repository or organization secrets, or dispatch with required=false."
+          exit 1
+
+      - name: Skip Public Launch GitHub Repo Smoke
+        if: ${{ env.HAS_PUBLIC_LAUNCH_SMOKE_SECRETS != 'true' && inputs.required != true }}
+        run: |
+          echo "Skipping public launch GitHub repo smoke because SSH target secrets are not configured."
+
+      - uses: actions/checkout@v4
+        if: ${{ env.HAS_PUBLIC_LAUNCH_SMOKE_SECRETS == 'true' }}
+
+      - uses: oven-sh/setup-bun@v2
+        if: ${{ env.HAS_PUBLIC_LAUNCH_SMOKE_SECRETS == 'true' }}
+        with:
+          bun-version-file: .bun-version
+
+      - name: Install
+        if: ${{ env.HAS_PUBLIC_LAUNCH_SMOKE_SECRETS == 'true' }}
+        run: bun install --frozen-lockfile
+
+      - name: Verify Bun version sync
+        if: ${{ env.HAS_PUBLIC_LAUNCH_SMOKE_SECRETS == 'true' }}
+        run: bun run bun:version:check
+
+      - name: Prepare SSH Key
+        if: ${{ env.HAS_PUBLIC_LAUNCH_SMOKE_SECRETS == 'true' }}
+        shell: bash
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.APPALOFT_PUBLIC_LAUNCH_SMOKE_SSH_PRIVATE_KEY || secrets.APPALOFT_E2E_SSH_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "${RUNNER_TEMP}/appaloft-ssh"
+          printf '%s\n' "${SSH_PRIVATE_KEY}" > "${RUNNER_TEMP}/appaloft-ssh/key"
+          chmod 600 "${RUNNER_TEMP}/appaloft-ssh/key"
+          echo "APPALOFT_E2E_SSH_PRIVATE_KEY=${RUNNER_TEMP}/appaloft-ssh/key" >> "${GITHUB_ENV}"
+
+      - name: Run public launch GitHub repo smoke
+        if: ${{ env.HAS_PUBLIC_LAUNCH_SMOKE_SECRETS == 'true' }}
+        env:
+          APPALOFT_PUBLIC_LAUNCH_SMOKE_CONFIRM: "true"
+          APPALOFT_PUBLIC_LAUNCH_SMOKE_SCENARIO: github-repo
+          APPALOFT_PUBLIC_LAUNCH_SMOKE_RUN_ID: ci-github-${{ github.run_id }}-${{ github.run_attempt }}
+          APPALOFT_PUBLIC_LAUNCH_SMOKE_GITHUB_TREE_URL: ${{ inputs.github_tree_url || 'https://github.com/coollabsio/coolify-examples/tree/v4.x/bun' }}
+          APPALOFT_E2E_SSH_HOST: ${{ secrets.APPALOFT_PUBLIC_LAUNCH_SMOKE_SSH_HOST || secrets.APPALOFT_E2E_SSH_HOST }}
+          APPALOFT_E2E_SSH_PORT: ${{ secrets.APPALOFT_PUBLIC_LAUNCH_SMOKE_SSH_PORT || secrets.APPALOFT_E2E_SSH_PORT || '22' }}
+          APPALOFT_E2E_SSH_USERNAME: ${{ secrets.APPALOFT_PUBLIC_LAUNCH_SMOKE_SSH_USERNAME || secrets.APPALOFT_E2E_SSH_USERNAME || 'root' }}
+        run: bun run smoke:public-launch:github-repo:evidence
+
+      - name: Upload public launch GitHub repo evidence
+        if: ${{ env.HAS_PUBLIC_LAUNCH_SMOKE_SECRETS == 'true' && always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-launch-github-repo-evidence
+          if-no-files-found: ignore
+          path: dist/release/public-launch-github-repo-evidence.json
