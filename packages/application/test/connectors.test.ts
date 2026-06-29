@@ -704,6 +704,55 @@ describe("connector catalog", () => {
     expect(JSON.stringify(plan)).not.toContain("PRIVATE KEY");
   });
 
+  test("[APP-CONN-003][APP-CONN-016] starts Domain Connect setup with a domain-scoped apply URL", async () => {
+    const registry = new InMemoryConnectorRegistry(
+      createDefaultConnectorDefinitions({
+        cloudflareDns: {
+          configured: true,
+        },
+      }),
+    );
+    const service = new PlanConnectorCapabilityQueryService(
+      registry,
+      new InMemoryConnectorProviderAdapterRegistry([
+        new FakeDnsConnectorProviderAdapter({
+          connectorKey: "cloudflare-dns",
+          providerTitle: "Cloudflare DNS",
+          domainConnect: {
+            providerKey: "appaloft.com",
+            serviceId: "appaloft-domain",
+            templateId: "appaloft-domain",
+            consentBaseUrl:
+              "https://api.cloudflare.com/client/v4/dns/domainconnect/v1/<domain>/apply",
+          },
+        }),
+      ]),
+    );
+
+    const result = await service.execute(createExecutionContext({ entrypoint: "system" }), {
+      connectorKey: "cloudflare-dns",
+      capabilityKey: "dns.domain-connect.start",
+      parameters: {
+        zoneName: "example.com",
+        hostname: "app.example.com",
+        target: "edge.appaloft.dev",
+        recordType: "CNAME",
+      },
+    });
+
+    expect(result.isOk()).toBe(true);
+    const redirectUrl = result._unsafeUnwrap().providerPlan?.domainConnectSetup?.redirectUrl ?? "";
+    expect(
+      redirectUrl.startsWith(
+        "https://api.cloudflare.com/client/v4/dns/domainconnect/v1/example.com/apply?",
+      ),
+    ).toBe(true);
+    expect(redirectUrl).toContain("domain=example.com");
+    expect(redirectUrl).toContain("host=app");
+    expect(redirectUrl).toContain("target=edge.appaloft.dev");
+    expect(redirectUrl).not.toContain("/appaloft.com/services/appaloft-domain/apply");
+  });
+
   test("[APP-CONN-003][APP-CONN-016] completes temporary Domain Connect setup through DNS readback", async () => {
     const registry = new InMemoryConnectorRegistry(
       createDefaultConnectorDefinitions({
