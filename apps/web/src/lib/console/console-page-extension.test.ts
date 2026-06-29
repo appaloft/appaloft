@@ -154,6 +154,11 @@ describe("Console page extension surface", () => {
   });
 
   test("[CONSOLE-EXT-PAGE-004] resolves neutral domain-error modal extensions", () => {
+    const modalHostSource = readFileSync(
+      new URL("../components/console/ConsoleDomainErrorModalHost.svelte", import.meta.url),
+      "utf8",
+    );
+
     expect(
       findConsoleDomainErrorModalExtension([domainErrorModalExtension], "plan_limit_exceeded"),
     ).toEqual(domainErrorModalExtension);
@@ -182,6 +187,12 @@ describe("Console page extension surface", () => {
       }),
     ).toBe(
       "/example/domain-error-modal?organizationId=org_123&errorCode=plan_limit_exceeded&requestPath=%2Fapi%2Fservers",
+    );
+    expect(modalHostSource).toContain(
+      'class="max-h-[calc(100vh-12rem)] overflow-y-auto px-0 pb-5"',
+    );
+    expect(modalHostSource).not.toContain(
+      'class="max-h-[calc(100vh-12rem)] overflow-y-auto px-5 pb-5"',
     );
   });
 
