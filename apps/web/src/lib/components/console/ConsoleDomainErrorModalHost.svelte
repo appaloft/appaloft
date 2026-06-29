@@ -84,7 +84,7 @@
         <Dialog.Description>{modalDescription}</Dialog.Description>
       {/if}
     </Dialog.Header>
-    <div class="max-h-[calc(100vh-12rem)] overflow-y-auto px-5 pb-5">
+    <div class="max-h-[calc(100vh-12rem)] overflow-y-auto px-0 pb-5">
       {#if modalEndpoint}
         <ConsoleExtensionPage embedded pageEndpointOverride={modalEndpoint} />
       {/if}
