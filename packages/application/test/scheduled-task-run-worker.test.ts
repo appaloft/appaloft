@@ -102,6 +102,22 @@ class MemoryScheduledTaskRunAttemptRepository implements ScheduledTaskRunAttempt
         }
         return this.run;
       },
+      visitScheduledTaskRunAttemptByScheduleSlot: (selection) => {
+        if (!this.run) {
+          return null;
+        }
+        const state = this.run.toState();
+        if (!this.run.belongsToTask(selection.taskId)) {
+          return null;
+        }
+        if (
+          state.triggerKind.value !== "scheduled" ||
+          state.scheduledFor?.value !== selection.scheduledFor.value
+        ) {
+          return null;
+        }
+        return this.run;
+      },
     });
   }
 

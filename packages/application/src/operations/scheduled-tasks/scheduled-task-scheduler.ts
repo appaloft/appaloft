@@ -81,6 +81,7 @@ export class ScheduledTaskScheduler {
         taskId: candidate.taskId,
         resourceId: candidate.resourceId,
         triggerKind: "scheduled",
+        scheduledFor: candidate.scheduledFor,
         requestedAt: now,
         idempotencyKey: schedulerIdempotencyKey(candidate),
       });

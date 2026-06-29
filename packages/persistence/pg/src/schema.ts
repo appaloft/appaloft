@@ -850,6 +850,7 @@ export interface ScheduledTaskRunAttemptsTable {
   resource_id: string;
   trigger_kind: string;
   status: string;
+  scheduled_for: NullableUpdatableTimestampColumn;
   created_at: TimestampColumn;
   started_at: NullableUpdatableTimestampColumn;
   finished_at: NullableUpdatableTimestampColumn;
