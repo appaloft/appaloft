@@ -213,6 +213,13 @@ describe("organization auth management console surface", () => {
     expect(instancePageSource).toContain("instanceAccessAllowed");
     expect(instancePageSource).toContain('void goto("/")');
     expect(instancePageSource).toContain("browser && instanceAccessAllowed && activeSection");
+    expect(instancePageSource).toContain(
+      'request<SystemPluginWebExtensionsResponse>("/api/system-plugins/web-extensions")',
+    );
+    expect(instancePageSource).toContain("enabled: browser && instanceAccessAllowed");
+    expect(instancePageSource).toContain(
+      "instanceSettingsItems(webExtensionsQuery.data?.items ?? [], $locale)",
+    );
     expect(instancePageSource).toContain("ConsoleOrganizationSwitcher");
     expect(instancePageSource).toContain("orpc.system.doctor.queryOptions");
     expect(instancePageSource).toContain("maintenanceWorkers");
