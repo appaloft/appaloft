@@ -98,8 +98,10 @@
     detailTabPanelScrollClass,
   } from "$lib/console/layout-classes";
   import {
+    findConsolePanelExtensionsByPlacement,
     findConsolePageExtensionByPath,
     isConsolePageExtensionVisible,
+    replacesNativeEnvironmentCopy,
     resolveConsolePageVisibilityEndpoint,
   } from "$lib/console/console-page-extension";
   import { modalIsOpen, setModalOpen } from "$lib/console/url-modal";
@@ -267,6 +269,12 @@
   );
   const projectAuditLogTabVisible = $derived(
     isConsolePageExtensionVisible(projectAuditLogExtension, projectAuditLogVisibility),
+  );
+  const nativeEnvironmentCopyReplaced = $derived(
+    findConsolePanelExtensionsByPlacement(
+      webExtensionsQuery.data?.items ?? [],
+      "project-environment-panel",
+    ).some(replacesNativeEnvironmentCopy),
   );
   const activeProjectTab = $derived(parseProjectDetailTab(page.url.searchParams.get("tab")));
   const visibleProjectDetailTabs = $derived(
@@ -3061,16 +3069,18 @@
                           <Pencil class="size-4" />
                           {$t(i18nKeys.console.projects.environmentRenameAction)}
                         </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          disabled={isProjectArchived || environment.lifecycleStatus !== "active"}
-                          onclick={() => openEnvironmentCloneDialog(environment)}
-                        >
-                          <Copy class="size-4" />
-                          {$t(i18nKeys.console.projects.environmentCloneAction)}
-                        </Button>
+                        {#if !nativeEnvironmentCopyReplaced}
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={isProjectArchived || environment.lifecycleStatus !== "active"}
+                            onclick={() => openEnvironmentCloneDialog(environment)}
+                          >
+                            <Copy class="size-4" />
+                            {$t(i18nKeys.console.projects.environmentCloneAction)}
+                          </Button>
+                        {/if}
                         <Button
                           type="button"
                           size="sm"
