@@ -520,7 +520,7 @@ describe("console page structure", () => {
     expect(consoleResourceCanvasSource).toContain("consolePageContentClass");
     expect(consoleResourceCanvasSource).not.toContain("max-w-5xl");
     expect(consoleExtensionPageSource).toContain(
-      '<ConsoleResourceCanvas class={embedded ? "max-w-none p-0" : "max-w-7xl"}>',
+      'class={embedded ? "max-w-none space-y-3 p-0 md:p-0" : "max-w-7xl"}',
     );
     expect(consoleExtensionPageSource).toContain("{#if embedded}");
     expect(consoleExtensionPageSource).toContain("{@render content()}");
