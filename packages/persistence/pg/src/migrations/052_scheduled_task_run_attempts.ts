@@ -11,6 +11,7 @@ export const scheduledTaskRunAttemptsMigration = {
         resource_id TEXT NOT NULL REFERENCES resources(id),
         trigger_kind TEXT NOT NULL,
         status TEXT NOT NULL,
+        scheduled_for TIMESTAMPTZ,
         created_at TIMESTAMPTZ NOT NULL,
         started_at TIMESTAMPTZ,
         finished_at TIMESTAMPTZ,
@@ -18,6 +19,17 @@ export const scheduledTaskRunAttemptsMigration = {
         failure_summary TEXT,
         skipped_reason TEXT
       )
+    `.execute(db);
+
+    await sql`
+      ALTER TABLE scheduled_task_run_attempts
+      ADD COLUMN IF NOT EXISTS scheduled_for TIMESTAMPTZ
+    `.execute(db);
+
+    await sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS scheduled_task_run_attempts_scheduled_for_unique
+      ON scheduled_task_run_attempts (task_id, scheduled_for)
+      WHERE trigger_kind = 'scheduled' AND scheduled_for IS NOT NULL
     `.execute(db);
 
     await sql`
