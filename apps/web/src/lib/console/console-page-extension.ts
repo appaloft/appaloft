@@ -7,6 +7,7 @@ export const consoleOperationIntentModalRenderer = "console-operation-intent-mod
 export interface ConsolePageExtensionMetadata {
   readonly renderer: typeof consolePageRenderer;
   readonly pageEndpoint: string;
+  readonly replacesNativeEnvironmentCopy?: boolean;
 }
 
 export interface ConsoleDomainErrorModalExtensionMetadata {
@@ -87,7 +88,16 @@ export function readConsolePageExtensionMetadata(
   return {
     renderer: consolePageRenderer,
     pageEndpoint: metadata.pageEndpoint,
+    ...(metadata.replacesNativeEnvironmentCopy === true
+      ? { replacesNativeEnvironmentCopy: true }
+      : {}),
   };
+}
+
+export function replacesNativeEnvironmentCopy(
+  extension: SystemPluginWebExtension | null | undefined,
+): boolean {
+  return readConsolePageExtensionMetadata(extension)?.replacesNativeEnvironmentCopy === true;
 }
 
 export function findConsoleDomainErrorModalExtension(

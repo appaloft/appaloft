@@ -402,12 +402,16 @@ describe("Console page extension surface", () => {
 
     expect(panelHostSource).toContain("data-console-extension-panel-host");
     expect(panelHostSource).toContain("findConsolePanelExtensionsByPlacement");
+    expect(panelHostSource).toContain("createLocalizedConsolePageEndpoint(endpoint, $locale)");
     expect(panelHostSource).toContain("projectId");
     expect(panelHostSource).toContain("environmentId");
     expect(panelHostSource).toContain("resourceId");
     expect(panelHostSource).toContain("type ConsolePageRequestAction");
     expect(panelHostSource).toContain("collapsedByDefault?: boolean");
     expect(panelHostSource).toContain('kind: "dialog-panel-grid"');
+    expect(panelHostSource).toContain('kind: "environment-copy-dialog"');
+    expect(panelHostSource).toContain("openEnvironmentCopyDialog(section)");
+    expect(panelHostSource).toContain("submitEnvironmentCopy(section)");
     expect(panelHostSource).toContain("openDialogPanel(section)");
     expect(panelHostSource).toContain("selectedDialogPanelSection.dialogTitle");
     expect(panelHostSource).toContain("expandedPanelKeys");
@@ -416,6 +420,8 @@ describe("Console page extension surface", () => {
     expect(panelHostSource).toContain("runRequestAction(action, item)");
     expect(panelHostSource).toContain("data-console-extension-panel-host");
     expect(projectPageSource).toContain('placement="project-environment-panel"');
+    expect(projectPageSource).toContain("replacesNativeEnvironmentCopy");
+    expect(projectPageSource).toContain("nativeEnvironmentCopyReplaced");
     expect(projectPageSource).toContain('"audit-log"');
     expect(projectPageSource).toContain("visibleProjectDetailTabs");
     expect(projectPageSource).toContain("detailTabPanelFlushClass");
