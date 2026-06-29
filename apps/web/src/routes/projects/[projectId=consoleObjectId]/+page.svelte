@@ -158,8 +158,8 @@
     visible?: boolean;
   };
   const projectSettingsSections = ["general", "archivedResources", "danger"] as const;
-  const projectDetailScrollablePageClass = "flex min-h-0 min-w-0 flex-col";
-  const projectDetailScrollableBodyClass = "flex min-h-0 min-w-0 flex-col";
+  const projectDetailScrollablePageClass = detailPageClass;
+  const projectDetailScrollableBodyClass = detailBodyClass;
   type ProjectAttentionItem = {
     key: string;
     kind:
