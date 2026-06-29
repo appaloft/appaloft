@@ -200,6 +200,303 @@ describe("CLI environment commands", () => {
     });
   });
 
+  test("[ENV-PROFILE-DUP-004] environment copy dispatches default isolated profile duplication", async () => {
+    ensureReflectMetadata();
+    const {
+      DuplicateEnvironmentProfileCommand,
+      PlanDuplicateEnvironmentQuery,
+      createExecutionContext,
+    } = await import("@appaloft/application");
+    const { createCliProgram } = await import("../src");
+    const commands: AppCommand<unknown>[] = [];
+    const queries: AppQuery<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, command: AppCommand<T>) => {
+        commands.push(command as AppCommand<unknown>);
+        return ok({
+          schemaVersion: "environments.duplicate-profile/v1",
+          sourceEnvironmentId: "env_production",
+          targetEnvironmentId: "env_staging",
+          copiedResources: [],
+          appliedDependencies: [],
+          createdDependencyBindings: [],
+          deferredDecisions: [],
+          warnings: [],
+          generatedAt: "2026-01-01T00:00:01.000Z",
+        } as T);
+      },
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, query: AppQuery<T>) => {
+        queries.push(query as AppQuery<unknown>);
+        return ok(environmentDuplicatePlanFixture() as T);
+      },
+    } as unknown as QueryBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) =>
+        createExecutionContext({
+          ...input,
+          requestId: "req_cli_environment_copy_test",
+        }),
+    };
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory,
+    });
+
+    const writeStdout = process.stdout.write;
+    try {
+      process.stdout.write = (() => true) as typeof process.stdout.write;
+      await program.parseAsync(["node", "appaloft", "env", "copy", "env_production", "staging"]);
+    } finally {
+      process.stdout.write = writeStdout;
+    }
+
+    expect(queries).toHaveLength(1);
+    expect(queries[0]).toBeInstanceOf(PlanDuplicateEnvironmentQuery);
+    expect(queries[0]).toMatchObject({
+      environmentId: "env_production",
+      targetName: "staging",
+    });
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toBeInstanceOf(DuplicateEnvironmentProfileCommand);
+    expect(commands[0]).toMatchObject({
+      environmentId: "env_production",
+      targetName: "staging",
+      dependencyDecisions: [
+        {
+          dependencyResourceId: "rsi_pg",
+          decision: "create-new-managed",
+          providerKey: "appaloft-managed-postgres",
+        },
+      ],
+    });
+  });
+
+  test("[ENV-PROFILE-DUP-001] environment copy dry-run returns a safe copy plan without applying", async () => {
+    ensureReflectMetadata();
+    const { PlanDuplicateEnvironmentQuery, createExecutionContext } = await import(
+      "@appaloft/application"
+    );
+    const { createCliProgram } = await import("../src");
+    const commands: AppCommand<unknown>[] = [];
+    const queries: AppQuery<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, command: AppCommand<T>) => {
+        commands.push(command as AppCommand<unknown>);
+        return ok({} as T);
+      },
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, query: AppQuery<T>) => {
+        queries.push(query as AppQuery<unknown>);
+        return ok(environmentDuplicatePlanFixture() as T);
+      },
+    } as unknown as QueryBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) =>
+        createExecutionContext({
+          ...input,
+          requestId: "req_cli_environment_copy_dry_run_test",
+        }),
+    };
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory,
+    });
+
+    let stdout = "";
+    const writeStdout = process.stdout.write;
+    try {
+      process.stdout.write = ((chunk: string | Uint8Array) => {
+        stdout += String(chunk);
+        return true;
+      }) as typeof process.stdout.write;
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "env",
+        "copy",
+        "env_production",
+        "staging",
+        "--dry-run",
+        "--json",
+      ]);
+    } finally {
+      process.stdout.write = writeStdout;
+    }
+
+    expect(queries).toHaveLength(1);
+    expect(queries[0]).toBeInstanceOf(PlanDuplicateEnvironmentQuery);
+    expect(commands).toHaveLength(0);
+    expect(stdout).toContain('"schemaVersion": "environments.copy-plan/v1"');
+    expect(stdout).toContain('"dependencies": "create-new-managed"');
+    expect(stdout).not.toContain("postgres://");
+    expect(stdout).not.toContain("sk_live_");
+  });
+
+  test("[ENV-PROFILE-DUP-004] environment copy requires explicit ack for shared source reuse", async () => {
+    ensureReflectMetadata();
+    const {
+      DuplicateEnvironmentProfileCommand,
+      PlanDuplicateEnvironmentQuery,
+      createExecutionContext,
+    } = await import("@appaloft/application");
+    const { createCliProgram } = await import("../src");
+    const commands: AppCommand<unknown>[] = [];
+    const queries: AppQuery<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, command: AppCommand<T>) => {
+        commands.push(command as AppCommand<unknown>);
+        return ok({
+          schemaVersion: "environments.duplicate-profile/v1",
+          sourceEnvironmentId: "env_production",
+          targetEnvironmentId: "env_staging",
+          copiedResources: [],
+          appliedDependencies: [],
+          createdDependencyBindings: [],
+          deferredDecisions: [],
+          warnings: [],
+          generatedAt: "2026-01-01T00:00:01.000Z",
+        } as T);
+      },
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, query: AppQuery<T>) => {
+        queries.push(query as AppQuery<unknown>);
+        return ok(environmentDuplicatePlanFixture() as T);
+      },
+    } as unknown as QueryBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) =>
+        createExecutionContext({
+          ...input,
+          requestId: "req_cli_environment_copy_reuse_source_test",
+        }),
+    };
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory,
+    });
+
+    let stdout = "";
+    const writeStdout = process.stdout.write;
+    try {
+      process.stdout.write = ((chunk: string | Uint8Array) => {
+        stdout += String(chunk);
+        return true;
+      }) as typeof process.stdout.write;
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "env",
+        "copy",
+        "env_production",
+        "staging",
+        "--reuse-source",
+        "db",
+        "--acknowledge-shared-source",
+        "--yes",
+      ]);
+    } finally {
+      process.stdout.write = writeStdout;
+    }
+
+    expect(queries).toHaveLength(1);
+    expect(queries[0]).toBeInstanceOf(PlanDuplicateEnvironmentQuery);
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toBeInstanceOf(DuplicateEnvironmentProfileCommand);
+    expect(commands[0]).toMatchObject({
+      dependencyDecisions: [
+        {
+          dependencyResourceId: "rsi_pg",
+          decision: "reuse-source",
+          acknowledgement: "I understand this target environment will share the source dependency.",
+        },
+      ],
+    });
+    expect(stdout).toContain('"confirmed": true');
+  });
+
+  test("[ENV-PROFILE-DUP-001] environment copy dry-run exposes advanced data domain and storage policies", async () => {
+    ensureReflectMetadata();
+    const { PlanDuplicateEnvironmentQuery, createExecutionContext } = await import(
+      "@appaloft/application"
+    );
+    const { createCliProgram } = await import("../src");
+    const commands: AppCommand<unknown>[] = [];
+    const queries: AppQuery<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, command: AppCommand<T>) => {
+        commands.push(command as AppCommand<unknown>);
+        return ok({} as T);
+      },
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, query: AppQuery<T>) => {
+        queries.push(query as AppQuery<unknown>);
+        return ok(environmentDuplicatePlanFixture() as T);
+      },
+    } as unknown as QueryBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) =>
+        createExecutionContext({
+          ...input,
+          requestId: "req_cli_environment_copy_advanced_dry_run_test",
+        }),
+    };
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory,
+    });
+
+    let stdout = "";
+    const writeStdout = process.stdout.write;
+    try {
+      process.stdout.write = ((chunk: string | Uint8Array) => {
+        stdout += String(chunk);
+        return true;
+      }) as typeof process.stdout.write;
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "env",
+        "copy",
+        "production",
+        "staging",
+        "--dry-run",
+        "--json",
+        "--database",
+        "restore:backup_123",
+        "--domain",
+        "rebind:staging.example.com",
+        "--storage",
+        "import:artifact_ref",
+      ]);
+    } finally {
+      process.stdout.write = writeStdout;
+    }
+
+    expect(queries).toHaveLength(1);
+    expect(queries[0]).toBeInstanceOf(PlanDuplicateEnvironmentQuery);
+    expect(commands).toHaveLength(0);
+    expect(stdout).toContain('"data": "restore:backup_123"');
+    expect(stdout).toContain('"domains": "rebind:staging.example.com"');
+    expect(stdout).toContain('"storage": "import:artifact_ref"');
+  });
+
   test("[ENV-LIFE-ENTRY-003] environment archive dispatches the application command", async () => {
     ensureReflectMetadata();
     const { ArchiveEnvironmentCommand, createExecutionContext } = await import(
@@ -655,3 +952,54 @@ describe("CLI environment commands", () => {
     });
   });
 });
+
+function environmentDuplicatePlanFixture() {
+  return {
+    schemaVersion: "environments.duplicate-plan/v1",
+    sourceEnvironment: {
+      id: "env_production",
+      projectId: "prj_demo",
+      name: "production",
+      kind: "production",
+      lifecycleStatus: "active",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      maskedVariables: [],
+    },
+    target: {
+      projectId: "prj_demo",
+      name: "staging",
+      conflict: false,
+    },
+    variableCandidates: [],
+    resourceCandidates: [
+      {
+        resourceId: "res_web",
+        name: "Web",
+        slug: "web",
+        kind: "application",
+        services: [{ name: "web", kind: "web" }],
+        decisionHint: "recreate-resource",
+      },
+    ],
+    dependencyCandidates: [
+      {
+        dependencyResourceId: "rsi_pg",
+        name: "Main DB",
+        slug: "main-db",
+        kind: "postgres",
+        sourceMode: "appaloft-managed",
+        providerKey: "appaloft-managed-postgres",
+        providerManaged: true,
+        lifecycleStatus: "active",
+        desiredCapabilities: [],
+        decisionHint: "create-new-managed",
+        reasons: ["Provider-managed dependencies should default to a new managed instance."],
+      },
+    ],
+    dependencyBindingCandidates: [],
+    domainRouteCandidates: [],
+    storageDecisionCandidates: [],
+    warnings: [],
+    generatedAt: "2026-01-01T00:00:00.000Z",
+  };
+}

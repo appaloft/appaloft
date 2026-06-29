@@ -852,6 +852,10 @@ export const cliCommandDescriptions = {
     "Apply reviewed environment profile duplication",
     "environment.lifecycle",
   ),
+  environmentCopy: withDocs(
+    "Copy an environment with safe isolated defaults",
+    "environment.lifecycle",
+  ),
   environmentSyncProfile: withDocs(
     "Sync selected environment profile shape",
     "environment.diff-promote",

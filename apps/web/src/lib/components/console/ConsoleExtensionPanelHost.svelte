@@ -37,12 +37,25 @@
     external?: boolean;
   };
 
-  type ConsolePageSection = ConsolePagePanelGridSection | ConsolePageCalloutSection;
+  type ConsolePageSection =
+    | ConsolePagePanelGridSection
+    | ConsolePageDialogPanelGridSection
+    | ConsolePageCalloutSection;
 
   type ConsolePagePanelGridSection = {
     kind: "panel-grid";
     title?: string;
     description?: string;
+    items: ConsolePagePanelItem[];
+  };
+
+  type ConsolePageDialogPanelGridSection = {
+    kind: "dialog-panel-grid";
+    title: string;
+    description?: string;
+    triggerLabel: string;
+    dialogTitle?: string;
+    dialogDescription?: string;
     items: ConsolePagePanelItem[];
   };
 
@@ -131,6 +144,8 @@
   } | null>(null);
   let confirmationOpen = $state(false);
   let expandedPanelKeys = $state<Record<string, boolean>>({});
+  let selectedDialogPanelSection = $state<ConsolePageDialogPanelGridSection | null>(null);
+  let dialogPanelOpen = $state(false);
 
   const webExtensionsQuery = createQuery(() =>
     queryOptions({
@@ -345,6 +360,11 @@
     };
   }
 
+  function openDialogPanel(section: ConsolePageDialogPanelGridSection): void {
+    selectedDialogPanelSection = section;
+    dialogPanelOpen = true;
+  }
+
   async function runRequestAction(
     action: ConsolePageRequestAction,
     item?: ConsolePagePanelItem,
@@ -547,6 +567,18 @@
                   {/each}
                 </div>
               </div>
+            {:else if section.kind === "dialog-panel-grid"}
+              <div class="flex flex-col gap-3 rounded-md border bg-background p-4 sm:flex-row sm:items-start sm:justify-between">
+                <div class="min-w-0 space-y-1">
+                  <h3 class="text-sm font-semibold">{section.title}</h3>
+                  {#if section.description}
+                    <p class="text-sm leading-6 text-muted-foreground">{section.description}</p>
+                  {/if}
+                </div>
+                <Button type="button" class="shrink-0" size="sm" onclick={() => openDialogPanel(section)}>
+                  {section.triggerLabel}
+                </Button>
+              </div>
             {/if}
           {/each}
         {/if}
@@ -571,6 +603,73 @@
         <Button type="button" onclick={confirmRequestAction}>
           {confirmationAction.action.label}
         </Button>
+      </div>
+    {/if}
+  </Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={dialogPanelOpen}>
+  <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-5xl">
+    {#if selectedDialogPanelSection}
+      <Dialog.Header>
+        <Dialog.Title>
+          {selectedDialogPanelSection.dialogTitle ?? selectedDialogPanelSection.title}
+        </Dialog.Title>
+        {#if selectedDialogPanelSection.dialogDescription || selectedDialogPanelSection.description}
+          <Dialog.Description>
+            {selectedDialogPanelSection.dialogDescription ?? selectedDialogPanelSection.description}
+          </Dialog.Description>
+        {/if}
+      </Dialog.Header>
+      {#if actionErrorMessage}
+        <div
+          class="mx-5 mt-5 rounded-md border border-destructive/25 bg-destructive/5 p-3 text-sm text-destructive sm:mx-8"
+        >
+          {actionErrorMessage}
+        </div>
+      {/if}
+      <div class="grid max-h-[70vh] gap-3 overflow-y-auto px-5 pb-5 sm:px-8 sm:pb-8 md:grid-cols-2 xl:grid-cols-3">
+        {#each selectedDialogPanelSection.items as item (item.title)}
+          <article class={["rounded-md border bg-background p-4", panelToneClass(item.tone)]}>
+            <h4 class="text-sm font-semibold">{item.title}</h4>
+            {#if item.description}
+              <p class="mt-1 text-sm leading-6 text-muted-foreground">{item.description}</p>
+            {/if}
+            {#if item.rows?.length}
+              <dl class="mt-3 space-y-2">
+                {#each item.rows as row (row.label)}
+                  <div class="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                    <dt class="text-xs text-muted-foreground">{row.label}</dt>
+                    <dd class={["break-all text-sm font-medium", toneClass(row.tone)]}>{row.value}</dd>
+                  </div>
+                {/each}
+              </dl>
+            {/if}
+            {#if item.actions?.length}
+              <div class="mt-4 flex flex-wrap gap-2">
+                {#each item.actions as action (requestActionKey(action, item))}
+                  <Button
+                    type="button"
+                    variant={action.variant === "primary" ? "default" : "outline"}
+                    size="sm"
+                    disabled={Boolean(action.disabled) ||
+                      pendingActionKey === requestActionKey(action, item)}
+                    onclick={() => runRequestAction(action, item)}
+                  >
+                    {pendingActionKey === requestActionKey(action, item)
+                      ? $t(i18nKeys.common.status.loading)
+                      : action.label}
+                  </Button>
+                {/each}
+              </div>
+              {#each item.actions as action (requestActionKey(action, item))}
+                {#if action.disabled && action.disabledReason}
+                  <p class="mt-2 text-xs text-muted-foreground">{action.disabledReason}</p>
+                {/if}
+              {/each}
+            {/if}
+          </article>
+        {/each}
       </div>
     {/if}
   </Dialog.Content>
