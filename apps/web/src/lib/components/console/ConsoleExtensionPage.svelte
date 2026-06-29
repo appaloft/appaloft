@@ -1118,18 +1118,18 @@
 
 {#snippet panelGridComparisonTable(section: ConsolePageDialogPanelGridSection | ConsolePagePanelGridSection)}
   <div
-    class="max-h-[70vh] overflow-auto rounded-lg border"
+    class="max-h-[64vh] overflow-auto rounded-lg border"
     data-console-page-dialog-comparison-table
   >
-    <table class="w-full min-w-[980px] border-collapse text-sm">
+    <table class="w-full min-w-[720px] border-collapse text-sm">
       <thead class="bg-muted/40">
         <tr>
-          <th scope="col" class="w-48 px-4 py-4 text-left font-semibold text-foreground">
+          <th scope="col" class="w-40 px-3 py-3 text-left font-semibold text-foreground">
             {section.comparisonFeatureLabel ?? "Feature"}
           </th>
           {#each section.items as item (item.title)}
-            <th scope="col" class="min-w-40 border-l px-4 py-4 text-center align-top">
-              <div class="flex min-h-10 items-center justify-center">
+            <th scope="col" class="min-w-32 border-l px-3 py-3 text-center align-top">
+              <div class="flex min-h-9 items-center justify-center">
                 <div class="flex flex-wrap items-center justify-center gap-2">
                   <span class="text-base font-semibold text-foreground">{item.title}</span>
                   {#if item.badge}
@@ -1151,12 +1151,12 @@
       <tbody class="divide-y">
         {#each comparisonRowLabels(section.items) as label (label)}
           <tr>
-            <th scope="row" class="bg-background px-4 py-3 text-left font-medium text-muted-foreground">
+            <th scope="row" class="bg-background px-3 py-2.5 text-left font-medium text-muted-foreground">
               {label}
             </th>
             {#each section.items as item (item.title)}
               {@const row = comparisonItemRow(item, label)}
-              <td class="border-l px-4 py-3 text-center align-middle">
+              <td class="border-l px-3 py-2.5 text-center align-middle">
                 {#if row}
                   <span class={["font-medium", toneClass(row.tone)]}>
                     {panelRowValue(item, row)}
@@ -1171,10 +1171,10 @@
       </tbody>
       <tfoot class="border-t bg-muted/20">
         <tr>
-          <th scope="row" class="bg-background px-4 py-3 text-left font-medium text-muted-foreground">
+          <th scope="row" class="bg-background px-3 py-3 text-left font-medium text-muted-foreground">
           </th>
           {#each section.items as item (item.title)}
-            <td class="border-l px-4 py-4 align-middle">
+            <td class="border-l px-3 py-3 align-middle">
               {#if item.actions?.length}
                 <div class="flex flex-wrap justify-center gap-2">
                   {#each item.actions as action (requestActionKey(action, item))}
