@@ -2942,10 +2942,20 @@ export function registerApplicationServices(
   container.registerSingleton(tokens.configureScheduledTaskUseCase, ConfigureScheduledTaskUseCase);
   container.registerSingleton(tokens.deleteScheduledTaskUseCase, DeleteScheduledTaskUseCase);
   container.registerSingleton(tokens.runScheduledTaskNowUseCase, RunScheduledTaskNowUseCase);
-  container.registerSingleton(
-    tokens.scheduledTaskRunAdmissionService,
-    ScheduledTaskRunAdmissionService,
-  );
+  container.register(tokens.scheduledTaskRunAdmissionService, {
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new ScheduledTaskRunAdmissionService(
+          dependencyContainer.resolve(tokens.scheduledTaskDefinitionRepository),
+          dependencyContainer.resolve(tokens.scheduledTaskRunAttemptRepository),
+          dependencyContainer.resolve(tokens.resourceRepository),
+          dependencyContainer.resolve(tokens.idGenerator),
+          dependencyContainer.resolve(tokens.clock),
+          dependencyContainer.resolve(tokens.durableWorkQueueAdapter),
+          dependencyContainer.resolve(tokens.processAttemptRecorder),
+        ),
+    ),
+  });
   container.register(tokens.scheduledTaskRunWorker, {
     useFactory: instanceCachingFactory(
       (dependencyContainer) =>

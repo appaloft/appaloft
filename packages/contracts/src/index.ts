@@ -5898,6 +5898,7 @@ export const scheduledTaskRunSummarySchema = z.object({
   resourceId: z.string(),
   triggerKind: scheduledTaskRunTriggerKindSchema,
   status: scheduledTaskRunStatusSchema,
+  scheduledFor: z.string().optional(),
   createdAt: z.string(),
   startedAt: z.string().optional(),
   finishedAt: z.string().optional(),

@@ -3823,6 +3823,7 @@ export interface ScheduledTaskRunSummary {
   resourceId: string;
   triggerKind: ScheduledTaskRunTriggerKind;
   status: ScheduledTaskRunStatus;
+  scheduledFor?: string;
   createdAt: string;
   startedAt?: string;
   finishedAt?: string;

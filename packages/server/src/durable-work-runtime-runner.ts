@@ -16,6 +16,9 @@ import {
   type ExecutionBackend,
   type ExecutionContextFactory,
   type ProcessAttemptRecorder,
+  ScheduledTaskRunExecutionHandler,
+  type ScheduledTaskRunWorker,
+  scheduledTaskRunDurableWorkKind,
   toRepositoryContext,
 } from "@appaloft/application";
 
@@ -32,6 +35,7 @@ export interface DurableWorkRuntimeRunnerInput {
   executionBackend: ExecutionBackend;
   eventBus: EventBus;
   processAttemptRecorder: ProcessAttemptRecorder;
+  scheduledTaskRunWorker: ScheduledTaskRunWorker;
   executionContextFactory: ExecutionContextFactory;
   logger: AppLogger;
   handlerRegistry?: DurableWorkHandlerRegistry;
@@ -56,12 +60,14 @@ function createDeploymentHandler(
 
 export function createCompositeDurableWorkHandlerRegistry(
   deploymentHandler: DurableWorkHandler,
+  scheduledTaskRunHandler: DurableWorkHandler,
   extensionRegistry?: DurableWorkHandlerRegistry,
 ): DurableWorkHandlerRegistry {
   return {
     resolve(item: DurableWorkItemRecord) {
       return (
         extensionRegistry?.resolve(item) ??
+        (item.kind === scheduledTaskRunDurableWorkKind ? scheduledTaskRunHandler : undefined) ??
         (item.kind === "deployment" ? deploymentHandler : undefined)
       );
     },
@@ -158,10 +164,17 @@ export function createDurableWorkRuntimeRunner(
         },
       });
       const handler = createDeploymentHandler(input);
+      const scheduledTaskRunHandler = new ScheduledTaskRunExecutionHandler(
+        input.scheduledTaskRunWorker,
+      );
       const report = await drainDurableWorkOnce(
         context,
         input.adapter,
-        createCompositeDurableWorkHandlerRegistry(handler, input.handlerRegistry),
+        createCompositeDurableWorkHandlerRegistry(
+          handler,
+          scheduledTaskRunHandler,
+          input.handlerRegistry,
+        ),
         {
           worker,
           now,

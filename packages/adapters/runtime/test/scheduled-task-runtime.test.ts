@@ -1,5 +1,6 @@
 import "../../../application/node_modules/reflect-metadata/Reflect.js";
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import {
   type AppSpan,
   type DeploymentReadModel,
@@ -398,12 +399,18 @@ describe("RuntimeTargetScheduledTaskRuntimePort", () => {
 
   test("[SCHED-TASK-RUNTIME-003] executes scheduled task commands over generic SSH Docker runtime targets", async () => {
     let capturedProcess: ScheduledTaskProcessRunnerInput | undefined;
+    let capturedIdentityText: string | undefined;
     const runtime = new RuntimeTargetScheduledTaskRuntimePort({
       deploymentReadModel: new StaticDeploymentReadModel(deploymentSummary()),
       serverRepository: new StaticServerRepository(sshServer()),
       now: () => "2026-05-05T00:30:00.000Z",
       processRunner: async (input) => {
         capturedProcess = input;
+        const identityArgIndex = input.command.indexOf("-i");
+        expect(identityArgIndex).toBeGreaterThan(0);
+        const identityFile = input.command[identityArgIndex + 1];
+        expect(identityFile).toBeString();
+        capturedIdentityText = readFileSync(identityFile, "utf8");
         return {
           exitCode: 0,
           stdout: "migration finished",
@@ -444,6 +451,9 @@ describe("RuntimeTargetScheduledTaskRuntimePort", () => {
     expect(capturedProcess?.command).toContain("2222");
     expect(capturedProcess?.command.at(-1)).toContain("--network 'container:appaloft-api'");
     expect(capturedProcess?.command.at(-1)).toContain("'registry.example.com/app:dep_live'");
+    expect(capturedIdentityText).toBe(
+      "-----BEGIN TEST KEY-----\nsecret\n-----END TEST KEY-----\n",
+    );
   });
 
   test("[SCHED-TASK-RUNTIME-002] executes scheduled task commands on local-shell Docker runtime targets", async () => {

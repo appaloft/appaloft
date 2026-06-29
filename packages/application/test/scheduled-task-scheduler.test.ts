@@ -4,6 +4,7 @@ import { describe, expect, test } from "bun:test";
 import {
   CreatedAt,
   EnvironmentId,
+  ok,
   ProjectId,
   Resource,
   ResourceId,
@@ -11,6 +12,7 @@ import {
   ResourceLifecycleStatusValue,
   ResourceName,
   ResourceSlug,
+  type Result,
   ScheduledTaskCommandIntent,
   ScheduledTaskConcurrencyPolicyValue,
   ScheduledTaskDefinition,
@@ -35,6 +37,17 @@ import {
 } from "@appaloft/testkit";
 
 import { createExecutionContext, type RepositoryContext, toRepositoryContext } from "../src";
+import {
+  type DurableWorkClaimInput,
+  type DurableWorkClaimResult,
+  type DurableWorkCompletionInput,
+  type DurableWorkCompletionResult,
+  type DurableWorkDeliveryCandidateFilter,
+  type DurableWorkEventRecord,
+  type DurableWorkItemRecord,
+  type DurableWorkListFilter,
+  type DurableWorkQueueAdapter,
+} from "../src/durable-work";
 import {
   type ScheduledTaskDefinitionRepository,
   type ScheduledTaskDueCandidate,
@@ -103,6 +116,15 @@ class RecordingScheduledTaskRunAttemptRepository implements ScheduledTaskRunAtte
           }
           return true;
         }) ?? null,
+      visitScheduledTaskRunAttemptByScheduleSlot: (selection) =>
+        this.records.find((run) => {
+          const state = run.toState();
+          return (
+            run.belongsToTask(selection.taskId) &&
+            state.triggerKind.value === "scheduled" &&
+            state.scheduledFor?.value === selection.scheduledFor.value
+          );
+        }) ?? null,
     });
   }
 
@@ -127,6 +149,69 @@ class StaticScheduledTaskDueCandidateReader implements ScheduledTaskDueCandidate
   ): Promise<ScheduledTaskDueCandidate[]> {
     this.inputs.push(input);
     return this.candidates.slice(0, input.limit);
+  }
+}
+
+class RecordingDurableWorkAdapter implements DurableWorkQueueAdapter {
+  readonly items = new Map<string, DurableWorkItemRecord>();
+  readonly events: DurableWorkEventRecord[] = [];
+
+  async recordItem(
+    _context: RepositoryContext,
+    item: DurableWorkItemRecord,
+  ): Promise<Result<DurableWorkItemRecord>> {
+    this.items.set(item.id, item);
+    return ok(item);
+  }
+
+  async appendEvent(
+    _context: RepositoryContext,
+    event: DurableWorkEventRecord,
+  ): Promise<Result<DurableWorkEventRecord>> {
+    this.events.push(event);
+    return ok(event);
+  }
+
+  async findItem(
+    _context: RepositoryContext,
+    id: string,
+  ): Promise<Result<DurableWorkItemRecord | null>> {
+    return ok(this.items.get(id) ?? null);
+  }
+
+  async listItems(
+    _context: RepositoryContext,
+    _filter?: DurableWorkListFilter,
+  ): Promise<Result<DurableWorkItemRecord[]>> {
+    return ok(Array.from(this.items.values()));
+  }
+
+  async listEvents(
+    _context: RepositoryContext,
+    workItemId: string,
+  ): Promise<Result<DurableWorkEventRecord[]>> {
+    return ok(this.events.filter((event) => event.workItemId === workItemId));
+  }
+
+  async listDueCandidates(
+    _context: RepositoryContext,
+    _filter: DurableWorkDeliveryCandidateFilter,
+  ): Promise<Result<DurableWorkItemRecord[]>> {
+    return ok(Array.from(this.items.values()));
+  }
+
+  async claimDue(
+    _context: RepositoryContext,
+    input: DurableWorkClaimInput,
+  ): Promise<Result<DurableWorkClaimResult>> {
+    return ok({ status: "not-found", workItemId: input.workItemId });
+  }
+
+  async complete(
+    _context: RepositoryContext,
+    input: DurableWorkCompletionInput,
+  ): Promise<Result<DurableWorkCompletionResult>> {
+    return ok({ status: "not-found", workItemId: input.workItemId });
   }
 }
 
@@ -189,16 +274,19 @@ async function createHarness(input?: {
     ],
   );
   const clock = new FixedClock("2026-05-05T00:10:00.000Z");
+  const durableWorkAdapter = new RecordingDurableWorkAdapter();
   const admission = new ScheduledTaskRunAdmissionService(
     new StaticScheduledTaskDefinitionRepository(input?.task ?? scheduledTaskFixture()),
     runAttemptRepository,
     resourceRepository,
     new SequenceIdGenerator(),
     clock,
+    durableWorkAdapter,
   );
 
   return {
     context,
+    durableWorkAdapter,
     dueReader,
     runAttemptRepository,
     scheduler: new ScheduledTaskScheduler(dueReader, admission, clock, new NoopLogger()),
@@ -207,7 +295,8 @@ async function createHarness(input?: {
 
 describe("ScheduledTaskScheduler", () => {
   test("[SCHED-TASK-SCHED-001] dispatches due tasks through scheduled run admission", async () => {
-    const { context, dueReader, runAttemptRepository, scheduler } = await createHarness();
+    const { context, durableWorkAdapter, dueReader, runAttemptRepository, scheduler } =
+      await createHarness();
 
     const result = await scheduler.run(context, { limit: 5 });
 
@@ -226,6 +315,7 @@ describe("ScheduledTaskScheduler", () => {
             resourceId: "res_api",
             triggerKind: "scheduled",
             status: "accepted",
+            scheduledFor: "2026-05-05T00:00:00.000Z",
             createdAt: "2026-05-05T00:10:00.000Z",
           },
         },
@@ -233,6 +323,16 @@ describe("ScheduledTaskScheduler", () => {
       failed: [],
     });
     expect(runAttemptRepository.records).toHaveLength(1);
+    expect(Array.from(durableWorkAdapter.items.values())[0]).toMatchObject({
+      kind: "scheduled-task-run",
+      operationKey: "scheduled-task-runs.run-due",
+      dedupeKey: "scheduled-task-run:tsk_daily_migration:2026-05-05T00:00:00.000Z",
+      safeDetails: {
+        runId: "str_0001",
+        workItemId: "dw_scheduled_task_run_str_0001",
+        scheduledFor: "2026-05-05T00:00:00.000Z",
+      },
+    });
     expect(runAttemptRepository.records[0]?.toState().triggerKind.value).toBe("scheduled");
   });
 

@@ -550,6 +550,7 @@ describe("scheduled task definition persistence", () => {
         taskId: ScheduledTaskId.rehydrate("tsk_hourly"),
         resourceId: ResourceId.rehydrate("res_api"),
         triggerKind: ScheduledTaskRunTriggerKindValue.scheduled(),
+        scheduledFor: CreatedAt.rehydrate("2026-05-05T01:00:00.000Z"),
         createdAt: CreatedAt.rehydrate("2026-05-05T01:00:10.000Z"),
       })._unsafeUnwrap();
       await runAttempts.upsert(

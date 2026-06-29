@@ -1936,6 +1936,10 @@ export async function createAppaloftServer(
       childContainer,
       tokens.processAttemptRecorder,
     ),
+    scheduledTaskRunWorker: resolveToken<ScheduledTaskRunWorker>(
+      childContainer,
+      tokens.scheduledTaskRunWorker,
+    ),
     executionContextFactory,
     logger,
     ...(durableWorkHandlerRegistry ? { handlerRegistry: durableWorkHandlerRegistry } : {}),

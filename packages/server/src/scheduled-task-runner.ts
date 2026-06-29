@@ -58,6 +58,11 @@ function candidateResourceId(attempt: ProcessAttemptRecord): string | undefined 
   return stringDetail(attempt, "resourceId") ?? attempt.resourceId;
 }
 
+function hasDurableWorkItem(attempt: ProcessAttemptRecord): boolean {
+  const value = attempt.safeDetails?.workItemId;
+  return typeof value === "string" && value.trim().length > 0;
+}
+
 export function createScheduledTaskRunner(input: ScheduledTaskRunnerInput): ScheduledTaskRunner {
   let timer: ReturnType<typeof setInterval> | undefined;
   let running = false;
@@ -161,42 +166,15 @@ export function createScheduledTaskRunner(input: ScheduledTaskRunnerInput): Sche
         durableCandidatesById.set(candidate.id, candidate);
       }
       const durableCandidates = [...durableCandidatesById.values()];
-      const durableRunIds = new Set(
-        durableCandidates
-          .map((candidate) => candidateRunId(candidate))
-          .filter((runId): runId is string => typeof runId === "string"),
-      );
-
       let completed = 0;
       let failed = result.value.failed.length;
       let skipped = 0;
-      for (const dispatch of result.value.dispatched) {
-        if (durableRunIds.has(dispatch.run.runId)) {
-          continue;
-        }
-
-        const workerResult = await input.worker.run(context, {
-          runId: dispatch.run.runId,
-          taskId: dispatch.taskId,
-          resourceId: dispatch.resourceId,
-        });
-
-        if (workerResult.isOk()) {
-          completed += 1;
-          continue;
-        }
-
-        failed += 1;
-        input.logger.error("scheduled_task_runner.run_failed", {
-          runId: dispatch.run.runId,
-          taskId: dispatch.taskId,
-          resourceId: dispatch.resourceId,
-          errorCode: workerResult.error.code,
-          message: workerResult.error.message,
-        });
-      }
-
       for (const candidate of durableCandidates) {
+        if (hasDurableWorkItem(candidate)) {
+          skipped += 1;
+          continue;
+        }
+
         const runId = candidateRunId(candidate);
         const taskId = candidateTaskId(candidate);
         const resourceId = candidateResourceId(candidate);

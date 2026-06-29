@@ -38,6 +38,7 @@ import {
   ScheduledTaskRetryLimit,
   ScheduledTaskRunAttempt,
   type ScheduledTaskRunAttemptByIdSpec,
+  type ScheduledTaskRunAttemptByScheduleSlotSpec,
   type ScheduledTaskRunAttemptMutationSpec,
   type ScheduledTaskRunAttemptMutationSpecVisitor,
   type ScheduledTaskRunAttemptSelectionSpec,
@@ -166,6 +167,16 @@ class KyselyScheduledTaskRunAttemptSelectionVisitor
       return next;
     };
   }
+
+  visitScheduledTaskRunAttemptByScheduleSlot(
+    spec: ScheduledTaskRunAttemptByScheduleSlotSpec,
+  ): ScheduledTaskRunAttemptSelectionApplier {
+    return (query) =>
+      query
+        .where("task_id", "=", spec.taskId.value)
+        .where("trigger_kind", "=", "scheduled")
+        .where("scheduled_for", "=", spec.scheduledFor.value);
+  }
 }
 
 class KyselyScheduledTaskRunAttemptMutationVisitor
@@ -182,6 +193,7 @@ class KyselyScheduledTaskRunAttemptMutationVisitor
         resource_id: state.resourceId.value,
         trigger_kind: state.triggerKind.value,
         status: state.status.value,
+        scheduled_for: state.scheduledFor?.value ?? null,
         created_at: state.createdAt.value,
         started_at: state.startedAt?.value ?? null,
         finished_at: state.finishedAt?.value ?? null,
@@ -221,6 +233,9 @@ function toScheduledTaskRunSummary(row: ScheduledTaskRunAttemptRow): ScheduledTa
     resourceId: row.resource_id,
     triggerKind: row.trigger_kind as ScheduledTaskRunSummary["triggerKind"],
     status: row.status as ScheduledTaskRunSummary["status"],
+    ...(row.scheduled_for
+      ? { scheduledFor: normalizeTimestamp(row.scheduled_for) ?? row.scheduled_for }
+      : {}),
     createdAt: normalizeTimestamp(row.created_at) ?? row.created_at,
     ...(row.started_at ? { startedAt: normalizeTimestamp(row.started_at) ?? row.started_at } : {}),
     ...(row.finished_at
@@ -253,6 +268,13 @@ function rehydrateScheduledTaskRunAttempt(
     status: ScheduledTaskRunStatusValue.rehydrate(
       row.status as Parameters<typeof ScheduledTaskRunStatusValue.rehydrate>[0],
     ),
+    ...(row.scheduled_for
+      ? {
+          scheduledFor: CreatedAt.rehydrate(
+            normalizeTimestamp(row.scheduled_for) ?? row.scheduled_for,
+          ),
+        }
+      : {}),
     createdAt: CreatedAt.rehydrate(normalizeTimestamp(row.created_at) ?? row.created_at),
     ...(row.started_at
       ? { startedAt: StartedAt.rehydrate(normalizeTimestamp(row.started_at) ?? row.started_at) }
@@ -621,6 +643,7 @@ export class PgScheduledTaskRunAttemptRepository implements ScheduledTaskRunAtte
               conflict.column("id").doUpdateSet({
                 trigger_kind: mutation.scheduledTaskRunAttempt.trigger_kind,
                 status: mutation.scheduledTaskRunAttempt.status,
+                scheduled_for: mutation.scheduledTaskRunAttempt.scheduled_for,
                 started_at: mutation.scheduledTaskRunAttempt.started_at,
                 finished_at: mutation.scheduledTaskRunAttempt.finished_at,
                 exit_code: mutation.scheduledTaskRunAttempt.exit_code,
@@ -699,8 +722,8 @@ export class PgScheduledTaskDueCandidateReader implements ScheduledTaskDueCandid
           .selectFrom("scheduled_task_run_attempts")
           .select("task_id")
           .where("trigger_kind", "=", "scheduled")
-          .where("created_at", ">=", bucketStart)
-          .where("created_at", "<", bucketEnd)
+          .where("scheduled_for", ">=", bucketStart)
+          .where("scheduled_for", "<", bucketEnd)
           .execute();
         const admittedTaskIds = new Set(admittedRows.map((row) => row.task_id));
         const rows = await executor

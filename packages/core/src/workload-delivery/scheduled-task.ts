@@ -875,6 +875,7 @@ export interface ScheduledTaskRunAttemptState {
   resourceId: ResourceId;
   triggerKind: ScheduledTaskRunTriggerKindValue;
   status: ScheduledTaskRunStatusValue;
+  scheduledFor?: CreatedAt;
   createdAt: CreatedAt;
   startedAt?: StartedAt;
   finishedAt?: FinishedAt;
@@ -888,11 +889,15 @@ export interface CreateScheduledTaskRunAttemptInput {
   taskId: ScheduledTaskId;
   resourceId: ResourceId;
   triggerKind: ScheduledTaskRunTriggerKindValue;
+  scheduledFor?: CreatedAt;
   createdAt: CreatedAt;
 }
 
 export interface ScheduledTaskRunAttemptSelectionSpecVisitor<TResult> {
   visitScheduledTaskRunAttemptById(spec: ScheduledTaskRunAttemptByIdSpec): TResult;
+  visitScheduledTaskRunAttemptByScheduleSlot(
+    spec: ScheduledTaskRunAttemptByScheduleSlotSpec,
+  ): TResult;
 }
 
 export interface ScheduledTaskRunAttemptSelectionSpec {
@@ -924,6 +929,26 @@ export class ScheduledTaskRunAttemptByIdSpec implements ScheduledTaskRunAttemptS
 
   accept<TResult>(visitor: ScheduledTaskRunAttemptSelectionSpecVisitor<TResult>): TResult {
     return visitor.visitScheduledTaskRunAttemptById(this);
+  }
+}
+
+export class ScheduledTaskRunAttemptByScheduleSlotSpec
+  implements ScheduledTaskRunAttemptSelectionSpec
+{
+  private constructor(
+    public readonly taskId: ScheduledTaskId,
+    public readonly scheduledFor: CreatedAt,
+  ) {}
+
+  static create(input: {
+    taskId: ScheduledTaskId;
+    scheduledFor: CreatedAt;
+  }): ScheduledTaskRunAttemptByScheduleSlotSpec {
+    return new ScheduledTaskRunAttemptByScheduleSlotSpec(input.taskId, input.scheduledFor);
+  }
+
+  accept<TResult>(visitor: ScheduledTaskRunAttemptSelectionSpecVisitor<TResult>): TResult {
+    return visitor.visitScheduledTaskRunAttemptByScheduleSlot(this);
   }
 }
 
@@ -968,6 +993,7 @@ export class ScheduledTaskRunAttempt extends AggregateRoot<
         resourceId: input.resourceId,
         triggerKind: input.triggerKind,
         status: ScheduledTaskRunStatusValue.accepted(),
+        ...(input.scheduledFor ? { scheduledFor: input.scheduledFor } : {}),
         createdAt: input.createdAt,
       }),
     );
