@@ -13,6 +13,12 @@ describe("console layout classes", () => {
       source.match(/export const detailTabPanelSubnavClass =\n {2}"([^"]+)";/)?.[1] ?? "";
     const shellSubnavClass =
       source.match(/export const subnavLayoutClass =\n {2}"([^"]+)";/)?.[1] ?? "";
+    const detailSubnavLayoutClass =
+      source.match(/export const detailSubnavLayoutClass =\n {2}"([^"]+)";/)?.[1] ?? "";
+    const detailSubnavRailClass =
+      source.match(/export const detailSubnavClass =\n {2}"([^"]+)";/)?.[1] ?? "";
+    const shellSubnavRailClass =
+      source.match(/export const subnavClass =\n {2}"([^"]+)";/)?.[1] ?? "";
 
     expect(detailHeaderClass).toContain("pt-3");
     expect(detailPanelClass).toContain("px-4");
@@ -21,6 +27,11 @@ describe("console layout classes", () => {
     expect(detailSubnavClass).not.toContain("w-[calc");
     expect(shellSubnavClass).not.toContain("-m-");
     expect(shellSubnavClass).not.toContain("w-[calc");
+    expect(detailSubnavLayoutClass).toContain("items-stretch");
+    expect(detailSubnavRailClass).toContain("self-stretch");
+    expect(detailSubnavRailClass).toContain("md:h-full");
+    expect(shellSubnavRailClass).toContain("self-stretch");
+    expect(shellSubnavRailClass).toContain("md:h-full");
   });
 
   test("[CONSOLE-SUBNAV-002] console shell mains leave page padding to content owners", async () => {

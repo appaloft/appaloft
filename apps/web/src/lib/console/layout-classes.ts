@@ -30,13 +30,13 @@ export const subnavLayoutClass =
   "grid min-h-[calc(100svh-3.5rem)] md:grid-cols-[16rem_minmax(0,1fr)]";
 
 export const detailSubnavLayoutClass =
-  "grid min-h-0 md:m-0 md:h-full md:min-h-0 md:overflow-hidden";
+  "grid min-h-0 items-stretch md:m-0 md:h-full md:min-h-0 md:overflow-hidden";
 
 export const subnavClass =
-  "min-w-0 border-b border-sidebar-border bg-sidebar text-sidebar-foreground md:border-b-0 md:border-r";
+  "min-w-0 self-stretch border-b border-sidebar-border bg-sidebar text-sidebar-foreground md:h-full md:border-b-0 md:border-r";
 
 export const detailSubnavClass =
-  "min-w-0 overflow-x-auto border-b border-sidebar-border bg-sidebar text-sidebar-foreground md:min-h-0 md:overflow-x-hidden md:overflow-y-auto md:border-b-0 md:border-r";
+  "min-w-0 self-stretch overflow-x-auto border-b border-sidebar-border bg-sidebar text-sidebar-foreground md:h-full md:min-h-0 md:overflow-x-hidden md:overflow-y-auto md:border-b-0 md:border-r";
 
 export const subnavKickerClass =
   "m-0 border-b border-sidebar-border px-3.5 pb-2.5 pt-3 text-xs font-semibold leading-4 text-muted-foreground";
