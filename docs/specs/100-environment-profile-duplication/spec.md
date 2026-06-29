@@ -74,8 +74,9 @@ attempt.
   - query `environments.diff-profile`;
   - command `environments.sync-profile`.
 - CLI:
-  - `appaloft env duplicate plan`;
-  - `appaloft env duplicate apply`;
+  - `appaloft env copy`;
+  - `appaloft env copy --dry-run`;
+  - compatibility aliases `appaloft env duplicate plan` and `appaloft env duplicate apply`;
   - `appaloft env diff-profile`;
   - `appaloft env sync-profile`.
 - Web/UI:

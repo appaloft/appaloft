@@ -407,6 +407,9 @@ describe("Console page extension surface", () => {
     expect(panelHostSource).toContain("resourceId");
     expect(panelHostSource).toContain("type ConsolePageRequestAction");
     expect(panelHostSource).toContain("collapsedByDefault?: boolean");
+    expect(panelHostSource).toContain('kind: "dialog-panel-grid"');
+    expect(panelHostSource).toContain("openDialogPanel(section)");
+    expect(panelHostSource).toContain("selectedDialogPanelSection.dialogTitle");
     expect(panelHostSource).toContain("expandedPanelKeys");
     expect(panelHostSource).toContain("resolvePanelExtensionVisibilityEndpoint");
     expect(panelHostSource).toContain("togglePanel(result)");

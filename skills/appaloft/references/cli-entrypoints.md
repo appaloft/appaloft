@@ -202,12 +202,12 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft env unlock <environmentId>` - `environments.unlock`
 - `appaloft env archive <environmentId>` - `environments.archive`
 - `appaloft env clone <environmentId> --name <targetName>` - `environments.clone`
-- `appaloft env duplicate apply <environmentId> --name <targetName>` - `environments.duplicate-profile`
+- `appaloft env copy <environmentId> <targetName>` - `environments.duplicate-profile`
 - `appaloft env set <environmentId> <key> <value>` - `environments.set-variable`
 - `appaloft env unset <environmentId> <key>` - `environments.unset-variable`
 - `appaloft env effective-precedence <environmentId>` - `environments.effective-precedence`
 - `appaloft env diff <environmentId> <otherEnvironmentId>` - `environments.diff`
-- `appaloft env duplicate plan <environmentId> --name <targetName>` - `environments.plan-duplicate`
+- `appaloft env copy <environmentId> <targetName> --dry-run` - `environments.plan-duplicate`
 - `appaloft env diff-profile <environmentId> <targetEnvironmentId>` - `environments.diff-profile`
 - `appaloft env sync-profile <environmentId> <targetEnvironmentId> --resource-ids <ids>` - `environments.sync-profile`
 - `appaloft env promote <environmentId> <targetName>` - `environments.promote`
