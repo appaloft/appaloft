@@ -1,11 +1,6 @@
-import { withScalar } from "fumadocs-openapi/scalar";
-import { createAPIPage } from "fumadocs-openapi/ui";
-import client from "@/components/api-page.client";
-import { openapi } from "@/lib/openapi";
+"use client";
 
-export const APIPage = createAPIPage(
-  openapi,
-  withScalar({
-    client,
-  }),
-);
+import { withScalar } from "fumadocs-openapi/scalar";
+import { createOpenAPIPage } from "fumadocs-openapi/ui";
+
+export const APIPage = createOpenAPIPage(withScalar());

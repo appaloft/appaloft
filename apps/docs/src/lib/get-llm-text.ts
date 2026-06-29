@@ -36,7 +36,7 @@ export async function getLLMFullText(): Promise<string> {
 function renderOpenAPIOperations(page: SourcePage): string {
   if (page.data.type !== "openapi") return "";
 
-  const operations = page.data.getAPIPageProps().operations ?? [];
+  const operations = page.data.getOpenAPIPageProps().operations ?? [];
   if (operations.length === 0)
     return "OpenAPI operation details are available in the public schema.";
 
