@@ -2,8 +2,11 @@ import { resolve } from "node:path";
 
 import { parseCliArgs, stringArg } from "./lib/release-utils";
 
-type SshSmokeSuite = "smoke:ssh:remote-state" | "smoke:ssh:quick-deploy";
-type SshSmokeSuiteMode = "all" | "quick-deploy" | "remote-state";
+type SshSmokeSuite =
+  | "smoke:public-launch:basic-docker"
+  | "smoke:public-launch:github-repo"
+  | "smoke:public-launch:scheduled-task-cron";
+type SshSmokeSuiteMode = "all" | "basic-docker" | "github-repo" | "scheduled-task-cron";
 
 interface SshSmokeEvidence {
   command?: unknown;
@@ -27,19 +30,29 @@ interface SshSmokeEvidenceEnvironment {
 }
 
 const expectedSuitesByMode: Record<SshSmokeSuiteMode, SshSmokeSuite[]> = {
-  all: ["smoke:ssh:remote-state", "smoke:ssh:quick-deploy"],
-  "quick-deploy": ["smoke:ssh:quick-deploy"],
-  "remote-state": ["smoke:ssh:remote-state"],
+  all: [
+    "smoke:public-launch:basic-docker",
+    "smoke:public-launch:github-repo",
+    "smoke:public-launch:scheduled-task-cron",
+  ],
+  "basic-docker": ["smoke:public-launch:basic-docker"],
+  "github-repo": ["smoke:public-launch:github-repo"],
+  "scheduled-task-cron": ["smoke:public-launch:scheduled-task-cron"],
 };
 
 function parseSuiteMode(value: string | undefined): SshSmokeSuiteMode {
   if (!value) {
     return "all";
   }
-  if (value === "all" || value === "remote-state" || value === "quick-deploy") {
+  if (
+    value === "all" ||
+    value === "basic-docker" ||
+    value === "github-repo" ||
+    value === "scheduled-task-cron"
+  ) {
     return value;
   }
-  throw new Error("--suite must be one of: all, remote-state, quick-deploy.");
+  throw new Error("--suite must be one of: all, basic-docker, github-repo, scheduled-task-cron.");
 }
 
 function assert(condition: boolean, message: string): void {
@@ -62,10 +75,11 @@ function assertBoolean(value: unknown, field: string): asserts value is boolean 
 
 function assertSuites(value: unknown, mode: SshSmokeSuiteMode): void {
   assert(Array.isArray(value), "suites must be an array.");
+  const suites = value as unknown[];
   const expected = expectedSuitesByMode[mode];
-  assert(value.length === expected.length, `suites must contain ${expected.length} item(s).`);
+  assert(suites.length === expected.length, `suites must contain ${expected.length} item(s).`);
   for (const suite of expected) {
-    assert(value.includes(suite), `suites must include ${suite}.`);
+    assert(suites.includes(suite), `suites must include ${suite}.`);
   }
 }
 

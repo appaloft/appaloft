@@ -1117,8 +1117,11 @@ The GitHub Actions/local explicit shell e2e harness in
 process boundary for SSH-server `ssh-pglite`: two separate CLI processes with different local
 PGlite directories deploy the same repository/config to the same trusted SSH target and the second
 process reuses the remote source link/resource identity.
-`.github/workflows/ssh-remote-state-e2e.yml` wires that harness into manual runs, nightly smoke,
-and release gating when the repository has the SSH target secrets configured.
+Current release-readiness wiring proves the public launch surface through
+`.github/workflows/public-launch-basic-docker-smoke.yml`,
+`.github/workflows/public-launch-github-repo-smoke.yml`, and
+`.github/workflows/public-launch-cron-smoke.yml` from nightly smoke and release gating when the
+repository has the SSH target secrets configured.
 
 Current config parsing accepts `access.domains[]` declarations with provider-neutral `host`,
 `pathPrefix`, and `tlsMode` fields, and rejects domain identity selectors, raw TLS/secret material,

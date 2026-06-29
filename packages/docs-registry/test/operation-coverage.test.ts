@@ -1853,15 +1853,20 @@ describe("public docs operation coverage", () => {
 
     expect(quickDeployMatrix).toContain("GitHub Actions secret-gated + local explicit SSH e2e");
     expect(quickDeployMatrix).toContain("integration + GitHub Actions/local explicit e2e");
-    expect(quickDeployMatrix).toContain(".github/workflows/ssh-quick-deploy-e2e.yml");
-    expect(quickDeployMatrix).toContain(".github/workflows/ssh-remote-state-e2e.yml");
-    expect(quickDeployMatrix).toContain("require_ssh_quick_deploy_e2e");
+    expect(quickDeployMatrix).toContain(".github/workflows/public-launch-basic-docker-smoke.yml");
+    expect(quickDeployMatrix).toContain(".github/workflows/public-launch-github-repo-smoke.yml");
+    expect(quickDeployMatrix).toContain("require_public_launch_github_repo_smoke");
     expect(deploymentConfigMatrix).toContain(
       "e2e-preferred, GitHub Actions secret-gated + local explicit SSH",
     );
-    expect(deploymentConfigMatrix).toContain(".github/workflows/ssh-remote-state-e2e.yml");
-    expect(deploymentConfigMatrix).toContain(".github/workflows/ssh-quick-deploy-e2e.yml");
-    expect(deploymentConfigMatrix).toContain("require_ssh_remote_state_e2e");
+    expect(deploymentConfigMatrix).toContain(
+      ".github/workflows/public-launch-basic-docker-smoke.yml",
+    );
+    expect(deploymentConfigMatrix).toContain(
+      ".github/workflows/public-launch-github-repo-smoke.yml",
+    );
+    expect(deploymentConfigMatrix).toContain(".github/workflows/public-launch-cron-smoke.yml");
+    expect(deploymentConfigMatrix).toContain("require_public_launch_cron_smoke");
     const deploymentConfigWorkflow = await Bun.file(
       "docs/workflows/deployment-config-file-bootstrap.md",
     ).text();

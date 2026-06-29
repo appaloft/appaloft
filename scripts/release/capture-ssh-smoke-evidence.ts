@@ -22,8 +22,11 @@ interface SshSmokeEvidence {
   suites: SshSmokeSuite[];
 }
 
-type SshSmokeSuite = "smoke:ssh:remote-state" | "smoke:ssh:quick-deploy";
-type SshSmokeSuiteMode = "all" | "quick-deploy" | "remote-state";
+type SshSmokeSuite =
+  | "smoke:public-launch:basic-docker"
+  | "smoke:public-launch:github-repo"
+  | "smoke:public-launch:scheduled-task-cron";
+type SshSmokeSuiteMode = "all" | "basic-docker" | "github-repo" | "scheduled-task-cron";
 
 function envConfigured(name: string): boolean {
   return Boolean(process.env[name]?.trim());
@@ -33,20 +36,32 @@ function parseSuiteMode(value: string | undefined): SshSmokeSuiteMode {
   if (!value) {
     return "all";
   }
-  if (value === "all" || value === "remote-state" || value === "quick-deploy") {
+  if (
+    value === "all" ||
+    value === "basic-docker" ||
+    value === "github-repo" ||
+    value === "scheduled-task-cron"
+  ) {
     return value;
   }
-  throw new Error("--suite must be one of: all, remote-state, quick-deploy.");
+  throw new Error("--suite must be one of: all, basic-docker, github-repo, scheduled-task-cron.");
 }
 
 function suitesForMode(mode: SshSmokeSuiteMode): SshSmokeSuite[] {
-  if (mode === "remote-state") {
-    return ["smoke:ssh:remote-state"];
+  if (mode === "basic-docker") {
+    return ["smoke:public-launch:basic-docker"];
   }
-  if (mode === "quick-deploy") {
-    return ["smoke:ssh:quick-deploy"];
+  if (mode === "github-repo") {
+    return ["smoke:public-launch:github-repo"];
   }
-  return ["smoke:ssh:remote-state", "smoke:ssh:quick-deploy"];
+  if (mode === "scheduled-task-cron") {
+    return ["smoke:public-launch:scheduled-task-cron"];
+  }
+  return [
+    "smoke:public-launch:basic-docker",
+    "smoke:public-launch:github-repo",
+    "smoke:public-launch:scheduled-task-cron",
+  ];
 }
 
 function parseSmokeCommand(args: ReadonlyMap<string, string | boolean>): {
@@ -77,16 +92,22 @@ function parseSmokeCommand(args: ReadonlyMap<string, string | boolean>): {
 }
 
 function defaultSmokeCommand(mode: SshSmokeSuiteMode): { command: string[]; displayName: string } {
-  if (mode === "remote-state") {
+  if (mode === "basic-docker") {
     return {
-      command: ["bun", "run", "smoke:ssh:remote-state"],
-      displayName: "bun run smoke:ssh:remote-state",
+      command: ["bun", "run", "smoke:public-launch:basic-docker"],
+      displayName: "bun run smoke:public-launch:basic-docker",
     };
   }
-  if (mode === "quick-deploy") {
+  if (mode === "github-repo") {
     return {
-      command: ["bun", "run", "smoke:ssh:quick-deploy"],
-      displayName: "bun run smoke:ssh:quick-deploy",
+      command: ["bun", "run", "smoke:public-launch:github-repo"],
+      displayName: "bun run smoke:public-launch:github-repo",
+    };
+  }
+  if (mode === "scheduled-task-cron") {
+    return {
+      command: ["bun", "run", "smoke:public-launch:scheduled-task-cron"],
+      displayName: "bun run smoke:public-launch:scheduled-task-cron",
     };
   }
   return {

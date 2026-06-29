@@ -142,9 +142,11 @@ owns the fingerprint.
 A GitHub Actions secret-gated and local explicit external SSH e2e harness in
 `apps/shell/test/e2e/github-action-ssh-state.workflow.e2e.ts` proves source link state across a
 real GitHub Actions style process boundary when run with `APPALOFT_E2E_SSH_REMOTE_STATE=true`
-against a provisioned SSH/Docker target. `.github/workflows/ssh-remote-state-e2e.yml` runs the same
-harness manually, from nightly smoke, and before release artifact publication when
-`APPALOFT_E2E_SSH_HOST` and `APPALOFT_E2E_SSH_PRIVATE_KEY` secrets are configured. Release dispatch
-can require it with `require_ssh_remote_state_e2e=true`. For `v0.11.x` publish tags, the release
-workflow requires this remote-state harness and the quick-deploy SSH harness before release
-artifact publication. Operational secret/target provisioning remains outside the repository code.
+against a provisioned SSH/Docker target. The current release-readiness layer exposes public SSH
+launch confidence through `.github/workflows/public-launch-basic-docker-smoke.yml`,
+`.github/workflows/public-launch-github-repo-smoke.yml`, and
+`.github/workflows/public-launch-cron-smoke.yml` from nightly smoke and release when public launch
+SSH target secrets are configured. Release dispatch can require them with
+`require_public_launch_basic_docker_smoke=true`,
+`require_public_launch_github_repo_smoke=true`, and `require_public_launch_cron_smoke=true`.
+Operational secret/target provisioning remains outside the repository code.
