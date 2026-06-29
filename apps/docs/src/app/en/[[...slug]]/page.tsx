@@ -3,7 +3,7 @@ import { type Metadata } from "next";
 import { notFound } from "next/navigation";
 import { APIPage } from "@/components/api-page";
 import { docsSite, withDocsBase } from "@/lib/config";
-import { openApiSchemaPath } from "@/lib/openapi";
+import { openApiSchemaPath, openapi } from "@/lib/openapi";
 import { source } from "@/lib/source";
 import { getMDXComponents } from "@/mdx-components";
 
@@ -19,6 +19,8 @@ export default async function Page(props: PageProps) {
   if (!page || page.data.type === "openapi") notFound();
 
   if (page.slugs.join("/") === "en/reference/openapi") {
+    const { bundled } = await openapi.getSchema(openApiSchemaPath);
+
     return (
       <DocsPage full>
         <DocsTitle>{page.data.title}</DocsTitle>
@@ -27,6 +29,7 @@ export default async function Page(props: PageProps) {
           <APIPage
             document={openApiSchemaPath}
             operations={getOpenAPIOperations()}
+            payload={{ bundled }}
             showDescription
             showTitle
           />
@@ -77,6 +80,6 @@ function getOpenAPIOperations() {
   return source.getPages().flatMap((page) => {
     if (page.data.type !== "openapi") return [];
 
-    return page.data.getAPIPageProps().operations ?? [];
+    return page.data.getOpenAPIPageProps().operations ?? [];
   });
 }
