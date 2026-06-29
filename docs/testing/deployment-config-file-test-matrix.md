@@ -517,12 +517,16 @@ Current implemented coverage:
   `apps/shell/test/e2e/github-action-ssh-state.workflow.e2e.ts`. The harness is disabled locally
   unless `APPALOFT_E2E_SSH_REMOTE_STATE=true` and proves the GitHub Actions style process boundary
   when run against a provisioned SSH/Docker target.
-- The external SSH harness is wired into `.github/workflows/ssh-remote-state-e2e.yml`, the nightly
-  smoke workflow, and the release workflow before release artifact publication. It runs when
-  `APPALOFT_E2E_SSH_HOST` and `APPALOFT_E2E_SSH_PRIVATE_KEY` secrets are configured; release
-  dispatch can set `require_ssh_remote_state_e2e=true` to fail fast when the secrets are missing.
-  For `v0.11.x` publish tags, the release workflow requires this remote-state harness and the
-  `.github/workflows/ssh-quick-deploy-e2e.yml` harness automatically before artifact publication.
+- The current release-readiness SSH harnesses are wired into
+  `.github/workflows/public-launch-basic-docker-smoke.yml`,
+  `.github/workflows/public-launch-github-repo-smoke.yml`, and
+  `.github/workflows/public-launch-cron-smoke.yml`, the nightly smoke workflow, and the release
+  workflow before release artifact publication. They run when
+  `APPALOFT_PUBLIC_LAUNCH_SMOKE_SSH_HOST` and `APPALOFT_PUBLIC_LAUNCH_SMOKE_SSH_PRIVATE_KEY`
+  secrets, or their `APPALOFT_E2E_SSH_*` fallbacks, are configured; release dispatch can set
+  `require_public_launch_basic_docker_smoke=true`,
+  `require_public_launch_github_repo_smoke=true`, and `require_public_launch_cron_smoke=true` to
+  fail fast when the secrets are missing.
 - `CONFIG-FILE-DOMAIN-001` through `CONFIG-FILE-DOMAIN-004` have parser/schema coverage in
   `packages/deployment-config/test/appaloft-config.test.ts`, proving `access.domains[]` accepts
   safe host/path/TLS intent, normalizes defaults, rejects identity selectors, rejects raw TLS/secret

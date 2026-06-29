@@ -173,9 +173,10 @@ selection overrides, not required setup.
 - A GitHub Actions secret-gated and local explicit external SSH e2e harness now covers two
   isolated GitHub Actions style CLI processes using different runner-local PGlite directories
   against the same SSH-server `ssh-pglite` state.
-  `.github/workflows/ssh-remote-state-e2e.yml` runs it manually, from nightly smoke, and before
-  release artifact publication when the SSH target secrets are configured. Repository code cannot
-  provision the external SSH/Docker target or its GitHub secrets; that remains operational setup.
+  Current release-readiness wiring runs the public launch SSH smoke workflows from nightly smoke and
+  before release artifact publication when the SSH target secrets are configured. Repository code
+  cannot provision the external SSH/Docker target or its GitHub secrets; that remains operational
+  setup.
 - Deployment planning now reads server-applied config domain desired state from SSH-server state
   and passes each `pathPrefix`/`tlsMode` route group into provider-neutral edge proxy route input
   without creating managed `DomainBinding` or `Certificate` aggregates. The SSH route state store

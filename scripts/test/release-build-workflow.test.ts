@@ -62,16 +62,25 @@ describe("release build workflow", () => {
     const updateReleaseNotesStep = workflow.match(
       / {6}- name: Update Release Notes\n(?<body>[\s\S]*?)\n\n {6}- name: Upload Final Release Metadata/,
     );
-    expect(updateReleaseNotesStep?.groups?.body).toContain("GH_TOKEN");
-    expect(updateReleaseNotesStep?.groups?.body).toContain("APPALOFT_RELEASE_PRERELEASE");
-    expect(updateReleaseNotesStep?.groups?.body.match(/^ {8}env:/gm)?.length).toBe(1);
+    const updateReleaseNotesStepBody = updateReleaseNotesStep?.groups?.body;
+    expect(updateReleaseNotesStepBody).toBeDefined();
+    expect(updateReleaseNotesStepBody).toContain("GH_TOKEN");
+    expect(updateReleaseNotesStepBody).toContain("APPALOFT_RELEASE_PRERELEASE");
+    expect(updateReleaseNotesStepBody?.match(/^ {8}env:/gm)?.length).toBe(1);
   });
 
   test("[RELEASE-HARDENING-006] keeps release-readiness smoke commands first-class", async () => {
     const scripts = await readPackageScripts();
     const nightlyWorkflow = await readText(".github/workflows/nightly.yml");
-    const remoteStateSshWorkflow = await readText(".github/workflows/ssh-remote-state-e2e.yml");
-    const quickDeploySshWorkflow = await readText(".github/workflows/ssh-quick-deploy-e2e.yml");
+    const publicLaunchBasicDockerWorkflow = await readText(
+      ".github/workflows/public-launch-basic-docker-smoke.yml",
+    );
+    const publicLaunchGitHubRepoWorkflow = await readText(
+      ".github/workflows/public-launch-github-repo-smoke.yml",
+    );
+    const publicLaunchCronWorkflow = await readText(
+      ".github/workflows/public-launch-cron-smoke.yml",
+    );
     const frameworkFixtureWorkflow = await readText(".github/workflows/framework-fixture-e2e.yml");
     const scheduledTaskWorkflow = await readText(".github/workflows/scheduled-task-e2e.yml");
     const storageCleanupWorkflow = await readText(".github/workflows/storage-cleanup-e2e.yml");
@@ -161,24 +170,27 @@ describe("release build workflow", () => {
     expect(scripts["smoke:ssh:preflight"]).toBe(
       "bun run scripts/release/check-ssh-release-readiness.ts",
     );
-    expect(scripts["smoke:ssh:remote-state"]).toStartWith("bun run smoke:ssh:preflight && ");
-    expect(scripts["smoke:ssh:remote-state"]).toContain("APPALOFT_E2E_SSH_REMOTE_STATE=true");
-    expect(scripts["smoke:ssh:remote-state"]).toContain(
-      "./apps/shell/test/e2e/github-action-ssh-state.workflow.e2e.ts",
+    expect(scripts["smoke:public-launch:basic-docker"]).toBe(
+      "APPALOFT_PUBLIC_LAUNCH_SMOKE_SCENARIO=basic-docker bun run scripts/smoke/public-launch-smoke.ts",
     );
-    expect(scripts["smoke:ssh:quick-deploy"]).toStartWith("bun run smoke:ssh:preflight && ");
-    expect(scripts["smoke:ssh:quick-deploy"]).toContain("APPALOFT_E2E_SSH_QUICK_DEPLOY=true");
-    expect(scripts["smoke:ssh:quick-deploy"]).toContain(
-      "./apps/shell/test/e2e/quick-deploy-ssh.workflow.e2e.ts",
+    expect(scripts["smoke:public-launch:github-repo"]).toBe(
+      "APPALOFT_PUBLIC_LAUNCH_SMOKE_SCENARIO=github-repo bun run scripts/smoke/public-launch-smoke.ts",
     );
-    expect(scripts["smoke:ssh"]).toBe(
-      "bun run smoke:ssh:preflight && bun run smoke:ssh:remote-state && bun run smoke:ssh:quick-deploy",
+    expect(scripts["smoke:public-launch:scheduled-task-cron"]).toBe(
+      "APPALOFT_PUBLIC_LAUNCH_SMOKE_SCENARIO=scheduled-task-cron bun run scripts/smoke/public-launch-smoke.ts",
     );
-    expect(scripts["smoke:ssh:remote-state:evidence"]).toBe(
-      "bun run scripts/release/capture-ssh-smoke-evidence.ts --suite remote-state --out dist/release/ssh-remote-state-evidence.json",
+    expect(scripts["smoke:public-launch"]).toBe(
+      "bun run smoke:public-launch:basic-docker && bun run smoke:public-launch:github-repo && bun run smoke:public-launch:scheduled-task-cron",
     );
-    expect(scripts["smoke:ssh:quick-deploy:evidence"]).toBe(
-      "bun run scripts/release/capture-ssh-smoke-evidence.ts --suite quick-deploy --out dist/release/ssh-quick-deploy-evidence.json",
+    expect(scripts["smoke:ssh"]).toBe("bun run smoke:public-launch");
+    expect(scripts["smoke:public-launch:basic-docker:evidence"]).toBe(
+      "bun run scripts/release/capture-ssh-smoke-evidence.ts --suite basic-docker --out dist/release/public-launch-basic-docker-evidence.json",
+    );
+    expect(scripts["smoke:public-launch:github-repo:evidence"]).toBe(
+      "bun run scripts/release/capture-ssh-smoke-evidence.ts --suite github-repo --out dist/release/public-launch-github-repo-evidence.json",
+    );
+    expect(scripts["smoke:public-launch:scheduled-task-cron:evidence"]).toBe(
+      "bun run scripts/release/capture-ssh-smoke-evidence.ts --suite scheduled-task-cron --out dist/release/public-launch-cron-evidence.json",
     );
     expect(scripts["smoke:ssh:evidence"]).toBe(
       "bun run scripts/release/capture-ssh-smoke-evidence.ts",
@@ -186,15 +198,21 @@ describe("release build workflow", () => {
     expect(scripts["smoke:ssh:evidence:verify"]).toBe(
       "bun run scripts/release/verify-ssh-smoke-evidence.ts",
     );
-    expect(scripts["smoke:ssh:remote-state:evidence:verify"]).toBe(
-      "bun run scripts/release/verify-ssh-smoke-evidence.ts --suite remote-state --path dist/release/ssh-remote-state-evidence.json",
+    expect(scripts["smoke:public-launch:basic-docker:evidence:verify"]).toBe(
+      "bun run scripts/release/verify-ssh-smoke-evidence.ts --suite basic-docker --path dist/release/public-launch-basic-docker-evidence.json",
     );
-    expect(scripts["smoke:ssh:quick-deploy:evidence:verify"]).toBe(
-      "bun run scripts/release/verify-ssh-smoke-evidence.ts --suite quick-deploy --path dist/release/ssh-quick-deploy-evidence.json",
+    expect(scripts["smoke:public-launch:github-repo:evidence:verify"]).toBe(
+      "bun run scripts/release/verify-ssh-smoke-evidence.ts --suite github-repo --path dist/release/public-launch-github-repo-evidence.json",
     );
-    expect(releaseWorkflow).toContain("ssh-remote-state-e2e");
-    expect(releaseWorkflow).toContain("require_ssh_remote_state_e2e");
-    expect(releaseWorkflow).toContain("ssh-quick-deploy-e2e");
+    expect(scripts["smoke:public-launch:scheduled-task-cron:evidence:verify"]).toBe(
+      "bun run scripts/release/verify-ssh-smoke-evidence.ts --suite scheduled-task-cron --path dist/release/public-launch-cron-evidence.json",
+    );
+    expect(releaseWorkflow).toContain("public-launch-basic-docker-smoke");
+    expect(releaseWorkflow).toContain("require_public_launch_basic_docker_smoke");
+    expect(releaseWorkflow).toContain("public-launch-github-repo-smoke");
+    expect(releaseWorkflow).toContain("require_public_launch_github_repo_smoke");
+    expect(releaseWorkflow).toContain("public-launch-cron-smoke");
+    expect(releaseWorkflow).toContain("require_public_launch_cron_smoke");
     expect(releaseWorkflow).toContain("framework-fixture-e2e");
     expect(releaseWorkflow).toContain("scheduled-task-e2e");
     expect(releaseWorkflow).toContain("storage-cleanup-e2e");
@@ -203,7 +221,6 @@ describe("release build workflow", () => {
     expect(releaseWorkflow).toContain("capacity-prune-e2e");
     expect(releaseWorkflow).toContain("preview-provider-e2e");
     expect(releaseWorkflow).toContain("dependency-redis-backup-e2e");
-    expect(releaseWorkflow).toContain("require_ssh_quick_deploy_e2e");
     expect(releaseWorkflow).toContain("require_framework_fixture_e2e");
     expect(releaseWorkflow).toContain("require_scheduled_task_e2e");
     expect(releaseWorkflow).toContain("require_storage_cleanup_e2e");
@@ -211,8 +228,13 @@ describe("release build workflow", () => {
     expect(releaseWorkflow).toContain("require_runtime_usage_e2e");
     expect(releaseWorkflow).toContain("require_capacity_prune_e2e");
     expect(releaseWorkflow).toContain("require_preview_provider_e2e");
-    expect(releaseWorkflow).toContain("uses: ./.github/workflows/ssh-remote-state-e2e.yml");
-    expect(releaseWorkflow).toContain("uses: ./.github/workflows/ssh-quick-deploy-e2e.yml");
+    expect(releaseWorkflow).toContain(
+      "uses: ./.github/workflows/public-launch-basic-docker-smoke.yml",
+    );
+    expect(releaseWorkflow).toContain(
+      "uses: ./.github/workflows/public-launch-github-repo-smoke.yml",
+    );
+    expect(releaseWorkflow).toContain("uses: ./.github/workflows/public-launch-cron-smoke.yml");
     expect(releaseWorkflow).toContain("uses: ./.github/workflows/framework-fixture-e2e.yml");
     expect(releaseWorkflow).toContain("uses: ./.github/workflows/scheduled-task-e2e.yml");
     expect(releaseWorkflow).toContain("uses: ./.github/workflows/storage-cleanup-e2e.yml");
@@ -230,8 +252,9 @@ describe("release build workflow", () => {
         "build-release:",
         "    needs:",
         "      - release-please",
-        "      - ssh-remote-state-e2e",
-        "      - ssh-quick-deploy-e2e",
+        "      - public-launch-basic-docker-smoke",
+        "      - public-launch-github-repo-smoke",
+        "      - public-launch-cron-smoke",
         "      - framework-fixture-e2e",
         "      - scheduled-task-e2e",
         "      - storage-cleanup-e2e",
@@ -246,14 +269,21 @@ describe("release build workflow", () => {
       [
         "required: ",
         "$",
-        "{{ github.event_name == 'workflow_dispatch' && inputs.require_ssh_remote_state_e2e }}",
+        "{{ github.event_name == 'workflow_dispatch' && inputs.require_public_launch_basic_docker_smoke }}",
       ].join(""),
     );
     expect(releaseWorkflow).toContain(
       [
         "required: ",
         "$",
-        "{{ github.event_name == 'workflow_dispatch' && inputs.require_ssh_quick_deploy_e2e }}",
+        "{{ github.event_name == 'workflow_dispatch' && inputs.require_public_launch_github_repo_smoke }}",
+      ].join(""),
+    );
+    expect(releaseWorkflow).toContain(
+      [
+        "required: ",
+        "$",
+        "{{ github.event_name == 'workflow_dispatch' && inputs.require_public_launch_cron_smoke }}",
       ].join(""),
     );
     expect(releaseWorkflow).toContain(
@@ -308,10 +338,16 @@ describe("release build workflow", () => {
     expect(releaseWorkflow).not.toContain(
       "startsWith(needs.release-please.outputs.tag_name, 'v0.11.')",
     );
-    expect(nightlyWorkflow).toContain("ssh-remote-state-e2e");
-    expect(nightlyWorkflow).toContain("uses: ./.github/workflows/ssh-remote-state-e2e.yml");
-    expect(nightlyWorkflow).toContain("ssh-quick-deploy-e2e");
-    expect(nightlyWorkflow).toContain("uses: ./.github/workflows/ssh-quick-deploy-e2e.yml");
+    expect(nightlyWorkflow).toContain("public-launch-basic-docker-smoke");
+    expect(nightlyWorkflow).toContain(
+      "uses: ./.github/workflows/public-launch-basic-docker-smoke.yml",
+    );
+    expect(nightlyWorkflow).toContain("public-launch-github-repo-smoke");
+    expect(nightlyWorkflow).toContain(
+      "uses: ./.github/workflows/public-launch-github-repo-smoke.yml",
+    );
+    expect(nightlyWorkflow).toContain("public-launch-cron-smoke");
+    expect(nightlyWorkflow).toContain("uses: ./.github/workflows/public-launch-cron-smoke.yml");
     expect(nightlyWorkflow).toContain("framework-fixture-e2e");
     expect(nightlyWorkflow).toContain("uses: ./.github/workflows/framework-fixture-e2e.yml");
     expect(nightlyWorkflow).toContain("scheduled-task-e2e");
@@ -411,62 +447,39 @@ describe("release build workflow", () => {
     expect(capacityPruneWorkflow).toContain(
       "Missing APPALOFT_E2E_SSH_HOST or APPALOFT_E2E_SSH_PRIVATE_KEY.",
     );
-    expect(remoteStateSshWorkflow).toContain("APPALOFT_E2E_SSH_REMOTE_STATE");
-    expect(remoteStateSshWorkflow).toContain("Check SSH Release Readiness");
-    expect(remoteStateSshWorkflow).toContain("bun run smoke:ssh:preflight");
-    expect(remoteStateSshWorkflow).toContain(
-      ["APPALOFT_E2E_SSH_PORT: ", "$", "{{ secrets.APPALOFT_E2E_SSH_PORT }}"].join(""),
+    expect(publicLaunchBasicDockerWorkflow).toContain(
+      "APPALOFT_PUBLIC_LAUNCH_SMOKE_SCENARIO: basic-docker",
     );
-    expect(remoteStateSshWorkflow).toContain(
-      ["APPALOFT_E2E_SSH_PORT: ", "$", "{{ secrets.APPALOFT_E2E_SSH_PORT || '22' }}"].join(""),
+    expect(publicLaunchBasicDockerWorkflow).toContain(
+      "bun run smoke:public-launch:basic-docker:evidence",
     );
-    expect(remoteStateSshWorkflow).toContain(
-      ["APPALOFT_E2E_SSH_USERNAME: ", "$", "{{ secrets.APPALOFT_E2E_SSH_USERNAME }}"].join(""),
+    expect(publicLaunchBasicDockerWorkflow).toContain("name: public-launch-basic-docker-evidence");
+    expect(publicLaunchBasicDockerWorkflow).toContain(
+      "path: dist/release/public-launch-basic-docker-evidence.json",
     );
-    expect(remoteStateSshWorkflow).toContain(
-      [
-        "APPALOFT_E2E_SSH_USERNAME: ",
-        "$",
-        "{{ secrets.APPALOFT_E2E_SSH_USERNAME || 'root' }}",
-      ].join(""),
+    expect(publicLaunchGitHubRepoWorkflow).toContain(
+      "APPALOFT_PUBLIC_LAUNCH_SMOKE_SCENARIO: github-repo",
     );
-    expect(remoteStateSshWorkflow).not.toContain(
-      ["APPALOFT_E2E_SSH_PRIVATE_KEY: ", "$", "{{ secrets.APPALOFT_E2E_SSH_PRIVATE_KEY }}"].join(
-        "",
-      ),
+    expect(publicLaunchGitHubRepoWorkflow).toContain(
+      "APPALOFT_PUBLIC_LAUNCH_SMOKE_GITHUB_TREE_URL",
     );
-    expect(remoteStateSshWorkflow).toContain("bun run smoke:ssh:remote-state:evidence");
-    expect(remoteStateSshWorkflow).toContain("Upload SSH Remote State Evidence");
-    expect(remoteStateSshWorkflow).toContain("name: ssh-remote-state-evidence");
-    expect(remoteStateSshWorkflow).toContain("path: dist/release/ssh-remote-state-evidence.json");
-    expect(quickDeploySshWorkflow).toContain("APPALOFT_E2E_SSH_QUICK_DEPLOY");
-    expect(quickDeploySshWorkflow).toContain("Check SSH Release Readiness");
-    expect(quickDeploySshWorkflow).toContain("bun run smoke:ssh:preflight");
-    expect(quickDeploySshWorkflow).toContain(
-      ["APPALOFT_E2E_SSH_PORT: ", "$", "{{ secrets.APPALOFT_E2E_SSH_PORT }}"].join(""),
+    expect(publicLaunchGitHubRepoWorkflow).toContain(
+      "bun run smoke:public-launch:github-repo:evidence",
     );
-    expect(quickDeploySshWorkflow).toContain(
-      ["APPALOFT_E2E_SSH_PORT: ", "$", "{{ secrets.APPALOFT_E2E_SSH_PORT || '22' }}"].join(""),
+    expect(publicLaunchGitHubRepoWorkflow).toContain("name: public-launch-github-repo-evidence");
+    expect(publicLaunchGitHubRepoWorkflow).toContain(
+      "path: dist/release/public-launch-github-repo-evidence.json",
     );
-    expect(quickDeploySshWorkflow).toContain(
-      ["APPALOFT_E2E_SSH_USERNAME: ", "$", "{{ secrets.APPALOFT_E2E_SSH_USERNAME }}"].join(""),
+    expect(publicLaunchCronWorkflow).toContain(
+      "APPALOFT_PUBLIC_LAUNCH_SMOKE_SCENARIO: scheduled-task-cron",
     );
-    expect(quickDeploySshWorkflow).toContain(
-      [
-        "APPALOFT_E2E_SSH_USERNAME: ",
-        "$",
-        "{{ secrets.APPALOFT_E2E_SSH_USERNAME || 'root' }}",
-      ].join(""),
+    expect(publicLaunchCronWorkflow).toContain(
+      "bun run smoke:public-launch:scheduled-task-cron:evidence",
     );
-    expect(quickDeploySshWorkflow).not.toContain(
-      ["APPALOFT_E2E_SSH_PRIVATE_KEY: ", "$", "{{ secrets.APPALOFT_E2E_SSH_PRIVATE_KEY }}"].join(
-        "",
-      ),
+    expect(publicLaunchCronWorkflow).toContain("name: public-launch-cron-evidence");
+    expect(publicLaunchCronWorkflow).toContain(
+      "path: dist/release/public-launch-cron-evidence.json",
     );
-    expect(quickDeploySshWorkflow).toContain("bun run smoke:ssh:quick-deploy:evidence");
-    expect(quickDeploySshWorkflow).toContain("Upload SSH Quick Deploy Evidence");
-    expect(quickDeploySshWorkflow).toContain("name: ssh-quick-deploy-evidence");
-    expect(quickDeploySshWorkflow).toContain("path: dist/release/ssh-quick-deploy-evidence.json");
   });
 
   test("[RELEASE-HARDENING-006] documents SSH release-readiness gates", async () => {
@@ -482,8 +495,9 @@ describe("release build workflow", () => {
     expect(releaseDocs).toContain("APPALOFT_E2E_SSH_HOST");
     expect(releaseDocs).toContain("APPALOFT_E2E_SSH_PRIVATE_KEY");
     expect(releaseDocs).toContain("APPALOFT_E2E_SSH_USERNAME");
-    expect(releaseDocs).toContain("require_ssh_remote_state_e2e=true");
-    expect(releaseDocs).toContain("require_ssh_quick_deploy_e2e=true");
+    expect(releaseDocs).toContain("require_public_launch_basic_docker_smoke=true");
+    expect(releaseDocs).toContain("require_public_launch_github_repo_smoke=true");
+    expect(releaseDocs).toContain("require_public_launch_cron_smoke=true");
     expect(releaseDocs).toContain("framework-fixture-e2e.yml");
     expect(releaseDocs).toContain("scheduled-task-e2e.yml");
     expect(releaseDocs).toContain("storage-cleanup-e2e.yml");
@@ -535,9 +549,8 @@ describe("release build workflow", () => {
     expect(releaseSkill).toContain("require_capacity_prune_e2e=true");
     expect(releaseSkill).toContain("require_preview_provider_e2e=true");
     expect(releaseHardeningMatrix).toContain("fail-closed reusable GitHub Actions gates");
-    expect(releaseHardeningMatrix).toContain(
-      "both scripts fail at the explicit `APPALOFT_E2E_SSH_HOST` requirement",
-    );
+    expect(releaseHardeningMatrix).toContain("both scripts fail at the explicit");
+    expect(releaseHardeningMatrix).toContain("`APPALOFT_PUBLIC_LAUNCH_SMOKE_CONFIRM=true`");
     expect(releaseHardeningMatrix).toContain("smoke:scheduled-task:docker");
     expect(releaseHardeningMatrix).toContain(
       "local explicit real scheduled-task runtime execution",
@@ -589,29 +602,29 @@ describe("release build workflow", () => {
       APPALOFT_E2E_SSH_REMOTE_STATE: "",
     };
 
-    const remoteStateResult = Bun.spawnSync(["bun", "run", "smoke:ssh:remote-state"], {
+    const basicDockerResult = Bun.spawnSync(["bun", "run", "smoke:public-launch:basic-docker"], {
       cwd: root,
       env: sshSmokeEnv,
       stderr: "pipe",
       stdout: "pipe",
     });
-    const remoteStateOutput = `${remoteStateResult.stdout.toString()}\n${remoteStateResult.stderr.toString()}`;
+    const basicDockerOutput = `${basicDockerResult.stdout.toString()}\n${basicDockerResult.stderr.toString()}`;
 
-    expect(remoteStateResult.exitCode).not.toBe(0);
-    expect(remoteStateOutput).toContain("SSH release-readiness preflight failed");
-    expect(remoteStateOutput).not.toContain("filters did not match any test files");
+    expect(basicDockerResult.exitCode).not.toBe(0);
+    expect(basicDockerOutput).toContain("APPALOFT_PUBLIC_LAUNCH_SMOKE_CONFIRM=true is required");
+    expect(basicDockerOutput).not.toContain("filters did not match any test files");
 
-    const quickDeployResult = Bun.spawnSync(["bun", "run", "smoke:ssh:quick-deploy"], {
+    const gitHubRepoResult = Bun.spawnSync(["bun", "run", "smoke:public-launch:github-repo"], {
       cwd: root,
       env: sshSmokeEnv,
       stderr: "pipe",
       stdout: "pipe",
     });
-    const quickDeployOutput = `${quickDeployResult.stdout.toString()}\n${quickDeployResult.stderr.toString()}`;
+    const gitHubRepoOutput = `${gitHubRepoResult.stdout.toString()}\n${gitHubRepoResult.stderr.toString()}`;
 
-    expect(quickDeployResult.exitCode).not.toBe(0);
-    expect(quickDeployOutput).toContain("SSH release-readiness preflight failed");
-    expect(quickDeployOutput).not.toContain("filters did not match any test files");
+    expect(gitHubRepoResult.exitCode).not.toBe(0);
+    expect(gitHubRepoOutput).toContain("APPALOFT_PUBLIC_LAUNCH_SMOKE_CONFIRM=true is required");
+    expect(gitHubRepoOutput).not.toContain("filters did not match any test files");
   });
 
   test("[RELEASE-HARDENING-006] SSH release-readiness preflight checks required environment without leaking key values", () => {
@@ -811,7 +824,11 @@ describe("release build workflow", () => {
       expect(evidence.matrixId).toBe("RELEASE-HARDENING-006");
       expect(evidence.command).toBe("custom smoke command");
       expect(evidence.suiteMode).toBe("all");
-      expect(evidence.suites).toEqual(["smoke:ssh:remote-state", "smoke:ssh:quick-deploy"]);
+      expect(evidence.suites).toEqual([
+        "smoke:public-launch:basic-docker",
+        "smoke:public-launch:github-repo",
+        "smoke:public-launch:scheduled-task-cron",
+      ]);
       expect(evidence.result).toBe("passed");
       expect(evidence.environment).toEqual({
         hostConfigured: true,
@@ -937,18 +954,18 @@ describe("release build workflow", () => {
       expect(failedOutput).toContain("SSH release-readiness evidence was not written");
       expect(existsSync(failedEvidencePath)).toBe(false);
 
-      const remoteStateEvidencePath = join(tempRoot, "remote-state-evidence.json");
-      const remoteStateResult = Bun.spawnSync(
+      const basicDockerEvidencePath = join(tempRoot, "basic-docker-evidence.json");
+      const basicDockerResult = Bun.spawnSync(
         [
           "bun",
           "run",
           "scripts/release/capture-ssh-smoke-evidence.ts",
           "--suite",
-          "remote-state",
+          "basic-docker",
           "--out",
-          remoteStateEvidencePath,
+          basicDockerEvidencePath,
           "--smoke-command-json",
-          JSON.stringify(["bun", "-e", "console.log('fake remote-state passed')"]),
+          JSON.stringify(["bun", "-e", "console.log('fake basic-docker passed')"]),
         ],
         {
           cwd: root,
@@ -956,29 +973,29 @@ describe("release build workflow", () => {
           stdout: "pipe",
         },
       );
-      const remoteStateEvidence = JSON.parse(await Bun.file(remoteStateEvidencePath).text()) as {
+      const basicDockerEvidence = JSON.parse(await Bun.file(basicDockerEvidencePath).text()) as {
         command?: string;
         suiteMode?: string;
         suites?: string[];
       };
 
-      expect(remoteStateResult.exitCode).toBe(0);
-      expect(remoteStateEvidence.command).toBe("custom smoke command");
-      expect(remoteStateEvidence.suiteMode).toBe("remote-state");
-      expect(remoteStateEvidence.suites).toEqual(["smoke:ssh:remote-state"]);
+      expect(basicDockerResult.exitCode).toBe(0);
+      expect(basicDockerEvidence.command).toBe("custom smoke command");
+      expect(basicDockerEvidence.suiteMode).toBe("basic-docker");
+      expect(basicDockerEvidence.suites).toEqual(["smoke:public-launch:basic-docker"]);
 
-      const quickDeployEvidencePath = join(tempRoot, "quick-deploy-evidence.json");
-      const quickDeployResult = Bun.spawnSync(
+      const gitHubRepoEvidencePath = join(tempRoot, "github-repo-evidence.json");
+      const gitHubRepoResult = Bun.spawnSync(
         [
           "bun",
           "run",
           "scripts/release/capture-ssh-smoke-evidence.ts",
           "--suite",
-          "quick-deploy",
+          "github-repo",
           "--out",
-          quickDeployEvidencePath,
+          gitHubRepoEvidencePath,
           "--smoke-command-json",
-          JSON.stringify(["bun", "-e", "console.log('fake quick-deploy passed')"]),
+          JSON.stringify(["bun", "-e", "console.log('fake github-repo passed')"]),
         ],
         {
           cwd: root,
@@ -986,14 +1003,42 @@ describe("release build workflow", () => {
           stdout: "pipe",
         },
       );
-      const quickDeployEvidence = JSON.parse(await Bun.file(quickDeployEvidencePath).text()) as {
+      const gitHubRepoEvidence = JSON.parse(await Bun.file(gitHubRepoEvidencePath).text()) as {
         suiteMode?: string;
         suites?: string[];
       };
 
-      expect(quickDeployResult.exitCode).toBe(0);
-      expect(quickDeployEvidence.suiteMode).toBe("quick-deploy");
-      expect(quickDeployEvidence.suites).toEqual(["smoke:ssh:quick-deploy"]);
+      expect(gitHubRepoResult.exitCode).toBe(0);
+      expect(gitHubRepoEvidence.suiteMode).toBe("github-repo");
+      expect(gitHubRepoEvidence.suites).toEqual(["smoke:public-launch:github-repo"]);
+
+      const cronEvidencePath = join(tempRoot, "cron-evidence.json");
+      const cronResult = Bun.spawnSync(
+        [
+          "bun",
+          "run",
+          "scripts/release/capture-ssh-smoke-evidence.ts",
+          "--suite",
+          "scheduled-task-cron",
+          "--out",
+          cronEvidencePath,
+          "--smoke-command-json",
+          JSON.stringify(["bun", "-e", "console.log('fake cron passed')"]),
+        ],
+        {
+          cwd: root,
+          stderr: "pipe",
+          stdout: "pipe",
+        },
+      );
+      const cronEvidence = JSON.parse(await Bun.file(cronEvidencePath).text()) as {
+        suiteMode?: string;
+        suites?: string[];
+      };
+
+      expect(cronResult.exitCode).toBe(0);
+      expect(cronEvidence.suiteMode).toBe("scheduled-task-cron");
+      expect(cronEvidence.suites).toEqual(["smoke:public-launch:scheduled-task-cron"]);
 
       const invalidSuiteEvidencePath = join(tempRoot, "invalid-suite-evidence.json");
       const invalidSuiteResult = Bun.spawnSync(
