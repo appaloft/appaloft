@@ -12,13 +12,18 @@ on:
         required: false
         default: false
         type: boolean
-      require_ssh_remote_state_e2e:
-        description: Fail the release if SSH remote-state E2E secrets are missing.
+      require_public_launch_basic_docker_smoke:
+        description: Fail the release if public launch basic Docker smoke secrets are missing.
         required: false
         default: false
         type: boolean
-      require_ssh_quick_deploy_e2e:
-        description: Fail the release if SSH quick-deploy E2E secrets are missing.
+      require_public_launch_github_repo_smoke:
+        description: Fail the release if public launch GitHub repo smoke secrets are missing.
+        required: false
+        default: false
+        type: boolean
+      require_public_launch_cron_smoke:
+        description: Fail the release if public launch cron smoke secrets are missing.
         required: false
         default: false
         type: boolean
@@ -210,20 +215,28 @@ jobs:
             gh workflow run ci.yml --repo "${GITHUB_REPOSITORY}" --ref "${branch}"
           done
 
-  ssh-remote-state-e2e:
+  public-launch-basic-docker-smoke:
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
-    uses: ./.github/workflows/ssh-remote-state-e2e.yml
+    uses: ./.github/workflows/public-launch-basic-docker-smoke.yml
     with:
-      required: ${{ github.event_name == 'workflow_dispatch' && inputs.require_ssh_remote_state_e2e }}
+      required: ${{ github.event_name == 'workflow_dispatch' && inputs.require_public_launch_basic_docker_smoke }}
     secrets: inherit
 
-  ssh-quick-deploy-e2e:
+  public-launch-github-repo-smoke:
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
-    uses: ./.github/workflows/ssh-quick-deploy-e2e.yml
+    uses: ./.github/workflows/public-launch-github-repo-smoke.yml
     with:
-      required: ${{ github.event_name == 'workflow_dispatch' && inputs.require_ssh_quick_deploy_e2e }}
+      required: ${{ github.event_name == 'workflow_dispatch' && inputs.require_public_launch_github_repo_smoke }}
+    secrets: inherit
+
+  public-launch-cron-smoke:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    uses: ./.github/workflows/public-launch-cron-smoke.yml
+    with:
+      required: ${{ github.event_name == 'workflow_dispatch' && inputs.require_public_launch_cron_smoke }}
     secrets: inherit
 
   framework-fixture-e2e:
@@ -302,8 +315,9 @@ jobs:
   build-release:
     needs:
       - release-please
-      - ssh-remote-state-e2e
-      - ssh-quick-deploy-e2e
+      - public-launch-basic-docker-smoke
+      - public-launch-github-repo-smoke
+      - public-launch-cron-smoke
       - framework-fixture-e2e
       - scheduled-task-e2e
       - storage-cleanup-e2e

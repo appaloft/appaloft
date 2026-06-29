@@ -321,13 +321,15 @@ harness for
 `QUICK-DEPLOY-WF-052` and the GitHub Actions style process boundary. It runs two separate CLI
 processes with different runner-local PGlite directories and verifies that the second deploy reuses
 remote SSH state/source link identity instead of creating a duplicate resource.
-`.github/workflows/ssh-remote-state-e2e.yml` exposes that harness as a manual workflow and wires it
-into nightly smoke plus release gating when `APPALOFT_E2E_SSH_HOST` and
-`APPALOFT_E2E_SSH_PRIVATE_KEY` secrets are configured. `.github/workflows/ssh-quick-deploy-e2e.yml`
-exposes the real quick-deploy SSH harness through the same nightly/release release-readiness path.
-Release dispatch can require the quick-deploy SSH harness with `require_ssh_quick_deploy_e2e=true`.
-For `v0.11.x` publish tags, the release workflow requires both SSH workflows before release artifact
-publication.
+The current release-readiness layer exposes the same public quick-deploy capability through
+`.github/workflows/public-launch-basic-docker-smoke.yml` for the basic Docker-image path and
+`.github/workflows/public-launch-github-repo-smoke.yml` for the public GitHub repository path. Both
+workflows run from nightly and release when `APPALOFT_PUBLIC_LAUNCH_SMOKE_SSH_HOST` and
+`APPALOFT_PUBLIC_LAUNCH_SMOKE_SSH_PRIVATE_KEY` secrets, or their `APPALOFT_E2E_SSH_*` fallbacks, are
+configured. Release dispatch can require them with
+`require_public_launch_basic_docker_smoke=true` and
+`require_public_launch_github_repo_smoke=true`. For `v0.11.x` publish tags, the release workflow can
+require the public launch workflows before release artifact publication.
 
 ## Open Questions
 
