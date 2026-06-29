@@ -189,9 +189,10 @@ describe("Console page extension surface", () => {
       "/example/domain-error-modal?organizationId=org_123&errorCode=plan_limit_exceeded&requestPath=%2Fapi%2Fservers",
     );
     expect(modalHostSource).toContain(
-      'class="max-h-[calc(100vh-12rem)] overflow-y-auto px-0 pb-5"',
+      'class="max-h-[calc(100vh-10rem)] overflow-y-auto px-4 pb-4 pt-2"',
     );
-    expect(modalHostSource).toContain('class="max-w-6xl gap-1"');
+    expect(modalHostSource).toContain('class="px-4 pb-0 pt-4"');
+    expect(modalHostSource).toContain('class="max-w-6xl gap-0"');
     expect(modalHostSource).not.toContain(
       'class="max-h-[calc(100vh-12rem)] overflow-y-auto px-5 pb-5"',
     );
@@ -355,7 +356,10 @@ describe("Console page extension surface", () => {
     expect(rendererSource).toContain('import { goto } from "$app/navigation";');
     expect(rendererSource).toContain('settingsScope?: "organization" | "instance" | null');
     expect(rendererSource).toContain("embedded?: boolean");
-    expect(rendererSource).toContain('class={embedded ? "max-w-none p-0" : "max-w-7xl"}');
+    expect(rendererSource).toContain(
+      'class={embedded ? "max-w-none space-y-3 p-0 md:p-0" : "max-w-7xl"}',
+    );
+    expect(rendererSource).toContain('class={embedded ? "space-y-3" : "space-y-4"}');
     expect(rendererSource).toContain('"space-y-4"');
     expect(rendererSource).toContain("{#if section.title || section.description}");
     expect(rendererSource).toContain("data-console-page-tab-radio");

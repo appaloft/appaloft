@@ -77,14 +77,14 @@
 </script>
 
 <Dialog.Root bind:open={modalOpen}>
-  <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-6xl gap-1">
-    <Dialog.Header>
+  <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-6xl gap-0">
+    <Dialog.Header class="px-4 pb-0 pt-4">
       <Dialog.Title>{modalTitle}</Dialog.Title>
       {#if modalDescription}
         <Dialog.Description>{modalDescription}</Dialog.Description>
       {/if}
     </Dialog.Header>
-    <div class="max-h-[calc(100vh-12rem)] overflow-y-auto px-0 pb-5">
+    <div class="max-h-[calc(100vh-10rem)] overflow-y-auto px-4 pb-4 pt-2">
       {#if modalEndpoint}
         <ConsoleExtensionPage embedded pageEndpointOverride={modalEndpoint} />
       {/if}

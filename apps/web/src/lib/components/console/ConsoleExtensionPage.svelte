@@ -1204,7 +1204,9 @@
 </svelte:head>
 
 {#snippet content()}
-  <ConsoleResourceCanvas class={embedded ? "max-w-none p-0" : "max-w-7xl"}>
+  <ConsoleResourceCanvas
+    class={embedded ? "max-w-none space-y-3 p-0 md:p-0" : "max-w-7xl"}
+  >
     {#if loading}
       <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {#each Array.from({ length: 4 }) as _}
@@ -1609,7 +1611,7 @@
             {/if}
           </section>
         {:else if section.kind === "panel-grid"}
-          <section class="space-y-4">
+          <section class={embedded ? "space-y-3" : "space-y-4"}>
             {#if section.title || section.description}
               <div class="space-y-1">
                 {#if section.title}
@@ -1640,7 +1642,7 @@
           </section>
         {:else if section.kind === "tabs"}
           {@const activeTab = selectedTab(section, sectionIndex)}
-          <section class="space-y-4">
+          <section class={embedded ? "space-y-3" : "space-y-4"}>
             {#if section.title || section.description}
               <div class="space-y-1">
                 {#if section.title}
@@ -1682,13 +1684,13 @@
               {/each}
             </div>
             {#if activeTab}
-              <div class="space-y-4">
+              <div class={embedded ? "space-y-3" : "space-y-4"}>
                 {#if activeTab.description}
                   <p class="text-sm text-muted-foreground">{activeTab.description}</p>
                 {/if}
                 {#each activeTab.sections as tabSection, tabSectionIndex (`${tabSection.kind}-${tabSectionIndex}`)}
                   {#if tabSection.kind === "panel-grid"}
-                    <section class="space-y-4">
+                    <section class={embedded ? "space-y-3" : "space-y-4"}>
                       {#if tabSection.title || tabSection.description}
                         <div class="space-y-1">
                           {#if tabSection.title}
