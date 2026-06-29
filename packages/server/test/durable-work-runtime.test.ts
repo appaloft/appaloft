@@ -21,6 +21,7 @@ import {
   type DurableWorkWorkerSlotClaimInput,
   type ExecutionContextFactory,
   type RepositoryContext,
+  scheduledTaskRunDurableWorkKind,
 } from "@appaloft/application";
 import { ok, type Result } from "@appaloft/core";
 import {
@@ -320,13 +321,25 @@ describe("durable work server runtime", () => {
         return ok({});
       },
     };
-    const registry = createCompositeDurableWorkHandlerRegistry(deploymentHandler, {
-      resolve(item) {
-        return item.kind === "blueprint-install" ? blueprintInstallHandler : undefined;
+    const scheduledTaskRunHandler: DurableWorkHandler = {
+      async handle() {
+        return ok({});
       },
-    });
+    };
+    const registry = createCompositeDurableWorkHandlerRegistry(
+      deploymentHandler,
+      scheduledTaskRunHandler,
+      {
+        resolve(item) {
+          return item.kind === "blueprint-install" ? blueprintInstallHandler : undefined;
+        },
+      },
+    );
 
     expect(registry.resolve(durableWorkItem({ kind: "deployment" }))).toBe(deploymentHandler);
+    expect(registry.resolve(durableWorkItem({ kind: scheduledTaskRunDurableWorkKind }))).toBe(
+      scheduledTaskRunHandler,
+    );
     expect(registry.resolve(durableWorkItem({ kind: "blueprint-install" }))).toBe(
       blueprintInstallHandler,
     );
