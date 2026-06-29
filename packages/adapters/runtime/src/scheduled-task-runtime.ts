@@ -343,7 +343,9 @@ export function renderDockerSwarmScheduledTaskCommand(
 function writeSshIdentityFile(privateKey: string): { identityFile: string; cleanup(): void } {
   const directory = mkdtempSync(join(tmpdir(), "appaloft-scheduled-task-ssh-"));
   const identityFile = join(directory, "identity");
-  writeFileSync(identityFile, privateKey, { mode: 0o600 });
+  writeFileSync(identityFile, privateKey.endsWith("\n") ? privateKey : `${privateKey}\n`, {
+    mode: 0o600,
+  });
   chmodSync(identityFile, 0o600);
 
   return {
