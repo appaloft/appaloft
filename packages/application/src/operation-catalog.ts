@@ -2962,7 +2962,7 @@ export const operationCatalog = [
     inputSchema: duplicateEnvironmentProfileCommandInputSchema,
     serviceToken: tokens.duplicateEnvironmentProfileUseCase,
     transports: {
-      cli: "appaloft env duplicate apply <environmentId> --name <targetName>",
+      cli: "appaloft env copy <environmentId> <targetName>",
       orpc: { method: "POST", path: "/api/environments/{environmentId}/duplicate-profile" },
     },
   },
@@ -3035,7 +3035,7 @@ export const operationCatalog = [
     inputSchema: planDuplicateEnvironmentQueryInputSchema,
     serviceToken: tokens.planDuplicateEnvironmentQueryService,
     transports: {
-      cli: "appaloft env duplicate plan <environmentId> --name <targetName>",
+      cli: "appaloft env copy <environmentId> <targetName> --dry-run",
       orpc: {
         method: "GET",
         path: "/api/environments/{environmentId}/duplicate-plan",

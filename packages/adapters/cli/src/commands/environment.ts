@@ -6,6 +6,8 @@ import {
   DiffEnvironmentsQuery,
   DuplicateEnvironmentProfileCommand,
   type DuplicateEnvironmentProfileCommandInput,
+  type EnvironmentDuplicateDependencyCandidate,
+  type EnvironmentDuplicatePlanSummary,
   EnvironmentEffectivePrecedenceQuery,
   ListEnvironmentsQuery,
   LockEnvironmentCommand,
@@ -18,10 +20,24 @@ import {
   UnlockEnvironmentCommand,
   UnsetEnvironmentVariableCommand,
 } from "@appaloft/application";
-import { configScopes, environmentKinds, variableExposures, variableKinds } from "@appaloft/core";
+import {
+  configScopes,
+  domainError,
+  environmentKinds,
+  variableExposures,
+  variableKinds,
+} from "@appaloft/core";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
+import { Effect } from "effect";
 
-import { optionalValue, runCommand, runQuery } from "../runtime.js";
+import {
+  CliRuntime,
+  optionalValue,
+  print,
+  resultToEffect,
+  runCommand,
+  runQuery,
+} from "../runtime.js";
 import { cliCommandDescriptions } from "./docs-help.js";
 
 const environmentIdArg = Args.text({ name: "environmentId" });
@@ -38,12 +54,44 @@ const archiveReasonOption = Options.text("reason").pipe(Options.optional);
 const cloneKindOption = Options.choice("kind", environmentKinds).pipe(Options.optional);
 const dependencyDecisionsOption = Options.text("dependency-decisions").pipe(Options.optional);
 const resourceDecisionsOption = Options.text("resource-decisions").pipe(Options.optional);
+const copyDependenciesOption = Options.choice("dependencies", ["create-new", "defer"]).pipe(
+  Options.withDefault("create-new" as const),
+);
+const copySecretsOption = Options.choice("secrets", ["regenerate", "configure-later"]).pipe(
+  Options.withDefault("regenerate" as const),
+);
+const copyDataOption = Options.choice("data", ["empty", "configure-later"]).pipe(
+  Options.withDefault("empty" as const),
+);
+const copyDomainsOption = Options.choice("domains", ["generated", "configure-later"]).pipe(
+  Options.withDefault("generated" as const),
+);
+const copyStorageOption = Options.text("storage").pipe(Options.withDefault("empty"));
+const copyNetworkOption = Options.choice("network", ["isolated"]).pipe(
+  Options.withDefault("isolated" as const),
+);
+const dryRunOption = Options.boolean("dry-run").pipe(Options.withDefault(false));
+const yesOption = Options.boolean("yes").pipe(Options.withDefault(false));
+const jsonOption = Options.boolean("json").pipe(Options.withDefault(false));
+const revealGeneratedSecretsOption = Options.boolean("reveal-generated-secrets").pipe(
+  Options.withDefault(false),
+);
+const databasePolicyOption = Options.text("database").pipe(Options.optional);
+const domainPolicyOption = Options.text("domain").pipe(Options.optional);
+const reuseSourceOption = Options.text("reuse-source").pipe(Options.optional);
+const acknowledgeSharedSourceOption = Options.boolean("acknowledge-shared-source").pipe(
+  Options.withDefault(false),
+);
 const resourceIdsOption = Options.text("resource-ids");
 const lockReasonOption = Options.text("reason").pipe(Options.optional);
 const exposureOption = Options.choice("exposure", variableExposures);
 const scopeOption = Options.choice("scope", configScopes).pipe(Options.optional);
 const secretOption = Options.boolean("secret").pipe(Options.withDefault(false));
 const variableKindOption = Options.choice("kind", variableKinds);
+
+type CopyDependencyDecision = NonNullable<
+  DuplicateEnvironmentProfileCommandInput["dependencyDecisions"]
+>[number];
 
 const listCommand = EffectCommand.make(
   "list",
@@ -287,6 +335,64 @@ const duplicateCommand = EffectCommand.make("duplicate").pipe(
   EffectCommand.withSubcommands([duplicatePlanCommand, duplicateApplyCommand]),
 );
 
+const copyCommand = EffectCommand.make(
+  "copy",
+  {
+    environmentId: environmentIdArg,
+    targetName: targetNameArg,
+    dependencies: copyDependenciesOption,
+    secrets: copySecretsOption,
+    data: copyDataOption,
+    domains: copyDomainsOption,
+    storage: copyStorageOption,
+    network: copyNetworkOption,
+    dryRun: dryRunOption,
+    yes: yesOption,
+    json: jsonOption,
+    revealGeneratedSecrets: revealGeneratedSecretsOption,
+    database: databasePolicyOption,
+    domain: domainPolicyOption,
+    reuseSource: reuseSourceOption,
+    acknowledgeSharedSource: acknowledgeSharedSourceOption,
+  },
+  ({
+    acknowledgeSharedSource,
+    database,
+    domain,
+    data,
+    dependencies,
+    domains,
+    dryRun,
+    environmentId,
+    json,
+    network,
+    revealGeneratedSecrets,
+    reuseSource,
+    secrets,
+    storage,
+    targetName,
+    yes,
+  }) =>
+    runEnvironmentCopy({
+      environmentId,
+      targetName,
+      dependencies,
+      secrets,
+      data,
+      domains,
+      storage,
+      network,
+      dryRun,
+      yes,
+      json,
+      revealGeneratedSecrets,
+      database: optionalValue(database),
+      domain: optionalValue(domain),
+      reuseSource: optionalValue(reuseSource),
+      acknowledgeSharedSource,
+    }),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.environmentCopy));
+
 const effectivePrecedenceCommand = EffectCommand.make(
   "effective-precedence",
   {
@@ -345,11 +451,243 @@ export const envCommand = EffectCommand.make("env").pipe(
     effectivePrecedenceCommand,
     diffCommand,
     diffProfileCommand,
+    copyCommand,
     duplicateCommand,
     syncProfileCommand,
     promoteCommand,
   ]),
 );
+
+function runEnvironmentCopy(input: {
+  readonly environmentId: string;
+  readonly targetName: string;
+  readonly dependencies: "create-new" | "defer";
+  readonly secrets: "regenerate" | "configure-later";
+  readonly data: "empty" | "configure-later";
+  readonly domains: "generated" | "configure-later";
+  readonly storage: string;
+  readonly network: "isolated";
+  readonly dryRun: boolean;
+  readonly yes: boolean;
+  readonly json: boolean;
+  readonly revealGeneratedSecrets: boolean;
+  readonly database: string | undefined;
+  readonly domain: string | undefined;
+  readonly reuseSource: string | undefined;
+  readonly acknowledgeSharedSource: boolean;
+}) {
+  return Effect.gen(function* () {
+    if (input.revealGeneratedSecrets && input.json) {
+      return yield* Effect.fail(
+        domainError.validation("Generated secret reveal is not available with JSON output", {
+          phase: "environment-profile-copy-cli",
+        }),
+      );
+    }
+
+    const cli = yield* CliRuntime;
+    if (input.revealGeneratedSecrets && !cli.terminalIO.stdin.isTTY) {
+      return yield* Effect.fail(
+        domainError.validation("Generated secret reveal requires an interactive TTY", {
+          phase: "environment-profile-copy-cli",
+        }),
+      );
+    }
+
+    const planQuery = yield* resultToEffect(
+      PlanDuplicateEnvironmentQuery.create({
+        environmentId: input.environmentId,
+        targetName: input.targetName,
+      }),
+    );
+    const planResult = yield* Effect.promise(() => cli.executeQuery(planQuery));
+    const plan = yield* resultToEffect(planResult);
+    const copyPlan = defaultEnvironmentCopyPlan(plan, input);
+
+    if (input.dryRun) {
+      yield* print(copyPlan);
+      return;
+    }
+
+    const command = yield* resultToEffect(
+      DuplicateEnvironmentProfileCommand.create({
+        environmentId: input.environmentId,
+        targetName: input.targetName,
+        dependencyDecisions: copyPlan.dependencyDecisions,
+      }),
+    );
+    const applyResult = yield* Effect.promise(() => cli.executeCommand(command));
+    const output = yield* resultToEffect(applyResult);
+    yield* print({
+      schemaVersion: "environments.copy/v1",
+      status: "applied",
+      sourceEnvironmentId: input.environmentId,
+      targetName: input.targetName,
+      defaultPolicies: copyPlan.defaultPolicies,
+      oneTimeSecretRevealRefs: [],
+      result: output,
+      ...(input.yes ? { confirmed: true } : {}),
+    });
+  });
+}
+
+function defaultEnvironmentCopyPlan(
+  plan: EnvironmentDuplicatePlanSummary,
+  input: {
+    readonly dependencies: "create-new" | "defer";
+    readonly secrets: "regenerate" | "configure-later";
+    readonly data: "empty" | "configure-later";
+    readonly domains: "generated" | "configure-later";
+    readonly storage: string;
+    readonly network: "isolated";
+    readonly database: string | undefined;
+    readonly domain: string | undefined;
+    readonly reuseSource: string | undefined;
+    readonly acknowledgeSharedSource: boolean;
+  },
+) {
+  return {
+    schemaVersion: "environments.copy-plan/v1" as const,
+    sourceEnvironmentId: plan.sourceEnvironment.id,
+    targetName: plan.target.name,
+    defaultPolicies: {
+      services: "copy-and-redeploy",
+      network: input.network,
+      dependencies: input.dependencies === "create-new" ? "create-new-managed" : "defer",
+      secrets: input.secrets,
+      data: databaseDataPolicy(input),
+      domains: domainPolicy(input),
+      storage: storagePolicy(input.storage),
+    },
+    dependencyDecisions: plan.dependencyCandidates.map((candidate) =>
+      dependencyDecisionFromCopyPlan(candidate, input),
+    ),
+    unresolvedBlockers: [
+      ...(input.secrets === "configure-later" ? ["secret-values"] : []),
+      ...(input.data === "configure-later" ? ["database-data"] : []),
+      ...(input.domains === "configure-later" ? ["custom-domain-routes"] : []),
+      ...(input.storage === "configure-later" ? ["storage-data"] : []),
+    ],
+    warnings: plan.warnings,
+    generatedAt: plan.generatedAt,
+  };
+}
+
+function databaseDataPolicy(input: {
+  readonly data: "empty" | "configure-later";
+  readonly database: string | undefined;
+}) {
+  if (input.database?.startsWith("restore:")) {
+    return input.database;
+  }
+  return input.data;
+}
+
+function domainPolicy(input: {
+  readonly domains: "generated" | "configure-later";
+  readonly domain: string | undefined;
+}) {
+  if (input.domain?.startsWith("rebind:")) {
+    return input.domain;
+  }
+  if (input.domain === "generated") {
+    return "generated-route";
+  }
+  if (input.domain === "defer" || input.domain === "configure-later") {
+    return "configure-later";
+  }
+  return input.domains === "generated" ? "generated-route" : "configure-later";
+}
+
+function storagePolicy(value: string) {
+  if (value === "empty") {
+    return "empty-volume";
+  }
+  if (value === "configure-later" || value === "defer") {
+    return "configure-later";
+  }
+  if (value.startsWith("restore:") || value.startsWith("import:")) {
+    return value;
+  }
+  return "configure-later";
+}
+
+function dependencyDecisionFromCopyPlan(
+  candidate: EnvironmentDuplicateDependencyCandidate,
+  input: {
+    readonly dependencies: "create-new" | "defer";
+    readonly database: string | undefined;
+    readonly reuseSource: string | undefined;
+    readonly acknowledgeSharedSource: boolean;
+  },
+): CopyDependencyDecision {
+  const databaseDecision = dependencyDatabaseDecision(candidate, input.database);
+  if (databaseDecision) {
+    return databaseDecision;
+  }
+
+  if (input.reuseSource && dependencyMatchesAlias(candidate, input.reuseSource)) {
+    return {
+      dependencyResourceId: candidate.dependencyResourceId,
+      decision: "reuse-source",
+      acknowledgement: input.acknowledgeSharedSource
+        ? "I understand this target environment will share the source dependency."
+        : "",
+    };
+  }
+
+  if (input.dependencies === "defer" || !candidate.providerManaged) {
+    return { dependencyResourceId: candidate.dependencyResourceId, decision: "defer" };
+  }
+
+  return {
+    dependencyResourceId: candidate.dependencyResourceId,
+    decision: "create-new-managed",
+    providerKey: candidate.providerKey,
+  };
+}
+
+function dependencyDatabaseDecision(
+  candidate: EnvironmentDuplicateDependencyCandidate,
+  value: string | undefined,
+): CopyDependencyDecision | null {
+  if (!value || !dependencyMatchesAlias(candidate, "db")) {
+    return null;
+  }
+
+  if (value === "create-new") {
+    return {
+      dependencyResourceId: candidate.dependencyResourceId,
+      decision: "create-new-managed",
+      providerKey: candidate.providerKey,
+    };
+  }
+  if (value === "defer") {
+    return { dependencyResourceId: candidate.dependencyResourceId, decision: "defer" };
+  }
+  if (value.startsWith("bind-existing:")) {
+    return {
+      dependencyResourceId: candidate.dependencyResourceId,
+      decision: "bind-existing",
+      targetDependencyResourceId: value.slice("bind-existing:".length),
+    };
+  }
+  return { dependencyResourceId: candidate.dependencyResourceId, decision: "defer" };
+}
+
+function dependencyMatchesAlias(
+  candidate: EnvironmentDuplicateDependencyCandidate,
+  alias: string,
+): boolean {
+  const normalized = alias.trim().toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+  if (normalized === "db" || normalized === "database") {
+    return candidate.kind === "postgres" || candidate.kind === "mysql";
+  }
+  return candidate.kind === normalized || candidate.slug === normalized;
+}
 
 function parseJsonArrayOption(text: string | undefined, optionName: string): unknown[] {
   if (!text?.trim()) {
