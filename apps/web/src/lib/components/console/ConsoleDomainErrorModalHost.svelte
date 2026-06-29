@@ -77,7 +77,7 @@
 </script>
 
 <Dialog.Root bind:open={modalOpen}>
-  <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-6xl">
+  <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-6xl gap-1">
     <Dialog.Header>
       <Dialog.Title>{modalTitle}</Dialog.Title>
       {#if modalDescription}
