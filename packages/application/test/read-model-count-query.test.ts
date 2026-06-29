@@ -5,6 +5,8 @@ import { CountDependencyResourcesQuery } from "../src/operations/dependency-reso
 import { CountDependencyResourcesQueryService } from "../src/operations/dependency-resources/count-dependency-resources.query-service";
 import { CountDeploymentsQuery } from "../src/operations/deployments/count-deployments.query";
 import { CountDeploymentsQueryService } from "../src/operations/deployments/count-deployments.query-service";
+import { ListDeploymentsQueryHandler } from "../src/operations/deployments/list-deployments.handler";
+import { ListDeploymentsQuery } from "../src/operations/deployments/list-deployments.query";
 import { ListDeploymentsQueryService } from "../src/operations/deployments/list-deployments.query-service";
 import { CountEnvironmentsQuery } from "../src/operations/environments/count-environments.query";
 import { CountEnvironmentsQueryService } from "../src/operations/environments/count-environments.query-service";
@@ -148,5 +150,23 @@ describe("read model count queries", () => {
       activeResourcesOnly: true,
       limit: 25,
     });
+  });
+
+  test("[READ-MODEL-COUNT-004] deployment list handler forwards activeResourcesOnly to the query service", async () => {
+    let capturedInput: Parameters<ListDeploymentsQueryService["execute"]>[1];
+    const queryService = {
+      execute: async (
+        _context: typeof context,
+        input: Parameters<ListDeploymentsQueryService["execute"]>[1],
+      ) => {
+        capturedInput = input;
+        return { items: [] };
+      },
+    } as unknown as ListDeploymentsQueryService;
+
+    const query = ListDeploymentsQuery.create({ activeResourcesOnly: true })._unsafeUnwrap();
+    await new ListDeploymentsQueryHandler(queryService).handle(context, query);
+
+    expect(capturedInput?.activeResourcesOnly).toBe(true);
   });
 });
