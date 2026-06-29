@@ -191,6 +191,7 @@ describe("Console page extension surface", () => {
     expect(modalHostSource).toContain(
       'class="max-h-[calc(100vh-12rem)] overflow-y-auto px-0 pb-5"',
     );
+    expect(modalHostSource).toContain('class="max-w-6xl gap-1"');
     expect(modalHostSource).not.toContain(
       'class="max-h-[calc(100vh-12rem)] overflow-y-auto px-5 pb-5"',
     );
@@ -306,6 +307,8 @@ describe("Console page extension surface", () => {
     expect(rendererSource).toContain("data-console-page-dialog-comparison-table");
     expect(rendererSource).toContain('{#if section.layout === "comparison-table"}');
     expect(rendererSource).toContain("{@render panelGridComparisonTable(section)}");
+    expect(rendererSource).toContain("title={action.disabled && action.disabledReason");
+    expect(rendererSource).not.toContain("firstDisabledActionReason(item)");
     expect(rendererSource).toContain('class="min-w-32 border-l px-3 py-3 text-center align-top"');
     expect(rendererSource).toContain('class="flex min-h-9 items-center justify-center"');
     expect(rendererSource).toContain(

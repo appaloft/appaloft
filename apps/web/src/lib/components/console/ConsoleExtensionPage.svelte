@@ -930,10 +930,6 @@
     return item.rows?.find((row) => row.label === label) ?? null;
   }
 
-  function firstDisabledActionReason(item: ConsolePagePanelItem): string | null {
-    return item.actions?.find((action) => action.disabled && action.disabledReason)?.disabledReason ?? null;
-  }
-
   function tabsSectionKey(section: ConsolePageTabsSection, index: number): string {
     return `${section.title ?? "tabs"}:${index}`;
   }
@@ -1183,6 +1179,9 @@
                       variant={action.variant === "primary" ? "default" : "outline"}
                       disabled={Boolean(action.disabled) ||
                         pendingActionKey === requestActionKey(action, item)}
+                      title={action.disabled && action.disabledReason
+                        ? action.disabledReason
+                        : undefined}
                       onclick={() => runRequestAction(action, item)}
                     >
                       {pendingActionKey === requestActionKey(action, item)
@@ -1191,11 +1190,6 @@
                     </Button>
                   {/each}
                 </div>
-              {/if}
-              {#if firstDisabledActionReason(item)}
-                <p class="mt-2 text-center text-xs leading-5 text-muted-foreground">
-                  {firstDisabledActionReason(item)}
-                </p>
               {/if}
             </td>
           {/each}
