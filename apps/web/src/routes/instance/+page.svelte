@@ -11,6 +11,7 @@
     MaintenanceWorkerStatus,
     OperatorWorkEvent,
     OperatorWorkItem,
+    SystemPluginWebExtension,
     TerminalSessionSummary,
   } from "@appaloft/contracts";
   import {
@@ -42,7 +43,7 @@
   } from "$lib/console/instance-access";
   import { instanceSettingsItems } from "$lib/console/settings-nav";
   import { formatTime } from "$lib/console/utils";
-  import { i18nKeys, t } from "$lib/i18n";
+  import { i18nKeys, locale, t } from "$lib/i18n";
   import { orpc, orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
 
@@ -60,6 +61,9 @@
   type InstanceRuntimeTopology = NonNullable<MaintenanceWorkerStatus["runtimeTopology"]>;
   type Props = {
     section?: InstanceSection | null;
+  };
+  type SystemPluginWebExtensionsResponse = {
+    items: SystemPluginWebExtension[];
   };
   type RuntimeStatusResponse = {
     schemaVersion: "cloud-dev-runtime.status/v1";
@@ -111,6 +115,15 @@
   const selectedWorkId = $derived(page.url.searchParams.get("workId") ?? "");
   const instanceAccessAllowed = $derived(
     $capabilities.capabilities[instanceAccessCapabilityKey]?.allowed === true,
+  );
+  const webExtensionsQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["system-plugins", "web-extensions"],
+      queryFn: () =>
+        request<SystemPluginWebExtensionsResponse>("/api/system-plugins/web-extensions"),
+      enabled: browser && instanceAccessAllowed,
+      staleTime: 30_000,
+    }),
   );
   const contextQuery = createQuery(() =>
     orpc.organizations.currentContext.queryOptions({
@@ -606,7 +619,7 @@ server-config-deploy: true`);
     description={$t(i18nKeys.console.instance.pageDescription)}
     groupLabel={$t(i18nKeys.console.instance.pageTitle)}
     activePath={instanceSectionHref(activeSection)}
-    items={instanceSettingsItems()}
+    items={instanceSettingsItems(webExtensionsQuery.data?.items ?? [], $locale)}
     breadcrumbs={[
       { label: $t(i18nKeys.console.nav.home), href: "/" },
       { label: $t(i18nKeys.console.instance.pageTitle) },
