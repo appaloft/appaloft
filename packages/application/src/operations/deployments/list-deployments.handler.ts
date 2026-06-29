@@ -25,11 +25,18 @@ export class ListDeploymentsQueryHandler
     return ok(
       await this.queryService.execute(
         context,
-        query.projectId || query.resourceId || query.includeArchived || query.limit
+        query.projectId ||
+          query.resourceId ||
+          query.includeArchived ||
+          query.activeResourcesOnly ||
+          query.limit
           ? {
               ...(query.projectId ? { projectId: query.projectId } : {}),
               ...(query.resourceId ? { resourceId: query.resourceId } : {}),
               ...(query.includeArchived ? { includeArchived: query.includeArchived } : {}),
+              ...(query.activeResourcesOnly
+                ? { activeResourcesOnly: query.activeResourcesOnly }
+                : {}),
               ...(query.limit ? { limit: query.limit } : {}),
             }
           : undefined,
