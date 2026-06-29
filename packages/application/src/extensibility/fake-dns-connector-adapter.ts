@@ -782,7 +782,27 @@ function domainConnectRedirectUrl(input: {
     query.set("key", input.signatureKey);
     query.set("sig", signature);
   }
-  return `${baseUrl}/${encodeURIComponent(input.providerKey)}/services/${encodeURIComponent(input.serviceId)}/apply?${query.toString()}`;
+  return `${domainConnectApplyUrl({
+    baseUrl,
+    providerKey: input.providerKey,
+    serviceId: input.serviceId,
+    zoneName: input.zoneName,
+  })}?${query.toString()}`;
+}
+
+function domainConnectApplyUrl(input: {
+  baseUrl: string;
+  providerKey: string;
+  serviceId: string;
+  zoneName: string;
+}): string {
+  if (input.baseUrl.includes("<domain>")) {
+    return input.baseUrl.replace("<domain>", encodeURIComponent(input.zoneName));
+  }
+  if (input.baseUrl.includes("{domain}")) {
+    return input.baseUrl.replace("{domain}", encodeURIComponent(input.zoneName));
+  }
+  return `${input.baseUrl}/${encodeURIComponent(input.providerKey)}/services/${encodeURIComponent(input.serviceId)}/apply`;
 }
 
 function domainConnectHostParameter(hostname: string, zoneName: string): string {
