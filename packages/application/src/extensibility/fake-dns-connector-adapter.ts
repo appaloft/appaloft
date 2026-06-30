@@ -796,13 +796,16 @@ function domainConnectApplyUrl(input: {
   serviceId: string;
   zoneName: string;
 }): string {
-  if (input.baseUrl.includes("<domain>")) {
-    return input.baseUrl.replace("<domain>", encodeURIComponent(input.zoneName));
+  const providerBaseUrl = domainConnectProviderBaseUrl(input.baseUrl);
+  return `${providerBaseUrl}/${encodeURIComponent(input.providerKey)}/services/${encodeURIComponent(input.serviceId)}/apply`;
+}
+
+function domainConnectProviderBaseUrl(baseUrl: string): string {
+  const normalized = baseUrl.replace(/\/$/, "");
+  if (normalized.endsWith("/v2/domainTemplates/providers")) {
+    return normalized;
   }
-  if (input.baseUrl.includes("{domain}")) {
-    return input.baseUrl.replace("{domain}", encodeURIComponent(input.zoneName));
-  }
-  return `${input.baseUrl}/${encodeURIComponent(input.providerKey)}/services/${encodeURIComponent(input.serviceId)}/apply`;
+  return `${normalized}/v2/domainTemplates/providers`;
 }
 
 function domainConnectHostParameter(hostname: string, zoneName: string): string {
