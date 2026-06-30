@@ -1216,11 +1216,12 @@
   let dnsConnectorApplyResult = $state<ConnectorCapabilityApplyResponse | null>(null);
   let dnsConnectorFeedback = $state<{
     bindingId: string;
-    kind: "success" | "error";
+    kind: "success" | "error" | "info";
     title: string;
     detail: string;
   } | null>(null);
   let dnsConnectorAuthWindow: Window | null = null;
+  let dnsConnectorAuthCleanup: (() => void) | null = null;
   let importFeedback = $state<{
     bindingId: string;
     kind: "success" | "error";
@@ -2340,6 +2341,7 @@
       return;
     }
 
+    clearDnsConnectorAuthorizationWatcher();
     dnsConnectorBindingId = binding.id;
     dnsConnectorReadiness = null;
     dnsConnectorPlan = null;
@@ -2509,6 +2511,21 @@
     ].join(",");
   }
 
+  function dnsConnectorFeedbackClass(kind: "success" | "error" | "info"): string {
+    if (kind === "success") {
+      return "border-emerald-500/30 bg-emerald-500/10 text-emerald-700";
+    }
+    if (kind === "error") {
+      return "border-destructive/30 bg-destructive/5 text-destructive";
+    }
+    return "border-primary/20 bg-primary/5 text-muted-foreground";
+  }
+
+  function clearDnsConnectorAuthorizationWatcher(): void {
+    dnsConnectorAuthCleanup?.();
+    dnsConnectorAuthCleanup = null;
+  }
+
   function isDnsConnectorAuxiliaryCallbackWindow(): boolean {
     if (!browser) {
       return false;
@@ -2561,6 +2578,7 @@
       return;
     }
 
+    clearDnsConnectorAuthorizationWatcher();
     dnsConnectorBindingId = "";
     dnsConnectorReadiness = null;
     dnsConnectorPlan = null;
@@ -2666,7 +2684,10 @@
     }
   }
 
-  async function verifyDnsAfterDomainConnect(bindingId: string): Promise<void> {
+  async function verifyDnsAfterDomainConnect(
+    bindingId: string,
+    options: { pendingIsInformational?: boolean } = {},
+  ): Promise<void> {
     try {
       await orpcClient.domainBindings.confirmOwnership({ domainBindingId: bindingId });
       dnsConnectorFeedback = {
@@ -2681,14 +2702,26 @@
     } catch (error) {
       dnsConnectorFeedback = {
         bindingId,
-        kind: "error",
-        title: $t(i18nKeys.console.domainBindings.confirmOwnershipErrorTitle),
-        detail: readErrorMessage(error),
+        kind: options.pendingIsInformational ? "info" : "error",
+        title: options.pendingIsInformational
+          ? $t(i18nKeys.console.domainBindings.dnsConnectorVerificationPendingTitle)
+          : $t(i18nKeys.console.domainBindings.confirmOwnershipErrorTitle),
+        detail: options.pendingIsInformational
+          ? $t(i18nKeys.console.domainBindings.dnsConnectorVerificationPendingDetail)
+          : readErrorMessage(error),
       };
     }
   }
 
   function openDomainConnectWindow(redirectUrl: string, bindingId: string): void {
+    clearDnsConnectorAuthorizationWatcher();
+    dnsConnectorFeedback = {
+      bindingId,
+      kind: "info",
+      title: $t(i18nKeys.console.domainBindings.dnsConnectorAuthorizationPendingTitle),
+      detail: $t(i18nKeys.console.domainBindings.dnsConnectorAuthorizationPendingDetail),
+    };
+
     const openedWindow = window.open(
       redirectUrl,
       dnsConnectorAuthWindowName,
@@ -2701,13 +2734,27 @@
 
     dnsConnectorAuthWindow = openedWindow;
     openedWindow.focus();
-    const timer = window.setInterval(() => {
-      if (!openedWindow.closed) {
+    let verifiedAfterReturn = false;
+    const verifyAfterReturn = (): void => {
+      if (verifiedAfterReturn) {
         return;
       }
-      window.clearInterval(timer);
-      void verifyDnsAfterDomainConnect(bindingId);
-    }, 1000);
+      verifiedAfterReturn = true;
+      clearDnsConnectorAuthorizationWatcher();
+      void verifyDnsAfterDomainConnect(bindingId, { pendingIsInformational: true });
+    };
+    const verifyAfterVisible = (): void => {
+      if (document.visibilityState !== "visible") {
+        return;
+      }
+      verifyAfterReturn();
+    };
+    window.addEventListener("focus", verifyAfterReturn);
+    document.addEventListener("visibilitychange", verifyAfterVisible);
+    dnsConnectorAuthCleanup = () => {
+      window.removeEventListener("focus", verifyAfterReturn);
+      document.removeEventListener("visibilitychange", verifyAfterVisible);
+    };
   }
 
   async function connectDnsProviderForSelectedBinding(): Promise<void> {
@@ -4811,6 +4858,7 @@
   });
 
   onDestroy(() => {
+    clearDnsConnectorAuthorizationWatcher();
     stopRuntimeLogFollow();
     if (diagnosticSummaryCopyResetTimeout) {
       clearTimeout(diagnosticSummaryCopyResetTimeout);
@@ -9731,9 +9779,7 @@
                               <div
                                 class={[
                                   "mt-3 rounded-md border px-3 py-2 text-xs",
-                                  dnsConnectorFeedback.kind === "success"
-                                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700"
-                                    : "border-destructive/30 bg-destructive/5 text-destructive",
+                                  dnsConnectorFeedbackClass(dnsConnectorFeedback.kind),
                                 ]}
                               >
                                 <p class="font-medium">{dnsConnectorFeedback.title}</p>
@@ -12424,9 +12470,7 @@
                 <div
                   class={[
                     "rounded-md border px-3 py-2 text-xs",
-                    dnsConnectorFeedback.kind === "success"
-                      ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-700"
-                      : "border-destructive/30 bg-destructive/5 text-destructive",
+                    dnsConnectorFeedbackClass(dnsConnectorFeedback.kind),
                   ]}
                 >
                   <p class="font-medium">{dnsConnectorFeedback.title}</p>
