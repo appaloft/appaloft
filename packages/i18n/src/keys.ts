@@ -1666,6 +1666,10 @@ export const i18nKeys = {
       dnsConnectorApplyErrorTitle: "console:domainBindings.dnsConnectorApplyErrorTitle",
       dnsConnectorApplySuccessTitle: "console:domainBindings.dnsConnectorApplySuccessTitle",
       dnsConnectorApplying: "console:domainBindings.dnsConnectorApplying",
+      dnsConnectorAuthorizationPendingDetail:
+        "console:domainBindings.dnsConnectorAuthorizationPendingDetail",
+      dnsConnectorAuthorizationPendingTitle:
+        "console:domainBindings.dnsConnectorAuthorizationPendingTitle",
       dnsConnectorCleanup: "console:domainBindings.dnsConnectorCleanup",
       dnsConnectorConfigure: "console:domainBindings.dnsConnectorConfigure",
       dnsConnectorConflicts: "console:domainBindings.dnsConnectorConflicts",
@@ -1698,6 +1702,10 @@ export const i18nKeys = {
       dnsConnectorPlanTitle: "console:domainBindings.dnsConnectorPlanTitle",
       dnsConnectorReadinessConflict: "console:domainBindings.dnsConnectorReadinessConflict",
       dnsConnectorReadinessConflictWith: "console:domainBindings.dnsConnectorReadinessConflictWith",
+      dnsConnectorVerificationPendingDetail:
+        "console:domainBindings.dnsConnectorVerificationPendingDetail",
+      dnsConnectorVerificationPendingTitle:
+        "console:domainBindings.dnsConnectorVerificationPendingTitle",
       dnsConnectorReadinessInitial: "console:domainBindings.dnsConnectorReadinessInitial",
       dnsConnectorReadinessNoZone: "console:domainBindings.dnsConnectorReadinessNoZone",
       dnsConnectorReadinessPlan: "console:domainBindings.dnsConnectorReadinessPlan",

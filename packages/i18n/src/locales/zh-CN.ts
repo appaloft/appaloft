@@ -1722,6 +1722,9 @@ export const zhCN = {
       dnsConnectorApplyErrorTitle: "无法应用 DNS",
       dnsConnectorApplySuccessTitle: "DNS 已应用",
       dnsConnectorApplying: "正在应用",
+      dnsConnectorAuthorizationPendingDetail:
+        "请在提供商窗口完成授权。回到 Appaloft 后，我们会继续检查 DNS。",
+      dnsConnectorAuthorizationPendingTitle: "等待 DNS 提供商授权",
       dnsConnectorCleanup: "清理",
       dnsConnectorConfigure: "配置 DNS",
       dnsConnectorConflicts: "冲突",
@@ -1771,6 +1774,9 @@ export const zhCN = {
       dnsConnectorRecords: "记录",
       dnsConnectorRefreshPlan: "刷新计划",
       dnsConnectorRisk: "风险",
+      dnsConnectorVerificationPendingDetail:
+        "如果你已经在提供商窗口完成授权，DNS 可能还在生效中。稍后回到这里刷新计划或重新验证。",
+      dnsConnectorVerificationPendingTitle: "等待 DNS 生效",
       dnsConnectorZoneName: "DNS 区域",
       emptyBody: "域名绑定保存验证、证书和就绪状态。",
       emptyGlobalBody: "域名绑定会从资源的网络页面创建；这里用于查找、验证、路由和证书治理。",

@@ -1885,6 +1885,9 @@ export const enUS = {
       dnsConnectorApplyErrorTitle: "Unable to apply DNS",
       dnsConnectorApplySuccessTitle: "DNS applied",
       dnsConnectorApplying: "Applying",
+      dnsConnectorAuthorizationPendingDetail:
+        "Complete the authorization in the provider window. Appaloft will check DNS after you return here.",
+      dnsConnectorAuthorizationPendingTitle: "Waiting for DNS provider authorization",
       dnsConnectorCleanup: "Cleanup",
       dnsConnectorConfigure: "Configure DNS",
       dnsConnectorConflicts: "Conflicts",
@@ -1935,6 +1938,9 @@ export const enUS = {
       dnsConnectorRecords: "Records",
       dnsConnectorRefreshPlan: "Refresh plan",
       dnsConnectorRisk: "Risk",
+      dnsConnectorVerificationPendingDetail:
+        "If you authorized the provider, DNS changes may still be propagating. Return here and refresh the plan or retry verification shortly.",
+      dnsConnectorVerificationPendingTitle: "Waiting for DNS changes",
       dnsConnectorZoneName: "DNS zone",
       emptyBody: "A domain binding stores verification, certificate, and readiness state.",
       emptyGlobalBody:
