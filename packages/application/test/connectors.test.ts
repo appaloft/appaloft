@@ -649,7 +649,7 @@ describe("connector catalog", () => {
             providerKey: "appaloft.com",
             serviceId: "appaloft-domain",
             templateId: "appaloft-domain",
-            consentBaseUrl: "https://domainconnect.test/providers",
+            consentBaseUrl: "https://domainconnect.test/domainconnect",
             signatureKey: "_dcpubkeyv1",
             privateKeyPem,
           },
@@ -689,7 +689,7 @@ describe("connector catalog", () => {
       ],
     });
     expect(plan.providerPlan?.domainConnectSetup?.redirectUrl).toContain(
-      "https://domainconnect.test/providers/appaloft.com/services/appaloft-domain/apply",
+      "https://domainconnect.test/domainconnect/v2/domainTemplates/providers/appaloft.com/services/appaloft-domain/apply",
     );
     expect(plan.providerPlan?.domainConnectSetup?.redirectUrl).toContain("domain=example.com");
     expect(plan.providerPlan?.domainConnectSetup?.redirectUrl).toContain("host=app");
@@ -704,7 +704,7 @@ describe("connector catalog", () => {
     expect(JSON.stringify(plan)).not.toContain("PRIVATE KEY");
   });
 
-  test("[APP-CONN-003][APP-CONN-016] starts Domain Connect setup with a domain-scoped apply URL", async () => {
+  test("[APP-CONN-003][APP-CONN-016] starts Domain Connect setup from a synchronous UX URL", async () => {
     const registry = new InMemoryConnectorRegistry(
       createDefaultConnectorDefinitions({
         cloudflareDns: {
@@ -722,8 +722,7 @@ describe("connector catalog", () => {
             providerKey: "appaloft.com",
             serviceId: "appaloft-domain",
             templateId: "appaloft-domain",
-            consentBaseUrl:
-              "https://api.cloudflare.com/client/v4/dns/domainconnect/v1/<domain>/apply",
+            consentBaseUrl: "https://dash.cloudflare.com/domainconnect",
           },
         }),
       ]),
@@ -744,13 +743,60 @@ describe("connector catalog", () => {
     const redirectUrl = result._unsafeUnwrap().providerPlan?.domainConnectSetup?.redirectUrl ?? "";
     expect(
       redirectUrl.startsWith(
-        "https://api.cloudflare.com/client/v4/dns/domainconnect/v1/example.com/apply?",
+        "https://dash.cloudflare.com/domainconnect/v2/domainTemplates/providers/appaloft.com/services/appaloft-domain/apply?",
       ),
     ).toBe(true);
     expect(redirectUrl).toContain("domain=example.com");
     expect(redirectUrl).toContain("host=app");
     expect(redirectUrl).toContain("target=edge.appaloft.dev");
-    expect(redirectUrl).not.toContain("/appaloft.com/services/appaloft-domain/apply");
+  });
+
+  test("[APP-CONN-003][APP-CONN-016] preserves an existing Domain Connect providers URL", async () => {
+    const registry = new InMemoryConnectorRegistry(
+      createDefaultConnectorDefinitions({
+        cloudflareDns: {
+          configured: true,
+        },
+      }),
+    );
+    const service = new PlanConnectorCapabilityQueryService(
+      registry,
+      new InMemoryConnectorProviderAdapterRegistry([
+        new FakeDnsConnectorProviderAdapter({
+          connectorKey: "cloudflare-dns",
+          providerTitle: "Cloudflare DNS",
+          domainConnect: {
+            providerKey: "appaloft.com",
+            serviceId: "appaloft-domain",
+            templateId: "appaloft-domain",
+            consentBaseUrl:
+              "https://dash.cloudflare.com/domainconnect/v2/domainTemplates/providers",
+          },
+        }),
+      ]),
+    );
+
+    const result = await service.execute(createExecutionContext({ entrypoint: "system" }), {
+      connectorKey: "cloudflare-dns",
+      capabilityKey: "dns.domain-connect.start",
+      parameters: {
+        zoneName: "example.com",
+        hostname: "app.example.com",
+        target: "edge.appaloft.dev",
+        recordType: "CNAME",
+      },
+    });
+
+    expect(result.isOk()).toBe(true);
+    const redirectUrl = result._unsafeUnwrap().providerPlan?.domainConnectSetup?.redirectUrl ?? "";
+    expect(
+      redirectUrl.startsWith(
+        "https://dash.cloudflare.com/domainconnect/v2/domainTemplates/providers/appaloft.com/services/appaloft-domain/apply?",
+      ),
+    ).toBe(true);
+    expect(redirectUrl).not.toContain(
+      "/v2/domainTemplates/providers/v2/domainTemplates/providers/",
+    );
   });
 
   test("[APP-CONN-003][APP-CONN-016] completes temporary Domain Connect setup through DNS readback", async () => {
