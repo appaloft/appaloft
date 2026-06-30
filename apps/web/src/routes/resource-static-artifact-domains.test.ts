@@ -21,6 +21,10 @@ const dnsConnectorCallbackEffectSource = resourcePageSource.slice(
     resourcePageSource.indexOf("const callbackPayload = readDnsConnectorCallbackPayload"),
   ),
 );
+const openDomainConnectWindowSource = resourcePageSource.slice(
+  resourcePageSource.indexOf("function openDomainConnectWindow"),
+  resourcePageSource.indexOf("async function connectDnsProviderForSelectedBinding"),
+);
 
 describe("resource static artifact domains panel", () => {
   test("[RESOURCE-STATIC-DOMAINS-001] offers the normal domain binding flow for static artifacts", () => {
@@ -94,5 +98,23 @@ describe("resource static artifact domains panel", () => {
     expect(resourcePageSource).not.toContain(
       "disabled={isResourceArchived || domainBindingUsesResourceRouteProvider}",
     );
+  });
+
+  test("[CLOUD-CONN-AUTH-022] keeps Domain Connect authorization informational until the user returns", () => {
+    expect(openDomainConnectWindowSource).toContain("dnsConnectorAuthorizationPendingTitle");
+    expect(openDomainConnectWindowSource).toContain("dnsConnectorAuthorizationPendingDetail");
+    expect(openDomainConnectWindowSource).toContain('kind: "info"');
+    expect(openDomainConnectWindowSource).toContain(
+      'window.addEventListener("focus", verifyAfterReturn)',
+    );
+    expect(openDomainConnectWindowSource).toContain(
+      'document.addEventListener("visibilitychange", verifyAfterVisible)',
+    );
+    expect(openDomainConnectWindowSource).toContain("pendingIsInformational: true");
+    expect(openDomainConnectWindowSource).not.toContain("window.setInterval");
+    expect(openDomainConnectWindowSource).not.toContain("openedWindow.closed");
+    expect(resourcePageSource).toContain("dnsConnectorFeedbackClass(dnsConnectorFeedback.kind)");
+    expect(englishLocaleSource).toContain("Waiting for DNS provider authorization");
+    expect(chineseLocaleSource).toContain("等待 DNS 提供商授权");
   });
 });
