@@ -72,6 +72,17 @@ DNS 可以有两类授权：
 | Temporary setup | 否 | Domain Connect 这类一次性窗口，用户在 provider 页面确认模板，Appaloft 回来验证结果。 |
 | Persistent provider credential | 是，必须加密或引用受控 secret | Cloudflare/Route53 这类持续管理记录、验证、cleanup、漂移检查的连接。 |
 
+当前 Cloudflare DNS connector 默认走 Temporary setup，也就是 Domain Connect 一次性授权：
+
+1. 用户在资源的 Custom domains 区域或域名绑定详情页点击 Configure DNS。
+2. Appaloft 通过 public DNS discovery 检测 provider，并生成当前绑定需要的 DNS plan。
+3. 检测到 Cloudflare 时，用户点击 Connect Cloudflare DNS，Appaloft 打开 Cloudflare 的 Domain Connect apply 页面。
+4. 用户在 Cloudflare 页面确认模板记录。Appaloft 不保存长期 Cloudflare token，也不会获得未来自动改 DNS 的权限。
+5. 用户回到 Appaloft 后刷新计划或重新验证。Appaloft 通过 public DNS readback 确认记录是否已经指向目标。
+6. 如果 provider 不可自动连接、授权账号不覆盖 zone，或用户不想使用 Domain Connect，Appaloft 继续展示 Manual DNS 表格。
+
+这个流程仍然属于 `cloudflare-dns` 具体 connector；`dns` 只是能力分类。审计、计划和状态里应记录 concrete connector、Domain Connect operation、目标 hostname、记录类型和 readback 结果。
+
 <h2 id="source-connections">Source 连接</h2>
 
 GitHub 登录只代表 identity，不自动代表 source access。访问仓库、列出 repositories、接收 webhook 或回写 deployment status 需要 source connector，例如 `github-source`。现有 GitHub App installation 可以兼容迁移成 source connection readback，但仍要保留 provider app installation 的权限边界和短期 token 交换。

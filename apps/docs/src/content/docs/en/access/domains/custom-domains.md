@@ -61,6 +61,29 @@ Typical states:
 - `ready`: domain and certificate are usable.
 - `failed`: DNS, certificate material, or proxy entrypoint needs action.
 
+<h2 id="domain-binding-provider-dns">Provider DNS automation</h2>
+
+When a user enters a hostname such as `pocketbase.example.com`, Appaloft first reduces it to the base domain, such as `example.com`, and checks public DNS for NS and authoritative nameserver data. This discovery does not require authorization. It only indicates which DNS provider probably hosts the domain, such as Cloudflare, GoDaddy, Route53, Namecheap, Vercel, DNSPod, Alibaba Cloud, Tencent Cloud, or an unknown provider.
+
+Public DNS discovery does not prove ownership and does not grant Appaloft permission to write DNS. Automatic DNS setup still requires the user to authorize a concrete connector, and Appaloft must find a zone in that authorized account that covers the hostname:
+
+- If Cloudflare is detected and the Cloudflare connector is available, the page recommends connecting Cloudflare DNS.
+- After authorization, if the account contains the `example.com` zone, Appaloft can show a DNS plan and apply records after the user confirms.
+- After authorization, if the account does not contain the `example.com` zone, Appaloft blocks automatic apply and explains that the authorized account does not cover the base domain.
+- If another provider is detected but no connector exists yet, the page shows the manual DNS fallback.
+- If the provider is unknown, the user can use manual DNS and later choose another connector.
+
+<h3 id="domain-binding-dns-connector-flow">DNS connector workflow</h3>
+
+From a resource's Networking > Custom domains page or a domain binding detail page, the DNS connector flow is:
+
+1. Create or open a domain binding that is still waiting for ownership.
+2. Click Configure DNS. Appaloft detects the base domain, DNS provider, current resolution, and the DNS records this binding needs.
+3. If Cloudflare is detected and Domain Connect is available, click Connect Cloudflare DNS. Appaloft builds a signed Domain Connect apply URL and opens the Cloudflare authorization window in the browser.
+4. Confirm the records in Cloudflare. This is a one-time authorization flow; Appaloft does not store a long-lived Cloudflare token.
+5. Return to Appaloft, then refresh the DNS plan or retry verification. Appaloft rechecks public DNS and ownership readiness; propagation can take a little time.
+6. If the provider does not support automatic connection, the authorized account does not cover the zone, or Domain Connect is temporarily unavailable, copy the records from the Manual DNS table into the current DNS provider.
+
 <h2 id="domain-binding-recovery">Recovery</h2>
 
 If binding fails, do not redeploy first. Check:
