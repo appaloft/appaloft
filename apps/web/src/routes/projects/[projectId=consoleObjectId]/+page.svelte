@@ -162,6 +162,12 @@
   const projectSettingsSections = ["general", "archivedResources", "danger"] as const;
   const projectDetailScrollablePageClass = detailPageClass;
   const projectDetailScrollableBodyClass = detailBodyClass;
+  const environmentLifecycleOptionButtonClass =
+    "h-auto w-full min-w-0 items-start justify-start gap-3 whitespace-normal px-3 py-3 text-left";
+  const environmentLifecycleOptionTextClass =
+    "min-w-0 flex-1 whitespace-normal break-words leading-snug";
+  const environmentLifecycleOptionDescriptionClass =
+    "mt-1 block whitespace-normal break-words text-xs font-normal leading-snug opacity-80";
   type ProjectAttentionItem = {
     key: string;
     kind:
@@ -4104,12 +4110,12 @@
               </p>
             </div>
 
-            <div class="grid gap-2 sm:grid-cols-2">
+            <div class="grid gap-2">
               {#if selectedEnvironment.lifecycleStatus === "locked"}
                 <Button
                   type="button"
                   variant={selectedEnvironmentLifecycleAction === "unlock" ? "default" : "outline"}
-                  class="h-auto justify-start px-3 py-3 text-left"
+                  class={environmentLifecycleOptionButtonClass}
                   disabled={isProjectArchived || unlockEnvironmentMutation.isPending}
                   onclick={() => {
                     selectedEnvironmentLifecycleAction = "unlock";
@@ -4117,11 +4123,11 @@
                   }}
                 >
                   <Unlock class="size-4 shrink-0" />
-                  <span class="min-w-0">
+                  <span class={environmentLifecycleOptionTextClass}>
                     <span class="block font-medium">
                       {$t(i18nKeys.console.projects.environmentUnlockAction)}
                     </span>
-                    <span class="block text-xs font-normal opacity-80">
+                    <span class={environmentLifecycleOptionDescriptionClass}>
                       {$t(i18nKeys.console.projects.environmentLifecycleUnlockOption)}
                     </span>
                   </span>
@@ -4130,7 +4136,7 @@
                 <Button
                   type="button"
                   variant={selectedEnvironmentLifecycleAction === "lock" ? "default" : "outline"}
-                  class="h-auto justify-start px-3 py-3 text-left"
+                  class={environmentLifecycleOptionButtonClass}
                   disabled={isProjectArchived ||
                     selectedEnvironment.lifecycleStatus !== "active" ||
                     lockEnvironmentMutation.isPending}
@@ -4140,11 +4146,11 @@
                   }}
                 >
                   <Lock class="size-4 shrink-0" />
-                  <span class="min-w-0">
+                  <span class={environmentLifecycleOptionTextClass}>
                     <span class="block font-medium">
                       {$t(i18nKeys.console.projects.environmentLockAction)}
                     </span>
-                    <span class="block text-xs font-normal opacity-80">
+                    <span class={environmentLifecycleOptionDescriptionClass}>
                       {$t(i18nKeys.console.projects.environmentLifecycleLockOption)}
                     </span>
                   </span>
@@ -4153,7 +4159,7 @@
               <Button
                 type="button"
                 variant={selectedEnvironmentLifecycleAction === "archive" ? "destructive" : "outline"}
-                class="h-auto justify-start px-3 py-3 text-left"
+                class={environmentLifecycleOptionButtonClass}
                 disabled={selectedEnvironment.lifecycleStatus === "archived" ||
                   archiveEnvironmentMutation.isPending}
                 onclick={() => {
@@ -4162,11 +4168,11 @@
                 }}
               >
                 <Archive class="size-4 shrink-0" />
-                <span class="min-w-0">
+                <span class={environmentLifecycleOptionTextClass}>
                   <span class="block font-medium">
                     {$t(i18nKeys.console.projects.environmentArchiveAction)}
                   </span>
-                  <span class="block text-xs font-normal opacity-80">
+                  <span class={environmentLifecycleOptionDescriptionClass}>
                     {$t(i18nKeys.console.projects.environmentLifecycleArchiveOption)}
                   </span>
                 </span>
