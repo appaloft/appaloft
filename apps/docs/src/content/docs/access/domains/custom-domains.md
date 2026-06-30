@@ -74,6 +74,17 @@ HTTP API 使用同一组 operation contract。API 不应把 DNS/TLS 语义藏在
 - 检测到 GoDaddy 等 provider 但没有对应 connector：页面显示手动 DNS fallback。
 - 未识别 provider：用户可以使用手动 DNS，未来也可以选择其他 connector。
 
+<h3 id="domain-binding-dns-connector-flow">DNS connector 操作方式</h3>
+
+在资源的 Networking > Custom domains 或域名绑定详情页，DNS connector 的流程是：
+
+1. 创建或打开一个还在等待 ownership 的域名绑定。
+2. 点击 Configure DNS。Appaloft 会检测 base domain、DNS provider、当前解析结果，以及这个绑定需要的 DNS 记录。
+3. 如果检测到 Cloudflare 且 Domain Connect 可用，点击 Connect Cloudflare DNS。Appaloft 会生成签名的 Domain Connect apply URL，并在浏览器里打开 Cloudflare 授权窗口。
+4. 在 Cloudflare 窗口确认记录。这个流程是一次性授权，不会把长期 Cloudflare token 保存到 Appaloft。
+5. 回到 Appaloft 后，刷新 DNS plan 或重新验证绑定。Appaloft 会重新读取 public DNS/ownership readiness；DNS 传播可能需要一点时间。
+6. 如果 provider 不支持自动连接、授权账号没有覆盖 zone，或 Domain Connect 暂时不可用，按 Manual DNS 表格把记录复制到当前 DNS provider。
+
 <h2 id="domain-binding-recovery">失败恢复</h2>
 
 如果绑定失败，先不要重新部署应用。按顺序检查：

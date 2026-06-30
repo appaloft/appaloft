@@ -53,12 +53,33 @@ So "DNS connector" is shorthand for "a concrete connector in the DNS category." 
 
 DNS connections are used to plan, apply, verify, and clean up Appaloft-managed DNS records. Appaloft can create these records automatically, but it should do so through deterministic provider adapters: generate a plan, detect conflicts, wait for acceptance, and then call the provider API. LLMs may explain the plan or help choose an entrypoint, but they should not hold tokens or directly mutate DNS.
 
+DNS readiness has three layers:
+
+| Layer | Authorization required | Purpose |
+| --- | --- | --- |
+| Public DNS discovery | No | Reduce a hostname to its base domain and query public NS or authoritative nameserver data to infer whether Cloudflare, GoDaddy, Route53, Namecheap, Vercel, DNSPod, Alibaba Cloud, Tencent Cloud, or an unknown provider probably hosts it. |
+| Connector authorization | Yes | The user authorizes a concrete connector, such as `cloudflare-dns`. Authorization proves Appaloft can access that provider account; it does not prove that account owns the current hostname. |
+| Zone ownership matching | Yes | Appaloft lists zones through the authorized account. Only a zone that covers the hostname can produce and apply a DNS plan. |
+
+If public DNS discovery detects Cloudflare, the page can recommend connecting Cloudflare DNS. If the authorized Cloudflare account does not contain a zone that covers the hostname, Appaloft must block automatic setup and explain that the account does not cover the base domain. If GoDaddy is detected but no GoDaddy connector exists yet, Appaloft should show the manual DNS fallback.
+
 DNS can use two authorization shapes:
 
 | Grant | Long-lived secret stored | Typical use |
 | --- | --- | --- |
 | Temporary setup | No | One-time Domain Connect style provider window where the user confirms a template and Appaloft verifies the result. |
 | Persistent provider credential | Yes, encrypted or referenced through a controlled secret | Ongoing Cloudflare/Route53 style record management, verification, cleanup, and drift checks. |
+
+The current Cloudflare DNS connector uses Temporary setup by default through Domain Connect:
+
+1. The user clicks Configure DNS from a resource's Custom domains area or from a domain binding detail page.
+2. Appaloft uses public DNS discovery to detect the provider and builds the DNS plan required for the binding.
+3. When Cloudflare is detected, the user clicks Connect Cloudflare DNS and Appaloft opens Cloudflare's Domain Connect apply page.
+4. The user confirms the template records in Cloudflare. Appaloft does not store a long-lived Cloudflare token and does not gain permission to change DNS later.
+5. The user returns to Appaloft, then refreshes the plan or retries verification. Appaloft confirms the result through public DNS readback.
+6. If the provider cannot be connected automatically, the authorized account does not cover the zone, or the user does not want Domain Connect, Appaloft keeps showing the Manual DNS table.
+
+This flow still belongs to the concrete `cloudflare-dns` connector; `dns` is only the capability category. Audit, plan, and status records should store the concrete connector, Domain Connect operation, target hostname, record types, and readback result.
 
 <h2 id="source-connections">Source connections</h2>
 
