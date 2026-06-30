@@ -37,3 +37,24 @@ secrets, bind resources, or deploy workloads.
 This is a query. It only reads existing project/environment/resource/dependency summaries and
 returns masked values. Apply work belongs to a later explicit command that dispatches existing
 environment/resource/dependency commands with reviewed decisions.
+
+## CLI And Console Review
+
+`appaloft env copy <source-env> <target-env> --dry-run --json` uses this query to show the same
+review surface that the Console uses before mutation.
+
+The default review is intentionally conservative: copy service/resource shape, create an isolated
+network, create new managed dependencies, regenerate secret references, start database/storage data
+empty, and use generated routes instead of production custom domains.
+
+Advanced decisions change the apply command:
+
+- `--reuse-source db --acknowledge-shared-source` / "Reuse source dependencies" keeps the copied
+  resource bound to the same source dependency and must stay visible as a shared-source warning.
+- `--database restore:<backupId>` / "Restore database from backup" uses a backup id instead of an
+  empty database.
+- `--domain rebind:<hostname>` / "Bind a custom domain" uses an explicit target host instead of a
+  generated route.
+- `--storage restore:<backupId>` / "Restore storage from backup" restores target volume data.
+- `--storage import:<artifactRef>` / "Import storage artifact" imports target volume data from an
+  artifact reference.
