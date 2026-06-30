@@ -3866,6 +3866,24 @@ describe("console page structure", () => {
     expect(environmentLifecycleDialogSource).toContain("environmentLifecycleArchiveOption");
     expect(environmentLifecycleDialogSource).toContain("environmentLifecycleLockOption");
     expect(environmentLifecycleDialogSource).toContain("environmentLifecycleUnlockOption");
+    expect(environmentLifecycleDialogSource).toContain('class="grid gap-2"');
+    expect(environmentLifecycleDialogSource).not.toContain("sm:grid-cols-2");
+    expect(
+      environmentLifecycleDialogSource.match(/environmentLifecycleOptionButtonClass/g)?.length ?? 0,
+    ).toBe(3);
+    expect(
+      environmentLifecycleDialogSource.match(/environmentLifecycleOptionTextClass/g)?.length ?? 0,
+    ).toBe(3);
+    expect(
+      environmentLifecycleDialogSource.match(/environmentLifecycleOptionDescriptionClass/g)
+        ?.length ?? 0,
+    ).toBe(3);
+    expect(projectDetailPageSource).toContain(
+      "h-auto w-full min-w-0 items-start justify-start gap-3 whitespace-normal px-3 py-3 text-left",
+    );
+    expect(projectDetailPageSource).toContain(
+      "min-w-0 flex-1 whitespace-normal break-words leading-snug",
+    );
     expect(environmentLifecycleDialogSource).toContain(
       "onclick={submitEnvironmentLifecycleAction}",
     );
