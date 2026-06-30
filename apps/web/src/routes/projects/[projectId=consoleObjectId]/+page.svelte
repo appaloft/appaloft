@@ -3086,6 +3086,14 @@
                             <Copy class="size-4" />
                             {$t(i18nKeys.console.projects.environmentCloneAction)}
                           </Button>
+                        {:else}
+                          <ConsoleExtensionPanelHost
+                            presentation="actions"
+                            placement="project-environment-panel"
+                            {projectId}
+                            environmentId={environment.id}
+                            environmentName={environment.name}
+                          />
                         {/if}
                         <Button
                           type="button"
@@ -3106,6 +3114,7 @@
                       placement="project-environment-panel"
                       {projectId}
                       environmentId={environment.id}
+                      environmentName={environment.name}
                     />
                   </article>
                 {/each}

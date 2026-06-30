@@ -36,6 +36,7 @@ export interface ConsolePageEndpointContext {
   } | null;
   readonly projectId?: string;
   readonly environmentId?: string;
+  readonly environmentName?: string;
   readonly resourceId?: string;
   readonly deploymentId?: string;
   readonly previewEnvironmentId?: string;
@@ -213,6 +214,7 @@ export function resolveConsolePageEndpoint(
     organizationRole: context.organization?.role ?? "",
     projectId: context.projectId ?? "",
     environmentId: context.environmentId ?? "",
+    environmentName: context.environmentName ?? "",
     resourceId: context.resourceId ?? "",
     deploymentId: context.deploymentId ?? "",
     previewEnvironmentId: context.previewEnvironmentId ?? "",
