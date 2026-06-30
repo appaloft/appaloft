@@ -1,7 +1,14 @@
 <script lang="ts">
   import { browser } from "$app/environment";
   import { page } from "$app/state";
-  import { AlertTriangle, ArrowUpRight, ChevronDown, ChevronUp, LoaderCircle } from "@lucide/svelte";
+  import {
+    AlertTriangle,
+    ArrowUpRight,
+    ChevronDown,
+    ChevronUp,
+    Copy,
+    LoaderCircle,
+  } from "@lucide/svelte";
   import { createQuery, queryOptions } from "@tanstack/svelte-query";
 
   import { readErrorMessage, request } from "$lib/api/client";
@@ -24,6 +31,7 @@
     title: string;
     description?: string;
     badge?: string;
+    chrome?: "panel" | "none";
     collapsedByDefault?: boolean;
     expandLabel?: string;
     collapseLabel?: string;
@@ -65,6 +73,7 @@
     kind: "environment-copy-dialog";
     title: string;
     description?: string;
+    entryLayout?: "button-only" | "panel";
     triggerLabel: string;
     dialogTitle?: string;
     dialogDescription?: string;
@@ -163,8 +172,10 @@
 
   type Props = {
     placement: SystemPluginWebExtension["placement"];
+    presentation?: "panel" | "actions";
     projectId?: string;
     environmentId?: string;
+    environmentName?: string;
     resourceId?: string;
     deploymentId?: string;
     previewEnvironmentId?: string;
@@ -173,8 +184,10 @@
 
   let {
     placement,
+    presentation = "panel",
     projectId = "",
     environmentId = "",
+    environmentName = "",
     resourceId = "",
     deploymentId = "",
     previewEnvironmentId = "",
@@ -241,6 +254,7 @@
         placement,
         projectId,
         environmentId,
+        environmentName,
         resourceId,
         deploymentId,
         previewEnvironmentId,
@@ -280,6 +294,7 @@
           organization: currentOrganization,
           projectId,
           environmentId,
+          environmentName,
           resourceId,
           deploymentId,
           previewEnvironmentId,
@@ -299,6 +314,7 @@
         placement,
         projectId,
         environmentId,
+        environmentName,
         resourceId,
         deploymentId,
         previewEnvironmentId,
@@ -324,9 +340,15 @@
 
   const panelResults = $derived<ConsolePanelDocumentResult[]>(panelDocumentsQuery.data ?? []);
   const visiblePanelResults = $derived(
-    panelResults.filter(
-      (result) => result.document.sections.length > 0 || (result.document.actions?.length ?? 0) > 0,
-    ),
+    panelResults.filter((result) => {
+      if (presentation === "actions") {
+        return result.document.sections.some((section) => section.kind === "environment-copy-dialog");
+      }
+      if (result.document.chrome === "none") {
+        return false;
+      }
+      return result.document.sections.length > 0 || (result.document.actions?.length ?? 0) > 0;
+    }),
   );
   const loading = $derived(
     webExtensionsQuery.isPending ||
@@ -505,6 +527,72 @@
     return pendingActionKey === environmentCopyActionKey(section);
   }
 
+  function environmentCopyHasAdvancedSelection(): boolean {
+    return (
+      environmentCopyReuseSource ||
+      environmentCopyRestoreDatabase ||
+      environmentCopyRebindDomain ||
+      environmentCopyRestoreStorage ||
+      environmentCopyImportStorage
+    );
+  }
+
+  function environmentCopySummaryRows(
+    section: ConsolePageEnvironmentCopyDialogSection,
+  ): ConsolePageKeyValue[] {
+    return section.summaryRows.map((row) => {
+      const label = row.label.toLowerCase();
+      if (label.includes("depend") || row.label.includes("依赖")) {
+        return environmentCopyReuseSource
+          ? { ...row, value: section.sharedSourceLabel, tone: "warning" }
+          : row;
+      }
+      if (label.includes("database") || row.label.includes("数据库")) {
+        return environmentCopyRestoreDatabase
+          ? {
+              ...row,
+              value: environmentCopyDatabaseBackupId.trim()
+                ? `${section.databaseRestoreLabel}: ${environmentCopyDatabaseBackupId.trim()}`
+                : section.databaseRestoreLabel,
+              tone: "warning",
+            }
+          : row;
+      }
+      if (label.includes("domain") || row.label.includes("域名")) {
+        return environmentCopyRebindDomain
+          ? {
+              ...row,
+              value: environmentCopyDomainTargetHost.trim()
+                ? `${section.domainRebindLabel}: ${environmentCopyDomainTargetHost.trim()}`
+                : section.domainRebindLabel,
+              tone: "warning",
+            }
+          : row;
+      }
+      if (label.includes("storage") || row.label.includes("存储")) {
+        if (environmentCopyRestoreStorage) {
+          return {
+            ...row,
+            value: environmentCopyStorageBackupId.trim()
+              ? `${section.storageRestoreLabel}: ${environmentCopyStorageBackupId.trim()}`
+              : section.storageRestoreLabel,
+            tone: "warning",
+          };
+        }
+        if (environmentCopyImportStorage) {
+          return {
+            ...row,
+            value: environmentCopyStorageArtifactRef.trim()
+              ? `${section.storageImportLabel}: ${environmentCopyStorageArtifactRef.trim()}`
+              : section.storageImportLabel,
+            tone: "warning",
+          };
+        }
+      }
+      return row;
+    });
+  }
+
   function environmentCopyBody(section: ConsolePageEnvironmentCopyDialogSection): Record<string, unknown> {
     return {
       ...(section.applyAction.body ?? {}),
@@ -583,11 +671,11 @@
   }
 </script>
 
-{#if loading}
+{#if loading && presentation === "panel"}
   <div class={["space-y-3", className]} data-console-extension-panel-host={placement}>
     <Skeleton class="h-28 w-full" />
   </div>
-{:else if errorMessage}
+{:else if errorMessage && presentation === "panel"}
   <section
     class={["console-panel space-y-3 border-destructive/25 bg-destructive/5 p-5", className]}
     data-console-extension-panel-host={placement}
@@ -599,6 +687,25 @@
     <p class="text-sm text-muted-foreground">{errorMessage}</p>
   </section>
 {:else if visiblePanelResults.length > 0}
+  {#if presentation === "actions"}
+    <div class={["flex flex-wrap items-center gap-1", className]} data-console-extension-panel-host={placement}>
+      {#each visiblePanelResults as result (result.extension.key)}
+        {#each result.document.sections as section, sectionIndex (`${section.kind}-${sectionIndex}`)}
+          {#if section.kind === "environment-copy-dialog"}
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onclick={() => openEnvironmentCopyDialog(section)}
+            >
+              <Copy class="size-4" />
+              {section.triggerLabel}
+            </Button>
+          {/if}
+        {/each}
+      {/each}
+    </div>
+  {:else}
   <div class={["space-y-4", className]} data-console-extension-panel-host={placement}>
     {#if actionErrorMessage}
       <section class="console-panel border-destructive/25 bg-destructive/5 p-4 text-sm text-destructive">
@@ -607,7 +714,18 @@
     {/if}
     {#each visiblePanelResults as result (result.extension.key)}
       {@const document = result.document}
-      <section class="console-panel space-y-4 p-5" data-console-extension-panel>
+      {#if document.chrome === "none"}
+        <div class="flex flex-wrap gap-2" data-console-extension-panel>
+          {#each document.sections as section, sectionIndex (`${section.kind}-${sectionIndex}`)}
+            {#if section.kind === "environment-copy-dialog"}
+              <Button type="button" size="sm" onclick={() => openEnvironmentCopyDialog(section)}>
+                {section.triggerLabel}
+              </Button>
+            {/if}
+          {/each}
+        </div>
+      {:else}
+        <section class="console-panel space-y-4 p-5" data-console-extension-panel>
         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div class="min-w-0 space-y-1">
             <div class="flex min-w-0 flex-wrap items-center gap-2">
@@ -735,30 +853,38 @@
                 </Button>
               </div>
             {:else if section.kind === "environment-copy-dialog"}
-              <div
-                class="flex flex-col gap-3 rounded-md border bg-background p-4 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div class="min-w-0 space-y-1">
-                  <h3 class="text-sm font-semibold">{section.title}</h3>
-                  {#if section.description}
-                    <p class="text-sm leading-6 text-muted-foreground">{section.description}</p>
-                  {/if}
-                </div>
-                <Button
-                  type="button"
-                  class="shrink-0"
-                  size="sm"
-                  onclick={() => openEnvironmentCopyDialog(section)}
-                >
+              {#if section.entryLayout === "button-only"}
+                <Button type="button" size="sm" onclick={() => openEnvironmentCopyDialog(section)}>
                   {section.triggerLabel}
                 </Button>
-              </div>
+              {:else}
+                <div
+                  class="flex flex-col gap-3 rounded-md border bg-background p-4 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div class="min-w-0 space-y-1">
+                    <h3 class="text-sm font-semibold">{section.title}</h3>
+                    {#if section.description}
+                      <p class="text-sm leading-6 text-muted-foreground">{section.description}</p>
+                    {/if}
+                  </div>
+                  <Button
+                    type="button"
+                    class="shrink-0"
+                    size="sm"
+                    onclick={() => openEnvironmentCopyDialog(section)}
+                  >
+                    {section.triggerLabel}
+                  </Button>
+                </div>
+              {/if}
             {/if}
           {/each}
         {/if}
-      </section>
+        </section>
+      {/if}
     {/each}
   </div>
+  {/if}
 {/if}
 
 <Dialog.Root bind:open={confirmationOpen}>
@@ -795,7 +921,7 @@
         {/if}
       </Dialog.Header>
       <form
-        class="max-h-[76vh] space-y-5 overflow-y-auto px-5 pb-5 sm:px-8 sm:pb-8"
+        class="max-h-[76vh] space-y-4 overflow-y-auto px-5 pb-5 sm:px-8 sm:pb-8"
         onsubmit={(event) => {
           event.preventDefault();
           void submitEnvironmentCopy(section);
@@ -806,230 +932,278 @@
             {actionErrorMessage}
           </div>
         {/if}
-        <div class="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
-          <div class="space-y-4">
-            {#if section.sourceLabel && section.sourceValue}
-              <div class="rounded-md border bg-muted/30 px-3 py-2">
-                <p class="text-xs text-muted-foreground">{section.sourceLabel}</p>
-                <p class="mt-1 break-all text-sm font-medium">{section.sourceValue}</p>
-              </div>
-            {/if}
-            <label class="grid gap-1.5 text-sm" for="environment-copy-target-name">
-              <span class="font-medium">{section.targetNameLabel}</span>
-              <input
-                id="environment-copy-target-name"
-                class="h-9 rounded-md border bg-background px-3 text-sm outline-none ring-ring transition focus-visible:ring-2"
-                value={environmentCopyTargetName}
-                placeholder={section.targetNamePlaceholder}
-                disabled={pendingActionKey === environmentCopyActionKey(section)}
-                oninput={(event) => {
-                  environmentCopyTargetName = event.currentTarget.value;
-                }}
-              />
-            </label>
-          </div>
-          <div class="rounded-md border border-emerald-200 bg-emerald-50/60 p-4 dark:border-emerald-400/30 dark:bg-emerald-400/10">
-            <h3 class="text-sm font-semibold">{section.summaryTitle}</h3>
-            {#if section.summaryDescription}
-              <p class="mt-1 text-sm leading-6 text-muted-foreground">{section.summaryDescription}</p>
-            {/if}
-            <dl class="mt-3 grid gap-2">
-              {#each section.summaryRows as row (row.label)}
-                <div class="grid gap-1 sm:grid-cols-[8rem_minmax(0,1fr)]">
-                  <dt class="text-xs text-muted-foreground">{row.label}</dt>
-                  <dd class={["text-sm font-medium", toneClass(row.tone)]}>{row.value}</dd>
-                </div>
-              {/each}
-            </dl>
-          </div>
-        </div>
-
-        <label class="flex items-start gap-3 rounded-md border p-3 text-sm">
+        <label class="grid gap-1.5 text-sm" for="environment-copy-target-name">
+          <span class="font-medium">{section.targetNameLabel}</span>
           <input
-            class="mt-0.5 size-4"
-            type="checkbox"
-            checked={environmentCopyAdvancedOpen}
+            id="environment-copy-target-name"
+            class="h-9 w-full rounded-md border bg-background px-3 text-sm outline-none ring-ring transition focus-visible:ring-2"
+            value={environmentCopyTargetName}
+            placeholder={section.targetNamePlaceholder}
+            disabled={pendingActionKey === environmentCopyActionKey(section)}
             oninput={(event) => {
-              environmentCopyAdvancedOpen = event.currentTarget.checked;
+              environmentCopyTargetName = event.currentTarget.value;
             }}
           />
-          <span class="min-w-0">
-            <span class="block font-medium">{section.advancedToggleLabel}</span>
-            {#if section.advancedDescription}
-              <span class="mt-1 block leading-6 text-muted-foreground">{section.advancedDescription}</span>
-            {/if}
-          </span>
         </label>
 
+        <section
+          class={[
+            "rounded-md border p-4",
+            environmentCopyHasAdvancedSelection()
+              ? "border-amber-200 bg-amber-50/60 dark:border-amber-400/30 dark:bg-amber-400/10"
+              : "bg-muted/20",
+          ]}
+        >
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div class="min-w-0 space-y-1">
+              <h3 class="text-sm font-semibold">{section.summaryTitle}</h3>
+              {#if section.summaryDescription}
+                <p class="text-sm leading-6 text-muted-foreground">{section.summaryDescription}</p>
+              {/if}
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              class="shrink-0"
+              onclick={() => {
+                environmentCopyAdvancedOpen = !environmentCopyAdvancedOpen;
+              }}
+            >
+              {section.advancedToggleLabel}
+              {#if environmentCopyAdvancedOpen}
+                <ChevronUp class="size-4" />
+              {:else}
+                <ChevronDown class="size-4" />
+              {/if}
+            </Button>
+          </div>
+          <dl class="mt-4 divide-y border-y">
+            {#each environmentCopySummaryRows(section) as row (row.label)}
+              <div class="grid gap-1 py-2.5 sm:grid-cols-[10rem_minmax(0,1fr)] sm:gap-3">
+                <dt class="text-xs text-muted-foreground">{row.label}</dt>
+                <dd class={["text-sm font-medium", toneClass(row.tone)]}>{row.value}</dd>
+              </div>
+            {/each}
+          </dl>
+        </section>
+
         {#if environmentCopyAdvancedOpen}
-          <div class="space-y-3 rounded-md border p-4">
-            <div class="space-y-1">
+          <section class="space-y-3">
+            <div>
               <h3 class="text-sm font-semibold">{section.advancedTitle}</h3>
               {#if section.advancedDescription}
-                <p class="text-sm leading-6 text-muted-foreground">{section.advancedDescription}</p>
+                <p class="mt-1 text-sm leading-6 text-muted-foreground">{section.advancedDescription}</p>
               {/if}
             </div>
 
-            <label class="flex items-start gap-3 rounded-md border bg-background p-3 text-sm">
-              <input
-                class="mt-0.5 size-4"
-                type="checkbox"
-                checked={environmentCopyReuseSource}
-                oninput={(event) => {
-                  environmentCopyReuseSource = event.currentTarget.checked;
-                  if (!environmentCopyReuseSource) environmentCopySharedSourceAck = false;
-                }}
-              />
-              <span class="min-w-0">
-                <span class="block font-medium">{section.sharedSourceLabel}</span>
-                <span class="mt-1 block leading-6 text-muted-foreground">
-                  {section.sharedSourceDescription}
-                </span>
-              </span>
-            </label>
-            {#if environmentCopyReuseSource}
-              <label class="ml-7 flex items-start gap-3 text-sm">
-                <input
-                  class="mt-0.5 size-4"
-                  type="checkbox"
-                  checked={environmentCopySharedSourceAck}
-                  oninput={(event) => {
-                    environmentCopySharedSourceAck = event.currentTarget.checked;
-                  }}
-                />
-                <span class="leading-6 text-muted-foreground">{section.sharedSourceAckLabel}</span>
-              </label>
-            {/if}
+            <div class="divide-y rounded-md border bg-background">
+              <div
+                class={[
+                  "p-3",
+                  environmentCopyReuseSource
+                    ? "bg-amber-50/60 dark:bg-amber-400/10"
+                    : "",
+                ]}
+              >
+                <label class="flex items-start gap-3 text-sm">
+                  <input
+                    class="mt-0.5 size-4"
+                    type="checkbox"
+                    checked={environmentCopyReuseSource}
+                    oninput={(event) => {
+                      environmentCopyReuseSource = event.currentTarget.checked;
+                      if (!environmentCopyReuseSource) environmentCopySharedSourceAck = false;
+                    }}
+                  />
+                  <span class="min-w-0">
+                    <span class="block font-medium">{section.sharedSourceLabel}</span>
+                    <span class="mt-1 block leading-6 text-muted-foreground">
+                      {section.sharedSourceDescription}
+                    </span>
+                  </span>
+                </label>
+                {#if environmentCopyReuseSource}
+                  <label class="mt-3 ml-7 flex items-start gap-3 text-sm">
+                    <input
+                      class="mt-0.5 size-4"
+                      type="checkbox"
+                      checked={environmentCopySharedSourceAck}
+                      oninput={(event) => {
+                        environmentCopySharedSourceAck = event.currentTarget.checked;
+                      }}
+                    />
+                    <span class="leading-6 text-muted-foreground">{section.sharedSourceAckLabel}</span>
+                  </label>
+                {/if}
+              </div>
 
-            <label class="flex items-start gap-3 rounded-md border bg-background p-3 text-sm">
-              <input
-                class="mt-0.5 size-4"
-                type="checkbox"
-                checked={environmentCopyRestoreDatabase}
-                oninput={(event) => {
-                  environmentCopyRestoreDatabase = event.currentTarget.checked;
-                }}
-              />
-              <span class="min-w-0">
-                <span class="block font-medium">{section.databaseRestoreLabel}</span>
-                <span class="mt-1 block leading-6 text-muted-foreground">
-                  {section.databaseRestoreDescription}
-                </span>
-              </span>
-            </label>
-            {#if environmentCopyRestoreDatabase}
-              <label class="ml-7 grid gap-1.5 text-sm" for="environment-copy-database-backup">
-                <span class="font-medium">{section.databaseBackupLabel}</span>
-                <input
-                  id="environment-copy-database-backup"
-                  class="h-9 rounded-md border bg-background px-3 text-sm outline-none ring-ring transition focus-visible:ring-2"
-                  value={environmentCopyDatabaseBackupId}
-                  placeholder={section.databaseBackupPlaceholder}
-                  oninput={(event) => {
-                    environmentCopyDatabaseBackupId = event.currentTarget.value;
-                  }}
-                />
-              </label>
-            {/if}
+              <div
+                class={[
+                  "p-3",
+                  environmentCopyRestoreDatabase
+                    ? "bg-amber-50/60 dark:bg-amber-400/10"
+                    : "",
+                ]}
+              >
+                <label class="flex items-start gap-3 text-sm">
+                  <input
+                    class="mt-0.5 size-4"
+                    type="checkbox"
+                    checked={environmentCopyRestoreDatabase}
+                    oninput={(event) => {
+                      environmentCopyRestoreDatabase = event.currentTarget.checked;
+                    }}
+                  />
+                  <span class="min-w-0">
+                    <span class="block font-medium">{section.databaseRestoreLabel}</span>
+                    <span class="mt-1 block leading-6 text-muted-foreground">
+                      {section.databaseRestoreDescription}
+                    </span>
+                  </span>
+                </label>
+                {#if environmentCopyRestoreDatabase}
+                  <label class="mt-3 ml-7 grid gap-1.5 text-sm" for="environment-copy-database-backup">
+                    <span class="font-medium">{section.databaseBackupLabel}</span>
+                    <input
+                      id="environment-copy-database-backup"
+                      class="h-9 rounded-md border bg-background px-3 text-sm outline-none ring-ring transition focus-visible:ring-2"
+                      value={environmentCopyDatabaseBackupId}
+                      placeholder={section.databaseBackupPlaceholder}
+                      oninput={(event) => {
+                        environmentCopyDatabaseBackupId = event.currentTarget.value;
+                      }}
+                    />
+                  </label>
+                {/if}
+              </div>
 
-            <label class="flex items-start gap-3 rounded-md border bg-background p-3 text-sm">
-              <input
-                class="mt-0.5 size-4"
-                type="checkbox"
-                checked={environmentCopyRebindDomain}
-                oninput={(event) => {
-                  environmentCopyRebindDomain = event.currentTarget.checked;
-                }}
-              />
-              <span class="min-w-0">
-                <span class="block font-medium">{section.domainRebindLabel}</span>
-                <span class="mt-1 block leading-6 text-muted-foreground">
-                  {section.domainRebindDescription}
-                </span>
-              </span>
-            </label>
-            {#if environmentCopyRebindDomain}
-              <label class="ml-7 grid gap-1.5 text-sm" for="environment-copy-domain-host">
-                <span class="font-medium">{section.domainTargetHostLabel}</span>
-                <input
-                  id="environment-copy-domain-host"
-                  class="h-9 rounded-md border bg-background px-3 text-sm outline-none ring-ring transition focus-visible:ring-2"
-                  value={environmentCopyDomainTargetHost}
-                  placeholder={section.domainTargetHostPlaceholder}
-                  oninput={(event) => {
-                    environmentCopyDomainTargetHost = event.currentTarget.value;
-                  }}
-                />
-              </label>
-            {/if}
+              <div
+                class={[
+                  "p-3",
+                  environmentCopyRebindDomain
+                    ? "bg-amber-50/60 dark:bg-amber-400/10"
+                    : "",
+                ]}
+              >
+                <label class="flex items-start gap-3 text-sm">
+                  <input
+                    class="mt-0.5 size-4"
+                    type="checkbox"
+                    checked={environmentCopyRebindDomain}
+                    oninput={(event) => {
+                      environmentCopyRebindDomain = event.currentTarget.checked;
+                    }}
+                  />
+                  <span class="min-w-0">
+                    <span class="block font-medium">{section.domainRebindLabel}</span>
+                    <span class="mt-1 block leading-6 text-muted-foreground">
+                      {section.domainRebindDescription}
+                    </span>
+                  </span>
+                </label>
+                {#if environmentCopyRebindDomain}
+                  <label class="mt-3 ml-7 grid gap-1.5 text-sm" for="environment-copy-domain-host">
+                    <span class="font-medium">{section.domainTargetHostLabel}</span>
+                    <input
+                      id="environment-copy-domain-host"
+                      class="h-9 rounded-md border bg-background px-3 text-sm outline-none ring-ring transition focus-visible:ring-2"
+                      value={environmentCopyDomainTargetHost}
+                      placeholder={section.domainTargetHostPlaceholder}
+                      oninput={(event) => {
+                        environmentCopyDomainTargetHost = event.currentTarget.value;
+                      }}
+                    />
+                  </label>
+                {/if}
+              </div>
 
-            <label class="flex items-start gap-3 rounded-md border bg-background p-3 text-sm">
-              <input
-                class="mt-0.5 size-4"
-                type="checkbox"
-                checked={environmentCopyRestoreStorage}
-                disabled={environmentCopyImportStorage}
-                oninput={(event) => {
-                  environmentCopyRestoreStorage = event.currentTarget.checked;
-                }}
-              />
-              <span class="min-w-0">
-                <span class="block font-medium">{section.storageRestoreLabel}</span>
-                <span class="mt-1 block leading-6 text-muted-foreground">
-                  {section.storageRestoreDescription}
-                </span>
-              </span>
-            </label>
-            {#if environmentCopyRestoreStorage}
-              <label class="ml-7 grid gap-1.5 text-sm" for="environment-copy-storage-backup">
-                <span class="font-medium">{section.storageBackupLabel}</span>
-                <input
-                  id="environment-copy-storage-backup"
-                  class="h-9 rounded-md border bg-background px-3 text-sm outline-none ring-ring transition focus-visible:ring-2"
-                  value={environmentCopyStorageBackupId}
-                  placeholder={section.storageBackupPlaceholder}
-                  oninput={(event) => {
-                    environmentCopyStorageBackupId = event.currentTarget.value;
-                  }}
-                />
-              </label>
-            {/if}
+              <div
+                class={[
+                  "p-3",
+                  environmentCopyRestoreStorage
+                    ? "bg-amber-50/60 dark:bg-amber-400/10"
+                    : "",
+                ]}
+              >
+                <label class="flex items-start gap-3 text-sm">
+                  <input
+                    class="mt-0.5 size-4"
+                    type="checkbox"
+                    checked={environmentCopyRestoreStorage}
+                    disabled={environmentCopyImportStorage}
+                    oninput={(event) => {
+                      environmentCopyRestoreStorage = event.currentTarget.checked;
+                    }}
+                  />
+                  <span class="min-w-0">
+                    <span class="block font-medium">{section.storageRestoreLabel}</span>
+                    <span class="mt-1 block leading-6 text-muted-foreground">
+                      {section.storageRestoreDescription}
+                    </span>
+                  </span>
+                </label>
+                {#if environmentCopyRestoreStorage}
+                  <label class="mt-3 ml-7 grid gap-1.5 text-sm" for="environment-copy-storage-backup">
+                    <span class="font-medium">{section.storageBackupLabel}</span>
+                    <input
+                      id="environment-copy-storage-backup"
+                      class="h-9 rounded-md border bg-background px-3 text-sm outline-none ring-ring transition focus-visible:ring-2"
+                      value={environmentCopyStorageBackupId}
+                      placeholder={section.storageBackupPlaceholder}
+                      oninput={(event) => {
+                        environmentCopyStorageBackupId = event.currentTarget.value;
+                      }}
+                    />
+                  </label>
+                {/if}
+              </div>
 
-            <label class="flex items-start gap-3 rounded-md border bg-background p-3 text-sm">
-              <input
-                class="mt-0.5 size-4"
-                type="checkbox"
-                checked={environmentCopyImportStorage}
-                disabled={environmentCopyRestoreStorage}
-                oninput={(event) => {
-                  environmentCopyImportStorage = event.currentTarget.checked;
-                }}
-              />
-              <span class="min-w-0">
-                <span class="block font-medium">{section.storageImportLabel}</span>
-                <span class="mt-1 block leading-6 text-muted-foreground">
-                  {section.storageImportDescription}
-                </span>
-              </span>
-            </label>
-            {#if environmentCopyImportStorage}
-              <label class="ml-7 grid gap-1.5 text-sm" for="environment-copy-storage-artifact">
-                <span class="font-medium">{section.storageArtifactLabel}</span>
-                <input
-                  id="environment-copy-storage-artifact"
-                  class="h-9 rounded-md border bg-background px-3 text-sm outline-none ring-ring transition focus-visible:ring-2"
-                  value={environmentCopyStorageArtifactRef}
-                  placeholder={section.storageArtifactPlaceholder}
-                  oninput={(event) => {
-                    environmentCopyStorageArtifactRef = event.currentTarget.value;
-                  }}
-                />
-              </label>
-            {/if}
-          </div>
+              <div
+                class={[
+                  "p-3",
+                  environmentCopyImportStorage
+                    ? "bg-amber-50/60 dark:bg-amber-400/10"
+                    : "",
+                ]}
+              >
+                <label class="flex items-start gap-3 text-sm">
+                  <input
+                    class="mt-0.5 size-4"
+                    type="checkbox"
+                    checked={environmentCopyImportStorage}
+                    disabled={environmentCopyRestoreStorage}
+                    oninput={(event) => {
+                      environmentCopyImportStorage = event.currentTarget.checked;
+                    }}
+                  />
+                  <span class="min-w-0">
+                    <span class="block font-medium">{section.storageImportLabel}</span>
+                    <span class="mt-1 block leading-6 text-muted-foreground">
+                      {section.storageImportDescription}
+                    </span>
+                  </span>
+                </label>
+                {#if environmentCopyImportStorage}
+                  <label class="mt-3 ml-7 grid gap-1.5 text-sm" for="environment-copy-storage-artifact">
+                    <span class="font-medium">{section.storageArtifactLabel}</span>
+                    <input
+                      id="environment-copy-storage-artifact"
+                      class="h-9 rounded-md border bg-background px-3 text-sm outline-none ring-ring transition focus-visible:ring-2"
+                      value={environmentCopyStorageArtifactRef}
+                      placeholder={section.storageArtifactPlaceholder}
+                      oninput={(event) => {
+                        environmentCopyStorageArtifactRef = event.currentTarget.value;
+                      }}
+                    />
+                  </label>
+                {/if}
+              </div>
+            </div>
+          </section>
         {/if}
 
-        <div class="flex justify-end gap-2">
+        <div class="flex justify-end gap-2 pt-1">
           <Button type="button" variant="outline" onclick={() => (environmentCopyDialogOpen = false)}>
             {section.cancelLabel ?? $t(i18nKeys.common.actions.cancel)}
           </Button>

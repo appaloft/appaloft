@@ -405,11 +405,18 @@ describe("Console page extension surface", () => {
     expect(panelHostSource).toContain("createLocalizedConsolePageEndpoint(endpoint, $locale)");
     expect(panelHostSource).toContain("projectId");
     expect(panelHostSource).toContain("environmentId");
+    expect(panelHostSource).toContain("environmentName");
     expect(panelHostSource).toContain("resourceId");
     expect(panelHostSource).toContain("type ConsolePageRequestAction");
+    expect(panelHostSource).toContain('presentation?: "panel" | "actions"');
+    expect(panelHostSource).toContain('presentation === "actions"');
+    expect(panelHostSource).toContain('chrome?: "panel" | "none"');
     expect(panelHostSource).toContain("collapsedByDefault?: boolean");
     expect(panelHostSource).toContain('kind: "dialog-panel-grid"');
     expect(panelHostSource).toContain('kind: "environment-copy-dialog"');
+    expect(panelHostSource).toContain('entryLayout?: "button-only" | "panel"');
+    expect(panelHostSource).toContain('document.chrome === "none"');
+    expect(panelHostSource).toContain('variant="outline"');
     expect(panelHostSource).toContain("openEnvironmentCopyDialog(section)");
     expect(panelHostSource).toContain("submitEnvironmentCopy(section)");
     expect(panelHostSource).toContain("openDialogPanel(section)");
@@ -420,6 +427,7 @@ describe("Console page extension surface", () => {
     expect(panelHostSource).toContain("runRequestAction(action, item)");
     expect(panelHostSource).toContain("data-console-extension-panel-host");
     expect(projectPageSource).toContain('placement="project-environment-panel"');
+    expect(projectPageSource).toContain('presentation="actions"');
     expect(projectPageSource).toContain("replacesNativeEnvironmentCopy");
     expect(projectPageSource).toContain("nativeEnvironmentCopyReplaced");
     expect(projectPageSource).toContain('"audit-log"');
@@ -430,6 +438,7 @@ describe("Console page extension surface", () => {
     );
     expect(projectPageSource).toContain("<ConsoleExtensionPage {projectId} embedded />");
     expect(projectPageSource).toContain("environmentId={environment.id}");
+    expect(projectPageSource).toContain("environmentName={environment.name}");
     expect(resourcePageSource).toContain('placement="resource-detail-panel"');
     expect(resourcePageSource).toContain('"audit-log"');
     expect(resourcePageSource).toContain("visibleResourceDetailTabs");

@@ -98,13 +98,40 @@ This command does not implicitly copy:
 These are returned as `deferredDecisions` and must be handled by later provider, admission, route,
 storage, or UI phases.
 
+## Default Copy Policy
+
+The neutral `appaloft env copy <source-env> <target-env>` surface maps to the safe duplicate-profile
+path:
+
+- services and resource shape: copy and redeploy in the target environment;
+- network: create an isolated network boundary for copied resources;
+- dependencies: `create-new-managed` for provider-managed Appaloft dependencies;
+- secrets: regenerate target secret references and never print or copy raw source values;
+- database data: start empty unless an explicit restore policy is supplied;
+- domains: create a generated route and do not move production custom domains by default;
+- storage data: start with empty volumes unless an explicit restore/import policy is supplied.
+
+Advanced policies must be explicit:
+
+| Console policy | CLI form | Meaning |
+| --- | --- | --- |
+| Reuse source dependencies | `--reuse-source db --acknowledge-shared-source` | Bind the copied resource to the same source dependency. This can mix data between environments and returns a shared-source warning. |
+| Restore database from backup | `--database restore:<backupId>` | Create the target environment with database data restored from a named backup instead of an empty database. |
+| Bind a custom domain | `--domain rebind:<hostname>` | Bind the target environment to an explicit hostname instead of a generated route. |
+| Restore storage from backup | `--storage restore:<backupId>` | Restore target volume data from a backup. |
+| Import storage artifact | `--storage import:<artifactRef>` | Import target volume data from an artifact reference. |
+
+`--dry-run --json` returns the reviewed plan without mutation. `--yes` accepts the safe defaults
+without an interactive prompt. Generated secrets are not printed by default; a future reveal surface
+must stay one-time and must be rejected in non-interactive JSON output.
+
 ## Entrypoints
 
 | Surface | Contract |
 | --- | --- |
-| CLI | `appaloft env duplicate apply <environmentId> --name <targetName> [--kind <kind>] --dependency-decisions <json-array> [--resource-decisions <json-array>]` |
+| CLI | `appaloft env copy <source-env> <target-env> [--dry-run] [--json] [--yes] [--database restore:<backupId>] [--domain rebind:<hostname>] [--storage restore:<backupId>\|import:<artifactRef>] [--reuse-source db --acknowledge-shared-source]`; compatibility alias: `appaloft env duplicate apply <environmentId> --name <targetName> ...` |
 | HTTP/oRPC | `POST /api/environments/{environmentId}/duplicate-profile` |
-| Web | Planned staged duplication workflow dispatches this command after review. |
+| Web | Console "Copy environment" opens a dialog with safe defaults and advanced policy switches; submit dispatches this command after review. |
 | Future MCP/tools | Generated from operation catalog metadata and this command schema. |
 
 ## Non-Goals
