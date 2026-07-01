@@ -101,6 +101,7 @@ import {
   type SystemPluginDefinition,
   type SystemPluginHttpMiddleware,
   type SystemPluginHttpRoute,
+  type SystemPluginWebHeadContribution,
   type SystemPluginWebExtension,
 } from "@appaloft/plugin-sdk";
 import { container, type DependencyContainer } from "tsyringe";
@@ -205,6 +206,7 @@ export interface AppaloftServerHttpExtension {
   middlewares?: readonly SystemPluginHttpMiddleware[];
   orpcRouterContributions?: readonly AppaloftServerOrpcRouterContribution[];
   routes?: readonly SystemPluginHttpRoute[];
+  webHeadContributions?: readonly SystemPluginWebHeadContribution[];
   webExtensions?: readonly SystemPluginWebExtension[];
 }
 
@@ -225,6 +227,7 @@ export interface AppaloftServerHttpContext extends AppaloftServerAuthRuntimeCont
     orpcRouterContributions: AppaloftServerOrpcRouterContribution[];
     routes: SystemPluginHttpRoute[];
     systemPlugins: SystemPluginDefinition[];
+    webHeadContributions: SystemPluginWebHeadContribution[];
     webExtensions: SystemPluginWebExtension[];
   };
 }
@@ -525,6 +528,9 @@ function createConfiguredHttpExtensionPlugin(
   if (http.middlewares.length > 0) {
     capabilities.push("http-middleware");
   }
+  if (http.webHeadContributions.length > 0) {
+    capabilities.push("web-head");
+  }
   if (http.webExtensions.length > 0) {
     capabilities.push("web-page");
   }
@@ -544,6 +550,9 @@ function createConfiguredHttpExtensionPlugin(
       capabilities,
       entrypoint: "appaloft-server://configured-extensions",
     },
+    ...(http.webHeadContributions.length > 0
+      ? { webHeadContributions: http.webHeadContributions }
+      : {}),
     ...(http.webExtensions.length > 0 ? { webExtensions: http.webExtensions } : {}),
     ...(http.middlewares.length > 0 || http.routes.length > 0
       ? {
@@ -566,6 +575,7 @@ async function configureServerExtensions(input: {
     orpcRouterContributions: [],
     routes: [],
     systemPlugins: [...input.systemPlugins],
+    webHeadContributions: [],
     webExtensions: [],
   };
 
@@ -574,6 +584,7 @@ async function configureServerExtensions(input: {
     http.middlewares.push(...(extension.http?.middlewares ?? []));
     http.orpcRouterContributions.push(...(extension.http?.orpcRouterContributions ?? []));
     http.routes.push(...(extension.http?.routes ?? []));
+    http.webHeadContributions.push(...(extension.http?.webHeadContributions ?? []));
     http.webExtensions.push(...(extension.http?.webExtensions ?? []));
     await extension.configureHttp?.({
       ...input.context,

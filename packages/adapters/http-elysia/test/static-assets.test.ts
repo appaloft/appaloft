@@ -17,6 +17,7 @@ import {
 import { resolveConfig } from "@appaloft/config";
 import { type AuthPublicConfig, type AuthSessionResponse } from "@appaloft/contracts";
 import { ok } from "@appaloft/core";
+import { type SystemPluginWebHeadContribution } from "@appaloft/plugin-sdk";
 import { createHttpApp } from "../src";
 
 class SilentLogger implements AppLogger {
@@ -46,6 +47,7 @@ function createTestApp(input?: {
   embeddedDocsAssets?: Readonly<Record<string, Blob>>;
   embeddedWebAssets?: Readonly<Record<string, Blob>>;
   middlewareHeaders?: Record<string, string>;
+  webHeadContributions?: SystemPluginWebHeadContribution[];
   onAuthSessionStatus?: (request: Request) => void;
   onExecutionContextCreate?: Parameters<
     typeof createHttpApp
@@ -131,17 +133,21 @@ function createTestApp(input?: {
       : {}),
     ...(input?.embeddedWebAssets ? { embeddedWebAssets: input.embeddedWebAssets } : {}),
     ...(input?.embeddedDocsAssets ? { embeddedDocsAssets: input.embeddedDocsAssets } : {}),
-    ...(input?.middlewareHeaders
+    ...(input?.middlewareHeaders || input?.webHeadContributions
       ? {
           pluginRuntime: {
+            listWebHeadContributions: () => input.webHeadContributions ?? [],
             listWebExtensions: () => [],
             listHttpRoutes: () => [],
-            listHttpMiddlewares: () => [
-              {
-                name: "test-static-header-middleware",
-                handle: () => ({ headers: input.middlewareHeaders ?? {} }),
-              },
-            ],
+            listHttpMiddlewares: () =>
+              input.middlewareHeaders
+                ? [
+                    {
+                      name: "test-static-header-middleware",
+                      handle: () => ({ headers: input.middlewareHeaders ?? {} }),
+                    },
+                  ]
+                : [],
           },
         }
       : {}),
@@ -299,6 +305,77 @@ describe("HTTP static assets", () => {
       expect(response.headers.get("vary")).toContain("Cookie");
       expect(response.headers.get("vary")).toContain("X-Appaloft-Locale");
       await expect(response.text()).resolves.toContain('<html lang="zh-CN">');
+    });
+  });
+
+  test("[WEB-HEAD-CONTRIB-002] injects system plugin web head contributions into console HTML", async () => {
+    const app = createTestApp({
+      embeddedWebAssets: {
+        "/200.html": new Blob([
+          '<!doctype html><html lang="en-US"><head><title>Appaloft</title></head><body>web-spa-fallback</body></html>',
+        ]),
+      },
+      middlewareHeaders: {
+        "x-test-static-header": "applied",
+      },
+      webHeadContributions: [
+        {
+          key: "configured-runtime-script",
+          html: '<script type="application/json" id="configured-runtime">{"enabled":true}</script>',
+        },
+      ],
+    });
+
+    await withServer(app, async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/projects/prj_1`, {
+        headers: {
+          accept: "text/html",
+          "accept-language": "zh-CN,zh;q=0.9,en-US;q=0.4",
+        },
+      });
+      const html = await response.text();
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("content-type")).toContain("text/html");
+      expect(response.headers.get("x-test-static-header")).toBe("applied");
+      expect(html).toContain('<html lang="zh-CN">');
+      expect(html).toContain(
+        '<script type="application/json" id="configured-runtime">{"enabled":true}</script>\n</head>',
+      );
+    });
+  });
+
+  test("[WEB-HEAD-CONTRIB-003] does not inject web head contributions outside console HTML", async () => {
+    const app = createTestApp({
+      embeddedDocsAssets: {
+        "/index.html": new Blob([
+          "<!doctype html><html><head><title>Docs</title></head><body>docs</body></html>",
+        ]),
+      },
+      embeddedWebAssets: {
+        "/200.html": new Blob(["web-spa-fallback-without-head"]),
+        "/_app/immutable/app.js": new Blob(["console-asset"]),
+      },
+      webHeadContributions: [
+        {
+          key: "configured-runtime-script",
+          html: '<script id="configured-runtime"></script>',
+        },
+      ],
+    });
+
+    await withServer(app, async (baseUrl) => {
+      await expect(
+        fetch(`${baseUrl}/docs`).then((response) => response.text()),
+      ).resolves.not.toContain("configured-runtime");
+      await expect(
+        fetch(`${baseUrl}/_app/immutable/app.js`).then((response) => response.text()),
+      ).resolves.not.toContain("configured-runtime");
+      await expect(
+        fetch(`${baseUrl}/projects/prj_1`, {
+          headers: { accept: "text/html" },
+        }).then((response) => response.text()),
+      ).resolves.not.toContain("configured-runtime");
     });
   });
 

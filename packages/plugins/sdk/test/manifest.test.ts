@@ -4,6 +4,7 @@ import {
   isPluginCompatible,
   pluginManifestSchema,
   systemPluginWebExtensionSchema,
+  systemPluginWebHeadContributionSchema,
 } from "../src/index";
 
 describe("plugin manifest contract", () => {
@@ -36,6 +37,30 @@ describe("plugin manifest contract", () => {
     });
 
     expect(isPluginCompatible(manifest, "0313c2dd90333931d3b6d767668f6f36774735fa")).toBe(true);
+  });
+
+  test("[WEB-HEAD-CONTRIB-001] accepts web head contributions from system plugins", () => {
+    const manifest = pluginManifestSchema.parse({
+      name: "configured-web-head",
+      displayName: "Configured Web Head",
+      description: "Runtime configured Web Console head contributions.",
+      version: "0.0.0",
+      kind: "system-extension",
+      compatibilityRange: "*",
+      capabilities: ["web-head"],
+      entrypoint: "appaloft-server://configured-web-head",
+    });
+
+    expect(isPluginCompatible(manifest, "0313c2dd90333931d3b6d767668f6f36774735fa")).toBe(true);
+    expect(
+      systemPluginWebHeadContributionSchema.parse({
+        key: "configured-runtime-script",
+        html: '<script type="application/json" id="configured-runtime">{}</script>',
+      }),
+    ).toMatchObject({
+      key: "configured-runtime-script",
+      html: expect.stringContaining("configured-runtime"),
+    });
   });
 
   test("accepts quick-deploy source web extension placement", () => {
