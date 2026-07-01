@@ -79,4 +79,49 @@ describe("plugin registry contract", () => {
     });
     expect(host.findByName("missing-plugin")).toBeNull();
   });
+
+  test("[WEB-HEAD-CONTRIB-001] lists web head contributions for compatible system plugins only", () => {
+    const configuredHeadPlugin: SystemPluginDefinition = {
+      manifest: {
+        name: "configured-web-head",
+        displayName: "Configured Web Head",
+        description: "Runtime configured Web Console head contributions.",
+        version: "0.1.0",
+        kind: "system-extension",
+        compatibilityRange: "^0.1.0",
+        capabilities: ["web-head"],
+        entrypoint: "appaloft-server://configured-web-head",
+      },
+      webHeadContributions: [
+        {
+          key: "configured-runtime-script",
+          html: '<script type="application/json" id="configured-runtime">{}</script>',
+        },
+      ],
+    };
+    const incompatibleHeadPlugin: SystemPluginDefinition = {
+      ...configuredHeadPlugin,
+      manifest: {
+        ...configuredHeadPlugin.manifest,
+        name: "configured-web-head-incompatible",
+        compatibilityRange: "^0.2.0",
+      },
+      webHeadContributions: [
+        {
+          key: "incompatible-runtime-script",
+          html: '<script type="application/json" id="incompatible-runtime">{}</script>',
+        },
+      ],
+    };
+
+    const host = new LocalPluginHost([configuredHeadPlugin, incompatibleHeadPlugin], "0.1.2");
+
+    expect(host.listWebHeadContributions()).toEqual([
+      expect.objectContaining({
+        key: "configured-runtime-script",
+        pluginName: "configured-web-head",
+        pluginDisplayName: "Configured Web Head",
+      }),
+    ]);
+  });
 });

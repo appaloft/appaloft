@@ -12,6 +12,7 @@ export const pluginCapabilitySchema = z.enum([
   "ai-tool",
   "http-route",
   "http-middleware",
+  "web-head",
   "web-page",
   "tenant-isolation",
 ]);
@@ -88,9 +89,15 @@ export const systemPluginWebExtensionSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
+export const systemPluginWebHeadContributionSchema = z.object({
+  key: z.string().min(1),
+  html: z.string().min(1),
+});
+
 export type PluginManifest = z.infer<typeof pluginManifestSchema>;
 export type PluginCapability = z.infer<typeof pluginCapabilitySchema>;
 export type PluginKind = z.infer<typeof pluginKindSchema>;
+export type SystemPluginWebHeadContribution = z.infer<typeof systemPluginWebHeadContributionSchema>;
 export type SystemPluginWebExtensionIcon = z.infer<typeof systemPluginWebExtensionIconSchema>;
 export type SystemPluginWebExtensionLocalization = z.infer<
   typeof systemPluginWebExtensionLocalizationSchema
@@ -177,6 +184,7 @@ export interface SystemPluginHttpRoute {
 
 export interface SystemPluginDefinition {
   manifest: PluginManifest;
+  webHeadContributions?: SystemPluginWebHeadContribution[];
   webExtensions?: SystemPluginWebExtension[];
   http?: {
     middlewares?: SystemPluginHttpMiddleware[];
