@@ -101,8 +101,8 @@ import {
   type SystemPluginDefinition,
   type SystemPluginHttpMiddleware,
   type SystemPluginHttpRoute,
-  type SystemPluginWebHeadContribution,
   type SystemPluginWebExtension,
+  type SystemPluginWebHeadContribution,
 } from "@appaloft/plugin-sdk";
 import { container, type DependencyContainer } from "tsyringe";
 import {
