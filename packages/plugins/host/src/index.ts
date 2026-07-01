@@ -6,8 +6,15 @@ import {
   type SystemPluginHttpMiddleware,
   type SystemPluginHttpRoute,
   type SystemPluginWebExtension,
+  type SystemPluginWebHeadContribution,
   systemPluginWebExtensionSchema,
+  systemPluginWebHeadContributionSchema,
 } from "@appaloft/plugin-sdk";
+
+export interface SystemPluginWebHeadContributionSummary extends SystemPluginWebHeadContribution {
+  pluginName: string;
+  pluginDisplayName: string;
+}
 
 export interface SystemPluginWebExtensionSummary extends SystemPluginWebExtension {
   pluginName: string;
@@ -30,7 +37,10 @@ export class LocalPluginHost implements PluginRegistry {
 
       if (
         manifest.kind !== "system-extension" &&
-        (definition.webExtensions || definition.http?.middlewares || definition.http?.routes)
+        (definition.webHeadContributions ||
+          definition.webExtensions ||
+          definition.http?.middlewares ||
+          definition.http?.routes)
       ) {
         throw new Error(
           `Plugin ${manifest.name} declares runtime HTTP or web extensions but is not marked as a system-extension`,
@@ -45,6 +55,13 @@ export class LocalPluginHost implements PluginRegistry {
             ? {
                 webExtensions: definition.webExtensions.map((extension) =>
                   systemPluginWebExtensionSchema.parse(extension),
+                ),
+              }
+            : {}),
+          ...(definition.webHeadContributions
+            ? {
+                webHeadContributions: definition.webHeadContributions.map((contribution) =>
+                  systemPluginWebHeadContributionSchema.parse(contribution),
                 ),
               }
             : {}),
@@ -99,6 +116,18 @@ export class LocalPluginHost implements PluginRegistry {
   findByName(name: string): PluginSummary | null {
     const plugin = this.byName.get(name);
     return plugin ? { ...plugin } : null;
+  }
+
+  listWebHeadContributions(): SystemPluginWebHeadContributionSummary[] {
+    return this.plugins
+      .filter((plugin) => plugin.summary.compatible && plugin.summary.kind === "system-extension")
+      .flatMap((plugin) =>
+        (plugin.definition.webHeadContributions ?? []).map((contribution) => ({
+          ...contribution,
+          pluginName: plugin.summary.name,
+          pluginDisplayName: plugin.summary.displayName ?? plugin.summary.name,
+        })),
+      );
   }
 
   listWebExtensions(): SystemPluginWebExtensionSummary[] {

@@ -57,11 +57,18 @@ import {
   type SystemPluginHttpRoute,
   type SystemPluginHttpRouteResult,
   type SystemPluginWebExtension,
+  type SystemPluginWebHeadContribution,
 } from "@appaloft/plugin-sdk";
 import { Elysia } from "elysia";
 import { resourceAccessFailureDiagnosticResponse } from "./resource-access-failure-diagnostics";
 
 interface SystemPluginRuntime {
+  listWebHeadContributions?(): Array<
+    SystemPluginWebHeadContribution & {
+      pluginName?: string;
+      pluginDisplayName?: string;
+    }
+  >;
   listWebExtensions(): Array<
     SystemPluginWebExtension & {
       pluginName: string;
@@ -411,6 +418,18 @@ function renderWebConsoleInitialLocaleHtml(html: string, locale: AppaloftLocale)
   }
 
   return html.replace(/<html\b/i, `<html lang="${locale}"`);
+}
+
+function renderWebConsoleHeadContributionsHtml(
+  html: string,
+  contributions: readonly SystemPluginWebHeadContribution[],
+): string {
+  if (contributions.length === 0 || !/<\/head\s*>/i.test(html)) {
+    return html;
+  }
+
+  const contributionHtml = contributions.map((contribution) => contribution.html).join("\n");
+  return html.replace(/<\/head\s*>/i, `${contributionHtml}\n</head>`);
 }
 
 function appendCsvHeader(headers: MutableHeaders, name: string, values: string[]): void {
@@ -915,6 +934,7 @@ export function createHttpApp(input: {
 }) {
   const pluginMiddlewares = input.pluginRuntime?.listHttpMiddlewares() ?? [];
   const pluginRoutes = input.pluginRuntime?.listHttpRoutes() ?? [];
+  const pluginWebHeadContributions = input.pluginRuntime?.listWebHeadContributions?.() ?? [];
   const orpcRoutePaths = collectOrpcRoutePaths(input.orpcRouterContributions ?? []);
   const webStaticDir = input.config.webStaticDir ? resolve(input.config.webStaticDir) : null;
   const docsStaticDir = input.config.docsStaticDir ? resolve(input.config.docsStaticDir) : null;
@@ -1202,18 +1222,15 @@ export function createHttpApp(input: {
     return `window.__APPALOFT_PUBLIC_CONFIG__=${escapeScriptJson(publicRuntimeConfig())};\n`;
   }
 
-  async function webConsoleInitialLocaleResponse(
-    request: Request,
-    response: Response,
-  ): Promise<Response> {
+  async function webConsoleHtmlResponse(request: Request, response: Response): Promise<Response> {
     const pathname = new URL(request.url).pathname;
     const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
-    const shouldRenderInitialLocale =
+    const shouldRenderWebConsoleHtml =
       response.status === 200 &&
       (contentType.includes("text/html") ||
         (isHtmlNavigationRequest(request) && !hasStaticAssetExtension(pathname)));
 
-    if (!shouldRenderInitialLocale) {
+    if (!shouldRenderWebConsoleHtml) {
       return response;
     }
 
@@ -1224,7 +1241,10 @@ export function createHttpApp(input: {
     appendResponseVaryHeader(headers, "Cookie");
     appendResponseVaryHeader(headers, "X-Appaloft-Locale");
 
-    return new Response(renderWebConsoleInitialLocaleHtml(await response.text(), locale), {
+    const localizedHtml = renderWebConsoleInitialLocaleHtml(await response.text(), locale);
+    const html = renderWebConsoleHeadContributionsHtml(localizedHtml, pluginWebHeadContributions);
+
+    return new Response(html, {
       headers,
       status: response.status,
       statusText: response.statusText,
@@ -1458,7 +1478,7 @@ export function createHttpApp(input: {
     }
 
     const response = webStaticResponse(new URL(request.url).pathname);
-    return response ? webConsoleInitialLocaleResponse(request, response) : fallback;
+    return response ? webConsoleHtmlResponse(request, response) : fallback;
   }
 
   function deploymentProgressStream(request: Request, requestId: string): Response {
