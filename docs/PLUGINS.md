@@ -16,7 +16,8 @@ There are now two distinct classes:
   - examples: source detectors, deployment hooks, build strategies
 - system plugins
   - installed by the operator who runs the control plane
-  - can extend backend routes, backend middleware, and control-plane pages
+  - can extend backend routes, backend middleware, Web Console HTML head markup, and
+    control-plane pages
   - used for hosted-only control-plane extensions, tenant admin surfaces, and operator-specific workflows
 
 Current manifest fields:
@@ -42,6 +43,7 @@ Current capability flags:
 - `ai-tool`
 - `http-route`
 - `http-middleware`
+- `web-head`
 - `web-page`
 - `tenant-isolation`
 
@@ -54,7 +56,18 @@ Milestone 1 includes:
 - local plugin host registry
 - built-in plugin registration
 - system plugin runtime for backend route/middleware registration
+- system plugin Web Console head contribution registration
 - system plugin web-extension discovery endpoint
+
+## Web Head Contributions
+
+System plugins may declare `webHeadContributions` when they need to add neutral operator-owned
+markup before the closing `</head>` of Web Console HTML responses. This extension point is owned by
+the HTTP adapter, so plugin authors do not import Svelte routes or Web application internals.
+
+Head contributions are trusted system-plugin code registered by the operator. They are not injected
+into user-deployed applications, static artifacts, public docs, API responses, or plugin route
+responses.
 
 Future lifecycle hooks:
 
