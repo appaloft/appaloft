@@ -1,6 +1,7 @@
 import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { bearer, emailOTP, magicLink, organization } from "better-auth/plugins";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
+import { adminAc, defaultAc, memberAc, ownerAc } from "better-auth/plugins/organization/access";
 
 export type AppaloftBetterAuthEmailOTPType =
   | "sign-in"
@@ -91,6 +92,26 @@ export type AppaloftBetterAuthSendInvitationEmail = NonNullable<
 export interface AppaloftBetterAuthOrganizationConfig {
   readonly sendInvitationEmail?: AppaloftBetterAuthSendInvitationEmail;
 }
+
+/**
+ * Organization team roles accepted as Better Auth membership values.
+ *
+ * `owner`/`admin` reuse the Better Auth default owner/admin statements. The
+ * collaborator roles (`billing`, `developer`, `viewer`) carry the same empty
+ * organization-governance statements as the legacy `member` role: they hold no
+ * member/invitation/organization mutation permission inside Better Auth, and
+ * product-level differences between them are enforced by the application
+ * operation guard boundary, not by Better Auth statements. The legacy `member`
+ * value stays registered so existing membership rows keep resolving.
+ */
+export const appaloftOrganizationTeamRoles = {
+  owner: ownerAc,
+  admin: adminAc,
+  member: memberAc,
+  billing: defaultAc.newRole({ ...memberAc.statements }),
+  developer: defaultAc.newRole({ ...memberAc.statements }),
+  viewer: defaultAc.newRole({ ...memberAc.statements }),
+};
 
 export interface AppaloftBetterAuthConfig {
   baseURL: string;
@@ -487,6 +508,7 @@ export function createAppaloftBetterAuthOptions(config: AppaloftBetterAuthConfig
     plugins: [
       bearer(),
       organization({
+        roles: appaloftOrganizationTeamRoles,
         ...(config.organization?.sendInvitationEmail
           ? { sendInvitationEmail: config.organization.sendInvitationEmail }
           : {}),

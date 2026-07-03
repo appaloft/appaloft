@@ -598,7 +598,7 @@ describe("organization auth management console surface", () => {
     expect(memberRoleDialogSource).toContain(
       "bind:value={roleDrafts[selectedMemberRoleMember.memberId]}",
     );
-    expect(memberRoleDialogSource).toContain("memberRoleOptions");
+    expect(memberRoleDialogSource).toContain("assignableMemberRoleOptions");
     expect(ownerTransferDialogSource).toContain("onsubmit={submitOwnerTransfer}");
     expect(ownerTransferDialogSource).toContain(
       "bind:value={ownerTransferDrafts[selectedOwnerTransferMember.memberId]}",
@@ -607,6 +607,10 @@ describe("organization auth management console surface", () => {
     expect(organizationPageSource).toContain("orpc.capabilities.query.queryOptions");
     expect(organizationPageSource).toContain("planContextEndpoint");
     expect(organizationPageSource).toContain("invitePlanLimitReached");
+    expect(organizationPageSource).toContain("invitationPlanContext?.allowedRoles");
+    expect(organizationPageSource).toContain("inviteRoleOptions");
+    expect(organizationPageSource).toContain("assignableMemberRoleOptions");
+    expect(organizationPageSource).toContain("roleBlockedDescription");
     expect(organizationPageSource).toContain("data-organization-invite-plan-upgrade");
     expect(invitationsSectionSource).toContain("handleInviteAction");
     expect(invitationsSectionSource).toContain('tone="invitation"');
