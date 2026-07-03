@@ -248,7 +248,7 @@
   const assignableMemberRoleOptions = $derived(
     memberRoleOptions.filter((role) => planAssignableRoles.includes(role)),
   );
-  const inviteRoleAllowed = $derived(inviteRoleOptions.includes(inviteRole));
+  const inviteRoleAllowed = $derived(roleOptionIncludes(inviteRoleOptions, inviteRole));
   const canInviteMembers = $derived(
     canInviteMembersByRole &&
       Boolean(currentOrganizationId) &&
@@ -589,7 +589,8 @@
       selectedMemberRoleMember?.role !== "owner" &&
       Boolean(roleDrafts[selectedMemberRoleMember?.memberId ?? ""]) &&
       roleDrafts[selectedMemberRoleMember?.memberId ?? ""] !== selectedMemberRoleMember?.role &&
-      assignableMemberRoleOptions.includes(
+      roleOptionIncludes(
+        assignableMemberRoleOptions,
         roleDrafts[selectedMemberRoleMember?.memberId ?? ""] as OrganizationTeamRole,
       ) &&
       !updateMemberRoleMutation.isPending,
@@ -666,7 +667,7 @@
   });
 
   $effect(() => {
-    if (inviteRoleOptions.length > 0 && !inviteRoleOptions.includes(inviteRole)) {
+    if (inviteRoleOptions.length > 0 && !roleOptionIncludes(inviteRoleOptions, inviteRole)) {
       const nextInviteRole = inviteRoleOptions[0];
       if (nextInviteRole) {
         inviteRole = nextInviteRole;
@@ -1057,7 +1058,7 @@
     if (
       role &&
       role !== "owner" &&
-      assignableMemberRoleOptions.includes(role) &&
+      roleOptionIncludes(assignableMemberRoleOptions, role) &&
       member?.role !== "owner" &&
       canUpdateMemberRoles
     ) {
@@ -1067,6 +1068,13 @@
 
   function isOrganizationTeamRole(role: unknown): role is OrganizationTeamRole {
     return roleOptions.includes(role as OrganizationTeamRole);
+  }
+
+  function roleOptionIncludes(
+    options: readonly OrganizationTeamRole[],
+    role: OrganizationTeamRole,
+  ): boolean {
+    return options.includes(role);
   }
 
   function transferOwner(fromMemberId: string): void {
