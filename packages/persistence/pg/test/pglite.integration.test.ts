@@ -914,6 +914,58 @@ async function insertDomainBinding(
 }
 
 describe("pglite persistence integration", () => {
+  test("[PG-PERF-FKEY-001] hot deployment foreign keys have standalone indexes", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-fkey-indexes-"));
+    const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
+
+    try {
+      const { createDatabase, createMigrator } = await import("../src/index");
+      const database = await createDatabase({
+        driver: "pglite",
+        pgliteDataDir,
+      });
+      const migrationResult = await createMigrator(database.db).migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      const indexes = await sql<{ indexname: string }>`
+        SELECT indexname
+        FROM pg_indexes
+        WHERE schemaname = 'public'
+          AND tablename IN ('deployments', 'domain_bindings')
+          AND indexname IN (
+            'deployments_project_id_fkey_idx',
+            'deployments_environment_id_fkey_idx',
+            'deployments_server_id_fkey_idx',
+            'deployments_destination_id_fkey_idx',
+            'deployments_rollback_of_deployment_id_fkey_idx',
+            'deployments_supersedes_deployment_id_fkey_idx',
+            'domain_bindings_environment_id_fkey_idx',
+            'domain_bindings_resource_id_fkey_idx',
+            'domain_bindings_server_id_fkey_idx',
+            'domain_bindings_destination_id_fkey_idx'
+          )
+        ORDER BY indexname
+      `.execute(database.db);
+
+      expect(indexes.rows.map((row) => row.indexname)).toEqual([
+        "deployments_destination_id_fkey_idx",
+        "deployments_environment_id_fkey_idx",
+        "deployments_project_id_fkey_idx",
+        "deployments_rollback_of_deployment_id_fkey_idx",
+        "deployments_server_id_fkey_idx",
+        "deployments_supersedes_deployment_id_fkey_idx",
+        "domain_bindings_destination_id_fkey_idx",
+        "domain_bindings_environment_id_fkey_idx",
+        "domain_bindings_resource_id_fkey_idx",
+        "domain_bindings_server_id_fkey_idx",
+      ]);
+
+      await database.close();
+    } finally {
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  });
+
   test("[SWARM-TARGET-REG-001] persists and reads deployment target kind", async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-target-kind-"));
     const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
