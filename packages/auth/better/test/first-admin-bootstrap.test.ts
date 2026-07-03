@@ -1774,7 +1774,8 @@ describe("Better Auth first-admin bootstrap adapter", () => {
     expect(invitationDeliveries).toEqual([
       expect.objectContaining({
         email: "pending-member@example.com",
-        role: "member",
+        // Granular team roles persist as-is instead of collapsing to `member`.
+        role: "developer",
       }),
     ]);
 
