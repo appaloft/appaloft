@@ -1757,7 +1757,7 @@ export class BetterAuthRuntime implements AuthRuntime {
         body: {
           organizationId: input.organizationId,
           email: input.email,
-          role: toBetterAuthRole(input.role),
+          role: input.role,
         },
       });
       return ok(mapInvitationSummary(result));
@@ -1791,7 +1791,7 @@ export class BetterAuthRuntime implements AuthRuntime {
         body: {
           organizationId: input.organizationId,
           memberId: input.memberId,
-          role: toBetterAuthRole(input.role),
+          role: input.role,
         },
       });
       return ok(mapMemberSummary(readObject(result, "member") ?? result));
@@ -2337,14 +2337,14 @@ function normalizeOrganizationTeamRole(role: string | undefined): OrganizationTe
   if (roles.includes("viewer")) {
     return "viewer";
   }
-  return "developer";
-}
-
-function toBetterAuthRole(role: OrganizationTeamRole): "admin" | "member" | "owner" {
-  if (role === "owner" || role === "admin") {
-    return role;
+  if (roles.includes("developer") || roles.includes("member")) {
+    // Legacy `member` rows predate granular role assignment and keep their
+    // historical developer capability.
+    return "developer";
   }
-  return "member";
+  // Unrecognized role strings fall back to least privilege instead of
+  // inheriting developer mutation capability.
+  return "viewer";
 }
 
 function providerTitle(key: AuthProviderKey): string {
@@ -2463,13 +2463,15 @@ function loginMethodsForRuntime(configured: Record<AuthProviderKey, boolean>) {
 function permissionsForRole(role: OrganizationTeamRole) {
   const owns = role === "owner";
   const manages = owns || role === "admin";
+  // Owner-target governance (changing or removing an owner member) is rejected
+  // by application-layer invariants; admins manage non-owner members.
   return {
     canInviteMembers: manages,
     canListMembers: true,
     canManageDeployTokens: manages,
-    canRemoveMembers: owns,
+    canRemoveMembers: manages,
     canTransferOwnership: owns,
-    canUpdateMemberRoles: owns,
+    canUpdateMemberRoles: manages,
   };
 }
 

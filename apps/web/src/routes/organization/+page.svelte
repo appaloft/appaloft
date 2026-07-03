@@ -71,10 +71,13 @@
     invitation?: {
       limitKind?: "users";
       limit?: number | "custom" | "unlimited";
+      allowedRoles?: OrganizationTeamRole[];
+      roleLimitKind?: "basicRbac";
       actionHref?: string;
       actionLabel?: string;
       blockedTitle?: string;
       blockedDescription?: string;
+      roleBlockedDescription?: string;
     };
   };
 
@@ -236,6 +239,16 @@
     inviteCapability?.reason === "cloud-plan-limit-exceeded" || invitePlanLimitReached,
   );
   const inviteUpgradeHref = $derived(invitationPlanContext?.actionHref ?? "");
+  const planAssignableRoles = $derived(
+    (invitationPlanContext?.allowedRoles ?? roleOptions).filter(isOrganizationTeamRole),
+  );
+  const inviteRoleOptions = $derived(
+    planAssignableRoles.filter((role) => role !== "owner"),
+  );
+  const assignableMemberRoleOptions = $derived(
+    memberRoleOptions.filter((role) => planAssignableRoles.includes(role)),
+  );
+  const inviteRoleAllowed = $derived(inviteRoleOptions.includes(inviteRole));
   const canInviteMembers = $derived(
     canInviteMembersByRole &&
       Boolean(currentOrganizationId) &&
@@ -560,6 +573,7 @@
   const canSubmitInvite = $derived(
     Boolean(currentOrganizationId) &&
       canInviteMembers &&
+      inviteRoleAllowed &&
       inviteEmail.trim().length > 0 &&
       !inviteMemberMutation.isPending,
   );
@@ -575,6 +589,9 @@
       selectedMemberRoleMember?.role !== "owner" &&
       Boolean(roleDrafts[selectedMemberRoleMember?.memberId ?? ""]) &&
       roleDrafts[selectedMemberRoleMember?.memberId ?? ""] !== selectedMemberRoleMember?.role &&
+      assignableMemberRoleOptions.includes(
+        roleDrafts[selectedMemberRoleMember?.memberId ?? ""] as OrganizationTeamRole,
+      ) &&
       !updateMemberRoleMutation.isPending,
   );
   const canSubmitOwnerTransfer = $derived(
@@ -646,6 +663,15 @@
     organizationName = profile.name;
     organizationSlug = profile.slug;
     organizationLogoUrl = profile.logoUrl ?? "";
+  });
+
+  $effect(() => {
+    if (inviteRoleOptions.length > 0 && !inviteRoleOptions.includes(inviteRole)) {
+      const nextInviteRole = inviteRoleOptions[0];
+      if (nextInviteRole) {
+        inviteRole = nextInviteRole;
+      }
+    }
   });
 
   function openInviteDialog(): void {
@@ -1028,9 +1054,19 @@
   function updateMemberRole(memberId: string): void {
     const role = roleDrafts[memberId];
     const member = activeMembers.find((candidate) => candidate.memberId === memberId);
-    if (role && role !== "owner" && member?.role !== "owner" && canUpdateMemberRoles) {
+    if (
+      role &&
+      role !== "owner" &&
+      assignableMemberRoleOptions.includes(role) &&
+      member?.role !== "owner" &&
+      canUpdateMemberRoles
+    ) {
       updateMemberRoleMutation.mutate({ memberId, role });
     }
+  }
+
+  function isOrganizationTeamRole(role: unknown): role is OrganizationTeamRole {
+    return roleOptions.includes(role as OrganizationTeamRole);
   }
 
   function transferOwner(fromMemberId: string): void {
@@ -1805,7 +1841,7 @@
           <Select.Root bind:value={inviteRole} disabled={!canInviteMembers} type="single">
             <Select.Trigger class="w-full">{roleLabel(inviteRole)}</Select.Trigger>
             <Select.Content>
-              {#each roleOptions as role (role)}
+              {#each inviteRoleOptions as role (role)}
                 <Select.Item value={role}>{roleLabel(role)}</Select.Item>
               {/each}
             </Select.Content>
@@ -1814,6 +1850,11 @@
         <p class="text-xs leading-5 text-muted-foreground">
           {$t(i18nKeys.console.organization.ownerSafetyNotice)}
         </p>
+        {#if invitationPlanContext?.roleBlockedDescription && !inviteRoleOptions.includes("billing")}
+          <p class="text-xs leading-5 text-muted-foreground">
+            {invitationPlanContext.roleBlockedDescription}
+          </p>
+        {/if}
         <Dialog.Footer class="px-0 pb-0">
           <Button type="button" variant="outline" onclick={() => setInviteDialogOpen(false)}>
             {$t(i18nKeys.common.actions.close)}
@@ -1915,7 +1956,7 @@
                   {roleLabel(roleDrafts[selectedMemberRoleMember.memberId] ?? selectedMemberRoleMember.role)}
                 </Select.Trigger>
                 <Select.Content>
-                  {#each memberRoleOptions as role (role)}
+                  {#each assignableMemberRoleOptions as role (role)}
                     <Select.Item value={role}>{roleLabel(role)}</Select.Item>
                   {/each}
                 </Select.Content>
