@@ -13,6 +13,14 @@ import {
 } from "@appaloft/i18n";
 import { derived, writable } from "svelte/store";
 
+type PublicRuntimeConfigWindow = Window & {
+  __APPALOFT_PUBLIC_CONFIG__?: {
+    locale?: {
+      cookieDomain?: string;
+    };
+  };
+};
+
 function readDocumentLocale(): string | null {
   return typeof document !== "undefined" ? document.documentElement.lang : null;
 }
@@ -64,14 +72,29 @@ export function setLocale(nextLocale: string): void {
 
   window.localStorage.setItem(appaloftLocaleStorageKey, normalizedLocale);
   if (typeof document !== "undefined") {
+    const cookieDomain = localeCookieDomain();
     // Server-rendered static HTML needs the cookie before the Cookie Store API is universal.
     // biome-ignore lint/suspicious/noDocumentCookie: language preference must be sent with the next navigation request
-    document.cookie = `${appaloftLocaleCookieName}=${encodeURIComponent(
-      normalizedLocale,
-    )}; Path=/; Max-Age=31536000; SameSite=Lax`;
+    document.cookie = [
+      `${appaloftLocaleCookieName}=${encodeURIComponent(normalizedLocale)}`,
+      "Path=/",
+      "Max-Age=31536000",
+      "SameSite=Lax",
+      cookieDomain ? `Domain=${cookieDomain}` : "",
+    ]
+      .filter(Boolean)
+      .join("; ");
     syncDocumentLocale(normalizedLocale);
   }
   window.dispatchEvent(new CustomEvent("appaloft:locale-change", { detail: normalizedLocale }));
+}
+
+function localeCookieDomain(): string {
+  return (
+    (
+      window as PublicRuntimeConfigWindow
+    ).__APPALOFT_PUBLIC_CONFIG__?.locale?.cookieDomain?.trim() ?? ""
+  );
 }
 
 export function localeHeaders(): Record<string, string> {
