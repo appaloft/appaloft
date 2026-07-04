@@ -37,6 +37,7 @@ and final round summaries must identify the row as a documented manual or deferr
 | PUB-DOCS-015 | Secret and diagnostic guidance is safe. | contract | Troubleshooting and diagnostic docs explain masked secrets and safe support payload sharing without instructing users to expose secret values. |
 | PUB-DOCS-016 | Public docs topics are traceable to specs and product surfaces. | contract | Topics that explain governed behavior record the public page/anchor, internal spec references, and the Web/CLI/API surface that links users to the topic. |
 | PUB-DOCS-017 | Public error guides are human- and agent-readable. | contract | Registered public error guides resolve to a human docs anchor and an agent-readable JSON guide with safe details, responsibility, actionability, remedies, and governing specs. |
+| PUB-DOCS-018 | Public docs honors shared Appaloft locale preference. | contract | The static docs shell reads the shared `appaloft.locale` preference used by www and Web console surfaces, maps between root `zh-CN` paths and `/en/*` paths, and writes the same cookie/localStorage key when users switch docs locale. |
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -185,6 +186,10 @@ Current status:
   remote-operation recovery.
 - `PUB-DOCS-017` is covered for registered public error guides by
   `packages/docs-registry/test/help-topics.test.ts`.
+- `PUB-DOCS-018` is covered by `apps/docs/src/lib/locale-preference.test.ts`, which verifies
+  shared locale normalization, cookie parsing/serialization, cross-subdomain cookie-first
+  preference priority, and root
+  `zh-CN` to `/en/*` static path mapping.
 
 There is still no dedicated automated public documentation checker for every product help
 affordance, complete link resolution in built output, search alias freshness, or future MCP/tool
