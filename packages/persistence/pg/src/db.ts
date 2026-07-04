@@ -103,6 +103,7 @@ import { previewPolicyEnvironmentProfileBaseMigration } from "./migrations/094_p
 import { connectorLifecycleMigration } from "./migrations/095_connector_lifecycle";
 import { domainBindingPathHandlingMigration } from "./migrations/096_domain_binding_path_handling";
 import { hotDeploymentForeignKeyIndexesMigration } from "./migrations/097_hot_deployment_foreign_key_indexes";
+import { hotRuntimeForeignKeyIndexesMigration } from "./migrations/098_hot_runtime_foreign_key_indexes";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -298,6 +299,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "095_connector_lifecycle": connectorLifecycleMigration,
       "096_domain_binding_path_handling": domainBindingPathHandlingMigration,
       "097_hot_deployment_foreign_key_indexes": hotDeploymentForeignKeyIndexesMigration,
+      "098_hot_runtime_foreign_key_indexes": hotRuntimeForeignKeyIndexesMigration,
     };
   }
 }
