@@ -2,6 +2,11 @@ import { createMDX } from "fumadocs-mdx/next";
 
 const docsBase = normalizeDocsBase(process.env.APPALOFT_DOCS_BASE);
 const docsSite = normalizeDocsSite(process.env.APPALOFT_DOCS_SITE);
+const localeCookieDomain =
+  process.env.NEXT_PUBLIC_APPALOFT_LOCALE_COOKIE_DOMAIN ||
+  process.env.PUBLIC_APPALOFT_LOCALE_COOKIE_DOMAIN ||
+  process.env.APPALOFT_LOCALE_COOKIE_DOMAIN ||
+  "";
 
 function normalizeDocsBase(value) {
   const trimmed = value?.trim() || "/docs";
@@ -27,6 +32,7 @@ const config = {
     APPALOFT_DOCS_BASE: docsBase,
     APPALOFT_DOCS_SITE: docsSite,
     NEXT_PUBLIC_APPALOFT_DOCS_BASE: docsBase,
+    NEXT_PUBLIC_APPALOFT_LOCALE_COOKIE_DOMAIN: localeCookieDomain,
   },
   ...(docsBase === "/" ? {} : { assetPrefix: docsBase }),
 };

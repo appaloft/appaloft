@@ -188,6 +188,16 @@ describe("resolveConfig", () => {
     expect(config.publicDocsBasePath).toBe("https://appaloft.com/docs");
   });
 
+  test("allows sharing the locale cookie across configured product subdomains", () => {
+    const config = resolveConfig({
+      env: {
+        APPALOFT_LOCALE_COOKIE_DOMAIN: ".appaloft.com",
+      },
+    });
+
+    expect(config.localeCookieDomain).toBe(".appaloft.com");
+  });
+
   test("reads the GitHub webhook secret from runtime configuration", () => {
     const config = resolveConfig({
       env: {

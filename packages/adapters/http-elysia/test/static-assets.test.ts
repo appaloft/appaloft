@@ -55,6 +55,7 @@ function createTestApp(input?: {
   onQuery?: (query: Query<unknown>) => void;
   publicDocsBasePath?: string;
   webStaticDir?: string;
+  localeCookieDomain?: string;
 }) {
   const queryBus = {
     execute: async <T>(_context: unknown, query: Query<T>) => {
@@ -76,6 +77,7 @@ function createTestApp(input?: {
       flags: {
         appVersion: "0.1.0-test",
         authProvider: "none",
+        localeCookieDomain: input?.localeCookieDomain,
         publicDocsBasePath: input?.publicDocsBasePath,
         webStaticDir: input?.webStaticDir ?? "",
         docsStaticDir: input?.docsStaticDir ?? "",
@@ -270,6 +272,7 @@ describe("HTTP static assets", () => {
 
   test("serves public docs base path through runtime config script", async () => {
     const app = createTestApp({
+      localeCookieDomain: ".appaloft.com",
       publicDocsBasePath: "https://appaloft.com/docs",
     });
 
@@ -278,6 +281,7 @@ describe("HTTP static assets", () => {
       expect(scriptResponse.status).toBe(200);
       const script = await scriptResponse.text();
       expect(script).toContain('"docs":{"basePath":"https://appaloft.com/docs"}');
+      expect(script).toContain('"locale":{"cookieDomain":".appaloft.com"}');
       expect(script).not.toContain("clientSecret");
     });
   });
