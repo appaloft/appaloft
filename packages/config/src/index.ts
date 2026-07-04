@@ -168,6 +168,7 @@ export interface AppConfig {
   httpHost: string;
   httpIdleTimeoutSeconds?: number;
   httpPort: number;
+  localeCookieDomain?: string;
   webOrigin: string;
   resourceAccessFailureRendererUrl?: string;
   publicDocsBasePath?: string;
@@ -1128,6 +1129,16 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
     httpPort: Number(
       source.flags?.httpPort ?? env.APPALOFT_HTTP_PORT ?? fileConfig.httpPort ?? defaults.httpPort,
     ),
+    ...(source.flags?.localeCookieDomain ||
+    env.APPALOFT_LOCALE_COOKIE_DOMAIN ||
+    fileConfig.localeCookieDomain
+      ? {
+          localeCookieDomain:
+            source.flags?.localeCookieDomain ??
+            env.APPALOFT_LOCALE_COOKIE_DOMAIN ??
+            fileConfig.localeCookieDomain,
+        }
+      : {}),
     webOrigin,
     ...(resourceAccessFailureRendererUrl ? { resourceAccessFailureRendererUrl } : {}),
     ...(source.flags?.publicDocsBasePath ||

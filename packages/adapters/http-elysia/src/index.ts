@@ -185,6 +185,9 @@ interface PublicRuntimeConfig {
   docs?: {
     basePath: string;
   };
+  locale?: {
+    cookieDomain: string;
+  };
 }
 
 const firstAdminBootstrapPath = "/bootstrap/auth/first-admin";
@@ -1214,6 +1217,9 @@ export function createHttpApp(input: {
       auth: input.authRuntime?.getPublicConfig() ?? disabledAuthPublicConfig,
       ...(input.config.publicDocsBasePath
         ? { docs: { basePath: input.config.publicDocsBasePath } }
+        : {}),
+      ...(input.config.localeCookieDomain
+        ? { locale: { cookieDomain: input.config.localeCookieDomain } }
         : {}),
     };
   }
