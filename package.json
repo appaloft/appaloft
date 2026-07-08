@@ -1,6 +1,6 @@
 {
   "name": "appaloft",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "devDependencies": {
     "@appaloft/adapter-packaging": "workspace:*",
     "@biomejs/biome": "^2.5.1",
