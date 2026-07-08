@@ -1,5 +1,48 @@
 # Changelog
 
+## [1.0.1](https://github.com/appaloft/appaloft/compare/v1.0.0...v1.0.1) (2026-07-08)
+
+
+### Features
+
+* add system plugin web head contributions ([e6f5f1a](https://github.com/appaloft/appaloft/commit/e6f5f1a5aaa13351d6b012674aa578b1df45eb95))
+* **web:** move language choices into account submenu ([493b125](https://github.com/appaloft/appaloft/commit/493b125a8c9a95ac5e3b6f5246a68d5e39123d7a))
+* **web:** move theme selector into account menu ([0b7f255](https://github.com/appaloft/appaloft/commit/0b7f255f7fcaaf88551574219f0a8e8a9398cbf9))
+* **web:** show account menu extension badges ([9efb2bd](https://github.com/appaloft/appaloft/commit/9efb2bdaa95969ac6bde1397c5fd2eda65f45131))
+
+
+### Bug Fixes
+
+* add blueprint detail card link ([94af566](https://github.com/appaloft/appaloft/commit/94af566477894e6c2e0c0f47e8d3596266f17a53))
+* add hot deployment foreign key indexes ([1051271](https://github.com/appaloft/appaloft/commit/1051271fd4b5e7ba65e176a6edbae484a89d27b3))
+* add hot deployment foreign key indexes ([4804783](https://github.com/appaloft/appaloft/commit/4804783b4bdf36134ee4aada728eddb6050e7dfa))
+* **blueprint-marketplace:** prevent compact fact label overlap ([2e3f669](https://github.com/appaloft/appaloft/commit/2e3f6697230ca362120dcbeec2b5a9435c9231b0))
+* build domain connect apply urls from sync ux ([ad70aad](https://github.com/appaloft/appaloft/commit/ad70aadcf0a38acba856a42554bf45366893e9ba))
+* **deployments:** forward activeResourcesOnly in list handler ([#655](https://github.com/appaloft/appaloft/issues/655)) ([230273f](https://github.com/appaloft/appaloft/commit/230273fe19b308c0052cd0b27d0f5d03b4e99b25))
+* link blueprint card body to details ([e5ab3bb](https://github.com/appaloft/appaloft/commit/e5ab3bb25fa63ac97893770925cd2e2587098fbe))
+* show static artifact deployment access URL ([2beda8d](https://github.com/appaloft/appaloft/commit/2beda8d5658f5fddc2abebe09b9f7ed34f5a011c))
+* show static artifact deployment access URL ([7c5a07f](https://github.com/appaloft/appaloft/commit/7c5a07fdab34cdfa0b89dc462fd6c715eaafbc82))
+* support domain-scoped domain connect apply urls ([5875f16](https://github.com/appaloft/appaloft/commit/5875f16f04793020a8bd671f61ad287ab30f603f))
+* timeout ssh edge proxy commands ([d6fb0fa](https://github.com/appaloft/appaloft/commit/d6fb0fa616efa8fbd7a848a497a309b5a838a29a))
+* **web:** expose DNS configuration handoffs ([7b5afe4](https://github.com/appaloft/appaloft/commit/7b5afe481332c528b4aed585e6a1e7cc4fd2d576))
+* **web:** make console tabs more discoverable ([1111557](https://github.com/appaloft/appaloft/commit/1111557d18d895f6fdc91763597a4460172a0f72))
+* **web:** render initial locale from request ([#636](https://github.com/appaloft/appaloft/issues/636)) ([939446b](https://github.com/appaloft/appaloft/commit/939446b05c4ad18c47cdfa6499d48e0268f1422c))
+
+
+### Documentation
+
+* explain dns connector workflow ([#664](https://github.com/appaloft/appaloft/issues/664)) ([408fd0d](https://github.com/appaloft/appaloft/commit/408fd0d8a2f19f47a03728bd53d08d62de330c8f))
+
+
+### Miscellaneous
+
+* align biome configuration version ([0afcc00](https://github.com/appaloft/appaloft/commit/0afcc00a2381234ac7a34bb53f708a9a5f50c368))
+* keep docs fumadocs dependencies compatible ([17041f8](https://github.com/appaloft/appaloft/commit/17041f8845bfb0e13a0fec6cf126d1668fd7020e))
+* upgrade docs tooling dependencies ([44b1a43](https://github.com/appaloft/appaloft/commit/44b1a43698b522ceb07670be24fd3775af173c4b))
+* upgrade docs tooling dependencies ([475c420](https://github.com/appaloft/appaloft/commit/475c4203d4a57c550e73df78f3e24515e12d57c8))
+* upgrade minor dependencies ([3aa46bc](https://github.com/appaloft/appaloft/commit/3aa46bc461cb183b90fd9276415a27a8964b141e))
+* upgrade minor dependencies ([a56ce82](https://github.com/appaloft/appaloft/commit/a56ce82f9da83417acb170693cae47516cf5b159))
+
 ## [1.0.0](https://github.com/appaloft/appaloft/compare/v1.0.0-rc.18...v1.0.0) (2026-06-25)
 
 
