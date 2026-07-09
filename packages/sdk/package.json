@@ -31,6 +31,6 @@
     "generate:operations": "bun run ../../scripts/release/generate-typescript-sdk-operations.ts",
     "lint": "biome check package.json tsconfig.json tsconfig.build.json src/index.ts test",
     "test": "bun test",
-    "typecheck": "tsgo -p tsconfig.json --noEmit --checkers 4"
+    "typecheck": "tsc -p tsconfig.json --noEmit --checkers 4"
   }
 }
