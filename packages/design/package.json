@@ -15,7 +15,7 @@
   },
   "scripts": {
     "lint": "biome check .",
-    "typecheck": "tsgo -p tsconfig.json --noEmit --checkers 4",
+    "typecheck": "tsc -p tsconfig.json --noEmit --checkers 4",
     "test:unit": "vitest --run"
   },
   "dependencies": {
