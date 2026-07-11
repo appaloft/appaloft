@@ -1354,7 +1354,7 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
       manifest: {
         schemaVersion: "appaloft.blueprint/v1",
         id: "remote-docker-demo",
-        name: "One-Click Docker Demo",
+        name: "Oneclick",
         version: "0.1.0",
         summary: "Remote Dockerfile Blueprint loaded from a one-click URL.",
         description: "A remote Blueprint fixture.",
@@ -1365,7 +1365,7 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
         components: [
           {
             id: "web",
-            name: "One-Click Docker Demo",
+            name: "Oneclick",
             kind: "service",
             runtime: {
               strategy: "dockerfile",
@@ -4967,14 +4967,14 @@ describe.serial("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     const blueprintUrl =
-      "https://raw.githubusercontent.com/appaloft/one-click-deploy-docker-demo/main/appaloft.blueprint.yaml";
+      "https://raw.githubusercontent.com/appaloft/examples/main/oneclick/appaloft.blueprint.yaml";
 
     await using view = createWebView();
     await view.navigate(
-      `${previewUrl}/?modal=quick-deploy&source=blueprint&blueprintUrl=${encodeURIComponent(blueprintUrl)}&blueprintTitle=One-Click%20Docker%20Demo&blueprintProfile=production&step=project&projectMode=new&projectName=One-Click%20Docker%20Demo&serverMode=new`,
+      `${previewUrl}/?modal=quick-deploy&source=blueprint&blueprintUrl=${encodeURIComponent(blueprintUrl)}&blueprintTitle=Oneclick&blueprintProfile=production&step=project&projectMode=new&projectName=Oneclick&serverMode=new`,
     );
 
-    await expectText(view, "One-Click Docker Demo");
+    await expectText(view, "Oneclick");
     await expectText(view, "自定义 Blueprint URL");
 
     const renderedStateJson = await waitFor(

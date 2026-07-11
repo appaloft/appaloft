@@ -45,7 +45,7 @@ README 示例：
 远程 Blueprint URL 示例：
 
 ```md title="README.md"
-[![Deploy on Appaloft](https://appaloft.com/badge/deploy.svg)](https://app.appaloft.com/deploy?source=blueprint&blueprintUrl=https%3A%2F%2Fraw.githubusercontent.com%2Fappaloft%2Fone-click-deploy-docker-demo%2Fmain%2Fappaloft.blueprint.yaml&blueprintTitle=One-Click+Docker+Demo&blueprintProfile=production&step=project&projectMode=new&projectName=One-Click+Docker+Demo)
+[![Deploy on Appaloft](https://appaloft.com/badge/deploy.svg)](https://app.appaloft.com/deploy?source=blueprint&blueprintUrl=https%3A%2F%2Fraw.githubusercontent.com%2Fappaloft%2Fexamples%2Fmain%2Foneclick%2Fappaloft.blueprint.yaml&blueprintTitle=Oneclick&blueprintProfile=production&step=project&projectMode=new&projectName=Oneclick)
 ```
 
 也可以打开 [One-click deploy 生成器](https://appaloft.com/deploy/one-click) 生成 Markdown。
