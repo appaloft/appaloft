@@ -43,7 +43,7 @@ README example:
 Remote Blueprint URL example:
 
 ```md title="README.md"
-[![Deploy on Appaloft](https://appaloft.com/badge/deploy.svg)](https://app.appaloft.com/deploy?source=blueprint&blueprintUrl=https%3A%2F%2Fraw.githubusercontent.com%2Fappaloft%2Fone-click-deploy-docker-demo%2Fmain%2Fappaloft.blueprint.yaml&blueprintTitle=One-Click+Docker+Demo&blueprintProfile=production&step=project&projectMode=new&projectName=One-Click+Docker+Demo)
+[![Deploy on Appaloft](https://appaloft.com/badge/deploy.svg)](https://app.appaloft.com/deploy?source=blueprint&blueprintUrl=https%3A%2F%2Fraw.githubusercontent.com%2Fappaloft%2Fexamples%2Fmain%2Foneclick%2Fappaloft.blueprint.yaml&blueprintTitle=Oneclick&blueprintProfile=production&step=project&projectMode=new&projectName=Oneclick)
 ```
 
 You can also use the [One-click deploy generator](https://appaloft.com/deploy/one-click).
