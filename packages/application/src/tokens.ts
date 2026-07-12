@@ -631,6 +631,10 @@ export const tokens = {
   listDeploymentsQueryService: Symbol.for("appaloft.list_deployments_query_service"),
   showDeploymentQueryService: Symbol.for("appaloft.show_deployment_query_service"),
   deploymentPlanQueryService: Symbol.for("appaloft.deployment_plan_query_service"),
+  deploymentProofQueryService: Symbol.for("appaloft.deployment_proof_query_service"),
+  deploymentProofRuntimeEvidenceReader: Symbol.for(
+    "appaloft.deployment_proof_runtime_evidence_reader",
+  ),
   deploymentRecoveryReadinessQueryService: Symbol.for(
     "appaloft.deployment_recovery_readiness_query_service",
   ),

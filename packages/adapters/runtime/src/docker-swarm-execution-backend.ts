@@ -21,6 +21,7 @@ import {
 } from "@appaloft/core";
 import {
   createDeploymentProgressEvent,
+  deploymentProofConfigurationFingerprint,
   type DependencyResourceSecretStore,
   deploymentProgressSteps,
   type DeploymentProgressRecorder,
@@ -104,6 +105,9 @@ function deploymentIdentity(deployment: Deployment): DockerSwarmRuntimeIdentityI
     deploymentId: state.id.value,
     targetId: state.serverId.value,
     destinationId: state.destinationId.value,
+    configurationFingerprint: deploymentProofConfigurationFingerprint(
+      state.environmentSnapshot.variables,
+    ),
   };
 }
 

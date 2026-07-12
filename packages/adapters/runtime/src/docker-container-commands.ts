@@ -1,3 +1,4 @@
+import { deploymentProofConfigurationFingerprint } from "@appaloft/application";
 import { type DeploymentState } from "@appaloft/core";
 
 import { requireServerBackedDeploymentStateFromState } from "./deployment-target";
@@ -47,6 +48,7 @@ export interface DockerContainerIdentity {
   previewMode?: string | undefined;
   previewBranch?: string | undefined;
   sourceFingerprint?: string | undefined;
+  configurationFingerprint?: string | undefined;
 }
 
 function normalizeDockerLabelValue(value: string | undefined): string | undefined {
@@ -125,6 +127,7 @@ export function appaloftDockerContainerLabels(identity: DockerContainerIdentity)
     dockerLabel("appaloft.preview-mode", identity.previewMode ?? previewIdentity.previewMode),
     dockerLabel("appaloft.preview-branch", identity.previewBranch),
     dockerLabel("appaloft.source-fingerprint", identity.sourceFingerprint),
+    dockerLabel("appaloft.configuration-fingerprint", identity.configurationFingerprint),
     requiredDockerLabel("appaloft.resource-id", identity.resourceId),
     dockerLabel("appaloft.resource-name", identity.resourceName),
     dockerLabel("appaloft.resource-slug", identity.resourceSlug),
@@ -216,6 +219,9 @@ export function appaloftDockerContainerLabelsForDeployment(
     previewMode: metadata["preview.mode"],
     previewBranch: metadata["preview.branch"],
     sourceFingerprint: metadata["access.sourceFingerprint"] ?? metadata["context.sourceFingerprint"],
+    configurationFingerprint: deploymentProofConfigurationFingerprint(
+      state.environmentSnapshot.variables,
+    ),
   });
 }
 

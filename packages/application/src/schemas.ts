@@ -88,6 +88,7 @@ export * from "./operations/deployments/cleanup-preview.schema";
 export * from "./operations/deployments/count-deployments.query";
 export * from "./operations/deployments/create-deployment.schema";
 export * from "./operations/deployments/deployment-plan.schema";
+export * from "./operations/deployments/deployment-proof.schema";
 export * from "./operations/deployments/deployment-recovery-readiness.schema";
 export * from "./operations/deployments/deployment-timeline.schema";
 export * from "./operations/deployments/force-redeploy-deployment.schema";

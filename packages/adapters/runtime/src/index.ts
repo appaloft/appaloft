@@ -94,6 +94,11 @@ import {
 
 export { RuntimeServerConnectivityChecker } from "./server-connectivity";
 export { RuntimeDeploymentHealthChecker } from "./deployment-health";
+export {
+  deploymentProofEvidenceFromDockerInspect,
+  RuntimeDeploymentProofEvidenceReader,
+  type DockerInspectState,
+} from "./deployment-proof-evidence";
 export { RuntimeResourceHealthProbeRunner } from "./resource-health-probes";
 export {
   dockerComposeRuntimeControlCommand,

@@ -5786,6 +5786,147 @@ export interface DeploymentRecoveryReadiness {
   recommendedActions: DeploymentRecoveryRecommendedAction[];
 }
 
+export type DeploymentProofVerdict =
+  | "verified"
+  | "partially-verified"
+  | "unverified"
+  | "stale"
+  | "failed";
+export type DeploymentProofEvidenceKind =
+  | "timeline-entry"
+  | "runtime-readback"
+  | "artifact-identity"
+  | "health-observation"
+  | "access-observation"
+  | "recovery-readiness";
+export type DeploymentProofUnavailableKind =
+  | "artifact"
+  | "workload"
+  | "configuration"
+  | "health"
+  | "access"
+  | "recovery";
+export interface DeploymentProofEvidenceReference {
+  kind: DeploymentProofEvidenceKind;
+  reference: string;
+  summary: string;
+  observedAt?: string;
+}
+export interface DeploymentProofUnavailableEvidence {
+  kind: DeploymentProofUnavailableKind;
+  reasonCode: string;
+  summary: string;
+}
+export interface DeploymentProofArtifactEvidence {
+  available: boolean;
+  reference?: string;
+  resolvedIdentity?: string;
+  reasonCode?: string;
+}
+export interface DeploymentProofWorkloadEvidence {
+  available: boolean;
+  identity?: string;
+  generation?: string;
+  deploymentId?: string;
+  startedAt?: string;
+  reasonCode?: string;
+}
+export interface DeploymentProofConfigurationEvidence {
+  available: boolean;
+  fingerprint?: string;
+  generation?: string;
+  matchesPlanned?: boolean;
+  reasonCode?: string;
+}
+export interface DeploymentProofCheckEvidence {
+  status: "passed" | "failed" | "skipped" | "unavailable";
+  summary: string;
+  reasonCode?: string;
+}
+export interface DeploymentProofAccessEvidence extends DeploymentProofCheckEvidence {
+  routeTargetsWorkload?: boolean;
+}
+export interface DeploymentProofRecoveryEvidence {
+  previousRuntimeRetained?: boolean;
+  rollbackCandidateDeploymentId?: string;
+  reasonCode?: string;
+}
+export interface DeploymentProofRuntimeEvidence {
+  available: boolean;
+  observedAt: string;
+  artifact: DeploymentProofArtifactEvidence;
+  workload: DeploymentProofWorkloadEvidence;
+  configuration: DeploymentProofConfigurationEvidence;
+  health: DeploymentProofCheckEvidence;
+  access: DeploymentProofAccessEvidence;
+  recovery: DeploymentProofRecoveryEvidence;
+  reasonCode?: string;
+}
+export interface DeploymentProofRuntimeEvidenceReader {
+  read(
+    context: ExecutionContext,
+    deployment: DeploymentSummary,
+  ): Promise<Result<DeploymentProofRuntimeEvidence>>;
+}
+export type DeploymentProofExpectedEffect =
+  | "rebuild-artifact"
+  | "replace-workload"
+  | "restart-workload"
+  | "apply-route"
+  | "verify-health-policy"
+  | "no-runtime-change";
+export type DeploymentProofReasonCode =
+  | "deployment_not_succeeded"
+  | "artifact_identity_unavailable"
+  | "artifact_identity_mismatch"
+  | "runtime_readback_unavailable"
+  | "workload_identity_unavailable"
+  | "workload_generation_mismatch"
+  | "configuration_evidence_unavailable"
+  | "configuration_fingerprint_mismatch"
+  | "internal_health_unavailable"
+  | "internal_health_failed"
+  | "public_access_unavailable"
+  | "public_access_failed"
+  | "access_route_workload_mismatch"
+  | "recovery_evidence_unavailable";
+export interface DeploymentProofMismatch {
+  reasonCode: DeploymentProofReasonCode;
+  severity: "warning" | "error" | "critical";
+  expected: string;
+  observed?: string;
+  evidence: DeploymentProofEvidenceReference[];
+  recommendedOperations: Array<
+    | "deployments.retry"
+    | "deployments.redeploy"
+    | "deployments.force-redeploy"
+    | "deployments.rollback"
+    | "deployments.timeline"
+    | "resources.diagnostic-summary"
+  >;
+}
+export interface DeploymentProof {
+  schemaVersion: "deployments.proof/v1";
+  deploymentId: string;
+  resourceId: string;
+  verdict: DeploymentProofVerdict;
+  planned: {
+    source: { reference: string; revision?: string };
+    artifact: { intent?: RuntimeArtifactIntent; reference?: string };
+    resourceProfile: { fingerprint: string };
+    configuration: { fingerprint: string };
+    runtimeTarget: { kind: TargetKind; providerKey: string };
+    verificationSteps: Array<{ kind: "internal-http" | "public-http"; label: string }>;
+    expectedEffects: DeploymentProofExpectedEffect[];
+  };
+  observed: DeploymentProofRuntimeEvidence;
+  mismatches: DeploymentProofMismatch[];
+  evidence: DeploymentProofEvidenceReference[];
+  unavailableEvidence: DeploymentProofUnavailableEvidence[];
+  generatedAt: string;
+  stateVersion: string;
+}
+
 export interface DeploymentAttemptRecoverySummary {
   source: "deployments.recovery-readiness";
   retryable: boolean;

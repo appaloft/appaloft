@@ -980,6 +980,7 @@ Implemented operations:
 | List deployments | Product-session member query | `deployments.list` | `ListDeploymentsQuery` | `ListDeploymentsQueryInput` | `appaloft deployments list` | `GET /api/deployments` |
 | Count deployments | Product-session member query | `deployments.count` | `CountDeploymentsQuery` | `CountDeploymentsQueryInput` | `appaloft deployments count` | `GET /api/deployments/count` |
 | Show deployment detail | Product-session member query | `deployments.show` | `ShowDeploymentQuery` | `ShowDeploymentQueryInput` | `appaloft deployments show <deploymentId>` | `GET /api/deployments/{deploymentId}` |
+| Read deployment proof | Product-session member query | `deployments.proof` | `DeploymentProofQuery` | `DeploymentProofQueryInput` | `appaloft deployments proof <deploymentId>` | `GET /api/deployments/{deploymentId}/proof` |
 | Read deployment recovery readiness | Query | `deployments.recovery-readiness` | `DeploymentRecoveryReadinessQuery` | `DeploymentRecoveryReadinessQueryInput` | `appaloft deployments recovery-readiness <deploymentId>` | `GET /api/deployments/{deploymentId}/recovery-readiness` |
 | Retry deployment attempt | Command | `deployments.retry` | `RetryDeploymentCommand` | `RetryDeploymentCommandInput` | `appaloft deployments retry <deploymentId>` | `POST /api/deployments/{deploymentId}/retry` |
 | Redeploy current resource profile | Command | `deployments.redeploy` | `RedeployDeploymentCommand` | `RedeployDeploymentCommandInput` | `appaloft deployments redeploy <resourceId>` | `POST /api/resources/{resourceId}/redeploy` |
@@ -1034,6 +1035,11 @@ Current boundary:
   deployment context, historical snapshot, safe dependency binding references copied at admission
   time, timeline summary, and safe related context while keeping full observation history on
   `deployments.timeline` and current health on `resources.health`.
+- `deployments.proof` is the active machine-readable planned-versus-observed deployment result. It
+  consumes the immutable snapshot plus sanitized runtime/artifact, timeline, current health,
+  access/route, and recovery evidence. `verified` requires all applicable evidence; command exit 0,
+  health 200, or public access success alone is insufficient. Unsupported readback remains explicit
+  as partial/unverified evidence instead of fabricated digest, workload, or configuration identity.
 - `deployments.timeline` and `deployments.timeline.stream` are the read-only replay/follow
   observation surfaces for one accepted deployment attempt. They are backed by the Deployment
   Timeline Journal selected in

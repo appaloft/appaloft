@@ -2034,6 +2034,16 @@ describe("console page structure", () => {
     expect(deploymentRecoveryDialogSource).toContain("data-deployment-recovery-intent-picker");
   });
 
+  test("[DEP-PROOF-WEB-001] renders proof dimensions, mismatches, and unavailable evidence", () => {
+    expect(deploymentDetailPageSource).toContain("orpc.deployments.proof.queryOptions");
+    expect(deploymentDetailPageSource).toContain('data-testid="deployment-proof"');
+    expect(deploymentDetailPageSource).toContain("data-deployment-proof-dimensions");
+    expect(deploymentDetailPageSource).toContain("data-deployment-proof-mismatches");
+    expect(deploymentDetailPageSource).toContain("data-deployment-proof-unavailable");
+    expect(deploymentDetailPageSource).toContain("proofVerdictPartiallyVerified");
+    expect(deploymentDetailPageSource).toContain("proofRecoveryUnavailable");
+  });
+
   test("[SERVER-COLLECTION-IA-001] opens server registration as an in-context dialog", () => {
     expect(serversPageSource).toContain('modalIsOpen(page, "create-server")');
     expect(serversPageSource).toContain("function openServerCreateDialog()");

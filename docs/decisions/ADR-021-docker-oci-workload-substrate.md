@@ -280,8 +280,10 @@ remain outside that command.
 
 The target contract still has gaps:
 
-- image artifact snapshots do not yet capture resolved image ids, digests, registry push/pull
-  results, or previous runtime identity;
+- image artifact snapshots do not yet capture all registry push/pull results. Resolved image ids or
+  digests and previous/current runtime identity are now governed as sanitized current evidence by
+  [ADR-087](./ADR-087-deployment-proof-boundary.md) and the `deployments.proof` query; unsupported
+  adapters must return an explicit evidence gap rather than inventing them;
 - runtime orchestration target selection is still single-server oriented, and target backend
   routing is not yet a dependency-injected registry keyed by target kind, provider key, and
   capabilities;
