@@ -63,6 +63,7 @@
     "smoke:framework:docker-fixtures": "APPALOFT_E2E_FRAMEWORK_DOCKER=true bun test --timeout=3600000 ./apps/shell/test/e2e/quick-deploy-framework-fixtures-docker.workflow.e2e.ts",
     "smoke:framework:docker-substrates": "bun test --timeout=300000 ./apps/shell/test/e2e/quick-deploy-local-docker-substrates.workflow.e2e.ts",
     "smoke:framework:docker": "bun run smoke:framework:docker-substrates && bun run smoke:framework:docker-fixtures",
+    "smoke:deployment:change-proof": "APPALOFT_E2E_DEPLOYMENT_CHANGE_DOCKER=true bun test --timeout=600000 ./apps/shell/test/e2e/quick-deploy-changed-workload-docker.workflow.e2e.ts",
     "smoke:framework:ssh": "bun run smoke:ssh:preflight && APPALOFT_E2E_SSH_FRAMEWORK_DOCKER=true bun test --timeout=1800000 ./apps/shell/test/e2e/quick-deploy-framework-fixtures-ssh.workflow.e2e.ts",
     "smoke:framework": "bun run smoke:framework:docker && bun run smoke:framework:ssh",
     "smoke:scheduled-task:docker": "APPALOFT_E2E_SCHEDULED_TASK_DOCKER=true bun test --timeout=300000 packages/adapters/runtime/test/scheduled-task-runtime.real-docker.test.ts",
