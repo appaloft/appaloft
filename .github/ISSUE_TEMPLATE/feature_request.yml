@@ -1,0 +1,48 @@
+name: "Feature request"
+description: "Propose a neutral Community capability or extension point"
+title: "feat: "
+labels:
+  - "enhancement"
+body:
+  - type: "markdown"
+    attributes:
+      value: "Describe the developer job and desired outcome before proposing an API or implementation. Hosted Cloud pricing, billing, entitlement, and private topology do not belong in this public repository."
+  - type: "textarea"
+    id: "problem"
+    attributes:
+      label: "Developer problem"
+      description: "What are you trying to deploy, operate, verify, diagnose, or recover?"
+    validations:
+      required: true
+  - type: "textarea"
+    id: "current"
+    attributes:
+      label: "Current path and limitation"
+      description: "What do you do today, and where does the workflow stop being safe or repeatable?"
+    validations:
+      required: true
+  - type: "textarea"
+    id: "outcome"
+    attributes:
+      label: "Desired outcome"
+      description: "Describe observable behavior across CLI, API, Web, GitHub Action, MCP, provider, or runtime surfaces."
+    validations:
+      required: true
+  - type: "textarea"
+    id: "example"
+    attributes:
+      label: "Example or evidence"
+      description: "Provide a sanitized command, repository, config, failure case, or workflow when available."
+  - type: "textarea"
+    id: "alternatives"
+    attributes:
+      label: "Alternatives considered"
+  - type: "checkboxes"
+    id: "checks"
+    attributes:
+      label: "Checks"
+      options:
+        - label: "I searched existing issues, pull requests, public operations, and the roadmap."
+          required: true
+        - label: "The request can be expressed as neutral Community behavior or an extension point."
+          required: true
