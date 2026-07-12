@@ -4,13 +4,14 @@
   </a>
 
   <p><code>/ˌæp əˈlɔːft/</code></p>
-  <h3>从 localhost 到你的服务器。</h3>
+  <h3>把应用、Docker 和 Compose 部署到你自己的服务器。</h3>
   <p>
-    <strong>本地优先的 AI native 单文件 PaaS。</strong><br />
-    一个文件，部署静态站点、本地项目、Git 仓库、Docker 和 Compose 应用；既可以手动操作，
-    也可以让 Agent 从 MCP / skill 调用。
+    <strong>面向开发者、小团队和 AI coding agent 的开源部署控制面。</strong><br />
+    用一份配置描述 workload，通过 CLI、GitHub Actions、Web、MCP 或 AI skill 部署，
+    再用 health、logs、retry 和 rollback evidence 验证结果。
   </p>
   <p>
+    <a href="https://github.com/appaloft/examples/tree/main/hello">五分钟示例</a> ·
     <a href="https://www.appaloft.com/zh-CN/">官网</a> ·
     <a href="https://app.appaloft.com">Cloud</a> ·
     <a href="https://docs.appaloft.com/">文档</a> ·
@@ -20,8 +21,34 @@
 </div>
 
 <p align="center">
-  <img src="https://www.appaloft.com/images/appaloft-www-hero-overview.png" alt="Appaloft 控制台总览" width="920" />
+  <img src="./docs/assets/appaloft-deploy-loop.gif" alt="Appaloft 部署、健康验证和公开 URL 终端演示" width="920" />
 </p>
+
+## 五分钟运行 Hello 示例
+
+官方 [`appaloft/examples/hello`](https://github.com/appaloft/examples/tree/main/hello) 是一个零依赖
+Node HTTP 应用，包含 Dockerfile、`appaloft.yml`、`/health` 和一个小型 JSON API。先 clone 并验证 workload：
+
+```bash
+git clone --depth 1 https://github.com/appaloft/examples.git
+cd examples/hello
+npm start
+```
+
+在另一个终端执行：
+
+```bash
+curl -sS http://127.0.0.1:3000/health
+```
+
+安装 Appaloft 并选好 target 后，通过同一份单文件配置部署当前目录：
+
+```bash
+appaloft deploy . --config appaloft.yml
+```
+
+完整示例还记录了本地 Docker 验证、public Git deployment、Cloud Console 设置、health check
+以及准确的 source/runtime contract。
 
 ## Appaloft 是什么？
 
@@ -47,11 +74,24 @@ curl -fsSL https://appaloft.com/install.sh | sudo sh
 固定某个发布版本：
 
 ```bash
-curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- --version 0.2.1
+curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- --version 1.0.1
 ```
 
 这个 installer 会安装或校验 Docker Engine 和 Compose plugin，把 self-hosted stack 写到
 `/opt/appaloft`，并启动 Appaloft backend、static console 和 PostgreSQL。
+
+## 当前范围和边界
+
+| 现在可以验证 | 当前边界 |
+| --- | --- |
+| 本地目录、public Git、zip、prebuilt image 和 Compose bundle | 需要由你提供或注册 runtime target，以及连接它所需的 credential。 |
+| Workspace commands、Dockerfile、Docker Compose、prebuilt-image 和 static-artifact plan | Provider capability 不完全相同；mutation 前应检查生成的 plan 和 target readiness。 |
+| Local shell、generic SSH 和 Docker Swarm runtime target | Appaloft 是部署控制面，不是通用 cloud account 或 DNS zone manager。 |
+| CLI、HTTP API、Web console、GitHub Action、MCP 和 AI skill | External edge/DNS provider orchestration 仍属于受治理的 post-1.0 track。 |
+| Health、logs、diagnostics、retry、redeploy、rollback 和 durable work observation | 命令成功不能替代 workload、health 和 access verification。 |
+
+当前公开契约和后续计划见 [Providers](./docs/PROVIDERS.md)、
+[Core operations](./docs/CORE_OPERATIONS.md) 和 [product roadmap](./docs/PRODUCT_ROADMAP.md)。
 
 ## 安装方式
 

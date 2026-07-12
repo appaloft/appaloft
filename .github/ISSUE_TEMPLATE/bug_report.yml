@@ -1,0 +1,67 @@
+name: "Bug report"
+description: "Report reproducible incorrect Appaloft behavior"
+title: "bug: "
+labels:
+  - "bug"
+body:
+  - type: "markdown"
+    attributes:
+      value: "Thanks for reporting a bug. Remove secrets, credentials, production identifiers, and customer data. Report vulnerabilities privately through SECURITY.md."
+  - type: "input"
+    id: "version"
+    attributes:
+      label: "Appaloft version"
+      description: "Run appaloft --version or provide the exact release/commit."
+      placeholder: "v1.0.1"
+    validations:
+      required: true
+  - type: "dropdown"
+    id: "surface"
+    attributes:
+      label: "Entry point"
+      options:
+        - "CLI"
+        - "Web console"
+        - "HTTP API / SDK"
+        - "GitHub Action"
+        - "MCP / AI skill"
+        - "Installer / self-hosted runtime"
+        - "Other"
+    validations:
+      required: true
+  - type: "textarea"
+    id: "reproduction"
+    attributes:
+      label: "Minimal reproduction"
+      description: "List exact commands, sanitized configuration, target kind, and the smallest source that reproduces the problem."
+    validations:
+      required: true
+  - type: "textarea"
+    id: "expected"
+    attributes:
+      label: "Expected behavior"
+    validations:
+      required: true
+  - type: "textarea"
+    id: "actual"
+    attributes:
+      label: "Actual behavior and evidence"
+      description: "Include sanitized status, error code, deployment phase, logs, or screenshots."
+    validations:
+      required: true
+  - type: "textarea"
+    id: "environment"
+    attributes:
+      label: "Environment"
+      description: "OS, architecture, database driver, runtime target/provider, Docker version, and relevant network/proxy details."
+  - type: "checkboxes"
+    id: "checks"
+    attributes:
+      label: "Checks"
+      options:
+        - label: "I searched existing issues and pull requests."
+          required: true
+        - label: "I removed secrets, credentials, private endpoints, and customer data."
+          required: true
+        - label: "This is not a security vulnerability."
+          required: true

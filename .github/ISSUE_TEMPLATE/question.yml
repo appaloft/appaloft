@@ -1,0 +1,36 @@
+name: "Question"
+description: "Ask about a documented Appaloft workflow or boundary"
+title: "question: "
+labels:
+  - "question"
+body:
+  - type: "markdown"
+    attributes:
+      value: "Use this form after checking the public documentation. Include enough sanitized context for a reproducible answer."
+  - type: "textarea"
+    id: "goal"
+    attributes:
+      label: "What are you trying to do?"
+    validations:
+      required: true
+  - type: "textarea"
+    id: "attempted"
+    attributes:
+      label: "What have you tried?"
+      description: "Include relevant commands, documentation links, and sanitized output."
+    validations:
+      required: true
+  - type: "textarea"
+    id: "context"
+    attributes:
+      label: "Environment and constraints"
+      description: "Appaloft version, entry point, target/provider, OS, and ownership or self-hosting constraints."
+  - type: "checkboxes"
+    id: "checks"
+    attributes:
+      label: "Checks"
+      options:
+        - label: "I searched the documentation and existing issues."
+          required: true
+        - label: "I removed secrets, credentials, private endpoints, and customer data."
+          required: true

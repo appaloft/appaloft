@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: "Appaloft documentation"
+    url: "https://docs.appaloft.com/"
+    about: "Read task-oriented install, deploy, server, runtime, and recovery guidance."
+  - name: "Security vulnerability"
+    url: "https://github.com/appaloft/appaloft/security/policy"
+    about: "Follow the private reporting instructions. Do not open a public issue."

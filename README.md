@@ -4,13 +4,14 @@
   </a>
 
   <p><code>/ˌæp əˈlɔːft/</code></p>
-  <h3>From localhost to your VPS.</h3>
+  <h3>Deploy apps, Docker, and Compose to servers you own.</h3>
   <p>
-    <strong>A local-first AI native 1 file PaaS.</strong><br />
-    Start with one file, then deploy static sites, local projects, Git repos, Docker, and Compose apps.
-    Click through yourself, or let agents use MCP / skill.
+    <strong>An open source deployment control plane for developers, small teams, and AI coding agents.</strong><br />
+    Describe the workload once, deploy through CLI, GitHub Actions, Web, MCP, or an AI skill,
+    then verify it with health, logs, retry, and rollback evidence.
   </p>
   <p>
+    <a href="https://github.com/appaloft/examples/tree/main/hello">5-minute example</a> ·
     <a href="https://www.appaloft.com/en-US/">Website</a> ·
     <a href="https://app.appaloft.com">Cloud</a> ·
     <a href="https://docs.appaloft.com/en/">Docs</a> ·
@@ -20,8 +21,36 @@
 </div>
 
 <p align="center">
-  <img src="https://www.appaloft.com/images/appaloft-www-hero-overview.png" alt="Appaloft console overview" width="920" />
+  <img src="./docs/assets/appaloft-deploy-loop.gif" alt="Appaloft deploy, health verification, and public URL terminal demo" width="920" />
 </p>
+
+## Try The Hello Example In Five Minutes
+
+The official [`appaloft/examples/hello`](https://github.com/appaloft/examples/tree/main/hello)
+project is a dependency-free Node HTTP app with a Dockerfile, `appaloft.yml`, `/health`, and a small
+JSON API. Clone it and verify the workload before deploying:
+
+```bash
+git clone --depth 1 https://github.com/appaloft/examples.git
+cd examples/hello
+npm start
+```
+
+In another terminal:
+
+```bash
+curl -sS http://127.0.0.1:3000/health
+```
+
+Once Appaloft is installed and a target is selected, deploy the same directory through the one-file
+configuration:
+
+```bash
+appaloft deploy . --config appaloft.yml
+```
+
+The full example documents local Docker verification, public Git deployment, Cloud Console setup,
+health checks, and the exact source/runtime contract.
 
 ## What Is Appaloft?
 
@@ -50,11 +79,24 @@ curl -fsSL https://appaloft.com/install.sh | sudo sh
 Pin a release version:
 
 ```bash
-curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- --version 0.2.1
+curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- --version 1.0.1
 ```
 
 The installer verifies or installs Docker Engine and the Compose plugin, writes the self-hosted
 stack to `/opt/appaloft`, and starts the Appaloft backend, static console, and PostgreSQL.
+
+## Current Scope And Boundaries
+
+| Ready to try today | Current boundary |
+| --- | --- |
+| Local folders, public Git repositories, zip archives, prebuilt images, and Compose bundles | You provide or register the runtime target and the credentials needed to reach it. |
+| Workspace commands, Dockerfile, Docker Compose, prebuilt-image, and static-artifact plans | Provider capabilities vary; inspect the generated plan and target readiness before mutation. |
+| Local shell, generic SSH, and Docker Swarm runtime targets | Appaloft is a deployment control plane, not a general cloud-account or DNS-zone manager. |
+| CLI, HTTP API, Web console, GitHub Action, MCP, and AI skill entrypoints | External edge/DNS provider orchestration remains a governed post-1.0 track. |
+| Health, logs, diagnostics, retry, redeploy, rollback, and durable work observation | A successful command is not a substitute for workload, health, and access verification. |
+
+See [Providers](./docs/PROVIDERS.md), [Core operations](./docs/CORE_OPERATIONS.md), and the
+[product roadmap](./docs/PRODUCT_ROADMAP.md) for the current public contracts and planned work.
 
 ## Install Options
 
