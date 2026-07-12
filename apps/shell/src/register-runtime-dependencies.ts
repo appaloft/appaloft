@@ -20,6 +20,7 @@ import {
   LocalExecutionBackend,
   RoutingExecutionBackend,
   RuntimeControlShellCommandExecutor,
+  RuntimeDeploymentProofEvidenceReader,
   RuntimeResourceHealthProbeRunner,
   RuntimeResourceRuntimeControlTarget,
   RuntimeResourceRuntimeLogReader,
@@ -1668,6 +1669,9 @@ export function registerRuntimeDependencies(
           ),
         ),
     ),
+  });
+  container.register(tokens.deploymentProofRuntimeEvidenceReader, {
+    useClass: RuntimeDeploymentProofEvidenceReader,
   });
   container.register(tokens.resourceRuntimeLogReader, {
     useFactory: instanceCachingFactory(

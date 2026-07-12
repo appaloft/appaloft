@@ -221,6 +221,11 @@ Still blocking 1.0.0:
   compatibility, and active-attempt cancel evidence are synchronized in
   [Deployment Observation And Recovery Hardening](./specs/071-deployment-observation-and-recovery/spec.md)
   and [Pre-RC Closure And Hardening](./specs/073-pre-rc-closure/tasks.md).
+- [ ] Deployment Proof correctness hardening is governed as an additive post-RC capability by
+  [Deployment Proof](./specs/103-deployment-proof/spec.md) and
+  [ADR-087](./decisions/ADR-087-deployment-proof-boundary.md). The release gate requires one shared
+  API/CLI/SDK/MCP/Web schema, truthful adapter readback/gaps, and real Docker positive plus
+  health-200-but-unchanged-workload negative smoke evidence before it is marked complete.
 - [x] `deployments.create` progress stream remains create-time observation, and standalone
   replay/follow deployment observation is owned by `deployments.stream-events` with application,
   HTTP/oRPC, OpenAPI, SDK generator, and SDK executable evidence recorded in

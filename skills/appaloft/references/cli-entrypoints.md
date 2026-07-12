@@ -226,6 +226,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft deployments list` - `deployments.list`
 - `appaloft deployments count` - `deployments.count`
 - `appaloft deployments show <deploymentId>` - `deployments.show`
+- `appaloft deployments proof <deploymentId>` - `deployments.proof`
 - `appaloft deployments plan --project <projectId> --environment <environmentId> --resource <resourceId> --server <serverId> [--destination <destinationId>]` - `deployments.plan`
 - `appaloft deployments recovery-readiness <deploymentId>` - `deployments.recovery-readiness`
 - `appaloft deployments timeline <deploymentId>` - `deployments.timeline`

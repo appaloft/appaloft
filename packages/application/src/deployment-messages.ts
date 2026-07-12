@@ -7,6 +7,7 @@ export * from "./operations/deployments/count-deployments.query";
 export * from "./operations/deployments/create-deployment.command";
 export * from "./operations/deployments/deployment-plan.query";
 export * from "./operations/deployments/deployment-preview-access";
+export * from "./operations/deployments/deployment-proof.query";
 export * from "./operations/deployments/deployment-recovery-readiness.query";
 export * from "./operations/deployments/deployment-timeline.query";
 export * from "./operations/deployments/force-redeploy-deployment.command";

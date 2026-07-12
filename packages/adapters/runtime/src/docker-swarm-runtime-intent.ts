@@ -32,6 +32,7 @@ export interface DockerSwarmRuntimeIdentityInput {
   deploymentId: string;
   targetId: string;
   destinationId: string;
+  configurationFingerprint?: string;
 }
 
 export interface DockerSwarmRuntimeIntentInput {
@@ -245,6 +246,9 @@ function runtimeIdentityLabels(identity: DockerSwarmRuntimeIdentityInput): Recor
     "appaloft.target-id": identity.targetId,
     "appaloft.destination-id": identity.destinationId,
     "appaloft.runtime-target": "docker-swarm",
+    ...(identity.configurationFingerprint
+      ? { "appaloft.configuration-fingerprint": identity.configurationFingerprint }
+      : {}),
   };
 }
 

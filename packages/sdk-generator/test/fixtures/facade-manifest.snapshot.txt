@@ -57,12 +57,14 @@ appaloft.dependencyResources.count -> dependency-resources.count GET /dependency
 appaloft.dependencyResources.createBackup -> dependency-resources.create-backup POST /dependency-resources/{dependencyResourceId}/backups
 appaloft.dependencyResources.delete -> dependency-resources.delete DELETE /dependency-resources/{dependencyResourceId}
 appaloft.dependencyResources.import -> dependency-resources.import POST /dependency-resources/import
+appaloft.dependencyResources.inspect -> dependency-resources.inspect GET /dependency-resources/{dependencyResourceId}/inspect
 appaloft.dependencyResources.list -> dependency-resources.list GET /dependency-resources
 appaloft.dependencyResources.listBackups -> dependency-resources.list-backups GET /dependency-resources/{dependencyResourceId}/backups
 appaloft.dependencyResources.provision -> dependency-resources.provision POST /dependency-resources/provision
 appaloft.dependencyResources.provisioning.accept -> dependency-resources.provisioning.accept POST /dependency-resources/provisioning/{planId}/accept
 appaloft.dependencyResources.provisioning.plan -> dependency-resources.provisioning.plan POST /dependency-resources/provisioning/plan
 appaloft.dependencyResources.provisioning.status -> dependency-resources.provisioning.status GET /dependency-resources/provisioning/{planId}
+appaloft.dependencyResources.query -> dependency-resources.query POST /dependency-resources/{dependencyResourceId}/query
 appaloft.dependencyResources.rename -> dependency-resources.rename POST /dependency-resources/{dependencyResourceId}/rename
 appaloft.dependencyResources.restoreBackup -> dependency-resources.restore-backup POST /dependency-resources/backups/{backupId}/restore
 appaloft.dependencyResources.show -> dependency-resources.show GET /dependency-resources/{dependencyResourceId}
@@ -80,6 +82,7 @@ appaloft.deployments.create -> deployments.create POST /deployments
 appaloft.deployments.forceRedeploy -> deployments.force-redeploy POST /resources/{resourceId}/force-redeploy
 appaloft.deployments.list -> deployments.list GET /deployments
 appaloft.deployments.plan -> deployments.plan GET /deployments/plan
+appaloft.deployments.proof -> deployments.proof GET /deployments/{deploymentId}/proof
 appaloft.deployments.prune -> deployments.prune POST /deployments/prune
 appaloft.deployments.recoveryReadiness -> deployments.recovery-readiness GET /deployments/{deploymentId}/recovery-readiness
 appaloft.deployments.redeploy -> deployments.redeploy POST /resources/{resourceId}/redeploy

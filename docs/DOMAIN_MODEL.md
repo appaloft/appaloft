@@ -632,6 +632,10 @@ Boundary rule:
 - deployment success is not current resource health. Attempt-time verification can feed resource
   health observation, but the long-lived current health view belongs to Workload Delivery read
   models such as `ResourceHealthSummary`.
+- `DeploymentProof` is a read-only Release Orchestration result that compares one immutable
+  Deployment plan with current sanitized artifact/runtime, Resource health/access, timeline, and
+  recovery evidence. It is not Deployment aggregate state, a deployment mutation, or a replacement
+  for the owning read models. Missing evidence cannot produce a `verified` verdict.
 - deployments are displayed under the Resource that owns them; global or project-level deployment
   pages are read/query rollups
 - deployment logs are attempt/progress records; application runtime logs are resource-owned
@@ -1078,6 +1082,8 @@ Rules:
 
 Current scope:
 - state machine for plan -> run -> verify -> rollback
+- machine-readable `deployments.proof` comparison of the immutable plan with current bounded
+  evidence, using `verified`, `partially-verified`, `unverified`, `stale`, and `failed`
 - belongs to exactly one `Resource`
 - carries both `destinationId` and `serverId`; `serverId` remains in persisted shape for transport
   compatibility and efficient target lookup

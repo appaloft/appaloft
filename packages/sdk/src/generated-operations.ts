@@ -637,6 +637,7 @@ export const generatedSdkOperations = [
       method: "POST",
       path: "/connections/capabilities/accept",
     },
+    docsHref: "/docs/integrations/connections/#connections-model",
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -655,6 +656,7 @@ export const generatedSdkOperations = [
       method: "POST",
       path: "/connections/capabilities/apply",
     },
+    docsHref: "/docs/integrations/connections/#connections-model",
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -673,6 +675,7 @@ export const generatedSdkOperations = [
       method: "POST",
       path: "/connections/capabilities/plan",
     },
+    docsHref: "/docs/integrations/connections/#connections-model",
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -691,6 +694,7 @@ export const generatedSdkOperations = [
       method: "GET",
       path: "/connections/catalog",
     },
+    docsHref: "/docs/integrations/connections/#connections-model",
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -709,6 +713,7 @@ export const generatedSdkOperations = [
       method: "GET",
       path: "/connections/categories",
     },
+    docsHref: "/docs/integrations/connections/#connections-model",
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -727,6 +732,7 @@ export const generatedSdkOperations = [
       method: "POST",
       path: "/connections/connect/callback",
     },
+    docsHref: "/docs/integrations/connections/#connections-model",
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -745,6 +751,7 @@ export const generatedSdkOperations = [
       method: "POST",
       path: "/connections/connect/start",
     },
+    docsHref: "/docs/integrations/connections/#connections-model",
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -763,6 +770,7 @@ export const generatedSdkOperations = [
       method: "GET",
       path: "/connections",
     },
+    docsHref: "/docs/integrations/connections/#connections-model",
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -781,6 +789,7 @@ export const generatedSdkOperations = [
       method: "POST",
       path: "/connections/{connectionId}/revoke",
     },
+    docsHref: "/docs/integrations/connections/#connections-model",
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -799,6 +808,7 @@ export const generatedSdkOperations = [
       method: "GET",
       path: "/connections/{connectionId}",
     },
+    docsHref: "/docs/integrations/connections/#connections-model",
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -817,6 +827,7 @@ export const generatedSdkOperations = [
       method: "GET",
       path: "/connections/{connectionId}/status",
     },
+    docsHref: "/docs/integrations/connections/#connections-model",
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -1108,6 +1119,24 @@ export const generatedSdkOperations = [
     facadeDefault: true,
   },
   {
+    operationKey: "dependency-resources.inspect",
+    operationGroup: "dependency-resources",
+    operationMethod: "inspect",
+    facadePath: ["dependencyResources", "inspect"],
+    operationId: "dependency-resources.inspect",
+    kind: "query",
+    domain: "dependency-resources",
+    messageName: "InspectDependencyResourceQuery",
+    route: {
+      method: "GET",
+      path: "/dependency-resources/{dependencyResourceId}/inspect",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
     operationKey: "dependency-resources.list",
     operationGroup: "dependency-resources",
     operationMethod: "list",
@@ -1216,6 +1245,24 @@ export const generatedSdkOperations = [
       path: "/dependency-resources/provisioning/{planId}",
     },
     docsHref: "/docs/resources/dependencies/#dependency-resource-lifecycle",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "dependency-resources.query",
+    operationGroup: "dependency-resources",
+    operationMethod: "query",
+    facadePath: ["dependencyResources", "query"],
+    operationId: "dependency-resources.query",
+    kind: "query",
+    domain: "dependency-resources",
+    messageName: "QueryDependencyResourceQuery",
+    route: {
+      method: "POST",
+      path: "/dependency-resources/{dependencyResourceId}/query",
+    },
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -1507,6 +1554,25 @@ export const generatedSdkOperations = [
     facadeDefault: false,
   },
   {
+    operationKey: "deployments.force-redeploy",
+    operationGroup: "deployments",
+    operationMethod: "forceRedeploy",
+    facadePath: ["deployments", "forceRedeploy"],
+    operationId: "deployments.forceRedeploy",
+    kind: "command",
+    domain: "deployments",
+    messageName: "ForceRedeployDeploymentCommand",
+    route: {
+      method: "POST",
+      path: "/resources/{resourceId}/force-redeploy",
+    },
+    docsHref: "/docs/deploy/recovery/#deployment-recovery-readiness",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
     operationKey: "deployments.list",
     operationGroup: "deployments",
     operationMethod: "list",
@@ -1539,6 +1605,25 @@ export const generatedSdkOperations = [
       path: "/deployments/plan",
     },
     docsHref: "/docs/deploy/lifecycle/#deployment-plan-preview",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "deployments.proof",
+    operationGroup: "deployments",
+    operationMethod: "proof",
+    facadePath: ["deployments", "proof"],
+    operationId: "deployments.proof",
+    kind: "query",
+    domain: "deployments",
+    messageName: "DeploymentProofQuery",
+    route: {
+      method: "GET",
+      path: "/deployments/{deploymentId}/proof",
+    },
+    docsHref: "/docs/deploy/lifecycle/#deployment-proof",
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -1596,25 +1681,6 @@ export const generatedSdkOperations = [
       path: "/resources/{resourceId}/redeploy",
     },
     docsHref: "/docs/deploy/recovery/#deployment-recovery-readiness",
-    authPolicy: "product-session",
-    errorFamily: "structured-platform-error",
-    streaming: false,
-    facadeDefault: true,
-  },
-  {
-    operationKey: "deployments.force-redeploy",
-    operationGroup: "deployments",
-    operationMethod: "forceRedeploy",
-    facadePath: ["deployments", "forceRedeploy"],
-    operationId: "deployments.forceRedeploy",
-    kind: "command",
-    domain: "deployments",
-    messageName: "ForceRedeployDeploymentCommand",
-    route: {
-      method: "POST",
-      path: "/resources/{resourceId}/force-redeploy",
-    },
-    docsHref: "/docs/deploy/recovery/#deployment-recovery-force-redeploy",
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -1823,6 +1889,26 @@ export const generatedSdkOperations = [
       method: "POST",
       path: "/domain-bindings/{domainBindingId}/dns-plan",
     },
+    docsHref: "/docs/access/domains/ownership/#domain-binding-ownership-check",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "domain-bindings.dns-readiness.inspect",
+    operationGroup: "domain-bindings",
+    operationMethod: "dnsReadinessInspect",
+    facadePath: ["domainBindings", "dnsReadiness", "inspect"],
+    operationId: "domainBindings.inspectDnsReadiness",
+    kind: "query",
+    domain: "domain-bindings",
+    messageName: "InspectDomainBindingDnsReadinessQuery",
+    route: {
+      method: "POST",
+      path: "/domain-bindings/dns-readiness/inspect",
+    },
+    docsHref: "/docs/access/domains/ownership/#domain-binding-ownership-check",
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -2032,6 +2118,7 @@ export const generatedSdkOperations = [
       method: "GET",
       path: "/environments/{environmentId}/diff-profile/{targetEnvironmentId}",
     },
+    docsHref: "/docs/environments/changes/diff-promote/#environment-diff",
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -2050,6 +2137,7 @@ export const generatedSdkOperations = [
       method: "POST",
       path: "/environments/{environmentId}/duplicate-profile",
     },
+    docsHref: "/docs/environments/changes/diff-promote/#environment-diff",
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -2125,6 +2213,7 @@ export const generatedSdkOperations = [
       method: "GET",
       path: "/environments/{environmentId}/duplicate-plan",
     },
+    docsHref: "/docs/environments/changes/diff-promote/#environment-diff",
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -2219,6 +2308,7 @@ export const generatedSdkOperations = [
       method: "POST",
       path: "/environments/{environmentId}/sync-profile/{targetEnvironmentId}",
     },
+    docsHref: "/docs/environments/changes/diff-promote/#environment-diff",
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -5436,6 +5526,7 @@ export interface GeneratedAppaloftClient {
     readonly createBackup: AppaloftSdkFacadeMethod;
     readonly delete: AppaloftSdkFacadeMethod;
     readonly import: AppaloftSdkFacadeMethod;
+    readonly inspect: AppaloftSdkFacadeMethod;
     readonly list: AppaloftSdkFacadeMethod;
     readonly listBackups: AppaloftSdkFacadeMethod;
     readonly provision: AppaloftSdkFacadeMethod;
@@ -5444,6 +5535,7 @@ export interface GeneratedAppaloftClient {
       readonly plan: AppaloftSdkFacadeMethod;
       readonly status: AppaloftSdkFacadeMethod;
     };
+    readonly query: AppaloftSdkFacadeMethod;
     readonly rename: AppaloftSdkFacadeMethod;
     readonly restoreBackup: AppaloftSdkFacadeMethod;
     readonly show: AppaloftSdkFacadeMethod;
@@ -5458,6 +5550,7 @@ export interface GeneratedAppaloftClient {
     readonly forceRedeploy: AppaloftSdkFacadeMethod;
     readonly list: AppaloftSdkFacadeMethod;
     readonly plan: AppaloftSdkFacadeMethod;
+    readonly proof: AppaloftSdkFacadeMethod;
     readonly prune: AppaloftSdkFacadeMethod;
     readonly recoveryReadiness: AppaloftSdkFacadeMethod;
     readonly redeploy: AppaloftSdkFacadeMethod;
@@ -5482,6 +5575,9 @@ export interface GeneratedAppaloftClient {
     readonly delete: AppaloftSdkFacadeMethod;
     readonly deleteCheck: AppaloftSdkFacadeMethod;
     readonly dnsPlan: AppaloftSdkFacadeMethod;
+    readonly dnsReadiness: {
+      readonly inspect: AppaloftSdkFacadeMethod;
+    };
     readonly list: AppaloftSdkFacadeMethod;
     readonly retryVerification: AppaloftSdkFacadeMethod;
     readonly show: AppaloftSdkFacadeMethod;

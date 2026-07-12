@@ -7,6 +7,7 @@ export * from "./operations/deployments/count-deployments.handler";
 export * from "./operations/deployments/count-deployments.query-service";
 export * from "./operations/deployments/create-deployment.handler";
 export * from "./operations/deployments/deployment-plan.handler";
+export * from "./operations/deployments/deployment-proof.handler";
 export * from "./operations/deployments/deployment-recovery-readiness.handler";
 export * from "./operations/deployments/deployment-timeline.handler";
 export * from "./operations/deployments/deployment-timeline.query-service";

@@ -21,6 +21,7 @@
   } from "@lucide/svelte";
   import {
     type DeploymentDetailSummary,
+    type DeploymentProofResponse,
     type DeploymentRecoveryReadinessResponse,
     type DeploymentProgressEvent,
     type DeploymentTimelineEnvelope,
@@ -171,6 +172,13 @@
       staleTime: 5_000,
     }),
   );
+  const deploymentProofQuery = createQuery(() =>
+    orpc.deployments.proof.queryOptions({
+      input: { deploymentId },
+      enabled: browser && deploymentId.length > 0,
+      staleTime: 5_000,
+    }),
+  );
   const deploymentRecoveryReadinessQuery = createQuery(() =>
     orpc.deployments.recoveryReadiness.queryOptions({
       input: {
@@ -213,6 +221,7 @@
   const listedDeployment = $derived(findDeployment(deployments, deploymentId));
   const headerDeployment = $derived(deployment ?? listedDeployment);
   const recoveryReadiness = $derived(deploymentRecoveryReadinessQuery.data ?? null);
+  const deploymentProof = $derived(deploymentProofQuery.data ?? null);
   const queryDeploymentTimeline = $derived(deploymentTimelineEntries(deploymentTimelineQuery.data));
   const deploymentTimeline = $derived(
     queryDeploymentTimeline.length > 0 ? queryDeploymentTimeline : replayDeploymentTimelineEntries,
@@ -760,6 +769,16 @@
         return $t(i18nKeys.console.deployments.recoveryReasonCommandNotActive);
       default:
         return reasonCode;
+    }
+  }
+
+  function proofVerdictLabel(verdict: DeploymentProofResponse["verdict"]): string {
+    switch (verdict) {
+      case "verified": return $t(i18nKeys.console.deployments.proofVerdictVerified);
+      case "partially-verified": return $t(i18nKeys.console.deployments.proofVerdictPartiallyVerified);
+      case "unverified": return $t(i18nKeys.console.deployments.proofVerdictUnverified);
+      case "stale": return $t(i18nKeys.console.deployments.proofVerdictStale);
+      case "failed": return $t(i18nKeys.console.deployments.proofVerdictFailed);
     }
   }
 
@@ -1973,6 +1992,94 @@
                 {/if}
               </div>
             </div>
+          </section>
+
+          <section class="console-panel p-4" data-testid="deployment-proof">
+            <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div class="space-y-2">
+                <h2 class="text-lg font-semibold">{$t(i18nKeys.console.deployments.proofTitle)}</h2>
+                <p class="text-sm leading-6 text-muted-foreground">
+                  {$t(i18nKeys.console.deployments.proofDescription)}
+                </p>
+              </div>
+              {#if deploymentProof}
+                <Badge variant={deploymentProof.verdict === "verified" ? "secondary" : "outline"}>
+                  {proofVerdictLabel(deploymentProof.verdict)}
+                </Badge>
+              {:else if deploymentProofQuery.isPending}
+                <Skeleton class="h-6 w-32" />
+              {/if}
+            </div>
+
+            {#if deploymentProof}
+              <div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4" data-deployment-proof-dimensions>
+                <div class="console-subtle-panel min-w-0 p-3">
+                  <p class="text-xs font-medium text-muted-foreground">{$t(i18nKeys.console.deployments.proofSource)}</p>
+                  <p class="mt-1 truncate text-sm">{deploymentProof.planned.source.reference}</p>
+                  <p class="truncate font-mono text-xs text-muted-foreground">{deploymentProof.planned.source.revision ?? "—"}</p>
+                </div>
+                <div class="console-subtle-panel min-w-0 p-3">
+                  <p class="text-xs font-medium text-muted-foreground">{$t(i18nKeys.console.deployments.proofArtifact)}</p>
+                  <p class="mt-1 truncate text-sm">{deploymentProof.planned.artifact.reference ?? "—"}</p>
+                  <p class="truncate font-mono text-xs text-muted-foreground">{deploymentProof.observed.artifact.resolvedIdentity ?? "—"}</p>
+                </div>
+                <div class="console-subtle-panel min-w-0 p-3">
+                  <p class="text-xs font-medium text-muted-foreground">{$t(i18nKeys.console.deployments.proofConfiguration)}</p>
+                  <p class="mt-1 truncate font-mono text-xs">{deploymentProof.planned.configuration.fingerprint}</p>
+                  <p class="truncate font-mono text-xs text-muted-foreground">{deploymentProof.observed.configuration.fingerprint ?? "—"}</p>
+                </div>
+                <div class="console-subtle-panel min-w-0 p-3">
+                  <p class="text-xs font-medium text-muted-foreground">{$t(i18nKeys.console.deployments.proofRuntime)}</p>
+                  <p class="mt-1 truncate text-sm">{deploymentProof.observed.workload.identity ?? "—"}</p>
+                  <p class="truncate font-mono text-xs text-muted-foreground">{deploymentProof.observed.workload.generation ?? "—"}</p>
+                </div>
+                <div class="console-subtle-panel min-w-0 p-3">
+                  <p class="text-xs font-medium text-muted-foreground">{$t(i18nKeys.console.deployments.proofHealth)}</p>
+                  <p class="mt-1 text-sm">{deploymentProof.observed.health.status}</p>
+                  <p class="text-xs text-muted-foreground">{deploymentProof.observed.health.summary}</p>
+                </div>
+                <div class="console-subtle-panel min-w-0 p-3">
+                  <p class="text-xs font-medium text-muted-foreground">{$t(i18nKeys.console.deployments.proofAccess)}</p>
+                  <p class="mt-1 text-sm">{deploymentProof.observed.access.status}</p>
+                  <p class="text-xs text-muted-foreground">{deploymentProof.observed.access.summary}</p>
+                </div>
+                <div class="console-subtle-panel min-w-0 p-3">
+                  <p class="text-xs font-medium text-muted-foreground">{$t(i18nKeys.console.deployments.proofRecovery)}</p>
+                  <p class="mt-1 text-sm">{deploymentProof.observed.recovery.previousRuntimeRetained ? $t(i18nKeys.console.deployments.proofRecoveryRetained) : $t(i18nKeys.console.deployments.proofRecoveryUnavailable)}</p>
+                  <p class="truncate font-mono text-xs text-muted-foreground">{deploymentProof.observed.recovery.rollbackCandidateDeploymentId ?? "—"}</p>
+                </div>
+                <div class="console-subtle-panel min-w-0 p-3">
+                  <p class="text-xs font-medium text-muted-foreground">{$t(i18nKeys.console.deployments.proofExpectedEffects)}</p>
+                  <p class="mt-1 text-sm">{deploymentProof.planned.expectedEffects.join(", ")}</p>
+                </div>
+              </div>
+
+              {#if deploymentProof.mismatches.length > 0}
+                <div class="mt-4 space-y-2" data-deployment-proof-mismatches>
+                  <h3 class="text-sm font-semibold">{$t(i18nKeys.console.deployments.proofMismatches)}</h3>
+                  {#each deploymentProof.mismatches as item (item.reasonCode)}
+                    <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm">
+                      <p class="font-mono text-xs">{item.reasonCode}</p>
+                      <p class="mt-1 text-muted-foreground">{item.expected} → {item.observed ?? "unavailable"}</p>
+                      <p class="mt-1 text-xs">{item.recommendedOperations.join(" · ")}</p>
+                    </div>
+                  {/each}
+                </div>
+              {/if}
+
+              {#if deploymentProof.unavailableEvidence.length > 0}
+                <div class="mt-4 space-y-2" data-deployment-proof-unavailable>
+                  <h3 class="text-sm font-semibold">{$t(i18nKeys.console.deployments.proofUnavailable)}</h3>
+                  {#each deploymentProof.unavailableEvidence as item (`${item.kind}:${item.reasonCode}`)}
+                    <div class="rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground">
+                      <span class="font-mono text-xs">{item.reasonCode}</span> · {item.summary}
+                    </div>
+                  {/each}
+                </div>
+              {/if}
+            {:else if deploymentProofQuery.error}
+              <p class="mt-4 text-sm text-destructive">{readErrorMessage(deploymentProofQuery.error)}</p>
+            {/if}
           </section>
 
           {#if deploymentRecoveryReadinessQuery.isPending}
