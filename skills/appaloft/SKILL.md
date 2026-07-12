@@ -60,7 +60,10 @@ surface available in the session.
 ## Common Workflows
 
 - First deployment: inspect source safely, create or select project/server/environment/resource,
-  plan when useful, deploy, watch progress, and return URL plus diagnostics.
+  plan when useful, deploy, watch progress, read `deployments.proof`, and return URL plus
+  diagnostics. A terminal deployment status or green CI run is not machine-verifiable success.
+  Claim success only when the proof verdict is `verified`; describe `partially-verified`,
+  `unverified`, `stale`, or `failed` as the explicit evidence gap or failure they represent.
 - Deployment progress observation is a core deploy step. For one deployment attempt, follow
   `appaloft deployments timeline <deploymentId> --follow --json` and use deployment timeline entries for log
   lines. For a parent durable work item that coordinates multiple resources or child deployments,

@@ -67,6 +67,12 @@ Verify failure does not always mean the process failed to start. It may be healt
 
 Use `appaloft deployments timeline <deploymentId> --follow --json` when you need a structured replay or live timeline stream after the original deploy command has disconnected. The stream can return entry, heartbeat, gap, closed, or error envelopes; a gap means re-open observation or inspect deployment detail before choosing recovery.
 
+<h3 id="deployment-proof">Deployment proof</h3>
+
+Run `appaloft deployments proof <deploymentId> --json` or read `GET /api/deployments/{deploymentId}/proof` when automation needs to know whether the accepted source, artifact, and configuration became the workload observed now.
+
+The result distinguishes `verified`, `partially-verified`, `unverified`, `stale`, and `failed`. It compares safe source/artifact/configuration fingerprints with resolved runtime identity, workload generation, health, access-route ownership, and recovery evidence. Missing adapter evidence is reported as unavailable and never counts as verified. A healthy old workload can therefore remain healthy while the attempted deployment proof fails or becomes stale.
+
 <h3 id="deployment-rollback">Rollback</h3>
 
 Rollback is the recovery path after failure. It should not hide failure as success.

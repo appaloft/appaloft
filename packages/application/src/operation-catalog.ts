@@ -67,6 +67,7 @@ import { cleanupPreviewCommandInputSchema } from "./operations/deployments/clean
 import { countDeploymentsQueryInputSchema } from "./operations/deployments/count-deployments.query";
 import { createDeploymentCommandInputSchema } from "./operations/deployments/create-deployment.command";
 import { deploymentPlanQueryInputSchema } from "./operations/deployments/deployment-plan.query";
+import { deploymentProofQueryInputSchema } from "./operations/deployments/deployment-proof.query";
 import { deploymentRecoveryReadinessQueryInputSchema } from "./operations/deployments/deployment-recovery-readiness.query";
 import { deploymentTimelineQueryInputSchema } from "./operations/deployments/deployment-timeline.query";
 import { forceRedeployDeploymentCommandInputSchema } from "./operations/deployments/force-redeploy-deployment.command";
@@ -3313,6 +3314,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft deployments plan --project <projectId> --environment <environmentId> --resource <resourceId> --server <serverId> [--destination <destinationId>]",
       orpc: { method: "GET", path: "/api/deployments/plan" },
+    },
+  },
+  {
+    key: "deployments.proof",
+    kind: "query",
+    domain: "deployments",
+    messageName: "DeploymentProofQuery",
+    handlerName: "DeploymentProofQueryHandler",
+    serviceName: "DeploymentProofQueryService",
+    inputSchema: deploymentProofQueryInputSchema,
+    serviceToken: tokens.deploymentProofQueryService,
+    transports: {
+      cli: "appaloft deployments proof <deploymentId>",
+      orpc: { method: "GET", path: "/api/deployments/{deploymentId}/proof" },
     },
   },
   {

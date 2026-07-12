@@ -222,7 +222,7 @@
       "id": "appaloft-skill-first-deploy-outcome",
       "family": "first-deploy-and-outcome",
       "prompt": "Deploy this repository with Appaloft and return the live URL, deployment id, resource id, logs command, diagnostics command, and recovery command.",
-      "expected_output": "A first-deploy sequence that safely inspects source, chooses CLI/API/Web/MCP surface, creates or selects project/server/environment/resource context, plans/deploys, observes, and returns an outcome packet.",
+      "expected_output": "A first-deploy sequence that safely inspects source, chooses CLI/API/Web/MCP surface, creates or selects project/server/environment/resource context, plans/deploys, observes, reads deployment proof, and only claims success for a verified verdict.",
       "expected_operations": [
         "projects.create",
         "servers.register",
@@ -231,6 +231,7 @@
         "deployments.plan",
         "deployments.create",
         "deployments.show",
+        "deployments.proof",
         "deployments.timeline.stream",
         "deployments.timeline",
         "resources.diagnostic-summary",
@@ -240,6 +241,7 @@
         "docs/agent/appaloft-deploy-skill.md",
         "docs/workflows/quick-deploy.md",
         "docs/workflows/deployments.create.md",
+        "docs/workflows/deployment-proof.md",
         "docs/testing/quick-deploy-test-matrix.md",
         "skills/appaloft/references/deploy-protocol.md"
       ],
@@ -247,7 +249,8 @@
         "Performs safe source inspection without reading .env, keys, tokens, cookies, or provider credentials.",
         "Uses existing Appaloft operations and does not invent quick-deploy.create.",
         "Treats deployment progress observation as part of deploy and follows deployment events instead of relying only on a final snapshot.",
-        "Returns URL/access state first, followed by ids, progress stream, logs, diagnostics, and recovery readiness."
+        "Reads deployments.proof after progress observation and claims success only for a verified verdict.",
+        "Returns URL/access state first, followed by proof verdict, ids, progress stream, logs, diagnostics, and recovery readiness."
       ]
     },
     {

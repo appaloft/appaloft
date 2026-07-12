@@ -5782,6 +5782,151 @@ export const deploymentRecoveryReadinessReasonSchema = z.object({
   recommendation: z.string().optional(),
 });
 
+export const deploymentProofVerdictSchema = z.enum([
+  "verified",
+  "partially-verified",
+  "unverified",
+  "stale",
+  "failed",
+]);
+export const deploymentProofEvidenceReferenceSchema = z.object({
+  kind: z.enum([
+    "timeline-entry",
+    "runtime-readback",
+    "artifact-identity",
+    "health-observation",
+    "access-observation",
+    "recovery-readiness",
+  ]),
+  reference: z.string(),
+  summary: z.string(),
+  observedAt: z.string().optional(),
+});
+export const deploymentProofRuntimeEvidenceSchema = z.object({
+  available: z.boolean(),
+  observedAt: z.string(),
+  artifact: z.object({
+    available: z.boolean(),
+    reference: z.string().optional(),
+    resolvedIdentity: z.string().optional(),
+    reasonCode: z.string().optional(),
+  }),
+  workload: z.object({
+    available: z.boolean(),
+    identity: z.string().optional(),
+    generation: z.string().optional(),
+    deploymentId: z.string().optional(),
+    startedAt: z.string().optional(),
+    reasonCode: z.string().optional(),
+  }),
+  configuration: z.object({
+    available: z.boolean(),
+    fingerprint: z.string().optional(),
+    generation: z.string().optional(),
+    matchesPlanned: z.boolean().optional(),
+    reasonCode: z.string().optional(),
+  }),
+  health: z.object({
+    status: z.enum(["passed", "failed", "skipped", "unavailable"]),
+    summary: z.string(),
+    reasonCode: z.string().optional(),
+  }),
+  access: z.object({
+    status: z.enum(["passed", "failed", "skipped", "unavailable"]),
+    summary: z.string(),
+    reasonCode: z.string().optional(),
+    routeTargetsWorkload: z.boolean().optional(),
+  }),
+  recovery: z.object({
+    previousRuntimeRetained: z.boolean().optional(),
+    rollbackCandidateDeploymentId: z.string().optional(),
+    reasonCode: z.string().optional(),
+  }),
+  reasonCode: z.string().optional(),
+});
+export const deploymentProofReasonCodeSchema = z.enum([
+  "deployment_not_succeeded",
+  "artifact_identity_unavailable",
+  "artifact_identity_mismatch",
+  "runtime_readback_unavailable",
+  "workload_identity_unavailable",
+  "workload_generation_mismatch",
+  "configuration_evidence_unavailable",
+  "configuration_fingerprint_mismatch",
+  "internal_health_unavailable",
+  "internal_health_failed",
+  "public_access_unavailable",
+  "public_access_failed",
+  "access_route_workload_mismatch",
+  "recovery_evidence_unavailable",
+]);
+export const deploymentProofInputSchema = z.object({
+  deploymentId: z.string().min(1),
+  resourceId: z.string().min(1).optional(),
+});
+export const deploymentProofResponseSchema = z.object({
+  schemaVersion: z.literal("deployments.proof/v1"),
+  deploymentId: z.string(),
+  resourceId: z.string(),
+  verdict: deploymentProofVerdictSchema,
+  planned: z.object({
+    source: z.object({ reference: z.string(), revision: z.string().optional() }),
+    artifact: z.object({
+      intent: z.enum(["build-image", "prebuilt-image", "compose-project"]).optional(),
+      reference: z.string().optional(),
+    }),
+    resourceProfile: z.object({ fingerprint: z.string() }),
+    configuration: z.object({ fingerprint: z.string() }),
+    runtimeTarget: z.object({
+      kind: z.enum(["single-server", "orchestrator-cluster", "serverless-provider"]),
+      providerKey: z.string(),
+    }),
+    verificationSteps: z.array(
+      z.object({ kind: z.enum(["internal-http", "public-http"]), label: z.string() }),
+    ),
+    expectedEffects: z.array(
+      z.enum([
+        "rebuild-artifact",
+        "replace-workload",
+        "restart-workload",
+        "apply-route",
+        "verify-health-policy",
+        "no-runtime-change",
+      ]),
+    ),
+  }),
+  observed: deploymentProofRuntimeEvidenceSchema,
+  mismatches: z.array(
+    z.object({
+      reasonCode: deploymentProofReasonCodeSchema,
+      severity: z.enum(["warning", "error", "critical"]),
+      expected: z.string(),
+      observed: z.string().optional(),
+      evidence: z.array(deploymentProofEvidenceReferenceSchema),
+      recommendedOperations: z.array(
+        z.enum([
+          "deployments.retry",
+          "deployments.redeploy",
+          "deployments.force-redeploy",
+          "deployments.rollback",
+          "deployments.timeline",
+          "resources.diagnostic-summary",
+        ]),
+      ),
+    }),
+  ),
+  evidence: z.array(deploymentProofEvidenceReferenceSchema),
+  unavailableEvidence: z.array(
+    z.object({
+      kind: z.enum(["artifact", "workload", "configuration", "health", "access", "recovery"]),
+      reasonCode: z.string(),
+      summary: z.string(),
+    }),
+  ),
+  generatedAt: z.string(),
+  stateVersion: z.string(),
+});
+
 export const deploymentRecoveryActionReadinessSchema = z.object({
   allowed: z.boolean(),
   commandActive: z.boolean(),
@@ -7643,6 +7788,8 @@ export type DeploymentRecoveryReadinessInput = z.infer<
 export type DeploymentRecoveryReadinessResponse = z.infer<
   typeof deploymentRecoveryReadinessResponseSchema
 >;
+export type DeploymentProofInput = z.infer<typeof deploymentProofInputSchema>;
+export type DeploymentProofResponse = z.infer<typeof deploymentProofResponseSchema>;
 export type DeploymentPlanInput = z.infer<typeof deploymentPlanInputSchema>;
 export type DeploymentPlanReasonCode = z.infer<typeof deploymentPlanReasonCodeSchema>;
 export type DeploymentPlanReason = z.infer<typeof deploymentPlanReasonSchema>;

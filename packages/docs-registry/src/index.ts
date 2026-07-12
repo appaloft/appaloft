@@ -424,12 +424,40 @@ export const publicDocsHelpTopics = {
     },
     surfaces: ["web", "cli", "http-api", "mcp"],
     relatedOperation: "deployments.create",
-    aliases: ["deploy", "deployment", "verify", "rollback", "部署", "回滚"],
+    aliases: ["deploy", "deployment", "verify", "proof", "rollback", "部署", "部署证明", "回滚"],
     specReferences: [
       "docs/queries/deployments.timeline.md",
       "docs/testing/deployment-timeline-journal-test-matrix.md",
       "docs/specs/095-deployment-timeline-journal/spec.md",
       "docs/decisions/ADR-084-deployment-timeline-journal-boundary.md",
+      "docs/queries/deployments.proof.md",
+      "docs/testing/deployment-proof-test-matrix.md",
+      "docs/specs/103-deployment-proof/spec.md",
+      "docs/decisions/ADR-087-deployment-proof-boundary.md",
+    ],
+  },
+  "deployment.proof": {
+    id: "deployment.proof",
+    title: "Deployment proof",
+    description:
+      "How deployment intent is reconciled with artifact, workload, configuration, health, access, and recovery readback.",
+    page: {
+      "zh-CN": "deploy/lifecycle",
+      "en-US": "en/deploy/lifecycle",
+    },
+    anchor: "deployment-proof",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["web", "cli", "http-api", "mcp"],
+    relatedOperation: "deployments.proof",
+    aliases: ["deployment proof", "runtime proof", "verified deployment", "部署证明"],
+    specReferences: [
+      "docs/queries/deployments.proof.md",
+      "docs/testing/deployment-proof-test-matrix.md",
+      "docs/specs/103-deployment-proof/spec.md",
+      "docs/decisions/ADR-087-deployment-proof-boundary.md",
     ],
   },
   "deployment.source": {
@@ -3865,6 +3893,7 @@ export const publicDocsOperationCoverage = [
   { operationKey: "deployments.list", status: "documented", topicId: "deployment.lifecycle" },
   { operationKey: "deployments.count", status: "documented", topicId: "deployment.lifecycle" },
   { operationKey: "deployments.show", status: "documented", topicId: "deployment.lifecycle" },
+  { operationKey: "deployments.proof", status: "documented", topicId: "deployment.proof" },
   { operationKey: "deployments.plan", status: "documented", topicId: "deployment.plan-preview" },
   {
     operationKey: "deployments.recovery-readiness",

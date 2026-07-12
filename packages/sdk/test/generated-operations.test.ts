@@ -3,6 +3,15 @@ import { describe, expect, test } from "bun:test";
 import { generatedSdkOperations } from "../src/internal";
 
 describe("generated SDK operation metadata", () => {
+  test("[DEP-PROOF-CONTRACT-001] exposes deployment proof metadata", () => {
+    expect(
+      generatedSdkOperations.find((item) => item.operationKey === "deployments.proof"),
+    ).toMatchObject({
+      kind: "query",
+      messageName: "DeploymentProofQuery",
+      route: { method: "GET", path: "/deployments/{deploymentId}/proof" },
+    });
+  });
   test("[RT-MON-002][RT-MON-003][TS-SDK-GEN-001] exposes runtime monitoring read operations", () => {
     expect(
       generatedSdkOperations.find(

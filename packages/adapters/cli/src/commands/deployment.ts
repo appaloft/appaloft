@@ -7,6 +7,7 @@ import {
   CreateDeploymentCommand,
   type CreateDeploymentCommandInput,
   DeploymentPlanQuery,
+  DeploymentProofQuery,
   DeploymentRecoveryReadinessQuery,
   type DeploymentSummary,
   DeploymentTimelineQuery,
@@ -2071,6 +2072,12 @@ const deploymentRecoveryReadinessCommand = EffectCommand.make(
   ({ deploymentId }) => runQuery(DeploymentRecoveryReadinessQuery.create({ deploymentId })),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentRecoveryReadiness));
 
+const deploymentProofCommand = EffectCommand.make(
+  "proof",
+  { deploymentId: deploymentIdArg },
+  ({ deploymentId }) => runQuery(DeploymentProofQuery.create({ deploymentId })),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentProof));
+
 const retryDeploymentCommand = EffectCommand.make(
   "retry",
   {
@@ -2275,6 +2282,7 @@ export const deploymentsCommand = EffectCommand.make("deployments").pipe(
     listDeploymentsCommand,
     showDeploymentCommand,
     deploymentPlanCommand,
+    deploymentProofCommand,
     deploymentRecoveryReadinessCommand,
     retryDeploymentCommand,
     redeployDeploymentCommand,

@@ -11,8 +11,11 @@ For deployment work, use this Appaloft deploy protocol:
 5. Run plan/preview when useful.
 6. Create or clean up deployment through Appaloft.
 7. Watch progress through the right stream, then observe detail, logs, resource health,
-   diagnostics, and recovery readiness.
-8. Return URL/access state first, then ids and next safe actions.
+   diagnostics, recovery readiness, and `deployments.proof`.
+8. Claim deployment success only when the proof verdict is `verified`. Treat
+   `partially-verified`, `unverified`, `stale`, and `failed` as non-success outcomes and report the
+   proof's evidence gaps, mismatches, and next safe actions.
+9. Return URL/access state first, then proof verdict, ids, and next safe actions.
 
 For Cloud deployments to a registered SSH server, read the server readiness summary and run
 `appaloft server test <serverId>` before starting deployment. If the target is unavailable,
@@ -221,6 +224,7 @@ deployment, or runtime state:
 ## Follow-Up Commands
 
 - `appaloft deployments show <deploymentId>`
+- `appaloft deployments proof <deploymentId>`
 - `appaloft deployments timeline <deploymentId>`
 - `appaloft deployments timeline <deploymentId> --follow --json`
 - `appaloft work events <workId> --follow --json`

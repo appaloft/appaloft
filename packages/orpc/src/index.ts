@@ -167,6 +167,7 @@ import {
   DeploymentPlanQuery,
   type DeploymentProgressEvent,
   type DeploymentProgressObserver,
+  DeploymentProofQuery,
   DeploymentRecoveryReadinessQuery,
   DeploymentTimelineQuery,
   DetachResourceStorageCommand,
@@ -191,6 +192,7 @@ import {
   deleteSshCredentialCommandInputSchema,
   deleteStorageVolumeCommandInputSchema,
   deploymentPlanQueryInputSchema,
+  deploymentProofQueryInputSchema,
   deploymentRecoveryReadinessQueryInputSchema,
   deploymentTimelineQueryInputSchema,
   detachResourceStorageCommandInputSchema,
@@ -466,13 +468,8 @@ import {
   replaySourceEventCommandInputSchema,
   resetResourceHealthCommandInputSchema,
   resourceAccessFailureEvidenceLookupQueryInputSchema,
-  resourceDiagnosticSummaryQueryInputSchema,
-  resourceEffectiveConfigQueryInputSchema,
   resourceHealthHistoryQueryInputSchema,
-  resourceHealthQueryInputSchema,
   resourceProxyConfigurationPreviewQueryInputSchema,
-  resourceRuntimeLogsQueryInputSchema,
-  restartResourceRuntimeCommandInputSchema,
   restoreDependencyResourceBackupCommandInputSchema,
   restoreProjectCommandInputSchema,
   restoreResourceCommandInputSchema,
@@ -590,8 +587,6 @@ import {
   showStorageVolumeQueryInputSchema,
   showTerminalSessionQueryInputSchema,
   startConnectionCommandInputSchema,
-  startResourceRuntimeCommandInputSchema,
-  stopResourceRuntimeCommandInputSchema,
   streamDeploymentTimelineQueryInputSchema,
   streamOperatorWorkEventsQueryInputSchema,
   switchCurrentOrganizationCommandInputSchema,
@@ -691,6 +686,7 @@ import {
   dependencyResourceResponseSchema,
   deploymentPlanResponseSchema,
   deploymentProgressEventSchema,
+  deploymentProofResponseSchema,
   deploymentRecoveryReadinessResponseSchema,
   deploymentTimelineEnvelopeSchema,
   deploymentTimelineResponseSchema,
@@ -5790,6 +5786,12 @@ export const deploymentRecoveryReadinessProcedure = base
     executeQuery(context, DeploymentRecoveryReadinessQuery.create(input)),
   );
 
+export const deploymentProofProcedure = base
+  .route({ method: "GET", path: "/deployments/{deploymentId}/proof", successStatus: 200 })
+  .input(deploymentProofQueryInputSchema)
+  .output(deploymentProofResponseSchema)
+  .handler(async ({ input, context }) => executeQuery(context, DeploymentProofQuery.create(input)));
+
 export const createDeploymentStreamProcedure = base
   .route({
     method: "POST",
@@ -7172,6 +7174,7 @@ export const appaloftOrpcRouter = {
     prune: pruneDeploymentsProcedure,
     plan: deploymentPlanProcedure,
     show: showDeploymentProcedure,
+    proof: deploymentProofProcedure,
     recoveryReadiness: deploymentRecoveryReadinessProcedure,
     createStream: createDeploymentStreamProcedure,
     timeline: deploymentTimelineProcedure,
@@ -9799,6 +9802,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/deployments/:deploymentId/archive",
     "/api/deployments/plan",
     "/api/deployments/:deploymentId",
+    "/api/deployments/:deploymentId/proof",
     "/api/deployments/:deploymentId/recovery-readiness",
     "/api/deployments/stream",
     "/api/deployments/prune",

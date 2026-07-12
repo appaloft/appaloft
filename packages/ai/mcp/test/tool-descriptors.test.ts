@@ -47,6 +47,13 @@ function mcpText(result: { content: { type: "text"; text: string }[] }): string 
 }
 
 describe("MCP tool descriptors", () => {
+  test("[DEP-PROOF-CONTRACT-001] exposes the shared deployment proof query", () => {
+    expect(toolContractsByOperationKey.get("deployments.proof")).toMatchObject({
+      name: "deployments_proof",
+      kind: "query",
+      httpRoute: "GET /api/deployments/{deploymentId}/proof",
+    });
+  });
   test("[MCP-REMOTE-STDIO-001] remote stdio proxy forwards JSON-RPC over HTTP with bearer auth", async () => {
     const requests: Request[] = [];
     let stdout = "";

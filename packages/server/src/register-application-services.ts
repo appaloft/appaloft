@@ -197,6 +197,8 @@ import {
   DeploymentLifecycleService,
   DeploymentPlanQueryHandler,
   DeploymentPlanQueryService,
+  DeploymentProofQueryHandler,
+  DeploymentProofQueryService,
   type DeploymentReadModel,
   DeploymentRecoveryReadinessQueryHandler,
   DeploymentRecoveryReadinessQueryService,
@@ -2519,6 +2521,7 @@ export function registerApplicationServices(
   container.registerSingleton(CreateActionSourceLinkDeploymentCommandHandler);
   container.registerSingleton(ShowDeploymentQueryHandler);
   container.registerSingleton(DeploymentPlanQueryHandler);
+  container.registerSingleton(DeploymentProofQueryHandler);
   container.registerSingleton(DeploymentRecoveryReadinessQueryHandler);
   container.registerSingleton(RetryDeploymentCommandHandler);
   container.registerSingleton(RedeployDeploymentCommandHandler);
@@ -3461,6 +3464,7 @@ export function registerApplicationServices(
   container.registerSingleton(tokens.listDeploymentsQueryService, ListDeploymentsQueryService);
   container.registerSingleton(tokens.showDeploymentQueryService, ShowDeploymentQueryService);
   container.registerSingleton(tokens.deploymentPlanQueryService, DeploymentPlanQueryService);
+  container.registerSingleton(tokens.deploymentProofQueryService, DeploymentProofQueryService);
   container.registerSingleton(
     tokens.deploymentRecoveryReadinessQueryService,
     DeploymentRecoveryReadinessQueryService,

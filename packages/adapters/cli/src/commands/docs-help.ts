@@ -7,6 +7,7 @@ function withDocs(summary: string, topicId: PublicDocsHelpTopicId): string {
 export const cliDocsHrefs = {
   deploymentSource: resolvePublicDocsHelpHref("deployment.source"),
   deploymentPlanPreview: resolvePublicDocsHelpHref("deployment.plan-preview"),
+  deploymentProof: resolvePublicDocsHelpHref("deployment.proof"),
   deploymentPreviewCleanup: resolvePublicDocsHelpHref("deployment.preview-cleanup"),
   productGradePreviews: resolvePublicDocsHelpHref("deployment.product-grade-previews"),
   deploymentSourceRelink: resolvePublicDocsHelpHref("deployment.source-relink"),
@@ -111,6 +112,10 @@ export const cliCommandDescriptions = {
   ),
   deploymentList: withDocs("List deployments", "deployment.lifecycle"),
   deploymentShow: withDocs("Show deployment detail", "deployment.lifecycle"),
+  deploymentProof: withDocs(
+    "Verify planned deployment identity against the running workload",
+    "deployment.proof",
+  ),
   deploymentRecoveryReadiness: withDocs(
     "Show retry, redeploy, cancel, and rollback readiness for a deployment",
     "deployment.recovery-readiness",
