@@ -72,7 +72,9 @@ import { deploymentRecoveryReadinessQueryInputSchema } from "./operations/deploy
 import { deploymentTimelineQueryInputSchema } from "./operations/deployments/deployment-timeline.query";
 import { forceRedeployDeploymentCommandInputSchema } from "./operations/deployments/force-redeploy-deployment.command";
 import { listDeploymentsQueryInputSchema } from "./operations/deployments/list-deployments.query";
+import { listStaleDeploymentAttemptsQueryInputSchema } from "./operations/deployments/list-stale-deployment-attempts.query";
 import { pruneDeploymentsCommandInputSchema } from "./operations/deployments/prune-deployments.command";
+import { reconcileStaleDeploymentCommandInputSchema } from "./operations/deployments/reconcile-stale-deployment.command";
 import { redeployDeploymentCommandInputSchema } from "./operations/deployments/redeploy-deployment.command";
 import { retryDeploymentCommandInputSchema } from "./operations/deployments/retry-deployment.command";
 import { rollbackDeploymentCommandInputSchema } from "./operations/deployments/rollback-deployment.command";
@@ -3191,6 +3193,20 @@ export const operationCatalog = [
     },
   },
   {
+    key: "deployments.reconcile-stale",
+    kind: "command",
+    domain: "deployments",
+    messageName: "ReconcileStaleDeploymentCommand",
+    handlerName: "ReconcileStaleDeploymentCommandHandler",
+    serviceName: "ReconcileStaleDeploymentUseCase",
+    inputSchema: reconcileStaleDeploymentCommandInputSchema,
+    serviceToken: tokens.reconcileStaleDeploymentUseCase,
+    transports: {
+      cli: "appaloft deployments reconcile-stale <deploymentId> --state-version <stateVersion> --confirm <deploymentId>",
+      orpc: { method: "POST", path: "/api/deployments/{deploymentId}/reconcile-stale" },
+    },
+  },
+  {
     key: "deployments.archive",
     kind: "command",
     domain: "deployments",
@@ -3272,6 +3288,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft deployments list",
       orpc: { method: "GET", path: "/api/deployments" },
+    },
+  },
+  {
+    key: "deployments.stale-attempts",
+    kind: "query",
+    domain: "deployments",
+    messageName: "ListStaleDeploymentAttemptsQuery",
+    handlerName: "ListStaleDeploymentAttemptsQueryHandler",
+    serviceName: "ListStaleDeploymentAttemptsQueryService",
+    inputSchema: listStaleDeploymentAttemptsQueryInputSchema,
+    serviceToken: tokens.listStaleDeploymentAttemptsQueryService,
+    transports: {
+      cli: "appaloft deployments stale",
+      orpc: { method: "GET", path: "/api/deployments/stale" },
     },
   },
   {

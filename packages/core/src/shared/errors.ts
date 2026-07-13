@@ -306,6 +306,16 @@ export const domainError = {
     message: string,
     details?: Record<string, string | number | boolean | null>,
   ): DomainError => createError("deployment_cancel_not_allowed", "user", message, details),
+  deploymentReconciliationNotAllowed: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError =>
+    createError("deployment_reconciliation_not_allowed", "user", message, details, true),
+  deploymentReconciliationStateStale: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError =>
+    createError("deployment_reconciliation_state_stale", "user", message, details, true),
   deploymentArchiveNotAllowed: (
     message: string,
     details?: Record<string, string | number | boolean | null>,

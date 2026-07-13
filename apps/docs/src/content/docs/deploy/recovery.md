@@ -18,6 +18,8 @@ relatedOperations:
   - deployments.redeploy
   - deployments.rollback
   - deployments.cancel
+  - deployments.stale-attempts
+  - deployments.reconcile-stale
   - deployments.archive
   - deployments.prune
   - source-links.relink
@@ -100,6 +102,25 @@ Rollback 的语义是“基于历史成功部署的 snapshot 和 Docker/OCI arti
 Cancel 用于停止一个尚未完成的 deployment attempt。它不会删除部署历史、日志、事件、runtime artifact、route intent、Resource 或环境配置。
 
 运行 `appaloft deployments cancel <deploymentId> --confirm <deploymentId>`，或调用 `POST /api/deployments/{deploymentId}/cancel`。`--confirm` 必须和 deployment id 完全一致；已经成功、失败、取消或回滚的 terminal attempt 会被拒绝。
+
+<h2 id="deployment-recovery-stale-attempts">处理长时间无活动的 attempt</h2>
+
+当部署长时间停在 created、planning、planned、running 或 cancel-requested 时，先运行
+`appaloft deployments stale --stale-after-seconds 900`。查询只根据 durable deployment
+timeline 和状态判断候选，不会因为浏览器断开或日志流中断而修改部署。
+
+确认 attempt 确实失去执行所有权后，使用查询返回的 `stateVersion`：
+
+```bash
+appaloft deployments reconcile-stale <deploymentId> \
+  --state-version <stateVersion> \
+  --stale-after-seconds 900 \
+  --confirm <deploymentId>
+```
+
+命令会在协调锁内重新读取状态。期间出现新活动、状态发生变化、阈值不再满足，或 attempt
+已经终结时，命令会拒绝执行。成功后旧 attempt 变为 `interrupted`，历史和恢复证据仍然
+保留；需要继续部署时再通过 recovery readiness 选择 retry 或 redeploy。
 
 <h2 id="deployment-recovery-archive-prune">归档和清理 attempt</h2>
 

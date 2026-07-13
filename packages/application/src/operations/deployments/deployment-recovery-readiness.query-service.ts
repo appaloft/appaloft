@@ -34,7 +34,11 @@ const activeDeploymentStatuses = new Set<DeploymentStatus>([
   "running",
   "cancel-requested",
 ]);
-const retryableDeploymentStatuses = new Set<DeploymentStatus>(["failed", "canceled"]);
+const retryableDeploymentStatuses = new Set<DeploymentStatus>([
+  "failed",
+  "canceled",
+  "interrupted",
+]);
 const recoveryCommandActive = {
   retry: true,
   redeploy: true,

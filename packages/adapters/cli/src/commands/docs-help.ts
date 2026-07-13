@@ -111,6 +111,11 @@ export const cliCommandDescriptions = {
     "cli.remote-control-plane-login",
   ),
   deploymentList: withDocs("List deployments", "deployment.lifecycle"),
+  deploymentStale: withDocs("List stale deployment attempts", "deployment.recovery-readiness"),
+  deploymentReconcileStale: withDocs(
+    "Reconcile a stale deployment attempt",
+    "deployment.recovery-readiness",
+  ),
   deploymentShow: withDocs("Show deployment detail", "deployment.lifecycle"),
   deploymentProof: withDocs(
     "Verify planned deployment identity against the running workload",

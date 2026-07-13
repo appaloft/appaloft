@@ -101,7 +101,7 @@ function createRepositoryContext(): RepositoryContext {
 function createDeploymentRecord(input: {
   id: string;
   createdAt: string;
-  status: "planned" | "succeeded" | "canceled";
+  status: "planned" | "succeeded" | "canceled" | "interrupted";
   includeDependencyBindingReference?: boolean;
   targetKind?: TargetKindValue;
   targetProviderKey?: ProviderKey;
@@ -234,6 +234,10 @@ function createDeploymentRecord(input: {
           : {}),
       })
       ._unsafeUnwrap();
+  }
+
+  if (input.status === "interrupted") {
+    deployment.interrupt(FinishedAt.rehydrate("2026-01-01T00:10:00.000Z"), [])._unsafeUnwrap();
   }
 
   return deployment;
@@ -458,6 +462,33 @@ describe("pglite deployment repository", () => {
       DeploymentByIdSpec.create(DeploymentId.rehydrate("dep_active")),
     );
     expect(storedSupersededDeployment?.toState().supersededByDeploymentId?.value).toBe("dep_next");
+
+    const interruptedDeployment = createDeploymentRecord({
+      id: "dep_interrupted",
+      createdAt: "2026-01-01T00:00:05.000Z",
+      status: "interrupted",
+    });
+    const interruptedInsert = await deploymentRepository.insertOne(
+      context,
+      interruptedDeployment,
+      UpsertDeploymentSpec.fromDeployment(interruptedDeployment),
+    );
+    expect(interruptedInsert.isOk()).toBe(true);
+
+    const storedInterruptedDeployment = await deploymentRepository.findOne(
+      context,
+      DeploymentByIdSpec.create(DeploymentId.rehydrate("dep_interrupted")),
+    );
+    const interruptedSummary = await deploymentReadModel.findOne(
+      context,
+      DeploymentByIdSpec.create(DeploymentId.rehydrate("dep_interrupted")),
+    );
+    expect(storedInterruptedDeployment?.toState().status.value).toBe("interrupted");
+    expect(interruptedSummary).toMatchObject({
+      id: "dep_interrupted",
+      status: "interrupted",
+      finishedAt: "2026-01-01T00:10:00.000Z",
+    });
 
     await database.db
       .updateTable("deployments")
