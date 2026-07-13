@@ -92,6 +92,7 @@ function proxyRouteStatusFor(
       return "ready";
     case "failed":
     case "canceled":
+    case "interrupted":
       return "failed";
     case "created":
     case "planning":

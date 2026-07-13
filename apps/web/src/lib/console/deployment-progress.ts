@@ -479,6 +479,7 @@ export function deploymentTimelineProgressStatus(
       return "succeeded";
     case "failed":
     case "canceled":
+    case "interrupted":
       return "failed";
     case "created":
     case "planning":
@@ -496,6 +497,7 @@ export function isTerminalDeploymentStatus(
     status === "succeeded" ||
     status === "failed" ||
     status === "canceled" ||
+    status === "interrupted" ||
     status === "rolled-back"
   );
 }
@@ -683,6 +685,7 @@ function deploymentTimelineStatus(
     case "failed":
       return status;
     case "canceled":
+    case "interrupted":
       return "failed";
     case "rolled-back":
       return "succeeded";

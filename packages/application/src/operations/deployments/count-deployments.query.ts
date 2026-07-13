@@ -14,6 +14,7 @@ const deploymentStatusSchema = z.enum([
   "succeeded",
   "failed",
   "canceled",
+  "interrupted",
   "rolled-back",
 ]);
 

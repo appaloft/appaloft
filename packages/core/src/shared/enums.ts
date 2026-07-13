@@ -182,6 +182,7 @@ export const deploymentStatuses = [
   "succeeded",
   "failed",
   "canceled",
+  "interrupted",
   "rolled-back",
 ] as const;
 

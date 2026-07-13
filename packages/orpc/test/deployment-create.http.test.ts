@@ -22,10 +22,12 @@ import {
   type ExecutionContext,
   type ExecutionContextFactory,
   ForceRedeployDeploymentCommand,
+  ListStaleDeploymentAttemptsQuery,
   type ProductSessionAuthorizationPort,
   PruneDeploymentsCommand,
   type Query,
   type QueryBus,
+  ReconcileStaleDeploymentCommand,
   RedeployDeploymentCommand,
   ResolveActionServerConfigDeploymentTargetCommand,
   ResolvePreviewPullRequestContextQuery,
@@ -2875,6 +2877,66 @@ describe("deployment create HTTP route", () => {
       deploymentId: "dep_cancel",
       confirm: "dep_cancel",
       resourceId: "res_demo",
+    });
+  });
+
+  test("[DEP-STALE-008] dispatches stale list query and reconcile command through HTTP", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    let capturedQuery: Query<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({
+          id: "dep_stale",
+          status: "interrupted",
+          interruptedAt: "2026-01-01T01:00:00.000Z",
+        } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, query: Query<T>): Promise<Result<T>> => {
+        capturedQuery = query as Query<unknown>;
+        return ok({
+          schemaVersion: "deployments.stale-attempts/v1",
+          items: [],
+          checkedAt: "2026-01-01T01:00:00.000Z",
+          staleAfterSeconds: 900,
+        } as T);
+      },
+    } as QueryBus;
+    const app = mountDeploymentCreateHttpRoutes(new Elysia(), {
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const listResponse = await app.handle(
+      new Request("http://localhost/api/deployments/stale?staleAfterSeconds=900", {
+        headers: productJsonHeaders,
+      }),
+    );
+    expect(listResponse.status).toBe(200);
+    expect(capturedQuery).toBeInstanceOf(ListStaleDeploymentAttemptsQuery);
+
+    const reconcileResponse = await app.handle(
+      new Request("http://localhost/api/deployments/dep_stale/reconcile-stale", {
+        method: "POST",
+        headers: productJsonHeaders,
+        body: JSON.stringify({
+          confirm: "dep_stale",
+          stateVersion: "sha256:observed",
+          staleAfterSeconds: 900,
+        }),
+      }),
+    );
+    expect(capturedCommand).toBeInstanceOf(ReconcileStaleDeploymentCommand);
+    expect(reconcileResponse.status, await reconcileResponse.clone().text()).toBe(200);
+    expect(capturedCommand).toMatchObject({
+      deploymentId: "dep_stale",
+      confirm: "dep_stale",
+      stateVersion: "sha256:observed",
+      staleAfterSeconds: 900,
     });
   });
 

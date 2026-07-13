@@ -218,12 +218,14 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft deployments force-redeploy <resourceId>` - `deployments.force-redeploy`
 - `appaloft deployments rollback <deploymentId> --candidate <rollbackCandidateDeploymentId>` - `deployments.rollback`
 - `appaloft deployments cancel <deploymentId> --confirm <deploymentId>` - `deployments.cancel`
+- `appaloft deployments reconcile-stale <deploymentId> --state-version <stateVersion> --confirm <deploymentId>` - `deployments.reconcile-stale`
 - `appaloft deployments archive <deploymentId> --confirm <deploymentId>` - `deployments.archive`
 - `appaloft deployments prune --before <iso>` - `deployments.prune`
 - `appaloft resource runtime stop [resourceId] [--preview <previewEnvironmentId>]` - `resources.runtime.stop`
 - `appaloft resource runtime start [resourceId] [--preview <previewEnvironmentId>]` - `resources.runtime.start`
 - `appaloft resource runtime restart [resourceId] [--preview <previewEnvironmentId>]` - `resources.runtime.restart`
 - `appaloft deployments list` - `deployments.list`
+- `appaloft deployments stale` - `deployments.stale-attempts`
 - `appaloft deployments count` - `deployments.count`
 - `appaloft deployments show <deploymentId>` - `deployments.show`
 - `appaloft deployments proof <deploymentId>` - `deployments.proof`

@@ -216,6 +216,21 @@ describe("DeploymentRecoveryReadinessQueryService", () => {
     );
   });
 
+  test("[DEP-STALE-007] reports an interrupted stale attempt as retry-ready", async () => {
+    const readiness = unwrap(
+      await createService({
+        deployments: [deploymentSummary({ status: "interrupted" })],
+      }).execute(createTestContext(), createQuery()),
+    );
+
+    expect(readiness.retryable).toBe(true);
+    expect(readiness.retry).toMatchObject({
+      allowed: true,
+      commandActive: true,
+      targetOperation: "deployments.retry",
+    });
+  });
+
   test("[DEP-RECOVERY-READINESS-002] blocks recovery actions while the inspected deployment is active", async () => {
     const activeDeployment = deploymentSummary({
       status: "running",

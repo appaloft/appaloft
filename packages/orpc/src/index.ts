@@ -294,6 +294,7 @@ import {
   ListSourceEventsQuery,
   ListSourceLinksQuery,
   ListSshCredentialsQuery,
+  ListStaleDeploymentAttemptsQuery,
   ListStaticArtifactPublicationsQuery,
   ListStorageVolumeBackupsQuery,
   ListStorageVolumesQuery,
@@ -338,6 +339,7 @@ import {
   listSourceEventsQueryInputSchema,
   listSourceLinksQueryInputSchema,
   listSshCredentialsQueryInputSchema,
+  listStaleDeploymentAttemptsQueryInputSchema,
   listStaticArtifactPublicationsQueryInputSchema,
   listStorageVolumeBackupsQueryInputSchema,
   listStorageVolumesQueryInputSchema,
@@ -401,6 +403,7 @@ import {
   queryEntitlementsInputSchema,
   queryEntitlementsResponseSchema,
   ReactivateOrganizationMemberCommand,
+  ReconcileStaleDeploymentCommand,
   RecordUsageIntentCommand,
   RedeployDeploymentCommand,
   RegisterServerCommand,
@@ -451,6 +454,7 @@ import {
   RunScheduledTaskNowCommand,
   RuntimeMonitoringRollupQuery,
   reactivateOrganizationMemberCommandInputSchema,
+  reconcileStaleDeploymentCommandInputSchema,
   recordUsageIntentInputSchema,
   recordUsageIntentResponseSchema,
   redeployDeploymentCommandInputSchema,
@@ -744,6 +748,7 @@ import {
   listServersResponseSchema,
   listSourceEventsResponseSchema,
   listSshCredentialsResponseSchema,
+  listStaleDeploymentAttemptsResponseSchema,
   listStaticArtifactPublicationsResponseSchema,
   listStorageVolumeBackupsResponseSchema,
   listStorageVolumesResponseSchema,
@@ -770,6 +775,7 @@ import {
   pruneStorageVolumeBackupResponseSchema,
   publishStaticArtifactResponseSchema,
   reactivateOrganizationMemberResponseSchema,
+  reconcileStaleDeploymentResponseSchema,
   redeployDeploymentResponseSchema,
   registerServerResponseSchema,
   removeOrganizationMemberResponseSchema,
@@ -5155,6 +5161,14 @@ export const listDeploymentsProcedure = base
   .output(listDeploymentsResponseSchema)
   .handler(async ({ input, context }) => executeQuery(context, ListDeploymentsQuery.create(input)));
 
+export const listStaleDeploymentAttemptsProcedure = base
+  .route({ method: "GET", path: "/deployments/stale", successStatus: 200 })
+  .input(listStaleDeploymentAttemptsQueryInputSchema)
+  .output(listStaleDeploymentAttemptsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListStaleDeploymentAttemptsQuery.create(input)),
+  );
+
 export const countDeploymentsProcedure = base
   .route({
     method: "GET",
@@ -5736,6 +5750,19 @@ export const cancelDeploymentProcedure = base
   .output(cancelDeploymentResponseSchema)
   .handler(async ({ input, context }) =>
     executeCommand(context, CancelDeploymentCommand.create(input)),
+  );
+
+export const reconcileStaleDeploymentProcedure = base
+  .route({
+    method: "POST",
+    path: "/deployments/{deploymentId}/reconcile-stale",
+    summary: "Reconcile stale deployment",
+    successStatus: 200,
+  })
+  .input(reconcileStaleDeploymentCommandInputSchema)
+  .output(reconcileStaleDeploymentResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ReconcileStaleDeploymentCommand.create(input)),
   );
 
 export const archiveDeploymentProcedure = base
@@ -7163,6 +7190,7 @@ export const appaloftOrpcRouter = {
   deployments: {
     count: countDeploymentsProcedure,
     list: listDeploymentsProcedure,
+    stale: listStaleDeploymentAttemptsProcedure,
     create: createDeploymentProcedure,
     cleanupPreview: cleanupPreviewProcedure,
     retry: retryDeploymentProcedure,
@@ -7170,6 +7198,7 @@ export const appaloftOrpcRouter = {
     forceRedeploy: forceRedeployDeploymentProcedure,
     rollback: rollbackDeploymentProcedure,
     cancel: cancelDeploymentProcedure,
+    reconcileStale: reconcileStaleDeploymentProcedure,
     archive: archiveDeploymentProcedure,
     prune: pruneDeploymentsProcedure,
     plan: deploymentPlanProcedure,
@@ -9795,10 +9824,12 @@ export function mountAppaloftOrpcRoutes(
     "/api/certificates/:certificateId/retries",
     "/api/certificates/:certificateId/revoke",
     "/api/deployments",
+    "/api/deployments/stale",
     "/api/deployments/cleanup-preview",
     "/api/deployments/:deploymentId/retry",
     "/api/deployments/:deploymentId/rollback",
     "/api/deployments/:deploymentId/cancel",
+    "/api/deployments/:deploymentId/reconcile-stale",
     "/api/deployments/:deploymentId/archive",
     "/api/deployments/plan",
     "/api/deployments/:deploymentId",

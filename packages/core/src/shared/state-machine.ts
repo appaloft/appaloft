@@ -712,12 +712,13 @@ export class DeploymentStatusValue extends StateMachineValueObject<
       this.value === "succeeded" ||
       this.value === "failed" ||
       this.value === "canceled" ||
+      this.value === "interrupted" ||
       this.value === "rolled-back"
     );
   }
 
   canRetryRecovery(): boolean {
-    return this.value === "failed" || this.value === "canceled";
+    return this.value === "failed" || this.value === "canceled" || this.value === "interrupted";
   }
 
   isTerminal(): boolean {
@@ -745,6 +746,13 @@ export class DeploymentStatusValue extends StateMachineValueObject<
       ["created", "planning", "planned", "running", "cancel-requested"],
       "Deployment must be active before cancellation",
     ).map(() => new DeploymentStatusValue("canceled"));
+  }
+
+  interrupt(): Result<DeploymentStatusValue> {
+    return this.ensureCurrent(
+      ["created", "planning", "planned", "running", "cancel-requested"],
+      "Deployment must be active before interruption",
+    ).map(() => new DeploymentStatusValue("interrupted"));
   }
 
   applyExecutionResult(result: ExecutionStatusValue): Result<DeploymentStatusValue> {
