@@ -40,6 +40,7 @@ function proxyConfigurationStatusFromDeployment(
       return "applied";
     case "failed":
     case "canceled":
+    case "interrupted":
       return "failed";
     case "created":
     case "planning":

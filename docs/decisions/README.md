@@ -107,6 +107,7 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-081: Source Version Value Object Boundary](./ADR-081-source-version-value-object-boundary.md) | Accepted | Defines neutral public source version value objects, source-specific reference rules, fixed deployment version snapshots, aliases, and detection ownership. |
 | [ADR-083: Storage Volume, Dependency Resource, And Backup Boundary](./ADR-083-storage-volume-dependency-resource-and-backup-boundary.md) | Accepted | Keeps mounted StorageVolume data separate from service DependencyResource lifecycle and defines the public storage backup source/target boundary. |
 | [ADR-086: Preview Operable Runtime Scope](./ADR-086-preview-operable-runtime-scope.md) | Accepted | Defines Preview Environment as a Resource-derived operable runtime scope for service/runtime operations, without creating preview-only operation shortcuts. |
+| [ADR-088: Deployment Stale Attempt Reconciliation](./ADR-088-deployment-stale-attempt-reconciliation.md) | Accepted | Defines conservative stale observation and coordinated interrupted terminal transition for lost deployment ownership. |
 
 ## Authoring Rules
 

@@ -13,8 +13,10 @@ import {
   DeploymentTimelineQuery,
   ForceRedeployDeploymentCommand,
   ListDeploymentsQuery,
+  ListStaleDeploymentAttemptsQuery,
   PruneDeploymentsCommand,
   publicPreviewUrlsFromDeploymentSummary,
+  ReconcileStaleDeploymentCommand,
   RedeployDeploymentCommand,
   RetryDeploymentCommand,
   RollbackDeploymentCommand,
@@ -154,6 +156,10 @@ const untilTerminalOption = Options.boolean("until-terminal").pipe(Options.withD
 const dryRunOption = Options.boolean("dry-run").pipe(Options.withDefault(true));
 const includeArchivedOption = Options.boolean("include-archived").pipe(Options.withDefault(false));
 const readinessGeneratedAtOption = Options.text("readiness-generated-at").pipe(Options.optional);
+const staleAfterSecondsOption = Options.integer("stale-after-seconds").pipe(
+  Options.withDefault(900),
+);
+const stateVersionOption = Options.text("state-version");
 const sourceDeploymentOption = Options.text("source-deployment").pipe(Options.optional);
 const rollbackCandidateOption = Options.text("candidate");
 const confirmDeploymentCancelOption = Options.text("confirm");
@@ -1036,6 +1042,7 @@ const deploymentTerminalStatuses = new Set<DeploymentSummary["status"]>([
   "succeeded",
   "failed",
   "canceled",
+  "interrupted",
   "rolled-back",
 ]);
 const synchronousDeploymentPollIntervalMs = 250;
@@ -2035,6 +2042,23 @@ const listDeploymentsCommand = EffectCommand.make(
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentList));
 
+const listStaleDeploymentAttemptsCommand = EffectCommand.make(
+  "stale",
+  {
+    project: projectOption,
+    resource: resourceOption,
+    staleAfterSeconds: staleAfterSecondsOption,
+  },
+  ({ project, resource, staleAfterSeconds }) =>
+    runQuery(
+      ListStaleDeploymentAttemptsQuery.create({
+        projectId: optionalValue(project),
+        resourceId: optionalValue(resource),
+        staleAfterSeconds,
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentStale));
+
 const showDeploymentCommand = EffectCommand.make(
   "show",
   {
@@ -2197,6 +2221,27 @@ const cancelDeploymentCommand = EffectCommand.make(
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentCancel));
 
+const reconcileStaleDeploymentCommand = EffectCommand.make(
+  "reconcile-stale",
+  {
+    deploymentId: deploymentIdArg,
+    confirm: confirmDeploymentCancelOption,
+    resource: resourceOption,
+    staleAfterSeconds: staleAfterSecondsOption,
+    stateVersion: stateVersionOption,
+  },
+  ({ confirm, deploymentId, resource, staleAfterSeconds, stateVersion }) =>
+    runCommand(
+      ReconcileStaleDeploymentCommand.create({
+        deploymentId,
+        confirm,
+        stateVersion,
+        resourceId: optionalValue(resource),
+        staleAfterSeconds,
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentReconcileStale));
+
 const archiveDeploymentCommand = EffectCommand.make(
   "archive",
   {
@@ -2280,6 +2325,7 @@ export const deploymentsCommand = EffectCommand.make("deployments").pipe(
   EffectCommand.withDescription(cliCommandDescriptions.deployments),
   EffectCommand.withSubcommands([
     listDeploymentsCommand,
+    listStaleDeploymentAttemptsCommand,
     showDeploymentCommand,
     deploymentPlanCommand,
     deploymentProofCommand,
@@ -2289,6 +2335,7 @@ export const deploymentsCommand = EffectCommand.make("deployments").pipe(
     forceRedeployDeploymentCommand,
     rollbackDeploymentCommand,
     cancelDeploymentCommand,
+    reconcileStaleDeploymentCommand,
     archiveDeploymentCommand,
     pruneDeploymentsCommand,
     logsCommand,

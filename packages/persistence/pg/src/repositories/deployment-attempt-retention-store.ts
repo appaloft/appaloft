@@ -10,7 +10,13 @@ import { type Kysely } from "kysely";
 import { type Database } from "../schema";
 import { resolveRepositoryExecutor } from "./shared";
 
-const terminalDeploymentStatuses = ["succeeded", "failed", "canceled", "rolled-back"] as const;
+const terminalDeploymentStatuses = [
+  "succeeded",
+  "failed",
+  "canceled",
+  "interrupted",
+  "rolled-back",
+] as const;
 
 export class PgDeploymentAttemptRetentionStore implements DeploymentAttemptRetentionStore {
   constructor(private readonly db: Kysely<Database>) {}
