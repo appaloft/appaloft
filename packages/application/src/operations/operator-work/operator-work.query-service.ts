@@ -74,6 +74,7 @@ function deploymentStatusToOperatorWorkStatus(
     case "succeeded":
       return "succeeded";
     case "failed":
+    case "interrupted":
       return "failed";
     case "canceled":
       return "canceled";
@@ -96,6 +97,7 @@ function deploymentPhase(status: DeploymentSummary["status"]): string {
       return "runtime-execution";
     case "succeeded":
     case "failed":
+    case "interrupted":
     case "canceled":
     case "rolled-back":
       return "runtime-verification";

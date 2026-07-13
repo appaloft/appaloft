@@ -223,6 +223,29 @@ describe("Deployment", () => {
     });
   });
 
+  test("[DEP-STALE-002 DEP-STALE-006] interrupts only non-terminal deployment attempts", () => {
+    const active = createDeployment()._unsafeUnwrap();
+    active.markPlanning(StartedAt.rehydrate("2026-01-01T00:00:01.000Z"))._unsafeUnwrap();
+    active.markPlanned(StartedAt.rehydrate("2026-01-01T00:00:02.000Z"))._unsafeUnwrap();
+
+    const interrupted = active.interrupt(FinishedAt.rehydrate("2026-01-01T00:15:00.000Z"), []);
+
+    expect(interrupted.isOk()).toBe(true);
+    expect(active.toState()).toMatchObject({
+      status: DeploymentStatusValue.rehydrate("interrupted"),
+      finishedAt: FinishedAt.rehydrate("2026-01-01T00:15:00.000Z"),
+    });
+    expect(active.pullDomainEvents().map((event) => event.type)).toEqual(
+      expect.arrayContaining(["deployment.interrupted", "deployment.finished"]),
+    );
+
+    const terminal = deployment({ status: "succeeded" });
+    expect(terminal.interrupt(FinishedAt.rehydrate("2026-01-01T00:16:00.000Z"), []).isErr()).toBe(
+      true,
+    );
+    expect(terminal.toState().status.value).toBe("succeeded");
+  });
+
   test("[DMBH-DEPLOY-002] fixes Docker image source version from runtime execution metadata", () => {
     const digest = "sha256:8b1a9953c4611296a827abf8c47804d7f6f4e6a6d7f4aaf8f6f5c6e6d7c8b9a0";
     const plan = runtimePlan().withSource(

@@ -480,6 +480,20 @@ export class Deployment extends AggregateRoot<DeploymentState> {
     });
   }
 
+  interrupt(at: FinishedAt, timeline: DeploymentTimelineJournalEntry[] = []): Result<void> {
+    return this.state.status.interrupt().map((nextStatus) => {
+      this.state.status = nextStatus;
+      this.appendTimeline(timeline);
+      this.state.finishedAt = at;
+      this.recordDomainEvent("deployment.interrupted", at, this.recoveryEventPayload());
+      this.recordDomainEvent("deployment.finished", at, {
+        ...this.recoveryEventPayload(),
+        status: this.state.status.value,
+      });
+      return undefined;
+    });
+  }
+
   appendTimeline(entries: DeploymentTimelineJournalEntry[]): void {
     this.state.timeline.push(...entries);
   }
@@ -610,6 +624,10 @@ export class Deployment extends AggregateRoot<DeploymentState> {
 
   requiresRuntimeCancellationForManualCancel(): boolean {
     return this.state.status.requiresRuntimeCancellationForManualCancel();
+  }
+
+  requiresRuntimeCancellationForStaleReconciliation(): boolean {
+    return this.state.status.value === "running" || this.state.status.value === "cancel-requested";
   }
 
   hasRealizedAccessRoute(expectation: AccessRouteExpectation): boolean {

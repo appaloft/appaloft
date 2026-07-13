@@ -17,6 +17,8 @@ relatedOperations:
   - deployments.redeploy
   - deployments.rollback
   - deployments.cancel
+  - deployments.stale-attempts
+  - deployments.reconcile-stale
   - deployments.archive
   - deployments.prune
   - source-links.relink
@@ -102,6 +104,26 @@ Run `appaloft deployments rollback <deploymentId> --candidate <candidateDeployme
 Cancel stops one non-terminal deployment attempt. It does not delete deployment history, logs, events, runtime artifacts, route intent, the Resource, or environment configuration.
 
 Run `appaloft deployments cancel <deploymentId> --confirm <deploymentId>` or call `POST /api/deployments/{deploymentId}/cancel`. The confirmation value must exactly match the deployment id. Terminal attempts such as succeeded, failed, canceled, or rolled-back deployments are rejected.
+
+<h2 id="deployment-recovery-stale-attempts">Reconcile an attempt with no durable activity</h2>
+
+When a deployment remains created, planning, planned, running, or cancel-requested, first run
+`appaloft deployments stale --stale-after-seconds 900`. The query uses durable deployment status
+and timeline activity; a disconnected browser or log stream never mutates the attempt.
+
+After confirming that execution ownership was lost, pass the returned `stateVersion`:
+
+```bash
+appaloft deployments reconcile-stale <deploymentId> \
+  --state-version <stateVersion> \
+  --stale-after-seconds 900 \
+  --confirm <deploymentId>
+```
+
+The command re-reads state under resource-runtime coordination. New activity, a changed state
+version, a threshold that is no longer met, or a terminal attempt causes rejection. Success marks
+the historical attempt `interrupted` while preserving its timeline and recovery evidence. Use
+recovery readiness before retrying or redeploying.
 
 <h2 id="deployment-recovery-archive-prune">Archive and prune attempts</h2>
 

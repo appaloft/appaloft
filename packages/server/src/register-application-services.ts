@@ -324,6 +324,8 @@ import {
   ListSourceEventsQueryService,
   ListSourceLinksQueryHandler,
   ListSshCredentialsQueryService,
+  ListStaleDeploymentAttemptsQueryHandler,
+  ListStaleDeploymentAttemptsQueryService,
   ListStaticArtifactPublicationsQueryHandler,
   ListStorageVolumeBackupsQueryHandler,
   ListStorageVolumeBackupsQueryService,
@@ -415,6 +417,8 @@ import {
   QueryEntitlementsQueryService,
   ReactivateOrganizationMemberCommandHandler,
   ReactivateOrganizationMemberUseCase,
+  ReconcileStaleDeploymentCommandHandler,
+  ReconcileStaleDeploymentUseCase,
   RecordUsageIntentCommandHandler,
   RecordUsageIntentUseCase,
   RedeployDeploymentCommandHandler,
@@ -2528,6 +2532,7 @@ export function registerApplicationServices(
   container.registerSingleton(ForceRedeployDeploymentCommandHandler);
   container.registerSingleton(RollbackDeploymentCommandHandler);
   container.registerSingleton(CancelDeploymentCommandHandler);
+  container.registerSingleton(ReconcileStaleDeploymentCommandHandler);
   container.registerSingleton(ArchiveDeploymentCommandHandler);
   container.registerSingleton(PruneDeploymentsCommandHandler);
   container.registerSingleton(StopResourceRuntimeCommandHandler);
@@ -3405,6 +3410,10 @@ export function registerApplicationServices(
   );
   container.registerSingleton(tokens.rollbackDeploymentUseCase, RollbackDeploymentUseCase);
   container.registerSingleton(tokens.cancelDeploymentUseCase, CancelDeploymentUseCase);
+  container.registerSingleton(
+    tokens.reconcileStaleDeploymentUseCase,
+    ReconcileStaleDeploymentUseCase,
+  );
   container.registerSingleton(tokens.archiveDeploymentUseCase, ArchiveDeploymentUseCase);
   container.registerSingleton(tokens.pruneDeploymentsUseCase, PruneDeploymentsUseCase);
   container.registerSingleton(tokens.cleanupPreviewUseCase, CleanupPreviewUseCase);
@@ -3462,6 +3471,11 @@ export function registerApplicationServices(
   container.registerSingleton(tokens.showCertificateQueryService, ShowCertificateQueryService);
   container.registerSingleton(tokens.countDeploymentsQueryService, CountDeploymentsQueryService);
   container.registerSingleton(tokens.listDeploymentsQueryService, ListDeploymentsQueryService);
+  container.registerSingleton(ListStaleDeploymentAttemptsQueryHandler);
+  container.registerSingleton(
+    tokens.listStaleDeploymentAttemptsQueryService,
+    ListStaleDeploymentAttemptsQueryService,
+  );
   container.registerSingleton(tokens.showDeploymentQueryService, ShowDeploymentQueryService);
   container.registerSingleton(tokens.deploymentPlanQueryService, DeploymentPlanQueryService);
   container.registerSingleton(tokens.deploymentProofQueryService, DeploymentProofQueryService);

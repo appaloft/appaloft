@@ -919,6 +919,7 @@ const serverDeploymentStatusSchema = z.enum([
   "succeeded",
   "failed",
   "canceled",
+  "interrupted",
   "rolled-back",
 ]);
 
@@ -1760,6 +1761,7 @@ export const resourceAccessRouteSummarySchema = z.object({
     "succeeded",
     "failed",
     "canceled",
+    "interrupted",
     "rolled-back",
   ]),
   pathPrefix: z.string(),
@@ -2099,6 +2101,7 @@ export const resourceHealthDeploymentContextSchema = z.object({
     "succeeded",
     "failed",
     "canceled",
+    "interrupted",
     "rolled-back",
   ]),
   createdAt: z.string(),
@@ -2292,6 +2295,7 @@ export const resourceSummarySchema = z.object({
       "succeeded",
       "failed",
       "canceled",
+      "interrupted",
       "rolled-back",
     ])
     .optional(),
@@ -2610,6 +2614,7 @@ export const resourceDetailIdentitySchema = z.object({
       "succeeded",
       "failed",
       "canceled",
+      "interrupted",
       "rolled-back",
     ])
     .optional(),
@@ -4778,7 +4783,9 @@ export const deploymentTimelineEntrySchema = z.object({
   phase: z.enum(["detect", "plan", "package", "deploy", "verify", "rollback"]).optional(),
   level: z.enum(["debug", "info", "warn", "error"]),
   message: z.string(),
-  status: z.enum(["running", "succeeded", "failed", "canceled", "rolled-back"]).optional(),
+  status: z
+    .enum(["running", "succeeded", "failed", "canceled", "interrupted", "rolled-back"])
+    .optional(),
   stream: z.enum(["stdout", "stderr"]).optional(),
   step: z
     .object({
@@ -5060,6 +5067,7 @@ export const deploymentSummarySchema = z.object({
     "succeeded",
     "failed",
     "canceled",
+    "interrupted",
     "rolled-back",
   ]),
   triggerKind: z.enum(["create", "retry", "redeploy", "force-redeploy", "rollback"]).optional(),
@@ -5183,6 +5191,29 @@ export const cancelDeploymentResponseSchema = z.object({
   id: z.string(),
   status: z.literal("canceled"),
   canceledAt: z.string(),
+});
+export const reconcileStaleDeploymentResponseSchema = z.object({
+  id: z.string(),
+  status: z.literal("interrupted"),
+  interruptedAt: z.string(),
+});
+export const staleDeploymentAttemptSummarySchema = z.object({
+  deploymentId: z.string(),
+  projectId: z.string(),
+  environmentId: z.string(),
+  resourceId: z.string(),
+  status: z.enum(["created", "planning", "planned", "running", "cancel-requested"]),
+  latestActivityAt: z.string(),
+  staleForSeconds: z.number().int().nonnegative(),
+  staleAfterSeconds: z.number().int().positive(),
+  stateVersion: z.string(),
+  runtimeCancellationRequired: z.boolean(),
+});
+export const listStaleDeploymentAttemptsResponseSchema = z.object({
+  schemaVersion: z.literal("deployments.stale-attempts/v1"),
+  items: z.array(staleDeploymentAttemptSummarySchema),
+  checkedAt: z.string(),
+  staleAfterSeconds: z.number().int().positive(),
 });
 export const archiveDeploymentResponseSchema = z.object({
   id: z.string(),
@@ -6487,6 +6518,7 @@ export const resourceDiagnosticDeploymentSchema = z.object({
     "succeeded",
     "failed",
     "canceled",
+    "interrupted",
     "rolled-back",
   ]),
   lifecyclePhase: z.enum([
@@ -6498,6 +6530,7 @@ export const resourceDiagnosticDeploymentSchema = z.object({
     "succeeded",
     "failed",
     "canceled",
+    "interrupted",
     "rolled-back",
   ]),
   runtimePlanId: z.string(),

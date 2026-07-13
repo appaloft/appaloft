@@ -3891,6 +3891,11 @@ export const publicDocsOperationCoverage = [
   },
   { operationKey: "deployments.create", status: "documented", topicId: "deployment.lifecycle" },
   { operationKey: "deployments.list", status: "documented", topicId: "deployment.lifecycle" },
+  {
+    operationKey: "deployments.stale-attempts",
+    status: "documented",
+    topicId: "deployment.recovery-readiness",
+  },
   { operationKey: "deployments.count", status: "documented", topicId: "deployment.lifecycle" },
   { operationKey: "deployments.show", status: "documented", topicId: "deployment.lifecycle" },
   { operationKey: "deployments.proof", status: "documented", topicId: "deployment.proof" },
@@ -3922,6 +3927,11 @@ export const publicDocsOperationCoverage = [
   },
   {
     operationKey: "deployments.cancel",
+    status: "documented",
+    topicId: "deployment.recovery-readiness",
+  },
+  {
+    operationKey: "deployments.reconcile-stale",
     status: "documented",
     topicId: "deployment.recovery-readiness",
   },

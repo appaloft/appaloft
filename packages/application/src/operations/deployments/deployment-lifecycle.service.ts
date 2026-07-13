@@ -111,6 +111,16 @@ export class DeploymentLifecycleService {
     });
   }
 
+  interrupt(deployment: Deployment, timeline: DeploymentTimelineJournalEntry[] = []): Result<void> {
+    const { clock } = this;
+
+    return safeTry(function* () {
+      const finishedAt = yield* FinishedAt.create(clock.now());
+      yield* deployment.interrupt(finishedAt, timeline);
+      return ok(undefined);
+    });
+  }
+
   failExecution(deployment: Deployment, error: DomainError): Result<void> {
     const { clock } = this;
 

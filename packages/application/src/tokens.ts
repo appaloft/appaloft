@@ -593,6 +593,7 @@ export const tokens = {
   forceRedeployDeploymentUseCase: Symbol.for("appaloft.force_redeploy_deployment_use_case"),
   rollbackDeploymentUseCase: Symbol.for("appaloft.rollback_deployment_use_case"),
   cancelDeploymentUseCase: Symbol.for("appaloft.cancel_deployment_use_case"),
+  reconcileStaleDeploymentUseCase: Symbol.for("appaloft.reconcile_stale_deployment_use_case"),
   archiveDeploymentUseCase: Symbol.for("appaloft.archive_deployment_use_case"),
   pruneDeploymentsUseCase: Symbol.for("appaloft.prune_deployments_use_case"),
   pruneResourceRuntimeControlAttemptsUseCase: Symbol.for(
@@ -629,6 +630,9 @@ export const tokens = {
   showCertificateQueryService: Symbol.for("appaloft.show_certificate_query_service"),
   countDeploymentsQueryService: Symbol.for("appaloft.count_deployments_query_service"),
   listDeploymentsQueryService: Symbol.for("appaloft.list_deployments_query_service"),
+  listStaleDeploymentAttemptsQueryService: Symbol.for(
+    "appaloft.list_stale_deployment_attempts_query_service",
+  ),
   showDeploymentQueryService: Symbol.for("appaloft.show_deployment_query_service"),
   deploymentPlanQueryService: Symbol.for("appaloft.deployment_plan_query_service"),
   deploymentProofQueryService: Symbol.for("appaloft.deployment_proof_query_service"),

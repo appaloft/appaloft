@@ -358,7 +358,7 @@ export interface DeploymentTimelineEntry {
   phase?: DeploymentProgressPhase;
   level: LogLevel;
   message: string;
-  status?: DeploymentProgressStatus | "canceled" | "rolled-back";
+  status?: DeploymentProgressStatus | "canceled" | "interrupted" | "rolled-back";
   stream?: "stdout" | "stderr";
   step?: {
     current: number;
@@ -5934,6 +5934,26 @@ export interface DeploymentAttemptRecoverySummary {
   rollbackReady: boolean;
   rollbackCandidateCount: number;
   blockedReasonCodes: string[];
+}
+
+export interface DeploymentStaleAttemptSummary {
+  deploymentId: string;
+  projectId: string;
+  environmentId: string;
+  resourceId: string;
+  status: "created" | "planning" | "planned" | "running" | "cancel-requested";
+  latestActivityAt: string;
+  staleForSeconds: number;
+  staleAfterSeconds: number;
+  stateVersion: string;
+  runtimeCancellationRequired: boolean;
+}
+
+export interface DeploymentStaleAttemptsResult {
+  schemaVersion: "deployments.stale-attempts/v1";
+  items: DeploymentStaleAttemptSummary[];
+  checkedAt: string;
+  staleAfterSeconds: number;
 }
 
 export interface DeploymentDetail {
