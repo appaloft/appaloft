@@ -20,6 +20,15 @@ describe("project detail page structure", () => {
     expect(primaryRowSource).toContain("i18nKeys.console.projects.resourcesTitle");
     expect(primaryRowSource).toContain("i18nKeys.console.projects.publicAccessTitle");
     expect(primaryRowSource).not.toContain("i18nKeys.console.projects.latestDeploymentTitle");
+    expect(projectSource).toContain("xl:grid-rows-[auto_auto]");
+    expect(primaryRowSource.match(/grid gap-5 xl:row-span-2 xl:grid-rows-subgrid/g)?.length).toBe(
+      2,
+    );
+    expect(primaryRowSource).toContain("data-project-overview-resources");
+    expect(primaryRowSource).toContain("data-project-overview-public-access");
+    expect(primaryRowSource).toContain("data-project-overview-resources-content");
+    expect(primaryRowSource).toContain("data-project-overview-public-access-content");
+    expect(primaryRowSource).not.toContain("console-side-panel");
 
     const statusGridOpenIndex = projectSource.lastIndexOf("<section", statusGridIndex);
     const statusGridSource = projectSource.slice(statusGridOpenIndex, runtimeMonitorIndex);
