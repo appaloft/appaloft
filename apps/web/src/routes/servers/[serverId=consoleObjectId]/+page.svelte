@@ -44,6 +44,7 @@
   import * as Dialog from "$lib/components/ui/dialog";
   import { Input } from "$lib/components/ui/input";
   import { ScrollArea } from "$lib/components/ui/scroll-area";
+  import ConsoleDataSkeleton from "$lib/components/console/ConsoleDataSkeleton.svelte";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import * as Tabs from "$lib/components/ui/tabs";
   import { webDocsHrefs } from "$lib/console/docs-help";
@@ -936,25 +937,22 @@
   title={server?.name ?? $t(i18nKeys.console.servers.pageTitle)}
   description={$t(i18nKeys.console.servers.detailDescription)}
 >
-  <Skeleton
-    name="server-detail"
-    loading={pageLoading}
-    animate="pulse"
-    transition
-  >
-    {#snippet fallback()}
-      <div
-        class="min-h-[32rem] w-full animate-pulse rounded-lg bg-muted/50"
-        aria-hidden="true"
-        data-server-detail-loading-skeleton
-      ></div>
-    {/snippet}
-    {#snippet fixture()}
-      <div class="min-h-[32rem] space-y-4 p-4" aria-hidden="true" data-server-detail-loading-skeleton>
+  {#if pageLoading}
+<div class="min-h-[32rem] space-y-4 p-4" aria-hidden="true" data-server-detail-loading-skeleton>
         <div class="space-y-2">
           <Badge class="console-page-kicker" variant="outline">{$t(i18nKeys.common.domain.server)}</Badge>
-          <h1 class="text-2xl font-semibold">Server name</h1>
-          <p class="text-sm text-muted-foreground">host.example.com · ssh credential ready</p>
+          <ConsoleDataSkeleton name="detail-title" loading={true} class="block">
+            {#snippet capture()}
+              <h1 class="text-2xl font-semibold">Server name</h1>
+            {/snippet}
+            <h1 class="text-2xl font-semibold">Server name</h1>
+          </ConsoleDataSkeleton>
+          <ConsoleDataSkeleton name="detail-description" loading={true} class="block">
+            {#snippet capture()}
+              <p class="text-sm text-muted-foreground">host.example.com · ssh credential ready</p>
+            {/snippet}
+            <p class="text-sm text-muted-foreground">host.example.com · ssh credential ready</p>
+          </ConsoleDataSkeleton>
         </div>
         <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {#each ["Provider", "Host", "Port", "Resources"] as label (label)}
@@ -968,9 +966,6 @@
           Server overview content
         </div>
       </div>
-    {/snippet}
-    {#if pageLoading}
-      <div class="min-h-[32rem]" aria-hidden="true" data-server-detail-loading-skeleton></div>
     {:else if !server}
     <section class="console-panel space-y-5 p-5">
       <Badge class="console-page-kicker" variant="outline">{$t(i18nKeys.errors.backend.notFound)}</Badge>
@@ -2076,7 +2071,6 @@
         </Tabs.Root>
     </div>
   {/if}
-  </Skeleton>
 </ConsoleShell>
 
 <Dialog.Root bind:open={serverLifecycleDialogOpen} onOpenChange={(open) => {

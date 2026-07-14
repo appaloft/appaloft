@@ -5,22 +5,18 @@ const detailPages = [
   {
     marker: "data-project-detail-loading-skeleton",
     path: "../../routes/projects/[projectId=consoleObjectId]/+page.svelte",
-    name: 'name="project-detail"',
   },
   {
     marker: "data-resource-detail-loading-skeleton",
     path: "../../routes/resources/[resourceId=consoleObjectId]/+page.svelte",
-    name: 'name="resource-detail"',
   },
   {
     marker: "data-deployment-detail-loading-skeleton",
     path: "../../routes/deployments/[deploymentId=deploymentId]/+page.svelte",
-    name: 'name="deployment-detail"',
   },
   {
     marker: "data-server-detail-loading-skeleton",
     path: "../../routes/servers/[serverId=consoleObjectId]/+page.svelte",
-    name: 'name="server-detail"',
   },
 ] as const;
 
@@ -35,12 +31,10 @@ describe("console detail loading skeletons", () => {
       const source = await readFile(new URL(page.path, import.meta.url), "utf8");
 
       expect(source).toContain(page.marker);
-      expect(source).toContain(page.name);
-      expect(source).toContain('import { Skeleton } from "$lib/components/ui/skeleton";');
-      expect(source).toContain("loading={pageLoading}");
-      expect(source).toContain("{#snippet fallback()}");
-      expect(source).toContain("{#snippet fixture()}");
       expect(source).toContain("{#if pageLoading}");
+      // Granular data skeletons, not a single outer page blank.
+      expect(source).toContain("ConsoleDataSkeleton");
+      expect(source).not.toContain('name="project-detail" loading={pageLoading}');
       expect(source).not.toContain("<Skeleton class=");
       if (source.includes("ConsoleDetailTabs")) {
         expect(detailTabsSource).toContain("detailTabsClass");
@@ -66,20 +60,20 @@ describe("console detail loading skeletons", () => {
     );
   });
 
-  test("[PROJECT-DETAIL-SKELETON-001] uses boneyard fixture with balanced resource placeholders", async () => {
+  test("[PROJECT-DETAIL-SKELETON-001] loading structure keeps balanced resource placeholders", async () => {
     const source = await readFile(
       new URL("../../routes/projects/[projectId=consoleObjectId]/+page.svelte", import.meta.url),
       "utf8",
     );
 
-    const fixtureSource = source.slice(
-      source.indexOf('name="project-detail"'),
-      source.indexOf("{#if pageLoading}"),
+    const loadingSource = source.slice(
+      source.indexOf("data-project-detail-loading-skeleton"),
+      source.indexOf("{:else if !project}"),
     );
 
-    expect(fixtureSource).toContain("{#snippet fixture()}");
-    expect(fixtureSource).toContain("{#each Array.from({ length: 2 }) as _, groupIndex");
-    expect(fixtureSource).not.toContain("groupIndex === 0 ? 2 : 1");
-    expect(fixtureSource).not.toContain("<Skeleton class=");
+    expect(loadingSource).toContain("{#each Array.from({ length: 2 }) as _, groupIndex");
+    expect(loadingSource).toContain("ConsoleDataSkeleton");
+    expect(loadingSource).not.toContain("groupIndex === 0 ? 2 : 1");
+    expect(loadingSource).not.toContain("<Skeleton class=");
   });
 });

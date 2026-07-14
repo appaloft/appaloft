@@ -11,7 +11,6 @@
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import * as Dialog from "$lib/components/ui/dialog";
-  import { Skeleton } from "$lib/components/ui/skeleton";
   import { webDocsHrefs } from "$lib/console/docs-help";
   import { formatTime, resourceDetailHref } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
@@ -127,17 +126,8 @@
   breadcrumbs={previewEnvironmentBreadcrumbs}
 >
   <div class="p-4 md:p-6">
-  <Skeleton
-    name="preview-environment-detail-page"
-    loading={previewEnvironmentQuery.isPending}
-    animate="pulse"
-    transition
-  >
-    {#snippet fallback()}
-      <div class="min-h-[28rem] w-full animate-pulse rounded-lg bg-muted/50" aria-hidden="true"></div>
-    {/snippet}
-    {#snippet fixture()}
-      <div class="space-y-8">
+  {#if previewEnvironmentQuery.isPending}
+<div class="space-y-8">
         <section class="space-y-2">
           <p class="text-sm text-muted-foreground">Active</p>
           <h1 class="text-2xl font-semibold">pev_sample_preview</h1>
@@ -152,9 +142,6 @@
           {/each}
         </section>
       </div>
-    {/snippet}
-    {#if previewEnvironmentQuery.isPending}
-      <div class="min-h-[28rem]" aria-hidden="true"></div>
     {:else if previewEnvironmentQuery.error || !previewEnvironment}
     <section class="space-y-5 py-2">
       <Badge class="w-fit" variant="outline">
@@ -407,6 +394,5 @@
       </Dialog.Content>
     </Dialog.Root>
     {/if}
-  </Skeleton>
   </div>
 </ConsoleShell>

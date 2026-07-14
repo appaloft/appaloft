@@ -129,6 +129,7 @@
   import * as Popover from "$lib/components/ui/popover";
   import { ScrollArea } from "$lib/components/ui/scroll-area";
   import * as Select from "$lib/components/ui/select";
+  import ConsoleDataSkeleton from "$lib/components/console/ConsoleDataSkeleton.svelte";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import { Textarea } from "$lib/components/ui/textarea";
   import {
@@ -7729,21 +7730,8 @@
     },
   ]}
 >
-  <Skeleton
-    name="resource-detail"
-    loading={pageLoading}
-    animate="pulse"
-    transition
-  >
-    {#snippet fallback()}
-      <div
-        class="min-h-[32rem] w-full animate-pulse rounded-lg bg-muted/50"
-        aria-hidden="true"
-        data-resource-detail-loading-skeleton
-      ></div>
-    {/snippet}
-    {#snippet fixture()}
-      <div class="min-h-[32rem] space-y-4 p-4" aria-hidden="true" data-resource-detail-loading-skeleton>
+  {#if pageLoading}
+<div class="min-h-[32rem] space-y-4 p-4" aria-hidden="true" data-resource-detail-loading-skeleton>
         <div class="space-y-2">
           <h1 class="text-2xl font-semibold">Resource name</h1>
           <p class="text-sm text-muted-foreground">Resource overview for skeleton capture.</p>
@@ -7760,9 +7748,6 @@
           Resource detail content
         </div>
       </div>
-    {/snippet}
-    {#if pageLoading}
-      <div class="min-h-[32rem]" aria-hidden="true" data-resource-detail-loading-skeleton></div>
     {:else if !resource}
     <section class="space-y-5 p-4 md:p-6">
       <Badge class="w-fit" variant="outline">{$t(i18nKeys.errors.backend.notFound)}</Badge>
@@ -13535,6 +13520,5 @@
       </Dialog.Root>
     </div>
   {/if}
-  </Skeleton>
 </ConsoleShell>
 {/if}

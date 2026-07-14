@@ -268,12 +268,8 @@
     { label: $t(i18nKeys.console.previewPolicies.pageTitle) },
   ]}
 >
-  <Skeleton name="preview-policies-page" loading={pageLoading} animate="pulse" transition>
-    {#snippet fallback()}
-      <div class="min-h-[28rem] w-full animate-pulse rounded-lg bg-muted/50" aria-hidden="true"></div>
-    {/snippet}
-    {#snippet fixture()}
-      <ConsoleResourceCanvas class="space-y-8">
+  {#if pageLoading}
+<ConsoleResourceCanvas class="space-y-8">
         <section class="console-panel space-y-3 p-5">
           <h2 class="text-lg font-semibold">Policy scope</h2>
           <p class="text-sm text-muted-foreground">Project · sample-project</p>
@@ -289,9 +285,6 @@
           </div>
         </section>
       </ConsoleResourceCanvas>
-    {/snippet}
-    {#if pageLoading}
-      <div class="min-h-[28rem]" aria-hidden="true"></div>
     {:else if projects.length === 0}
       <ConsoleResourceCanvas>
         <section class="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
@@ -553,7 +546,6 @@
       </section>
       </ConsoleResourceCanvas>
     {/if}
-  </Skeleton>
 
   <Dialog.Root bind:open={scopeDialogOpen} onOpenChange={(open) => {
     if (!open) {

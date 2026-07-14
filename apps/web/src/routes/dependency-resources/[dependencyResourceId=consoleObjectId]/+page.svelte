@@ -568,17 +568,8 @@
   title={selectedDependencyResource?.name ?? $t(i18nKeys.console.dependencyResources.pageTitle)}
   description={$t(i18nKeys.console.dependencyResources.pageDescription)}
 >
-  <Skeleton
-    name="dependency-resource-detail-page"
-    loading={pageLoading}
-    animate="pulse"
-    transition
-  >
-    {#snippet fallback()}
-      <div class="min-h-[28rem] w-full animate-pulse rounded-lg bg-muted/50" aria-hidden="true"></div>
-    {/snippet}
-    {#snippet fixture()}
-      <div class="space-y-5 p-4 md:p-6">
+  {#if pageLoading}
+<div class="space-y-5 p-4 md:p-6">
         <header class="space-y-2">
           <h1 class="text-2xl font-semibold">postgres-main</h1>
           <p class="text-sm text-muted-foreground">Dependency resource detail</p>
@@ -588,9 +579,6 @@
           <p class="text-sm text-muted-foreground">postgres · ready</p>
         </section>
       </div>
-    {/snippet}
-    {#if pageLoading}
-      <div class="min-h-[28rem]" aria-hidden="true"></div>
     {:else if dependencyResourceError}
     <div class="p-4 md:p-6">
       <ConsoleStatePanel
@@ -903,7 +891,6 @@
       </Tabs.Root>
     </section>
     {/if}
-  </Skeleton>
 
   {#if selectedDependencyResource}
   <Dialog.Root bind:open={backupCreateDialogOpen}>
