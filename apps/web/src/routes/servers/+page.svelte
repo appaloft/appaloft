@@ -547,12 +547,8 @@
       {/if}
     </section>
 
-    <Skeleton name="servers-list-page" loading={pageLoading} animate="pulse" transition>
-      {#snippet fallback()}
-        <div class="min-h-96 w-full animate-pulse rounded-lg bg-muted/50" aria-hidden="true" data-server-list-skeleton></div>
-      {/snippet}
-      {#snippet fixture()}
-        <section class="space-y-3" data-server-list-skeleton>
+    {#if pageLoading}
+<section class="space-y-3" data-server-list-skeleton>
           <div>
             <h2 class="text-lg font-semibold">Servers</h2>
             <p class="mt-1 text-sm text-muted-foreground">Registered deployment targets</p>
@@ -562,9 +558,6 @@
             <p class="mt-1 text-sm text-muted-foreground">ready · 4 resources</p>
           </article>
         </section>
-      {/snippet}
-    {#if pageLoading}
-      <div class="min-h-96" aria-hidden="true" data-server-list-skeleton></div>
     {:else if visibleServers.length === 0}
       <ConsoleEmptyState
         tone="server"
@@ -795,7 +788,6 @@
           </div>
         </section>
     {/if}
-    </Skeleton>
   </ConsoleResourceCanvas>
 
   <Dialog.Root bind:open={serverCreateDialogOpen} onOpenChange={setServerCreateDialogOpen}>

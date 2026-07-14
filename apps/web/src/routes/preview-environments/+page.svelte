@@ -7,7 +7,6 @@
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
-  import { Skeleton } from "$lib/components/ui/skeleton";
   import { readErrorMessage } from "$lib/api/client";
   import { webDocsHrefs } from "$lib/console/docs-help";
   import { createConsoleQueries } from "$lib/console/queries";
@@ -80,17 +79,8 @@
   ]}
 >
   <div class="p-4 md:p-6">
-  <Skeleton
-    name="preview-environments-list-page"
-    loading={previewEnvironmentsLoading}
-    animate="pulse"
-    transition
-  >
-    {#snippet fallback()}
-      <div class="min-h-96 w-full animate-pulse rounded-lg bg-muted/50" aria-hidden="true"></div>
-    {/snippet}
-    {#snippet fixture()}
-      <div class="space-y-8">
+  {#if previewEnvironmentsLoading}
+<div class="space-y-8">
         <section class="space-y-2">
           <h1 class="text-2xl font-semibold">Preview environments</h1>
           <p class="text-sm text-muted-foreground">Ephemeral environments for pull requests.</p>
@@ -112,9 +102,6 @@
           </article>
         </div>
       </div>
-    {/snippet}
-    {#if previewEnvironmentsLoading}
-      <div class="min-h-96" aria-hidden="true"></div>
     {:else if previewEnvironments.length === 0}
     <section class="space-y-5 py-2">
       <Badge class="w-fit" variant="outline">
@@ -291,6 +278,5 @@
       </section>
     </div>
     {/if}
-  </Skeleton>
   </div>
 </ConsoleShell>
