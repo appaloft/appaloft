@@ -2,6 +2,59 @@
 @import "./tokens.css";
 @import "./tailwind.css";
 
+:root,
+:root[data-theme="light"],
+.light {
+  --background: #f4f7fb;
+  --foreground: #152238;
+  --card: #ffffff;
+  --card-foreground: #152238;
+  --popover: #ffffff;
+  --popover-foreground: #152238;
+  --secondary: #edf2f8;
+  --secondary-foreground: #253851;
+  --muted: #eef3f8;
+  --muted-foreground: #5e7089;
+  --accent: #e8f0ff;
+  --accent-foreground: #2452bd;
+  --border: #c9d4e3;
+  --input: #b5c3d6;
+  --sidebar: #eef3f8;
+  --sidebar-foreground: #203149;
+  --sidebar-accent: #dfe8f6;
+  --sidebar-accent-foreground: #152b4d;
+  --sidebar-border: #c2cede;
+  --radius: 0.25rem;
+  --shadow-2xs: 0 1px 0 hsl(214 48% 19% / 7%);
+  --shadow-xs: 0 1px 1px hsl(214 48% 19% / 7%), 0 1px 0 hsl(214 48% 19% / 5%);
+  --shadow-sm: 0 2px 4px -2px hsl(214 48% 19% / 14%), 0 1px 0 hsl(214 48% 19% / 6%);
+  --shadow: 0 4px 8px -5px hsl(214 48% 19% / 18%), 0 1px 0 hsl(214 48% 19% / 6%);
+  --shadow-md: 0 8px 16px -10px hsl(214 48% 19% / 24%), 0 1px 0 hsl(214 48% 19% / 7%);
+}
+
+.dark,
+:root[data-theme="dark"] {
+  --background: #0c131f;
+  --foreground: #edf3fc;
+  --card: #121c2a;
+  --card-foreground: #edf3fc;
+  --popover: #162132;
+  --popover-foreground: #edf3fc;
+  --secondary: #1b283b;
+  --secondary-foreground: #e8eff9;
+  --muted: #182538;
+  --muted-foreground: #a6b5c9;
+  --accent: #203553;
+  --accent-foreground: #f2f6fd;
+  --border: #34445b;
+  --input: #465873;
+  --sidebar: #101a28;
+  --sidebar-foreground: #edf3fc;
+  --sidebar-accent: #1d304a;
+  --sidebar-accent-foreground: #f2f6fd;
+  --sidebar-border: #35465f;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

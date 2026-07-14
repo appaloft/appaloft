@@ -48,17 +48,21 @@ Resource -> Access -> Health -> Logs -> Diagnostics -> Terminal
 
 ## Color Roles
 
-- Console canvas: `#ffffff` for the page background and main workspace outside object panels. It
-  should read as white, not light blue, heavy gray-blue, cream, sand, beige, or yellow.
+- Console canvas: cool structural gray `#f4f7fb` for the workspace outside object panels. It must
+  stay neutral and low-chroma rather than reading as blue decoration, heavy gray-blue, cream, sand,
+  beige, or yellow.
 - Console panel: `#ffffff` for object panels, tables, sheets, popovers, and form surfaces.
-- Console ink: `#1b2738` for primary text and active tab text. Do not use pure black as the brand
+- Console ink: `#152238` for primary text and active tab text. Do not use pure black as the brand
   fill for primary actions.
 - Appaloft blue: `#4e84ff`, taken from the canonical logo asset, for primary actions, selected
   states, links, focus rings, and running/planning status. Use it sparingly.
-- Appaloft soft blue: `#f2f7ff` and `#f8fbff` for selected row, subtle callout, and low-emphasis
+- Appaloft soft blue: `#e8f0ff` and `#edf2f8` for selected row, subtle callout, and low-emphasis
   CTA backgrounds.
-- Quiet border: `#d9e2f2` for panel boundaries, table rows, input borders, and dividers.
-- Input hairline: `#a8bdd8` for form controls so fields stay visible without heavy outlines.
+- Quiet border: `#c9d4e3` for panel boundaries, table rows, and dividers.
+- Input hairline: `#b5c3d6` for form controls so fields remain more visible than passive panels.
+- Sidebar rail: `#eef3f8` with `#c2cede` separation. Active navigation keeps the soft-blue row tint
+  and adds a 2px Appaloft-blue inset rail so location remains legible without pill navigation. The
+  collapsed icon rail uses a compact Appaloft-blue active square with white ink.
 - Ready green: `oklch(0.58 0.18 145)` for healthy, ready, succeeded, or configured-positive
   states.
 - Failure red: `oklch(0.61 0.21 27)` for failed, unhealthy, destructive, or unsafe actions.
@@ -92,14 +96,17 @@ identity.
 - Component styling belongs in Tailwind utility classes.
 - Global CSS is limited to design tokens, Tailwind theme mapping, base typography, and framework
   adapters.
-- Buttons are compact rectangular controls with gently rounded 6px corners. Default product buttons
+- Buttons are compact rectangular controls with 2px corners. Default product buttons
   are 32px tall on desktop, use Appaloft blue for the single primary action, and avoid oversized
   pills.
+- Panels and overlays use 4px corners. Large card-like 12-16px rounding is not part of the console
+  grammar; full pills are reserved for badges, compact status, and intentionally pill-shaped input.
 - Form controls are 32px tall by default, with a consistent 4px label-to-control gap and visible
   input hairlines.
-- Default console borders use one quiet 1px hairline for inputs, primary panels, secondary panels,
-  metric strips, and data display rows. Show hierarchy with spacing, typography, and surface tint;
-  reserve stronger border color for hover, focus, selected, warning, and destructive states.
+- Default console borders use a quiet 1px hairline for primary panels, secondary panels, metric
+  strips, and data display rows. Inputs use the stronger input hairline. Show hierarchy with spacing,
+  typography, surface tint, and a crisp 1px directional shadow; reserve primary color for hover,
+  focus, selected, warning, and destructive states.
 - Cards frame repeated object tiles, framed tools, and empty states. Avoid nested cards.
 - Tables are dense, scan-friendly records with status badges, owner links, timestamps, and action
   affordances.

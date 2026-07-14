@@ -31,10 +31,10 @@
   .console-panel {
     position: relative;
     overflow: hidden;
-    border: 1px solid var(--input);
+    border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     background: var(--card);
-    box-shadow: var(--shadow-2xs);
+    box-shadow: var(--shadow-xs);
   }
 
   .dark .console-panel {
@@ -84,18 +84,18 @@
   }
 
   .console-subtle-panel {
-    border: 1px solid var(--input);
+    border: 1px solid var(--border);
     border-radius: var(--radius-md);
-    background: color-mix(in oklch, var(--muted) 24%, var(--card));
+    background: color-mix(in oklch, var(--muted) 68%, var(--card));
     box-shadow: none;
   }
 
   .console-side-panel {
-    border: 1px solid var(--input);
+    border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     background: var(--card);
     padding: 1rem;
-    box-shadow: var(--shadow-2xs);
+    box-shadow: var(--shadow-xs);
   }
 
   .dark .console-side-panel {
@@ -103,20 +103,20 @@
   }
 
   .console-section {
-    border-top: 1px solid var(--input);
+    border-top: 1px solid var(--border);
     padding-top: 1.25rem;
   }
 
   .console-record-list {
     overflow: hidden;
-    border: 1px solid var(--input);
+    border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     background: var(--card);
-    box-shadow: var(--shadow-2xs);
+    box-shadow: var(--shadow-xs);
   }
 
   .console-record-list > :not([hidden]) ~ :not([hidden]) {
-    border-top: 1px solid var(--input);
+    border-top: 1px solid var(--border);
   }
 
   .console-record-row {
@@ -131,7 +131,7 @@
   }
 
   .console-record-row:hover {
-    background: color-mix(in oklch, var(--muted) 42%, transparent);
+    background: color-mix(in oklch, var(--primary) 5%, var(--card));
   }
 
   .console-record-row:hover::before {
@@ -145,10 +145,10 @@
   .console-metric-strip {
     display: grid;
     overflow: hidden;
-    border: 1px solid var(--input);
+    border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     background: var(--card);
-    box-shadow: var(--shadow-2xs);
+    box-shadow: var(--shadow-xs);
   }
 
   .console-metric-strip > * {
@@ -158,7 +158,7 @@
 
   @media (min-width: 768px) {
     .console-metric-strip > * + * {
-      border-left: 1px solid var(--input);
+      border-left: 1px solid var(--border);
     }
   }
 
@@ -171,14 +171,14 @@
     }
 
     .console-metric-strip > * + * {
-      border-left: 1px solid var(--input);
+      border-left: 1px solid var(--border);
     }
   }
 
   .console-form-section {
     display: grid;
     gap: 1rem;
-    border-top: 1px solid var(--input);
+    border-top: 1px solid var(--border);
     padding-top: 1.25rem;
   }
 
@@ -303,8 +303,16 @@
     color: color-mix(in oklch, var(--sidebar-foreground) 54%, transparent);
   }
 
-  [data-slot="sidebar-menu-button"] {
+  [data-sidebar="menu-button"] {
     border-radius: var(--radius-md);
+  }
+
+  [data-sidebar="menu-button"][data-active="true"] {
+    box-shadow: inset 2px 0 0 var(--sidebar-primary);
+  }
+
+  [data-sidebar="menu-button"][data-active="true"] :where(svg) {
+    color: var(--sidebar-primary);
   }
 
   [data-slot="sidebar-wrapper"] :where([data-slot^="sidebar"], [data-sidebar]),
@@ -315,15 +323,15 @@
     transition: none !important;
   }
 
-  [data-slot="sidebar-menu-button"],
-  [data-slot="sidebar-menu-button"] *,
-  [data-slot="sidebar-menu-sub-button"],
-  [data-slot="sidebar-menu-sub-button"] * {
+  [data-sidebar="menu-button"],
+  [data-sidebar="menu-button"] *,
+  [data-sidebar="menu-sub-button"],
+  [data-sidebar="menu-sub-button"] * {
     transition: none !important;
   }
 
-  [data-slot="sidebar-menu-button"]::before,
-  [data-slot="sidebar-menu-sub-button"]::before {
+  [data-sidebar="menu-button"]::before,
+  [data-sidebar="menu-sub-button"]::before {
     transition: none !important;
   }
 
@@ -335,8 +343,9 @@
   }
 
   [data-console-header] {
-    border-bottom-color: var(--input);
-    background: var(--card);
+    border-bottom-color: var(--border);
+    background: color-mix(in oklch, var(--card) 94%, var(--muted));
+    box-shadow: var(--shadow-2xs);
   }
 
   .console-owner-header {
@@ -367,6 +376,15 @@
 
   [data-console-main] :where([class~="rounded-md"][class~="border"]) {
     border-radius: var(--radius-md);
+    border-color: var(--border);
+  }
+
+  [data-console-main]
+    :where(
+      [data-slot="input"].rounded-md,
+      [data-slot="textarea"].rounded-md,
+      [data-slot="select-trigger"].rounded-md
+    ) {
     border-color: var(--input);
   }
 
@@ -396,6 +414,18 @@
 }
 
 @layer utilities {
+  [data-slot="sidebar"][data-collapsible="icon"] [data-sidebar="menu-button"][data-active="true"] {
+    background: var(--sidebar-primary);
+    color: var(--sidebar-primary-foreground);
+    box-shadow: var(--shadow-xs);
+  }
+
+  [data-slot="sidebar"][data-collapsible="icon"]
+    [data-sidebar="menu-button"][data-active="true"]
+    :where(svg) {
+    color: currentColor;
+  }
+
   .console-stepper {
     background: var(--card);
   }
