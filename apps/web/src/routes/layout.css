@@ -86,7 +86,7 @@
   .console-subtle-panel {
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
-    background: color-mix(in oklch, var(--muted) 68%, var(--card));
+    background: var(--card);
     box-shadow: none;
   }
 

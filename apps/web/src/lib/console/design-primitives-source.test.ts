@@ -34,4 +34,12 @@ describe("community design primitives CSS source", () => {
     expect(layoutCss).toContain("background: color-mix(in oklch, var(--primary) 5%, var(--card))");
     expect(emptyStateSource).toContain("border border-dashed bg-card");
   });
+
+  test("keeps ordinary subtle panels neutral instead of giving empty states a danger tint", async () => {
+    const layoutCss = await readFile(new URL("../../routes/layout.css", import.meta.url), "utf8");
+    const subtlePanelSource = layoutCss.match(/\.console-subtle-panel\s*\{([\s\S]*?)\}/)?.[1] ?? "";
+
+    expect(subtlePanelSource).toContain("background: var(--card)");
+    expect(subtlePanelSource).not.toMatch(/destructive|red|rose|pink|color-mix/);
+  });
 });

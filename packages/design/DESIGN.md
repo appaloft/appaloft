@@ -65,12 +65,14 @@ Resource -> Access -> Health -> Logs -> Diagnostics -> Terminal
   collapsed icon rail uses a compact Appaloft-blue active square with white ink.
 - Ready green: `oklch(0.58 0.18 145)` for healthy, ready, succeeded, or configured-positive
   states.
-- Failure red: `oklch(0.61 0.21 27)` for failed, unhealthy, destructive, or unsafe actions.
+- Failure red: `oklch(0.61 0.21 27)` for failed, unhealthy, destructive, or unsafe actions. Empty,
+  unavailable, unconfigured, and not-yet-created states stay on neutral card or muted surfaces.
 - Warning amber: `oklch(0.66 0.16 75)` for delayed readiness, warnings, or pending verification.
 - Muted text: `#64748d` for secondary labels, timestamps, descriptions, and placeholders.
 
 Avoid gradient backgrounds in the console. Depth comes from spacing, borders, typography, and
-restrained shadows. Semantic colors are only for real workflow meaning. Avoid warm yellow canvases,
+restrained shadows. Semantic colors are only for real workflow meaning; absence or missing setup is
+neutral until it represents a real failure or blocker. Avoid warm yellow canvases,
 deep navy-heavy chrome, black primary buttons, and generic shadcn neutral gray as the product
 identity.
 
