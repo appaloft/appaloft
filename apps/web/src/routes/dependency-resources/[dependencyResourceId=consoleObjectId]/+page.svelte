@@ -568,13 +568,30 @@
   title={selectedDependencyResource?.name ?? $t(i18nKeys.console.dependencyResources.pageTitle)}
   description={$t(i18nKeys.console.dependencyResources.pageDescription)}
 >
-  {#if pageLoading}
-    <div class="space-y-5 p-4 md:p-6">
-      <Skeleton class="h-8 w-72" />
-      <Skeleton class="h-44 w-full" />
-      <Skeleton class="h-80 w-full" />
-    </div>
-  {:else if dependencyResourceError}
+  <Skeleton
+    name="dependency-resource-detail-page"
+    loading={pageLoading}
+    animate="pulse"
+    transition
+  >
+    {#snippet fallback()}
+      <div class="min-h-[28rem] w-full animate-pulse rounded-lg bg-muted/50" aria-hidden="true"></div>
+    {/snippet}
+    {#snippet fixture()}
+      <div class="space-y-5 p-4 md:p-6">
+        <header class="space-y-2">
+          <h1 class="text-2xl font-semibold">postgres-main</h1>
+          <p class="text-sm text-muted-foreground">Dependency resource detail</p>
+        </header>
+        <section class="console-panel space-y-3 p-5">
+          <h2 class="text-lg font-semibold">Overview</h2>
+          <p class="text-sm text-muted-foreground">postgres · ready</p>
+        </section>
+      </div>
+    {/snippet}
+    {#if pageLoading}
+      <div class="min-h-[28rem]" aria-hidden="true"></div>
+    {:else if dependencyResourceError}
     <div class="p-4 md:p-6">
       <ConsoleStatePanel
         tone="error"
@@ -704,28 +721,50 @@
                 {$t(i18nKeys.console.dependencyResources.backupDescription)}
               </p>
             </div>
-            {#if selectedResourceBackupsQuery.isPending}
-              <Skeleton class="h-20 w-full" />
-            {:else}
-              <dl class="grid gap-2 text-sm">
-                <div class="flex items-center justify-between gap-3">
-                  <dt class="text-muted-foreground">
-                    {$t(i18nKeys.console.dependencyResources.latestBackup)}
-                  </dt>
-                  <dd class="min-w-0 truncate font-medium">
-                    {latestBackup ? backupLabel(latestBackup) : "-"}
-                  </dd>
-                </div>
-                <div class="flex items-center justify-between gap-3">
-                  <dt class="text-muted-foreground">
-                    {$t(i18nKeys.console.dependencyResources.backupStatus)}
-                  </dt>
-                  <dd class="font-medium">
-                    {selectedBackups.length === 0 ? "0" : `${readyBackups.length} / ${selectedBackups.length}`}
-                  </dd>
-                </div>
-              </dl>
-            {/if}
+            <Skeleton
+              name="dependency-resource-backup-summary"
+              loading={selectedResourceBackupsQuery.isPending}
+              animate="pulse"
+              transition
+            >
+              {#snippet fallback()}
+                <div class="min-h-20 w-full animate-pulse rounded-md bg-muted/50" aria-hidden="true"></div>
+              {/snippet}
+              {#snippet fixture()}
+                <dl class="grid gap-2 text-sm">
+                  <div class="flex items-center justify-between gap-3">
+                    <dt class="text-muted-foreground">Latest backup</dt>
+                    <dd class="min-w-0 truncate font-medium">backup-sample</dd>
+                  </div>
+                  <div class="flex items-center justify-between gap-3">
+                    <dt class="text-muted-foreground">Backup status</dt>
+                    <dd class="font-medium">1 / 1</dd>
+                  </div>
+                </dl>
+              {/snippet}
+              {#if selectedResourceBackupsQuery.isPending}
+                <div class="min-h-20" aria-hidden="true"></div>
+              {:else}
+                <dl class="grid gap-2 text-sm">
+                  <div class="flex items-center justify-between gap-3">
+                    <dt class="text-muted-foreground">
+                      {$t(i18nKeys.console.dependencyResources.latestBackup)}
+                    </dt>
+                    <dd class="min-w-0 truncate font-medium">
+                      {latestBackup ? backupLabel(latestBackup) : "-"}
+                    </dd>
+                  </div>
+                  <div class="flex items-center justify-between gap-3">
+                    <dt class="text-muted-foreground">
+                      {$t(i18nKeys.console.dependencyResources.backupStatus)}
+                    </dt>
+                    <dd class="font-medium">
+                      {selectedBackups.length === 0 ? "0" : `${readyBackups.length} / ${selectedBackups.length}`}
+                    </dd>
+                  </div>
+                </dl>
+              {/if}
+            </Skeleton>
             <div class="grid gap-2 sm:grid-cols-2">
               <Button
                 class="w-full"
@@ -863,7 +902,8 @@
         </Tabs.Content>
       </Tabs.Root>
     </section>
-  {/if}
+    {/if}
+  </Skeleton>
 
   {#if selectedDependencyResource}
   <Dialog.Root bind:open={backupCreateDialogOpen}>

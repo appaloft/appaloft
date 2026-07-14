@@ -673,7 +673,23 @@
 
 {#if loading && presentation === "panel"}
   <div class={["space-y-3", className]} data-console-extension-panel-host={placement}>
-    <Skeleton class="h-28 w-full" />
+    <Skeleton
+      name="console-extension-panel-host"
+      loading={true}
+      animate="pulse"
+      transition
+    >
+      {#snippet fallback()}
+        <div class="min-h-28 w-full animate-pulse rounded-lg bg-muted/50" aria-hidden="true"></div>
+      {/snippet}
+      {#snippet fixture()}
+        <section class="console-panel space-y-2 p-5">
+          <h2 class="text-base font-semibold">Extension panel</h2>
+          <p class="text-sm text-muted-foreground">Sample extension panel content</p>
+        </section>
+      {/snippet}
+      <div class="min-h-28" aria-hidden="true"></div>
+    </Skeleton>
   </div>
 {:else if errorMessage && presentation === "panel"}
   <section
