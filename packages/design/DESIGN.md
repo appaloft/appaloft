@@ -110,6 +110,11 @@ identity.
   typography, surface tint, and a crisp 1px directional shadow; reserve primary color for hover,
   focus, selected, warning, and destructive states.
 - Cards frame repeated object tiles, framed tools, and empty states. Avoid nested cards.
+- Overview pages must not place variable-height primary content beside a vertical stack of summary
+  cards when that stack would delay the next full-width section. Keep equal-role summaries in their
+  own responsive grid: stretch cards to the shared desktop row, then let them return to natural
+  content height when stacked on narrow screens. Do not hard-code a shared total card height to
+  create visual alignment.
 - Tables are dense, scan-friendly records with status badges, owner links, timestamps, and action
   affordances.
 - Status badges use semantic colors and stay compact.

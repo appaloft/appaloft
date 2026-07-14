@@ -2,6 +2,34 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, test } from "vitest";
 
 describe("project detail page structure", () => {
+  test("[PROJECT-OVERVIEW-RHYTHM-001] keeps primary content and status summaries on independent layout rows", async () => {
+    const projectSource = await readFile(
+      new URL("../../routes/projects/[projectId=consoleObjectId]/+page.svelte", import.meta.url),
+      "utf8",
+    );
+
+    const primaryRowIndex = projectSource.indexOf("data-project-overview-primary");
+    const statusGridIndex = projectSource.indexOf("data-project-overview-status-grid");
+    const runtimeMonitorIndex = projectSource.indexOf("data-project-runtime-monitor");
+
+    expect(primaryRowIndex).toBeGreaterThan(-1);
+    expect(statusGridIndex).toBeGreaterThan(primaryRowIndex);
+    expect(runtimeMonitorIndex).toBeGreaterThan(statusGridIndex);
+
+    const primaryRowSource = projectSource.slice(primaryRowIndex, statusGridIndex);
+    expect(primaryRowSource).toContain("i18nKeys.console.projects.resourcesTitle");
+    expect(primaryRowSource).toContain("i18nKeys.console.projects.publicAccessTitle");
+    expect(primaryRowSource).not.toContain("i18nKeys.console.projects.latestDeploymentTitle");
+
+    const statusGridOpenIndex = projectSource.lastIndexOf("<section", statusGridIndex);
+    const statusGridSource = projectSource.slice(statusGridOpenIndex, runtimeMonitorIndex);
+    expect(statusGridSource).toContain("md:grid-cols-3");
+    expect(statusGridSource).toContain("i18nKeys.console.projects.latestDeploymentTitle");
+    expect(statusGridSource).toContain("i18nKeys.console.projects.attentionTitle");
+    expect(statusGridSource).toContain("i18nKeys.common.domain.status");
+    expect(statusGridSource).not.toContain('<aside class="space-y-4">');
+  });
+
   test("[PROJECT-IA-001] keeps Project overview outcome-first and moves edits into focused dialogs", async () => {
     const [projectSource, i18nKeysSource, englishLocaleSource, chineseLocaleSource] =
       await Promise.all([

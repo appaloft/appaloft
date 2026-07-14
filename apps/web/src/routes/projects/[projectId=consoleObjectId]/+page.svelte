@@ -2228,7 +2228,10 @@
           value="overview"
           class={[detailTabPanelScrollClass, "flex flex-col gap-6"]}
         >
-          <section class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+          <section
+            class="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]"
+            data-project-overview-primary
+          >
             <div class="space-y-5">
               <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                 <div>
@@ -2367,8 +2370,7 @@
               {/if}
             </div>
 
-            <aside class="space-y-4">
-              <section class="console-side-panel space-y-3">
+            <section class="console-side-panel space-y-3">
                 <div>
                   <div class="flex items-center justify-between gap-3">
                     <h2 class="text-sm font-semibold">
@@ -2405,9 +2407,14 @@
                     </p>
                   {/if}
                 </div>
-              </section>
+            </section>
+          </section>
 
-              <section class="console-side-panel space-y-3">
+          <section
+            class="grid items-stretch gap-4 md:grid-cols-3"
+            data-project-overview-status-grid
+          >
+            <section class="console-side-panel space-y-3">
                 <h2 class="text-sm font-semibold">
                   {$t(i18nKeys.console.projects.latestDeploymentTitle)}
                 </h2>
@@ -2435,9 +2442,9 @@
                     {$t(i18nKeys.console.projects.noProjectDeploymentBody)}
                   </p>
                 {/if}
-              </section>
+            </section>
 
-              <section class="console-side-panel space-y-3">
+            <section class="console-side-panel space-y-3">
                 <h2 class="text-sm font-semibold">
                   {$t(i18nKeys.console.projects.attentionTitle)}
                 </h2>
@@ -2552,15 +2559,14 @@
                     {$t(i18nKeys.console.projects.noAttentionTitle)}
                   </p>
                 {/if}
-              </section>
+            </section>
 
-              <section class="console-side-panel space-y-2">
-                <h2 class="text-sm font-semibold">{$t(i18nKeys.common.domain.status)}</h2>
-                <p class="text-sm leading-6 text-muted-foreground">
-                  {$t(i18nKeys.console.projects.healthSummaryGap)}
-                </p>
-              </section>
-            </aside>
+            <section class="console-side-panel space-y-2">
+              <h2 class="text-sm font-semibold">{$t(i18nKeys.common.domain.status)}</h2>
+              <p class="text-sm leading-6 text-muted-foreground">
+                {$t(i18nKeys.console.projects.healthSummaryGap)}
+              </p>
+            </section>
           </section>
 
           <section class="console-panel space-y-5 p-5" data-project-runtime-monitor>
