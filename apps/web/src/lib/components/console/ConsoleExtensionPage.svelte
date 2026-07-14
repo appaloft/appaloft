@@ -39,7 +39,6 @@
   import { Button } from "$lib/components/ui/button";
   import * as Card from "$lib/components/ui/card";
   import * as Dialog from "$lib/components/ui/dialog";
-  import { Skeleton } from "$lib/components/ui/skeleton";
   import ConsoleTableFilterSelect from "$lib/components/console/ConsoleTableFilterSelect.svelte";
   import {
     createLocalizedConsolePageEndpoint,
@@ -1207,12 +1206,8 @@
   <ConsoleResourceCanvas
     class={embedded ? "max-w-none space-y-3 p-0 md:p-0" : "max-w-7xl"}
   >
-    <Skeleton name="console-extension-page" loading={loading} animate="pulse" transition>
-      {#snippet fallback()}
-        <div class="min-h-96 w-full animate-pulse rounded-lg bg-muted/50" aria-hidden="true"></div>
-      {/snippet}
-      {#snippet fixture()}
-        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    {#if loading}
+<div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {#each Array.from({ length: 4 }) as _, index (index)}
             <section class="console-panel space-y-2 p-4">
               <h3 class="text-sm font-semibold">Metric {index + 1}</h3>
@@ -1224,10 +1219,7 @@
           <h2 class="text-base font-semibold">Extension page</h2>
           <p class="text-sm text-muted-foreground">Sample extension page body</p>
         </section>
-      {/snippet}
-      {#if loading}
-        <div class="min-h-96" aria-hidden="true"></div>
-      {:else if errorMessage}
+    {:else if errorMessage}
       <section class="console-panel space-y-3 border-destructive/25 bg-destructive/5 p-5">
         <h2 class="flex items-center gap-2 text-base font-semibold">
           <AlertTriangle class="size-4" />
@@ -1979,7 +1971,6 @@
         {/if}
       {/each}
     {/if}
-    </Skeleton>
   </ConsoleResourceCanvas>
 {/snippet}
 

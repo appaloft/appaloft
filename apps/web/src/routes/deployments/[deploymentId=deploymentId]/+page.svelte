@@ -41,6 +41,7 @@
   import { Button } from "$lib/components/ui/button";
   import * as Dialog from "$lib/components/ui/dialog";
   import { ScrollArea } from "$lib/components/ui/scroll-area";
+  import ConsoleDataSkeleton from "$lib/components/console/ConsoleDataSkeleton.svelte";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import * as Tabs from "$lib/components/ui/tabs";
   import {
@@ -1340,21 +1341,8 @@
     },
   ]}
 >
-  <Skeleton
-    name="deployment-detail"
-    loading={pageLoading}
-    animate="pulse"
-    transition
-  >
-    {#snippet fallback()}
-      <div
-        class="min-h-[32rem] w-full animate-pulse rounded-lg bg-muted/50"
-        aria-hidden="true"
-        data-deployment-detail-loading-skeleton
-      ></div>
-    {/snippet}
-    {#snippet fixture()}
-      <div class="min-h-[32rem] space-y-4 p-4" aria-hidden="true" data-deployment-detail-loading-skeleton>
+  {#if pageLoading}
+<div class="min-h-[32rem] space-y-4 p-4" aria-hidden="true" data-deployment-detail-loading-skeleton>
         <div class="space-y-2">
           <h1 class="text-2xl font-semibold">Deployment source</h1>
           <p class="text-sm text-muted-foreground">Attempt snapshot for skeleton capture.</p>
@@ -1371,9 +1359,6 @@
           Access and observation panels
         </div>
       </div>
-    {/snippet}
-    {#if pageLoading}
-      <div class="min-h-[32rem]" aria-hidden="true" data-deployment-detail-loading-skeleton></div>
     {:else if !deployment}
     <section class="space-y-5 p-4 md:p-6">
       <Badge class="w-fit" variant="outline">{$t(i18nKeys.errors.backend.notFound)}</Badge>
@@ -2118,7 +2103,6 @@
       </Tabs.Root>
     </div>
   {/if}
-  </Skeleton>
 </ConsoleShell>
 
 <DeploymentProgressDialog

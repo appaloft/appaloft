@@ -33,7 +33,6 @@
   import { Input } from "$lib/components/ui/input";
   import { ScrollArea } from "$lib/components/ui/scroll-area";
   import * as Select from "$lib/components/ui/select";
-  import { Skeleton } from "$lib/components/ui/skeleton";
   import * as Tabs from "$lib/components/ui/tabs";
   import { webDocsHrefs } from "$lib/console/docs-help";
   import {
@@ -504,12 +503,8 @@
   title={selectedDomainBinding?.domainName ?? $t(i18nKeys.console.domainBindings.pageTitle)}
   description={$t(i18nKeys.console.domainBindings.pageDescription)}
 >
-  <Skeleton name="domain-binding-detail-page" loading={pageLoading} animate="pulse" transition>
-    {#snippet fallback()}
-      <div class="min-h-[28rem] w-full animate-pulse rounded-lg bg-muted/50" aria-hidden="true"></div>
-    {/snippet}
-    {#snippet fixture()}
-      <div class="space-y-5">
+  {#if pageLoading}
+<div class="space-y-5">
         <header class="space-y-2">
           <h1 class="text-2xl font-semibold">app.example.com</h1>
           <p class="text-sm text-muted-foreground">Domain binding detail</p>
@@ -519,9 +514,6 @@
           <p class="text-sm text-muted-foreground">pending_verification · path / · edge</p>
         </section>
       </div>
-    {/snippet}
-    {#if pageLoading}
-      <div class="min-h-[28rem]" aria-hidden="true"></div>
     {:else if !selectedDomainBinding}
     <ConsoleResourceCanvas>
       <div class="console-panel space-y-4 p-6">
@@ -935,7 +927,6 @@
       </Tabs.Root>
     </div>
     {/if}
-  </Skeleton>
 
   <Dialog.Root bind:open={domainBindingVerificationDialogOpen}>
     <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-xl">

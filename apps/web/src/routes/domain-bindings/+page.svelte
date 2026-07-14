@@ -12,7 +12,6 @@
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import * as Select from "$lib/components/ui/select";
-  import { Skeleton } from "$lib/components/ui/skeleton";
   import { webDocsHrefs } from "$lib/console/docs-help";
   import { createConsoleQueries } from "$lib/console/queries";
   import {
@@ -150,21 +149,8 @@
   description={$t(i18nKeys.console.domainBindings.pageDescription)}
 >
   <ConsoleResourceCanvas data-domain-bindings-display-surface>
-    <Skeleton
-      name="domain-bindings-list-page"
-      loading={domainBindingsLoading}
-      animate="pulse"
-      transition
-    >
-      {#snippet fallback()}
-        <div
-          class="min-h-96 w-full animate-pulse rounded-lg bg-muted/50"
-          aria-hidden="true"
-          data-domain-binding-list-skeleton
-        ></div>
-      {/snippet}
-      {#snippet fixture()}
-        <section class="space-y-6" data-domain-binding-list-skeleton>
+    {#if domainBindingsLoading}
+<section class="space-y-6" data-domain-binding-list-skeleton>
           <div class="space-y-2">
             <h1 class="text-2xl font-semibold md:text-3xl">Domain bindings</h1>
             <p class="text-sm text-muted-foreground">Custom domains for resources.</p>
@@ -189,10 +175,7 @@
             </article>
           </div>
         </section>
-      {/snippet}
-      {#if domainBindingsLoading}
-        <div class="min-h-96" aria-hidden="true"></div>
-      {:else}
+    {:else}
       <section class="space-y-6">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div class="max-w-3xl space-y-3">
@@ -383,6 +366,5 @@
         </section>
       {/if}
       {/if}
-    </Skeleton>
   </ConsoleResourceCanvas>
 </ConsoleShell>

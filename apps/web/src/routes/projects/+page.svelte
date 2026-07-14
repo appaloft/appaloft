@@ -19,7 +19,7 @@
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import * as Dialog from "$lib/components/ui/dialog";
-  import { Skeleton } from "$lib/components/ui/skeleton";
+  import ConsoleDataSkeleton from "$lib/components/console/ConsoleDataSkeleton.svelte";
   import { readErrorMessage } from "$lib/api/client";
   import { canRunProductQueries } from "$lib/console/auth-query-gate";
   import { webDocsHrefs } from "$lib/console/docs-help";
@@ -369,45 +369,42 @@
             class="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
             data-project-pagination
           >
-            {#if projectListLoading}
-              <Skeleton name="projects-list-pagination" loading={true} animate="pulse" transition>
-                {#snippet fallback()}
-                  <div class="h-8 w-40 animate-pulse rounded-md bg-muted/50" aria-hidden="true"></div>
-                {/snippet}
-                {#snippet fixture()}
-                  <span class="text-sm text-muted-foreground">1–12 of 24</span>
-                {/snippet}
-                <div class="h-8 w-40" aria-hidden="true"></div>
-              </Skeleton>
-            {:else}
-              <span>
-                {$t(i18nKeys.console.projects.projectListRange, {
-                  start: projectPageStart,
-                  end: projectPageEnd,
-                  total: projectTotal,
-                })}
-              </span>
-              <div class="flex items-center gap-1">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={!canGoPrevious || projectSortMode || reorderProjectsMutation.isPending}
-                  onclick={() => setProjectPage(projectOffset - projectPageSize)}
-                >
-                  {$t(i18nKeys.common.actions.previous)}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={!canGoNext || projectSortMode || reorderProjectsMutation.isPending}
-                  onclick={() => setProjectPage(projectOffset + projectPageSize)}
-                >
-                  {$t(i18nKeys.common.actions.next)}
-                </Button>
-              </div>
-            {/if}
+            <ConsoleDataSkeleton name="projects-list-pagination" loading={projectListLoading} class="flex flex-wrap items-center gap-2">
+              {#snippet capture()}
+                <span class="text-sm text-muted-foreground">1–12 of 24</span>
+              {/snippet}
+              {#if projectListLoading}
+                <span class="text-sm text-muted-foreground" aria-hidden="true">1–12 of 24</span>
+              {:else}
+                <span>
+                  {$t(i18nKeys.console.projects.projectListRange, {
+                    start: projectPageStart,
+                    end: projectPageEnd,
+                    total: projectTotal,
+                  })}
+                </span>
+                <div class="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={!canGoPrevious || projectSortMode || reorderProjectsMutation.isPending}
+                    onclick={() => setProjectPage(projectOffset - projectPageSize)}
+                  >
+                    {$t(i18nKeys.common.actions.previous)}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={!canGoNext || projectSortMode || reorderProjectsMutation.isPending}
+                    onclick={() => setProjectPage(projectOffset + projectPageSize)}
+                  >
+                    {$t(i18nKeys.common.actions.next)}
+                  </Button>
+                </div>
+              {/if}
+            </ConsoleDataSkeleton>
           </div>
         </div>
 
@@ -437,23 +434,47 @@
           data-project-grid
         >
           {#if projectListLoading}
-            <Skeleton name="projects-list-grid" loading={true} animate="pulse" transition class="col-span-full">
-              {#snippet fallback()}
-                <div class="min-h-56 w-full animate-pulse rounded-lg bg-muted/50" aria-hidden="true" data-project-loading-card></div>
-              {/snippet}
-              {#snippet fixture()}
-                <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3" data-project-loading-card>
-                  {#each Array.from({ length: 3 }) as _, index (index)}
-                    <article class="flex min-h-56 min-w-0 flex-col rounded-md border bg-card p-4 shadow-sm">
+            {#each Array.from({ length: 6 }) as _, index (index)}
+              <article
+                class="flex min-h-56 min-w-0 flex-col rounded-md border bg-card p-4 shadow-sm"
+                data-project-loading-card
+              >
+                <div class="space-y-2 pr-10">
+                  <ConsoleDataSkeleton name={`projects-card-title-${index}`} loading={true} class="block">
+                    {#snippet capture()}
                       <h3 class="font-semibold">Sample project {index + 1}</h3>
-                      <p class="mt-2 text-sm text-muted-foreground">Project description for bone capture.</p>
-                      <p class="mt-auto text-sm text-muted-foreground">3 resources · ready</p>
-                    </article>
-                  {/each}
+                    {/snippet}
+                    <h3 class="font-semibold">Sample project {index + 1}</h3>
+                  </ConsoleDataSkeleton>
+                  <ConsoleDataSkeleton name={`projects-card-badge-${index}`} loading={true} class="block">
+                    {#snippet capture()}
+                      <span class="text-sm">ready</span>
+                    {/snippet}
+                    <span class="text-sm">ready</span>
+                  </ConsoleDataSkeleton>
+                  <ConsoleDataSkeleton name={`projects-card-description-${index}`} loading={true} class="block">
+                    {#snippet capture()}
+                      <p class="text-sm text-muted-foreground">Project description for bone capture.</p>
+                    {/snippet}
+                    <p class="text-sm text-muted-foreground">Project description for bone capture.</p>
+                  </ConsoleDataSkeleton>
                 </div>
-              {/snippet}
-              <div class="min-h-56" aria-hidden="true" data-project-loading-card></div>
-            </Skeleton>
+                <div class="mt-5 grid gap-2">
+                  <ConsoleDataSkeleton name={`projects-card-meta-${index}`} loading={true} class="block">
+                    {#snippet capture()}
+                      <p class="text-sm text-muted-foreground">3 resources · 1 environment</p>
+                    {/snippet}
+                    <p class="text-sm text-muted-foreground">3 resources · 1 environment</p>
+                  </ConsoleDataSkeleton>
+                </div>
+                <ConsoleDataSkeleton name={`projects-card-footer-${index}`} loading={true} class="mt-auto block">
+                  {#snippet capture()}
+                    <p class="text-sm text-muted-foreground">Updated recently</p>
+                  {/snippet}
+                  <p class="text-sm text-muted-foreground">Updated recently</p>
+                </ConsoleDataSkeleton>
+              </article>
+            {/each}
           {:else}
             {#each visibleProjects as project (project.id)}
               {@const projectResources = resources.filter((resource) => resource.projectId === project.id)}

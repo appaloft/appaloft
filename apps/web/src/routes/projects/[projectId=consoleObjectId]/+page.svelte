@@ -78,6 +78,7 @@
   } from "$lib/components/ui/dropdown-menu";
   import { Input } from "$lib/components/ui/input";
   import * as Select from "$lib/components/ui/select";
+  import ConsoleDataSkeleton from "$lib/components/console/ConsoleDataSkeleton.svelte";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import * as Tabs from "$lib/components/ui/tabs";
   import {
@@ -1895,31 +1896,33 @@
     },
   ]}
 >
-  <Skeleton
-    name="project-detail"
-    loading={pageLoading}
-    animate="pulse"
-    transition
-  >
-    {#snippet fallback()}
-      <div
-        class="min-h-[32rem] w-full animate-pulse rounded-lg bg-muted/50"
-        aria-hidden="true"
-        data-project-detail-loading-skeleton
-      ></div>
-    {/snippet}
-    {#snippet fixture()}
-      <div class="min-h-[32rem] space-y-4 p-4" aria-hidden="true" data-project-detail-loading-skeleton>
+  {#if pageLoading}
+<div class="min-h-[32rem] space-y-4 p-4" aria-hidden="true" data-project-detail-loading-skeleton>
         <div class="space-y-2">
           <Badge variant="outline">{$t(i18nKeys.common.domain.project)}</Badge>
-          <h1 class="text-2xl font-semibold">Project name</h1>
-          <p class="text-sm text-muted-foreground">Project description for skeleton capture.</p>
+          <ConsoleDataSkeleton name="detail-title" loading={true} class="block">
+            {#snippet capture()}
+              <h1 class="text-2xl font-semibold">Project name</h1>
+            {/snippet}
+            <h1 class="text-2xl font-semibold">Project name</h1>
+          </ConsoleDataSkeleton>
+          <ConsoleDataSkeleton name="detail-description" loading={true} class="block">
+            {#snippet capture()}
+              <p class="text-sm text-muted-foreground">Project description for skeleton capture.</p>
+            {/snippet}
+            <p class="text-sm text-muted-foreground">Project description for skeleton capture.</p>
+          </ConsoleDataSkeleton>
         </div>
         <div class="grid gap-3 md:grid-cols-4">
           {#each ["Resources", "Access", "Deployment", "Attention"] as label (label)}
             <div class="rounded-md border bg-card p-4 text-sm">
               <p class="text-xs text-muted-foreground">{label}</p>
-              <p class="mt-1 font-semibold">3</p>
+              <ConsoleDataSkeleton name="detail-metric-value" loading={true} class="block">
+                {#snippet capture()}
+                  <p class="mt-1 font-semibold">3</p>
+                {/snippet}
+                <p class="mt-1 font-semibold">3</p>
+              </ConsoleDataSkeleton>
             </div>
           {/each}
         </div>
@@ -1931,7 +1934,14 @@
                 <p class="text-sm font-medium">Environment {groupIndex + 1}</p>
                 <div class="console-record-list">
                   {#each Array.from({ length: 2 }) as _, rowIndex (rowIndex)}
-                    <div class="console-record-row text-sm">Resource {rowIndex + 1}</div>
+                    <div class="console-record-row text-sm">
+                      <ConsoleDataSkeleton name={`detail-resource-row-${groupIndex}-${rowIndex}`} loading={true} class="block w-full">
+                        {#snippet capture()}
+                          <span>Resource {rowIndex + 1}</span>
+                        {/snippet}
+                        <span>Resource {rowIndex + 1}</span>
+                      </ConsoleDataSkeleton>
+                    </div>
                   {/each}
                 </div>
               </section>
@@ -1944,9 +1954,6 @@
           </aside>
         </div>
       </div>
-    {/snippet}
-    {#if pageLoading}
-      <div class="min-h-[32rem]" aria-hidden="true" data-project-detail-loading-skeleton></div>
     {:else if !project}
     <section class="space-y-5 p-4 md:p-6">
       <Badge class="w-fit" variant="outline">{$t(i18nKeys.errors.backend.notFound)}</Badge>
@@ -4312,5 +4319,4 @@
       </Dialog.Content>
     </Dialog.Root>
   {/if}
-  </Skeleton>
 </ConsoleShell>

@@ -23,7 +23,6 @@
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import { ScrollArea } from "$lib/components/ui/scroll-area";
-  import { Skeleton } from "$lib/components/ui/skeleton";
   import {
     detailHeaderClass,
     detailPageClass,
@@ -380,17 +379,8 @@
   description={$t(i18nKeys.console.installedApplications.pageDescription)}
   {breadcrumbs}
 >
-  <Skeleton
-    name="installed-application-detail-page"
-    loading={installedApplicationQuery.isPending}
-    animate="pulse"
-    transition
-  >
-    {#snippet fallback()}
-      <div class="min-h-[28rem] w-full animate-pulse rounded-lg bg-muted/50" aria-hidden="true"></div>
-    {/snippet}
-    {#snippet fixture()}
-      <div class="space-y-5 p-4 md:p-6">
+  {#if installedApplicationQuery.isPending}
+<div class="space-y-5 p-4 md:p-6">
         <header class="space-y-2">
           <h1 class="text-2xl font-semibold">Sample Application</h1>
           <p class="text-sm text-muted-foreground">Installed application detail</p>
@@ -400,9 +390,6 @@
           <p class="text-sm text-muted-foreground">running · marketplace install</p>
         </section>
       </div>
-    {/snippet}
-    {#if installedApplicationQuery.isPending}
-      <div class="min-h-[28rem]" aria-hidden="true"></div>
     {:else if installedApplicationQuery.error || !installedApplication}
     <section class="console-panel m-4 p-5 md:m-6">
       <div class="flex items-start gap-3">
@@ -899,5 +886,4 @@
       </div>
     </div>
     {/if}
-  </Skeleton>
 </ConsoleShell>

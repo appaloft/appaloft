@@ -33,7 +33,6 @@
   import * as Dialog from "$lib/components/ui/dialog";
   import { Input } from "$lib/components/ui/input";
   import * as Select from "$lib/components/ui/select";
-  import { Skeleton } from "$lib/components/ui/skeleton";
   import { webDocsHrefs } from "$lib/console/docs-help";
   import { createConsoleQueries } from "$lib/console/queries";
   import { canRunProductQueries } from "$lib/console/auth-query-gate";
@@ -527,17 +526,8 @@
   title={$t(i18nKeys.console.dependencyResources.pageTitle)}
   description={$t(i18nKeys.console.dependencyResources.pageDescription)}
 >
-  <Skeleton
-    name="dependency-resources-list-page"
-    loading={dependencyResourcesLoading}
-    animate="pulse"
-    transition
-  >
-    {#snippet fallback()}
-      <div class="min-h-[28rem] w-full animate-pulse rounded-lg bg-muted/50" aria-hidden="true"></div>
-    {/snippet}
-    {#snippet fixture()}
-      <div class="space-y-5">
+  {#if dependencyResourcesLoading}
+<div class="space-y-5">
         <section class="space-y-2">
           <h1 class="text-2xl font-semibold">Dependency resources</h1>
           <p class="text-sm text-muted-foreground">Shared databases and services.</p>
@@ -551,9 +541,6 @@
           </article>
         </div>
       </div>
-    {/snippet}
-    {#if dependencyResourcesLoading}
-      <div class="min-h-[28rem]" aria-hidden="true"></div>
     {:else if dependencyResourcesError}
     <ConsoleStatePanel
       tone="error"
@@ -746,7 +733,6 @@
       {/if}
     </ConsoleResourceCanvas>
     {/if}
-  </Skeleton>
 
   <Dialog.Root
     bind:open={dependencyResourceCreateDialogOpen}

@@ -26,7 +26,6 @@
   import * as Dialog from "$lib/components/ui/dialog";
   import { Input } from "$lib/components/ui/input";
   import * as Select from "$lib/components/ui/select";
-  import { Skeleton } from "$lib/components/ui/skeleton";
   import {
     endpointFromTemplate,
     findBlueprintCatalogExtensionByKey,
@@ -1101,17 +1100,8 @@
   ]}
 >
   <div class="p-4 md:p-6">
-  <Skeleton
-    name="marketplace-blueprint-detail-page"
-    loading={webExtensionsQuery.isPending || detailQuery.isPending}
-    animate="pulse"
-    transition
-  >
-    {#snippet fallback()}
-      <div class="min-h-96 w-full animate-pulse rounded-lg bg-muted/50" aria-hidden="true"></div>
-    {/snippet}
-    {#snippet fixture()}
-      <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+  {#if webExtensionsQuery.isPending || detailQuery.isPending}
+<div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
         <section class="console-panel space-y-3 p-5">
           <h1 class="text-2xl font-semibold">Blueprint title</h1>
           <p class="text-sm text-muted-foreground">Sample marketplace blueprint detail.</p>
@@ -1121,9 +1111,6 @@
           <p class="text-sm text-muted-foreground">One-click install actions</p>
         </aside>
       </div>
-    {/snippet}
-    {#if webExtensionsQuery.isPending || detailQuery.isPending}
-      <div class="min-h-96" aria-hidden="true"></div>
     {:else if !catalogMetadata}
     <section class="console-panel p-5">
       <div class="flex items-start gap-3">
@@ -1914,6 +1901,5 @@
       </Dialog.Root>
     </div>
     {/if}
-  </Skeleton>
   </div>
 </ConsoleShell>

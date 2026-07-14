@@ -16,8 +16,9 @@
     createBlueprintMarketplaceLocalizedEndpoint,
     defaultBlueprintMarketplaceListEndpoint,
   } from "./url";
-  import { Skeleton } from "@appaloft/ui/skeleton";
+  import { DataSkeleton } from "@appaloft/ui/skeleton";
   import { cn } from "@appaloft/ui/utils";
+  // Skeleton is boneyard-backed: wrap card fields while catalog data loads.
 
   type BlueprintRegistryEntry = {
     readonly id: string;
@@ -554,107 +555,124 @@
     {/if}
   </div>
 
-  <Skeleton name="blueprint-marketplace-page" loading={isLoading} animate="pulse" transition>
-    {#snippet fallback()}
-      <div
-        class="min-h-[760px] w-full animate-pulse rounded-lg bg-muted/50"
-        role="status"
-        aria-label={copy.loadingAria}
-        data-blueprint-marketplace-skeleton
-      ></div>
-    {/snippet}
-    {#snippet fixture()}
-      <div class="flex min-h-[760px] flex-col gap-7" aria-hidden="true">
-        <nav class={categoryTabsClass}>
-          {#each ["All 12", "Databases 4", "CMS 3", "Analytics 2", "Auth 3"] as label (label)}
+  {#if isLoading}
+    <div
+      class="flex min-h-[760px] flex-col gap-7"
+      role="status"
+      aria-label={copy.loadingAria}
+      data-blueprint-marketplace-skeleton
+    >
+      <nav class={categoryTabsClass} aria-hidden="true">
+        {#each ["All 12", "Databases 4", "CMS 3", "Analytics 2", "Auth 3", "Tools 2"] as label, index (label)}
+          <DataSkeleton name={`marketplace-category-tab-${index}`} loading={true} >
+            {#snippet capture()}
+              <span
+                class="min-h-9 rounded-lg border border-[#dbe2ea] bg-white px-3 font-sans text-sm font-extrabold text-[#425166]"
+              >
+                {label}
+              </span>
+            {/snippet}
             <span
               class="min-h-9 rounded-lg border border-[#dbe2ea] bg-white px-3 font-sans text-sm font-extrabold text-[#425166]"
             >
               {label}
             </span>
-          {/each}
-        </nav>
-        {#each [
-          {
-            title: "Featured Blueprints",
-            description: "Official catalog entries ready to deploy.",
-            count: 6,
-            cards: ["PocketBase", "Ghost", "Plausible", "Umami", "N8N", "Gitea"],
-          },
-          {
-            title: "Databases",
-            description: "Self-hosted data stores and backends.",
-            count: 4,
-            cards: ["PostgreSQL", "Redis", "MinIO", "Meilisearch"],
-          },
-          {
-            title: "CMS",
-            description: "Content platforms for product teams.",
-            count: 2,
-            cards: ["Directus", "Strapi"],
-          },
-        ] as group (group.title)}
-          <section class="flex flex-col gap-3">
-            <div class="flex items-end justify-between gap-3">
-              <div>
+          </DataSkeleton>
+        {/each}
+      </nav>
+      {#each [
+        { title: "Featured Blueprints", count: 6, cards: ["PocketBase", "Ghost", "Plausible", "Umami"] },
+        { title: "Databases", count: 4, cards: ["PostgreSQL", "Redis"] },
+      ] as group, groupIndex (group.title)}
+        <section class="flex flex-col gap-3" aria-hidden="true">
+          <div class="flex items-end justify-between gap-3">
+            <div>
+              <DataSkeleton name={`marketplace-group-title-${groupIndex}`} loading={true}  class="block">
+                {#snippet capture()}
+                  <h2 class="m-0 text-[1.05rem]">{group.title}</h2>
+                {/snippet}
                 <h2 class="m-0 text-[1.05rem]">{group.title}</h2>
-                <p class="m-0 mt-1 text-sm text-[#526071]">{group.description}</p>
-              </div>
-              <span class={badgeClass}>{group.count}</span>
+              </DataSkeleton>
+              <DataSkeleton name={`marketplace-group-description-${groupIndex}`} loading={true}  class="block">
+                {#snippet capture()}
+                  <p class="m-0 mt-1 text-sm text-[#526071]">Official catalog entries ready to deploy.</p>
+                {/snippet}
+                <p class="m-0 mt-1 text-sm text-[#526071]">Official catalog entries ready to deploy.</p>
+              </DataSkeleton>
             </div>
-            <div class={gridClass}>
-              {#each group.cards as title (title)}
-                <article
-                  class="flex min-h-[300px] flex-col gap-4 rounded-xl border border-[#dbe2ea] bg-white/90 p-4 shadow-[0_18px_48px_rgba(20,31,47,0.07)]"
-                >
-                  <div class="grid min-w-0 grid-cols-[56px_minmax(0,1fr)] gap-3">
+            <DataSkeleton name={`marketplace-group-count-${groupIndex}`} loading={true} >
+              {#snippet capture()}
+                <span class={badgeClass}>{group.count}</span>
+              {/snippet}
+              <span class={badgeClass}>{group.count}</span>
+            </DataSkeleton>
+          </div>
+          <div class={gridClass}>
+            {#each group.cards as title, cardIndex (title)}
+              <article
+                class="flex min-h-[300px] flex-col gap-4 rounded-xl border border-[#dbe2ea] bg-white/90 p-4 shadow-[0_18px_48px_rgba(20,31,47,0.07)]"
+              >
+                <div class="grid min-w-0 grid-cols-[56px_minmax(0,1fr)] gap-3">
+                  <DataSkeleton name={`marketplace-card-icon-${groupIndex}-${cardIndex}`} loading={true} >
+                    {#snippet capture()}
+                      <div
+                        class="grid size-14 place-items-center rounded-lg border border-[#dbe2ea] bg-[#f8fafc] text-xs font-black uppercase"
+                      >
+                        {title.slice(0, 2)}
+                      </div>
+                    {/snippet}
                     <div
                       class="grid size-14 place-items-center rounded-lg border border-[#dbe2ea] bg-[#f8fafc] text-xs font-black uppercase"
                     >
                       {title.slice(0, 2)}
                     </div>
-                    <div>
+                  </DataSkeleton>
+                  <div>
+                    <DataSkeleton name={`marketplace-card-title-${groupIndex}-${cardIndex}`} loading={true}  class="block">
+                      {#snippet capture()}
+                        <h3 class="m-0 text-lg font-semibold leading-snug">{title}</h3>
+                      {/snippet}
                       <h3 class="m-0 text-lg font-semibold leading-snug">{title}</h3>
+                    </DataSkeleton>
+                    <DataSkeleton name={`marketplace-card-summary-${groupIndex}-${cardIndex}`} loading={true}  class="block">
+                      {#snippet capture()}
+                        <p class="m-0 mt-1 text-sm leading-6 text-[#526071]">
+                          Official Blueprint sample for skeleton capture.
+                        </p>
+                      {/snippet}
                       <p class="m-0 mt-1 text-sm leading-6 text-[#526071]">
                         Official Blueprint sample for skeleton capture.
                       </p>
-                    </div>
+                    </DataSkeleton>
                   </div>
-                  <p class="m-0 text-sm leading-6 text-[#526071]">
-                    Runtime units, managed dependencies, and a clear deploy plan.
-                  </p>
-                  <dl class="grid grid-cols-2 gap-2">
-                    <div class="grid gap-1 rounded-lg border border-[#dbe2ea] bg-[#f8fafc] p-3">
-                      <dt class="text-xs font-bold text-[#526071]">Dependencies</dt>
-                      <dd class="m-0 font-semibold">Postgres</dd>
-                    </div>
-                    <div class="grid gap-1 rounded-lg border border-[#dbe2ea] bg-[#f8fafc] p-3">
-                      <dt class="text-xs font-bold text-[#526071]">Ports</dt>
-                      <dd class="m-0 font-semibold">8080</dd>
-                    </div>
-                  </dl>
-                  <div class="mt-auto flex justify-end">
+                </div>
+                <DataSkeleton name={`marketplace-card-facts-${groupIndex}-${cardIndex}`} loading={true}  class="block">
+                  {#snippet capture()}
+                    <p class="m-0 text-sm leading-6 text-[#526071]">Docker · Postgres · 1 service</p>
+                  {/snippet}
+                  <p class="m-0 text-sm leading-6 text-[#526071]">Docker · Postgres · 1 service</p>
+                </DataSkeleton>
+                <DataSkeleton name={`marketplace-card-action-${groupIndex}-${cardIndex}`} loading={true}  class="mt-auto block">
+                  {#snippet capture()}
                     <span
-                      class="inline-flex min-h-[38px] items-center rounded-lg border border-[#c9d3df] px-3 text-sm font-extrabold"
+                      class="inline-flex min-h-[38px] w-full items-center justify-center rounded-lg border border-[#4e84ff] bg-[#4e84ff] text-[0.82rem] font-extrabold text-white"
                     >
-                      Deploy →
+                      Deploy
                     </span>
-                  </div>
-                </article>
-              {/each}
-            </div>
-          </section>
-        {/each}
-      </div>
-    {/snippet}
-    {#if isLoading}
-      <div
-        class="min-h-[760px]"
-        role="status"
-        aria-label={copy.loadingAria}
-        data-blueprint-marketplace-skeleton
-      ></div>
-    {:else if errorMessage}
+                  {/snippet}
+                  <span
+                    class="inline-flex min-h-[38px] w-full items-center justify-center rounded-lg border border-[#4e84ff] bg-[#4e84ff] text-[0.82rem] font-extrabold text-white"
+                  >
+                    Deploy
+                  </span>
+                </DataSkeleton>
+              </article>
+            {/each}
+          </div>
+        </section>
+      {/each}
+    </div>
+  {:else if errorMessage}
       <section class="rounded-lg border border-[#dbe2ea] bg-white/90 p-7 shadow-[0_18px_48px_rgba(20,31,47,0.07)]">
         <h2 class="m-0 text-xl">{copy.errorTitle}</h2>
         <p class="m-0 mt-2 text-[#526071]">{errorMessage}</p>
@@ -754,5 +772,4 @@
         {/each}
       </div>
     {/if}
-  </Skeleton>
 </section>
