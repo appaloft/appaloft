@@ -554,141 +554,205 @@
     {/if}
   </div>
 
-  {#if isLoading}
-    <section class="flex min-h-[760px] flex-col gap-7" aria-label={copy.loadingAria} data-blueprint-marketplace-skeleton>
-      <div class={cn(categoryTabsClass, "pointer-events-none")} aria-hidden="true">
-        {#each Array.from({ length: 12 }) as _, index (index)}
-          <Skeleton class={index === 1 || index === 8 ? "h-9 w-40 rounded-lg" : "h-9 w-28 rounded-lg"} />
+  <Skeleton name="blueprint-marketplace-page" loading={isLoading} animate="pulse" transition>
+    {#snippet fallback()}
+      <div
+        class="min-h-[760px] w-full animate-pulse rounded-lg bg-muted/50"
+        role="status"
+        aria-label={copy.loadingAria}
+        data-blueprint-marketplace-skeleton
+      ></div>
+    {/snippet}
+    {#snippet fixture()}
+      <div class="flex min-h-[760px] flex-col gap-7" aria-hidden="true">
+        <nav class={categoryTabsClass}>
+          {#each ["All 12", "Databases 4", "CMS 3", "Analytics 2", "Auth 3"] as label (label)}
+            <span
+              class="min-h-9 rounded-lg border border-[#dbe2ea] bg-white px-3 font-sans text-sm font-extrabold text-[#425166]"
+            >
+              {label}
+            </span>
+          {/each}
+        </nav>
+        {#each [
+          {
+            title: "Featured Blueprints",
+            description: "Official catalog entries ready to deploy.",
+            count: 6,
+            cards: ["PocketBase", "Ghost", "Plausible", "Umami", "N8N", "Gitea"],
+          },
+          {
+            title: "Databases",
+            description: "Self-hosted data stores and backends.",
+            count: 4,
+            cards: ["PostgreSQL", "Redis", "MinIO", "Meilisearch"],
+          },
+          {
+            title: "CMS",
+            description: "Content platforms for product teams.",
+            count: 2,
+            cards: ["Directus", "Strapi"],
+          },
+        ] as group (group.title)}
+          <section class="flex flex-col gap-3">
+            <div class="flex items-end justify-between gap-3">
+              <div>
+                <h2 class="m-0 text-[1.05rem]">{group.title}</h2>
+                <p class="m-0 mt-1 text-sm text-[#526071]">{group.description}</p>
+              </div>
+              <span class={badgeClass}>{group.count}</span>
+            </div>
+            <div class={gridClass}>
+              {#each group.cards as title (title)}
+                <article
+                  class="flex min-h-[300px] flex-col gap-4 rounded-xl border border-[#dbe2ea] bg-white/90 p-4 shadow-[0_18px_48px_rgba(20,31,47,0.07)]"
+                >
+                  <div class="grid min-w-0 grid-cols-[56px_minmax(0,1fr)] gap-3">
+                    <div
+                      class="grid size-14 place-items-center rounded-lg border border-[#dbe2ea] bg-[#f8fafc] text-xs font-black uppercase"
+                    >
+                      {title.slice(0, 2)}
+                    </div>
+                    <div>
+                      <h3 class="m-0 text-lg font-semibold leading-snug">{title}</h3>
+                      <p class="m-0 mt-1 text-sm leading-6 text-[#526071]">
+                        Official Blueprint sample for skeleton capture.
+                      </p>
+                    </div>
+                  </div>
+                  <p class="m-0 text-sm leading-6 text-[#526071]">
+                    Runtime units, managed dependencies, and a clear deploy plan.
+                  </p>
+                  <dl class="grid grid-cols-2 gap-2">
+                    <div class="grid gap-1 rounded-lg border border-[#dbe2ea] bg-[#f8fafc] p-3">
+                      <dt class="text-xs font-bold text-[#526071]">Dependencies</dt>
+                      <dd class="m-0 font-semibold">Postgres</dd>
+                    </div>
+                    <div class="grid gap-1 rounded-lg border border-[#dbe2ea] bg-[#f8fafc] p-3">
+                      <dt class="text-xs font-bold text-[#526071]">Ports</dt>
+                      <dd class="m-0 font-semibold">8080</dd>
+                    </div>
+                  </dl>
+                  <div class="mt-auto flex justify-end">
+                    <span
+                      class="inline-flex min-h-[38px] items-center rounded-lg border border-[#c9d3df] px-3 text-sm font-extrabold"
+                    >
+                      Deploy →
+                    </span>
+                  </div>
+                </article>
+              {/each}
+            </div>
+          </section>
         {/each}
       </div>
-      {#each Array.from({ length: 3 }) as _, groupIndex (groupIndex)}
-        <section class="flex flex-col gap-3" aria-hidden="true">
-          <div class="flex items-end justify-between gap-3">
-            <div>
-              <Skeleton class="h-7 w-[190px]" />
-              <Skeleton class="mt-2.5 h-4 w-full max-w-[360px]" />
-            </div>
-            <Skeleton class="h-7 w-[34px]" />
-          </div>
-          <div class={gridClass}>
-            {#each Array.from({ length: groupIndex === 2 ? 2 : 4 }) as _, cardIndex (cardIndex)}
-              <article class="min-h-[300px]">
-                <div class="grid min-w-0 grid-cols-[56px_minmax(0,1fr)] gap-3">
-                  <Skeleton class="size-14 rounded-lg" />
-                  <div>
-                    <Skeleton class="h-[26px] w-2/3" />
-                    <Skeleton class="mt-2 h-4 w-full" />
-                    <Skeleton class="mt-2 h-4 w-[58%]" />
-                  </div>
-                </div>
-                <Skeleton class="h-12 w-[88%]" />
-                <Skeleton class="h-[42px] w-full" />
-                <Skeleton class="h-[42px] w-[58%]" />
-                <Skeleton class="mt-auto h-[38px] w-full" />
-              </article>
-            {/each}
-          </div>
-        </section>
-      {/each}
-    </section>
-  {:else if errorMessage}
-    <section class="rounded-lg border border-[#dbe2ea] bg-white/90 p-7 shadow-[0_18px_48px_rgba(20,31,47,0.07)]">
-      <h2 class="m-0 text-xl">{copy.errorTitle}</h2>
-      <p class="m-0 mt-2 text-[#526071]">{errorMessage}</p>
-      <button
-        class="mt-4 inline-flex min-h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-[#4e84ff] bg-[#4e84ff] px-3 font-sans text-[0.82rem] font-extrabold text-white transition-transform duration-150 hover:-translate-y-px"
-        type="button"
-        onclick={() => loadMarketplace()}
-      >
-        {copy.retry}
-      </button>
-    </section>
-  {:else}
-    {#if selectedCategory}
-      <p class="m-0 flex flex-wrap gap-2 text-sm font-bold text-slate-500">
-        <strong>{selectedCategory.label}</strong>
-        <span>/</span>
-        {selectedCategory.description}
-      </p>
-    {/if}
-
-    <div class={groupsClass} data-blueprint-marketplace-groups>
-      {#if !isDialogSurface && featuredListings.length > 0}
-        <section class="flex flex-col gap-3" data-blueprint-marketplace-featured>
-          <div class="flex flex-col gap-1.5">
-            <h2 class="m-0 text-[1.2rem]">{copy.featuredTitle}</h2>
-            <p class="m-0 text-sm leading-6 text-[#526071]">
-              {copy.featuredSubtitle}
-            </p>
-          </div>
-          <div class={gridClass}>
-            {#each featuredListings as item (item.slug)}
-              <BlueprintMarketplaceCard
-                {item}
-                actionHref={primaryAction === "select" ? "#" : actionHref(item)}
-                actionLabel={actionButtonLabel}
-                detailHref={detailHref(item)}
-                density="default"
-                labels={cardLabels}
-                selected={selectedSlug === item.slug}
-                onprimaryaction={(event) => {
-                  if (primaryAction === "select") {
-                    event.preventDefault();
-                    handlePrimaryAction(item);
-                  }
-                }}
-                {onview}
-              />
-            {/each}
-          </div>
-        </section>
-
-        <section class="flex flex-col gap-3" data-blueprint-marketplace-catalog-heading>
-          <div class="flex flex-col gap-1.5">
-            <h2 class="m-0 text-[1.2rem]">{copy.allOfficialTitle}</h2>
-            <p class="m-0 text-sm leading-6 text-[#526071]">
-              {copy.catalogSummary(categories.length, filteredListings.length)}
-            </p>
-          </div>
-        </section>
+    {/snippet}
+    {#if isLoading}
+      <div
+        class="min-h-[760px]"
+        role="status"
+        aria-label={copy.loadingAria}
+        data-blueprint-marketplace-skeleton
+      ></div>
+    {:else if errorMessage}
+      <section class="rounded-lg border border-[#dbe2ea] bg-white/90 p-7 shadow-[0_18px_48px_rgba(20,31,47,0.07)]">
+        <h2 class="m-0 text-xl">{copy.errorTitle}</h2>
+        <p class="m-0 mt-2 text-[#526071]">{errorMessage}</p>
+        <button
+          class="mt-4 inline-flex min-h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-[#4e84ff] bg-[#4e84ff] px-3 font-sans text-[0.82rem] font-extrabold text-white transition-transform duration-150 hover:-translate-y-px"
+          type="button"
+          onclick={() => loadMarketplace()}
+        >
+          {copy.retry}
+        </button>
+      </section>
+    {:else}
+      {#if selectedCategory}
+        <p class="m-0 flex flex-wrap gap-2 text-sm font-bold text-slate-500">
+          <strong>{selectedCategory.label}</strong>
+          <span>/</span>
+          {selectedCategory.description}
+        </p>
       {/if}
 
-      {#each groupedListings as group (group.category.key)}
-        <section class="flex flex-col gap-3">
-          <div class="flex items-end justify-between gap-3">
-            <div>
-              <h2 class="m-0 text-[1.05rem]">{group.category.label}</h2>
-              <p class="m-0 mt-1 text-sm text-[#526071]">{group.category.description}</p>
+      <div class={groupsClass} data-blueprint-marketplace-groups>
+        {#if !isDialogSurface && featuredListings.length > 0}
+          <section class="flex flex-col gap-3" data-blueprint-marketplace-featured>
+            <div class="flex flex-col gap-1.5">
+              <h2 class="m-0 text-[1.2rem]">{copy.featuredTitle}</h2>
+              <p class="m-0 text-sm leading-6 text-[#526071]">
+                {copy.featuredSubtitle}
+              </p>
             </div>
-            <span class={badgeClass}>{group.items.length}</span>
-          </div>
-          <div class={gridClass}>
-            {#each group.items as item (item.slug)}
-              <BlueprintMarketplaceCard
-                {item}
-                actionHref={primaryAction === "select" ? "#" : actionHref(item)}
-                actionLabel={actionButtonLabel}
-                detailHref={detailHref(item)}
-                density={cardDensity}
-                labels={cardLabels}
-                selected={selectedSlug === item.slug}
-                onprimaryaction={(event) => {
-                  if (primaryAction === "select") {
-                    event.preventDefault();
-                    handlePrimaryAction(item);
-                  }
-                }}
-                {onview}
-              />
-            {/each}
-          </div>
-        </section>
-      {:else}
-        <section class="rounded-lg border border-[#dbe2ea] bg-white/90 p-7 shadow-[0_18px_48px_rgba(20,31,47,0.07)]">
-          <h2 class="m-0 text-xl">没有匹配的 Blueprint</h2>
-          <p class="m-0 mt-2 text-[#526071]">试试其他搜索词或分类。</p>
-        </section>
-      {/each}
-    </div>
-  {/if}
+            <div class={gridClass}>
+              {#each featuredListings as item (item.slug)}
+                <BlueprintMarketplaceCard
+                  {item}
+                  actionHref={primaryAction === "select" ? "#" : actionHref(item)}
+                  actionLabel={actionButtonLabel}
+                  detailHref={detailHref(item)}
+                  density="default"
+                  labels={cardLabels}
+                  selected={selectedSlug === item.slug}
+                  onprimaryaction={(event) => {
+                    if (primaryAction === "select") {
+                      event.preventDefault();
+                      handlePrimaryAction(item);
+                    }
+                  }}
+                  {onview}
+                />
+              {/each}
+            </div>
+          </section>
+
+          <section class="flex flex-col gap-3" data-blueprint-marketplace-catalog-heading>
+            <div class="flex flex-col gap-1.5">
+              <h2 class="m-0 text-[1.2rem]">{copy.allOfficialTitle}</h2>
+              <p class="m-0 text-sm leading-6 text-[#526071]">
+                {copy.catalogSummary(categories.length, filteredListings.length)}
+              </p>
+            </div>
+          </section>
+        {/if}
+
+        {#each groupedListings as group (group.category.key)}
+          <section class="flex flex-col gap-3">
+            <div class="flex items-end justify-between gap-3">
+              <div>
+                <h2 class="m-0 text-[1.05rem]">{group.category.label}</h2>
+                <p class="m-0 mt-1 text-sm text-[#526071]">{group.category.description}</p>
+              </div>
+              <span class={badgeClass}>{group.items.length}</span>
+            </div>
+            <div class={gridClass}>
+              {#each group.items as item (item.slug)}
+                <BlueprintMarketplaceCard
+                  {item}
+                  actionHref={primaryAction === "select" ? "#" : actionHref(item)}
+                  actionLabel={actionButtonLabel}
+                  detailHref={detailHref(item)}
+                  density={cardDensity}
+                  labels={cardLabels}
+                  selected={selectedSlug === item.slug}
+                  onprimaryaction={(event) => {
+                    if (primaryAction === "select") {
+                      event.preventDefault();
+                      handlePrimaryAction(item);
+                    }
+                  }}
+                  {onview}
+                />
+              {/each}
+            </div>
+          </section>
+        {:else}
+          <section class="rounded-lg border border-[#dbe2ea] bg-white/90 p-7 shadow-[0_18px_48px_rgba(20,31,47,0.07)]">
+            <h2 class="m-0 text-xl">没有匹配的 Blueprint</h2>
+            <p class="m-0 mt-2 text-[#526071]">试试其他搜索词或分类。</p>
+          </section>
+        {/each}
+      </div>
+    {/if}
+  </Skeleton>
 </section>

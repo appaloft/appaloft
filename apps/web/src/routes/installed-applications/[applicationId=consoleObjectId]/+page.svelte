@@ -380,13 +380,30 @@
   description={$t(i18nKeys.console.installedApplications.pageDescription)}
   {breadcrumbs}
 >
-  {#if installedApplicationQuery.isPending}
-    <div class="space-y-5 p-4 md:p-6">
-      <Skeleton class="h-7 w-72" />
-      <Skeleton class="h-32 w-full" />
-      <Skeleton class="h-72 w-full" />
-    </div>
-  {:else if installedApplicationQuery.error || !installedApplication}
+  <Skeleton
+    name="installed-application-detail-page"
+    loading={installedApplicationQuery.isPending}
+    animate="pulse"
+    transition
+  >
+    {#snippet fallback()}
+      <div class="min-h-[28rem] w-full animate-pulse rounded-lg bg-muted/50" aria-hidden="true"></div>
+    {/snippet}
+    {#snippet fixture()}
+      <div class="space-y-5 p-4 md:p-6">
+        <header class="space-y-2">
+          <h1 class="text-2xl font-semibold">Sample Application</h1>
+          <p class="text-sm text-muted-foreground">Installed application detail</p>
+        </header>
+        <section class="console-panel space-y-3 p-5">
+          <h2 class="text-lg font-semibold">Overview</h2>
+          <p class="text-sm text-muted-foreground">running · marketplace install</p>
+        </section>
+      </div>
+    {/snippet}
+    {#if installedApplicationQuery.isPending}
+      <div class="min-h-[28rem]" aria-hidden="true"></div>
+    {:else if installedApplicationQuery.error || !installedApplication}
     <section class="console-panel m-4 p-5 md:m-6">
       <div class="flex items-start gap-3">
         <Package class="mt-0.5 size-5 text-destructive" />
@@ -881,5 +898,6 @@
         {/if}
       </div>
     </div>
-  {/if}
+    {/if}
+  </Skeleton>
 </ConsoleShell>

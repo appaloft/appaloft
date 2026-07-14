@@ -135,9 +135,13 @@ describe("operations workbench home", () => {
     );
   });
 
-  test("[HOME-SKELETON-001] uses the shared shadcn skeleton primitive", () => {
+  test("[HOME-SKELETON-001] uses boneyard Skeleton wrappers instead of hand-drawn bars", () => {
     expect(homePageSource).toContain('import { Skeleton } from "$lib/components/ui/skeleton";');
-    expect(homePageSource).toContain("<Skeleton class=");
+    expect(homePageSource).toContain('name="home-metric-active-deployments"');
+    expect(homePageSource).toContain('name="home-attention-list"');
+    expect(homePageSource).toContain("{#snippet fallback()}");
+    expect(homePageSource).toContain("{#snippet fixture()}");
+    expect(homePageSource).not.toContain("<Skeleton class=");
     expect(homePageSource).toContain("const workStateLoading = $derived(");
     expect(homePageSource).toContain("{#if !workStateLoading && !hasWork}");
     expect(homePageSource).toContain("deploymentsLoading");

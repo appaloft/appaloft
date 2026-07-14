@@ -268,42 +268,60 @@
     { label: $t(i18nKeys.console.previewPolicies.pageTitle) },
   ]}
 >
-  {#if pageLoading}
-    <ConsoleResourceCanvas class="space-y-5">
-      <Skeleton class="h-5 w-48" />
-      <Skeleton class="h-40 w-full" />
-      <Skeleton class="h-64 w-full" />
-    </ConsoleResourceCanvas>
-  {:else if projects.length === 0}
-    <ConsoleResourceCanvas>
-      <section class="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
-        <div class="max-w-2xl space-y-2">
-          <div class="flex items-center gap-2">
-            <h1 class="text-2xl font-semibold">{$t(i18nKeys.console.previewPolicies.scopeTitle)}</h1>
-            <DocsHelpLink
-              href={webDocsHrefs.productGradePreviews}
-              ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-            />
+  <Skeleton name="preview-policies-page" loading={pageLoading} animate="pulse" transition>
+    {#snippet fallback()}
+      <div class="min-h-[28rem] w-full animate-pulse rounded-lg bg-muted/50" aria-hidden="true"></div>
+    {/snippet}
+    {#snippet fixture()}
+      <ConsoleResourceCanvas class="space-y-8">
+        <section class="console-panel space-y-3 p-5">
+          <h2 class="text-lg font-semibold">Policy scope</h2>
+          <p class="text-sm text-muted-foreground">Project · sample-project</p>
+        </section>
+        <section class="grid gap-4 lg:grid-cols-2">
+          <div class="console-panel space-y-3 p-5">
+            <h2 class="text-lg font-semibold">Readback</h2>
+            <p class="text-sm text-muted-foreground">Configured · without-secrets</p>
           </div>
-          <p class="text-sm leading-6 text-muted-foreground">
-            {$t(i18nKeys.console.previewPolicies.scopeDescription)}
-          </p>
-        </div>
-      </section>
+          <div class="console-panel space-y-3 p-5">
+            <h2 class="text-lg font-semibold">Settings</h2>
+            <p class="text-sm text-muted-foreground">Same-repo previews enabled</p>
+          </div>
+        </section>
+      </ConsoleResourceCanvas>
+    {/snippet}
+    {#if pageLoading}
+      <div class="min-h-[28rem]" aria-hidden="true"></div>
+    {:else if projects.length === 0}
+      <ConsoleResourceCanvas>
+        <section class="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+          <div class="max-w-2xl space-y-2">
+            <div class="flex items-center gap-2">
+              <h1 class="text-2xl font-semibold">{$t(i18nKeys.console.previewPolicies.scopeTitle)}</h1>
+              <DocsHelpLink
+                href={webDocsHrefs.productGradePreviews}
+                ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+              />
+            </div>
+            <p class="text-sm leading-6 text-muted-foreground">
+              {$t(i18nKeys.console.previewPolicies.scopeDescription)}
+            </p>
+          </div>
+        </section>
 
-      <ConsoleEmptyState
-        tone="preview-policy"
-        title={$t(i18nKeys.console.previewPolicies.emptyProjectsTitle)}
-        description={$t(i18nKeys.console.previewPolicies.emptyProjectsBody)}
-        learnMoreHref={webDocsHrefs.productGradePreviews}
-      >
-        <Button href="/projects" variant="outline">
-          {$t(i18nKeys.common.actions.viewProjects)}
-        </Button>
-      </ConsoleEmptyState>
-    </ConsoleResourceCanvas>
-  {:else}
-    <ConsoleResourceCanvas class="space-y-8">
+        <ConsoleEmptyState
+          tone="preview-policy"
+          title={$t(i18nKeys.console.previewPolicies.emptyProjectsTitle)}
+          description={$t(i18nKeys.console.previewPolicies.emptyProjectsBody)}
+          learnMoreHref={webDocsHrefs.productGradePreviews}
+        >
+          <Button href="/projects" variant="outline">
+            {$t(i18nKeys.common.actions.viewProjects)}
+          </Button>
+        </ConsoleEmptyState>
+      </ConsoleResourceCanvas>
+    {:else}
+      <ConsoleResourceCanvas class="space-y-8">
       <section
         class="console-panel space-y-4 p-5"
         data-preview-policy-scope-display-surface
@@ -374,47 +392,66 @@
             </p>
           </div>
 
-          {#if previewPolicyQuery.isPending}
-            <div class="space-y-2">
-              <Skeleton class="h-5 w-28" />
-              <Skeleton class="h-5 w-40" />
-            </div>
-          {:else if previewPolicyQuery.error}
-            <p class="text-sm text-destructive">
-              {$t(i18nKeys.console.previewPolicies.policyReadFailed)}
-            </p>
-          {:else if previewPolicyQuery.data}
-            <div class="space-y-3 text-sm">
-              <div>
-                <p class="text-muted-foreground">
-                  {$t(i18nKeys.console.previewPolicies.sourceLabel)}
-                </p>
-                <p class="mt-1 font-medium">
-                  {previewPolicyQuery.data.policy.source === "configured"
-                    ? $t(i18nKeys.console.previewPolicies.configuredSource)
-                    : $t(i18nKeys.console.previewPolicies.defaultSource)}
-                </p>
+          <Skeleton
+            name="preview-policies-readback"
+            loading={previewPolicyQuery.isPending}
+            animate="pulse"
+            transition
+          >
+            {#snippet fallback()}
+              <div class="min-h-24 w-full animate-pulse rounded-md bg-muted/50" aria-hidden="true"></div>
+            {/snippet}
+            {#snippet fixture()}
+              <div class="space-y-3 text-sm">
+                <div>
+                  <p class="text-muted-foreground">Source</p>
+                  <p class="mt-1 font-medium">Configured</p>
+                </div>
+                <div>
+                  <p class="text-muted-foreground">Fork mode</p>
+                  <p class="mt-1 font-medium">Without secrets</p>
+                </div>
               </div>
-              <div>
-                <p class="text-muted-foreground">
-                  {$t(i18nKeys.console.previewPolicies.forkModeLabel)}
-                </p>
-                <p class="mt-1 font-medium">
-                  {$t(forkModeLabelKey(previewPolicyQuery.data.policy.settings.forkPreviews))}
-                </p>
+            {/snippet}
+            {#if previewPolicyQuery.isPending}
+              <div class="min-h-24" aria-hidden="true"></div>
+            {:else if previewPolicyQuery.error}
+              <p class="text-sm text-destructive">
+                {$t(i18nKeys.console.previewPolicies.policyReadFailed)}
+              </p>
+            {:else if previewPolicyQuery.data}
+              <div class="space-y-3 text-sm">
+                <div>
+                  <p class="text-muted-foreground">
+                    {$t(i18nKeys.console.previewPolicies.sourceLabel)}
+                  </p>
+                  <p class="mt-1 font-medium">
+                    {previewPolicyQuery.data.policy.source === "configured"
+                      ? $t(i18nKeys.console.previewPolicies.configuredSource)
+                      : $t(i18nKeys.console.previewPolicies.defaultSource)}
+                  </p>
+                </div>
+                <div>
+                  <p class="text-muted-foreground">
+                    {$t(i18nKeys.console.previewPolicies.forkModeLabel)}
+                  </p>
+                  <p class="mt-1 font-medium">
+                    {$t(forkModeLabelKey(previewPolicyQuery.data.policy.settings.forkPreviews))}
+                  </p>
+                </div>
+                <div>
+                  <p class="text-muted-foreground">
+                    {$t(i18nKeys.console.previewPolicies.updatedAt)}
+                  </p>
+                  <p class="mt-1 font-medium">
+                    {previewPolicyQuery.data.policy.updatedAt
+                      ? formatTime(previewPolicyQuery.data.policy.updatedAt)
+                      : "-"}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p class="text-muted-foreground">
-                  {$t(i18nKeys.console.previewPolicies.updatedAt)}
-                </p>
-                <p class="mt-1 font-medium">
-                  {previewPolicyQuery.data.policy.updatedAt
-                    ? formatTime(previewPolicyQuery.data.policy.updatedAt)
-                    : "-"}
-                </p>
-              </div>
-            </div>
-          {/if}
+            {/if}
+          </Skeleton>
         </div>
 
         <section class="console-panel space-y-5 p-5" data-preview-policy-summary>
@@ -440,17 +477,32 @@
             </Button>
           </div>
 
-          {#if previewPolicyQuery.isPending}
-            <div class="grid gap-3 md:grid-cols-2">
-              {#each Array.from({ length: 4 }) as _, index (index)}
-                <Skeleton class="h-16 w-full" />
-              {/each}
-            </div>
-          {:else if previewPolicyQuery.error}
-            <div class="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-              {$t(i18nKeys.console.previewPolicies.policyReadFailed)}
-            </div>
-          {:else if previewPolicyQuery.data}
+          <Skeleton
+            name="preview-policies-settings-summary"
+            loading={previewPolicyQuery.isPending}
+            animate="pulse"
+            transition
+          >
+            {#snippet fallback()}
+              <div class="min-h-32 w-full animate-pulse rounded-md bg-muted/50" aria-hidden="true"></div>
+            {/snippet}
+            {#snippet fixture()}
+              <dl class="grid gap-3 md:grid-cols-2">
+                {#each ["Same-repo", "Secrets", "Max active", "TTL hours"] as label (label)}
+                  <div class="rounded-md border bg-card p-3">
+                    <dt class="text-xs font-medium text-muted-foreground">{label}</dt>
+                    <dd class="mt-1 text-sm font-semibold">Enabled</dd>
+                  </div>
+                {/each}
+              </dl>
+            {/snippet}
+            {#if previewPolicyQuery.isPending}
+              <div class="min-h-32" aria-hidden="true"></div>
+            {:else if previewPolicyQuery.error}
+              <div class="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+                {$t(i18nKeys.console.previewPolicies.policyReadFailed)}
+              </div>
+            {:else if previewPolicyQuery.data}
             {@const settings = previewPolicyQuery.data.policy.settings}
             <dl class="grid gap-3 md:grid-cols-2">
               <div class="rounded-md border bg-card p-3">
@@ -482,11 +534,12 @@
                 </dd>
               </div>
             </dl>
-          {:else}
-            <div class="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
-              {$t(i18nKeys.console.previewPolicies.scopeRequired)}
-            </div>
-          {/if}
+            {:else}
+              <div class="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
+                {$t(i18nKeys.console.previewPolicies.scopeRequired)}
+              </div>
+            {/if}
+          </Skeleton>
 
           {#if feedback}
             <div
@@ -498,8 +551,9 @@
           {/if}
         </section>
       </section>
-    </ConsoleResourceCanvas>
-  {/if}
+      </ConsoleResourceCanvas>
+    {/if}
+  </Skeleton>
 
   <Dialog.Root bind:open={scopeDialogOpen} onOpenChange={(open) => {
     if (!open) {

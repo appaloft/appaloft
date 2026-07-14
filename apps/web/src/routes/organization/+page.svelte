@@ -1138,11 +1138,21 @@
 
   <div class="p-4 md:p-6">
   {#if contextQuery.isPending}
-    <div class="space-y-5">
-      <Skeleton class="h-5 w-40" />
-      <Skeleton class="h-28 w-full" />
-      <Skeleton class="h-52 w-full" />
-    </div>
+    <Skeleton name="organization-context" loading={true} animate="pulse" transition>
+      {#snippet fallback()}
+        <div class="min-h-80 w-full animate-pulse rounded-lg bg-muted/50" aria-hidden="true"></div>
+      {/snippet}
+      {#snippet fixture()}
+        <div class="space-y-5">
+          <h1 class="text-2xl font-semibold">Organization</h1>
+          <section class="console-panel p-5">
+            <h2 class="text-lg font-semibold">Profile</h2>
+            <p class="mt-2 text-sm text-muted-foreground">Team settings and membership.</p>
+          </section>
+        </div>
+      {/snippet}
+      <div class="min-h-80" aria-hidden="true"></div>
+    </Skeleton>
   {:else if contextQuery.error}
     <section class="console-panel space-y-4 p-5">
       <div class="space-y-2">
@@ -1172,27 +1182,51 @@
           </div>
           <div class="console-metric-strip grid-cols-3 text-center md:min-w-96">
             <div>
-              {#if profileMetricsLoading}
-                <Skeleton class="mx-auto h-7 w-10" />
-              {:else}
-                <p class="text-xl font-semibold">{members.length}</p>
-              {/if}
+              <Skeleton name="organization-metric-members" loading={profileMetricsLoading} animate="pulse" transition>
+                {#snippet fallback()}
+                  <div class="mx-auto h-7 w-10 animate-pulse rounded bg-muted/50" aria-hidden="true"></div>
+                {/snippet}
+                {#snippet fixture()}
+                  <p class="text-xl font-semibold">3</p>
+                {/snippet}
+                {#if profileMetricsLoading}
+                  <div class="mx-auto h-7 w-10" aria-hidden="true"></div>
+                {:else}
+                  <p class="text-xl font-semibold">{members.length}</p>
+                {/if}
+              </Skeleton>
               <p class="mt-1 text-xs text-muted-foreground">{$t(i18nKeys.console.organization.membersTitle)}</p>
             </div>
             <div>
-              {#if profileMetricsLoading}
-                <Skeleton class="mx-auto h-7 w-10" />
-              {:else}
-                <p class="text-xl font-semibold">{invitations.length}</p>
-              {/if}
+              <Skeleton name="organization-metric-invitations" loading={profileMetricsLoading} animate="pulse" transition>
+                {#snippet fallback()}
+                  <div class="mx-auto h-7 w-10 animate-pulse rounded bg-muted/50" aria-hidden="true"></div>
+                {/snippet}
+                {#snippet fixture()}
+                  <p class="text-xl font-semibold">1</p>
+                {/snippet}
+                {#if profileMetricsLoading}
+                  <div class="mx-auto h-7 w-10" aria-hidden="true"></div>
+                {:else}
+                  <p class="text-xl font-semibold">{invitations.length}</p>
+                {/if}
+              </Skeleton>
               <p class="mt-1 text-xs text-muted-foreground">{$t(i18nKeys.console.organization.invitationsTitle)}</p>
             </div>
             <div>
-              {#if profileMetricsLoading}
-                <Skeleton class="mx-auto h-7 w-10" />
-              {:else}
-                <p class="text-xl font-semibold">{deployTokens.length}</p>
-              {/if}
+              <Skeleton name="organization-metric-tokens" loading={profileMetricsLoading} animate="pulse" transition>
+                {#snippet fallback()}
+                  <div class="mx-auto h-7 w-10 animate-pulse rounded bg-muted/50" aria-hidden="true"></div>
+                {/snippet}
+                {#snippet fixture()}
+                  <p class="text-xl font-semibold">2</p>
+                {/snippet}
+                {#if profileMetricsLoading}
+                  <div class="mx-auto h-7 w-10" aria-hidden="true"></div>
+                {:else}
+                  <p class="text-xl font-semibold">{deployTokens.length}</p>
+                {/if}
+              </Skeleton>
               <p class="mt-1 text-xs text-muted-foreground">{$t(i18nKeys.console.organization.deployTokensTitle)}</p>
             </div>
           </div>
@@ -1223,13 +1257,24 @@
 
       {#if activeSection === "profile"}
       {#if organizationProfileLoading}
-        <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
-          <div class="space-y-5">
-            <Skeleton class="h-80 w-full" />
-            <Skeleton class="h-44 w-full" />
-          </div>
-          <Skeleton class="h-80 w-full" />
-        </div>
+        <Skeleton name="organization-profile" loading={true} animate="pulse" transition>
+          {#snippet fallback()}
+            <div class="min-h-[28rem] w-full animate-pulse rounded-lg bg-muted/50" aria-hidden="true"></div>
+          {/snippet}
+          {#snippet fixture()}
+            <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
+              <section class="console-panel space-y-3 p-5">
+                <h2 class="text-lg font-semibold">Organization profile</h2>
+                <p class="text-sm text-muted-foreground">Name, slug, and ownership summary.</p>
+              </section>
+              <aside class="console-panel space-y-3 p-5">
+                <h2 class="text-lg font-semibold">Danger zone</h2>
+                <p class="text-sm text-muted-foreground">Archive or transfer ownership.</p>
+              </aside>
+            </div>
+          {/snippet}
+          <div class="min-h-[28rem]" aria-hidden="true"></div>
+        </Skeleton>
       {:else}
       <section class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
         <div class="space-y-5">
@@ -1404,14 +1449,20 @@
           </p>
         </div>
         {#if membersSectionLoading}
-          <div class="console-record-list">
-            <div class="console-record-row">
-              <Skeleton class="h-12 w-full" />
-            </div>
-            <div class="console-record-row">
-              <Skeleton class="h-12 w-full" />
-            </div>
-          </div>
+          <Skeleton name="organization-members" loading={true} animate="pulse" transition>
+            {#snippet fallback()}
+              <div class="min-h-24 w-full animate-pulse rounded-lg bg-muted/50" aria-hidden="true"></div>
+            {/snippet}
+            {#snippet fixture()}
+              <div class="console-record-list">
+                <div class="console-record-row">
+                  <h3 class="font-semibold">Alice</h3>
+                  <p class="text-sm text-muted-foreground">alice@example.com · owner</p>
+                </div>
+              </div>
+            {/snippet}
+            <div class="min-h-24" aria-hidden="true"></div>
+          </Skeleton>
         {:else}
         <div class="space-y-5">
           <div class="console-record-list">
@@ -1571,14 +1622,20 @@
           </div>
         {/if}
         {#if invitationsSectionLoading}
-          <div class="console-record-list">
-            <div class="console-record-row">
-              <Skeleton class="h-12 w-full" />
-            </div>
-            <div class="console-record-row">
-              <Skeleton class="h-12 w-full" />
-            </div>
-          </div>
+          <Skeleton name="organization-invitations" loading={true} animate="pulse" transition>
+            {#snippet fallback()}
+              <div class="min-h-24 w-full animate-pulse rounded-lg bg-muted/50" aria-hidden="true"></div>
+            {/snippet}
+            {#snippet fixture()}
+              <div class="console-record-list">
+                <div class="console-record-row">
+                  <h3 class="font-semibold">bob@example.com</h3>
+                  <p class="text-sm text-muted-foreground">pending · member</p>
+                </div>
+              </div>
+            {/snippet}
+            <div class="min-h-24" aria-hidden="true"></div>
+          </Skeleton>
         {:else if invitations.length === 0}
           <ConsoleEmptyState
             tone="invitation"
@@ -1633,14 +1690,20 @@
           </Button>
         </div>
         {#if deployTokensSectionLoading}
-          <div class="console-record-list">
-            <div class="console-record-row">
-              <Skeleton class="h-14 w-full" />
-            </div>
-            <div class="console-record-row">
-              <Skeleton class="h-14 w-full" />
-            </div>
-          </div>
+          <Skeleton name="organization-deploy-tokens" loading={true} animate="pulse" transition>
+            {#snippet fallback()}
+              <div class="min-h-28 w-full animate-pulse rounded-lg bg-muted/50" aria-hidden="true"></div>
+            {/snippet}
+            {#snippet fixture()}
+              <div class="console-record-list">
+                <div class="console-record-row">
+                  <h3 class="font-semibold">ci-bot</h3>
+                  <p class="text-sm text-muted-foreground">active · last used recently</p>
+                </div>
+              </div>
+            {/snippet}
+            <div class="min-h-28" aria-hidden="true"></div>
+          </Skeleton>
         {:else if deployTokens.length === 0}
           <ConsoleEmptyState
             tone="credential"
@@ -1710,14 +1773,20 @@
           </p>
         </div>
         {#if archivedProjectsSectionLoading}
-          <div class="console-record-list">
-            <div class="console-record-row">
-              <Skeleton class="h-14 w-full" />
-            </div>
-            <div class="console-record-row">
-              <Skeleton class="h-14 w-full" />
-            </div>
-          </div>
+          <Skeleton name="organization-archived-projects" loading={true} animate="pulse" transition>
+            {#snippet fallback()}
+              <div class="min-h-28 w-full animate-pulse rounded-lg bg-muted/50" aria-hidden="true"></div>
+            {/snippet}
+            {#snippet fixture()}
+              <div class="console-record-list">
+                <div class="console-record-row">
+                  <h3 class="font-semibold">legacy-app</h3>
+                  <p class="text-sm text-muted-foreground">archived project</p>
+                </div>
+              </div>
+            {/snippet}
+            <div class="min-h-28" aria-hidden="true"></div>
+          </Skeleton>
         {:else if archivedProjects.length === 0}
           <ConsoleEmptyState
             tone="project"

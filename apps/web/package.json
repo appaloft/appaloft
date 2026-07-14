@@ -14,6 +14,7 @@
     "lint": "biome check .",
     "format": "biome format --write .",
     "test:unit": "vitest",
+    "bones:capture": "boneyard-js build --out ./src/lib/bones",
     "test": "bun run test:unit -- --run && bun run test:e2e",
     "test:e2e": "bun run test:e2e:webview",
     "test:e2e:webview": "bun run build && bun test --max-concurrency=1 --timeout=60000 test/e2e-webview/home.webview.test.ts -t \"^(?!.*(DEP-EVENTS|RES-PROFILE-ENTRY-002\\\\] submits resource archive|ENV-LIFE|RES-PROFILE-ENTRY-008|CERT-IMPORT|QUICK-DEPLOY-ENTRY)).*$\" && bun test --max-concurrency=1 --timeout=60000 test/e2e-webview/home.webview.test.ts -t \"DEP-EVENTS|RES-PROFILE-ENTRY-002\\\\] submits resource archive|ENV-LIFE|RES-PROFILE-ENTRY-008|CERT-IMPORT|QUICK-DEPLOY-ENTRY\""
@@ -56,6 +57,7 @@
   "dependencies": {
     "@thesvg/icons": "^3.0.18",
     "@wterm/dom": "^0.3.0",
+    "boneyard-js": "^1.9.0",
     "sortablejs": "^1.15.7"
   }
 }

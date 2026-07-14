@@ -35,7 +35,8 @@
   },
   "dependencies": {
     "@appaloft/blueprints": "workspace:*",
-    "@appaloft/ui": "workspace:*"
+    "@appaloft/ui": "workspace:*",
+    "boneyard-js": "^1.9.0"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.1.2",

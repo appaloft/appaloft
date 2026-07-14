@@ -547,71 +547,24 @@
       {/if}
     </section>
 
-    {#if pageLoading}
-      <section class="space-y-3" data-server-list-skeleton>
-        <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <div class="space-y-2">
-            <Skeleton class="h-5 w-32" />
-            <Skeleton class="h-4 w-64 max-w-full" />
+    <Skeleton name="servers-list-page" loading={pageLoading} animate="pulse" transition>
+      {#snippet fallback()}
+        <div class="min-h-96 w-full animate-pulse rounded-lg bg-muted/50" aria-hidden="true" data-server-list-skeleton></div>
+      {/snippet}
+      {#snippet fixture()}
+        <section class="space-y-3" data-server-list-skeleton>
+          <div>
+            <h2 class="text-lg font-semibold">Servers</h2>
+            <p class="mt-1 text-sm text-muted-foreground">Registered deployment targets</p>
           </div>
-          <Skeleton class="h-4 w-28" />
-        </div>
-
-        <div class="grid gap-3">
-          {#each Array.from({ length: 3 }) as _, index (index)}
-            <article
-              class="rounded-md border bg-card p-4 shadow-sm lg:grid lg:grid-cols-[minmax(16rem,1fr)_auto] lg:items-start lg:gap-x-4"
-            >
-              <div class="min-w-0">
-                <div class="flex min-w-0 items-start gap-3">
-                  <div class="min-w-0 space-y-2">
-                    <div class="flex min-w-0 items-center gap-2">
-                      <Skeleton class="size-4 shrink-0 rounded-sm" />
-                      <Skeleton class="h-5 w-36" />
-                      <Skeleton class="h-5 w-14 rounded-sm" />
-                    </div>
-                    <Skeleton class="h-4 w-48 max-w-full" />
-                  </div>
-                </div>
-              </div>
-
-              <div class="mt-4 grid min-w-0 gap-2 sm:grid-cols-3 lg:col-span-2">
-                {#each Array.from({ length: 3 }) as _, cardIndex (`${index}-${cardIndex}`)}
-                  <div class="grid min-w-0 gap-2 rounded-md border bg-background/60 px-3 py-2">
-                    <div class="flex min-w-0 items-center justify-between gap-3">
-                      <div class="inline-flex min-w-0 items-center gap-2">
-                        <Skeleton class="size-3.5 shrink-0 rounded-sm" />
-                        <Skeleton class="h-4 w-20" />
-                      </div>
-                      <Skeleton class="h-5 w-14 rounded-sm" />
-                    </div>
-                    <Skeleton class="h-4 w-full" />
-                  </div>
-                {/each}
-              </div>
-
-              <div
-                class="mt-3 grid min-w-0 gap-x-4 gap-y-2 border-t pt-3 sm:grid-cols-2 lg:col-span-2 lg:grid-cols-4"
-              >
-                {#each Array.from({ length: 4 }) as _, metaIndex (`${index}-${metaIndex}`)}
-                  <div class="inline-flex min-w-0 items-center gap-2">
-                    <Skeleton class="size-3.5 shrink-0 rounded-sm" />
-                    <Skeleton class="h-4 w-28" />
-                  </div>
-                {/each}
-              </div>
-
-              <div
-                class="mt-3 flex flex-wrap items-center justify-end gap-2 border-t pt-3 lg:col-start-2 lg:row-start-1 lg:mt-0 lg:border-t-0 lg:pt-0"
-              >
-                <Skeleton class="h-8 w-20 rounded-md" />
-                <Skeleton class="h-8 w-24 rounded-md" />
-                <Skeleton class="h-8 w-24 rounded-md" />
-              </div>
-            </article>
-          {/each}
-        </div>
-      </section>
+          <article class="rounded-md border bg-card p-4 shadow-sm">
+            <p class="font-semibold">edge-1.example.com</p>
+            <p class="mt-1 text-sm text-muted-foreground">ready · 4 resources</p>
+          </article>
+        </section>
+      {/snippet}
+    {#if pageLoading}
+      <div class="min-h-96" aria-hidden="true" data-server-list-skeleton></div>
     {:else if visibleServers.length === 0}
       <ConsoleEmptyState
         tone="server"
@@ -842,6 +795,7 @@
           </div>
         </section>
     {/if}
+    </Skeleton>
   </ConsoleResourceCanvas>
 
   <Dialog.Root bind:open={serverCreateDialogOpen} onOpenChange={setServerCreateDialogOpen}>
@@ -862,11 +816,19 @@
         {#if serverCreateIntentModalVisible && serverCreateIntentEndpoint}
           <ConsoleExtensionPage embedded pageEndpointOverride={serverCreateIntentEndpoint} />
         {:else if serverCreateIntentVisibilityPending}
-          <div class="space-y-3">
-            <Skeleton class="h-10 w-full" />
-            <Skeleton class="h-28 w-full" />
-            <Skeleton class="h-10 w-40" />
-          </div>
+          <Skeleton name="servers-create-intent" loading={true} animate="pulse" transition>
+            {#snippet fallback()}
+              <div class="min-h-40 w-full animate-pulse rounded-lg bg-muted/50" aria-hidden="true"></div>
+            {/snippet}
+            {#snippet fixture()}
+              <div class="space-y-3">
+                <p class="text-sm font-medium">Create server</p>
+                <p class="text-sm text-muted-foreground">Host connection details</p>
+                <button type="button" class="rounded-md border px-3 py-2 text-sm">Continue</button>
+              </div>
+            {/snippet}
+            <div class="min-h-40" aria-hidden="true"></div>
+          </Skeleton>
         {:else}
           <ServerCreateForm
             idPrefix="servers-page-create"

@@ -211,235 +211,252 @@
     { label: $t(i18nKeys.console.deployments.pageTitle) },
   ]}
 >
-  {#if pageLoading}
-    <ConsoleResourceCanvas class="space-y-5">
-      <section class="space-y-3">
-        <Skeleton class="h-5 w-36" />
-        <Skeleton class="h-4 w-72" />
-      </section>
-      <div class="space-y-3">
-        {#each Array.from({ length: 6 }) as _, index (index)}
-          <Skeleton class="h-12 w-full" />
-        {/each}
-      </div>
-    </ConsoleResourceCanvas>
-  {:else if deployments.length === 0}
-    <ConsoleResourceCanvas class="space-y-6">
-      <section class="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
-        <div class="max-w-2xl space-y-2">
-          <div class="flex items-center gap-2">
-            <h1 class="text-2xl font-semibold">{$t(i18nKeys.console.deployments.focusTitle)}</h1>
-            <DocsHelpLink
-              href={webDocsHrefs.deploymentLifecycle}
-              ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-            />
+  <Skeleton name="deployments-list-page" loading={pageLoading} animate="pulse" transition>
+    {#snippet fallback()}
+      <div class="min-h-96 w-full animate-pulse rounded-lg bg-muted/50" aria-hidden="true"></div>
+    {/snippet}
+    {#snippet fixture()}
+      <ConsoleResourceCanvas class="space-y-6">
+        <section class="space-y-2">
+          <h1 class="text-2xl font-semibold">Deployments</h1>
+          <p class="text-sm text-muted-foreground">Track deployment attempts across projects.</p>
+        </section>
+        <section class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {#each ["Records", "In flight", "Failed", "Succeeded"] as label (label)}
+            <article class="console-subtle-panel p-4">
+              <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+              <p class="mt-2 text-2xl font-semibold">12</p>
+            </article>
+          {/each}
+        </section>
+        <section class="space-y-3">
+          <h2 class="text-lg font-semibold">Deployment list</h2>
+          <div class="console-subtle-panel px-4 py-6 text-sm text-muted-foreground">
+            Sample deployment row · succeeded
           </div>
-          <p class="text-sm leading-6 text-muted-foreground">
-            {$t(i18nKeys.console.deployments.focusDescription)}
-          </p>
-        </div>
-      </section>
-
-      <ConsoleEmptyState
-        tone="deployment"
-        title={$t(i18nKeys.console.deployments.emptyTitle)}
-        description={$t(i18nKeys.console.deployments.emptyBody)}
-        learnMoreHref={webDocsHrefs.deploymentLifecycle}
-      >
-        <Button href="/projects">
-          <FolderOpen class="size-4" />
-          {$t(i18nKeys.common.actions.viewProjects)}
-        </Button>
-      </ConsoleEmptyState>
-    </ConsoleResourceCanvas>
-  {:else}
-    <ConsoleResourceCanvas class="space-y-6">
-      <section class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div class="max-w-2xl space-y-2">
-          <div class="flex items-center gap-2">
-            <h1 class="text-2xl font-semibold">{$t(i18nKeys.console.deployments.focusTitle)}</h1>
-            <DocsHelpLink
-              href={webDocsHrefs.deploymentLifecycle}
-              ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-            />
-          </div>
-          <p class="text-sm leading-6 text-muted-foreground">
-            {$t(i18nKeys.console.deployments.focusDescription)}
-          </p>
-        </div>
-        <div class="flex flex-wrap gap-2">
-          {#if selectedProject}
-            <Button href="/deployments" variant="outline">{$t(i18nKeys.common.actions.viewAll)}</Button>
-          {/if}
-          <Button href={selectedOwnerHref} variant="outline">
-            {selectedOwnerLabel}
-            <ArrowRight class="size-4" />
-          </Button>
-        </div>
-      </section>
-
-      <section class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <article class="console-subtle-panel p-4">
-          <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            {$t(i18nKeys.console.deployments.records)}
-          </p>
-          <p class="mt-2 text-2xl font-semibold">{visibleDeployments.length}</p>
-          <p class="mt-1 text-xs text-muted-foreground">
-            {$t(i18nKeys.console.deployments.filteredRecords)}
-          </p>
-        </article>
-        <article class="console-subtle-panel p-4">
-          <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            {$t(i18nKeys.console.deployments.inFlight)}
-          </p>
-          <p class="mt-2 text-2xl font-semibold">{visibleInFlightDeployments.length}</p>
-          <p class="mt-1 text-xs text-muted-foreground">
-            {$t(i18nKeys.console.deployments.runningAttemptHint)}
-          </p>
-        </article>
-        <article class="console-subtle-panel p-4">
-          <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            {$t(i18nKeys.console.deployments.needsAttention)}
-          </p>
-          <p class="mt-2 text-2xl font-semibold">{visibleFailedDeployments.length}</p>
-          <p class="mt-1 text-xs text-muted-foreground">
-            {$t(i18nKeys.console.deployments.failedAttemptHint)}
-          </p>
-        </article>
-        <article class="console-subtle-panel p-4">
-          <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            {$t(i18nKeys.common.status.passed)}
-          </p>
-          <p class="mt-2 text-2xl font-semibold">{visibleSucceededDeployments.length}</p>
-          <p class="mt-1 text-xs text-muted-foreground">
-            {$t(i18nKeys.console.deployments.succeededAttemptHint)}
-          </p>
-        </article>
-      </section>
-
-      <section
-        class="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4"
-        data-deployments-feed-display-surface
-      >
-        <label class="min-w-0 space-y-1.5 text-sm font-medium">
-          {$t(i18nKeys.common.domain.project)}
-          <Select.Root bind:value={projectFilter} type="single">
-            <Select.Trigger class="w-full min-w-0">
-              {selectedProjectFilterLabel}
-            </Select.Trigger>
-            <Select.Content>
-              <Select.Item value="all">
-                {$t(i18nKeys.console.deployments.allProjects)}
-              </Select.Item>
-              {#each projects as project (project.id)}
-                <Select.Item value={project.id}>{project.name}</Select.Item>
-              {/each}
-            </Select.Content>
-          </Select.Root>
-        </label>
-        <label class="min-w-0 space-y-1.5 text-sm font-medium">
-          {$t(i18nKeys.common.domain.environment)}
-          <Select.Root bind:value={environmentFilter} disabled={!selectedProject} type="single">
-            <Select.Trigger class="w-full min-w-0">
-              {selectedEnvironmentFilterLabel}
-            </Select.Trigger>
-            <Select.Content>
-              <Select.Item value="all">
-                {$t(i18nKeys.console.deployments.filterAllEnvironments)}
-              </Select.Item>
-              {#each filteredEnvironments as environment (environment.id)}
-                <Select.Item value={environment.id}>{environment.name}</Select.Item>
-              {/each}
-            </Select.Content>
-          </Select.Root>
-        </label>
-        <label class="min-w-0 space-y-1.5 text-sm font-medium">
-          {$t(i18nKeys.common.domain.resource)}
-          <Select.Root bind:value={resourceFilter} disabled={!selectedProject} type="single">
-            <Select.Trigger class="w-full min-w-0">
-              {selectedResourceFilterLabel}
-            </Select.Trigger>
-            <Select.Content>
-              <Select.Item value="all">
-                {$t(i18nKeys.console.deployments.filterAllResources)}
-              </Select.Item>
-              {#each filteredResourcesForProject as resource (resource.id)}
-                <Select.Item value={resource.id}>{resource.name}</Select.Item>
-              {/each}
-            </Select.Content>
-          </Select.Root>
-        </label>
-        <label class="min-w-0 space-y-1.5 text-sm font-medium">
-          {$t(i18nKeys.common.domain.status)}
-          <Select.Root bind:value={statusFilter} type="single">
-            <Select.Trigger class="w-full min-w-0">
-              {selectedStatusFilterLabel}
-            </Select.Trigger>
-            <Select.Content>
-              <Select.Item value="all">
-                {$t(i18nKeys.console.deployments.filterAllStatuses)}
-              </Select.Item>
-              {#each deploymentStatuses as status (status)}
-                <Select.Item value={status}>{statusLabel(status)}</Select.Item>
-              {/each}
-            </Select.Content>
-          </Select.Root>
-        </label>
-      </section>
-
-      <section class="space-y-3">
-        <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h2 class="text-lg font-semibold">{$t(i18nKeys.console.deployments.listTitle)}</h2>
-            <p class="mt-1 text-sm text-muted-foreground">
-              {$t(i18nKeys.console.deployments.listDescription)}
+        </section>
+      </ConsoleResourceCanvas>
+    {/snippet}
+    {#if pageLoading}
+      <div class="min-h-96" aria-hidden="true"></div>
+    {:else if deployments.length === 0}
+      <ConsoleResourceCanvas class="space-y-6">
+        <section class="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+          <div class="max-w-2xl space-y-2">
+            <div class="flex items-center gap-2">
+              <h1 class="text-2xl font-semibold">{$t(i18nKeys.console.deployments.focusTitle)}</h1>
+              <DocsHelpLink
+                href={webDocsHrefs.deploymentLifecycle}
+                ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+              />
+            </div>
+            <p class="text-sm leading-6 text-muted-foreground">
+              {$t(i18nKeys.console.deployments.focusDescription)}
             </p>
           </div>
-          {#if visibleDeployments.length > 0}
-            <div
-              class="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
-              data-deployment-pagination
-            >
-              <span>
-                {$t(i18nKeys.console.deployments.listRange, {
-                  start: deploymentPageStart,
-                  end: deploymentPageEnd,
-                  total: deploymentTotal,
-                })}
-              </span>
-              <div class="flex items-center gap-1">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon-sm"
-                  aria-label={$t(i18nKeys.common.actions.previous)}
-                  disabled={!canGoPrevious}
-                  onclick={() => setDeploymentPage(deploymentOffset - deploymentPageSize)}
-                >
-                  <ChevronLeft class="size-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon-sm"
-                  aria-label={$t(i18nKeys.common.actions.next)}
-                  disabled={!canGoNext}
-                  onclick={() => setDeploymentPage(deploymentOffset + deploymentPageSize)}
-                >
-                  <ChevronRight class="size-4" />
-                </Button>
+        </section>
+
+        <ConsoleEmptyState
+          tone="deployment"
+          title={$t(i18nKeys.console.deployments.emptyTitle)}
+          description={$t(i18nKeys.console.deployments.emptyBody)}
+          learnMoreHref={webDocsHrefs.deploymentLifecycle}
+        >
+          <Button href="/projects">
+            <FolderOpen class="size-4" />
+            {$t(i18nKeys.common.actions.viewProjects)}
+          </Button>
+        </ConsoleEmptyState>
+      </ConsoleResourceCanvas>
+    {:else}
+      <ConsoleResourceCanvas class="space-y-6">
+        <section class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div class="max-w-2xl space-y-2">
+            <div class="flex items-center gap-2">
+              <h1 class="text-2xl font-semibold">{$t(i18nKeys.console.deployments.focusTitle)}</h1>
+              <DocsHelpLink
+                href={webDocsHrefs.deploymentLifecycle}
+                ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+              />
+            </div>
+            <p class="text-sm leading-6 text-muted-foreground">
+              {$t(i18nKeys.console.deployments.focusDescription)}
+            </p>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            {#if selectedProject}
+              <Button href="/deployments" variant="outline">{$t(i18nKeys.common.actions.viewAll)}</Button>
+            {/if}
+            <Button href={selectedOwnerHref} variant="outline">
+              {selectedOwnerLabel}
+              <ArrowRight class="size-4" />
+            </Button>
+          </div>
+        </section>
+
+        <section class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <article class="console-subtle-panel p-4">
+            <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {$t(i18nKeys.console.deployments.records)}
+            </p>
+            <p class="mt-2 text-2xl font-semibold">{visibleDeployments.length}</p>
+            <p class="mt-1 text-xs text-muted-foreground">
+              {$t(i18nKeys.console.deployments.filteredRecords)}
+            </p>
+          </article>
+          <article class="console-subtle-panel p-4">
+            <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {$t(i18nKeys.console.deployments.inFlight)}
+            </p>
+            <p class="mt-2 text-2xl font-semibold">{visibleInFlightDeployments.length}</p>
+            <p class="mt-1 text-xs text-muted-foreground">
+              {$t(i18nKeys.console.deployments.runningAttemptHint)}
+            </p>
+          </article>
+          <article class="console-subtle-panel p-4">
+            <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {$t(i18nKeys.console.deployments.needsAttention)}
+            </p>
+            <p class="mt-2 text-2xl font-semibold">{visibleFailedDeployments.length}</p>
+            <p class="mt-1 text-xs text-muted-foreground">
+              {$t(i18nKeys.console.deployments.failedAttemptHint)}
+            </p>
+          </article>
+          <article class="console-subtle-panel p-4">
+            <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {$t(i18nKeys.common.status.passed)}
+            </p>
+            <p class="mt-2 text-2xl font-semibold">{visibleSucceededDeployments.length}</p>
+            <p class="mt-1 text-xs text-muted-foreground">
+              {$t(i18nKeys.console.deployments.succeededAttemptHint)}
+            </p>
+          </article>
+        </section>
+
+        <section
+          class="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4"
+          data-deployments-feed-display-surface
+        >
+          <label class="min-w-0 space-y-1.5 text-sm font-medium">
+            {$t(i18nKeys.common.domain.project)}
+            <Select.Root bind:value={projectFilter} type="single">
+              <Select.Trigger class="w-full min-w-0">
+                {selectedProjectFilterLabel}
+              </Select.Trigger>
+              <Select.Content>
+                <Select.Item value="all">
+                  {$t(i18nKeys.console.deployments.allProjects)}
+                </Select.Item>
+                {#each projects as project (project.id)}
+                  <Select.Item value={project.id}>{project.name}</Select.Item>
+                {/each}
+              </Select.Content>
+            </Select.Root>
+          </label>
+          <label class="min-w-0 space-y-1.5 text-sm font-medium">
+            {$t(i18nKeys.common.domain.environment)}
+            <Select.Root bind:value={environmentFilter} disabled={!selectedProject} type="single">
+              <Select.Trigger class="w-full min-w-0">
+                {selectedEnvironmentFilterLabel}
+              </Select.Trigger>
+              <Select.Content>
+                <Select.Item value="all">
+                  {$t(i18nKeys.console.deployments.filterAllEnvironments)}
+                </Select.Item>
+                {#each filteredEnvironments as environment (environment.id)}
+                  <Select.Item value={environment.id}>{environment.name}</Select.Item>
+                {/each}
+              </Select.Content>
+            </Select.Root>
+          </label>
+          <label class="min-w-0 space-y-1.5 text-sm font-medium">
+            {$t(i18nKeys.common.domain.resource)}
+            <Select.Root bind:value={resourceFilter} disabled={!selectedProject} type="single">
+              <Select.Trigger class="w-full min-w-0">
+                {selectedResourceFilterLabel}
+              </Select.Trigger>
+              <Select.Content>
+                <Select.Item value="all">
+                  {$t(i18nKeys.console.deployments.filterAllResources)}
+                </Select.Item>
+                {#each filteredResourcesForProject as resource (resource.id)}
+                  <Select.Item value={resource.id}>{resource.name}</Select.Item>
+                {/each}
+              </Select.Content>
+            </Select.Root>
+          </label>
+          <label class="min-w-0 space-y-1.5 text-sm font-medium">
+            {$t(i18nKeys.common.domain.status)}
+            <Select.Root bind:value={statusFilter} type="single">
+              <Select.Trigger class="w-full min-w-0">
+                {selectedStatusFilterLabel}
+              </Select.Trigger>
+              <Select.Content>
+                <Select.Item value="all">
+                  {$t(i18nKeys.console.deployments.filterAllStatuses)}
+                </Select.Item>
+                {#each deploymentStatuses as status (status)}
+                  <Select.Item value={status}>{statusLabel(status)}</Select.Item>
+                {/each}
+              </Select.Content>
+            </Select.Root>
+          </label>
+        </section>
+
+        <section class="space-y-3">
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 class="text-lg font-semibold">{$t(i18nKeys.console.deployments.listTitle)}</h2>
+              <p class="mt-1 text-sm text-muted-foreground">
+                {$t(i18nKeys.console.deployments.listDescription)}
+              </p>
+            </div>
+            {#if visibleDeployments.length > 0}
+              <div
+                class="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
+                data-deployment-pagination
+              >
+                <span>
+                  {$t(i18nKeys.console.deployments.listRange, {
+                    start: deploymentPageStart,
+                    end: deploymentPageEnd,
+                    total: deploymentTotal,
+                  })}
+                </span>
+                <div class="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon-sm"
+                    aria-label={$t(i18nKeys.common.actions.previous)}
+                    disabled={!canGoPrevious}
+                    onclick={() => setDeploymentPage(deploymentOffset - deploymentPageSize)}
+                  >
+                    <ChevronLeft class="size-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon-sm"
+                    aria-label={$t(i18nKeys.common.actions.next)}
+                    disabled={!canGoNext}
+                    onclick={() => setDeploymentPage(deploymentOffset + deploymentPageSize)}
+                  >
+                    <ChevronRight class="size-4" />
+                  </Button>
+                </div>
               </div>
+            {/if}
+          </div>
+          {#if visibleDeployments.length > 0}
+            <DeploymentTable deployments={paginatedDeployments} {projects} {environments} {resources} />
+          {:else}
+            <div class="console-subtle-panel px-4 py-6 text-sm text-muted-foreground">
+              {$t(i18nKeys.console.deployments.noFilteredDeployments)}
             </div>
           {/if}
-        </div>
-        {#if visibleDeployments.length > 0}
-          <DeploymentTable deployments={paginatedDeployments} {projects} {environments} {resources} />
-        {:else}
-          <div class="console-subtle-panel px-4 py-6 text-sm text-muted-foreground">
-            {$t(i18nKeys.console.deployments.noFilteredDeployments)}
-          </div>
-        {/if}
-      </section>
-    </ConsoleResourceCanvas>
-  {/if}
+        </section>
+      </ConsoleResourceCanvas>
+    {/if}
+  </Skeleton>
 </ConsoleShell>

@@ -1297,229 +1297,6 @@
   </div>
 {/snippet}
 
-{#snippet deploymentDetailLoadingSkeleton()}
-  <div class={detailPageClass} data-deployment-detail-loading-skeleton>
-    <section class={detailHeaderClass}>
-      <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-        <div class="max-w-3xl space-y-3">
-          <div class="flex flex-wrap items-center gap-2">
-            <Skeleton class="h-5 w-24 rounded-md" />
-            <Skeleton class="h-5 w-20 rounded-md" />
-          </div>
-          <div class="space-y-2">
-            <Skeleton class="h-8 w-80 max-w-full" />
-            <Skeleton class="h-4 w-full max-w-2xl" />
-            <Skeleton class="h-4 w-3/5 max-w-xl" />
-          </div>
-        </div>
-
-        <div class="flex flex-wrap gap-2" data-deployment-header-owner-actions>
-          <Button href="/deployments" variant="outline">
-            <ArrowLeft class="size-4" />
-            {$t(i18nKeys.common.actions.backToDeployments)}
-          </Button>
-          <Button type="button" variant="outline" disabled>
-            <FolderOpen class="size-4" />
-            {$t(i18nKeys.common.actions.openProject)}
-          </Button>
-          <Button type="button" variant="outline" disabled>
-            <Boxes class="size-4" />
-            {$t(i18nKeys.common.actions.openResource)}
-          </Button>
-        </div>
-      </div>
-    </section>
-
-    <Tabs.Root value={activeTab} class={detailBodyClass}>
-      <ScrollArea class={detailTabsScrollAreaClass}>
-        <nav aria-label={$t(i18nKeys.console.deployments.pageTitle)} class={detailTabsClass}>
-          {#each deploymentDetailTabs as tab (tab)}
-            <a
-              href={deploymentTabHref(tab)}
-              class={detailTabClass}
-              aria-current={activeTab === tab ? "page" : undefined}
-              onclick={(event) => selectDeploymentTab(tab, event)}
-            >
-              {deploymentTabLabel(tab)}
-            </a>
-          {/each}
-        </nav>
-      </ScrollArea>
-
-      <Tabs.Content value="overview" class={[detailTabPanelScrollClass, "space-y-5"]}>
-        <section class="console-panel p-4" data-deployment-attempt-snapshot>
-          <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-            <div class="space-y-2">
-              <div class="flex flex-wrap items-center gap-2">
-                <Badge variant="outline">
-                  {$t(i18nKeys.console.deployments.attemptSnapshotTitle)}
-                </Badge>
-                <Skeleton class="h-5 w-24 rounded-md" />
-              </div>
-              <div class="space-y-1">
-                <h2 class="text-lg font-semibold">
-                  {$t(i18nKeys.console.deployments.attemptSnapshotTitle)}
-                </h2>
-                <p class="max-w-3xl text-sm leading-6 text-muted-foreground">
-                  {$t(i18nKeys.console.deployments.attemptSnapshotDescription)}
-                </p>
-              </div>
-            </div>
-            <Button type="button" variant="outline" disabled>
-              <Clock3 class="size-4" />
-              {$t(i18nKeys.common.actions.viewProgress)}
-            </Button>
-          </div>
-
-          <div class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <div class="console-subtle-panel px-3 py-2">
-              <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.project)}</p>
-              <Skeleton class="mt-2 h-4 w-32 max-w-full" />
-            </div>
-            <div class="console-subtle-panel px-3 py-2">
-              <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.environment)}</p>
-              <Skeleton class="mt-2 h-4 w-32 max-w-full" />
-            </div>
-            <div class="console-subtle-panel px-3 py-2">
-              <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.resource)}</p>
-              <Skeleton class="mt-2 h-4 w-32 max-w-full" />
-            </div>
-            <div class="console-subtle-panel px-3 py-2">
-              <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.server)}</p>
-              <Skeleton class="mt-2 h-4 w-32 max-w-full" />
-            </div>
-          </div>
-
-          <div class="mt-3 grid gap-3 md:grid-cols-[10rem_minmax(0,1fr)]">
-            <div class="console-subtle-panel px-3 py-2">
-              <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.kind)}</p>
-              <Skeleton class="mt-2 h-4 w-20" />
-            </div>
-            <div class="console-subtle-panel px-3 py-2">
-              <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.source)}</p>
-              <Skeleton class="mt-2 h-4 w-full" />
-              <Skeleton class="mt-2 h-4 w-3/5" />
-            </div>
-          </div>
-
-          <div class="mt-3 grid gap-3 md:grid-cols-3">
-            <div class="console-subtle-panel px-3 py-2">
-              <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.createdAt)}</p>
-              <Skeleton class="mt-2 h-4 w-32" />
-            </div>
-            <div class="console-subtle-panel px-3 py-2">
-              <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.startedAt)}</p>
-              <Skeleton class="mt-2 h-4 w-32" />
-            </div>
-            <div class="console-subtle-panel px-3 py-2">
-              <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.finishedAt)}</p>
-              <Skeleton class="mt-2 h-4 w-32" />
-            </div>
-          </div>
-
-          <div class="mt-4 rounded-md border bg-muted/20 px-3 py-3">
-            <Skeleton class="h-4 w-56 max-w-full" />
-          </div>
-        </section>
-
-        <section class="console-panel p-4" data-deployment-access-snapshot>
-          <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div class="min-w-0 space-y-2">
-              <p class="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                <Link2 class="size-4" />
-                {$t(i18nKeys.console.deployments.accessSnapshotTitle)}
-              </p>
-              <p class="text-sm leading-6 text-muted-foreground">
-                {$t(i18nKeys.console.deployments.accessSnapshotDescription)}
-              </p>
-              <Skeleton class="h-7 w-full max-w-xl" />
-              <Skeleton class="h-5 w-24 rounded-md" />
-            </div>
-            <div class="flex shrink-0 flex-wrap gap-2">
-              <Button type="button" disabled>
-                <ExternalLink class="size-4" />
-                {$t(i18nKeys.console.deployments.openAccessUrl)}
-              </Button>
-              <Button type="button" variant="outline" disabled>
-                <Copy class="size-4" />
-                {$t(i18nKeys.console.deployments.copyAccessUrl)}
-              </Button>
-            </div>
-          </div>
-        </section>
-
-        <section class="console-panel p-4" data-deployment-current-resource-handoff>
-          <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div class="space-y-2">
-              <div class="flex flex-wrap items-center gap-2">
-                <Skeleton class="h-5 w-28 rounded-md" />
-                <Skeleton class="h-5 w-32 rounded-md" />
-              </div>
-              <div class="space-y-1">
-                <h2 class="text-lg font-semibold">
-                  {$t(i18nKeys.console.deployments.currentResourceStateTitle)}
-                </h2>
-                <p class="max-w-3xl text-sm leading-6 text-muted-foreground">
-                  {$t(i18nKeys.console.deployments.currentResourceStateDescription)}
-                </p>
-              </div>
-            </div>
-          </div>
-          <div class="mt-5 grid gap-4 lg:grid-cols-2">
-            <div class="console-subtle-panel flex min-w-0 flex-col gap-4 p-4">
-              <div class="space-y-1">
-                <h3 class="text-sm font-semibold">
-                  {$t(i18nKeys.console.deployments.attemptObservationTitle)}
-                </h3>
-                <Skeleton class="h-4 w-full" />
-                <Skeleton class="h-4 w-3/4" />
-              </div>
-              <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                <Button type="button" variant="outline" class="justify-start" disabled>
-                  <Clock3 class="size-4" />
-                  {$t(i18nKeys.console.deployments.timelineTab)}
-                </Button>
-                <Button type="button" variant="outline" class="justify-start" disabled>
-                  <ListChecks class="size-4" />
-                  {$t(i18nKeys.console.deployments.snapshotTab)}
-                </Button>
-                <Button type="button" variant="outline" class="justify-start" disabled>
-                  <Copy class="size-4" />
-                  {$t(i18nKeys.console.resources.diagnosticSummaryCopy)}
-                </Button>
-              </div>
-            </div>
-
-            <div class="console-subtle-panel flex min-w-0 flex-col gap-4 p-4">
-              <div class="space-y-1">
-                <h3 class="text-sm font-semibold">
-                  {$t(i18nKeys.console.deployments.currentResourceObservationTitle)}
-                </h3>
-                <Skeleton class="h-4 w-full" />
-                <Skeleton class="h-4 w-3/4" />
-              </div>
-              <div class="grid gap-2 sm:grid-cols-3">
-                <Button type="button" variant="outline" class="justify-start" disabled>
-                  <Boxes class="size-4" />
-                  {$t(i18nKeys.common.actions.openResource)}
-                </Button>
-                <Button type="button" variant="outline" class="justify-start" disabled>
-                  <FileText class="size-4" />
-                  {$t(i18nKeys.console.deployments.openResourceLogs)}
-                </Button>
-                <Button type="button" variant="outline" class="justify-start" disabled>
-                  <Terminal class="size-4" />
-                  {$t(i18nKeys.common.actions.openTerminal)}
-                </Button>
-              </div>
-            </div>
-          </div>
-        </section>
-      </Tabs.Content>
-    </Tabs.Root>
-  </div>
-{/snippet}
-
 <ConsoleShell
   title={deployment?.runtimePlan.source.displayName ?? $t(i18nKeys.console.deployments.pageTitle)}
   description={$t(i18nKeys.console.deployments.detailDescription)}
@@ -1563,9 +1340,41 @@
     },
   ]}
 >
-  {#if pageLoading}
-    {@render deploymentDetailLoadingSkeleton()}
-  {:else if !deployment}
+  <Skeleton
+    name="deployment-detail"
+    loading={pageLoading}
+    animate="pulse"
+    transition
+  >
+    {#snippet fallback()}
+      <div
+        class="min-h-[32rem] w-full animate-pulse rounded-lg bg-muted/50"
+        aria-hidden="true"
+        data-deployment-detail-loading-skeleton
+      ></div>
+    {/snippet}
+    {#snippet fixture()}
+      <div class="min-h-[32rem] space-y-4 p-4" aria-hidden="true" data-deployment-detail-loading-skeleton>
+        <div class="space-y-2">
+          <h1 class="text-2xl font-semibold">Deployment source</h1>
+          <p class="text-sm text-muted-foreground">Attempt snapshot for skeleton capture.</p>
+        </div>
+        <div class="grid gap-3 md:grid-cols-4">
+          {#each ["Project", "Environment", "Resource", "Server"] as label (label)}
+            <div class="console-subtle-panel px-3 py-2 text-sm">
+              <p class="text-xs text-muted-foreground">{label}</p>
+              <p class="mt-1 font-medium">Sample</p>
+            </div>
+          {/each}
+        </div>
+        <div class="rounded-md border bg-card p-4 text-sm text-muted-foreground">
+          Access and observation panels
+        </div>
+      </div>
+    {/snippet}
+    {#if pageLoading}
+      <div class="min-h-[32rem]" aria-hidden="true" data-deployment-detail-loading-skeleton></div>
+    {:else if !deployment}
     <section class="space-y-5 p-4 md:p-6">
       <Badge class="w-fit" variant="outline">{$t(i18nKeys.errors.backend.notFound)}</Badge>
       <div class="mt-4 max-w-2xl space-y-3">
@@ -2007,7 +1816,20 @@
                   {proofVerdictLabel(deploymentProof.verdict)}
                 </Badge>
               {:else if deploymentProofQuery.isPending}
-                <Skeleton class="h-6 w-32" />
+                <Skeleton
+                  name="deployment-detail-proof-badge"
+                  loading={true}
+                  animate="pulse"
+                  transition
+                >
+                  {#snippet fallback()}
+                    <div class="h-6 w-32 animate-pulse rounded-md bg-muted/50" aria-hidden="true"></div>
+                  {/snippet}
+                  {#snippet fixture()}
+                    <span class="inline-flex h-6 items-center rounded-md border px-2 text-xs">Verified</span>
+                  {/snippet}
+                  <span class="inline-flex h-6 w-32" aria-hidden="true"></span>
+                </Skeleton>
               {/if}
             </div>
 
@@ -2082,24 +1904,36 @@
             {/if}
           </section>
 
-          {#if deploymentRecoveryReadinessQuery.isPending}
-            <section class="console-panel p-4" data-testid="deployment-recovery-readiness-loading">
-              <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                <div class="space-y-2">
-                  <h2 class="text-lg font-semibold">
-                    {$t(i18nKeys.console.deployments.recoveryTitle)}
-                  </h2>
-                  <p class="text-sm leading-6 text-muted-foreground">
-                    {$t(i18nKeys.console.deployments.recoveryDescription)}
-                  </p>
+          <Skeleton
+            name="deployment-detail-recovery"
+            loading={deploymentRecoveryReadinessQuery.isPending}
+            animate="pulse"
+            transition
+          >
+            {#snippet fallback()}
+              <section class="console-panel p-4" aria-hidden="true" data-testid="deployment-recovery-readiness-loading">
+                <div class="h-9 w-36 animate-pulse rounded-md bg-muted/50"></div>
+                <div class="mt-4 grid gap-3 sm:grid-cols-3">
+                  {#each Array.from({ length: 3 }) as _, i (i)}
+                    <div class="h-16 animate-pulse rounded-md bg-muted/50"></div>
+                  {/each}
                 </div>
-                <Skeleton class="h-9 w-36" />
-              </div>
-              <div class="mt-4 grid gap-3 sm:grid-cols-3">
-                <Skeleton class="h-16 w-full" />
-                <Skeleton class="h-16 w-full" />
-                <Skeleton class="h-16 w-full" />
-              </div>
+              </section>
+            {/snippet}
+            {#snippet fixture()}
+              <section class="console-panel space-y-3 p-4" aria-hidden="true">
+                <h2 class="text-lg font-semibold">Recovery readiness</h2>
+                <p class="text-sm text-muted-foreground">Rollback and retain previous runtime.</p>
+                <div class="grid gap-3 sm:grid-cols-3">
+                  {#each ["Rollback", "Retain", "Candidate"] as label (label)}
+                    <div class="rounded-md border p-3 text-sm">{label}</div>
+                  {/each}
+                </div>
+              </section>
+            {/snippet}
+            {#if deploymentRecoveryReadinessQuery.isPending}
+            <section class="console-panel p-4" data-testid="deployment-recovery-readiness-loading">
+              <div class="min-h-28" aria-hidden="true"></div>
             </section>
           {:else if recoveryReadiness}
             <section class="console-panel p-4" data-testid="deployment-recovery-readiness">
@@ -2174,6 +2008,7 @@
               </div>
             </section>
           {/if}
+          </Skeleton>
 
         </Tabs.Content>
 
@@ -2283,6 +2118,7 @@
       </Tabs.Root>
     </div>
   {/if}
+  </Skeleton>
 </ConsoleShell>
 
 <DeploymentProgressDialog
