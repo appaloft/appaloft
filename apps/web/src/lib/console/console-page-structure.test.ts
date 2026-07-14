@@ -2845,7 +2845,7 @@ describe("console page structure", () => {
     const blueprintVariantDisplaySurface = sourceBetween(
       marketplaceBlueprintDetailPageSource,
       "data-blueprint-variant-display-surface",
-      '<section class="grid gap-3 md:grid-cols-3">',
+      "data-blueprint-overview-summary",
     );
     const installSummarySource =
       marketplaceBlueprintDetailPageSource.match(
@@ -2884,6 +2884,48 @@ describe("console page structure", () => {
     expect(installDialogSource).toContain("{detailCopy.startDeployment}");
     expect(installDialogSource).not.toContain("生成 dry-run");
     expect(installDialogSource).not.toContain("预览部署计划");
+  });
+
+  test("[BLUEPRINT-DETAIL-IA-001] orders Blueprint details around deployment decisions and created topology", () => {
+    const summaryHeader = sourceBetween(
+      marketplaceBlueprintDetailPageSource,
+      "data-blueprint-summary-header",
+      "data-blueprint-detail-body",
+    );
+
+    expect(marketplaceBlueprintDetailPageSource).toContain("data-blueprint-summary-header");
+    expect(marketplaceBlueprintDetailPageSource).toContain("data-blueprint-footprint-summary");
+    expect(marketplaceBlueprintDetailPageSource).toContain("data-blueprint-detail-body");
+    expect(marketplaceBlueprintDetailPageSource).toContain("data-blueprint-overview-summary");
+    expect(marketplaceBlueprintDetailPageSource).toContain("data-blueprint-topology");
+    expect(marketplaceBlueprintDetailPageSource).toContain("data-blueprint-configuration-summary");
+    expect(summaryHeader).not.toContain("detailCopy.planPrefix");
+    expect(summaryHeader).not.toContain("upgradeSummary(selectedUpgrade)");
+    expect(marketplaceBlueprintDetailPageSource.match(/href={listing\.websiteUrl}/g)?.length).toBe(
+      1,
+    );
+    expect(
+      marketplaceBlueprintDetailPageSource.match(/href={listing\.documentationUrl}/g)?.length,
+    ).toBe(1);
+    expect(marketplaceBlueprintDetailPageSource).toContain(
+      'class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_21rem]"',
+    );
+    expect(marketplaceBlueprintDetailPageSource).toContain(
+      'class="order-2 min-w-0 space-y-5 xl:order-1"',
+    );
+    expect(marketplaceBlueprintDetailPageSource).toContain(
+      'class="order-1 min-w-0 space-y-5 xl:order-2 xl:sticky xl:top-20 xl:self-start"',
+    );
+    expect(marketplaceBlueprintDetailPageSource).not.toContain("detailCopy.backToMarketplace");
+    expect(
+      marketplaceBlueprintDetailPageSource.indexOf("data-blueprint-variant-display-surface"),
+    ).toBeLessThan(marketplaceBlueprintDetailPageSource.indexOf("data-blueprint-overview-summary"));
+    expect(
+      marketplaceBlueprintDetailPageSource.indexOf("data-blueprint-overview-summary"),
+    ).toBeLessThan(marketplaceBlueprintDetailPageSource.indexOf("data-blueprint-topology"));
+    expect(marketplaceBlueprintDetailPageSource.indexOf("data-blueprint-topology")).toBeLessThan(
+      marketplaceBlueprintDetailPageSource.indexOf("data-blueprint-configuration-summary"),
+    );
   });
 
   test("[BLUEPRINT-INSTALL-IA-002] presents install completion as a handoff, not a progress dump", () => {
@@ -2938,7 +2980,7 @@ describe("console page structure", () => {
 
     const installHandoffSource =
       marketplaceBlueprintDetailPageSource.match(
-        /data-blueprint-install-handoff[\s\S]*?<Button href="\/marketplace"/,
+        /data-blueprint-install-handoff[\s\S]*?<\/aside>/,
       )?.[0] ?? "";
 
     expect(installHandoffSource).toContain("installHandoffTitle(installResult.progress)");

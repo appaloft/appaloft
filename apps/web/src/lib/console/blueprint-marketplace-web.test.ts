@@ -149,7 +149,9 @@ describe("Blueprint marketplace console surface", () => {
     expect(detailPageSource).toContain("detailCopy.deploymentPlans");
     expect(detailPageSource).toContain("detailCopy.quickDeploy");
     expect(detailPageSource).toContain("detailCopy.topology");
-    expect(detailPageSource).toContain("detailCopy.backToMarketplace");
+    expect(detailPageSource).toContain("data-blueprint-summary-header");
+    expect(detailPageSource).toContain("data-blueprint-install-summary");
+    expect(detailPageSource).not.toContain("detailCopy.backToMarketplace");
     expect(detailPageSource).not.toContain('title={listing?.title ?? "蓝图详情"}');
     expect(detailPageSource).toContain("normalizeBlueprintDetailResponse");
     expect(detailPageSource).toContain("response.entry");
@@ -195,11 +197,11 @@ describe("Blueprint marketplace console surface", () => {
     );
     expect(detailPageSource).toContain("依赖资源");
     expect(detailPageSource).toContain("环境变量");
-    expect(detailPageSource).toContain("官方网站");
+    expect(detailPageSource).toContain('website: "官网"');
     expect(detailPageSource).toContain("部署方案");
     expect(detailPageSource).toContain("升级策略");
-    expect(detailPageSource).toContain("应用服务、后台任务或静态站点");
-    expect(detailPageSource).toContain("安装后生成访问入口");
+    expect(detailPageSource).toContain("应用拓扑");
+    expect(detailPageSource).toContain("配置与密钥");
     expect(detailPageSource).toContain("安装后会创建的应用运行单元。");
     expect(detailPageSource).toContain("端口");
     expect(detailPageSource).toContain("访问路径");

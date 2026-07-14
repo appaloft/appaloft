@@ -132,6 +132,12 @@ area uses one named surface:
 - `console-metric-strip`: compact related counters.
 - danger surface: destructive action plus readiness or blocker evidence.
 
+Blueprint detail pages follow one operator path: product summary and compact footprint, deployment
+choice and upgrade implications, the topology Appaloft will create, then configuration requirements.
+Do not repeat external links, plan summaries, or equal-weight count cards across the page. Keep one
+deploy action summary near the decision area, and use record lists rather than nested cards for
+topology and configuration detail.
+
 `console-subtle-panel` must use the same border strength as inputs and other console containers. Do
 not use pale inset-shadow borders for data rows inside panels because they make the product feel like
 multiple visual systems.
