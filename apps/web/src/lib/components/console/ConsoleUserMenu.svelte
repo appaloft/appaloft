@@ -215,20 +215,33 @@
     aria-busy={authSessionLoading}
     class="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
   >
-    {#if authSessionLoading}
-      <Skeleton class="size-8 shrink-0 rounded-full" data-console-user-menu-loading-avatar />
-    {:else}
-      <Avatar size="sm">
-        <AvatarFallback>{initials(authIdentity ?? "Appaloft")}</AvatarFallback>
-      </Avatar>
-    {/if}
-    <span class="min-w-0 flex-1 self-center group-data-[collapsible=icon]:hidden">
+    <Skeleton name="console-user-menu-trigger" loading={authSessionLoading} animate="pulse" transition class="flex min-w-0 flex-1 items-center gap-2">
+      {#snippet fallback()}
+        <div class="flex items-center gap-2" aria-hidden="true">
+          <div class="size-8 shrink-0 animate-pulse rounded-full bg-muted/50" data-console-user-menu-loading-avatar></div>
+          <div class="h-4 w-24 animate-pulse rounded bg-muted/50 group-data-[collapsible=icon]:hidden" data-console-user-menu-loading-label></div>
+        </div>
+      {/snippet}
+      {#snippet fixture()}
+        <div class="flex items-center gap-2">
+          <Avatar size="sm"><AvatarFallback>AL</AvatarFallback></Avatar>
+          <span class="block truncate text-sm font-medium">appaloft@example.com</span>
+        </div>
+      {/snippet}
       {#if authSessionLoading}
-        <Skeleton class="h-4 w-24" data-console-user-menu-loading-label />
+        <div class="flex items-center gap-2" aria-hidden="true">
+          <div class="size-8 shrink-0" data-console-user-menu-loading-avatar></div>
+          <div class="h-4 w-24 group-data-[collapsible=icon]:hidden" data-console-user-menu-loading-label></div>
+        </div>
       {:else}
-        <span class="block truncate text-sm font-medium">{authIdentity ?? $t(i18nKeys.common.status.unauthenticated)}</span>
+        <Avatar size="sm">
+          <AvatarFallback>{initials(authIdentity ?? "Appaloft")}</AvatarFallback>
+        </Avatar>
+        <span class="min-w-0 flex-1 self-center group-data-[collapsible=icon]:hidden">
+          <span class="block truncate text-sm font-medium">{authIdentity ?? $t(i18nKeys.common.status.unauthenticated)}</span>
+        </span>
       {/if}
-    </span>
+    </Skeleton>
     <ChevronUp class="size-4 text-muted-foreground group-data-[collapsible=icon]:hidden" />
   </DropdownMenuTrigger>
   <DropdownMenuContent
@@ -239,13 +252,21 @@
   >
     <DropdownMenuLabel>
       <div class="flex items-center gap-2">
-        {#if authSessionLoading}
-          <Skeleton class="size-4 shrink-0 rounded-full" />
-          <Skeleton class="h-4 w-32" data-console-user-menu-loading-menu-label />
-        {:else}
-          <UserRound class="size-4" />
-          <span class="min-w-0 truncate">{authIdentity ?? $t(i18nKeys.console.shell.userSettings)}</span>
-        {/if}
+        <Skeleton name="console-user-menu-label" loading={authSessionLoading} animate="pulse" transition class="flex min-w-0 items-center gap-2">
+          {#snippet fallback()}
+            <div class="h-4 w-32 animate-pulse rounded bg-muted/50" data-console-user-menu-loading-menu-label aria-hidden="true"></div>
+          {/snippet}
+          {#snippet fixture()}
+            <UserRound class="size-4" />
+            <span class="min-w-0 truncate">appaloft@example.com</span>
+          {/snippet}
+          {#if authSessionLoading}
+            <div class="h-4 w-32" data-console-user-menu-loading-menu-label aria-hidden="true"></div>
+          {:else}
+            <UserRound class="size-4" />
+            <span class="min-w-0 truncate">{authIdentity ?? $t(i18nKeys.console.shell.userSettings)}</span>
+          {/if}
+        </Skeleton>
       </div>
     </DropdownMenuLabel>
     <DropdownMenuSeparator />
@@ -350,8 +371,16 @@
     {#if authSessionLoading}
       <DropdownMenuSeparator />
       <DropdownMenuItem disabled>
-        <Skeleton class="size-4 shrink-0 rounded-sm" />
-        <Skeleton class="h-4 w-20" data-console-user-menu-loading-action />
+        <Skeleton name="console-user-menu-action" loading={true} animate="pulse" transition class="flex items-center gap-2">
+          {#snippet fallback()}
+            <div class="h-4 w-20 animate-pulse rounded bg-muted/50" data-console-user-menu-loading-action aria-hidden="true"></div>
+          {/snippet}
+          {#snippet fixture()}
+            <LogOut class="size-4" />
+            <span>Sign out</span>
+          {/snippet}
+          <div class="h-4 w-20" data-console-user-menu-loading-action aria-hidden="true"></div>
+        </Skeleton>
       </DropdownMenuItem>
     {:else if authSession.session}
       <DropdownMenuSeparator />

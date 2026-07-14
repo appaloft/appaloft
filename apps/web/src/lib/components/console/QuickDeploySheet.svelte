@@ -5356,12 +5356,24 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
                     </p>
                   </div>
                 </div>
-                {#if webExtensionsQuery.isPending}
-                  <div class="grid gap-2 sm:grid-cols-2">
-                    <Skeleton class="h-20 w-full" />
-                    <Skeleton class="h-20 w-full" />
-                  </div>
-                {:else if quickDeploySourceExtensions.length > 0}
+                <Skeleton
+                  name="quick-deploy-blueprint-catalogs"
+                  loading={webExtensionsQuery.isPending}
+                  animate="pulse"
+                  transition
+                >
+                  {#snippet fallback()}
+                    <div class="min-h-20 w-full animate-pulse rounded-md bg-muted/50" aria-hidden="true"></div>
+                  {/snippet}
+                  {#snippet fixture()}
+                    <div class="grid gap-2 sm:grid-cols-2">
+                      <div class="console-subtle-panel px-3 py-3 text-sm">Community marketplace</div>
+                      <div class="console-subtle-panel px-3 py-3 text-sm">Custom catalog</div>
+                    </div>
+                  {/snippet}
+                  {#if webExtensionsQuery.isPending}
+                    <div class="min-h-20" aria-hidden="true"></div>
+                  {:else if quickDeploySourceExtensions.length > 0}
                   {#if selectedBlueprintIdentity}
                     <div class="console-subtle-panel flex flex-col gap-3 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
                       <div class="flex min-w-0 items-center gap-3">
@@ -5455,10 +5467,23 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
                           依赖资源读取失败
                         </div>
                       {:else if selectedBlueprintDetailQuery.isPending && !selectedBlueprintManifest}
-                        <div class="grid gap-2 sm:grid-cols-2">
-                          <Skeleton class="h-24 w-full" />
-                          <Skeleton class="h-24 w-full" />
-                        </div>
+                        <Skeleton
+                          name="quick-deploy-blueprint-dependencies"
+                          loading={true}
+                          animate="pulse"
+                          transition
+                        >
+                          {#snippet fallback()}
+                            <div class="min-h-24 w-full animate-pulse rounded-md bg-muted/50" aria-hidden="true"></div>
+                          {/snippet}
+                          {#snippet fixture()}
+                            <div class="grid gap-2 sm:grid-cols-2">
+                              <div class="rounded-md border bg-background p-3 text-sm">Postgres</div>
+                              <div class="rounded-md border bg-background p-3 text-sm">Redis</div>
+                            </div>
+                          {/snippet}
+                          <div class="min-h-24" aria-hidden="true"></div>
+                        </Skeleton>
                       {:else if selectedBlueprintProvisionableDependencies.length > 0}
                         <div class="grid gap-3">
                           {#each selectedBlueprintProvisionableDependencies as requirement (requirement.id)}
@@ -5603,6 +5628,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
                     {$t(i18nKeys.console.quickDeploy.sourceBlueprintCatalogUnavailable)}
                   </div>
                 {/if}
+                </Skeleton>
               </div>
             {:else if sourceKind === "static-site"}
               <div class="space-y-4" data-static-site-upload-source>
@@ -6022,11 +6048,25 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
                   {/if}
                   <Input bind:value={githubRepositorySearch} placeholder={$t(i18nKeys.console.quickDeploy.githubRepositorySearch)} />
                   <div class="max-h-64 space-y-2 overflow-auto rounded-md border border-input bg-card p-2">
-                    {#if githubRepositoriesQuery.isPending}
-                      {#each Array.from({ length: 4 }) as _, index (index)}
-                        <Skeleton class="h-14 w-full" />
-                      {/each}
-                    {:else if githubRepositories.length > 0}
+                    <Skeleton
+                      name="quick-deploy-github-repositories"
+                      loading={githubRepositoriesQuery.isPending}
+                      animate="pulse"
+                      transition
+                    >
+                      {#snippet fallback()}
+                        <div class="min-h-56 w-full animate-pulse rounded-md bg-muted/50" aria-hidden="true"></div>
+                      {/snippet}
+                      {#snippet fixture()}
+                        <div class="space-y-2">
+                          {#each ["org/app", "org/api", "org/docs", "org/web"] as fullName (fullName)}
+                            <div class="rounded-md border px-3 py-3 text-sm font-medium">{fullName}</div>
+                          {/each}
+                        </div>
+                      {/snippet}
+                      {#if githubRepositoriesQuery.isPending}
+                        <div class="min-h-56" aria-hidden="true"></div>
+                      {:else if githubRepositories.length > 0}
                       {#each githubRepositories as repository (repository.id)}
                         <Button
                           type="button"
@@ -6066,6 +6106,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
                         {/if}
                       </div>
                     {/if}
+                    </Skeleton>
                   </div>
                 </div>
               {/if}
@@ -6931,16 +6972,34 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     </Dialog.Header>
 
     <div class="px-5 pb-5">
-      {#if selectedBlueprintDetailQuery.isPending}
-        <div class="grid gap-3 md:grid-cols-2">
-          <Skeleton class="h-40 w-full" />
-          <Skeleton class="h-40 w-full" />
-        </div>
-      {:else if selectedBlueprintDetailQuery.isError || !selectedBlueprintDetail || !selectedBlueprintListing || !selectedBlueprintManifest || !selectedBlueprintEffectiveManifest}
-        <div class="console-subtle-panel px-3 py-3 text-sm text-muted-foreground">
-          无法加载这个蓝图详情。
-        </div>
-      {:else}
+      <Skeleton
+        name="quick-deploy-blueprint-detail-dialog"
+        loading={selectedBlueprintDetailQuery.isPending}
+        animate="pulse"
+        transition
+      >
+        {#snippet fallback()}
+          <div class="min-h-40 w-full animate-pulse rounded-md bg-muted/50" aria-hidden="true"></div>
+        {/snippet}
+        {#snippet fixture()}
+          <div class="grid gap-3 md:grid-cols-2">
+            <section class="console-subtle-panel space-y-2 p-3">
+              <h3 class="text-sm font-semibold">Overview</h3>
+              <p class="text-xs text-muted-foreground">Sample blueprint detail</p>
+            </section>
+            <section class="console-subtle-panel space-y-2 p-3">
+              <h3 class="text-sm font-semibold">Dependencies</h3>
+              <p class="text-xs text-muted-foreground">Postgres · Redis</p>
+            </section>
+          </div>
+        {/snippet}
+        {#if selectedBlueprintDetailQuery.isPending}
+          <div class="min-h-40" aria-hidden="true"></div>
+        {:else if selectedBlueprintDetailQuery.isError || !selectedBlueprintDetail || !selectedBlueprintListing || !selectedBlueprintManifest || !selectedBlueprintEffectiveManifest}
+          <div class="console-subtle-panel px-3 py-3 text-sm text-muted-foreground">
+            无法加载这个蓝图详情。
+          </div>
+        {:else}
         <div class="space-y-5">
           <section class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div class="flex min-w-0 items-start gap-4">
@@ -7140,7 +7199,8 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
             </Button>
           </Dialog.Footer>
         </div>
-      {/if}
+        {/if}
+      </Skeleton>
     </div>
   </Dialog.Content>
 </Dialog.Root>

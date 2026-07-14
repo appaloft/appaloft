@@ -145,13 +145,26 @@
     </div>
   </div>
 
-  {#if loading}
-    <div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-      {#each metricTiles as tile (tile.key)}
-        <Skeleton class="h-24 w-full" />
-      {/each}
-    </div>
-  {:else if error}
+  <Skeleton name="runtime-usage-panel" loading={loading} animate="pulse" transition>
+    {#snippet fallback()}
+      <div class="mt-4 min-h-24 w-full animate-pulse rounded-md bg-muted/50" aria-hidden="true"></div>
+    {/snippet}
+    {#snippet fixture()}
+      <div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        {#each metricTiles as tile (tile.key)}
+          <div class="rounded-md border bg-muted/30 px-3 py-2">
+            <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <tile.icon class="size-4" />
+              {tile.label}
+            </p>
+            <p class="mt-2 truncate text-sm font-semibold">—</p>
+          </div>
+        {/each}
+      </div>
+    {/snippet}
+    {#if loading}
+      <div class="mt-4 min-h-24" aria-hidden="true"></div>
+    {:else if error}
     <div class="mt-4 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
       <AlertTriangle class="mt-0.5 size-4 shrink-0" />
       <span>{error}</span>
@@ -207,4 +220,5 @@
       {$t(i18nKeys.console.runtimeUsage.empty)}
     </p>
   {/if}
+  </Skeleton>
 </section>

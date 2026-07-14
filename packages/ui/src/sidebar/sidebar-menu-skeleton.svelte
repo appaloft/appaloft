@@ -7,30 +7,37 @@
 		ref = $bindable(null),
 		class: className,
 		showIcon = false,
+		name = "sidebar-menu-item",
 		children,
 		...restProps
 	}: WithElementRef<HTMLAttributes<HTMLElement>> & {
 		showIcon?: boolean;
+		/** Unique boneyard bone name when multiple menu skeletons are on screen. */
+		name?: string;
 	} = $props();
-
-	// Random width between 50% and 90%
-	const width = `${Math.floor(Math.random() * 40) + 50}%`;
 </script>
 
-<div
-	bind:this={ref}
-	data-slot="sidebar-menu-skeleton"
-	data-sidebar="menu-skeleton"
-	class={cn("h-8 gap-2 rounded-md px-2 flex items-center", className)}
-	{...restProps}
->
-	{#if showIcon}
-		<Skeleton class="size-4 rounded-md" data-sidebar="menu-skeleton-icon" />
-	{/if}
+<div bind:this={ref} data-slot="sidebar-menu-skeleton" data-sidebar="menu-skeleton" {...restProps}>
 	<Skeleton
-		class="h-4 max-w-(--skeleton-width) flex-1"
-		data-sidebar="menu-skeleton-text"
-		style="--skeleton-width: {width};"
-	/>
-	{@render children?.()}
+		{name}
+		loading={true}
+		animate="pulse"
+		class={cn("h-8 rounded-md", className)}
+	>
+		{#snippet fixture()}
+			<div class="flex h-8 items-center gap-2 rounded-md px-2">
+				{#if showIcon}
+					<span class="size-4 shrink-0 rounded-md bg-transparent" data-sidebar="menu-skeleton-icon"></span>
+				{/if}
+				<span class="h-4 min-w-0 flex-1 text-sm">Project name</span>
+			</div>
+		{/snippet}
+		<div class="flex h-8 items-center gap-2 rounded-md px-2" aria-hidden="true">
+			{#if showIcon}
+				<span class="size-4 shrink-0 rounded-md bg-transparent" data-sidebar="menu-skeleton-icon"></span>
+			{/if}
+			<span class="h-4 min-w-0 flex-1 text-sm text-transparent">Project name</span>
+		</div>
+		{@render children?.()}
+	</Skeleton>
 </div>

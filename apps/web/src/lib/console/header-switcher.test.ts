@@ -42,6 +42,9 @@ describe("console header switcher", () => {
     expect(shellSource).toContain("data-console-header-breadcrumb-skeleton");
     expect(shellSource).toContain("{#if item.loading}");
     expect(shellSource).toContain('import { Skeleton } from "$lib/components/ui/skeleton";');
+    expect(shellSource).toContain('name="console-header-breadcrumb"');
+    expect(shellSource).toContain("{#snippet fallback()}");
+    expect(shellSource).not.toContain("<Skeleton class=");
   });
 
   test("[CONSOLE-HEADER-SWITCHER-002] exposes project resource and deployment switchers", async () => {

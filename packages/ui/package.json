@@ -160,6 +160,7 @@
     "@appaloft/design": "workspace:*",
     "@lucide/svelte": "^1.21.0",
     "bits-ui": "^2.18.1",
+    "boneyard-js": "^1.9.0",
     "clsx": "^2.1.1",
     "layerchart": "^1.0.13",
     "tailwind-merge": "^3.6.0",

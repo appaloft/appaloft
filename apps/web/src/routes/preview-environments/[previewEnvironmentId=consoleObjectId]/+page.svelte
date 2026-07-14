@@ -127,13 +127,35 @@
   breadcrumbs={previewEnvironmentBreadcrumbs}
 >
   <div class="p-4 md:p-6">
-  {#if previewEnvironmentQuery.isPending}
-    <div class="space-y-5">
-      <Skeleton class="h-5 w-56" />
-      <Skeleton class="h-32 w-full" />
-      <Skeleton class="h-64 w-full" />
-    </div>
-  {:else if previewEnvironmentQuery.error || !previewEnvironment}
+  <Skeleton
+    name="preview-environment-detail-page"
+    loading={previewEnvironmentQuery.isPending}
+    animate="pulse"
+    transition
+  >
+    {#snippet fallback()}
+      <div class="min-h-[28rem] w-full animate-pulse rounded-lg bg-muted/50" aria-hidden="true"></div>
+    {/snippet}
+    {#snippet fixture()}
+      <div class="space-y-8">
+        <section class="space-y-2">
+          <p class="text-sm text-muted-foreground">Active</p>
+          <h1 class="text-2xl font-semibold">pev_sample_preview</h1>
+          <p class="text-sm text-muted-foreground">org/repo #42</p>
+        </section>
+        <section class="grid gap-4 lg:grid-cols-3">
+          {#each ["Source", "Owner", "Lifecycle"] as title (title)}
+            <div class="console-panel space-y-3 p-5">
+              <h2 class="text-lg font-semibold">{title}</h2>
+              <p class="text-sm text-muted-foreground">Sample preview detail</p>
+            </div>
+          {/each}
+        </section>
+      </div>
+    {/snippet}
+    {#if previewEnvironmentQuery.isPending}
+      <div class="min-h-[28rem]" aria-hidden="true"></div>
+    {:else if previewEnvironmentQuery.error || !previewEnvironment}
     <section class="space-y-5 py-2">
       <Badge class="w-fit" variant="outline">
         {$t(i18nKeys.common.status.unknown)}
@@ -384,6 +406,7 @@
         </div>
       </Dialog.Content>
     </Dialog.Root>
-  {/if}
+    {/if}
+  </Skeleton>
   </div>
 </ConsoleShell>

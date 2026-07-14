@@ -7678,167 +7678,6 @@
   </section>
 {/snippet}
 
-{#snippet resourceDetailLoadingSkeleton()}
-  <div class={detailPageClass} data-resource-detail-loading-skeleton>
-    <section class={detailHeaderClass}>
-      <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-        <div class="min-w-0 space-y-2">
-          <div class="flex flex-wrap items-center gap-2">
-            <Skeleton class="h-8 w-72 max-w-full" />
-            <Skeleton class="h-5 w-20 rounded-md" />
-          </div>
-          <Skeleton class="h-4 w-full max-w-2xl" />
-          <Skeleton class="h-4 w-3/5 max-w-xl" />
-        </div>
-
-        <div class="flex shrink-0 flex-wrap gap-2">
-          <Button type="button" variant="outline" size="lg" disabled>
-            <ResourceStatusDot status="loading" />
-            <span>{$t(i18nKeys.console.resources.healthTitle)}</span>
-            <span class="text-muted-foreground">{$t(i18nKeys.common.status.loading)}</span>
-          </Button>
-          <Button type="button" disabled>
-            <RotateCw class="size-4" />
-            {$t(i18nKeys.common.actions.redeploy)}
-          </Button>
-        </div>
-      </div>
-    </section>
-
-    <div class={detailBodyClass}>
-      <ScrollArea class={detailTabsScrollAreaClass}>
-        <nav aria-label={$t(i18nKeys.console.resources.overviewTitle)} class={detailTabsClass}>
-          {#each visibleResourceDetailTabs as tab (tab)}
-            <a
-              id={`resource-tab-${tab}`}
-              href={resourceTabHref(tab)}
-              class={detailTabClass}
-              aria-current={activeTab === tab ? "page" : undefined}
-              onclick={(event) => selectResourceTab(tab, event)}
-            >
-              {resourceTabLabel(tab)}
-            </a>
-          {/each}
-        </nav>
-      </ScrollArea>
-
-      {#if activeTab === "deployments"}
-        <div class={detailTabPanelScrollClass}>
-          <section id="resource-deployments" class="space-y-4">
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <h2 class="text-lg font-semibold">
-                  {$t(i18nKeys.console.resources.deploymentsTitle)}
-                </h2>
-                <p class="mt-1 text-sm text-muted-foreground">
-                  {$t(i18nKeys.console.resources.deploymentsDescription)}
-                </p>
-              </div>
-              <Button type="button" disabled>
-                <RotateCw class="size-4" />
-                {$t(i18nKeys.common.actions.redeploy)}
-              </Button>
-            </div>
-            <div class="rounded-md border bg-background">
-              {#each Array.from({ length: 4 }) as _}
-                <div class="flex flex-col gap-2 border-b px-4 py-3 last:border-b-0 sm:flex-row sm:items-center sm:justify-between">
-                  <div class="min-w-0">
-                    <div class="flex flex-wrap items-center gap-2">
-                      <Skeleton class="h-5 w-28 rounded-md" />
-                      <Skeleton class="h-5 w-20 rounded-md" />
-                    </div>
-                    <Skeleton class="mt-2 h-3 w-56 max-w-full" />
-                  </div>
-                  <Skeleton class="h-8 w-24 rounded-md" />
-                </div>
-              {/each}
-            </div>
-          </section>
-        </div>
-      {:else}
-        <div class={detailTabPanelScrollClass}>
-          <section id="resource-overview" class="space-y-5">
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div class="min-w-0">
-                <h2 class="text-lg font-semibold">
-                  {$t(i18nKeys.console.resources.overviewTitle)}
-                </h2>
-                <p class="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
-                  {$t(i18nKeys.console.resources.overviewDescription)}
-                </p>
-              </div>
-              <Button type="button" variant="outline" disabled>
-                <Globe2 class="size-4" />
-                {$t(i18nKeys.console.deployments.openAccessUrl)}
-              </Button>
-            </div>
-
-            <div class="grid gap-4">
-              <section class="rounded-md border bg-background p-4">
-                <div class="space-y-2">
-                  <p class="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                    <Link2 class="size-4" />
-                    {$t(i18nKeys.console.resources.overviewCurrentAccess)}
-                  </p>
-                  <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                    <Skeleton class="h-7 w-full max-w-lg" />
-                    <Button type="button" variant="outline" class="shrink-0" disabled>
-                      <Copy class="size-4" />
-                      {$t(i18nKeys.console.resources.copyAccessUrl)}
-                    </Button>
-                  </div>
-                  <div class="flex flex-wrap items-center gap-2">
-                    <Skeleton class="h-5 w-24 rounded-md" />
-                    <Skeleton class="h-5 w-20 rounded-md" />
-                  </div>
-                </div>
-              </section>
-
-              <section class="rounded-md border bg-background p-4">
-                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div class="min-w-0">
-                    <p class="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                      <Gauge class="size-4" />
-                      {$t(i18nKeys.console.resources.overviewCurrentHealth)}
-                    </p>
-                    <p class="mt-2 flex items-center gap-2 text-lg font-semibold">
-                      <ResourceStatusDot status="loading" />
-                      {$t(i18nKeys.common.status.loading)}
-                    </p>
-                    <Skeleton class="mt-2 h-3 w-40" />
-                  </div>
-                  <Button type="button" size="sm" variant="outline" disabled>
-                    <RefreshCw class="size-4" />
-                    {$t(i18nKeys.console.resources.healthRefresh)}
-                  </Button>
-                </div>
-                <div class="mt-4 grid gap-3 sm:grid-cols-2">
-                  {#each Array.from({ length: 4 }) as _}
-                    <div class="rounded-md bg-muted/25 px-3 py-2">
-                      <Skeleton class="h-3 w-24" />
-                      <Skeleton class="mt-2 h-4 w-20" />
-                    </div>
-                  {/each}
-                </div>
-              </section>
-            </div>
-
-            <div class="grid gap-4 xl:grid-cols-3">
-              {#each Array.from({ length: 3 }) as _}
-                <section class="console-subtle-panel p-4">
-                  <Skeleton class="h-5 w-36" />
-                  <Skeleton class="mt-2 h-4 w-full" />
-                  <Skeleton class="mt-2 h-4 w-3/4" />
-                </section>
-              {/each}
-            </div>
-          </section>
-        </div>
-      {/if}
-    </div>
-  </div>
-{/snippet}
-
 {#if dnsConnectorCallbackStandalonePayload}
   <main class="flex min-h-screen items-center justify-center bg-background px-6 py-10">
     <section class="w-full max-w-sm rounded-md border bg-card p-5 text-center shadow-sm">
@@ -7890,9 +7729,41 @@
     },
   ]}
 >
-  {#if pageLoading}
-    {@render resourceDetailLoadingSkeleton()}
-  {:else if !resource}
+  <Skeleton
+    name="resource-detail"
+    loading={pageLoading}
+    animate="pulse"
+    transition
+  >
+    {#snippet fallback()}
+      <div
+        class="min-h-[32rem] w-full animate-pulse rounded-lg bg-muted/50"
+        aria-hidden="true"
+        data-resource-detail-loading-skeleton
+      ></div>
+    {/snippet}
+    {#snippet fixture()}
+      <div class="min-h-[32rem] space-y-4 p-4" aria-hidden="true" data-resource-detail-loading-skeleton>
+        <div class="space-y-2">
+          <h1 class="text-2xl font-semibold">Resource name</h1>
+          <p class="text-sm text-muted-foreground">Resource overview for skeleton capture.</p>
+        </div>
+        <div class="grid gap-3 md:grid-cols-3">
+          {#each ["Access", "Health", "Deployments"] as label (label)}
+            <div class="rounded-md border bg-card p-4 text-sm">
+              <p class="text-xs text-muted-foreground">{label}</p>
+              <p class="mt-1 font-medium">Ready</p>
+            </div>
+          {/each}
+        </div>
+        <div class="min-h-48 rounded-md border bg-card p-4 text-sm text-muted-foreground">
+          Resource detail content
+        </div>
+      </div>
+    {/snippet}
+    {#if pageLoading}
+      <div class="min-h-[32rem]" aria-hidden="true" data-resource-detail-loading-skeleton></div>
+    {:else if !resource}
     <section class="space-y-5 p-4 md:p-6">
       <Badge class="w-fit" variant="outline">{$t(i18nKeys.errors.backend.notFound)}</Badge>
       <div class="mt-4 max-w-2xl space-y-3">
@@ -7983,12 +7854,28 @@
                   </Button>
                 </div>
 
-                {#if resourceHealthQuery.isPending}
-                  <div class="mt-3 space-y-2">
-                    <Skeleton class="h-8 w-full" />
-                    <Skeleton class="h-8 w-full" />
-                  </div>
-                {:else if resourceHealthQuery.error}
+                <Skeleton
+                  name="resource-detail-health"
+                  loading={resourceHealthQuery.isPending}
+                  animate="pulse"
+                  transition
+                  class="mt-3"
+                >
+                  {#snippet fallback()}
+                    <div class="space-y-2" aria-hidden="true">
+                      <div class="h-8 animate-pulse rounded-md bg-muted/50"></div>
+                      <div class="h-8 animate-pulse rounded-md bg-muted/50"></div>
+                    </div>
+                  {/snippet}
+                  {#snippet fixture()}
+                    <div class="space-y-2" aria-hidden="true">
+                      <div class="rounded-md border px-3 py-2 text-sm">Healthy</div>
+                      <div class="rounded-md border px-3 py-2 text-sm">Runtime control idle</div>
+                    </div>
+                  {/snippet}
+                  {#if resourceHealthQuery.isPending}
+                    <div class="h-8" aria-hidden="true"></div>
+                  {:else if resourceHealthQuery.error}
                   <p class="mt-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
                     {readErrorMessage(resourceHealthQuery.error)}
                   </p>
@@ -8116,6 +8003,7 @@
                     {/if}
                   </div>
                 {/if}
+                </Skeleton>
               </Popover.Content>
             </Popover.Root>
             {#if latestRuntimeControlActive && latestRuntimeControl}
@@ -8330,12 +8218,27 @@
                   <Badge variant="outline">{scheduledTasks.length}</Badge>
                 </div>
 
-                {#if scheduledTasksQuery.isPending}
-                  <div class="space-y-3">
-                    <Skeleton class="h-36 w-full" />
-                    <Skeleton class="h-36 w-full" />
-                  </div>
-                {:else if scheduledTasksQuery.error}
+                <Skeleton
+                  name="resource-detail-scheduled-tasks"
+                  loading={scheduledTasksQuery.isPending}
+                  animate="pulse"
+                  transition
+                >
+                  {#snippet fallback()}
+                    <div class="space-y-3" aria-hidden="true">
+                      <div class="h-36 animate-pulse rounded-md bg-muted/50"></div>
+                      <div class="h-36 animate-pulse rounded-md bg-muted/50"></div>
+                    </div>
+                  {/snippet}
+                  {#snippet fixture()}
+                    <div class="space-y-3" aria-hidden="true">
+                      <div class="rounded-md border p-4 text-sm">Scheduled task A</div>
+                      <div class="rounded-md border p-4 text-sm">Scheduled task B</div>
+                    </div>
+                  {/snippet}
+                  {#if scheduledTasksQuery.isPending}
+                    <div class="h-36" aria-hidden="true"></div>
+                  {:else if scheduledTasksQuery.error}
                   <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
                     <p class="font-medium">
                       {$t(i18nKeys.console.resources.scheduledTasksLoadFailed)}
@@ -8416,6 +8319,7 @@
                     {/each}
                   </div>
                 {/if}
+                </Skeleton>
               </section>
 
               <section class="space-y-3">
@@ -8426,9 +8330,21 @@
                   <Badge variant="outline">{scheduledTaskRuns.length}</Badge>
                 </div>
 
-                {#if scheduledTaskRunsQuery.isPending}
-                  <Skeleton class="h-64 w-full" />
-                {:else if scheduledTaskRunsQuery.error}
+                <Skeleton
+                  name="resource-detail-scheduled-task-runs"
+                  loading={scheduledTaskRunsQuery.isPending}
+                  animate="pulse"
+                  transition
+                >
+                  {#snippet fallback()}
+                    <div class="h-64 w-full animate-pulse rounded-md bg-muted/50" aria-hidden="true"></div>
+                  {/snippet}
+                  {#snippet fixture()}
+                    <div class="rounded-md border p-4 text-sm" aria-hidden="true">Task run history</div>
+                  {/snippet}
+                  {#if scheduledTaskRunsQuery.isPending}
+                    <div class="h-64" aria-hidden="true"></div>
+                  {:else if scheduledTaskRunsQuery.error}
                   <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
                     <p class="font-medium">
                       {$t(i18nKeys.console.resources.scheduledTaskRunsLoadFailed)}
@@ -8527,6 +8443,7 @@
                     </div>
                   </div>
                 {/if}
+                </Skeleton>
               </section>
             </div>
                 </section>
@@ -8564,12 +8481,27 @@
               </Button>
             </div>
 
-            {#if resourceSourceEventsQuery.isPending}
-              <div class="space-y-3">
-                <Skeleton class="h-28 w-full" />
-                <Skeleton class="h-28 w-full" />
-              </div>
-            {:else if resourceSourceEventsQuery.error}
+            <Skeleton
+              name="resource-detail-source-events"
+              loading={resourceSourceEventsQuery.isPending}
+              animate="pulse"
+              transition
+            >
+              {#snippet fallback()}
+                <div class="space-y-3" aria-hidden="true">
+                  <div class="h-28 animate-pulse rounded-md bg-muted/50"></div>
+                  <div class="h-28 animate-pulse rounded-md bg-muted/50"></div>
+                </div>
+              {/snippet}
+              {#snippet fixture()}
+                <div class="space-y-3" aria-hidden="true">
+                  <div class="rounded-md border p-3 text-sm">Source event A</div>
+                  <div class="rounded-md border p-3 text-sm">Source event B</div>
+                </div>
+              {/snippet}
+              {#if resourceSourceEventsQuery.isPending}
+                <div class="h-28" aria-hidden="true"></div>
+              {:else if resourceSourceEventsQuery.error}
               <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
                 <p class="font-medium">
                   {$t(i18nKeys.console.resources.sourceEventsLoadFailed)}
@@ -8662,6 +8594,7 @@
                 {/each}
               </div>
             {/if}
+            </Skeleton>
                 </section>
               {/if}
             </div>
@@ -8737,12 +8670,27 @@
               </div>
             {/if}
 
-            {#if resourcePreviewEnvironmentsQuery.isPending}
-              <div class="space-y-3">
-                <Skeleton class="h-28 w-full" />
-                <Skeleton class="h-28 w-full" />
-              </div>
-            {:else if resourcePreviewEnvironmentsQuery.error}
+            <Skeleton
+              name="resource-detail-preview-environments"
+              loading={resourcePreviewEnvironmentsQuery.isPending}
+              animate="pulse"
+              transition
+            >
+              {#snippet fallback()}
+                <div class="space-y-3" aria-hidden="true">
+                  <div class="h-28 animate-pulse rounded-md bg-muted/50"></div>
+                  <div class="h-28 animate-pulse rounded-md bg-muted/50"></div>
+                </div>
+              {/snippet}
+              {#snippet fixture()}
+                <div class="space-y-3" aria-hidden="true">
+                  <div class="rounded-md border p-3 text-sm">Preview environment A</div>
+                  <div class="rounded-md border p-3 text-sm">Preview environment B</div>
+                </div>
+              {/snippet}
+              {#if resourcePreviewEnvironmentsQuery.isPending}
+                <div class="h-28" aria-hidden="true"></div>
+              {:else if resourcePreviewEnvironmentsQuery.error}
               <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
                 <p class="font-medium">
                   {$t(i18nKeys.console.resources.previewEnvironmentsLoadFailed)}
@@ -8838,6 +8786,7 @@
                 {/each}
               </div>
             {/if}
+            </Skeleton>
             </section>
           </div>
         {:else if activeTab === "overview"}
@@ -9813,9 +9762,21 @@
                       </Button>
                     </div>
 
-                    {#if proxyConfigurationLoading}
-                      <Skeleton class="h-40 w-full" />
-                    {:else if proxyConfigurationError}
+                    <Skeleton
+                      name="resource-detail-proxy-configuration"
+                      loading={proxyConfigurationLoading}
+                      animate="pulse"
+                      transition
+                    >
+                      {#snippet fallback()}
+                        <div class="h-40 w-full animate-pulse rounded-md bg-muted/50" aria-hidden="true"></div>
+                      {/snippet}
+                      {#snippet fixture()}
+                        <div class="rounded-md border p-4 text-sm" aria-hidden="true">Proxy configuration</div>
+                      {/snippet}
+                      {#if proxyConfigurationLoading}
+                        <div class="h-40" aria-hidden="true"></div>
+                      {:else if proxyConfigurationError}
                       <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
                         {proxyConfigurationError}
                       </div>
@@ -9920,6 +9881,7 @@
                         </section>
                       {/if}
                     {/if}
+                    </Skeleton>
                   </section>
                 {:else if activeResourceSection === "profile"}
                   <div id="resource-configuration-profile" class="space-y-4">
@@ -10088,9 +10050,21 @@
                       {/if}
                     </div>
 
-                    {#if resourceEffectiveConfigQuery.isPending}
-                      <Skeleton class="h-40 w-full" />
-                    {:else if resourceEffectiveConfigQuery.error}
+                    <Skeleton
+                      name="resource-detail-effective-config"
+                      loading={resourceEffectiveConfigQuery.isPending}
+                      animate="pulse"
+                      transition
+                    >
+                      {#snippet fallback()}
+                        <div class="h-40 w-full animate-pulse rounded-md bg-muted/50" aria-hidden="true"></div>
+                      {/snippet}
+                      {#snippet fixture()}
+                        <div class="rounded-md border p-4 text-sm" aria-hidden="true">Effective configuration</div>
+                      {/snippet}
+                      {#if resourceEffectiveConfigQuery.isPending}
+                        <div class="h-40" aria-hidden="true"></div>
+                      {:else if resourceEffectiveConfigQuery.error}
                       <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
                         {readErrorMessage(resourceEffectiveConfigQuery.error)}
                       </div>
@@ -10203,6 +10177,7 @@
                         {/if}
                       </section>
                     {/if}
+                    </Skeleton>
                   </section>
                 {:else if activeResourceSection === "auto-deploy"}
                   <section id="resource-auto-deploy-settings" class="space-y-4">
@@ -10462,9 +10437,21 @@
                       </div>
                     </div>
 
-                    {#if resourceDependencyBindingsQuery.isPending}
-                      <Skeleton class="h-40 w-full" />
-                    {:else if resourceDependencyBindingsQuery.error}
+                    <Skeleton
+                      name="resource-detail-dependency-bindings"
+                      loading={resourceDependencyBindingsQuery.isPending}
+                      animate="pulse"
+                      transition
+                    >
+                      {#snippet fallback()}
+                        <div class="h-40 w-full animate-pulse rounded-md bg-muted/50" aria-hidden="true"></div>
+                      {/snippet}
+                      {#snippet fixture()}
+                        <div class="rounded-md border p-4 text-sm" aria-hidden="true">Dependency bindings</div>
+                      {/snippet}
+                      {#if resourceDependencyBindingsQuery.isPending}
+                        <div class="h-40" aria-hidden="true"></div>
+                      {:else if resourceDependencyBindingsQuery.error}
                       <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
                         {readErrorMessage(resourceDependencyBindingsQuery.error)}
                       </div>
@@ -10546,6 +10533,7 @@
                         {/each}
                       </div>
                     {/if}
+                    </Skeleton>
 
                     <ConsoleExtensionPanelHost
                       placement="resource-detail-panel"
@@ -12257,9 +12245,21 @@
                 </div>
               </section>
 
-              {#if dnsConnectorPlanPending}
-                <Skeleton class="h-40 w-full" />
-              {:else if dnsConnectorPlan}
+              <Skeleton
+                name="resource-detail-dns-connector-plan"
+                loading={dnsConnectorPlanPending}
+                animate="pulse"
+                transition
+              >
+                {#snippet fallback()}
+                  <div class="h-40 w-full animate-pulse rounded-md bg-muted/50" aria-hidden="true"></div>
+                {/snippet}
+                {#snippet fixture()}
+                  <div class="rounded-md border p-4 text-sm" aria-hidden="true">DNS connector plan</div>
+                {/snippet}
+                {#if dnsConnectorPlanPending}
+                  <div class="h-40" aria-hidden="true"></div>
+                {:else if dnsConnectorPlan}
                 <section class="space-y-4 rounded-md border bg-background p-4">
                   <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div class="min-w-0">
@@ -12465,6 +12465,7 @@
                   </div>
                 </section>
               {/if}
+              </Skeleton>
 
               {#if dnsConnectorFeedback?.bindingId === selectedDnsConnectorBinding.id}
                 <div
@@ -13534,5 +13535,6 @@
       </Dialog.Root>
     </div>
   {/if}
+  </Skeleton>
 </ConsoleShell>
 {/if}

@@ -395,38 +395,70 @@
         <section class="nothing-status-strip" data-home-status-strip>
           <a href="/deployments" class="nothing-status-cell" data-tone="progress">
             <span>{$t(i18nKeys.console.home.activeDeploymentsMetric)}</span>
-            {#if activeDeploymentCountQuery.isPending}
-              <Skeleton class="h-7 w-10" />
-            {:else}
-              <strong>{activeDeploymentTotal}</strong>
-            {/if}
+            <Skeleton name="home-metric-active-deployments" loading={activeDeploymentCountQuery.isPending} animate="pulse" transition>
+              {#snippet fallback()}
+                <div class="h-7 w-10 animate-pulse rounded bg-muted/50" aria-hidden="true"></div>
+              {/snippet}
+              {#snippet fixture()}
+                <strong>3</strong>
+              {/snippet}
+              {#if activeDeploymentCountQuery.isPending}
+                <div class="h-7 w-10" aria-hidden="true"></div>
+              {:else}
+                <strong>{activeDeploymentTotal}</strong>
+              {/if}
+            </Skeleton>
             <small>{$t(i18nKeys.console.home.activeDeploymentsTitle)}</small>
           </a>
           <a href="/deployments" class="nothing-status-cell" data-tone="critical">
             <span>{$t(i18nKeys.console.home.failedDeploymentsMetric)}</span>
-            {#if failedDeploymentCountQuery.isPending}
-              <Skeleton class="h-7 w-10" />
-            {:else}
-              <strong>{failedDeploymentTotal}</strong>
-            {/if}
+            <Skeleton name="home-metric-failed-deployments" loading={failedDeploymentCountQuery.isPending} animate="pulse" transition>
+              {#snippet fallback()}
+                <div class="h-7 w-10 animate-pulse rounded bg-muted/50" aria-hidden="true"></div>
+              {/snippet}
+              {#snippet fixture()}
+                <strong>1</strong>
+              {/snippet}
+              {#if failedDeploymentCountQuery.isPending}
+                <div class="h-7 w-10" aria-hidden="true"></div>
+              {:else}
+                <strong>{failedDeploymentTotal}</strong>
+              {/if}
+            </Skeleton>
             <small>{$t(i18nKeys.console.home.failedDeploymentsTitle)}</small>
           </a>
           <div class="nothing-status-cell" data-home-resource-status-cell>
             <span>{$t(i18nKeys.common.domain.resources)}</span>
-            {#if resourceCountQuery.isPending}
-              <Skeleton class="h-7 w-10" />
-            {:else}
-              <strong>{resourceTotal}</strong>
-            {/if}
+            <Skeleton name="home-metric-resources" loading={resourceCountQuery.isPending} animate="pulse" transition>
+              {#snippet fallback()}
+                <div class="h-7 w-10 animate-pulse rounded bg-muted/50" aria-hidden="true"></div>
+              {/snippet}
+              {#snippet fixture()}
+                <strong>8</strong>
+              {/snippet}
+              {#if resourceCountQuery.isPending}
+                <div class="h-7 w-10" aria-hidden="true"></div>
+              {:else}
+                <strong>{resourceTotal}</strong>
+              {/if}
+            </Skeleton>
             <small>{$t(i18nKeys.console.home.resourcePreviewLabel)}</small>
           </div>
           <a href="/servers" class="nothing-status-cell">
             <span>{$t(i18nKeys.common.domain.servers)}</span>
-            {#if serverCountQuery.isPending}
-              <Skeleton class="h-7 w-10" />
-            {:else}
-              <strong>{serverTotal}</strong>
-            {/if}
+            <Skeleton name="home-metric-servers" loading={serverCountQuery.isPending} animate="pulse" transition>
+              {#snippet fallback()}
+                <div class="h-7 w-10 animate-pulse rounded bg-muted/50" aria-hidden="true"></div>
+              {/snippet}
+              {#snippet fixture()}
+                <strong>2</strong>
+              {/snippet}
+              {#if serverCountQuery.isPending}
+                <div class="h-7 w-10" aria-hidden="true"></div>
+              {:else}
+                <strong>{serverTotal}</strong>
+              {/if}
+            </Skeleton>
             <small>{$t(i18nKeys.console.home.serverAvailableTarget)}</small>
           </a>
         </section>
@@ -437,25 +469,38 @@
               <div class="nothing-panel" data-home-active-deployments>
                 <div class="nothing-section-header">
                   <p class="nothing-label">{$t(i18nKeys.console.home.activeDeploymentsTitle)}</p>
-                  {#if activeDeploymentCountQuery.isPending}
-                    <Skeleton class="h-5 w-12" />
-                  {:else}
-                    <h2>{activeDeploymentTotal}</h2>
-                  {/if}
+                  <Skeleton name="home-active-deployments-heading" loading={activeDeploymentCountQuery.isPending} animate="pulse" transition>
+                    {#snippet fallback()}
+                      <div class="h-5 w-12 animate-pulse rounded bg-muted/50" aria-hidden="true"></div>
+                    {/snippet}
+                    {#snippet fixture()}
+                      <h2>3</h2>
+                    {/snippet}
+                    {#if activeDeploymentCountQuery.isPending}
+                      <div class="h-5 w-12" aria-hidden="true"></div>
+                    {:else}
+                      <h2>{activeDeploymentTotal}</h2>
+                    {/if}
+                  </Skeleton>
                   <p>{$t(i18nKeys.console.home.activeDeploymentsDescription)}</p>
                 </div>
-                {#if deploymentsLoading}
-                  <div class="nothing-deployment-list" aria-hidden="true">
-                    {#each Array.from({ length: 2 }) as _, index (index)}
+                <Skeleton name="home-active-deployments-list" loading={deploymentsLoading} animate="pulse" transition>
+                  {#snippet fallback()}
+                    <div class="min-h-24 w-full animate-pulse rounded-lg bg-muted/50" aria-hidden="true"></div>
+                  {/snippet}
+                  {#snippet fixture()}
+                    <div class="nothing-deployment-list">
                       <div class="nothing-deployment-row">
                         <span>
-                          <Skeleton class="h-4 w-40" />
-                          <Skeleton class="mt-2 h-3 w-56" />
+                          <strong>api-service</strong>
+                          <small>prod · running</small>
                         </span>
-                        <Skeleton class="h-6 w-24" />
+                        <span class="nothing-deployment-state">running</span>
                       </div>
-                    {/each}
-                  </div>
+                    </div>
+                  {/snippet}
+                {#if deploymentsLoading}
+                  <div class="min-h-24" aria-hidden="true"></div>
                 {:else if activeDeployments.length > 0}
                   <div class="nothing-deployment-list">
                     {#each activeDeployments.slice(0, 4) as deployment (deployment.id)}
@@ -476,30 +521,44 @@
                     {$t(i18nKeys.console.home.noActiveDeployments)}
                   </div>
                 {/if}
+                </Skeleton>
               </div>
 
               <div class="nothing-panel" data-home-failed-deployments>
                 <div class="nothing-section-header">
                   <p class="nothing-label">{$t(i18nKeys.console.home.failedDeploymentsTitle)}</p>
-                  {#if failedDeploymentCountQuery.isPending}
-                    <Skeleton class="h-5 w-12" />
-                  {:else}
-                    <h2>{failedDeploymentTotal}</h2>
-                  {/if}
+                  <Skeleton name="home-failed-deployments-heading" loading={failedDeploymentCountQuery.isPending} animate="pulse" transition>
+                    {#snippet fallback()}
+                      <div class="h-5 w-12 animate-pulse rounded bg-muted/50" aria-hidden="true"></div>
+                    {/snippet}
+                    {#snippet fixture()}
+                      <h2>1</h2>
+                    {/snippet}
+                    {#if failedDeploymentCountQuery.isPending}
+                      <div class="h-5 w-12" aria-hidden="true"></div>
+                    {:else}
+                      <h2>{failedDeploymentTotal}</h2>
+                    {/if}
+                  </Skeleton>
                   <p>{$t(i18nKeys.console.home.failedDeploymentsDescription)}</p>
                 </div>
-                {#if deploymentsLoading}
-                  <div class="nothing-deployment-list" aria-hidden="true">
-                    {#each Array.from({ length: 2 }) as _, index (index)}
+                <Skeleton name="home-failed-deployments-list" loading={deploymentsLoading} animate="pulse" transition>
+                  {#snippet fallback()}
+                    <div class="min-h-24 w-full animate-pulse rounded-lg bg-muted/50" aria-hidden="true"></div>
+                  {/snippet}
+                  {#snippet fixture()}
+                    <div class="nothing-deployment-list">
                       <div class="nothing-deployment-row">
                         <span>
-                          <Skeleton class="h-4 w-40" />
-                          <Skeleton class="mt-2 h-3 w-56" />
+                          <strong>worker</strong>
+                          <small>staging · failed</small>
                         </span>
-                        <Skeleton class="h-6 w-24" />
+                        <span class="nothing-deployment-state">failed</span>
                       </div>
-                    {/each}
-                  </div>
+                    </div>
+                  {/snippet}
+                {#if deploymentsLoading}
+                  <div class="min-h-24" aria-hidden="true"></div>
                 {:else if failedDeployments.length > 0}
                   <div class="nothing-deployment-list">
                     {#each failedDeployments.slice(0, 4) as deployment (deployment.id)}
@@ -520,6 +579,7 @@
                     {$t(i18nKeys.console.home.noFailedDeployments)}
                   </div>
                 {/if}
+                </Skeleton>
               </div>
             </section>
 
@@ -530,22 +590,25 @@
                 <p>{$t(i18nKeys.console.home.attentionDescription)}</p>
               </div>
 
-              {#if workStateLoading}
-                <div class="nothing-attention-list" aria-hidden="true">
-                  {#each Array.from({ length: 3 }) as _, index (index)}
-                    <div class="nothing-attention-card">
+              <Skeleton name="home-attention-list" loading={workStateLoading} animate="pulse" transition>
+                {#snippet fallback()}
+                  <div class="min-h-40 w-full animate-pulse rounded-lg bg-muted/50" aria-hidden="true"></div>
+                {/snippet}
+                {#snippet fixture()}
+                  <div class="nothing-attention-list">
+                    <article class="nothing-attention-card">
                       <div class="nothing-attention-row">
-                        <Skeleton class="size-5 rounded-md" />
-                        <Skeleton class="h-4 w-48" />
-                        <Skeleton class="h-8 w-28" />
+                        <strong>Failed deployment</strong>
+                        <span>critical</span>
                       </div>
-                      <span class="nothing-attention-copy">
-                        <Skeleton class="h-3 w-full max-w-xl" />
-                        <Skeleton class="h-3 w-72 max-w-full" />
-                      </span>
-                    </div>
-                  {/each}
-                </div>
+                      <div class="nothing-attention-copy">
+                        <p>1 failed attempt needs attention</p>
+                      </div>
+                    </article>
+                  </div>
+                {/snippet}
+              {#if workStateLoading}
+                <div class="min-h-40" aria-hidden="true"></div>
               {:else if attentionItems.length > 0}
                 <div class="nothing-attention-list">
                   {#each attentionItems as item (item.project.id + item.reason)}
@@ -599,6 +662,7 @@
                   <span>{$t(i18nKeys.console.home.noAttentionDescription)}</span>
                 </div>
               {/if}
+              </Skeleton>
             </section>
 
             <section class="nothing-panel" data-home-deployment-rollup>
@@ -610,18 +674,23 @@
                   {$t(i18nKeys.console.home.recentDeploymentsReadModelGap)}
                 </p>
               </div>
-              {#if deploymentsLoading}
-                <div class="nothing-deployment-rollup-list" aria-hidden="true">
-                  {#each Array.from({ length: 4 }) as _, index (index)}
+              <Skeleton name="home-deployment-rollup" loading={deploymentsLoading} animate="pulse" transition>
+                {#snippet fallback()}
+                  <div class="min-h-32 w-full animate-pulse rounded-lg bg-muted/50" aria-hidden="true"></div>
+                {/snippet}
+                {#snippet fixture()}
+                  <div class="nothing-deployment-rollup-list">
                     <div class="nothing-deployment-rollup-row">
                       <span>
-                        <Skeleton class="h-4 w-40" />
-                        <Skeleton class="mt-2 h-3 w-60" />
+                        <strong>api-service</strong>
+                        <small>prod · succeeded</small>
                       </span>
-                      <Skeleton class="h-6 w-24" />
+                      <span>succeeded</span>
                     </div>
-                  {/each}
-                </div>
+                  </div>
+                {/snippet}
+              {#if deploymentsLoading}
+                <div class="min-h-32" aria-hidden="true"></div>
               {:else if deployments.length > 0}
                 <div class="nothing-deployment-rollup-list">
                   {#each deployments.slice(0, 6) as deployment (deployment.id)}
@@ -646,6 +715,7 @@
                   {$t(i18nKeys.console.home.latestDeploymentEmpty)}
                 </div>
               {/if}
+              </Skeleton>
             </section>
           </div>
 

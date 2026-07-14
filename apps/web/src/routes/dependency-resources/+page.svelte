@@ -527,13 +527,34 @@
   title={$t(i18nKeys.console.dependencyResources.pageTitle)}
   description={$t(i18nKeys.console.dependencyResources.pageDescription)}
 >
-  {#if dependencyResourcesLoading}
-    <div class="space-y-5">
-      <Skeleton class="h-8 w-72" />
-      <Skeleton class="h-44 w-full" />
-      <Skeleton class="h-80 w-full" />
-    </div>
-  {:else if dependencyResourcesError}
+  <Skeleton
+    name="dependency-resources-list-page"
+    loading={dependencyResourcesLoading}
+    animate="pulse"
+    transition
+  >
+    {#snippet fallback()}
+      <div class="min-h-[28rem] w-full animate-pulse rounded-lg bg-muted/50" aria-hidden="true"></div>
+    {/snippet}
+    {#snippet fixture()}
+      <div class="space-y-5">
+        <section class="space-y-2">
+          <h1 class="text-2xl font-semibold">Dependency resources</h1>
+          <p class="text-sm text-muted-foreground">Shared databases and services.</p>
+        </section>
+        <div class="console-record-list">
+          <article class="console-record-row">
+            <div class="min-w-0 space-y-1">
+              <h3 class="font-medium">postgres-main</h3>
+              <p class="text-xs text-muted-foreground">postgres · ready</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    {/snippet}
+    {#if dependencyResourcesLoading}
+      <div class="min-h-[28rem]" aria-hidden="true"></div>
+    {:else if dependencyResourcesError}
     <ConsoleStatePanel
       tone="error"
       title={$t(i18nKeys.errors.web.backendUnavailable)}
@@ -724,7 +745,8 @@
         </section>
       {/if}
     </ConsoleResourceCanvas>
-  {/if}
+    {/if}
+  </Skeleton>
 
   <Dialog.Root
     bind:open={dependencyResourceCreateDialogOpen}

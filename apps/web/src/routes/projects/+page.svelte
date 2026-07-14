@@ -370,11 +370,15 @@
             data-project-pagination
           >
             {#if projectListLoading}
-              <Skeleton class="h-5 w-28" />
-              <div class="flex items-center gap-1">
-                <Skeleton class="h-8 w-16 rounded-md" />
-                <Skeleton class="h-8 w-16 rounded-md" />
-              </div>
+              <Skeleton name="projects-list-pagination" loading={true} animate="pulse" transition>
+                {#snippet fallback()}
+                  <div class="h-8 w-40 animate-pulse rounded-md bg-muted/50" aria-hidden="true"></div>
+                {/snippet}
+                {#snippet fixture()}
+                  <span class="text-sm text-muted-foreground">1–12 of 24</span>
+                {/snippet}
+                <div class="h-8 w-40" aria-hidden="true"></div>
+              </Skeleton>
             {:else}
               <span>
                 {$t(i18nKeys.console.projects.projectListRange, {
@@ -433,28 +437,23 @@
           data-project-grid
         >
           {#if projectListLoading}
-            {#each Array.from({ length: 6 }) as _, index (index)}
-              <article
-                class="flex min-h-56 min-w-0 flex-col rounded-md border bg-card p-4 shadow-sm"
-                aria-hidden="true"
-                data-project-loading-card
-              >
-                <div class="space-y-2 pr-10">
-                  <Skeleton class="h-5 w-3/5" />
-                  <Skeleton class="h-5 w-32 rounded-md" />
-                  <div class="space-y-1.5 pt-1">
-                    <Skeleton class="h-4 w-full" />
-                    <Skeleton class="h-4 w-4/5" />
-                  </div>
+            <Skeleton name="projects-list-grid" loading={true} animate="pulse" transition class="col-span-full">
+              {#snippet fallback()}
+                <div class="min-h-56 w-full animate-pulse rounded-lg bg-muted/50" aria-hidden="true" data-project-loading-card></div>
+              {/snippet}
+              {#snippet fixture()}
+                <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3" data-project-loading-card>
+                  {#each Array.from({ length: 3 }) as _, index (index)}
+                    <article class="flex min-h-56 min-w-0 flex-col rounded-md border bg-card p-4 shadow-sm">
+                      <h3 class="font-semibold">Sample project {index + 1}</h3>
+                      <p class="mt-2 text-sm text-muted-foreground">Project description for bone capture.</p>
+                      <p class="mt-auto text-sm text-muted-foreground">3 resources · ready</p>
+                    </article>
+                  {/each}
                 </div>
-                <div class="mt-5 grid gap-2">
-                  <Skeleton class="h-4 w-24" />
-                  <Skeleton class="h-4 w-20" />
-                  <Skeleton class="h-4 w-44 max-w-full" />
-                </div>
-                <Skeleton class="mt-auto h-4 w-24" />
-              </article>
-            {/each}
+              {/snippet}
+              <div class="min-h-56" aria-hidden="true" data-project-loading-card></div>
+            </Skeleton>
           {:else}
             {#each visibleProjects as project (project.id)}
               {@const projectResources = resources.filter((resource) => resource.projectId === project.id)}

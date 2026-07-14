@@ -1,6 +1,7 @@
 import { type IncomingMessage, type ServerResponse } from "node:http";
 import { sveltekit } from "@sveltejs/kit/vite";
 import tailwindcss from "@tailwindcss/vite";
+import { boneyardPlugin } from "boneyard-js/vite";
 import { defineConfig, loadEnv, type Plugin } from "vite";
 
 const firstAdminBootstrapPath = "/bootstrap/auth/first-admin";
@@ -230,6 +231,15 @@ export default defineConfig(({ mode }) => {
       createFirstAdminBootstrapGatePlugin(proxyTarget),
       tailwindcss(),
       sveltekit(),
+      // Capture pixel-perfect bones from named <Skeleton> wrappers during dev.
+      // Skip initial capture so cold starts don't block without a ready backend.
+      boneyardPlugin({
+        out: "./src/lib/bones",
+        framework: "svelte",
+        skipInitial: true,
+        breakpoints: [375, 768, 1280],
+        wait: 1200,
+      }),
     ],
     server: {
       ...(webDevHost ? { host: webDevHost } : {}),
