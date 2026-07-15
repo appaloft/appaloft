@@ -50,6 +50,17 @@ process managers are not v1 public workload runtime strategies. A future non-Doc
 added only through a new ADR and local specs that define its artifact, rollout, health, log,
 rollback, and cleanup semantics.
 
+For `docker-compose`, image-backed services must be pulled before the replacement project is
+started. Buildable services may then build with refreshed base images according to the deployment
+policy. A successful Compose command is only apply evidence: the adapter must resolve the
+configured target service and complete the required runtime health and public-route verification
+steps before it records deployment success.
+
+This preflight relies on the supported Compose v2/v5 CLI and its `pull --ignore-buildable`
+contract. Legacy Compose v1 is not a safe fallback for this rollout sequence; targets that only
+provide `docker-compose` must fail before candidate mutation and be upgraded to a supported
+`docker compose` CLI.
+
 This ADR defines the workload artifact substrate, not a permanent single-node Docker-only
 orchestration model. Runtime target selection and future Docker Swarm or Kubernetes execution
 backends are governed by

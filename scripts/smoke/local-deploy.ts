@@ -242,7 +242,17 @@ async function createComposeSourceDir(input: {
   const sourceDir = join(input.workspaceDir, "compose-app");
   const composeFile = join(sourceDir, "docker-compose.yml");
   mkdirSync(sourceDir, { recursive: true });
-  await Bun.write(composeFile, ["services:", "  web:", `    image: ${input.image}`].join("\n"));
+  await Bun.write(
+    composeFile,
+    [
+      "services:",
+      "  web:",
+      `    image: ${input.image}`,
+      "    pull_policy: never",
+      "    ports:",
+      '      - "127.0.0.1::3000"',
+    ].join("\n"),
+  );
 
   return { composeFile, sourceDir };
 }
@@ -392,7 +402,7 @@ async function main(): Promise<void> {
     const response = appUrl ? await fetch(appUrl) : null;
     let payload: unknown;
     if (method === "docker-compose") {
-      if (!logs.stdout.includes("Compose stack started successfully")) {
+      if (!logs.stdout.includes("Compose stack passed deployment verification")) {
         throw new Error(`Compose smoke did not report a successful stack start:\n${logs.stdout}`);
       }
       payload = { composeStarted: true };

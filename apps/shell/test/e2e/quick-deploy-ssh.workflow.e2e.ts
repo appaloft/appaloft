@@ -168,7 +168,7 @@ describe("quick deploy SSH workflow e2e", () => {
       const logs = runShellCli(["logs", deploymentId], workspace.cliOptions);
       expectCliSuccess(logs, "deployment logs");
       expect(logs.stdout).toContain("Using SSH docker-compose-stack execution");
-      expect(logs.stdout).toContain("SSH compose stack started");
+      expect(logs.stdout).toContain("SSH compose stack passed deployment verification");
       expect(logs.stdout).toContain("docker-compose.yml");
     } finally {
       if (deploymentId) {

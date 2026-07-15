@@ -255,6 +255,84 @@ export function dockerRemoveResourceContainersCommand(input: {
     .join(" && ");
 }
 
+export interface DockerDeploymentContainerObservation {
+  id: string;
+  runtimeStatus: string;
+  healthStatus: string;
+  ipAddress?: string;
+}
+
+export type DockerDeploymentContainerVerification = {
+  status: "ready" | "pending" | "failed" | "missing";
+  containers: DockerDeploymentContainerObservation[];
+};
+
+export function dockerDeploymentContainerVerificationCommand(input: {
+  deploymentId: string;
+  targetServiceName?: string;
+  quote: (value: string) => string;
+}): string {
+  const filters = [
+    `--filter ${input.quote(`label=appaloft.deployment-id=${input.deploymentId}`)}`,
+    ...(input.targetServiceName
+      ? [`--filter ${input.quote(`label=com.docker.compose.service=${input.targetServiceName}`)}`]
+      : []),
+  ].join(" ");
+  const format = [
+    "{{.Id}}",
+    "{{json .State}}",
+    "{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}",
+  ].join("|");
+
+  return [
+    `docker ps -aq ${filters}`,
+    "| while read -r container_id; do",
+    `docker inspect --format ${input.quote(format)} "$container_id";`,
+    "done",
+  ].join(" ");
+}
+
+export function parseDockerDeploymentContainerVerification(
+  output: string,
+): DockerDeploymentContainerVerification {
+  const containers = output
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line): DockerDeploymentContainerObservation => {
+      const [id = "", rawState = "{}", rawIpAddress = ""] = line.split("|");
+      let state: { Status?: string; Health?: { Status?: string } } = {};
+      try {
+        state = JSON.parse(rawState) as typeof state;
+      } catch {
+        state = {};
+      }
+      const ipAddress = rawIpAddress.trim().split(/\s+/).find(Boolean);
+      return {
+        id,
+        runtimeStatus: state.Status ?? "unknown",
+        healthStatus: state.Health?.Status ?? "none",
+        ...(ipAddress ? { ipAddress } : {}),
+      };
+    });
+
+  if (containers.length === 0) {
+    return { status: "missing", containers };
+  }
+  if (
+    containers.some(
+      (container) =>
+        container.runtimeStatus !== "running" || container.healthStatus === "unhealthy",
+    )
+  ) {
+    return { status: "failed", containers };
+  }
+  if (containers.some((container) => container.healthStatus === "starting")) {
+    return { status: "pending", containers };
+  }
+  return { status: "ready", containers };
+}
+
 export function dockerRemoveConflictingRouteContainersCommand(input: {
   deploymentId: string;
   accessRoutes: readonly { host: string; pathPrefix: string }[];
