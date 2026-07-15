@@ -955,15 +955,25 @@
           </ConsoleDataSkeleton>
         </div>
         <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {#each ["Provider", "Host", "Port", "Resources"] as label (label)}
+          {#each ["Provider", "Host", "Port", "Resources"] as label, index (label)}
             <div class="rounded-md border bg-card p-4 text-sm">
               <p class="text-xs text-muted-foreground">{label}</p>
-              <p class="mt-1 font-medium">Sample value</p>
+              <ConsoleDataSkeleton name={`server-detail-metric-${index}`} loading={true} class="mt-1 block">
+                {#snippet capture()}
+                  <p class="font-medium">Sample value</p>
+                {/snippet}
+                <p class="font-medium">Sample value</p>
+              </ConsoleDataSkeleton>
             </div>
           {/each}
         </div>
         <div class="min-h-48 rounded-md border bg-card p-4 text-sm text-muted-foreground">
-          Server overview content
+          <ConsoleDataSkeleton name="server-detail-overview" loading={true} class="block w-full" fallbackClass="block min-h-40 w-full animate-pulse rounded-md bg-muted/50">
+            {#snippet capture()}
+              <p>Server overview content</p>
+            {/snippet}
+            <p>Server overview content</p>
+          </ConsoleDataSkeleton>
         </div>
       </div>
     {:else if !server}

@@ -22,6 +22,7 @@
   import Sortable from "sortablejs";
 
   import ConsoleEmptyState from "$lib/components/console/ConsoleEmptyState.svelte";
+  import ConsoleDataSkeleton from "$lib/components/console/ConsoleDataSkeleton.svelte";
   import ConsoleExtensionPage from "$lib/components/console/ConsoleExtensionPage.svelte";
   import ConsoleResourceCanvas from "$lib/components/console/ConsoleResourceCanvas.svelte";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
@@ -554,8 +555,18 @@
             <p class="mt-1 text-sm text-muted-foreground">Registered deployment targets</p>
           </div>
           <article class="rounded-md border bg-card p-4 shadow-sm">
-            <p class="font-semibold">edge-1.example.com</p>
-            <p class="mt-1 text-sm text-muted-foreground">ready · 4 resources</p>
+            <ConsoleDataSkeleton name="servers-list-row-name" loading={true} class="block">
+              {#snippet capture()}
+                <p class="font-semibold">edge-1.example.com</p>
+              {/snippet}
+              <p class="font-semibold">edge-1.example.com</p>
+            </ConsoleDataSkeleton>
+            <ConsoleDataSkeleton name="servers-list-row-meta" loading={true} class="mt-1 block">
+              {#snippet capture()}
+                <p class="text-sm text-muted-foreground">ready · 4 resources</p>
+              {/snippet}
+              <p class="text-sm text-muted-foreground">ready · 4 resources</p>
+            </ConsoleDataSkeleton>
           </article>
         </section>
     {:else if visibleServers.length === 0}

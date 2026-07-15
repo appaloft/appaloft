@@ -15,6 +15,7 @@
   import { readErrorMessage } from "$lib/api/client";
   import ConsoleDetailSubnav from "$lib/components/console/ConsoleDetailSubnav.svelte";
   import ConsoleDetailTabs from "$lib/components/console/ConsoleDetailTabs.svelte";
+  import ConsoleDataSkeleton from "$lib/components/console/ConsoleDataSkeleton.svelte";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import ConsoleStatePanel from "$lib/components/console/ConsoleStatePanel.svelte";
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
@@ -569,14 +570,29 @@
   description={$t(i18nKeys.console.dependencyResources.pageDescription)}
 >
   {#if pageLoading}
-<div class="space-y-5 p-4 md:p-6">
+<div class="space-y-5 p-4 md:p-6" data-dependency-resource-detail-loading-skeleton>
         <header class="space-y-2">
-          <h1 class="text-2xl font-semibold">postgres-main</h1>
-          <p class="text-sm text-muted-foreground">Dependency resource detail</p>
+          <ConsoleDataSkeleton name="dependency-resource-detail-title" loading={true} class="block">
+            {#snippet capture()}
+              <h1 class="text-2xl font-semibold">postgres-main</h1>
+            {/snippet}
+            <h1 class="text-2xl font-semibold">postgres-main</h1>
+          </ConsoleDataSkeleton>
+          <ConsoleDataSkeleton name="dependency-resource-detail-description" loading={true} class="block">
+            {#snippet capture()}
+              <p class="text-sm text-muted-foreground">Dependency resource detail</p>
+            {/snippet}
+            <p class="text-sm text-muted-foreground">Dependency resource detail</p>
+          </ConsoleDataSkeleton>
         </header>
         <section class="console-panel space-y-3 p-5">
           <h2 class="text-lg font-semibold">Overview</h2>
-          <p class="text-sm text-muted-foreground">postgres · ready</p>
+          <ConsoleDataSkeleton name="dependency-resource-detail-overview" loading={true} class="block">
+            {#snippet capture()}
+              <p class="text-sm text-muted-foreground">postgres · ready</p>
+            {/snippet}
+            <p class="text-sm text-muted-foreground">postgres · ready</p>
+          </ConsoleDataSkeleton>
         </section>
       </div>
     {:else if dependencyResourceError}

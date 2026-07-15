@@ -7,6 +7,7 @@
 
   import { readErrorMessage } from "$lib/api/client";
   import ConsoleEmptyState from "$lib/components/console/ConsoleEmptyState.svelte";
+  import ConsoleDataSkeleton from "$lib/components/console/ConsoleDataSkeleton.svelte";
   import ConsoleResourceCanvas from "$lib/components/console/ConsoleResourceCanvas.svelte";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
@@ -269,19 +270,34 @@
   ]}
 >
   {#if pageLoading}
-<ConsoleResourceCanvas class="space-y-8">
+<ConsoleResourceCanvas class="space-y-8" data-preview-policy-loading-skeleton>
         <section class="console-panel space-y-3 p-5">
           <h2 class="text-lg font-semibold">Policy scope</h2>
-          <p class="text-sm text-muted-foreground">Project · sample-project</p>
+          <ConsoleDataSkeleton name="preview-policy-scope" loading={true} class="block">
+            {#snippet capture()}
+              <p class="text-sm text-muted-foreground">Project · sample-project</p>
+            {/snippet}
+            <p class="text-sm text-muted-foreground">Project · sample-project</p>
+          </ConsoleDataSkeleton>
         </section>
         <section class="grid gap-4 lg:grid-cols-2">
           <div class="console-panel space-y-3 p-5">
             <h2 class="text-lg font-semibold">Readback</h2>
-            <p class="text-sm text-muted-foreground">Configured · without-secrets</p>
+            <ConsoleDataSkeleton name="preview-policy-readback" loading={true} class="block">
+              {#snippet capture()}
+                <p class="text-sm text-muted-foreground">Configured · without-secrets</p>
+              {/snippet}
+              <p class="text-sm text-muted-foreground">Configured · without-secrets</p>
+            </ConsoleDataSkeleton>
           </div>
           <div class="console-panel space-y-3 p-5">
             <h2 class="text-lg font-semibold">Settings</h2>
-            <p class="text-sm text-muted-foreground">Same-repo previews enabled</p>
+            <ConsoleDataSkeleton name="preview-policy-settings" loading={true} class="block">
+              {#snippet capture()}
+                <p class="text-sm text-muted-foreground">Same-repo previews enabled</p>
+              {/snippet}
+              <p class="text-sm text-muted-foreground">Same-repo previews enabled</p>
+            </ConsoleDataSkeleton>
           </div>
         </section>
       </ConsoleResourceCanvas>

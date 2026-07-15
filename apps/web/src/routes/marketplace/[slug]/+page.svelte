@@ -18,6 +18,7 @@
 
   import { request, readErrorMessage } from "$lib/api/client";
   import BlueprintProductIcon from "$lib/components/console/BlueprintProductIcon.svelte";
+  import ConsoleDataSkeleton from "$lib/components/console/ConsoleDataSkeleton.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
@@ -1089,14 +1090,29 @@
 >
   <div class="p-4 md:p-6">
   {#if webExtensionsQuery.isPending || detailQuery.isPending}
-<div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+<div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]" data-blueprint-detail-loading-skeleton>
         <section class="console-panel space-y-3 p-5">
-          <h1 class="text-2xl font-semibold">Blueprint title</h1>
-          <p class="text-sm text-muted-foreground">Sample marketplace blueprint detail.</p>
+          <ConsoleDataSkeleton name="blueprint-detail-title" loading={true} class="block">
+            {#snippet capture()}
+              <h1 class="text-2xl font-semibold">Blueprint title</h1>
+            {/snippet}
+            <h1 class="text-2xl font-semibold">Blueprint title</h1>
+          </ConsoleDataSkeleton>
+          <ConsoleDataSkeleton name="blueprint-detail-description" loading={true} class="block">
+            {#snippet capture()}
+              <p class="text-sm text-muted-foreground">Sample marketplace blueprint detail.</p>
+            {/snippet}
+            <p class="text-sm text-muted-foreground">Sample marketplace blueprint detail.</p>
+          </ConsoleDataSkeleton>
         </section>
         <aside class="console-panel space-y-3 p-5">
           <h2 class="text-lg font-semibold">Deploy</h2>
-          <p class="text-sm text-muted-foreground">One-click install actions</p>
+          <ConsoleDataSkeleton name="blueprint-detail-actions" loading={true} class="block">
+            {#snippet capture()}
+              <p class="text-sm text-muted-foreground">One-click install actions</p>
+            {/snippet}
+            <p class="text-sm text-muted-foreground">One-click install actions</p>
+          </ConsoleDataSkeleton>
         </aside>
       </div>
     {:else if !catalogMetadata}

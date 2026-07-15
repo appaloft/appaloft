@@ -6,6 +6,7 @@
   import { ArrowLeft, GitPullRequestArrow, ShieldCheck, Trash2 } from "@lucide/svelte";
 
   import { readErrorMessage } from "$lib/api/client";
+  import ConsoleDataSkeleton from "$lib/components/console/ConsoleDataSkeleton.svelte";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
   import { Badge } from "$lib/components/ui/badge";
@@ -127,17 +128,37 @@
 >
   <div class="p-4 md:p-6">
   {#if previewEnvironmentQuery.isPending}
-<div class="space-y-8">
+<div class="space-y-8" data-preview-environment-detail-loading-skeleton>
         <section class="space-y-2">
-          <p class="text-sm text-muted-foreground">Active</p>
-          <h1 class="text-2xl font-semibold">pev_sample_preview</h1>
-          <p class="text-sm text-muted-foreground">org/repo #42</p>
+          <ConsoleDataSkeleton name="preview-environment-detail-status" loading={true} class="block">
+            {#snippet capture()}
+              <p class="text-sm text-muted-foreground">Active</p>
+            {/snippet}
+            <p class="text-sm text-muted-foreground">Active</p>
+          </ConsoleDataSkeleton>
+          <ConsoleDataSkeleton name="preview-environment-detail-title" loading={true} class="block">
+            {#snippet capture()}
+              <h1 class="text-2xl font-semibold">pev_sample_preview</h1>
+            {/snippet}
+            <h1 class="text-2xl font-semibold">pev_sample_preview</h1>
+          </ConsoleDataSkeleton>
+          <ConsoleDataSkeleton name="preview-environment-detail-source" loading={true} class="block">
+            {#snippet capture()}
+              <p class="text-sm text-muted-foreground">org/repo #42</p>
+            {/snippet}
+            <p class="text-sm text-muted-foreground">org/repo #42</p>
+          </ConsoleDataSkeleton>
         </section>
         <section class="grid gap-4 lg:grid-cols-3">
-          {#each ["Source", "Owner", "Lifecycle"] as title (title)}
+          {#each ["Source", "Owner", "Lifecycle"] as title, index (title)}
             <div class="console-panel space-y-3 p-5">
               <h2 class="text-lg font-semibold">{title}</h2>
-              <p class="text-sm text-muted-foreground">Sample preview detail</p>
+              <ConsoleDataSkeleton name={`preview-environment-detail-panel-${index}`} loading={true} class="block">
+                {#snippet capture()}
+                  <p class="text-sm text-muted-foreground">Sample preview detail</p>
+                {/snippet}
+                <p class="text-sm text-muted-foreground">Sample preview detail</p>
+              </ConsoleDataSkeleton>
             </div>
           {/each}
         </section>

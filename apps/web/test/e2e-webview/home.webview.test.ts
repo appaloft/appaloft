@@ -3653,6 +3653,64 @@ async function hasElement(view: Bun.WebView, selector: string): Promise<boolean>
   return view.evaluate<boolean>(`Boolean(document.querySelector(${JSON.stringify(selector)}))`);
 }
 
+type LoadingSkeletonVisualState = {
+  fixtureTextVisible: boolean;
+  fallbackCount: number;
+  hiddenFallbackCount: number;
+  visibleShapeCount: number;
+  clientWidth: number;
+  scrollWidth: number;
+};
+
+async function loadingSkeletonVisualState(
+  view: Bun.WebView,
+  selector: string,
+): Promise<LoadingSkeletonVisualState> {
+  return JSON.parse(
+    await view.evaluate<string>(`(() => {
+      const surface = document.querySelector(${JSON.stringify(selector)});
+      const fallbackLayers = surface
+        ? Array.from(surface.querySelectorAll('[data-data-skeleton-fallback-content="true"]'))
+        : [];
+      const fixtureTokens = ['edge-1.example.com', 'ready · 4 resources'];
+      const fixtureTextVisible = surface
+        ? Array.from(surface.querySelectorAll('p')).some((element) => {
+            const text = element.textContent ?? '';
+            const style = getComputedStyle(element);
+            const rect = element.getBoundingClientRect();
+            return fixtureTokens.some((token) => text.includes(token))
+              && style.visibility !== 'hidden'
+              && rect.width > 0
+              && rect.height > 0;
+          })
+        : false;
+      const hiddenFallbackCount = fallbackLayers.filter((layer) => {
+        const style = getComputedStyle(layer);
+        return style.opacity === '0' && style.visibility === 'hidden';
+      }).length;
+      const visibleShapeCount = fallbackLayers.filter((layer) => {
+        const shape = layer.parentElement;
+        if (!shape) return false;
+        const rect = shape.getBoundingClientRect();
+        const background = getComputedStyle(shape).backgroundColor;
+        return rect.width > 0
+          && rect.height > 0
+          && background !== 'rgba(0, 0, 0, 0)'
+          && background !== 'transparent';
+      }).length;
+
+      return JSON.stringify({
+        fixtureTextVisible,
+        fallbackCount: fallbackLayers.length,
+        hiddenFallbackCount,
+        visibleShapeCount,
+        clientWidth: document.documentElement.clientWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+      });
+    })()`),
+  ) as LoadingSkeletonVisualState;
+}
+
 async function ensureResourceSection(
   view: Bun.WebView,
   input: { tab: string; section: string; sectionSelector: string },
@@ -4902,6 +4960,68 @@ describe.serial("console e2e with Bun.WebView", () => {
     expect(mobileLayout.rowCount).toBe(12);
     expect(mobileLayout.firstVisualRowItemCount).toBe(1);
     expect(mobileLayout.scrollWidth).toBeLessThanOrEqual(mobileLayout.clientWidth);
+  }, 45_000);
+
+  test("[CONSOLE-LOADING-SKELETON-002] renders server loading data as visible skeletons on desktop and mobile", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    const previousServerListRoute = apiResponses.dashboard["/api/rpc/servers/list"];
+    let releaseServerList: () => void = () => {};
+    let serverListReleased = false;
+    const serverListGate = new Promise<void>((resolve) => {
+      releaseServerList = () => {
+        if (!serverListReleased) {
+          serverListReleased = true;
+          resolve();
+        }
+      };
+    });
+    apiResponses.dashboard["/api/rpc/servers/list"] = async (request: Request, body: unknown) => {
+      await serverListGate;
+      return isApiRouteHandler(previousServerListRoute)
+        ? previousServerListRoute(request, body)
+        : previousServerListRoute;
+    };
+
+    await using view = createWebView({ width: 1536, height: 900 });
+    await using mobileView = createWebView({ width: 390, height: 844 });
+
+    try {
+      await view.navigate(`${previewUrl}/servers`);
+      await mobileView.navigate(`${previewUrl}/servers`);
+      await waitFor(
+        () => hasElement(view, "[data-server-list-skeleton]"),
+        Boolean,
+        "Expected desktop server loading skeleton",
+      );
+      await waitFor(
+        () => hasElement(mobileView, "[data-server-list-skeleton]"),
+        Boolean,
+        "Expected mobile server loading skeleton",
+      );
+
+      const desktopState = await loadingSkeletonVisualState(view, "[data-server-list-skeleton]");
+      const mobileState = await loadingSkeletonVisualState(
+        mobileView,
+        "[data-server-list-skeleton]",
+      );
+
+      for (const state of [desktopState, mobileState]) {
+        expect(state.fixtureTextVisible).toBe(false);
+        expect(state.fallbackCount).toBeGreaterThanOrEqual(2);
+        expect(state.hiddenFallbackCount).toBe(state.fallbackCount);
+        expect(state.visibleShapeCount).toBe(state.fallbackCount);
+        expect(state.scrollWidth).toBeLessThanOrEqual(state.clientWidth);
+      }
+
+      releaseServerList();
+      await expectText(view, "Grid Server 12");
+      await expectText(mobileView, "Grid Server 12");
+    } finally {
+      releaseServerList();
+      apiResponses.dashboard["/api/rpc/servers/list"] = previousServerListRoute;
+    }
   }, 45_000);
 
   test("[QUICK-DEPLOY-UX-004][QUICK-DEPLOY-UX-005] locks selected Blueprint source and renders its icon", async () => {

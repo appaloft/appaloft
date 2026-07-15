@@ -3,6 +3,7 @@
   import { ArrowRight, GitPullRequestArrow } from "@lucide/svelte";
   import type { PreviewEnvironmentStatus } from "@appaloft/contracts";
 
+  import ConsoleDataSkeleton from "$lib/components/console/ConsoleDataSkeleton.svelte";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
   import { Badge } from "$lib/components/ui/badge";
@@ -80,24 +81,39 @@
 >
   <div class="p-4 md:p-6">
   {#if previewEnvironmentsLoading}
-<div class="space-y-8">
+<div class="space-y-8" data-preview-environment-list-skeleton>
         <section class="space-y-2">
           <h1 class="text-2xl font-semibold">Preview environments</h1>
           <p class="text-sm text-muted-foreground">Ephemeral environments for pull requests.</p>
         </section>
         <section class="console-metric-strip sm:grid-cols-3">
-          {#each ["Total", "Active", "Cleanup"] as label (label)}
+          {#each ["Total", "Active", "Cleanup"] as label, index (label)}
             <div>
               <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
-              <p class="mt-1 text-2xl font-semibold">3</p>
+              <ConsoleDataSkeleton name={`preview-environment-list-metric-${index}`} loading={true} class="mt-1 block">
+                {#snippet capture()}
+                  <p class="text-2xl font-semibold">3</p>
+                {/snippet}
+                <p class="text-2xl font-semibold">3</p>
+              </ConsoleDataSkeleton>
             </div>
           {/each}
         </section>
         <div class="console-record-list">
           <article class="console-record-row">
             <div class="min-w-0 space-y-2">
-              <h3 class="font-medium">org/repo #42</h3>
-              <p class="text-xs text-muted-foreground">Sample preview environment</p>
+              <ConsoleDataSkeleton name="preview-environment-list-row-title" loading={true} class="block">
+                {#snippet capture()}
+                  <h3 class="font-medium">org/repo #42</h3>
+                {/snippet}
+                <h3 class="font-medium">org/repo #42</h3>
+              </ConsoleDataSkeleton>
+              <ConsoleDataSkeleton name="preview-environment-list-row-description" loading={true} class="block">
+                {#snippet capture()}
+                  <p class="text-xs text-muted-foreground">Sample preview environment</p>
+                {/snippet}
+                <p class="text-xs text-muted-foreground">Sample preview environment</p>
+              </ConsoleDataSkeleton>
             </div>
           </article>
         </div>

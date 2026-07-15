@@ -21,6 +21,7 @@
 
   import { readErrorMessage } from "$lib/api/client";
   import ConsoleEmptyState from "$lib/components/console/ConsoleEmptyState.svelte";
+  import ConsoleDataSkeleton from "$lib/components/console/ConsoleDataSkeleton.svelte";
   import ConsoleResourceCanvas from "$lib/components/console/ConsoleResourceCanvas.svelte";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import ConsoleStatePanel from "$lib/components/console/ConsoleStatePanel.svelte";
@@ -527,7 +528,7 @@
   description={$t(i18nKeys.console.dependencyResources.pageDescription)}
 >
   {#if dependencyResourcesLoading}
-<div class="space-y-5">
+<div class="space-y-5" data-dependency-resource-list-skeleton>
         <section class="space-y-2">
           <h1 class="text-2xl font-semibold">Dependency resources</h1>
           <p class="text-sm text-muted-foreground">Shared databases and services.</p>
@@ -535,8 +536,18 @@
         <div class="console-record-list">
           <article class="console-record-row">
             <div class="min-w-0 space-y-1">
-              <h3 class="font-medium">postgres-main</h3>
-              <p class="text-xs text-muted-foreground">postgres · ready</p>
+              <ConsoleDataSkeleton name="dependency-resource-list-row-name" loading={true} class="block">
+                {#snippet capture()}
+                  <h3 class="font-medium">postgres-main</h3>
+                {/snippet}
+                <h3 class="font-medium">postgres-main</h3>
+              </ConsoleDataSkeleton>
+              <ConsoleDataSkeleton name="dependency-resource-list-row-meta" loading={true} class="block">
+                {#snippet capture()}
+                  <p class="text-xs text-muted-foreground">postgres · ready</p>
+                {/snippet}
+                <p class="text-xs text-muted-foreground">postgres · ready</p>
+              </ConsoleDataSkeleton>
             </div>
           </article>
         </div>
