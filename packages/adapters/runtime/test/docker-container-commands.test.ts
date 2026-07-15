@@ -1,10 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import {
   dockerContainerLabelFlags,
+  dockerDeploymentContainerVerificationCommand,
   dockerPublishedPortFlag,
   dockerRemoveConflictingRouteContainersCommand,
   dockerRemoveResourceContainersCommand,
   parseDockerPublishedHostPort,
+  parseDockerDeploymentContainerVerification,
   appaloftDockerContainerLabels,
 } from "../src/docker-container-commands";
 
@@ -43,6 +45,41 @@ describe("docker container command helpers", () => {
     expect(command).toContain("--filter 'label=appaloft.resource-id=res_first'");
     expect(command).toContain("--filter 'label=appaloft.deployment-id=dep_previous'");
     expect(command).not.toContain("publish=3000");
+  });
+
+  test("[DEP-CREATE-ASYNC-009A] scopes Compose verification to the deployment target service", () => {
+    const command = dockerDeploymentContainerVerificationCommand({
+      deploymentId: "dep_candidate",
+      targetServiceName: "web",
+      quote,
+    });
+
+    expect(command).toContain("--filter 'label=appaloft.deployment-id=dep_candidate'");
+    expect(command).toContain("--filter 'label=com.docker.compose.service=web'");
+    expect(command).toContain("{{json .State}}");
+  });
+
+  test("[DEP-CREATE-ASYNC-009A] distinguishes ready, pending, and failed Compose containers", () => {
+    expect(
+      parseDockerDeploymentContainerVerification(
+        'abc|{"Status":"running","Health":{"Status":"healthy"}}|172.18.0.4\ndef|{"Status":"running"}|172.18.0.5\n',
+      ),
+    ).toEqual({
+      status: "ready",
+      containers: [
+        { id: "abc", runtimeStatus: "running", healthStatus: "healthy", ipAddress: "172.18.0.4" },
+        { id: "def", runtimeStatus: "running", healthStatus: "none", ipAddress: "172.18.0.5" },
+      ],
+    });
+    expect(
+      parseDockerDeploymentContainerVerification(
+        'abc|{"Status":"running","Health":{"Status":"starting"}}|172.18.0.4\n',
+      ).status,
+    ).toBe("pending");
+    expect(
+      parseDockerDeploymentContainerVerification('abc|{"Status":"exited"}|\n').status,
+    ).toBe("failed");
+    expect(parseDockerDeploymentContainerVerification("").status).toBe("missing");
   });
 
   test("cleans conflicting access route containers without removing the active deployment", () => {

@@ -72,4 +72,43 @@ describe("compose ownership label overrides", () => {
     expect(script).toContain('      "appaloft.storage-runtime-realized-by": "deployment-execution"');
     expect(script).toContain('mv "$tmp_file" "$override_file"');
   });
+
+  test("[DEP-CREATE-ASYNC-016A] scopes proxy labels and network attachment to the Compose target service", () => {
+    const script = renderComposeOwnershipLabelOverrideScript({
+      composeFile: "/srv/app/docker-compose.yml",
+      overrideFile: "/srv/app/.appaloft.compose.labels.override.yml",
+      labels: dockerLabelsFromAssignments(["appaloft.managed=true"]),
+      targetServiceName: "web",
+      targetLabels: dockerLabelsFromAssignments([
+        "traefik.enable=true",
+        "traefik.http.routers.dep.rule=Host(`compose.example.com`)",
+      ]),
+      targetNetworkName: "appaloft-edge",
+      quote: shellQuote,
+    });
+
+    expect(script).toContain("target_service='web'");
+    expect(script).toContain('if [ "$service" = "$target_service" ]; then');
+    expect(script).toContain('"traefik.enable": "true"');
+    expect(script).toContain("    networks:");
+    expect(script).toContain('      - "appaloft-edge"');
+    expect(script).toContain("networks:");
+    expect(script).toContain('  "appaloft-edge":');
+    expect(script).toContain("    external: true");
+    expect(script).toContain('    name: "appaloft-edge"');
+  });
+
+  test("[DEP-CREATE-ASYNC-016A] infers the only service for a derived Compose route", () => {
+    const script = renderComposeOwnershipLabelOverrideScript({
+      composeFile: "/srv/app/docker-compose.yml",
+      overrideFile: "/srv/app/.appaloft.compose.labels.override.yml",
+      labels: dockerLabelsFromAssignments(["appaloft.managed=true"]),
+      targetLabels: dockerLabelsFromAssignments(["traefik.enable=true"]),
+      targetNetworkName: "appaloft-edge",
+      quote: shellQuote,
+    });
+
+    expect(script).toContain('service_count="$(printf "%s\\n" "$services"');
+    expect(script).toContain("Compose routing requires targetServiceName when the project has multiple services");
+  });
 });

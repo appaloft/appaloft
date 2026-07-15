@@ -629,7 +629,10 @@ function runtimeVerificationStepsFor(input: {
   execution: RuntimeExecutionPlan;
   accessRoutes: AccessRoute[];
 }): RuntimeVerificationStep[] {
-  if (input.execution.kind !== "docker-container") {
+  if (
+    input.execution.kind !== "docker-container" &&
+    input.execution.kind !== "docker-compose-stack"
+  ) {
     return [];
   }
 
@@ -656,7 +659,10 @@ function runtimePlanStepsFor(input: {
   accessRoutes: AccessRoute[];
   steps: PlanStepText[];
 }): PlanStepText[] {
-  if (input.execution.kind !== "docker-container") {
+  if (
+    input.execution.kind !== "docker-container" &&
+    input.execution.kind !== "docker-compose-stack"
+  ) {
     return input.steps;
   }
 
@@ -698,12 +704,36 @@ function withRequestedAccessRoutes(input: {
     const executionWithMetadata =
       Object.keys(metadata).length > 0 ? input.execution.withMetadata(metadata) : input.execution;
 
-    if (accessRoutes.length > 0 && input.execution.kind !== "docker-container") {
+    if (
+      accessRoutes.length > 0 &&
+      input.execution.kind === "docker-compose-stack" &&
+      !executionWithMetadata.metadata?.targetServiceName &&
+      !hasDerivedDefaultAccessRoute(input.requestedDeployment)
+    ) {
+      return err(
+        domainError.validation(
+          "Compose access routing requires a configured target service name",
+        ),
+      );
+    }
+
+    if (
+      accessRoutes.length > 0 &&
+      input.execution.kind !== "docker-container" &&
+      input.execution.kind !== "docker-compose-stack"
+    ) {
       if (!hasEdgeProxyRoute(accessRoutes) || hasDerivedDefaultAccessRoute(input.requestedDeployment)) {
+        const verificationSteps = runtimeVerificationStepsFor({
+          execution: executionWithMetadata,
+          accessRoutes: [],
+        });
         return ok({
           buildStrategy: input.buildStrategy,
           packagingMode: input.packagingMode,
-          execution: executionWithMetadata,
+          execution:
+            verificationSteps.length > 0
+              ? executionWithMetadata.withVerificationSteps(verificationSteps)
+              : executionWithMetadata,
           runtimeArtifact: input.runtimeArtifact,
           steps: runtimePlanStepsFor({
             execution: executionWithMetadata,
@@ -715,7 +745,7 @@ function withRequestedAccessRoutes(input: {
 
       return err(
         domainError.validation(
-          "Access routing is currently supported for Docker container deployments",
+          "Access routing is currently supported for Docker container and Compose deployments",
         ),
       );
     }
@@ -774,6 +804,9 @@ function chooseStrategies(input: {
         "compose.projectNameSource": "runtime-instance-name",
         composeFile,
         workdir: workingDirectory,
+        ...(requestedDeployment.targetServiceName
+          ? { targetServiceName: requestedDeployment.targetServiceName }
+          : {}),
       },
     });
     return withRequestedAccessRoutes({
@@ -1146,7 +1179,8 @@ function chooseStrategies(input: {
         metadata,
       });
 
-      return ok({
+      return withRequestedAccessRoutes({
+        requestedDeployment,
         buildStrategy: BuildStrategyKindValue.rehydrate("workspace-commands"),
         packagingMode: PackagingModeValue.rehydrate("compose-bundle"),
         execution,
