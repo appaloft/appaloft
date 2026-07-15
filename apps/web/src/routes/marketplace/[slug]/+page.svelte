@@ -2,7 +2,6 @@
   import { browser } from "$app/environment";
   import { page } from "$app/state";
   import {
-    ArrowLeft,
     ArrowRight,
     Boxes,
     ExternalLink,
@@ -12,7 +11,6 @@
     PlugZap,
     Route,
     Server,
-    SlidersHorizontal,
   } from "@lucide/svelte";
   import { createQuery, queryOptions } from "@tanstack/svelte-query";
   import type { SystemPluginWebExtension } from "@appaloft/contracts";
@@ -253,11 +251,9 @@
       unavailableTitle: "Blueprint unavailable",
       unavailableDescription: "This Blueprint could not be loaded.",
       featured: "Featured",
-      planPrefix: "Plan:",
+      version: "Version",
       website: "Website",
       docs: "Docs",
-      officialWebsite: "Official website",
-      deploymentDocs: "Deployment docs",
       quickDeploy: "Quick deploy",
       deploymentPlans: "Deployment plans",
       currentPlan: "Current plan",
@@ -267,10 +263,8 @@
       upgradePolicy: "Upgrade policy",
       upgradeRequiresMaintenance: "Upgrades require separate confirmation in the installed application's maintenance flow.",
       components: "Components",
-      componentSummary: "App services, background workers, or static sites",
       dependencies: "Dependencies",
       publicEntry: "Public entry",
-      publicEntrySummary: "Access endpoints are generated after install",
       overview: "Overview",
       useCases: "Use cases",
       appaloftCreates: "Appaloft will create",
@@ -324,7 +318,6 @@
       viewInstalledApplication: "View installed application",
       installedApplicationPending: "The install result page will appear after the application ID is returned. You can review resources or deployment records now.",
       openProjects: "Open projects",
-      backToMarketplace: "Back to Marketplace",
       close: "Close",
       quickDeployDialogTitle: (title: string) => `Quick deploy ${title}`,
       quickDeployDialogDescription: "The source is fixed to the current Blueprint. Confirm Profile, parameters, and secrets to deploy.",
@@ -375,11 +368,9 @@
       unavailableTitle: "蓝图暂不可用",
       unavailableDescription: "无法加载这个蓝图。",
       featured: "精选",
-      planPrefix: "方案：",
+      version: "版本",
       website: "官网",
       docs: "文档",
-      officialWebsite: "官方网站",
-      deploymentDocs: "部署文档",
       quickDeploy: "快速部署",
       deploymentPlans: "部署方案",
       currentPlan: "当前方案",
@@ -389,10 +380,8 @@
       upgradePolicy: "升级策略",
       upgradeRequiresMaintenance: "升级需要在已安装应用的维护流程中单独确认。",
       components: "组件",
-      componentSummary: "应用服务、后台任务或静态站点",
       dependencies: "依赖资源",
       publicEntry: "公开入口",
-      publicEntrySummary: "安装后生成访问入口",
       overview: "介绍",
       useCases: "适合场景",
       appaloftCreates: "Appaloft 会创建",
@@ -446,7 +435,6 @@
       viewInstalledApplication: "查看安装聚合",
       installedApplicationPending: "安装结果页会在应用 ID 返回后出现。现在可以先查看资源或部署记录。",
       openProjects: "打开项目列表",
-      backToMarketplace: "返回应用市场",
       close: "关闭",
       quickDeployDialogTitle: (title: string) => `快速部署 ${title}`,
       quickDeployDialogDescription: "来源固定为当前 Blueprint。确认 Profile、参数和密钥后即可部署。",
@@ -1136,362 +1124,328 @@
       </div>
     </section>
   {:else}
-    <div
-      class="mx-auto grid w-full max-w-7xl gap-5 xl:grid-cols-[minmax(0,1fr)_390px]"
-      data-blueprint-detail-display-surface
-    >
-      <div class="min-w-0 space-y-5">
-        <section class="console-panel p-5">
-          <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-            <div class="flex min-w-0 items-start gap-4">
-              <BlueprintProductIcon
-                title={listing.title}
-                icon={listing.icon}
-                class="size-14"
-                imageClass="size-8"
-              />
-              <div class="min-w-0 space-y-3">
-                <div class="space-y-1">
-                  <div class="flex flex-wrap items-center gap-2">
-                    <Badge variant="outline">{listing.category}</Badge>
-                    {#if listing.featured}
-                      <Badge variant="outline">{detailCopy.featured}</Badge>
-                    {/if}
-                    {#if listing.publisher}
-                      <Badge variant="outline">{listing.publisher.name}</Badge>
-                    {/if}
-                    {#if variantOptions.length > 0}
-                      <Badge variant="outline">{detailCopy.planPrefix}{selectedVariantLabel()}</Badge>
-                    {/if}
-                    {#if selectedUpgrade}
-                      <Badge variant="outline">{upgradeSummary(selectedUpgrade)}</Badge>
-                    {/if}
-                  </div>
-                  <h1 class="text-3xl font-semibold tracking-normal md:text-4xl">{listing.title}</h1>
-                  <p class="max-w-3xl text-sm leading-6 text-muted-foreground">{listing.subtitle}</p>
-                </div>
-                <div class="flex flex-wrap gap-2">
-                  {#if listing.websiteUrl}
-                    <Button href={listing.websiteUrl} target="_blank" rel="noreferrer" variant="outline" size="sm">
-                      {detailCopy.website}
-                      <ExternalLink class="size-4" />
-                    </Button>
-                  {/if}
-                  {#if listing.documentationUrl}
-                    <Button href={listing.documentationUrl} target="_blank" rel="noreferrer" variant="outline" size="sm">
-                      {detailCopy.docs}
-                      <ExternalLink class="size-4" />
-                    </Button>
-                  {/if}
-                </div>
-              </div>
-            </div>
-            <Button
-              type="button"
-              class="shrink-0 xl:hidden"
-              onclick={openInstallDialog}
-              disabled={!installEndpoint}
-            >
-              {detailCopy.quickDeploy}
-              <ArrowRight class="size-4" />
-            </Button>
-          </div>
-        </section>
-
-        {#if selectedUpgrade || variantOptions.length > 0}
-          <section class="console-panel p-5" data-blueprint-variant-display-surface>
-            <div class="grid gap-4 lg:grid-cols-2">
-              <div class="space-y-2">
-                <h2 class="text-lg font-semibold">{detailCopy.deploymentPlans}</h2>
-                {#if variantOptions.length > 0}
-                  <div class="grid gap-2">
-                    {#each variantOptions as variant (variant.id)}
-                      <article
-                        class={`rounded-md border px-3 py-2 text-sm ${selectedVariant === variant.id ? "border-primary bg-primary/5" : "bg-background"}`}
-                        data-blueprint-variant-option
-                      >
-                        <div class="flex items-start justify-between gap-3">
-                          <span class="min-w-0 font-medium">{variant.label ?? variant.id}</span>
-                          {#if selectedVariant === variant.id}
-                            <Badge variant="outline">{detailCopy.currentPlan}</Badge>
-                          {/if}
-                        </div>
-                        <span class="mt-1 block text-xs leading-5 text-muted-foreground">
-                          {variant.summary ?? detailCopy.optionalTopology}
-                        </span>
-                      </article>
-                    {/each}
-                  </div>
-                {:else}
-                  <p class="text-sm leading-6 text-muted-foreground">{detailCopy.onlyDefaultPlan}</p>
+    <div class="mx-auto w-full max-w-7xl space-y-5" data-blueprint-detail-display-surface>
+      <section class="console-panel p-5" data-blueprint-summary-header>
+        <div class="flex min-w-0 items-start gap-4">
+          <BlueprintProductIcon
+            title={listing.title}
+            icon={listing.icon}
+            class="size-14"
+            imageClass="size-8"
+          />
+          <div class="min-w-0 space-y-3">
+            <div class="space-y-2">
+              <div class="flex flex-wrap items-center gap-2">
+                <Badge variant="outline">{listing.category}</Badge>
+                {#if listing.featured}
+                  <Badge variant="outline">{detailCopy.featured}</Badge>
                 {/if}
-                <p class="text-xs leading-5 text-muted-foreground">
-                  {detailCopy.deploymentPlanHelp}
-                </p>
+                {#if listing.publisher}
+                  <Badge variant="outline">{listing.publisher.name}</Badge>
+                {/if}
               </div>
-              <div class="space-y-2">
-                <h2 class="text-lg font-semibold">{detailCopy.upgradePolicy}</h2>
-                <div class="console-subtle-panel px-3 py-2 text-sm">
-                  <p class="font-medium">{upgradeSummary(selectedUpgrade)}</p>
-                  <p class="mt-1 text-xs leading-5 text-muted-foreground">
-                    {selectedUpgrade?.instructions ??
-                      selectedUpgrade?.steps?.[0]?.changes?.[0] ??
-                      detailCopy.upgradeRequiresMaintenance}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </section>
-        {/if}
-
-        <section class="grid gap-3 md:grid-cols-3">
-          <article class="console-panel p-4">
-            <div class="flex items-center gap-2 text-sm font-medium">
-              <Server class="size-4 text-muted-foreground" />
-              {detailCopy.components}
-            </div>
-            <p class="mt-3 text-2xl font-semibold">{effectiveManifest.components.length}</p>
-            <p class="mt-1 text-xs text-muted-foreground">{detailCopy.componentSummary}</p>
-          </article>
-          <article class="console-panel p-4">
-            <div class="flex items-center gap-2 text-sm font-medium">
-              <PlugZap class="size-4 text-muted-foreground" />
-              {detailCopy.dependencies}
-            </div>
-            <p class="mt-3 text-2xl font-semibold">{effectiveManifest.resources.length}</p>
-            <p class="mt-1 truncate text-xs text-muted-foreground">
-              {dependencyKindSummary()}
-            </p>
-          </article>
-          <article class="console-panel p-4">
-            <div class="flex items-center gap-2 text-sm font-medium">
-              <Route class="size-4 text-muted-foreground" />
-              {detailCopy.publicEntry}
-            </div>
-            <p class="mt-3 text-2xl font-semibold">
-              {effectiveManifest.components.reduce((count, component) => count + component.routes.length, 0)}
-            </p>
-            <p class="mt-1 text-xs text-muted-foreground">{detailCopy.publicEntrySummary}</p>
-          </article>
-        </section>
-
-        <section class="console-panel p-5">
-          <div class="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div class="space-y-1">
-              <h2 class="text-lg font-semibold">{detailCopy.overview}</h2>
-              <p class="max-w-3xl text-sm leading-6 text-muted-foreground">
-                {effectiveManifest.description ?? listing.blueprint.summary ?? listing.subtitle}
+              <h1 class="text-3xl font-semibold tracking-normal">{listing.title}</h1>
+              <p class="max-w-4xl text-sm leading-6 text-muted-foreground">
+                {effectiveManifest.description ?? listing.subtitle}
               </p>
             </div>
-            <div class="flex shrink-0 flex-wrap gap-2">
+            <div class="flex flex-wrap gap-2">
               {#if listing.websiteUrl}
                 <Button href={listing.websiteUrl} target="_blank" rel="noreferrer" variant="outline" size="sm">
-                  {detailCopy.officialWebsite}
+                  {detailCopy.website}
                   <ExternalLink class="size-4" />
                 </Button>
               {/if}
               {#if listing.documentationUrl}
                 <Button href={listing.documentationUrl} target="_blank" rel="noreferrer" variant="outline" size="sm">
-                  {detailCopy.deploymentDocs}
+                  {detailCopy.docs}
                   <ExternalLink class="size-4" />
                 </Button>
               {/if}
             </div>
           </div>
+        </div>
 
-          <div class="grid gap-5 md:grid-cols-2">
-            <div class="space-y-2">
-              <h3 class="text-sm font-semibold">{detailCopy.useCases}</h3>
-              <ul class="space-y-2 text-sm leading-6 text-muted-foreground">
-                {#each listing.overview?.useCases ?? [detailCopy.deployAppUseCase(listing.title), detailCopy.inspectTopologyUseCase] as useCase (useCase)}
-                  <li class="flex gap-2">
-                    <span class="mt-2 size-1.5 shrink-0 rounded-full bg-foreground/55"></span>
-                    <span>{useCase}</span>
-                  </li>
-                {/each}
-              </ul>
-            </div>
-            <div class="space-y-2">
-              <h3 class="text-sm font-semibold">{detailCopy.appaloftCreates}</h3>
-              <ul class="space-y-2 text-sm leading-6 text-muted-foreground">
-                {#each listing.overview?.highlights ?? [
-                  detailCopy.runtimeUnitsHighlight(effectiveManifest.components.length),
-                  effectiveManifest.resources.length > 0
-                    ? detailCopy.dependencyBindingsHighlight(effectiveManifest.resources.map((resource) => resource.kind).join(" / "))
-                    : detailCopy.noManagedDependencies,
-                  detailCopy.projectEnvironmentPlanHighlight,
-                ] as highlight (highlight)}
-                  <li class="flex gap-2">
-                    <span class="mt-2 size-1.5 shrink-0 rounded-full bg-foreground/55"></span>
-                    <span>{highlight}</span>
-                  </li>
-                {/each}
-              </ul>
-            </div>
+        <dl
+          class="-mx-5 -mb-5 mt-5 grid grid-cols-2 gap-px border-t bg-border md:grid-cols-4"
+          data-blueprint-footprint-summary
+        >
+          <div class="min-w-0 bg-card px-4 py-3">
+            <dt class="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+              <Package class="size-3.5" />
+              {detailCopy.version}
+            </dt>
+            <dd class="mt-1 truncate font-mono text-sm font-semibold">{listing.blueprint.version}</dd>
           </div>
-        </section>
+          <div class="min-w-0 bg-card px-4 py-3">
+            <dt class="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+              <Server class="size-3.5" />
+              {detailCopy.components}
+            </dt>
+            <dd class="mt-1 text-sm font-semibold">{effectiveManifest.components.length}</dd>
+          </div>
+          <div class="min-w-0 bg-card px-4 py-3">
+            <dt class="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+              <PlugZap class="size-3.5" />
+              {detailCopy.dependencies}
+            </dt>
+            <dd class="mt-1 truncate text-sm font-semibold" title={dependencyKindSummary()}>
+              {effectiveManifest.resources.length} · {dependencyKindSummary()}
+            </dd>
+          </div>
+          <div class="min-w-0 bg-card px-4 py-3">
+            <dt class="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+              <Route class="size-3.5" />
+              {detailCopy.publicEntry}
+            </dt>
+            <dd class="mt-1 text-sm font-semibold">
+              {effectiveManifest.components.reduce((count, component) => count + component.routes.length, 0)}
+            </dd>
+          </div>
+        </dl>
+      </section>
 
-        <section class="console-panel p-5">
-          <div class="mb-4 flex items-center justify-between gap-3">
-            <div>
-              <h2 class="text-lg font-semibold">{detailCopy.topology}</h2>
-              <p class="text-sm text-muted-foreground">{detailCopy.topologyDescription}</p>
-            </div>
-            <Badge variant="outline">{listing.blueprint.version}</Badge>
-          </div>
-          <div class="space-y-3">
-            {#each effectiveManifest.components as component (component.id)}
-              <article class="console-subtle-panel p-4">
-                <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div class="min-w-0">
-                    <h3 class="font-semibold">{component.name}</h3>
-                    <p class="mt-1 text-sm text-muted-foreground">
-                      {blueprintComponentKindLabel(component.kind)} · {blueprintRuntimeStrategyLabel(component.runtime.strategy)}
-                    </p>
-                  </div>
-                  <Badge variant="outline">
-                    {blueprintRuntimeSummary(component)}
-                  </Badge>
-                </div>
-                <div class="mt-3 grid gap-2 text-xs md:grid-cols-3">
-                  <div>
-                    <p class="text-muted-foreground">{detailCopy.ports}</p>
-                    <p class="font-medium">
-                      {component.ports.map((port) => `${port.name}:${port.containerPort}/${port.protocol}`).join(", ") || detailCopy.none}
-                    </p>
-                  </div>
-                  <div>
-                    <p class="text-muted-foreground">{detailCopy.routes}</p>
-                    <p class="font-medium">
-                      {component.routes.map((route) => `${route.port}${route.pathPrefix}`).join(", ") || detailCopy.none}
-                    </p>
-                  </div>
-                  <div>
-                    <p class="text-muted-foreground">{detailCopy.bindings}</p>
-                    <p class="font-medium">
-                      {[...component.usesResources, ...component.usesSecrets].join(", ") || detailCopy.none}
-                    </p>
-                  </div>
-                </div>
-              </article>
-            {/each}
-          </div>
-        </section>
+      <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_21rem]" data-blueprint-detail-body>
+        <div class="order-2 min-w-0 space-y-5 xl:order-1">
+          {#if selectedUpgrade || variantOptions.length > 0}
+            <section class="console-panel p-5" data-blueprint-variant-display-surface>
+              <div class="space-y-1">
+                <h2 class="text-lg font-semibold">{detailCopy.deploymentPlans}</h2>
+                <p class="text-xs leading-5 text-muted-foreground">
+                  {detailCopy.deploymentPlanHelp}
+                </p>
+              </div>
 
-        <section class="grid gap-5 lg:grid-cols-2">
-          <article class="console-panel p-5">
-            <div class="mb-4 flex items-center gap-2">
-              <PlugZap class="size-4 text-muted-foreground" />
-              <h2 class="text-lg font-semibold">{detailCopy.dependencyResources}</h2>
-            </div>
-            <div class="space-y-2">
-              {#each effectiveManifest.resources as resource (resource.id)}
-                <div class="console-subtle-panel px-3 py-2 text-sm">
-                  <div class="flex items-center justify-between gap-3">
-                    <span class="font-medium">{resource.label}</span>
-                    <Badge variant="outline">{resource.kind}</Badge>
-                  </div>
-                  <p class="mt-1 text-xs text-muted-foreground">{resource.id}</p>
+              {#if variantOptions.length > 0}
+                <div class="mt-4 grid gap-2 sm:grid-cols-2">
+                  {#each variantOptions as variant (variant.id)}
+                    <article
+                      class={`rounded-md border px-3 py-2 text-sm ${selectedVariant === variant.id ? "border-primary bg-primary/5" : "bg-card"}`}
+                      data-blueprint-variant-option
+                    >
+                      <div class="flex items-start justify-between gap-3">
+                        <span class="min-w-0 font-medium">{variant.label ?? variant.id}</span>
+                        {#if selectedVariant === variant.id}
+                          <Badge variant="outline">{detailCopy.currentPlan}</Badge>
+                        {/if}
+                      </div>
+                      <span class="mt-1 block text-xs leading-5 text-muted-foreground">
+                        {variant.summary ?? detailCopy.optionalTopology}
+                      </span>
+                    </article>
+                  {/each}
                 </div>
               {:else}
-                <p class="text-sm text-muted-foreground">{detailCopy.noExternalDependencies}</p>
+                <p class="mt-4 text-sm leading-6 text-muted-foreground">
+                  {detailCopy.onlyDefaultPlan}
+                </p>
+              {/if}
+
+              {#if selectedUpgrade}
+                <div class="mt-4 border-t pt-4">
+                  <div class="grid gap-3 sm:grid-cols-[minmax(10rem,1fr)_minmax(0,1.6fr)] sm:items-start">
+                    <div class="space-y-1">
+                      <h3 class="text-sm font-semibold">{detailCopy.upgradePolicy}</h3>
+                      <p class="text-xs leading-5 text-muted-foreground">
+                        {selectedUpgrade.instructions ??
+                          selectedUpgrade.steps?.[0]?.changes?.[0] ??
+                          detailCopy.upgradeRequiresMaintenance}
+                      </p>
+                    </div>
+                    <Badge class="h-auto w-full min-w-0 justify-start whitespace-normal text-left leading-4" variant="outline">
+                      {upgradeSummary(selectedUpgrade)}
+                    </Badge>
+                  </div>
+                </div>
+              {/if}
+            </section>
+          {/if}
+
+          <section class="console-panel p-5" data-blueprint-overview-summary>
+            <h2 class="mb-4 text-lg font-semibold">{detailCopy.overview}</h2>
+
+            <div class="grid gap-5 md:grid-cols-2">
+              <div class="space-y-2">
+                <h3 class="text-sm font-semibold">{detailCopy.useCases}</h3>
+                <ul class="space-y-2 text-sm leading-6 text-muted-foreground">
+                  {#each listing.overview?.useCases ?? [detailCopy.deployAppUseCase(listing.title), detailCopy.inspectTopologyUseCase] as useCase (useCase)}
+                    <li class="flex gap-2">
+                      <span class="mt-2 size-1.5 shrink-0 rounded-full bg-foreground/55"></span>
+                      <span>{useCase}</span>
+                    </li>
+                  {/each}
+                </ul>
+              </div>
+              <div class="space-y-2">
+                <h3 class="text-sm font-semibold">{detailCopy.appaloftCreates}</h3>
+                <ul class="space-y-2 text-sm leading-6 text-muted-foreground">
+                  {#each listing.overview?.highlights ?? [
+                    detailCopy.runtimeUnitsHighlight(effectiveManifest.components.length),
+                    effectiveManifest.resources.length > 0
+                      ? detailCopy.dependencyBindingsHighlight(effectiveManifest.resources.map((resource) => resource.kind).join(" / "))
+                      : detailCopy.noManagedDependencies,
+                    detailCopy.projectEnvironmentPlanHighlight,
+                  ] as highlight (highlight)}
+                    <li class="flex gap-2">
+                      <span class="mt-2 size-1.5 shrink-0 rounded-full bg-foreground/55"></span>
+                      <span>{highlight}</span>
+                    </li>
+                  {/each}
+                </ul>
+              </div>
+            </div>
+          </section>
+
+          <section class="space-y-3" data-blueprint-topology>
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <h2 class="text-lg font-semibold">{detailCopy.topology}</h2>
+                <p class="text-sm text-muted-foreground">{detailCopy.topologyDescription}</p>
+              </div>
+              <Badge variant="outline">{listing.blueprint.version}</Badge>
+            </div>
+            <div class="console-record-list">
+              {#each effectiveManifest.components as component (component.id)}
+                <article class="console-record-row">
+                  <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div class="min-w-0">
+                      <h3 class="font-semibold">{component.name}</h3>
+                      <p class="mt-1 text-sm text-muted-foreground">
+                        {blueprintComponentKindLabel(component.kind)} · {blueprintRuntimeStrategyLabel(component.runtime.strategy)}
+                      </p>
+                    </div>
+                    <Badge variant="outline">
+                      {blueprintRuntimeSummary(component)}
+                    </Badge>
+                  </div>
+                  <div class="mt-3 grid gap-2 text-xs md:grid-cols-3">
+                    <div>
+                      <p class="text-muted-foreground">{detailCopy.ports}</p>
+                      <p class="font-medium">
+                        {component.ports.map((port) => `${port.name}:${port.containerPort}/${port.protocol}`).join(", ") || detailCopy.none}
+                      </p>
+                    </div>
+                    <div>
+                      <p class="text-muted-foreground">{detailCopy.routes}</p>
+                      <p class="font-medium">
+                        {component.routes.map((route) => `${route.port}${route.pathPrefix}`).join(", ") || detailCopy.none}
+                      </p>
+                    </div>
+                    <div>
+                      <p class="text-muted-foreground">{detailCopy.bindings}</p>
+                      <p class="font-medium">
+                        {[...component.usesResources, ...component.usesSecrets].join(", ") || detailCopy.none}
+                      </p>
+                    </div>
+                  </div>
+                </article>
               {/each}
             </div>
-          </article>
+          </section>
 
-          <article class="console-panel p-5">
+          <section class="console-panel p-5" data-blueprint-configuration-summary>
             <div class="mb-4 flex items-center gap-2">
               <KeyRound class="size-4 text-muted-foreground" />
               <h2 class="text-lg font-semibold">{detailCopy.configurationAndSecrets}</h2>
             </div>
-            <div class="space-y-3">
-              <div>
-                <p class="mb-2 text-xs font-medium text-muted-foreground">{detailCopy.parameters}</p>
-                <div class="space-y-2">
-                  {#each effectiveManifest.parameters as parameter (parameter.key)}
-                    <div class="console-subtle-panel px-3 py-2 text-sm">
+
+            <div class="grid gap-6 lg:grid-cols-2">
+              <div class="min-w-0 space-y-2">
+                <div class="flex items-center gap-2">
+                  <PlugZap class="size-4 text-muted-foreground" />
+                  <h3 class="text-sm font-semibold">{detailCopy.dependencyResources}</h3>
+                </div>
+                <div class="console-record-list">
+                  {#each effectiveManifest.resources as resource (resource.id)}
+                    <div class="console-record-row py-3 text-sm">
                       <div class="flex items-center justify-between gap-3">
-                        <span class="font-medium">{parameter.label}</span>
-                        <Badge variant="outline">{parameter.type}</Badge>
+                        <span class="font-medium">{resource.label}</span>
+                        <Badge variant="outline">{resource.kind}</Badge>
                       </div>
-                      <p class="mt-1 font-mono text-xs text-muted-foreground">{parameter.key}</p>
+                      <p class="font-mono text-xs text-muted-foreground">{resource.id}</p>
                     </div>
                   {:else}
-                    <p class="text-sm text-muted-foreground">{detailCopy.noParameters}</p>
+                    <p class="px-4 py-3 text-sm text-muted-foreground">
+                      {detailCopy.noExternalDependencies}
+                    </p>
                   {/each}
                 </div>
               </div>
-              <div>
-                <p class="mb-2 text-xs font-medium text-muted-foreground">{detailCopy.secretPlaceholders}</p>
+
+              <div class="min-w-0 space-y-4">
                 <div class="space-y-2">
-                  {#each effectiveManifest.secrets as secret (secret.key)}
-                    <div class="console-subtle-panel px-3 py-2 text-sm">
-                      <div class="flex items-center justify-between gap-3">
-                        <span class="font-medium">{secret.label}</span>
-                        <Badge variant="outline">{secret.required ? detailCopy.required : detailCopy.optional}</Badge>
+                  <h3 class="text-sm font-semibold">{detailCopy.parameters}</h3>
+                  <div class="console-record-list">
+                    {#each effectiveManifest.parameters as parameter (parameter.key)}
+                      <div class="console-record-row py-3 text-sm">
+                        <div class="flex items-center justify-between gap-3">
+                          <span class="font-medium">{parameter.label}</span>
+                          <Badge variant="outline">{parameter.type}</Badge>
+                        </div>
+                        <p class="font-mono text-xs text-muted-foreground">{parameter.key}</p>
                       </div>
-                      <p class="mt-1 font-mono text-xs text-muted-foreground">{secret.key}</p>
-                    </div>
-                  {:else}
-                    <p class="text-sm text-muted-foreground">{detailCopy.noSecretPlaceholders}</p>
-                  {/each}
+                    {:else}
+                      <p class="px-4 py-3 text-sm text-muted-foreground">{detailCopy.noParameters}</p>
+                    {/each}
+                  </div>
+                </div>
+
+                <div class="space-y-2">
+                  <h3 class="text-sm font-semibold">{detailCopy.secretPlaceholders}</h3>
+                  <div class="console-record-list">
+                    {#each effectiveManifest.secrets as secret (secret.key)}
+                      <div class="console-record-row py-3 text-sm">
+                        <div class="flex items-center justify-between gap-3">
+                          <span class="font-medium">{secret.label}</span>
+                          <Badge variant="outline">
+                            {secret.required ? detailCopy.required : detailCopy.optional}
+                          </Badge>
+                        </div>
+                        <p class="font-mono text-xs text-muted-foreground">{secret.key}</p>
+                      </div>
+                    {:else}
+                      <p class="px-4 py-3 text-sm text-muted-foreground">
+                        {detailCopy.noSecretPlaceholders}
+                      </p>
+                    {/each}
+                  </div>
                 </div>
               </div>
             </div>
-          </article>
-        </section>
 
-        <section class="console-panel p-5">
-          <div class="mb-4 flex items-center gap-2">
-            <SlidersHorizontal class="size-4 text-muted-foreground" />
-            <h2 class="text-lg font-semibold">{detailCopy.environmentVariables}</h2>
-          </div>
-          <div class="grid gap-2 md:grid-cols-2">
-            {#each allVariables as variable (`${variable.key}-${variable.value}`)}
-              <div class="console-subtle-panel px-3 py-2 text-sm">
-                <p class="font-mono font-medium">{variable.key}</p>
-                <p class="mt-1 truncate text-xs text-muted-foreground">{variable.value}</p>
+            {#if allVariables.length > 0}
+              <div class="mt-5 border-t pt-5">
+                <h3 class="mb-2 text-sm font-semibold">{detailCopy.environmentVariables}</h3>
+                <div class="console-record-list grid md:grid-cols-2">
+                  {#each allVariables as variable (`${variable.key}-${variable.value}`)}
+                    <div class="console-record-row py-3 text-sm">
+                      <p class="font-mono font-medium">{variable.key}</p>
+                      <p class="truncate text-xs text-muted-foreground">{variable.value}</p>
+                    </div>
+                  {/each}
+                </div>
               </div>
             {:else}
-              <p class="text-sm text-muted-foreground">{detailCopy.noPlainVariables}</p>
-            {/each}
-          </div>
-        </section>
-      </div>
+              <p class="mt-5 border-t pt-4 text-xs leading-5 text-muted-foreground">
+                {detailCopy.noPlainVariables}
+              </p>
+            {/if}
+          </section>
+        </div>
 
-      <aside class="min-w-0 space-y-5 xl:sticky xl:top-20 xl:self-start">
-        <section class="console-side-panel space-y-4" data-blueprint-install-summary>
-          <div class="flex items-center justify-between gap-3">
-            <div>
-              <h2 class="text-lg font-semibold">{detailCopy.quickDeploy}</h2>
-              <p class="text-sm text-muted-foreground">{detailCopy.quickDeployDescription}</p>
+        <aside class="order-1 min-w-0 space-y-5 xl:order-2 xl:sticky xl:top-20 xl:self-start">
+          <section class="console-side-panel space-y-4" data-blueprint-install-summary>
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <h2 class="text-lg font-semibold">{detailCopy.quickDeploy}</h2>
+                <p class="text-sm text-muted-foreground">{detailCopy.quickDeployDescription}</p>
+              </div>
+              <Boxes class="size-5 text-muted-foreground" />
             </div>
-            <Boxes class="size-5 text-muted-foreground" />
-          </div>
 
-          <div class="grid gap-2 rounded-md border border-border bg-muted/30 p-3 text-xs">
-            <div class="flex items-center justify-between gap-3">
-              <span class="text-muted-foreground">{detailCopy.targetPlan}</span>
-              <span class="min-w-0 truncate font-medium">{selectedVariantLabel()}</span>
-            </div>
-            <div class="flex items-center justify-between gap-3">
-              <span class="text-muted-foreground">{detailCopy.defaultProfile}</span>
-              <span class="font-mono">{profile}</span>
-            </div>
-            <div class="flex items-center justify-between gap-3">
-              <span class="text-muted-foreground">{detailCopy.parametersAndSecrets}</span>
-              <span class="font-mono">{effectiveManifest.parameters.length} / {effectiveManifest.secrets.length}</span>
-            </div>
-            <div class="flex items-center justify-between gap-3">
-              <span class="text-muted-foreground">{detailCopy.componentsAndDependencies}</span>
-              <span class="font-mono">{effectiveManifest.components.length} / {effectiveManifest.resources.length}</span>
-            </div>
-          </div>
-
-          <div class="grid gap-2">
             <Button
               type="button"
-              class="hidden xl:inline-flex"
+              class="w-full"
               onclick={openInstallDialog}
               disabled={!installEndpoint}
             >
@@ -1501,268 +1455,283 @@
               {detailCopy.quickDeploy}
               <ArrowRight class="size-4" />
             </Button>
-          </div>
 
-          {#if installError}
-            <div class="console-subtle-panel border-destructive/30 px-3 py-2 text-sm text-destructive">
-              {installError}
+            <div class="grid gap-2 border-t pt-4 text-xs">
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-muted-foreground">{detailCopy.targetPlan}</span>
+                <span class="min-w-0 truncate font-medium">{selectedVariantLabel()}</span>
+              </div>
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-muted-foreground">{detailCopy.defaultProfile}</span>
+                <span class="font-mono">{profile}</span>
+              </div>
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-muted-foreground">{detailCopy.parametersAndSecrets}</span>
+                <span class="font-mono">{effectiveManifest.parameters.length} / {effectiveManifest.secrets.length}</span>
+              </div>
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-muted-foreground">{detailCopy.componentsAndDependencies}</span>
+                <span class="font-mono">{effectiveManifest.components.length} / {effectiveManifest.resources.length}</span>
+              </div>
             </div>
-          {/if}
 
-          {#if installResult?.progress}
-            <div
-              class="console-subtle-panel space-y-4 p-3"
-              data-blueprint-install-progress
-              data-blueprint-install-handoff
-            >
-              <div class="flex flex-wrap items-start justify-between gap-2">
-                <div>
-                  <p class="text-sm font-semibold">{installHandoffTitle(installResult.progress)}</p>
-                  <p class="mt-1 text-xs leading-5 text-muted-foreground">
-                    {installHandoffDescription(installResult.progress)}
+            {#if installError}
+              <div class="console-subtle-panel border-destructive/30 px-3 py-2 text-sm text-destructive">
+                {installError}
+              </div>
+            {/if}
+
+            {#if installResult?.progress}
+              <div
+                class="console-subtle-panel space-y-4 p-3"
+                data-blueprint-install-progress
+                data-blueprint-install-handoff
+              >
+                <div class="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p class="text-sm font-semibold">{installHandoffTitle(installResult.progress)}</p>
+                    <p class="mt-1 text-xs leading-5 text-muted-foreground">
+                      {installHandoffDescription(installResult.progress)}
+                    </p>
+                  </div>
+                  <Badge variant={installResult.progress.userStatus === "failed" ? "destructive" : "outline"}>
+                    {progressBadgeLabel(installResult.progress)}
+                  </Badge>
+                </div>
+
+                <div class="grid gap-2 rounded-md border bg-background p-3 text-xs">
+                  <div class="flex items-center justify-between gap-3">
+                    <span class="text-muted-foreground">{detailCopy.currentStep}</span>
+                    <span class="font-mono">{installResult.progress.currentStep}</span>
+                  </div>
+                  <div class="flex items-center justify-between gap-3">
+                    <span class="text-muted-foreground">{detailCopy.applicationStatus}</span>
+                    <span class="font-mono">{installResult.progress.status}</span>
+                  </div>
+                  <div class="flex items-center justify-between gap-3">
+                    <span class="text-muted-foreground">{detailCopy.applicationId}</span>
+                    <span class="break-all font-mono">{installResult.progress.applicationId}</span>
+                  </div>
+                  <p class="border-t pt-2 leading-5 text-muted-foreground">
+                    {installResult.progress.message}
                   </p>
                 </div>
-                <Badge variant={installResult.progress.userStatus === "failed" ? "destructive" : "outline"}>
-                  {progressBadgeLabel(installResult.progress)}
-                </Badge>
-              </div>
 
-              <div class="grid gap-2 rounded-md border bg-background p-3 text-xs">
-                <div class="flex items-center justify-between gap-3">
-                  <span class="text-muted-foreground">{detailCopy.currentStep}</span>
-                  <span class="font-mono">{installResult.progress.currentStep}</span>
-                </div>
-                <div class="flex items-center justify-between gap-3">
-                  <span class="text-muted-foreground">{detailCopy.applicationStatus}</span>
-                  <span class="font-mono">{installResult.progress.status}</span>
-                </div>
-                <div class="flex items-center justify-between gap-3">
-                  <span class="text-muted-foreground">{detailCopy.applicationId}</span>
-                  <span class="break-all font-mono">{installResult.progress.applicationId}</span>
-                </div>
-                <p class="border-t pt-2 leading-5 text-muted-foreground">
-                  {installResult.progress.message}
-                </p>
-              </div>
-
-              <section class="space-y-2" data-blueprint-install-created-resources>
-                <div class="flex items-center justify-between gap-3">
-                  <p class="text-xs font-medium text-muted-foreground">{detailCopy.createdResources}</p>
-                  <Badge variant="outline">{countOrNoneLabel(installedApplicationComponents.length)}</Badge>
-                </div>
-                {#each installedApplicationComponents as component (component.componentId)}
-                  <div class="rounded-md border bg-background px-3 py-2 text-xs">
-                    <div class="flex flex-wrap items-center justify-between gap-2">
-                      <div class="min-w-0">
-                        <p class="truncate font-medium">{component.name ?? component.componentId}</p>
-                        <p class="mt-1 truncate font-mono text-muted-foreground">
-                          {pendingResourceLabel(component.resource?.resourceId ?? component.resource?.resourceSlug)}
-                        </p>
+                <section class="space-y-2" data-blueprint-install-created-resources>
+                  <div class="flex items-center justify-between gap-3">
+                    <p class="text-xs font-medium text-muted-foreground">{detailCopy.createdResources}</p>
+                    <Badge variant="outline">{countOrNoneLabel(installedApplicationComponents.length)}</Badge>
+                  </div>
+                  {#each installedApplicationComponents as component (component.componentId)}
+                    <div class="rounded-md border bg-background px-3 py-2 text-xs">
+                      <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div class="min-w-0">
+                          <p class="truncate font-medium">{component.name ?? component.componentId}</p>
+                          <p class="mt-1 truncate font-mono text-muted-foreground">
+                            {pendingResourceLabel(component.resource?.resourceId ?? component.resource?.resourceSlug)}
+                          </p>
+                        </div>
+                        {#if component.resource?.resourceId}
+                          <Button
+                            href={progressResourceHref(component.resource.resourceId)}
+                            variant="outline"
+                            size="sm"
+                          >
+                            {detailCopy.openResource}
+                            <ArrowRight class="size-3.5" />
+                          </Button>
+                        {:else}
+                          <Badge variant="outline">{detailCopy.planned}</Badge>
+                        {/if}
                       </div>
-                      {#if component.resource?.resourceId}
-                        <Button
-                          href={progressResourceHref(component.resource.resourceId)}
-                          variant="outline"
-                          size="sm"
-                        >
-                          {detailCopy.openResource}
-                          <ArrowRight class="size-3.5" />
-                        </Button>
-                      {:else}
-                        <Badge variant="outline">{detailCopy.planned}</Badge>
-                      {/if}
                     </div>
-                  </div>
-                {:else}
-                  <div class="rounded-md border border-dashed bg-background px-3 py-2 text-xs leading-5 text-muted-foreground">
-                    {detailCopy.createdResourcesEmpty}
-                  </div>
-                {/each}
-              </section>
+                  {:else}
+                    <div class="rounded-md border border-dashed bg-background px-3 py-2 text-xs leading-5 text-muted-foreground">
+                      {detailCopy.createdResourcesEmpty}
+                    </div>
+                  {/each}
+                </section>
 
-              <section class="space-y-2" data-blueprint-install-dependencies>
-                <div class="flex items-center justify-between gap-3">
-                  <p class="text-xs font-medium text-muted-foreground">{detailCopy.dependencyResources}</p>
-                  <Badge variant="outline">{countOrNoneLabel(installedApplicationDependencies.length)}</Badge>
-                </div>
-                {#each installedApplicationDependencies as dependency (dependency.requirementId)}
-                  <div class="rounded-md border bg-background px-3 py-2 text-xs">
-                    <div class="flex flex-wrap items-center justify-between gap-2">
-                      <div class="min-w-0">
-                        <p class="truncate font-medium">{dependency.requirementId}</p>
-                        <p class="mt-1 truncate font-mono text-muted-foreground">
-                          {dependency.dependencyResourceId ?? pendingDependencyLabel(dependency.plannedMode)}
-                        </p>
+                <section class="space-y-2" data-blueprint-install-dependencies>
+                  <div class="flex items-center justify-between gap-3">
+                    <p class="text-xs font-medium text-muted-foreground">{detailCopy.dependencyResources}</p>
+                    <Badge variant="outline">{countOrNoneLabel(installedApplicationDependencies.length)}</Badge>
+                  </div>
+                  {#each installedApplicationDependencies as dependency (dependency.requirementId)}
+                    <div class="rounded-md border bg-background px-3 py-2 text-xs">
+                      <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div class="min-w-0">
+                          <p class="truncate font-medium">{dependency.requirementId}</p>
+                          <p class="mt-1 truncate font-mono text-muted-foreground">
+                            {dependency.dependencyResourceId ?? pendingDependencyLabel(dependency.plannedMode)}
+                          </p>
+                        </div>
+                        {#if dependency.dependencyResourceId}
+                          <Button
+                            href={dependencyResourceCollectionHref(dependency.dependencyResourceId)}
+                            variant="outline"
+                            size="sm"
+                          >
+                            {detailCopy.openGovernance}
+                            <ArrowRight class="size-3.5" />
+                          </Button>
+                        {:else}
+                          <Badge variant={dependency.bindingStatus === "blocked" ? "destructive" : "outline"}>
+                            {installPlanStatusLabel(dependency.bindingStatus)}
+                          </Badge>
+                        {/if}
                       </div>
                       {#if dependency.dependencyResourceId}
-                        <Button
-                          href={dependencyResourceCollectionHref(dependency.dependencyResourceId)}
-                          variant="outline"
-                          size="sm"
-                        >
-                          {detailCopy.openGovernance}
-                          <ArrowRight class="size-3.5" />
-                        </Button>
-                      {:else}
-                        <Badge variant={dependency.bindingStatus === "blocked" ? "destructive" : "outline"}>
-                          {installPlanStatusLabel(dependency.bindingStatus)}
-                        </Badge>
-                      {/if}
-                    </div>
-                    {#if dependency.dependencyResourceId}
-                      <p class="mt-2 border-t pt-2 leading-5 text-muted-foreground">
-                        {detailCopy.dependencyGovernanceReady}
-                      </p>
-                    {/if}
-                  </div>
-                {:else}
-                  <div class="rounded-md border border-dashed bg-background px-3 py-2 text-xs leading-5 text-muted-foreground">
-                    {detailCopy.installNoDependencies}
-                  </div>
-                {/each}
-              </section>
-
-              <section class="space-y-2" data-blueprint-install-public-urls>
-                <div class="flex items-center justify-between gap-3">
-                  <p class="text-xs font-medium text-muted-foreground">{detailCopy.publicUrl}</p>
-                  <Badge variant="outline">{countOrNoneLabel(installedApplicationPublicEndpoints.length)}</Badge>
-                </div>
-                {#each installedApplicationPublicEndpoints as endpoint (`${endpoint.componentId}-${endpoint.url}`)}
-                  <div class="rounded-md border bg-background px-3 py-2 text-xs">
-                    <div class="flex flex-wrap items-center justify-between gap-2">
-                      <div class="min-w-0">
-                        <p class="truncate font-medium">{endpoint.label}</p>
-                        <p class="mt-1 truncate font-mono text-muted-foreground">{endpoint.url}</p>
-                      </div>
-                      <Button href={endpoint.url} target="_blank" rel="noreferrer" variant="outline" size="sm">
-                        {detailCopy.open}
-                        <ExternalLink class="size-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                {:else}
-                  <div class="rounded-md border border-dashed bg-background px-3 py-2 text-xs leading-5 text-muted-foreground">
-                    {detailCopy.publicUrlEmpty}
-                  </div>
-                {/each}
-              </section>
-
-              <section class="space-y-2" data-blueprint-install-component-deployments>
-                <p class="text-xs font-medium text-muted-foreground">{detailCopy.componentDeployments}</p>
-                {#each installResult.progress.componentDeployments as component (component.componentId)}
-                  <div class="rounded-md border bg-background px-3 py-2 text-xs">
-                    <div class="flex flex-wrap items-center justify-between gap-2">
-                      <div class="min-w-0">
-                        <p class="truncate font-medium">{component.name}</p>
-                        <p class="mt-1 font-mono text-muted-foreground">
-                          {componentDeploymentStatus(component.deployment)}
+                        <p class="mt-2 border-t pt-2 leading-5 text-muted-foreground">
+                          {detailCopy.dependencyGovernanceReady}
                         </p>
-                      </div>
-                      {#if "deploymentId" in component.deployment}
-                        <Button
-                          href={progressDeploymentHref(component.deployment.deploymentId)}
-                          variant="outline"
-                          size="sm"
-                        >
-                          {detailCopy.viewDeployment}
-                          <ArrowRight class="size-3.5" />
-                        </Button>
-                      {:else}
-                        <Badge variant="outline">{detailCopy.planned}</Badge>
                       {/if}
                     </div>
-                  </div>
-                {:else}
-                  <div class="rounded-md border border-dashed bg-background px-3 py-2 text-xs leading-5 text-muted-foreground">
-                    {detailCopy.componentDeploymentsEmpty}
-                  </div>
-                {/each}
-              </section>
+                  {:else}
+                    <div class="rounded-md border border-dashed bg-background px-3 py-2 text-xs leading-5 text-muted-foreground">
+                      {detailCopy.installNoDependencies}
+                    </div>
+                  {/each}
+                </section>
 
-              {#if installResult.progress.failure}
-                <div class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                  {installResult.progress.failure.reason}
-                </div>
-              {/if}
+                <section class="space-y-2" data-blueprint-install-public-urls>
+                  <div class="flex items-center justify-between gap-3">
+                    <p class="text-xs font-medium text-muted-foreground">{detailCopy.publicUrl}</p>
+                    <Badge variant="outline">{countOrNoneLabel(installedApplicationPublicEndpoints.length)}</Badge>
+                  </div>
+                  {#each installedApplicationPublicEndpoints as endpoint (`${endpoint.componentId}-${endpoint.url}`)}
+                    <div class="rounded-md border bg-background px-3 py-2 text-xs">
+                      <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div class="min-w-0">
+                          <p class="truncate font-medium">{endpoint.label}</p>
+                          <p class="mt-1 truncate font-mono text-muted-foreground">{endpoint.url}</p>
+                        </div>
+                        <Button href={endpoint.url} target="_blank" rel="noreferrer" variant="outline" size="sm">
+                          {detailCopy.open}
+                          <ExternalLink class="size-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  {:else}
+                    <div class="rounded-md border border-dashed bg-background px-3 py-2 text-xs leading-5 text-muted-foreground">
+                      {detailCopy.publicUrlEmpty}
+                    </div>
+                  {/each}
+                </section>
 
-              <div class="grid gap-2" data-blueprint-install-next-actions>
-                {#if installedApplicationEndpoint}
-                  <Button
-                    type="button"
-                    onclick={refreshInstalledApplicationProgress}
-                    disabled={installRefreshPending}
-                    variant="outline"
-                    class="w-full"
-                  >
-                    {#if installRefreshPending}
-                      <LoaderCircle class="size-4 animate-spin" />
-                    {/if}
-                    {detailCopy.refreshInstallStatus}
-                  </Button>
+                <section class="space-y-2" data-blueprint-install-component-deployments>
+                  <p class="text-xs font-medium text-muted-foreground">{detailCopy.componentDeployments}</p>
+                  {#each installResult.progress.componentDeployments as component (component.componentId)}
+                    <div class="rounded-md border bg-background px-3 py-2 text-xs">
+                      <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div class="min-w-0">
+                          <p class="truncate font-medium">{component.name}</p>
+                          <p class="mt-1 font-mono text-muted-foreground">
+                            {componentDeploymentStatus(component.deployment)}
+                          </p>
+                        </div>
+                        {#if "deploymentId" in component.deployment}
+                          <Button
+                            href={progressDeploymentHref(component.deployment.deploymentId)}
+                            variant="outline"
+                            size="sm"
+                          >
+                            {detailCopy.viewDeployment}
+                            <ArrowRight class="size-3.5" />
+                          </Button>
+                        {:else}
+                          <Badge variant="outline">{detailCopy.planned}</Badge>
+                        {/if}
+                      </div>
+                    </div>
+                  {:else}
+                    <div class="rounded-md border border-dashed bg-background px-3 py-2 text-xs leading-5 text-muted-foreground">
+                      {detailCopy.componentDeploymentsEmpty}
+                    </div>
+                  {/each}
+                </section>
+
+                {#if installResult.progress.failure}
+                  <div class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                    {installResult.progress.failure.reason}
+                  </div>
                 {/if}
-                {#if installedApplicationComponents.find((component) => component.resource?.resourceId)?.resource?.resourceId}
-                  {@const firstResourceId = installedApplicationComponents.find((component) => component.resource?.resourceId)?.resource?.resourceId}
-                  {#if firstResourceId}
+
+                <div class="grid gap-2" data-blueprint-install-next-actions>
+                  {#if installedApplicationEndpoint}
                     <Button
-                      href={progressResourceHref(firstResourceId)}
+                      type="button"
+                      onclick={refreshInstalledApplicationProgress}
+                      disabled={installRefreshPending}
                       variant="outline"
                       class="w-full"
                     >
-                      {detailCopy.openFirstResource}
+                      {#if installRefreshPending}
+                        <LoaderCircle class="size-4 animate-spin" />
+                      {/if}
+                      {detailCopy.refreshInstallStatus}
+                    </Button>
+                  {/if}
+                  {#if installedApplicationComponents.find((component) => component.resource?.resourceId)?.resource?.resourceId}
+                    {@const firstResourceId = installedApplicationComponents.find((component) => component.resource?.resourceId)?.resource?.resourceId}
+                    {#if firstResourceId}
+                      <Button
+                        href={progressResourceHref(firstResourceId)}
+                        variant="outline"
+                        class="w-full"
+                      >
+                        {detailCopy.openFirstResource}
+                        <ArrowRight class="size-4" />
+                      </Button>
+                    {/if}
+                  {/if}
+                  {#if installedApplicationPublicEndpoints[0]?.url}
+                    <Button
+                      href={installedApplicationPublicEndpoints[0].url}
+                      target="_blank"
+                      rel="noreferrer"
+                      variant="outline"
+                      class="w-full"
+                    >
+                      {detailCopy.openPublicUrl}
+                      <ExternalLink class="size-4" />
+                    </Button>
+                  {/if}
+                  {#if installResult.progress.deploymentIds[0]}
+                    <Button
+                      href={progressDeploymentHref(installResult.progress.deploymentIds[0])}
+                      variant="outline"
+                      class="w-full"
+                    >
+                      {detailCopy.openLatestDeployment}
                       <ArrowRight class="size-4" />
                     </Button>
                   {/if}
-                {/if}
-                {#if installedApplicationPublicEndpoints[0]?.url}
-                  <Button
-                    href={installedApplicationPublicEndpoints[0].url}
-                    target="_blank"
-                    rel="noreferrer"
-                    variant="outline"
-                    class="w-full"
-                  >
-                    {detailCopy.openPublicUrl}
-                    <ExternalLink class="size-4" />
-                  </Button>
-                {/if}
-                {#if installResult.progress.deploymentIds[0]}
-                  <Button
-                    href={progressDeploymentHref(installResult.progress.deploymentIds[0])}
-                    variant="outline"
-                    class="w-full"
-                  >
-                    {detailCopy.openLatestDeployment}
+                  {#if installResult.progress.applicationId}
+                    <Button
+                      href={installedApplicationHref(installResult.progress.applicationId)}
+                      variant="outline"
+                      class="w-full"
+                    >
+                      {detailCopy.viewInstalledApplication}
+                      <ArrowRight class="size-4" />
+                    </Button>
+                  {:else}
+                    <div class="rounded-md border border-dashed bg-background px-3 py-2 text-xs leading-5 text-muted-foreground">
+                      {detailCopy.installedApplicationPending}
+                    </div>
+                  {/if}
+                  <Button href="/projects" variant="outline" class="w-full">
+                    {detailCopy.openProjects}
                     <ArrowRight class="size-4" />
                   </Button>
-                {/if}
-                {#if installResult.progress.applicationId}
-                  <Button
-                    href={installedApplicationHref(installResult.progress.applicationId)}
-                    variant="outline"
-                    class="w-full"
-                  >
-                    {detailCopy.viewInstalledApplication}
-                    <ArrowRight class="size-4" />
-                  </Button>
-                {:else}
-                  <div class="rounded-md border border-dashed bg-background px-3 py-2 text-xs leading-5 text-muted-foreground">
-                    {detailCopy.installedApplicationPending}
-                  </div>
-                {/if}
-                <Button href="/projects" variant="outline" class="w-full">
-                  {detailCopy.openProjects}
-                  <ArrowRight class="size-4" />
-                </Button>
+                </div>
               </div>
-            </div>
-          {/if}
-        </section>
+            {/if}
+          </section>
 
-        <Button href="/marketplace" variant="outline" class="w-full">
-          <ArrowLeft class="size-4" />
-          {detailCopy.backToMarketplace}
-        </Button>
-      </aside>
+        </aside>
+      </div>
 
       <Dialog.Root bind:open={installDialogOpen} onOpenChange={setInstallDialogOpen}>
         <Dialog.Content closeLabel={detailCopy.close} class="max-w-3xl">

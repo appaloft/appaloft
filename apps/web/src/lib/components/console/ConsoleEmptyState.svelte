@@ -41,7 +41,7 @@
 </script>
 
 <Empty.Root
-  class="min-h-[28rem] border border-dashed bg-background px-6 py-14 shadow-sm sm:min-h-[34rem]"
+  class="min-h-[28rem] border border-dashed bg-card px-6 py-14 shadow-sm sm:min-h-[34rem]"
   data-console-empty-state={tone}
 >
   <Empty.Media class="relative size-32 overflow-visible">

@@ -22,6 +22,15 @@ describe("design package", () => {
     }
   });
 
+  test("gives the Web console a crisp control-plane theme without changing portable tokens", async () => {
+    const webCss = await readFile(new URL("../styles/web.css", import.meta.url), "utf8");
+
+    expect(webCss).toContain("--background: #f4f7fb");
+    expect(webCss).toContain("--border: #c9d4e3");
+    expect(webCss).toContain("--input: #b5c3d6");
+    expect(webCss).toContain("--radius: 0.25rem");
+  });
+
   test("exports portable design tokens for non-CSS renderers", () => {
     expect(appaloftPortableDesignTokens.color.primary).toBe("#4e84ff");
     expect(appaloftPortableDesignTokens.color.background).toBe("#ffffff");

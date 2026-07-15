@@ -648,7 +648,7 @@ describe("console page structure", () => {
 
   test("[CONSOLE-COPY-IA-000] keeps user-visible console copy free of internal implementation terms", () => {
     const forbiddenVisibleCopyPattern =
-      /\b(?:read model|readback|later phase|route gap|provider adapter|install worker|focused governed flow|owner links|owner surface|owner view|danger flow|blocker\/check|route intent from Blueprint|service \/ worker \/ static surface|deployment attempt|console intent)\b|待接入|尚未接入|资源 readback|依赖资源 readback|安装 snapshot|owner 面|资源 owner|按 intent/iu;
+      /\b(?:read model|later phase|route gap|provider adapter|install worker|focused governed flow|owner links|owner surface|owner view|danger flow|blocker\/check|route intent from Blueprint|service \/ worker \/ static surface|deployment attempt|console intent)\b|待接入|尚未接入|资源 readback|依赖资源 readback|安装 snapshot|owner 面|资源 owner|按 intent/iu;
     const visibleCopyFiles = [
       ...routePageSources(routesRootPath),
       {
@@ -1085,7 +1085,7 @@ describe("console page structure", () => {
     expect(resourceDetailPageSource).not.toContain(
       "xl:grid-cols-[minmax(0,1.1fr)_minmax(20rem,0.9fr)]",
     );
-    expect(resourceDetailBodySource).toContain("onclick={openResourceDeploymentDialog}");
+    expect(resourceDetailPageSource).toContain("onclick={openResourceDeploymentDialog}");
     expect(resourceDetailBodySource).toContain("onclick={openResourceDomainBindingCreateDialog}");
     expect(resourceDetailBodySource).toContain("onclick={openScheduledTaskCreateDialog}");
     expect(resourceDetailBodySource).toContain("{@render resourceRuntimeControlPanel()}");
@@ -1800,7 +1800,7 @@ describe("console page structure", () => {
     expect(deploymentsPageSource).toContain('import * as Select from "$lib/components/ui/select"');
     expect(deploymentsPageSource).toContain("<Select.Root bind:value={projectFilter}");
     expect(deploymentsPageSource).toContain("<Select.Root bind:value={environmentFilter}");
-    expect(deploymentsPageSource).toContain("disabled={!selectedProject}");
+    expect(deploymentsPageSource).toContain("disabled={pageLoading || !selectedProject}");
     expect(deploymentsPageSource).toContain(
       ": $t(i18nKeys.console.deployments.selectProjectFirst)",
     );
@@ -2444,7 +2444,7 @@ describe("console page structure", () => {
     expect(domainBindingLoadingSource).toContain("console-record-list");
     expect(domainBindingLoadingSource).toContain("console-record-row p-0");
     expect(domainBindingLoadingSource).toContain("md:grid-cols-3");
-    expect(domainBindingLoadingSource).toContain("lg:absolute lg:right-4 lg:top-4");
+    expect(domainBindingLoadingSource).toContain("bg-muted/20");
     expect(domainBindingsListSource).toContain("domainBindingDetailHref(binding)");
     expect(domainBindingsListSource).toContain("data-domain-binding-row");
     expect(domainBindingsListSource).toContain("data-domain-binding-pending-dns-notice");
@@ -2664,9 +2664,7 @@ describe("console page structure", () => {
     );
 
     expect(serversDisplaySurface).toContain("data-server-list-skeleton");
-    expect(serverLoadingSource).toContain("lg:grid-cols-[minmax(16rem,1fr)_auto]");
-    expect(serverLoadingSource).toContain("sm:grid-cols-3");
-    expect(serverLoadingSource).toContain("lg:grid-cols-4");
+    expect(serverLoadingSource).toContain("rounded-md border bg-card p-4 shadow-sm");
     expect(serverReadinessSource).toContain("connectivitySurfaceDescription");
     expect(serversPageSource).toContain('case "active":\n        return "secondary";');
     expect(serversPageSource).toContain('case "ready":\n        return "secondary";');
@@ -2845,7 +2843,7 @@ describe("console page structure", () => {
     const blueprintVariantDisplaySurface = sourceBetween(
       marketplaceBlueprintDetailPageSource,
       "data-blueprint-variant-display-surface",
-      '<section class="grid gap-3 md:grid-cols-3">',
+      "data-blueprint-overview-summary",
     );
     const installSummarySource =
       marketplaceBlueprintDetailPageSource.match(
@@ -2884,6 +2882,48 @@ describe("console page structure", () => {
     expect(installDialogSource).toContain("{detailCopy.startDeployment}");
     expect(installDialogSource).not.toContain("生成 dry-run");
     expect(installDialogSource).not.toContain("预览部署计划");
+  });
+
+  test("[BLUEPRINT-DETAIL-IA-001] orders Blueprint details around deployment decisions and created topology", () => {
+    const summaryHeader = sourceBetween(
+      marketplaceBlueprintDetailPageSource,
+      "data-blueprint-summary-header",
+      "data-blueprint-detail-body",
+    );
+
+    expect(marketplaceBlueprintDetailPageSource).toContain("data-blueprint-summary-header");
+    expect(marketplaceBlueprintDetailPageSource).toContain("data-blueprint-footprint-summary");
+    expect(marketplaceBlueprintDetailPageSource).toContain("data-blueprint-detail-body");
+    expect(marketplaceBlueprintDetailPageSource).toContain("data-blueprint-overview-summary");
+    expect(marketplaceBlueprintDetailPageSource).toContain("data-blueprint-topology");
+    expect(marketplaceBlueprintDetailPageSource).toContain("data-blueprint-configuration-summary");
+    expect(summaryHeader).not.toContain("detailCopy.planPrefix");
+    expect(summaryHeader).not.toContain("upgradeSummary(selectedUpgrade)");
+    expect(marketplaceBlueprintDetailPageSource.match(/href={listing\.websiteUrl}/g)?.length).toBe(
+      1,
+    );
+    expect(
+      marketplaceBlueprintDetailPageSource.match(/href={listing\.documentationUrl}/g)?.length,
+    ).toBe(1);
+    expect(marketplaceBlueprintDetailPageSource).toContain(
+      'class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_21rem]"',
+    );
+    expect(marketplaceBlueprintDetailPageSource).toContain(
+      'class="order-2 min-w-0 space-y-5 xl:order-1"',
+    );
+    expect(marketplaceBlueprintDetailPageSource).toContain(
+      'class="order-1 min-w-0 space-y-5 xl:order-2 xl:sticky xl:top-20 xl:self-start"',
+    );
+    expect(marketplaceBlueprintDetailPageSource).not.toContain("detailCopy.backToMarketplace");
+    expect(
+      marketplaceBlueprintDetailPageSource.indexOf("data-blueprint-variant-display-surface"),
+    ).toBeLessThan(marketplaceBlueprintDetailPageSource.indexOf("data-blueprint-overview-summary"));
+    expect(
+      marketplaceBlueprintDetailPageSource.indexOf("data-blueprint-overview-summary"),
+    ).toBeLessThan(marketplaceBlueprintDetailPageSource.indexOf("data-blueprint-topology"));
+    expect(marketplaceBlueprintDetailPageSource.indexOf("data-blueprint-topology")).toBeLessThan(
+      marketplaceBlueprintDetailPageSource.indexOf("data-blueprint-configuration-summary"),
+    );
   });
 
   test("[BLUEPRINT-INSTALL-IA-002] presents install completion as a handoff, not a progress dump", () => {
@@ -2938,7 +2978,7 @@ describe("console page structure", () => {
 
     const installHandoffSource =
       marketplaceBlueprintDetailPageSource.match(
-        /data-blueprint-install-handoff[\s\S]*?<Button href="\/marketplace"/,
+        /data-blueprint-install-handoff[\s\S]*?<\/aside>/,
       )?.[0] ?? "";
 
     expect(installHandoffSource).toContain("installHandoffTitle(installResult.progress)");
