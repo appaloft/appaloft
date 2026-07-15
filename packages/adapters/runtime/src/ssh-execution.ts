@@ -65,7 +65,10 @@ import {
   parseDockerPublishedHostPort,
   appaloftDockerContainerLabelsForDeployment,
 } from "./docker-container-commands";
-import { waitForComposeDeploymentContainers } from "./compose-deployment-verification";
+import {
+  composeContainerVerificationWaitOptions,
+  waitForComposeDeploymentContainers,
+} from "./compose-deployment-verification";
 import {
   requireServerBackedDeploymentState,
   requireServerBackedDeploymentStateFromState,
@@ -3876,12 +3879,14 @@ export class SshExecutionBackend implements ExecutionBackend {
       }
 
       const healthOptions = httpHealthCheckOptions(state.runtimePlan.execution);
+      const containerVerificationWait = composeContainerVerificationWaitOptions(
+        state.runtimePlan.execution.healthCheck,
+      );
       const containerVerification = await waitForComposeDeploymentContainers({
         deploymentId: state.id.value,
         ...(targetServiceName ? { targetServiceName } : {}),
         quote: shellQuote,
-        attempts: healthOptions?.retries ?? 1,
-        intervalMs: healthOptions?.intervalMs ?? 0,
+        ...containerVerificationWait,
         run: (command) =>
           this.runRemoteCommand({
             target,
