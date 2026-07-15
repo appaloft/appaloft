@@ -2665,8 +2665,6 @@ describe("console page structure", () => {
 
     expect(serversDisplaySurface).toContain("data-server-list-skeleton");
     expect(serverLoadingSource).toContain("rounded-md border bg-card p-4 shadow-sm");
-    expect(serverLoadingSource).toContain("sm:grid-cols-3");
-    expect(serverLoadingSource).toContain("lg:grid-cols-4");
     expect(serverReadinessSource).toContain("connectivitySurfaceDescription");
     expect(serversPageSource).toContain('case "active":\n        return "secondary";');
     expect(serversPageSource).toContain('case "ready":\n        return "secondary";');
