@@ -34,7 +34,10 @@
 				aria-hidden="true"
 				inert
 			>
-				<div data-data-skeleton-fallback-content="true" style="opacity:0">
+				<div
+					data-data-skeleton-fallback-content="true"
+					style="opacity:0;visibility:hidden"
+				>
 					{@render capture()}
 				</div>
 			</div>

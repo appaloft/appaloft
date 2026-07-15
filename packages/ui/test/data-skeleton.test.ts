@@ -11,7 +11,7 @@ describe("DataSkeleton", () => {
     expect(body).toContain("Capture placeholder");
     expect(body).not.toContain("Loaded value");
     expect(body).toContain('data-data-skeleton-fallback-content="true"');
-    expect(body).toContain("opacity:0");
+    expect(body).toContain('style="opacity:0;visibility:hidden"');
   });
 
   test("[UI-DATA-SKELETON-002] applies the configured fallback shape when capture content exists", () => {
