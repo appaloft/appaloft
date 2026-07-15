@@ -1344,19 +1344,39 @@
   {#if pageLoading}
 <div class="min-h-[32rem] space-y-4 p-4" aria-hidden="true" data-deployment-detail-loading-skeleton>
         <div class="space-y-2">
-          <h1 class="text-2xl font-semibold">Deployment source</h1>
-          <p class="text-sm text-muted-foreground">Attempt snapshot for skeleton capture.</p>
+          <ConsoleDataSkeleton name="deployment-detail-title" loading={true} class="block">
+            {#snippet capture()}
+              <h1 class="text-2xl font-semibold">Deployment source</h1>
+            {/snippet}
+            <h1 class="text-2xl font-semibold">Deployment source</h1>
+          </ConsoleDataSkeleton>
+          <ConsoleDataSkeleton name="deployment-detail-description" loading={true} class="block">
+            {#snippet capture()}
+              <p class="text-sm text-muted-foreground">Attempt snapshot for skeleton capture.</p>
+            {/snippet}
+            <p class="text-sm text-muted-foreground">Attempt snapshot for skeleton capture.</p>
+          </ConsoleDataSkeleton>
         </div>
         <div class="grid gap-3 md:grid-cols-4">
-          {#each ["Project", "Environment", "Resource", "Server"] as label (label)}
+          {#each ["Project", "Environment", "Resource", "Server"] as label, index (label)}
             <div class="console-subtle-panel px-3 py-2 text-sm">
               <p class="text-xs text-muted-foreground">{label}</p>
-              <p class="mt-1 font-medium">Sample</p>
+              <ConsoleDataSkeleton name={`deployment-detail-context-${index}`} loading={true} class="mt-1 block">
+                {#snippet capture()}
+                  <p class="font-medium">Sample</p>
+                {/snippet}
+                <p class="font-medium">Sample</p>
+              </ConsoleDataSkeleton>
             </div>
           {/each}
         </div>
         <div class="rounded-md border bg-card p-4 text-sm text-muted-foreground">
-          Access and observation panels
+          <ConsoleDataSkeleton name="deployment-detail-content" loading={true} class="block w-full" fallbackClass="block min-h-40 w-full animate-pulse rounded-md bg-muted/50">
+            {#snippet capture()}
+              <p>Access and observation panels</p>
+            {/snippet}
+            <p>Access and observation panels</p>
+          </ConsoleDataSkeleton>
         </div>
       </div>
     {:else if !deployment}

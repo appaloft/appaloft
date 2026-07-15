@@ -19,6 +19,7 @@
   import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
 
   import { readErrorMessage, request } from "$lib/api/client";
+  import ConsoleDataSkeleton from "$lib/components/console/ConsoleDataSkeleton.svelte";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
@@ -380,14 +381,29 @@
   {breadcrumbs}
 >
   {#if installedApplicationQuery.isPending}
-<div class="space-y-5 p-4 md:p-6">
+<div class="space-y-5 p-4 md:p-6" data-installed-application-detail-loading-skeleton>
         <header class="space-y-2">
-          <h1 class="text-2xl font-semibold">Sample Application</h1>
-          <p class="text-sm text-muted-foreground">Installed application detail</p>
+          <ConsoleDataSkeleton name="installed-application-detail-title" loading={true} class="block">
+            {#snippet capture()}
+              <h1 class="text-2xl font-semibold">Sample Application</h1>
+            {/snippet}
+            <h1 class="text-2xl font-semibold">Sample Application</h1>
+          </ConsoleDataSkeleton>
+          <ConsoleDataSkeleton name="installed-application-detail-description" loading={true} class="block">
+            {#snippet capture()}
+              <p class="text-sm text-muted-foreground">Installed application detail</p>
+            {/snippet}
+            <p class="text-sm text-muted-foreground">Installed application detail</p>
+          </ConsoleDataSkeleton>
         </header>
         <section class="console-panel space-y-3 p-5">
           <h2 class="text-lg font-semibold">Overview</h2>
-          <p class="text-sm text-muted-foreground">running · marketplace install</p>
+          <ConsoleDataSkeleton name="installed-application-detail-overview" loading={true} class="block">
+            {#snippet capture()}
+              <p class="text-sm text-muted-foreground">running · marketplace install</p>
+            {/snippet}
+            <p class="text-sm text-muted-foreground">running · marketplace install</p>
+          </ConsoleDataSkeleton>
         </section>
       </div>
     {:else if installedApplicationQuery.error || !installedApplication}

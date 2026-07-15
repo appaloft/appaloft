@@ -24,6 +24,7 @@
   } from "@appaloft/contracts";
 
   import { readErrorMessage } from "$lib/api/client";
+  import ConsoleDataSkeleton from "$lib/components/console/ConsoleDataSkeleton.svelte";
   import ConsoleResourceCanvas from "$lib/components/console/ConsoleResourceCanvas.svelte";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
@@ -504,14 +505,29 @@
   description={$t(i18nKeys.console.domainBindings.pageDescription)}
 >
   {#if pageLoading}
-<div class="space-y-5">
+<div class="space-y-5" data-domain-binding-detail-loading-skeleton>
         <header class="space-y-2">
-          <h1 class="text-2xl font-semibold">app.example.com</h1>
-          <p class="text-sm text-muted-foreground">Domain binding detail</p>
+          <ConsoleDataSkeleton name="domain-binding-detail-title" loading={true} class="block">
+            {#snippet capture()}
+              <h1 class="text-2xl font-semibold">app.example.com</h1>
+            {/snippet}
+            <h1 class="text-2xl font-semibold">app.example.com</h1>
+          </ConsoleDataSkeleton>
+          <ConsoleDataSkeleton name="domain-binding-detail-description" loading={true} class="block">
+            {#snippet capture()}
+              <p class="text-sm text-muted-foreground">Domain binding detail</p>
+            {/snippet}
+            <p class="text-sm text-muted-foreground">Domain binding detail</p>
+          </ConsoleDataSkeleton>
         </header>
         <section class="console-panel space-y-3 p-5">
           <h2 class="text-lg font-semibold">Overview</h2>
-          <p class="text-sm text-muted-foreground">pending_verification · path / · edge</p>
+          <ConsoleDataSkeleton name="domain-binding-detail-overview" loading={true} class="block">
+            {#snippet capture()}
+              <p class="text-sm text-muted-foreground">pending_verification · path / · edge</p>
+            {/snippet}
+            <p class="text-sm text-muted-foreground">pending_verification · path / · edge</p>
+          </ConsoleDataSkeleton>
         </section>
       </div>
     {:else if !selectedDomainBinding}
