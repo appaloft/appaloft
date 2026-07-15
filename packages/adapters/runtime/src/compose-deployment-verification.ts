@@ -10,6 +10,18 @@ export interface ComposeVerificationCommandResult {
   stderr: string;
 }
 
+export function composeContainerVerificationWaitOptions(
+  policy?: {
+    intervalSeconds: { value: number };
+    retries: { value: number };
+  },
+): { attempts: number; intervalMs: number } {
+  return {
+    attempts: Math.max(1, policy?.retries.value ?? 40),
+    intervalMs: Math.max(0, policy?.intervalSeconds.value ?? 0.25) * 1_000,
+  };
+}
+
 export async function waitForComposeDeploymentContainers(input: {
   deploymentId: string;
   targetServiceName?: string;
