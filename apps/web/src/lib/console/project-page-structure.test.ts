@@ -209,7 +209,7 @@ describe("project detail page structure", () => {
     expect(projectSource).not.toContain("failedProjectBlueprintInstallItems");
     expect(projectSource).toContain("DropdownMenuContent");
     expect(projectSource).toContain("projectAttentionStatusLabel");
-    expect(projectSource).toContain("key: `operator-work-${work.id}`");
+    expect(projectSource).toContain("key: `operator-work-$" + "{work.id}`");
     expect(projectSource).toContain("{#each projectAttentionItems as item (item.key)}");
     expect(projectSource).not.toContain("work.id, work.step");
     expect(projectSource).not.toContain("item.href ?? item.resourceId ?? item.title");

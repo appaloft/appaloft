@@ -319,7 +319,9 @@
   [data-slot="sidebar-wrapper"] :where([data-slot^="sidebar"], [data-sidebar]) *,
   [data-slot="sidebar-wrapper"] :where([data-slot^="sidebar"], [data-sidebar])::before,
   [data-slot="sidebar-wrapper"] :where([data-slot^="sidebar"], [data-sidebar])::after {
+    /* biome-ignore lint/complexity/noImportantStyles: these resets must win over component transitions */
     animation: none !important;
+    /* biome-ignore lint/complexity/noImportantStyles: these resets must win over component transitions */
     transition: none !important;
   }
 
@@ -327,18 +329,23 @@
   [data-sidebar="menu-button"] *,
   [data-sidebar="menu-sub-button"],
   [data-sidebar="menu-sub-button"] * {
+    /* biome-ignore lint/complexity/noImportantStyles: these resets must win over component transitions */
     transition: none !important;
   }
 
   [data-sidebar="menu-button"]::before,
   [data-sidebar="menu-sub-button"]::before {
+    /* biome-ignore lint/complexity/noImportantStyles: these resets must win over component transitions */
     transition: none !important;
   }
 
   [data-slot="sidebar-inset"] {
+    /* biome-ignore lint/complexity/noImportantStyles: layout reset must win over component defaults */
     margin: 0 !important;
+    /* biome-ignore lint/complexity/noImportantStyles: layout reset must win over component defaults */
     border-radius: 0 !important;
     background: transparent;
+    /* biome-ignore lint/complexity/noImportantStyles: layout reset must win over component defaults */
     box-shadow: none !important;
   }
 
