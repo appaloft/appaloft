@@ -1931,7 +1931,12 @@
             <h2 class="text-lg font-semibold">{$t(i18nKeys.console.projects.resourcesTitle)}</h2>
             {#each Array.from({ length: 2 }) as _, groupIndex (groupIndex)}
               <section class="space-y-2">
-                <p class="text-sm font-medium">Environment {groupIndex + 1}</p>
+                <ConsoleDataSkeleton name={`detail-environment-${groupIndex}`} loading={true} class="block">
+                  {#snippet capture()}
+                    <p class="text-sm font-medium">Environment {groupIndex + 1}</p>
+                  {/snippet}
+                  <p class="text-sm font-medium">Environment {groupIndex + 1}</p>
+                </ConsoleDataSkeleton>
                 <div class="console-record-list">
                   {#each Array.from({ length: 2 }) as _, rowIndex (rowIndex)}
                     <div class="console-record-row text-sm">

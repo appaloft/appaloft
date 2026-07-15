@@ -5,6 +5,7 @@
   import type { DomainBindingSummary } from "@appaloft/contracts";
 
   import ConsoleEmptyState from "$lib/components/console/ConsoleEmptyState.svelte";
+  import ConsoleDataSkeleton from "$lib/components/console/ConsoleDataSkeleton.svelte";
   import ConsoleResourceCanvas from "$lib/components/console/ConsoleResourceCanvas.svelte";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import DomainBindingVerifyDnsButton from "$lib/components/console/DomainBindingVerifyDnsButton.svelte";
@@ -160,14 +161,29 @@
               <div class="block min-w-0 space-y-3 p-4">
                 <div class="flex min-w-0 flex-wrap items-center gap-2">
                   <Globe2 class="size-4 shrink-0 text-muted-foreground" />
-                  <h3 class="truncate font-medium">app.example.com</h3>
-                  <Badge variant="secondary">pending_verification</Badge>
+                  <ConsoleDataSkeleton name="domain-binding-list-domain" loading={true} class="block min-w-40">
+                    {#snippet capture()}
+                      <h3 class="truncate font-medium">app.example.com</h3>
+                    {/snippet}
+                    <h3 class="truncate font-medium">app.example.com</h3>
+                  </ConsoleDataSkeleton>
+                  <ConsoleDataSkeleton name="domain-binding-list-status" loading={true} class="block">
+                    {#snippet capture()}
+                      <Badge variant="secondary">pending_verification</Badge>
+                    {/snippet}
+                    <Badge variant="secondary">pending_verification</Badge>
+                  </ConsoleDataSkeleton>
                 </div>
                 <div class="grid gap-2 text-xs text-muted-foreground md:grid-cols-3">
-                  {#each ["Project", "Environment", "Resource"] as label (label)}
+                  {#each ["Project", "Environment", "Resource"] as label, index (label)}
                     <div class="rounded-md border border-border/60 bg-muted/20 px-3 py-2">
                       <p class="uppercase tracking-wide">{label}</p>
-                      <p class="mt-1 truncate font-medium text-foreground">Sample</p>
+                      <ConsoleDataSkeleton name={`domain-binding-list-context-${index}`} loading={true} class="mt-1 block">
+                        {#snippet capture()}
+                          <p class="truncate font-medium text-foreground">Sample</p>
+                        {/snippet}
+                        <p class="truncate font-medium text-foreground">Sample</p>
+                      </ConsoleDataSkeleton>
                     </div>
                   {/each}
                 </div>
