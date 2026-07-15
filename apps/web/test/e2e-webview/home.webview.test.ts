@@ -3634,6 +3634,21 @@ async function expectElement(
   );
 }
 
+async function expectResourceOwnerNavigation(view: Bun.WebView): Promise<void> {
+  await waitFor(
+    () =>
+      view.evaluate<boolean>(`(() => {
+        const resourcePath = ${JSON.stringify(demoResourcePath)};
+        const resourceLinks = Array.from(document.querySelectorAll("a"))
+          .map((anchor) => new URL(anchor.href).pathname + new URL(anchor.href).search);
+        return ["settings", "dependencies", "configuration", "logs", "terminal"]
+          .every((tab) => resourceLinks.includes(resourcePath + "?tab=" + tab));
+      })()`),
+    Boolean,
+    "Expected resource owner navigation to finish rendering",
+  );
+}
+
 async function hasElement(view: Bun.WebView, selector: string): Promise<boolean> {
   return view.evaluate<boolean>(`Boolean(document.querySelector(${JSON.stringify(selector)}))`);
 }
@@ -4859,7 +4874,11 @@ describe.serial("console e2e with Bun.WebView", () => {
 
     await using mobileView = createWebView({ width: 390, height: 844 });
     await mobileView.navigate(`${previewUrl}/servers`);
-    await expectText(mobileView, "edge");
+    await waitFor(
+      () => mobileView.evaluate<number>(`document.querySelectorAll('[data-server-row]').length`),
+      (count) => count === 12,
+      "Expected paginated server rows to finish rendering on mobile",
+    );
     const mobileLayout = JSON.parse(
       await mobileView.evaluate<string>(`(() => {
         const rows = Array.from(document.querySelectorAll('[data-server-row]'));
@@ -6028,6 +6047,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     await using view = createWebView();
     await view.navigate(`${previewUrl}${demoResourcePath}`);
     await expectAnyText(view, ["Resource overview", "资源概览"]);
+    await expectResourceOwnerNavigation(view);
     const resourceNavigationState = JSON.parse(
       await view.evaluate<string>(`JSON.stringify((() => {
         const demoResourcePath = ${JSON.stringify(demoResourcePath)};
@@ -6128,6 +6148,7 @@ describe.serial("console e2e with Bun.WebView", () => {
     await using mobileView = createWebView({ width: 390, height: 900 });
     await mobileView.navigate(`${previewUrl}${demoResourcePath}`);
     await expectAnyText(mobileView, ["Resource overview", "资源概览"]);
+    await expectResourceOwnerNavigation(mobileView);
     const mobileNavigationState = JSON.parse(
       await mobileView.evaluate<string>(`JSON.stringify((() => {
         const demoResourcePath = ${JSON.stringify(demoResourcePath)};
