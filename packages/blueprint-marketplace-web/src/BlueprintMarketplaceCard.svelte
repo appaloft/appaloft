@@ -78,8 +78,9 @@
 
   let iconFailed = $state(false);
 
+  const showCover = $derived(density === "default");
   const cardClass = $derived(cn(
-    "min-w-0 border-border/90 bg-card/95 py-0 text-card-foreground shadow-[0_18px_48px_rgba(20,31,47,0.07)] transition-colors hover:border-ring/35",
+    "relative min-w-0 overflow-hidden border-border/90 bg-card/95 py-0 text-card-foreground shadow-[0_18px_48px_rgba(20,31,47,0.07)] transition-colors hover:border-ring/35",
     "data-[density=default]:min-h-[300px] data-[density=compact]:min-h-[178px] data-[density=mini]:min-h-[158px]",
     detailHref && "cursor-pointer",
     selected && "border-ring/50 ring-1 ring-ring/20",
@@ -141,6 +142,48 @@
       : undefined;
   }
 
+  function normalizeCoverHex(value: string | undefined): string | undefined {
+    if (!value) {
+      return undefined;
+    }
+    const trimmed = value.trim();
+    if (/^#[0-9A-Fa-f]{6}$/.test(trimmed)) {
+      return trimmed.toLowerCase();
+    }
+    if (/^#[0-9A-Fa-f]{3}$/.test(trimmed)) {
+      const [, r, g, b] = trimmed;
+      return `#${r}${r}${g}${g}${b}${b}`.toLowerCase();
+    }
+    if (/^[0-9A-Fa-f]{6}$/.test(trimmed)) {
+      return `#${trimmed.toLowerCase()}`;
+    }
+    return undefined;
+  }
+
+  function coverTone(): string {
+    const explicit = normalizeCoverHex(item.icon?.tone);
+    if (explicit) {
+      return explicit;
+    }
+    const fromUrl = item.icon?.url?.match(/cdn\.simpleicons\.org\/[^/?#]+\/([0-9A-Fa-f]{3,8})/i)?.[1];
+    const parsed = normalizeCoverHex(fromUrl);
+    if (parsed) {
+      return parsed;
+    }
+    return "#4e84ff";
+  }
+
+  function coverStyle(): string {
+    const tone = coverTone();
+    const raw = tone.replace("#", "");
+    const r = Number.parseInt(raw.slice(0, 2), 16);
+    const g = Number.parseInt(raw.slice(2, 4), 16);
+    const b = Number.parseInt(raw.slice(4, 6), 16);
+    const deep = `rgb(${Math.max(r - 40, 10)}, ${Math.max(g - 36, 14)}, ${Math.max(b - 24, 28)})`;
+    const soft = `rgb(${Math.min(r + 28, 255)}, ${Math.min(g + 32, 255)}, ${Math.min(b + 36, 255)})`;
+    return `background: radial-gradient(ellipse 90% 80% at 20% 20%, rgba(255,255,255,0.28), transparent 55%), linear-gradient(135deg, ${soft} 0%, ${tone} 48%, ${deep} 100%);`;
+  }
+
   function handlePrimaryAction(event: MouseEvent): void {
     onprimaryaction?.(event, item);
   }
@@ -165,35 +208,70 @@
   data-marketplace-search-text={searchText}
   data-density={density}
 >
-  <CardContent class={contentClass}>
-    {#if detailHref}
-      <a
-        class="absolute inset-0 z-10 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-        href={detailHref}
-        aria-label={detailLinkLabel()}
-        data-blueprint-marketplace-detail-link
-      ></a>
-    {/if}
-    <div class="flex min-w-0 items-start justify-between gap-3">
-      <div class={cn("grid min-w-0 gap-3", isCompact ? "grid-cols-[2.5rem_minmax(0,1fr)]" : "grid-cols-[2.75rem_minmax(0,1fr)]")}>
-        <div class={iconClass} style={iconFallbackStyle()}>
+  {#if detailHref}
+    <a
+      class="absolute inset-0 z-10 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      href={detailHref}
+      aria-label={detailLinkLabel()}
+      data-blueprint-marketplace-detail-link
+    ></a>
+  {/if}
+
+  {#if showCover}
+    <div
+      class="relative h-[104px] overflow-hidden border-b border-border/40"
+      style={coverStyle()}
+      data-blueprint-marketplace-cover
+      aria-hidden="true"
+    >
+      <div
+        class="pointer-events-none absolute inset-0 opacity-20"
+        style="background-image:linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px),linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px);background-size:22px 22px;"
+      ></div>
+      <div class="relative flex h-full items-center justify-center">
+        <div class="grid size-14 place-items-center rounded-xl border border-white/55 bg-white/95 shadow-md">
           {#if item.icon?.url && !iconFailed}
             <img
-              class={cn("object-contain", isCompact ? "size-6" : "size-7")}
+              class="size-8 object-contain"
               src={item.icon.url}
-              alt={item.icon.alt ?? `${item.title} icon`}
+              alt=""
               loading="lazy"
               decoding="async"
               onerror={() => {
                 iconFailed = true;
               }}
             />
-          {:else if iconLabel()}
-            <span>{iconLabel()}</span>
           {:else}
-            <span aria-hidden="true">□</span>
+            <span class="text-sm font-black uppercase text-foreground">{iconLabel()}</span>
           {/if}
         </div>
+      </div>
+    </div>
+  {/if}
+
+  <CardContent class={contentClass}>
+    <div class="flex min-w-0 items-start justify-between gap-3">
+      <div class={cn("grid min-w-0 gap-3", showCover ? "grid-cols-1" : isCompact ? "grid-cols-[2.5rem_minmax(0,1fr)]" : "grid-cols-[2.75rem_minmax(0,1fr)]")}>
+        {#if !showCover}
+          <div class={iconClass} style={iconFallbackStyle()}>
+            {#if item.icon?.url && !iconFailed}
+              <img
+                class={cn("object-contain", isCompact ? "size-6" : "size-7")}
+                src={item.icon.url}
+                alt={item.icon.alt ?? `${item.title} icon`}
+                loading="lazy"
+                decoding="async"
+                onerror={() => {
+                  iconFailed = true;
+                }}
+              />
+            {:else if iconLabel()}
+              <span>{iconLabel()}</span>
+            {:else}
+              <span aria-hidden="true">□</span>
+            {/if}
+          </div>
+        {/if}
         <div class="min-w-0">
           <h3 class={cn("truncate font-semibold leading-snug text-foreground", isCompact ? "text-base" : "text-lg")}>{item.title}</h3>
           <p class={cn("mt-1 line-clamp-2 text-muted-foreground", isCompact ? "text-sm leading-6" : "text-sm leading-6")}>{item.subtitle}</p>
@@ -256,7 +334,7 @@
 
   {#if showFooter}
     <CardFooter
-      class={cn("flex min-w-0 items-center justify-end gap-2 border-t px-4 py-3", isCompact && "px-3 py-2.5")}
+      class={cn("relative z-20 flex min-w-0 items-center justify-end gap-2 border-t px-4 py-3", isCompact && "px-3 py-2.5")}
     >
       <div class={cn("flex shrink-0 items-center gap-2", isCompact && "min-w-0 flex-wrap justify-end")}>
         {#if item.websiteUrl}
