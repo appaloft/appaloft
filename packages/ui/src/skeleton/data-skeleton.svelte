@@ -2,7 +2,7 @@
 	/**
 	 * Granular boneyard wrapper for data-bound UI cells.
 	 * Wrap values (numbers, titles, rows), not whole pages.
-	 * `capture` is used for bone capture and as muted fallback until bones exist.
+	 * `capture` is used for bone capture and preserves fallback layout until bones exist.
 	 */
 	import type { Snippet } from "svelte";
 	import Skeleton from "boneyard-js/svelte";
@@ -20,7 +20,7 @@
 		name,
 		loading,
 		class: className = "",
-		fallbackClass = "inline-block min-h-[1em] min-w-[2ch] animate-pulse rounded bg-muted/70",
+		fallbackClass,
 		children,
 		capture,
 	}: Props = $props();
@@ -29,11 +29,23 @@
 <Skeleton {name} {loading} animate="pulse" transition class={className}>
 	{#snippet fallback()}
 		{#if capture}
-			<div class="animate-pulse rounded bg-muted/50 text-transparent select-none" aria-hidden="true">
-				{@render capture()}
+			<div
+				class={[fallbackClass ?? "animate-pulse rounded bg-muted/50", "select-none"]}
+				aria-hidden="true"
+				inert
+			>
+				<div
+					data-data-skeleton-fallback-content="true"
+					style="opacity:0;visibility:hidden"
+				>
+					{@render capture()}
+				</div>
 			</div>
 		{:else}
-			<span class={fallbackClass} aria-hidden="true"></span>
+			<span
+				class={fallbackClass ?? "inline-block min-h-[1em] min-w-[2ch] animate-pulse rounded bg-muted/70"}
+				aria-hidden="true"
+			></span>
 		{/if}
 	{/snippet}
 	{#snippet fixture()}
