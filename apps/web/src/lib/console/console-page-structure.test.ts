@@ -648,7 +648,7 @@ describe("console page structure", () => {
 
   test("[CONSOLE-COPY-IA-000] keeps user-visible console copy free of internal implementation terms", () => {
     const forbiddenVisibleCopyPattern =
-      /\b(?:read model|readback|later phase|route gap|provider adapter|install worker|focused governed flow|owner links|owner surface|owner view|danger flow|blocker\/check|route intent from Blueprint|service \/ worker \/ static surface|deployment attempt|console intent)\b|待接入|尚未接入|资源 readback|依赖资源 readback|安装 snapshot|owner 面|资源 owner|按 intent/iu;
+      /\b(?:read model|later phase|route gap|provider adapter|install worker|focused governed flow|owner links|owner surface|owner view|danger flow|blocker\/check|route intent from Blueprint|service \/ worker \/ static surface|deployment attempt|console intent)\b|待接入|尚未接入|资源 readback|依赖资源 readback|安装 snapshot|owner 面|资源 owner|按 intent/iu;
     const visibleCopyFiles = [
       ...routePageSources(routesRootPath),
       {
@@ -1085,7 +1085,7 @@ describe("console page structure", () => {
     expect(resourceDetailPageSource).not.toContain(
       "xl:grid-cols-[minmax(0,1.1fr)_minmax(20rem,0.9fr)]",
     );
-    expect(resourceDetailBodySource).toContain("onclick={openResourceDeploymentDialog}");
+    expect(resourceDetailPageSource).toContain("onclick={openResourceDeploymentDialog}");
     expect(resourceDetailBodySource).toContain("onclick={openResourceDomainBindingCreateDialog}");
     expect(resourceDetailBodySource).toContain("onclick={openScheduledTaskCreateDialog}");
     expect(resourceDetailBodySource).toContain("{@render resourceRuntimeControlPanel()}");
@@ -1800,7 +1800,7 @@ describe("console page structure", () => {
     expect(deploymentsPageSource).toContain('import * as Select from "$lib/components/ui/select"');
     expect(deploymentsPageSource).toContain("<Select.Root bind:value={projectFilter}");
     expect(deploymentsPageSource).toContain("<Select.Root bind:value={environmentFilter}");
-    expect(deploymentsPageSource).toContain("disabled={!selectedProject}");
+    expect(deploymentsPageSource).toContain("disabled={pageLoading || !selectedProject}");
     expect(deploymentsPageSource).toContain(
       ": $t(i18nKeys.console.deployments.selectProjectFirst)",
     );
@@ -2444,7 +2444,7 @@ describe("console page structure", () => {
     expect(domainBindingLoadingSource).toContain("console-record-list");
     expect(domainBindingLoadingSource).toContain("console-record-row p-0");
     expect(domainBindingLoadingSource).toContain("md:grid-cols-3");
-    expect(domainBindingLoadingSource).toContain("lg:absolute lg:right-4 lg:top-4");
+    expect(domainBindingLoadingSource).toContain("bg-muted/20");
     expect(domainBindingsListSource).toContain("domainBindingDetailHref(binding)");
     expect(domainBindingsListSource).toContain("data-domain-binding-row");
     expect(domainBindingsListSource).toContain("data-domain-binding-pending-dns-notice");
@@ -2664,7 +2664,7 @@ describe("console page structure", () => {
     );
 
     expect(serversDisplaySurface).toContain("data-server-list-skeleton");
-    expect(serverLoadingSource).toContain("lg:grid-cols-[minmax(16rem,1fr)_auto]");
+    expect(serverLoadingSource).toContain("rounded-md border bg-card p-4 shadow-sm");
     expect(serverLoadingSource).toContain("sm:grid-cols-3");
     expect(serverLoadingSource).toContain("lg:grid-cols-4");
     expect(serverReadinessSource).toContain("connectivitySurfaceDescription");

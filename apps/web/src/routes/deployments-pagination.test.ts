@@ -36,7 +36,7 @@ describe("deployments page pagination surface", () => {
       "selectedProject\n        ? $t(i18nKeys.console.deployments.filterAllResources)\n        : $t(i18nKeys.console.deployments.selectProjectFirst)",
     );
     expect(pageSource).toContain(
-      '<Select.Root bind:value={resourceFilter} disabled={!selectedProject} type="single">',
+      '<Select.Root bind:value={resourceFilter} disabled={pageLoading || !selectedProject} type="single">',
     );
   });
 });
