@@ -178,7 +178,7 @@ describe("runtime command builder", () => {
     );
   });
 
-  test("renders portable Compose up for SSH targets with Docker Compose v1 fallback", () => {
+  test("[DEP-CREATE-ASYNC-004A] fails safely when an SSH target only has legacy Compose v1", () => {
     const spec = RuntimeCommandBuilder.docker().composeUp({
       composeFile: "/srv/app/docker-compose.yml",
       additionalComposeFiles: ["/srv/app/.appaloft.compose.labels.override.yml"],
@@ -197,9 +197,27 @@ describe("runtime command builder", () => {
       "docker-compose -f '/srv/app/docker-compose.yml' config --services >/dev/null 2>&1",
     );
     expect(command).toContain(
+      "Appaloft safe Compose deployment requires the supported docker compose v2/v5 CLI",
+    );
+    expect(command).not.toContain("appaloft_docker_compose_cmd='docker-compose'");
+    expect(command).toContain(
       "$appaloft_docker_compose_cmd -p 'preview-123-dep-1' -f '/srv/app/docker-compose.yml'",
     );
     expect(command).toContain("--scale 'worker=4'");
+  });
+
+  test("[DEP-CREATE-ASYNC-004A] pre-pulls Compose service images before build and up", () => {
+    const spec = RuntimeCommandBuilder.docker().composeUp({
+      composeFile: "/srv/app/docker-compose.yml",
+      additionalComposeFiles: ["/srv/app/.appaloft.compose.labels.override.yml"],
+      projectName: "preview-123-dep-1",
+      workingDirectory: "/srv/app",
+      pull: true,
+    });
+
+    expect(renderRuntimeCommandString(spec, { quote: shellQuote })).toBe(
+      "cd '/srv/app' && docker compose -p 'preview-123-dep-1' -f '/srv/app/docker-compose.yml' -f '/srv/app/.appaloft.compose.labels.override.yml' pull --ignore-buildable && docker compose -p 'preview-123-dep-1' -f '/srv/app/docker-compose.yml' -f '/srv/app/.appaloft.compose.labels.override.yml' build --pull && docker compose -p 'preview-123-dep-1' -f '/srv/app/docker-compose.yml' -f '/srv/app/.appaloft.compose.labels.override.yml' up -d --build",
+    );
   });
 
   test("[DEP-FORCE-REDEPLOY-003] renders forced Compose builds before compose up", () => {
@@ -213,7 +231,7 @@ describe("runtime command builder", () => {
     });
 
     expect(renderRuntimeCommandString(spec, { quote: shellQuote })).toBe(
-      "cd '/srv/app' && docker compose -p 'preview-123-dep-1' -f '/srv/app/docker-compose.yml' -f '/srv/app/.appaloft.compose.labels.override.yml' build --pull --no-cache && docker compose -p 'preview-123-dep-1' -f '/srv/app/docker-compose.yml' -f '/srv/app/.appaloft.compose.labels.override.yml' up -d --build",
+      "cd '/srv/app' && docker compose -p 'preview-123-dep-1' -f '/srv/app/docker-compose.yml' -f '/srv/app/.appaloft.compose.labels.override.yml' pull --ignore-buildable && docker compose -p 'preview-123-dep-1' -f '/srv/app/docker-compose.yml' -f '/srv/app/.appaloft.compose.labels.override.yml' build --pull --no-cache && docker compose -p 'preview-123-dep-1' -f '/srv/app/docker-compose.yml' -f '/srv/app/.appaloft.compose.labels.override.yml' up -d --build",
     );
   });
 });

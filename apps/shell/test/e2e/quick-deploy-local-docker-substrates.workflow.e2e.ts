@@ -48,6 +48,7 @@ describe("quick deploy local Docker substrate e2e", () => {
       appVersion: "0.1.0-quick-deploy-local-docker-substrates-e2e",
       env: {
         APPALOFT_COMPOSE_SMOKE_IMAGE: prebuiltImage,
+        APPALOFT_COMPOSE_SMOKE_PULL_POLICY: "never",
       },
     });
     const dockerfilePort = await reservePort();
@@ -212,11 +213,14 @@ describe("quick deploy local Docker substrate e2e", () => {
       const composeTimeline = await waitForDeploymentTimeline(
         composeDeploymentId,
         workspace.cliOptions,
-        ["Using local docker-compose-stack execution", "Compose stack started successfully"],
+        [
+          "Using local docker-compose-stack execution",
+          "Compose stack passed deployment verification",
+        ],
         { label: "Docker Compose deployment" },
       );
       expect(composeTimeline.stdout).toContain("Using local docker-compose-stack execution");
-      expect(composeTimeline.stdout).toContain("Compose stack started successfully");
+      expect(composeTimeline.stdout).toContain("Compose stack passed deployment verification");
       expect(composeTimeline.stdout).toContain("docker-compose.yml");
       expect(composeTimeline.stdout).toContain(fixturePath("docker-compose-hello"));
 

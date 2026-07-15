@@ -59,11 +59,15 @@ Execute builds, uploads, starts, and routes the application in the selected targ
 
 Execution failures often involve network, credentials, image pulls, build commands, server resources, or runtime backend behavior. Inspect logs and diagnostics before changing domains.
 
+Compose updates run an image preflight before starting the candidate project: pull image-backed services, build buildable services, then run the replacement. A failed preflight starts no candidate containers. Compose public routing also requires an explicit `targetServiceName`, so Appaloft applies proxy labels and the edge network only to that service.
+
 <h3 id="deployment-verify">Verify</h3>
 
 Verify checks process state, health policy, proxy routing, and access URLs.
 
 Verify failure does not always mean the process failed to start. It may be health path, listener port, proxy routing, or access URL observation.
+
+A successful `docker compose up` is not deployment success. Appaloft still checks that candidate containers exist and are running, that native Docker/Compose health has not failed, and that configured target-service HTTP and public-route checks pass. A failed candidate is cleaned up by deployment identity; it does not turn the previous successful runtime or route into a successful replacement.
 
 Use `appaloft deployments timeline <deploymentId> --follow --json` when you need a structured replay or live timeline stream after the original deploy command has disconnected. The stream can return entry, heartbeat, gap, closed, or error envelopes; a gap means re-open observation or inspect deployment detail before choosing recovery.
 
