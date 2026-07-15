@@ -33,7 +33,6 @@
   import * as Dialog from "$lib/components/ui/dialog";
   import { Input } from "$lib/components/ui/input";
   import * as Select from "$lib/components/ui/select";
-  import { Skeleton } from "$lib/components/ui/skeleton";
   import { webDocsHrefs } from "$lib/console/docs-help";
   import { createConsoleQueries } from "$lib/console/queries";
   import { canRunProductQueries } from "$lib/console/auth-query-gate";
@@ -528,12 +527,21 @@
   description={$t(i18nKeys.console.dependencyResources.pageDescription)}
 >
   {#if dependencyResourcesLoading}
-    <div class="space-y-5">
-      <Skeleton class="h-8 w-72" />
-      <Skeleton class="h-44 w-full" />
-      <Skeleton class="h-80 w-full" />
-    </div>
-  {:else if dependencyResourcesError}
+<div class="space-y-5">
+        <section class="space-y-2">
+          <h1 class="text-2xl font-semibold">Dependency resources</h1>
+          <p class="text-sm text-muted-foreground">Shared databases and services.</p>
+        </section>
+        <div class="console-record-list">
+          <article class="console-record-row">
+            <div class="min-w-0 space-y-1">
+              <h3 class="font-medium">postgres-main</h3>
+              <p class="text-xs text-muted-foreground">postgres · ready</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    {:else if dependencyResourcesError}
     <ConsoleStatePanel
       tone="error"
       title={$t(i18nKeys.errors.web.backendUnavailable)}
@@ -724,7 +732,7 @@
         </section>
       {/if}
     </ConsoleResourceCanvas>
-  {/if}
+    {/if}
 
   <Dialog.Root
     bind:open={dependencyResourceCreateDialogOpen}

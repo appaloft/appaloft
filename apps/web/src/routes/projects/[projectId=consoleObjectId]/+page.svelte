@@ -78,6 +78,7 @@
   } from "$lib/components/ui/dropdown-menu";
   import { Input } from "$lib/components/ui/input";
   import * as Select from "$lib/components/ui/select";
+  import ConsoleDataSkeleton from "$lib/components/console/ConsoleDataSkeleton.svelte";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import * as Tabs from "$lib/components/ui/tabs";
   import {
@@ -1878,193 +1879,6 @@
   <title>{project?.name ?? $t(i18nKeys.console.projects.pageTitle)} · Appaloft</title>
 </svelte:head>
 
-{#snippet projectDetailLoadingSkeleton()}
-  <div class={detailPageClass} data-project-detail-loading-skeleton>
-    <section class={detailHeaderClass}>
-      <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-        <div class="max-w-3xl space-y-3">
-          <div class="flex flex-wrap items-center gap-2">
-            <Badge variant="outline">{$t(i18nKeys.common.domain.project)}</Badge>
-            <Skeleton class="h-5 w-32 rounded-md" />
-            <Skeleton class="h-5 w-16 rounded-md" />
-          </div>
-          <div class="space-y-2">
-            <Skeleton class="h-8 w-72 max-w-full" />
-            <Skeleton class="h-4 w-full max-w-2xl" />
-            <Skeleton class="h-4 w-3/5 max-w-xl" />
-          </div>
-          <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-            <span class="inline-flex items-center gap-2">
-              {$t(i18nKeys.common.domain.createdAt)} · <Skeleton class="h-3 w-32" />
-            </span>
-          </div>
-        </div>
-
-        <div class="flex flex-wrap gap-2">
-          <Button type="button" disabled>
-            <Plus class="size-4" />
-            {$t(i18nKeys.console.projects.addResourceAction)}
-          </Button>
-          <Button type="button" variant="outline" disabled>
-            {$t(i18nKeys.common.actions.viewAll)}
-            <ArrowRight class="size-4" />
-          </Button>
-        </div>
-      </div>
-
-      <section class="console-metric-strip mt-5 lg:grid-cols-4" aria-label={$t(i18nKeys.console.projects.operationalSummaryTitle)}>
-        {#each [
-          i18nKeys.common.domain.resources,
-          i18nKeys.console.projects.publicAccessTitle,
-          i18nKeys.console.projects.latestDeploymentTitle,
-          i18nKeys.console.projects.attentionTitle,
-        ] as summaryTitle}
-          <article>
-            <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              {$t(summaryTitle)}
-            </p>
-            <Skeleton class="mt-2 h-8 w-12" />
-            <Skeleton class="mt-2 h-3 w-32 max-w-full" />
-          </article>
-        {/each}
-      </section>
-    </section>
-
-    <Tabs.Root value={activeProjectTab} class={detailBodyClass}>
-      <ConsoleDetailTabs
-        ariaLabel={$t(i18nKeys.console.projects.pageTitle)}
-        items={projectDetailTabItems}
-      />
-
-      <Tabs.Content value="overview" class={[detailTabPanelScrollClass, "flex flex-col gap-6"]}>
-        <section class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
-          <div class="space-y-5">
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <h2 class="text-lg font-semibold">
-                  {$t(i18nKeys.console.projects.resourcesTitle)}
-                </h2>
-                <p class="mt-1 text-sm text-muted-foreground">
-                  {$t(i18nKeys.console.projects.resourcesDescription)}
-                </p>
-              </div>
-              <Button type="button" variant="outline" disabled>
-                {$t(i18nKeys.common.actions.viewAll)}
-                <ArrowRight class="size-4" />
-              </Button>
-            </div>
-
-            <div class="space-y-4">
-              {#each Array.from({ length: 2 }) as _, groupIndex}
-                <section class="space-y-2">
-                  <div class="flex flex-wrap items-center justify-between gap-2">
-                    <div class="min-w-0">
-                      <Skeleton class="h-5 w-36" />
-                      <Skeleton class="mt-2 h-3 w-20" />
-                    </div>
-                    <Skeleton class="h-5 w-20 rounded-md" />
-                  </div>
-                  <div class="console-record-list">
-                    {#each Array.from({ length: 2 }) as _}
-                      <div class="console-record-row">
-                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                          <div class="min-w-0">
-                            <div class="flex min-w-0 flex-wrap items-center gap-2">
-                              <Skeleton class="h-4 w-40" />
-                              <Skeleton class="h-5 w-16 rounded-md" />
-                              <Skeleton class="h-5 w-20 rounded-md" />
-                            </div>
-                            <Skeleton class="mt-2 h-3 w-full max-w-sm" />
-                          </div>
-                          <div class="flex shrink-0 flex-wrap gap-2">
-                            <Button type="button" size="sm" variant="outline" disabled>
-                              <Play class="size-4" />
-                              {$t(i18nKeys.common.actions.createDeployment)}
-                            </Button>
-                            <Button type="button" size="sm" variant="outline" disabled>
-                              {$t(i18nKeys.common.actions.openResource)}
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    {/each}
-                  </div>
-                </section>
-              {/each}
-            </div>
-          </div>
-
-          <aside class="space-y-4">
-            <section class="console-side-panel space-y-3">
-              <div>
-                <div class="flex items-center justify-between gap-3">
-                  <h2 class="text-sm font-semibold">
-                    {$t(i18nKeys.console.projects.publicAccessTitle)}
-                  </h2>
-                  <Skeleton class="h-4 w-8" />
-                </div>
-                <p class="mt-1 text-xs leading-5 text-muted-foreground">
-                  {$t(i18nKeys.console.projects.publicAccessDescription)}
-                </p>
-              </div>
-              <div class="console-record-list">
-                {#each Array.from({ length: 2 }) as _}
-                  <div class="console-record-row">
-                    <Skeleton class="h-4 w-40" />
-                    <Skeleton class="mt-2 h-3 w-56 max-w-full" />
-                  </div>
-                {/each}
-              </div>
-            </section>
-
-            <section class="console-side-panel space-y-3">
-              <h2 class="text-sm font-semibold">
-                {$t(i18nKeys.console.projects.latestDeploymentTitle)}
-              </h2>
-              <div class="console-record-row">
-                <div class="flex flex-wrap items-center justify-between gap-2">
-                  <Skeleton class="h-4 w-24" />
-                  <Skeleton class="h-5 w-24 rounded-md" />
-                </div>
-                <Skeleton class="mt-2 h-3 w-36" />
-                <Skeleton class="mt-2 h-3 w-28" />
-              </div>
-            </section>
-
-            <section class="console-side-panel space-y-3">
-              <h2 class="text-sm font-semibold">
-                {$t(i18nKeys.console.projects.attentionTitle)}
-              </h2>
-              <div class="space-y-2">
-                {#each Array.from({ length: 2 }) as _}
-                  <article class="rounded-md border border-border bg-background px-3 py-2">
-                    <div class="flex min-w-0 items-center justify-between gap-2">
-                      <div class="flex min-w-0 items-center gap-2">
-                        <span class="relative inline-flex size-2.5 shrink-0 rounded-full bg-muted-foreground" aria-hidden="true"></span>
-                        <Skeleton class="h-4 w-36" />
-                      </div>
-                      <Button type="button" size="icon" variant="ghost" disabled aria-label={$t(i18nKeys.common.actions.viewProgress)}>
-                        <ChevronDown class="size-3.5" />
-                      </Button>
-                    </div>
-                    <Skeleton class="mt-2 h-3 w-full" />
-                    <Skeleton class="mt-2 h-3 w-2/3" />
-                    <div class="mt-2">
-                      <Button type="button" size="sm" variant="outline" disabled>
-                        {$t(i18nKeys.common.actions.viewProgress)}
-                      </Button>
-                    </div>
-                  </article>
-                {/each}
-              </div>
-            </section>
-          </aside>
-        </section>
-      </Tabs.Content>
-    </Tabs.Root>
-  </div>
-{/snippet}
-
 <ConsoleShell
   title={project?.name ?? $t(i18nKeys.console.projects.pageTitle)}
   description={$t(i18nKeys.console.projects.detailDescription)}
@@ -2083,8 +1897,64 @@
   ]}
 >
   {#if pageLoading}
-    {@render projectDetailLoadingSkeleton()}
-  {:else if !project}
+<div class="min-h-[32rem] space-y-4 p-4" aria-hidden="true" data-project-detail-loading-skeleton>
+        <div class="space-y-2">
+          <Badge variant="outline">{$t(i18nKeys.common.domain.project)}</Badge>
+          <ConsoleDataSkeleton name="detail-title" loading={true} class="block">
+            {#snippet capture()}
+              <h1 class="text-2xl font-semibold">Project name</h1>
+            {/snippet}
+            <h1 class="text-2xl font-semibold">Project name</h1>
+          </ConsoleDataSkeleton>
+          <ConsoleDataSkeleton name="detail-description" loading={true} class="block">
+            {#snippet capture()}
+              <p class="text-sm text-muted-foreground">Project description for skeleton capture.</p>
+            {/snippet}
+            <p class="text-sm text-muted-foreground">Project description for skeleton capture.</p>
+          </ConsoleDataSkeleton>
+        </div>
+        <div class="grid gap-3 md:grid-cols-4">
+          {#each ["Resources", "Access", "Deployment", "Attention"] as label (label)}
+            <div class="rounded-md border bg-card p-4 text-sm">
+              <p class="text-xs text-muted-foreground">{label}</p>
+              <ConsoleDataSkeleton name="detail-metric-value" loading={true} class="block">
+                {#snippet capture()}
+                  <p class="mt-1 font-semibold">3</p>
+                {/snippet}
+                <p class="mt-1 font-semibold">3</p>
+              </ConsoleDataSkeleton>
+            </div>
+          {/each}
+        </div>
+        <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
+          <div class="space-y-3">
+            <h2 class="text-lg font-semibold">{$t(i18nKeys.console.projects.resourcesTitle)}</h2>
+            {#each Array.from({ length: 2 }) as _, groupIndex (groupIndex)}
+              <section class="space-y-2">
+                <p class="text-sm font-medium">Environment {groupIndex + 1}</p>
+                <div class="console-record-list">
+                  {#each Array.from({ length: 2 }) as _, rowIndex (rowIndex)}
+                    <div class="console-record-row text-sm">
+                      <ConsoleDataSkeleton name={`detail-resource-row-${groupIndex}-${rowIndex}`} loading={true} class="block w-full">
+                        {#snippet capture()}
+                          <span>Resource {rowIndex + 1}</span>
+                        {/snippet}
+                        <span>Resource {rowIndex + 1}</span>
+                      </ConsoleDataSkeleton>
+                    </div>
+                  {/each}
+                </div>
+              </section>
+            {/each}
+          </div>
+          <aside class="space-y-3">
+            <div class="console-side-panel p-3 text-sm">Public access</div>
+            <div class="console-side-panel p-3 text-sm">Latest deployment</div>
+            <div class="console-side-panel p-3 text-sm">Attention items</div>
+          </aside>
+        </div>
+      </div>
+    {:else if !project}
     <section class="space-y-5 p-4 md:p-6">
       <Badge class="w-fit" variant="outline">{$t(i18nKeys.errors.backend.notFound)}</Badge>
       <div class="mt-4 max-w-2xl space-y-3">
@@ -2887,13 +2757,31 @@
                   </p>
                 </div>
 
-                {#if projectPreviewEnvironmentsQuery.isPending}
-                  <div class="space-y-3">
-                    {#each Array.from({ length: 3 }) as _, index (index)}
-                      <Skeleton class="h-20 w-full" />
-                    {/each}
-                  </div>
-                {:else if projectPreviewEnvironments.length > 0}
+                <Skeleton
+                  name="project-detail-preview-environments"
+                  loading={projectPreviewEnvironmentsQuery.isPending}
+                  animate="pulse"
+                  transition
+                >
+                  {#snippet fallback()}
+                    <div class="space-y-3" aria-hidden="true">
+                      {#each Array.from({ length: 3 }) as _, index (index)}
+                        <div class="h-20 animate-pulse rounded-md bg-muted/50"></div>
+                      {/each}
+                    </div>
+                  {/snippet}
+                  {#snippet fixture()}
+                    <div class="space-y-3" aria-hidden="true">
+                      {#each Array.from({ length: 3 }) as _, index (index)}
+                        <div class="rounded-md border bg-card p-3 text-sm">
+                          Preview environment {index + 1}
+                        </div>
+                      {/each}
+                    </div>
+                  {/snippet}
+                  {#if projectPreviewEnvironmentsQuery.isPending}
+                    <div class="h-20" aria-hidden="true"></div>
+                  {:else if projectPreviewEnvironments.length > 0}
                   <div class="console-record-list">
                     {#each projectPreviewEnvironments as previewEnvironment (previewEnvironment.previewEnvironmentId)}
                       {@const previewResource = findResource(
@@ -2970,6 +2858,7 @@
                     </div>
                   </div>
                 {/if}
+                </Skeleton>
               </section>
 
               <section class="space-y-3">
@@ -2982,13 +2871,31 @@
                   </p>
                 </div>
 
-                {#if projectPreviewResourcesQuery.isPending}
-                  <div class="space-y-3">
-                    {#each Array.from({ length: 3 }) as _, index (index)}
-                      <Skeleton class="h-20 w-full" />
-                    {/each}
-                  </div>
-                {:else}
+                <Skeleton
+                  name="project-detail-preview-resources"
+                  loading={projectPreviewResourcesQuery.isPending}
+                  animate="pulse"
+                  transition
+                >
+                  {#snippet fallback()}
+                    <div class="space-y-3" aria-hidden="true">
+                      {#each Array.from({ length: 3 }) as _, index (index)}
+                        <div class="h-20 animate-pulse rounded-md bg-muted/50"></div>
+                      {/each}
+                    </div>
+                  {/snippet}
+                  {#snippet fixture()}
+                    <div class="space-y-3" aria-hidden="true">
+                      {#each Array.from({ length: 3 }) as _, index (index)}
+                        <div class="rounded-md border bg-card p-3 text-sm">
+                          Preview resource {index + 1}
+                        </div>
+                      {/each}
+                    </div>
+                  {/snippet}
+                  {#if projectPreviewResourcesQuery.isPending}
+                    <div class="h-20" aria-hidden="true"></div>
+                  {:else}
                   <ResourceListTable
                     resources={projectPreviewResources}
                     deployments={deployments}
@@ -3001,7 +2908,8 @@
                     }}
                     showEnvironment
                   />
-                {/if}
+                  {/if}
+                </Skeleton>
               </section>
             </div>
           </section>

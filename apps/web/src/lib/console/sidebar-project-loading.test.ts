@@ -9,6 +9,9 @@ describe("console sidebar project loading state", () => {
     );
 
     expect(shellSource).toContain('import { Skeleton } from "$lib/components/ui/skeleton";');
+    expect(shellSource).toContain('name="console-shell-projects"');
+    expect(shellSource).toContain("{#snippet fallback()}");
+    expect(shellSource).not.toContain("<Skeleton class=");
     expect(shellSource).toContain(
       "const projectsLoading = $derived(projectsQuery.isPending && projects.length === 0);",
     );

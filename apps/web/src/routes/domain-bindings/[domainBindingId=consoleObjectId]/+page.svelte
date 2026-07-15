@@ -33,7 +33,6 @@
   import { Input } from "$lib/components/ui/input";
   import { ScrollArea } from "$lib/components/ui/scroll-area";
   import * as Select from "$lib/components/ui/select";
-  import { Skeleton } from "$lib/components/ui/skeleton";
   import * as Tabs from "$lib/components/ui/tabs";
   import { webDocsHrefs } from "$lib/console/docs-help";
   import {
@@ -505,11 +504,17 @@
   description={$t(i18nKeys.console.domainBindings.pageDescription)}
 >
   {#if pageLoading}
-    <div class="space-y-5">
-      <Skeleton class="h-44 w-full" />
-      <Skeleton class="h-96 w-full" />
-    </div>
-  {:else if !selectedDomainBinding}
+<div class="space-y-5">
+        <header class="space-y-2">
+          <h1 class="text-2xl font-semibold">app.example.com</h1>
+          <p class="text-sm text-muted-foreground">Domain binding detail</p>
+        </header>
+        <section class="console-panel space-y-3 p-5">
+          <h2 class="text-lg font-semibold">Overview</h2>
+          <p class="text-sm text-muted-foreground">pending_verification · path / · edge</p>
+        </section>
+      </div>
+    {:else if !selectedDomainBinding}
     <ConsoleResourceCanvas>
       <div class="console-panel space-y-4 p-6">
         <Globe2 class="size-5 text-muted-foreground" />
@@ -921,7 +926,7 @@
         </Tabs.Content>
       </Tabs.Root>
     </div>
-  {/if}
+    {/if}
 
   <Dialog.Root bind:open={domainBindingVerificationDialogOpen}>
     <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="max-w-xl">

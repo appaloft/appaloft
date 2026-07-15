@@ -5,22 +5,18 @@ const detailPages = [
   {
     marker: "data-project-detail-loading-skeleton",
     path: "../../routes/projects/[projectId=consoleObjectId]/+page.svelte",
-    renderCall: "{@render projectDetailLoadingSkeleton()}",
   },
   {
     marker: "data-resource-detail-loading-skeleton",
     path: "../../routes/resources/[resourceId=consoleObjectId]/+page.svelte",
-    renderCall: "{@render resourceDetailLoadingSkeleton()}",
   },
   {
     marker: "data-deployment-detail-loading-skeleton",
     path: "../../routes/deployments/[deploymentId=deploymentId]/+page.svelte",
-    renderCall: "{@render deploymentDetailLoadingSkeleton()}",
   },
   {
     marker: "data-server-detail-loading-skeleton",
     path: "../../routes/servers/[serverId=consoleObjectId]/+page.svelte",
-    renderCall: "{@render serverDetailLoadingSkeleton()}",
   },
 ] as const;
 
@@ -35,13 +31,16 @@ describe("console detail loading skeletons", () => {
       const source = await readFile(new URL(page.path, import.meta.url), "utf8");
 
       expect(source).toContain(page.marker);
+      expect(source).toContain("{#if pageLoading}");
+      // Granular data skeletons, not a single outer page blank.
+      expect(source).toContain("ConsoleDataSkeleton");
+      expect(source).not.toContain('name="project-detail" loading={pageLoading}');
+      expect(source).not.toContain("<Skeleton class=");
       if (source.includes("ConsoleDetailTabs")) {
         expect(detailTabsSource).toContain("detailTabsClass");
       } else {
         expect(source).toContain("detailTabsClass");
       }
-      expect(source).toContain("{#if pageLoading}");
-      expect(source).toContain(page.renderCall);
     }
   });
 
@@ -61,19 +60,20 @@ describe("console detail loading skeletons", () => {
     );
   });
 
-  test("[PROJECT-DETAIL-SKELETON-001] renders balanced resource row placeholders", async () => {
+  test("[PROJECT-DETAIL-SKELETON-001] loading structure keeps balanced resource placeholders", async () => {
     const source = await readFile(
       new URL("../../routes/projects/[projectId=consoleObjectId]/+page.svelte", import.meta.url),
       "utf8",
     );
 
-    const resourceSkeletonSource = source.slice(
-      source.indexOf("{#snippet projectDetailLoadingSkeleton()}"),
-      source.indexOf('<aside class="space-y-4">'),
+    const loadingSource = source.slice(
+      source.indexOf("data-project-detail-loading-skeleton"),
+      source.indexOf("{:else if !project}"),
     );
 
-    expect(resourceSkeletonSource).toContain("{#each Array.from({ length: 2 }) as _, groupIndex}");
-    expect(resourceSkeletonSource).toContain("{#each Array.from({ length: 2 }) as _}");
-    expect(resourceSkeletonSource).not.toContain("groupIndex === 0 ? 2 : 1");
+    expect(loadingSource).toContain("{#each Array.from({ length: 2 }) as _, groupIndex");
+    expect(loadingSource).toContain("ConsoleDataSkeleton");
+    expect(loadingSource).not.toContain("groupIndex === 0 ? 2 : 1");
+    expect(loadingSource).not.toContain("<Skeleton class=");
   });
 });

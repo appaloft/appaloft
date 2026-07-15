@@ -39,7 +39,6 @@
   import { Button } from "$lib/components/ui/button";
   import * as Card from "$lib/components/ui/card";
   import * as Dialog from "$lib/components/ui/dialog";
-  import { Skeleton } from "$lib/components/ui/skeleton";
   import ConsoleTableFilterSelect from "$lib/components/console/ConsoleTableFilterSelect.svelte";
   import {
     createLocalizedConsolePageEndpoint,
@@ -1208,12 +1207,18 @@
     class={embedded ? "max-w-none space-y-3 p-0 md:p-0" : "max-w-7xl"}
   >
     {#if loading}
-      <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {#each Array.from({ length: 4 }) as _}
-          <Skeleton class="h-36" />
-        {/each}
-      </div>
-      <Skeleton class="h-80" />
+<div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {#each Array.from({ length: 4 }) as _, index (index)}
+            <section class="console-panel space-y-2 p-4">
+              <h3 class="text-sm font-semibold">Metric {index + 1}</h3>
+              <p class="text-2xl font-semibold">12</p>
+            </section>
+          {/each}
+        </div>
+        <section class="console-panel mt-4 space-y-2 p-5">
+          <h2 class="text-base font-semibold">Extension page</h2>
+          <p class="text-sm text-muted-foreground">Sample extension page body</p>
+        </section>
     {:else if errorMessage}
       <section class="console-panel space-y-3 border-destructive/25 bg-destructive/5 p-5">
         <h2 class="flex items-center gap-2 text-base font-semibold">

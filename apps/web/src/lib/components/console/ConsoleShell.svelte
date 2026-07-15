@@ -494,17 +494,24 @@
         <SidebarGroupContent>
           <SidebarMenu>
             {#if projectsLoading}
-              {#each Array.from({ length: 3 }) as _, index (index)}
-                <SidebarMenuItem>
-                  <div
-                    class="flex h-8 items-center gap-2 rounded-md px-2 group-data-[collapsible=icon]:justify-center"
-                    aria-hidden="true"
-                  >
-                    <Skeleton class="size-4 shrink-0 rounded-sm" />
-                    <Skeleton class="h-4 min-w-0 flex-1 group-data-[collapsible=icon]:hidden" />
-                  </div>
-                </SidebarMenuItem>
-              {/each}
+              <SidebarMenuItem>
+                <Skeleton name="console-shell-projects" loading={true} animate="pulse" transition class="w-full">
+                  {#snippet fallback()}
+                    <div class="h-24 w-full animate-pulse rounded-md bg-muted/50" aria-hidden="true"></div>
+                  {/snippet}
+                  {#snippet fixture()}
+                    <div class="space-y-1">
+                      {#each ["Alpha", "Beta", "Gamma"] as name (name)}
+                        <div class="flex h-8 items-center gap-2 rounded-md px-2">
+                          <FolderOpen class="size-4" />
+                          <span>{name}</span>
+                        </div>
+                      {/each}
+                    </div>
+                  {/snippet}
+                  <div class="h-24" aria-hidden="true"></div>
+                </Skeleton>
+              </SidebarMenuItem>
             {:else if filteredProjects.length > 0}
               {#each filteredProjects.slice(0, 8) as project (project.id)}
                 {@const projectIsActive = activeProjectId === project.id}
@@ -589,14 +596,35 @@
                 {#each visibleBreadcrumbs as item, index (`${item.label}-${index}`)}
                   <Breadcrumb.Item class="group/breadcrumb-item peer/breadcrumb-item min-w-0">
                     {#if item.loading}
-                      <div
-                        class="flex h-8 min-w-24 items-center gap-2 rounded-md px-2"
-                        aria-hidden="true"
-                        data-console-header-breadcrumb-skeleton
+                      <Skeleton
+                        name="console-header-breadcrumb"
+                        loading={true}
+                        animate="pulse"
+                        transition
+                        class="min-w-24"
                       >
-                        <Skeleton class="size-4 shrink-0 rounded-sm" />
-                        <Skeleton class="h-4 w-24 min-w-0 sm:w-32" />
-                      </div>
+                        {#snippet fallback()}
+                          <div
+                            class="h-8 w-32 animate-pulse rounded-md bg-muted/50"
+                            aria-hidden="true"
+                            data-console-header-breadcrumb-skeleton
+                          ></div>
+                        {/snippet}
+                        {#snippet fixture()}
+                          <div
+                            class="flex h-8 min-w-24 items-center gap-2 rounded-md px-2"
+                            data-console-header-breadcrumb-skeleton
+                          >
+                            <FolderOpen class="size-4" />
+                            <span>Project name</span>
+                          </div>
+                        {/snippet}
+                        <div
+                          class="h-8 w-32"
+                          aria-hidden="true"
+                          data-console-header-breadcrumb-skeleton
+                        ></div>
+                      </Skeleton>
                     {:else if switcherItems(item).length > 0}
                       <DropdownMenu>
                         <div

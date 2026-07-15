@@ -19,7 +19,7 @@
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import * as Dialog from "$lib/components/ui/dialog";
-  import { Skeleton } from "$lib/components/ui/skeleton";
+  import ConsoleDataSkeleton from "$lib/components/console/ConsoleDataSkeleton.svelte";
   import { readErrorMessage } from "$lib/api/client";
   import { canRunProductQueries } from "$lib/console/auth-query-gate";
   import { webDocsHrefs } from "$lib/console/docs-help";
@@ -369,41 +369,42 @@
             class="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
             data-project-pagination
           >
-            {#if projectListLoading}
-              <Skeleton class="h-5 w-28" />
-              <div class="flex items-center gap-1">
-                <Skeleton class="h-8 w-16 rounded-md" />
-                <Skeleton class="h-8 w-16 rounded-md" />
-              </div>
-            {:else}
-              <span>
-                {$t(i18nKeys.console.projects.projectListRange, {
-                  start: projectPageStart,
-                  end: projectPageEnd,
-                  total: projectTotal,
-                })}
-              </span>
-              <div class="flex items-center gap-1">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={!canGoPrevious || projectSortMode || reorderProjectsMutation.isPending}
-                  onclick={() => setProjectPage(projectOffset - projectPageSize)}
-                >
-                  {$t(i18nKeys.common.actions.previous)}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={!canGoNext || projectSortMode || reorderProjectsMutation.isPending}
-                  onclick={() => setProjectPage(projectOffset + projectPageSize)}
-                >
-                  {$t(i18nKeys.common.actions.next)}
-                </Button>
-              </div>
-            {/if}
+            <ConsoleDataSkeleton name="projects-list-pagination" loading={projectListLoading} class="flex flex-wrap items-center gap-2">
+              {#snippet capture()}
+                <span class="text-sm text-muted-foreground">1–12 of 24</span>
+              {/snippet}
+              {#if projectListLoading}
+                <span class="text-sm text-muted-foreground" aria-hidden="true">1–12 of 24</span>
+              {:else}
+                <span>
+                  {$t(i18nKeys.console.projects.projectListRange, {
+                    start: projectPageStart,
+                    end: projectPageEnd,
+                    total: projectTotal,
+                  })}
+                </span>
+                <div class="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={!canGoPrevious || projectSortMode || reorderProjectsMutation.isPending}
+                    onclick={() => setProjectPage(projectOffset - projectPageSize)}
+                  >
+                    {$t(i18nKeys.common.actions.previous)}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={!canGoNext || projectSortMode || reorderProjectsMutation.isPending}
+                    onclick={() => setProjectPage(projectOffset + projectPageSize)}
+                  >
+                    {$t(i18nKeys.common.actions.next)}
+                  </Button>
+                </div>
+              {/if}
+            </ConsoleDataSkeleton>
           </div>
         </div>
 
@@ -436,23 +437,42 @@
             {#each Array.from({ length: 6 }) as _, index (index)}
               <article
                 class="flex min-h-56 min-w-0 flex-col rounded-md border bg-card p-4 shadow-sm"
-                aria-hidden="true"
                 data-project-loading-card
               >
                 <div class="space-y-2 pr-10">
-                  <Skeleton class="h-5 w-3/5" />
-                  <Skeleton class="h-5 w-32 rounded-md" />
-                  <div class="space-y-1.5 pt-1">
-                    <Skeleton class="h-4 w-full" />
-                    <Skeleton class="h-4 w-4/5" />
-                  </div>
+                  <ConsoleDataSkeleton name={`projects-card-title-${index}`} loading={true} class="block">
+                    {#snippet capture()}
+                      <h3 class="font-semibold">Sample project {index + 1}</h3>
+                    {/snippet}
+                    <h3 class="font-semibold">Sample project {index + 1}</h3>
+                  </ConsoleDataSkeleton>
+                  <ConsoleDataSkeleton name={`projects-card-badge-${index}`} loading={true} class="block">
+                    {#snippet capture()}
+                      <span class="text-sm">ready</span>
+                    {/snippet}
+                    <span class="text-sm">ready</span>
+                  </ConsoleDataSkeleton>
+                  <ConsoleDataSkeleton name={`projects-card-description-${index}`} loading={true} class="block">
+                    {#snippet capture()}
+                      <p class="text-sm text-muted-foreground">Project description for bone capture.</p>
+                    {/snippet}
+                    <p class="text-sm text-muted-foreground">Project description for bone capture.</p>
+                  </ConsoleDataSkeleton>
                 </div>
                 <div class="mt-5 grid gap-2">
-                  <Skeleton class="h-4 w-24" />
-                  <Skeleton class="h-4 w-20" />
-                  <Skeleton class="h-4 w-44 max-w-full" />
+                  <ConsoleDataSkeleton name={`projects-card-meta-${index}`} loading={true} class="block">
+                    {#snippet capture()}
+                      <p class="text-sm text-muted-foreground">3 resources · 1 environment</p>
+                    {/snippet}
+                    <p class="text-sm text-muted-foreground">3 resources · 1 environment</p>
+                  </ConsoleDataSkeleton>
                 </div>
-                <Skeleton class="mt-auto h-4 w-24" />
+                <ConsoleDataSkeleton name={`projects-card-footer-${index}`} loading={true} class="mt-auto block">
+                  {#snippet capture()}
+                    <p class="text-sm text-muted-foreground">Updated recently</p>
+                  {/snippet}
+                  <p class="text-sm text-muted-foreground">Updated recently</p>
+                </ConsoleDataSkeleton>
               </article>
             {/each}
           {:else}

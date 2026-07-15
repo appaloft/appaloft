@@ -11,7 +11,7 @@
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
   import { Button } from "$lib/components/ui/button";
   import * as Select from "$lib/components/ui/select";
-  import { Skeleton } from "$lib/components/ui/skeleton";
+  import ConsoleDataSkeleton from "$lib/components/console/ConsoleDataSkeleton.svelte";
   import { webDocsHrefs } from "$lib/console/docs-help";
   import { createConsoleQueries } from "$lib/console/queries";
   import {
@@ -211,35 +211,34 @@
     { label: $t(i18nKeys.console.deployments.pageTitle) },
   ]}
 >
-  {#if pageLoading}
-    <ConsoleResourceCanvas class="space-y-5">
-      <section class="space-y-3">
-        <Skeleton class="h-5 w-36" />
-        <Skeleton class="h-4 w-72" />
-      </section>
-      <div class="space-y-3">
-        {#each Array.from({ length: 6 }) as _, index (index)}
-          <Skeleton class="h-12 w-full" />
-        {/each}
-      </div>
-    </ConsoleResourceCanvas>
-  {:else if deployments.length === 0}
-    <ConsoleResourceCanvas class="space-y-6">
-      <section class="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
-        <div class="max-w-2xl space-y-2">
-          <div class="flex items-center gap-2">
-            <h1 class="text-2xl font-semibold">{$t(i18nKeys.console.deployments.focusTitle)}</h1>
-            <DocsHelpLink
-              href={webDocsHrefs.deploymentLifecycle}
-              ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-            />
-          </div>
-          <p class="text-sm leading-6 text-muted-foreground">
-            {$t(i18nKeys.console.deployments.focusDescription)}
-          </p>
+  <ConsoleResourceCanvas class="space-y-6">
+    <section class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+      <div class="max-w-2xl space-y-2">
+        <div class="flex items-center gap-2">
+          <h1 class="text-2xl font-semibold">{$t(i18nKeys.console.deployments.focusTitle)}</h1>
+          <DocsHelpLink
+            href={webDocsHrefs.deploymentLifecycle}
+            ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+          />
         </div>
-      </section>
+        <p class="text-sm leading-6 text-muted-foreground">
+          {$t(i18nKeys.console.deployments.focusDescription)}
+        </p>
+      </div>
+      {#if !pageLoading && deployments.length > 0}
+        <div class="flex flex-wrap gap-2">
+          {#if selectedProject}
+            <Button href="/deployments" variant="outline">{$t(i18nKeys.common.actions.viewAll)}</Button>
+          {/if}
+          <Button href={selectedOwnerHref} variant="outline">
+            {selectedOwnerLabel}
+            <ArrowRight class="size-4" />
+          </Button>
+        </div>
+      {/if}
+    </section>
 
+    {#if !pageLoading && deployments.length === 0}
       <ConsoleEmptyState
         tone="deployment"
         title={$t(i18nKeys.console.deployments.emptyTitle)}
@@ -251,39 +250,18 @@
           {$t(i18nKeys.common.actions.viewProjects)}
         </Button>
       </ConsoleEmptyState>
-    </ConsoleResourceCanvas>
-  {:else}
-    <ConsoleResourceCanvas class="space-y-6">
-      <section class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div class="max-w-2xl space-y-2">
-          <div class="flex items-center gap-2">
-            <h1 class="text-2xl font-semibold">{$t(i18nKeys.console.deployments.focusTitle)}</h1>
-            <DocsHelpLink
-              href={webDocsHrefs.deploymentLifecycle}
-              ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-            />
-          </div>
-          <p class="text-sm leading-6 text-muted-foreground">
-            {$t(i18nKeys.console.deployments.focusDescription)}
-          </p>
-        </div>
-        <div class="flex flex-wrap gap-2">
-          {#if selectedProject}
-            <Button href="/deployments" variant="outline">{$t(i18nKeys.common.actions.viewAll)}</Button>
-          {/if}
-          <Button href={selectedOwnerHref} variant="outline">
-            {selectedOwnerLabel}
-            <ArrowRight class="size-4" />
-          </Button>
-        </div>
-      </section>
-
+    {:else}
       <section class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <article class="console-subtle-panel p-4">
           <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             {$t(i18nKeys.console.deployments.records)}
           </p>
-          <p class="mt-2 text-2xl font-semibold">{visibleDeployments.length}</p>
+          <p class="mt-2 text-2xl font-semibold">
+            <ConsoleDataSkeleton name="deployments-metric-records" loading={pageLoading}>
+              {#snippet capture()}12{/snippet}
+              {pageLoading ? 0 : visibleDeployments.length}
+            </ConsoleDataSkeleton>
+          </p>
           <p class="mt-1 text-xs text-muted-foreground">
             {$t(i18nKeys.console.deployments.filteredRecords)}
           </p>
@@ -292,7 +270,12 @@
           <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             {$t(i18nKeys.console.deployments.inFlight)}
           </p>
-          <p class="mt-2 text-2xl font-semibold">{visibleInFlightDeployments.length}</p>
+          <p class="mt-2 text-2xl font-semibold">
+            <ConsoleDataSkeleton name="deployments-metric-in-flight" loading={pageLoading}>
+              {#snippet capture()}3{/snippet}
+              {pageLoading ? 0 : visibleInFlightDeployments.length}
+            </ConsoleDataSkeleton>
+          </p>
           <p class="mt-1 text-xs text-muted-foreground">
             {$t(i18nKeys.console.deployments.runningAttemptHint)}
           </p>
@@ -301,7 +284,12 @@
           <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             {$t(i18nKeys.console.deployments.needsAttention)}
           </p>
-          <p class="mt-2 text-2xl font-semibold">{visibleFailedDeployments.length}</p>
+          <p class="mt-2 text-2xl font-semibold">
+            <ConsoleDataSkeleton name="deployments-metric-failed" loading={pageLoading}>
+              {#snippet capture()}1{/snippet}
+              {pageLoading ? 0 : visibleFailedDeployments.length}
+            </ConsoleDataSkeleton>
+          </p>
           <p class="mt-1 text-xs text-muted-foreground">
             {$t(i18nKeys.console.deployments.failedAttemptHint)}
           </p>
@@ -310,7 +298,12 @@
           <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             {$t(i18nKeys.common.status.passed)}
           </p>
-          <p class="mt-2 text-2xl font-semibold">{visibleSucceededDeployments.length}</p>
+          <p class="mt-2 text-2xl font-semibold">
+            <ConsoleDataSkeleton name="deployments-metric-succeeded" loading={pageLoading}>
+              {#snippet capture()}8{/snippet}
+              {pageLoading ? 0 : visibleSucceededDeployments.length}
+            </ConsoleDataSkeleton>
+          </p>
           <p class="mt-1 text-xs text-muted-foreground">
             {$t(i18nKeys.console.deployments.succeededAttemptHint)}
           </p>
@@ -323,7 +316,7 @@
       >
         <label class="min-w-0 space-y-1.5 text-sm font-medium">
           {$t(i18nKeys.common.domain.project)}
-          <Select.Root bind:value={projectFilter} type="single">
+          <Select.Root bind:value={projectFilter} type="single" disabled={pageLoading}>
             <Select.Trigger class="w-full min-w-0">
               {selectedProjectFilterLabel}
             </Select.Trigger>
@@ -339,7 +332,7 @@
         </label>
         <label class="min-w-0 space-y-1.5 text-sm font-medium">
           {$t(i18nKeys.common.domain.environment)}
-          <Select.Root bind:value={environmentFilter} disabled={!selectedProject} type="single">
+          <Select.Root bind:value={environmentFilter} disabled={pageLoading || !selectedProject} type="single">
             <Select.Trigger class="w-full min-w-0">
               {selectedEnvironmentFilterLabel}
             </Select.Trigger>
@@ -355,7 +348,7 @@
         </label>
         <label class="min-w-0 space-y-1.5 text-sm font-medium">
           {$t(i18nKeys.common.domain.resource)}
-          <Select.Root bind:value={resourceFilter} disabled={!selectedProject} type="single">
+          <Select.Root bind:value={resourceFilter} disabled={pageLoading || !selectedProject} type="single">
             <Select.Trigger class="w-full min-w-0">
               {selectedResourceFilterLabel}
             </Select.Trigger>
@@ -371,7 +364,7 @@
         </label>
         <label class="min-w-0 space-y-1.5 text-sm font-medium">
           {$t(i18nKeys.common.domain.status)}
-          <Select.Root bind:value={statusFilter} type="single">
+          <Select.Root bind:value={statusFilter} type="single" disabled={pageLoading}>
             <Select.Trigger class="w-full min-w-0">
               {selectedStatusFilterLabel}
             </Select.Trigger>
@@ -395,7 +388,7 @@
               {$t(i18nKeys.console.deployments.listDescription)}
             </p>
           </div>
-          {#if visibleDeployments.length > 0}
+          {#if !pageLoading && visibleDeployments.length > 0}
             <div
               class="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
               data-deployment-pagination
@@ -432,14 +425,48 @@
             </div>
           {/if}
         </div>
-        {#if visibleDeployments.length > 0}
-          <DeploymentTable deployments={paginatedDeployments} {projects} {environments} {resources} />
-        {:else}
-          <div class="console-subtle-panel px-4 py-6 text-sm text-muted-foreground">
-            {$t(i18nKeys.console.deployments.noFilteredDeployments)}
-          </div>
-        {/if}
+
+        <ConsoleDataSkeleton name="deployments-table" loading={pageLoading} class="block w-full" fallbackClass="block min-h-48 w-full animate-pulse rounded-lg bg-muted/50">
+          {#snippet capture()}
+            <div class="console-subtle-panel space-y-3 px-4 py-4 text-sm">
+              <div class="flex justify-between gap-3">
+                <span class="font-medium">api-service</span>
+                <span>succeeded</span>
+              </div>
+              <div class="flex justify-between gap-3">
+                <span class="font-medium">worker</span>
+                <span>running</span>
+              </div>
+              <div class="flex justify-between gap-3">
+                <span class="font-medium">web</span>
+                <span>failed</span>
+              </div>
+            </div>
+          {/snippet}
+          {#if pageLoading}
+            <div class="console-subtle-panel space-y-3 px-4 py-4 text-sm" aria-hidden="true">
+              <div class="flex justify-between gap-3">
+                <span class="font-medium">api-service</span>
+                <span>succeeded</span>
+              </div>
+              <div class="flex justify-between gap-3">
+                <span class="font-medium">worker</span>
+                <span>running</span>
+              </div>
+              <div class="flex justify-between gap-3">
+                <span class="font-medium">web</span>
+                <span>failed</span>
+              </div>
+            </div>
+          {:else if visibleDeployments.length > 0}
+            <DeploymentTable deployments={paginatedDeployments} {projects} {environments} {resources} />
+          {:else}
+            <div class="console-subtle-panel px-4 py-6 text-sm text-muted-foreground">
+              {$t(i18nKeys.console.deployments.noFilteredDeployments)}
+            </div>
+          {/if}
+        </ConsoleDataSkeleton>
       </section>
-    </ConsoleResourceCanvas>
-  {/if}
+    {/if}
+  </ConsoleResourceCanvas>
 </ConsoleShell>

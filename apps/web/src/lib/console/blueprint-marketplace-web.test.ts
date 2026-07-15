@@ -184,7 +184,10 @@ describe("Blueprint marketplace console surface", () => {
     expect(sharedPackageSource).toContain("全部官方蓝图");
     expect(sharedPackageSource).toContain("data-marketplace-surface={surface}");
     expect(sharedPackageSource).toContain("data-blueprint-marketplace-skeleton");
-    expect(sharedPackageSource).toContain('class="flex min-h-[760px] flex-col gap-7"');
+    expect(sharedPackageSource).toContain("min-h-[760px]");
+    // Loading UI keeps category tabs + card grid structure (not a single blank page slab).
+    expect(sharedPackageSource).toContain("min-h-[300px]");
+    expect(sharedPackageSource).toContain("{#if isLoading}");
     expect(sharedPackageSource).toContain("readonly loading?: boolean");
     expect(sharedPackageSource).toContain('locale = "en-US"');
     expect(sharedPackageSource).toContain('title: "Marketplace"');

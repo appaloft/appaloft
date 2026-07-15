@@ -7,7 +7,6 @@
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
-  import { Skeleton } from "$lib/components/ui/skeleton";
   import { readErrorMessage } from "$lib/api/client";
   import { webDocsHrefs } from "$lib/console/docs-help";
   import { createConsoleQueries } from "$lib/console/queries";
@@ -81,23 +80,29 @@
 >
   <div class="p-4 md:p-6">
   {#if previewEnvironmentsLoading}
-    <div class="space-y-5">
-      <section class="space-y-3">
-        <Skeleton class="h-5 w-44" />
-        <Skeleton class="h-4 w-80" />
-      </section>
-      <section class="console-metric-strip sm:grid-cols-3">
-        {#each Array.from({ length: 3 }) as _, index (index)}
-          <Skeleton class="h-16 w-full" />
-        {/each}
-      </section>
-      <div class="space-y-3">
-        {#each Array.from({ length: 6 }) as _, index (index)}
-          <Skeleton class="h-12 w-full" />
-        {/each}
+<div class="space-y-8">
+        <section class="space-y-2">
+          <h1 class="text-2xl font-semibold">Preview environments</h1>
+          <p class="text-sm text-muted-foreground">Ephemeral environments for pull requests.</p>
+        </section>
+        <section class="console-metric-strip sm:grid-cols-3">
+          {#each ["Total", "Active", "Cleanup"] as label (label)}
+            <div>
+              <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+              <p class="mt-1 text-2xl font-semibold">3</p>
+            </div>
+          {/each}
+        </section>
+        <div class="console-record-list">
+          <article class="console-record-row">
+            <div class="min-w-0 space-y-2">
+              <h3 class="font-medium">org/repo #42</h3>
+              <p class="text-xs text-muted-foreground">Sample preview environment</p>
+            </div>
+          </article>
+        </div>
       </div>
-    </div>
-  {:else if previewEnvironments.length === 0}
+    {:else if previewEnvironments.length === 0}
     <section class="space-y-5 py-2">
       <Badge class="w-fit" variant="outline">
         {$t(i18nKeys.console.previewEnvironments.allProjects)}
@@ -272,6 +277,6 @@
         </div>
       </section>
     </div>
-  {/if}
+    {/if}
   </div>
 </ConsoleShell>

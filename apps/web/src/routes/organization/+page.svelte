@@ -33,7 +33,7 @@
   import * as Dialog from "$lib/components/ui/dialog";
   import { Input } from "$lib/components/ui/input";
   import * as Select from "$lib/components/ui/select";
-  import { Skeleton } from "$lib/components/ui/skeleton";
+  import ConsoleDataSkeleton from "$lib/components/console/ConsoleDataSkeleton.svelte";
   import { webDocsHrefs } from "$lib/console/docs-help";
   import { organizationSettingsItems } from "$lib/console/settings-nav";
   import { modalIsOpen, setModalOpen } from "$lib/console/url-modal";
@@ -1138,10 +1138,37 @@
 
   <div class="p-4 md:p-6">
   {#if contextQuery.isPending}
-    <div class="space-y-5">
-      <Skeleton class="h-5 w-40" />
-      <Skeleton class="h-28 w-full" />
-      <Skeleton class="h-52 w-full" />
+    <div class="space-y-8">
+      <section class="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+        <div class="max-w-2xl space-y-2">
+          <h1 class="text-2xl font-semibold">{$t(i18nKeys.console.organization.focusTitle)}</h1>
+          <p class="text-sm leading-6 text-muted-foreground">
+            {$t(i18nKeys.console.organization.focusDescription)}
+          </p>
+        </div>
+        <div class="console-metric-strip grid-cols-3 text-center md:min-w-96">
+          {#each ["members", "invitations", "tokens"] as metric (metric)}
+            <div>
+              <ConsoleDataSkeleton name={`organization-context-metric-${metric}`} loading={true}>
+                {#snippet capture()}
+                  <p class="text-xl font-semibold">3</p>
+                {/snippet}
+                <p class="text-xl font-semibold">3</p>
+              </ConsoleDataSkeleton>
+              <p class="mt-1 text-xs text-muted-foreground">{metric}</p>
+            </div>
+          {/each}
+        </div>
+      </section>
+      <section class="console-panel space-y-3 p-5">
+        <h2 class="text-lg font-semibold">{$t(i18nKeys.console.organization.profileTitle)}</h2>
+        <ConsoleDataSkeleton name="organization-context-profile" loading={true} class="block" fallbackClass="block min-h-24 w-full animate-pulse rounded-md bg-muted/50">
+          {#snippet capture()}
+            <p class="text-sm text-muted-foreground">Organization profile summary</p>
+          {/snippet}
+          <p class="text-sm text-muted-foreground">Organization profile summary</p>
+        </ConsoleDataSkeleton>
+      </section>
     </div>
   {:else if contextQuery.error}
     <section class="console-panel space-y-4 p-5">
@@ -1172,27 +1199,30 @@
           </div>
           <div class="console-metric-strip grid-cols-3 text-center md:min-w-96">
             <div>
-              {#if profileMetricsLoading}
-                <Skeleton class="mx-auto h-7 w-10" />
-              {:else}
-                <p class="text-xl font-semibold">{members.length}</p>
-              {/if}
+              <ConsoleDataSkeleton name="organization-metric-members" loading={profileMetricsLoading}>
+                  {#snippet capture()}
+                    <p class="text-xl font-semibold">3</p>
+                  {/snippet}
+                  <p class="text-xl font-semibold">{members.length}</p>
+                </ConsoleDataSkeleton>
               <p class="mt-1 text-xs text-muted-foreground">{$t(i18nKeys.console.organization.membersTitle)}</p>
             </div>
             <div>
-              {#if profileMetricsLoading}
-                <Skeleton class="mx-auto h-7 w-10" />
-              {:else}
-                <p class="text-xl font-semibold">{invitations.length}</p>
-              {/if}
+              <ConsoleDataSkeleton name="organization-metric-invitations" loading={profileMetricsLoading}>
+                  {#snippet capture()}
+                    <p class="text-xl font-semibold">1</p>
+                  {/snippet}
+                  <p class="text-xl font-semibold">{invitations.length}</p>
+                </ConsoleDataSkeleton>
               <p class="mt-1 text-xs text-muted-foreground">{$t(i18nKeys.console.organization.invitationsTitle)}</p>
             </div>
             <div>
-              {#if profileMetricsLoading}
-                <Skeleton class="mx-auto h-7 w-10" />
-              {:else}
-                <p class="text-xl font-semibold">{deployTokens.length}</p>
-              {/if}
+              <ConsoleDataSkeleton name="organization-metric-tokens" loading={profileMetricsLoading}>
+                  {#snippet capture()}
+                    <p class="text-xl font-semibold">2</p>
+                  {/snippet}
+                  <p class="text-xl font-semibold">{deployTokens.length}</p>
+                </ConsoleDataSkeleton>
               <p class="mt-1 text-xs text-muted-foreground">{$t(i18nKeys.console.organization.deployTokensTitle)}</p>
             </div>
           </div>
@@ -1225,10 +1255,31 @@
       {#if organizationProfileLoading}
         <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
           <div class="space-y-5">
-            <Skeleton class="h-80 w-full" />
-            <Skeleton class="h-44 w-full" />
+            <section class="console-panel space-y-3 p-5">
+              <h2 class="text-lg font-semibold">{$t(i18nKeys.console.organization.profileTitle)}</h2>
+              <ConsoleDataSkeleton name="organization-profile-name" loading={true} class="block">
+                {#snippet capture()}
+                  <p class="text-base font-semibold">Acme Org</p>
+                {/snippet}
+                <p class="text-base font-semibold">Acme Org</p>
+              </ConsoleDataSkeleton>
+              <ConsoleDataSkeleton name="organization-profile-slug" loading={true} class="block">
+                {#snippet capture()}
+                  <p class="text-sm text-muted-foreground">acme-org</p>
+                {/snippet}
+                <p class="text-sm text-muted-foreground">acme-org</p>
+              </ConsoleDataSkeleton>
+            </section>
           </div>
-          <Skeleton class="h-80 w-full" />
+          <aside class="console-panel space-y-3 p-5">
+            <h2 class="text-lg font-semibold">Summary</h2>
+            <ConsoleDataSkeleton name="organization-profile-summary" loading={true} class="block">
+              {#snippet capture()}
+                <p class="text-sm text-muted-foreground">3 members · 1 invitation</p>
+              {/snippet}
+              <p class="text-sm text-muted-foreground">3 members · 1 invitation</p>
+            </ConsoleDataSkeleton>
+          </aside>
         </div>
       {:else}
       <section class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
@@ -1406,10 +1457,32 @@
         {#if membersSectionLoading}
           <div class="console-record-list">
             <div class="console-record-row">
-              <Skeleton class="h-12 w-full" />
+              <ConsoleDataSkeleton name="organization-members-row-0" loading={true} class="block w-full" fallbackClass="block h-12 w-full animate-pulse rounded-md bg-muted/50">
+                {#snippet capture()}
+                  <div class="space-y-1">
+                    <h3 class="font-semibold">Alice</h3>
+                    <p class="text-sm text-muted-foreground">sample detail</p>
+                  </div>
+                {/snippet}
+                <div class="space-y-1" aria-hidden="true">
+                  <h3 class="font-semibold">Alice</h3>
+                  <p class="text-sm text-muted-foreground">sample detail</p>
+                </div>
+              </ConsoleDataSkeleton>
             </div>
             <div class="console-record-row">
-              <Skeleton class="h-12 w-full" />
+              <ConsoleDataSkeleton name="organization-members-row-1" loading={true} class="block w-full" fallbackClass="block h-12 w-full animate-pulse rounded-md bg-muted/50">
+                {#snippet capture()}
+                  <div class="space-y-1">
+                    <h3 class="font-semibold">Bob</h3>
+                    <p class="text-sm text-muted-foreground">sample detail</p>
+                  </div>
+                {/snippet}
+                <div class="space-y-1" aria-hidden="true">
+                  <h3 class="font-semibold">Bob</h3>
+                  <p class="text-sm text-muted-foreground">sample detail</p>
+                </div>
+              </ConsoleDataSkeleton>
             </div>
           </div>
         {:else}
@@ -1573,10 +1646,18 @@
         {#if invitationsSectionLoading}
           <div class="console-record-list">
             <div class="console-record-row">
-              <Skeleton class="h-12 w-full" />
-            </div>
-            <div class="console-record-row">
-              <Skeleton class="h-12 w-full" />
+              <ConsoleDataSkeleton name="organization-invitations-row-0" loading={true} class="block w-full" fallbackClass="block h-12 w-full animate-pulse rounded-md bg-muted/50">
+                {#snippet capture()}
+                  <div class="space-y-1">
+                    <h3 class="font-semibold">bob@example.com</h3>
+                    <p class="text-sm text-muted-foreground">sample detail</p>
+                  </div>
+                {/snippet}
+                <div class="space-y-1" aria-hidden="true">
+                  <h3 class="font-semibold">bob@example.com</h3>
+                  <p class="text-sm text-muted-foreground">sample detail</p>
+                </div>
+              </ConsoleDataSkeleton>
             </div>
           </div>
         {:else if invitations.length === 0}
@@ -1635,10 +1716,18 @@
         {#if deployTokensSectionLoading}
           <div class="console-record-list">
             <div class="console-record-row">
-              <Skeleton class="h-14 w-full" />
-            </div>
-            <div class="console-record-row">
-              <Skeleton class="h-14 w-full" />
+              <ConsoleDataSkeleton name="organization-deploy-tokens-row-0" loading={true} class="block w-full" fallbackClass="block h-12 w-full animate-pulse rounded-md bg-muted/50">
+                {#snippet capture()}
+                  <div class="space-y-1">
+                    <h3 class="font-semibold">ci-bot</h3>
+                    <p class="text-sm text-muted-foreground">sample detail</p>
+                  </div>
+                {/snippet}
+                <div class="space-y-1" aria-hidden="true">
+                  <h3 class="font-semibold">ci-bot</h3>
+                  <p class="text-sm text-muted-foreground">sample detail</p>
+                </div>
+              </ConsoleDataSkeleton>
             </div>
           </div>
         {:else if deployTokens.length === 0}
@@ -1712,10 +1801,18 @@
         {#if archivedProjectsSectionLoading}
           <div class="console-record-list">
             <div class="console-record-row">
-              <Skeleton class="h-14 w-full" />
-            </div>
-            <div class="console-record-row">
-              <Skeleton class="h-14 w-full" />
+              <ConsoleDataSkeleton name="organization-archived-projects-row-0" loading={true} class="block w-full" fallbackClass="block h-12 w-full animate-pulse rounded-md bg-muted/50">
+                {#snippet capture()}
+                  <div class="space-y-1">
+                    <h3 class="font-semibold">legacy-app</h3>
+                    <p class="text-sm text-muted-foreground">sample detail</p>
+                  </div>
+                {/snippet}
+                <div class="space-y-1" aria-hidden="true">
+                  <h3 class="font-semibold">legacy-app</h3>
+                  <p class="text-sm text-muted-foreground">sample detail</p>
+                </div>
+              </ConsoleDataSkeleton>
             </div>
           </div>
         {:else if archivedProjects.length === 0}

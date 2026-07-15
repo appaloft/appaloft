@@ -24,7 +24,6 @@
   import * as Dialog from "$lib/components/ui/dialog";
   import { Input } from "$lib/components/ui/input";
   import * as Select from "$lib/components/ui/select";
-  import { Skeleton } from "$lib/components/ui/skeleton";
   import {
     endpointFromTemplate,
     findBlueprintCatalogExtensionByKey,
@@ -1090,11 +1089,17 @@
 >
   <div class="p-4 md:p-6">
   {#if webExtensionsQuery.isPending || detailQuery.isPending}
-    <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
-      <Skeleton class="h-96 w-full" />
-      <Skeleton class="h-96 w-full" />
-    </div>
-  {:else if !catalogMetadata}
+<div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <section class="console-panel space-y-3 p-5">
+          <h1 class="text-2xl font-semibold">Blueprint title</h1>
+          <p class="text-sm text-muted-foreground">Sample marketplace blueprint detail.</p>
+        </section>
+        <aside class="console-panel space-y-3 p-5">
+          <h2 class="text-lg font-semibold">Deploy</h2>
+          <p class="text-sm text-muted-foreground">One-click install actions</p>
+        </aside>
+      </div>
+    {:else if !catalogMetadata}
     <section class="console-panel p-5">
       <div class="flex items-start gap-3">
         <Package class="mt-0.5 size-5 text-muted-foreground" />
@@ -1864,6 +1869,6 @@
         </Dialog.Content>
       </Dialog.Root>
     </div>
-  {/if}
+    {/if}
   </div>
 </ConsoleShell>

@@ -11,7 +11,6 @@
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import * as Dialog from "$lib/components/ui/dialog";
-  import { Skeleton } from "$lib/components/ui/skeleton";
   import { webDocsHrefs } from "$lib/console/docs-help";
   import { formatTime, resourceDetailHref } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
@@ -128,12 +127,22 @@
 >
   <div class="p-4 md:p-6">
   {#if previewEnvironmentQuery.isPending}
-    <div class="space-y-5">
-      <Skeleton class="h-5 w-56" />
-      <Skeleton class="h-32 w-full" />
-      <Skeleton class="h-64 w-full" />
-    </div>
-  {:else if previewEnvironmentQuery.error || !previewEnvironment}
+<div class="space-y-8">
+        <section class="space-y-2">
+          <p class="text-sm text-muted-foreground">Active</p>
+          <h1 class="text-2xl font-semibold">pev_sample_preview</h1>
+          <p class="text-sm text-muted-foreground">org/repo #42</p>
+        </section>
+        <section class="grid gap-4 lg:grid-cols-3">
+          {#each ["Source", "Owner", "Lifecycle"] as title (title)}
+            <div class="console-panel space-y-3 p-5">
+              <h2 class="text-lg font-semibold">{title}</h2>
+              <p class="text-sm text-muted-foreground">Sample preview detail</p>
+            </div>
+          {/each}
+        </section>
+      </div>
+    {:else if previewEnvironmentQuery.error || !previewEnvironment}
     <section class="space-y-5 py-2">
       <Badge class="w-fit" variant="outline">
         {$t(i18nKeys.common.status.unknown)}
@@ -384,6 +393,6 @@
         </div>
       </Dialog.Content>
     </Dialog.Root>
-  {/if}
+    {/if}
   </div>
 </ConsoleShell>
