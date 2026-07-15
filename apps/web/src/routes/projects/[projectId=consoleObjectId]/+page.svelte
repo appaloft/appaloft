@@ -2098,8 +2098,14 @@
           value="overview"
           class={[detailTabPanelScrollClass, "flex flex-col gap-6"]}
         >
-          <section class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
-            <div class="space-y-5">
+          <section
+            class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem] xl:grid-rows-[auto_auto] xl:gap-x-6 xl:gap-y-5"
+            data-project-overview-primary
+          >
+            <div
+              class="grid gap-5 xl:row-span-2 xl:grid-rows-subgrid"
+              data-project-overview-resources
+            >
               <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                   <h2 class="text-lg font-semibold">
@@ -2116,7 +2122,7 @@
               </div>
 
               {#if projectResources.length > 0}
-                <div class="space-y-4">
+                <div class="space-y-4" data-project-overview-resources-content>
                   {#each nonEmptyProjectResourceGroups as group (group.environment.id)}
                     <section class="space-y-2">
                       <div class="flex flex-wrap items-center justify-between gap-2">
@@ -2205,7 +2211,10 @@
                   {/if}
                 </div>
               {:else}
-                <div class="console-subtle-panel px-4 py-6">
+                <div
+                  class="console-subtle-panel px-4 py-6"
+                  data-project-overview-resources-content
+                >
                   <div class="flex items-start gap-3">
                     <FolderOpen class="mt-0.5 size-4 text-muted-foreground" />
                     <div class="space-y-2">
@@ -2237,47 +2246,54 @@
               {/if}
             </div>
 
-            <aside class="space-y-4">
-              <section class="console-side-panel space-y-3">
+            <section
+              class="grid gap-5 xl:row-span-2 xl:grid-rows-subgrid"
+              data-project-overview-public-access
+            >
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                  <div class="flex items-center justify-between gap-3">
-                    <h2 class="text-sm font-semibold">
-                      {$t(i18nKeys.console.projects.publicAccessTitle)}
-                    </h2>
-                    <span class="text-sm text-muted-foreground">{projectAccessRoutes.length}</span>
-                  </div>
-                  <p class="mt-1 text-xs leading-5 text-muted-foreground">
+                  <h2 class="text-lg font-semibold">
+                    {$t(i18nKeys.console.projects.publicAccessTitle)}
+                  </h2>
+                  <p class="mt-1 text-sm text-muted-foreground">
                     {$t(i18nKeys.console.projects.publicAccessDescription)}
                   </p>
                 </div>
+                <span class="text-sm text-muted-foreground">{projectAccessRoutes.length}</span>
+              </div>
 
-                <div class="console-record-list">
-                  {#if projectAccessRoutes.length > 0}
-                    {#each projectAccessRoutes.slice(0, 4) as route (`${route.resourceId}-${route.hostname}-${route.pathPrefix}`)}
-                      <a
-                        href={route.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        class="console-record-row block"
-                      >
-                        <div class="flex min-w-0 items-center justify-between gap-2">
-                          <p class="min-w-0 truncate text-sm font-medium">{route.hostname}</p>
-                          <ExternalLink class="size-3 shrink-0 text-muted-foreground" />
-                        </div>
-                        <p class="mt-1 truncate text-xs text-muted-foreground">
-                          {route.resourceName} · {route.pathPrefix} · {route.scheme.toUpperCase()}
-                        </p>
-                      </a>
-                    {/each}
-                  {:else}
-                    <p class="px-4 py-4 text-sm leading-6 text-muted-foreground">
-                      {$t(i18nKeys.console.projects.noPublicAccess)}
-                    </p>
-                  {/if}
-                </div>
-              </section>
+              <div class="console-record-list" data-project-overview-public-access-content>
+                {#if projectAccessRoutes.length > 0}
+                  {#each projectAccessRoutes.slice(0, 4) as route (`${route.resourceId}-${route.hostname}-${route.pathPrefix}`)}
+                    <a
+                      href={route.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      class="console-record-row block"
+                    >
+                      <div class="flex min-w-0 items-center justify-between gap-2">
+                        <p class="min-w-0 truncate text-sm font-medium">{route.hostname}</p>
+                        <ExternalLink class="size-3 shrink-0 text-muted-foreground" />
+                      </div>
+                      <p class="mt-1 truncate text-xs text-muted-foreground">
+                        {route.resourceName} · {route.pathPrefix} · {route.scheme.toUpperCase()}
+                      </p>
+                    </a>
+                  {/each}
+                {:else}
+                  <p class="px-4 py-4 text-sm leading-6 text-muted-foreground">
+                    {$t(i18nKeys.console.projects.noPublicAccess)}
+                  </p>
+                {/if}
+              </div>
+            </section>
+          </section>
 
-              <section class="console-side-panel space-y-3">
+          <section
+            class="grid items-stretch gap-4 md:grid-cols-3"
+            data-project-overview-status-grid
+          >
+            <section class="console-side-panel space-y-3">
                 <h2 class="text-sm font-semibold">
                   {$t(i18nKeys.console.projects.latestDeploymentTitle)}
                 </h2>
@@ -2305,9 +2321,9 @@
                     {$t(i18nKeys.console.projects.noProjectDeploymentBody)}
                   </p>
                 {/if}
-              </section>
+            </section>
 
-              <section class="console-side-panel space-y-3">
+            <section class="console-side-panel space-y-3">
                 <h2 class="text-sm font-semibold">
                   {$t(i18nKeys.console.projects.attentionTitle)}
                 </h2>
@@ -2422,15 +2438,14 @@
                     {$t(i18nKeys.console.projects.noAttentionTitle)}
                   </p>
                 {/if}
-              </section>
+            </section>
 
-              <section class="console-side-panel space-y-2">
-                <h2 class="text-sm font-semibold">{$t(i18nKeys.common.domain.status)}</h2>
-                <p class="text-sm leading-6 text-muted-foreground">
-                  {$t(i18nKeys.console.projects.healthSummaryGap)}
-                </p>
-              </section>
-            </aside>
+            <section class="console-side-panel space-y-2">
+              <h2 class="text-sm font-semibold">{$t(i18nKeys.common.domain.status)}</h2>
+              <p class="text-sm leading-6 text-muted-foreground">
+                {$t(i18nKeys.console.projects.healthSummaryGap)}
+              </p>
+            </section>
           </section>
 
           <section class="console-panel space-y-5 p-5" data-project-runtime-monitor>

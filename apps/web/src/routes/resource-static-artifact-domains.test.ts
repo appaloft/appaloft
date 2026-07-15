@@ -71,8 +71,8 @@ describe("resource static artifact domains panel", () => {
     expect(resourcePageSource).toContain("window.open(");
     expect(resourcePageSource).toContain("dnsConnectorAuthWindowName");
     expect(resourcePageSource).toContain("dnsConnectorAuthorizationPopupFeatures()");
-    expect(resourcePageSource).toContain("`left=${left}`");
-    expect(resourcePageSource).toContain("`top=${top}`");
+    expect(resourcePageSource).toContain("`left=$" + "{left}`");
+    expect(resourcePageSource).toContain("`top=$" + "{top}`");
     expect(resourcePageSource).toContain(
       'const dnsConnectorCallbackMessageType = "appaloft:dns-connector-callback"',
     );
