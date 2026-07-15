@@ -868,7 +868,9 @@ describe("Zero-to-SSH supported catalog acceptance harness", () => {
       expect(plan.execution.buildCommand).toBe(descriptor.expected.commandSpecs.build);
       expect(plan.execution.startCommand).toBe(descriptor.expected.commandSpecs.start);
       if (plan.execution.kind === "docker-compose-stack") {
-        expect(plan.execution.verificationSteps).toEqual([]);
+        expect(plan.execution.verificationSteps.map((step) => step.kind)).toEqual([
+          "internal-http",
+        ]);
       } else {
         expect(plan.execution.verificationSteps.map((step) => step.kind)).toContain(
           "internal-http",

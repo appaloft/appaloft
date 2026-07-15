@@ -65,9 +65,11 @@ import {
 } from "./git-source-submodules";
 import {
   dockerPublishedPortCommand,
+  dockerRemoveResourceContainersCommand,
   parseDockerPublishedHostPort,
   appaloftDockerContainerLabelsForDeployment,
 } from "./docker-container-commands";
+import { waitForComposeDeploymentContainers } from "./compose-deployment-verification";
 import { requireServerBackedDeploymentState } from "./deployment-target";
 import { deriveRuntimeInstanceNames } from "./runtime-instance-names";
 import {
@@ -248,12 +250,14 @@ async function reservePort(preferred?: number): Promise<number> {
 
 interface HttpHealthCheckOptions {
   method: string;
+  headers?: Record<string, string>;
   expectedStatusCode: number;
   expectedResponseText?: string;
   intervalMs: number;
   timeoutMs: number;
   retries: number;
   startPeriodMs: number;
+  tlsVerification?: "strict" | "allow-untrusted";
 }
 
 function httpHealthCheckOptions(
@@ -292,7 +296,11 @@ async function waitForHealth(
     try {
       const response = await fetch(url, {
         method: options.method,
+        ...(options.headers ? { headers: options.headers } : {}),
         signal: controller.signal,
+        ...(options.tlsVerification === "allow-untrusted"
+          ? { tls: { rejectUnauthorized: false } }
+          : {}),
       });
       const responseText = options.expectedResponseText ? await response.text() : "";
       if (
@@ -312,6 +320,28 @@ async function waitForHealth(
   }
 
   return { ok: false, reason: lastFailure };
+}
+
+function composePublicHealthUrl(input: {
+  route: RuntimeExecutionPlan["accessRoutes"][number];
+  healthPath: string;
+  port: number;
+  httpPort?: number;
+  httpsPort?: number;
+}): string {
+  const prefix = input.route.pathPrefix === "/" ? "" : input.route.pathPrefix.replace(/\/+$/, "");
+  const path = input.healthPath.startsWith("/") ? input.healthPath : `/${input.healthPath}`;
+  const routePath = path === "/" ? prefix || "/" : `${prefix}${path}`;
+  if (input.route.proxyKind === "none") {
+    return `http://127.0.0.1:${input.route.targetPort ?? input.port}${routePath}`;
+  }
+  const scheme = input.route.tlsMode === "auto" ? "https" : "http";
+  const proxyPort = scheme === "https" ? input.httpsPort : input.httpPort;
+  const portSuffix =
+    proxyPort && !((scheme === "http" && proxyPort === 80) || (scheme === "https" && proxyPort === 443))
+      ? `:${proxyPort}`
+      : "";
+  return `${scheme}://${input.route.domains[0] ?? "localhost"}${portSuffix}${routePath}`;
 }
 
 function sanitizeName(input: string): string {
@@ -2665,6 +2695,72 @@ export class LocalExecutionBackend implements ExecutionBackend {
       deploymentId: state.id.value,
       metadata: state.runtimePlan.execution.metadata,
     });
+    const accessRoutes = state.runtimePlan.execution.accessRoutes;
+    const composePort = state.runtimePlan.execution.port;
+    const targetServiceName = state.runtimePlan.execution.metadata?.targetServiceName;
+    const proxyEnsurePlanResult = this.edgeProxyProviderRegistry
+      ? await createEdgeProxyEnsurePlan({
+          providerRegistry: this.edgeProxyProviderRegistry,
+          context: { correlationId: context.requestId },
+          accessRoutes,
+          options: proxyBootstrapOptionsFromEnv(env),
+        })
+      : ok(null);
+    if (proxyEnsurePlanResult.isErr()) {
+      return ok({
+        deployment: this.applyFailure(deployment, {
+          timeline: [...timeline, phaseLog("deploy", proxyEnsurePlanResult.error.message, "error")],
+          errorCode: proxyEnsurePlanResult.error.code,
+          retryable: proxyEnsurePlanResult.error.retryable,
+          metadata: { phase: "proxy-bootstrap", ...preparedSource.metadata },
+        }).deployment,
+      });
+    }
+    if (proxyEnsurePlanResult.value) {
+      const network = await runShellCommand({
+        command: proxyEnsurePlanResult.value.networkCommand,
+        cwd: workdir,
+        env,
+      });
+      const proxy = await runShellCommand({
+        command: proxyEnsurePlanResult.value.containerCommand,
+        cwd: workdir,
+        env,
+      });
+      if (network.failed || proxy.failed) {
+        const message = `${proxyEnsurePlanResult.value.displayName} edge proxy failed to start`;
+        return ok({
+          deployment: this.applyFailure(deployment, {
+            timeline: [...timeline, phaseLog("deploy", message, "error")],
+            errorCode: "docker_compose_edge_proxy_start_failed",
+            retryable: true,
+            metadata: { phase: "proxy-bootstrap", ...preparedSource.metadata },
+          }).deployment,
+        });
+      }
+    }
+    const resourceAccessFailureRenderer = this.resourceAccessFailureRenderer?.();
+    const proxyRoutePlanResult =
+      this.edgeProxyProviderRegistry && composePort
+        ? await createProxyRouteRealizationPlan({
+            providerRegistry: this.edgeProxyProviderRegistry,
+            context: { correlationId: context.requestId },
+            deploymentId: state.id.value,
+            port: composePort,
+            accessRoutes,
+            ...(resourceAccessFailureRenderer ? { resourceAccessFailureRenderer } : {}),
+          })
+        : ok(null);
+    if (proxyRoutePlanResult.isErr()) {
+      return ok({
+        deployment: this.applyFailure(deployment, {
+          timeline: [...timeline, phaseLog("deploy", proxyRoutePlanResult.error.message, "error")],
+          errorCode: proxyRoutePlanResult.error.code,
+          retryable: proxyRoutePlanResult.error.retryable,
+          metadata: { phase: "proxy-route-realization", ...preparedSource.metadata },
+        }).deployment,
+      });
+    }
     const deployOwnershipResult = await this.ensureExecutionStillOwned(context, deployment, {
       phase: "deploy",
       step: "before-compose-up",
@@ -2757,6 +2853,11 @@ export class LocalExecutionBackend implements ExecutionBackend {
         composeFile,
         overrideFile: composeOwnershipOverrideFile,
         labels: composeOwnershipLabels,
+        ...(targetServiceName ? { targetServiceName } : {}),
+        targetLabels: dockerLabelsFromAssignments(proxyRoutePlanResult.value?.labels ?? []),
+        ...(proxyRoutePlanResult.value?.networkName
+          ? { targetNetworkName: proxyRoutePlanResult.value.networkName }
+          : {}),
         mounts: storageMounts.value,
         volumeRealizations: storageVolumeRealizations.value,
         quote: shellQuote,
@@ -2804,7 +2905,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         additionalComposeFiles: [composeOwnershipOverrideFile],
         projectName: runtimeInstanceNames.composeProjectName,
         scales: composeScaleFromRuntimeMetadata(state.runtimePlan.execution.metadata),
-        pull: isForceRedeployDeployment(state),
+        pull: true,
         noCache: isForceRedeployDeployment(state),
       }),
       { quote: shellQuote },
@@ -2843,6 +2944,15 @@ export class LocalExecutionBackend implements ExecutionBackend {
     });
 
     if (up.failed) {
+      await runShellCommand({
+        command: dockerRemoveResourceContainersCommand({
+          resourceId: state.resourceId.value,
+          deploymentIds: [state.id.value],
+          quote: shellQuote,
+        }),
+        cwd: workdir,
+        env: runtimeEnv.value.env,
+      });
       const message = "Docker compose deployment failed";
       await this.report(context, {
         deploymentId: state.id.value,
@@ -2870,13 +2980,269 @@ export class LocalExecutionBackend implements ExecutionBackend {
       });
     }
 
+    const proxyReloadPlanResult = this.edgeProxyProviderRegistry
+      ? await createProxyReloadPlan({
+          providerRegistry: this.edgeProxyProviderRegistry,
+          context: { correlationId: context.requestId },
+          deploymentId: state.id.value,
+          accessRoutes,
+          routePlan: proxyRoutePlanResult.value,
+          reason: "route-realization",
+        })
+      : ok(null);
+    if (proxyReloadPlanResult.isErr()) {
+      await runShellCommand({
+        command: dockerRemoveResourceContainersCommand({
+          resourceId: state.resourceId.value,
+          deploymentIds: [state.id.value],
+          quote: shellQuote,
+        }),
+        cwd: workdir,
+        env: runtimeEnv.value.env,
+      });
+      return ok({
+        deployment: this.applyFailure(deployment, {
+          timeline: [...timeline, phaseLog("deploy", proxyReloadPlanResult.error.message, "error")],
+          errorCode: proxyReloadPlanResult.error.code,
+          retryable: proxyReloadPlanResult.error.retryable,
+          metadata: { phase: "proxy-reload", ...preparedSource.metadata },
+        }).deployment,
+      });
+    }
+    if (proxyReloadPlanResult.value?.required) {
+      const reload = await executeProxyReloadPlan({
+        plan: proxyReloadPlanResult.value,
+        runCommand: (step) =>
+          runShellCommand({ command: step.command ?? "", cwd: workdir, env: runtimeEnv.value.env }),
+      });
+      if (reload.status === "failed") {
+        await runShellCommand({
+          command: dockerRemoveResourceContainersCommand({
+            resourceId: state.resourceId.value,
+            deploymentIds: [state.id.value],
+            quote: shellQuote,
+          }),
+          cwd: workdir,
+          env: runtimeEnv.value.env,
+        });
+        return ok({
+          deployment: this.applyFailure(deployment, {
+            timeline: [...timeline, phaseLog("deploy", reload.message, "error")],
+            errorCode: reload.errorCode,
+            retryable: reload.retryable,
+            metadata: { phase: "proxy-reload", ...preparedSource.metadata },
+          }).deployment,
+        });
+      }
+    }
+
+    const healthOptions = httpHealthCheckOptions(state.runtimePlan.execution);
+    const containerVerification = await waitForComposeDeploymentContainers({
+      deploymentId: state.id.value,
+      ...(targetServiceName ? { targetServiceName } : {}),
+      quote: shellQuote,
+      attempts: healthOptions?.retries ?? 1,
+      intervalMs: healthOptions?.intervalMs ?? 0,
+      run: (command) =>
+        runShellCommand({
+          command,
+          cwd: workdir,
+          env: runtimeEnv.value.env,
+          redactions: runtimeEnv.value.redactions,
+        }),
+    });
+    if (containerVerification.verification.status !== "ready") {
+      await runShellCommand({
+        command: dockerRemoveResourceContainersCommand({
+          resourceId: state.resourceId.value,
+          deploymentIds: [state.id.value],
+          quote: shellQuote,
+        }),
+        cwd: workdir,
+        env: runtimeEnv.value.env,
+      });
+      const message = `Compose target verification failed (${containerVerification.verification.status})`;
+      return ok({
+        deployment: this.applyFailure(deployment, {
+          timeline: [...timeline, phaseLog("verify", message, "error")],
+          errorCode: "docker_compose_target_verification_failed",
+          retryable: true,
+          metadata: {
+            composeFile,
+            composeProjectName: runtimeInstanceNames.composeProjectName,
+            ...(targetServiceName ? { targetServiceName } : {}),
+            workdir,
+            ...preparedSource.metadata,
+          },
+        }).deployment,
+      });
+    }
+
+    const targetContainer = containerVerification.verification.containers[0];
+    const containerPort = state.runtimePlan.execution.port;
+    if (
+      healthOptions &&
+      targetContainer &&
+      containerPort &&
+      (targetServiceName || containerVerification.verification.containers.length === 1)
+    ) {
+      const publishedPort = await runShellCommand({
+        command: dockerPublishedPortCommand({
+          containerName: targetContainer.id,
+          containerPort,
+          quote: shellQuote,
+        }),
+        cwd: workdir,
+        env: runtimeEnv.value.env,
+      });
+      const publishedHostPort = parseDockerPublishedHostPort(publishedPort.stdout);
+      const healthHost = publishedHostPort
+        ? `127.0.0.1:${publishedHostPort}`
+        : targetContainer.ipAddress
+          ? `${targetContainer.ipAddress}:${containerPort}`
+          : undefined;
+      if (!healthHost) {
+        const message = `Compose target service ${targetServiceName ?? "inferred target"} has no reachable health endpoint`;
+        await runShellCommand({
+          command: dockerRemoveResourceContainersCommand({
+            resourceId: state.resourceId.value,
+            deploymentIds: [state.id.value],
+            quote: shellQuote,
+          }),
+          cwd: workdir,
+          env: runtimeEnv.value.env,
+        });
+        return ok({
+          deployment: this.applyFailure(deployment, {
+            timeline: [...timeline, phaseLog("verify", message, "error")],
+            errorCode: "docker_compose_health_endpoint_unavailable",
+            retryable: true,
+            metadata: {
+              composeFile,
+              composeProjectName: runtimeInstanceNames.composeProjectName,
+              ...(targetServiceName ? { targetServiceName } : {}),
+              workdir,
+              ...preparedSource.metadata,
+            },
+          }).deployment,
+        });
+      }
+      const healthPath = state.runtimePlan.execution.healthCheckPath ?? "/";
+      const url = `http://${healthHost}${healthPath.startsWith("/") ? healthPath : `/${healthPath}`}`;
+      const health = await waitForHealth(url, healthOptions);
+      if (!health.ok) {
+        await runShellCommand({
+          command: dockerRemoveResourceContainersCommand({
+            resourceId: state.resourceId.value,
+            deploymentIds: [state.id.value],
+            quote: shellQuote,
+          }),
+          cwd: workdir,
+          env: runtimeEnv.value.env,
+        });
+        const message = `Compose target health check failed for ${url}${health.reason ? `: ${health.reason}` : ""}`;
+        return ok({
+          deployment: this.applyFailure(deployment, {
+            timeline: [...timeline, phaseLog("verify", message, "error")],
+            errorCode: "docker_compose_health_check_failed",
+            retryable: true,
+            metadata: {
+              composeFile,
+              composeProjectName: runtimeInstanceNames.composeProjectName,
+              ...(targetServiceName ? { targetServiceName } : {}),
+              url,
+              workdir,
+              ...preparedSource.metadata,
+            },
+          }).deployment,
+        });
+      }
+      timeline.push(phaseLog("verify", `Compose target service is healthy at ${url}`));
+    } else if (!healthOptions) {
+      timeline.push(phaseLog("verify", "Health check disabled for resource"));
+    } else {
+      timeline.push(phaseLog("verify", "Compose containers are running and native health checks passed"));
+    }
+
+    const verificationSteps = state.runtimePlan.execution.verificationSteps.map((step) => step.kind);
+    if (healthOptions && verificationSteps.includes("public-http") && containerPort) {
+      for (const route of accessRoutes) {
+        const publicUrl = composePublicHealthUrl({
+          route,
+          healthPath: state.runtimePlan.execution.healthCheckPath ?? "/",
+          port: containerPort,
+          ...proxyBootstrapOptionsFromEnv(runtimeEnv.value.env),
+        });
+        const verificationUrl = new URL(publicUrl);
+        const publicHost = verificationUrl.hostname;
+        verificationUrl.hostname = "127.0.0.1";
+        const publicHealth = await waitForHealth(verificationUrl.toString(), {
+          ...healthOptions,
+          headers: { Host: publicHost },
+          ...(route.proxyKind !== "none" && route.tlsMode === "auto"
+            ? { tlsVerification: "allow-untrusted" as const }
+            : {}),
+        });
+        if (!publicHealth.ok) {
+          await runShellCommand({
+            command: dockerRemoveResourceContainersCommand({
+              resourceId: state.resourceId.value,
+              deploymentIds: [state.id.value],
+              quote: shellQuote,
+            }),
+            cwd: workdir,
+            env: runtimeEnv.value.env,
+          });
+          const message = `Compose public route health check failed for ${publicUrl}${publicHealth.reason ? `: ${publicHealth.reason}` : ""}`;
+          return ok({
+            deployment: this.applyFailure(deployment, {
+              timeline: [...timeline, phaseLog("verify", message, "error")],
+              errorCode: "docker_compose_public_route_health_check_failed",
+              retryable: true,
+              metadata: {
+                composeFile,
+                composeProjectName: runtimeInstanceNames.composeProjectName,
+                ...(targetServiceName ? { targetServiceName } : {}),
+                url: publicUrl,
+                workdir,
+                ...preparedSource.metadata,
+              },
+            }).deployment,
+          });
+        }
+        timeline.push(phaseLog("verify", `Compose public route is reachable at ${publicUrl}`));
+      }
+    }
+
+    const supersededDeploymentIds = supersededDeploymentIdsForCleanup(state);
+    if (supersededDeploymentIds.length > 0) {
+      const cleanup = await runShellCommand({
+        command: dockerRemoveResourceContainersCommand({
+          resourceId: state.resourceId.value,
+          deploymentIds: supersededDeploymentIds,
+          quote: shellQuote,
+        }),
+        cwd: workdir,
+        env: runtimeEnv.value.env,
+      });
+      timeline.push(
+        phaseLog(
+          "deploy",
+          cleanup.failed
+            ? "Failed to release superseded Compose containers"
+            : "Released superseded Compose containers after candidate verification",
+          cleanup.failed ? "warn" : "info",
+        ),
+      );
+    }
+
     await this.report(context, {
       deploymentId: state.id.value,
       phase: "deploy",
       status: "succeeded",
       message: "Compose stack started",
     });
-    const message = "Compose stack started successfully";
+    const message = "Compose stack passed deployment verification";
     timeline.push(phaseLog("verify", message));
     await this.report(context, {
       deploymentId: state.id.value,

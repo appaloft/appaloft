@@ -330,7 +330,7 @@ describe("DefaultRuntimePlanResolver", () => {
     expect(plan.steps).toContain("Run docker container");
   });
 
-  test("[CONFIG-FILE-SERVICE-GRAPH-005] plans workspace service graphs as generated compose stacks", async () => {
+  test("[CONFIG-FILE-SERVICE-GRAPH-005][DEP-CREATE-ASYNC-009A] plans workspace service graphs with Compose verification", async () => {
     ensureReflectMetadata();
     const { DefaultRuntimePlanResolver } = await import("../src");
     const resolver = new DefaultRuntimePlanResolver();
@@ -417,7 +417,16 @@ describe("DefaultRuntimePlanResolver", () => {
     );
     expect(plan.execution.metadata?.["serviceGraph.services"]).toContain("start:worker");
     expect(plan.execution.metadata?.["serviceGraph.services"]).toContain('"replicas":4');
+    expect(
+      plan.execution.verificationSteps.map((step) => ({ kind: step.kind, label: step.label })),
+    ).toEqual([
+      {
+        kind: "internal-http",
+        label: "Verify internal container health",
+      },
+    ]);
     expect(plan.steps).toContain("Generate compose service graph");
+    expect(plan.steps).toContain("Verify internal container health");
   });
 
   test("[WF-PLAN-DET-007][WF-PLAN-DET-013][WF-PLAN-CAT-001] classifies Next.js workspace plans as SSR", async () => {
@@ -2446,7 +2455,12 @@ describe("DefaultRuntimePlanResolver", () => {
     expect(plan.execution).toEqual(
       expect.objectContaining({
         kind: "docker-compose-stack",
-        accessRoutes: [],
+        accessRoutes: [
+          expect.objectContaining({
+            domains: ["compose.localtest.me"],
+            proxyKind: "traefik",
+          }),
+        ],
         metadata: expect.objectContaining({
           "access.routeSource": "server-applied-config-domain",
           "access.hostname": "compose.localtest.me",
@@ -2508,7 +2522,12 @@ describe("DefaultRuntimePlanResolver", () => {
     expect(plan.execution).toEqual(
       expect.objectContaining({
         kind: "docker-compose-stack",
-        accessRoutes: [],
+        accessRoutes: [
+          expect.objectContaining({
+            domains: ["compose.203-0-113-10.sslip.io"],
+            proxyKind: "traefik",
+          }),
+        ],
         metadata: expect.objectContaining({
           "access.routeSource": "generated-default",
           "access.hostname": "compose.203-0-113-10.sslip.io",
@@ -2519,7 +2538,7 @@ describe("DefaultRuntimePlanResolver", () => {
     );
   });
 
-  test("rejects explicit edge access routes on Compose plans", async () => {
+  test("[DEP-CREATE-ASYNC-016A] plans explicit Compose routes with public verification", async () => {
     ensureReflectMetadata();
     const { DefaultRuntimePlanResolver } = await import("../src");
     const resolver = new DefaultRuntimePlanResolver();
@@ -2541,15 +2560,21 @@ describe("DefaultRuntimePlanResolver", () => {
       requestedDeployment: {
         method: "docker-compose",
         port: 3000,
+        targetServiceName: "web",
         domains: ["compose.example.com"],
       },
       generatedAt: "2026-01-01T00:00:00.000Z",
     });
 
-    expect(result.isErr()).toBe(true);
-    expect(result._unsafeUnwrapErr().message).toBe(
-      "Access routing is currently supported for Docker container deployments",
-    );
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+    expect(plan.execution.accessRoutes).toEqual([
+      expect.objectContaining({ domains: ["compose.example.com"] }),
+    ]);
+    expect(plan.execution.verificationSteps.map((step) => step.kind)).toEqual([
+      "internal-http",
+      "public-http",
+    ]);
   });
 
   test("[DEP-CREATE-ADM-026] static strategy packages publish directory as static server image artifact", async () => {

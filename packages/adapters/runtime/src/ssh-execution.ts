@@ -61,9 +61,11 @@ import {
 import {
   dockerPublishedPortCommand,
   dockerRemoveConflictingRouteContainersCommand,
+  dockerRemoveResourceContainersCommand,
   parseDockerPublishedHostPort,
   appaloftDockerContainerLabelsForDeployment,
 } from "./docker-container-commands";
+import { waitForComposeDeploymentContainers } from "./compose-deployment-verification";
 import {
   requireServerBackedDeploymentState,
   requireServerBackedDeploymentStateFromState,
@@ -3563,6 +3565,78 @@ export class SshExecutionBackend implements ExecutionBackend {
         : `${remoteWorkdir}/${composeFile}`;
       const remoteComposeOwnershipOverrideFile = `${remoteWorkdir}/.appaloft.compose.labels.override.yml`;
       const remoteRuntimeEnvFile = `${remoteWorkdir}/.appaloft/runtime.env`;
+      const accessRoutes = state.runtimePlan.execution.accessRoutes;
+      const composePort = state.runtimePlan.execution.port;
+      const targetServiceName = state.runtimePlan.execution.metadata?.targetServiceName;
+      const proxyEnsurePlanResult = this.edgeProxyProviderRegistry
+        ? await createEdgeProxyEnsurePlan({
+            providerRegistry: this.edgeProxyProviderRegistry,
+            context: { correlationId: context.requestId },
+            accessRoutes,
+            options: proxyBootstrapOptionsFromEnv(env),
+          })
+        : ok(null);
+      if (proxyEnsurePlanResult.isErr()) {
+        return ok({
+          deployment: this.applyFailure(deployment, {
+            timeline: [...timeline, phaseLog("deploy", proxyEnsurePlanResult.error.message, "error")],
+            errorCode: proxyEnsurePlanResult.error.code,
+            retryable: proxyEnsurePlanResult.error.retryable,
+            metadata: { host: target.host, phase: "proxy-bootstrap", ...prepared.source.metadata },
+          }),
+        });
+      }
+      if (proxyEnsurePlanResult.value) {
+        const network = await this.runRemoteCommand({
+          target,
+          command: proxyEnsurePlanResult.value.networkCommand,
+          cwd: runtimeDir,
+          env,
+        });
+        const proxy = await this.runRemoteCommand({
+          target,
+          command: proxyEnsurePlanResult.value.containerCommand,
+          cwd: runtimeDir,
+          env,
+        });
+        if (network.failed || proxy.failed) {
+          const message = `${proxyEnsurePlanResult.value.displayName} edge proxy failed to start`;
+          return ok({
+            deployment: this.applyFailure(deployment, {
+              timeline: [...timeline, phaseLog("deploy", message, "error")],
+              errorCode: "ssh_docker_compose_edge_proxy_start_failed",
+              retryable: true,
+              metadata: { host: target.host, phase: "proxy-bootstrap", ...prepared.source.metadata },
+            }),
+          });
+        }
+      }
+      const resourceAccessFailureRenderer = this.resourceAccessFailureRenderer?.();
+      const proxyRoutePlanResult =
+        this.edgeProxyProviderRegistry && composePort
+          ? await createProxyRouteRealizationPlan({
+              providerRegistry: this.edgeProxyProviderRegistry,
+              context: { correlationId: context.requestId },
+              deploymentId: state.id.value,
+              port: composePort,
+              accessRoutes,
+              ...(resourceAccessFailureRenderer ? { resourceAccessFailureRenderer } : {}),
+            })
+          : ok(null);
+      if (proxyRoutePlanResult.isErr()) {
+        return ok({
+          deployment: this.applyFailure(deployment, {
+            timeline: [...timeline, phaseLog("deploy", proxyRoutePlanResult.error.message, "error")],
+            errorCode: proxyRoutePlanResult.error.code,
+            retryable: proxyRoutePlanResult.error.retryable,
+            metadata: {
+              host: target.host,
+              phase: "proxy-route-realization",
+              ...prepared.source.metadata,
+            },
+          }),
+        });
+      }
       const composeOwnershipLabels = dockerLabelsFromAssignments(
         appaloftDockerContainerLabelsForDeployment(state),
       );
@@ -3649,6 +3723,11 @@ export class SshExecutionBackend implements ExecutionBackend {
             composeFile: remoteComposeFile,
             overrideFile: remoteComposeOwnershipOverrideFile,
             labels: composeOwnershipLabels,
+            ...(targetServiceName ? { targetServiceName } : {}),
+            targetLabels: dockerLabelsFromAssignments(proxyRoutePlanResult.value?.labels ?? []),
+            ...(proxyRoutePlanResult.value?.networkName
+              ? { targetNetworkName: proxyRoutePlanResult.value.networkName }
+              : {}),
             mounts: storageMounts.value,
             volumeRealizations: storageVolumeRealizations.value,
             quote: shellQuote,
@@ -3688,7 +3767,7 @@ export class SshExecutionBackend implements ExecutionBackend {
           workingDirectory: remoteWorkdir,
           scales: composeScaleFromRuntimeMetadata(state.runtimePlan.execution.metadata),
           portableDockerCompose: true,
-          pull: isForceRedeployDeployment(state),
+          pull: true,
           noCache: isForceRedeployDeployment(state),
         }),
         { quote: shellQuote },
@@ -3717,7 +3796,20 @@ export class SshExecutionBackend implements ExecutionBackend {
         }),
       });
 
+      const cleanupCandidate = () =>
+        this.runRemoteCommand({
+          target,
+          command: dockerRemoveResourceContainersCommand({
+            resourceId: state.resourceId.value,
+            deploymentIds: [state.id.value],
+            quote: shellQuote,
+          }),
+          cwd: runtimeDir,
+          env: runtimeEnv.value.env,
+        });
+
       if (up.failed) {
+        await cleanupCandidate();
         const message = "SSH Docker Compose deployment failed";
         timeline.push(phaseLog("deploy", message, "error"));
         return ok({
@@ -3738,7 +3830,262 @@ export class SshExecutionBackend implements ExecutionBackend {
         });
       }
 
-      timeline.push(phaseLog("verify", `SSH compose stack started from ${remoteComposeFile}`));
+      const proxyReloadPlanResult = this.edgeProxyProviderRegistry
+        ? await createProxyReloadPlan({
+            providerRegistry: this.edgeProxyProviderRegistry,
+            context: { correlationId: context.requestId },
+            deploymentId: state.id.value,
+            accessRoutes,
+            routePlan: proxyRoutePlanResult.value,
+            reason: "route-realization",
+          })
+        : ok(null);
+      if (proxyReloadPlanResult.isErr()) {
+        await cleanupCandidate();
+        return ok({
+          deployment: this.applyFailure(deployment, {
+            timeline: [...timeline, phaseLog("deploy", proxyReloadPlanResult.error.message, "error")],
+            errorCode: proxyReloadPlanResult.error.code,
+            retryable: proxyReloadPlanResult.error.retryable,
+            metadata: { host: target.host, phase: "proxy-reload", ...prepared.source.metadata },
+          }),
+        });
+      }
+      if (proxyReloadPlanResult.value?.required) {
+        const reload = await executeProxyReloadPlan({
+          plan: proxyReloadPlanResult.value,
+          runCommand: (step) =>
+            this.runRemoteCommand({
+              target,
+              command: step.command ?? "",
+              cwd: runtimeDir,
+              env: runtimeEnv.value.env,
+            }),
+        });
+        if (reload.status === "failed") {
+          await cleanupCandidate();
+          return ok({
+            deployment: this.applyFailure(deployment, {
+              timeline: [...timeline, phaseLog("deploy", reload.message, "error")],
+              errorCode: reload.errorCode,
+              retryable: reload.retryable,
+              metadata: { host: target.host, phase: "proxy-reload", ...prepared.source.metadata },
+            }),
+          });
+        }
+      }
+
+      const healthOptions = httpHealthCheckOptions(state.runtimePlan.execution);
+      const containerVerification = await waitForComposeDeploymentContainers({
+        deploymentId: state.id.value,
+        ...(targetServiceName ? { targetServiceName } : {}),
+        quote: shellQuote,
+        attempts: healthOptions?.retries ?? 1,
+        intervalMs: healthOptions?.intervalMs ?? 0,
+        run: (command) =>
+          this.runRemoteCommand({
+            target,
+            command,
+            cwd: runtimeDir,
+            env: runtimeEnv.value.env,
+          }),
+      });
+      if (containerVerification.verification.status !== "ready") {
+        await cleanupCandidate();
+        const message = `SSH Compose target verification failed (${containerVerification.verification.status})`;
+        timeline.push(phaseLog("verify", message, "error"));
+        return ok({
+          deployment: this.applyFailure(deployment, {
+            timeline,
+            errorCode: "ssh_docker_compose_target_verification_failed",
+            retryable: true,
+            metadata: {
+              host: target.host,
+              remoteWorkdir,
+              composeFile: remoteComposeFile,
+              composeProjectName: runtimeInstanceNames.composeProjectName,
+              ...(targetServiceName ? { targetServiceName } : {}),
+              ...prepared.source.metadata,
+            },
+          }),
+        });
+      }
+
+      const targetContainer = containerVerification.verification.containers[0];
+      const port = state.runtimePlan.execution.port;
+      const healthPath = normalizeHealthCheckPath(
+        state.runtimePlan.execution.healthCheck?.http?.path.value ??
+          state.runtimePlan.execution.healthCheckPath,
+      );
+      const verificationSteps =
+        state.runtimePlan.execution.verificationSteps.length > 0
+          ? state.runtimePlan.execution.verificationSteps.map((step) => step.kind)
+          : defaultVerificationSteps(state.runtimePlan.execution.accessRoutes);
+      let internalUrl: string | undefined;
+
+      if (
+        healthOptions &&
+        targetContainer &&
+        port &&
+        (targetServiceName || containerVerification.verification.containers.length === 1)
+      ) {
+        if (targetContainer.ipAddress) {
+          internalUrl = `http://${targetContainer.ipAddress}:${port}${healthPath}`;
+        } else {
+          const publishedPortResult = await this.runRemoteCommand({
+            target,
+            command: dockerPublishedPortCommand({
+              containerName: targetContainer.id,
+              containerPort: port,
+              quote: shellQuote,
+            }),
+            cwd: runtimeDir,
+            env: runtimeEnv.value.env,
+          });
+          const publishedHostPort = parseDockerPublishedHostPort(publishedPortResult.stdout);
+          if (publishedHostPort) {
+            internalUrl = `http://127.0.0.1:${publishedHostPort}${healthPath}`;
+          }
+        }
+
+        if (!internalUrl) {
+          await cleanupCandidate();
+          const message = `SSH Compose target service ${targetServiceName ?? "inferred target"} has no reachable health endpoint`;
+          timeline.push(phaseLog("verify", message, "error"));
+          return ok({
+            deployment: this.applyFailure(deployment, {
+              timeline,
+              errorCode: "ssh_docker_compose_health_endpoint_unavailable",
+              retryable: true,
+              metadata: {
+                host: target.host,
+                remoteWorkdir,
+                composeFile: remoteComposeFile,
+                composeProjectName: runtimeInstanceNames.composeProjectName,
+                ...(targetServiceName ? { targetServiceName } : {}),
+                ...prepared.source.metadata,
+              },
+            }),
+          });
+        }
+
+        if (verificationSteps.includes("internal-http")) {
+          const internalHealth = await this.waitForRemoteInternalHealth({
+            target,
+            url: internalUrl,
+            options: healthOptions,
+            cwd: runtimeDir,
+            env: runtimeEnv.value.env,
+          });
+          if (!internalHealth.ok) {
+            await cleanupCandidate();
+            const message = `SSH Compose internal health check failed for ${internalUrl}${internalHealth.reason ? `: ${internalHealth.reason}` : ""}`;
+            timeline.push(phaseLog("verify", message, "error"));
+            return ok({
+              deployment: this.applyFailure(deployment, {
+                timeline,
+                errorCode: "ssh_docker_compose_internal_health_check_failed",
+                retryable: true,
+                metadata: {
+                  host: target.host,
+                  remoteWorkdir,
+                  composeFile: remoteComposeFile,
+                  composeProjectName: runtimeInstanceNames.composeProjectName,
+                  ...(targetServiceName ? { targetServiceName } : {}),
+                  url: internalUrl,
+                  ...prepared.source.metadata,
+                },
+              }),
+            });
+          }
+          timeline.push(phaseLog("verify", `SSH Compose target is reachable at ${internalUrl}`));
+        }
+      }
+
+      if (healthOptions && verificationSteps.includes("public-http")) {
+        if (accessRoutes.length === 0) {
+          await cleanupCandidate();
+          const message = "SSH Compose public route verification requested without access routes";
+          timeline.push(phaseLog("verify", message, "error"));
+          return ok({
+            deployment: this.applyFailure(deployment, {
+              timeline,
+              errorCode: "ssh_docker_compose_public_route_missing",
+              retryable: false,
+              metadata: {
+                host: target.host,
+                remoteWorkdir,
+                composeFile: remoteComposeFile,
+                composeProjectName: runtimeInstanceNames.composeProjectName,
+                ...prepared.source.metadata,
+              },
+            }),
+          });
+        }
+
+        for (const route of accessRoutes) {
+          const publicUrl = publicHealthUrl({ route, healthPath, publicHost: target.publicHost, port: port ?? 80 });
+          const publicHealth = await waitForHealth(publicUrl, {
+            ...healthOptions,
+            tlsVerification:
+              route.proxyKind !== "none" && route.tlsMode === "auto"
+                ? "allow-untrusted"
+                : "strict",
+          });
+          if (!publicHealth.ok) {
+            await cleanupCandidate();
+            const message = `SSH Compose public route health check failed for ${publicUrl}${publicHealth.reason ? `: ${publicHealth.reason}` : ""}`;
+            timeline.push(phaseLog("verify", message, "error"));
+            return ok({
+              deployment: this.applyFailure(deployment, {
+                timeline,
+                errorCode: publicRouteHealthErrorCode(publicHealth),
+                retryable: true,
+                metadata: {
+                  host: target.host,
+                  remoteWorkdir,
+                  composeFile: remoteComposeFile,
+                  composeProjectName: runtimeInstanceNames.composeProjectName,
+                  ...(targetServiceName ? { targetServiceName } : {}),
+                  url: publicUrl,
+                  publicRouteFailureKind: publicHealth.failureKind,
+                  ...prepared.source.metadata,
+                },
+              }),
+            });
+          }
+          timeline.push(phaseLog("verify", `SSH Compose public route is reachable at ${publicUrl}`));
+        }
+      }
+
+      if (!healthOptions) {
+        timeline.push(phaseLog("verify", "Health check disabled for resource"));
+      } else if (!targetServiceName || !port) {
+        timeline.push(phaseLog("verify", "SSH Compose containers are running and native health checks passed"));
+      }
+      const supersededDeploymentIds = supersededDeploymentIdsForCleanup(state);
+      if (supersededDeploymentIds.length > 0) {
+        const cleanup = await this.runRemoteCommand({
+          target,
+          command: dockerRemoveResourceContainersCommand({
+            resourceId: state.resourceId.value,
+            deploymentIds: supersededDeploymentIds,
+            quote: shellQuote,
+          }),
+          cwd: runtimeDir,
+          env: runtimeEnv.value.env,
+        });
+        timeline.push(
+          phaseLog(
+            "deploy",
+            cleanup.failed
+              ? "Failed to release superseded SSH Compose containers"
+              : "Released superseded SSH Compose containers after candidate verification",
+            cleanup.failed ? "warn" : "info",
+          ),
+        );
+      }
+      timeline.push(phaseLog("verify", `SSH compose stack passed deployment verification from ${remoteComposeFile}`));
       deployment.applyExecutionResult(
         FinishedAt.rehydrate(new Date().toISOString()),
         ExecutionResult.rehydrate({

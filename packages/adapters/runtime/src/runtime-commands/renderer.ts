@@ -132,12 +132,17 @@ function renderDockerComposeUpCommand(
   spec: DockerComposeUpCommandSpec,
   options: RuntimeCommandRenderOptions,
 ): string {
-  const composeInvocation = [
+  const composePrefix = [
     spec.portableDockerCompose === true ? "$appaloft_docker_compose_cmd" : "docker compose",
     spec.projectName ? `-p ${options.quote(spec.projectName.value)}` : "",
     "-f",
     options.quote(spec.composeFile.value),
     ...spec.additionalComposeFiles.flatMap((composeFile) => ["-f", options.quote(composeFile.value)]),
+  ]
+    .filter((part) => part.length > 0)
+    .join(" ");
+  const composeInvocation = [
+    composePrefix,
     "up",
     spec.detach ? "-d" : "",
     spec.build ? "--build" : "",
@@ -151,14 +156,7 @@ function renderDockerComposeUpCommand(
   const composeBuildInvocation =
     spec.build && (spec.pull || spec.noCache)
       ? [
-          spec.portableDockerCompose === true ? "$appaloft_docker_compose_cmd" : "docker compose",
-          spec.projectName ? `-p ${options.quote(spec.projectName.value)}` : "",
-          "-f",
-          options.quote(spec.composeFile.value),
-          ...spec.additionalComposeFiles.flatMap((composeFile) => [
-            "-f",
-            options.quote(composeFile.value),
-          ]),
+          composePrefix,
           "build",
           spec.pull ? "--pull" : "",
           spec.noCache ? "--no-cache" : "",
@@ -166,9 +164,12 @@ function renderDockerComposeUpCommand(
           .filter((part) => part.length > 0)
           .join(" ")
       : undefined;
-  const command = composeBuildInvocation
-    ? `${composeBuildInvocation} && ${composeInvocation}`
-    : composeInvocation;
+  const composePullInvocation = spec.pull
+    ? `${composePrefix} pull --ignore-buildable`
+    : undefined;
+  const command = [composePullInvocation, composeBuildInvocation, composeInvocation]
+    .filter((part): part is string => part !== undefined)
+    .join(" && ");
 
   if (spec.portableDockerCompose !== true) {
     return command;
@@ -178,7 +179,7 @@ function renderDockerComposeUpCommand(
     "{",
     "appaloft_docker_compose_cmd='';",
     `if docker compose -f ${options.quote(spec.composeFile.value)} config --services >/dev/null 2>&1; then appaloft_docker_compose_cmd='docker compose';`,
-    `elif command -v docker-compose >/dev/null 2>&1 && docker-compose -f ${options.quote(spec.composeFile.value)} config --services >/dev/null 2>&1; then appaloft_docker_compose_cmd='docker-compose';`,
+    `elif command -v docker-compose >/dev/null 2>&1 && docker-compose -f ${options.quote(spec.composeFile.value)} config --services >/dev/null 2>&1; then printf '%s\\n' 'Appaloft safe Compose deployment requires the supported docker compose v2/v5 CLI' >&2; exit 2;`,
     "else appaloft_docker_compose_cmd='docker compose'; fi;",
     command,
     ";",
