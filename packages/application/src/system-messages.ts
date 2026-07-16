@@ -3,6 +3,8 @@ export * from "./operations/system/apply-connector-capability.command";
 export * from "./operations/system/apply-instance-upgrade.command";
 export * from "./operations/system/check-instance-upgrade.query";
 export * from "./operations/system/complete-connection-callback.command";
+export * from "./operations/system/control-plane-secret-rotation-apply.command";
+export * from "./operations/system/control-plane-secret-rotation-plan.query";
 export * from "./operations/system/db-migrate.command";
 export * from "./operations/system/db-status.query";
 export * from "./operations/system/doctor.query";

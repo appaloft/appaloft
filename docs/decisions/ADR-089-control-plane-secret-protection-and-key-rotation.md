@@ -1,0 +1,52 @@
+# ADR-089: Control-Plane Secret Protection And Key Rotation
+
+Status: Accepted
+
+Date: 2026-07-16
+
+## Context
+
+Resource and Environment secret inputs currently enter aggregate state and deployment snapshots as
+raw text. PG/PGlite dependency secret stores also persist raw values. Runtime adapters later inject
+those values directly, while Docker Swarm treats Resource env secrets as pre-existing Docker secret
+names. There is no implemented keyring, envelope version, old-key window, explicit migration, or
+runtime environment key-set verification. A control-plane key failure therefore cannot be handled
+safely because no common protection boundary exists.
+
+## Decision
+
+Appaloft adopts a provider-neutral control-plane secret protection port. The Community adapter uses
+versioned authenticated AES-256-GCM envelopes with one active encryption key and retained decrypt-only
+keys. Secret-bearing Environment/Resource entries, immutable Deployment snapshots, and dependency
+runtime secret payloads persist envelopes. Plaintext exists only at command ingress and transient
+runtime materialization.
+
+Every plan, create, retry, redeploy, rollback, Docker, Compose, SSH, and Swarm path must validate all
+secret envelopes before mutation. One failure aborts the entire environment. No adapter may map a
+failure to an empty string, omit the key, or continue to terminal success.
+
+Key rotation is an explicit System Maintenance workflow: dry-run classifies safe counts and states;
+apply requires the dry-run digest, target active key, explicit legacy authorization when needed, and
+an external backup evidence reference. The PG/PGlite adapter preflights all rows and commits all
+rewraps in one transaction. Failure rolls back the entire migration; retry is idempotent.
+
+Deployment Proof compares the planned and observed runtime environment key set and count without
+returning values. Secret ciphertext is excluded from configuration fingerprint semantics so rewraps
+do not create false drift.
+
+## Consequences
+
+- Missing/wrong keys and corrupt/legacy envelopes become stable fail-closed operational errors.
+- Self-hosted and hosted composition must configure a keyring before accepting or deploying secrets.
+- Existing plaintext rows require an explicit backed-up migration before deployment.
+- Provider KMS/Vault adapters may implement the same port without changing public domain behavior.
+- Docker Swarm must honor environment-variable semantics; file-only Docker secrets are not a silent
+  substitute for an env key.
+
+## Governed Sources
+
+- `docs/specs/105-control-plane-secret-protection/`
+- `docs/workflows/control-plane-secret-key-rotation.md`
+- `docs/errors/control-plane-secret-protection.md`
+- `docs/testing/control-plane-secret-protection-test-matrix.md`
+- ADR-012, ADR-041, and ADR-087.

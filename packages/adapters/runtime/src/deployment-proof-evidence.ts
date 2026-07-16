@@ -2,6 +2,7 @@ import { connect as connectTcp, isIP } from "node:net";
 import { connect as connectTls } from "node:tls";
 import {
   deploymentProofConfigurationFingerprint,
+  deploymentProofEnvironmentKeyFingerprint,
   type DeploymentProofRuntimeEvidence,
   type DeploymentProofRuntimeEvidenceReader,
   type DeploymentSummary,
@@ -14,8 +15,11 @@ export interface DockerInspectState {
   Image?: string;
   Created?: string;
   State?: { Running?: boolean; StartedAt?: string; Health?: { Status?: string } };
-  Config?: { Image?: string; Labels?: Record<string, string> };
-  Spec?: { Labels?: Record<string, string>; TaskTemplate?: { ContainerSpec?: { Image?: string } } };
+  Config?: { Image?: string; Labels?: Record<string, string>; Env?: string[] };
+  Spec?: {
+    Labels?: Record<string, string>;
+    TaskTemplate?: { ContainerSpec?: { Image?: string; Env?: string[] } };
+  };
   UpdatedAt?: string;
 }
 
@@ -245,6 +249,39 @@ export function deploymentProofEvidenceFromDockerInspect(
   const observedDeploymentId = labels["appaloft.deployment-id"];
   const configurationFingerprint = labels["appaloft.configuration-fingerprint"];
   const plannedFingerprint = deploymentProofConfigurationFingerprint(deployment.environmentSnapshot.variables);
+  const plannedKeys = [
+    ...new Set([
+      ...deployment.environmentSnapshot.variables
+        .filter((variable) => variable.exposure === "runtime")
+        .map((variable) => variable.key),
+      ...(deployment.dependencyBindingReferences ?? [])
+        .filter(
+          (reference) =>
+            reference.scope === "runtime-only" &&
+            reference.injectionMode === "env" &&
+            reference.snapshotReadiness.status === "ready",
+        )
+        .map((reference) => reference.targetName),
+    ]),
+  ].sort();
+  const observedEnvironmentEntries =
+    inspect.Config?.Env ?? inspect.Spec?.TaskTemplate?.ContainerSpec?.Env;
+  const observedKeys = observedEnvironmentEntries
+    ? [
+        ...new Set(
+          observedEnvironmentEntries.map((entry) => {
+            const separator = entry.indexOf("=");
+            return separator < 0 ? entry : entry.slice(0, separator);
+          }),
+        ),
+      ].filter((key) => key.length > 0)
+    : undefined;
+  const matchesPlannedKeySet = observedKeys
+    ? plannedKeys.every((key) => observedKeys.includes(key))
+    : false;
+  const observedPlannedKeys = observedKeys
+    ? plannedKeys.filter((key) => observedKeys.includes(key))
+    : undefined;
   const running = inspect.State?.Running ?? true;
   const healthStatus = inspect.State?.Health?.Status;
   const healthPassed = running && healthStatus !== "unhealthy";
@@ -268,9 +305,25 @@ export function deploymentProofEvidenceFromDockerInspect(
       ...(!inspect.Id ? { reasonCode: "workload_identity_unavailable" } : {}),
     },
     configuration: {
-      available: Boolean(configurationFingerprint),
-      ...(configurationFingerprint ? { fingerprint: configurationFingerprint, matchesPlanned: configurationFingerprint === plannedFingerprint } : {}),
-      ...(!configurationFingerprint ? { reasonCode: "configuration_evidence_unavailable" } : {}),
+      available: Boolean(configurationFingerprint && observedKeys),
+      ...(configurationFingerprint
+        ? {
+            fingerprint: configurationFingerprint,
+            matchesPlanned:
+              configurationFingerprint === plannedFingerprint && matchesPlannedKeySet,
+          }
+        : {}),
+      ...(observedPlannedKeys
+        ? {
+            keyCount: observedPlannedKeys.length,
+            plannedKeyCount: plannedKeys.length,
+            keyFingerprint: deploymentProofEnvironmentKeyFingerprint(observedPlannedKeys),
+            matchesPlannedKeySet,
+          }
+        : {}),
+      ...(!configurationFingerprint || !observedKeys
+        ? { reasonCode: "configuration_environment_key_evidence_unavailable" }
+        : {}),
     },
     health: { status: healthPassed ? "passed" : "failed", summary: healthPassed ? "Observed workload is running and healthy" : "Observed workload is not healthy" },
     access: {

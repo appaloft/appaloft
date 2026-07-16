@@ -1,4 +1,4 @@
-import "../../../application/node_modules/reflect-metadata/Reflect.js";
+import "reflect-metadata";
 import { mkdtempSync, rmSync } from "node:fs";
 import { describe, expect, test } from "bun:test";
 import {
@@ -68,6 +68,7 @@ import {
   ok,
   type Result,
 } from "@appaloft/core";
+import { TestControlPlaneSecretProtector } from "@appaloft/testkit";
 import {
   type DependencyResourceSecretStore,
   type DeploymentProgressEvent,
@@ -231,6 +232,10 @@ function createContext(): ExecutionContext {
   };
 }
 
+const testSecretProtector = new TestControlPlaneSecretProtector();
+const protectedFixture = (value: string) =>
+  `appaloft-test-secret:v1:${Buffer.from(value, "utf8").toString("base64url")}`;
+
 function runtimeEnvironmentSnapshot(input: { secretKey?: string } = {}): EnvironmentConfigSnapshot {
   const secretKey = input.secretKey ?? "DATABASE_URL";
 
@@ -246,7 +251,7 @@ function runtimeEnvironmentSnapshot(input: { secretKey?: string } = {}): Environ
     variables: [
       {
         key: ConfigKey.rehydrate(secretKey),
-        value: ConfigValueText.rehydrate("postgres://secret-value"),
+        value: ConfigValueText.rehydrate(protectedFixture("postgres://secret-value")),
         kind: VariableKindValue.rehydrate("secret"),
         exposure: VariableExposureValue.rehydrate("runtime"),
         scope: ConfigScopeValue.rehydrate("environment"),
@@ -426,6 +431,16 @@ function commandStatus(command: string[]): number {
     stdout: "pipe",
     stderr: "pipe",
   }).exitCode;
+}
+
+function swarmServiceEnvironmentKeys(serviceName: string): string[] {
+  return commandOutput([
+    "sh",
+    "-c",
+    `docker service inspect ${serviceName} --format '{{range .Spec.TaskTemplate.ContainerSpec.Env}}{{println .}}{{end}}' | sed 's/=.*//' | sort -u`,
+  ])
+    .split(/\r?\n/)
+    .filter(Boolean);
 }
 
 function commandResult(command: string[]): { exitCode: number; stderr: string; stdout: string } {
@@ -708,7 +723,15 @@ describe("DockerSwarmExecutionBackend", () => {
 
   test("[SWARM-TARGET-APPLY-001][SWARM-TARGET-CLEAN-001] executes fake Swarm apply commands without default registry activation", async () => {
     const runner = new RecordingSwarmCommandRunner();
-    const backend = new DockerSwarmExecutionBackend(runner);
+    const backend = new DockerSwarmExecutionBackend(
+      runner,
+      undefined,
+      {},
+      undefined,
+      undefined,
+      undefined,
+      testSecretProtector,
+    );
 
     const result = await backend.execute(createContext(), runningDeployment());
 
@@ -725,8 +748,11 @@ describe("DockerSwarmExecutionBackend", () => {
     expect(runner.calls[0]?.command).toContain(
       "--name 'appaloft-res-api-dst-prod-dep-swarm-backend_web'",
     );
-    expect(runner.calls[0]?.command).toContain("--secret 'source=DATABASE_URL,target=DATABASE_URL'");
-    expect(runner.calls[0]?.command).not.toContain("postgres://secret-value");
+    expect(runner.calls[0]?.command).toContain(
+      "--env 'DATABASE_URL=postgres://secret-value'",
+    );
+    expect(runner.calls[0]?.displayCommand).not.toContain("postgres://secret-value");
+    expect(runner.calls[1]?.command).toContain("sed 's/=.*//' | grep -Fqx -- 'DATABASE_URL'");
     expect(runner.calls[3]?.command).toContain(
       '); if [ "$current_deployment" != \'dep_swarm_backend\' ]; then',
     );
@@ -748,6 +774,7 @@ describe("DockerSwarmExecutionBackend", () => {
       undefined,
       recorder,
       reporter,
+      testSecretProtector,
     );
 
     const result = await backend.execute(createContext(), runningDeployment());
@@ -793,7 +820,15 @@ describe("DockerSwarmExecutionBackend", () => {
 
   test("[STOR-REALIZE-003][SWARM-TARGET-APPLY-001] executes fake Swarm Compose stack apply commands with storage mounts", async () => {
     const runner = new RecordingSwarmCommandRunner();
-    const backend = new DockerSwarmExecutionBackend(runner);
+    const backend = new DockerSwarmExecutionBackend(
+      runner,
+      undefined,
+      {},
+      undefined,
+      undefined,
+      undefined,
+      testSecretProtector,
+    );
 
     const result = await backend.execute(
       createContext(),
@@ -835,7 +870,7 @@ describe("DockerSwarmExecutionBackend", () => {
     });
   });
 
-  test("[DEP-BIND-SECRET-RESOLVE-006] materializes resolved dependency refs as Swarm secrets before service create", async () => {
+  test("[DEP-BIND-SECRET-RESOLVE-006] materializes resolved dependency refs as Swarm environment variables", async () => {
     const runner = new RecordingSwarmCommandRunner();
     const store = new MemoryDependencyResourceSecretStore();
     const secretValue = "postgres://app:swarm-secret@db.example.com:5432/app";
@@ -844,7 +879,15 @@ describe("DockerSwarmExecutionBackend", () => {
       purpose: "connection",
       secretValue,
     });
-    const backend = new DockerSwarmExecutionBackend(runner, undefined, {}, store);
+    const backend = new DockerSwarmExecutionBackend(
+      runner,
+      undefined,
+      {},
+      store,
+      undefined,
+      undefined,
+      testSecretProtector,
+    );
 
     const result = await backend.execute(
       createContext(),
@@ -855,28 +898,14 @@ describe("DockerSwarmExecutionBackend", () => {
 
     expect(result.isOk()).toBe(true);
     expect(runner.calls.map((call) => call.step)).toEqual([
-      "materialize-dependency-secret:DATABASE_URL",
       "create-candidate-service",
       "verify-candidate-service",
       "promote-route-target",
       "cleanup-superseded-services",
     ]);
-    expect(runner.calls[0]?.command).toContain(
-      "docker secret inspect 'appaloft-dep-swarm-backend-database-url'",
-    );
-    expect(runner.calls[0]?.command).toContain(
-      "'appaloft-dep-swarm-backend-database-url' -",
-    );
-    expect(runner.calls[0]?.command).toContain(secretValue);
-    expect(runner.calls[0]?.displayCommand).toContain("[redacted]");
+    expect(runner.calls[0]?.command).toContain(`--env 'DATABASE_URL=${secretValue}'`);
     expect(runner.calls[0]?.displayCommand).not.toContain(secretValue);
-    expect(runner.calls[1]?.command).toContain(
-      "--secret 'source=appaloft-dep-swarm-backend-database-url,target=DATABASE_URL'",
-    );
-    expect(runner.calls[1]?.displayCommand).toContain(
-      "--secret 'source=appaloft-dep-swarm-backend-database-url,target=DATABASE_URL'",
-    );
-    expect(runner.calls[1]?.command).not.toContain(secretValue);
+    expect(runner.calls[1]?.command).toContain("sed 's/=.*//' | grep -Fqx -- 'DATABASE_URL'");
     expect(runner.calls[1]?.displayCommand).not.toContain(secretValue);
 
     const deployment = result._unsafeUnwrap().deployment.toState();
@@ -889,7 +918,15 @@ describe("DockerSwarmExecutionBackend", () => {
 
   test("[DEP-BIND-SECRET-RESOLVE-006] fails safely when the Swarm dependency secret resolver is unavailable", async () => {
     const runner = new RecordingSwarmCommandRunner();
-    const backend = new DockerSwarmExecutionBackend(runner);
+    const backend = new DockerSwarmExecutionBackend(
+      runner,
+      undefined,
+      {},
+      undefined,
+      undefined,
+      undefined,
+      testSecretProtector,
+    );
 
     const result = await backend.execute(
       createContext(),
@@ -911,7 +948,15 @@ describe("DockerSwarmExecutionBackend", () => {
 
   test("[SWARM-TARGET-CLEAN-001] executes fake Swarm cleanup through cancel using scoped labels", async () => {
     const runner = new RecordingSwarmCommandRunner();
-    const backend = new DockerSwarmExecutionBackend(runner);
+    const backend = new DockerSwarmExecutionBackend(
+      runner,
+      undefined,
+      {},
+      undefined,
+      undefined,
+      undefined,
+      testSecretProtector,
+    );
 
     const result = await backend.cancel(createContext(), runningDeployment());
 
@@ -929,7 +974,7 @@ describe("DockerSwarmExecutionBackend", () => {
     const runner = new RecordingSwarmCommandRunner();
     const backend = new DockerSwarmExecutionBackend(runner, undefined, {
       edgeNetworkName: "appaloft-smoke-edge",
-    });
+    }, undefined, undefined, undefined, testSecretProtector);
 
     const result = await backend.execute(createContext(), runningDeployment());
 
@@ -940,7 +985,15 @@ describe("DockerSwarmExecutionBackend", () => {
 
   test("[SWARM-TARGET-APPLY-002][SWARM-TARGET-CLEAN-001] cleans only the failed candidate when fake verification fails", async () => {
     const runner = new FailingVerifySwarmCommandRunner();
-    const backend = new DockerSwarmExecutionBackend(runner);
+    const backend = new DockerSwarmExecutionBackend(
+      runner,
+      undefined,
+      {},
+      undefined,
+      undefined,
+      undefined,
+      testSecretProtector,
+    );
 
     const result = await backend.execute(createContext(), runningDeployment());
 
@@ -971,7 +1024,15 @@ describe("DockerSwarmExecutionBackend", () => {
       "create-candidate-service",
       "failed to create service: no space left on device",
     );
-    const backend = new DockerSwarmExecutionBackend(runner);
+    const backend = new DockerSwarmExecutionBackend(
+      runner,
+      undefined,
+      {},
+      undefined,
+      undefined,
+      undefined,
+      testSecretProtector,
+    );
 
     const result = await backend.execute(createContext(), runningDeployment());
 
@@ -998,7 +1059,15 @@ describe("DockerSwarmExecutionBackend", () => {
       "verify-candidate-service",
       "service task failed: memory cgroup out of memory",
     );
-    const backend = new DockerSwarmExecutionBackend(runner);
+    const backend = new DockerSwarmExecutionBackend(
+      runner,
+      undefined,
+      {},
+      undefined,
+      undefined,
+      undefined,
+      testSecretProtector,
+    );
 
     const result = await backend.execute(createContext(), runningDeployment());
 
@@ -1021,7 +1090,15 @@ describe("DockerSwarmExecutionBackend", () => {
 
   test("[SWARM-TARGET-SECRET-001] redacts Swarm command failure output in deployment logs and metadata", async () => {
     const runner = new SecretLeakingVerifySwarmCommandRunner();
-    const backend = new DockerSwarmExecutionBackend(runner);
+    const backend = new DockerSwarmExecutionBackend(
+      runner,
+      undefined,
+      {},
+      undefined,
+      undefined,
+      undefined,
+      testSecretProtector,
+    );
 
     const result = await backend.execute(createContext(), runningDeployment());
 
@@ -1096,6 +1173,10 @@ describe("DockerSwarmExecutionBackend", () => {
         }),
         undefined,
         { edgeNetworkName },
+        undefined,
+        undefined,
+        undefined,
+        testSecretProtector,
       );
 
       try {
@@ -1108,13 +1189,6 @@ describe("DockerSwarmExecutionBackend", () => {
           ].join("\n"),
         );
         prepareSmokeEdgeProxy({ edgeNetworkName, publishedPort: edgeProxyPort });
-        commandStatus(["docker", "secret", "rm", secretKey]);
-        commandOutput([
-          "sh",
-          "-c",
-          `printf %s 'postgres://secret-value' | docker secret create ${secretKey} -`,
-        ]);
-
         const result = await backend.execute(createContext(), deployment);
         expect(result.isOk()).toBe(true);
         const state = result._unsafeUnwrap().deployment.toState();
@@ -1139,6 +1213,9 @@ describe("DockerSwarmExecutionBackend", () => {
         expect(JSON.stringify(state.runtimePlan.execution.metadata)).not.toContain(
           "postgres://secret-value",
         );
+        expect(
+          swarmServiceEnvironmentKeys("appaloft-res-api-dst-prod-dep-swarm-compose_web"),
+        ).toEqual(expect.arrayContaining([secretKey, "PUBLIC_FLAG"]));
         await waitForSmokeRoute({
           expectedText: "Welcome to nginx",
           host: "api.example.com",
@@ -1154,7 +1231,6 @@ describe("DockerSwarmExecutionBackend", () => {
         if (!deploymentCleaned) {
           await backend.cancel(createContext(), deployment);
         }
-        commandStatus(["docker", "secret", "rm", secretKey]);
         removeSmokeEdgeProxy();
         await removeDockerVolumeWithRetry(storageVolumeName);
         rmSync(composeDir, { force: true, recursive: true });
@@ -1212,16 +1288,14 @@ describe("DockerSwarmExecutionBackend", () => {
         }),
         undefined,
         { edgeNetworkName },
+        undefined,
+        undefined,
+        undefined,
+        testSecretProtector,
       );
 
       try {
         prepareSmokeEdgeProxy({ edgeNetworkName, publishedPort: edgeProxyPort });
-        commandStatus(["docker", "secret", "rm", secretKey]);
-        commandOutput([
-          "sh",
-          "-c",
-          `printf %s 'postgres://secret-value' | docker secret create ${secretKey} -`,
-        ]);
         const result = await backend.execute(createContext(), deployment);
         expect(result.isOk()).toBe(true);
         const state = result._unsafeUnwrap().deployment.toState();
@@ -1245,6 +1319,9 @@ describe("DockerSwarmExecutionBackend", () => {
         expect(JSON.stringify(state.runtimePlan.execution.metadata)).not.toContain(
           "postgres://secret-value",
         );
+        expect(
+          swarmServiceEnvironmentKeys("appaloft-res-api-dst-prod-dep-swarm-backend_web"),
+        ).toEqual(expect.arrayContaining([secretKey, "PUBLIC_FLAG"]));
         await waitForSmokeRoute({
           expectedText: "Welcome to nginx",
           host: "api.example.com",
@@ -1301,7 +1378,6 @@ describe("DockerSwarmExecutionBackend", () => {
         if (!deploymentCleaned) {
           await backend.cancel(createContext(), deployment);
         }
-        commandStatus(["docker", "secret", "rm", secretKey]);
         removeSmokeEdgeProxy();
         if (registry) {
           commandStatus(["docker", "logout", registry.registryAddress]);

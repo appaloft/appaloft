@@ -7,6 +7,7 @@ import {
   type DeploymentExecutionGuard,
   type DeploymentProgressRecorder,
   type DeploymentProgressReporter,
+  type ControlPlaneSecretProtector,
   type DependencyResourceSecretStore,
   type EdgeProxyProviderRegistry,
   type ExecutionBackend,
@@ -59,6 +60,7 @@ import {
   githubHttpsSubmodulePrefix,
 } from "./git-source-submodules";
 import {
+  dockerContainerEnvironmentKeyVerificationCommand,
   dockerPublishedPortCommand,
   dockerRemoveConflictingRouteContainersCommand,
   dockerRemoveResourceContainersCommand,
@@ -876,6 +878,7 @@ export class SshExecutionBackend implements ExecutionBackend {
     private readonly resourceAccessFailureRenderer?: () => ResourceAccessFailureRendererTarget | undefined,
     private readonly deploymentExecutionGuard?: DeploymentExecutionGuard,
     private readonly dependencyResourceSecretStore?: DependencyResourceSecretStore,
+    private readonly controlPlaneSecretProtector?: ControlPlaneSecretProtector,
   ) {}
 
   private async report(
@@ -2020,6 +2023,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       context,
       deployment,
       dependencyResourceSecretStore: this.dependencyResourceSecretStore,
+      controlPlaneSecretProtector: this.controlPlaneSecretProtector,
       port,
       includeDependencyRuntimeSecrets: false,
     });
@@ -2463,6 +2467,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         context,
         deployment,
         dependencyResourceSecretStore: this.dependencyResourceSecretStore,
+        controlPlaneSecretProtector: this.controlPlaneSecretProtector,
         port,
       });
       if (runtimeEnv.isErr()) {
@@ -2667,6 +2672,48 @@ export class SshExecutionBackend implements ExecutionBackend {
           }),
         });
       }
+
+      const environmentKeyVerification = await this.runRemoteCommand({
+        target,
+        command: dockerContainerEnvironmentKeyVerificationCommand({
+          containerName,
+          expectedKeys: dockerEnvVariables.map((variable) => variable.name),
+          quote: shellQuote,
+        }),
+        cwd: runtimeDir,
+        env,
+      });
+      if (environmentKeyVerification.failed) {
+        await this.runRemoteCommand({
+          target,
+          command: `docker rm -f ${shellQuote(containerName)}`,
+          cwd: runtimeDir,
+          env,
+        });
+        const message = "SSH Docker container environment key verification failed";
+        timeline.push(phaseLog("verify", message, "error"));
+        return ok({
+          deployment: this.applyFailure(deployment, {
+            timeline,
+            errorCode: "ssh_docker_environment_key_verification_failed",
+            retryable: true,
+            metadata: {
+              host: target.host,
+              image,
+              containerName,
+              expectedEnvironmentKeyCount: String(dockerEnvVariables.length),
+              ...prepared.source.metadata,
+              ...dockerImageVersionMetadata,
+            },
+          }),
+        });
+      }
+      timeline.push(
+        phaseLog(
+          "verify",
+          `SSH Docker container environment key set verified (${dockerEnvVariables.length} keys)`,
+        ),
+      );
 
       const proxyReloadPlanResult = this.edgeProxyProviderRegistry
         ? await createProxyReloadPlan({
@@ -3430,6 +3477,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       context,
       deployment,
       dependencyResourceSecretStore: this.dependencyResourceSecretStore,
+      controlPlaneSecretProtector: this.controlPlaneSecretProtector,
       ...(state.runtimePlan.execution.port ? { port: state.runtimePlan.execution.port } : {}),
       includeDependencyRuntimeSecrets: false,
     });
@@ -3529,6 +3577,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         context,
         deployment,
         dependencyResourceSecretStore: this.dependencyResourceSecretStore,
+        controlPlaneSecretProtector: this.controlPlaneSecretProtector,
         ...(state.runtimePlan.execution.port ? { port: state.runtimePlan.execution.port } : {}),
       });
       if (runtimeEnv.isErr()) {
@@ -3733,6 +3782,7 @@ export class SshExecutionBackend implements ExecutionBackend {
               : {}),
             mounts: storageMounts.value,
             volumeRealizations: storageVolumeRealizations.value,
+            environmentKeys: runtimeEnvVariables.map((variable) => variable.name),
             quote: shellQuote,
           }),
         }),
@@ -3917,6 +3967,44 @@ export class SshExecutionBackend implements ExecutionBackend {
       }
 
       const targetContainer = containerVerification.verification.containers[0];
+      const environmentKeyVerification = targetContainer
+        ? await this.runRemoteCommand({
+            target,
+            command: dockerContainerEnvironmentKeyVerificationCommand({
+              containerName: targetContainer.id,
+              expectedKeys: runtimeEnvVariables.map((variable) => variable.name),
+              quote: shellQuote,
+            }),
+            cwd: runtimeDir,
+            env: runtimeEnv.value.env,
+          })
+        : { failed: true };
+      if (environmentKeyVerification.failed) {
+        await cleanupCandidate();
+        const message = "SSH Compose target environment key verification failed";
+        timeline.push(phaseLog("verify", message, "error"));
+        return ok({
+          deployment: this.applyFailure(deployment, {
+            timeline,
+            errorCode: "ssh_docker_compose_environment_key_verification_failed",
+            retryable: true,
+            metadata: {
+              host: target.host,
+              remoteWorkdir,
+              composeFile: remoteComposeFile,
+              composeProjectName: runtimeInstanceNames.composeProjectName,
+              expectedEnvironmentKeyCount: String(runtimeEnvVariables.length),
+              ...prepared.source.metadata,
+            },
+          }),
+        });
+      }
+      timeline.push(
+        phaseLog(
+          "verify",
+          `SSH Compose target environment key set verified (${runtimeEnvVariables.length} keys)`,
+        ),
+      );
       const port = state.runtimePlan.execution.port;
       const healthPath = normalizeHealthCheckPath(
         state.runtimePlan.execution.healthCheck?.http?.path.value ??
@@ -4155,6 +4243,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       context,
       deployment,
       dependencyResourceSecretStore: this.dependencyResourceSecretStore,
+      controlPlaneSecretProtector: this.controlPlaneSecretProtector,
       includeDependencyRuntimeSecrets: false,
     });
     if (runtimeEnv.isErr()) {
@@ -4319,6 +4408,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       context,
       deployment,
       dependencyResourceSecretStore: this.dependencyResourceSecretStore,
+      controlPlaneSecretProtector: this.controlPlaneSecretProtector,
       includeDependencyRuntimeSecrets: false,
     });
     if (runtimeEnv.isErr()) {

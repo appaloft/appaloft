@@ -268,6 +268,7 @@ import { applyConnectorCapabilityCommandInputSchema } from "./operations/system/
 import { applyInstanceUpgradeCommandInputSchema } from "./operations/system/apply-instance-upgrade.command";
 import { checkInstanceUpgradeQueryInputSchema } from "./operations/system/check-instance-upgrade.query";
 import { completeConnectionCallbackCommandInputSchema } from "./operations/system/complete-connection-callback.command";
+import { controlPlaneSecretRotationApplyCommandInputSchema } from "./operations/system/control-plane-secret-rotation-apply.command";
 import { githubAppConnectionQueryInputSchema } from "./operations/system/github-app-connection.query";
 import { listConnectionsQueryInputSchema } from "./operations/system/list-connections.query";
 import { listConnectorsQueryInputSchema } from "./operations/system/list-connectors.query";
@@ -4535,6 +4536,31 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft upgrade apply",
       orpc: { method: "POST", path: "/api/instance-upgrade/apply" },
+    },
+  },
+  {
+    key: "system.control-plane-secret-rotation.plan",
+    kind: "query",
+    domain: "system",
+    messageName: "ControlPlaneSecretRotationPlanQuery",
+    handlerName: "ControlPlaneSecretRotationPlanQueryHandler",
+    serviceName: "ControlPlaneSecretRotationPlanQueryService",
+    serviceToken: tokens.controlPlaneSecretRotationPlanQueryService,
+    transports: {
+      cli: "appaloft db secret-rotation plan",
+    },
+  },
+  {
+    key: "system.control-plane-secret-rotation.apply",
+    kind: "command",
+    domain: "system",
+    messageName: "ControlPlaneSecretRotationApplyCommand",
+    handlerName: "ControlPlaneSecretRotationApplyCommandHandler",
+    serviceName: "ControlPlaneSecretRotationApplyUseCase",
+    inputSchema: controlPlaneSecretRotationApplyCommandInputSchema,
+    serviceToken: tokens.controlPlaneSecretRotationApplyUseCase,
+    transports: {
+      cli: "appaloft db secret-rotation apply",
     },
   },
   {

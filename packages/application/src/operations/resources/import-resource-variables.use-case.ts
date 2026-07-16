@@ -22,6 +22,7 @@ import {
   AllowAllOperationGuardPort,
   type AppLogger,
   type Clock,
+  type ControlPlaneSecretProtector,
   type EventBus,
   type OperationGuardPort,
   type ResourceRepository,
@@ -277,6 +278,8 @@ export class ImportResourceVariablesUseCase {
     private readonly eventBus: EventBus,
     @inject(tokens.logger)
     private readonly logger: AppLogger,
+    @inject(tokens.controlPlaneSecretProtector)
+    private readonly secretProtector: ControlPlaneSecretProtector,
     @inject(tokens.operationGuardPort)
     private readonly operationGuardPort?: OperationGuardPort,
   ) {}
@@ -285,7 +288,8 @@ export class ImportResourceVariablesUseCase {
     context: ExecutionContext,
     input: ImportResourceVariablesCommandInput,
   ): Promise<Result<ImportResourceVariablesResponse>> {
-    const { clock, eventBus, logger, operationGuardPort, resourceRepository } = this;
+    const { clock, eventBus, logger, operationGuardPort, resourceRepository, secretProtector } =
+      this;
     const repositoryContext = toRepositoryContext(context);
 
     return safeTry(async function* () {
@@ -347,7 +351,10 @@ export class ImportResourceVariablesUseCase {
 
       for (const entry of classified) {
         const key = yield* ConfigKey.create(entry.key);
-        const value = yield* ConfigValueText.create(entry.value);
+        const storedValue = entry.isSecret
+          ? yield* await secretProtector.protect({ purpose: "resource-variable" }, entry.value)
+          : { envelope: entry.value };
+        const value = yield* ConfigValueText.create(storedValue.envelope);
         const kind = yield* VariableKindValue.create(entry.kind);
         preparedEntries.push({
           key,

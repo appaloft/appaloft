@@ -674,6 +674,10 @@ export const zhCN = {
       proofAccess: "访问与路由",
       proofArtifact: "构建产物",
       proofConfiguration: "配置指纹",
+      proofEnvironmentKeys: "运行时环境变量键",
+      proofEnvironmentKeysMatched: "键集合一致",
+      proofEnvironmentKeysMismatch: "键集合不一致",
+      proofEnvironmentKeysUnavailable: "键集合不可用",
       proofDescription:
         "把已接受的源码、产物、配置和预期变化，与当前实际运行的工作负载逐项比较。仅仅健康并不代表部署已验证。",
       proofExpectedEffects: "预期变化",

@@ -72,12 +72,19 @@ export function renderComposeOwnershipLabelOverrideScript(input: {
   targetServiceName?: string;
   targetLabels?: readonly RuntimeCommandLabel[];
   targetNetworkName?: string;
+  environmentKeys?: readonly string[];
   mounts?: readonly DockerRunMountInput[];
   volumeRealizations?: readonly DockerStorageVolumeRealization[];
   quote: (value: string) => string;
 }): string {
   const labelLines = renderLabelLines(input.labels);
   const targetLabelLines = renderLabelLines(input.targetLabels ?? []);
+  const environmentLines = [...new Set(input.environmentKeys ?? [])]
+    .sort()
+    .flatMap((key, index) => [
+      ...(index === 0 ? ["    environment:"] : []),
+      `      ${yamlQuoted(key)}: ${yamlQuoted(`\${${key}}`)}`,
+    ]);
   const mountLines = renderMountLines(input.mounts ?? []);
   const topLevelVolumeLines = renderTopLevelVolumeLines({
     mounts: input.mounts ?? [],
@@ -91,7 +98,8 @@ export function renderComposeOwnershipLabelOverrideScript(input: {
         `    name: ${yamlQuoted(input.targetNetworkName)}`,
       ]
     : [];
-  const requiresTargetService = targetLabelLines.length > 0 || Boolean(input.targetNetworkName);
+  const requiresTargetService =
+    targetLabelLines.length > 0 || environmentLines.length > 0 || Boolean(input.targetNetworkName);
   const staticLines = [
     "set -eu",
     `compose_file=${input.quote(input.composeFile)}`,
@@ -142,6 +150,7 @@ export function renderComposeOwnershipLabelOverrideScript(input: {
       ? [
           '    if [ "$service" = "$target_service" ]; then',
           ...targetLabelLines.map((line) => `      printf '%s\\n' ${input.quote(line)}`),
+          ...environmentLines.map((line) => `      printf '%s\\n' ${input.quote(line)}`),
           ...(input.targetNetworkName
             ? [
                 `      printf '%s\\n' ${input.quote("    networks:")}`,

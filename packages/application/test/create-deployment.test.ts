@@ -138,7 +138,42 @@ import {
   NoopLogger,
   PassThroughMutationCoordinator,
   SequenceIdGenerator,
+  TestControlPlaneSecretProtector,
 } from "@appaloft/testkit";
+
+const testSecretProtector = new TestControlPlaneSecretProtector();
+const testProtectedSecret = (value: string) =>
+  `appaloft-test-secret:v1:${Buffer.from(value, "utf8").toString("base64url")}`;
+
+const unavailableSecretProtector: ControlPlaneSecretProtector = {
+  activeKeyId: () => null,
+  inspect: () => ({ state: "unreadable" }),
+  protect: async () =>
+    err({
+      code: "control_plane_secret_keyring_unavailable",
+      category: "infra",
+      message: "Control-plane secret keyring is unavailable; operation was blocked",
+      retryable: false,
+      details: { phase: "control-plane-secret-materialization" },
+    }),
+  unprotect: async () =>
+    err({
+      code: "control_plane_secret_keyring_unavailable",
+      category: "infra",
+      message: "Control-plane secret keyring is unavailable; deployment was blocked",
+      retryable: false,
+      details: { phase: "control-plane-secret-materialization" },
+    }),
+  rewrap: async () =>
+    err({
+      code: "control_plane_secret_keyring_unavailable",
+      category: "infra",
+      message: "Control-plane secret keyring is unavailable; rotation was blocked",
+      retryable: false,
+      details: { phase: "control-plane-secret-rotation" },
+    }),
+};
+
 import { DeploymentTimelineProgressRecorder } from "../src/deployment-progress-recorder";
 import {
   type DurableWorkClaimInput,
@@ -165,6 +200,7 @@ import {
   type ScheduledRuntimePrunePolicyRepository,
 } from "../src/operations/servers/scheduled-runtime-prune.service";
 import {
+  type ControlPlaneSecretProtector,
   type DefaultAccessDomainProvider,
   type DefaultAccessDomainRequest,
   type DeploymentConfigReader,
@@ -962,6 +998,7 @@ async function createDeploymentFixture(
     operationGuardPort?: OperationGuardPort;
     environmentProfileDecisionReadModel?: MemoryEnvironmentProfileDecisionStore;
     sourceVersionDetector?: SourceVersionDetector;
+    controlPlaneSecretProtector?: ControlPlaneSecretProtector;
   } = {},
 ) {
   const projects = new MemoryProjectRepository();
@@ -1096,6 +1133,7 @@ async function createDeploymentFixture(
     new DeploymentLifecycleService(clock),
     new PassThroughMutationCoordinator(),
     options.runtimeTargetBackendRegistry ?? new StaticRuntimeTargetBackendRegistry(),
+    options.controlPlaneSecretProtector ?? testSecretProtector,
     options.domainRouteBindingReader,
     options.serverAppliedRouteDesiredStateReader,
     dependencyBindingReadModel,
@@ -1592,6 +1630,42 @@ class RaceLosingMemoryDeploymentRepository extends MemoryDeploymentRepository {
 }
 
 describe("CreateDeploymentUseCase", () => {
+  test("[CPS-FAIL-002] missing keyring blocks deployment before persistence or execution", async () => {
+    const fixture = await createDeploymentFixture(new ExplicitContextRequiredPolicy(), {
+      controlPlaneSecretProtector: unavailableSecretProtector,
+    });
+    const marker = "MISSING_KEYRING_MARKER";
+    fixture.environment
+      .setVariable({
+        key: ConfigKey.rehydrate("DEPLOYMENT_SECRET"),
+        value: ConfigValueText.rehydrate(testProtectedSecret(marker)),
+        kind: VariableKindValue.rehydrate("secret"),
+        exposure: VariableExposureValue.rehydrate("runtime"),
+        scope: ConfigScopeValue.rehydrate("environment"),
+        isSecret: true,
+        updatedAt: UpdatedAt.rehydrate(fixture.clock.now()),
+      })
+      ._unsafeUnwrap();
+    await fixture.environments.upsert(
+      fixture.repositoryContext,
+      fixture.environment,
+      UpsertEnvironmentSpec.fromEnvironment(fixture.environment),
+    );
+
+    const result = await fixture.createDeploymentUseCase.execute(
+      fixture.context,
+      fixture.createDeploymentInput,
+    );
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "control_plane_secret_keyring_unavailable",
+      details: { phase: "control-plane-secret-materialization" },
+    });
+    expect(fixture.deployments.items.size).toBe(0);
+    expect(JSON.stringify(result._unsafeUnwrapErr())).not.toContain(marker);
+  });
+
   test("rejects legacy deployment source and runtime fields at command schema boundary", () => {
     const command = CreateDeploymentCommand.create({
       projectId: "prj_demo",
@@ -3305,6 +3379,7 @@ describe("CreateDeploymentUseCase", () => {
       new DeploymentLifecycleService(clock),
       new PassThroughMutationCoordinator(),
       new StaticRuntimeTargetBackendRegistry(),
+      testSecretProtector,
     );
 
     const result = await useCase.execute(context, {
@@ -3445,7 +3520,7 @@ describe("CreateDeploymentUseCase", () => {
 
     environment.setVariable({
       key: ConfigKey.rehydrate("DATABASE_URL"),
-      value: ConfigValueText.rehydrate("postgres://db"),
+      value: ConfigValueText.rehydrate(testProtectedSecret("postgres://db")),
       kind: VariableKindValue.rehydrate("secret"),
       exposure: VariableExposureValue.rehydrate("runtime"),
       scope: ConfigScopeValue.rehydrate("environment"),
@@ -3508,6 +3583,7 @@ describe("CreateDeploymentUseCase", () => {
       new DeploymentLifecycleService(clock),
       new PassThroughMutationCoordinator(),
       new StaticRuntimeTargetBackendRegistry(),
+      testSecretProtector,
     );
 
     const result = await useCase.execute(context, {
@@ -3530,7 +3606,7 @@ describe("CreateDeploymentUseCase", () => {
     expect(deployment?.toState().environmentSnapshot.variables).toEqual([
       expect.objectContaining({
         key: "DATABASE_URL",
-        value: "postgres://db",
+        value: testProtectedSecret("postgres://db"),
         isSecret: true,
       }),
     ]);
@@ -3622,7 +3698,7 @@ describe("CreateDeploymentUseCase", () => {
     });
     resource.setVariable({
       key: ConfigKey.rehydrate("DATABASE_URL"),
-      value: ConfigValueText.rehydrate("postgres://resource"),
+      value: ConfigValueText.rehydrate(testProtectedSecret("postgres://resource")),
       kind: VariableKindValue.rehydrate("secret"),
       exposure: VariableExposureValue.rehydrate("runtime"),
       isSecret: true,
@@ -3677,6 +3753,7 @@ describe("CreateDeploymentUseCase", () => {
       new DeploymentLifecycleService(clock),
       new PassThroughMutationCoordinator(),
       new StaticRuntimeTargetBackendRegistry(),
+      testSecretProtector,
     );
 
     const result = await useCase.execute(context, {
@@ -3707,7 +3784,7 @@ describe("CreateDeploymentUseCase", () => {
       expect.arrayContaining([
         expect.objectContaining({
           key: "DATABASE_URL",
-          value: "postgres://resource",
+          value: testProtectedSecret("postgres://resource"),
           scope: "resource",
           isSecret: true,
         }),
@@ -4672,6 +4749,7 @@ describe("CreateDeploymentUseCase", () => {
       new DeploymentLifecycleService(clock),
       new PassThroughMutationCoordinator(),
       new StaticRuntimeTargetBackendRegistry(),
+      testSecretProtector,
     );
 
     const result = await useCase.execute(context, {
@@ -4749,6 +4827,7 @@ describe("CreateDeploymentUseCase", () => {
       new DeploymentLifecycleService(clock),
       new PassThroughMutationCoordinator(),
       new StaticRuntimeTargetBackendRegistry(),
+      testSecretProtector,
     );
 
     const result = await useCase.execute(context, {
@@ -4846,6 +4925,7 @@ describe("CreateDeploymentUseCase", () => {
       new DeploymentLifecycleService(clock),
       new PassThroughMutationCoordinator(),
       new StaticRuntimeTargetBackendRegistry(),
+      testSecretProtector,
     );
 
     const result = await useCase.execute(context, {

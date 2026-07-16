@@ -11,6 +11,7 @@ import { inject, injectable } from "tsyringe";
 
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
 import {
+  type ControlPlaneSecretProtector,
   type DependencyResourceSecretStore,
   type DeploymentPlanPreview,
   type DeploymentPlanReason,
@@ -578,6 +579,8 @@ export class DeploymentPlanQueryService {
     private readonly runtimePlanResolutionInputBuilder: RuntimePlanResolutionInputBuilder,
     @inject(tokens.runtimeTargetBackendRegistry)
     private readonly runtimeTargetBackendRegistry: RuntimeTargetBackendRegistry,
+    @inject(tokens.controlPlaneSecretProtector)
+    private readonly controlPlaneSecretProtector: ControlPlaneSecretProtector,
     @inject(tokens.domainRouteBindingReader)
     private readonly domainRouteBindingReader?: DomainRouteBindingReader,
     @inject(tokens.serverAppliedRouteStateRepository)
@@ -620,6 +623,7 @@ export class DeploymentPlanQueryService {
     const {
       deploymentContextResolver,
       deploymentSnapshotFactory,
+      controlPlaneSecretProtector,
       dependencyResourceSecretStore,
       domainRouteBindingReader,
       resourceDependencyBindingReadModel,
@@ -670,6 +674,15 @@ export class DeploymentPlanQueryService {
       }
 
       const snapshot = yield* deploymentSnapshotFactory.create(environment, resource);
+      for (const variable of snapshot.variables) {
+        if (!variable.isSecret) continue;
+        yield* await controlPlaneSecretProtector.unprotect(
+          {
+            purpose: variable.scope === "resource" ? "resource-variable" : "environment-variable",
+          },
+          variable.value,
+        );
+      }
       const requestedDeploymentBaseResult = requestedDeploymentFromResource(resource);
       if (requestedDeploymentBaseResult.isErr()) {
         return ok(

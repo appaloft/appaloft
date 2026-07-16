@@ -18,6 +18,7 @@ import {
   type DeploymentExecutionGuard,
   type DeploymentProgressRecorder,
   type DeploymentProgressReporter,
+  type ControlPlaneSecretProtector,
   type DependencyResourceSecretStore,
   type EdgeProxyProviderRegistry,
   type ExecutionBackend,
@@ -64,6 +65,7 @@ import {
   githubHttpsSubmodulePrefix,
 } from "./git-source-submodules";
 import {
+  dockerContainerEnvironmentKeyVerificationCommand,
   dockerPublishedPortCommand,
   dockerRemoveResourceContainersCommand,
   parseDockerPublishedHostPort,
@@ -619,6 +621,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     private readonly resourceAccessFailureRenderer?: () => ResourceAccessFailureRendererTarget | undefined,
     private readonly deploymentExecutionGuard?: DeploymentExecutionGuard,
     private readonly dependencyResourceSecretStore?: DependencyResourceSecretStore,
+    private readonly controlPlaneSecretProtector?: ControlPlaneSecretProtector,
   ) {}
 
   private async report(
@@ -1205,6 +1208,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       context,
       deployment,
       dependencyResourceSecretStore: this.dependencyResourceSecretStore,
+      controlPlaneSecretProtector: this.controlPlaneSecretProtector,
       port,
       includeDependencyRuntimeSecrets: false,
     });
@@ -1357,6 +1361,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       context,
       deployment,
       dependencyResourceSecretStore: this.dependencyResourceSecretStore,
+      controlPlaneSecretProtector: this.controlPlaneSecretProtector,
       port,
     });
     if (runtimeEnv.isErr()) {
@@ -1518,6 +1523,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       context,
       deployment,
       dependencyResourceSecretStore: this.dependencyResourceSecretStore,
+      controlPlaneSecretProtector: this.controlPlaneSecretProtector,
       port: containerPort,
       includeDependencyRuntimeSecrets: false,
     });
@@ -2067,6 +2073,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       context,
       deployment,
       dependencyResourceSecretStore: this.dependencyResourceSecretStore,
+      controlPlaneSecretProtector: this.controlPlaneSecretProtector,
       port: containerPort,
     });
     if (runtimeEnv.isErr()) {
@@ -2248,6 +2255,42 @@ export class LocalExecutionBackend implements ExecutionBackend {
         }).deployment,
       });
     }
+    const environmentKeyVerification = await runShellCommand({
+      command: dockerContainerEnvironmentKeyVerificationCommand({
+        containerName,
+        expectedKeys: dockerEnvVariables.map((variable) => variable.name),
+        quote: shellQuote,
+      }),
+      cwd: workdir,
+      env,
+    });
+    if (environmentKeyVerification.failed) {
+      await runShellCommand({
+        command: `docker rm -f ${shellQuote(containerName)}`,
+        cwd: workdir,
+        env,
+      });
+      const message = "Docker container environment key verification failed";
+      return ok({
+        deployment: this.applyFailure(deployment, {
+          timeline: [...timeline, phaseLog("verify", message, "error")],
+          errorCode: "docker_environment_key_verification_failed",
+          retryable: true,
+          metadata: {
+            image,
+            containerName,
+            expectedEnvironmentKeyCount: String(dockerEnvVariables.length),
+            ...preparedSource.metadata,
+          },
+        }).deployment,
+      });
+    }
+    timeline.push(
+      phaseLog(
+        "verify",
+        `Docker container environment key set verified (${dockerEnvVariables.length} keys)`,
+      ),
+    );
     await this.report(context, {
       deploymentId: state.id.value,
       phase: "deploy",
@@ -2671,6 +2714,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       context,
       deployment,
       dependencyResourceSecretStore: this.dependencyResourceSecretStore,
+      controlPlaneSecretProtector: this.controlPlaneSecretProtector,
       ...(state.runtimePlan.execution.port ? { port: state.runtimePlan.execution.port } : {}),
       includeDependencyRuntimeSecrets: false,
     });
@@ -2775,6 +2819,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       context,
       deployment,
       dependencyResourceSecretStore: this.dependencyResourceSecretStore,
+      controlPlaneSecretProtector: this.controlPlaneSecretProtector,
       ...(state.runtimePlan.execution.port ? { port: state.runtimePlan.execution.port } : {}),
     });
     if (runtimeEnv.isErr()) {
@@ -2863,6 +2908,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
           : {}),
         mounts: storageMounts.value,
         volumeRealizations: storageVolumeRealizations.value,
+        environmentKeys: Object.keys(runtimeEnvPlaceholders),
         quote: shellQuote,
       }),
       cwd: workdir,
@@ -3084,6 +3130,46 @@ export class LocalExecutionBackend implements ExecutionBackend {
     }
 
     const targetContainer = containerVerification.verification.containers[0];
+    const environmentKeyVerification = await runShellCommand({
+      command: dockerContainerEnvironmentKeyVerificationCommand({
+        containerName: targetContainer?.id ?? "",
+        expectedKeys: Object.keys(runtimeEnvPlaceholders),
+        quote: shellQuote,
+      }),
+      cwd: workdir,
+      env: runtimeEnv.value.env,
+    });
+    if (!targetContainer || environmentKeyVerification.failed) {
+      await runShellCommand({
+        command: dockerRemoveResourceContainersCommand({
+          resourceId: state.resourceId.value,
+          deploymentIds: [state.id.value],
+          quote: shellQuote,
+        }),
+        cwd: workdir,
+        env: runtimeEnv.value.env,
+      });
+      const message = "Compose target environment key verification failed";
+      return ok({
+        deployment: this.applyFailure(deployment, {
+          timeline: [...timeline, phaseLog("verify", message, "error")],
+          errorCode: "docker_compose_environment_key_verification_failed",
+          retryable: true,
+          metadata: {
+            composeFile,
+            composeProjectName: runtimeInstanceNames.composeProjectName,
+            expectedEnvironmentKeyCount: String(Object.keys(runtimeEnvPlaceholders).length),
+            ...preparedSource.metadata,
+          },
+        }).deployment,
+      });
+    }
+    timeline.push(
+      phaseLog(
+        "verify",
+        `Compose target environment key set verified (${Object.keys(runtimeEnvPlaceholders).length} keys)`,
+      ),
+    );
     const containerPort = state.runtimePlan.execution.port;
     if (
       healthOptions &&
@@ -3332,6 +3418,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       context,
       deployment,
       dependencyResourceSecretStore: this.dependencyResourceSecretStore,
+      controlPlaneSecretProtector: this.controlPlaneSecretProtector,
       includeDependencyRuntimeSecrets: false,
     });
     if (runtimeEnv.isErr()) {
@@ -3449,6 +3536,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       context,
       deployment,
       dependencyResourceSecretStore: this.dependencyResourceSecretStore,
+      controlPlaneSecretProtector: this.controlPlaneSecretProtector,
       includeDependencyRuntimeSecrets: false,
     });
     if (runtimeEnv.isErr()) {

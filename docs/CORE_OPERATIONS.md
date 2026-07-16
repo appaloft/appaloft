@@ -1830,6 +1830,8 @@ Implemented operations:
 | Doctor diagnostics | Query | `system.doctor` | `DoctorQuery` | none | `appaloft doctor` | `GET /api/system/doctor` |
 | Check instance upgrade | Query | `system.instance-upgrade.check` | `CheckInstanceUpgradeQuery` | `CheckInstanceUpgradeQueryInput` | `appaloft upgrade check` | `GET /api/instance-upgrade/check` |
 | Apply instance upgrade | Command | `system.instance-upgrade.apply` | `ApplyInstanceUpgradeCommand` | `ApplyInstanceUpgradeCommandInput` | `appaloft upgrade apply --confirm` | `POST /api/instance-upgrade/apply` |
+| Plan control-plane secret rotation | Query | `system.control-plane-secret-rotation.plan` | `ControlPlaneSecretRotationPlanQuery` | none | `appaloft db secret-rotation plan` | none |
+| Apply control-plane secret rotation | Command | `system.control-plane-secret-rotation.apply` | `ControlPlaneSecretRotationApplyCommand` | `ControlPlaneSecretRotationApplyCommandInput` | `appaloft db secret-rotation apply --plan-digest <digest> --backup-reference <reference>` | none |
 | Database status | Query | `system.db-status` | `DbStatusQuery` | none | `appaloft db status` | none |
 | Database migrate | Command | `system.db-migrate` | `DbMigrateCommand` | none | `appaloft db migrate` | none |
 

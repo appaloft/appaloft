@@ -29,6 +29,7 @@ import { checkOperationGuards } from "../../operation-guard";
 import {
   AllowAllOperationGuardPort,
   type AppLogger,
+  type ControlPlaneSecretProtector,
   type DependencyResourceSecretStore,
   type DeploymentOverlayPort,
   type DeploymentProgressReporter,
@@ -590,6 +591,8 @@ export class CreateDeploymentUseCase {
     private readonly mutationCoordinator: MutationCoordinator,
     @inject(tokens.runtimeTargetBackendRegistry)
     private readonly runtimeTargetBackendRegistry: RuntimeTargetBackendRegistry,
+    @inject(tokens.controlPlaneSecretProtector)
+    private readonly controlPlaneSecretProtector: ControlPlaneSecretProtector,
     @inject(tokens.domainRouteBindingReader)
     private readonly domainRouteBindingReader?: DomainRouteBindingReader,
     @inject(tokens.serverAppliedRouteStateRepository)
@@ -769,6 +772,7 @@ export class CreateDeploymentUseCase {
       operationGuardPort,
       durableWorkQueueAdapter,
       environmentProfileDecisionReadModel,
+      controlPlaneSecretProtector,
     } = this;
     const persistDeployment = this.persistDeployment.bind(this);
     const supersedeActiveDeployment = this.supersedeActiveDeployment.bind(this);
@@ -929,6 +933,15 @@ export class CreateDeploymentUseCase {
       });
       const snapshotResult = deploymentSnapshotFactory.create(environment, resource);
       const snapshot = yield* snapshotResult;
+      for (const variable of snapshot.variables) {
+        if (!variable.isSecret) continue;
+        yield* await controlPlaneSecretProtector.unprotect(
+          {
+            purpose: variable.scope === "resource" ? "resource-variable" : "environment-variable",
+          },
+          variable.value,
+        );
+      }
       const dependencyBindingSummaries = resourceDependencyBindingReadModel
         ? yield* await resourceDependencyBindingReadModel.list(repositoryContext, {
             resourceId: resource.toState().id.value,

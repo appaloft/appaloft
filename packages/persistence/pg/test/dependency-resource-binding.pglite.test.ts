@@ -35,6 +35,7 @@ import {
   UpsertResourceBindingSpec,
   UpsertResourceInstanceSpec,
 } from "@appaloft/core";
+import { TestControlPlaneSecretProtector } from "@appaloft/testkit";
 
 describe("dependency resource binding persistence", () => {
   test("[DEP-BIND-PG-READ-001] [DEP-BIND-PG-DELETE-001] [DEP-BIND-REDIS-BIND-001] persists binding read model and delete blocker", async () => {
@@ -68,7 +69,10 @@ describe("dependency resource binding persistence", () => {
       const bindings = new PgResourceDependencyBindingRepository(database.db);
       const readModel = new PgResourceDependencyBindingReadModel(database.db);
       const deleteSafetyReader = new PgDependencyResourceDeleteSafetyReader(database.db);
-      const secretStore = new PgDependencyBindingSecretStore(database.db);
+      const secretStore = new PgDependencyBindingSecretStore(
+        database.db,
+        new TestControlPlaneSecretProtector(),
+      );
       const projects = new PgProjectRepository(database.db);
       const environments = new PgEnvironmentRepository(database.db);
       const createdAt = CreatedAt.rehydrate("2026-01-01T00:00:00.000Z");

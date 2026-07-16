@@ -21,6 +21,7 @@ import {
 } from "@appaloft/core";
 import {
   createDeploymentProgressEvent,
+  type ControlPlaneSecretProtector,
   deploymentProofConfigurationFingerprint,
   type DependencyResourceSecretStore,
   deploymentProgressSteps,
@@ -35,7 +36,6 @@ import {
 import {
   renderDockerSwarmApplyPlan,
   renderDockerSwarmCleanupPlan,
-  renderDockerSwarmDependencySecretName,
   renderDockerSwarmRuntimeIntent,
   type DockerSwarmRuntimeIdentityInput,
 } from "./docker-swarm-runtime-intent";
@@ -258,6 +258,7 @@ export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
     private readonly dependencyResourceSecretStore?: DependencyResourceSecretStore,
     private readonly progressRecorder?: DeploymentProgressRecorder,
     private readonly progressReporter?: DeploymentProgressReporter,
+    private readonly controlPlaneSecretProtector?: ControlPlaneSecretProtector,
   ) {
     this.descriptor = {
       key: "docker-swarm",
@@ -277,6 +278,7 @@ export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
       context,
       deployment,
       dependencyResourceSecretStore: this.dependencyResourceSecretStore,
+      controlPlaneSecretProtector: this.controlPlaneSecretProtector,
     });
     if (runtimeEnvResult.isErr()) {
       const message = safeFailureMessage(runtimeEnvResult.error.message, deploymentSecretRedactions(deployment));
@@ -317,7 +319,15 @@ export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
       );
     }
 
-    const applyPlanResult = renderDockerSwarmApplyPlan(intentResult.value);
+    const materializedIntent = {
+      ...intentResult.value,
+      environment: intentResult.value.environment.map((variable) => {
+        const value = variable.secret ? runtimeEnv.env[variable.name] : variable.value;
+        const { valueFrom: _valueFrom, ...safeIntent } = variable;
+        return { ...safeIntent, ...(typeof value === "string" ? { value } : {}) };
+      }),
+    };
+    const applyPlanResult = renderDockerSwarmApplyPlan(materializedIntent);
     if (applyPlanResult.isErr()) {
       const message = safeFailureMessage(applyPlanResult.error.message, redactions);
       return applyExecutionResult(
@@ -333,12 +343,7 @@ export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
     }
 
     const timeline: DeploymentTimelineJournalEntry[] = [];
-    const dependencySecretSteps = this.renderDependencySecretMaterializationSteps({
-      identity,
-      env: runtimeEnv.env,
-      dependencyTargetNames: runtimeEnv.dependencyTargetNames,
-    });
-    for (const step of [...dependencySecretSteps, ...applyPlanResult.value.steps]) {
+    for (const step of applyPlanResult.value.steps) {
       const phase = this.phaseForStep(step.step);
       await this.pushTimeline(timeline, context, identity.deploymentId, {
         phase,
@@ -542,42 +547,6 @@ export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
         });
       }
     }
-  }
-
-  private renderDependencySecretMaterializationSteps(input: {
-    identity: DockerSwarmRuntimeIdentityInput;
-    env: NodeJS.ProcessEnv;
-    dependencyTargetNames: ReadonlySet<string>;
-  }): DockerSwarmCommandRunnerInput[] {
-    return [...input.dependencyTargetNames].sort().flatMap((targetName) => {
-      const secretValue = input.env[targetName];
-      if (typeof secretValue !== "string") {
-        return [];
-      }
-
-      const secretName = renderDockerSwarmDependencySecretName({
-        identity: input.identity,
-        targetName,
-      });
-      const createLabels = commandParts([
-        `--label ${shellQuote("appaloft.managed=true")}`,
-        `--label ${shellQuote("appaloft.runtime-target=docker-swarm")}`,
-        `--label ${shellQuote(`appaloft.deployment-id=${input.identity.deploymentId}`)}`,
-        `--label ${shellQuote(`appaloft.target-id=${input.identity.targetId}`)}`,
-        `--label ${shellQuote(`appaloft.destination-id=${input.identity.destinationId}`)}`,
-        `--label ${shellQuote(`appaloft.dependency-target=${targetName}`)}`,
-      ]);
-      const inspect = `docker secret inspect ${shellQuote(secretName)} >/dev/null 2>&1`;
-      const create = `printf %s ${shellQuote(secretValue)} | docker secret create ${createLabels} ${shellQuote(secretName)} -`;
-      const displayCreate = `printf %s ${shellQuote("[redacted]")} | docker secret create ${createLabels} ${shellQuote(secretName)} -`;
-      return [
-        {
-          step: `materialize-dependency-secret:${targetName}`,
-          command: `${inspect} || ${create}`,
-          displayCommand: `${inspect} || ${displayCreate}`,
-        },
-      ];
-    });
   }
 
   private async cleanupFailedCandidate(

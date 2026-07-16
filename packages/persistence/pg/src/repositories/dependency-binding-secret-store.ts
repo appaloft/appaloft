@@ -1,4 +1,5 @@
 import {
+  type ControlPlaneSecretProtector,
   type DependencyBindingSecretStore,
   type DependencyBindingSecretStoreInput,
   type DependencyBindingSecretStoreResult,
@@ -14,7 +15,10 @@ function buildSecretRef(input: DependencyBindingSecretStoreInput): string {
 }
 
 export class PgDependencyBindingSecretStore implements DependencyBindingSecretStore {
-  constructor(private readonly db: Kysely<Database>) {}
+  constructor(
+    private readonly db: Kysely<Database>,
+    private readonly secretProtector: ControlPlaneSecretProtector,
+  ) {}
 
   async store(
     context: ExecutionContext,
@@ -22,6 +26,11 @@ export class PgDependencyBindingSecretStore implements DependencyBindingSecretSt
   ): Promise<Result<DependencyBindingSecretStoreResult>> {
     void context;
     const secretRef = buildSecretRef(input);
+    const protectedValue = await this.secretProtector.protect(
+      { purpose: "dependency-binding" },
+      input.secretValue,
+    );
+    if (protectedValue.isErr()) return err(protectedValue.error);
 
     try {
       await this.db
@@ -32,7 +41,7 @@ export class PgDependencyBindingSecretStore implements DependencyBindingSecretSt
           resource_id: input.resourceId,
           secret_version: input.secretVersion,
           payload: {
-            value: input.secretValue,
+            value: protectedValue.value.envelope,
           },
           metadata: {
             rotatedAt: input.rotatedAt,
@@ -42,7 +51,7 @@ export class PgDependencyBindingSecretStore implements DependencyBindingSecretSt
         .onConflict((conflict) =>
           conflict.column("ref").doUpdateSet({
             payload: {
-              value: input.secretValue,
+              value: protectedValue.value.envelope,
             },
             metadata: {
               rotatedAt: input.rotatedAt,

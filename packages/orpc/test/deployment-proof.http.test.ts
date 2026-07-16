@@ -64,7 +64,14 @@ function proof(): DeploymentProofResponse {
       observedAt: "2026-07-12T10:00:00.000Z",
       artifact: { available: true, resolvedIdentity: "sha256:image" },
       workload: { available: true, generation: "dep_demo", deploymentId: "dep_demo" },
-      configuration: { available: true, matchesPlanned: true },
+      configuration: {
+        available: true,
+        keyCount: 2,
+        plannedKeyCount: 2,
+        keyFingerprint: "sha256:keys",
+        matchesPlanned: true,
+        matchesPlannedKeySet: true,
+      },
       health: { status: "passed", summary: "ok" },
       access: { status: "passed", summary: "ok", routeTargetsWorkload: true },
       recovery: {},
@@ -103,10 +110,20 @@ describe("deployment proof HTTP route", () => {
       }),
     );
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({
+    const body = await response.json();
+    expect(body).toMatchObject({
       schemaVersion: "deployments.proof/v1",
       verdict: "verified",
+      observed: {
+        configuration: {
+          keyCount: 2,
+          plannedKeyCount: 2,
+          keyFingerprint: "sha256:keys",
+          matchesPlannedKeySet: true,
+        },
+      },
     });
+    expect(JSON.stringify(body)).not.toContain("marker-secret-value");
     expect(captured).toBeInstanceOf(DeploymentProofQuery);
     expect(captured).toMatchObject({ deploymentId: "dep_demo" });
   });

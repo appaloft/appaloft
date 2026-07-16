@@ -10,6 +10,7 @@
     "@appaloft/adapter-filesystem": "workspace:*",
     "@appaloft/adapter-http-elysia": "workspace:*",
     "@appaloft/adapter-runtime": "workspace:*",
+    "@appaloft/adapter-secret-protection": "workspace:*",
     "@appaloft/ai-mcp": "workspace:*",
     "@appaloft/application": "workspace:*",
     "@appaloft/auth-better": "workspace:*",

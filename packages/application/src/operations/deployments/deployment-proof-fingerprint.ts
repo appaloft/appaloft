@@ -6,6 +6,7 @@ export interface DeploymentProofConfigurationVariable {
   kind: string;
   exposure: string;
   scope: string;
+  isSecret?: boolean;
 }
 
 export function deploymentProofFingerprint(value: unknown): string {
@@ -18,6 +19,16 @@ export function deploymentProofConfigurationFingerprint(
   return deploymentProofFingerprint(
     [...variables]
       .sort((left, right) => left.key.localeCompare(right.key))
-      .map((item) => [item.key, item.value, item.kind, item.exposure, item.scope]),
+      .map((item) => [
+        item.key,
+        item.isSecret ? "[secret]" : item.value,
+        item.kind,
+        item.exposure,
+        item.scope,
+      ]),
   );
+}
+
+export function deploymentProofEnvironmentKeyFingerprint(keys: readonly string[]): string {
+  return deploymentProofFingerprint([...new Set(keys)].sort());
 }

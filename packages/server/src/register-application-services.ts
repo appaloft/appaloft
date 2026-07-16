@@ -106,6 +106,8 @@ import {
   ConfirmActionPreviewRouteCommandHandler,
   ConfirmActionPreviewRouteUseCase,
   ConfirmDomainBindingOwnershipUseCase,
+  ControlPlaneSecretRotationApplyUseCase,
+  ControlPlaneSecretRotationPlanQueryService,
   CountDependencyResourcesQueryService,
   CountDeploymentsQueryService,
   CountEnvironmentsQueryService,
@@ -3624,6 +3626,14 @@ export function registerApplicationServices(
   container.registerSingleton(tokens.doctorQueryService, DoctorQueryService);
   container.registerSingleton(tokens.dbStatusQueryService, DbStatusQueryService);
   container.registerSingleton(tokens.dbMigrateUseCase, DbMigrateUseCase);
+  container.registerSingleton(
+    tokens.controlPlaneSecretRotationPlanQueryService,
+    ControlPlaneSecretRotationPlanQueryService,
+  );
+  container.registerSingleton(
+    tokens.controlPlaneSecretRotationApplyUseCase,
+    ControlPlaneSecretRotationApplyUseCase,
+  );
   container.registerSingleton(
     tokens.checkInstanceUpgradeQueryService,
     CheckInstanceUpgradeQueryService,

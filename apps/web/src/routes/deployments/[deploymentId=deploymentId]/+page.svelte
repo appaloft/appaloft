@@ -1854,6 +1854,16 @@
                   <p class="text-xs font-medium text-muted-foreground">{$t(i18nKeys.console.deployments.proofConfiguration)}</p>
                   <p class="mt-1 truncate font-mono text-xs">{deploymentProof.planned.configuration.fingerprint}</p>
                   <p class="truncate font-mono text-xs text-muted-foreground">{deploymentProof.observed.configuration.fingerprint ?? "—"}</p>
+                  <p class="mt-1 text-xs text-muted-foreground" data-deployment-proof-environment-keys>
+                    {$t(i18nKeys.console.deployments.proofEnvironmentKeys)}:
+                    {deploymentProof.observed.configuration.keyCount ?? "—"}/{deploymentProof.observed.configuration.plannedKeyCount ?? "—"}
+                    ·
+                    {deploymentProof.observed.configuration.matchesPlannedKeySet === true
+                      ? $t(i18nKeys.console.deployments.proofEnvironmentKeysMatched)
+                      : deploymentProof.observed.configuration.matchesPlannedKeySet === false
+                        ? $t(i18nKeys.console.deployments.proofEnvironmentKeysMismatch)
+                        : $t(i18nKeys.console.deployments.proofEnvironmentKeysUnavailable)}
+                  </p>
                 </div>
                 <div class="console-subtle-panel min-w-0 p-3">
                   <p class="text-xs font-medium text-muted-foreground">{$t(i18nKeys.console.deployments.proofRuntime)}</p>

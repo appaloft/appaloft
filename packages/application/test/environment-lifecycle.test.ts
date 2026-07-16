@@ -58,6 +58,7 @@ import {
   MemoryServerRepository,
   NoopLogger,
   SequenceIdGenerator,
+  TestControlPlaneSecretProtector,
 } from "@appaloft/testkit";
 
 import { createExecutionContext, toRepositoryContext } from "../src";
@@ -780,11 +781,48 @@ describe("environment archive operations", () => {
     });
   });
 
+  test("[CPS-PROTECT-001] protects secret environment variables before repository persistence", async () => {
+    const { clock, context, environments, eventBus, logger, repositoryContext } =
+      await createHarness();
+    const useCase = new SetEnvironmentVariableUseCase(
+      environments,
+      clock,
+      eventBus,
+      logger,
+      new TestControlPlaneSecretProtector(),
+    );
+    const marker = "ENVIRONMENT_SECRET_MARKER";
+
+    const result = await useCase.execute(context, {
+      environmentId: "env_demo",
+      key: "DATABASE_URL",
+      value: marker,
+      kind: "secret",
+      exposure: "runtime",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const persisted = await environments.findOne(
+      repositoryContext,
+      EnvironmentByIdSpec.create(EnvironmentId.rehydrate("env_demo")),
+    );
+    const value = persisted?.toState().variables.toState()[0]?.value.value;
+    expect(value).toStartWith("appaloft-test-secret:v1:");
+    expect(value).not.toContain(marker);
+    expect(JSON.stringify(eventBus.events)).not.toContain(marker);
+  });
+
   test("[ENV-LIFE-GUARD-001] rejects variable writes after archive", async () => {
     const { clock, context, environments, eventBus, logger } = await createHarness(
       environmentFixture({ lifecycleStatus: "archived" }),
     );
-    const useCase = new SetEnvironmentVariableUseCase(environments, clock, eventBus, logger);
+    const useCase = new SetEnvironmentVariableUseCase(
+      environments,
+      clock,
+      eventBus,
+      logger,
+      new TestControlPlaneSecretProtector(),
+    );
 
     const result = await useCase.execute(context, {
       environmentId: "env_demo",
@@ -928,7 +966,13 @@ describe("environment archive operations", () => {
     const { clock, context, environments, eventBus, logger } = await createHarness(
       environmentFixture({ lifecycleStatus: "locked" }),
     );
-    const setUseCase = new SetEnvironmentVariableUseCase(environments, clock, eventBus, logger);
+    const setUseCase = new SetEnvironmentVariableUseCase(
+      environments,
+      clock,
+      eventBus,
+      logger,
+      new TestControlPlaneSecretProtector(),
+    );
     const unsetUseCase = new UnsetEnvironmentVariableUseCase(environments, clock, eventBus, logger);
 
     const setResult = await setUseCase.execute(context, {

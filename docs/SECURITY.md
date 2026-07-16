@@ -3,6 +3,9 @@
 ## Secrets
 
 - secrets are modeled explicitly
+- workload secret values are persisted only as versioned authenticated envelopes
+- a missing, wrong, or retired control-plane key blocks planning and execution
+- key rotation is an explicit dry-run plus atomic migration; legacy plaintext never deploys implicitly
 - read models mask secret values
 - build-time secrets are rejected
 - logs should never contain unmasked secrets
