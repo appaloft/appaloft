@@ -1,3 +1,5 @@
+import { connect as connectTcp, isIP } from "node:net";
+import { connect as connectTls } from "node:tls";
 import {
   deploymentProofConfigurationFingerprint,
   type DeploymentProofRuntimeEvidence,
@@ -5,7 +7,7 @@ import {
   type DeploymentSummary,
   type ExecutionContext,
 } from "@appaloft/application";
-import { ok, type Result } from "@appaloft/core";
+import { deploymentRouteIdentityHeaderName, ok, type Result } from "@appaloft/core";
 
 export interface DockerInspectState {
   Id?: string;
@@ -15,6 +17,194 @@ export interface DockerInspectState {
   Config?: { Image?: string; Labels?: Record<string, string> };
   Spec?: { Labels?: Record<string, string>; TaskTemplate?: { ContainerSpec?: { Image?: string } } };
   UpdatedAt?: string;
+}
+
+export type DeploymentProofRouteFetch = (
+  input: string,
+  init?: RequestInit,
+) => Promise<Response>;
+
+function directHttpResponse(url: URL, signal: AbortSignal | null | undefined): Promise<Response> {
+  return new Promise<Response>((resolve, reject) => {
+    let settled = false;
+    let received = "";
+    const port = Number(url.port || (url.protocol === "https:" ? 443 : 80));
+    const onConnect = (): void => {
+      socket.write(
+        [
+          `GET ${url.pathname || "/"}${url.search} HTTP/1.1`,
+          `Host: ${url.host}`,
+          "User-Agent: Appaloft-Deployment-Proof",
+          "Accept: */*",
+          "Connection: close",
+          "",
+          "",
+        ].join("\r\n"),
+      );
+    };
+    const socket =
+      url.protocol === "https:"
+        ? connectTls(
+            {
+              host: url.hostname,
+              port,
+              ...(isIP(url.hostname) === 0 ? { servername: url.hostname } : {}),
+            },
+            onConnect,
+          )
+        : connectTcp({ host: url.hostname, port }, onConnect);
+    const fail = (error: Error): void => {
+      if (settled) return;
+      settled = true;
+      signal?.removeEventListener("abort", abort);
+      socket.destroy();
+      reject(error);
+    };
+    const abort = (): void => fail(new Error("managed public route request aborted"));
+    if (signal?.aborted) {
+      fail(new Error("managed public route request aborted"));
+      return;
+    }
+    signal?.addEventListener("abort", abort, { once: true });
+    socket.setEncoding("latin1");
+    socket.setTimeout(5_000, () => fail(new Error("managed public route request timed out")));
+    socket.on("error", fail);
+    socket.on("end", () => fail(new Error("managed public route closed before response headers")));
+    socket.on("data", (chunk: string) => {
+      if (settled) return;
+      received += chunk;
+      const headerEnd = received.indexOf("\r\n\r\n");
+      if (headerEnd < 0) return;
+      const [statusLine = "", ...headerLines] = received.slice(0, headerEnd).split("\r\n");
+      const status = Number(/^HTTP\/\d(?:\.\d)?\s+(\d{3})/u.exec(statusLine)?.[1] ?? 500);
+      const headers = new Headers();
+      for (const line of headerLines) {
+        const separator = line.indexOf(":");
+        if (separator > 0) {
+          headers.append(line.slice(0, separator), line.slice(separator + 1).trim());
+        }
+      }
+      settled = true;
+      signal?.removeEventListener("abort", abort);
+      socket.destroy();
+      resolve(new Response(null, { status, headers }));
+    });
+  });
+}
+
+async function directManagedRouteFetch(
+  input: string,
+  init: RequestInit = {},
+  redirectCount = 0,
+): Promise<Response> {
+  const url = new URL(input);
+  const response = await directHttpResponse(url, init.signal);
+  const location = response.headers.get("location");
+  if (init.redirect !== "follow" || !location || response.status < 300 || response.status >= 400) {
+    return response;
+  }
+  if (redirectCount >= 5) throw new Error("managed public route exceeded redirect limit");
+  return await directManagedRouteFetch(new URL(location, url).toString(), init, redirectCount + 1);
+}
+
+function joinRoutePath(pathPrefix: string, healthPath: string): string {
+  const prefix = pathPrefix === "/" ? "" : pathPrefix.replace(/\/+$/u, "");
+  const path = healthPath.startsWith("/") ? healthPath : `/${healthPath}`;
+  return `${prefix}${path}` || "/";
+}
+
+function managedRouteUrls(deployment: DeploymentSummary): string[] {
+  const healthPath = deployment.runtimePlan.execution.healthCheckPath ?? "/";
+  return (deployment.runtimePlan.execution.accessRoutes ?? [])
+    .filter(
+      (route) =>
+        route.proxyKind !== "none" &&
+        route.routeBehavior !== "redirect" &&
+        !route.redirectTo,
+    )
+    .flatMap((route) =>
+      route.domains.map((domain) => {
+        const scheme = route.tlsMode === "auto" ? "https" : "http";
+        return `${scheme}://${domain}${joinRoutePath(route.pathPrefix, healthPath)}`;
+      }),
+    );
+}
+
+export async function readDeploymentProofManagedRouteEvidence(
+  deployment: DeploymentSummary,
+  fetchImpl: DeploymentProofRouteFetch = directManagedRouteFetch,
+): Promise<DeploymentProofRuntimeEvidence["access"]> {
+  const urls = managedRouteUrls(deployment);
+  if (urls.length === 0) {
+    return {
+      status: "passed",
+      routeTargetsWorkload: true,
+      summary: "No managed public route identity is required",
+    };
+  }
+
+  for (const url of urls) {
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      let response: Response;
+      try {
+        response = await fetchImpl(url, {
+          redirect: "follow",
+          signal: AbortSignal.timeout(5_000),
+        });
+      } catch (error) {
+        return {
+          status: "failed",
+          routeTargetsWorkload: false,
+          summary: `Managed public route probe failed for ${url}: ${
+            error instanceof Error ? error.message : "unknown fetch error"
+          }`,
+          reasonCode: "public_route_probe_failed",
+        };
+      }
+
+      if (!response.ok) {
+        if ([502, 503, 504].includes(response.status) && attempt < 5) {
+          await Bun.sleep(200);
+          continue;
+        }
+        return {
+          status: "failed",
+          routeTargetsWorkload: false,
+          summary: `Managed public route returned HTTP ${response.status} for ${url}`,
+          reasonCode: "public_route_http_failed",
+        };
+      }
+
+      const observedDeploymentId = response.headers.get(deploymentRouteIdentityHeaderName);
+      if (observedDeploymentId === deployment.id) break;
+      if (attempt < 5) {
+        await Bun.sleep(200);
+        continue;
+      }
+      if (!observedDeploymentId) {
+        return {
+          status: "failed",
+          routeTargetsWorkload: false,
+          summary: `Managed public route did not return deployment identity for ${url}`,
+          reasonCode: "public_route_deployment_identity_missing",
+        };
+      }
+      return {
+        status: "failed",
+        routeTargetsWorkload: false,
+        summary:
+          `Managed public route served deployment ${observedDeploymentId} ` +
+          `instead of ${deployment.id}`,
+        reasonCode: "public_route_deployment_identity_mismatch",
+      };
+    }
+  }
+
+  return {
+    status: "passed",
+    routeTargetsWorkload: true,
+    summary: `Managed public route served deployment ${deployment.id}`,
+  };
 }
 
 async function run(args: string[]): Promise<{ ok: boolean; stdout: string }> {
@@ -58,7 +248,6 @@ export function deploymentProofEvidenceFromDockerInspect(
   const running = inspect.State?.Running ?? true;
   const healthStatus = inspect.State?.Health?.Status;
   const healthPassed = running && healthStatus !== "unhealthy";
-  const routeTargetsWorkload = observedDeploymentId === deployment.id;
   const imageReference = inspect.Config?.Image ?? inspect.Spec?.TaskTemplate?.ContainerSpec?.Image;
   return {
     available: true,
@@ -84,7 +273,11 @@ export function deploymentProofEvidenceFromDockerInspect(
       ...(!configurationFingerprint ? { reasonCode: "configuration_evidence_unavailable" } : {}),
     },
     health: { status: healthPassed ? "passed" : "failed", summary: healthPassed ? "Observed workload is running and healthy" : "Observed workload is not healthy" },
-    access: { status: routeTargetsWorkload ? "passed" : "failed", routeTargetsWorkload, summary: routeTargetsWorkload ? "Observed route ownership points to this workload generation" : "Observed workload generation does not match the planned route owner" },
+    access: {
+      status: "unavailable",
+      summary: "Public route identity has not been observed yet",
+      reasonCode: "public_route_identity_unobserved",
+    },
     recovery: {
       previousRuntimeRetained: Boolean(deployment.runtimePlan.execution.metadata?.previousDeploymentId),
       ...(deployment.runtimePlan.execution.metadata?.previousDeploymentId ? { rollbackCandidateDeploymentId: deployment.runtimePlan.execution.metadata.previousDeploymentId } : {}),
@@ -102,7 +295,18 @@ export class RuntimeDeploymentProofEvidenceReader implements DeploymentProofRunt
       if (!serviceId.ok || !serviceId.stdout.split(/\s+/u)[0]) return ok(unavailable(deployment, "docker_swarm_service_unavailable"));
       const inspect = await run(["docker", "service", "inspect", serviceId.stdout.split(/\s+/u)[0]!, "--format", "{{json .}}"]);
       if (!inspect.ok) return ok(unavailable(deployment, "docker_swarm_inspect_unavailable"));
-      try { return ok(deploymentProofEvidenceFromDockerInspect(deployment, JSON.parse(inspect.stdout) as DockerInspectState)); } catch { return ok(unavailable(deployment, "docker_swarm_inspect_invalid")); }
+      try {
+        const evidence = deploymentProofEvidenceFromDockerInspect(
+          deployment,
+          JSON.parse(inspect.stdout) as DockerInspectState,
+        );
+        return ok({
+          ...evidence,
+          access: await readDeploymentProofManagedRouteEvidence(deployment),
+        });
+      } catch {
+        return ok(unavailable(deployment, "docker_swarm_inspect_invalid"));
+      }
     }
 
     if (provider !== "local-shell") return ok(unavailable(deployment, "runtime_target_readback_unsupported"));
@@ -111,6 +315,17 @@ export class RuntimeDeploymentProofEvidenceReader implements DeploymentProofRunt
     if (!containerId.ok || !firstContainerId) return ok(unavailable(deployment, "docker_container_unavailable"));
     const inspect = await run(["docker", "inspect", firstContainerId, "--format", "{{json .}}"]);
     if (!inspect.ok) return ok(unavailable(deployment, "docker_inspect_unavailable"));
-    try { return ok(deploymentProofEvidenceFromDockerInspect(deployment, JSON.parse(inspect.stdout) as DockerInspectState)); } catch { return ok(unavailable(deployment, "docker_inspect_invalid")); }
+    try {
+      const evidence = deploymentProofEvidenceFromDockerInspect(
+        deployment,
+        JSON.parse(inspect.stdout) as DockerInspectState,
+      );
+      return ok({
+        ...evidence,
+        access: await readDeploymentProofManagedRouteEvidence(deployment),
+      });
+    } catch {
+      return ok(unavailable(deployment, "docker_inspect_invalid"));
+    }
   }
 }

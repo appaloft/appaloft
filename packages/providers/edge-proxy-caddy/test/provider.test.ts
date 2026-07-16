@@ -105,6 +105,9 @@ describe("CaddyEdgeProxyProvider", () => {
       "lucaslorentz/caddy-docker-proxy:2.9-alpine",
     );
     expect(realized._unsafeUnwrap().labels).toContain("caddy=http://app.203.0.113.10.sslip.io");
+    expect(realized._unsafeUnwrap().labels).toContain(
+      "caddy.header.X-Appaloft-Deployment-Id=dep_demo",
+    );
     expect(reload.isOk()).toBe(true);
     expect(reload._unsafeUnwrap()).toMatchObject({
       providerKey: "caddy",
@@ -230,6 +233,7 @@ describe("CaddyEdgeProxyProvider", () => {
     expect(labels).toContain("redir");
     expect(labels).toContain("308");
     expect(labels).not.toContain("caddy_1.reverse_proxy");
+    expect(labels).not.toContain("caddy_1.header.X-Appaloft-Deployment-Id");
   });
 
   test("[EDGE-PROXY-ROUTE-009] renders preserve and strip path handling distinctly", async () => {

@@ -34,9 +34,17 @@ The public query schema is the published language for API, CLI JSON, generated S
 tools, Web, and private Cloud consumers. Cloud may apply tenant/authz policy or produce summaries,
 but must not redefine the proof model.
 
+For an Appaloft-managed Caddy or Traefik serve route, the edge proxy stamps the response with the
+deployment identity that owns the route. Deployment Proof probes the public route and compares that
+provider-stamped identity with the planned Deployment. The observed container's label remains
+workload evidence only: it cannot prove that the proxy actually served that container. Redirect-only
+routes and direct-port access do not claim this managed-route identity evidence.
+
 ## Consequences
 
 - Runtime adapters need an observation capability or an explicit unavailable result.
+- Managed edge-proxy providers must render the shared deployment identity response marker, and a
+  missing or mismatched marker cannot produce `verified`.
 - Stable artifact/workload/configuration identity is now part of the adapter evidence contract but
   remains outside Deployment command input and aggregate invariants.
 - Deployment Detail gains a multi-dimensional Proof section rather than a success badge.

@@ -1,0 +1,150 @@
+import "../../../application/node_modules/reflect-metadata/Reflect.js";
+
+import { createServer } from "node:net";
+import { expect, test } from "bun:test";
+import { type DeploymentSummary } from "@appaloft/application";
+import { readDeploymentProofManagedRouteEvidence } from "../src";
+
+const realTraefikTest =
+  Bun.env.APPALOFT_DEPLOYMENT_ROUTE_PROOF_TRAEFIK_SMOKE === "1" ? test : test.skip;
+
+function docker(args: string[]): string {
+  const result = Bun.spawnSync(["docker", ...args], { stdout: "pipe", stderr: "pipe" });
+  if (result.exitCode !== 0) {
+    throw new Error(`docker ${args[0]} failed: ${result.stderr.toString()}`);
+  }
+  return result.stdout.toString().trim();
+}
+
+function dockerLogs(name: string): string {
+  const result = Bun.spawnSync(["docker", "logs", name], { stdout: "pipe", stderr: "pipe" });
+  return `${result.stdout.toString()}${result.stderr.toString()}`.trim();
+}
+
+async function reservePort(): Promise<number> {
+  return await new Promise((resolve, reject) => {
+    const server = createServer();
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      if (!address || typeof address === "string") {
+        reject(new Error("port unavailable"));
+        return;
+      }
+      server.close((error) => (error ? reject(error) : resolve(address.port)));
+    });
+    server.on("error", reject);
+  });
+}
+
+realTraefikTest(
+  "[DEP-PROOF-SMOKE-003] real Traefik response identity rejects a stale public route",
+  async () => {
+    const suffix = crypto.randomUUID().slice(0, 8);
+    const network = `appaloft-route-proof-${suffix}`;
+    const workload = `${network}-workload`;
+    const proxy = `${network}-proxy`;
+    const port = await reservePort();
+
+    try {
+      docker(["network", "create", network]);
+      docker([
+        "run",
+        "-d",
+        "--name",
+        workload,
+        "--network",
+        network,
+        "--label",
+        "traefik.enable=true",
+        "--label",
+        `traefik.docker.network=${network}`,
+        "--label",
+        "traefik.http.routers.route-proof.rule=Host(`route-proof.test`)",
+        "--label",
+        "traefik.http.routers.route-proof.entrypoints=web",
+        "--label",
+        "traefik.http.routers.route-proof.middlewares=route-proof-identity",
+        "--label",
+        "traefik.http.routers.route-proof.service=route-proof",
+        "--label",
+        "traefik.http.middlewares.route-proof-identity.headers.customresponseheaders.X-Appaloft-Deployment-Id=dep_v1",
+        "--label",
+        "traefik.http.services.route-proof.loadbalancer.server.port=3000",
+        "alpine:3.20",
+        "sh",
+        "-c",
+        "while true; do printf 'HTTP/1.1 200 OK\\r\\nContent-Length: 2\\r\\nConnection: close\\r\\n\\r\\nok' | nc -l -p 3000; done",
+      ]);
+      docker([
+        "run",
+        "-d",
+        "--name",
+        proxy,
+        "--network",
+        network,
+        "-p",
+        `127.0.0.1:${port}:80`,
+        "-v",
+        "/var/run/docker.sock:/var/run/docker.sock:ro",
+        "traefik:v3.6.2",
+        "--providers.docker=true",
+        "--providers.docker.exposedbydefault=false",
+        `--providers.docker.network=${network}`,
+        "--entrypoints.web.address=:80",
+        "--log.level=DEBUG",
+      ]);
+
+      const routeFetch = async (_input: string, init?: RequestInit): Promise<Response> => {
+        return await fetch(`http://127.0.0.1:${port}/`, {
+          ...init,
+          headers: { Host: "route-proof.test" },
+        });
+      };
+      let routedResponse: Response | undefined;
+      for (let attempt = 0; attempt < 80; attempt += 1) {
+        try {
+          routedResponse = await routeFetch("http://route-proof.test/");
+          if (routedResponse.ok) break;
+        } catch {
+          // Traefik may still be discovering Docker labels.
+        }
+        await Bun.sleep(250);
+      }
+      if (!routedResponse?.ok) {
+        throw new Error(
+          `Traefik route did not become ready (status ${routedResponse?.status ?? "unavailable"}): ${dockerLogs(proxy)}`,
+        );
+      }
+      expect(routedResponse?.headers.get("X-Appaloft-Deployment-Id")).toBe("dep_v1");
+
+      const evidence = await readDeploymentProofManagedRouteEvidence(
+        {
+          id: "dep_v2",
+          runtimePlan: {
+            execution: {
+              accessRoutes: [
+                {
+                  proxyKind: "traefik",
+                  domains: ["route-proof.test"],
+                  pathPrefix: "/",
+                  tlsMode: "disabled",
+                },
+              ],
+            },
+          },
+        } as DeploymentSummary,
+        routeFetch,
+      );
+
+      expect(evidence).toMatchObject({
+        status: "failed",
+        routeTargetsWorkload: false,
+        reasonCode: "public_route_deployment_identity_mismatch",
+      });
+    } finally {
+      Bun.spawnSync(["docker", "rm", "-f", proxy, workload]);
+      Bun.spawnSync(["docker", "network", "rm", network]);
+    }
+  },
+  60_000,
+);
