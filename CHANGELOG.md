@@ -1,5 +1,37 @@
 # Changelog
 
+## [1.0.2](https://github.com/appaloft/appaloft/compare/v1.0.1...v1.0.2) (2026-07-16)
+
+
+### Security
+
+* **secrets:** fail closed when control-plane secret decryption or key rotation cannot safely complete ([#687](https://github.com/appaloft/appaloft/pull/687)) ([4c1b0c5](https://github.com/appaloft/appaloft/commit/4c1b0c525c142e52f981581b71bfd7633f67e7f3))
+
+
+### Features
+
+* **deployments:** add machine-verifiable deployment proof ([e698c23](https://github.com/appaloft/appaloft/commit/e698c2345f1ef11c6376ac668ed83a19b1d86889))
+* **deployments:** reconcile stale attempts ([d609617](https://github.com/appaloft/appaloft/commit/d60961753936d1a69d878b7010d8c2b5140014dc))
+* **deployments:** reconcile stale attempts ([5991bb2](https://github.com/appaloft/appaloft/commit/5991bb212444d35208521398b57c40e69e43c8d6))
+* **runtime:** verify compose candidates before promotion ([738cfdd](https://github.com/appaloft/appaloft/commit/738cfddd56c666f79b236c09d855185bcdc31bea))
+* **runtime:** verify compose candidates before promotion ([ee444d8](https://github.com/appaloft/appaloft/commit/ee444d8c8e98d9b0583f8d74054114fbe1a048d4))
+* **web:** add cover visuals to blueprint marketplace cards ([#683](https://github.com/appaloft/appaloft/issues/683)) ([136c21d](https://github.com/appaloft/appaloft/commit/136c21d584fe6b42b8175c62bb79f205268751c5))
+* **web:** replace hand-drawn skeletons with boneyard-js ([#677](https://github.com/appaloft/appaloft/issues/677)) ([c7a0ee8](https://github.com/appaloft/appaloft/commit/c7a0ee88296be494cdf015f458aeb75400ee4961))
+
+
+### Bug Fixes
+
+* **deployments:** verify managed route identity ([#686](https://github.com/appaloft/appaloft/issues/686)) ([956066d](https://github.com/appaloft/appaloft/commit/956066d34fea62c297e90aa69019215a5066b17e))
+* **runtime:** wait for native compose health ([#684](https://github.com/appaloft/appaloft/issues/684)) ([9f27dd4](https://github.com/appaloft/appaloft/commit/9f27dd44bc6206e7aa71b09c214e5e09ae33b157))
+* **web:** replace loading fixtures with data skeletons ([#685](https://github.com/appaloft/appaloft/issues/685)) ([e1142cf](https://github.com/appaloft/appaloft/commit/e1142cfa46db3835c43397a96411e6b11d371742))
+* **web:** use granular data skeletons instead of page wraps ([#678](https://github.com/appaloft/appaloft/issues/678)) ([79d2c8f](https://github.com/appaloft/appaloft/commit/79d2c8f7cf58e508fe8132b236088a99313a35a1))
+
+
+### Documentation
+
+* improve repository onboarding and community health ([#675](https://github.com/appaloft/appaloft/issues/675)) ([6b61fdb](https://github.com/appaloft/appaloft/commit/6b61fdbd5346007752992bb53102896109c46eb3))
+* point one-click demo at appaloft/examples/oneclick ([#672](https://github.com/appaloft/appaloft/issues/672)) ([2cfd970](https://github.com/appaloft/appaloft/commit/2cfd970a460e218b61b6fd377d42cb7e0625c1b0))
+
 ## [1.0.1](https://github.com/appaloft/appaloft/compare/v1.0.0...v1.0.1) (2026-07-08)
 
 
