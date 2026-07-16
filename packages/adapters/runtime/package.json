@@ -12,6 +12,10 @@
 		"@appaloft/core": "workspace:*",
 		"@appaloft/i18n": "workspace:*"
 	},
+	"devDependencies": {
+		"@appaloft/testkit": "workspace:*",
+		"reflect-metadata": "^0.2.2"
+	},
 	"scripts": {
 		"lint": "biome check .",
 		"typecheck": "tsc -p tsconfig.json --noEmit --checkers 4",

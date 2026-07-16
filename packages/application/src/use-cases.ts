@@ -289,6 +289,8 @@ export * from "./operations/storage-volumes/show-storage-volume.query-service";
 export * from "./operations/storage-volumes/show-storage-volume-backup.query-service";
 export * from "./operations/system/apply-instance-upgrade.use-case";
 export * from "./operations/system/check-instance-upgrade.query-service";
+export * from "./operations/system/control-plane-secret-rotation-apply.use-case";
+export * from "./operations/system/control-plane-secret-rotation-plan.query-service";
 export * from "./operations/system/db-migrate.use-case";
 export * from "./operations/system/db-status.query-service";
 export * from "./operations/system/doctor.query-service";

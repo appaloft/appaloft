@@ -262,6 +262,24 @@ export interface DockerDeploymentContainerObservation {
   ipAddress?: string;
 }
 
+export function dockerContainerEnvironmentKeyVerificationCommand(input: {
+  containerName: string;
+  expectedKeys: readonly string[];
+  quote: (value: string) => string;
+}): string {
+  const inspect = `docker inspect --format ${input.quote("{{range .Config.Env}}{{println .}}{{end}}")}`;
+  const actualKeys = `${inspect} ${input.quote(input.containerName)} | sed 's/=.*//' | sort -u`;
+  const checks = [...new Set(input.expectedKeys)].sort().map(
+    (key) => `printf '%s\\n' "$appaloft_runtime_env_keys" | grep -Fqx -- ${input.quote(key)}`,
+  );
+
+  return [
+    `docker inspect ${input.quote(input.containerName)} >/dev/null`,
+    `appaloft_runtime_env_keys="$(${actualKeys})"`,
+    ...checks,
+  ].join(" && ");
+}
+
 export type DockerDeploymentContainerVerification = {
   status: "ready" | "pending" | "failed" | "missing";
   containers: DockerDeploymentContainerObservation[];

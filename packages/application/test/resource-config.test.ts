@@ -30,6 +30,7 @@ import {
   MemoryEnvironmentRepository,
   MemoryResourceRepository,
   NoopLogger,
+  TestControlPlaneSecretProtector,
 } from "@appaloft/testkit";
 
 import {
@@ -152,6 +153,7 @@ async function createHarness(input?: {
   const eventBus = new CapturedEventBus();
   const clock = new FixedClock("2026-01-01T00:00:10.000Z");
   const logger = new NoopLogger();
+  const secretProtector = new TestControlPlaneSecretProtector();
   const environment = input?.environment ?? environmentFixture();
   const resource = input?.resource ?? resourceFixture();
 
@@ -168,12 +170,19 @@ async function createHarness(input?: {
     environments,
     resources,
     eventBus,
-    setVariableUseCase: new SetResourceVariableUseCase(resources, clock, eventBus, logger),
+    setVariableUseCase: new SetResourceVariableUseCase(
+      resources,
+      clock,
+      eventBus,
+      logger,
+      secretProtector,
+    ),
     importVariablesUseCase: new ImportResourceVariablesUseCase(
       resources,
       clock,
       eventBus,
       logger,
+      secretProtector,
       input?.guard,
     ),
     createSecretReferenceUseCase: new CreateResourceSecretReferenceUseCase(
@@ -181,12 +190,14 @@ async function createHarness(input?: {
       clock,
       eventBus,
       logger,
+      secretProtector,
     ),
     rotateSecretReferenceUseCase: new RotateResourceSecretReferenceUseCase(
       resources,
       clock,
       eventBus,
       logger,
+      secretProtector,
     ),
     deleteSecretReferenceUseCase: new DeleteResourceSecretReferenceUseCase(
       resources,
@@ -259,7 +270,13 @@ describe("resource config operations", () => {
   });
 
   test("[RES-PROFILE-CONFIG-002] [RES-PROFILE-CONFIG-009] [RES-PROFILE-CONFIG-010] [RES-PROFILE-CONFIG-011] masks secrets and resolves resource precedence in effective config", async () => {
-    const { context, effectiveConfigQueryService, setVariableUseCase } = await createHarness();
+    const {
+      context,
+      effectiveConfigQueryService,
+      repositoryContext,
+      resources,
+      setVariableUseCase,
+    } = await createHarness();
 
     const setResult = await setVariableUseCase.execute(context, {
       resourceId: "res_web",
@@ -267,9 +284,15 @@ describe("resource config operations", () => {
       value: "postgres://resource",
       kind: "secret",
       exposure: "runtime",
-      isSecret: true,
     });
     expect(setResult.isOk()).toBe(true);
+    const persisted = await resources.findOne(
+      repositoryContext,
+      ResourceByIdSpec.create(ResourceId.rehydrate("res_web")),
+    );
+    const persistedValue = persisted?.toState().variables.toState()[0]?.value.value;
+    expect(persistedValue).toStartWith("appaloft-test-secret:v1:");
+    expect(persistedValue).not.toContain("postgres://resource");
 
     const queryResult = await effectiveConfigQueryService.execute(context, {
       resourceId: "res_web",

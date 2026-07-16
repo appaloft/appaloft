@@ -1,4 +1,4 @@
-import "../../../application/node_modules/reflect-metadata/Reflect.js";
+import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
 import { deploymentProofConfigurationFingerprint, type DeploymentSummary } from "@appaloft/application";
@@ -16,7 +16,7 @@ const deployment = {
 } as DeploymentSummary;
 
 describe("deployment proof runtime evidence", () => {
-  test("[DEP-PROOF-ADAPTER-001] normalizes Docker identity without leaking inspect environment", () => {
+  test("[DEP-PROOF-ADAPTER-001][CPS-PROOF-010] verifies environment keys without returning values", () => {
     const configurationFingerprint = deploymentProofConfigurationFingerprint(variables);
     const evidence = deploymentProofEvidenceFromDockerInspect(deployment, {
       Id: "container-v2",
@@ -24,6 +24,7 @@ describe("deployment proof runtime evidence", () => {
       State: { Running: true, StartedAt: "2026-07-12T09:59:11.000Z", Health: { Status: "healthy" } },
       Config: {
         Image: "appaloft/web:v2",
+        Env: ["APP_VERSION=v2", "TOKEN=runtime-marker", "IMAGE_DEFAULT=present"],
         Labels: {
           "appaloft.deployment-id": "dep_v2",
           "appaloft.configuration-fingerprint": configurationFingerprint,
@@ -35,12 +36,41 @@ describe("deployment proof runtime evidence", () => {
       available: true,
       artifact: { resolvedIdentity: "sha256:image-v2" },
       workload: { identity: "container-v2", generation: "dep_v2" },
-      configuration: { fingerprint: configurationFingerprint, matchesPlanned: true },
+      configuration: {
+        fingerprint: configurationFingerprint,
+        matchesPlanned: true,
+        matchesPlannedKeySet: true,
+        keyCount: 2,
+        plannedKeyCount: 2,
+      },
       health: { status: "passed" },
       access: { status: "passed", routeTargetsWorkload: true },
       recovery: { previousRuntimeRetained: true, rollbackCandidateDeploymentId: "dep_v1" },
     });
     expect(JSON.stringify(evidence)).not.toContain("do-not-return");
+    expect(JSON.stringify(evidence)).not.toContain("runtime-marker");
+  });
+
+  test("[CPS-PROOF-010] a missing planned environment key cannot match", () => {
+    const configurationFingerprint = deploymentProofConfigurationFingerprint(variables);
+    const evidence = deploymentProofEvidenceFromDockerInspect(deployment, {
+      Id: "container-v2",
+      Config: {
+        Env: ["APP_VERSION=v2"],
+        Labels: {
+          "appaloft.deployment-id": "dep_v2",
+          "appaloft.configuration-fingerprint": configurationFingerprint,
+        },
+      },
+    });
+
+    expect(evidence.configuration).toMatchObject({
+      available: true,
+      matchesPlanned: false,
+      matchesPlannedKeySet: false,
+      keyCount: 1,
+      plannedKeyCount: 2,
+    });
   });
 
   test("[DEP-PROOF-ADAPTER-002] reports stale workload and configuration instead of trusting health", () => {

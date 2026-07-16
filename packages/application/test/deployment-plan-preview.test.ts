@@ -78,6 +78,7 @@ import {
   MemoryResourceRepository,
   MemoryServerRepository,
   SequenceIdGenerator,
+  TestControlPlaneSecretProtector,
 } from "@appaloft/testkit";
 
 import {
@@ -373,6 +374,7 @@ async function createHarness(input?: {
       new DeploymentSnapshotFactory(clock, idGenerator),
       new RuntimePlanResolutionInputBuilder(clock, idGenerator),
       new StaticRuntimeTargetBackendRegistry(),
+      new TestControlPlaneSecretProtector(),
       undefined,
       undefined,
       bindingReadModel,

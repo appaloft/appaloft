@@ -741,6 +741,10 @@ export const enUS = {
       proofAccess: "Access and route",
       proofArtifact: "Artifact",
       proofConfiguration: "Configuration fingerprint",
+      proofEnvironmentKeys: "Runtime environment keys",
+      proofEnvironmentKeysMatched: "key set matched",
+      proofEnvironmentKeysMismatch: "key set mismatch",
+      proofEnvironmentKeysUnavailable: "key set unavailable",
       proofDescription:
         "Compares the accepted source, artifact, configuration, and expected effects with the workload observed now. Health alone is not a verified deployment.",
       proofExpectedEffects: "Expected effects",

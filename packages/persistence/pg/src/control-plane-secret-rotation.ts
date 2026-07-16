@@ -1,0 +1,348 @@
+import { createHash } from "node:crypto";
+
+import {
+  type ControlPlaneSecretContext,
+  type ControlPlaneSecretEnvelopeState,
+  type ControlPlaneSecretProtector,
+  type ControlPlaneSecretRotationApplyInput,
+  type ControlPlaneSecretRotationApplyResult,
+  type ControlPlaneSecretRotationPlan,
+  type ControlPlaneSecretRotationPort,
+} from "@appaloft/application";
+import { type DomainError, err, ok, type Result } from "@appaloft/core";
+import { type Kysely, type Transaction } from "kysely";
+
+import { type Database } from "./schema";
+
+type RotationDatabase = Kysely<Database> | Transaction<Database>;
+type RotationTable =
+  | "environment_variables"
+  | "resource_variables"
+  | "dependency_resource_secrets"
+  | "dependency_binding_secrets"
+  | "deployments";
+
+interface RotationRecord {
+  table: RotationTable;
+  id: string;
+  context: ControlPlaneSecretContext;
+  value: string;
+  state: ControlPlaneSecretEnvelopeState;
+  keyId?: string;
+  variableIndex?: number;
+  snapshot?: Record<string, unknown>;
+}
+
+export interface ControlPlaneSecretRotationFaultInjector {
+  afterWrite?(completedWriteCount: number): void;
+}
+
+function rotationError(code: string, message: string, reason: string): DomainError {
+  return {
+    code,
+    category: "infra",
+    message,
+    retryable: false,
+    details: { phase: "control-plane-secret-rotation", reason },
+  };
+}
+
+function payloadValue(payload: unknown): string | undefined {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return undefined;
+  const value = (payload as { value?: unknown }).value;
+  return typeof value === "string" ? value : undefined;
+}
+
+function snapshotVariables(snapshot: Record<string, unknown>): unknown[] {
+  return Array.isArray(snapshot.variables) ? snapshot.variables : [];
+}
+
+function rotationDigest(records: readonly RotationRecord[], activeKeyId: string | null): string {
+  const hash = createHash("sha256");
+  hash.update(activeKeyId ?? "unavailable");
+  for (const record of [...records].sort((left, right) =>
+    `${left.table}:${left.id}`.localeCompare(`${right.table}:${right.id}`),
+  )) {
+    hash.update(record.table);
+    hash.update("\0");
+    hash.update(record.id);
+    hash.update("\0");
+    hash.update(record.context.purpose);
+    hash.update("\0");
+    hash.update(record.value);
+    hash.update("\0");
+  }
+  return `sha256:${hash.digest("hex")}`;
+}
+
+function persistenceRecordIdentity(record: RotationRecord): string {
+  if (record.table !== "deployments") return `${record.table}:${record.id}`;
+  return `${record.table}:${record.id.slice(0, record.id.lastIndexOf(":"))}`;
+}
+
+export class PgControlPlaneSecretRotationService implements ControlPlaneSecretRotationPort {
+  constructor(
+    private readonly db: Kysely<Database>,
+    private readonly secretProtector: ControlPlaneSecretProtector,
+    private readonly faultInjector?: ControlPlaneSecretRotationFaultInjector,
+  ) {}
+
+  async plan(): Promise<Result<ControlPlaneSecretRotationPlan>> {
+    try {
+      return ok(await this.planWith(this.db));
+    } catch {
+      return err(
+        rotationError(
+          "control_plane_secret_rotation_plan_failed",
+          "Control-plane secret rotation dry-run failed",
+          "plan-read-failed",
+        ),
+      );
+    }
+  }
+
+  async apply(
+    input: ControlPlaneSecretRotationApplyInput,
+  ): Promise<Result<ControlPlaneSecretRotationApplyResult>> {
+    if (!input.backupReference.trim()) {
+      return err(
+        rotationError(
+          "control_plane_secret_rotation_backup_required",
+          "An external backup reference is required before rotation",
+          "backup-reference-missing",
+        ),
+      );
+    }
+    const activeKeyId = this.secretProtector.activeKeyId();
+    if (!activeKeyId) {
+      return err(
+        rotationError(
+          "control_plane_secret_keyring_unavailable",
+          "Control-plane secret keyring is unavailable; rotation was blocked",
+          "keyring-unavailable",
+        ),
+      );
+    }
+
+    try {
+      const result = await this.db.transaction().execute(async (transaction) => {
+        const records = await this.collect(transaction);
+        const digest = rotationDigest(records, activeKeyId);
+        if (digest !== input.planDigest) {
+          throw rotationError(
+            "control_plane_secret_rotation_plan_stale",
+            "The rotation plan is stale; run dry-run again",
+            "plan-digest-mismatch",
+          );
+        }
+
+        const prepared = [] as Array<{
+          record: RotationRecord;
+          envelope: string;
+          changed: boolean;
+        }>;
+        for (const record of records) {
+          const rewrapped = await this.secretProtector.rewrap(record.context, record.value, {
+            allowLegacyPlaintext: input.allowLegacyPlaintext,
+          });
+          if (rewrapped.isErr()) throw rewrapped.error;
+          prepared.push({
+            record,
+            envelope: rewrapped.value.envelope,
+            changed: rewrapped.value.changed,
+          });
+        }
+
+        let writeCount = 0;
+        for (const item of prepared.filter((candidate) => candidate.changed)) {
+          await this.write(transaction, item.record, item.envelope);
+          writeCount += 1;
+          this.faultInjector?.afterWrite?.(writeCount);
+        }
+
+        return {
+          schemaVersion: "control-plane.secret-rotation-result/v1" as const,
+          activeKeyId,
+          matchedRecordCount: records.length,
+          rotatedRecordCount: writeCount,
+          unchangedRecordCount: records.length - writeCount,
+          planDigest: digest,
+          status: writeCount === 0 ? ("already-active" as const) : ("applied" as const),
+        };
+      });
+      return ok(result);
+    } catch (error) {
+      const safe = error as Partial<DomainError>;
+      if (
+        typeof safe.code === "string" &&
+        typeof safe.message === "string" &&
+        typeof safe.category === "string" &&
+        typeof safe.retryable === "boolean"
+      ) {
+        return err(error as DomainError);
+      }
+      return err(
+        rotationError(
+          "control_plane_secret_rotation_failed",
+          "Control-plane secret rotation failed and was rolled back",
+          "transaction-rolled-back",
+        ),
+      );
+    }
+  }
+
+  private async planWith(db: RotationDatabase): Promise<ControlPlaneSecretRotationPlan> {
+    const records = await this.collect(db);
+    const stateCounts = {
+      "active-key": 0,
+      "retained-key": 0,
+      "legacy-plaintext": 0,
+      unreadable: 0,
+    } satisfies Record<ControlPlaneSecretEnvelopeState, number>;
+    for (const record of records) {
+      if (record.state === "active-key" || record.state === "retained-key") {
+        const authenticated = await this.secretProtector.unprotect(record.context, record.value);
+        if (authenticated.isErr()) {
+          stateCounts.unreadable += 1;
+          continue;
+        }
+      }
+      stateCounts[record.state] += 1;
+    }
+    const activeKeyId = this.secretProtector.activeKeyId();
+    return {
+      schemaVersion: "control-plane.secret-rotation-plan/v1",
+      activeKeyId,
+      recordCount: new Set(records.map(persistenceRecordIdentity)).size,
+      variableKeyCount: records.length,
+      stateCounts,
+      requiresLegacyAuthorization: stateCounts["legacy-plaintext"] > 0,
+      ready: Boolean(activeKeyId) && stateCounts.unreadable === 0,
+      planDigest: rotationDigest(records, activeKeyId),
+    };
+  }
+
+  private async collect(db: RotationDatabase): Promise<RotationRecord[]> {
+    const [environmentRows, resourceRows, dependencyRows, bindingRows, deploymentRows] =
+      await Promise.all([
+        db
+          .selectFrom("environment_variables")
+          .select(["id", "value"])
+          .where("is_secret", "=", true)
+          .execute(),
+        db
+          .selectFrom("resource_variables")
+          .select(["id", "value"])
+          .where("is_secret", "=", true)
+          .execute(),
+        db.selectFrom("dependency_resource_secrets").select(["ref", "payload"]).execute(),
+        db.selectFrom("dependency_binding_secrets").select(["ref", "payload"]).execute(),
+        db.selectFrom("deployments").select(["id", "environment_snapshot"]).execute(),
+      ]);
+    const records: RotationRecord[] = [];
+    const append = (
+      table: RotationTable,
+      id: string,
+      context: ControlPlaneSecretContext,
+      value: string,
+      extras: Partial<RotationRecord> = {},
+    ) => {
+      const inspected = this.secretProtector.inspect(value);
+      records.push({ table, id, context, value, ...inspected, ...extras });
+    };
+    for (const row of environmentRows) {
+      append("environment_variables", row.id, { purpose: "environment-variable" }, row.value);
+    }
+    for (const row of resourceRows) {
+      append("resource_variables", row.id, { purpose: "resource-variable" }, row.value);
+    }
+    for (const row of dependencyRows) {
+      const value = payloadValue(row.payload);
+      if (value)
+        append("dependency_resource_secrets", row.ref, { purpose: "dependency-resource" }, value);
+    }
+    for (const row of bindingRows) {
+      const value = payloadValue(row.payload);
+      if (value)
+        append("dependency_binding_secrets", row.ref, { purpose: "dependency-binding" }, value);
+    }
+    for (const row of deploymentRows) {
+      const variables = snapshotVariables(row.environment_snapshot);
+      variables.forEach((candidate, variableIndex) => {
+        if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return;
+        const variable = candidate as Record<string, unknown>;
+        if (variable.isSecret !== true || typeof variable.value !== "string") return;
+        append(
+          "deployments",
+          `${row.id}:${variableIndex}`,
+          { purpose: variable.scope === "resource" ? "resource-variable" : "environment-variable" },
+          variable.value,
+          { variableIndex, snapshot: row.environment_snapshot },
+        );
+      });
+    }
+    return records;
+  }
+
+  private async write(
+    db: Transaction<Database>,
+    record: RotationRecord,
+    envelope: string,
+  ): Promise<void> {
+    switch (record.table) {
+      case "environment_variables":
+        await db
+          .updateTable(record.table)
+          .set({ value: envelope })
+          .where("id", "=", record.id)
+          .execute();
+        return;
+      case "resource_variables":
+        await db
+          .updateTable(record.table)
+          .set({ value: envelope })
+          .where("id", "=", record.id)
+          .execute();
+        return;
+      case "dependency_resource_secrets":
+      case "dependency_binding_secrets": {
+        const row = await db
+          .selectFrom(record.table)
+          .select("payload")
+          .where("ref", "=", record.id)
+          .executeTakeFirstOrThrow();
+        await db
+          .updateTable(record.table)
+          .set({ payload: { ...row.payload, value: envelope } })
+          .where("ref", "=", record.id)
+          .execute();
+        return;
+      }
+      case "deployments": {
+        const separator = record.id.lastIndexOf(":");
+        const deploymentId = record.id.slice(0, separator);
+        const variableIndex = record.variableIndex;
+        if (variableIndex === undefined)
+          throw new Error("rotation deployment variable index missing");
+        const row = await db
+          .selectFrom("deployments")
+          .select("environment_snapshot")
+          .where("id", "=", deploymentId)
+          .executeTakeFirstOrThrow();
+        const variables = snapshotVariables(row.environment_snapshot).map((variable, index) =>
+          index === variableIndex &&
+          variable &&
+          typeof variable === "object" &&
+          !Array.isArray(variable)
+            ? { ...(variable as Record<string, unknown>), value: envelope }
+            : variable,
+        );
+        await db
+          .updateTable("deployments")
+          .set({ environment_snapshot: { ...row.environment_snapshot, variables } })
+          .where("id", "=", deploymentId)
+          .execute();
+      }
+    }
+  }
+}

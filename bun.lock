@@ -65,6 +65,7 @@
         "@appaloft/adapter-filesystem": "workspace:*",
         "@appaloft/adapter-http-elysia": "workspace:*",
         "@appaloft/adapter-runtime": "workspace:*",
+        "@appaloft/adapter-secret-protection": "workspace:*",
         "@appaloft/ai-mcp": "workspace:*",
         "@appaloft/application": "workspace:*",
         "@appaloft/auth-better": "workspace:*",
@@ -194,6 +195,17 @@
         "@appaloft/blueprints": "workspace:*",
         "@appaloft/core": "workspace:*",
         "@appaloft/i18n": "workspace:*",
+      },
+      "devDependencies": {
+        "@appaloft/testkit": "workspace:*",
+        "reflect-metadata": "^0.2.2",
+      },
+    },
+    "packages/adapters/secret-protection": {
+      "name": "@appaloft/adapter-secret-protection",
+      "dependencies": {
+        "@appaloft/application": "workspace:*",
+        "@appaloft/core": "workspace:*",
       },
     },
     "packages/ai/mcp": {
@@ -451,6 +463,8 @@
         "postgres": "^3.4.9",
       },
       "devDependencies": {
+        "@appaloft/adapter-secret-protection": "workspace:*",
+        "@appaloft/testkit": "workspace:*",
         "reflect-metadata": "^0.2.2",
       },
     },
@@ -566,6 +580,7 @@
         "@appaloft/adapter-filesystem": "workspace:*",
         "@appaloft/adapter-http-elysia": "workspace:*",
         "@appaloft/adapter-runtime": "workspace:*",
+        "@appaloft/adapter-secret-protection": "workspace:*",
         "@appaloft/ai-mcp": "workspace:*",
         "@appaloft/application": "workspace:*",
         "@appaloft/auth-better": "workspace:*",
@@ -660,6 +675,8 @@
     "@appaloft/adapter-packaging": ["@appaloft/adapter-packaging@workspace:packages/adapters/packaging"],
 
     "@appaloft/adapter-runtime": ["@appaloft/adapter-runtime@workspace:packages/adapters/runtime"],
+
+    "@appaloft/adapter-secret-protection": ["@appaloft/adapter-secret-protection@workspace:packages/adapters/secret-protection"],
 
     "@appaloft/ai-mcp": ["@appaloft/ai-mcp@workspace:packages/ai/mcp"],
 

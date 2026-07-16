@@ -38,6 +38,7 @@ import {
   SshExecutionBackend,
   StorageRuntimeCleanerAdapter,
 } from "@appaloft/adapter-runtime";
+import { controlPlaneSecretProtectorFromEnvironment } from "@appaloft/adapter-secret-protection";
 import {
   AllowAllOperationGuardPort,
   AllowAllOperationScopePort,
@@ -143,6 +144,7 @@ import {
   PgCertificateSecretStore,
   PgConnectorAuthorizationAttemptStore,
   PgConnectorConnectionStore,
+  PgControlPlaneSecretRotationService,
   PgDefaultAccessDomainPolicyRepository,
   PgDependencyBindingSecretStore,
   PgDependencyResourceBackupPolicyRepository,
@@ -895,6 +897,21 @@ export function registerRuntimeDependencies(
   container: DependencyContainer,
   input: RegisterRuntimeDependenciesInput,
 ): void {
+  const secretProtector = controlPlaneSecretProtectorFromEnvironment({
+    APPALOFT_CONTROL_PLANE_ACTIVE_SECRET_KEY_ID:
+      process.env.APPALOFT_CONTROL_PLANE_ACTIVE_SECRET_KEY_ID,
+    APPALOFT_CONTROL_PLANE_SECRET_KEYS: process.env.APPALOFT_CONTROL_PLANE_SECRET_KEYS,
+  });
+  if (secretProtector.isErr()) {
+    throw new Error(
+      `Control-plane secret protection configuration failed (${secretProtector.error.code})`,
+    );
+  }
+  container.registerInstance(tokens.controlPlaneSecretProtector, secretProtector.value);
+  container.registerInstance(
+    tokens.controlPlaneSecretRotationPort,
+    new PgControlPlaneSecretRotationService(input.database.db, secretProtector.value),
+  );
   container.register(tokens.clock, {
     useFactory: instanceCachingFactory(() => new SystemClock()),
   });
@@ -1413,11 +1430,21 @@ export function registerRuntimeDependencies(
     ),
   });
   container.register(tokens.dependencyBindingSecretStore, {
-    useFactory: instanceCachingFactory(() => new PgDependencyBindingSecretStore(input.database.db)),
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new PgDependencyBindingSecretStore(
+          input.database.db,
+          dependencyContainer.resolve(tokens.controlPlaneSecretProtector),
+        ),
+    ),
   });
   container.register(tokens.dependencyResourceSecretStore, {
     useFactory: instanceCachingFactory(
-      () => new PgDependencyResourceSecretStore(input.database.db),
+      (dependencyContainer) =>
+        new PgDependencyResourceSecretStore(
+          input.database.db,
+          dependencyContainer.resolve(tokens.controlPlaneSecretProtector),
+        ),
     ),
   });
   container.register(tokens.certificateHttpChallengeTokenStore, {
@@ -1639,6 +1666,7 @@ export function registerRuntimeDependencies(
           input.resourceAccessFailureRenderer,
           dependencyContainer.resolve(tokens.deploymentExecutionGuard),
           dependencyContainer.resolve(tokens.dependencyResourceSecretStore),
+          dependencyContainer.resolve(tokens.controlPlaneSecretProtector),
         ),
         sshBackend: new SshExecutionBackend(
           join(input.config.dataDir, "runtime"),
@@ -1652,6 +1680,7 @@ export function registerRuntimeDependencies(
           input.resourceAccessFailureRenderer,
           dependencyContainer.resolve(tokens.deploymentExecutionGuard),
           dependencyContainer.resolve(tokens.dependencyResourceSecretStore),
+          dependencyContainer.resolve(tokens.controlPlaneSecretProtector),
         ),
         ...(input.config.dockerSwarmExecution.enabled
           ? {
@@ -1671,6 +1700,7 @@ export function registerRuntimeDependencies(
                 dependencyContainer.resolve(tokens.dependencyResourceSecretStore),
                 dependencyContainer.resolve(tokens.deploymentProgressRecorder),
                 dependencyContainer.resolve(tokens.deploymentProgressReporter),
+                dependencyContainer.resolve(tokens.controlPlaneSecretProtector),
               ),
             }
           : {}),

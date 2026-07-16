@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   dockerContainerLabelFlags,
+  dockerContainerEnvironmentKeyVerificationCommand,
   dockerDeploymentContainerVerificationCommand,
   dockerPublishedPortFlag,
   dockerRemoveConflictingRouteContainersCommand,
@@ -15,6 +16,20 @@ function quote(input: string): string {
 }
 
 describe("docker container command helpers", () => {
+  test("[CPS-SUBSTRATE-009] verifies only the expected environment key set", () => {
+    const command = dockerContainerEnvironmentKeyVerificationCommand({
+      containerName: "appaloft-dep_candidate",
+      expectedKeys: ["PUBLIC_MARKER", "SECRET_MARKER", "SECRET_MARKER"],
+      quote,
+    });
+
+    expect(command).toContain("docker inspect 'appaloft-dep_candidate' >/dev/null");
+    expect(command).toContain("{{range .Config.Env}}{{println .}}{{end}}");
+    expect(command).toContain("sed 's/=.*//'");
+    expect(command.match(/grep -Fqx -- 'SECRET_MARKER'/g)).toHaveLength(1);
+    expect(command).not.toContain("marker-secret-value");
+  });
+
   test("publishes direct-port resources on their configured host port", () => {
     expect(dockerPublishedPortFlag({ containerPort: 3000, exposureMode: "direct-port" })).toBe(
       "-p 3000:3000",

@@ -1,0 +1,234 @@
+import "reflect-metadata";
+
+import { describe, expect, test } from "bun:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { AesGcmControlPlaneSecretProtector } from "@appaloft/adapter-secret-protection";
+import { createExecutionContext } from "@appaloft/application";
+
+import {
+  createDatabase,
+  createMigrator,
+  PgControlPlaneSecretRotationService,
+  PgDependencyResourceSecretStore,
+} from "../src";
+
+const key = (fill: number): string => Buffer.alloc(32, fill).toString("base64");
+const context = createExecutionContext({
+  requestId: "req_secret_rotation_test",
+  entrypoint: "system",
+});
+
+async function withDatabase(
+  run: (database: Awaited<ReturnType<typeof createDatabase>>) => Promise<void>,
+): Promise<void> {
+  const dataDir = mkdtempSync(join(tmpdir(), "appaloft-secret-rotation-"));
+  const database = await createDatabase({ driver: "pglite", pgliteDataDir: dataDir });
+  try {
+    const migrated = await createMigrator(database.db).migrateToLatest();
+    expect(migrated.error).toBeUndefined();
+    await run(database);
+  } finally {
+    await database.close();
+    rmSync(dataDir, { recursive: true, force: true });
+  }
+}
+
+function protectors() {
+  const oldProtector = AesGcmControlPlaneSecretProtector.create({
+    activeKeyId: "key-v1",
+    keys: { "key-v1": key(11) },
+  })._unsafeUnwrap();
+  const rotatingProtector = AesGcmControlPlaneSecretProtector.create({
+    activeKeyId: "key-v2",
+    keys: { "key-v1": key(11), "key-v2": key(12) },
+  })._unsafeUnwrap();
+  return { oldProtector, rotatingProtector };
+}
+
+async function seedTwoSecrets(
+  database: Awaited<ReturnType<typeof createDatabase>>,
+  oldProtector: ReturnType<typeof protectors>["oldProtector"],
+) {
+  const store = new PgDependencyResourceSecretStore(database.db, oldProtector);
+  for (const [id, marker] of [
+    ["rsi_rotation_a", "ROTATION_MARKER_A"],
+    ["rsi_rotation_b", "ROTATION_MARKER_B"],
+  ] as const) {
+    const stored = await store.storeConnection(context, {
+      dependencyResourceId: id,
+      projectId: "prj_rotation",
+      environmentId: "env_rotation",
+      kind: "postgres",
+      purpose: "connection",
+      secretValue: marker,
+      storedAt: "2026-01-01T00:00:00.000Z",
+    });
+    expect(stored.isOk()).toBe(true);
+  }
+}
+
+async function envelopeStates(
+  database: Awaited<ReturnType<typeof createDatabase>>,
+  protector: ReturnType<typeof protectors>["rotatingProtector"],
+) {
+  const rows = await database.db
+    .selectFrom("dependency_resource_secrets")
+    .select("payload")
+    .orderBy("ref")
+    .execute();
+  return rows.map((row) => protector.inspect((row.payload as { value: string }).value).state);
+}
+
+describe("control-plane secret rotation", () => {
+  test("[CPS-FAIL-003][CPS-ROTATE-006] same key id with wrong material is unreadable, never already-active", () =>
+    withDatabase(async (database) => {
+      const { oldProtector } = protectors();
+      await seedTwoSecrets(database, oldProtector);
+      const wrongProtector = AesGcmControlPlaneSecretProtector.create({
+        activeKeyId: "key-v1",
+        keys: { "key-v1": key(99) },
+      })._unsafeUnwrap();
+      const service = new PgControlPlaneSecretRotationService(database.db, wrongProtector);
+
+      const plan = (await service.plan())._unsafeUnwrap();
+      expect(plan).toMatchObject({
+        ready: false,
+        stateCounts: { unreadable: 2, "active-key": 0 },
+      });
+      const applied = await service.apply({
+        planDigest: plan.planDigest,
+        backupReference: "backup:test-wrong-key",
+        allowLegacyPlaintext: false,
+      });
+      expect(applied._unsafeUnwrapErr().code).toBe("control_plane_secret_materialization_failed");
+      expect(await envelopeStates(database, oldProtector)).toEqual(["active-key", "active-key"]);
+    }));
+
+  test("[CPS-ROTATE-006] rotates retained envelopes and is idempotent", () =>
+    withDatabase(async (database) => {
+      const { oldProtector, rotatingProtector } = protectors();
+      await seedTwoSecrets(database, oldProtector);
+      const service = new PgControlPlaneSecretRotationService(database.db, rotatingProtector);
+
+      const plan = (await service.plan())._unsafeUnwrap();
+      expect(plan).toMatchObject({
+        recordCount: 2,
+        variableKeyCount: 2,
+        stateCounts: { "retained-key": 2, "active-key": 0 },
+        ready: true,
+      });
+      expect(JSON.stringify(plan)).not.toContain("ROTATION_MARKER");
+
+      const applied = await service.apply({
+        planDigest: plan.planDigest,
+        backupReference: "backup:test-rotation-001",
+        allowLegacyPlaintext: false,
+      });
+      expect(applied._unsafeUnwrap()).toMatchObject({
+        rotatedRecordCount: 2,
+        status: "applied",
+      });
+      expect(await envelopeStates(database, rotatingProtector)).toEqual([
+        "active-key",
+        "active-key",
+      ]);
+
+      const retryPlan = (await service.plan())._unsafeUnwrap();
+      const retry = await service.apply({
+        planDigest: retryPlan.planDigest,
+        backupReference: "backup:test-rotation-001",
+        allowLegacyPlaintext: false,
+      });
+      expect(retry._unsafeUnwrap()).toMatchObject({
+        rotatedRecordCount: 0,
+        unchangedRecordCount: 2,
+        status: "already-active",
+      });
+    }));
+
+  test("[CPS-ROTATE-007] mid-transaction failure rolls back and retry succeeds", () =>
+    withDatabase(async (database) => {
+      const { oldProtector, rotatingProtector } = protectors();
+      await seedTwoSecrets(database, oldProtector);
+      const failing = new PgControlPlaneSecretRotationService(database.db, rotatingProtector, {
+        afterWrite(completedWriteCount) {
+          if (completedWriteCount === 1) throw new Error("test fault");
+        },
+      });
+      const plan = (await failing.plan())._unsafeUnwrap();
+      const failed = await failing.apply({
+        planDigest: plan.planDigest,
+        backupReference: "backup:test-rotation-rollback",
+        allowLegacyPlaintext: false,
+      });
+      expect(failed.isErr()).toBe(true);
+      expect(await envelopeStates(database, rotatingProtector)).toEqual([
+        "retained-key",
+        "retained-key",
+      ]);
+
+      const retry = await new PgControlPlaneSecretRotationService(
+        database.db,
+        rotatingProtector,
+      ).apply({
+        planDigest: plan.planDigest,
+        backupReference: "backup:test-rotation-rollback",
+        allowLegacyPlaintext: false,
+      });
+      expect(retry._unsafeUnwrap().rotatedRecordCount).toBe(2);
+    }));
+
+  test("[CPS-ROTATE-008] legacy plaintext needs explicit authorization and backup evidence", () =>
+    withDatabase(async (database) => {
+      await database.db
+        .insertInto("dependency_resource_secrets")
+        .values({
+          ref: "appaloft://dependency-resources/rsi_legacy/connection",
+          dependency_resource_id: "rsi_legacy",
+          project_id: "prj_rotation",
+          environment_id: "env_rotation",
+          kind: "postgres",
+          purpose: "connection",
+          payload: { value: "LEGACY_ROTATION_MARKER" },
+          metadata: { storedAt: "2026-01-01T00:00:00.000Z" },
+          created_at: "2026-01-01T00:00:00.000Z",
+        })
+        .execute();
+      const { rotatingProtector } = protectors();
+      const service = new PgControlPlaneSecretRotationService(database.db, rotatingProtector);
+      const plan = (await service.plan())._unsafeUnwrap();
+      expect(plan).toMatchObject({
+        requiresLegacyAuthorization: true,
+        stateCounts: { "legacy-plaintext": 1 },
+      });
+
+      const noBackup = await service.apply({
+        planDigest: plan.planDigest,
+        backupReference: "",
+        allowLegacyPlaintext: true,
+      });
+      expect(noBackup._unsafeUnwrapErr().code).toBe(
+        "control_plane_secret_rotation_backup_required",
+      );
+      const blocked = await service.apply({
+        planDigest: plan.planDigest,
+        backupReference: "backup:test-legacy",
+        allowLegacyPlaintext: false,
+      });
+      expect(blocked._unsafeUnwrapErr().code).toBe(
+        "control_plane_secret_legacy_migration_required",
+      );
+      expect(await envelopeStates(database, rotatingProtector)).toEqual(["legacy-plaintext"]);
+
+      const migrated = await service.apply({
+        planDigest: plan.planDigest,
+        backupReference: "backup:test-legacy",
+        allowLegacyPlaintext: true,
+      });
+      expect(migrated._unsafeUnwrap().rotatedRecordCount).toBe(1);
+      expect(await envelopeStates(database, rotatingProtector)).toEqual(["active-key"]);
+    }));
+});

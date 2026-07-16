@@ -6,6 +6,8 @@ export * from "./operations/system/apply-instance-upgrade.handler";
 export * from "./operations/system/check-instance-upgrade.handler";
 export * from "./operations/system/complete-connection-callback.handler";
 export * from "./operations/system/complete-connection-callback.use-case";
+export * from "./operations/system/control-plane-secret-rotation-apply.handler";
+export * from "./operations/system/control-plane-secret-rotation-plan.handler";
 export * from "./operations/system/db-migrate.handler";
 export * from "./operations/system/db-status.handler";
 export * from "./operations/system/doctor.handler";

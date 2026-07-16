@@ -27,7 +27,14 @@ describe("deployment proof contract", () => {
           generation: "dep_v2",
           deploymentId: "dep_v2",
         },
-        configuration: { available: true, matchesPlanned: true },
+        configuration: {
+          available: true,
+          keyCount: 2,
+          plannedKeyCount: 2,
+          keyFingerprint: "sha256:keys",
+          matchesPlanned: true,
+          matchesPlannedKeySet: true,
+        },
         health: { status: "passed", summary: "ok" },
         access: { status: "passed", summary: "ok", routeTargetsWorkload: true },
         recovery: { previousRuntimeRetained: true },
@@ -39,5 +46,11 @@ describe("deployment proof contract", () => {
       stateVersion: "v1",
     });
     expect(parsed.verdict).toBe("verified");
+    expect(parsed.observed.configuration).toMatchObject({
+      keyCount: 2,
+      plannedKeyCount: 2,
+      keyFingerprint: "sha256:keys",
+      matchesPlannedKeySet: true,
+    });
   });
 });

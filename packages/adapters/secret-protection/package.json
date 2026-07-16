@@ -1,0 +1,17 @@
+{
+  "name": "@appaloft/adapter-secret-protection",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@appaloft/application": "workspace:*",
+    "@appaloft/core": "workspace:*"
+  },
+  "scripts": {
+    "lint": "biome check .",
+    "test": "bun test",
+    "typecheck": "tsc -p tsconfig.json --noEmit --checkers 4"
+  }
+}

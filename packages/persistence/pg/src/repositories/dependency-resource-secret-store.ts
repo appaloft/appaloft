@@ -1,4 +1,5 @@
 import {
+  type ControlPlaneSecretProtector,
   type DependencyResourceSecretResolutionInput,
   type DependencyResourceSecretResolutionResult,
   type DependencyResourceSecretStore,
@@ -20,7 +21,10 @@ function buildSecretRef(input: DependencyResourceSecretStoreInput): string {
 }
 
 export class PgDependencyResourceSecretStore implements DependencyResourceSecretStore {
-  constructor(private readonly db: Kysely<Database>) {}
+  constructor(
+    private readonly db: Kysely<Database>,
+    private readonly secretProtector: ControlPlaneSecretProtector,
+  ) {}
 
   async storeConnection(
     context: ExecutionContext,
@@ -28,6 +32,11 @@ export class PgDependencyResourceSecretStore implements DependencyResourceSecret
   ): Promise<Result<DependencyResourceSecretStoreResult>> {
     void context;
     const secretRef = buildSecretRef(input);
+    const protectedValue = await this.secretProtector.protect(
+      { purpose: "dependency-resource" },
+      input.secretValue,
+    );
+    if (protectedValue.isErr()) return err(protectedValue.error);
 
     try {
       await this.db
@@ -40,7 +49,7 @@ export class PgDependencyResourceSecretStore implements DependencyResourceSecret
           kind: input.kind,
           purpose: input.purpose,
           payload: {
-            value: input.secretValue,
+            value: protectedValue.value.envelope,
           },
           metadata: {
             storedAt: input.storedAt,
@@ -50,7 +59,7 @@ export class PgDependencyResourceSecretStore implements DependencyResourceSecret
         .onConflict((conflict) =>
           conflict.column("ref").doUpdateSet({
             payload: {
-              value: input.secretValue,
+              value: protectedValue.value.envelope,
             },
             metadata: {
               storedAt: input.storedAt,
@@ -112,9 +121,15 @@ export class PgDependencyResourceSecretStore implements DependencyResourceSecret
         );
       }
 
+      const unprotected = await this.secretProtector.unprotect(
+        { purpose: row ? "dependency-resource" : "dependency-binding" },
+        payload.value,
+      );
+      if (unprotected.isErr()) return err(unprotected.error);
+
       return ok({
         secretRef: resolvedRow.ref,
-        secretValue: payload.value,
+        secretValue: unprotected.value.plaintext,
       });
     } catch (error) {
       return err(

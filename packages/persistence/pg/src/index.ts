@@ -1,3 +1,4 @@
+export * from "./control-plane-secret-rotation";
 export * from "./db";
 export * from "./diagnostics";
 export * from "./mutation-coordinator";
