@@ -19,7 +19,14 @@ import {
   type ResourceAccessFailureRendererTarget,
 } from "@appaloft/application";
 import { sanitizeAppliedRouteContextMetadata } from "@appaloft/application/resource-access-failure-diagnostics";
-import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
+import {
+  type DomainError,
+  deploymentRouteIdentityHeaderName,
+  domainError,
+  err,
+  ok,
+  type Result,
+} from "@appaloft/core";
 
 export const traefikEdgeNetworkName = "appaloft-edge";
 const traefikImage = "traefik:v3.6.2";
@@ -454,7 +461,9 @@ function labelsForTraefik(input: {
   const service = `${router}-svc`;
   const entrypoint = input.route.tlsMode === "auto" ? "websecure" : "web";
   const pathHandlingMiddleware = routePathHandlingMiddlewareName({ route: input.route, router });
+  const routeProofMiddleware = `${router}-route-proof`;
   const middlewares = [
+    routeProofMiddleware,
     ...(pathHandlingMiddleware ? [pathHandlingMiddleware] : []),
     ...(input.accessFailureMiddlewareName ? [input.accessFailureMiddlewareName] : []),
   ];
@@ -472,6 +481,7 @@ function labelsForTraefik(input: {
     ...(pathHandlingMiddleware
       ? routePathHandlingLabels({ route: input.route, middleware: pathHandlingMiddleware })
       : []),
+    `traefik.http.middlewares.${routeProofMiddleware}.headers.customresponseheaders.${deploymentRouteIdentityHeaderName}=${input.deploymentId}`,
     `traefik.http.routers.${router}.service=${service}`,
     `traefik.http.services.${service}.loadbalancer.server.port=${input.route.targetPort ?? input.port}`,
   ];

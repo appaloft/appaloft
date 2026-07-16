@@ -16,7 +16,14 @@ import {
   type ProxyRouteRealizationInput,
   type ProxyRouteRealizationPlan,
 } from "@appaloft/application";
-import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
+import {
+  type DomainError,
+  deploymentRouteIdentityHeaderName,
+  domainError,
+  err,
+  ok,
+  type Result,
+} from "@appaloft/core";
 
 export const caddyEdgeNetworkName = "appaloft-edge";
 const caddyImage = "lucaslorentz/caddy-docker-proxy:2.9-alpine";
@@ -46,6 +53,7 @@ function labelsForCaddy(input: {
   route: EdgeProxyRouteInput;
   port: number;
   index: number;
+  deploymentId: string;
 }): string[] {
   const suffix = input.index === 0 ? "" : `_${input.index}`;
   const scheme = input.route.tlsMode === "auto" ? "https" : "http";
@@ -70,10 +78,15 @@ function labelsForCaddy(input: {
   return path
     ? [
         `caddy${suffix}=${site}`,
+        `caddy${suffix}.header.${deploymentRouteIdentityHeaderName}=${input.deploymentId}`,
         `caddy${suffix}.${pathDirective}=${path}`,
         `caddy${suffix}.${pathDirective}.reverse_proxy=${reverseProxy}`,
       ]
-    : [`caddy${suffix}=${site}`, `caddy${suffix}.reverse_proxy=${reverseProxy}`];
+    : [
+        `caddy${suffix}=${site}`,
+        `caddy${suffix}.header.${deploymentRouteIdentityHeaderName}=${input.deploymentId}`,
+        `caddy${suffix}.reverse_proxy=${reverseProxy}`,
+      ];
 }
 
 function routeScheme(route: EdgeProxyRouteInput): "http" | "https" {
@@ -279,7 +292,7 @@ export class CaddyEdgeProxyProvider implements EdgeProxyProvider {
   ): Promise<Result<ProxyRouteRealizationPlan, DomainError>> {
     const providerRoutes = input.accessRoutes.filter((route) => route.proxyKind === "caddy");
     const labels = providerRoutes.flatMap((route, index) =>
-      labelsForCaddy({ route, port: input.port, index }),
+      labelsForCaddy({ route, port: input.port, index, deploymentId: input.deploymentId }),
     );
 
     return ok({

@@ -36,6 +36,8 @@ logs, or raw provider/container payloads.
 - Missing evidence cannot produce `verified`.
 - A successful health check is evidence about the observed endpoint, not proof that it is the
   planned workload.
+- A managed public route is matched from the proxy-stamped deployment identity observed on the
+  response. The current container's deployment label cannot satisfy route ownership by itself.
 - Current identity/configuration drift after a previously successful attempt returns `stale`.
 - Required failed checks or critical attempted-rollout mismatch return `failed`.
 

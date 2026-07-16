@@ -1,6 +1,7 @@
 import { RoutePathPrefix } from "../shared/text-values";
 
 export const accessDefaultOpenPathPrefixMetadataKey = "access.defaultOpenPathPrefix";
+export const deploymentRouteIdentityHeaderName = "X-Appaloft-Deployment-Id";
 
 export interface AccessRouteOpenPathPrefixInput {
   readonly metadata?: Readonly<Record<string, string>>;

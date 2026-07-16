@@ -32,3 +32,16 @@
 - [x] Browser-check the bilingual blog at desktop/mobile widths and verify Deployment Detail through
   its structure test, shared DTO, and Cloud composed API/OpenAPI route.
 - [x] Complete Post-Implementation Sync and dual-repository status/commit/PR checks.
+
+## Managed Route Identity Hardening
+
+- [x] Record that container labels are workload evidence, not public-route evidence, in ADR-087,
+  the proof spec/workflow/query, and the Test Matrix.
+- [x] Add failing provider tests for a deployment identity response header on Caddy and Traefik
+  serve routes.
+- [x] Add failing runtime evidence tests for matching, mismatched, and missing managed-route
+  deployment identity.
+- [x] Implement provider-stamped route identity and runtime public-route observation without
+  changing the `deployments.proof/v1` schema.
+- [x] Run focused provider/application/adapter tests and the real proxy-backed route proof smoke.
+- [x] Complete Post-Implementation Sync and update this artifact state.

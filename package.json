@@ -58,6 +58,7 @@
     "smoke:local:commands": "bun run scripts/smoke/local-deploy.ts --method=workspace-commands --port=4310",
     "smoke:local:docker": "bun run scripts/smoke/local-deploy.ts --method=dockerfile --port=4311",
     "smoke:deployment-proof": "bun run scripts/smoke/deployment-proof.ts",
+    "smoke:deployment-route-proof": "APPALOFT_DEPLOYMENT_ROUTE_PROOF_TRAEFIK_SMOKE=1 bun test --timeout=60000 packages/adapters/runtime/test/deployment-route-proof.real-traefik.test.ts",
     "smoke:local:compose": "bun run scripts/smoke/local-deploy.ts --method=docker-compose --port=4312",
     "smoke:local:prebuilt": "bun run scripts/smoke/local-deploy.ts --method=prebuilt-image --port=4313",
     "smoke:local:static": "bun run scripts/smoke/local-deploy.ts --method=static",
