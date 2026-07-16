@@ -1,6 +1,11 @@
 # Changelog
 
-## [1.1.0](https://github.com/appaloft/appaloft/compare/v1.0.1...v1.1.0) (2026-07-16)
+## [1.0.2](https://github.com/appaloft/appaloft/compare/v1.0.1...v1.0.2) (2026-07-16)
+
+
+### Security
+
+* **secrets:** fail closed when control-plane secret decryption or key rotation cannot safely complete ([#687](https://github.com/appaloft/appaloft/pull/687)) ([4c1b0c5](https://github.com/appaloft/appaloft/commit/4c1b0c525c142e52f981581b71bfd7633f67e7f3))
 
 
 ### Features
