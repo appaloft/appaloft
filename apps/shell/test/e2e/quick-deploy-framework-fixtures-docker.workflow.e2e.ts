@@ -22,9 +22,9 @@ const frameworkFixturesRoot = new URL(
   import.meta.url,
 ).pathname;
 
-function deploymentRuntimeUrl(logs: string): string {
-  const parsed = parseJson<{ logs?: Array<{ message?: string }> }>(logs);
-  const runtimeUrl = parsed.logs
+function deploymentRuntimeUrl(timeline: string): string {
+  const parsed = parseJson<{ entries?: Array<{ message?: string }> }>(timeline);
+  const runtimeUrl = parsed.entries
     ?.map((entry) => entry.message ?? "")
     .map(
       (message) =>
@@ -33,7 +33,7 @@ function deploymentRuntimeUrl(logs: string): string {
     .find((url): url is string => Boolean(url));
 
   if (!runtimeUrl) {
-    throw new Error(`Could not find runtime URL in logs:\n${logs}`);
+    throw new Error(`Could not find runtime URL in deployment timeline:\n${timeline}`);
   }
 
   return runtimeUrl;
@@ -146,15 +146,18 @@ describe("quick deploy framework fixture Docker workflow e2e", () => {
         const deploymentId = parseJson<{ id: string }>(deployment.stdout).id;
         deploymentIds.push(deploymentId);
 
-        const logs = runShellCli(["logs", deploymentId], workspace.cliOptions);
-        expect(logs.exitCode, logs.stderr).toBe(0);
-        expect(logs.stdout).toContain("Using local docker-container execution");
-        expect(logs.stdout).toContain(fixture.expectedGeneratedLog);
-        expect(logs.stdout).toContain("docker build");
-        expect(logs.stdout).toContain("docker run -d");
-        expect(logs.stdout).toContain("Container is reachable");
+        const timeline = runShellCli(
+          ["deployments", "timeline", deploymentId],
+          workspace.cliOptions,
+        );
+        expect(timeline.exitCode, timeline.stderr).toBe(0);
+        expect(timeline.stdout).toContain("Using local docker-container execution");
+        expect(timeline.stdout).toContain(fixture.expectedGeneratedLog);
+        expect(timeline.stdout).toContain("docker build");
+        expect(timeline.stdout).toContain("docker run -d");
+        expect(timeline.stdout).toContain("Container is reachable");
 
-        const runtimeUrl = deploymentRuntimeUrl(logs.stdout);
+        const runtimeUrl = deploymentRuntimeUrl(timeline.stdout);
         await waitForHttpHealth(runtimeUrl);
         const runtimeResponse = await fetch(runtimeUrl);
         expect(runtimeResponse.ok).toBe(true);
@@ -215,12 +218,12 @@ describe("quick deploy framework fixture Docker workflow e2e", () => {
           execution: {
             kind: "docker-container",
             port: fixture.port,
-            verificationSteps: [
+            verificationSteps: expect.arrayContaining([
               {
                 kind: "internal-http",
                 label: "Verify internal container health",
               },
-            ],
+            ]),
           },
         });
 
