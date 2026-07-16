@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.4](https://github.com/appaloft/appaloft/compare/v1.0.3...v1.0.4) (2026-07-16)
+
+
+### Bug Fixes
+
+* **runtime:** preserve sqlite backup helper permissions ([#695](https://github.com/appaloft/appaloft/issues/695)) ([99a1291](https://github.com/appaloft/appaloft/commit/99a129178bf4e7c58966154205eb3242b45cee6b))
+
 ## [1.0.3](https://github.com/appaloft/appaloft/compare/v1.0.2...v1.0.3) (2026-07-16)
 
 
