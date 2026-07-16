@@ -272,11 +272,7 @@ function dockerNetworkFlags(networkNames: readonly string[]): string {
 
 function dockerEnvironmentFlags(environment: readonly DockerSwarmEnvironmentVariableIntent[]): string {
   return environment
-    .map((variable) =>
-      variable.secret
-        ? `--secret ${shellQuote(`source=${dockerSecretSource(variable)},target=${variable.name}`)}`
-        : `--env ${shellQuote(`${variable.name}=${variable.value ?? ""}`)}`,
-    )
+    .map((variable) => `--env ${shellQuote(`${variable.name}=${variable.value ?? ""}`)}`)
     .join(" ");
 }
 
@@ -284,11 +280,7 @@ function dockerEnvironmentDisplayFlags(
   environment: readonly DockerSwarmEnvironmentVariableIntent[],
 ): string {
   return environment
-    .map((variable) =>
-      variable.secret
-        ? `--secret ${shellQuote(`source=${dockerSecretSource(variable)},target=${variable.name}`)}`
-        : `--env ${shellQuote(`${variable.name}=********`)}`,
-    )
+    .map((variable) => `--env ${shellQuote(`${variable.name}=********`)}`)
     .join(" ");
 }
 
@@ -299,9 +291,9 @@ function yamlQuoted(value: string): string {
 function dockerComposeOverrideContent(input: {
   intent: DockerSwarmRuntimeIntent;
   networkNames: readonly string[];
+  redactValues?: boolean;
 }): string {
-  const plainEnvironment = input.intent.environment.filter((variable) => !variable.secret);
-  const secretEnvironment = input.intent.environment.filter((variable) => variable.secret);
+  const environment = input.intent.environment;
   const volumeMounts = input.intent.mounts.filter((mount) => mount.type === "volume");
   const uniqueVolumeNames = [...new Set(volumeMounts.map((mount) => mount.source))].sort();
   const labelsByVolumeName = new Map(
@@ -310,9 +302,6 @@ function dockerComposeOverrideContent(input: {
       realization.labels,
     ]),
   );
-  const uniqueSecretSources = [
-    ...new Set(secretEnvironment.map((variable) => dockerSecretSource(variable))),
-  ].sort();
   const serviceLines = [
     "services:",
     `  ${yamlQuoted(input.intent.targetServiceName)}:`,
@@ -321,24 +310,15 @@ function dockerComposeOverrideContent(input: {
     ...Object.entries(input.intent.labels)
       .sort(([left], [right]) => left.localeCompare(right))
       .map(([key, value]) => `        ${yamlQuoted(key)}: ${yamlQuoted(value)}`),
-    ...(plainEnvironment.length > 0
+    ...(environment.length > 0
       ? [
           "    environment:",
-          ...plainEnvironment.map(
-            (variable) => `      ${yamlQuoted(variable.name)}: ${yamlQuoted(variable.value ?? "")}`,
+          ...environment.map(
+            (variable) =>
+              `      ${yamlQuoted(variable.name)}: ${yamlQuoted(
+                input.redactValues ? "********" : (variable.value ?? ""),
+              )}`,
           ),
-        ]
-      : []),
-    ...(uniqueSecretSources.length > 0
-      ? [
-          "    secrets:",
-          ...secretEnvironment.map((variable) => {
-            const source = dockerSecretSource(variable);
-            return [
-              `      - source: ${yamlQuoted(source)}`,
-              `        target: ${yamlQuoted(variable.name)}`,
-            ];
-          }).flat(),
         ]
       : []),
     ...(input.intent.mounts.length > 0
@@ -385,22 +365,10 @@ function dockerComposeOverrideContent(input: {
           }),
         ]
       : [];
-  const secretLines =
-    uniqueSecretSources.length > 0
-      ? [
-          "secrets:",
-          ...uniqueSecretSources.flatMap((secretName) => [
-            `  ${yamlQuoted(secretName)}:`,
-            "    external: true",
-          ]),
-        ]
-      : [];
-
   return [
     ...serviceLines,
     ...networkLines,
     ...volumeLines,
-    ...secretLines,
   ].join("\n");
 }
 
@@ -408,6 +376,7 @@ function stackDeployCommand(input: {
   composeFile: string;
   intent: DockerSwarmRuntimeIntent;
   networkNames: readonly string[];
+  redactValues?: boolean;
 }): string {
   const overrideContent = dockerComposeOverrideContent(input);
   return [
@@ -435,15 +404,6 @@ function dockerMountFlags(mounts: readonly DockerSwarmMountIntent[]): string {
       )}`,
     )
     .join(" ");
-}
-
-function dockerSecretSource(variable: DockerSwarmEnvironmentVariableIntent): string {
-  const secretPrefix = "secret:";
-  if (variable.valueFrom?.startsWith(secretPrefix)) {
-    return variable.valueFrom.slice(secretPrefix.length);
-  }
-
-  return variable.name;
 }
 
 function dockerHealthFlags(health: DockerSwarmHealthIntent | undefined): string {
@@ -1147,6 +1107,15 @@ function requiredReadinessStep(
 export function renderDockerSwarmApplyPlan(
   intent: DockerSwarmRuntimeIntent,
 ): Result<DockerSwarmApplyPlan> {
+  if (intent.environment.some((variable) => typeof variable.value !== "string")) {
+    return err(
+      domainError.infra("Docker Swarm environment materialization is incomplete", {
+        phase: "control-plane-secret-materialization",
+        reason: "environment-value-unavailable",
+        variableKeyCount: intent.environment.length,
+      }),
+    );
+  }
   const networkNames = [
     ...new Set([
       ...intent.componentLinks.map((link) => link.networkName),
@@ -1202,14 +1171,24 @@ export function renderDockerSwarmApplyPlan(
             composeFile: intent.workload.composeFile,
             intent,
             networkNames: resolvedNetworkNames,
+            redactValues: true,
           }),
         };
   const readinessStep = requiredReadinessStep(intent.readinessGates);
 
+  const verifyEnvironmentKeys = intent.environment
+    .map(
+      (variable) =>
+        `docker service inspect ${shellQuote(intent.serviceName)} --format ${shellQuote(
+          "{{range .Spec.TaskTemplate.ContainerSpec.Env}}{{println .}}{{end}}",
+        )} | sed 's/=.*//' | grep -Fqx -- ${shellQuote(variable.name)}`,
+    )
+    .join(" && ");
   const verifyCommand = commandParts([
     "docker service ps",
     "--filter 'desired-state=running'",
     shellQuote(intent.serviceName),
+    ...(verifyEnvironmentKeys ? ["&&", verifyEnvironmentKeys] : []),
   ]);
   const promoteCommand = commandParts([
     "docker service update",

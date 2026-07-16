@@ -16,7 +16,13 @@ import {
 } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
-import { type AppLogger, type Clock, type EnvironmentRepository, type EventBus } from "../../ports";
+import {
+  type AppLogger,
+  type Clock,
+  type ControlPlaneSecretProtector,
+  type EnvironmentRepository,
+  type EventBus,
+} from "../../ports";
 import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
 import { type SetEnvironmentVariableCommandInput } from "./set-environment-variable.command";
@@ -32,13 +38,15 @@ export class SetEnvironmentVariableUseCase {
     private readonly eventBus: EventBus,
     @inject(tokens.logger)
     private readonly logger: AppLogger,
+    @inject(tokens.controlPlaneSecretProtector)
+    private readonly secretProtector: ControlPlaneSecretProtector,
   ) {}
 
   async execute(
     context: ExecutionContext,
     input: SetEnvironmentVariableCommandInput,
   ): Promise<Result<void>> {
-    const { clock, environmentRepository, eventBus, logger } = this;
+    const { clock, environmentRepository, eventBus, logger, secretProtector } = this;
     const repositoryContext = toRepositoryContext(context);
 
     return safeTry(async function* () {
@@ -53,7 +61,11 @@ export class SetEnvironmentVariableUseCase {
       }
 
       const key = yield* ConfigKey.create(input.key);
-      const value = yield* ConfigValueText.create(input.value);
+      const isSecret = input.isSecret === true || input.kind === "secret";
+      const storedValue = isSecret
+        ? yield* await secretProtector.protect({ purpose: "environment-variable" }, input.value)
+        : { envelope: input.value };
+      const value = yield* ConfigValueText.create(storedValue.envelope);
       const kind = yield* VariableKindValue.create(input.kind);
       const exposure = yield* VariableExposureValue.create(input.exposure);
 
@@ -69,7 +81,7 @@ export class SetEnvironmentVariableUseCase {
         kind,
         exposure,
         ...(scope ? { scope } : {}),
-        ...(typeof input.isSecret === "boolean" ? { isSecret: input.isSecret } : {}),
+        isSecret,
         updatedAt,
       });
 

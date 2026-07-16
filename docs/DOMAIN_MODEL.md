@@ -451,6 +451,12 @@ Boundary rule:
   `Resource` configuration entries. It may expose masked values and safe override metadata such as
   winning scope and overridden scopes, but it must not expose plaintext secrets, mutate aggregates,
   or become a deployment-owned configuration model.
+- secret-classified Environment and Resource configuration values cross the application boundary
+  through a versioned control-plane protection port. Persistence may store only protected envelopes;
+  deployment planning and execution must authenticate and materialize the complete selected set
+  before runtime mutation. Key rotation is a system operation over persistence records, not
+  Environment, Resource, or Deployment aggregate behavior; it uses a dry-run digest, an external
+  backup reference, and one atomic transaction so partial key states are never observable.
 - access/proxy/log/health failure visibility belongs to application read/query surfaces. Source
   failures may preserve stable source, code, category, phase, retryability, and safe related ids, but
   copyable diagnostic and health payloads must normalize unsafe adjacent message text such as auth

@@ -1,4 +1,5 @@
 import type {
+  ControlPlaneSecretProtector,
   DependencyResourceSecretStore,
   ExecutionContext,
 } from "@appaloft/application";
@@ -140,6 +141,7 @@ export async function resolveDependencyRuntimeEnvironment(input: {
   context: ExecutionContext;
   deployment: Deployment;
   dependencyResourceSecretStore: DependencyResourceSecretStore | undefined;
+  controlPlaneSecretProtector?: ControlPlaneSecretProtector | undefined;
   port?: number;
   baseEnv?: NodeJS.ProcessEnv;
   includeDependencyRuntimeSecrets?: boolean;
@@ -159,11 +161,35 @@ export async function resolveDependencyRuntimeEnvironment(input: {
   const redactions: string[] = [];
   const dependencyTargetNames = new Set<string>();
 
+  const materializedSnapshotVariables: Array<{ key: string; value: string; isSecret: boolean }> = [];
   for (const variable of state.environmentSnapshot.variables) {
-    env[variable.key] = variable.value;
-    if (variable.isSecret) {
-      redactions.push(variable.value);
+    if (!variable.isSecret) {
+      materializedSnapshotVariables.push({ key: variable.key, value: variable.value, isSecret: false });
+      continue;
     }
+    if (!input.controlPlaneSecretProtector) {
+      return err({
+        code: "control_plane_secret_keyring_unavailable",
+        category: "infra",
+        message: "Control-plane secret keyring is unavailable; deployment was blocked",
+        retryable: false,
+        details: { phase: "control-plane-secret-materialization", reason: "keyring-unavailable" },
+      });
+    }
+    const resolved = await input.controlPlaneSecretProtector.unprotect(
+      { purpose: variable.scope === "resource" ? "resource-variable" : "environment-variable" },
+      variable.value,
+    );
+    if (resolved.isErr()) return err(resolved.error);
+    materializedSnapshotVariables.push({
+      key: variable.key,
+      value: resolved.value.plaintext,
+      isSecret: true,
+    });
+  }
+  for (const variable of materializedSnapshotVariables) {
+    env[variable.key] = variable.value;
+    if (variable.isSecret) redactions.push(variable.value);
   }
 
   if (input.includeDependencyRuntimeSecrets !== false) {

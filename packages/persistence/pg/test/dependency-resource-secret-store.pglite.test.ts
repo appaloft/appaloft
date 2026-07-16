@@ -5,6 +5,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createExecutionContext } from "@appaloft/application";
+import { TestControlPlaneSecretProtector } from "@appaloft/testkit";
 
 describe("dependency resource secret store persistence", () => {
   test("[DEP-BIND-SECRET-RESOLVE-001] [DEP-BIND-SECRET-RESOLVE-002] stores and resolves imported dependency connection values", async () => {
@@ -25,7 +26,8 @@ describe("dependency resource secret store persistence", () => {
         requestId: "req_dependency_resource_secret_store_pglite_test",
         entrypoint: "system",
       });
-      const store = new PgDependencyResourceSecretStore(database.db);
+      const secretProtector = new TestControlPlaneSecretProtector();
+      const store = new PgDependencyResourceSecretStore(database.db, secretProtector);
       const postgresUrl = "postgres://app:super-secret@db.example.com:5432/app";
       const redisUrl = "rediss://default:super-secret@cache.example.com:6380/0";
 
@@ -57,6 +59,12 @@ describe("dependency resource secret store persistence", () => {
       await expect(
         database.db.selectFrom("dependency_resources").selectAll().execute(),
       ).resolves.toEqual([]);
+      const storedPayloads = await database.db
+        .selectFrom("dependency_resource_secrets")
+        .select("payload")
+        .execute();
+      expect(JSON.stringify(storedPayloads)).not.toContain(postgresUrl);
+      expect(JSON.stringify(storedPayloads)).not.toContain(redisUrl);
 
       const postgresResolved = await store.resolve(executionContext, {
         secretRef: postgresStored._unsafeUnwrap().secretRef,
@@ -105,8 +113,12 @@ describe("dependency resource secret store persistence", () => {
         requestId: "req_dependency_binding_secret_resolve_pglite_test",
         entrypoint: "system",
       });
-      const bindingSecretStore = new PgDependencyBindingSecretStore(database.db);
-      const runtimeSecretResolver = new PgDependencyResourceSecretStore(database.db);
+      const secretProtector = new TestControlPlaneSecretProtector();
+      const bindingSecretStore = new PgDependencyBindingSecretStore(database.db, secretProtector);
+      const runtimeSecretResolver = new PgDependencyResourceSecretStore(
+        database.db,
+        secretProtector,
+      );
       const firstSecret = "postgres://app:first-secret@db.example.com:5432/app";
       const secondSecret = "postgres://app:second-secret@db.example.com:5432/app";
 

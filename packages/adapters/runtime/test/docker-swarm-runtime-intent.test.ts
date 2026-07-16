@@ -679,7 +679,14 @@ describe("renderDockerSwarmRuntimeIntent", () => {
     });
 
     expect(intentResult.isOk()).toBe(true);
-    const result = renderDockerSwarmApplyPlan(intentResult._unsafeUnwrap());
+    const intent = intentResult._unsafeUnwrap();
+    const result = renderDockerSwarmApplyPlan({
+      ...intent,
+      environment: intent.environment.map((variable) => ({
+        ...variable,
+        value: variable.secret ? "postgres://secret-value" : variable.value,
+      })),
+    });
 
     expect(result.isOk()).toBe(true);
     const plan = result._unsafeUnwrap();
@@ -699,16 +706,26 @@ describe("renderDockerSwarmRuntimeIntent", () => {
     expect(createCommand).toContain("--network 'appaloft-edge'");
     expect(createCommand).toContain("--label 'appaloft.deployment-id=dep_123'");
     expect(createCommand).toContain("--env 'PUBLIC_FLAG=enabled'");
-    expect(createCommand).toContain("--secret 'source=DATABASE_URL,target=DATABASE_URL'");
+    expect(createCommand).toContain("--env 'DATABASE_URL=postgres://secret-value'");
     expect(createCommand).toContain("'registry.example.com/team/app:sha'");
     expect(createCommand).not.toContain("--publish");
     expect(createCommand).not.toContain("-p ");
-    expect(createCommand).not.toContain("postgres://secret-value");
     expect(createCommand).not.toContain("traefik.http.routers");
     expect(createDisplayCommand).toContain("--env 'PUBLIC_FLAG=********'");
-    expect(createDisplayCommand).toContain("--secret 'source=DATABASE_URL,target=DATABASE_URL'");
+    expect(createDisplayCommand).toContain("--env 'DATABASE_URL=********'");
     expect(createDisplayCommand).not.toContain("PUBLIC_FLAG=enabled");
     expect(createDisplayCommand).not.toContain("postgres://secret-value");
+
+    const fixedStringVerificationPlan = renderDockerSwarmApplyPlan({
+      ...intent,
+      environment: [{ ...intent.environment[0]!, name: "FLAG[0]", value: "present" }],
+    })._unsafeUnwrap();
+    const fixedStringVerificationCommand =
+      fixedStringVerificationPlan.steps[1]?.command ?? "";
+    expect(fixedStringVerificationCommand).toContain(
+      "sed 's/=.*//' | grep -Fqx -- 'FLAG[0]'",
+    );
+    expect(fixedStringVerificationCommand).not.toContain("grep -q '^FLAG[0]='");
 
     const privateRegistryIntent = renderDockerSwarmRuntimeIntent({
       runtimePlan: imageRuntimePlan({
@@ -722,7 +739,13 @@ describe("renderDockerSwarmRuntimeIntent", () => {
         destinationId: "dst_prod",
       },
     })._unsafeUnwrap();
-    const privateRegistryPlan = renderDockerSwarmApplyPlan(privateRegistryIntent)._unsafeUnwrap();
+    const privateRegistryPlan = renderDockerSwarmApplyPlan({
+      ...privateRegistryIntent,
+      environment: privateRegistryIntent.environment.map((variable) => ({
+        ...variable,
+        value: variable.secret ? "postgres://secret-value" : variable.value,
+      })),
+    })._unsafeUnwrap();
     const privateRegistryCreateCommand = privateRegistryPlan.steps[0]?.command ?? "";
     const privateRegistryDisplayCommand = privateRegistryPlan.steps[0]?.displayCommand ?? "";
     expect(privateRegistryCreateCommand).toContain("--with-registry-auth");

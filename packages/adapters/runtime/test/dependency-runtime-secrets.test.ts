@@ -1,3 +1,5 @@
+import "reflect-metadata";
+
 import { describe, expect, test } from "bun:test";
 import {
   BuildStrategyKindValue,
@@ -46,6 +48,7 @@ import {
   ok,
 } from "@appaloft/core";
 import { type DependencyResourceSecretStore, type ExecutionContext } from "@appaloft/application";
+import { TestControlPlaneSecretProtector } from "@appaloft/testkit";
 import {
   isAppaloftManagedRuntimeEnvironmentKey,
   resolveDependencyRuntimeEnvironment,
@@ -96,6 +99,10 @@ class MemoryDependencyResourceSecretStore implements DependencyResourceSecretSto
   }
 }
 
+const testSecretProtector = new TestControlPlaneSecretProtector();
+const protectedFixture = (value: string) =>
+  `appaloft-test-secret:v1:${Buffer.from(value, "utf8").toString("base64url")}`;
+
 function createDeploymentWithDependencyRef(
   secretRef: string,
   input: {
@@ -103,6 +110,7 @@ function createDeploymentWithDependencyRef(
     dependencyResourceId?: string;
     kind?: "postgres" | "redis" | "mysql" | "clickhouse" | "object-storage" | "opensearch";
     targetName?: string;
+    additionalSecretValue?: string;
   } = {},
 ): Deployment {
   return Deployment.create({
@@ -143,12 +151,24 @@ function createDeploymentWithDependencyRef(
       variables: [
         {
           key: ConfigKey.rehydrate("APP_SECRET"),
-          value: ConfigValueText.rehydrate("environment-secret"),
+          value: ConfigValueText.rehydrate(protectedFixture("environment-secret")),
           kind: VariableKindValue.rehydrate("secret"),
           exposure: VariableExposureValue.rehydrate("runtime"),
           scope: ConfigScopeValue.rehydrate("environment"),
           isSecret: true,
         },
+        ...(input.additionalSecretValue
+          ? [
+              {
+                key: ConfigKey.rehydrate("SECOND_SECRET"),
+                value: ConfigValueText.rehydrate(input.additionalSecretValue),
+                kind: VariableKindValue.rehydrate("secret"),
+                exposure: VariableExposureValue.rehydrate("runtime"),
+                scope: ConfigScopeValue.rehydrate("environment"),
+                isSecret: true,
+              },
+            ]
+          : []),
       ],
     }),
     dependencyBindingReferences: [
@@ -178,6 +198,26 @@ describe("dependency runtime secret resolution", () => {
     expect(isAppaloftManagedRuntimeEnvironmentKey("APPALOFT_BETTER_AUTH_SECRET")).toBe(false);
   });
 
+  test("[CPS-FAIL-005] one unreadable secret blocks the entire runtime environment", async () => {
+    const marker = "PARTIAL_ENV_MARKER";
+    const resolved = await resolveDependencyRuntimeEnvironment({
+      context: testContext("req_partial_secret_failure"),
+      deployment: createDeploymentWithDependencyRef("external://unused", {
+        additionalSecretValue: marker,
+      }),
+      dependencyResourceSecretStore: undefined,
+      controlPlaneSecretProtector: testSecretProtector,
+      includeDependencyRuntimeSecrets: false,
+      baseEnv: {},
+    });
+
+    expect(resolved.isErr()).toBe(true);
+    expect(resolved._unsafeUnwrapErr().code).toBe(
+      "control_plane_secret_legacy_migration_required",
+    );
+    expect(JSON.stringify(resolved._unsafeUnwrapErr())).not.toContain(marker);
+  });
+
   test("[DEP-BIND-SECRET-RESOLVE-005] resolves Appaloft-owned dependency refs into runtime env with redaction metadata", async () => {
     const context = testContext("req_dependency_runtime_secret_test");
     const store = new MemoryDependencyResourceSecretStore();
@@ -194,6 +234,7 @@ describe("dependency runtime secret resolution", () => {
         "appaloft://dependency-resources/rsi_pg/connection",
       ),
       dependencyResourceSecretStore: store,
+      controlPlaneSecretProtector: testSecretProtector,
       port: 4000,
       baseEnv: {},
     });
@@ -245,6 +286,7 @@ describe("dependency runtime secret resolution", () => {
         },
       ),
       dependencyResourceSecretStore: store,
+      controlPlaneSecretProtector: testSecretProtector,
       port: 4000,
       baseEnv: {},
     });
@@ -296,6 +338,7 @@ describe("dependency runtime secret resolution", () => {
         },
       ),
       dependencyResourceSecretStore: store,
+      controlPlaneSecretProtector: testSecretProtector,
       baseEnv: {},
     });
 
@@ -316,6 +359,7 @@ describe("dependency runtime secret resolution", () => {
         "appaloft://dependency-resources/rsi_pg/connection",
       ),
       dependencyResourceSecretStore: store,
+      controlPlaneSecretProtector: testSecretProtector,
       baseEnv: {},
     });
 
@@ -345,6 +389,7 @@ describe("dependency runtime secret resolution", () => {
         "appaloft://dependency-resources/rsi_pg/connection",
       ),
       dependencyResourceSecretStore: store,
+      controlPlaneSecretProtector: testSecretProtector,
       includeDependencyRuntimeSecrets: false,
       baseEnv: {},
     });
@@ -367,6 +412,7 @@ describe("dependency runtime secret resolution", () => {
       context,
       deployment: createDeploymentWithDependencyRef(rotatedSecretRef),
       dependencyResourceSecretStore: store,
+      controlPlaneSecretProtector: testSecretProtector,
       baseEnv: {},
     });
 

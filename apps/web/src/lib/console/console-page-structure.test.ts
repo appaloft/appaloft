@@ -2040,6 +2040,10 @@ describe("console page structure", () => {
     expect(deploymentDetailPageSource).toContain("data-deployment-proof-dimensions");
     expect(deploymentDetailPageSource).toContain("data-deployment-proof-mismatches");
     expect(deploymentDetailPageSource).toContain("data-deployment-proof-unavailable");
+    expect(deploymentDetailPageSource).toContain("data-deployment-proof-environment-keys");
+    expect(deploymentDetailPageSource).toContain("matchesPlannedKeySet");
+    expect(deploymentDetailPageSource).toContain("configuration.keyCount");
+    expect(deploymentDetailPageSource).toContain("configuration.plannedKeyCount");
     expect(deploymentDetailPageSource).toContain("proofVerdictPartiallyVerified");
     expect(deploymentDetailPageSource).toContain("proofRecoveryUnavailable");
   });

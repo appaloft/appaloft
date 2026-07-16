@@ -98,6 +98,23 @@ describe("compose ownership label overrides", () => {
     expect(script).toContain('    name: "appaloft-edge"');
   });
 
+  test("[CPS-SUBSTRATE-009] injects runtime environment keys into the target service without values", () => {
+    const script = renderComposeOwnershipLabelOverrideScript({
+      composeFile: "/srv/app/docker-compose.yml",
+      overrideFile: "/srv/app/.appaloft.compose.labels.override.yml",
+      labels: dockerLabelsFromAssignments(["appaloft.managed=true"]),
+      targetServiceName: "web",
+      environmentKeys: ["PUBLIC_MARKER", "SECRET_MARKER", "SECRET_MARKER"],
+      quote: shellQuote,
+    });
+
+    expect(script).toContain("target_service='web'");
+    expect(script).toContain('    environment:');
+    expect(script).toContain('      "PUBLIC_MARKER": "${PUBLIC_MARKER}"');
+    expect(script.match(/"SECRET_MARKER": "\$\{SECRET_MARKER\}"/g)).toHaveLength(1);
+    expect(script).not.toContain("marker-secret-value");
+  });
+
   test("[DEP-CREATE-ASYNC-016A] infers the only service for a derived Compose route", () => {
     const script = renderComposeOwnershipLabelOverrideScript({
       composeFile: "/srv/app/docker-compose.yml",

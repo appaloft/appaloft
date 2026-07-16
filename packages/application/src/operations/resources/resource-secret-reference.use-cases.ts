@@ -15,7 +15,13 @@ import {
 import { inject, injectable } from "tsyringe";
 
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
-import { type AppLogger, type Clock, type EventBus, type ResourceRepository } from "../../ports";
+import {
+  type AppLogger,
+  type Clock,
+  type ControlPlaneSecretProtector,
+  type EventBus,
+  type ResourceRepository,
+} from "../../ports";
 import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
 import {
@@ -71,13 +77,15 @@ export class CreateResourceSecretReferenceUseCase {
     private readonly eventBus: EventBus,
     @inject(tokens.logger)
     private readonly logger: AppLogger,
+    @inject(tokens.controlPlaneSecretProtector)
+    private readonly secretProtector: ControlPlaneSecretProtector,
   ) {}
 
   async execute(
     context: ExecutionContext,
     input: CreateResourceSecretReferenceCommand,
   ): Promise<Result<ResourceSecretReferenceMutationResult>> {
-    const { clock, eventBus, logger, resourceRepository } = this;
+    const { clock, eventBus, logger, resourceRepository, secretProtector } = this;
 
     return safeTry(async function* () {
       const loaded = yield* await loadResource({
@@ -86,7 +94,11 @@ export class CreateResourceSecretReferenceUseCase {
         resourceId: input.resourceId,
       });
       const key = yield* ConfigKey.create(input.key);
-      const value = yield* ConfigValueText.create(input.value);
+      const protectedValue = yield* await secretProtector.protect(
+        { purpose: "resource-variable" },
+        input.value,
+      );
+      const value = yield* ConfigValueText.create(protectedValue.envelope);
       const exposure = yield* VariableExposureValue.create(input.exposure);
       const updatedAt = yield* UpdatedAt.create(clock.now());
 
@@ -119,13 +131,15 @@ export class RotateResourceSecretReferenceUseCase {
     private readonly eventBus: EventBus,
     @inject(tokens.logger)
     private readonly logger: AppLogger,
+    @inject(tokens.controlPlaneSecretProtector)
+    private readonly secretProtector: ControlPlaneSecretProtector,
   ) {}
 
   async execute(
     context: ExecutionContext,
     input: RotateResourceSecretReferenceCommand,
   ): Promise<Result<ResourceSecretReferenceMutationResult>> {
-    const { clock, eventBus, logger, resourceRepository } = this;
+    const { clock, eventBus, logger, resourceRepository, secretProtector } = this;
 
     return safeTry(async function* () {
       const loaded = yield* await loadResource({
@@ -134,7 +148,11 @@ export class RotateResourceSecretReferenceUseCase {
         resourceId: input.resourceId,
       });
       const key = yield* ConfigKey.create(input.key);
-      const value = yield* ConfigValueText.create(input.value);
+      const protectedValue = yield* await secretProtector.protect(
+        { purpose: "resource-variable" },
+        input.value,
+      );
+      const value = yield* ConfigValueText.create(protectedValue.envelope);
       const exposure = yield* VariableExposureValue.create(input.exposure);
       const updatedAt = yield* UpdatedAt.create(clock.now());
 

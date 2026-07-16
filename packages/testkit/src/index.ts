@@ -11,6 +11,8 @@ import {
   type CertificateSecretStore,
   type CertificateSummary,
   type Clock,
+  type ControlPlaneSecretContext,
+  type ControlPlaneSecretProtector,
   type DependencyBindingSecretStore,
   type DependencyBindingSecretStoreInput,
   type DependencyResourceBackupProviderInput,
@@ -181,6 +183,72 @@ import {
   type StorageVolumeMutationSpec,
   type StorageVolumeSelectionSpec,
 } from "@appaloft/core";
+
+const testSecretPrefix = "appaloft-test-secret:v1:";
+
+/** Deterministic, non-cryptographic protector for application tests only. */
+export class TestControlPlaneSecretProtector implements ControlPlaneSecretProtector {
+  activeKeyId(): string {
+    return "test-key";
+  }
+
+  inspect(value: string) {
+    return value.startsWith(testSecretPrefix)
+      ? ({ state: "active-key", keyId: "test-key" } as const)
+      : ({ state: "legacy-plaintext" } as const);
+  }
+
+  async protect(_context: ControlPlaneSecretContext, plaintext: string) {
+    return ok({
+      envelope: `${testSecretPrefix}${Buffer.from(plaintext, "utf8").toString("base64url")}`,
+      keyId: "test-key",
+    });
+  }
+
+  async unprotect(_context: ControlPlaneSecretContext, envelope: string) {
+    if (!envelope.startsWith(testSecretPrefix)) {
+      return err({
+        code: "control_plane_secret_legacy_migration_required",
+        category: "infra" as const,
+        message: "Test secret requires migration",
+        retryable: false,
+      });
+    }
+    return ok({
+      plaintext: Buffer.from(envelope.slice(testSecretPrefix.length), "base64url").toString("utf8"),
+      keyId: "test-key",
+    });
+  }
+
+  async rewrap(
+    context: ControlPlaneSecretContext,
+    value: string,
+    options: { allowLegacyPlaintext: boolean },
+  ) {
+    if (value.startsWith(testSecretPrefix)) {
+      return ok({
+        envelope: value,
+        keyId: "test-key",
+        previousState: "active-key" as const,
+        changed: false,
+      });
+    }
+    if (!options.allowLegacyPlaintext) {
+      return err({
+        code: "control_plane_secret_legacy_migration_required",
+        category: "infra" as const,
+        message: "Test secret requires migration",
+        retryable: false,
+      });
+    }
+    const protectedValue = await this.protect(context, value);
+    return ok({
+      ...protectedValue._unsafeUnwrap(),
+      previousState: "legacy-plaintext" as const,
+      changed: true,
+    });
+  }
+}
 
 const defaultReadModelListLimit = 100;
 

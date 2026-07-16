@@ -5854,7 +5854,11 @@ export const deploymentProofRuntimeEvidenceSchema = z.object({
     available: z.boolean(),
     fingerprint: z.string().optional(),
     generation: z.string().optional(),
+    keyCount: z.number().int().nonnegative().optional(),
+    plannedKeyCount: z.number().int().nonnegative().optional(),
+    keyFingerprint: z.string().optional(),
     matchesPlanned: z.boolean().optional(),
+    matchesPlannedKeySet: z.boolean().optional(),
     reasonCode: z.string().optional(),
   }),
   health: z.object({

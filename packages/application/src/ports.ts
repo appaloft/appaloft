@@ -158,6 +158,94 @@ export interface AppLogger {
   error(message: string, context?: Record<string, unknown>): void;
 }
 
+export type ControlPlaneSecretPurpose =
+  | "environment-variable"
+  | "resource-variable"
+  | "dependency-resource"
+  | "dependency-binding";
+
+export interface ControlPlaneSecretContext {
+  purpose: ControlPlaneSecretPurpose;
+}
+
+export type ControlPlaneSecretEnvelopeState =
+  | "active-key"
+  | "retained-key"
+  | "legacy-plaintext"
+  | "unreadable";
+
+export interface ControlPlaneProtectedSecret {
+  envelope: string;
+  keyId: string;
+}
+
+export interface ControlPlaneUnprotectedSecret {
+  plaintext: string;
+  keyId: string;
+}
+
+export interface ControlPlaneSecretRewrapResult extends ControlPlaneProtectedSecret {
+  previousState: Exclude<ControlPlaneSecretEnvelopeState, "unreadable">;
+  changed: boolean;
+}
+
+/**
+ * Protects secret material before persistence and materializes it only at an
+ * execution boundary. Implementations must never substitute an empty value on
+ * failure and must keep errors free of secret material.
+ */
+export interface ControlPlaneSecretProtector {
+  activeKeyId(): string | null;
+  inspect(value: string): { state: ControlPlaneSecretEnvelopeState; keyId?: string };
+  protect(
+    context: ControlPlaneSecretContext,
+    plaintext: string,
+  ): Promise<Result<ControlPlaneProtectedSecret, DomainError>>;
+  unprotect(
+    context: ControlPlaneSecretContext,
+    envelope: string,
+  ): Promise<Result<ControlPlaneUnprotectedSecret, DomainError>>;
+  rewrap(
+    context: ControlPlaneSecretContext,
+    value: string,
+    options: { allowLegacyPlaintext: boolean },
+  ): Promise<Result<ControlPlaneSecretRewrapResult, DomainError>>;
+}
+
+export interface ControlPlaneSecretRotationPlan {
+  schemaVersion: "control-plane.secret-rotation-plan/v1";
+  activeKeyId: string | null;
+  recordCount: number;
+  variableKeyCount: number;
+  stateCounts: Record<ControlPlaneSecretEnvelopeState, number>;
+  requiresLegacyAuthorization: boolean;
+  ready: boolean;
+  planDigest: string;
+}
+
+export interface ControlPlaneSecretRotationApplyInput {
+  planDigest: string;
+  backupReference: string;
+  allowLegacyPlaintext: boolean;
+}
+
+export interface ControlPlaneSecretRotationApplyResult {
+  schemaVersion: "control-plane.secret-rotation-result/v1";
+  activeKeyId: string;
+  matchedRecordCount: number;
+  rotatedRecordCount: number;
+  unchangedRecordCount: number;
+  planDigest: string;
+  status: "applied" | "already-active";
+}
+
+export interface ControlPlaneSecretRotationPort {
+  plan(): Promise<Result<ControlPlaneSecretRotationPlan, DomainError>>;
+  apply(
+    input: ControlPlaneSecretRotationApplyInput,
+  ): Promise<Result<ControlPlaneSecretRotationApplyResult, DomainError>>;
+}
+
 export interface EventBus {
   publish(context: ExecutionContext, events: DomainEvent[]): Promise<void>;
 }
@@ -5836,6 +5924,10 @@ export interface DeploymentProofConfigurationEvidence {
   fingerprint?: string;
   generation?: string;
   matchesPlanned?: boolean;
+  keyCount?: number;
+  plannedKeyCount?: number;
+  keyFingerprint?: string;
+  matchesPlannedKeySet?: boolean;
   reasonCode?: string;
 }
 export interface DeploymentProofCheckEvidence {
