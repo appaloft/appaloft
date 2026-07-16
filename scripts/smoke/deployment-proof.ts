@@ -16,6 +16,24 @@ type Proof = {
   };
   mismatches: Array<{ reasonCode: string }>;
 };
+type DeploymentDetail = {
+  deployment: {
+    resourceId: string;
+    runtimePlan: {
+      execution: {
+        healthCheckPath?: string;
+        accessRoutes?: Array<{
+          proxyKind: string;
+          domains: string[];
+          pathPrefix: string;
+          tlsMode: string;
+          routeBehavior?: string;
+          redirectTo?: string;
+        }>;
+      };
+    };
+  };
+};
 
 async function reservePort(): Promise<number> {
   return await new Promise((resolvePort, reject) => {
@@ -66,6 +84,36 @@ async function waitFor(url: string): Promise<Response> {
     await Bun.sleep(250);
   }
   throw new Error(`Timed out waiting for ${url}`);
+}
+
+function managedRouteUrl(detail: DeploymentDetail): string {
+  const route = detail.deployment.runtimePlan.execution.accessRoutes?.find(
+    (candidate) =>
+      candidate.proxyKind !== "none" &&
+      candidate.routeBehavior !== "redirect" &&
+      !candidate.redirectTo,
+  );
+  const domain = route?.domains[0];
+  if (!route || !domain) throw new Error("deployment did not expose a managed route");
+  const scheme = route.tlsMode === "auto" ? "https" : "http";
+  const prefix = route.pathPrefix === "/" ? "" : route.pathPrefix.replace(/\/+$/u, "");
+  const healthPath = detail.deployment.runtimePlan.execution.healthCheckPath ?? "/";
+  const path = healthPath.startsWith("/") ? healthPath : `/${healthPath}`;
+  return `${scheme}://${domain}${prefix}${path}`;
+}
+
+async function waitForDeploymentRoute(url: string, deploymentId: string): Promise<void> {
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    const result = run(["curl", "--noproxy", "*", "-fsS", "-D", "-", "-o", "/dev/null", url]);
+    if (
+      result.exitCode === 0 &&
+      result.stdout.toLowerCase().includes(`x-appaloft-deployment-id: ${deploymentId}`)
+    ) {
+      return;
+    }
+    await Bun.sleep(250);
+  }
+  throw new Error(`Timed out waiting for ${url} to serve deployment ${deploymentId}`);
 }
 
 async function main(): Promise<void> {
@@ -162,10 +210,12 @@ async function main(): Promise<void> {
         "deploy v1",
       ),
     ).id;
-    const firstDetail = json<{ deployment: { resourceId: string } }>(
+    const firstDetail = json<DeploymentDetail>(
       expectSuccess(runCli(["deployments", "show", firstDeploymentId]), "show v1"),
     );
     resourceId = firstDetail.deployment.resourceId;
+    const publicRouteUrl = managedRouteUrl(firstDetail);
+    await waitForDeploymentRoute(publicRouteUrl, firstDeploymentId);
     const firstProof = json<Proof>(
       expectSuccess(runCli(["deployments", "proof", firstDeploymentId]), "proof v1"),
     );
@@ -204,6 +254,10 @@ async function main(): Promise<void> {
         "redeploy v2",
       ),
     ).id;
+    const secondDetail = json<DeploymentDetail>(
+      expectSuccess(runCli(["deployments", "show", secondDeploymentId]), "show v2"),
+    );
+    await waitForDeploymentRoute(managedRouteUrl(secondDetail), secondDeploymentId);
     const secondProof = json<Proof>(
       expectSuccess(runCli(["deployments", "proof", secondDeploymentId]), "proof v2"),
     );

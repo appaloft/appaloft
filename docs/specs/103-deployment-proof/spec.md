@@ -3,7 +3,7 @@
 ## Status
 
 - Round: Post-Implementation Sync
-- Artifact state: implemented and verified; awaiting public PR review
+- Artifact state: implemented; managed-route identity hardening verified
 - Roadmap target: post-`1.0.0-rc` deployment correctness hardening
 - Compatibility impact: backward-compatible minor public capability
 
@@ -51,9 +51,10 @@ deployment proof by itself.
 | DEP-PROOF-007 | Recovery candidate | A previous compatible successful runtime is retained or unavailable | Proof is read | Recovery evidence reports retained/unavailable truth and references recovery readiness. |
 | DEP-PROOF-008 | Static target | A static artifact target is realized as the accepted runtime/publisher target | Proof is read | Artifact and serving generation are verified where supported; unsupported readback is explicit. |
 | DEP-PROOF-009 | Health failure | Required internal health evidence fails | Proof is read | Verdict is `failed` even if artifact/workload identity matches. |
-| DEP-PROOF-010 | Route mismatch | Public access is healthy but the current route does not target the observed workload | Proof is read | Verdict is `failed` or `stale` with `access_route_workload_mismatch`. |
+| DEP-PROOF-010 | Route mismatch | Public access is healthy but the managed proxy response identity points to another deployment | Proof is read | Verdict is `failed` or `stale` with `access_route_workload_mismatch`; HTTP success and container labels cannot substitute for route identity. |
 | DEP-PROOF-011 | Scope and not found | Deployment is absent, outside tenant/project scope, or resource context mismatches | API/CLI/SDK/MCP reads proof | Existing not-found/forbidden/context error policy applies without leaking cross-scope facts. |
 | DEP-PROOF-012 | Published-language parity | A consumer reads API, CLI JSON, SDK, MCP, or Web | The same deployment is requested | Every surface consumes the same `deployments.proof/v1` schema and operation. |
+| DEP-PROOF-013 | Route identity unavailable | A managed Caddy or Traefik route responds without the Appaloft deployment identity marker | Proof is read | Verdict is never `verified`; missing route identity is explicit instead of inferred from the observed container label. |
 
 ## Domain Ownership
 
@@ -82,7 +83,9 @@ Planned facts include source revision, artifact intent/reference, safe Resource 
 configuration fingerprints, runtime target, expected verification steps, and planned effects.
 Observed facts include resolved artifact identity when supported, workload identity/generation,
 start/update time, safe configuration fingerprint/generation, internal health, public access,
-route-to-workload comparison, and previous runtime/rollback candidate retention.
+provider-stamped route deployment identity, route-to-workload comparison, and previous
+runtime/rollback candidate retention. A container's own deployment label proves workload identity;
+it does not prove which workload the public proxy served.
 
 Evidence references existing timeline cursors/entries, runtime readback, artifact identity,
 health/access observations, and recovery readiness. It must never include raw secrets, raw

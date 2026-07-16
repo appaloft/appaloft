@@ -128,6 +128,12 @@ describe("TraefikEdgeProxyProvider", () => {
     expect(routeProbeSyntax.exitCode).toBe(0);
     expect(routeProbeSyntax.stderr.toString()).toBe("");
     expect(realized._unsafeUnwrap().labels).toContain("traefik.enable=true");
+    expect(realized._unsafeUnwrap().labels).toEqual(
+      expect.arrayContaining([
+        "traefik.http.routers.dep-demo.middlewares=dep-demo-route-proof",
+        "traefik.http.middlewares.dep-demo-route-proof.headers.customresponseheaders.X-Appaloft-Deployment-Id=dep_demo",
+      ]),
+    );
     expect(reload.isOk()).toBe(true);
     expect(reload._unsafeUnwrap()).toMatchObject({
       providerKey: "traefik",
@@ -277,6 +283,9 @@ describe("TraefikEdgeProxyProvider", () => {
       "traefik.http.middlewares.dep-canonical-1-http-redirect-scheme.redirectscheme.scheme=https",
     );
     expect(labels).not.toContain("dep-canonical-1-svc.loadbalancer");
+    expect(labels).not.toContain(
+      "dep-canonical-1-route-proof.headers.customresponseheaders.X-Appaloft-Deployment-Id",
+    );
   });
 
   test("[EDGE-PROXY-ROUTE-009] renders strip-prefix middleware for explicit strip path handling", async () => {
@@ -302,7 +311,7 @@ describe("TraefikEdgeProxyProvider", () => {
     expect(realized.isOk()).toBe(true);
     expect(realized._unsafeUnwrap().labels).toEqual(
       expect.arrayContaining([
-        "traefik.http.routers.dep-path.middlewares=dep-path-strip-prefix",
+        "traefik.http.routers.dep-path.middlewares=dep-path-route-proof,dep-path-strip-prefix",
         "traefik.http.middlewares.dep-path-strip-prefix.stripprefix.prefixes=/nocodb",
       ]),
     );
@@ -438,7 +447,7 @@ describe("TraefikEdgeProxyProvider", () => {
     const labels = realized._unsafeUnwrap().labels;
     expect(labels).toEqual(
       expect.arrayContaining([
-        "traefik.http.routers.dep-access-failure.middlewares=appaloft-access-errors",
+        "traefik.http.routers.dep-access-failure.middlewares=dep-access-failure-route-proof,appaloft-access-errors",
         "traefik.http.routers.dep-access-failure-1.middlewares=dep-access-failure-1-redirect",
         "traefik.http.middlewares.appaloft-access-errors.errors.status=404,502,503,504",
         "traefik.http.middlewares.appaloft-access-errors.errors.service=appaloft-backend",
@@ -463,7 +472,7 @@ describe("TraefikEdgeProxyProvider", () => {
     expect(view.isOk()).toBe(true);
     const content = view._unsafeUnwrap().sections[0]?.content ?? "";
     expect(content).toContain(
-      "traefik.http.routers.dep-access-failure.middlewares=appaloft-access-errors",
+      "traefik.http.routers.dep-access-failure.middlewares=dep-access-failure-route-proof,appaloft-access-errors",
     );
     expect(content).toContain(
       "traefik.http.services.appaloft-backend.loadbalancer.server.url=http://appaloft.internal:3001",
@@ -515,7 +524,9 @@ describe("TraefikEdgeProxyProvider", () => {
     expect(realized.isOk()).toBe(true);
     const labels = realized._unsafeUnwrap().labels;
     const serialized = labels.join("\n");
-    expect(labels).toContain("traefik.http.routers.dep-real.middlewares=dep-real-access-errors");
+    expect(labels).toContain(
+      "traefik.http.routers.dep-real.middlewares=dep-real-route-proof,dep-real-access-errors",
+    );
     expect(serialized).toContain(
       "traefik.http.middlewares.dep-real-access-errors.errors.status=404,502,503,504",
     );

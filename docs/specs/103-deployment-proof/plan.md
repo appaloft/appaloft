@@ -13,6 +13,10 @@
 - Add a mutation-free application query and one `deployments.proof/v1` published DTO.
 - Add a provider-neutral runtime evidence port. Runtime adapters translate Docker/Compose/Swarm/SSH
   readback to safe artifact/workload/configuration facts or explicit unavailable reasons.
+- Managed edge-proxy providers stamp served responses with the deployment identity. Runtime proof
+  readback probes the planned public route and compares that response identity with the Deployment;
+  it does not derive route ownership from the container label. The route probe uses direct TCP/TLS
+  so an ambient control-plane HTTP proxy cannot intercept a local or private deployment check.
 - Derive planned fingerprints/effects from the immutable Deployment snapshot. Compare on read in the
   application service; adapters never decide the verdict.
 - Reuse deployment timeline, `resources.health`, access/route readback, and
@@ -35,11 +39,14 @@
 - Unit/application: verdict lattice, effect derivation, mismatch/action mapping, fingerprints,
   redaction, not-found/context scope.
 - Adapter: local Docker, Compose, generic SSH, Docker Swarm, static artifact, unavailable readback,
-  and stale identity.
+  stale identity, managed-route identity match/mismatch, and missing route identity.
+- Provider: Caddy and Traefik serving routes render the shared deployment identity response header;
+  redirect-only routes remain outside workload route proof.
 - Contract: contracts, operation catalog, HTTP/oRPC, CLI JSON, generated SDK, MCP descriptor.
 - Web: detail rendering for verified/partial/failed/stale and unavailable evidence.
-- Real smoke: v1 -> changed config/profile -> v2 verified, plus command-success/health-200 with stale
-  workload identity that cannot become verified.
+- Real smoke: v1 -> changed config/profile -> v2 verified, command-success/health-200 with stale
+  workload identity that cannot become verified, and a real Traefik 200 response carrying an older
+  deployment identity.
 
 ## Risks And Deferred Gaps
 
@@ -48,3 +55,5 @@
   fabricate a digest or generation.
 - Full Change Effect planning remains separate; this slice derives only the minimum safe effect set
   required to detect an expected workload replacement that did not occur.
+- Direct-port routes cannot carry a provider-stamped identity and continue to rely on workload and
+  configured health evidence; the managed-route identity gate applies to Caddy/Traefik serve routes.
