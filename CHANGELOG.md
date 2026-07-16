@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.3](https://github.com/appaloft/appaloft/compare/v1.0.2...v1.0.3) (2026-07-16)
+
+
+### Miscellaneous
+
+* **release:** align framework smoke checks with the deployment timeline contract ([#689](https://github.com/appaloft/appaloft/pull/689)) ([83dd69c](https://github.com/appaloft/appaloft/commit/83dd69c7459bcec8d6c7f7d3c3614c08abe7cd3f))
+
 ## [1.0.2](https://github.com/appaloft/appaloft/compare/v1.0.1...v1.0.2) (2026-07-16)
 
 
