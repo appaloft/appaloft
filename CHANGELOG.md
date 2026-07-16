@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.0.3](https://github.com/appaloft/appaloft/compare/v1.0.2...v1.0.3) (2026-07-16)
+
+
+### Bug Fixes
+
+* restore release please version boundary ([#693](https://github.com/appaloft/appaloft/issues/693)) ([9d6c1b9](https://github.com/appaloft/appaloft/commit/9d6c1b95b814bafed72f46030d96145b7386ea5e))
+
+
+### Miscellaneous
+
+* release 1.0.3 ([#690](https://github.com/appaloft/appaloft/issues/690)) ([417db41](https://github.com/appaloft/appaloft/commit/417db41541715d07837d9f0bb825b5eeff5d6f94))
+* release 1.0.3 ([#691](https://github.com/appaloft/appaloft/issues/691)) ([3df1544](https://github.com/appaloft/appaloft/commit/3df15447a4bf1ae000eeff8c0581e8e99d41fe2b))
+
 ## [1.0.2](https://github.com/appaloft/appaloft/compare/v1.0.1...v1.0.2) (2026-07-16)
 
 
