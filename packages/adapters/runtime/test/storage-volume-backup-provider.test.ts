@@ -359,6 +359,7 @@ describe("storage volume backup runtime provider", () => {
     expect(script).toContain("data.db");
     expect(script).toContain("APPALOFT_SQLITE_HELPER_IMAGE");
     expect(script).toContain("keinos/sqlite3:latest");
+    expect(script).toContain('--user "$(id -u):$(id -g)"');
     expect(script).toContain("tar -czf");
     expect(script).toContain("appaloft.storage-volume-id");
     expect(script).not.toContain("apk add");
