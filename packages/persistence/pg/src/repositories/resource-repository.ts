@@ -184,6 +184,20 @@ class KyselyResourceMutationVisitor
           ...(spec.state.autoDeployPolicy.dedupeWindowSeconds
             ? { dedupeWindowSeconds: spec.state.autoDeployPolicy.dedupeWindowSeconds.value }
             : {}),
+          ...(spec.state.autoDeployPolicy.includePaths
+            ? {
+                includePaths: spec.state.autoDeployPolicy.includePaths.map(
+                  (pattern) => pattern.value,
+                ),
+              }
+            : {}),
+          ...(spec.state.autoDeployPolicy.excludePaths
+            ? {
+                excludePaths: spec.state.autoDeployPolicy.excludePaths.map(
+                  (pattern) => pattern.value,
+                ),
+              }
+            : {}),
         } satisfies SerializedResourceAutoDeployPolicy)
       : null;
 

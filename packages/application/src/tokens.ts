@@ -164,6 +164,7 @@ export const tokens = {
   sourceEventRecorder: Symbol.for("appaloft.source_event_recorder"),
   sourceEventPolicyReader: Symbol.for("appaloft.source_event_policy_reader"),
   sourceEventDeploymentDispatcher: Symbol.for("appaloft.source_event_deployment_dispatcher"),
+  sourceEventChangedPathResolver: Symbol.for("appaloft.source_event_changed_path_resolver"),
   sourceEventReadModel: Symbol.for("appaloft.source_event_read_model"),
   sourceEventRetentionStore: Symbol.for("appaloft.source_event_retention_store"),
   auditEventRecorder: Symbol.for("appaloft.audit_event_recorder"),

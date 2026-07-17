@@ -177,6 +177,7 @@ import {
   SourceLocator,
   SourceOriginalLocator,
   SourcePackageManagerValue,
+  SourcePathPattern,
   SourceRepositoryFullName,
   SourceRepositoryId,
   SourceRuntimeFamilyValue,
@@ -481,6 +482,8 @@ export interface SerializedResourceAutoDeployPolicy extends Record<string, unkno
   blockedReason?: "source-binding-changed";
   genericWebhookSecretRef?: string;
   dedupeWindowSeconds?: number;
+  includePaths?: string[];
+  excludePaths?: string[];
 }
 
 export interface SerializedDomainVerificationAttempt extends Record<string, unknown> {
@@ -1766,6 +1769,20 @@ export function rehydrateResourceRow(
               ? {
                   dedupeWindowSeconds: SourceEventDedupeWindowSeconds.rehydrate(
                     autoDeployPolicy.dedupeWindowSeconds,
+                  ),
+                }
+              : {}),
+            ...(autoDeployPolicy.includePaths
+              ? {
+                  includePaths: autoDeployPolicy.includePaths.map((pattern) =>
+                    SourcePathPattern.rehydrate(pattern),
+                  ),
+                }
+              : {}),
+            ...(autoDeployPolicy.excludePaths
+              ? {
+                  excludePaths: autoDeployPolicy.excludePaths.map((pattern) =>
+                    SourcePathPattern.rehydrate(pattern),
                   ),
                 }
               : {}),

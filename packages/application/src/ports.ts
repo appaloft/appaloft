@@ -3333,6 +3333,8 @@ export interface ResourceDetailAutoDeployPolicy {
   blockedReason?: "source-binding-changed";
   genericWebhookSecretRef?: string;
   dedupeWindowSeconds?: number;
+  includePaths?: string[];
+  excludePaths?: string[];
   updatedAt: string;
 }
 
@@ -5703,7 +5705,8 @@ export type DeploymentDetailSection =
   | "related-context"
   | "timeline"
   | "snapshot"
-  | "latest-failure";
+  | "latest-failure"
+  | "source-event";
 
 export interface DeploymentDetailSectionError {
   section: DeploymentDetailSection;
@@ -6057,9 +6060,21 @@ export interface DeploymentDetail {
   timeline?: DeploymentAttemptTimeline;
   latestFailure?: DeploymentAttemptFailureSummary;
   recoverySummary?: DeploymentAttemptRecoverySummary;
+  sourceEvent?: SourceEventDeploymentTriggerSummary;
   nextActions: DeploymentAttemptNextAction[];
   sectionErrors: DeploymentDetailSectionError[];
   generatedAt: string;
+}
+
+export interface SourceEventDeploymentTriggerSummary {
+  sourceEventId: string;
+  sourceKind: SourceEventSourceKind;
+  ref: string;
+  revision: string;
+  changeSet?: SourceEventChangeSet;
+  matchedPaths?: string[];
+  matchedPathCount?: number;
+  receivedAt: string;
 }
 
 export const operatorWorkKinds = [
@@ -6686,6 +6701,9 @@ export type SourceEventVerificationMethod = "provider-signature" | "generic-hmac
 export type SourceEventIgnoredReason =
   | "no-matching-policy"
   | "ref-not-matched"
+  | "path-not-matched"
+  | "path-diff-unavailable"
+  | "ref-deleted"
   | "policy-disabled"
   | "policy-blocked";
 export type SourceEventPolicyResultStatus =
@@ -6696,6 +6714,9 @@ export type SourceEventPolicyResultStatus =
   | "dispatched";
 export type SourceEventPolicyResultReason =
   | "ref-not-matched"
+  | "path-not-matched"
+  | "path-diff-unavailable"
+  | "ref-deleted"
   | "policy-disabled"
   | "policy-blocked"
   | "dispatch-failed";
@@ -6718,6 +6739,27 @@ export interface SourceEventPolicyResult {
   reason?: SourceEventPolicyResultReason;
   deploymentId?: string;
   errorCode?: string;
+  matchedPaths?: string[];
+  matchedPathCount?: number;
+}
+
+export type SourceEventRefChangeKind = "created" | "updated" | "deleted";
+export type SourceEventChangedPathUnavailableReason =
+  | "provider-compare-unavailable"
+  | "provider-compare-truncated";
+
+export type SourceEventChangedPathResolution =
+  | { status: "resolved"; changedPaths: string[] }
+  | { status: "unavailable"; reason: SourceEventChangedPathUnavailableReason };
+
+export interface SourceEventChangeSet {
+  status: "not-requested" | "resolved" | "unavailable";
+  refChangeKind: SourceEventRefChangeKind;
+  beforeRevision?: string;
+  forced?: boolean;
+  changedPaths?: string[];
+  changedPathCount?: number;
+  unavailableReason?: SourceEventChangedPathUnavailableReason;
 }
 
 export interface SourceEventRecord {
@@ -6729,6 +6771,7 @@ export interface SourceEventRecord {
   sourceIdentity: SourceEventIdentity;
   ref: string;
   revision: string;
+  changeSet?: SourceEventChangeSet;
   deliveryId?: string;
   idempotencyKey?: string;
   dedupeKey: string;
@@ -6802,6 +6845,7 @@ export interface SourceEventDetail {
   sourceIdentity: SourceEventIdentity;
   ref: string;
   revision: string;
+  changeSet?: SourceEventChangeSet;
   verification: SourceEventVerificationSummary;
   status: SourceEventStatus;
   dedupeOfSourceEventId?: string;
@@ -7295,6 +7339,10 @@ export interface VerifiedSourceEventInput {
   sourceIdentity: SourceEventIdentity;
   ref: string;
   revision: string;
+  beforeRevision?: string;
+  refChangeKind?: "created" | "updated" | "deleted";
+  forced?: boolean;
+  providerConnectionId?: string;
   deliveryId?: string;
   idempotencyKey?: string;
   verification: {
@@ -8719,6 +8767,8 @@ export interface SourceEventPolicyCandidate {
   status: "enabled" | "disabled" | "blocked";
   refs: string[];
   eventKinds: SourceEventKind[];
+  includePaths?: string[];
+  excludePaths?: string[];
   sourceBinding: SourceEventIdentity;
   blockedReason?: "source-binding-changed";
 }
@@ -8731,6 +8781,24 @@ export interface SourceEventPolicyReader {
       sourceIdentity: SourceEventIdentity;
     },
   ): Promise<SourceEventPolicyCandidate[]>;
+}
+
+export interface SourceEventChangedPathResolverInput {
+  sourceKind: SourceEventSourceKind;
+  sourceIdentity: SourceEventIdentity;
+  ref: string;
+  revision: string;
+  beforeRevision?: string;
+  refChangeKind: SourceEventRefChangeKind;
+  forced: boolean;
+  providerConnectionId?: string;
+}
+
+export interface SourceEventChangedPathResolver {
+  resolve(
+    context: ExecutionContext,
+    input: SourceEventChangedPathResolverInput,
+  ): Promise<Result<SourceEventChangedPathResolution>>;
 }
 
 export interface SourceEventDeploymentDispatchInput {
@@ -8767,6 +8835,10 @@ export interface SourceEventReadModel {
   findOne(
     context: RepositoryContext,
     input: SourceEventShowInput,
+  ): Promise<SourceEventDetail | null>;
+  findByCreatedDeploymentId(
+    context: RepositoryContext,
+    deploymentId: string,
   ): Promise<SourceEventDetail | null>;
 }
 

@@ -346,6 +346,7 @@ function tenantQueryBus(input: {
       },
     },
     clock,
+    input.sourceEventReadModel,
   );
   const listDeployTokens = new ListDeployTokensQueryService(input.deployTokenReadModel);
   const showDeployToken = new ShowDeployTokenQueryService(input.deployTokenReadModel);

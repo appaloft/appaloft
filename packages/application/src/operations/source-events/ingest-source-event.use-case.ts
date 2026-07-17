@@ -1,4 +1,10 @@
-import { err, ok, type Result } from "@appaloft/core";
+import {
+  err,
+  ok,
+  ResourceAutoDeployPathPolicy,
+  type Result,
+  SourcePathPattern,
+} from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
@@ -12,6 +18,8 @@ import {
   type OperationGuardPort,
   type ProcessAttemptNextAction,
   type ProcessAttemptRecorder,
+  type SourceEventChangedPathResolver,
+  type SourceEventChangeSet,
   type SourceEventDeploymentDispatcher,
   type SourceEventIdentity,
   type SourceEventIgnoredReason,
@@ -51,6 +59,8 @@ export class IngestSourceEventUseCase {
     private readonly processAttemptRecorder: ProcessAttemptRecorder = new NoopProcessAttemptRecorder(),
     @inject(tokens.operationGuardPort)
     private readonly operationGuardPort?: OperationGuardPort,
+    @inject(tokens.sourceEventChangedPathResolver)
+    private readonly sourceEventChangedPathResolver?: SourceEventChangedPathResolver,
   ) {}
 
   async execute(
@@ -113,6 +123,19 @@ export class IngestSourceEventUseCase {
           input.eventKind,
           input.ref,
           input.scopeResourceId,
+          {
+            executionContext: context,
+            ...(this.sourceEventChangedPathResolver
+              ? { changedPathResolver: this.sourceEventChangedPathResolver }
+              : {}),
+            revision: input.revision,
+            ...(input.beforeRevision ? { beforeRevision: input.beforeRevision } : {}),
+            refChangeKind: input.refChangeKind ?? "updated",
+            forced: input.forced ?? false,
+            ...(input.providerConnectionId
+              ? { providerConnectionId: input.providerConnectionId }
+              : {}),
+          },
         )
       : emptySourceEventOutcome();
 
@@ -124,6 +147,7 @@ export class IngestSourceEventUseCase {
       sourceIdentity,
       ref: input.ref,
       revision: input.revision,
+      changeSet: outcome.changeSet,
       ...(input.deliveryId ? { deliveryId: input.deliveryId } : {}),
       ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),
       dedupeKey,
@@ -254,6 +278,15 @@ async function recordSourceEventProcessAttempt(input: {
       createdDeploymentCount: input.record.createdDeploymentIds.length,
       dispatchTargetCount: input.dispatchTargetCount,
       sourceEventStatus: input.record.status,
+      ...(input.record.changeSet
+        ? {
+            refChangeKind: input.record.changeSet.refChangeKind,
+            finalDiffStatus: input.record.changeSet.status,
+            ...(input.record.changeSet.changedPathCount !== undefined
+              ? { changedPathCount: input.record.changeSet.changedPathCount }
+              : {}),
+          }
+        : {}),
     },
   });
 
@@ -268,6 +301,7 @@ export interface SourceEventOutcome {
   policyResults: SourceEventPolicyResult[];
   createdDeploymentIds: string[];
   dispatchTargets: SourceEventPolicyCandidate[];
+  changeSet: SourceEventChangeSet;
 }
 
 function emptySourceEventOutcome(): SourceEventOutcome {
@@ -278,6 +312,7 @@ function emptySourceEventOutcome(): SourceEventOutcome {
     policyResults: [],
     createdDeploymentIds: [],
     dispatchTargets: [],
+    changeSet: { status: "not-requested", refChangeKind: "updated" },
   };
 }
 
@@ -288,7 +323,17 @@ export async function evaluateSourceEventPolicyMatch(
   sourceIdentity: SourceEventIdentity,
   eventKind: IngestSourceEventCommandPayload["eventKind"],
   ref: string,
-  scopeResourceId?: string,
+  scopeResourceId: string | undefined,
+  changeInput: {
+    executionContext: ExecutionContext;
+    changedPathResolver?: SourceEventChangedPathResolver;
+    revision: string;
+    beforeRevision?: string;
+    refChangeKind: "created" | "updated" | "deleted";
+    forced: boolean;
+    providerConnectionId?: string;
+    existingChangeSet?: SourceEventChangeSet;
+  },
 ): Promise<SourceEventOutcome> {
   const allCandidates = await sourceEventPolicyReader.listCandidates(context, {
     sourceKind,
@@ -297,6 +342,20 @@ export async function evaluateSourceEventPolicyMatch(
   const candidates = scopeResourceId
     ? allCandidates.filter((candidate) => candidate.resourceId === scopeResourceId)
     : allCandidates;
+  const finalDiffCandidates = candidates.filter(
+    (candidate) =>
+      candidate.status === "enabled" &&
+      candidate.eventKinds.includes(eventKind) &&
+      candidate.refs.includes(ref),
+  );
+
+  const changeSet = await resolveChangeSet({
+    sourceKind,
+    sourceIdentity,
+    ref,
+    candidates: finalDiffCandidates,
+    ...changeInput,
+  });
 
   if (candidates.length === 0) {
     return {
@@ -306,6 +365,7 @@ export async function evaluateSourceEventPolicyMatch(
       policyResults: [],
       createdDeploymentIds: [],
       dispatchTargets: [],
+      changeSet,
     };
   }
 
@@ -317,6 +377,16 @@ export async function evaluateSourceEventPolicyMatch(
 
   for (const candidate of candidates) {
     projectId ??= candidate.projectId;
+
+    if (changeInput.refChangeKind === "deleted") {
+      ignoredReasons.add("ref-deleted");
+      policyResults.push({
+        resourceId: candidate.resourceId,
+        status: "ignored",
+        reason: "ref-deleted",
+      });
+      continue;
+    }
 
     if (candidate.status === "blocked") {
       ignoredReasons.add("policy-blocked");
@@ -348,6 +418,47 @@ export async function evaluateSourceEventPolicyMatch(
       continue;
     }
 
+    if ((candidate.includePaths?.length ?? 0) > 0 || (candidate.excludePaths?.length ?? 0) > 0) {
+      if (changeSet.status !== "resolved") {
+        ignoredReasons.add("path-diff-unavailable");
+        policyResults.push({
+          resourceId: candidate.resourceId,
+          status: "ignored",
+          reason: "path-diff-unavailable",
+        });
+        continue;
+      }
+
+      const pathPolicy = ResourceAutoDeployPathPolicy.rehydrate({
+        includePaths: (candidate.includePaths ?? []).map((pattern) =>
+          SourcePathPattern.rehydrate(pattern),
+        ),
+        excludePaths: (candidate.excludePaths ?? []).map((pattern) =>
+          SourcePathPattern.rehydrate(pattern),
+        ),
+      });
+      const matchingPaths = pathPolicy.matchingPaths(changeSet.changedPaths ?? []);
+      if (matchingPaths.length === 0) {
+        ignoredReasons.add("path-not-matched");
+        policyResults.push({
+          resourceId: candidate.resourceId,
+          status: "ignored",
+          reason: "path-not-matched",
+        });
+        continue;
+      }
+
+      matchedResourceIds.push(candidate.resourceId);
+      dispatchTargets.push(candidate);
+      policyResults.push({
+        resourceId: candidate.resourceId,
+        status: "matched",
+        matchedPathCount: matchingPaths.length,
+        matchedPaths: matchingPaths.slice(0, 20),
+      });
+      continue;
+    }
+
     matchedResourceIds.push(candidate.resourceId);
     dispatchTargets.push(candidate);
     policyResults.push({
@@ -365,6 +476,7 @@ export async function evaluateSourceEventPolicyMatch(
       policyResults,
       createdDeploymentIds: [],
       dispatchTargets,
+      changeSet,
     };
   }
 
@@ -376,6 +488,92 @@ export async function evaluateSourceEventPolicyMatch(
     policyResults,
     createdDeploymentIds: [],
     dispatchTargets: [],
+    changeSet,
+  };
+}
+
+async function resolveChangeSet(input: {
+  executionContext: ExecutionContext;
+  changedPathResolver?: SourceEventChangedPathResolver;
+  sourceKind: IngestSourceEventCommandPayload["sourceKind"];
+  sourceIdentity: SourceEventIdentity;
+  ref: string;
+  revision: string;
+  beforeRevision?: string;
+  refChangeKind: "created" | "updated" | "deleted";
+  forced: boolean;
+  providerConnectionId?: string;
+  candidates: SourceEventPolicyCandidate[];
+  existingChangeSet?: SourceEventChangeSet;
+}): Promise<SourceEventChangeSet> {
+  if (input.existingChangeSet) {
+    return input.existingChangeSet;
+  }
+
+  const base = {
+    refChangeKind: input.refChangeKind,
+    ...(input.beforeRevision ? { beforeRevision: input.beforeRevision } : {}),
+    forced: input.forced,
+  };
+  if (input.refChangeKind === "deleted") {
+    return { status: "not-requested", ...base };
+  }
+
+  const requiresPaths = input.candidates.some(
+    (candidate) =>
+      (candidate.includePaths?.length ?? 0) > 0 || (candidate.excludePaths?.length ?? 0) > 0,
+  );
+  if (!requiresPaths) {
+    return { status: "not-requested", ...base };
+  }
+
+  if (!input.changedPathResolver) {
+    return {
+      status: "unavailable",
+      ...base,
+      unavailableReason: "provider-compare-unavailable",
+    };
+  }
+
+  const resolved = await input.changedPathResolver.resolve(input.executionContext, {
+    sourceKind: input.sourceKind,
+    sourceIdentity: input.sourceIdentity,
+    ref: input.ref,
+    revision: input.revision,
+    ...(input.beforeRevision ? { beforeRevision: input.beforeRevision } : {}),
+    refChangeKind: input.refChangeKind,
+    forced: input.forced,
+    ...(input.providerConnectionId ? { providerConnectionId: input.providerConnectionId } : {}),
+  });
+  if (resolved.isErr()) {
+    return {
+      status: "unavailable",
+      ...base,
+      unavailableReason: "provider-compare-unavailable",
+    };
+  }
+  if (resolved.value.status === "unavailable") {
+    return {
+      status: "unavailable",
+      ...base,
+      unavailableReason: resolved.value.reason,
+    };
+  }
+
+  const changedPaths = [...new Set(resolved.value.changedPaths)];
+  if (changedPaths.length > 300) {
+    return {
+      status: "unavailable",
+      ...base,
+      unavailableReason: "provider-compare-truncated",
+    };
+  }
+
+  return {
+    status: "resolved",
+    ...base,
+    changedPaths,
+    changedPathCount: changedPaths.length,
   };
 }
 
@@ -389,10 +587,14 @@ export async function dispatchSourceEventDeployments(
 ): Promise<SourceEventRecord> {
   const dispatchResults = new Map<string, SourceEventPolicyResult>();
   const createdDeploymentIds: string[] = [...record.createdDeploymentIds];
+  const priorPolicyResults = new Map(
+    record.policyResults.map((result) => [result.resourceId, result]),
+  );
 
   for (const target of targets) {
     if (!target.serverId) {
       dispatchResults.set(target.resourceId, {
+        ...priorPolicyResults.get(target.resourceId),
         resourceId: target.resourceId,
         status: "dispatch-failed",
         reason: "dispatch-failed",
@@ -411,6 +613,7 @@ export async function dispatchSourceEventDeployments(
     });
     if (result.isErr()) {
       dispatchResults.set(target.resourceId, {
+        ...priorPolicyResults.get(target.resourceId),
         resourceId: target.resourceId,
         status: "dispatch-failed",
         reason: "dispatch-failed",
@@ -421,6 +624,7 @@ export async function dispatchSourceEventDeployments(
 
     createdDeploymentIds.push(result.value.deploymentId);
     dispatchResults.set(target.resourceId, {
+      ...priorPolicyResults.get(target.resourceId),
       resourceId: target.resourceId,
       status: "dispatched",
       deploymentId: result.value.deploymentId,

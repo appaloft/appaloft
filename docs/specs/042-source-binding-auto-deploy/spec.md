@@ -102,6 +102,8 @@ Minimum policy fields:
 - `sourceKind`: the accepted source family, initially Git or generic signed.
 - `refSelector`: branch, tag, or exact ref selector.
 - `eventKinds`: initially push; pull request preview remains separate.
+- `includePaths`: optional repository-root-relative path patterns. Omission means all paths.
+- `excludePaths`: optional repository-root-relative path patterns evaluated after inclusion.
 - `dedupeWindow`: implementation-defined default recorded in docs and read models.
 - `createdBy` and `updatedAt` audit metadata.
 
@@ -117,6 +119,9 @@ and not silently deleted, but source events must not create deployments while it
 - reject secret-bearing URLs and unsafe payload fields;
 - normalize provider-specific payloads into source identity, ref, commit/revision, event kind, and
   delivery id;
+- preserve provider-neutral ref lifecycle and before/after revision facts;
+- resolve final changed paths only when at least one candidate policy filters paths;
+- fail path-filtered candidates closed when a complete final diff cannot be proven;
 - dedupe repeat deliveries before dispatching deployments;
 - evaluate policies through application logic, not webhook transport code;
 - dispatch `deployments.create` only for matching enabled policies;
@@ -146,6 +151,12 @@ validation, but it must not create a source event record or deployment attempt. 
 webhook secret, missing/invalid signature, unsupported event kind, or unsafe payload shape reject
 before `source-events.ingest` dispatch.
 
+For GitHub push events, `before` and `after` define the final comparison. `created`, `deleted`, and
+`forced` are normalized as provider-neutral ref lifecycle facts. Deleted refs are recorded as
+ignored and never deploy. New refs compare the empty tree to `after`. Updated refs, including merge,
+multi-commit, and force pushes, compare `before` directly with `after`; per-commit path arrays are
+never used for policy matching.
+
 The first generic signed HTTP route is:
 
 ```text
@@ -171,6 +182,12 @@ must not be persisted.
 | `SRC-AUTO-SPEC-007` | Resource-scoped generic signed webhook matches a source shared by another Resource. | Only the Resource named in the webhook route is eligible for deployment dispatch. |
 | `SRC-AUTO-SPEC-008` | GitHub push webhook has a valid provider signature. | Payload normalizes to safe provider-neutral source facts, uses provider delivery id for dedupe, and can fan out to all matching enabled Resource policies. |
 | `SRC-AUTO-SPEC-009` | GitHub push webhook has missing config, invalid signature, unsupported event kind, or unsafe payload shape. | Request rejects before command dispatch; no source event or deployment is created and no raw payload/signature/secret appears in errors. |
+| `SRC-AUTO-SPEC-010` | Merge or multi-commit push touches a selected path only in an intermediate commit and restores the final tree. | The path-filtered Resource is ignored because the final `before..after` diff does not contain that path. |
+| `SRC-AUTO-SPEC-011` | A final changed path matches include and does not match exclude. | The Resource matches and its policy result records the bounded matching path. |
+| `SRC-AUTO-SPEC-012` | A final changed path is excluded or no final path matches include. | The Resource is ignored with `path-not-matched`. |
+| `SRC-AUTO-SPEC-013` | A force push cannot be compared completely. | Path-filtered Resources fail closed with `path-diff-unavailable`; unfiltered compatible Resources retain ref-based behavior. |
+| `SRC-AUTO-SPEC-014` | A branch or tag is deleted. | The event is retained as ignored with `ref-deleted`; no Resource is dispatched and the all-zero revision is not deployable. |
+| `SRC-AUTO-SPEC-015` | A new ref is pushed. | Path matching compares the empty tree with the new `after` tree. |
 
 ## Public Surfaces
 

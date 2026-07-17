@@ -722,6 +722,20 @@ function isSafeAutoDeployRef(value: string): boolean {
   return GitRefText.create(value).isOk();
 }
 
+function isSafeAutoDeployPathPattern(value: string): boolean {
+  const normalized = value.trim();
+  return (
+    normalized.length > 0 &&
+    normalized.length <= 512 &&
+    !normalized.startsWith("/") &&
+    !normalized.endsWith("/") &&
+    !normalized.includes("\\") &&
+    !normalized.includes("//") &&
+    !/[\r\n\0]/.test(normalized) &&
+    !normalized.split("/").some((segment) => segment === "." || segment === "..")
+  );
+}
+
 function isSafeAutoDeployEvent(value: string): boolean {
   return SourceEventKindValue.create(value).isOk();
 }
@@ -1081,6 +1095,16 @@ export const appaloftDeploymentAutoDeployConfigSchema = z
       .optional()
       .default(["push"]),
     dedupeWindowSeconds: z.number().int().positive().max(86_400).optional(),
+    includePaths: z
+      .array(nonEmptyStringSchema.refine(isSafeAutoDeployPathPattern))
+      .min(1)
+      .max(100)
+      .optional(),
+    excludePaths: z
+      .array(nonEmptyStringSchema.refine(isSafeAutoDeployPathPattern))
+      .min(1)
+      .max(100)
+      .optional(),
   })
   .strict()
   .superRefine((value, context) => {

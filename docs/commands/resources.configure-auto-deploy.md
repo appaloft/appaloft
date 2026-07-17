@@ -36,6 +36,8 @@ type ConfigureResourceAutoDeployInput = {
     triggerKind: "git-push" | "generic-signed-webhook";
     refs: readonly string[];
     eventKinds: readonly ("push" | "tag")[];
+    includePaths?: readonly string[];
+    excludePaths?: readonly string[];
     genericWebhookSecretRef?: string;
     dedupeWindowSeconds?: number;
   };
@@ -53,6 +55,11 @@ Rules:
   binding and unblocks the existing policy only when it still matches the current source kind.
 - `genericWebhookSecretRef` is required when `triggerKind = "generic-signed-webhook"` and must be a
   safe reference/version handle, never a secret value.
+- `includePaths` and `excludePaths` are optional repository-root-relative glob lists for
+  `triggerKind = "git-push"` only. Matching evaluates the provider's final `before..after` change
+  set, applies includes first, then excludes. No path fields preserves ref-only behavior.
+- Path patterns must be bounded safe relative globs. Absolute paths, `..`, and backslashes are
+  rejected before persistence.
 - The first accepted generic signed reference format is `resource-secret:<KEY>`, where `<KEY>` is a
   Resource-owned runtime secret variable on the same Resource.
 
@@ -83,6 +90,8 @@ type ConfigureResourceAutoDeployResult = {
   triggerKind?: "git-push" | "generic-signed-webhook";
   refs?: readonly string[];
   eventKinds?: readonly ("push" | "tag")[];
+  includePaths?: readonly string[];
+  excludePaths?: readonly string[];
   sourceBindingFingerprint?: string;
   blockedReason?: "source-binding-changed";
 };

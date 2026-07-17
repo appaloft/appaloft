@@ -1611,6 +1611,62 @@
               </div>
             </div>
 
+            {#if deploymentDetail?.sourceEvent}
+              <section class="mt-3 rounded-md border bg-muted/20 px-3 py-3" data-deployment-source-event>
+                <div class="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline">
+                    {$t(i18nKeys.console.deployments.sourceEventTriggerTitle)}
+                  </Badge>
+                  <span class="font-mono text-xs text-muted-foreground">
+                    {deploymentDetail.sourceEvent.sourceEventId}
+                  </span>
+                </div>
+                <p class="mt-2 text-sm text-muted-foreground">
+                  {$t(i18nKeys.console.deployments.sourceEventTriggerDescription)}
+                </p>
+                <dl class="mt-3 grid gap-3 md:grid-cols-3">
+                  <div class="console-subtle-panel px-3 py-2">
+                    <dt class="text-xs text-muted-foreground">Ref</dt>
+                    <dd class="mt-1 break-all font-mono text-sm font-medium">
+                      {deploymentDetail.sourceEvent.ref}
+                    </dd>
+                  </div>
+                  <div class="console-subtle-panel px-3 py-2">
+                    <dt class="text-xs text-muted-foreground">Revision</dt>
+                    <dd class="mt-1 break-all font-mono text-sm font-medium">
+                      {deploymentDetail.sourceEvent.revision}
+                    </dd>
+                  </div>
+                  <div class="console-subtle-panel px-3 py-2">
+                    <dt class="text-xs text-muted-foreground">
+                      {$t(i18nKeys.console.deployments.sourceEventFinalDiff)}
+                    </dt>
+                    <dd class="mt-1 text-sm font-medium">
+                      {deploymentDetail.sourceEvent.changeSet?.status ?? "not-requested"}
+                      {#if deploymentDetail.sourceEvent.changeSet?.changedPathCount !== undefined}
+                        · {deploymentDetail.sourceEvent.changeSet.changedPathCount}
+                      {/if}
+                    </dd>
+                  </div>
+                </dl>
+                {#if deploymentDetail.sourceEvent.matchedPaths?.length}
+                  <div class="mt-3">
+                    <p class="text-xs text-muted-foreground">
+                      {$t(i18nKeys.console.deployments.sourceEventMatchedPaths)}
+                      {#if deploymentDetail.sourceEvent.matchedPathCount !== undefined}
+                        ({deploymentDetail.sourceEvent.matchedPathCount})
+                      {/if}
+                    </p>
+                    <div class="mt-2 flex flex-wrap gap-2">
+                      {#each deploymentDetail.sourceEvent.matchedPaths as path (path)}
+                        <code class="rounded bg-muted px-2 py-1 text-xs">{path}</code>
+                      {/each}
+                    </div>
+                  </div>
+                {/if}
+              </section>
+            {/if}
+
             <div class="mt-3 grid gap-3 md:grid-cols-3">
               <div class="console-subtle-panel px-3 py-2">
                 <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.createdAt)}</p>

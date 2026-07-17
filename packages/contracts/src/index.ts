@@ -2661,6 +2661,8 @@ export const resourceAutoDeployPolicySummarySchema = z.object({
   blockedReason: z.enum(["source-binding-changed"]).optional(),
   genericWebhookSecretRef: z.string().optional(),
   dedupeWindowSeconds: z.number().int().positive().optional(),
+  includePaths: z.array(z.string()).optional(),
+  excludePaths: z.array(z.string()).optional(),
   updatedAt: z.string(),
 });
 
@@ -3165,6 +3167,8 @@ export const configureResourceAutoDeployInputSchema = z.object({
       eventKinds: z.array(z.enum(["push", "tag"])).min(1),
       genericWebhookSecretRef: z.string().min(1).optional(),
       dedupeWindowSeconds: z.number().int().positive().optional(),
+      includePaths: z.array(z.string().min(1).max(512)).min(1).max(100).optional(),
+      excludePaths: z.array(z.string().min(1).max(512)).min(1).max(100).optional(),
     })
     .optional(),
   idempotencyKey: z.string().min(1).optional(),
@@ -3176,6 +3180,8 @@ export const configureResourceAutoDeployResponseSchema = z.object({
   triggerKind: z.enum(["git-push", "generic-signed-webhook"]).optional(),
   refs: z.array(z.string()).optional(),
   eventKinds: z.array(z.enum(["push", "tag"])).optional(),
+  includePaths: z.array(z.string()).optional(),
+  excludePaths: z.array(z.string()).optional(),
   sourceBindingFingerprint: z.string().optional(),
   blockedReason: z.enum(["source-binding-changed"]).optional(),
 });
@@ -3194,6 +3200,9 @@ export const sourceEventDedupeStatusSchema = z.enum(["new", "duplicate"]);
 export const sourceEventIgnoredReasonSchema = z.enum([
   "no-matching-policy",
   "ref-not-matched",
+  "path-not-matched",
+  "path-diff-unavailable",
+  "ref-deleted",
   "policy-disabled",
   "policy-blocked",
 ]);
@@ -3206,6 +3215,9 @@ export const sourceEventPolicyResultStatusSchema = z.enum([
 ]);
 export const sourceEventPolicyResultReasonSchema = z.enum([
   "ref-not-matched",
+  "path-not-matched",
+  "path-diff-unavailable",
+  "ref-deleted",
   "policy-disabled",
   "policy-blocked",
   "dispatch-failed",
@@ -3281,6 +3293,20 @@ export const sourceEventPolicyResultSchema = z.object({
   reason: sourceEventPolicyResultReasonSchema.optional(),
   deploymentId: z.string().optional(),
   errorCode: z.string().optional(),
+  matchedPaths: z.array(z.string()).max(20).optional(),
+  matchedPathCount: z.number().int().nonnegative().optional(),
+});
+
+export const sourceEventChangeSetSchema = z.object({
+  status: z.enum(["not-requested", "resolved", "unavailable"]),
+  refChangeKind: z.enum(["created", "updated", "deleted"]),
+  beforeRevision: z.string().optional(),
+  forced: z.boolean().optional(),
+  changedPaths: z.array(z.string()).max(300).optional(),
+  changedPathCount: z.number().int().nonnegative().optional(),
+  unavailableReason: z
+    .enum(["provider-compare-unavailable", "provider-compare-truncated"])
+    .optional(),
 });
 
 export const showSourceEventResponseSchema = z.object({
@@ -3292,6 +3318,7 @@ export const showSourceEventResponseSchema = z.object({
   sourceIdentity: sourceEventIdentitySchema,
   ref: z.string(),
   revision: z.string(),
+  changeSet: sourceEventChangeSetSchema.optional(),
   verification: sourceEventVerificationSummarySchema,
   status: sourceEventStatusSchema,
   dedupeOfSourceEventId: z.string().optional(),
@@ -5484,7 +5511,7 @@ export const deploymentRelatedContextSchema = z.object({
 });
 
 export const deploymentDetailSectionErrorSchema = z.object({
-  section: z.enum(["related-context", "timeline", "snapshot", "latest-failure"]),
+  section: z.enum(["related-context", "timeline", "snapshot", "latest-failure", "source-event"]),
   code: z.string(),
   category: z.string(),
   phase: z.string(),
@@ -6047,6 +6074,18 @@ export const showDeploymentResponseSchema = z.object({
   timeline: deploymentAttemptTimelineSchema.optional(),
   latestFailure: deploymentAttemptFailureSummarySchema.optional(),
   recoverySummary: deploymentAttemptRecoverySummarySchema.optional(),
+  sourceEvent: z
+    .object({
+      sourceEventId: z.string(),
+      sourceKind: sourceEventSourceKindSchema,
+      ref: z.string(),
+      revision: z.string(),
+      changeSet: sourceEventChangeSetSchema.optional(),
+      matchedPaths: z.array(z.string()).optional(),
+      matchedPathCount: z.number().int().nonnegative().optional(),
+      receivedAt: z.string(),
+    })
+    .optional(),
   nextActions: z.array(
     z.enum(["timeline", "resource-detail", "resource-health", "diagnostic-summary"]),
   ),

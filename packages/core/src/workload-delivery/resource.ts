@@ -75,6 +75,7 @@ import {
   type ResourceAutoDeployTriggerKindValue,
   type SourceEventDedupeWindowSeconds,
   type SourceEventKindValue,
+  type SourcePathPattern,
 } from "./auto-deploy-policy";
 import {
   cloneResourceSourceBindingState,
@@ -1957,6 +1958,8 @@ export class Resource extends AggregateRoot<ResourceState> {
     configuredAt: UpdatedAt;
     genericWebhookSecretRef?: ResourceAutoDeploySecretRef;
     dedupeWindowSeconds?: SourceEventDedupeWindowSeconds;
+    includePaths?: readonly SourcePathPattern[];
+    excludePaths?: readonly SourcePathPattern[];
   }): Result<ResourceAutoDeployPolicyState> {
     const lifecycleGuard = this.rejectInactiveResource("resources.configure-auto-deploy");
     if (lifecycleGuard.isErr()) {
@@ -1987,6 +1990,8 @@ export class Resource extends AggregateRoot<ResourceState> {
         ? { genericWebhookSecretRef: input.genericWebhookSecretRef }
         : {}),
       ...(input.dedupeWindowSeconds ? { dedupeWindowSeconds: input.dedupeWindowSeconds } : {}),
+      ...(input.includePaths ? { includePaths: input.includePaths } : {}),
+      ...(input.excludePaths ? { excludePaths: input.excludePaths } : {}),
     });
     if (policy.isErr()) {
       return err(policy.error);
@@ -2002,6 +2007,8 @@ export class Resource extends AggregateRoot<ResourceState> {
       triggerKind: this.state.autoDeployPolicy.triggerKind.value,
       refs: this.state.autoDeployPolicy.refs.map((ref) => ref.value),
       eventKinds: this.state.autoDeployPolicy.eventKinds.map((eventKind) => eventKind.value),
+      includePaths: this.state.autoDeployPolicy.includePaths?.map((pattern) => pattern.value) ?? [],
+      excludePaths: this.state.autoDeployPolicy.excludePaths?.map((pattern) => pattern.value) ?? [],
       sourceBindingFingerprint: this.state.autoDeployPolicy.sourceBindingFingerprint.value,
       configuredAt: input.configuredAt.value,
     });

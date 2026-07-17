@@ -73,3 +73,16 @@
 
 - [x] Reconcile ADRs, command/query specs, event specs, error specs, test matrix, public docs,
   operation catalog, `CORE_OPERATIONS.md`, and roadmap notes after Code Round.
+
+## Final-Diff Path Policy Round
+
+- [x] Amend ADR-037 with final-diff ownership, ref lifecycle, compatibility, and fail-closed rules.
+- [x] Add `SRC-AUTO-SPEC-010` through `SRC-AUTO-SPEC-015` acceptance criteria.
+- [x] Add `SRC-AUTO-EVENT-009` through `SRC-AUTO-EVENT-012` and `SRC-AUTO-QUERY-003` failing tests.
+- [x] Add Resource include/exclude path-pattern value objects and persistence serialization.
+- [x] Normalize GitHub before/after, created/deleted/forced, and installation identity safely.
+- [x] Add provider-neutral final changed-path resolver and GitHub compare/tree adapter.
+- [x] Fail closed for deleted refs and incomplete diffs without changing unfiltered policy behavior.
+- [x] Persist safe comparison evidence and expose matched paths through source-event and deployment detail.
+- [x] Synchronize CLI, HTTP/oRPC, Web, repository config, public docs, and GitHub Action examples.
+- [x] Run targeted tests, package typechecks, lint, migration tests, docs tests, and diff checks.

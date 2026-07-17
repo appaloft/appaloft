@@ -32,6 +32,8 @@
   comes from, auto-deploy policy says which source events may create deployment attempts.
 - Keep source event identity, ref selector, event kind, delivery id, and signature result as explicit
   value objects if they enter core state.
+- Add repository path-pattern value objects to the Resource policy. Patterns are normalized and
+  matched in core; provider diff resolution remains outside core.
 
 ### Application
 
@@ -43,6 +45,8 @@
 - `IngestSourceEventUseCase` must depend on ports for signature verification, policy read model or
   repository lookup, source event persistence, deployment command dispatch, and mutation
   coordination.
+- Add a provider-neutral changed-path resolver port. Resolve once per accepted delivery only when
+  at least one candidate policy has path selectors.
 - Application logic, not provider transport adapters, owns policy matching and dedupe decisions.
 - Deployment creation must dispatch the existing `CreateDeploymentCommand` or use an internal
   application service that preserves the same command schema and async acceptance semantics.
@@ -51,6 +55,7 @@
 
 - Add source event tables/read models for normalized safe facts, delivery status, ignored reasons,
   matched policies, and created deployment ids.
+- Persist bounded final-diff evidence and per-policy matched paths in a compatible JSONB column.
 - Scope first source event list/show read models by project and resource; global operator rollups
   remain future.
 - Add Resource auto-deploy policy persistence through the owning Resource aggregate or a
@@ -99,6 +104,11 @@ Minimum stable test ids for Code Round:
   dispatch remains unscoped.
 - `SRC-AUTO-EVENT-008`: missing GitHub webhook config, invalid signature, unsupported event kind,
   or unsafe payload rejects before command dispatch.
+- `SRC-AUTO-EVENT-009`: final diff, not intermediate commits, owns path matching.
+- `SRC-AUTO-EVENT-010`: include/exclude rules match bounded final paths.
+- `SRC-AUTO-EVENT-011`: unavailable or truncated diff fails closed only for path policies.
+- `SRC-AUTO-EVENT-012`: deleted refs never dispatch and new refs compare from an empty tree.
+- `SRC-AUTO-QUERY-003`: detail exposes safe comparison status and matched paths.
 - `SRC-AUTO-ENTRY-001`: CLI, HTTP/oRPC, Web, and future MCP/tool schemas map to the same
   operations.
 
@@ -111,6 +121,8 @@ Minimum stable test ids for Code Round:
   remain future.
 - GitHub push webhooks start with one system-scoped runtime-config secret. Reusable provider
   webhook credentials and rotation history remain future.
+- Private-repository final-diff resolution uses the existing GitHub App installation-token runtime
+  when the webhook carries an installation id. No long-lived diff token is added.
 - GitHub App preview lifecycle and product-grade PR preview are adjacent but separate roadmap
   items.
 - Auto-deploy must not bypass `deployments.create` admission, resource-runtime coordination,
