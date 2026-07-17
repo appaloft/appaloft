@@ -18,6 +18,7 @@ import {
   PortNumber,
   ProjectId,
   Resource,
+  ResourceAutoDeployPathPolicy,
   ResourceAutoDeploySecretRef,
   ResourceAutoDeployTriggerKindValue,
   ResourceExposureModeValue,
@@ -33,6 +34,7 @@ import {
   SourceEventKindValue,
   SourceKindValue,
   SourceLocator,
+  SourcePathPattern,
   StaticPublishDirectory,
   UpdatedAt,
   VariableExposureValue,
@@ -365,6 +367,53 @@ describe("Resource", () => {
     expect(resource.pullDomainEvents().map((event) => event.type)).toContain(
       "resource-auto-deploy-policy-configured",
     );
+  });
+
+  test("[SRC-AUTO-EVENT-010] matches final changed paths through include then exclude patterns", () => {
+    const pathPolicy = ResourceAutoDeployPathPolicy.create({
+      includePaths: [SourcePathPattern.create("apps/web/**")._unsafeUnwrap()],
+      excludePaths: [SourcePathPattern.create("apps/web/docs/**")._unsafeUnwrap()],
+    })._unsafeUnwrap();
+
+    expect(
+      pathPolicy.matchingPaths([
+        "apps/api/src/index.ts",
+        "apps/web/docs/setup.md",
+        "apps/web/src/index.ts",
+      ]),
+    ).toEqual(["apps/web/src/index.ts"]);
+
+    for (const unsafePattern of ["/apps/web/**", "apps/../secrets/**", "apps\\web\\**"]) {
+      expect(SourcePathPattern.create(unsafePattern).isErr()).toBe(true);
+    }
+  });
+
+  test("[SRC-AUTO-EVENT-010] persists Resource include and exclude path policy", () => {
+    const resource = Resource.create({
+      ...baseInput,
+      kind: ResourceKindValue.rehydrate("application"),
+      sourceBinding: {
+        kind: SourceKindValue.rehydrate("git-public"),
+        locator: SourceLocator.rehydrate("https://github.com/appaloft/demo"),
+        displayName: DisplayNameText.rehydrate("appaloft/demo"),
+        gitRef: GitRefText.rehydrate("main"),
+      },
+    })._unsafeUnwrap();
+
+    resource
+      .configureAutoDeployPolicy({
+        triggerKind: ResourceAutoDeployTriggerKindValue.rehydrate("git-push"),
+        refs: [GitRefText.rehydrate("main")],
+        eventKinds: [SourceEventKindValue.rehydrate("push")],
+        includePaths: [SourcePathPattern.create("apps/web/**")._unsafeUnwrap()],
+        excludePaths: [SourcePathPattern.create("apps/web/docs/**")._unsafeUnwrap()],
+        configuredAt: UpdatedAt.rehydrate("2026-01-01T00:03:00.000Z"),
+      })
+      ._unsafeUnwrap();
+
+    const policy = resource.toState().autoDeployPolicy;
+    expect(policy?.includePaths?.map((pattern) => pattern.value)).toEqual(["apps/web/**"]);
+    expect(policy?.excludePaths?.map((pattern) => pattern.value)).toEqual(["apps/web/docs/**"]);
   });
 
   test("[SRC-AUTO-POLICY-004] accepts only Resource variable secret references for generic signed webhooks", () => {

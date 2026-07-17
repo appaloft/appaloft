@@ -153,6 +153,11 @@ POST /api/resources/{resourceId}/source-events/generic-signed
 启用时，策略属于一个 Resource，并绑定到该 Resource 当前的 source profile。修改 Resource
 source 后，旧策略会进入 blocked 状态，直到用户显式确认新 source 仍然应该触发自动部署。
 
+Git push 策略可以额外配置仓库根目录相对的 `includePaths` 和 `excludePaths` glob。Appaloft
+只比较最终 `before..after` 差异（新建 ref 使用空树到新 revision），先应用 include，再应用
+exclude，不会合并中间 commit 的文件列表。删除 ref 永不部署；provider diff 不可用或被截断时，
+带路径规则的策略 fail closed，不带路径规则的策略继续保持 ref-only 行为。
+
 <h2 id="source-auto-deploy-signatures">签名和 secret</h2>
 
 Git provider webhook 和 generic signed webhook 都必须先完成签名校验，再进入 policy matching。
@@ -174,8 +179,9 @@ source event id。
 
 <h2 id="source-auto-deploy-ignored-events">忽略和阻塞的事件</h2>
 
-已验证的事件也可能不创建部署。常见原因包括 ref 不匹配、没有启用的策略、策略被禁用、或 source
-binding 变化后策略处于 blocked pending acknowledgement。
+已验证的事件也可能不创建部署。常见原因包括 ref 不匹配、最终路径未匹配、最终 diff 不可用或被
+截断、ref 被删除、没有启用的策略、策略被禁用、或 source binding 变化后策略处于 blocked pending
+acknowledgement。
 
 这些结果应该通过 `source-events.list` 和 `source-events.show` 显示安全的 reason code、匹配的
 Resource、以及已创建的 deployment id。不要在日志或 UI 中暴露 webhook secret、provider token 或

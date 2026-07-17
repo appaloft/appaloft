@@ -27,6 +27,10 @@ export class IngestSourceEventCommand extends Command<IngestSourceEventResult> {
     public readonly deliveryId?: string,
     public readonly idempotencyKey?: string,
     public readonly receivedAt?: string,
+    public readonly beforeRevision?: string,
+    public readonly refChangeKind?: IngestSourceEventCommandPayload["refChangeKind"],
+    public readonly forced?: boolean,
+    public readonly providerConnectionId?: string,
   ) {
     super();
   }
@@ -45,6 +49,10 @@ export class IngestSourceEventCommand extends Command<IngestSourceEventResult> {
           trimToUndefined(parsed.deliveryId),
           trimToUndefined(parsed.idempotencyKey),
           trimToUndefined(parsed.receivedAt),
+          trimToUndefined(parsed.beforeRevision),
+          parsed.refChangeKind,
+          parsed.forced,
+          trimToUndefined(parsed.providerConnectionId),
         ),
     );
   }

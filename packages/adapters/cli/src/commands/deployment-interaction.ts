@@ -226,6 +226,8 @@ export interface DeploymentAutoDeploySeed {
   refs?: string[];
   eventKinds: ("push" | "tag")[];
   dedupeWindowSeconds?: number;
+  includePaths?: string[];
+  excludePaths?: string[];
 }
 export interface DeploymentGeneratedAccessProfileSeed {
   generatedAccessMode: "inherit" | "disabled";
@@ -785,6 +787,12 @@ export function deploymentPromptSeedFromConfig(
         eventKinds: config.autoDeploy.events,
         ...(config.autoDeploy.dedupeWindowSeconds
           ? { dedupeWindowSeconds: config.autoDeploy.dedupeWindowSeconds }
+          : {}),
+        ...(config.autoDeploy.includePaths
+          ? { includePaths: [...config.autoDeploy.includePaths] }
+          : {}),
+        ...(config.autoDeploy.excludePaths
+          ? { excludePaths: [...config.autoDeploy.excludePaths] }
           : {}),
       } satisfies DeploymentAutoDeploySeed)
     : undefined;
@@ -3471,6 +3479,8 @@ function autoDeployPolicyMatchesConfig(
     current.triggerKind === desired.triggerKind &&
     stringArraysEqual(current.refs, desired.refs) &&
     stringArraysEqual(current.eventKinds, desired.eventKinds) &&
+    stringArraysEqual(current.includePaths ?? [], desired.includePaths ?? []) &&
+    stringArraysEqual(current.excludePaths ?? [], desired.excludePaths ?? []) &&
     current.dedupeWindowSeconds === desired.dedupeWindowSeconds
   );
 }
@@ -3517,6 +3527,12 @@ function configureRepositoryConfigAutoDeploy(input: {
                 eventKinds: input.policy.eventKinds,
                 ...(input.policy.dedupeWindowSeconds
                   ? { dedupeWindowSeconds: input.policy.dedupeWindowSeconds }
+                  : {}),
+                ...(input.policy.includePaths
+                  ? { includePaths: [...input.policy.includePaths] }
+                  : {}),
+                ...(input.policy.excludePaths
+                  ? { excludePaths: [...input.policy.excludePaths] }
                   : {}),
               },
             }

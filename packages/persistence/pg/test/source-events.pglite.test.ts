@@ -120,6 +120,14 @@ describe("source event persistence", () => {
         },
         ref: "main",
         revision: "def456",
+        changeSet: {
+          status: "resolved",
+          refChangeKind: "updated",
+          beforeRevision: "abc123",
+          forced: false,
+          changedPaths: ["apps/web/src/index.ts"],
+          changedPathCount: 1,
+        },
         deliveryId: "delivery_2",
         dedupeKey:
           "delivery:github:repo_1:appaloft/demo:https://github.com/appaloft/demo:delivery_2",
@@ -135,6 +143,8 @@ describe("source event persistence", () => {
             resourceId: "res_web",
             status: "dispatched",
             deploymentId: "dep_1",
+            matchedPaths: ["apps/web/src/index.ts"],
+            matchedPathCount: 1,
           },
         ],
         createdDeploymentIds: ["dep_1"],
@@ -168,6 +178,31 @@ describe("source event persistence", () => {
         projectId: "prj_demo",
         matchedResourceIds: ["res_web"],
         createdDeploymentIds: ["dep_1"],
+        changeSet: {
+          status: "resolved",
+          beforeRevision: "abc123",
+          changedPathCount: 1,
+        },
+        policyResults: [
+          {
+            resourceId: "res_web",
+            matchedPaths: ["apps/web/src/index.ts"],
+            matchedPathCount: 1,
+          },
+        ],
+      });
+
+      expect(
+        await sourceEvents.findByCreatedDeploymentId(repositoryContext, "dep_1"),
+      ).toMatchObject({
+        sourceEventId: "sevt_dispatched",
+        changeSet: { status: "resolved", changedPathCount: 1 },
+        policyResults: [
+          {
+            deploymentId: "dep_1",
+            matchedPaths: ["apps/web/src/index.ts"],
+          },
+        ],
       });
     } finally {
       await database.close();

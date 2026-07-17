@@ -52,6 +52,15 @@ type SourceEventDetail = {
   };
   ref: string;
   revision: string;
+  changeSet?: {
+    status: "not-requested" | "resolved" | "unavailable";
+    refChangeKind: "created" | "updated" | "deleted";
+    beforeRevision?: string;
+    forced?: boolean;
+    changedPaths?: readonly string[];
+    changedPathCount?: number;
+    unavailableReason?: "provider-compare-unavailable" | "provider-compare-truncated";
+  };
   verification: {
     status: "verified" | "rejected";
     method?: "provider-signature" | "generic-hmac";
@@ -67,7 +76,16 @@ type SourceEventDetail = {
 type SourceEventPolicyResult = {
   resourceId: string;
   status: "matched" | "ignored" | "blocked" | "dispatch-failed" | "dispatched";
-  reason?: "ref-not-matched" | "policy-disabled" | "policy-blocked" | "dispatch-failed";
+  reason?:
+    | "ref-not-matched"
+    | "path-not-matched"
+    | "path-diff-unavailable"
+    | "ref-deleted"
+    | "policy-disabled"
+    | "policy-blocked"
+    | "dispatch-failed";
+  matchedPaths?: readonly string[];
+  matchedPathCount?: number;
   deploymentId?: string;
   errorCode?: string;
 };

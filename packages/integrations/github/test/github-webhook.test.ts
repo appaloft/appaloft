@@ -26,7 +26,11 @@ async function hmacSha256Hex(secretValue: string, body: string): Promise<string>
 function githubPushPayload() {
   return {
     ref: "refs/heads/main",
+    before: "a1b2c3d4",
     after: "f1e2d3c4",
+    created: false,
+    deleted: false,
+    forced: false,
     repository: {
       id: 123456,
       full_name: "appaloft/demo",
@@ -96,6 +100,10 @@ describe("GitHub source event webhook verifier", () => {
         },
         ref: "main",
         revision: "f1e2d3c4",
+        beforeRevision: "a1b2c3d4",
+        refChangeKind: "updated",
+        forced: false,
+        providerConnectionId: "98765",
         deliveryId: "delivery_1",
         verification: {
           status: "verified",
@@ -105,6 +113,39 @@ describe("GitHub source event webhook verifier", () => {
     });
     expect(JSON.stringify(result._unsafeUnwrap())).not.toContain("correct-secret");
     expect(JSON.stringify(result._unsafeUnwrap())).not.toContain("sha256=");
+  });
+
+  test("[SRC-AUTO-EVENT-012] normalizes deleted refs without treating the zero SHA as deployable", async () => {
+    const verifier = createGitHubSourceEventWebhookVerifier();
+    const payload = {
+      ...githubPushPayload(),
+      after: "0000000000000000000000000000000000000000",
+      deleted: true,
+    };
+    const rawBody = JSON.stringify(payload);
+    const signature = await hmacSha256Hex("correct-secret", rawBody);
+
+    const result = await verifier.verify(
+      createExecutionContext({ entrypoint: "http", requestId: "req_github_deleted_ref_test" }),
+      {
+        eventName: "push",
+        deliveryId: "delivery_deleted_ref",
+        rawBody,
+        signature: `sha256=${signature}`,
+        secretValue: "correct-secret",
+      },
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      outcome: "source-event",
+      sourceEvent: {
+        ref: "main",
+        revision: "a1b2c3d4",
+        beforeRevision: "a1b2c3d4",
+        refChangeKind: "deleted",
+      },
+    });
   });
 
   test("[SRC-AUTO-EVENT-008] rejects invalid signatures and unsafe payloads before normalization", async () => {

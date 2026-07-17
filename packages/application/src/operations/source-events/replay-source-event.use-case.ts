@@ -83,6 +83,16 @@ export class ReplaySourceEventUseCase {
       sourceEvent.eventKind,
       sourceEvent.ref,
       parsed.value.resourceId,
+      {
+        executionContext: context,
+        revision: sourceEvent.revision,
+        ...(sourceEvent.changeSet?.beforeRevision
+          ? { beforeRevision: sourceEvent.changeSet.beforeRevision }
+          : {}),
+        refChangeKind: sourceEvent.changeSet?.refChangeKind ?? "updated",
+        forced: sourceEvent.changeSet?.forced ?? false,
+        ...(sourceEvent.changeSet ? { existingChangeSet: sourceEvent.changeSet } : {}),
+      },
     );
     const projectId = outcome.projectId ?? sourceEvent.projectId;
 
@@ -94,6 +104,7 @@ export class ReplaySourceEventUseCase {
       sourceIdentity: sourceEvent.sourceIdentity,
       ref: sourceEvent.ref,
       revision: sourceEvent.revision,
+      changeSet: outcome.changeSet,
       dedupeKey: `replay:${sourceEvent.sourceEventId}:${parsed.value.idempotencyKey ?? context.requestId}`,
       dedupeStatus: "new",
       verification: sourceEvent.verification,

@@ -38,6 +38,9 @@ Reason codes may appear in source event read models without being top-level erro
 
 - `no-matching-policy`
 - `ref-not-matched`
+- `path-not-matched`
+- `path-diff-unavailable`
+- `ref-deleted`
 - `policy-disabled`
 - `policy-blocked`
 - `duplicate-delivery`

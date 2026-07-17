@@ -125,6 +125,8 @@ const autoDeployRefOption = Options.text("ref").pipe(Options.repeated);
 const autoDeployEventKindOption = Options.choice("event-kind", autoDeployEventKinds).pipe(
   Options.repeated,
 );
+const autoDeployIncludePathOption = Options.text("include-path").pipe(Options.repeated);
+const autoDeployExcludePathOption = Options.text("exclude-path").pipe(Options.repeated);
 const autoDeploySourceBindingFingerprintOption = Options.text("source-binding-fingerprint").pipe(
   Options.optional,
 );
@@ -1154,6 +1156,8 @@ const configureAutoDeployCommand = EffectCommand.make(
     triggerKind: autoDeployTriggerKindOption,
     refs: autoDeployRefOption,
     eventKinds: autoDeployEventKindOption,
+    includePaths: autoDeployIncludePathOption,
+    excludePaths: autoDeployExcludePathOption,
     sourceBindingFingerprint: autoDeploySourceBindingFingerprintOption,
     genericWebhookSecretRef: autoDeployGenericWebhookSecretRefOption,
     dedupeWindowSeconds: autoDeployDedupeWindowSecondsOption,
@@ -1163,6 +1167,8 @@ const configureAutoDeployCommand = EffectCommand.make(
   ({
     dedupeWindowSeconds,
     eventKinds,
+    includePaths,
+    excludePaths,
     genericWebhookSecretRef,
     idempotencyKey,
     json,
@@ -1185,6 +1191,8 @@ const configureAutoDeployCommand = EffectCommand.make(
             triggerKind: triggerKindValue ?? "git-push",
             refs,
             eventKinds: selectedEventKinds.length > 0 ? [...selectedEventKinds] : ["push"],
+            ...(includePaths.length > 0 ? { includePaths: [...includePaths] } : {}),
+            ...(excludePaths.length > 0 ? { excludePaths: [...excludePaths] } : {}),
             ...(genericWebhookSecretRefValue
               ? { genericWebhookSecretRef: genericWebhookSecretRefValue }
               : {}),

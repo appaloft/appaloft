@@ -339,6 +339,10 @@ autoDeploy:
     - main
   events:
     - push
+  includePaths:
+    - apps/api/**
+  excludePaths:
+    - "**/*.md"
   dedupeWindowSeconds: 300
 ```
 
@@ -346,6 +350,10 @@ This configures Resource auto-deploy policy before deployment. The final deploym
 contains only Appaloft ids; source-event ids, webhook delivery ids, provider accounts, webhook
 secrets, tokens, and passwords do not belong in `appaloft.yaml`. Use `enabled: false` to disable an
 existing auto-deploy policy from config.
+
+`includePaths` and `excludePaths` are optional repository-root globs. Appaloft matches them against
+the final provider `before..after` change set, applying includes before excludes. Omit both fields
+to keep ref-only triggering. Absolute paths, parent traversal, and backslashes are rejected.
 
 <h2 id="environment-config-file-env">Environment values</h2>
 

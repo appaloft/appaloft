@@ -171,12 +171,22 @@ autoDeploy:
     - main
   events:
     - push
+  includePaths:
+    - apps/api/**
+  excludePaths:
+    - "**/*.md"
 ```
 
 Config deploy reconciles this through `resources.configure-auto-deploy` before the next deployment
 attempt. Generic signed webhook secret references and endpoint setup remain explicit operations.
 Do not commit webhook secrets, provider tokens, source-event ids, or delivery ids in
 `appaloft.yaml`.
+
+Path rules are optional repository-root globs. Appaloft calculates the final `before..after` change
+set for an updated ref (or empty tree to the new revision for a created ref), applies includes
+first, then excludes. It never unions intermediate commit arrays. A deleted ref never deploys. If
+the provider comparison is unavailable or truncated, path-filtered policies fail closed; policies
+without path rules retain ref-only behavior.
 
 <h2 id="source-auto-deploy-signatures">Signatures and secrets</h2>
 
@@ -200,8 +210,9 @@ and the original source event id in the source event read model.
 
 <h2 id="source-auto-deploy-ignored-events">Ignored and blocked events</h2>
 
-A verified event may still create no deployment. Common reasons include unmatched ref, no enabled
-policy, disabled policy, or a policy blocked pending acknowledgement after a source binding change.
+A verified event may still create no deployment. Common reasons include unmatched ref, unmatched
+final paths, unavailable/truncated final diff, deleted ref, no enabled policy, disabled policy, or a
+policy blocked pending acknowledgement after a source binding change.
 
 `source-events.list` and `source-events.show` should display safe reason codes, matched Resources,
 and created deployment ids. Logs and UI must not expose webhook secrets, provider tokens, or raw

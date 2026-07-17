@@ -19,6 +19,9 @@ import {
   type PreviewFeedbackWriter,
   type PreviewFeedbackWriterInput,
   type PreviewFeedbackWriterResult,
+  type SourceEventChangedPathResolution,
+  type SourceEventChangedPathResolver,
+  type SourceEventChangedPathResolverInput,
 } from "@appaloft/application";
 import { domainError, err, ok, type Result } from "@appaloft/core";
 
@@ -562,6 +565,185 @@ export function createGitHubActionSourcePackageConfigReader(
   return new GitHubRawActionSourcePackageConfigReader(fetcher, rawBaseUrl);
 }
 
+export interface GitHubSourceEventChangedPathResolverOptions {
+  githubAppRuntime?: GitHubAppRuntime;
+  fetcher?: typeof fetch;
+  apiBaseUrl?: string;
+}
+
+export class GitHubApiSourceEventChangedPathResolver implements SourceEventChangedPathResolver {
+  private readonly fetcher: typeof fetch;
+  private readonly apiBaseUrl: string;
+
+  constructor(private readonly options: GitHubSourceEventChangedPathResolverOptions = {}) {
+    this.fetcher = options.fetcher ?? fetch;
+    this.apiBaseUrl = options.apiBaseUrl ?? "https://api.github.com";
+  }
+
+  async resolve(
+    context: ExecutionContext,
+    input: SourceEventChangedPathResolverInput,
+  ): Promise<Result<SourceEventChangedPathResolution>> {
+    try {
+      return await this.resolveFromProvider(context, input);
+    } catch {
+      return ok({ status: "unavailable", reason: "provider-compare-unavailable" });
+    }
+  }
+
+  private async resolveFromProvider(
+    context: ExecutionContext,
+    input: SourceEventChangedPathResolverInput,
+  ): Promise<Result<SourceEventChangedPathResolution>> {
+    if (input.sourceKind !== "github" || input.refChangeKind === "deleted") {
+      return ok({ status: "unavailable", reason: "provider-compare-unavailable" });
+    }
+
+    const repository = input.sourceIdentity.repositoryFullName
+      ? parseRepositoryFullName(input.sourceIdentity.repositoryFullName)
+      : null;
+    if (!repository) {
+      return ok({ status: "unavailable", reason: "provider-compare-unavailable" });
+    }
+
+    let accessToken: string | undefined;
+    if (input.providerConnectionId && this.options.githubAppRuntime) {
+      const token = await this.options.githubAppRuntime.createInstallationAccessToken(context, {
+        installationId: input.providerConnectionId,
+      });
+      if (token.isErr()) {
+        return ok({ status: "unavailable", reason: "provider-compare-unavailable" });
+      }
+      accessToken = token.value.token;
+    }
+
+    const headers: Record<string, string> = {
+      accept: "application/vnd.github+json",
+      "user-agent": "appaloft-control-plane",
+      "x-github-api-version": "2022-11-28",
+    };
+    if (accessToken) {
+      headers.authorization = `Bearer ${accessToken}`;
+    }
+
+    if (input.refChangeKind === "created") {
+      return this.resolveCreatedRef(repository, input.revision, headers);
+    }
+    if (!input.beforeRevision) {
+      return ok({ status: "unavailable", reason: "provider-compare-unavailable" });
+    }
+    return this.resolveUpdatedRef(repository, input.beforeRevision, input.revision, headers);
+  }
+
+  private async resolveUpdatedRef(
+    repository: { owner: string; name: string },
+    beforeRevision: string,
+    revision: string,
+    headers: Record<string, string>,
+  ): Promise<Result<SourceEventChangedPathResolution>> {
+    const url = gitHubApiUrl(
+      this.apiBaseUrl,
+      `/repos/${repository.owner}/${repository.name}/compare/${encodeURIComponent(
+        beforeRevision,
+      )}...${encodeURIComponent(revision)}?per_page=100&page=1`,
+    );
+    const response = await this.fetcher(url, { headers });
+    if (!response.ok) {
+      return ok({ status: "unavailable", reason: "provider-compare-unavailable" });
+    }
+
+    const payload = objectRecord(await response.json());
+    const files = payload && Array.isArray(payload.files) ? payload.files : null;
+    if (!files) {
+      return ok({ status: "unavailable", reason: "provider-compare-unavailable" });
+    }
+    if (files.length >= 300) {
+      return ok({ status: "unavailable", reason: "provider-compare-truncated" });
+    }
+
+    const changedPaths: string[] = [];
+    for (const value of files) {
+      const file = objectRecord(value);
+      const filename = file ? safeRepositoryPath(file.filename) : null;
+      const previousFilename = file ? safeRepositoryPath(file.previous_filename) : null;
+      if (!filename) {
+        return ok({ status: "unavailable", reason: "provider-compare-unavailable" });
+      }
+      changedPaths.push(filename);
+      if (previousFilename) changedPaths.push(previousFilename);
+    }
+
+    return ok({ status: "resolved", changedPaths: [...new Set(changedPaths)] });
+  }
+
+  private async resolveCreatedRef(
+    repository: { owner: string; name: string },
+    revision: string,
+    headers: Record<string, string>,
+  ): Promise<Result<SourceEventChangedPathResolution>> {
+    const url = gitHubApiUrl(
+      this.apiBaseUrl,
+      `/repos/${repository.owner}/${repository.name}/git/trees/${encodeURIComponent(
+        revision,
+      )}?recursive=1`,
+    );
+    const response = await this.fetcher(url, { headers });
+    if (!response.ok) {
+      return ok({ status: "unavailable", reason: "provider-compare-unavailable" });
+    }
+
+    const payload = objectRecord(await response.json());
+    const tree = payload && Array.isArray(payload.tree) ? payload.tree : null;
+    if (!tree || payload?.truncated === true) {
+      return ok({
+        status: "unavailable",
+        reason:
+          payload?.truncated === true
+            ? "provider-compare-truncated"
+            : "provider-compare-unavailable",
+      });
+    }
+
+    const changedPaths: string[] = [];
+    for (const value of tree) {
+      const entry = objectRecord(value);
+      const type = entry ? nonEmptyString(entry.type) : null;
+      if (type === "tree") continue;
+      const path = entry ? safeRepositoryPath(entry.path) : null;
+      if (!path) {
+        return ok({ status: "unavailable", reason: "provider-compare-unavailable" });
+      }
+      changedPaths.push(path);
+      if (changedPaths.length > 300) {
+        return ok({ status: "unavailable", reason: "provider-compare-truncated" });
+      }
+    }
+
+    return ok({ status: "resolved", changedPaths });
+  }
+}
+
+export function createGitHubSourceEventChangedPathResolver(
+  options: GitHubSourceEventChangedPathResolverOptions = {},
+): SourceEventChangedPathResolver {
+  return new GitHubApiSourceEventChangedPathResolver(options);
+}
+
+function safeRepositoryPath(value: unknown): string | null {
+  const path = nonEmptyString(value);
+  if (
+    !path ||
+    path.length > 1024 ||
+    path.startsWith("/") ||
+    path.includes("\\") ||
+    /[\r\n\0]/.test(path) ||
+    path.split("/").some((segment) => segment === "." || segment === "..")
+  ) {
+    return null;
+  }
+  return path;
+}
+
 export class GitHubWebhookSourceEventVerifier implements GitHubSourceEventWebhookVerifier {
   async verify(
     _context: ExecutionContext,
@@ -612,6 +794,12 @@ export class GitHubWebhookSourceEventVerifier implements GitHubSourceEventWebhoo
         },
         ref: normalizeGitHubRef(payload.value.ref),
         revision: payload.value.revision,
+        ...(payload.value.beforeRevision ? { beforeRevision: payload.value.beforeRevision } : {}),
+        refChangeKind: payload.value.refChangeKind,
+        forced: payload.value.forced,
+        ...(payload.value.providerConnectionId
+          ? { providerConnectionId: payload.value.providerConnectionId }
+          : {}),
         ...(input.deliveryId ? { deliveryId: input.deliveryId } : {}),
         verification: {
           status: "verified",
@@ -1287,6 +1475,10 @@ interface GitHubPushPayloadFacts {
   repositoryFullName: string;
   ref: string;
   revision: string;
+  beforeRevision?: string;
+  refChangeKind: "created" | "updated" | "deleted";
+  forced: boolean;
+  providerConnectionId?: string;
 }
 
 interface GitHubPullRequestPayloadFacts {
@@ -1329,9 +1521,33 @@ function parseGitHubPushPayload(
     (repository ? nonEmptyString(repository.clone_url) : null) ??
     (repository ? nonEmptyString(repository.html_url) : null);
   const ref = payload ? nonEmptyString(payload.ref) : null;
-  const revision = payload ? nonEmptyString(payload.after) : null;
+  const before = payload ? nonEmptyString(payload.before) : null;
+  const after = payload ? nonEmptyString(payload.after) : null;
+  const created = payload && typeof payload.created === "boolean" ? payload.created : null;
+  const deleted = payload && typeof payload.deleted === "boolean" ? payload.deleted : null;
+  const forced = payload && typeof payload.forced === "boolean" ? payload.forced : null;
+  const installation = payload ? objectRecord(payload.installation) : null;
+  const installationId = installation ? installation.id : undefined;
+  const providerConnectionId =
+    typeof installationId === "number" || typeof installationId === "string"
+      ? String(installationId)
+      : null;
 
-  if (!repositoryIdValue || !repositoryFullName || !locator || !ref || !revision) {
+  if (
+    !repositoryIdValue ||
+    !repositoryFullName ||
+    !locator ||
+    !ref ||
+    !before ||
+    !after ||
+    created === null ||
+    deleted === null ||
+    forced === null ||
+    (created && deleted) ||
+    (created && isZeroGitSha(after)) ||
+    (deleted && isZeroGitSha(before)) ||
+    (!created && !deleted && (isZeroGitSha(before) || isZeroGitSha(after)))
+  ) {
     return err(
       domainError.validation("GitHub source event body is invalid", {
         phase: "source-event-normalization",
@@ -1346,8 +1562,16 @@ function parseGitHubPushPayload(
     providerRepositoryId: repositoryIdValue,
     repositoryFullName,
     ref,
-    revision,
+    revision: deleted ? before : after,
+    ...(!created ? { beforeRevision: before } : {}),
+    refChangeKind: created ? "created" : deleted ? "deleted" : "updated",
+    forced,
+    ...(providerConnectionId ? { providerConnectionId } : {}),
   });
+}
+
+function isZeroGitSha(value: string): boolean {
+  return /^0{40}$/.test(value);
 }
 
 function parseGitHubPullRequestPayload(

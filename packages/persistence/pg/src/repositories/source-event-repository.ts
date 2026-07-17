@@ -142,6 +142,8 @@ export class PgSourceEventRepository
         status: policy.status,
         refs: [...policy.refs],
         eventKinds: [...policy.eventKinds],
+        ...(policy.includePaths ? { includePaths: [...policy.includePaths] } : {}),
+        ...(policy.excludePaths ? { excludePaths: [...policy.excludePaths] } : {}),
         sourceBinding: sourceIdentityFromBinding(sourceBinding),
         ...(policy.blockedReason ? { blockedReason: policy.blockedReason } : {}),
       });
@@ -222,6 +224,26 @@ export class PgSourceEventRepository
     }
 
     const row = await query.executeTakeFirst();
+    return row ? detailFromRow(row) : null;
+  }
+
+  async findByCreatedDeploymentId(
+    context: RepositoryContext,
+    deploymentId: string,
+  ): Promise<SourceEventDetail | null> {
+    const executor = resolveRepositoryExecutor(this.db, context);
+    let query = executor
+      .selectFrom("source_events")
+      .selectAll()
+      .where(sql<boolean>`${deploymentId} = ANY(created_deployment_ids)`);
+    const organizationId = resolveRepositoryContextOrganizationId(context);
+    if (organizationId) {
+      query = query.where("project_id", "in", (subquery) =>
+        subquery.selectFrom("projects").select("id").where("organization_id", "=", organizationId),
+      );
+    }
+
+    const row = await query.orderBy("received_at", "desc").executeTakeFirst();
     return row ? detailFromRow(row) : null;
   }
 }
@@ -397,6 +419,9 @@ function insertableFromRecord(record: SourceEventRecord): Insertable<SourceEvent
     source_identity: { ...record.sourceIdentity },
     ref: record.ref,
     revision: record.revision,
+    change_set: record.changeSet
+      ? { ...record.changeSet }
+      : { status: "not-requested", refChangeKind: "updated" },
     delivery_id: record.deliveryId ?? null,
     idempotency_key: record.idempotencyKey ?? null,
     dedupe_key: record.dedupeKey,
@@ -422,6 +447,7 @@ function recordFromRow(row: SourceEventRow): SourceEventRecord {
     sourceIdentity: row.source_identity as unknown as SourceEventRecord["sourceIdentity"],
     ref: row.ref,
     revision: row.revision,
+    changeSet: row.change_set as unknown as NonNullable<SourceEventRecord["changeSet"]>,
     ...(row.delivery_id ? { deliveryId: row.delivery_id } : {}),
     ...(row.idempotency_key ? { idempotencyKey: row.idempotency_key } : {}),
     dedupeKey: row.dedupe_key,
@@ -466,6 +492,7 @@ function detailFromRow(row: SourceEventRow): SourceEventDetail {
     sourceIdentity: { ...record.sourceIdentity },
     ref: record.ref,
     revision: record.revision,
+    ...(record.changeSet ? { changeSet: { ...record.changeSet } } : {}),
     verification: { ...record.verification },
     status: record.status,
     ...(record.dedupeOfSourceEventId

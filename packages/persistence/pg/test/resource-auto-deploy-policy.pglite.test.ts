@@ -25,6 +25,7 @@ import {
   SourceEventKindValue,
   SourceKindValue,
   SourceLocator,
+  SourcePathPattern,
   UpdatedAt,
   UpsertEnvironmentSpec,
   UpsertProjectSpec,
@@ -92,6 +93,8 @@ describe("resource auto-deploy policy persistence", () => {
           triggerKind: ResourceAutoDeployTriggerKindValue.rehydrate("git-push"),
           refs: [GitRefText.rehydrate("main")],
           eventKinds: [SourceEventKindValue.rehydrate("push")],
+          includePaths: [SourcePathPattern.rehydrate("apps/web/**")],
+          excludePaths: [SourcePathPattern.rehydrate("apps/web/docs/**")],
           configuredAt: UpdatedAt.rehydrate("2026-01-01T00:01:00.000Z"),
         })
         ._unsafeUnwrap();
@@ -126,6 +129,8 @@ describe("resource auto-deploy policy persistence", () => {
       expect(policy?.triggerKind.value).toBe("git-push");
       expect(policy?.refs.map((ref) => ref.value)).toEqual(["main"]);
       expect(policy?.eventKinds.map((eventKind) => eventKind.value)).toEqual(["push"]);
+      expect(policy?.includePaths?.map((pattern) => pattern.value)).toEqual(["apps/web/**"]);
+      expect(policy?.excludePaths?.map((pattern) => pattern.value)).toEqual(["apps/web/docs/**"]);
       expect(policy?.sourceBindingFingerprint.value).toMatch(/^srcfp_[a-f0-9]{8}$/);
     } finally {
       await database.close();

@@ -97,6 +97,45 @@ async function parseCliWithOutput(
 }
 
 describe("CLI resource commands", () => {
+  test("[SRC-AUTO-ENTRY-001] resource auto-deploy preserves repeated path policies", async () => {
+    const { ConfigureResourceAutoDeployCommand } = await import("@appaloft/application");
+    const { program, commands } = await createCommandCaptureHarness(
+      "req_cli_resource_auto_deploy_paths_test",
+    );
+
+    await parseCli(program, [
+      "node",
+      "appaloft",
+      "resource",
+      "auto-deploy",
+      "res_demo",
+      "--mode",
+      "enable",
+      "--ref",
+      "main",
+      "--include-path",
+      "apps/api/**",
+      "--include-path",
+      "packages/shared/**",
+      "--exclude-path",
+      "**/*.md",
+    ]);
+
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toBeInstanceOf(ConfigureResourceAutoDeployCommand);
+    expect(commands[0]).toMatchObject({
+      resourceId: "res_demo",
+      mode: "enable",
+      policy: {
+        triggerKind: "git-push",
+        refs: ["main"],
+        eventKinds: ["push"],
+        includePaths: ["apps/api/**", "packages/shared/**"],
+        excludePaths: ["**/*.md"],
+      },
+    });
+  });
+
   test("[RES-PROFILE-ENTRY-003] resource configure-runtime dispatches the application command", async () => {
     ensureReflectMetadata();
     const { ConfigureResourceRuntimeCommand, createExecutionContext } = await import(

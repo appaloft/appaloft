@@ -1336,6 +1336,10 @@ describe("Appaloft deployment config schema", () => {
         "  events:",
         "    - push",
         "    - tag",
+        "  includePaths:",
+        "    - apps/web/**",
+        "  excludePaths:",
+        "    - apps/web/docs/**",
         "  dedupeWindowSeconds: 300",
       ].join("\n"),
       "appaloft.yaml",
@@ -1348,6 +1352,8 @@ describe("Appaloft deployment config schema", () => {
         trigger: "git-push",
         refs: ["main", "refs/tags/v1.0.0"],
         events: ["push", "tag"],
+        includePaths: ["apps/web/**"],
+        excludePaths: ["apps/web/docs/**"],
         dedupeWindowSeconds: 300,
       });
     }

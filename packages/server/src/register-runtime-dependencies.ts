@@ -129,6 +129,7 @@ import {
   createGitHubPreviewFeedbackWriter,
   createGitHubPreviewPullRequestWebhookVerifier,
   createGitHubRepositoryBrowser,
+  createGitHubSourceEventChangedPathResolver,
   createGitHubSourceEventWebhookVerifier,
 } from "@appaloft/integration-github";
 import { gitlabIntegration } from "@appaloft/integration-gitlab";
@@ -1917,6 +1918,13 @@ export function registerRuntimeDependencies(
   });
   container.register(tokens.githubSourceEventWebhookVerifier, {
     useFactory: instanceCachingFactory(() => createGitHubSourceEventWebhookVerifier()),
+  });
+  container.register(tokens.sourceEventChangedPathResolver, {
+    useFactory: instanceCachingFactory((dependencyContainer) =>
+      createGitHubSourceEventChangedPathResolver({
+        githubAppRuntime: dependencyContainer.resolve(tokens.githubAppRuntime),
+      }),
+    ),
   });
   container.register(tokens.githubPreviewPullRequestWebhookVerifier, {
     useFactory: instanceCachingFactory(() => createGitHubPreviewPullRequestWebhookVerifier()),

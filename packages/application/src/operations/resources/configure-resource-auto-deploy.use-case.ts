@@ -12,6 +12,7 @@ import {
   SourceBindingFingerprint,
   SourceEventDedupeWindowSeconds,
   SourceEventKindValue,
+  SourcePathPattern,
   safeTry,
   UpdatedAt,
   UpsertResourceSpec,
@@ -113,11 +114,15 @@ function autoDeployPolicyFromInput(
   eventKinds: SourceEventKindValue[];
   genericWebhookSecretRef?: ResourceAutoDeploySecretRef;
   dedupeWindowSeconds?: SourceEventDedupeWindowSeconds;
+  includePaths?: SourcePathPattern[];
+  excludePaths?: SourcePathPattern[];
 }> {
   return safeTry(function* () {
     const triggerKind = yield* ResourceAutoDeployTriggerKindValue.create(input.triggerKind);
     const refs: GitRefText[] = [];
     const eventKinds: SourceEventKindValue[] = [];
+    const includePaths: SourcePathPattern[] = [];
+    const excludePaths: SourcePathPattern[] = [];
 
     for (const ref of input.refs) {
       refs.push(yield* GitRefText.create(ref));
@@ -125,6 +130,14 @@ function autoDeployPolicyFromInput(
 
     for (const eventKind of input.eventKinds) {
       eventKinds.push(yield* SourceEventKindValue.create(eventKind));
+    }
+
+    for (const path of input.includePaths ?? []) {
+      includePaths.push(yield* SourcePathPattern.create(path));
+    }
+
+    for (const path of input.excludePaths ?? []) {
+      excludePaths.push(yield* SourcePathPattern.create(path));
     }
 
     const genericWebhookSecretRef = input.genericWebhookSecretRef
@@ -140,6 +153,8 @@ function autoDeployPolicyFromInput(
       eventKinds,
       ...(genericWebhookSecretRef ? { genericWebhookSecretRef } : {}),
       ...(dedupeWindowSeconds ? { dedupeWindowSeconds } : {}),
+      ...(includePaths.length ? { includePaths } : {}),
+      ...(excludePaths.length ? { excludePaths } : {}),
     });
   });
 }
@@ -154,6 +169,12 @@ function resultFromPolicy(
     triggerKind: policy.triggerKind.value,
     refs: policy.refs.map((ref) => ref.value),
     eventKinds: policy.eventKinds.map((eventKind) => eventKind.value),
+    ...(policy.includePaths
+      ? { includePaths: policy.includePaths.map((pattern) => pattern.value) }
+      : {}),
+    ...(policy.excludePaths
+      ? { excludePaths: policy.excludePaths.map((pattern) => pattern.value) }
+      : {}),
     sourceBindingFingerprint: policy.sourceBindingFingerprint.value,
     ...(policy.blockedReason ? { blockedReason: policy.blockedReason.value } : {}),
   };

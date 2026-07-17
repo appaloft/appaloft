@@ -35,6 +35,9 @@ name: Deploy
 on:
   push:
     branches: [main]
+    paths:
+      - "apps/api/**"
+      - "packages/shared/**"
 
 jobs:
   deploy:
@@ -55,6 +58,11 @@ jobs:
 
 Pin `version` to an Appaloft CLI release for production workflows. `version: latest` is useful for
 quick experiments, but it trades repeatability for convenience.
+
+GitHub's `on.push.paths` decides whether this workflow starts and can save runner time. It is
+separate from Appaloft Resource auto-deploy `includePaths` / `excludePaths`, which are persisted
+control-plane policy and evaluate the provider's final `before..after` change set. Keep both aligned
+when you use both surfaces; a workflow run only proves that GitHub matched its workflow filters.
 
 Minimal `appaloft.yml`:
 

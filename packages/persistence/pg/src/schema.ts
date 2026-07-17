@@ -621,6 +621,7 @@ export interface SourceEventsTable {
   source_identity: ColumnType<JsonRecord, JsonRecord, JsonRecord>;
   ref: string;
   revision: string;
+  change_set: ColumnType<JsonRecord, JsonRecord | undefined, JsonRecord>;
   delivery_id: string | null;
   idempotency_key: string | null;
   dedupe_key: string;

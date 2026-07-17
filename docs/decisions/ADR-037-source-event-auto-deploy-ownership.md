@@ -15,6 +15,7 @@ Auto-deploy adds a new trigger path:
 ```text
 verified source event
   -> provider-neutral source event facts
+  -> final source change resolution when a policy filters paths
   -> Resource auto-deploy policy match
   -> deployments.create
 ```
@@ -34,6 +35,7 @@ The first public Code Round uses these ownership boundaries:
 | --- | --- |
 | Auto-deploy policy | Resource-owned configuration, changed only by `resources.configure-auto-deploy`. |
 | Source event verification and normalization | Integration/transport adapter plus application ports; application receives provider-neutral facts. |
+| Final changed-path resolution | Application port with provider integration adapter; it compares final `before` and `after` revisions and never unions per-commit path lists. |
 | Source event dedupe, match result, and diagnostics | Source event application service and read model. |
 | Deployment attempt creation | Existing `deployments.create` admission path. |
 | Runtime coordination | Existing `resource-runtime` operation coordination. |
@@ -56,6 +58,23 @@ Re-enabling or acknowledging the policy requires an explicit `resources.configur
 command after the source binding change. Read models and Web/CLI/API output must show the blocked
 reason so operators can decide whether the policy should apply to the new source.
 
+### Final-Diff Path Policy
+
+A `git-push` policy may add repository-root-relative `includePaths` and `excludePaths`. Omitting
+both fields preserves existing ref-based behavior. When either field is present, a policy matches
+only when at least one path in the final source change matches an include pattern (or any path when
+includes are omitted) and does not match an exclude pattern.
+
+Path matching uses the final tree difference, never the union of per-commit `added`, `modified`, or
+`removed` arrays. Existing-ref pushes compare `before` directly with `after`; merge and multi-commit
+pushes therefore have the same semantics as one final two-revision change. Force pushes use the
+same final comparison. If the provider cannot prove a complete comparison, only path-filtered
+policies fail closed with `path-diff-unavailable`.
+
+New refs compare an empty tree with the `after` tree. Deleted refs never create deployments,
+including policies without path selectors. All-zero provider SHAs are ref lifecycle sentinels and
+must not become deployable revisions. Truncated provider results are not match evidence.
+
 ## Source Event Read Models
 
 Source event records are retained in a project/resource-scoped read model.
@@ -68,6 +87,7 @@ Minimum safe fields:
 - resource id when matched;
 - normalized source identity;
 - ref and revision;
+- ref change kind, optional before revision, force-push marker, and final-diff resolution status;
 - event kind;
 - delivery id or idempotency key;
 - verification result;
@@ -144,6 +164,10 @@ The first supported event is `push`. A verified push event normalizes:
 - `sourceIdentity.repositoryFullName` from `repository.full_name`;
 - `ref` from the Git ref, with `refs/heads/` stripped for branch refs;
 - `revision` from `after`;
+- `beforeRevision` from `before` for updated or deleted refs;
+- `refChangeKind` from `created`/`deleted`, otherwise `updated`;
+- `forced` from the provider force-push marker;
+- `providerConnectionId` from `installation.id` when present, used only for provider access;
 - `deliveryId` from `X-GitHub-Delivery`.
 
 Provider-signed GitHub events are not Resource-scoped and must not pass `scopeResourceId` to
@@ -155,6 +179,14 @@ If the configured webhook secret is missing, the route must reject before parsin
 dispatching the ingest command with a stable safe configuration error. Invalid signatures or missing
 signature headers reject before command dispatch. Unsupported GitHub event kinds reject without
 persisting a source event.
+
+When at least one eligible Resource policy has path selectors, the application resolves final
+changed paths through the GitHub integration. Public repositories may use an unauthenticated
+compare/tree request. Private repositories use the webhook installation id with the configured
+GitHub App runtime to obtain a short-lived installation token. Tokens remain integration material
+and are never persisted or returned. Missing access, provider failure, unrelated revisions that
+cannot be compared, or truncated results become `path-diff-unavailable`; the system never falls
+back to intermediate commit arrays.
 
 ## Process State And Retry Baseline
 
