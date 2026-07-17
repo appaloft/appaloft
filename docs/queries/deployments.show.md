@@ -115,6 +115,16 @@ type DeploymentDetail = {
   timeline?: DeploymentAttemptTimeline;
   latestFailure?: DeploymentAttemptFailureSummary;
   recoverySummary?: DeploymentAttemptRecoverySummary;
+  sourceEvent?: {
+    sourceEventId: string;
+    sourceKind: "github" | "gitlab" | "generic-signed";
+    ref: string;
+    revision: string;
+    changeSet?: SourceEventChangeSet;
+    matchedPaths?: readonly string[];
+    matchedPathCount?: number;
+    receivedAt: string;
+  };
   nextActions: DeploymentAttemptNextAction[];
   generatedAt: string;
 };
@@ -148,6 +158,9 @@ Required behavior:
 - `recoverySummary`, when present, is a compact read-only projection of the shared recovery readiness
   policy. It may show retry/redeploy/rollback readiness and candidate counts, but it must not expose
   active write actions unless the corresponding operations are active in the operation catalog.
+- `sourceEvent`, when present, is a reverse read-model projection from the source event that created
+  this deployment. It exposes bounded safe final-diff and matched-path evidence without adding
+  source-event fields to `deployments.create` or mutating the immutable deployment aggregate.
 - `nextActions` may include read-only deep links or companion query affordances such as
   `logs`, `resource-detail`, `resource-health`, or `diagnostic-summary`. It must not invent
   retry/redeploy/rollback commands before those commands are public again.

@@ -146,6 +146,12 @@ function autoDeployPolicyFromState(
     ...(policy.dedupeWindowSeconds
       ? { dedupeWindowSeconds: policy.dedupeWindowSeconds.value }
       : {}),
+    ...(policy.includePaths
+      ? { includePaths: policy.includePaths.map((pattern) => pattern.value) }
+      : {}),
+    ...(policy.excludePaths
+      ? { excludePaths: policy.excludePaths.map((pattern) => pattern.value) }
+      : {}),
     updatedAt: policy.updatedAt.value,
   };
 }

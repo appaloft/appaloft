@@ -9,6 +9,8 @@ import {
   type ProcessAttemptRecord,
   type ProcessAttemptRecorder,
   type RepositoryContext,
+  type SourceEventChangedPathResolution,
+  type SourceEventChangedPathResolver,
   type SourceEventDeploymentDispatcher,
   type SourceEventDeploymentDispatchInput,
   type SourceEventListInput,
@@ -139,6 +141,15 @@ class MemorySourceEventStore
     );
   }
 
+  async findByCreatedDeploymentId(
+    _context: RepositoryContext,
+    deploymentId: string,
+  ): Promise<SourceEventRecord | null> {
+    return (
+      this.records.find((record) => record.createdDeploymentIds.includes(deploymentId)) ?? null
+    );
+  }
+
   async prune(
     _context: RepositoryContext,
     input: SourceEventPruneInput,
@@ -222,6 +233,20 @@ class MemorySourceEventDeploymentDispatcher implements SourceEventDeploymentDisp
   }
 }
 
+class MemorySourceEventChangedPathResolver implements SourceEventChangedPathResolver {
+  readonly inputs: Parameters<SourceEventChangedPathResolver["resolve"]>[1][] = [];
+
+  constructor(private readonly resolution: SourceEventChangedPathResolution) {}
+
+  async resolve(
+    _context: Parameters<SourceEventChangedPathResolver["resolve"]>[0],
+    input: Parameters<SourceEventChangedPathResolver["resolve"]>[1],
+  ): ReturnType<SourceEventChangedPathResolver["resolve"]> {
+    this.inputs.push({ ...input, sourceIdentity: { ...input.sourceIdentity } });
+    return ok(this.resolution);
+  }
+}
+
 class FailingSourceEventDeploymentDispatcher implements SourceEventDeploymentDispatcher {
   readonly inputs: SourceEventDeploymentDispatchInput[] = [];
 
@@ -278,10 +303,23 @@ function cloneRecord(record: SourceEventRecord): SourceEventRecord {
   return {
     ...record,
     sourceIdentity: { ...record.sourceIdentity },
+    ...(record.changeSet
+      ? {
+          changeSet: {
+            ...record.changeSet,
+            ...(record.changeSet.changedPaths
+              ? { changedPaths: [...record.changeSet.changedPaths] }
+              : {}),
+          },
+        }
+      : {}),
     verification: { ...record.verification },
     matchedResourceIds: [...record.matchedResourceIds],
     ignoredReasons: [...record.ignoredReasons],
-    policyResults: record.policyResults.map((result) => ({ ...result })),
+    policyResults: record.policyResults.map((result) => ({
+      ...result,
+      ...(result.matchedPaths ? { matchedPaths: [...result.matchedPaths] } : {}),
+    })),
     createdDeploymentIds: [...record.createdDeploymentIds],
   };
 }
@@ -327,6 +365,7 @@ function createHarness(
     deploymentDispatcher?: SourceEventDeploymentDispatcher;
     processAttemptRecorder?: ProcessAttemptRecorder;
     operationGuardPort?: OperationGuardPort;
+    changedPathResolver?: SourceEventChangedPathResolver;
   } = {},
 ) {
   const context = createExecutionContext({
@@ -350,6 +389,7 @@ function createHarness(
       options.deploymentDispatcher,
       options.processAttemptRecorder,
       options.operationGuardPort ?? new AllowAllOperationGuardPort(),
+      options.changedPathResolver,
     ),
     list: new ListSourceEventsQueryService(sourceEvents, clock),
     show: new ShowSourceEventQueryService(sourceEvents),
@@ -630,6 +670,8 @@ describe("source event application baseline", () => {
           sourceKind: "github",
           eventKind: "push",
           ref: "main",
+          refChangeKind: "updated",
+          finalDiffStatus: "not-requested",
           verificationStatus: "verified",
           repositoryFullName: "appaloft/demo",
           matchedResourceCount: 1,
@@ -662,6 +704,8 @@ describe("source event application baseline", () => {
           sourceKind: "github",
           eventKind: "push",
           ref: "main",
+          refChangeKind: "updated",
+          finalDiffStatus: "not-requested",
           verificationStatus: "verified",
           repositoryFullName: "appaloft/demo",
           matchedResourceCount: 1,
@@ -1055,6 +1099,220 @@ describe("source event application baseline", () => {
           reason: "ref-not-matched",
         },
       ],
+    });
+  });
+
+  test("[SRC-AUTO-EVENT-009] [SRC-AUTO-EVENT-010] matches only resolved final changed paths", async () => {
+    const changedPathResolver = new MemorySourceEventChangedPathResolver({
+      status: "resolved",
+      changedPaths: ["apps/web/docs/setup.md", "apps/web/src/index.ts", "apps/api/src/index.ts"],
+    });
+    const deploymentDispatcher = new MemorySourceEventDeploymentDispatcher(["dep_web"]);
+    const { context, ingest, sourceEvents } = createHarness({
+      changedPathResolver,
+      deploymentDispatcher,
+      policyCandidates: [
+        {
+          projectId: "prj_demo",
+          environmentId: "env_prod",
+          resourceId: "res_web",
+          serverId: "srv_prod",
+          status: "enabled",
+          refs: ["main"],
+          eventKinds: ["push"],
+          includePaths: ["apps/web/**"],
+          excludePaths: ["apps/web/docs/**"],
+          sourceBinding: {
+            locator: "https://github.com/appaloft/demo",
+            providerRepositoryId: "repo_1",
+            repositoryFullName: "appaloft/demo",
+          },
+        },
+      ],
+    });
+
+    const result = await ingest.execute(context, {
+      sourceKind: "github",
+      eventKind: "push",
+      sourceIdentity: {
+        locator: "https://github.com/appaloft/demo",
+        providerRepositoryId: "repo_1",
+        repositoryFullName: "appaloft/demo",
+      },
+      ref: "main",
+      revision: "after123",
+      beforeRevision: "before123",
+      refChangeKind: "updated",
+      forced: false,
+      providerConnectionId: "98765",
+      deliveryId: "delivery_final_diff",
+      verification: { status: "verified", method: "provider-signature" },
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      status: "dispatched",
+      matchedResourceIds: ["res_web"],
+    });
+    expect(changedPathResolver.inputs).toEqual([
+      {
+        sourceKind: "github",
+        sourceIdentity: {
+          locator: "https://github.com/appaloft/demo",
+          providerRepositoryId: "repo_1",
+          repositoryFullName: "appaloft/demo",
+        },
+        ref: "main",
+        revision: "after123",
+        beforeRevision: "before123",
+        refChangeKind: "updated",
+        forced: false,
+        providerConnectionId: "98765",
+      },
+    ]);
+    expect(sourceEvents.records[0]).toMatchObject({
+      changeSet: {
+        status: "resolved",
+        beforeRevision: "before123",
+        refChangeKind: "updated",
+        forced: false,
+        changedPathCount: 3,
+      },
+      policyResults: [
+        {
+          resourceId: "res_web",
+          status: "dispatched",
+          matchedPaths: ["apps/web/src/index.ts"],
+        },
+      ],
+    });
+  });
+
+  test("[SRC-AUTO-EVENT-011] fails closed only for policies that require a final diff", async () => {
+    const changedPathResolver = new MemorySourceEventChangedPathResolver({
+      status: "unavailable",
+      reason: "provider-compare-unavailable",
+    });
+    const deploymentDispatcher = new MemorySourceEventDeploymentDispatcher(["dep_worker"]);
+    const sharedSource = {
+      locator: "https://github.com/appaloft/demo",
+      providerRepositoryId: "repo_1",
+      repositoryFullName: "appaloft/demo",
+    };
+    const { context, ingest, sourceEvents } = createHarness({
+      changedPathResolver,
+      deploymentDispatcher,
+      policyCandidates: [
+        {
+          projectId: "prj_demo",
+          environmentId: "env_prod",
+          resourceId: "res_web",
+          serverId: "srv_prod",
+          status: "enabled",
+          refs: ["main"],
+          eventKinds: ["push"],
+          includePaths: ["apps/web/**"],
+          sourceBinding: sharedSource,
+        },
+        {
+          projectId: "prj_demo",
+          environmentId: "env_prod",
+          resourceId: "res_worker",
+          serverId: "srv_prod",
+          status: "enabled",
+          refs: ["main"],
+          eventKinds: ["push"],
+          sourceBinding: sharedSource,
+        },
+      ],
+    });
+
+    const result = await ingest.execute(context, {
+      sourceKind: "github",
+      eventKind: "push",
+      sourceIdentity: sharedSource,
+      ref: "main",
+      revision: "after123",
+      beforeRevision: "before123",
+      refChangeKind: "updated",
+      forced: true,
+      deliveryId: "delivery_force_push",
+      verification: { status: "verified", method: "provider-signature" },
+    });
+
+    expect(result._unsafeUnwrap()).toMatchObject({
+      status: "dispatched",
+      matchedResourceIds: ["res_worker"],
+      ignoredReasons: ["path-diff-unavailable"],
+    });
+    expect(sourceEvents.records[0]?.policyResults).toEqual([
+      {
+        resourceId: "res_web",
+        status: "ignored",
+        reason: "path-diff-unavailable",
+      },
+      {
+        resourceId: "res_worker",
+        status: "dispatched",
+        deploymentId: "dep_worker",
+      },
+    ]);
+  });
+
+  test("[SRC-AUTO-EVENT-012] ignores deleted refs before path resolution or dispatch", async () => {
+    const changedPathResolver = new MemorySourceEventChangedPathResolver({
+      status: "resolved",
+      changedPaths: ["apps/web/src/index.ts"],
+    });
+    const deploymentDispatcher = new MemorySourceEventDeploymentDispatcher();
+    const { context, ingest, sourceEvents } = createHarness({
+      changedPathResolver,
+      deploymentDispatcher,
+      policyCandidates: [
+        {
+          projectId: "prj_demo",
+          environmentId: "env_prod",
+          resourceId: "res_web",
+          serverId: "srv_prod",
+          status: "enabled",
+          refs: ["main"],
+          eventKinds: ["push"],
+          sourceBinding: {
+            locator: "https://github.com/appaloft/demo",
+            repositoryFullName: "appaloft/demo",
+          },
+        },
+      ],
+    });
+
+    const result = await ingest.execute(context, {
+      sourceKind: "github",
+      eventKind: "push",
+      sourceIdentity: {
+        locator: "https://github.com/appaloft/demo",
+        repositoryFullName: "appaloft/demo",
+      },
+      ref: "main",
+      revision: "before123",
+      beforeRevision: "before123",
+      refChangeKind: "deleted",
+      forced: false,
+      deliveryId: "delivery_deleted",
+      verification: { status: "verified", method: "provider-signature" },
+    });
+
+    expect(result._unsafeUnwrap()).toMatchObject({
+      status: "ignored",
+      matchedResourceIds: [],
+      ignoredReasons: ["ref-deleted"],
+    });
+    expect(changedPathResolver.inputs).toHaveLength(0);
+    expect(deploymentDispatcher.inputs).toHaveLength(0);
+    expect(sourceEvents.records[0]).toMatchObject({
+      changeSet: {
+        status: "not-requested",
+        refChangeKind: "deleted",
+      },
     });
   });
 

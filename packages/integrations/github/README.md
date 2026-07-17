@@ -1,8 +1,14 @@
 # @appaloft/integration-github
 
-GitHub integration skeleton package.
+GitHub webhook and provider integration package.
 
 Responsibilities:
 
 - GitHub capability descriptor
-- future webhook and repository metadata adapter boundary
+- verified push webhook normalization
+- bounded final change-set resolution for Resource path policies
+- short-lived GitHub App installation-token access for private repository comparisons
+
+Updated refs compare the provider's final `before...after` state, created refs list the final tree,
+and deleted refs fail closed. The integration does not union intermediate commit arrays, persist raw
+webhook payloads, or expose provider tokens.

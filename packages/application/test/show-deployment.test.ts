@@ -25,6 +25,8 @@ import {
   type ResourceSummary,
   type ServerReadModel,
   type ServerSummary,
+  type SourceEventDetail,
+  type SourceEventReadModel,
 } from "../src/ports";
 import {
   DeploymentRecoveryReadinessQueryService,
@@ -382,6 +384,8 @@ function createService(input?: {
   environments?: EnvironmentSummary[];
   resources?: ResourceSummary[];
   servers?: ServerSummary[];
+  sourceEvents?: SourceEventDetail[];
+  sourceEventReadModel?: SourceEventReadModel;
 }) {
   const deploymentReadModel = new StaticDeploymentReadModel(
     input?.deployments ?? [deploymentSummary()],
@@ -392,6 +396,16 @@ function createService(input?: {
   );
   const resourceReadModel = new StaticResourceReadModel(input?.resources ?? [resourceSummary()]);
   const serverReadModel = new StaticServerReadModel(input?.servers ?? [serverSummary()]);
+  const sourceEventReadModel: SourceEventReadModel =
+    input?.sourceEventReadModel ??
+    ({
+      list: async () => ({ items: [] }),
+      findOne: async (_context, query) =>
+        input?.sourceEvents?.find((event) => event.sourceEventId === query.sourceEventId) ?? null,
+      findByCreatedDeploymentId: async (_context, deploymentId) =>
+        input?.sourceEvents?.find((event) => event.createdDeploymentIds.includes(deploymentId)) ??
+        null,
+    } satisfies SourceEventReadModel);
 
   return {
     deploymentReadModel,
@@ -411,6 +425,7 @@ function createService(input?: {
         new FixedClock(),
       ),
       new FixedClock(),
+      sourceEventReadModel,
     ),
   };
 }
@@ -508,6 +523,84 @@ describe("ShowDeploymentQueryService", () => {
     ]);
     expect(detail.sectionErrors).toEqual([]);
     expect(detail.generatedAt).toBe("2026-01-01T00:00:10.000Z");
+  });
+
+  test("[SRC-AUTO-QUERY-003] explains the final paths that triggered a deployment", async () => {
+    const result = await createService({
+      sourceEvents: [
+        {
+          sourceEventId: "sev_push_1",
+          projectId: "prj_demo",
+          matchedResourceIds: ["res_web"],
+          sourceKind: "github",
+          eventKind: "push",
+          sourceIdentity: { locator: "https://github.com/acme/web" },
+          ref: "refs/heads/main",
+          revision: "after-sha",
+          changeSet: {
+            status: "resolved",
+            refChangeKind: "updated",
+            beforeRevision: "before-sha",
+            changedPaths: ["apps/web/src/index.ts", "docs/readme.md"],
+            changedPathCount: 2,
+          },
+          verification: { status: "verified", method: "provider-signature" },
+          status: "dispatched",
+          policyResults: [
+            {
+              resourceId: "res_web",
+              status: "dispatched",
+              deploymentId: "dep_demo",
+              matchedPaths: ["apps/web/src/index.ts"],
+              matchedPathCount: 1,
+            },
+          ],
+          createdDeploymentIds: ["dep_demo"],
+          receivedAt: "2026-01-01T00:00:04.000Z",
+        },
+      ],
+    }).service.execute(createTestContext(), createQuery());
+
+    expect(unwrap(result).sourceEvent).toEqual({
+      sourceEventId: "sev_push_1",
+      sourceKind: "github",
+      ref: "refs/heads/main",
+      revision: "after-sha",
+      changeSet: {
+        status: "resolved",
+        refChangeKind: "updated",
+        beforeRevision: "before-sha",
+        changedPaths: ["apps/web/src/index.ts", "docs/readme.md"],
+        changedPathCount: 2,
+      },
+      matchedPaths: ["apps/web/src/index.ts"],
+      matchedPathCount: 1,
+      receivedAt: "2026-01-01T00:00:04.000Z",
+    });
+  });
+
+  test("[SRC-AUTO-QUERY-003] keeps base deployment detail available when trigger evidence fails", async () => {
+    const result = await createService({
+      sourceEventReadModel: {
+        list: async () => ({ items: [] }),
+        findOne: async () => null,
+        findByCreatedDeploymentId: async () => {
+          throw new Error("source event read unavailable");
+        },
+      },
+    }).service.execute(createTestContext(), createQuery());
+
+    expect(unwrap(result)).toMatchObject({
+      deployment: { id: "dep_demo" },
+      sectionErrors: [
+        {
+          section: "source-event",
+          code: "deployment_source_event_context_unavailable",
+          phase: "source-event-context-resolution",
+          retriable: true,
+        },
+      ],
+    });
   });
 
   test("does not expose warning timeline entries as latest failure for succeeded deployments", async () => {

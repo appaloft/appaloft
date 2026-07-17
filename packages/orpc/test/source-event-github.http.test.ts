@@ -56,7 +56,11 @@ async function hmacSha256Hex(secretValue: string, body: string): Promise<string>
 function githubPushPayload() {
   return {
     ref: "refs/heads/main",
+    before: "before123",
     after: "abc123",
+    created: false,
+    deleted: false,
+    forced: false,
     repository: {
       id: 123456,
       full_name: "appaloft/demo",
@@ -144,6 +148,9 @@ describe("GitHub source event HTTP route", () => {
     });
     expect(command.ref).toBe("main");
     expect(command.revision).toBe("abc123");
+    expect(command.beforeRevision).toBe("before123");
+    expect(command.refChangeKind).toBe("updated");
+    expect(command.forced).toBe(false);
     expect(command.deliveryId).toBe("delivery_1");
     expect(command.verification).toEqual({
       status: "verified",

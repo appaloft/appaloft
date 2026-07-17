@@ -48,6 +48,10 @@ autoDeploy:
     - main
   events:
     - push
+  includePaths:
+    - apps/api/**
+  excludePaths:
+    - "**/*.md"
   dedupeWindowSeconds: 300
 ```
 
@@ -57,6 +61,9 @@ Rules:
 - `trigger` supports `git-push`.
 - `refs` is required when enabled and uses the existing safe git-ref grammar.
 - `events` defaults to `["push"]` and supports `push` and `tag`.
+- `includePaths` and `excludePaths` are optional safe repository-root-relative globs. Include rules
+  apply before exclude rules to the final provider change set; omitting both preserves ref-only
+  behavior.
 - `dedupeWindowSeconds` is optional and must be a positive integer.
 - `enabled: false` disables any existing Resource auto-deploy policy and does not require refs.
 - Repository config must not declare provider accounts, webhook secret values, source-event ids,

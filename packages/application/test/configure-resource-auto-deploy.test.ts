@@ -83,6 +83,8 @@ describe("ConfigureResourceAutoDeployUseCase", () => {
         triggerKind: "git-push",
         refs: ["main"],
         eventKinds: ["push"],
+        includePaths: ["apps/web/**"],
+        excludePaths: ["apps/web/docs/**"],
       },
     });
 
@@ -93,12 +95,17 @@ describe("ConfigureResourceAutoDeployUseCase", () => {
       triggerKind: "git-push",
       refs: ["main"],
       eventKinds: ["push"],
+      includePaths: ["apps/web/**"],
+      excludePaths: ["apps/web/docs/**"],
     });
     const persisted = await resources.findOne(
       repositoryContext,
       ResourceByIdSpec.create(ResourceId.rehydrate("res_web")),
     );
     expect(persisted?.toState().autoDeployPolicy?.status.value).toBe("enabled");
+    expect(
+      persisted?.toState().autoDeployPolicy?.includePaths?.map((pattern) => pattern.value),
+    ).toEqual(["apps/web/**"]);
     expect(eventBus.events.map((event) => (event as { type?: string }).type)).toContain(
       "resource-auto-deploy-policy-configured",
     );

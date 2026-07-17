@@ -124,6 +124,7 @@ import {
   createGitHubPreviewFeedbackWriter,
   createGitHubPreviewPullRequestWebhookVerifier,
   createGitHubRepositoryBrowser,
+  createGitHubSourceEventChangedPathResolver,
   createGitHubSourceEventWebhookVerifier,
   githubIntegration,
 } from "@appaloft/integration-github";
@@ -1843,6 +1844,9 @@ export function registerRuntimeDependencies(
   });
   container.register(tokens.githubSourceEventWebhookVerifier, {
     useFactory: instanceCachingFactory(() => createGitHubSourceEventWebhookVerifier()),
+  });
+  container.register(tokens.sourceEventChangedPathResolver, {
+    useFactory: instanceCachingFactory(() => createGitHubSourceEventChangedPathResolver()),
   });
   container.register(tokens.githubPreviewPullRequestWebhookVerifier, {
     useFactory: instanceCachingFactory(() => createGitHubPreviewPullRequestWebhookVerifier()),

@@ -15,6 +15,7 @@ const sourceEventKinds = ["push", "tag"] as const;
 const policyStatuses = ["enabled", "disabled", "blocked"] as const;
 const blockedReasons = ["source-binding-changed"] as const;
 const resourceSecretRefPrefix = "resource-secret:";
+const maximumSourcePathPatternCount = 100;
 
 function includesValue<TValue extends string>(
   values: readonly TValue[],
@@ -253,6 +254,126 @@ export class SourceEventDedupeWindowSeconds extends ScalarValueObject<number> {
   }
 }
 
+const sourcePathPatternBrand: unique symbol = Symbol("SourcePathPattern");
+export class SourcePathPattern extends ScalarValueObject<string> {
+  private [sourcePathPatternBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<SourcePathPattern> {
+    const normalized = value.trim();
+    const segments = normalized.split("/");
+    if (
+      !normalized ||
+      normalized.length > 512 ||
+      normalized.startsWith("/") ||
+      normalized.endsWith("/") ||
+      normalized.includes("\\") ||
+      normalized.includes("//") ||
+      /[\r\n\0]/.test(normalized) ||
+      segments.some((segment) => segment === "." || segment === "..")
+    ) {
+      return err(
+        autoDeployValidationError(
+          "Auto-deploy path pattern must be a safe repository-root-relative glob",
+          { field: "policy.pathPatterns" },
+        ),
+      );
+    }
+
+    return ok(new SourcePathPattern(normalized));
+  }
+
+  static rehydrate(value: string): SourcePathPattern {
+    return new SourcePathPattern(value);
+  }
+
+  matches(path: string): boolean {
+    return sourcePathPatternRegex(this.value).test(path);
+  }
+}
+
+export interface ResourceAutoDeployPathPolicyState {
+  includePaths: SourcePathPattern[];
+  excludePaths: SourcePathPattern[];
+}
+
+export class ResourceAutoDeployPathPolicy extends ValueObject<ResourceAutoDeployPathPolicyState> {
+  private constructor(state: ResourceAutoDeployPathPolicyState) {
+    super(state);
+  }
+
+  static create(input: {
+    includePaths?: readonly SourcePathPattern[];
+    excludePaths?: readonly SourcePathPattern[];
+  }): Result<ResourceAutoDeployPathPolicy> {
+    const includePaths = uniqueByValue(input.includePaths ?? []);
+    const excludePaths = uniqueByValue(input.excludePaths ?? []);
+    if (
+      includePaths.length > maximumSourcePathPatternCount ||
+      excludePaths.length > maximumSourcePathPatternCount
+    ) {
+      return err(
+        autoDeployValidationError("Auto-deploy path policy contains too many patterns", {
+          field: "policy.pathPatterns",
+          maximum: maximumSourcePathPatternCount,
+        }),
+      );
+    }
+    if (includePaths.length === 0 && excludePaths.length === 0) {
+      return err(
+        autoDeployValidationError("Auto-deploy path policy requires include or exclude patterns", {
+          field: "policy.pathPatterns",
+        }),
+      );
+    }
+
+    return ok(new ResourceAutoDeployPathPolicy({ includePaths, excludePaths }));
+  }
+
+  static rehydrate(state: ResourceAutoDeployPathPolicyState): ResourceAutoDeployPathPolicy {
+    return new ResourceAutoDeployPathPolicy({
+      includePaths: [...state.includePaths],
+      excludePaths: [...state.excludePaths],
+    });
+  }
+
+  matchingPaths(paths: readonly string[]): string[] {
+    return [...new Set(paths)].filter((path) => {
+      const included =
+        this.state.includePaths.length === 0 ||
+        this.state.includePaths.some((pattern) => pattern.matches(path));
+      return included && !this.state.excludePaths.some((pattern) => pattern.matches(path));
+    });
+  }
+}
+
+function sourcePathPatternRegex(pattern: string): RegExp {
+  let source = "^";
+  for (let index = 0; index < pattern.length; index += 1) {
+    const character = pattern[index] ?? "";
+    const next = pattern[index + 1];
+    if (character === "*" && next === "*") {
+      const followedBySlash = pattern[index + 2] === "/";
+      source += followedBySlash ? "(?:.*/)?" : ".*";
+      index += followedBySlash ? 2 : 1;
+      continue;
+    }
+    if (character === "*") {
+      source += "[^/]*";
+      continue;
+    }
+    if (character === "?") {
+      source += "[^/]";
+      continue;
+    }
+    source += character.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+  return new RegExp(`${source}$`);
+}
+
 export interface ResourceAutoDeployPolicyState {
   status: ResourceAutoDeployPolicyStatusValue;
   triggerKind: ResourceAutoDeployTriggerKindValue;
@@ -263,6 +384,8 @@ export interface ResourceAutoDeployPolicyState {
   blockedReason?: ResourceAutoDeployPolicyBlockedReasonValue;
   genericWebhookSecretRef?: ResourceAutoDeploySecretRef;
   dedupeWindowSeconds?: SourceEventDedupeWindowSeconds;
+  includePaths?: SourcePathPattern[];
+  excludePaths?: SourcePathPattern[];
 }
 
 export class ResourceAutoDeployPolicy extends ValueObject<ResourceAutoDeployPolicyState> {
@@ -278,9 +401,25 @@ export class ResourceAutoDeployPolicy extends ValueObject<ResourceAutoDeployPoli
     updatedAt: UpdatedAt;
     genericWebhookSecretRef?: ResourceAutoDeploySecretRef;
     dedupeWindowSeconds?: SourceEventDedupeWindowSeconds;
+    includePaths?: readonly SourcePathPattern[];
+    excludePaths?: readonly SourcePathPattern[];
   }): Result<ResourceAutoDeployPolicy> {
     const refs = uniqueByValue(input.refs);
     const eventKinds = uniqueByValue(input.eventKinds);
+    const includePaths = uniqueByValue(input.includePaths ?? []);
+    const excludePaths = uniqueByValue(input.excludePaths ?? []);
+
+    if (
+      includePaths.length > maximumSourcePathPatternCount ||
+      excludePaths.length > maximumSourcePathPatternCount
+    ) {
+      return err(
+        autoDeployValidationError("Auto-deploy path policy contains too many patterns", {
+          field: "policy.pathPatterns",
+          maximum: maximumSourcePathPatternCount,
+        }),
+      );
+    }
 
     if (refs.length === 0) {
       return err(
@@ -310,6 +449,17 @@ export class ResourceAutoDeployPolicy extends ValueObject<ResourceAutoDeployPoli
       );
     }
 
+    if (
+      input.triggerKind.requiresGenericWebhookSecret() &&
+      (includePaths.length || excludePaths.length)
+    ) {
+      return err(
+        autoDeployValidationError("Path filters are supported only for git-push auto-deploy", {
+          field: "policy.pathPatterns",
+        }),
+      );
+    }
+
     return ok(
       new ResourceAutoDeployPolicy({
         status: ResourceAutoDeployPolicyStatusValue.enabled(),
@@ -322,6 +472,8 @@ export class ResourceAutoDeployPolicy extends ValueObject<ResourceAutoDeployPoli
           ? { genericWebhookSecretRef: input.genericWebhookSecretRef }
           : {}),
         ...(input.dedupeWindowSeconds ? { dedupeWindowSeconds: input.dedupeWindowSeconds } : {}),
+        ...(includePaths.length ? { includePaths } : {}),
+        ...(excludePaths.length ? { excludePaths } : {}),
       }),
     );
   }
@@ -387,6 +539,8 @@ export function cloneResourceAutoDeployPolicyState(
       ? { genericWebhookSecretRef: state.genericWebhookSecretRef }
       : {}),
     ...(state.dedupeWindowSeconds ? { dedupeWindowSeconds: state.dedupeWindowSeconds } : {}),
+    ...(state.includePaths ? { includePaths: [...state.includePaths] } : {}),
+    ...(state.excludePaths ? { excludePaths: [...state.excludePaths] } : {}),
   };
 }
 

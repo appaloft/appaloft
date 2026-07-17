@@ -29,6 +29,10 @@ autoDeploy:
     - main
   events:
     - push
+  includePaths:
+    - apps/api/**
+  excludePaths:
+    - "**/*.md"
   dedupeWindowSeconds: 300
 ```
 
@@ -45,7 +49,7 @@ the buses:
 4. disable an existing policy when `enabled: false`;
 5. call `deployments.create` with ids only.
 
-If the policy is already enabled with the same trigger, refs, event kinds, and dedupe window, config
+If the policy is already enabled with the same trigger, refs, event kinds, path rules, and dedupe window, config
 deploy must not dispatch a duplicate configure command. If a policy is blocked because the source
 binding changed, config deploy may reconfigure it from YAML to bind it to the current Resource
 source fingerprint.
@@ -56,6 +60,8 @@ source fingerprint.
   operation-catalog key is introduced.
 - `deployments.create` remains ids-only and does not grow source-event trigger fields.
 - `appaloft.yaml` becomes the source of truth for the common git-push auto-deploy policy.
+- `includePaths` and `excludePaths` are optional safe repository-root globs. They apply to the final
+  provider `before..after` change set, with include rules evaluated before exclude rules.
 - Raw webhook secrets and generic signed webhook endpoint material stay outside repository config
   for this MVP.
 - The Appaloft deploy skill and YAML sync guidance must treat source-event/auto-deploy policy

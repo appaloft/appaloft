@@ -412,13 +412,19 @@ autoDeploy:
     - main
   events:
     - push
+  includePaths:
+    - apps/api/**
+  excludePaths:
+    - "**/*.md"
   dedupeWindowSeconds: 300
 ```
 
 Auto-deploy declarations configure Resource-owned source-event policy through
 `resources.configure-auto-deploy`. Config may not include source-event ids, webhook delivery ids,
 provider accounts, credentials, tenants, organization ids, raw webhook secrets, raw tokens, or
-target/server identity. Generic signed webhook policy remains an explicit operation outside this
+target/server identity. Path policies use repository-root-relative safe globs and match the final
+provider `before..after` diff with include-before-exclude semantics. Omitting both fields preserves
+ref-only behavior. Generic signed webhook policy remains an explicit operation outside this
 MVP because it needs secret-reference custody and endpoint setup.
 
 `preview.pullRequest.policy` uses product-grade preview policy language:

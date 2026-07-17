@@ -122,6 +122,10 @@ describe("resource auto-deploy console settings", () => {
     expect(source).toContain("orpcClient.resources.configureAutoDeploy");
     expect(source).toContain("ConfigureResourceAutoDeployInput");
     expect(source).toContain("autoDeployGenericWebhookSecretRef");
+    expect(source).toContain("autoDeployIncludePaths");
+    expect(source).toContain("autoDeployExcludePaths");
+    expect(source).toContain("parseAutoDeployPatterns");
+    expect(source).toContain("data-resource-auto-deploy-form");
     expect(source).toContain("acknowledge-source-binding");
     expect(source).toContain("sourceAutoDeploySetup");
     expect(source).not.toMatch(

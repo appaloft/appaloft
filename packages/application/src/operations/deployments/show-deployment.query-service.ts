@@ -32,6 +32,7 @@ import {
   type ProjectReadModel,
   type ResourceReadModel,
   type ServerReadModel,
+  type SourceEventReadModel,
 } from "../../ports";
 import { tokens } from "../../tokens";
 import { dependencyBindingSnapshotSummaryFromReferenceSummaries } from "./dependency-binding-snapshot-references";
@@ -119,6 +120,17 @@ function relatedContextError(
   };
 }
 
+function sourceEventContextError(deploymentId: string): DeploymentDetailSectionError {
+  return {
+    section: "source-event",
+    code: "deployment_source_event_context_unavailable",
+    category: "application",
+    phase: "source-event-context-resolution",
+    retriable: true,
+    relatedEntityId: deploymentId,
+  };
+}
+
 @injectable()
 export class ShowDeploymentQueryService {
   constructor(
@@ -136,6 +148,8 @@ export class ShowDeploymentQueryService {
     private readonly recoveryReadinessQueryService: DeploymentRecoveryReadinessQueryService,
     @inject(tokens.clock)
     private readonly clock: Clock,
+    @inject(tokens.sourceEventReadModel)
+    private readonly sourceEventReadModel: SourceEventReadModel,
   ) {}
 
   async execute(
@@ -243,6 +257,19 @@ export class ShowDeploymentQueryService {
       const latestFailure = query.includeLatestFailure
         ? latestFailureFromLogs(deployment)
         : undefined;
+      let sourceEvent: Awaited<ReturnType<SourceEventReadModel["findByCreatedDeploymentId"]>> =
+        null;
+      try {
+        sourceEvent = await this.sourceEventReadModel.findByCreatedDeploymentId(
+          repositoryContext,
+          deployment.id,
+        );
+      } catch {
+        sectionErrors.push(sourceEventContextError(deployment.id));
+      }
+      const sourcePolicyResult = sourceEvent?.policyResults.find(
+        (result) => result.deploymentId === deployment.id,
+      );
       let recoverySummary: DeploymentAttemptRecoverySummary | undefined;
 
       if (query.includeRecoverySummary) {
@@ -308,6 +335,24 @@ export class ShowDeploymentQueryService {
           : {}),
         ...(latestFailure ? { latestFailure } : {}),
         ...(recoverySummary ? { recoverySummary } : {}),
+        ...(sourceEvent
+          ? {
+              sourceEvent: {
+                sourceEventId: sourceEvent.sourceEventId,
+                sourceKind: sourceEvent.sourceKind,
+                ref: sourceEvent.ref,
+                revision: sourceEvent.revision,
+                ...(sourceEvent.changeSet ? { changeSet: { ...sourceEvent.changeSet } } : {}),
+                ...(sourcePolicyResult?.matchedPaths
+                  ? { matchedPaths: [...sourcePolicyResult.matchedPaths] }
+                  : {}),
+                ...(sourcePolicyResult?.matchedPathCount !== undefined
+                  ? { matchedPathCount: sourcePolicyResult.matchedPathCount }
+                  : {}),
+                receivedAt: sourceEvent.receivedAt,
+              },
+            }
+          : {}),
         nextActions: ["timeline", "resource-detail", "resource-health", "diagnostic-summary"],
         sectionErrors,
         generatedAt: this.clock.now(),

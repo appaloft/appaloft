@@ -46,6 +46,10 @@ type IngestSourceEventInput = {
   };
   ref: string;
   revision: string;
+  beforeRevision?: string;
+  refChangeKind?: "created" | "updated" | "deleted";
+  forced?: boolean;
+  providerConnectionId?: string;
   deliveryId?: string;
   idempotencyKey?: string;
   verification: {
@@ -75,6 +79,13 @@ It verifies `X-Hub-Signature-256` with configured `APPALOFT_GITHUB_WEBHOOK_SECRE
 this command without `scopeResourceId` so matching may fan out to all eligible Resource policies.
 GitHub `ping` is a transport no-op and must not dispatch this command.
 
+For GitHub push events, the transport normalizes `before`, `after`, `created`, `deleted`, and
+`forced`. A deleted ref uses the last non-zero revision for evidence but always fails closed before
+deployment dispatch. When at least one candidate policy declares path rules, the GitHub adapter
+resolves the final change set: `before..after` for updated refs, or empty tree to `after` for a new
+ref. It does not union the webhook's intermediate commit arrays. Private repositories use the
+verified webhook installation id to request a short-lived GitHub App installation token.
+
 The first Resource-scoped generic signed HTTP route is:
 
 ```text
@@ -100,15 +111,18 @@ included in this command input, source event records, read models, errors, logs,
 3. Persist or read the durable source event record before dispatching deployments.
 4. Return deduped result without creating deployments when the event already exists.
 5. Find enabled, unblocked Resource policies whose source binding and refs match the event.
-6. When `scopeResourceId` is present, discard all policy candidates except that Resource before
+6. Resolve final changed paths only when at least one candidate has a path policy. Apply include
+   patterns first and exclude patterns second. If provider comparison is unavailable or truncated,
+   filtered policies fail closed while ref-only policies keep their backward-compatible behavior.
+7. When `scopeResourceId` is present, discard all policy candidates except that Resource before
    dispatch evaluation.
-7. Include `scopeResourceId` in the dedupe key so Resource-scoped generic signed routes do not
+8. Include `scopeResourceId` in the dedupe key so Resource-scoped generic signed routes do not
    dedupe events across different Resources that share the same source identity and delivery id.
-8. Record ignored or blocked reasons when no deployment is created.
-9. For each match, dispatch ordinary `deployments.create` with Resource/environment/runtime context
+9. Record ignored or blocked reasons when no deployment is created.
+10. For each match, dispatch ordinary `deployments.create` with Resource/environment/runtime context
    only; do not pass source event fields into deployment admission.
-10. Record created deployment ids or structured dispatch failure details.
-11. Project accepted and dispatched/failed outcomes into `operator-work.*` through safe
+11. Record created deployment ids or structured dispatch failure details.
+12. Project accepted and dispatched/failed outcomes into `operator-work.*` through safe
     process-attempt rows keyed by the source event dedupe key. This is an operator-visible
     projection only; source-event deployment dispatch still runs inline from this command path.
 
@@ -123,6 +137,9 @@ type IngestSourceEventResult = {
   ignoredReasons: readonly (
     | "no-matching-policy"
     | "ref-not-matched"
+    | "path-not-matched"
+    | "path-diff-unavailable"
+    | "ref-deleted"
     | "policy-disabled"
     | "policy-blocked"
   )[];
