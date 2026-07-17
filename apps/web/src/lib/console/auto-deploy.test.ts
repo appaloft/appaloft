@@ -125,6 +125,7 @@ describe("resource auto-deploy console settings", () => {
     expect(source).toContain("autoDeployIncludePaths");
     expect(source).toContain("autoDeployExcludePaths");
     expect(source).toContain("parseAutoDeployPatterns");
+    expect(source).toContain("<Dialog.Root bind:open={autoDeployDialogOpen}>");
     expect(source).toContain("data-resource-auto-deploy-form");
     expect(source).toContain("acknowledge-source-binding");
     expect(source).toContain("sourceAutoDeploySetup");
