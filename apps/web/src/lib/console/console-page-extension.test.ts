@@ -336,6 +336,13 @@ describe("Console page extension surface", () => {
     expect(rendererSource).toContain("data-console-page-dialog-panel-body");
     expect(rendererSource).toContain("px-5 pb-5 sm:px-8 sm:pb-8");
     expect(rendererSource).toContain("fieldBindings?: Record<string, string>");
+    expect(rendererSource).toContain('type: "select"');
+    expect(rendererSource).toContain("ConsolePageSelectPanelField");
+    expect(rendererSource).toContain("options: ConsolePagePanelFieldOption[]");
+    expect(rendererSource).toContain("<Select.Root");
+    expect(rendererSource).toContain("setPanelSelectFieldValue(item, field, value)");
+    expect(rendererSource).toContain("panelSelectFieldLabel(item, field)");
+    expect(rendererSource).toContain("number | string");
     expect(rendererSource).toContain("autoRun?: boolean");
     expect(rendererSource).toContain("confirmation?:");
     expect(rendererSource).toContain("confirmationOpen = true");
