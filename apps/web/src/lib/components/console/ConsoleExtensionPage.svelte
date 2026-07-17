@@ -39,6 +39,7 @@
   import { Button } from "$lib/components/ui/button";
   import * as Card from "$lib/components/ui/card";
   import * as Dialog from "$lib/components/ui/dialog";
+  import * as Select from "$lib/components/ui/select";
   import ConsoleTableFilterSelect from "$lib/components/console/ConsoleTableFilterSelect.svelte";
   import {
     createLocalizedConsolePageEndpoint,
@@ -192,7 +193,12 @@
     tone?: ConsolePageTone;
   };
 
-  type ConsolePagePanelField = {
+  type ConsolePagePanelFieldOption = {
+    value: string;
+    label: string;
+  };
+
+  type ConsolePageNumericPanelField = {
     name: string;
     label: string;
     type: "number" | "range" | "range-number";
@@ -204,6 +210,16 @@
     prefix?: string;
     suffix?: string;
   };
+
+  type ConsolePageSelectPanelField = {
+    name: string;
+    label: string;
+    type: "select";
+    value: string;
+    options: ConsolePagePanelFieldOption[];
+  };
+
+  type ConsolePagePanelField = ConsolePageNumericPanelField | ConsolePageSelectPanelField;
 
   type ConsolePageRequestAction = {
     label: string;
@@ -424,7 +440,7 @@
     item?: ConsolePagePanelItem;
   } | null>(null);
   let confirmationOpen = $state(false);
-  let panelFieldValues = $state<Record<string, number>>({});
+  let panelFieldValues = $state<Record<string, number | string>>({});
   let selectedPanelGridSection = $state<ConsolePageDialogPanelGridSection | null>(null);
   let panelGridDialogOpen = $state(false);
   let selectedIntegrationDetails = $state<ConsolePageIntegrationDetails | null>(null);
@@ -774,29 +790,53 @@
     return `${item.title}:${field.name}`;
   }
 
-  function panelFieldValue(item: ConsolePagePanelItem, field: ConsolePagePanelField): number {
-    const value = panelFieldValues[panelFieldKey(item, field)] ?? field.value;
+  function panelFieldValue(
+    item: ConsolePagePanelItem,
+    field: ConsolePagePanelField,
+  ): number | string {
+    const stored = panelFieldValues[panelFieldKey(item, field)];
+    if (field.type === "select") {
+      return typeof stored === "string" ? stored : field.value;
+    }
+    const value = typeof stored === "number" ? stored : field.value;
     return clampPanelFieldValue(value, field);
   }
 
-  function panelFieldValueByName(item: ConsolePagePanelItem, fieldName: string): number | null {
+  function panelFieldValueByName(item: ConsolePagePanelItem, fieldName: string): number | string | null {
     const field = item.fields?.find((candidate) => candidate.name === fieldName);
     return field ? panelFieldValue(item, field) : null;
   }
 
-  function panelFieldDisplayDivisor(field: ConsolePagePanelField): number {
+  function panelSelectFieldLabel(item: ConsolePagePanelItem, field: ConsolePageSelectPanelField): string {
+    const value = panelFieldValue(item, field);
+    return field.options.find((option) => option.value === value)?.label ?? String(value);
+  }
+
+  function setPanelSelectFieldValue(
+    item: ConsolePagePanelItem,
+    field: ConsolePageSelectPanelField,
+    value: string,
+  ): void {
+    if (!field.options.some((option) => option.value === value)) return;
+    panelFieldValues = {
+      ...panelFieldValues,
+      [panelFieldKey(item, field)]: value,
+    };
+  }
+
+  function panelFieldDisplayDivisor(field: ConsolePageNumericPanelField): number {
     return field.displayDivisor && field.displayDivisor > 0 ? field.displayDivisor : 1;
   }
 
-  function panelFieldDisplayValue(item: ConsolePagePanelItem, field: ConsolePagePanelField): number {
-    return panelFieldValue(item, field) / panelFieldDisplayDivisor(field);
+  function panelFieldDisplayValue(item: ConsolePagePanelItem, field: ConsolePageNumericPanelField): number {
+    return Number(panelFieldValue(item, field)) / panelFieldDisplayDivisor(field);
   }
 
-  function panelFieldDisplayBound(value: number | undefined, field: ConsolePagePanelField): number | undefined {
+  function panelFieldDisplayBound(value: number | undefined, field: ConsolePageNumericPanelField): number | undefined {
     return typeof value === "number" ? value / panelFieldDisplayDivisor(field) : undefined;
   }
 
-  function clampPanelFieldValue(value: number, field: ConsolePagePanelField): number {
+  function clampPanelFieldValue(value: number, field: ConsolePageNumericPanelField): number {
     const min = typeof field.min === "number" ? field.min : Number.NEGATIVE_INFINITY;
     const max = typeof field.max === "number" ? field.max : Number.POSITIVE_INFINITY;
     return Math.min(max, Math.max(min, value));
@@ -804,7 +844,7 @@
 
   function setPanelFieldDisplayValue(
     item: ConsolePagePanelItem,
-    field: ConsolePagePanelField,
+    field: ConsolePageNumericPanelField,
     displayValue: number,
   ): void {
     if (!Number.isFinite(displayValue)) return;
@@ -831,7 +871,7 @@
     calculation: Extract<ConsolePageRowCalculation, { kind: "tiered-multiple" | "tiered-unit-rate" }>,
   ): { readonly fieldValue: number; readonly units: number } | null {
     const fieldValue = panelFieldValueByName(item, calculation.field);
-    if (fieldValue === null) return null;
+    if (typeof fieldValue !== "number") return null;
     const tier = resolveCalculationTier(calculation.tiers, fieldValue);
     if (!tier) return null;
     const units = Math.floor((fieldValue * tier.multiplier) / (calculation.divisor ?? 1));
@@ -862,7 +902,7 @@
     if (!calculation) return displayValueText(row.value);
     if (calculation.kind === "field-money") {
       const fieldValue = panelFieldValueByName(item, calculation.field);
-      return fieldValue === null
+      return typeof fieldValue !== "number"
         ? displayValueText(row.value)
         : formatConsoleMoney(fieldValue, calculation.currency, fieldValue % 100 === 0 ? 0 : 2);
     }
@@ -1027,6 +1067,22 @@
               >
                 <span class="font-medium text-foreground">{field.label}</span>
                 <div class="flex items-center gap-3">
+                  {#if field.type === "select"}
+                    <Select.Root
+                      type="single"
+                      value={String(panelFieldValue(item, field))}
+                      onValueChange={(value) => setPanelSelectFieldValue(item, field, value)}
+                    >
+                      <Select.Trigger class="w-full">
+                        {panelSelectFieldLabel(item, field)}
+                      </Select.Trigger>
+                      <Select.Content>
+                        {#each field.options as option (option.value)}
+                          <Select.Item value={option.value}>{option.label}</Select.Item>
+                        {/each}
+                      </Select.Content>
+                    </Select.Root>
+                  {/if}
                   {#if field.type === "range" || field.type === "range-number"}
                     <input
                       class="h-2 min-w-0 flex-1 cursor-pointer appearance-none rounded-full bg-muted accent-primary"
@@ -1043,7 +1099,7 @@
                         )}
                     />
                   {/if}
-                  {#if field.prefix}
+                  {#if field.type !== "select" && field.prefix}
                     <span class="shrink-0 text-sm font-medium text-muted-foreground">
                       {field.prefix}
                     </span>
@@ -1064,7 +1120,7 @@
                         )}
                     />
                   {/if}
-                  {#if field.suffix}
+                  {#if field.type !== "select" && field.suffix}
                     <span class="shrink-0 text-sm text-muted-foreground">{field.suffix}</span>
                   {/if}
                 </div>
