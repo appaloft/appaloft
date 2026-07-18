@@ -16,7 +16,8 @@
 - Add a PG/PGlite rotation port that classifies every supported row, requires a matching safe plan
   digest, and updates all rows in one transaction.
 - Return bounded safe findings for unreadable rows and let the source CLI run plan/apply against the
-  existing coordinated SSH PGlite mirror lifecycle. Read-only plan never uploads the mirror.
+  existing coordinated SSH PGlite mirror lifecycle. Read-only plan only holds an ephemeral lock; it
+  never creates durable markers, migrates schema, recovers stale locks, or uploads the mirror.
 - Extend Deployment Proof with value-free planned/observed environment key-set evidence.
 
 ## Persistence And Migration

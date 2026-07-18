@@ -166,10 +166,16 @@ describe("remote PGlite state sync", () => {
 
     try {
       await mkdir(join(remoteStateRoot, "pglite"), { recursive: true });
+      await mkdir(join(remoteStateRoot, "locks"), { recursive: true });
       await mkdir(join(remoteStateRoot, "source-links"), { recursive: true });
       await mkdir(join(remoteStateRoot, "server-applied-routes"), { recursive: true });
       await writeFile(join(remoteStateRoot, "pglite", "live.txt"), "remote-live-state");
       await writeFile(join(remoteStateRoot, "sync-revision.txt"), "7\n");
+      await writeFile(
+        join(remoteStateRoot, "schema-version.json"),
+        '{"version":1,"migratedAt":"legacy"}\n',
+      );
+      const durableEntriesBefore = (await readdir(remoteStateRoot)).sort();
 
       const session = await prepareRemotePgliteStateSync({
         argv: [
@@ -201,6 +207,11 @@ describe("remote PGlite state sync", () => {
       expect(await readFile(join(remoteStateRoot, "pglite", "live.txt"), "utf8")).toBe(
         "remote-live-state",
       );
+      expect(await readFile(join(remoteStateRoot, "schema-version.json"), "utf8")).toBe(
+        '{"version":1,"migratedAt":"legacy"}\n',
+      );
+      expect((await readdir(remoteStateRoot)).sort()).toEqual(durableEntriesBefore);
+      expect(await readdir(join(remoteStateRoot, "locks"))).toEqual([]);
     } finally {
       await rm(localDataRoot, { recursive: true, force: true });
       await rm(remoteRuntimeRoot, { recursive: true, force: true });

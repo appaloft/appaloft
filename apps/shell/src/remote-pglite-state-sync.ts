@@ -230,7 +230,15 @@ function parseRemoteRevisionConflict(
   }
 }
 
-function remoteArchiveCommand(dataRoot: string): string {
+function remoteArchiveCommand(dataRoot: string, readOnly: boolean): string {
+  if (readOnly) {
+    return [
+      `test -d ${shellQuote(dataRoot)}/pglite`,
+      `cd ${shellQuote(dataRoot)}`,
+      "tar -czf - pglite source-links server-applied-routes",
+    ].join(" && ");
+  }
+
   return [
     `mkdir -p ${shellQuote(dataRoot)}/pglite ${shellQuote(dataRoot)}/source-links ${shellQuote(dataRoot)}/server-applied-routes`,
     `cd ${shellQuote(dataRoot)}`,
@@ -238,13 +246,13 @@ function remoteArchiveCommand(dataRoot: string): string {
   ].join(" && ");
 }
 
-function remoteRevisionReadCommand(dataRoot: string): string {
+function remoteRevisionReadCommand(dataRoot: string, readOnly: boolean): string {
   const quotedDataRoot = shellQuote(dataRoot);
 
   return [
     `data_root=${quotedDataRoot}`,
     'revision_file="$data_root/sync-revision.txt"',
-    'mkdir -p "$data_root"',
+    ...(readOnly ? [] : ['mkdir -p "$data_root"']),
     'if [ -f "$revision_file" ]; then cat "$revision_file"; else printf "0\\n"; fi',
   ].join("; ");
 }
@@ -550,7 +558,7 @@ export class RemotePgliteArchiveSync {
       command: "ssh",
       args: [
         ...buildSshRemoteStateProcessArgs(this.plan.target),
-        remoteArchiveCommand(this.plan.dataRoot),
+        remoteArchiveCommand(this.plan.dataRoot, this.plan.readOnly === true),
       ],
       redactions: this.plan.target.identityFile ? [this.plan.target.identityFile] : [],
     });
@@ -616,7 +624,7 @@ export class RemotePgliteArchiveSync {
       command: "ssh",
       args: [
         ...buildSshRemoteStateProcessArgs(this.plan.target),
-        remoteRevisionReadCommand(this.plan.dataRoot),
+        remoteRevisionReadCommand(this.plan.dataRoot, this.plan.readOnly === true),
       ],
       redactions: this.plan.target.identityFile ? [this.plan.target.identityFile] : [],
     });
@@ -773,6 +781,7 @@ export async function prepareRemotePgliteStateSync(
   const lifecycle = new SshRemoteStateLifecycle({
     target: planValue.target,
     dataRoot: planValue.dataRoot,
+    readOnly: planValue.readOnly === true,
     owner: "appaloft-cli",
     correlationId: `remote_state_shell_${process.pid}_${Date.now().toString(36)}`,
     staleAfterMs: remotePgliteMaintenanceLockStaleAfterMs,
