@@ -83,6 +83,36 @@ async function envelopeStates(
 }
 
 describe("control-plane secret rotation", () => {
+  test("[CPS-COMPAT-017] plan treats absent post-initial secret tables as empty", async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), "appaloft-secret-rotation-legacy-"));
+    const database = await createDatabase({ driver: "pglite", pgliteDataDir: dataDir });
+    try {
+      const migrated = await createMigrator(database.db).migrateTo("026_mutation_coordinations");
+      expect(migrated.error).toBeUndefined();
+      const { rotatingProtector } = protectors();
+
+      const plan = await new PgControlPlaneSecretRotationService(
+        database.db,
+        rotatingProtector,
+      ).plan();
+
+      expect(plan._unsafeUnwrap()).toMatchObject({
+        recordCount: 0,
+        variableKeyCount: 0,
+        ready: true,
+        stateCounts: {
+          "active-key": 0,
+          "retained-key": 0,
+          "legacy-plaintext": 0,
+          unreadable: 0,
+        },
+      });
+    } finally {
+      await database.close();
+      rmSync(dataDir, { recursive: true, force: true });
+    }
+  });
+
   test("[CPS-FAIL-003][CPS-ROTATE-006] same key id with wrong material is unreadable, never already-active", () =>
     withDatabase(async (database) => {
       const { oldProtector } = protectors();

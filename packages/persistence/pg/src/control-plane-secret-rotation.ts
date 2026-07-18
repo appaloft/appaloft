@@ -11,7 +11,7 @@ import {
   type ControlPlaneSecretRotationUnreadableFinding,
 } from "@appaloft/application";
 import { type DomainError, err, ok, type Result } from "@appaloft/core";
-import { type Kysely, type Transaction } from "kysely";
+import { type Kysely, sql, type Transaction } from "kysely";
 
 import { type Database } from "./schema";
 
@@ -22,6 +22,10 @@ type RotationTable =
   | "dependency_resource_secrets"
   | "dependency_binding_secrets"
   | "deployments";
+type OptionalRotationTable =
+  | "resource_variables"
+  | "dependency_resource_secrets"
+  | "dependency_binding_secrets";
 
 interface RotationRecord {
   table: RotationTable;
@@ -86,6 +90,19 @@ const maxUnreadableFindings = 100;
 
 function unreadableReason(error: DomainError): string {
   return typeof error.details?.reason === "string" ? error.details.reason : "unreadable";
+}
+
+async function rotationTableExists(
+  db: RotationDatabase,
+  table: OptionalRotationTable,
+): Promise<boolean> {
+  const result = await sql<{ table_count: number }>`
+    SELECT COUNT(*)::integer AS table_count
+    FROM information_schema.tables
+    WHERE table_schema = current_schema()
+      AND table_name = ${table}
+  `.execute(db);
+  return Number(result.rows[0]?.table_count ?? 0) > 0;
 }
 
 export class PgControlPlaneSecretRotationService implements ControlPlaneSecretRotationPort {
@@ -253,6 +270,15 @@ export class PgControlPlaneSecretRotationService implements ControlPlaneSecretRo
   }
 
   private async collect(db: RotationDatabase): Promise<RotationRecord[]> {
+    // Rotation planning intentionally runs before application migrations. These tables were added
+    // after the initial schema, so their absence in an older state means that source has no rows;
+    // every other discovery or read failure still propagates and fails the operation closed.
+    const [hasResourceVariables, hasDependencyResourceSecrets, hasDependencyBindingSecrets] =
+      await Promise.all([
+        rotationTableExists(db, "resource_variables"),
+        rotationTableExists(db, "dependency_resource_secrets"),
+        rotationTableExists(db, "dependency_binding_secrets"),
+      ]);
     const [environmentRows, resourceRows, dependencyRows, bindingRows, deploymentRows] =
       await Promise.all([
         db
@@ -260,19 +286,25 @@ export class PgControlPlaneSecretRotationService implements ControlPlaneSecretRo
           .select(["id", "environment_id", "key", "value"])
           .where("is_secret", "=", true)
           .execute(),
-        db
-          .selectFrom("resource_variables")
-          .select(["id", "resource_id", "key", "value"])
-          .where("is_secret", "=", true)
-          .execute(),
-        db
-          .selectFrom("dependency_resource_secrets")
-          .select(["ref", "dependency_resource_id", "environment_id", "payload"])
-          .execute(),
-        db
-          .selectFrom("dependency_binding_secrets")
-          .select(["ref", "binding_id", "resource_id", "payload"])
-          .execute(),
+        hasResourceVariables
+          ? db
+              .selectFrom("resource_variables")
+              .select(["id", "resource_id", "key", "value"])
+              .where("is_secret", "=", true)
+              .execute()
+          : Promise.resolve([]),
+        hasDependencyResourceSecrets
+          ? db
+              .selectFrom("dependency_resource_secrets")
+              .select(["ref", "dependency_resource_id", "environment_id", "payload"])
+              .execute()
+          : Promise.resolve([]),
+        hasDependencyBindingSecrets
+          ? db
+              .selectFrom("dependency_binding_secrets")
+              .select(["ref", "binding_id", "resource_id", "payload"])
+              .execute()
+          : Promise.resolve([]),
         db.selectFrom("deployments").select(["id", "environment_snapshot"]).execute(),
       ]);
     const records: RotationRecord[] = [];

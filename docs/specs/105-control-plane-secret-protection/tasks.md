@@ -21,6 +21,7 @@
 - [x] Keep SSH PGlite plan preparation free of durable marker, migration, stale-lock recovery, and upload writes.
 - [x] Stream SSH PGlite plan/apply archives through private temporary files with bounded process memory.
 - [x] Add an opt-in, versioned safe JSON CLI failure contract for unattended maintenance gates.
+- [x] Keep pre-migration plans compatible with absent post-initial secret-bearing tables.
 - [x] Make Swarm env semantics and runtime key proof consistent with other substrates.
 
 ## Verification And Sync
