@@ -136,6 +136,10 @@ export interface PgliteRuntimeAssets {
   initdbWasmModule?: WebAssembly.Module;
 }
 
+// PGlite minor releases may embed different PostgreSQL major versions. A persisted data directory
+// must be exported and imported when this value changes; opening it directly is unsupported.
+export const supportedPglitePostgresMajorVersion = "18" as const;
+
 export async function createDatabase(input: CreateDatabaseInput): Promise<DatabaseConnection> {
   if (input.driver === "pglite") {
     const dataDir = resolve(input.pgliteDataDir ?? ".appaloft/data/pglite");

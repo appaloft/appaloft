@@ -52,6 +52,10 @@
   zero-row table-only probe. This distinguishes database execution, source-table shape, and
   identifier-column shape without reading catalog contents or business rows and without publishing
   SQL, relation names, database details, values, or row counts.
+- Before a read-only SSH PGlite maintenance mirror is opened, compare its value-free `PG_VERSION`
+  major with the PostgreSQL major embedded by the current PGlite runtime. Fail closed with a fixed
+  migration-required reason on mismatch; do not attempt an in-place minor-version upgrade, inspect
+  rows, classify the state as corrupt, or upload the mirror.
 - Extend Deployment Proof with value-free planned/observed environment key-set evidence.
 
 ## Persistence And Migration
@@ -90,6 +94,8 @@
   failure publishes only its fixed category, without SQL or private database detail.
 - Verify database, table-only, and identifier-column probes are ordered from least specific to most
   specific and publish only their fixed boundary category.
+- Verify a PostgreSQL 17 SSH mirror is rejected by the PostgreSQL 18 PGlite runtime before database
+  composition, with safe major-version evidence and no durable remote-state change.
 
 ## Risks And Deferred Gaps
 

@@ -51,6 +51,11 @@ When that zero-row identifier query also fails generically, the adapter diagnose
 least specific to most specific: a constant database query, a zero-row table-only query, then the
 zero-row identifier query. These probes read neither catalog contents nor business rows and publish
 only fixed database, table-shape, or identifier-shape categories.
+Before opening a read-only SSH PGlite mirror, the shell compares its value-free PostgreSQL major
+marker with the major embedded by the current PGlite runtime. A mismatch is a migration-required
+compatibility state, not database corruption: planning fails closed before row inspection or upload.
+The guard does not perform an implicit PGlite minor-version upgrade; that requires the documented
+export/import path plus separately authorized backup and write-freeze controls.
 Every rotation source is scanned through deterministic bounded keyset pages over its stable identifier.
 The coordinated plan mirror is immutable for the duration of the read, so keyset pagination visits
 every source row exactly once without offset drift. A missing or non-increasing cursor is a fail-closed
