@@ -195,6 +195,7 @@ export interface AppaloftServer {
 export interface AppaloftRemotePgliteStateSyncSession {
   dataRoot: string;
   localPgliteDataDir: string;
+  readOnly?: boolean;
   target: SshRemoteStateTarget;
   releaseForCliRuntime(): Promise<Result<void>>;
   refreshLocalMirror(): Promise<Result<void>>;
@@ -1551,9 +1552,17 @@ export async function createAppaloftServer(
   });
   const migrator = createMigrator(database.db);
   const deploymentProgressReporter = new ShellDeploymentProgressReporter();
+  const remotePgliteStateSyncSession = options?.remotePgliteStateSyncSession;
 
-  if (config.databaseDriver === "pglite" || config.autoMigrate) {
-    await migrator.migrateToLatest();
+  if (
+    (config.databaseDriver === "pglite" || config.autoMigrate) &&
+    remotePgliteStateSyncSession?.readOnly !== true
+  ) {
+    const migration = await migrator.migrateToLatest();
+    if (migration.error) {
+      await database.close();
+      throw migration.error;
+    }
   }
 
   let auditLogConsoleExecutionContextFactory: ExecutionContextFactory | undefined;
@@ -1585,9 +1594,7 @@ export async function createAppaloftServer(
   const serverAppliedRouteRepository = new PgServerAppliedRouteStateRepository(database.db);
   const sourceLinkStore = createCliSourceLinkStore(sourceLinkRepository);
   const serverAppliedRouteStore = createCliServerAppliedRouteStore(serverAppliedRouteRepository);
-  const remotePgliteStateSyncSession = options?.remotePgliteStateSyncSession;
-
-  if (config.databaseDriver === "pglite") {
+  if (config.databaseDriver === "pglite" && remotePgliteStateSyncSession?.readOnly !== true) {
     await adoptLegacyPgliteState({
       pgliteDataDir: config.pgliteDataDir,
       sourceLinkStore,

@@ -96,6 +96,9 @@
   specific and publish only their fixed boundary category.
 - Verify a PostgreSQL 17 SSH mirror is rejected by the PostgreSQL 18 PGlite runtime before database
   composition, with safe major-version evidence and no durable remote-state change.
+- Verify a read-only remote maintenance composition does not run application migrations against its
+  mirror, while ordinary PGlite startup surfaces migration failure before registering application
+  services.
 
 ## Risks And Deferred Gaps
 
