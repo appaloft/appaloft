@@ -123,8 +123,12 @@ async function createPreviewDeployCliHarness(
   const storageProvenanceWrites: unknown[] = [];
   const scheduledTaskProvenanceWrites: unknown[] = [];
   const createdDeploymentSummaries: unknown[] = [];
+  const createdDependencyResources: Record<string, unknown>[] = [];
+  const createdDependencyBindings: Record<string, unknown>[] = [];
   let createdResourceCount = 0;
   let createdDeploymentCount = 0;
+  let createdDependencyCount = 0;
+  let createdDependencyBindingCount = 0;
   const commandBus = {
     execute: async <T>(_context: unknown, command: AppCommand<T>) => {
       operations.push(command.constructor.name);
@@ -188,10 +192,65 @@ async function createPreviewDeployCliHarness(
               : {}),
           } as T);
         }
-        case "ProvisionDependencyResourceCommand":
-          return ok({ id: "dep_res_db" } as T);
-        case "BindResourceDependencyCommand":
-          return ok({ id: "rbd_db" } as T);
+        case "ProvisionDependencyResourceCommand": {
+          createdDependencyCount += 1;
+          const dependencyCommand = command as unknown as Record<string, unknown>;
+          const id =
+            createdDependencyCount === 1 ? "dep_res_db" : `dep_res_db_${createdDependencyCount}`;
+          createdDependencyResources.push({
+            id,
+            projectId: dependencyCommand.projectId,
+            environmentId: dependencyCommand.environmentId,
+            name: dependencyCommand.name,
+            slug: String(dependencyCommand.name ?? id)
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, "-")
+              .replace(/^-|-$/g, ""),
+            kind: dependencyCommand.kind,
+            sourceMode: "appaloft-managed",
+            providerKey: "",
+            providerManaged: true,
+            lifecycleStatus: "ready",
+            desiredCapabilities: [],
+            capabilityReadbacks: [],
+            bindingReadiness: { status: "ready" },
+            createdAt: "2026-05-24T00:00:00.000Z",
+          });
+          return ok({ id } as T);
+        }
+        case "BindResourceDependencyCommand": {
+          createdDependencyBindingCount += 1;
+          const bindingCommand = command as unknown as Record<string, unknown>;
+          const id =
+            createdDependencyBindingCount === 1
+              ? "rbd_db"
+              : `rbd_db_${createdDependencyBindingCount}`;
+          const dependency = createdDependencyResources.find(
+            (candidate) => candidate.id === bindingCommand.dependencyResourceId,
+          );
+          createdDependencyBindings.push({
+            id,
+            projectId: dependency?.projectId ?? "proj_1",
+            environmentId: dependency?.environmentId ?? "env_1",
+            resourceId: bindingCommand.resourceId,
+            dependencyResourceId: bindingCommand.dependencyResourceId,
+            kind: dependency?.kind ?? "postgres",
+            sourceMode: "appaloft-managed",
+            providerKey: "",
+            providerManaged: true,
+            lifecycleStatus: "ready",
+            target: {
+              targetName: bindingCommand.targetName,
+              scope: bindingCommand.scope,
+              injectionMode: bindingCommand.injectionMode,
+            },
+            bindingReadiness: { status: "ready" },
+            snapshotReadiness: { status: "deferred" },
+            status: "active",
+            createdAt: "2026-05-24T00:00:00.000Z",
+          });
+          return ok({ id } as T);
+        }
         case "ConfigureDependencyResourceBackupPolicyCommand": {
           const backupCommand = command as unknown as { input: Record<string, unknown> };
           return ok({ id: backupCommand.input.policyId ?? "dbp_cfg_db" } as T);
@@ -296,13 +355,21 @@ async function createPreviewDeployCliHarness(
         );
       }
       if (query.constructor.name === "ListDependencyResourcesQuery") {
-        return ok({ items: input.dependencyResources ?? [] } as T);
+        return ok({ items: input.dependencyResources ?? createdDependencyResources } as T);
       }
       if (query.constructor.name === "ListDependencyResourceBackupPoliciesQuery") {
         return ok({ items: input.dependencyBackupPolicies ?? [] } as T);
       }
       if (query.constructor.name === "ListResourceDependencyBindingsQuery") {
-        return ok({ items: input.dependencyBindings ?? [] } as T);
+        if (input.dependencyBindings) {
+          return ok({ items: input.dependencyBindings } as T);
+        }
+        const bindingQuery = query as unknown as { resourceId?: string };
+        return ok({
+          items: createdDependencyBindings.filter(
+            (binding) => binding.resourceId === bindingQuery.resourceId,
+          ),
+        } as T);
       }
       if (query.constructor.name === "ListStorageVolumesQuery") {
         return ok({ items: input.storageVolumes ?? [] } as T);
@@ -1154,6 +1221,97 @@ describe("CLI deployment config entry workflow", () => {
     }
     expect(harness.sourceLinkCalls.some((call) => call.includes("applications.api"))).toBe(true);
     expect(harness.sourceLinkCalls.some((call) => call.includes("applications.worker"))).toBe(true);
+  });
+
+  test("[CONFIG-FILE-APPLICATION-GRAPH-007] application graph provisions one named dependency and binds every consumer", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-application-dependency-config-"));
+    const configPath = join(workspace, "appaloft.yaml");
+    writeFileSync(
+      configPath,
+      [
+        "dependencies:",
+        "  database:",
+        "    resourceName: Acme Shared Postgres",
+        "    kind: postgres",
+        "    source: managed",
+        "    bind:",
+        "      env: DATABASE_URL",
+        "applications:",
+        "  api:",
+        "    resource:",
+        "      name: Acme API",
+        "    runtime:",
+        "      strategy: workspace-commands",
+        "    dependencies:",
+        "      - database",
+        "  site:",
+        "    resource:",
+        "      name: Acme Site",
+        "      kind: static-site",
+        "    runtime:",
+        "      strategy: static",
+        "      publishDirectory: dist",
+        "  worker:",
+        "    resource:",
+        "      name: Acme Worker",
+        "      kind: worker",
+        "    runtime:",
+        "      strategy: workspace-commands",
+        "    dependencies:",
+        "      - database",
+        "",
+      ].join("\n"),
+    );
+    const harness = await createPreviewDeployCliHarness({
+      deploymentSummaries: [
+        { id: "dep_1", resourceId: "res_1", status: "succeeded", runtimePlan: { execution: {} } },
+        { id: "dep_2", resourceId: "res_2", status: "succeeded", runtimePlan: { execution: {} } },
+        { id: "dep_3", resourceId: "res_3", status: "succeeded", runtimePlan: { execution: {} } },
+      ],
+    });
+
+    try {
+      await withMutedProcessOutput(async () => {
+        await harness.program.parseAsync([
+          "node",
+          "appaloft",
+          "deploy",
+          workspace,
+          "--config",
+          configPath,
+          "--server-host",
+          "203.0.113.93",
+          "--server-provider",
+          "generic-ssh",
+        ]);
+      });
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    const provisions = harness.commands.filter(
+      (command) => command.constructor.name === "ProvisionDependencyResourceCommand",
+    ) as Record<string, unknown>[];
+    expect(provisions).toHaveLength(1);
+    expect(provisions[0]).toMatchObject({ name: "acme-shared-postgres", kind: "postgres" });
+
+    const bindings = harness.commands.filter(
+      (command) => command.constructor.name === "BindResourceDependencyCommand",
+    ) as Record<string, unknown>[];
+    expect(bindings).toEqual([
+      expect.objectContaining({ resourceId: "res_1", targetName: "DATABASE_URL" }),
+      expect.objectContaining({ resourceId: "res_3", targetName: "DATABASE_URL" }),
+    ]);
+
+    const deployments = harness.commands.filter(
+      (command) => command.constructor.name === "CreateDeploymentCommand",
+    ) as Record<string, unknown>[];
+    expect(deployments).toHaveLength(3);
+    for (const deployment of deployments) {
+      expect(deployment).not.toHaveProperty("dependencyResourceId");
+      expect(deployment).not.toHaveProperty("targetName");
+    }
   });
 
   test("[CONFIG-FILE-IMAGE-SOURCE-003] config prebuilt image source creates Resource profile before deployment", async () => {
@@ -3509,7 +3667,7 @@ describe("CLI deployment config entry workflow", () => {
           id: "dep_1",
           resourceId: "res_1",
           status: "failed",
-          logs: [
+          timeline: [
             {
               timestamp: "2026-05-17T11:48:38.000Z",
               source: "runtime",
@@ -3601,7 +3759,7 @@ describe("CLI deployment config entry workflow", () => {
           id: "dep_1",
           resourceId: "res_1",
           status: "failed",
-          logs: [
+          timeline: [
             {
               timestamp: "2026-05-22T10:12:00.000Z",
               source: "runtime",

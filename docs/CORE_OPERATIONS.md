@@ -771,8 +771,10 @@ Current boundary:
   repository config workflow. Each application entry expands into a Resource-specific Quick Deploy
   draft and one ordinary ids-only `deployments.create` admission; the graph does not add
   cross-Resource fields to `deployments.create`, does not select durable identity from committed
-  config, and does not imply atomic release-group rollback or provider-specific orchestration. This
-  is governed by
+  config, and does not imply atomic release-group rollback or provider-specific orchestration.
+  Application entries may reference one top-level named managed dependency by stable key; the
+  config workflow reuses that dependency resource and binds each consumer Resource without putting
+  dependency ids or secret values into deployment admission. This is governed by
   [Repository Config Application Graph](./specs/097-repository-config-application-graph/spec.md).
 - storage volume lifecycle is implemented for Phase 7 through
   `storage-volumes.create/list/show/rename/delete` and `resources.attach-storage/detach-storage`.

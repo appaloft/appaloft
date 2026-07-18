@@ -321,6 +321,163 @@ describe("Appaloft deployment config schema", () => {
     }
   });
 
+  test("[CONFIG-FILE-APPLICATION-GRAPH-005] accepts named shared dependency references", () => {
+    const parsed = parseAppaloftDeploymentConfig({
+      dependencies: {
+        database: {
+          resourceName: "Acme Shared Postgres",
+          kind: "postgres",
+          source: "managed",
+          bind: { env: "DATABASE_URL" },
+        },
+      },
+      applications: {
+        api: {
+          resource: { name: "Acme API" },
+          dependencies: ["database"],
+        },
+        site: {
+          resource: { name: "Acme Site", kind: "static-site" },
+        },
+        worker: {
+          resource: { name: "Acme Worker", kind: "worker" },
+          dependencies: ["database"],
+        },
+      },
+    });
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.dependencies?.database?.resourceName).toBe("Acme Shared Postgres");
+      expect(parsed.data.applications?.api?.dependencies).toEqual(["database"]);
+      expect(parsed.data.applications?.site?.dependencies).toBeUndefined();
+      expect(parsed.data.applications?.worker?.dependencies).toEqual(["database"]);
+    }
+  });
+
+  test("[CONFIG-FILE-APPLICATION-GRAPH-006] rejects ambiguous application dependency references", () => {
+    const undefinedReference = parseAppaloftDeploymentConfig({
+      applications: {
+        api: {
+          resource: { name: "Acme API" },
+          dependencies: ["database"],
+        },
+      },
+    });
+    expect(undefinedReference.success).toBe(false);
+    if (!undefinedReference.success) {
+      expect(undefinedReference.error.issues[0]?.path).toEqual([
+        "applications",
+        "api",
+        "dependencies",
+        0,
+      ]);
+    }
+
+    const unnamedSharedDependency = parseAppaloftDeploymentConfig({
+      dependencies: {
+        database: {
+          kind: "postgres",
+          source: "managed",
+          bind: { env: "DATABASE_URL" },
+        },
+      },
+      applications: {
+        api: {
+          resource: { name: "Acme API" },
+          dependencies: ["database"],
+        },
+        worker: {
+          resource: { name: "Acme Worker" },
+          dependencies: ["database"],
+        },
+      },
+    });
+    expect(unnamedSharedDependency.success).toBe(false);
+    if (!unnamedSharedDependency.success) {
+      expect(unnamedSharedDependency.error.issues[0]?.path).toEqual([
+        "dependencies",
+        "database",
+        "resourceName",
+      ]);
+    }
+
+    const unreferencedDefinition = parseAppaloftDeploymentConfig({
+      dependencies: {
+        database: {
+          resourceName: "Acme Shared Postgres",
+          kind: "postgres",
+          source: "managed",
+          bind: { env: "DATABASE_URL" },
+        },
+      },
+      applications: {
+        api: { resource: { name: "Acme API" } },
+      },
+    });
+    expect(unreferencedDefinition.success).toBe(false);
+    if (!unreferencedDefinition.success) {
+      expect(unreferencedDefinition.error.issues[0]?.path).toEqual(["dependencies", "database"]);
+    }
+
+    const duplicateReference = parseAppaloftDeploymentConfig({
+      dependencies: {
+        database: {
+          resourceName: "Acme Shared Postgres",
+          kind: "postgres",
+          source: "managed",
+          bind: { env: "DATABASE_URL" },
+        },
+      },
+      applications: {
+        api: {
+          resource: { name: "Acme API" },
+          dependencies: ["database", "database"],
+        },
+      },
+    });
+    expect(duplicateReference.success).toBe(false);
+    if (!duplicateReference.success) {
+      expect(duplicateReference.error.issues[0]?.path).toEqual([
+        "applications",
+        "api",
+        "dependencies",
+        1,
+      ]);
+    }
+
+    const sharedPreviewDependency = parseAppaloftDeploymentConfig({
+      dependencies: {
+        database: {
+          resourceName: "Acme Shared Postgres",
+          kind: "postgres",
+          source: "managed",
+          bind: { env: "DATABASE_URL" },
+          preview: { lifecycle: "ephemeral" },
+        },
+      },
+      applications: {
+        api: {
+          resource: { name: "Acme API" },
+          dependencies: ["database"],
+        },
+        worker: {
+          resource: { name: "Acme Worker" },
+          dependencies: ["database"],
+        },
+      },
+    });
+    expect(sharedPreviewDependency.success).toBe(false);
+    if (!sharedPreviewDependency.success) {
+      expect(sharedPreviewDependency.error.issues[0]?.path).toEqual([
+        "dependencies",
+        "database",
+        "preview",
+        "lifecycle",
+      ]);
+    }
+  });
+
   test("[CONFIG-FILE-APPLICATION-GRAPH-002] rejects unsafe application graph declarations", () => {
     const badKey = parseAppaloftDeploymentConfig({
       applications: {
