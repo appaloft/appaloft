@@ -36,6 +36,7 @@
 - [x] Reject read-only SSH PGlite mirrors from an incompatible embedded PostgreSQL major before opening or uploading them, with value-free version evidence.
 - [x] Keep read-only SSH PGlite maintenance composition on the downloaded schema without running migrations, and fail ordinary startup immediately when migration returns an error.
 - [x] Extend bounded source/probe SQLSTATE diagnosis to fixed safe operational families without publishing codes or database details.
+- [x] Classify SQLSTATE-free embedded runtime failures through bounded fixed error kinds without publishing exception detail.
 - [x] Preserve safe source-specific rotation read failures for unattended diagnosis.
 - [x] Replace optional-table schema discovery with direct reads guarded by exact PostgreSQL `42P01` handling.
 - [x] Make Swarm env semantics and runtime key proof consistent with other substrates.
