@@ -161,6 +161,37 @@ describe("control-plane secret rotation", () => {
       expect(JSON.stringify(plan)).not.toContain("private source detail");
     }));
 
+  test("[CPS-DIAG-032] real PGlite schema mismatch keeps a safe source classification", async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), "appaloft-secret-rotation-schema-"));
+    const database = await createDatabase({ driver: "pglite", pgliteDataDir: dataDir });
+    try {
+      await database.db.schema
+        .createTable("environment_variables")
+        .addColumn("id", "text", (column) => column.primaryKey())
+        .addColumn("environment_id", "text", (column) => column.notNull())
+        .addColumn("key", "text", (column) => column.notNull())
+        .addColumn("value", "text", (column) => column.notNull())
+        .execute();
+      const { rotatingProtector } = protectors();
+
+      const plan = await new PgControlPlaneSecretRotationService(
+        database.db,
+        rotatingProtector,
+      ).plan();
+
+      expect(plan._unsafeUnwrapErr()).toMatchObject({
+        code: "control_plane_secret_rotation_source_read_failed",
+        details: {
+          phase: "control-plane-secret-rotation",
+          reason: "environment-variables-schema-incompatible",
+        },
+      });
+    } finally {
+      await database.close();
+      rmSync(dataDir, { recursive: true, force: true });
+    }
+  });
+
   test("[CPS-DIAG-026] generic source failures use bounded column probes", () =>
     withDatabase(async (database) => {
       const compiler = new PostgresQueryCompiler();
