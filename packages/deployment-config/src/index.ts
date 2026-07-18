@@ -140,6 +140,12 @@ const autoDeployRefsRequiredError =
   "config_auto_deploy_resolution: autoDeploy.refs is required when autoDeploy is enabled";
 const dependencyBackupPolicyRequiredError =
   "config_dependency_backup_resolution: dependencies.<key>.backup intervalHours and retentionDays are required when enabled";
+const applicationDependencyResolutionError =
+  "config_application_dependency_resolution: application dependency references must resolve to one top-level dependency definition";
+const sharedApplicationDependencyNameError =
+  "config_application_dependency_resolution: dependencies referenced by multiple applications require resourceName";
+const sharedPreviewDependencyError =
+  "config_application_dependency_resolution: preview ephemeral dependencies cannot be shared by multiple applications";
 const monitoringThresholdRuleRequiredError =
   "config_monitoring_thresholds_resolution: monitoring.thresholds.rules[] requires warning or critical";
 const monitoringThresholdCriticalOrderError =
@@ -985,6 +991,17 @@ export const appaloftDeploymentApplicationConfigSchema = z
       .describe("Requested runtime replicas for this named application."),
     env: z.record(z.string(), nonSecretEnvironmentValueSchema).optional(),
     secrets: z.record(z.string(), appaloftDeploymentSecretReferenceSchema).optional(),
+    dependencies: z
+      .array(
+        z
+          .string()
+          .regex(
+            dependencyKeyPattern,
+            "config_application_dependency_resolution: application dependency keys must start with a lowercase letter and contain only lowercase letters, digits, dash, or underscore",
+          ),
+      )
+      .min(1)
+      .optional(),
     services: z
       .record(
         z
@@ -1042,6 +1059,9 @@ export const appaloftDeploymentDependencyBackupConfigSchema = z
 
 export const appaloftDeploymentDependencyConfigSchema = z
   .object({
+    resourceName: nonEmptyStringSchema
+      .optional()
+      .describe("Stable managed dependency Resource name for application-graph reuse."),
     kind: z.enum(appaloftDeploymentDependencyKinds).describe("Application dependency kind."),
     source: z.literal("managed").describe("Managed dependencies are created by Appaloft."),
     bind: z
@@ -1474,6 +1494,61 @@ export const appaloftDeploymentConfigSchema = z
   })
   .strict()
   .superRefine((value, context) => {
+    const applicationDependencyConsumers = new Map<string, string[]>();
+    if (value.applications) {
+      for (const [applicationKey, application] of Object.entries(value.applications)) {
+        const referencedDependencyKeys = new Set<string>();
+        for (const [index, dependencyKey] of (application.dependencies ?? []).entries()) {
+          if (referencedDependencyKeys.has(dependencyKey)) {
+            context.addIssue({
+              code: "custom",
+              path: ["applications", applicationKey, "dependencies", index],
+              message: applicationDependencyResolutionError,
+            });
+            continue;
+          }
+          referencedDependencyKeys.add(dependencyKey);
+          const dependency = value.dependencies?.[dependencyKey];
+          if (!dependency) {
+            context.addIssue({
+              code: "custom",
+              path: ["applications", applicationKey, "dependencies", index],
+              message: applicationDependencyResolutionError,
+            });
+            continue;
+          }
+          const consumers = applicationDependencyConsumers.get(dependencyKey) ?? [];
+          consumers.push(applicationKey);
+          applicationDependencyConsumers.set(dependencyKey, consumers);
+        }
+      }
+
+      for (const [dependencyKey, dependency] of Object.entries(value.dependencies ?? {})) {
+        const consumers = applicationDependencyConsumers.get(dependencyKey) ?? [];
+        if (consumers.length === 0) {
+          context.addIssue({
+            code: "custom",
+            path: ["dependencies", dependencyKey],
+            message: applicationDependencyResolutionError,
+          });
+        }
+        if (consumers.length > 1 && !dependency.resourceName) {
+          context.addIssue({
+            code: "custom",
+            path: ["dependencies", dependencyKey, "resourceName"],
+            message: sharedApplicationDependencyNameError,
+          });
+        }
+        if (consumers.length > 1 && dependency.preview?.lifecycle === "ephemeral") {
+          context.addIssue({
+            code: "custom",
+            path: ["dependencies", dependencyKey, "preview", "lifecycle"],
+            message: sharedPreviewDependencyError,
+          });
+        }
+      }
+    }
+
     if (value.source?.type !== "image") {
       return;
     }

@@ -109,6 +109,39 @@ appaloft resource configure-source res_web \
   --base-directory apps/web
 ```
 
+<h2 id="application-graph-dependencies">让多个应用共用一个依赖</h2>
+
+在 application graph 中，只在顶层定义一次托管依赖，再让每个消费者应用引用它的 key。一个依赖被
+多个应用共用时必须提供稳定的 `resourceName`，这样后续消费者会复用同一个托管 Resource，而不是
+重复创建数据库：
+
+```yaml
+dependencies:
+  database:
+    resourceName: Acme Shared Postgres
+    kind: postgres
+    source: managed
+    bind:
+      env: DATABASE_URL
+
+applications:
+  api:
+    resource:
+      name: Acme API
+    dependencies:
+      - database
+  worker:
+    resource:
+      name: Acme Worker
+      kind: worker
+    dependencies:
+      - database
+```
+
+Appaloft 会协调一个具名 Postgres Resource，并为每个消费者 Resource 分别创建 `DATABASE_URL`
+binding。所有顶层依赖都必须被引用，每个引用都必须能解析，临时 preview 依赖不能被多个应用共用。
+连接值和 dependency Resource id 不会写进提交的配置文件。
+
 <h2 id="local-static-output">本地静态输出</h2>
 
 当用户已经有 `dist`、`build` 或类似静态输出目录时，可以把这个目录作为 source 直接交给 Appaloft：

@@ -190,6 +190,7 @@ export type DeploymentServerAppliedRouteSeed = ServerAppliedRouteDomainIntent;
 export interface DeploymentServiceSeed extends RequestedDeploymentServiceConfig {}
 export interface DeploymentDependencySeed {
   key: string;
+  resourceName?: string;
   kind: ManagedDependencyResourceKind;
   source: "managed";
   bindEnv: string;
@@ -709,6 +710,7 @@ export function deploymentPromptSeedFromConfig(
       ([key, dependency]) =>
         ({
           key,
+          ...(dependency.resourceName ? { resourceName: dependency.resourceName } : {}),
           kind: dependency.kind,
           source: dependency.source,
           bindEnv: dependency.bind.env,
@@ -947,6 +949,12 @@ export function applicationDeploymentPromptSeedsFromConfig(
         env: application.env,
         secrets: application.secrets,
         services: application.services,
+        dependencies: Object.fromEntries(
+          (application.dependencies ?? []).flatMap((dependencyKey) => {
+            const dependency = config.dependencies?.[dependencyKey];
+            return dependency ? [[dependencyKey, dependency]] : [];
+          }),
+        ),
       };
       const seed = deploymentPromptSeedFromConfig(applicationConfig);
       const resourceServices = seed.services;
@@ -1039,7 +1047,7 @@ function renderConfigEnvValueTemplate(input: {
 }
 
 export function deploymentEnvironmentVariablesFromConfig(
-  config: AppaloftDeploymentConfig,
+  config: Pick<AppaloftDeploymentConfig, "env" | "secrets">,
   options: DeploymentEnvironmentVariablesFromConfigOptions = {},
 ): Result<DeploymentEnvironmentVariableSeed[]> {
   const variables: DeploymentEnvironmentVariableSeed[] = [];
@@ -1992,7 +2000,7 @@ function repositoryConfigDependencyName(input: {
   const base =
     input.dependency.previewLifecycle === "ephemeral" && input.sourceFingerprint
       ? `preview-${shortSourceFingerprintHash(input.sourceFingerprint)}-${input.dependency.key}`
-      : `${input.resourceId}-${input.dependency.key}`;
+      : (input.dependency.resourceName ?? `${input.resourceId}-${input.dependency.key}`);
 
   return normalizeQuickDeployGeneratedNameBase(base);
 }

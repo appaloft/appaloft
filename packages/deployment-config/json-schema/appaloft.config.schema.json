@@ -409,6 +409,11 @@
               "pathPrefix": {
                 "type": "string"
               },
+              "pathHandling": {
+                "default": "preserve",
+                "type": "string",
+                "enum": ["preserve", "strip"]
+              },
               "tlsMode": {
                 "default": "auto",
                 "type": "string",
@@ -439,7 +444,7 @@
                 ]
               }
             },
-            "required": ["host", "pathPrefix", "tlsMode"],
+            "required": ["host", "pathPrefix", "pathHandling", "tlsMode"],
             "additionalProperties": false,
             "description": "Provider-neutral server-applied domain intent."
           }
@@ -1097,6 +1102,11 @@
                     "pathPrefix": {
                       "type": "string"
                     },
+                    "pathHandling": {
+                      "default": "preserve",
+                      "type": "string",
+                      "enum": ["preserve", "strip"]
+                    },
                     "tlsMode": {
                       "default": "auto",
                       "type": "string",
@@ -1127,7 +1137,7 @@
                       ]
                     }
                   },
-                  "required": ["host", "pathPrefix", "tlsMode"],
+                  "required": ["host", "pathPrefix", "pathHandling", "tlsMode"],
                   "additionalProperties": false,
                   "description": "Provider-neutral server-applied domain intent."
                 }
@@ -1841,6 +1851,11 @@
                     "pathPrefix": {
                       "type": "string"
                     },
+                    "pathHandling": {
+                      "default": "preserve",
+                      "type": "string",
+                      "enum": ["preserve", "strip"]
+                    },
                     "tlsMode": {
                       "default": "auto",
                       "type": "string",
@@ -1871,7 +1886,7 @@
                       ]
                     }
                   },
-                  "required": ["host", "pathPrefix", "tlsMode"],
+                  "required": ["host", "pathPrefix", "pathHandling", "tlsMode"],
                   "additionalProperties": false,
                   "description": "Provider-neutral server-applied domain intent."
                 }
@@ -1943,6 +1958,14 @@
               },
               "required": ["from"],
               "additionalProperties": false
+            }
+          },
+          "dependencies": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_-]{0,62}$"
             }
           },
           "services": {
@@ -2261,6 +2284,11 @@
       "additionalProperties": {
         "type": "object",
         "properties": {
+          "resourceName": {
+            "description": "Stable managed dependency Resource name for application-graph reuse.",
+            "type": "string",
+            "minLength": 1
+          },
           "kind": {
             "type": "string",
             "enum": ["postgres", "redis", "mysql", "clickhouse", "object-storage", "opensearch"],
@@ -2481,6 +2509,24 @@
           "type": "integer",
           "exclusiveMinimum": 0,
           "maximum": 86400
+        },
+        "includePaths": {
+          "minItems": 1,
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "excludePaths": {
+          "minItems": 1,
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       },
       "required": ["enabled", "trigger", "events"],
