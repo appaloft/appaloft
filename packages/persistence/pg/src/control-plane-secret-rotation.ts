@@ -11,7 +11,7 @@ import {
   type ControlPlaneSecretRotationUnreadableFinding,
 } from "@appaloft/application";
 import { type DomainError, err, ok, type Result } from "@appaloft/core";
-import { type Kysely, sql, type Transaction } from "kysely";
+import { type Kysely, type Transaction } from "kysely";
 
 import { type Database } from "./schema";
 
@@ -22,11 +22,6 @@ type RotationTable =
   | "dependency_resource_secrets"
   | "dependency_binding_secrets"
   | "deployments";
-type OptionalRotationTable =
-  | "resource_variables"
-  | "dependency_resource_secrets"
-  | "dependency_binding_secrets";
-
 interface RotationRecord {
   table: RotationTable;
   id: string;
@@ -92,23 +87,35 @@ function unreadableReason(error: DomainError): string {
   return typeof error.details?.reason === "string" ? error.details.reason : "unreadable";
 }
 
-async function rotationTableExists(
-  db: RotationDatabase,
-  table: OptionalRotationTable,
-): Promise<boolean> {
-  const result = await sql<{ table_count: number }>`
-    SELECT COUNT(*)::integer AS table_count
-    FROM information_schema.tables
-    WHERE table_schema = current_schema()
-      AND table_name = ${table}
-  `.execute(db);
-  return Number(result.rows[0]?.table_count ?? 0) > 0;
-}
-
 async function readRotationSource<T>(source: string, read: () => Promise<T>): Promise<T> {
   try {
     return await read();
   } catch {
+    throw rotationError(
+      "control_plane_secret_rotation_source_read_failed",
+      "A control-plane secret rotation source could not be read",
+      `${source}-read-failed`,
+    );
+  }
+}
+
+function isUndefinedTableError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: unknown }).code === "42P01"
+  );
+}
+
+async function readOptionalRotationSource<T>(
+  source: string,
+  read: () => Promise<T[]>,
+): Promise<T[]> {
+  try {
+    return await read();
+  } catch (error) {
+    if (isUndefinedTableError(error)) return [];
     throw rotationError(
       "control_plane_secret_rotation_source_read_failed",
       "A control-plane secret rotation source could not be read",
@@ -292,20 +299,8 @@ export class PgControlPlaneSecretRotationService implements ControlPlaneSecretRo
 
   private async collect(db: RotationDatabase): Promise<RotationRecord[]> {
     // Rotation planning intentionally runs before application migrations. These tables were added
-    // after the initial schema, so their absence in an older state means that source has no rows;
-    // every other discovery or read failure still propagates and fails the operation closed.
-    const [hasResourceVariables, hasDependencyResourceSecrets, hasDependencyBindingSecrets] =
-      await Promise.all([
-        readRotationSource("resource-variables-schema", () =>
-          rotationTableExists(db, "resource_variables"),
-        ),
-        readRotationSource("dependency-resource-secrets-schema", () =>
-          rotationTableExists(db, "dependency_resource_secrets"),
-        ),
-        readRotationSource("dependency-binding-secrets-schema", () =>
-          rotationTableExists(db, "dependency_binding_secrets"),
-        ),
-      ]);
+    // after the initial schema. Read them directly and treat only PostgreSQL's exact undefined-table
+    // code as an empty source; every other read failure still fails the operation closed.
     // Keep source reads ordered so a failed maintenance plan has one deterministic safe reason and
     // does not leave concurrent reads running while the coordinated mirror is being closed.
     const environmentRows = await readRotationSource("environment-variables", () =>
@@ -315,31 +310,25 @@ export class PgControlPlaneSecretRotationService implements ControlPlaneSecretRo
         .where("is_secret", "=", true)
         .execute(),
     );
-    const resourceRows = hasResourceVariables
-      ? await readRotationSource("resource-variables", () =>
-          db
-            .selectFrom("resource_variables")
-            .select(["id", "resource_id", "key", "value"])
-            .where("is_secret", "=", true)
-            .execute(),
-        )
-      : [];
-    const dependencyRows = hasDependencyResourceSecrets
-      ? await readRotationSource("dependency-resource-secrets", () =>
-          db
-            .selectFrom("dependency_resource_secrets")
-            .select(["ref", "dependency_resource_id", "environment_id", "payload"])
-            .execute(),
-        )
-      : [];
-    const bindingRows = hasDependencyBindingSecrets
-      ? await readRotationSource("dependency-binding-secrets", () =>
-          db
-            .selectFrom("dependency_binding_secrets")
-            .select(["ref", "binding_id", "resource_id", "payload"])
-            .execute(),
-        )
-      : [];
+    const resourceRows = await readOptionalRotationSource("resource-variables", () =>
+      db
+        .selectFrom("resource_variables")
+        .select(["id", "resource_id", "key", "value"])
+        .where("is_secret", "=", true)
+        .execute(),
+    );
+    const dependencyRows = await readOptionalRotationSource("dependency-resource-secrets", () =>
+      db
+        .selectFrom("dependency_resource_secrets")
+        .select(["ref", "dependency_resource_id", "environment_id", "payload"])
+        .execute(),
+    );
+    const bindingRows = await readOptionalRotationSource("dependency-binding-secrets", () =>
+      db
+        .selectFrom("dependency_binding_secrets")
+        .select(["ref", "binding_id", "resource_id", "payload"])
+        .execute(),
+    );
     const deploymentRows = await readRotationSource("deployment-snapshots", () =>
       db.selectFrom("deployments").select(["id", "environment_snapshot"]).execute(),
     );
