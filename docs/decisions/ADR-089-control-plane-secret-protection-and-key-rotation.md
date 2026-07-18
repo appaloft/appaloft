@@ -34,6 +34,7 @@ Because dry-run precedes application migrations, every source is read directly a
 failures remain fail closed and expose only their fixed safe classification.
 For unattended diagnosis, a bounded SQLSTATE allowlist maps to fixed operational categories without
 publishing the SQLSTATE or database detail; unknown failures retain the generic read-failed reason.
+Only known driver wrapper fields and SQLSTATE aliases are traversed, with bounded depth and node count.
 
 Dry-run may return a bounded list of unreadable findings containing only record source, stable
 business ids, variable key/index when applicable, safe envelope key id, and stable failure reason.

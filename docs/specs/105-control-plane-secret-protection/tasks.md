@@ -25,6 +25,7 @@
 - [x] Keep pre-migration plans compatible with fresh or partially initialized state that has no
       rotation source tables yet.
 - [x] Add bounded, value-free SQLSTATE source diagnosis for unattended rotation preflight.
+- [x] Traverse only bounded, known driver wrapper fields and SQLSTATE aliases during safe diagnosis.
 - [x] Preserve safe source-specific rotation read failures for unattended diagnosis.
 - [x] Replace optional-table schema discovery with direct reads guarded by exact PostgreSQL `42P01` handling.
 - [x] Make Swarm env semantics and runtime key proof consistent with other substrates.

@@ -88,17 +88,24 @@ function unreadableReason(error: DomainError): string {
 }
 
 function sqlStateCode(error: unknown): string | undefined {
-  let candidate = error;
-  for (let depth = 0; depth < 4; depth += 1) {
-    if (typeof candidate !== "object" || candidate === null) return undefined;
-    if (
-      "code" in candidate &&
-      typeof (candidate as { code?: unknown }).code === "string" &&
-      /^[0-9A-Z]{5}$/.test((candidate as { code: string }).code)
-    ) {
-      return (candidate as { code: string }).code;
+  const pending: Array<{ candidate: unknown; depth: number }> = [{ candidate: error, depth: 0 }];
+  const visited = new Set<object>();
+  let inspected = 0;
+  while (pending.length > 0 && inspected < 8) {
+    const next = pending.shift();
+    if (!next || typeof next.candidate !== "object" || next.candidate === null) continue;
+    if (visited.has(next.candidate)) continue;
+    visited.add(next.candidate);
+    inspected += 1;
+    const candidate = next.candidate as Record<string, unknown>;
+    for (const key of ["code", "sqlState", "sqlstate", "sql_state"] as const) {
+      const value = candidate[key];
+      if (typeof value === "string" && /^[0-9A-Z]{5}$/.test(value)) return value;
     }
-    candidate = "cause" in candidate ? (candidate as { cause?: unknown }).cause : undefined;
+    if (next.depth >= 3) continue;
+    for (const key of ["cause", "originalError", "error"] as const) {
+      if (key in candidate) pending.push({ candidate: candidate[key], depth: next.depth + 1 });
+    }
   }
   return undefined;
 }
