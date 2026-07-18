@@ -19,6 +19,8 @@ row without explicit authorization.
 Dry-run runs before application migrations. A fresh or partially initialized state can therefore
 lack any rotation source table. Direct source reads treat only PostgreSQL's exact undefined-table
 code `42P01` as an empty source; any other read failure remains a safe, fail-closed source error.
+Environment and Resource secret filters compile as parameter-free `IS TRUE` predicates, avoiding
+embedded-runtime boolean bind inference while preserving secret-only selection.
 Allowlisted SQLSTATE classes are reduced to fixed categories such as schema-incompatible,
 feature-unsupported, state-unavailable, or storage-corrupt. The raw SQLSTATE, database message,
 query, relation, host, and path are never published; unknown failures keep the generic read-failed

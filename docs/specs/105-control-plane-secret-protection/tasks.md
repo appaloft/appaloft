@@ -27,6 +27,7 @@
 - [x] Add bounded, value-free SQLSTATE source diagnosis for unattended rotation preflight.
 - [x] Traverse only bounded, known driver wrapper fields and SQLSTATE aliases during safe diagnosis.
 - [x] Map allowlisted SQLSTATE classes to fixed safe source categories without weakening exact `42P01` handling.
+- [x] Compile rotation source secret filters as parameter-free `IS TRUE` predicates and verify the generated SQL contains no boolean bind parameter.
 - [x] Preserve safe source-specific rotation read failures for unattended diagnosis.
 - [x] Replace optional-table schema discovery with direct reads guarded by exact PostgreSQL `42P01` handling.
 - [x] Make Swarm env semantics and runtime key proof consistent with other substrates.

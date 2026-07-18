@@ -319,14 +319,14 @@ export class PgControlPlaneSecretRotationService implements ControlPlaneSecretRo
       db
         .selectFrom("environment_variables")
         .select(["id", "environment_id", "key", "value"])
-        .where("is_secret", "=", true)
+        .where("is_secret", "is", true)
         .execute(),
     );
     const resourceRows = await readOptionalRotationSource("resource-variables", () =>
       db
         .selectFrom("resource_variables")
         .select(["id", "resource_id", "key", "value"])
-        .where("is_secret", "=", true)
+        .where("is_secret", "is", true)
         .execute(),
     );
     const dependencyRows = await readOptionalRotationSource("dependency-resource-secrets", () =>

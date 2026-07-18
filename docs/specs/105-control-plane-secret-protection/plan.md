@@ -34,6 +34,8 @@
   database messages, queries, relations, hosts, and paths outside the published contract.
 - Classify allowlisted SQLSTATE classes rather than a few exact members, while preserving exact
   `42P01` as the only undefined-table empty-source signal.
+- Compile Environment and Resource secret filters as parameter-free PostgreSQL `IS TRUE`
+  predicates so embedded runtimes do not need to infer a bound boolean type.
 - Extend Deployment Proof with value-free planned/observed environment key-set evidence.
 
 ## Persistence And Migration

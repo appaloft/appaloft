@@ -7,6 +7,7 @@ import { join } from "node:path";
 
 import { AesGcmControlPlaneSecretProtector } from "@appaloft/adapter-secret-protection";
 import { createExecutionContext } from "@appaloft/application";
+import { type KyselyPlugin, PostgresQueryCompiler } from "kysely";
 
 import {
   createDatabase,
@@ -212,6 +213,39 @@ describe("control-plane secret rotation", () => {
       rmSync(dataDir, { recursive: true, force: true });
     }
   });
+
+  test("[CPS-COMPAT-024] secret source filters use parameter-free boolean predicates", () =>
+    withDatabase(async (database) => {
+      const queries: string[] = [];
+      const compiler = new PostgresQueryCompiler();
+      const capturePlugin: KyselyPlugin = {
+        transformQuery(args) {
+          queries.push(compiler.compileQuery(args.node, args.queryId).sql);
+          return args.node;
+        },
+        async transformResult(args) {
+          return args.result;
+        },
+      };
+      const { rotatingProtector } = protectors();
+
+      const plan = await new PgControlPlaneSecretRotationService(
+        database.db.withPlugin(capturePlugin),
+        rotatingProtector,
+      ).plan();
+
+      expect(plan.isOk()).toBe(true);
+      const variableQueries = queries.filter(
+        (query) =>
+          query.includes('from "environment_variables"') ||
+          query.includes('from "resource_variables"'),
+      );
+      expect(variableQueries).toHaveLength(2);
+      for (const query of variableQueries) {
+        expect(query).toContain('where "is_secret" is true');
+        expect(query).not.toContain("$1");
+      }
+    }));
 
   test("[CPS-DIAG-021] plan classifies a safe SQLSTATE category without database details", () =>
     withDatabase(async (database) => {

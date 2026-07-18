@@ -32,6 +32,8 @@ rewraps in one transaction. Failure rolls back the entire migration; retry is id
 Because dry-run precedes application migrations, every source is read directly and exact PostgreSQL
 `42P01` is treated as an empty source for fresh or partially initialized state. All other source
 failures remain fail closed and expose only their fixed safe classification.
+Environment and Resource secret filters use parameter-free PostgreSQL `IS TRUE` predicates so
+embedded runtimes do not need to infer a bound boolean type during this pre-migration read.
 For unattended diagnosis, a bounded SQLSTATE class allowlist maps to fixed operational categories
 without publishing the SQLSTATE or database detail; exact `42P01` alone means an empty source and
 unknown failures retain the generic read-failed reason.
