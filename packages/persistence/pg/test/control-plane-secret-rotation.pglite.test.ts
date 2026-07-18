@@ -84,7 +84,7 @@ async function envelopeStates(
 }
 
 describe("control-plane secret rotation", () => {
-  test("[CPS-DIAG-018] plan reports a failed source without database details", () =>
+  test("[CPS-DIAG-018][CPS-DIAG-030] plan reports a failed source without database details", () =>
     withDatabase(async (database) => {
       const failingDatabase = new Proxy(database.db, {
         get(target, property) {
@@ -114,20 +114,62 @@ describe("control-plane secret rotation", () => {
         retryable: false,
         details: {
           phase: "control-plane-secret-rotation",
-          reason: "environment-variables-id-schema-read-failed",
+          reason: "environment-variables-table-schema-read-failed",
         },
       });
       expect(JSON.stringify(plan)).not.toContain("environment_variables");
       expect(JSON.stringify(plan)).not.toContain("SELECT");
     }));
 
+  test("[CPS-DIAG-030] database probes fail closed before source-shape probes", () =>
+    withDatabase(async (database) => {
+      const failingDatabase = new Proxy(database.db, {
+        get(target, property) {
+          if (property === "selectFrom") {
+            return (table: string) => {
+              if (table === "environment_variables") throw new Error("private source detail");
+              const selectFrom = target.selectFrom.bind(target) as unknown as (
+                source: string,
+              ) => ReturnType<typeof target.selectFrom>;
+              return selectFrom(table);
+            };
+          }
+          if (property === "selectNoFrom") {
+            throw new Error("private database detail");
+          }
+          const value = Reflect.get(target, property, target);
+          return typeof value === "function" ? value.bind(target) : value;
+        },
+      }) as typeof database.db;
+      const { rotatingProtector } = protectors();
+
+      const plan = await new PgControlPlaneSecretRotationService(
+        failingDatabase,
+        rotatingProtector,
+      ).plan();
+
+      expect(plan._unsafeUnwrapErr()).toMatchObject({
+        code: "control_plane_secret_rotation_source_read_failed",
+        category: "infra",
+        retryable: false,
+        details: {
+          phase: "control-plane-secret-rotation",
+          reason: "environment-variables-database-read-failed",
+        },
+      });
+      expect(JSON.stringify(plan)).not.toContain("private database detail");
+      expect(JSON.stringify(plan)).not.toContain("private source detail");
+    }));
+
   test("[CPS-DIAG-026] generic source failures use bounded column probes", () =>
     withDatabase(async (database) => {
       const compiler = new PostgresQueryCompiler();
       const privateDetail = "private combined row detail";
+      const queries: string[] = [];
       const failingPlugin: KyselyPlugin = {
         transformQuery(args) {
           const query = compiler.compileQuery(args.node, args.queryId).sql;
+          queries.push(query);
           if (
             query.includes('from "environment_variables"') &&
             query.includes('select "id", "environment_id"')
@@ -156,6 +198,13 @@ describe("control-plane secret rotation", () => {
       });
       expect(JSON.stringify(plan)).not.toContain(privateDetail);
       expect(JSON.stringify(plan)).not.toContain("environment_variables");
+      expect(queries[1]).toBe('select 1 as "probe"');
+      expect(queries[2]).toContain('select 1 as "probe" from "environment_variables"');
+      expect(queries[2]).toContain("where false");
+      expect(queries[3]).toContain('select "id" from "environment_variables"');
+      expect(queries[3]).toContain("where false");
+      expect(queries[4]).toContain('select "id" from "environment_variables"');
+      expect(queries[4]).not.toContain("where false");
     }));
 
   test("[CPS-DIAG-027] bounded probes publish only an allowlisted SQLSTATE class", () =>

@@ -48,6 +48,10 @@
 - Before the Environment identifier row probe, run a parameter-free zero-row identifier query so a
   generic failure can be reduced to a fixed schema-shape or row-read boundary without exposing the
   database error, query, relation, value, or row count. Keep both outcomes fail closed.
+- Before the zero-row Environment identifier probe, run a constant database probe and then a
+  zero-row table-only probe. This distinguishes database execution, source-table shape, and
+  identifier-column shape without reading catalog contents or business rows and without publishing
+  SQL, relation names, database details, values, or row counts.
 - Extend Deployment Proof with value-free planned/observed environment key-set evidence.
 
 ## Persistence And Migration
@@ -84,6 +88,8 @@
   second page, and never returns persisted values in the plan.
 - Verify the zero-row identifier probe is ordered before the one-row probe and that a schema-shape
   failure publishes only its fixed category, without SQL or private database detail.
+- Verify database, table-only, and identifier-column probes are ordered from least specific to most
+  specific and publish only their fixed boundary category.
 
 ## Risks And Deferred Gaps
 

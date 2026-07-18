@@ -390,6 +390,19 @@ export class PgControlPlaneSecretRotationService implements ControlPlaneSecretRo
       (row) => row.id,
       [
         {
+          name: "database",
+          read: () => db.selectNoFrom(sql<number>`1`.as("probe")).execute(),
+        },
+        {
+          name: "table-schema",
+          read: () =>
+            db
+              .selectFrom("environment_variables")
+              .select(sql<number>`1`.as("probe"))
+              .where(sql<boolean>`false`)
+              .execute(),
+        },
+        {
           name: "id-schema",
           read: () =>
             db
