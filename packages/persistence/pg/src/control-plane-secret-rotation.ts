@@ -111,7 +111,7 @@ function sqlStateCode(error: unknown): string | undefined {
   return undefined;
 }
 
-function runtimeFailureKind(error: unknown): string | undefined {
+function runtimeFailureKind(error: unknown, includeUntypedRuntime: boolean): string | undefined {
   const pending: Array<{ candidate: unknown; depth: number }> = [{ candidate: error, depth: 0 }];
   const visited = new Set<object>();
   let inspected = 0;
@@ -124,6 +124,7 @@ function runtimeFailureKind(error: unknown): string | undefined {
     const candidate = next.candidate as Record<string, unknown>;
     const name = candidate.name;
     if (name === "RuntimeError") return "runtime-failed";
+    if (includeUntypedRuntime && name === "Error") return "untyped-runtime-failed";
     if (name === "ErrnoError") return "filesystem-unavailable";
     if (name === "AbortError") return "operation-aborted";
     if (name === "DatabaseError") return "database-protocol-failed";
@@ -135,7 +136,11 @@ function runtimeFailureKind(error: unknown): string | undefined {
   return undefined;
 }
 
-function sourceReadFailureReason(source: string, error: unknown): string {
+function sourceReadFailureReason(
+  source: string,
+  error: unknown,
+  includeUntypedRuntime = false,
+): string {
   const code = sqlStateCode(error);
   if (code?.startsWith("08")) return `${source}-connection-unavailable`;
   if (code?.startsWith("22")) return `${source}-data-invalid`;
@@ -154,7 +159,7 @@ function sourceReadFailureReason(source: string, error: unknown): string {
   if (code?.startsWith("HV")) return `${source}-foreign-data-failed`;
   if (code?.startsWith("P0")) return `${source}-procedural-failed`;
   if (code?.startsWith("XX")) return `${source}-storage-corrupt`;
-  const runtimeKind = runtimeFailureKind(error);
+  const runtimeKind = runtimeFailureKind(error, includeUntypedRuntime);
   if (runtimeKind) return `${source}-${runtimeKind}`;
   return `${source}-read-failed`;
 }
@@ -177,7 +182,11 @@ async function readOptionalRotationSource<T>(
           throw rotationError(
             "control_plane_secret_rotation_source_read_failed",
             "A control-plane secret rotation source could not be read",
-            sourceReadFailureReason(`${source}-${probe.name}`, probeError),
+            sourceReadFailureReason(
+              `${source}-${probe.name}`,
+              probeError,
+              probe.name === "database",
+            ),
           );
         }
       }

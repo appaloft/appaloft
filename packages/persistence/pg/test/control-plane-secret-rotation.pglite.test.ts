@@ -121,7 +121,7 @@ describe("control-plane secret rotation", () => {
       expect(JSON.stringify(plan)).not.toContain("SELECT");
     }));
 
-  test("[CPS-DIAG-030] database probes fail closed before source-shape probes", () =>
+  test("[CPS-DIAG-030][CPS-DIAG-034] database probes fail closed before source-shape probes", () =>
     withDatabase(async (database) => {
       const failingDatabase = new Proxy(database.db, {
         get(target, property) {
@@ -154,7 +154,7 @@ describe("control-plane secret rotation", () => {
         retryable: false,
         details: {
           phase: "control-plane-secret-rotation",
-          reason: "environment-variables-database-read-failed",
+          reason: "environment-variables-database-untyped-runtime-failed",
         },
       });
       expect(JSON.stringify(plan)).not.toContain("private database detail");
