@@ -126,7 +126,7 @@ function createControlPlaneFetch(
     const url = new URL(request.url);
     const override = overrides?.[url.pathname];
     if (override) {
-      return override;
+      return override.clone();
     }
 
     if (url.pathname === "/api/version") {
@@ -1493,6 +1493,84 @@ describe("CLI remote control-plane client", () => {
     expect(requests.at(-1)?.headers.get("user-agent")).toBe("appaloft-cli");
     expect(listed.stdout).toContain("prj_remote");
     expect(shown.stdout).toContain("Remote Project");
+  });
+
+  test("[CONTROL-PLANE-CLI-006][GITHUB-APP-CONNECTION-001] GitHub source status and repository browse dispatch remotely", async () => {
+    const requests: Request[] = [];
+    const program = createRemoteCliProgram({
+      version: "0.12.5-test",
+      profile: profile("local"),
+      fetch: createControlPlaneFetch(requests, {
+        "/api/integrations/github/app-connection": jsonResponse({
+          configurationStatus: "configured",
+          connected: true,
+          tenantId: "org_self_hosted",
+          installationId: "123",
+        }),
+        "/api/integrations/github/repositories": jsonResponse({
+          items: [
+            {
+              id: "456",
+              name: "stocktruth",
+              fullName: "nichenqin/stocktruth",
+              private: true,
+              defaultBranch: "main",
+              htmlUrl: "https://github.com/nichenqin/stocktruth",
+              cloneUrl: "https://github.com/nichenqin/stocktruth.git",
+              ownerLogin: "nichenqin",
+              updatedAt: "2026-07-18T00:00:00.000Z",
+            },
+          ],
+        }),
+      }),
+      now: () => "2026-05-17T00:00:00.000Z",
+    });
+
+    const status = await captureProcessOutput(() =>
+      program.parseAsync(["node", "appaloft", "github", "status"]),
+    );
+    const repositories = await captureProcessOutput(() =>
+      program.parseAsync(["node", "appaloft", "github", "repositories", "--search", "stocktruth"]),
+    );
+
+    expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual(
+      [
+        "GET /api/version",
+        "GET /api/organizations/current-context",
+        "GET /api/integrations/github/app-connection",
+        "GET /api/integrations/github/repositories",
+      ],
+    );
+    expect(new URL(requests[3]?.url ?? "http://localhost").searchParams.get("search")).toBe(
+      "stocktruth",
+    );
+    expect(status.stdout).toContain('"connected": true');
+    expect(repositories.stdout).toContain("nichenqin/stocktruth");
+  });
+
+  test("[CONTROL-PLANE-CLI-006][APP-CONN-014] connector catalog omits defaults and sends explicit availability", async () => {
+    const requests: Request[] = [];
+    const program = createRemoteCliProgram({
+      version: "0.12.5-test",
+      profile: profile("local"),
+      fetch: createControlPlaneFetch(requests, {
+        "/api/connections/catalog": jsonResponse({ items: [] }),
+      }),
+      now: () => "2026-05-17T00:00:00.000Z",
+    });
+
+    await captureProcessOutput(() =>
+      program.parseAsync(["node", "appaloft", "connectors", "catalog"]),
+    );
+    await captureProcessOutput(() =>
+      program.parseAsync(["node", "appaloft", "connectors", "catalog", "--include-unavailable"]),
+    );
+
+    const defaultUrl = new URL(requests[2]?.url ?? "http://localhost");
+    const explicitUrl = new URL(requests[3]?.url ?? "http://localhost");
+    expect(defaultUrl.pathname).toBe("/api/connections/catalog");
+    expect([...defaultUrl.searchParams]).toEqual([]);
+    expect(explicitUrl.searchParams.get("includeUnavailable")).toBe("true");
   });
 
   test("[CONTROL-PLANE-CLI-006][SYSTEM-DIAG-004] doctor dispatches through the selected control plane", async () => {

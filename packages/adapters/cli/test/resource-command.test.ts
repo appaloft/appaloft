@@ -546,7 +546,7 @@ describe("CLI resource commands", () => {
     });
   });
 
-  test("[RES-SECRET-CRUD-008] resource secrets create/update/delete dispatch application commands", async () => {
+  test("[RES-SECRET-CRUD-008] resource secrets create/rotate/delete dispatch application commands", async () => {
     const {
       CreateResourceSecretReferenceCommand,
       DeleteResourceSecretReferenceCommand,
@@ -571,7 +571,7 @@ describe("CLI resource commands", () => {
       "appaloft",
       "resource",
       "secrets",
-      "update",
+      "rotate",
       "res_demo",
       "WEBHOOK_SECRET",
       "rotated",
@@ -598,6 +598,67 @@ describe("CLI resource commands", () => {
     });
     expect(commands[1]).toBeInstanceOf(RotateResourceSecretReferenceCommand);
     expect(commands[2]).toBeInstanceOf(DeleteResourceSecretReferenceCommand);
+  });
+
+  test("[RES-SECRET-CRUD-011] dispatches create and rotate with secret material from stdin", async () => {
+    const { CreateResourceSecretReferenceCommand, RotateResourceSecretReferenceCommand } =
+      await import("@appaloft/application");
+    const { commands, program } = await createCommandCaptureHarness(
+      "req_cli_resource_secrets_stdin_test",
+    );
+    const secretInputs = ["created-from-stdin\n", "rotated-from-stdin\r\n"];
+    const stdin = process.stdin as typeof process.stdin & {
+      [Symbol.asyncIterator](): AsyncIterableIterator<Buffer>;
+    };
+    const originalIterator = stdin[Symbol.asyncIterator];
+
+    stdin[Symbol.asyncIterator] = async function* () {
+      yield Buffer.from(secretInputs.shift() ?? "");
+    };
+    try {
+      const createOutput = await parseCliWithOutput(program, [
+        "node",
+        "appaloft",
+        "resource",
+        "secrets",
+        "create",
+        "res_demo",
+        "WEBHOOK_SECRET",
+        "--stdin",
+      ]);
+      const rotateOutput = await parseCliWithOutput(program, [
+        "node",
+        "appaloft",
+        "resource",
+        "secrets",
+        "rotate",
+        "res_demo",
+        "WEBHOOK_SECRET",
+        "--stdin",
+      ]);
+
+      expect(createOutput).not.toContain("created-from-stdin");
+      expect(rotateOutput).not.toContain("rotated-from-stdin");
+    } finally {
+      stdin[Symbol.asyncIterator] = originalIterator;
+    }
+
+    expect(commands).toHaveLength(2);
+    expect(commands[0]).toBeInstanceOf(CreateResourceSecretReferenceCommand);
+    expect(commands[0]).toMatchObject({ value: "created-from-stdin" });
+    expect(commands[1]).toBeInstanceOf(RotateResourceSecretReferenceCommand);
+    expect(commands[1]).toMatchObject({ value: "rotated-from-stdin" });
+
+    const { resolveResourceSecretValue } = await import("../src/commands/resource");
+    const conflictingInputs = await resolveResourceSecretValue({
+      stdin: true,
+      value: "secret-in-argv",
+      readStdin: async () => "secret-from-stdin",
+    });
+    expect(conflictingInputs.isErr()).toBe(true);
+
+    const missingInput = await resolveResourceSecretValue({ stdin: false, value: "" });
+    expect(missingInput.isErr()).toBe(true);
   });
 
   test("[RES-SECRET-CRUD-009] resource secrets list/show dispatch application queries", async () => {

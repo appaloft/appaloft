@@ -94,6 +94,9 @@ describe("CLI docs help links", () => {
     );
 
     expect(cliCommandDescriptions.serverCredential).toContain(cliDocsHrefs.serverSshCredential);
+    expect(cliCommandDescriptions.github).toContain(cliDocsHrefs.deploymentSource);
+    expect(cliCommandDescriptions.githubStatus).toContain(cliDocsHrefs.deploymentSource);
+    expect(cliCommandDescriptions.githubRepositories).toContain(cliDocsHrefs.deploymentSource);
     expect(cliCommandDescriptions.serverRegister).toContain(cliDocsHrefs.serverDockerSwarmTarget);
     expect(cliCommandDescriptions.serverCredentialRotate).toContain(
       cliDocsHrefs.serverSshCredential,

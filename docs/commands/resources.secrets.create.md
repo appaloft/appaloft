@@ -8,7 +8,7 @@ It is an explicit secret lifecycle command, not a generic variable update.
 - Operation key: `resources.secrets.create`
 - Command: `CreateResourceSecretReferenceCommand`
 - Input schema: `CreateResourceSecretReferenceCommandInput`
-- Test matrix: `RES-SECRET-CRUD-001`, `RES-SECRET-CRUD-006`, `RES-SECRET-CRUD-008`
+- Test matrix: `RES-SECRET-CRUD-001`, `RES-SECRET-CRUD-006`, `RES-SECRET-CRUD-008`, `RES-SECRET-CRUD-011`
 
 ## Input
 
@@ -32,8 +32,11 @@ It is an explicit secret lifecycle command, not a generic variable update.
 
 | Surface | Contract |
 | --- | --- |
-| CLI | `appaloft resource secrets create <resourceId> <key> <value> [--exposure runtime]` |
+| CLI | `appaloft resource secrets create <resourceId> <key> [<value> | --stdin] [--exposure runtime]` |
 | HTTP/oRPC | `POST /api/resources/{resourceId}/secrets` |
 | Web | Uses the same operation when Resource config exposes explicit secret-reference controls. |
 | Future MCP tools | Expose the command with the same schema and never return raw `value`. |
 
+Use `--stdin` for automation so secret material is not exposed through the process argument list.
+One trailing line ending is removed from piped input; empty input and combining `--stdin` with a
+positional value are rejected.

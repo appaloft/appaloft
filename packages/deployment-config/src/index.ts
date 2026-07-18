@@ -773,6 +773,31 @@ const appaloftDeploymentGeneratedAccessConfigSchema = z
   .strict()
   .describe("Resource generated access profile intent.");
 
+function domainRouteMatchesPath(routePathPrefix: string, requestPath: string): boolean {
+  return (
+    routePathPrefix === "/" ||
+    requestPath === routePathPrefix ||
+    requestPath.startsWith(routePathPrefix.endsWith("/") ? routePathPrefix : `${routePathPrefix}/`)
+  );
+}
+
+function redirectTargetServesPath(
+  sourcePathPrefix: string,
+  targets: readonly z.infer<typeof appaloftDeploymentAccessDomainConfigSchema>[],
+): boolean {
+  const baseTarget = targets
+    .filter((target) => domainRouteMatchesPath(target.pathPrefix, sourcePathPrefix))
+    .sort((left, right) => right.pathPrefix.length - left.pathPrefix.length)[0];
+  if (!baseTarget || baseTarget.redirectTo) {
+    return false;
+  }
+
+  return !targets.some(
+    (target) =>
+      Boolean(target.redirectTo) && domainRouteMatchesPath(sourcePathPrefix, target.pathPrefix),
+  );
+}
+
 export const appaloftDeploymentAccessConfigSchema = z
   .object({
     domains: z.array(appaloftDeploymentAccessDomainConfigSchema).min(1).optional(),
@@ -790,18 +815,24 @@ export const appaloftDeploymentAccessConfigSchema = z
       return;
     }
 
-    const byHost = new Map<string, NonNullable<typeof value.domains>[number]>();
+    const byHost = new Map<string, NonNullable<typeof value.domains>>();
+    const routeKeys = new Set<string>();
     for (const domain of domains) {
-      const existing = byHost.get(domain.host);
-      if (existing) {
+      const normalizedHost = domain.host.toLowerCase();
+      const routeKey = `${normalizedHost}\u0000${domain.pathPrefix}`;
+      if (routeKeys.has(routeKey)) {
         context.addIssue({
           code: "custom",
           path: ["domains"],
-          message: "config_domain_resolution: access.domains[] cannot contain duplicate hosts",
+          message:
+            "config_domain_resolution: access.domains[] cannot contain duplicate host and pathPrefix routes",
         });
         return;
       }
-      byHost.set(domain.host, domain);
+      routeKeys.add(routeKey);
+      const hostDomains = byHost.get(normalizedHost) ?? [];
+      hostDomains.push(domain);
+      byHost.set(normalizedHost, hostDomains);
     }
 
     for (const domain of domains) {
@@ -818,8 +849,9 @@ export const appaloftDeploymentAccessConfigSchema = z
         continue;
       }
 
-      const target = byHost.get(domain.redirectTo);
-      if (!target) {
+      const normalizedRedirectTarget = domain.redirectTo.toLowerCase();
+      const targets = byHost.get(normalizedRedirectTarget);
+      if (!targets || targets.length === 0) {
         context.addIssue({
           code: "custom",
           path: ["domains"],
@@ -829,7 +861,7 @@ export const appaloftDeploymentAccessConfigSchema = z
         return;
       }
 
-      if (target.host === domain.host) {
+      if (normalizedRedirectTarget === domain.host.toLowerCase()) {
         context.addIssue({
           code: "custom",
           path: ["domains"],
@@ -838,7 +870,7 @@ export const appaloftDeploymentAccessConfigSchema = z
         return;
       }
 
-      if (target.redirectTo) {
+      if (!redirectTargetServesPath(domain.pathPrefix, targets)) {
         context.addIssue({
           code: "custom",
           path: ["domains"],

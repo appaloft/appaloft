@@ -1765,6 +1765,34 @@ export const publicDocsHelpTopics = {
       "apps/web/src/routes/resources/[resourceId=consoleObjectId]/+page.svelte: resource configuration section",
     ],
   },
+  "environment.secret-values": {
+    id: "environment.secret-values",
+    title: "Secret values",
+    description: "How to create, rotate, inspect, and pass Resource secrets safely.",
+    page: {
+      "zh-CN": "environments/variables/secrets",
+      "en-US": "en/environments/variables/secrets",
+    },
+    anchor: "environment-secret-values",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["web", "cli", "http-api", "mcp"],
+    relatedOperation: "resources.secrets.create",
+    aliases: ["secret", "secrets", "stdin", "masking", "密钥"],
+    specReferences: [
+      "docs/commands/resources.secrets.create.md",
+      "docs/commands/resources.secrets.rotate.md",
+      "docs/commands/resources.secrets.delete.md",
+      "docs/queries/resources.secrets.list.md",
+      "docs/queries/resources.secrets.show.md",
+      "docs/testing/resource-profile-lifecycle-test-matrix.md",
+    ],
+    webSurfaces: [
+      "apps/web/src/routes/resources/[resourceId=consoleObjectId]/+page.svelte: resource secret configuration",
+    ],
+  },
   "environment.diff-promote": {
     id: "environment.diff-promote",
     title: "Environment diff and promote",
@@ -3533,6 +3561,20 @@ export const publicDocsOperationCoverage = [
     topicId: "dependency.resource-lifecycle",
   },
   {
+    operationKey: "dependency-resources.inspect",
+    status: "migration-gap",
+    reason:
+      "The operation is active, but the public dependency page does not yet document its safe readback, CLI inputs, limits, and recovery guidance.",
+    targetPage: "dependency resource inspect and query guide",
+  },
+  {
+    operationKey: "dependency-resources.query",
+    status: "migration-gap",
+    reason:
+      "The operation is active, but the public dependency page does not yet document its bounded read-only query contract, CLI inputs, denials, and recovery guidance.",
+    targetPage: "dependency resource inspect and query guide",
+  },
+  {
     operationKey: "dependency-resources.rename",
     status: "documented",
     topicId: "dependency.resource-lifecycle",
@@ -3654,27 +3696,27 @@ export const publicDocsOperationCoverage = [
   {
     operationKey: "resources.secrets.create",
     status: "documented",
-    topicId: "environment.variable-precedence",
+    topicId: "environment.secret-values",
   },
   {
     operationKey: "resources.secrets.rotate",
     status: "documented",
-    topicId: "environment.variable-precedence",
+    topicId: "environment.secret-values",
   },
   {
     operationKey: "resources.secrets.delete",
     status: "documented",
-    topicId: "environment.variable-precedence",
+    topicId: "environment.secret-values",
   },
   {
     operationKey: "resources.secrets.list",
     status: "documented",
-    topicId: "environment.variable-precedence",
+    topicId: "environment.secret-values",
   },
   {
     operationKey: "resources.secrets.show",
     status: "documented",
-    topicId: "environment.variable-precedence",
+    topicId: "environment.secret-values",
   },
   {
     operationKey: "resources.import-variables",
@@ -4168,6 +4210,20 @@ export const publicDocsOperationCoverage = [
   },
   { operationKey: "system.db-status", status: "documented", topicId: "advanced.control-plane" },
   { operationKey: "system.db-migrate", status: "documented", topicId: "advanced.control-plane" },
+  {
+    operationKey: "system.control-plane-secret-rotation.plan",
+    status: "migration-gap",
+    reason:
+      "The security-sensitive workflow is active, but the public self-hosting guide does not yet cover plan digests, backup prerequisites, safe output, or recovery.",
+    targetPage: "control-plane secret rotation guide",
+  },
+  {
+    operationKey: "system.control-plane-secret-rotation.apply",
+    status: "migration-gap",
+    reason:
+      "The security-sensitive workflow is active, but the public self-hosting guide does not yet cover backup references, stale-plan denial, rollback, or recovery.",
+    targetPage: "control-plane secret rotation guide",
+  },
 ] as const satisfies readonly PublicDocsOperationCoverage[];
 
 const publicDocsOperationCoverageByKey: ReadonlyMap<string, PublicDocsOperationCoverage> = new Map(

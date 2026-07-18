@@ -9,7 +9,9 @@ searchAliases:
   - "github"
   - "repository"
   - "pull request"
-relatedOperations: []
+relatedOperations:
+  - system.github-app-connection.show
+  - system.github-repositories.list
 sidebar:
   label: "GitHub"
   order: 1
@@ -28,6 +30,9 @@ The GitHub integration should expose only information that helps users decide wh
 ## Connect the repository [step]
 
 Choose the organization and repository, then confirm that Appaloft can read code, receive pull request events, and report deployment status when needed. Grant only the repositories required for deployment instead of opening the whole organization by default.
+
+Use `appaloft github status` to inspect the current workspace installation and
+`appaloft github repositories --search <text>` to browse its granted repositories.
 
 ## Choose deployment inputs [step]
 

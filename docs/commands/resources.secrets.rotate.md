@@ -7,7 +7,7 @@
 - Operation key: `resources.secrets.rotate`
 - Command: `RotateResourceSecretReferenceCommand`
 - Input schema: `RotateResourceSecretReferenceCommandInput`
-- Test matrix: `RES-SECRET-CRUD-002`, `RES-SECRET-CRUD-006`, `RES-SECRET-CRUD-008`
+- Test matrix: `RES-SECRET-CRUD-002`, `RES-SECRET-CRUD-006`, `RES-SECRET-CRUD-008`, `RES-SECRET-CRUD-011`
 
 ## Behavior
 
@@ -20,8 +20,11 @@ publishes `resource-secret-reference-rotated` without raw secret material.
 
 | Surface | Contract |
 | --- | --- |
-| CLI | `appaloft resource secrets rotate <resourceId> <key> <value> [--exposure runtime]` |
+| CLI | `appaloft resource secrets rotate <resourceId> <key> [<value> | --stdin] [--exposure runtime]` |
 | HTTP/oRPC | `POST /api/resources/{resourceId}/secrets/{key}` |
 | Web | Uses the same operation for explicit secret rotation. |
 | Future MCP tools | Expose the command with the same schema and masked result. |
 
+Use `--stdin` for automation so secret material is not exposed through the process argument list.
+One trailing line ending is removed from piped input; empty input and combining `--stdin` with a
+positional value are rejected.

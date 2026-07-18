@@ -26,12 +26,11 @@ const generatedOperationsWithoutRemoteCli = new Set([
   "organizations.delete",
   "organizations.profile.change",
   "organizations.profile.show",
+  "servers.configure-edge-proxy",
   "servers.test-draft-connectivity",
   "source-events.ingest",
   "static-artifacts.publications.list",
   "static-artifacts.publish",
-  "system.github-app-connection.show",
-  "system.github-repositories.list",
   "system.integrations.list",
 ]);
 
@@ -94,6 +93,9 @@ describe("Remote CLI Mapping Matrix", () => {
       uniqueGeneratedKeys.filter(
         (key) => !remoteCliKeys.has(key) && !generatedOperationsWithoutRemoteCli.has(key),
       ),
+    ).toEqual([]);
+    expect(
+      [...generatedOperationsWithoutRemoteCli].filter((key) => remoteCliKeys.has(key)),
     ).toEqual([]);
   });
 

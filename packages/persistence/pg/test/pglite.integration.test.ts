@@ -2206,6 +2206,95 @@ describe("pglite persistence integration", () => {
     }
   }, 15000);
 
+  test("[CONFIG-FILE-DOMAIN-010] pg route store accepts distinct paths on one host", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-route-paths-"));
+    const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
+    let closeDatabase: (() => Promise<void>) | undefined;
+
+    try {
+      const { createDatabase, createMigrator, PgServerAppliedRouteStateRepository } = await import(
+        "../src/index"
+      );
+      const database = await createDatabase({ driver: "pglite", pgliteDataDir });
+      closeDatabase = () => database.close();
+      const migrationResult = await createMigrator(database.db).migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      const target = await seedSourceLinkContext(database.db, "route_paths");
+      const store = createServerAppliedRouteStateStore(
+        new PgServerAppliedRouteStateRepository(database.db),
+      );
+      const distinctRoutes = await store.upsertDesired({
+        target,
+        updatedAt: "2026-07-18T00:00:00.000Z",
+        domains: [
+          { host: "app.example.com", pathPrefix: "/api", tlsMode: "auto" },
+          { host: "APP.EXAMPLE.COM", pathPrefix: "/v1", tlsMode: "auto" },
+        ],
+      });
+      expect(distinctRoutes.isOk()).toBe(true);
+
+      const duplicateRoute = await store.upsertDesired({
+        target,
+        updatedAt: "2026-07-18T00:01:00.000Z",
+        domains: [
+          { host: "app.example.com", pathPrefix: "/api", tlsMode: "auto" },
+          { host: "APP.EXAMPLE.COM", pathPrefix: "/api", tlsMode: "auto" },
+        ],
+      });
+      expect(duplicateRoute.isErr()).toBe(true);
+      expect(duplicateRoute.isErr() ? duplicateRoute.error.message : "").toContain(
+        "duplicate host and pathPrefix routes",
+      );
+
+      const pathLoop = await store.upsertDesired({
+        target,
+        updatedAt: "2026-07-18T00:02:00.000Z",
+        domains: [
+          { host: "a.example.com", pathPrefix: "/", tlsMode: "auto" },
+          { host: "b.example.com", pathPrefix: "/", tlsMode: "auto" },
+          {
+            host: "a.example.com",
+            pathPrefix: "/api/",
+            tlsMode: "auto",
+            redirectTo: "b.example.com",
+          },
+          {
+            host: "b.example.com",
+            pathPrefix: "/api/legacy",
+            tlsMode: "auto",
+            redirectTo: "a.example.com",
+          },
+        ],
+      });
+      expect(pathLoop.isErr()).toBe(true);
+      expect(pathLoop.isErr() ? pathLoop.error.message : "").toContain(
+        "redirect target must be a served domain",
+      );
+
+      const trailingSlashMismatch = await store.upsertDesired({
+        target,
+        updatedAt: "2026-07-18T00:03:00.000Z",
+        domains: [
+          {
+            host: "a.example.com",
+            pathPrefix: "/api",
+            tlsMode: "auto",
+            redirectTo: "b.example.com",
+          },
+          { host: "b.example.com", pathPrefix: "/api/", tlsMode: "auto" },
+        ],
+      });
+      expect(trailingSlashMismatch.isErr()).toBe(true);
+      expect(trailingSlashMismatch.isErr() ? trailingSlashMismatch.error.message : "").toContain(
+        "redirect target must be a served domain",
+      );
+    } finally {
+      await closeDatabase?.();
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  }, 15000);
+
   test("[SERVER-APPLIED-ROUTE-STATE-003] pg route store persists status writeback and conflicts", async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-route-status-"));
     const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");

@@ -118,11 +118,12 @@ generic `resources.update`.
 | RES-SECRET-CRUD-003 | `resources.secrets.delete` | Command use case | Existing Resource-owned secret reference removed. | Deletes the Resource-owned secret entry and publishes `resource-secret-reference-deleted`. |
 | RES-SECRET-CRUD-004 | `resources.secrets.list` | Query service | Resource has secret references. | Returns `resources.secrets.list/v1` with `value = "****"` only. |
 | RES-SECRET-CRUD-005 | `resources.secrets.show` | Query service | Existing Resource-owned secret reference read. | Returns `resources.secrets.show/v1` with `value = "****"` only. |
-| RES-SECRET-CRUD-006 | HTTP/oRPC | Entrypoint | Secret create/update/delete routes submitted. | Dispatches the matching command through `CommandBus` using shared schemas. |
+| RES-SECRET-CRUD-006 | HTTP/oRPC | Entrypoint | Secret create/rotate/delete routes submitted. | Dispatches the matching command through `CommandBus` using shared schemas. |
 | RES-SECRET-CRUD-007 | HTTP/oRPC | Entrypoint | Secret list/show routes submitted. | Dispatches the matching query through `QueryBus` using shared schemas. |
-| RES-SECRET-CRUD-008 | CLI | Entrypoint | Secret create/update/delete commands submitted. | Dispatches the matching application command through `CommandBus`; no CLI-only secret lifecycle exists. |
+| RES-SECRET-CRUD-008 | CLI | Entrypoint | Secret create/rotate/delete commands submitted. | Dispatches the matching application command through `CommandBus`; no CLI-only secret lifecycle exists. |
 | RES-SECRET-CRUD-009 | CLI | Entrypoint | Secret list/show commands submitted. | Dispatches the matching application query through `QueryBus` and returns masked output only. |
 | RES-SECRET-CRUD-010 | Operation catalog/docs | Catalog | Secret reference CRUD/list/show is public. | `CORE_OPERATIONS.md`, `BUSINESS_OPERATION_MAP.md`, `operation-catalog.ts`, CLI help, HTTP/oRPC, public docs registry, and future MCP-tool decision surfaces name the same operations. |
+| RES-SECRET-CRUD-011 | CLI | Entrypoint | Secret create or rotate reads the value from standard input. | `--stdin` accepts non-empty secret material without placing it in argv, strips one trailing newline, rejects an argv value combined with `--stdin`, and never returns the value. |
 | DMBH-RES-NET-001 | `Resource` | Core domain unit | Resource network exposure mode and health-check type vary across direct-port, reverse-proxy, HTTP, and unsupported health checks. | `Resource` owns admission while exposure mode and health-check type value objects answer single-value predicates. |
 | RES-PROFILE-ARCHIVE-001 | `resources.archive` | Command use case | Active resource archived. | Coordinates runtime stop when a current supported runtime placement is retained, persists archived lifecycle, publishes `resource-archived`, returns `ok({ id })`. |
 | RES-PROFILE-ARCHIVE-002 | `resources.archive` | Command use case | Already archived resource. | Returns idempotent `ok({ id })` without duplicate lifecycle state effect or duplicate event, while still allowing runtime stop coordination to repair older archived resources whose runtime is retained. |
@@ -220,7 +221,7 @@ Automated coverage now exists for:
   `packages/application/test/resource-config.test.ts`;
 - `RES-SECRET-CRUD-006` and `RES-SECRET-CRUD-007` in
   `packages/orpc/test/resource-config.http.test.ts`;
-- `RES-SECRET-CRUD-008` and `RES-SECRET-CRUD-009` in
+- `RES-SECRET-CRUD-008`, `RES-SECRET-CRUD-009`, and `RES-SECRET-CRUD-011` in
   `packages/adapters/cli/test/resource-command.test.ts`;
 - `RES-PROFILE-ARCHIVE-001`, `RES-PROFILE-ARCHIVE-002`, `RES-PROFILE-ARCHIVE-003`,
   `RES-PROFILE-ARCHIVE-003A`, `RES-PROFILE-ARCHIVE-005`, and `RES-PROFILE-ARCHIVE-006` in
