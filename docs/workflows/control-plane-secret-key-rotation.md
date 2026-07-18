@@ -23,6 +23,8 @@ Known SQLSTATE families are reduced to fixed categories such as schema-incompati
 feature-unsupported, state-unavailable, or storage-corrupt. The raw SQLSTATE, database message,
 query, relation, host, and path are never published; unknown failures keep the generic read-failed
 category.
+Known driver wrapper fields and SQLSTATE aliases are inspected only within a bounded traversal;
+arbitrary payload fields are ignored.
 
 Use the source CLI from the repository checkout:
 
