@@ -1,5 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -93,6 +101,85 @@ describe("CLI SSH remote state lifecycle", () => {
     expect(commands).toHaveLength(2);
     expect(commands[1]?.command).toContain("rm -rf");
     expect(commands[1]?.command).toContain("mutation.lock");
+  });
+
+  test("[CPS-REMOTE-013] read-only prepare leaves durable remote state unchanged", async () => {
+    const dataRoot = mkdtempSync(join(tmpdir(), "appaloft-readonly-state-"));
+    const schemaMarker = join(dataRoot, "schema-version.json");
+    const backendMarker = join(dataRoot, "backend.json");
+
+    try {
+      mkdirSync(join(dataRoot, "pglite"), { recursive: true });
+      mkdirSync(join(dataRoot, "locks"), { recursive: true });
+      writeFileSync(schemaMarker, '{"version":1,"migratedAt":"legacy"}\n');
+      writeFileSync(join(dataRoot, "pglite", "live.txt"), "live-state");
+
+      const lifecycle = new SshRemoteStateLifecycle({
+        dataRoot,
+        readOnly: true,
+        target: { host: "127.0.0.1" },
+        owner: "appaloft-cli",
+        correlationId: "readonly_1",
+        heartbeatIntervalMs: null,
+        runner: { run: ({ command }) => executeCommand(command) },
+      });
+
+      const prepared = await lifecycle.prepare();
+
+      expect(prepared.isOk()).toBe(true);
+      if (prepared.isErr()) {
+        throw new Error(prepared.error.message);
+      }
+      expect(existsSync(backendMarker)).toBe(false);
+      expect(existsSync(join(dataRoot, "backups"))).toBe(false);
+      expect(existsSync(join(dataRoot, "journals"))).toBe(false);
+      expect(readFileSync(schemaMarker, "utf8")).toBe('{"version":1,"migratedAt":"legacy"}\n');
+
+      const released = await prepared.value.release();
+
+      expect(released.isOk()).toBe(true);
+      expect(readdirSync(join(dataRoot, "locks"))).toEqual([]);
+      expect(readFileSync(join(dataRoot, "pglite", "live.txt"), "utf8")).toBe("live-state");
+      expect(readFileSync(schemaMarker, "utf8")).toBe('{"version":1,"migratedAt":"legacy"}\n');
+    } finally {
+      rmSync(dataRoot, { recursive: true, force: true });
+    }
+  });
+
+  test("[CPS-REMOTE-013] read-only prepare never recovers a stale lock", async () => {
+    const dataRoot = mkdtempSync(join(tmpdir(), "appaloft-readonly-stale-lock-"));
+    const lockRoot = join(dataRoot, "locks", "mutation.lock");
+
+    try {
+      mkdirSync(join(dataRoot, "pglite"), { recursive: true });
+      mkdirSync(lockRoot, { recursive: true });
+      writeFileSync(join(dataRoot, "schema-version.json"), '{"version":1}\n');
+      writeFileSync(
+        join(lockRoot, "owner.json"),
+        '{"owner":"previous","correlationId":"previous_1","startedAt":"2020-01-01T00:00:00Z","lastHeartbeatAt":"2020-01-01T00:00:00Z","staleAfterSeconds":1}\n',
+      );
+
+      const lifecycle = new SshRemoteStateLifecycle({
+        dataRoot,
+        readOnly: true,
+        target: { host: "127.0.0.1" },
+        heartbeatIntervalMs: null,
+        lockAcquireTimeoutMs: 0,
+        staleAfterMs: 1_000,
+        runner: { run: ({ command }) => executeCommand(command) },
+      });
+
+      const prepared = await lifecycle.prepare();
+
+      expect(prepared.isErr()).toBe(true);
+      expect(existsSync(lockRoot)).toBe(true);
+      expect(existsSync(join(dataRoot, "locks", "recovered"))).toBe(false);
+      expect(readFileSync(join(lockRoot, "owner.json"), "utf8")).toContain(
+        '"correlationId":"previous_1"',
+      );
+    } finally {
+      rmSync(dataRoot, { recursive: true, force: true });
+    }
   });
 
   test("[CONFIG-FILE-STATE-015] SSH adapter returns structured backend mismatch", async () => {

@@ -42,6 +42,7 @@ export interface SshRemoteCommandRunner {
 export interface SshRemoteStateLifecycleOptions {
   dataRoot: string;
   target: SshRemoteStateTarget;
+  readOnly?: boolean;
   schemaVersion?: number;
   owner?: string;
   correlationId?: string;
@@ -189,19 +190,27 @@ function remotePrepareCommand(input: {
   owner: string;
   correlationId: string;
   staleAfterSeconds: number;
+  readOnly: boolean;
 }): AshScript {
   return ash`
     set -eu
     ${ash.env("data_root", input.dataRoot)}
     ${ash.env("schema_version", input.schemaVersion)}
     ${ash.env("stale_after_seconds", input.staleAfterSeconds)}
+    ${ash.env("read_only", input.readOnly ? "true" : "false")}
     ${ash.env("owner_json", jsonString(input.owner))}
     ${ash.env("correlation_id_json", jsonString(input.correlationId))}
     ${ash.raw(`now="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
     now_epoch="$(date -u +%s)"
     stamp="$(date -u +"%Y-%m-%dT%H-%M-%SZ")"
-    mkdir -p "$data_root"
-    mkdir -p "$data_root/pglite" "$data_root/locks" "$data_root/backups" "$data_root/journals" "$data_root/source-links" "$data_root/server-applied-routes" "$data_root/locks/recovered"`)}
+    if [ "$read_only" = true ]; then
+      [ -d "$data_root" ] || { echo "remote state root does not exist" >&2; exit 1; }
+      [ -d "$data_root/pglite" ] || { echo "remote PGlite state does not exist" >&2; exit 1; }
+      [ -d "$data_root/locks" ] || { echo "remote state lock directory does not exist" >&2; exit 1; }
+    else
+      mkdir -p "$data_root"
+      mkdir -p "$data_root/pglite" "$data_root/locks" "$data_root/backups" "$data_root/journals" "$data_root/source-links" "$data_root/server-applied-routes" "$data_root/locks/recovered"
+    fi`)}
     ${ash.raw(`backend_marker="$data_root/${serverStateBackendMarkerFile}"
     actual_backend=""
     if [ -f "$backend_marker" ]; then
@@ -211,7 +220,9 @@ function remotePrepareCommand(input: {
       printf '{"phase":"server-state-backend","reason":${jsonString(serverStateBackendMismatchReason)},"expectedStateBackend":"ssh-pglite","actualStateBackend":"%s"}\\n' "$actual_backend" >&2
       exit ${stateBackendMismatchExitCode}
     fi
-    printf '{"schemaVersion":${jsonString(serverStateBackendMarkerSchemaVersion)},"stateBackend":"ssh-pglite","updatedAt":"%s","owner":%s}\\n' "$now" "$owner_json" > "$backend_marker"
+    if [ "$read_only" != true ]; then
+      printf '{"schemaVersion":${jsonString(serverStateBackendMarkerSchemaVersion)},"stateBackend":"ssh-pglite","updatedAt":"%s","owner":%s}\\n' "$now" "$owner_json" > "$backend_marker"
+    fi
     lock_dir="$data_root/locks/mutation.lock"
     owner_file="$lock_dir/owner.json"
     if ! mkdir "$lock_dir"; then
@@ -245,7 +256,7 @@ function remotePrepareCommand(input: {
       if [ -n "$heartbeat_epoch" ]; then
         lock_age_seconds=$((now_epoch - heartbeat_epoch))
       fi
-      if [ -n "$lock_age_seconds" ] && [ "$lock_age_seconds" -ge "$recorded_stale_after" ]; then
+      if [ "$read_only" != true ] && [ -n "$lock_age_seconds" ] && [ "$lock_age_seconds" -ge "$recorded_stale_after" ]; then
         recovered_path="$data_root/locks/recovered/mutation-$stamp-$$.lock"
         if mv "$lock_dir" "$recovered_path" 2>/dev/null; then
           printf '{"phase":"%s","recoveredAt":"%s","recoveredBy":%s,"correlationId":%s,"lockAgeSeconds":%s}\\n' "remote-state-lock" "$now" "$owner_json" "$correlation_id_json" "$lock_age_seconds" > "$recovered_path/recovered.json"
@@ -266,7 +277,7 @@ function remotePrepareCommand(input: {
       current_version="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*\\([0-9][0-9]*\\).*/\\1/p' "$marker" | head -n 1 || true)"
     fi
     [ -n "$current_version" ] || current_version=0
-    if [ "$current_version" != "$schema_version" ]; then
+    if [ "$read_only" != true ] && [ "$current_version" != "$schema_version" ]; then
       backup_path="$data_root/backups/schema-$current_version-to-$schema_version-$stamp.json"
       journal_path="$data_root/journals/schema-$current_version-to-$schema_version-$stamp.json"
       if [ -f "$marker" ]; then cp "$marker" "$backup_path"; else printf "{}\\n" > "$backup_path"; fi
@@ -275,7 +286,9 @@ function remotePrepareCommand(input: {
     fi
     actual_version="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*\\([0-9][0-9]*\\).*/\\1/p' "$marker" | head -n 1 || true)"
     if [ "$actual_version" != "$schema_version" ]; then
-      printf '{"phase":"remote-state-recovery","message":"schema marker integrity check failed","recordedAt":"%s"}\\n' "$now" > "$data_root/recovery.json"
+      if [ "$read_only" != true ]; then
+        printf '{"phase":"remote-state-recovery","message":"schema marker integrity check failed","recordedAt":"%s"}\\n' "$now" > "$data_root/recovery.json"
+      fi
       rm -rf "$lock_dir"
       echo "remote state schema marker failed integrity check" >&2
       exit ${migrationFailureExitCode}
@@ -485,6 +498,7 @@ export class SshRemoteStateLifecycle {
   private readonly dataRoot: string;
   private readonly target: SshRemoteStateTarget;
   private readonly schemaVersion: number;
+  private readonly readOnly: boolean;
   private readonly owner: string;
   private readonly correlationId: string;
   private readonly cwd: string;
@@ -501,6 +515,7 @@ export class SshRemoteStateLifecycle {
     this.dataRoot = options.dataRoot;
     this.target = options.target;
     this.schemaVersion = options.schemaVersion ?? defaultSchemaVersion;
+    this.readOnly = options.readOnly ?? false;
     this.owner = options.owner ?? "appaloft-cli";
     this.correlationId = options.correlationId ?? defaultCorrelationId("remote_state");
     this.cwd = options.cwd ?? process.cwd();
@@ -560,6 +575,7 @@ export class SshRemoteStateLifecycle {
             owner: this.owner,
             correlationId: this.correlationId,
             staleAfterSeconds: Math.ceil(this.staleAfterMs / 1_000),
+            readOnly: this.readOnly,
           }),
         ),
         cwd: this.cwd,
