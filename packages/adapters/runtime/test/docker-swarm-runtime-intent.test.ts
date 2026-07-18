@@ -666,7 +666,7 @@ describe("renderDockerSwarmRuntimeIntent", () => {
     );
   });
 
-  test("[SWARM-TARGET-APPLY-001][SWARM-TARGET-ROUTE-001][SWARM-TARGET-SECRET-001] renders image apply plan as candidate rollout without public host ports", () => {
+  test("[SWARM-TARGET-APPLY-001][SWARM-TARGET-ROUTE-001][SWARM-TARGET-SECRET-001][SWARM-TARGET-VERIFY-001] renders image apply plan as candidate rollout without public host ports", () => {
     const intentResult = renderDockerSwarmRuntimeIntent({
       runtimePlan: imageRuntimePlan(),
       environmentSnapshot: runtimeEnvironmentSnapshot(),
@@ -715,6 +715,15 @@ describe("renderDockerSwarmRuntimeIntent", () => {
     expect(createDisplayCommand).toContain("--env 'DATABASE_URL=********'");
     expect(createDisplayCommand).not.toContain("PUBLIC_FLAG=enabled");
     expect(createDisplayCommand).not.toContain("postgres://secret-value");
+
+    const verifyCommand = plan.steps[1]?.command ?? "";
+    expect(verifyCommand).toContain(".Spec.Mode.Replicated.Replicas");
+    expect(verifyCommand).toContain(".CurrentState");
+    expect(verifyCommand).toContain("running_count");
+    expect(verifyCommand).toContain("desired_replicas");
+    expect(verifyCommand).toContain("docker service ps --no-trunc");
+    expect(verifyCommand).toContain("exit 1");
+    expect(Bun.spawnSync(["sh", "-n", "-c", verifyCommand]).exitCode).toBe(0);
 
     const fixedStringVerificationPlan = renderDockerSwarmApplyPlan({
       ...intent,
@@ -814,10 +823,11 @@ describe("renderDockerSwarmRuntimeIntent", () => {
     );
   });
 
-  test("[STOR-REALIZE-003][SWARM-TARGET-APPLY-001] renders Compose stack apply plan with storage mounts", () => {
+  test("[STOR-REALIZE-003][SWARM-TARGET-APPLY-001][SWARM-TARGET-AUTH-001] renders Compose stack apply plan with storage mounts", () => {
     const intentResult = renderDockerSwarmRuntimeIntent({
       runtimePlan: composeRuntimePlan({
         swarmTargetService: "web",
+        imagePullSecretRef: "raw-private-registry-token",
         "storage.mounts": JSON.stringify([
           {
             attachmentId: "rsa_data",
@@ -848,8 +858,11 @@ describe("renderDockerSwarmRuntimeIntent", () => {
       "cleanup-superseded-services",
     ]);
     const deployCommand = plan.steps[0]?.command ?? "";
+    expect(plan.steps[0]?.stdinFile).toBe("docker-compose.yml");
     expect(deployCommand).toContain("docker stack deploy");
-    expect(deployCommand).toContain("-c 'docker-compose.yml' -c \"$override_file\"");
+    expect(deployCommand).toContain("--with-registry-auth");
+    expect(deployCommand).not.toContain("raw-private-registry-token");
+    expect(deployCommand).toContain('-c - -c "$override_file"');
     expect(deployCommand).toContain("'appaloft-res-api-dst-preview-dep-124'");
     expect(deployCommand).toContain('"appaloft.managed": "true"');
     expect(deployCommand).toContain('"appaloft.deployment-id": "dep_124"');

@@ -143,6 +143,8 @@ export {
   type DockerSwarmCommandRunner,
   type DockerSwarmCommandRunnerInput,
   type DockerSwarmCommandRunnerResult,
+  type DockerSwarmProcessRunner,
+  type DockerSwarmProcessRunnerInput,
   type DockerSwarmShellCommandRunnerOptions,
 } from "./docker-swarm-execution-backend";
 export {

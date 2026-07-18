@@ -41,6 +41,8 @@ apply, observe, and clean up Swarm workloads through the runtime target abstract
 3. Add a Swarm runtime target backend descriptor and registry selection coverage.
 4. Implement Swarm render/apply/verify/log/health/cleanup behind `packages/adapters/runtime`
    without leaking Docker client types into core/application.
+   Swarm mutation and verification commands resolve the registered manager and execute through its
+   SSH identity; local execution is an explicit smoke/test runner only.
 5. Add persistence/read-model support only for sanitized target summaries needed by deployment
    detail, resource health/logs, diagnostics, cleanup, and rollback-candidate identity.
 6. Add CLI/API/Web/future MCP help or descriptions only through existing operations and generated
@@ -69,6 +71,9 @@ apply, observe, and clean up Swarm workloads through the runtime target abstract
 ## Risks And Migration Gaps
 
 - Registry push/pull policy for buildable sources is unresolved.
+- Pre-`1.0.0` registry credential ownership is operator-managed on the registered manager. Product-
+  managed login, temporary `DOCKER_CONFIG`, rotation, and cleanup are not applicable until a future
+  accepted registry-management capability defines them.
 - Replicas and update strategy are intentionally defaulted/deferred until target/profile
   configuration owns them.
 - Capacity diagnostics may be partial depending on manager/node visibility.

@@ -60,6 +60,11 @@ export interface DockerSwarmComposeWorkloadIntent {
   kind: "compose";
   composeFile: string;
   targetServiceName: string;
+  registryAuth?: {
+    required: true;
+    secretRef: "********";
+    redacted: true;
+  };
 }
 
 export type DockerSwarmWorkloadIntent =
@@ -177,6 +182,7 @@ export interface DockerSwarmApplyPlanStep {
   step: DockerSwarmApplyPlanStepName;
   command: string;
   displayCommand: string;
+  stdinFile?: string;
 }
 
 export interface DockerSwarmApplyPlan {
@@ -382,7 +388,13 @@ function stackDeployCommand(input: {
   return [
     "override_file=$(mktemp -t appaloft-swarm-compose-override.XXXXXX.yml)",
     `printf %s ${shellQuote(overrideContent)} > "$override_file"`,
-    `docker stack deploy -c ${shellQuote(input.composeFile)} -c "$override_file" ${shellQuote(input.intent.stackName)}`,
+    commandParts([
+      "docker stack deploy",
+      "-c -",
+      '-c "$override_file"',
+      input.intent.workload.registryAuth ? "--with-registry-auth" : "",
+      shellQuote(input.intent.stackName),
+    ]),
     'status="$?"',
     'rm -f "$override_file"',
     'exit "$status"',
@@ -541,6 +553,9 @@ function renderComposeWorkload(
     kind: "compose",
     composeFile: composeFile.value,
     targetServiceName: renderTargetServiceName(targetServiceName),
+    ...(metadataValue(runtimePlan, execution, registryAuthMetadataKeys)
+      ? { registryAuth: { required: true, secretRef: "********", redacted: true } }
+      : {}),
   });
 }
 
@@ -1162,6 +1177,7 @@ export function renderDockerSwarmApplyPlan(
         }
       : {
           step: "deploy-candidate-stack" as const,
+          stdinFile: intent.workload.composeFile,
           command: stackDeployCommand({
             composeFile: intent.workload.composeFile,
             intent,
@@ -1184,12 +1200,24 @@ export function renderDockerSwarmApplyPlan(
         )} | sed 's/=.*//' | grep -Fqx -- ${shellQuote(variable.name)}`,
     )
     .join(" && ");
-  const verifyCommand = commandParts([
-    "docker service ps",
-    "--filter 'desired-state=running'",
-    shellQuote(intent.serviceName),
-    ...(verifyEnvironmentKeys ? ["&&", verifyEnvironmentKeys] : []),
-  ]);
+  const quotedServiceName = shellQuote(intent.serviceName);
+  const verifyCommand = [
+    `service_name=${quotedServiceName}`,
+    "attempt=0",
+    "max_attempts=50",
+    [
+      'while [ "$attempt" -lt "$max_attempts" ]; do',
+      'desired_replicas=$(docker service inspect "$service_name" --format \'{{if .Spec.Mode.Replicated}}{{.Spec.Mode.Replicated.Replicas}}{{else}}-1{{end}}\') || exit 1;',
+      'if [ "$desired_replicas" -lt 0 ]; then desired_replicas=$(docker service ps "$service_name" --filter \'desired-state=running\' --format \'{{.ID}}\' | wc -l | tr -d \' \'); fi;',
+      'running_count=$(docker service ps "$service_name" --filter \'desired-state=running\' --format \'{{.CurrentState}}\' | awk \'$1 == "Running" { count += 1 } END { print count + 0 }\') || exit 1;',
+      'if [ "$desired_replicas" -gt 0 ] && [ "$running_count" -eq "$desired_replicas" ]; then break; fi;',
+      'attempt=$((attempt + 1));',
+      "sleep 1;",
+      "done",
+    ].join(" "),
+    'if [ "$desired_replicas" -le 0 ] || [ "$running_count" -ne "$desired_replicas" ]; then docker service ps --no-trunc "$service_name"; exit 1; fi',
+    ...(verifyEnvironmentKeys ? [verifyEnvironmentKeys] : []),
+  ].join("; ");
   const promoteCommand = commandParts([
     "docker service update",
     `--label-add ${shellQuote("appaloft.route-candidate=ready")}`,

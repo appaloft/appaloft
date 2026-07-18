@@ -26,6 +26,8 @@ in the default shell runtime registry unless explicitly opted out.
 | SWARM-TARGET-RENDER-001 | Adapter contract | Render OCI image workload. | Runtime artifact, environment snapshot, network profile, health policy, and access-route snapshot render to adapter-owned Swarm service/stack intent with sanitized display output. |
 | SWARM-TARGET-RENDER-002 | Adapter contract | Render Compose artifact workload. | Compose-backed runtime intent maps to a Swarm stack only when runnable services are OCI/Docker-backed and the public target service is unambiguous. |
 | SWARM-TARGET-SECRET-001 | Redaction | Registry and runtime secret references. | Image pull credentials, pull secrets, env secret values, rendered commands, and provider responses expose only masked values and safe references in logs, diagnostics, errors, and read models. |
+| SWARM-TARGET-AUTH-001 | Runtime adapter integration | Registry-authenticated apply execution context. | Shell/server composition resolves the registered Swarm manager and runs image-service and Compose-stack apply plans through that manager's SSH identity, preserving the remote user's Docker credential-store context and propagating it with `--with-registry-auth` without copying registry credentials or creating an Appaloft-owned `DOCKER_CONFIG`. |
+| SWARM-TARGET-VERIFY-001 | Runtime adapter integration | Candidate service task convergence. | Verification waits until desired replicas equal running tasks, fails on timeout/under-replication before route promotion, and returns bounded task/node evidence suitable for diagnosing per-node image-pull failures. |
 | SWARM-TARGET-APPLY-001 | Adapter integration | Successful replacement rollout. | Candidate/update rollout preserves previous same-resource service until required apply, health, route, and public verification gates pass, then records sanitized new runtime identity. |
 | SWARM-TARGET-APPLY-002 | Adapter integration | Failed replacement rollout. | Original `deployments.create` remains accepted; failure state and `deployment-failed` are persisted; cleanup touches only the failed candidate or safe Swarm rollback artifact. |
 | SWARM-TARGET-OBS-001 | Query/log adapter | Read Swarm service logs. | `resources.runtime-logs` returns normalized Appaloft log events with resource/deployment context, not raw Docker service log frames. |
@@ -68,6 +70,19 @@ in the default shell runtime registry unless explicitly opted out.
   command, and display payloads. Local real Swarm smoke has passed with a temporary authenticated
   registry, private image push/pull, `--with-registry-auth`, and secret-safe deployment
   logs/metadata.
+- `SWARM-TARGET-AUTH-001` has runner and intent coverage proving default composition can bind the
+  Swarm command runner to the registered manager repository/SSH identity. The standalone
+  local runner remains valid only when constructed explicitly for local smoke/tests. Registry auth
+  uses the remote manager user's Docker credential store; Appaloft-managed `DOCKER_CONFIG`, login,
+  logout, and credential cleanup are not part of this row.
+  Adapter intent coverage proves both image-service and Compose-stack plans render
+  `--with-registry-auth` without exposing the raw secret reference. Compose coverage also proves
+  the base Compose file is marked as runner stdin and the remote command uses `-c -` instead of
+  assuming a shared control-plane/manager filesystem path.
+- `SWARM-TARGET-VERIFY-001` has adapter intent coverage for a shell-syntax-checked bounded
+  convergence command that compares desired replicas with running tasks before route promotion.
+  Failure output includes bounded task and node placement evidence while redaction remains active.
+  This proves pulls on scheduled nodes, not on otherwise unused cluster nodes.
 - `SWARM-TARGET-APPLY-001` has initial adapter contract coverage proving OCI image apply planning
   creates a deployment-specific candidate service before verification, route promotion, and
   superseded-service cleanup. The opt-in fake backend now executes that order, records sanitized

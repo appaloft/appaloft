@@ -131,13 +131,18 @@ replicas、update policy、ingress、registry secret 或 manifest 直接写入 `
 
 operator 还应确认：
 
-- image registry access 已配置，并且不会暴露 secret value；
+- image registry access 已为注册 manager 上同一个 SSH 用户配置；Appaloft 会让
+  `--with-registry-auth` 使用该远端用户的 Docker credential store，不接收、复制或清理 registry
+  password 与 Docker config file。登录时应使用 image reference 中相同的 canonical registry host，
+  Docker Hub alias 也遵循这条规则；
 - Swarm edge network 是 overlay network；如果部署应使用 `appaloft-edge` 以外的网络名，请设置
   `APPALOFT_DOCKER_SWARM_EDGE_NETWORK`；
 - health check 与 service log 能以 Appaloft 可标准化的形态读取。
 
-Swarm rollout 会在 verification 通过前保留上一版 service，logs 和 health 会返回 Appaloft status
-shape，cleanup 会只按 resource、deployment、destination 和 target labels 限定范围。
+Swarm rollout 会在期望副本都有对应 Running task 前保留上一版 service。如果某个已调度 node
+无法拉取 image，或 task 仍处于 rejected、pending、failed，verification 会在 route promotion 前
+失败并返回有界的 task/node 证据。logs 和 health 会返回 Appaloft status shape，cleanup 会只按
+resource、deployment、destination 和 target labels 限定范围。
 
 ```bash title="运行连接测试"
 appaloft server test srv_primary

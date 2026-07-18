@@ -39,6 +39,11 @@
   metadata is redacted.
 - [x] `SWARM-TARGET-SECRET-001B`: registry credentials, pull secrets, env values, and all rendered
   command/provider payloads are redacted across real Swarm execution.
+- [x] `SWARM-TARGET-AUTH-001`: default shell/server composition executes Swarm commands through the
+  registered manager SSH identity without copying registry credentials or creating an
+  Appaloft-owned `DOCKER_CONFIG`.
+- [x] `SWARM-TARGET-VERIFY-001`: candidate verification waits for desired replicas to match Running
+  tasks and emits bounded task/node evidence before failing under-replicated rollout.
 
 ## Implementation
 
@@ -61,6 +66,11 @@
 - [x] Add bounded shell command runner for the Swarm execution backend.
 - [x] Add default-enabled shell composition for the Swarm execution backend with explicit opt-out.
 - [x] Add environment-gated real Swarm smoke harness for apply/route/secret/cleanup validation.
+- [x] Bind production Swarm apply, verify, promotion, and cleanup to the registered manager SSH
+  execution context while retaining explicit local runner construction for smoke tests.
+- [x] Stream control-plane-local Compose input over runner stdin for remote `docker stack deploy`
+  instead of assuming the manager shares the control-plane filesystem.
+- [x] Replace exit-code-only `docker service ps` verification with bounded service convergence.
 - [x] Add a first-class `bun run smoke:swarm` command for opt-in real Swarm smoke execution.
 - [x] Add configurable Swarm edge network selection for default execution and smoke runs.
 - [x] Smoke-test real apply/verify/cleanup against a Swarm manager.

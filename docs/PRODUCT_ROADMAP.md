@@ -60,6 +60,10 @@ Current release alignment:
 <!-- release-alignment:end -->
 
 Historical alignment notes:
+- [x] On 2026-07-18, Docker Swarm patch hardening bound apply, verification, route promotion, and
+  cleanup to the registered manager SSH identity, documented operator-owned manager Docker
+  credentials, streamed Compose input to remote stack deployment, and required desired replicas to
+  match Running tasks before traffic promotion.
 - [x] On 2026-04-23, the public docs app and standalone docs deployment workflow were merged on
   `origin/main`; on 2026-05-24, repository-owned production docs deployment was removed, so
   `docs.appaloft.com` production publishing is managed outside this repository's GitHub Actions.
