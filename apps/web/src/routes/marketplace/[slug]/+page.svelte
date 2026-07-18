@@ -1142,7 +1142,8 @@
   {:else}
     <div class="mx-auto w-full max-w-7xl space-y-5" data-blueprint-detail-display-surface>
       <section class="console-panel p-5" data-blueprint-summary-header>
-        <div class="flex min-w-0 items-start gap-4">
+        <div class="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-center">
+          <div class="flex min-w-0 items-start gap-4">
           <BlueprintProductIcon
             title={listing.title}
             icon={listing.icon}
@@ -1180,6 +1181,17 @@
               {/if}
             </div>
           </div>
+          </div>
+          <img
+            src="/illustrations/blueprint-deploy-workspace.png"
+            alt=""
+            aria-hidden="true"
+            class="mx-auto w-full max-w-[22rem] object-contain lg:mx-0"
+            width="1200"
+            height="600"
+            decoding="async"
+            data-blueprint-detail-illustration
+          />
         </div>
 
         <dl

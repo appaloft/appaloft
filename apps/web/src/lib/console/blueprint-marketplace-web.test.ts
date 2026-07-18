@@ -150,6 +150,9 @@ describe("Blueprint marketplace console surface", () => {
     expect(detailPageSource).toContain("detailCopy.quickDeploy");
     expect(detailPageSource).toContain("detailCopy.topology");
     expect(detailPageSource).toContain("data-blueprint-summary-header");
+    expect(detailPageSource).toContain("/illustrations/blueprint-deploy-workspace.png");
+    expect(detailPageSource).toContain("data-blueprint-detail-illustration");
+    expect(detailPageSource).toContain('alt=""');
     expect(detailPageSource).toContain("data-blueprint-install-summary");
     expect(detailPageSource).not.toContain("detailCopy.backToMarketplace");
     expect(detailPageSource).not.toContain('title={listing?.title ?? "蓝图详情"}');
