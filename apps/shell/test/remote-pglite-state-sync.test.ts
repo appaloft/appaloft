@@ -349,6 +349,7 @@ describe("remote PGlite state sync", () => {
       await mkdir(join(remoteStateRoot, "source-links"), { recursive: true });
       await mkdir(join(remoteStateRoot, "server-applied-routes"), { recursive: true });
       await writeFile(join(remoteStateRoot, "pglite", "live.txt"), "remote-live-state");
+      await writeFile(join(remoteStateRoot, "pglite", "PG_VERSION"), "18\n");
       await writeFile(join(remoteStateRoot, "sync-revision.txt"), "7\n");
       await writeFile(
         join(remoteStateRoot, "schema-version.json"),
@@ -389,6 +390,59 @@ describe("remote PGlite state sync", () => {
       expect(await readFile(join(remoteStateRoot, "schema-version.json"), "utf8")).toBe(
         '{"version":1,"migratedAt":"legacy"}\n',
       );
+      expect((await readdir(remoteStateRoot)).sort()).toEqual(durableEntriesBefore);
+      expect(await readdir(join(remoteStateRoot, "locks"))).toEqual([]);
+    } finally {
+      await rm(localDataRoot, { recursive: true, force: true });
+      await rm(remoteRuntimeRoot, { recursive: true, force: true });
+    }
+  });
+
+  test("[CPS-COMPAT-031] SSH rotation plan blocks an incompatible PGlite PostgreSQL major before opening the mirror", async () => {
+    const localDataRoot = await mkdtemp(join(tmpdir(), "appaloft-secret-plan-version-local-"));
+    const remoteRuntimeRoot = await mkdtemp(join(tmpdir(), "appaloft-secret-plan-version-remote-"));
+    const remoteStateRoot = join(remoteRuntimeRoot, "state");
+
+    try {
+      await mkdir(join(remoteStateRoot, "pglite"), { recursive: true });
+      await mkdir(join(remoteStateRoot, "locks"), { recursive: true });
+      await mkdir(join(remoteStateRoot, "source-links"), { recursive: true });
+      await mkdir(join(remoteStateRoot, "server-applied-routes"), { recursive: true });
+      await writeFile(join(remoteStateRoot, "pglite", "PG_VERSION"), "17\n");
+      await writeFile(join(remoteStateRoot, "pglite", "private-row.bin"), "private state");
+      await writeFile(join(remoteStateRoot, "sync-revision.txt"), "7\n");
+      await writeFile(
+        join(remoteStateRoot, "schema-version.json"),
+        '{"version":1,"migratedAt":"legacy"}\n',
+      );
+      const durableEntriesBefore = (await readdir(remoteStateRoot)).sort();
+
+      const session = await prepareRemotePgliteStateSync({
+        argv: [
+          "appaloft",
+          "db",
+          "secret-rotation",
+          "plan",
+          "--state-backend",
+          "ssh-pglite",
+          "--server-host",
+          "127.0.0.1",
+        ],
+        config: testConfig(localDataRoot, { remoteRuntimeRoot }),
+        runner: createLocalSshArchiveRunner(),
+      });
+
+      expect(session.isErr()).toBe(true);
+      if (session.isOk()) throw new Error("Expected incompatible PGlite major failure");
+      expect(session.error.details).toMatchObject({
+        phase: "remote-state-sync-download",
+        stateBackend: "ssh-pglite",
+        reason: "remote_pglite_postgres_major_incompatible",
+        sourcePostgresMajor: "17",
+        requiredPostgresMajor: "18",
+      });
+      expect(JSON.stringify(session.error)).not.toContain("private state");
+      expect(JSON.stringify(session.error)).not.toContain("private-row.bin");
       expect((await readdir(remoteStateRoot)).sort()).toEqual(durableEntriesBefore);
       expect(await readdir(join(remoteStateRoot, "locks"))).toEqual([]);
     } finally {

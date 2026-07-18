@@ -12,7 +12,10 @@ import {
 } from "@appaloft/adapter-cli";
 import { type AppConfig, resolveConfig } from "@appaloft/config";
 import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
-import { type PgliteRuntimeAssets } from "@appaloft/persistence-pg";
+import {
+  type PgliteRuntimeAssets,
+  supportedPglitePostgresMajorVersion,
+} from "@appaloft/persistence-pg";
 import { mergeRemotePgliteState } from "./pglite-remote-state-merge";
 
 export interface RemotePgliteStateSyncPlan {
@@ -209,6 +212,53 @@ function parseRemoteRevision(value: string): number | null {
 
   const parsed = Number(trimmedValue);
   return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
+}
+
+async function verifyReadOnlyPgliteMajorVersion(
+  plan: RemotePgliteStateSyncPlan,
+): Promise<Result<void>> {
+  let sourceMajor: string;
+  try {
+    sourceMajor = (await readFile(join(plan.localPgliteDataDir, "PG_VERSION"), "utf8")).trim();
+  } catch {
+    return err(
+      domainError.infra("SSH remote PGlite PostgreSQL major version could not be verified", {
+        ...errorDetails({
+          phase: "remote-state-sync-download",
+          target: plan.target,
+        }),
+        reason: "remote_pglite_postgres_major_unavailable",
+      }),
+    );
+  }
+
+  if (!/^\d+$/.test(sourceMajor)) {
+    return err(
+      domainError.infra("SSH remote PGlite PostgreSQL major version is invalid", {
+        ...errorDetails({
+          phase: "remote-state-sync-download",
+          target: plan.target,
+        }),
+        reason: "remote_pglite_postgres_major_invalid",
+      }),
+    );
+  }
+
+  if (sourceMajor !== supportedPglitePostgresMajorVersion) {
+    return err(
+      domainError.infra("SSH remote PGlite PostgreSQL major version requires migration", {
+        ...errorDetails({
+          phase: "remote-state-sync-download",
+          target: plan.target,
+        }),
+        reason: "remote_pglite_postgres_major_incompatible",
+        sourcePostgresMajor: sourceMajor,
+        requiredPostgresMajor: supportedPglitePostgresMajorVersion,
+      }),
+    );
+  }
+
+  return ok(undefined);
 }
 
 function parseRemoteRevisionConflict(
@@ -867,6 +917,17 @@ export async function prepareRemotePgliteStateSync(
       return err(released.error);
     }
     return err(downloaded.error);
+  }
+
+  if (planValue.readOnly === true) {
+    const compatible = await verifyReadOnlyPgliteMajorVersion(planValue);
+    if (compatible.isErr()) {
+      const released = await prepared.value.release();
+      if (released.isErr()) {
+        return err(released.error);
+      }
+      return err(compatible.error);
+    }
   }
 
   const baseRevision = await archiveSync.readRemoteRevision();

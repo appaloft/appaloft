@@ -232,6 +232,8 @@ export interface SafeCliErrorEvidence {
   phase: string | null;
   reason: string | null;
   stateBackend: string | null;
+  sourcePostgresMajor: string | null;
+  requiredPostgresMajor: string | null;
   exitCode: number | null;
   retryable: boolean;
 }
@@ -239,6 +241,11 @@ export interface SafeCliErrorEvidence {
 function safeErrorDetail(error: DomainError, key: string): string | null {
   const value = error.details?.[key];
   return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function safePostgresMajorDetail(error: DomainError, key: string): string | null {
+  const value = error.details?.[key];
+  return typeof value === "string" && /^\d{1,3}$/.test(value) ? value : null;
 }
 
 export function safeCliErrorEvidence(error: unknown): SafeCliErrorEvidence {
@@ -250,6 +257,8 @@ export function safeCliErrorEvidence(error: unknown): SafeCliErrorEvidence {
       phase: null,
       reason: null,
       stateBackend: null,
+      sourcePostgresMajor: null,
+      requiredPostgresMajor: null,
       exitCode: null,
       retryable: false,
     };
@@ -263,6 +272,8 @@ export function safeCliErrorEvidence(error: unknown): SafeCliErrorEvidence {
     phase: safeErrorDetail(error, "phase"),
     reason: safeErrorDetail(error, "reason"),
     stateBackend: safeErrorDetail(error, "stateBackend"),
+    sourcePostgresMajor: safePostgresMajorDetail(error, "sourcePostgresMajor"),
+    requiredPostgresMajor: safePostgresMajorDetail(error, "requiredPostgresMajor"),
     exitCode: typeof exitCode === "number" && Number.isInteger(exitCode) ? exitCode : null,
     retryable: error.retryable,
   };

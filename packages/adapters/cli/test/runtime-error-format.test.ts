@@ -16,6 +16,8 @@ describe("CLI safe error evidence", () => {
         host: "203.0.113.10",
         stderr: "secret-value ciphertext-value",
         message: "/private/operator/key",
+        sourcePostgresMajor: "17",
+        requiredPostgresMajor: "18",
         exitCode: 23,
       },
     };
@@ -28,6 +30,8 @@ describe("CLI safe error evidence", () => {
       phase: "remote-state-sync-download",
       reason: "remote_pglite_composition_failed",
       stateBackend: "ssh-pglite",
+      sourcePostgresMajor: "17",
+      requiredPostgresMajor: "18",
       exitCode: 23,
       retryable: true,
     });
@@ -52,11 +56,33 @@ describe("CLI safe error evidence", () => {
       phase: null,
       reason: null,
       stateBackend: null,
+      sourcePostgresMajor: null,
+      requiredPostgresMajor: null,
       exitCode: null,
       retryable: false,
     });
     expect(output).not.toContain("secret-value");
     expect(output).not.toContain("ciphertext-value");
     expect(output).not.toContain("/private/operator/key");
+  });
+
+  test("[CPS-COMPAT-031] rejects non-numeric version details from safe evidence", () => {
+    const output = formatSafeCliError({
+      code: "infra_error",
+      category: "infra",
+      message: "PGlite version mismatch",
+      retryable: false,
+      details: {
+        sourcePostgresMajor: "17 /private/operator/key",
+        requiredPostgresMajor: "secret-value",
+      },
+    } satisfies DomainError);
+
+    expect(JSON.parse(output)).toMatchObject({
+      sourcePostgresMajor: null,
+      requiredPostgresMajor: null,
+    });
+    expect(output).not.toContain("/private/operator/key");
+    expect(output).not.toContain("secret-value");
   });
 });
