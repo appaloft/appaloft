@@ -87,18 +87,6 @@ function unreadableReason(error: DomainError): string {
   return typeof error.details?.reason === "string" ? error.details.reason : "unreadable";
 }
 
-async function readRotationSource<T>(source: string, read: () => Promise<T>): Promise<T> {
-  try {
-    return await read();
-  } catch {
-    throw rotationError(
-      "control_plane_secret_rotation_source_read_failed",
-      "A control-plane secret rotation source could not be read",
-      `${source}-read-failed`,
-    );
-  }
-}
-
 function isUndefinedTableError(error: unknown): boolean {
   return (
     typeof error === "object" &&
@@ -298,12 +286,13 @@ export class PgControlPlaneSecretRotationService implements ControlPlaneSecretRo
   }
 
   private async collect(db: RotationDatabase): Promise<RotationRecord[]> {
-    // Rotation planning intentionally runs before application migrations. These tables were added
-    // after the initial schema. Read them directly and treat only PostgreSQL's exact undefined-table
-    // code as an empty source; every other read failure still fails the operation closed.
+    // Rotation planning intentionally runs before application migrations and may inspect a fresh or
+    // partially initialized state. Read every source directly and treat only PostgreSQL's exact
+    // undefined-table code as an empty source; every other read failure still fails the operation
+    // closed. This keeps first deployment safe without relying on version-specific schema catalogs.
     // Keep source reads ordered so a failed maintenance plan has one deterministic safe reason and
     // does not leave concurrent reads running while the coordinated mirror is being closed.
-    const environmentRows = await readRotationSource("environment-variables", () =>
+    const environmentRows = await readOptionalRotationSource("environment-variables", () =>
       db
         .selectFrom("environment_variables")
         .select(["id", "environment_id", "key", "value"])
@@ -329,7 +318,7 @@ export class PgControlPlaneSecretRotationService implements ControlPlaneSecretRo
         .select(["ref", "binding_id", "resource_id", "payload"])
         .execute(),
     );
-    const deploymentRows = await readRotationSource("deployment-snapshots", () =>
+    const deploymentRows = await readOptionalRotationSource("deployment-snapshots", () =>
       db.selectFrom("deployments").select(["id", "environment_snapshot"]).execute(),
     );
     const records: RotationRecord[] = [];

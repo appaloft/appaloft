@@ -29,6 +29,9 @@ Key rotation is an explicit System Maintenance workflow: dry-run classifies safe
 apply requires the dry-run digest, target active key, explicit legacy authorization when needed, and
 an external backup evidence reference. The PG/PGlite adapter preflights all rows and commits all
 rewraps in one transaction. Failure rolls back the entire migration; retry is idempotent.
+Because dry-run precedes application migrations, every source is read directly and exact PostgreSQL
+`42P01` is treated as an empty source for fresh or partially initialized state. All other source
+failures remain fail closed and expose only their fixed safe classification.
 
 Dry-run may return a bounded list of unreadable findings containing only record source, stable
 business ids, variable key/index when applicable, safe envelope key id, and stable failure reason.

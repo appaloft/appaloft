@@ -16,6 +16,10 @@ safe key ids, bounded safe unreadable findings, readiness, and a deterministic p
 rejects a stale digest, missing backup reference, unreadable envelope, absent target key, or legacy
 row without explicit authorization.
 
+Dry-run runs before application migrations. A fresh or partially initialized state can therefore
+lack any rotation source table. Direct source reads treat only PostgreSQL's exact undefined-table
+code `42P01` as an empty source; any other read failure remains a safe, fail-closed source error.
+
 Use the source CLI from the repository checkout:
 
 ```bash
