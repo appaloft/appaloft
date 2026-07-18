@@ -1676,6 +1676,47 @@ describe("CLI remote control-plane client", () => {
     expect(listed.stdout).toContain("srv_remote");
   });
 
+  test("[DEP-CREATE-ENTRY-008][CONTROL-PLANE-CLI-010] ids-only deployment create dispatches through the remote generated route", async () => {
+    const requests: Request[] = [];
+    const program = createRemoteCliProgram({
+      version: "0.12.5-test",
+      profile: profile("local"),
+      fetch: createControlPlaneFetch(requests, {
+        "/api/deployments": jsonResponse({ id: "dep_remote" }, 202),
+      }),
+      now: () => "2026-05-17T00:00:00.000Z",
+    });
+
+    const created = await captureProcessOutput(() =>
+      program.parseAsync([
+        "node",
+        "appaloft",
+        "deployments",
+        "create",
+        "--project",
+        "prj_remote",
+        "--environment",
+        "env_production",
+        "--resource",
+        "res_api",
+        "--server",
+        "srv_remote",
+      ]),
+    );
+
+    expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual(
+      ["GET /api/version", "GET /api/organizations/current-context", "POST /api/deployments"],
+    );
+    expect(await requests[2]?.json()).toEqual({
+      projectId: "prj_remote",
+      environmentId: "env_production",
+      resourceId: "res_api",
+      serverId: "srv_remote",
+      executionMode: "detached",
+    });
+    expect(created.stdout).toContain("dep_remote");
+  });
+
   test("[CONTROL-PLANE-CLI-013] remote bounded deployment timeline adapts the SDK response for CLI rendering", async () => {
     const requests: Request[] = [];
     const program = createRemoteCliProgram({

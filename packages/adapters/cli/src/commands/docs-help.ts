@@ -74,6 +74,10 @@ export const cliDocsHrefs = {
 export const cliCommandDescriptions = {
   deploy: withDocs("Create a deployment", "deployment.source"),
   deploymentPlan: withDocs("Preview deployment plan without execution", "deployment.plan-preview"),
+  deploymentCreate: withDocs(
+    "Create a deployment from an existing Resource profile and target context",
+    "deployment.lifecycle",
+  ),
   controlPlaneLogin: withDocs(
     "Login to Appaloft and store a local CLI profile",
     "cli.remote-control-plane-login",

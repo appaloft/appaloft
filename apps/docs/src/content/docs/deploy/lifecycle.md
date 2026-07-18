@@ -28,6 +28,18 @@ Appaloft 把部署建模为 `detect -> plan -> execute -> verify -> rollback`。
 
 这个生命周期用于解释用户看到的部署状态。它不是内部实现细节：用户需要知道当前卡在哪一步、这一步读取什么输入、失败后该怎么恢复。
 
+当 Project、Environment、Resource profile 和 Server 已经存在时，登录后的远程 CLI 可以直接提交第一次部署，而不运行本地 Quick Deploy：
+
+```bash
+appaloft deployments create \
+  --project <projectId> \
+  --environment <environmentId> \
+  --resource <resourceId> \
+  --server <serverId>
+```
+
+这个命令只通过共享的 `deployments.create` 合约发送既有上下文 ID，不上传本地源码包，也不使用仓库部署配置字段；常规 CLI 目标选择仍可能读取仓库的 `controlPlane` 配置。返回 deployment id 只表示 attempt 已接受；仍需通过 timeline 和 proof 命令验证执行结果。
+
 ![Deployment lifecycle](/docs/diagrams/deployment-lifecycle.svg)
 
 <h3 id="deployment-detect">Detect</h3>
