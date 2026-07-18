@@ -221,6 +221,30 @@ export interface ControlPlaneSecretRotationPlan {
   requiresLegacyAuthorization: boolean;
   ready: boolean;
   planDigest: string;
+  unreadableFindings: ControlPlaneSecretRotationUnreadableFinding[];
+  unreadableFindingsTruncated: boolean;
+}
+
+export type ControlPlaneSecretRotationFindingSource =
+  | "environment-variable"
+  | "resource-variable"
+  | "dependency-resource-secret"
+  | "dependency-binding-secret"
+  | "deployment-snapshot-variable";
+
+export interface ControlPlaneSecretRotationUnreadableFinding {
+  source: ControlPlaneSecretRotationFindingSource;
+  recordId: string;
+  reason: string;
+  purpose: ControlPlaneSecretContext["purpose"];
+  keyId?: string;
+  environmentId?: string;
+  resourceId?: string;
+  dependencyResourceId?: string;
+  bindingId?: string;
+  deploymentId?: string;
+  variableKey?: string;
+  variableIndex?: number;
 }
 
 export interface ControlPlaneSecretRotationApplyInput {

@@ -30,6 +30,12 @@ apply requires the dry-run digest, target active key, explicit legacy authorizat
 an external backup evidence reference. The PG/PGlite adapter preflights all rows and commits all
 rewraps in one transaction. Failure rolls back the entire migration; retry is idempotent.
 
+Dry-run may return a bounded list of unreadable findings containing only record source, stable
+business ids, variable key/index when applicable, safe envelope key id, and stable failure reason.
+It never returns values, ciphertext, key material, or secret length. When SSH PGlite owns state,
+the source CLI uses the coordinated remote mirror lifecycle: plan downloads without uploading,
+while apply alone performs backup, revision-fenced upload, and conflict-safe merge.
+
 Deployment Proof compares the planned and observed runtime environment key set and count without
 returning values. Secret ciphertext is excluded from configuration fingerprint semantics so rewraps
 do not create false drift.

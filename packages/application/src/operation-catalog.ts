@@ -4547,7 +4547,7 @@ export const operationCatalog = [
     serviceName: "ControlPlaneSecretRotationPlanQueryService",
     serviceToken: tokens.controlPlaneSecretRotationPlanQueryService,
     transports: {
-      cli: "appaloft db secret-rotation plan",
+      cli: "appaloft db secret-rotation plan [--state-backend ssh-pglite --server-host <host>]",
     },
   },
   {
@@ -4560,7 +4560,7 @@ export const operationCatalog = [
     inputSchema: controlPlaneSecretRotationApplyCommandInputSchema,
     serviceToken: tokens.controlPlaneSecretRotationApplyUseCase,
     transports: {
-      cli: "appaloft db secret-rotation apply",
+      cli: "appaloft db secret-rotation apply --plan-digest <digest> --backup-reference <reference> [--state-backend ssh-pglite --server-host <host>]",
     },
   },
   {

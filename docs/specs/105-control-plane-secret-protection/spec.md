@@ -42,6 +42,8 @@ runtime materialization, and rotated through an explicit atomic migration.
 | CPS-PROOF-010 | Runtime key mismatch | Runtime reports success but inspect readback is missing one or more planned keys | Deployment is verified | Success is rejected or proof is failed; planned/observed counts and key-set fingerprints contain no values. |
 | CPS-SAFE-011 | Safe outputs | Secret protection fails through API, CLI, Web, logs, diagnostics, or proof | Output is serialized | It exposes stable code, phase, key id/status and counts only; never plaintext, ciphertext, key material, secret length, or provider payload. |
 | CPS-COMPAT-012 | Retained legal ciphertext | A historical envelope uses a retained supported key/version | It is planned, retried, rolled back, or migrated | It decrypts under the documented compatibility window and can be rewrapped to the active key. |
+| CPS-REMOTE-013 | SSH PGlite maintenance | A pure CLI installation keeps Appaloft state on an SSH server | Rotation plan or apply runs with an explicit SSH target | Plan reads a coordinated local mirror without uploading it; apply alone performs the guarded backup, revision-fenced upload, and conflict-safe merge. |
+| CPS-DIAG-014 | Unreadable record diagnosis | One or more persisted envelopes cannot be authenticated or parsed | Rotation dry-run classifies the state | The bounded result identifies the record source, business ids, variable key when applicable, and stable reason without returning values, ciphertext, key material, or secret length. |
 
 ## Domain Ownership
 
@@ -56,7 +58,8 @@ runtime materialization, and rotated through an explicit atomic migration.
 - Existing API/CLI/Web Resource and Environment secret inputs continue to dispatch shared commands.
 - `deployments.plan`, `deployments.create`, retry, redeploy, and rollback fail closed on any unavailable secret.
 - Rotation exposes a read-only dry-run and an explicit apply command with plan digest, backup
-  reference, active key id, and legacy authorization. Values are never accepted or returned.
+  reference, active key id, legacy authorization, bounded unreadable-record diagnostics, and an
+  explicit SSH PGlite target when the server owns state. Values are never accepted or returned.
 - Deployment Proof reports planned/observed environment key count and fingerprint only.
 
 ## Non-Goals
