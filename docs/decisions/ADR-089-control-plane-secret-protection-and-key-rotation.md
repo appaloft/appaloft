@@ -38,7 +38,10 @@ parameter-free `IS TRUE` compatibility attempt removed bind inference but live p
 the predicate itself was still not a reliable pre-migration boundary for the legacy embedded runtime.
 For unattended diagnosis, a bounded SQLSTATE class allowlist maps to fixed operational categories
 without publishing the SQLSTATE or database detail; exact `42P01` alone means an empty source and
-unknown failures retain the generic read-failed reason.
+unknown failures retain the generic read-failed reason. The allowlist includes fixed connection,
+data, integrity, transaction, authorization, resource, operator, system, configuration,
+foreign-data, procedural, schema, feature, state, and internal-storage families so a bounded column
+probe can identify the failing operational boundary without exposing the underlying code or row.
 Only known driver wrapper fields and SQLSTATE aliases are traversed, with bounded depth and node count.
 
 Dry-run may return a bounded list of unreadable findings containing only record source, stable
