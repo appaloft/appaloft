@@ -83,6 +83,43 @@ async function envelopeStates(
 }
 
 describe("control-plane secret rotation", () => {
+  test("[CPS-DIAG-018] plan reports the failed required source without database details", () =>
+    withDatabase(async (database) => {
+      const failingDatabase = new Proxy(database.db, {
+        get(target, property) {
+          if (property === "selectFrom") {
+            return (table: string) => {
+              if (table === "environment_variables") throw new Error("private database detail");
+              const selectFrom = target.selectFrom.bind(target) as unknown as (
+                source: string,
+              ) => ReturnType<typeof target.selectFrom>;
+              return selectFrom(table);
+            };
+          }
+          const value = Reflect.get(target, property, target);
+          return typeof value === "function" ? value.bind(target) : value;
+        },
+      }) as typeof database.db;
+      const { rotatingProtector } = protectors();
+
+      const plan = await new PgControlPlaneSecretRotationService(
+        failingDatabase,
+        rotatingProtector,
+      ).plan();
+
+      expect(plan._unsafeUnwrapErr()).toMatchObject({
+        code: "control_plane_secret_rotation_source_read_failed",
+        category: "infra",
+        retryable: false,
+        details: {
+          phase: "control-plane-secret-rotation",
+          reason: "environment-variables-read-failed",
+        },
+      });
+      expect(JSON.stringify(plan)).not.toContain("environment_variables");
+      expect(JSON.stringify(plan)).not.toContain("SELECT");
+    }));
+
   test("[CPS-COMPAT-017] plan treats absent post-initial secret tables as empty", async () => {
     const dataDir = mkdtempSync(join(tmpdir(), "appaloft-secret-rotation-legacy-"));
     const database = await createDatabase({ driver: "pglite", pgliteDataDir: dataDir });
