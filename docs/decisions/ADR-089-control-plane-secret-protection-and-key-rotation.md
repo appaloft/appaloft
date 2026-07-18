@@ -32,8 +32,10 @@ rewraps in one transaction. Failure rolls back the entire migration; retry is id
 Because dry-run precedes application migrations, every source is read directly and exact PostgreSQL
 `42P01` is treated as an empty source for fresh or partially initialized state. All other source
 failures remain fail closed and expose only their fixed safe classification.
-Environment and Resource secret filters use parameter-free PostgreSQL `IS TRUE` predicates so
-embedded runtimes do not need to infer a bound boolean type during this pre-migration read.
+Environment and Resource source reads select the `is_secret` marker without a database boolean
+predicate and exclude non-secret rows in memory before inspection or plan accounting. The earlier
+parameter-free `IS TRUE` compatibility attempt removed bind inference but live preflight showed that
+the predicate itself was still not a reliable pre-migration boundary for the legacy embedded runtime.
 For unattended diagnosis, a bounded SQLSTATE class allowlist maps to fixed operational categories
 without publishing the SQLSTATE or database detail; exact `42P01` alone means an empty source and
 unknown failures retain the generic read-failed reason.
