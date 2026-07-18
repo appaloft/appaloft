@@ -83,7 +83,7 @@ async function envelopeStates(
 }
 
 describe("control-plane secret rotation", () => {
-  test("[CPS-DIAG-018] plan reports the failed required source without database details", () =>
+  test("[CPS-DIAG-018] plan reports a failed source without database details", () =>
     withDatabase(async (database) => {
       const failingDatabase = new Proxy(database.db, {
         get(target, property) {
@@ -161,6 +161,34 @@ describe("control-plane secret rotation", () => {
     try {
       const migrated = await createMigrator(database.db).migrateTo("026_mutation_coordinations");
       expect(migrated.error).toBeUndefined();
+      const { rotatingProtector } = protectors();
+
+      const plan = await new PgControlPlaneSecretRotationService(
+        database.db,
+        rotatingProtector,
+      ).plan();
+
+      expect(plan._unsafeUnwrap()).toMatchObject({
+        recordCount: 0,
+        variableKeyCount: 0,
+        ready: true,
+        stateCounts: {
+          "active-key": 0,
+          "retained-key": 0,
+          "legacy-plaintext": 0,
+          unreadable: 0,
+        },
+      });
+    } finally {
+      await database.close();
+      rmSync(dataDir, { recursive: true, force: true });
+    }
+  });
+
+  test("[CPS-COMPAT-020] plan treats a pre-initial state as an empty rotation source", async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), "appaloft-secret-rotation-pre-initial-"));
+    const database = await createDatabase({ driver: "pglite", pgliteDataDir: dataDir });
+    try {
       const { rotatingProtector } = protectors();
 
       const plan = await new PgControlPlaneSecretRotationService(
