@@ -375,6 +375,83 @@ describe("control-plane secret rotation", () => {
       }
     }));
 
+  test("[CPS-COMPAT-028] rotation source reads use complete keyset pagination", () =>
+    withDatabase(async (database) => {
+      const queries: string[] = [];
+      const compiler = new PostgresQueryCompiler();
+      const capturePlugin: KyselyPlugin = {
+        transformQuery(args) {
+          queries.push(compiler.compileQuery(args.node, args.queryId).sql);
+          return args.node;
+        },
+        async transformResult(args) {
+          return args.result;
+        },
+      };
+      const { rotatingProtector } = protectors();
+      await database.db
+        .insertInto("projects")
+        .values({
+          id: "prj_rotation_pagination",
+          name: "Rotation pagination",
+          slug: "rotation-pagination",
+          created_at: "2026-01-01T00:00:00.000Z",
+        })
+        .execute();
+      await database.db
+        .insertInto("environments")
+        .values({
+          id: "env_rotation_pagination",
+          project_id: "prj_rotation_pagination",
+          name: "production",
+          kind: "production",
+          created_at: "2026-01-01T00:00:00.000Z",
+        })
+        .execute();
+      await database.db
+        .insertInto("environment_variables")
+        .values(
+          Array.from({ length: 257 }, (_, index) => {
+            const suffix = String(index).padStart(3, "0");
+            return {
+              id: `env_var_page_${suffix}`,
+              environment_id: "env_rotation_pagination",
+              key: `SECRET_PAGE_${suffix}`,
+              value: `legacy-page-value-${suffix}`,
+              kind: "literal" as const,
+              exposure: "runtime" as const,
+              scope: "resource" as const,
+              is_secret: true,
+              updated_at: "2026-01-01T00:00:00.000Z",
+            };
+          }),
+        )
+        .execute();
+
+      const plan = await new PgControlPlaneSecretRotationService(
+        database.db.withPlugin(capturePlugin),
+        rotatingProtector,
+      ).plan();
+
+      expect(plan.isOk()).toBe(true);
+      expect(plan._unsafeUnwrap()).toMatchObject({
+        recordCount: 257,
+        variableKeyCount: 257,
+        requiresLegacyAuthorization: true,
+      });
+      expect(JSON.stringify(plan)).not.toContain("legacy-page-value");
+      const environmentQueries = queries.filter((query) =>
+        query.includes('from "environment_variables"'),
+      );
+      expect(environmentQueries).toHaveLength(2);
+      for (const query of environmentQueries) {
+        expect(query).toContain('order by "id"');
+        expect(query).toContain(" limit ");
+      }
+      expect(environmentQueries[0]).not.toContain(" where ");
+      expect(environmentQueries[1]).toContain('where "id" >');
+    }));
+
   test("[CPS-DIAG-021] plan classifies a safe SQLSTATE category without database details", () =>
     withDatabase(async (database) => {
       const failingDatabase = new Proxy(database.db, {

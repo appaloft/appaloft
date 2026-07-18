@@ -82,6 +82,7 @@ function persistenceRecordIdentity(record: RotationRecord): string {
 }
 
 const maxUnreadableFindings = 100;
+const rotationSourcePageSize = 256;
 
 function unreadableReason(error: DomainError): string {
   return typeof error.details?.reason === "string" ? error.details.reason : "unreadable";
@@ -167,6 +168,31 @@ async function readOptionalRotationSource<T>(
       "A control-plane secret rotation source could not be read",
       reason,
     );
+  }
+}
+
+async function readRotationSourcePages<T>(
+  source: string,
+  readPage: (after: string | undefined) => Promise<T[]>,
+  cursorOf: (row: T) => string,
+  probes: ReadonlyArray<{ name: string; read: () => Promise<unknown[]> }> = [],
+): Promise<T[]> {
+  const rows: T[] = [];
+  let after: string | undefined;
+  while (true) {
+    const page = await readOptionalRotationSource(source, () => readPage(after), probes);
+    if (page.length === 0) return rows;
+    rows.push(...page);
+    const next = cursorOf(page[page.length - 1] as T);
+    if (!next || (after !== undefined && next <= after)) {
+      throw rotationError(
+        "control_plane_secret_rotation_source_read_failed",
+        "A control-plane secret rotation source could not be read",
+        `${source}-pagination-invalid`,
+      );
+    }
+    after = next;
+    if (page.length < rotationSourcePageSize) return rows;
   }
 }
 
@@ -350,50 +376,93 @@ export class PgControlPlaneSecretRotationService implements ControlPlaneSecretRo
     // closed. This keeps first deployment safe without relying on version-specific schema catalogs.
     // Keep source reads ordered so a failed maintenance plan has one deterministic safe reason and
     // does not leave concurrent reads running while the coordinated mirror is being closed.
-    const environmentRows = await readOptionalRotationSource(
+    const environmentRows = await readRotationSourcePages(
       "environment-variables",
-      () =>
-        db
+      (after) => {
+        let query = db
           .selectFrom("environment_variables")
           .select(["id", "environment_id", "key", "value", "is_secret"])
-          .execute(),
+          .orderBy("id")
+          .limit(rotationSourcePageSize);
+        if (after !== undefined) query = query.where("id", ">", after);
+        return query.execute();
+      },
+      (row) => row.id,
       [
-        { name: "id", read: () => db.selectFrom("environment_variables").select("id").execute() },
+        {
+          name: "id",
+          read: () => db.selectFrom("environment_variables").select("id").limit(1).execute(),
+        },
         {
           name: "environment-id",
-          read: () => db.selectFrom("environment_variables").select("environment_id").execute(),
+          read: () =>
+            db.selectFrom("environment_variables").select("environment_id").limit(1).execute(),
         },
-        { name: "key", read: () => db.selectFrom("environment_variables").select("key").execute() },
+        {
+          name: "key",
+          read: () => db.selectFrom("environment_variables").select("key").limit(1).execute(),
+        },
         {
           name: "value",
-          read: () => db.selectFrom("environment_variables").select("value").execute(),
+          read: () => db.selectFrom("environment_variables").select("value").limit(1).execute(),
         },
         {
           name: "is-secret",
-          read: () => db.selectFrom("environment_variables").select("is_secret").execute(),
+          read: () => db.selectFrom("environment_variables").select("is_secret").limit(1).execute(),
         },
       ],
     );
-    const resourceRows = await readOptionalRotationSource("resource-variables", () =>
-      db
-        .selectFrom("resource_variables")
-        .select(["id", "resource_id", "key", "value", "is_secret"])
-        .execute(),
+    const resourceRows = await readRotationSourcePages(
+      "resource-variables",
+      (after) => {
+        let query = db
+          .selectFrom("resource_variables")
+          .select(["id", "resource_id", "key", "value", "is_secret"])
+          .orderBy("id")
+          .limit(rotationSourcePageSize);
+        if (after !== undefined) query = query.where("id", ">", after);
+        return query.execute();
+      },
+      (row) => row.id,
     );
-    const dependencyRows = await readOptionalRotationSource("dependency-resource-secrets", () =>
-      db
-        .selectFrom("dependency_resource_secrets")
-        .select(["ref", "dependency_resource_id", "environment_id", "payload"])
-        .execute(),
+    const dependencyRows = await readRotationSourcePages(
+      "dependency-resource-secrets",
+      (after) => {
+        let query = db
+          .selectFrom("dependency_resource_secrets")
+          .select(["ref", "dependency_resource_id", "environment_id", "payload"])
+          .orderBy("ref")
+          .limit(rotationSourcePageSize);
+        if (after !== undefined) query = query.where("ref", ">", after);
+        return query.execute();
+      },
+      (row) => row.ref,
     );
-    const bindingRows = await readOptionalRotationSource("dependency-binding-secrets", () =>
-      db
-        .selectFrom("dependency_binding_secrets")
-        .select(["ref", "binding_id", "resource_id", "payload"])
-        .execute(),
+    const bindingRows = await readRotationSourcePages(
+      "dependency-binding-secrets",
+      (after) => {
+        let query = db
+          .selectFrom("dependency_binding_secrets")
+          .select(["ref", "binding_id", "resource_id", "payload"])
+          .orderBy("ref")
+          .limit(rotationSourcePageSize);
+        if (after !== undefined) query = query.where("ref", ">", after);
+        return query.execute();
+      },
+      (row) => row.ref,
     );
-    const deploymentRows = await readOptionalRotationSource("deployment-snapshots", () =>
-      db.selectFrom("deployments").select(["id", "environment_snapshot"]).execute(),
+    const deploymentRows = await readRotationSourcePages(
+      "deployment-snapshots",
+      (after) => {
+        let query = db
+          .selectFrom("deployments")
+          .select(["id", "environment_snapshot"])
+          .orderBy("id")
+          .limit(rotationSourcePageSize);
+        if (after !== undefined) query = query.where("id", ">", after);
+        return query.execute();
+      },
+      (row) => row.id,
     );
     const records: RotationRecord[] = [];
     const append = (

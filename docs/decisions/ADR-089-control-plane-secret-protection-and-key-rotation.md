@@ -43,6 +43,10 @@ data, integrity, transaction, authorization, resource, operator, system, configu
 foreign-data, procedural, schema, feature, state, and internal-storage families so a bounded column
 probe can identify the failing operational boundary without exposing the underlying code or row.
 Only known driver wrapper fields and SQLSTATE aliases are traversed, with bounded depth and node count.
+Every rotation source is scanned through deterministic bounded keyset pages over its stable identifier.
+The coordinated plan mirror is immutable for the duration of the read, so keyset pagination visits
+every source row exactly once without offset drift. A missing or non-increasing cursor is a fail-closed
+source read failure; the adapter never treats an incomplete page sequence as a valid rotation plan.
 
 Dry-run may return a bounded list of unreadable findings containing only record source, stable
 business ids, variable key/index when applicable, safe envelope key id, and stable failure reason.

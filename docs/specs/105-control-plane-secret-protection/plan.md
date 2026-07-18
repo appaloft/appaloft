@@ -42,6 +42,9 @@
 - When an Environment source read fails generically without SQLSTATE, run ordered read-only
   single-column probes and reduce the result to a fixed column category or row-materialization
   category without publishing probe values, row counts, SQL, or arbitrary database details.
+- Read every rotation source through deterministic bounded keyset pages on the immutable maintenance
+  mirror. Require strictly increasing source identifiers, never use offsets, and fail closed rather
+  than accepting an incomplete scan when cursor progress is invalid.
 - Extend Deployment Proof with value-free planned/observed environment key-set evidence.
 
 ## Persistence And Migration
@@ -74,6 +77,8 @@
 - Verify a failed source returns only its stable source reason and no SQL/schema details.
 - Verify generic combined-row failures run bounded single-column probes and expose only the fixed
   row-materialization category.
+- Verify a source larger than one read page is fully counted, uses a stable ordered cursor for the
+  second page, and never returns persisted values in the plan.
 
 ## Risks And Deferred Gaps
 
