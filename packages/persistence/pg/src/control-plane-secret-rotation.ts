@@ -105,6 +105,18 @@ async function rotationTableExists(
   return Number(result.rows[0]?.table_count ?? 0) > 0;
 }
 
+async function readRotationSource<T>(source: string, read: () => Promise<T>): Promise<T> {
+  try {
+    return await read();
+  } catch {
+    throw rotationError(
+      "control_plane_secret_rotation_source_read_failed",
+      "A control-plane secret rotation source could not be read",
+      `${source}-read-failed`,
+    );
+  }
+}
+
 export class PgControlPlaneSecretRotationService implements ControlPlaneSecretRotationPort {
   constructor(
     private readonly db: Kysely<Database>,
@@ -115,7 +127,16 @@ export class PgControlPlaneSecretRotationService implements ControlPlaneSecretRo
   async plan(): Promise<Result<ControlPlaneSecretRotationPlan>> {
     try {
       return ok(await this.planWith(this.db));
-    } catch {
+    } catch (error) {
+      const safe = error as Partial<DomainError>;
+      if (
+        typeof safe.code === "string" &&
+        typeof safe.message === "string" &&
+        typeof safe.category === "string" &&
+        typeof safe.retryable === "boolean"
+      ) {
+        return err(error as DomainError);
+      }
       return err(
         rotationError(
           "control_plane_secret_rotation_plan_failed",
@@ -275,38 +296,53 @@ export class PgControlPlaneSecretRotationService implements ControlPlaneSecretRo
     // every other discovery or read failure still propagates and fails the operation closed.
     const [hasResourceVariables, hasDependencyResourceSecrets, hasDependencyBindingSecrets] =
       await Promise.all([
-        rotationTableExists(db, "resource_variables"),
-        rotationTableExists(db, "dependency_resource_secrets"),
-        rotationTableExists(db, "dependency_binding_secrets"),
+        readRotationSource("resource-variables-schema", () =>
+          rotationTableExists(db, "resource_variables"),
+        ),
+        readRotationSource("dependency-resource-secrets-schema", () =>
+          rotationTableExists(db, "dependency_resource_secrets"),
+        ),
+        readRotationSource("dependency-binding-secrets-schema", () =>
+          rotationTableExists(db, "dependency_binding_secrets"),
+        ),
       ]);
-    const [environmentRows, resourceRows, dependencyRows, bindingRows, deploymentRows] =
-      await Promise.all([
-        db
-          .selectFrom("environment_variables")
-          .select(["id", "environment_id", "key", "value"])
-          .where("is_secret", "=", true)
-          .execute(),
-        hasResourceVariables
-          ? db
-              .selectFrom("resource_variables")
-              .select(["id", "resource_id", "key", "value"])
-              .where("is_secret", "=", true)
-              .execute()
-          : Promise.resolve([]),
-        hasDependencyResourceSecrets
-          ? db
-              .selectFrom("dependency_resource_secrets")
-              .select(["ref", "dependency_resource_id", "environment_id", "payload"])
-              .execute()
-          : Promise.resolve([]),
-        hasDependencyBindingSecrets
-          ? db
-              .selectFrom("dependency_binding_secrets")
-              .select(["ref", "binding_id", "resource_id", "payload"])
-              .execute()
-          : Promise.resolve([]),
-        db.selectFrom("deployments").select(["id", "environment_snapshot"]).execute(),
-      ]);
+    // Keep source reads ordered so a failed maintenance plan has one deterministic safe reason and
+    // does not leave concurrent reads running while the coordinated mirror is being closed.
+    const environmentRows = await readRotationSource("environment-variables", () =>
+      db
+        .selectFrom("environment_variables")
+        .select(["id", "environment_id", "key", "value"])
+        .where("is_secret", "=", true)
+        .execute(),
+    );
+    const resourceRows = hasResourceVariables
+      ? await readRotationSource("resource-variables", () =>
+          db
+            .selectFrom("resource_variables")
+            .select(["id", "resource_id", "key", "value"])
+            .where("is_secret", "=", true)
+            .execute(),
+        )
+      : [];
+    const dependencyRows = hasDependencyResourceSecrets
+      ? await readRotationSource("dependency-resource-secrets", () =>
+          db
+            .selectFrom("dependency_resource_secrets")
+            .select(["ref", "dependency_resource_id", "environment_id", "payload"])
+            .execute(),
+        )
+      : [];
+    const bindingRows = hasDependencyBindingSecrets
+      ? await readRotationSource("dependency-binding-secrets", () =>
+          db
+            .selectFrom("dependency_binding_secrets")
+            .select(["ref", "binding_id", "resource_id", "payload"])
+            .execute(),
+        )
+      : [];
+    const deploymentRows = await readRotationSource("deployment-snapshots", () =>
+      db.selectFrom("deployments").select(["id", "environment_snapshot"]).execute(),
+    );
     const records: RotationRecord[] = [];
     const append = (
       table: RotationTable,
