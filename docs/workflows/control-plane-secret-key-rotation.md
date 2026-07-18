@@ -35,8 +35,10 @@ appaloft db secret-rotation plan \
   --server-ssh-private-key-file <path>
 ```
 
-The read-only plan releases state-root coordination without uploading its local mirror. Apply uses
-the normal remote backup, revision fence, and conflict-safe merge before replacing server state.
+The read-only plan may hold an ephemeral state-root coordination lock and removes it on release. It
+does not create a backend marker, migrate a schema marker, recover a stale lock, or upload its local
+mirror. Apply uses the normal durable preparation, remote backup, revision fence, and conflict-safe
+merge before replacing server state.
 
 Add `--allow-legacy-plaintext` only for the separately approved one-time migration of pre-envelope
 rows. Keep the old key in `APPALOFT_CONTROL_PLANE_SECRET_KEYS` until the post-commit plan reports no
