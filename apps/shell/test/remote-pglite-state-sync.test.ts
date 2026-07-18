@@ -159,6 +159,54 @@ function createLocalSshArchiveRunner() {
 }
 
 describe("remote PGlite state sync", () => {
+  test("[CPS-REMOTE-013] SSH secret rotation plan downloads state without uploading it", async () => {
+    const localDataRoot = await mkdtemp(join(tmpdir(), "appaloft-secret-plan-local-"));
+    const remoteRuntimeRoot = await mkdtemp(join(tmpdir(), "appaloft-secret-plan-remote-"));
+    const remoteStateRoot = join(remoteRuntimeRoot, "state");
+
+    try {
+      await mkdir(join(remoteStateRoot, "pglite"), { recursive: true });
+      await mkdir(join(remoteStateRoot, "source-links"), { recursive: true });
+      await mkdir(join(remoteStateRoot, "server-applied-routes"), { recursive: true });
+      await writeFile(join(remoteStateRoot, "pglite", "live.txt"), "remote-live-state");
+      await writeFile(join(remoteStateRoot, "sync-revision.txt"), "7\n");
+
+      const session = await prepareRemotePgliteStateSync({
+        argv: [
+          "appaloft",
+          "db",
+          "secret-rotation",
+          "plan",
+          "--state-backend",
+          "ssh-pglite",
+          "--server-host",
+          "127.0.0.1",
+        ],
+        config: testConfig(localDataRoot, { remoteRuntimeRoot }),
+        runner: createLocalSshArchiveRunner(),
+      });
+
+      expect(session.isOk()).toBe(true);
+      if (session.isErr() || !session.value) {
+        throw new Error("Expected read-only remote secret rotation session");
+      }
+      expect(session.value.readOnly).toBe(true);
+
+      const released = await session.value.releaseForCliRuntime();
+      const finalized = await session.value.syncBackAndRelease();
+
+      expect(released.isOk()).toBe(true);
+      expect(finalized.isOk()).toBe(true);
+      expect(await readFile(join(remoteStateRoot, "sync-revision.txt"), "utf8")).toBe("7\n");
+      expect(await readFile(join(remoteStateRoot, "pglite", "live.txt"), "utf8")).toBe(
+        "remote-live-state",
+      );
+    } finally {
+      await rm(localDataRoot, { recursive: true, force: true });
+      await rm(remoteRuntimeRoot, { recursive: true, force: true });
+    }
+  });
+
   test("[CONFIG-FILE-STATE-010] SSH deploy plans a remote PGlite local mirror before composition", async () => {
     const dataDir = await mkdtemp(join(tmpdir(), "appaloft-remote-sync-"));
     try {

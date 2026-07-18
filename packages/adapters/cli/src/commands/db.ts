@@ -16,9 +16,22 @@ const statusCommand = EffectCommand.make("status", {}, () => runQuery(DbStatusQu
   EffectCommand.withDescription("Show migration status"),
 );
 
-const secretRotationPlanCommand = EffectCommand.make("plan", {}, () =>
-  runQuery(ControlPlaneSecretRotationPlanQuery.create()),
-).pipe(
+const remoteStateOptions = {
+  stateBackend: Options.choice("state-backend", [
+    "ssh-pglite",
+    "local-pglite",
+    "postgres-control-plane",
+  ] as const).pipe(Options.optional),
+  serverHost: Options.text("server-host").pipe(Options.optional),
+  serverPort: Options.text("server-port").pipe(Options.optional),
+  serverSshUsername: Options.text("server-ssh-username").pipe(Options.optional),
+  serverSshPrivateKeyFile: Options.text("server-ssh-private-key-file").pipe(Options.optional),
+};
+
+const secretRotationPlanCommand = EffectCommand.make("plan", remoteStateOptions, (options) => {
+  void options;
+  return runQuery(ControlPlaneSecretRotationPlanQuery.create());
+}).pipe(
   EffectCommand.withDescription(
     "Dry-run control-plane secret rotation using counts, states, and a safe plan digest",
   ),
@@ -32,15 +45,18 @@ const secretRotationApplyCommand = EffectCommand.make(
     allowLegacyPlaintext: Options.boolean("allow-legacy-plaintext").pipe(
       Options.withDefault(false),
     ),
+    ...remoteStateOptions,
   },
-  ({ allowLegacyPlaintext, backupReference, planDigest }) =>
-    runCommand(
+  ({ allowLegacyPlaintext, backupReference, planDigest, ...remoteOptions }) => {
+    void remoteOptions;
+    return runCommand(
       ControlPlaneSecretRotationApplyCommand.create({
         planDigest,
         backupReference,
         allowLegacyPlaintext,
       }),
-    ),
+    );
+  },
 ).pipe(
   EffectCommand.withDescription(
     "Atomically apply a matching rotation plan after an external backup",

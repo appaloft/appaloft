@@ -8,6 +8,7 @@ import {
   type ControlPlaneSecretRotationApplyResult,
   type ControlPlaneSecretRotationPlan,
   type ControlPlaneSecretRotationPort,
+  type ControlPlaneSecretRotationUnreadableFinding,
 } from "@appaloft/application";
 import { type DomainError, err, ok, type Result } from "@appaloft/core";
 import { type Kysely, type Transaction } from "kysely";
@@ -31,6 +32,7 @@ interface RotationRecord {
   keyId?: string;
   variableIndex?: number;
   snapshot?: Record<string, unknown>;
+  finding: Omit<ControlPlaneSecretRotationUnreadableFinding, "reason" | "keyId">;
 }
 
 export interface ControlPlaneSecretRotationFaultInjector {
@@ -78,6 +80,12 @@ function rotationDigest(records: readonly RotationRecord[], activeKeyId: string 
 function persistenceRecordIdentity(record: RotationRecord): string {
   if (record.table !== "deployments") return `${record.table}:${record.id}`;
   return `${record.table}:${record.id.slice(0, record.id.lastIndexOf(":"))}`;
+}
+
+const maxUnreadableFindings = 100;
+
+function unreadableReason(error: DomainError): string {
+  return typeof error.details?.reason === "string" ? error.details.reason : "unreadable";
 }
 
 export class PgControlPlaneSecretRotationService implements ControlPlaneSecretRotationPort {
@@ -199,11 +207,31 @@ export class PgControlPlaneSecretRotationService implements ControlPlaneSecretRo
       "legacy-plaintext": 0,
       unreadable: 0,
     } satisfies Record<ControlPlaneSecretEnvelopeState, number>;
+    const unreadableFindings: ControlPlaneSecretRotationUnreadableFinding[] = [];
     for (const record of records) {
+      if (record.state === "unreadable") {
+        const authenticated = await this.secretProtector.unprotect(record.context, record.value);
+        stateCounts.unreadable += 1;
+        if (unreadableFindings.length < maxUnreadableFindings) {
+          unreadableFindings.push({
+            ...record.finding,
+            ...(record.keyId ? { keyId: record.keyId } : {}),
+            reason: authenticated.isErr() ? unreadableReason(authenticated.error) : "unreadable",
+          });
+        }
+        continue;
+      }
       if (record.state === "active-key" || record.state === "retained-key") {
         const authenticated = await this.secretProtector.unprotect(record.context, record.value);
         if (authenticated.isErr()) {
           stateCounts.unreadable += 1;
+          if (unreadableFindings.length < maxUnreadableFindings) {
+            unreadableFindings.push({
+              ...record.finding,
+              ...(record.keyId ? { keyId: record.keyId } : {}),
+              reason: unreadableReason(authenticated.error),
+            });
+          }
           continue;
         }
       }
@@ -219,6 +247,8 @@ export class PgControlPlaneSecretRotationService implements ControlPlaneSecretRo
       requiresLegacyAuthorization: stateCounts["legacy-plaintext"] > 0,
       ready: Boolean(activeKeyId) && stateCounts.unreadable === 0,
       planDigest: rotationDigest(records, activeKeyId),
+      unreadableFindings,
+      unreadableFindingsTruncated: stateCounts.unreadable > unreadableFindings.length,
     };
   }
 
@@ -227,16 +257,22 @@ export class PgControlPlaneSecretRotationService implements ControlPlaneSecretRo
       await Promise.all([
         db
           .selectFrom("environment_variables")
-          .select(["id", "value"])
+          .select(["id", "environment_id", "key", "value"])
           .where("is_secret", "=", true)
           .execute(),
         db
           .selectFrom("resource_variables")
-          .select(["id", "value"])
+          .select(["id", "resource_id", "key", "value"])
           .where("is_secret", "=", true)
           .execute(),
-        db.selectFrom("dependency_resource_secrets").select(["ref", "payload"]).execute(),
-        db.selectFrom("dependency_binding_secrets").select(["ref", "payload"]).execute(),
+        db
+          .selectFrom("dependency_resource_secrets")
+          .select(["ref", "dependency_resource_id", "environment_id", "payload"])
+          .execute(),
+        db
+          .selectFrom("dependency_binding_secrets")
+          .select(["ref", "binding_id", "resource_id", "payload"])
+          .execute(),
         db.selectFrom("deployments").select(["id", "environment_snapshot"]).execute(),
       ]);
     const records: RotationRecord[] = [];
@@ -245,26 +281,51 @@ export class PgControlPlaneSecretRotationService implements ControlPlaneSecretRo
       id: string,
       context: ControlPlaneSecretContext,
       value: string,
-      extras: Partial<RotationRecord> = {},
+      finding: RotationRecord["finding"],
+      extras: Omit<Partial<RotationRecord>, "finding"> = {},
     ) => {
       const inspected = this.secretProtector.inspect(value);
-      records.push({ table, id, context, value, ...inspected, ...extras });
+      records.push({ table, id, context, value, finding, ...inspected, ...extras });
     };
     for (const row of environmentRows) {
-      append("environment_variables", row.id, { purpose: "environment-variable" }, row.value);
+      append("environment_variables", row.id, { purpose: "environment-variable" }, row.value, {
+        source: "environment-variable",
+        recordId: row.id,
+        purpose: "environment-variable",
+        environmentId: row.environment_id,
+        variableKey: row.key,
+      });
     }
     for (const row of resourceRows) {
-      append("resource_variables", row.id, { purpose: "resource-variable" }, row.value);
+      append("resource_variables", row.id, { purpose: "resource-variable" }, row.value, {
+        source: "resource-variable",
+        recordId: row.id,
+        purpose: "resource-variable",
+        resourceId: row.resource_id,
+        variableKey: row.key,
+      });
     }
     for (const row of dependencyRows) {
       const value = payloadValue(row.payload);
       if (value)
-        append("dependency_resource_secrets", row.ref, { purpose: "dependency-resource" }, value);
+        append("dependency_resource_secrets", row.ref, { purpose: "dependency-resource" }, value, {
+          source: "dependency-resource-secret",
+          recordId: row.ref,
+          purpose: "dependency-resource",
+          dependencyResourceId: row.dependency_resource_id,
+          environmentId: row.environment_id,
+        });
     }
     for (const row of bindingRows) {
       const value = payloadValue(row.payload);
       if (value)
-        append("dependency_binding_secrets", row.ref, { purpose: "dependency-binding" }, value);
+        append("dependency_binding_secrets", row.ref, { purpose: "dependency-binding" }, value, {
+          source: "dependency-binding-secret",
+          recordId: row.ref,
+          purpose: "dependency-binding",
+          bindingId: row.binding_id,
+          resourceId: row.resource_id,
+        });
     }
     for (const row of deploymentRows) {
       const variables = snapshotVariables(row.environment_snapshot);
@@ -277,6 +338,14 @@ export class PgControlPlaneSecretRotationService implements ControlPlaneSecretRo
           `${row.id}:${variableIndex}`,
           { purpose: variable.scope === "resource" ? "resource-variable" : "environment-variable" },
           variable.value,
+          {
+            source: "deployment-snapshot-variable",
+            recordId: row.id,
+            purpose: variable.scope === "resource" ? "resource-variable" : "environment-variable",
+            deploymentId: row.id,
+            ...(typeof variable.key === "string" ? { variableKey: variable.key } : {}),
+            variableIndex,
+          },
           { variableIndex, snapshot: row.environment_snapshot },
         );
       });

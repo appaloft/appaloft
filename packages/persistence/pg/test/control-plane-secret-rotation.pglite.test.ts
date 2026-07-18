@@ -97,7 +97,21 @@ describe("control-plane secret rotation", () => {
       expect(plan).toMatchObject({
         ready: false,
         stateCounts: { unreadable: 2, "active-key": 0 },
+        unreadableFindings: [
+          {
+            source: "dependency-resource-secret",
+            dependencyResourceId: "rsi_rotation_a",
+            reason: "authentication-failed",
+          },
+          {
+            source: "dependency-resource-secret",
+            dependencyResourceId: "rsi_rotation_b",
+            reason: "authentication-failed",
+          },
+        ],
+        unreadableFindingsTruncated: false,
       });
+      expect(JSON.stringify(plan)).not.toContain("ROTATION_MARKER");
       const applied = await service.apply({
         planDigest: plan.planDigest,
         backupReference: "backup:test-wrong-key",

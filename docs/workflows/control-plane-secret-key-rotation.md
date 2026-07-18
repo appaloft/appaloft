@@ -11,9 +11,10 @@ configure active + retained keyring
   -> remove old key only after compatibility window closes
 ```
 
-Dry-run performs no writes and returns only record/variable counts, envelope states, safe key ids,
-readiness, and a deterministic plan digest. Apply rejects a stale digest, missing backup reference,
-unreadable envelope, absent target key, or legacy row without explicit authorization.
+Dry-run performs no business-state writes and returns only record/variable counts, envelope states,
+safe key ids, bounded safe unreadable findings, readiness, and a deterministic plan digest. Apply
+rejects a stale digest, missing backup reference, unreadable envelope, absent target key, or legacy
+row without explicit authorization.
 
 Use the source CLI from the repository checkout:
 
@@ -23,6 +24,19 @@ appaloft db secret-rotation apply \
   --plan-digest sha256:<dry-run-digest> \
   --backup-reference <external-backup-reference>
 ```
+
+For SSH-server PGlite state, add the same explicit target options to plan and apply:
+
+```bash
+appaloft db secret-rotation plan \
+  --state-backend ssh-pglite \
+  --server-host <host> \
+  --server-ssh-username <user> \
+  --server-ssh-private-key-file <path>
+```
+
+The read-only plan releases state-root coordination without uploading its local mirror. Apply uses
+the normal remote backup, revision fence, and conflict-safe merge before replacing server state.
 
 Add `--allow-legacy-plaintext` only for the separately approved one-time migration of pre-envelope
 rows. Keep the old key in `APPALOFT_CONTROL_PLANE_SECRET_KEYS` until the post-commit plan reports no
