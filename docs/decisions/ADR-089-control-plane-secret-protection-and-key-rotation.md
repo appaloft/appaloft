@@ -47,6 +47,10 @@ When a generic Environment identifier read remains, the adapter first runs a par
 identifier query and only then a one-row identifier probe. This separates fixed schema-shape and row
 materialization boundaries while both remain fail closed; neither probe publishes SQL, relation names,
 values, row counts, messages, hosts, or paths.
+When that zero-row identifier query also fails generically, the adapter diagnoses the boundary from
+least specific to most specific: a constant database query, a zero-row table-only query, then the
+zero-row identifier query. These probes read neither catalog contents nor business rows and publish
+only fixed database, table-shape, or identifier-shape categories.
 Every rotation source is scanned through deterministic bounded keyset pages over its stable identifier.
 The coordinated plan mirror is immutable for the duration of the read, so keyset pagination visits
 every source row exactly once without offset drift. A missing or non-increasing cursor is a fail-closed

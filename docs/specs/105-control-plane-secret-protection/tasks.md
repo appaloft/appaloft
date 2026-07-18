@@ -32,6 +32,7 @@
 - [x] Add bounded read-only Environment column probes for generic source failures and publish only fixed column or row-materialization categories.
 - [x] Page every rotation source by its stable identifier and verify a multi-page source is classified completely without value disclosure.
 - [x] Separate Environment identifier schema-shape and one-row probes with a parameter-free zero-row query, preserving fail-closed behavior and value-free diagnostics.
+- [x] Layer constant database, zero-row source-table, and zero-row identifier-column probes before row materialization without reading catalog contents or business rows.
 - [x] Extend bounded source/probe SQLSTATE diagnosis to fixed safe operational families without publishing codes or database details.
 - [x] Preserve safe source-specific rotation read failures for unattended diagnosis.
 - [x] Replace optional-table schema discovery with direct reads guarded by exact PostgreSQL `42P01` handling.
