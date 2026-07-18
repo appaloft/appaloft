@@ -122,15 +122,37 @@ function sourceReadFailureReason(source: string, error: unknown): string {
 async function readOptionalRotationSource<T>(
   source: string,
   read: () => Promise<T[]>,
+  probes: ReadonlyArray<{ name: string; read: () => Promise<unknown[]> }> = [],
 ): Promise<T[]> {
   try {
     return await read();
   } catch (error) {
     if (sqlStateCode(error) === "42P01") return [];
+    const reason = sourceReadFailureReason(source, error);
+    if (reason === `${source}-read-failed`) {
+      for (const probe of probes) {
+        try {
+          await probe.read();
+        } catch (probeError) {
+          throw rotationError(
+            "control_plane_secret_rotation_source_read_failed",
+            "A control-plane secret rotation source could not be read",
+            sourceReadFailureReason(`${source}-${probe.name}`, probeError),
+          );
+        }
+      }
+      if (probes.length > 0) {
+        throw rotationError(
+          "control_plane_secret_rotation_source_read_failed",
+          "A control-plane secret rotation source could not be read",
+          `${source}-row-materialization-failed`,
+        );
+      }
+    }
     throw rotationError(
       "control_plane_secret_rotation_source_read_failed",
       "A control-plane secret rotation source could not be read",
-      sourceReadFailureReason(source, error),
+      reason,
     );
   }
 }
@@ -315,11 +337,29 @@ export class PgControlPlaneSecretRotationService implements ControlPlaneSecretRo
     // closed. This keeps first deployment safe without relying on version-specific schema catalogs.
     // Keep source reads ordered so a failed maintenance plan has one deterministic safe reason and
     // does not leave concurrent reads running while the coordinated mirror is being closed.
-    const environmentRows = await readOptionalRotationSource("environment-variables", () =>
-      db
-        .selectFrom("environment_variables")
-        .select(["id", "environment_id", "key", "value", "is_secret"])
-        .execute(),
+    const environmentRows = await readOptionalRotationSource(
+      "environment-variables",
+      () =>
+        db
+          .selectFrom("environment_variables")
+          .select(["id", "environment_id", "key", "value", "is_secret"])
+          .execute(),
+      [
+        { name: "id", read: () => db.selectFrom("environment_variables").select("id").execute() },
+        {
+          name: "environment-id",
+          read: () => db.selectFrom("environment_variables").select("environment_id").execute(),
+        },
+        { name: "key", read: () => db.selectFrom("environment_variables").select("key").execute() },
+        {
+          name: "value",
+          read: () => db.selectFrom("environment_variables").select("value").execute(),
+        },
+        {
+          name: "is-secret",
+          read: () => db.selectFrom("environment_variables").select("is_secret").execute(),
+        },
+      ],
     );
     const resourceRows = await readOptionalRotationSource("resource-variables", () =>
       db
