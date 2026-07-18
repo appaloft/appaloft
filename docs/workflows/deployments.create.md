@@ -109,6 +109,11 @@ Web must not:
 CLI may:
 
 - accept non-interactive flags/options;
+- use `appaloft deployments create` with the complete ids-only deployment context when related
+  Resource profile and target configuration already exist, including through a selected remote
+  control-plane profile;
+- submit detached durable work for a selected remote control plane, or synchronously progress and
+  verify the deployment when the ids-only command runs in pure local mode;
 - discover or read an explicit repository config file as a local entry-workflow profile source;
 - prompt interactively when TTY is available as the CLI form of the Quick Deploy workflow;
 - create/select related records through their own explicit commands before deployment;
