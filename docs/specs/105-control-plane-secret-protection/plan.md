@@ -26,6 +26,8 @@
   sources while retaining fail-closed behavior for initial-schema and all other read failures.
 - Preserve fixed source-specific failure reasons through the operation boundary so unattended
   maintenance can locate the failing read without publishing database error details.
+- Read post-initial optional sources directly and classify only PostgreSQL `42P01` as legacy
+  absence, avoiding schema-catalog assumptions while preserving fail-closed behavior.
 - Extend Deployment Proof with value-free planned/observed environment key-set evidence.
 
 ## Persistence And Migration

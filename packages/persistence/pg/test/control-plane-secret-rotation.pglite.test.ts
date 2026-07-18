@@ -120,7 +120,42 @@ describe("control-plane secret rotation", () => {
       expect(JSON.stringify(plan)).not.toContain("SELECT");
     }));
 
-  test("[CPS-COMPAT-017] plan treats absent post-initial secret tables as empty", async () => {
+  test("[CPS-COMPAT-019] optional source failures other than undefined-table stay fail-closed", () =>
+    withDatabase(async (database) => {
+      const failingDatabase = new Proxy(database.db, {
+        get(target, property) {
+          if (property === "selectFrom") {
+            return (table: string) => {
+              if (table === "resource_variables") throw new Error("private optional read detail");
+              const selectFrom = target.selectFrom.bind(target) as unknown as (
+                source: string,
+              ) => ReturnType<typeof target.selectFrom>;
+              return selectFrom(table);
+            };
+          }
+          const value = Reflect.get(target, property, target);
+          return typeof value === "function" ? value.bind(target) : value;
+        },
+      }) as typeof database.db;
+      const { rotatingProtector } = protectors();
+
+      const plan = await new PgControlPlaneSecretRotationService(
+        failingDatabase,
+        rotatingProtector,
+      ).plan();
+
+      expect(plan._unsafeUnwrapErr()).toMatchObject({
+        code: "control_plane_secret_rotation_source_read_failed",
+        details: {
+          phase: "control-plane-secret-rotation",
+          reason: "resource-variables-read-failed",
+        },
+      });
+      expect(JSON.stringify(plan)).not.toContain("private optional read detail");
+      expect(JSON.stringify(plan)).not.toContain("resource_variables");
+    }));
+
+  test("[CPS-COMPAT-017][CPS-COMPAT-019] plan treats absent post-initial secret tables as empty", async () => {
     const dataDir = mkdtempSync(join(tmpdir(), "appaloft-secret-rotation-legacy-"));
     const database = await createDatabase({ driver: "pglite", pgliteDataDir: dataDir });
     try {

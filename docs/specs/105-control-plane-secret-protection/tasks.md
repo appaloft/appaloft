@@ -23,6 +23,7 @@
 - [x] Add an opt-in, versioned safe JSON CLI failure contract for unattended maintenance gates.
 - [x] Keep pre-migration plans compatible with absent post-initial secret-bearing tables.
 - [x] Preserve safe source-specific rotation read failures for unattended diagnosis.
+- [x] Replace optional-table schema discovery with direct reads guarded by exact PostgreSQL `42P01` handling.
 - [x] Make Swarm env semantics and runtime key proof consistent with other substrates.
 
 ## Verification And Sync
