@@ -154,7 +154,7 @@ describe("archive and delete lifecycle CLI e2e", () => {
           "--name",
           "cleanup-blocker-server",
           "--host",
-          "127.0.0.1",
+          "127.0.0.2",
           "--port",
           "22",
           "--provider",

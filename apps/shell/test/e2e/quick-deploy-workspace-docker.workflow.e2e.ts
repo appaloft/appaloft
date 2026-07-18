@@ -49,6 +49,7 @@ describe("quick deploy workspace Docker workflow e2e", () => {
     });
     const appPort = await reservePort();
     const suffix = crypto.randomUUID().slice(0, 8);
+    const serverHost = `127.0.0.${(Number.parseInt(suffix.slice(0, 2), 16) % 253) + 2}`;
     let deploymentId: string | undefined;
 
     try {
@@ -66,7 +67,7 @@ describe("quick deploy workspace Docker workflow e2e", () => {
           "--name",
           `local-${suffix}`,
           "--host",
-          "127.0.0.1",
+          serverHost,
           "--provider",
           "local-shell",
         ],
