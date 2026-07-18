@@ -135,16 +135,20 @@ after trusted PR preview context selects preview scope, and none may be added to
 
 Use this order:
 
-1. Existing Appaloft config: `appaloft deploy <source>`; `source.type: image` in config is a
+1. Existing configured Resource in a selected remote control plane: use `appaloft deployments
+   create --project <projectId> --environment <environmentId> --resource <resourceId> --server
+   <serverId> [--destination <destinationId>]`; it is ids-only and does not replace source/profile
+   configuration or proof verification.
+2. Existing Appaloft config: `appaloft deploy <source>`; `source.type: image` in config is a
    Resource source/runtime profile declaration, not a deployment command field or registry secret
    surface.
-2. Docker/OCI image: `appaloft deploy image://<image>:<tag> --method prebuilt-image`.
-3. Compose source: `appaloft deploy <source> --method docker-compose`.
-4. Dockerfile source: `appaloft deploy <source> --method dockerfile`.
-5. Built static output: `appaloft deploy ./dist --as static-site`.
-6. Static source: `appaloft deploy <source> --method static --publish-dir <dir>`.
-7. Workspace commands: use explicit install, build, start, and port options.
-8. Blueprint catalog: use `appaloft blueprint list/show/plan-install` for neutral catalog discovery
+3. Docker/OCI image: `appaloft deploy image://<image>:<tag> --method prebuilt-image`.
+4. Compose source: `appaloft deploy <source> --method docker-compose`.
+5. Dockerfile source: `appaloft deploy <source> --method dockerfile`.
+6. Built static output: `appaloft deploy ./dist --as static-site`.
+7. Static source: `appaloft deploy <source> --method static --publish-dir <dir>`.
+8. Workspace commands: use explicit install, build, start, and port options.
+9. Blueprint catalog: use `appaloft blueprint list/show/plan-install` for neutral catalog discovery
    and dry-run planning. For Web quick deploy, use
    `source=blueprint&sourceExtension=<catalog-extension-key>&blueprintSlug=<slug>` for official or
    extension-provided Blueprints such as PocketBase; do not invent a hidden CLI-only Blueprint

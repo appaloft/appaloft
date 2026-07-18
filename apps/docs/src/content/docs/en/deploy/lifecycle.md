@@ -27,6 +27,18 @@ Appaloft models deployment as `detect -> plan -> execute -> verify -> rollback`.
 
 This lifecycle explains user-visible deployment state. Users need to know which step failed, which input it used, and how to recover.
 
+When a Project, Environment, Resource profile, and Server already exist, a logged-in remote CLI can admit the first deployment without running local Quick Deploy:
+
+```bash
+appaloft deployments create \
+  --project <projectId> \
+  --environment <environmentId> \
+  --resource <resourceId> \
+  --server <serverId>
+```
+
+This command sends only the existing context ids through the shared `deployments.create` contract. It does not read or upload a local source package or repository config. The returned deployment id means the attempt was accepted; use the timeline and proof commands to verify execution.
+
 ![Deployment lifecycle](/docs/diagrams/deployment-lifecycle.svg)
 
 <h3 id="deployment-detect">Detect</h3>

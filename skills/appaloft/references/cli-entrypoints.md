@@ -212,7 +212,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft env sync-profile <environmentId> <targetEnvironmentId> --resource-ids <ids>` - `environments.sync-profile`
 - `appaloft env promote <environmentId> <targetName>` - `environments.promote`
 - `appaloft preview cleanup [path-or-source] --preview pull-request --preview-id pr-123` - `deployments.cleanup-preview`
-- `appaloft deploy [path-or-source] [--config appaloft.yml] [--env KEY=VALUE] [--secret KEY=ci-env:NAME] [--preview pull-request]` - `deployments.create`
+- `appaloft deploy [path-or-source] [--config appaloft.yml] [--env KEY=VALUE] [--secret KEY=ci-env:NAME] [--preview pull-request]; appaloft deployments create --project <projectId> --environment <environmentId> --resource <resourceId> --server <serverId> [--destination <destinationId>]` - `deployments.create`; the namespaced form is ids-only and supports remote control-plane profiles after explicit Resource profile and target setup
 - `appaloft deployments retry <deploymentId>` - `deployments.retry`
 - `appaloft deployments redeploy <resourceId>` - `deployments.redeploy`
 - `appaloft deployments force-redeploy <resourceId>` - `deployments.force-redeploy`

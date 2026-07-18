@@ -201,6 +201,8 @@ The implemented Code Round slice includes:
   composition;
 - remote dispatch for generated SDK non-streaming command/query operations that are not explicitly
   webhook-signature-only, source-package, local gateway, or streaming/watch operations;
+- namespaced ids-only deployment admission through `appaloft deployments create`, which reuses the
+  generated `deployments.create` contract after Resource profile and target context already exist;
 - clear unsupported-operation errors for local-only commands when remote mode is selected.
 
 `projects.list`, `projects.show`, `projects.rename`, and `servers.list` are covered by automated

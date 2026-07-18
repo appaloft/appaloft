@@ -219,6 +219,9 @@ Code Round implemented:
 10. Kept top-level quick deploy, source-package/bootstrap paths, remote-state, DB, serve, terminal
    attach, webhook-signed source ingestion, and streaming/follow behavior local or explicitly
    unsupported in selected remote mode.
+11. Added `appaloft deployments create` as a strict ids-only admission surface so a remote CLI
+    profile can create the first deployment after explicit Resource profile and target setup,
+    without remoteizing source-package/config bootstrap or top-level Quick Deploy.
 
 This slice proves the new architecture without touching deployment admission, SSH state adoption,
 domain mapping, or control-plane-owned source-package execution.

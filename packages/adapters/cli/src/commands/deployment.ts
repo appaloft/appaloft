@@ -52,6 +52,7 @@ import {
   optionalValue,
   resultToEffect,
   runCommand,
+  runDeploymentCommand,
   runDeploymentCommandResult,
   runDeploymentTimelineQuery,
   runQuery,
@@ -90,7 +91,9 @@ const resourceIdArg = Args.text({ name: "resourceId" });
 
 const sourceBaseDirectoryOption = Options.text("source-base-directory").pipe(Options.optional);
 const projectOption = Options.text("project").pipe(Options.optional);
+const deploymentCreateProjectOption = Options.text("project");
 const serverOption = Options.text("server").pipe(Options.optional);
+const deploymentCreateServerOption = Options.text("server");
 const serverHostOption = Options.text("server-host").pipe(Options.optional);
 const serverNameOption = Options.text("server-name").pipe(Options.optional);
 const serverProviderOption = Options.text("server-provider").pipe(Options.optional);
@@ -102,7 +105,9 @@ const serverSshPrivateKeyFileOption = Options.text("server-ssh-private-key-file"
 );
 const destinationOption = Options.text("destination").pipe(Options.optional);
 const environmentOption = Options.text("environment").pipe(Options.optional);
+const deploymentCreateEnvironmentOption = Options.text("environment");
 const resourceOption = Options.text("resource").pipe(Options.optional);
+const deploymentCreateResourceOption = Options.text("resource");
 const resourceNameOption = Options.text("resource-name").pipe(Options.optional);
 const resourceKindOption = Options.choice("resource-kind", resourceKinds).pipe(Options.optional);
 const resourceDescriptionOption = Options.text("resource-description").pipe(Options.optional);
@@ -2025,6 +2030,31 @@ export const logsCommand = EffectCommand.make(
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentTimeline));
 
+const createDeploymentCommand = EffectCommand.make(
+  "create",
+  {
+    project: deploymentCreateProjectOption,
+    environment: deploymentCreateEnvironmentOption,
+    resource: deploymentCreateResourceOption,
+    server: deploymentCreateServerOption,
+    destination: destinationOption,
+  },
+  ({ destination, environment, project, resource, server }) => {
+    const destinationId = optionalValue(destination);
+    return runDeploymentCommand(
+      CreateDeploymentCommand.create({
+        projectId: project,
+        environmentId: environment,
+        resourceId: resource,
+        serverId: server,
+        ...(destinationId ? { destinationId } : {}),
+        executionMode: "detached",
+      }),
+      { appLogLines: 3 },
+    );
+  },
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentCreate));
+
 const listDeploymentsCommand = EffectCommand.make(
   "list",
   {
@@ -2324,6 +2354,7 @@ const deploymentTimelineCommand = EffectCommand.make(
 export const deploymentsCommand = EffectCommand.make("deployments").pipe(
   EffectCommand.withDescription(cliCommandDescriptions.deployments),
   EffectCommand.withSubcommands([
+    createDeploymentCommand,
     listDeploymentsCommand,
     listStaleDeploymentAttemptsCommand,
     showDeploymentCommand,
