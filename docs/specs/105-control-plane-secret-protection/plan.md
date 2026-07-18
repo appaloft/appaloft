@@ -23,11 +23,13 @@
 - Add an opt-in safe JSON CLI error renderer for unattended maintenance. It serializes a fixed
   allowlist of stable classification fields and replaces unknown failures with an unclassified code.
 - Let pre-migration rotation planning recognize absent post-initial secret-bearing tables as empty
-  sources while retaining fail-closed behavior for initial-schema and all other read failures.
+  sources while retaining fail-closed behavior for every non-`42P01` read failure.
 - Preserve fixed source-specific failure reasons through the operation boundary so unattended
   maintenance can locate the failing read without publishing database error details.
 - Read post-initial optional sources directly and classify only PostgreSQL `42P01` as legacy
   absence, avoiding schema-catalog assumptions while preserving fail-closed behavior.
+- Read every rotation source directly before migrations so fresh or partially initialized state can
+  classify exact PostgreSQL `42P01` as empty without weakening any other source failure.
 - Extend Deployment Proof with value-free planned/observed environment key-set evidence.
 
 ## Persistence And Migration
@@ -53,7 +55,8 @@
   secret markers for both domain and unknown failures.
 - Verify a PGlite state stopped before the first post-initial secret table can still produce a safe
   rotation plan without implicitly migrating that state.
-- Verify a missing required source returns only its stable source reason and no SQL/schema details.
+- Verify a pre-initial PGlite state with no rotation source tables produces a safe empty-source plan.
+- Verify a failed source returns only its stable source reason and no SQL/schema details.
 
 ## Risks And Deferred Gaps
 
