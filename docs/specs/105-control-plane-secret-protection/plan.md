@@ -22,6 +22,8 @@
   output-buffer or input-buffer pressure; cleanup removes those files on every exit path.
 - Add an opt-in safe JSON CLI error renderer for unattended maintenance. It serializes a fixed
   allowlist of stable classification fields and replaces unknown failures with an unclassified code.
+- Let pre-migration rotation planning recognize absent post-initial secret-bearing tables as empty
+  sources while retaining fail-closed behavior for initial-schema and all other read failures.
 - Extend Deployment Proof with value-free planned/observed environment key-set evidence.
 
 ## Persistence And Migration
@@ -45,6 +47,8 @@
   accepting the complete compressed archive as an in-memory byte array.
 - Verify the safe CLI error contract omits arbitrary messages, stderr, hosts, paths, ciphertext, and
   secret markers for both domain and unknown failures.
+- Verify a PGlite state stopped before the first post-initial secret table can still produce a safe
+  rotation plan without implicitly migrating that state.
 
 ## Risks And Deferred Gaps
 
