@@ -11,7 +11,7 @@ import {
   type ControlPlaneSecretRotationUnreadableFinding,
 } from "@appaloft/application";
 import { type DomainError, err, ok, type Result } from "@appaloft/core";
-import { type Kysely, type Transaction } from "kysely";
+import { type Kysely, sql, type Transaction } from "kysely";
 
 import { type Database } from "./schema";
 
@@ -390,7 +390,16 @@ export class PgControlPlaneSecretRotationService implements ControlPlaneSecretRo
       (row) => row.id,
       [
         {
-          name: "id",
+          name: "id-schema",
+          read: () =>
+            db
+              .selectFrom("environment_variables")
+              .select("id")
+              .where(sql<boolean>`false`)
+              .execute(),
+        },
+        {
+          name: "id-row",
           read: () => db.selectFrom("environment_variables").select("id").limit(1).execute(),
         },
         {
