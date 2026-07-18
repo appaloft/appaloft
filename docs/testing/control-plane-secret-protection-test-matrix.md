@@ -14,3 +14,5 @@
 | CPS-PROOF-010 | Missing observed runtime keys cannot be reported as matching/successful. | deployment proof/Web/API | integration | `deployment-proof-evidence.test.ts`; application and transport proof tests | passing |
 | CPS-SAFE-011 | Logs, errors, API, CLI, diagnostics, and proof leak no secret/cipher/key material. | published surfaces | integration | protector, runtime redaction, proof evidence, CLI smoke, transport tests, source scan | passing |
 | CPS-COMPAT-012 | Retained old key/version decrypts and rewraps to active. | crypto/PG | unit + integration | protector retained-key test and rotation PGlite tests | passing |
+| CPS-REMOTE-013 | SSH PGlite rotation plan is read-only remotely; apply retains guarded sync semantics. | shell/CLI/SSH PGlite | integration | `remote-pglite-state-sync.test.ts`; source CLI help smoke | passing |
+| CPS-DIAG-014 | Unreadable plan findings are bounded, actionable, and value/ciphertext free. | PG/PGlite + CLI | integration | `control-plane-secret-rotation.pglite.test.ts`; source leak assertion | passing |

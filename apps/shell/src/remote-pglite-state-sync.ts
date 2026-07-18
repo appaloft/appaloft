@@ -22,6 +22,7 @@ export interface RemotePgliteStateSyncPlan {
   backupRetentionDays: number;
   backupMaxCount: number;
   target: SshRemoteStateTarget;
+  readOnly?: boolean;
 }
 
 export interface RemotePgliteStateSyncSession extends RemotePgliteStateSyncPlan {
@@ -121,9 +122,22 @@ function hasPreviewCleanupCommand(argv: readonly string[]): boolean {
   return argv[previewIndex + 1] === "cleanup";
 }
 
+function hasSecretRotationCommand(argv: readonly string[]): boolean {
+  const dbIndex = argv.indexOf("db");
+  return dbIndex !== -1 && argv[dbIndex + 1] === "secret-rotation";
+}
+
+function hasSecretRotationPlanCommand(argv: readonly string[]): boolean {
+  const dbIndex = argv.indexOf("db");
+  return dbIndex !== -1 && argv[dbIndex + 1] === "secret-rotation" && argv[dbIndex + 2] === "plan";
+}
+
 function requiresRemotePgliteStateCommand(argv: readonly string[]): boolean {
   return (
-    hasDeployCommand(argv) || hasSourceLinkRelinkCommand(argv) || hasPreviewCleanupCommand(argv)
+    hasDeployCommand(argv) ||
+    hasSourceLinkRelinkCommand(argv) ||
+    hasPreviewCleanupCommand(argv) ||
+    hasSecretRotationCommand(argv)
   );
 }
 
@@ -425,6 +439,7 @@ export function resolveRemotePgliteStateSyncPlan(
     backupRetentionDays: config.remotePgliteSyncBackupRetentionDays,
     backupMaxCount: config.remotePgliteSyncBackupMaxCount,
     target,
+    readOnly: hasSecretRotationPlanCommand(argv),
   });
 }
 
@@ -911,6 +926,12 @@ export async function prepareRemotePgliteStateSync(
     syncBackAndRelease: async () => {
       let firstError: DomainError | null = null;
       const mergedLocalRoot = localTransactionRoot(planValue.localDataRoot, "merged");
+      if (planValue.readOnly) {
+        const released = await ensureReleased();
+        await rm(baseSnapshotRoot, { recursive: true, force: true });
+        await rm(mergedLocalRoot, { recursive: true, force: true });
+        return released;
+      }
       const resumed = await ensureLifecycleSession();
       if (resumed.isErr()) {
         return err(resumed.error);

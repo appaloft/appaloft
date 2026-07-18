@@ -15,6 +15,8 @@
   runtime environment resolver used by Docker, Compose, SSH, and Swarm.
 - Add a PG/PGlite rotation port that classifies every supported row, requires a matching safe plan
   digest, and updates all rows in one transaction.
+- Return bounded safe findings for unreadable rows and let the source CLI run plan/apply against the
+  existing coordinated SSH PGlite mirror lifecycle. Read-only plan never uploads the mirror.
 - Extend Deployment Proof with value-free planned/observed environment key-set evidence.
 
 ## Persistence And Migration
@@ -33,6 +35,7 @@
   real Docker tests as listed in the dedicated matrix.
 - Use marker keys and assert only key presence/count/fingerprint at runtime.
 - Verify red-green behavior for missing/wrong/corrupt keys and mid-transaction rollback.
+- Verify SSH plan leaves the remote sync revision unchanged and apply retains backup/revision fencing.
 
 ## Risks And Deferred Gaps
 

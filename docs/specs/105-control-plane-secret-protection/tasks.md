@@ -17,6 +17,7 @@
 - [x] Implement versioned protector/keyring configuration and safe errors.
 - [x] Protect secret writes and validate/materialize snapshots all-or-nothing.
 - [x] Implement atomic dry-run/apply migration with plan digest, backup reference, and retry.
+- [x] Add bounded safe unreadable-record findings and coordinated SSH PGlite plan/apply support.
 - [x] Make Swarm env semantics and runtime key proof consistent with other substrates.
 
 ## Verification And Sync
