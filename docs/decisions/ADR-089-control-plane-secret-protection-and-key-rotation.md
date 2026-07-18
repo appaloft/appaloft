@@ -61,6 +61,10 @@ adoption entirely. Rotation planning therefore diagnoses the downloaded schema a
 of mutating a disposable mirror and then continuing after a hidden migration failure. Normal PGlite
 startup still migrates, but any migration error aborts composition before application services are
 registered.
+When an embedded runtime failure has no SQLSTATE, source diagnosis may inspect only the fixed error
+kind on the same bounded known-wrapper chain. Runtime, virtual-filesystem, abort, and database-protocol
+failures map to fixed categories; exception names, messages, paths, SQL, errno values, and arbitrary
+payloads remain unpublished.
 Every rotation source is scanned through deterministic bounded keyset pages over its stable identifier.
 The coordinated plan mirror is immutable for the duration of the read, so keyset pagination visits
 every source row exactly once without offset drift. A missing or non-increasing cursor is a fail-closed
