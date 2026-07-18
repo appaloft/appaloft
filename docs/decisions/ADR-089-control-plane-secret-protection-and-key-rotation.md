@@ -56,6 +56,11 @@ marker with the major embedded by the current PGlite runtime. A mismatch is a mi
 compatibility state, not database corruption: planning fails closed before row inspection or upload.
 The guard does not perform an implicit PGlite minor-version upgrade; that requires the documented
 export/import path plus separately authorized backup and write-freeze controls.
+The read-only SSH maintenance composition also skips application migrations and legacy-state
+adoption entirely. Rotation planning therefore diagnoses the downloaded schema as it exists instead
+of mutating a disposable mirror and then continuing after a hidden migration failure. Normal PGlite
+startup still migrates, but any migration error aborts composition before application services are
+registered.
 Every rotation source is scanned through deterministic bounded keyset pages over its stable identifier.
 The coordinated plan mirror is immutable for the duration of the read, so keyset pagination visits
 every source row exactly once without offset drift. A missing or non-increasing cursor is a fail-closed
