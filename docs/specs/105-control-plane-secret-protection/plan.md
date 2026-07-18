@@ -69,6 +69,7 @@
   rotation plan without implicitly migrating that state.
 - Verify a pre-initial PGlite state with no rotation source tables produces a safe empty-source plan.
 - Verify schema-incompatible and nested undefined-table failures expose only fixed safe categories.
+- Verify bounded probes classify additional PostgreSQL SQLSTATE families into fixed safe categories without exposing the code or database detail.
 - Verify known driver wrapper fields and SQLSTATE aliases preserve the same bounded safe categories.
 - Verify a failed source returns only its stable source reason and no SQL/schema details.
 - Verify generic combined-row failures run bounded single-column probes and expose only the fixed

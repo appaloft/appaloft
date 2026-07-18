@@ -112,9 +112,22 @@ function sqlStateCode(error: unknown): string | undefined {
 
 function sourceReadFailureReason(source: string, error: unknown): string {
   const code = sqlStateCode(error);
+  if (code?.startsWith("08")) return `${source}-connection-unavailable`;
+  if (code?.startsWith("22")) return `${source}-data-invalid`;
+  if (code?.startsWith("23")) return `${source}-integrity-violated`;
+  if (code?.startsWith("25")) return `${source}-transaction-state-invalid`;
+  if (code?.startsWith("28")) return `${source}-authorization-failed`;
+  if (code?.startsWith("40")) return `${source}-transaction-rolled-back`;
   if (code?.startsWith("42") && code !== "42P01") return `${source}-schema-incompatible`;
   if (code?.startsWith("0A")) return `${source}-feature-unsupported`;
+  if (code?.startsWith("53")) return `${source}-resource-exhausted`;
+  if (code?.startsWith("54")) return `${source}-program-limit-exceeded`;
   if (code?.startsWith("55")) return `${source}-state-unavailable`;
+  if (code?.startsWith("57")) return `${source}-operator-intervention`;
+  if (code?.startsWith("58")) return `${source}-system-failed`;
+  if (code?.startsWith("F0")) return `${source}-configuration-invalid`;
+  if (code?.startsWith("HV")) return `${source}-foreign-data-failed`;
+  if (code?.startsWith("P0")) return `${source}-procedural-failed`;
   if (code?.startsWith("XX")) return `${source}-storage-corrupt`;
   return `${source}-read-failed`;
 }
