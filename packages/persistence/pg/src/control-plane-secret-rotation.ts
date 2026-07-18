@@ -318,15 +318,13 @@ export class PgControlPlaneSecretRotationService implements ControlPlaneSecretRo
     const environmentRows = await readOptionalRotationSource("environment-variables", () =>
       db
         .selectFrom("environment_variables")
-        .select(["id", "environment_id", "key", "value"])
-        .where("is_secret", "is", true)
+        .select(["id", "environment_id", "key", "value", "is_secret"])
         .execute(),
     );
     const resourceRows = await readOptionalRotationSource("resource-variables", () =>
       db
         .selectFrom("resource_variables")
-        .select(["id", "resource_id", "key", "value"])
-        .where("is_secret", "is", true)
+        .select(["id", "resource_id", "key", "value", "is_secret"])
         .execute(),
     );
     const dependencyRows = await readOptionalRotationSource("dependency-resource-secrets", () =>
@@ -357,6 +355,7 @@ export class PgControlPlaneSecretRotationService implements ControlPlaneSecretRo
       records.push({ table, id, context, value, finding, ...inspected, ...extras });
     };
     for (const row of environmentRows) {
+      if (!row.is_secret) continue;
       append("environment_variables", row.id, { purpose: "environment-variable" }, row.value, {
         source: "environment-variable",
         recordId: row.id,
@@ -366,6 +365,7 @@ export class PgControlPlaneSecretRotationService implements ControlPlaneSecretRo
       });
     }
     for (const row of resourceRows) {
+      if (!row.is_secret) continue;
       append("resource_variables", row.id, { purpose: "resource-variable" }, row.value, {
         source: "resource-variable",
         recordId: row.id,
