@@ -50,6 +50,7 @@ runtime materialization, and rotated through an explicit atomic migration.
 | CPS-DIAG-018 | Rotation source read diagnosis | Rotation cannot read a configured source for a reason other than exact undefined-table `42P01` | The operation returns a safe error | The error exposes a fixed source-specific reason without SQL, table identifiers, paths, hostnames, values, ciphertext, or arbitrary database details. |
 | CPS-COMPAT-019 | Optional post-initial source read | Rotation reads a post-initial source before application migrations | PostgreSQL reports exact undefined-table code `42P01` | The source is classified as empty; every other database failure remains fail closed and is reduced to the fixed safe source reason. |
 | CPS-COMPAT-020 | Pre-initial source read | Rotation planning opens a fresh or partially initialized state before application migrations | One or more rotation source tables report exact PostgreSQL undefined-table code `42P01` | Each missing source is classified as empty; any other database failure remains fail closed and is reduced to the fixed safe source reason. |
+| CPS-DIAG-021 | SQLSTATE source diagnosis | A rotation source read fails before a plan can be produced | The failure or a bounded cause exposes an allowlisted SQLSTATE family | The operation publishes only a fixed category (`schema-incompatible`, `feature-unsupported`, `state-unavailable`, or `storage-corrupt`); it never publishes SQLSTATE, message, query, relation, host, or path, and unknown failures remain generic. |
 
 ## Domain Ownership
 

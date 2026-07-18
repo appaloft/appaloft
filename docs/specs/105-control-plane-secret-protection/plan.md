@@ -30,6 +30,8 @@
   absence, avoiding schema-catalog assumptions while preserving fail-closed behavior.
 - Read every rotation source directly before migrations so fresh or partially initialized state can
   classify exact PostgreSQL `42P01` as empty without weakening any other source failure.
+- Reduce a bounded SQLSTATE allowlist to fixed safe operational categories while keeping raw codes,
+  database messages, queries, relations, hosts, and paths outside the published contract.
 - Extend Deployment Proof with value-free planned/observed environment key-set evidence.
 
 ## Persistence And Migration
@@ -56,6 +58,7 @@
 - Verify a PGlite state stopped before the first post-initial secret table can still produce a safe
   rotation plan without implicitly migrating that state.
 - Verify a pre-initial PGlite state with no rotation source tables produces a safe empty-source plan.
+- Verify schema-incompatible and nested undefined-table failures expose only fixed safe categories.
 - Verify a failed source returns only its stable source reason and no SQL/schema details.
 
 ## Risks And Deferred Gaps
