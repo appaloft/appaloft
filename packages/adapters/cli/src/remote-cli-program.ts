@@ -403,6 +403,7 @@ export function createRemoteCliProgram(input: RemoteCliProgramInput): CliProgram
     NodeContext.layer,
     Layer.succeed(CliRuntime, {
       version: input.version,
+      executionTarget: "remote",
       startServer: async () => {
         throw unsupportedLocalRemoteError("Serving the local Appaloft backend is local-only");
       },

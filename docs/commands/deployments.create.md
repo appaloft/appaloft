@@ -434,6 +434,9 @@ Allowed entry differences:
 - CLI can dispatch the complete ids-only context through `appaloft deployments create`; this
   namespaced surface is remote-control-plane capable because it does not perform local
   source-package, repository-config, SSH-state, or prompt work.
+- The namespaced surface submits detached durable work when a remote control-plane profile is
+  selected. In pure local mode it executes synchronously and rejects the CLI invocation unless the
+  deployment reaches `succeeded`.
 - Web can provide UX preflight validation and Quick Deploy input collection before dispatch.
 - API remains strict and non-interactive.
 - Stream/progress APIs can expose technical progress.

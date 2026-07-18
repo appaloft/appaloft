@@ -125,6 +125,7 @@ export class CliRuntime extends Context.Tag("CliRuntime")<
   CliRuntime,
   {
     readonly version: string;
+    readonly executionTarget?: "local" | "remote";
     readonly startServer: () => Promise<void>;
     readonly startWorkerRuntime?: () => Promise<void>;
     readonly executeCommand: <T>(
@@ -145,6 +146,7 @@ export class CliRuntime extends Context.Tag("CliRuntime")<
 export const CliRuntimeLive = (input: CliProgramInput) =>
   Layer.succeed(CliRuntime, {
     version: input.version,
+    executionTarget: "local",
     startServer: input.startServer,
     ...(input.startWorkerRuntime ? { startWorkerRuntime: input.startWorkerRuntime } : {}),
     executeCommand: async <T>(message: AppCommand<T>, options?: ExecuteCommandOptions) => {

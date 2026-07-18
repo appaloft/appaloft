@@ -2041,17 +2041,37 @@ const createDeploymentCommand = EffectCommand.make(
   },
   ({ destination, environment, project, resource, server }) => {
     const destinationId = optionalValue(destination);
-    return runDeploymentCommand(
-      CreateDeploymentCommand.create({
-        projectId: project,
-        environmentId: environment,
-        resourceId: resource,
-        serverId: server,
-        ...(destinationId ? { destinationId } : {}),
-        executionMode: "detached",
-      }),
-      { appLogLines: 3 },
-    );
+    const input = {
+      projectId: project,
+      environmentId: environment,
+      resourceId: resource,
+      serverId: server,
+      ...(destinationId ? { destinationId } : {}),
+    } satisfies Omit<CreateDeploymentCommandInput, "executionMode">;
+
+    return Effect.gen(function* () {
+      const cli = yield* CliRuntime;
+      if (cli.executionTarget === "remote") {
+        return yield* runDeploymentCommand(
+          CreateDeploymentCommand.create({
+            ...input,
+            executionMode: "detached",
+          }),
+          { appLogLines: 3 },
+        );
+      }
+
+      return yield* runCreateDeploymentCommand(
+        {
+          ...input,
+          executionMode: "synchronous",
+        },
+        {
+          appLogLines: 3,
+          requirePreviewUrl: false,
+        },
+      );
+    });
   },
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentCreate));
 

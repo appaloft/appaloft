@@ -13,8 +13,9 @@ import {
 import { ok } from "@appaloft/core";
 
 describe("CLI deployment create command", () => {
-  test("[DEP-CREATE-ENTRY-008] deployments create dispatches the shared ids-only command", async () => {
+  test("[DEP-CREATE-ENTRY-009] local deployments create progresses synchronously", async () => {
     const commands: AppCommand<unknown>[] = [];
+    let workerStarts = 0;
     const commandBus = {
       execute: async <T>(_context: unknown, command: AppCommand<T>) => {
         commands.push(command as AppCommand<unknown>);
@@ -22,7 +23,16 @@ describe("CLI deployment create command", () => {
       },
     } as unknown as CommandBus;
     const queryBus = {
-      execute: async <T>(_context: unknown, _query: AppQuery<T>) => ok({} as T),
+      execute: async <T>(_context: unknown, _query: AppQuery<T>) =>
+        ok({
+          items: [
+            {
+              id: "dep_remote",
+              resourceId: "res_api",
+              status: "succeeded",
+            },
+          ],
+        } as T),
     } as unknown as QueryBus;
     const executionContextFactory: ExecutionContextFactory = {
       create: (input) =>
@@ -35,6 +45,9 @@ describe("CLI deployment create command", () => {
     const program = createCliProgram({
       version: "0.1.0-test",
       startServer: async () => {},
+      startWorkerRuntime: async () => {
+        workerStarts += 1;
+      },
       commandBus,
       queryBus,
       executionContextFactory,
@@ -71,7 +84,8 @@ describe("CLI deployment create command", () => {
       resourceId: "res_api",
       serverId: "srv_production",
       destinationId: "dst_default",
-      executionMode: "detached",
+      executionMode: "synchronous",
     });
+    expect(workerStarts).toBe(1);
   });
 });
