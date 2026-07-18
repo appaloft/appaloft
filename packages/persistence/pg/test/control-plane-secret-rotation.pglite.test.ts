@@ -114,7 +114,7 @@ describe("control-plane secret rotation", () => {
         retryable: false,
         details: {
           phase: "control-plane-secret-rotation",
-          reason: "environment-variables-id-read-failed",
+          reason: "environment-variables-id-schema-read-failed",
         },
       });
       expect(JSON.stringify(plan)).not.toContain("environment_variables");
@@ -171,7 +171,11 @@ describe("control-plane secret rotation", () => {
           ) {
             throw new Error("private combined row detail");
           }
-          if (query.includes('from "environment_variables"') && query.includes('select "id"')) {
+          if (
+            query.includes('from "environment_variables"') &&
+            query.includes('select "id"') &&
+            !query.includes("where false")
+          ) {
             throw Object.assign(new Error(privateDetail), { code: "22P02" });
           }
           return args.node;
@@ -191,11 +195,56 @@ describe("control-plane secret rotation", () => {
         code: "control_plane_secret_rotation_source_read_failed",
         details: {
           phase: "control-plane-secret-rotation",
-          reason: "environment-variables-id-data-invalid",
+          reason: "environment-variables-id-row-data-invalid",
         },
       });
       expect(JSON.stringify(plan)).not.toContain("22P02");
       expect(JSON.stringify(plan)).not.toContain(privateDetail);
+    }));
+
+  test("[CPS-DIAG-029] schema-only probes distinguish query shape from row reads", () =>
+    withDatabase(async (database) => {
+      const compiler = new PostgresQueryCompiler();
+      const privateDetail = "private schema probe detail";
+      const failingPlugin: KyselyPlugin = {
+        transformQuery(args) {
+          const query = compiler.compileQuery(args.node, args.queryId).sql;
+          if (
+            query.includes('from "environment_variables"') &&
+            query.includes('select "id", "environment_id"')
+          ) {
+            throw new Error("private combined row detail");
+          }
+          if (
+            query.includes('from "environment_variables"') &&
+            query.includes('select "id"') &&
+            query.includes("where false")
+          ) {
+            throw new Error(privateDetail);
+          }
+          return args.node;
+        },
+        async transformResult(args) {
+          return args.result;
+        },
+      };
+      const { rotatingProtector } = protectors();
+
+      const plan = await new PgControlPlaneSecretRotationService(
+        database.db.withPlugin(failingPlugin),
+        rotatingProtector,
+      ).plan();
+
+      expect(plan._unsafeUnwrapErr()).toMatchObject({
+        code: "control_plane_secret_rotation_source_read_failed",
+        details: {
+          phase: "control-plane-secret-rotation",
+          reason: "environment-variables-id-schema-read-failed",
+        },
+      });
+      expect(JSON.stringify(plan)).not.toContain(privateDetail);
+      expect(JSON.stringify(plan)).not.toContain("environment_variables");
+      expect(JSON.stringify(plan)).not.toContain("where false");
     }));
 
   test("[CPS-COMPAT-019] optional source failures other than undefined-table stay fail-closed", () =>

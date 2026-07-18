@@ -45,6 +45,9 @@
 - Read every rotation source through deterministic bounded keyset pages on the immutable maintenance
   mirror. Require strictly increasing source identifiers, never use offsets, and fail closed rather
   than accepting an incomplete scan when cursor progress is invalid.
+- Before the Environment identifier row probe, run a parameter-free zero-row identifier query so a
+  generic failure can be reduced to a fixed schema-shape or row-read boundary without exposing the
+  database error, query, relation, value, or row count. Keep both outcomes fail closed.
 - Extend Deployment Proof with value-free planned/observed environment key-set evidence.
 
 ## Persistence And Migration
@@ -79,6 +82,8 @@
   row-materialization category.
 - Verify a source larger than one read page is fully counted, uses a stable ordered cursor for the
   second page, and never returns persisted values in the plan.
+- Verify the zero-row identifier probe is ordered before the one-row probe and that a schema-shape
+  failure publishes only its fixed category, without SQL or private database detail.
 
 ## Risks And Deferred Gaps
 

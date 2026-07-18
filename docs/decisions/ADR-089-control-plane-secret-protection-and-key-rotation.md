@@ -43,6 +43,10 @@ data, integrity, transaction, authorization, resource, operator, system, configu
 foreign-data, procedural, schema, feature, state, and internal-storage families so a bounded column
 probe can identify the failing operational boundary without exposing the underlying code or row.
 Only known driver wrapper fields and SQLSTATE aliases are traversed, with bounded depth and node count.
+When a generic Environment identifier read remains, the adapter first runs a parameter-free zero-row
+identifier query and only then a one-row identifier probe. This separates fixed schema-shape and row
+materialization boundaries while both remain fail closed; neither probe publishes SQL, relation names,
+values, row counts, messages, hosts, or paths.
 Every rotation source is scanned through deterministic bounded keyset pages over its stable identifier.
 The coordinated plan mirror is immutable for the duration of the read, so keyset pagination visits
 every source row exactly once without offset drift. A missing or non-increasing cursor is a fail-closed
