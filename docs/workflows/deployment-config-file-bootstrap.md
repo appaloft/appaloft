@@ -186,6 +186,12 @@ dispatch one ordinary ids-only `deployments.create` per application. The applica
 not a cross-Resource transaction, not a release group, and not a new `deployments.create` input.
 Each application may also declare a `services.<key>` Resource service graph; those services remain
 inside that application's Resource profile and are governed by the repository service graph spec.
+An application may reference a top-level managed dependency by key through
+`applications.<key>.dependencies`. When multiple application entries reference the same dependency,
+the definition must provide a stable `resourceName`; the workflow reconciles that one named
+dependency resource once and creates an independent runtime binding for every consumer Resource.
+Definitions are never copied into application entries, and committed config never carries the
+dependency resource id or connection secret.
 
 Declared dependencies are reconciled as part of the same Quick Deploy entry workflow after the
 target Resource is known and before deployment admission. The workflow lists current dependency

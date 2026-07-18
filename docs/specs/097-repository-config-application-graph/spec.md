@@ -27,6 +27,7 @@ provider-account choices in public config.
 | Application graph | The named application map declared by `applications.<key>` in repository config. | Repository config | multi-app config, app graph |
 | Application key | Stable repository-local key for one deployable Resource entry. | Repository config | app key, component key |
 | Application entry | One declared Resource/profile/deployment draft inside the application graph. | Repository config | application, component |
+| Shared application dependency | One top-level named managed dependency resource referenced by two or more application entries and bound separately to every consumer Resource. | Repository config / dependency resources | shared database, graph dependency |
 | Primary application | The first sorted application entry used by single-deployment compatibility paths. | Repository config workflow | default app |
 
 ## Scenarios And Acceptance Criteria
@@ -37,6 +38,9 @@ provider-account choices in public config.
 | CONFIG-FILE-APPLICATION-GRAPH-002 | Parser rejects unsafe application graph | application key shape, required resource name, raw secret material, identity fields, or unsupported orchestration fields are invalid | config parser runs | parsing fails before mutation with config schema/identity/secret/capability errors. |
 | CONFIG-FILE-APPLICATION-GRAPH-003 | Config snapshot preserves application entries | repository config reader loads an application graph | filesystem reader returns a config snapshot | each application entry carries its normalized Resource draft and requested deployment profile for workflow expansion. |
 | CONFIG-FILE-APPLICATION-GRAPH-004 | CLI config workflow expands application graph | `appaloft deploy --config appaloft.yml` runs with application graph entries and trusted target context | CLI entry workflow resolves deployment inputs | each application entry is expanded into a Resource-specific ids-only `deployments.create` input; final deployment admission remains single-Resource and ids-only per application. |
+| CONFIG-FILE-APPLICATION-GRAPH-005 | Parser accepts explicit dependency references | Top-level `dependencies.database` has a stable `resourceName`, while `applications.api.dependencies` and `applications.worker.dependencies` both reference `database` | config parser runs | The shared definition and each consumer reference are accepted and preserved without copying credentials or provider identity into config. |
+| CONFIG-FILE-APPLICATION-GRAPH-006 | Parser rejects ambiguous dependency references | An application references an undefined or duplicate dependency, a definition is unreferenced, multiple applications reference a dependency without `resourceName`, or multiple applications share an ephemeral preview dependency | config parser runs | Parsing fails before mutation with a path-specific application-graph dependency error. |
+| CONFIG-FILE-APPLICATION-GRAPH-007 | CLI reconciles one shared dependency for all consumers | API and worker reference the same named managed Postgres dependency | CLI config workflow expands the graph | The named dependency resource is provisioned at most once, each consumer Resource gets its own `DATABASE_URL` binding, non-consumers stay unbound, and each deployment remains ordinary ids-only admission. |
 
 ## Domain Ownership
 
@@ -53,7 +57,17 @@ provider-account choices in public config.
 
 - Repository config: `applications.<key>` is a map. Keys must be lowercase stable identifiers.
 - Each entry must declare `resource.name`. Supported application-entry fields in this slice are
-  `resource`, `source`, `runtime`, `network`, `health`, `access`, `env`, `secrets`, and `services`.
+  `resource`, `source`, `runtime`, `network`, `health`, `access`, `env`, `secrets`, `services`, and
+  dependency-key references under `dependencies`.
+- Top-level `dependencies.<key>` remains the single dependency definition. `resourceName` is an
+  optional stable managed dependency display name for one consumer and is required when the same
+  dependency key is referenced by multiple application entries. Application entries reference the
+  key; they never duplicate the definition or carry a dependency resource id.
+- In an application graph, every top-level dependency must be referenced by at least one
+  application, every reference must resolve to a top-level definition, and one application cannot
+  repeat the same key. This prevents silently ignored or duplicated dependency declarations.
+- A dependency with `preview.lifecycle: ephemeral` may have only one application consumer. Shared
+  preview dependency lifecycle and cleanup semantics remain unsupported and fail before mutation.
 - CLI config deploy may expand application entries into multiple Resource-specific deployment
   inputs and execute them sequentially through the existing `deployments.create` command.
 - API/HTTP: no new deployment input is added. `deployments.create` stays ids-only and single
@@ -64,7 +78,8 @@ provider-account choices in public config.
 
 ## Non-Goals
 
-- Atomic cross-Resource releases, rollback, health gates, dependency ordering, or release groups.
+- Atomic cross-Resource releases, rollback, health gates, dependency startup ordering, or release
+  groups. Shared dependency reconciliation is sequential and idempotent, not transactional.
 - Provider-specific Compose project settings, Kubernetes manifests, Helm, Cloud billing, hosted
   worker topology, tenant placement, or plan limits.
 - Selecting durable identity such as project id, resource id, server id, destination id, credential

@@ -108,6 +108,41 @@ appaloft resource configure-source res_web \
   --base-directory apps/web
 ```
 
+<h2 id="application-graph-dependencies">Share a dependency across applications</h2>
+
+In an application graph, define a managed dependency once at the top level and reference its key
+from every application that consumes it. A dependency shared by multiple applications requires a
+stable `resourceName` so later consumers reuse the same managed Resource instead of provisioning a
+second database:
+
+```yaml
+dependencies:
+  database:
+    resourceName: Acme Shared Postgres
+    kind: postgres
+    source: managed
+    bind:
+      env: DATABASE_URL
+
+applications:
+  api:
+    resource:
+      name: Acme API
+    dependencies:
+      - database
+  worker:
+    resource:
+      name: Acme Worker
+      kind: worker
+    dependencies:
+      - database
+```
+
+Appaloft reconciles one named Postgres Resource and creates a separate `DATABASE_URL` binding for
+each consuming Resource. Every top-level dependency must be referenced, every reference must
+resolve, and ephemeral preview dependencies cannot be shared. Connection values and dependency
+Resource ids stay out of committed config.
+
 <h2 id="local-static-output">Local static output</h2>
 
 When you already have a `dist`, `build`, or similar static output directory, pass that directory as
