@@ -39,6 +39,9 @@
 - When a legacy embedded runtime still cannot execute the source query, select the boolean marker
   without a database predicate and exclude non-secret rows in memory before inspection or plan
   accounting. Keep all source read failures other than exact `42P01` fail-closed.
+- When an Environment source read fails generically without SQLSTATE, run ordered read-only
+  single-column probes and reduce the result to a fixed column category or row-materialization
+  category without publishing probe values, row counts, SQL, or arbitrary database details.
 - Extend Deployment Proof with value-free planned/observed environment key-set evidence.
 
 ## Persistence And Migration
@@ -68,6 +71,8 @@
 - Verify schema-incompatible and nested undefined-table failures expose only fixed safe categories.
 - Verify known driver wrapper fields and SQLSTATE aliases preserve the same bounded safe categories.
 - Verify a failed source returns only its stable source reason and no SQL/schema details.
+- Verify generic combined-row failures run bounded single-column probes and expose only the fixed
+  row-materialization category.
 
 ## Risks And Deferred Gaps
 

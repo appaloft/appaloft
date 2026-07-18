@@ -29,6 +29,7 @@
 - [x] Map allowlisted SQLSTATE classes to fixed safe source categories without weakening exact `42P01` handling.
 - [x] Compile rotation source secret filters as parameter-free `IS TRUE` predicates and verify the generated SQL contains no boolean bind parameter.
 - [x] Supersede the database boolean predicate with an in-memory secret marker filter, verify both source queries have no `WHERE`, and prove non-secret rows never enter the rotation plan.
+- [x] Add bounded read-only Environment column probes for generic source failures and publish only fixed column or row-materialization categories.
 - [x] Preserve safe source-specific rotation read failures for unattended diagnosis.
 - [x] Replace optional-table schema discovery with direct reads guarded by exact PostgreSQL `42P01` handling.
 - [x] Make Swarm env semantics and runtime key proof consistent with other substrates.
