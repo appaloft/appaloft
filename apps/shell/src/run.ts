@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { mkdir, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import {
+  createCliHelpProgram,
   createRemoteCliProgram,
   defaultCliControlPlaneProfileStore,
   resolveCliExecutionTarget,
@@ -263,6 +264,10 @@ function mcpMode(argv: readonly string[]): "stdio" | "serve" | "remote-stdio" | 
   return null;
 }
 
+function isHelpInvocation(argv: readonly string[]): boolean {
+  return argv.includes("--help") || argv.includes("-h");
+}
+
 function readOptionValue(args: readonly string[], name: string): string | null {
   const longName = `--${name}`;
   const equalsPrefix = `${longName}=`;
@@ -411,6 +416,26 @@ export async function runShellCli(options?: ShellRuntimeOptions): Promise<void> 
 
     try {
       await remoteCliProgram.parseAsync(cliArgv);
+      process.exitCode = 0;
+    } catch {
+      const currentExitCode = readExitCode();
+      exitCode = currentExitCode !== 0 ? currentExitCode : 1;
+    }
+
+    if (exitCode !== 0) {
+      process.exit(exitCode);
+    }
+    return;
+  }
+
+  if (isHelpInvocation(cliArgv)) {
+    const helpProgram = createCliHelpProgram({
+      version: process.env.APPALOFT_APP_VERSION ?? "0.0.0",
+    });
+    let exitCode = 0;
+
+    try {
+      await helpProgram.parseAsync(cliArgv);
       process.exitCode = 0;
     } catch {
       const currentExitCode = readExitCode();
