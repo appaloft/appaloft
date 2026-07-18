@@ -1,9 +1,9 @@
 import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
-import { mkdir, mkdtemp, readdir, readFile, rm, utimes, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { createDatabase, createMigrator } from "@appaloft/persistence-pg";
 import {
   prepareRemotePgliteStateSync,
@@ -159,6 +159,185 @@ function createLocalSshArchiveRunner() {
 }
 
 describe("remote PGlite state sync", () => {
+  test("[CPS-REMOTE-015] SSH mirror download streams the archive to a private file", async () => {
+    const localDataRoot = await mkdtemp(join(tmpdir(), "appaloft-stream-download-local-"));
+    const remoteRuntimeRoot = await mkdtemp(join(tmpdir(), "appaloft-stream-download-remote-"));
+    const remoteStateRoot = join(remoteRuntimeRoot, "state");
+    let streamedArchivePath: string | undefined;
+    let streamedArchiveMode: number | undefined;
+
+    try {
+      await mkdir(join(remoteStateRoot, "pglite"), { recursive: true });
+      await mkdir(join(remoteStateRoot, "source-links"), { recursive: true });
+      await mkdir(join(remoteStateRoot, "server-applied-routes"), { recursive: true });
+      await writeFile(join(remoteStateRoot, "pglite", "live.txt"), "remote-live-state");
+
+      const baseRunner = createLocalSshArchiveRunner();
+      const runner = {
+        run(input: RemotePgliteArchiveRunnerInput) {
+          if (input.command === "ssh" && input.args.at(-1)?.includes("tar -czf -")) {
+            throw new Error("download archive must not use an in-memory stdout buffer");
+          }
+          return baseRunner.run(input);
+        },
+        async runToFile(input: RemotePgliteArchiveRunnerInput, outputPath: string) {
+          streamedArchivePath = outputPath;
+          streamedArchiveMode = (await stat(outputPath)).mode & 0o777;
+          const command = ["sh", "-lc", input.args.at(-1) ?? ""];
+          const process = Bun.spawn(command, {
+            stdout: Bun.file(outputPath),
+            stderr: "pipe",
+          });
+          const exitCode = await process.exited;
+          return {
+            exitCode,
+            stdout: new Uint8Array(),
+            stderr: await new Response(process.stderr).text(),
+            failed: exitCode !== 0,
+          };
+        },
+      };
+      const sync = new RemotePgliteArchiveSync(
+        {
+          dataRoot: remoteStateRoot,
+          localDataRoot,
+          localPgliteDataDir: join(localDataRoot, "pglite"),
+          backupRetentionDays: 7,
+          backupMaxCount: 20,
+          target: { host: "127.0.0.1" },
+          readOnly: true,
+        },
+        runner,
+      );
+
+      const result = await sync.syncFromRemote();
+
+      expect(result.isOk()).toBe(true);
+      expect(await readFile(join(localDataRoot, "pglite", "live.txt"), "utf8")).toBe(
+        "remote-live-state",
+      );
+      expect(streamedArchivePath).toBeDefined();
+      expect(streamedArchiveMode).toBe(0o600);
+      expect(await Bun.file(streamedArchivePath ?? "").exists()).toBe(false);
+    } finally {
+      await rm(localDataRoot, { recursive: true, force: true });
+      await rm(remoteRuntimeRoot, { recursive: true, force: true });
+    }
+  });
+
+  test("[CPS-REMOTE-015] SSH mirror upload streams the archive from a private file", async () => {
+    const localDataRoot = await mkdtemp(join(tmpdir(), "appaloft-stream-upload-local-"));
+    const remoteRuntimeRoot = await mkdtemp(join(tmpdir(), "appaloft-stream-upload-remote-"));
+    const remoteStateRoot = join(remoteRuntimeRoot, "state");
+    let streamedArchivePath: string | undefined;
+    let streamedArchiveMode: number | undefined;
+
+    try {
+      await mkdir(join(localDataRoot, "pglite"), { recursive: true });
+      await mkdir(join(localDataRoot, "source-links"), { recursive: true });
+      await mkdir(join(localDataRoot, "server-applied-routes"), { recursive: true });
+      await mkdir(join(remoteStateRoot, "pglite"), { recursive: true });
+      await mkdir(join(remoteStateRoot, "source-links"), { recursive: true });
+      await mkdir(join(remoteStateRoot, "server-applied-routes"), { recursive: true });
+      await mkdir(join(remoteStateRoot, "locks"), { recursive: true });
+      await writeFile(join(localDataRoot, "pglite", "updated.txt"), "updated-state");
+      await writeFile(join(remoteStateRoot, "sync-revision.txt"), "3\n");
+
+      const baseRunner = createLocalSshArchiveRunner();
+      const runner = {
+        run(input: RemotePgliteArchiveRunnerInput) {
+          if (input.command === "ssh" && input.stdin) {
+            throw new Error("upload archive must not use an in-memory stdin buffer");
+          }
+          return baseRunner.run(input);
+        },
+        async runFromFile(input: RemotePgliteArchiveRunnerInput, inputPath: string) {
+          streamedArchivePath = inputPath;
+          streamedArchiveMode = (await stat(inputPath)).mode & 0o777;
+          const command = ["sh", "-lc", input.args.at(-1) ?? ""];
+          const process = Bun.spawn(command, {
+            stdin: Bun.file(inputPath),
+            stdout: "pipe",
+            stderr: "pipe",
+          });
+          const exitCode = await process.exited;
+          return {
+            exitCode,
+            stdout: new Uint8Array(await new Response(process.stdout).arrayBuffer()),
+            stderr: await new Response(process.stderr).text(),
+            failed: exitCode !== 0,
+          };
+        },
+      };
+      const sync = new RemotePgliteArchiveSync(
+        {
+          dataRoot: remoteStateRoot,
+          localDataRoot,
+          localPgliteDataDir: join(localDataRoot, "pglite"),
+          backupRetentionDays: 7,
+          backupMaxCount: 20,
+          target: { host: "127.0.0.1" },
+        },
+        runner,
+      );
+
+      const result = await sync.syncToRemote({ expectedRevision: 3, nextRevision: 4 });
+
+      expect(result.isOk()).toBe(true);
+      expect(await readFile(join(remoteStateRoot, "pglite", "updated.txt"), "utf8")).toBe(
+        "updated-state",
+      );
+      expect(await readFile(join(remoteStateRoot, "sync-revision.txt"), "utf8")).toBe("4\n");
+      expect(streamedArchivePath).toBeDefined();
+      expect(streamedArchiveMode).toBe(0o600);
+      expect(await Bun.file(streamedArchivePath ?? "").exists()).toBe(false);
+    } finally {
+      await rm(localDataRoot, { recursive: true, force: true });
+      await rm(remoteRuntimeRoot, { recursive: true, force: true });
+    }
+  });
+
+  test("[CPS-REMOTE-015] SSH mirror upload removes its private archive when creation throws", async () => {
+    const localDataRoot = await mkdtemp(join(tmpdir(), "appaloft-stream-cleanup-local-"));
+
+    try {
+      await mkdir(join(localDataRoot, "pglite"), { recursive: true });
+      await mkdir(join(localDataRoot, "source-links"), { recursive: true });
+      await mkdir(join(localDataRoot, "server-applied-routes"), { recursive: true });
+      const sync = new RemotePgliteArchiveSync(
+        {
+          dataRoot: "/var/lib/appaloft/runtime/state",
+          localDataRoot,
+          localPgliteDataDir: join(localDataRoot, "pglite"),
+          backupRetentionDays: 7,
+          backupMaxCount: 20,
+          target: { host: "127.0.0.1" },
+        },
+        {
+          run(input: RemotePgliteArchiveRunnerInput) {
+            if (input.command === "tar") {
+              throw new Error("simulated archive creation failure");
+            }
+            throw new Error("unexpected runner call");
+          },
+        },
+      );
+
+      await expect(sync.syncToRemote({ expectedRevision: 3, nextRevision: 4 })).rejects.toThrow(
+        "simulated archive creation failure",
+      );
+      const parentEntries = await readdir(join(localDataRoot, ".."));
+      expect(
+        parentEntries.some(
+          (entry) =>
+            entry.startsWith(`${basename(localDataRoot)}.upload-`) && entry.endsWith(".tar.gz"),
+        ),
+      ).toBe(false);
+    } finally {
+      await rm(localDataRoot, { recursive: true, force: true });
+    }
+  });
+
   test("[CPS-REMOTE-013] SSH secret rotation plan downloads state without uploading it", async () => {
     const localDataRoot = await mkdtemp(join(tmpdir(), "appaloft-secret-plan-local-"));
     const remoteRuntimeRoot = await mkdtemp(join(tmpdir(), "appaloft-secret-plan-remote-"));

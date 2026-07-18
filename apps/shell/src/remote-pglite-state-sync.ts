@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { cp, mkdir, rename, rm } from "node:fs/promises";
+import { cp, mkdir, open, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import {
   buildSshRemoteStateProcessArgs,
@@ -47,6 +47,14 @@ export interface RemotePgliteArchiveRunnerResult {
 
 export interface RemotePgliteArchiveRunner {
   run(input: RemotePgliteArchiveRunnerInput): RemotePgliteArchiveRunnerResult;
+  runToFile?(
+    input: RemotePgliteArchiveRunnerInput,
+    outputPath: string,
+  ): Promise<RemotePgliteArchiveRunnerResult> | RemotePgliteArchiveRunnerResult;
+  runFromFile?(
+    input: RemotePgliteArchiveRunnerInput,
+    inputPath: string,
+  ): Promise<RemotePgliteArchiveRunnerResult> | RemotePgliteArchiveRunnerResult;
 }
 
 interface LifecycleRunnerInput {
@@ -306,6 +314,13 @@ function remoteExtractCommand(input: {
 }
 
 function defaultRunner(): RemotePgliteArchiveRunner {
+  function redactedStderr(input: RemotePgliteArchiveRunnerInput, stderr: string): string {
+    return (input.redactions ?? []).reduce(
+      (value, secret) => (secret.length > 0 ? value.replaceAll(secret, "[redacted]") : value),
+      stderr,
+    );
+  }
+
   return {
     run(input) {
       const result = Bun.spawnSync([input.command, ...input.args], {
@@ -314,16 +329,45 @@ function defaultRunner(): RemotePgliteArchiveRunner {
         stderr: "pipe",
       });
       const stderr = result.stderr.toString();
-      const redactedStderr = (input.redactions ?? []).reduce(
-        (value, secret) => (secret.length > 0 ? value.replaceAll(secret, "[redacted]") : value),
-        stderr,
-      );
-
       return {
         exitCode: result.exitCode,
         stdout: result.stdout,
-        stderr: redactedStderr,
+        stderr: redactedStderr(input, stderr),
         failed: !result.success,
+      };
+    },
+    async runToFile(input, outputPath) {
+      const process = Bun.spawn([input.command, ...input.args], {
+        stdout: Bun.file(outputPath),
+        stderr: "pipe",
+      });
+      const exitCode = await process.exited;
+      const stderr = await new Response(process.stderr).text();
+
+      return {
+        exitCode,
+        stdout: new Uint8Array(),
+        stderr: redactedStderr(input, stderr),
+        failed: exitCode !== 0,
+      };
+    },
+    async runFromFile(input, inputPath) {
+      const process = Bun.spawn([input.command, ...input.args], {
+        stdin: Bun.file(inputPath),
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+      const exitCode = await process.exited;
+      const [stdout, stderr] = await Promise.all([
+        new Response(process.stdout).arrayBuffer(),
+        new Response(process.stderr).text(),
+      ]);
+
+      return {
+        exitCode,
+        stdout: new Uint8Array(stdout),
+        stderr: redactedStderr(input, stderr),
+        failed: exitCode !== 0,
       };
     },
   };
@@ -331,6 +375,12 @@ function defaultRunner(): RemotePgliteArchiveRunner {
 
 function localTransactionRoot(localDataRoot: string, label: string): string {
   return `${localDataRoot}.${label}-${process.pid}-${Date.now()}`;
+}
+
+async function preparePrivateArchiveFile(path: string): Promise<void> {
+  await rm(path, { force: true });
+  const handle = await open(path, "w", 0o600);
+  await handle.close();
 }
 
 async function replaceLocalMirror(input: {
@@ -554,53 +604,60 @@ export class RemotePgliteArchiveSync {
 
   async syncFromRemote(): Promise<Result<void>> {
     const stagingRoot = localTransactionRoot(this.plan.localDataRoot, "download");
-    const remoteArchive = this.runner.run({
-      command: "ssh",
-      args: [
-        ...buildSshRemoteStateProcessArgs(this.plan.target),
-        remoteArchiveCommand(this.plan.dataRoot, this.plan.readOnly === true),
-      ],
-      redactions: this.plan.target.identityFile ? [this.plan.target.identityFile] : [],
-    });
-    if (remoteArchive.failed) {
-      return err(
-        domainError.infra(
-          "SSH remote PGlite state could not be downloaded",
-          errorDetails({
-            phase: "remote-state-sync-download",
-            target: this.plan.target,
-            exitCode: remoteArchive.exitCode,
-            stderr: remoteArchive.stderr,
-          }),
-        ),
-      );
-    }
-
+    const archivePath = `${stagingRoot}.tar.gz`;
     await rm(stagingRoot, { recursive: true, force: true });
     await mkdir(dirname(this.plan.localDataRoot), { recursive: true });
-    await mkdir(stagingRoot, { recursive: true });
-
-    const extract = this.runner.run({
-      command: "tar",
-      args: ["-xzf", "-", "-C", stagingRoot],
-      stdin: remoteArchive.stdout,
-    });
-    if (extract.failed) {
-      await rm(stagingRoot, { recursive: true, force: true });
-      return err(
-        domainError.infra(
-          "SSH remote PGlite state archive could not be extracted",
-          errorDetails({
-            phase: "remote-state-sync-download",
-            target: this.plan.target,
-            exitCode: extract.exitCode,
-            stderr: extract.stderr,
-          }),
-        ),
-      );
-    }
+    await preparePrivateArchiveFile(archivePath);
 
     try {
+      const downloadInput = {
+        command: "ssh",
+        args: [
+          ...buildSshRemoteStateProcessArgs(this.plan.target),
+          remoteArchiveCommand(this.plan.dataRoot, this.plan.readOnly === true),
+        ],
+        redactions: this.plan.target.identityFile ? [this.plan.target.identityFile] : [],
+      } satisfies RemotePgliteArchiveRunnerInput;
+      const remoteArchive = this.runner.runToFile
+        ? await this.runner.runToFile(downloadInput, archivePath)
+        : this.runner.run(downloadInput);
+      if (remoteArchive.failed) {
+        return err(
+          domainError.infra(
+            "SSH remote PGlite state could not be downloaded",
+            errorDetails({
+              phase: "remote-state-sync-download",
+              target: this.plan.target,
+              exitCode: remoteArchive.exitCode,
+              stderr: remoteArchive.stderr,
+            }),
+          ),
+        );
+      }
+      if (!this.runner.runToFile) {
+        await writeFile(archivePath, remoteArchive.stdout, { mode: 0o600 });
+      }
+
+      await mkdir(stagingRoot, { recursive: true });
+      const extract = this.runner.run({
+        command: "tar",
+        args: ["-xzf", archivePath, "-C", stagingRoot],
+      });
+      if (extract.failed) {
+        await rm(stagingRoot, { recursive: true, force: true });
+        return err(
+          domainError.infra(
+            "SSH remote PGlite state archive could not be extracted",
+            errorDetails({
+              phase: "remote-state-sync-download",
+              target: this.plan.target,
+              exitCode: extract.exitCode,
+              stderr: extract.stderr,
+            }),
+          ),
+        );
+      }
+
       await replaceLocalMirror({
         sourceRoot: stagingRoot,
         targetRoot: this.plan.localDataRoot,
@@ -616,6 +673,8 @@ export class RemotePgliteArchiveSync {
           message: error instanceof Error ? error.message : String(error),
         }),
       );
+    } finally {
+      await rm(archivePath, { force: true });
     }
   }
 
@@ -667,89 +726,97 @@ export class RemotePgliteArchiveSync {
     await mkdir(this.plan.localPgliteDataDir, { recursive: true });
     await mkdir(join(this.plan.localDataRoot, "source-links"), { recursive: true });
     await mkdir(join(this.plan.localDataRoot, "server-applied-routes"), { recursive: true });
-    const archive = this.runner.run({
-      command: "tar",
-      args: [
-        "-czf",
-        "-",
-        "-C",
-        this.plan.localDataRoot,
-        "pglite",
-        "source-links",
-        "server-applied-routes",
-      ],
-    });
-    if (archive.failed) {
-      return err(
-        domainError.infra(
-          "Local PGlite state archive could not be created",
-          errorDetails({
-            phase: "remote-state-sync-upload",
-            target: this.plan.target,
-            exitCode: archive.exitCode,
-            stderr: archive.stderr,
-          }),
-        ),
-      );
-    }
+    const archivePath = `${localTransactionRoot(this.plan.localDataRoot, "upload")}.tar.gz`;
+    await preparePrivateArchiveFile(archivePath);
+    try {
+      const archive = this.runner.run({
+        command: "tar",
+        args: [
+          "-czf",
+          archivePath,
+          "-C",
+          this.plan.localDataRoot,
+          "pglite",
+          "source-links",
+          "server-applied-routes",
+        ],
+      });
+      if (archive.failed) {
+        return err(
+          domainError.infra(
+            "Local PGlite state archive could not be created",
+            errorDetails({
+              phase: "remote-state-sync-upload",
+              target: this.plan.target,
+              exitCode: archive.exitCode,
+              stderr: archive.stderr,
+            }),
+          ),
+        );
+      }
 
-    const remoteExtract = this.runner.run({
-      command: "ssh",
-      args: [
-        ...buildSshRemoteStateProcessArgs(this.plan.target),
-        remoteExtractCommand({
-          dataRoot: this.plan.dataRoot,
-          expectedRevision,
-          nextRevision,
-          backupRetentionDays: this.plan.backupRetentionDays,
-          backupMaxCount: this.plan.backupMaxCount,
-        }),
-      ],
-      stdin: archive.stdout,
-      redactions: this.plan.target.identityFile ? [this.plan.target.identityFile] : [],
-    });
-    if (remoteExtract.failed) {
-      const revisionConflict =
-        remoteExtract.exitCode === remoteStateRevisionConflictExitCode
-          ? parseRemoteRevisionConflict(remoteExtract.stderr)
-          : null;
-      return err(
-        remoteExtract.exitCode === remoteStateRevisionConflictExitCode
-          ? {
-              code: "infra_error",
-              category: "infra",
-              message:
-                "SSH remote PGlite state changed while the command was running; retry with a fresh remote snapshot",
-              retryable: true,
-              details: {
-                ...errorDetails({
+      const uploadInput = {
+        command: "ssh",
+        args: [
+          ...buildSshRemoteStateProcessArgs(this.plan.target),
+          remoteExtractCommand({
+            dataRoot: this.plan.dataRoot,
+            expectedRevision,
+            nextRevision,
+            backupRetentionDays: this.plan.backupRetentionDays,
+            backupMaxCount: this.plan.backupMaxCount,
+          }),
+        ],
+        redactions: this.plan.target.identityFile ? [this.plan.target.identityFile] : [],
+      } satisfies RemotePgliteArchiveRunnerInput;
+      const remoteExtract = this.runner.runFromFile
+        ? await this.runner.runFromFile(uploadInput, archivePath)
+        : this.runner.run({ ...uploadInput, stdin: await readFile(archivePath) });
+      if (remoteExtract.failed) {
+        const revisionConflict =
+          remoteExtract.exitCode === remoteStateRevisionConflictExitCode
+            ? parseRemoteRevisionConflict(remoteExtract.stderr)
+            : null;
+        return err(
+          remoteExtract.exitCode === remoteStateRevisionConflictExitCode
+            ? {
+                code: "infra_error",
+                category: "infra",
+                message:
+                  "SSH remote PGlite state changed while the command was running; retry with a fresh remote snapshot",
+                retryable: true,
+                details: {
+                  ...errorDetails({
+                    phase: "remote-state-sync-upload",
+                    target: this.plan.target,
+                    exitCode: remoteExtract.exitCode,
+                    stderr: remoteExtract.stderr,
+                  }),
+                  reason: "remote_state_revision_conflict",
+                  ...(revisionConflict?.expectedRevision === undefined
+                    ? {}
+                    : { expectedRevision: revisionConflict.expectedRevision }),
+                  ...(revisionConflict?.actualRevision === undefined
+                    ? {}
+                    : { actualRevision: revisionConflict.actualRevision }),
+                },
+              }
+            : domainError.infra(
+                "SSH remote PGlite state could not be uploaded",
+                errorDetails({
                   phase: "remote-state-sync-upload",
                   target: this.plan.target,
                   exitCode: remoteExtract.exitCode,
                   stderr: remoteExtract.stderr,
                 }),
-                reason: "remote_state_revision_conflict",
-                ...(revisionConflict?.expectedRevision === undefined
-                  ? {}
-                  : { expectedRevision: revisionConflict.expectedRevision }),
-                ...(revisionConflict?.actualRevision === undefined
-                  ? {}
-                  : { actualRevision: revisionConflict.actualRevision }),
-              },
-            }
-          : domainError.infra(
-              "SSH remote PGlite state could not be uploaded",
-              errorDetails({
-                phase: "remote-state-sync-upload",
-                target: this.plan.target,
-                exitCode: remoteExtract.exitCode,
-                stderr: remoteExtract.stderr,
-              }),
-            ),
-      );
-    }
+              ),
+        );
+      }
 
-    return ok(undefined);
+      return ok(undefined);
+    } finally {
+      await rm(archivePath, { force: true });
+    }
   }
 }
 
