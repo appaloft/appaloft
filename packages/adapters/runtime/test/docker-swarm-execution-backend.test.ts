@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { describe, expect, test } from "bun:test";
 import {
   AccessRoute,
@@ -9,11 +9,16 @@ import {
   ConfigValueText,
   CreatedAt,
   Deployment,
+  DeploymentTarget,
+  DeploymentTargetCredentialKindValue,
   DeploymentDependencyBindingSnapshotReadinessValue,
   DeploymentDependencyRuntimeSecretRef,
   DeploymentId,
+  DeploymentTargetLifecycleStatusValue,
+  DeploymentTargetName,
   DeploymentTargetDescriptor,
   DeploymentTargetId,
+  DeploymentTargetUsername,
   DestinationId,
   DetectSummary,
   DisplayNameText,
@@ -34,6 +39,7 @@ import {
   HealthCheckStartPeriodSeconds,
   HealthCheckTimeoutSeconds,
   HealthCheckTypeValue,
+  HostAddress,
   ImageReference,
   PackagingModeValue,
   PlanStepText,
@@ -58,6 +64,7 @@ import {
   SourceDescriptor,
   SourceKindValue,
   SourceLocator,
+  SshPrivateKeyText,
   StartedAt,
   TargetKindValue,
   TlsModeValue,
@@ -68,7 +75,7 @@ import {
   ok,
   type Result,
 } from "@appaloft/core";
-import { TestControlPlaneSecretProtector } from "@appaloft/testkit";
+import { MemoryServerRepository, TestControlPlaneSecretProtector } from "@appaloft/testkit";
 import {
   type DependencyResourceSecretStore,
   type DeploymentProgressEvent,
@@ -82,6 +89,8 @@ import {
   type DockerSwarmCommandRunner,
   type DockerSwarmCommandRunnerInput,
   type DockerSwarmCommandRunnerResult,
+  type DockerSwarmProcessRunner,
+  type DockerSwarmProcessRunnerInput,
 } from "../src/docker-swarm-execution-backend";
 
 const generatedAt = GeneratedAt.rehydrate("2026-04-01T00:00:00.000Z");
@@ -95,6 +104,21 @@ class RecordingSwarmCommandRunner implements DockerSwarmCommandRunner {
   ): Promise<Result<DockerSwarmCommandRunnerResult>> {
     this.calls.push(input);
     return ok({ exitCode: 0, stdout: "ok" });
+  }
+}
+
+class RecordingSwarmProcessRunner implements DockerSwarmProcessRunner {
+  readonly calls: DockerSwarmProcessRunnerInput[] = [];
+  identityFileExistedDuringRun = false;
+
+  async run(
+    input: DockerSwarmProcessRunnerInput,
+  ): Promise<Result<DockerSwarmCommandRunnerResult>> {
+    this.calls.push(input);
+    const identityFlagIndex = input.args.indexOf("-i");
+    const identityFile = identityFlagIndex >= 0 ? input.args[identityFlagIndex + 1] : undefined;
+    this.identityFileExistedDuringRun = identityFile ? existsSync(identityFile) : false;
+    return ok({ exitCode: 0, stdout: "remote-ok", stderr: "" });
   }
 }
 
@@ -671,6 +695,98 @@ async function prepareAuthenticatedRegistryImage(input: {
 const realSwarmSmokeTest = Bun.env.APPALOFT_DOCKER_SWARM_SMOKE === "1" ? test : test.skip;
 
 describe("DockerSwarmExecutionBackend", () => {
+  test("[SWARM-TARGET-AUTH-001] shell command runner executes through the registered Swarm manager SSH identity", async () => {
+    const processRunner = new RecordingSwarmProcessRunner();
+    const serverRepository = new MemoryServerRepository();
+    serverRepository.items.set(
+      "dtg_swarm_1",
+      DeploymentTarget.rehydrate({
+        id: DeploymentTargetId.rehydrate("dtg_swarm_1"),
+        name: DeploymentTargetName.rehydrate("Swarm manager"),
+        providerKey: ProviderKey.rehydrate("docker-swarm"),
+        targetKind: TargetKindValue.rehydrate("orchestrator-cluster"),
+        host: HostAddress.rehydrate("swarm.example.test"),
+        port: PortNumber.rehydrate(2222),
+        lifecycleStatus: DeploymentTargetLifecycleStatusValue.active(),
+        credential: {
+          kind: DeploymentTargetCredentialKindValue.rehydrate("ssh-private-key"),
+          username: DeploymentTargetUsername.rehydrate("deploy"),
+          privateKey: SshPrivateKeyText.rehydrate("test-private-key"),
+        },
+        createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+      }),
+    );
+    const runner = new DockerSwarmShellCommandRunner({
+      processRunner,
+      serverRepository,
+    });
+
+    const result = await runner.run({
+      context: createContext(),
+      targetId: "dtg_swarm_1",
+      step: "create-candidate-service",
+      command: "docker service create --with-registry-auth private.example/app:sha",
+      displayCommand: "docker service create --with-registry-auth private.example/app:sha",
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(processRunner.calls).toHaveLength(1);
+    expect(processRunner.calls[0]?.executable).toBe("ssh");
+    expect(processRunner.calls[0]?.args).toEqual(
+      expect.arrayContaining(["-p", "2222", "deploy@swarm.example.test"]),
+    );
+    expect(processRunner.calls[0]?.args.at(-1)).toBe(
+      "docker service create --with-registry-auth private.example/app:sha",
+    );
+    expect(processRunner.calls[0]?.args.join(" ")).not.toContain("DOCKER_CONFIG");
+    expect(processRunner.calls[0]?.args.join(" ")).not.toContain("env -i");
+    expect(processRunner.identityFileExistedDuringRun).toBe(true);
+    const identityFlagIndex = processRunner.calls[0]?.args.indexOf("-i") ?? -1;
+    const identityFile = processRunner.calls[0]?.args[identityFlagIndex + 1];
+    expect(identityFile ? existsSync(identityFile) : true).toBe(false);
+  });
+
+  test("[SWARM-TARGET-AUTH-001] registered-manager runner fails closed without target context", async () => {
+    const processRunner = new RecordingSwarmProcessRunner();
+    const runner = new DockerSwarmShellCommandRunner({
+      processRunner,
+      serverRepository: new MemoryServerRepository(),
+    });
+
+    const result = await runner.run({
+      step: "create-candidate-service",
+      command: "docker service create private.example/app:sha",
+      displayCommand: "docker service create private.example/app:sha",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr().details).toMatchObject({
+      phase: "create-candidate-service",
+      reason: "swarm-manager-context-unavailable",
+    });
+    expect(processRunner.calls).toHaveLength(0);
+  });
+
+  test("[SWARM-TARGET-AUTH-001] shell command runner streams a local Compose file over stdin", async () => {
+    const inputDirectory = mkdtempSync(`${process.cwd()}/.tmp-appaloft-swarm-compose-stdin-`);
+    const inputFile = `${inputDirectory}/compose.yml`;
+    await Bun.write(inputFile, "services: {}\n");
+    try {
+      const runner = new DockerSwarmShellCommandRunner();
+      const result = await runner.run({
+        step: "deploy-candidate-stack",
+        command: "read first_line; printf '%s' \"$first_line\"",
+        displayCommand: "docker stack deploy -c -",
+        stdinFile: inputFile,
+      });
+
+      expect(result.isOk()).toBe(true);
+      expect(result._unsafeUnwrap().stdout).toBe("services: {}");
+    } finally {
+      rmSync(inputDirectory, { recursive: true, force: true });
+    }
+  });
+
   test("[SWARM-TARGET-APPLY-001][SWARM-TARGET-CLEAN-001] shell command runner executes bounded Swarm commands", async () => {
     const runner = new DockerSwarmShellCommandRunner();
 

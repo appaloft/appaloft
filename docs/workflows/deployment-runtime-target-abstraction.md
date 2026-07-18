@@ -220,8 +220,15 @@ Swarm-specific rules:
 - registry credentials, pull secrets, environment secret values, rendered command output, and raw
   Docker provider payloads must be masked before logs, diagnostics, errors, or read models expose
   them;
+- before a product-managed registry credential capability exists, the operator owns registry
+  login on the registered manager's SSH user; apply and verification execute through that manager
+  identity so Docker can propagate its credential store with `--with-registry-auth`, while
+  Appaloft does not create a temporary `DOCKER_CONFIG` or own login/logout cleanup;
 - rollout must preserve or restore the previous same-resource service until required apply, health,
   route, and public verification gates pass;
+- verification must wait for desired replicas to have matching Running tasks and must fail with
+  bounded task/node evidence before route promotion when scheduled tasks reject, fail, remain
+  pending, or cannot pull the image;
 - `resources.runtime-logs`, `resources.health`, proxy/diagnostic summaries, and capacity
   diagnostics must return normalized Appaloft shapes rather than Docker service API objects;
 - cleanup is scoped by resource, deployment, target, destination, and adapter-owned labels, and it

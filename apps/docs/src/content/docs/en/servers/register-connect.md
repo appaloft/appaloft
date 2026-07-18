@@ -133,13 +133,18 @@ Before deploying to a Swarm target, `server test`/`server doctor` checks:
 
 Operators should also verify:
 
-- image registry access is configured without exposing secret values;
+- image registry access is configured for the same SSH user on the registered manager; Appaloft
+  uses that remote user's Docker credential store for `--with-registry-auth` and does not accept,
+  copy, or clean up registry passwords or Docker config files. Log in with the same canonical
+  registry host used by the image reference, including for Docker Hub aliases;
 - the Swarm edge network is an overlay network; set `APPALOFT_DOCKER_SWARM_EDGE_NETWORK` when the
   deployment should use a network name other than `appaloft-edge`;
 - health checks and service logs can be read in a form Appaloft can normalize.
 
-Swarm rollout preserves the previous service until verification passes, logs and health are
-returned as Appaloft status shapes, and cleanup stays scoped to the resource, deployment,
+Swarm rollout preserves the previous service until the desired replicas have matching Running
+tasks. If a scheduled node cannot pull the image or a task remains rejected, pending, or failed,
+verification stops before route promotion and reports bounded task/node evidence. Logs and health
+are returned as Appaloft status shapes, and cleanup stays scoped to the resource, deployment,
 destination, and target labels.
 
 ```bash title="Run connectivity test"

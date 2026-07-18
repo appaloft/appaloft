@@ -206,10 +206,31 @@ environment-gated real Swarm smoke proves Swarm apply, route realization, regist
 image pull, secret-safe metadata, and scoped cleanup behind the same command boundary. Kubernetes
 is not an active implementation target.
 
+For the pre-`1.0.0` Swarm credential boundary, registry credentials are owned by the operator of
+the registered Swarm manager. Appaloft executes every Swarm apply and verification command through
+that registered manager's SSH identity, so Docker reads the manager user's credential store and
+`--with-registry-auth` propagates that authenticated registry identity to scheduled tasks.
+Appaloft does not accept, persist, copy, log in with, or clean up registry credentials in this
+model. Consequently, a temporary Appaloft-owned `DOCKER_CONFIG` and an Appaloft login/logout
+lifecycle are not applicable. A future product-managed registry credential capability requires a
+separate accepted Spec/ADR round with explicit secret ownership, rotation, audit, and cleanup
+semantics. Docker CLI owns registry-host canonicalization, including Docker Hub aliases; operators
+must log in on the manager with the same canonical registry identity used by workload image
+references. Both image-service creation and Compose stack deployment propagate that manager
+identity with `--with-registry-auth` when registry auth is required.
+
+Swarm verification is a convergence gate, not a successful Docker CLI exit-code check. Before
+route promotion or superseded-runtime cleanup, the backend must prove the service's desired
+replicas have matching running tasks. Task evidence is read from the manager and therefore covers
+every node on which the scheduler placed a desired task. A rejected, failed, pending, or
+under-replicated service fails verification and keeps the previous serving runtime. This does not
+claim that unused cluster nodes can pull the image; proving every node independently would be a
+separate cluster-readiness operation.
+
 ## Open Questions
 
 - Should cluster target registration stay under transport-compatible `servers.register`, or should
   a future public alias such as `deployment-targets.register` be added after the operation catalog
   vocabulary is widened?
-- Which registry/pull-secret model should cluster backends use before public registry management
-  exists?
+- Should product-managed registry credentials be added after `1.0.0`, or should operator-owned
+  manager credential stores remain the only supported Swarm model?
