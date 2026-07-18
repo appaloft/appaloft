@@ -1,4 +1,5 @@
 import {
+  type Command as AppCommand,
   ArchiveResourceCommand,
   ArchiveResourceRuntimeLogsCommand,
   AttachResourceStorageCommand,
@@ -46,6 +47,10 @@ import {
   UnsetResourceVariableCommand,
 } from "@appaloft/application";
 import {
+  domainError,
+  err,
+  ok,
+  type Result,
   resourceExposureModes,
   resourceGeneratedAccessModes,
   resourceKinds,
@@ -57,10 +62,12 @@ import {
   versionReferenceKinds,
 } from "@appaloft/core";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
+import { Effect } from "effect";
 
 import {
   optionalNumber,
   optionalValue,
+  resultToEffect,
   runCommand,
   runQuery,
   runResourceDiagnosticSummaryQuery,
@@ -221,13 +228,14 @@ const variableExposureOption = Options.choice("exposure", variableExposures);
 const secretExposureOption = Options.choice("exposure", variableExposures).pipe(
   Options.withDefault("runtime"),
 );
+const secretStdinOption = Options.boolean("stdin").pipe(Options.withDefault(false));
 const variableKindOption = Options.choice("kind", variableKinds).pipe(
   Options.withDefault("plain-config"),
 );
 const variableSecretOption = Options.boolean("secret").pipe(Options.withDefault(false));
 const importContentOption = Options.text("content");
 const secretKeyArg = Args.text({ name: "key" });
-const secretValueArg = Args.text({ name: "value" });
+const secretValueArg = Args.text({ name: "value" }).pipe(Args.withDefault(""));
 const storageDestinationPathOption = Options.text("destination-path");
 const storageMountModeOption = Options.choice("mount-mode", ["read-write", "read-only"]).pipe(
   Options.withDefault("read-write"),
@@ -746,39 +754,81 @@ const unsetVariableCommand = EffectCommand.make(
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceUnsetVariable));
 
+async function readResourceSecretStdin(): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
+export async function resolveResourceSecretValue(input: {
+  readonly stdin: boolean;
+  readonly value: string;
+  readonly readStdin?: () => Promise<string>;
+}): Promise<Result<string>> {
+  if (input.stdin && input.value.length > 0) {
+    return err(domainError.validation("Use either a secret value argument or --stdin, not both"));
+  }
+  if (!input.stdin && input.value.length === 0) {
+    return err(domainError.validation("Provide a secret value argument or use --stdin"));
+  }
+
+  const rawValue = input.stdin ? await (input.readStdin ?? readResourceSecretStdin)() : input.value;
+  const value = input.stdin ? rawValue.replace(/\r?\n$/u, "") : rawValue;
+  if (value.length === 0) {
+    return err(domainError.validation("Secret value must not be empty"));
+  }
+  return ok(value);
+}
+
+function resourceSecretValueTask(
+  input: { readonly stdin: boolean; readonly value: string },
+  createCommand: (value: string) => Result<AppCommand<unknown>>,
+) {
+  return Effect.gen(function* () {
+    const value = yield* resultToEffect(
+      yield* Effect.promise(() => resolveResourceSecretValue(input)),
+    );
+    yield* runCommand(createCommand(value));
+  });
+}
+
 const secretsCreateCommand = EffectCommand.make(
   "create",
   {
     resourceId: resourceIdArg,
     key: secretKeyArg,
     value: secretValueArg,
+    stdin: secretStdinOption,
     exposure: secretExposureOption,
   },
-  ({ exposure, key, resourceId, value }) =>
-    runCommand(
+  ({ exposure, key, resourceId, stdin, value }) =>
+    resourceSecretValueTask({ stdin, value }, (resolvedValue) =>
       CreateResourceSecretReferenceCommand.create({
         resourceId,
         key,
-        value,
+        value: resolvedValue,
         exposure,
       }),
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceSecretsCreate));
 
-const secretsUpdateCommand = EffectCommand.make(
-  "update",
+const secretsRotateCommand = EffectCommand.make(
+  "rotate",
   {
     resourceId: resourceIdArg,
     key: secretKeyArg,
     value: secretValueArg,
+    stdin: secretStdinOption,
     exposure: secretExposureOption,
   },
-  ({ exposure, key, resourceId, value }) =>
-    runCommand(
+  ({ exposure, key, resourceId, stdin, value }) =>
+    resourceSecretValueTask({ stdin, value }, (resolvedValue) =>
       RotateResourceSecretReferenceCommand.create({
         resourceId,
         key,
-        value,
+        value: resolvedValue,
         exposure,
       }),
     ),
@@ -837,7 +887,7 @@ const secretsCommand = EffectCommand.make("secrets").pipe(
   EffectCommand.withDescription(cliCommandDescriptions.resourceSecrets),
   EffectCommand.withSubcommands([
     secretsCreateCommand,
-    secretsUpdateCommand,
+    secretsRotateCommand,
     secretsDeleteCommand,
     secretsListCommand,
     secretsShowCommand,

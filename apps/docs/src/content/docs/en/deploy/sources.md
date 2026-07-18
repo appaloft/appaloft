@@ -13,6 +13,8 @@ searchAliases:
 relatedOperations:
   - deployments.create
   - system.integrations.list
+  - system.github-app-connection.show
+  - system.github-repositories.list
   - source-links.relink
   - resources.configure-auto-deploy
   - source-events.ingest
@@ -62,6 +64,16 @@ Common modes include:
 `GET /api/integrations` returns these modes and safe configuration status. It describes capabilities, audience, whether provider installation is required, and whether operator secret material is required; it does not return tokens, private keys, webhook secrets, or raw provider payloads.
 
 When the GitHub integration uses `hosted-provider-app` or `operator-managed-app`, the Web console repository picker first asks the user to install the configured GitHub App. After installation, the GitHub setup URL returns to Appaloft, and Appaloft stores only readback data such as installation id, account login, repository selection mode, and update time. Repository browsing uses an installation access token and does not fall back to user OAuth.
+
+CLI callers can inspect the tenant-scoped installation and browse only repositories granted to it:
+
+```bash
+appaloft github status
+appaloft github repositories --search web
+```
+
+If `status` reports that the App is not installed for the current workspace, use its returned install
+URL and select the intended GitHub account and repository before listing repositories again.
 
 <h2 id="deployment-source-validation">Input checks</h2>
 

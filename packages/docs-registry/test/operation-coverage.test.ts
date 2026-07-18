@@ -1566,11 +1566,6 @@ describe("public docs operation coverage", () => {
 
     for (const operationKey of [
       "resources.set-variable",
-      "resources.secrets.create",
-      "resources.secrets.rotate",
-      "resources.secrets.delete",
-      "resources.secrets.list",
-      "resources.secrets.show",
       "resources.import-variables",
       "resources.unset-variable",
       "resources.effective-config",
@@ -1595,6 +1590,36 @@ describe("public docs operation coverage", () => {
           "docs/testing/resource-profile-lifecycle-test-matrix.md",
           "docs/specs/031-resource-secret-operations-and-effective-config/spec.md",
           "docs/specs/009-resource-detail-profile-editing-closure/spec.md",
+        ]),
+      );
+      expect(topic.webSurfaces?.join("\n")).toContain(
+        "apps/web/src/routes/resources/[resourceId=consoleObjectId]/+page.svelte",
+      );
+    }
+
+    for (const operationKey of [
+      "resources.secrets.create",
+      "resources.secrets.rotate",
+      "resources.secrets.delete",
+      "resources.secrets.list",
+      "resources.secrets.show",
+    ] as const) {
+      const coverage = getPublicDocsOperationCoverage(operationKey);
+      const topic = publicDocsHelpTopics["environment.secret-values"];
+
+      expect(coverage).toMatchObject({
+        operationKey,
+        status: "documented",
+        topicId: "environment.secret-values",
+      });
+      expect(topic.specReferences).toEqual(
+        expect.arrayContaining([
+          "docs/commands/resources.secrets.create.md",
+          "docs/commands/resources.secrets.rotate.md",
+          "docs/commands/resources.secrets.delete.md",
+          "docs/queries/resources.secrets.list.md",
+          "docs/queries/resources.secrets.show.md",
+          "docs/testing/resource-profile-lifecycle-test-matrix.md",
         ]),
       );
       expect(topic.webSurfaces?.join("\n")).toContain(
@@ -1962,10 +1987,10 @@ describe("public docs operation coverage", () => {
     expect(shellRuntimeRegistration).toContain("new RuntimeTargetScheduledTaskRuntimePort");
     expect(shellRuntimeRegistration).not.toContain("new HermeticScheduledTaskRuntimePort");
     expect(runAdmissionService).toContain(
-      'const manualRunOperationKey = "scheduled-tasks.run-now"',
+      "const manualRunOperationKey = scheduledTaskRunNowOperationKey;",
     );
     expect(runAdmissionService).toContain(
-      'const scheduledRunOperationKey = "scheduled-task-runs.run-due"',
+      "const scheduledRunOperationKey = scheduledTaskRunDueOperationKey;",
     );
     expect(runAdmissionService).not.toContain('operationKey: "scheduled-task-runs.run-now"');
     expect(scheduledTaskRunner).toContain('"scheduled-tasks.run-now"');

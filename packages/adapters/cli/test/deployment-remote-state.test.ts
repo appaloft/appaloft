@@ -420,6 +420,87 @@ describe("CLI server-applied route desired state", () => {
     }
   });
 
+  test("[CONFIG-FILE-DOMAIN-010] server-applied route state accepts distinct paths on one host", async () => {
+    const root = await tempStateRoot();
+    try {
+      const store = new FileSystemServerAppliedRouteDesiredStateStore(root);
+      const target = {
+        projectId: "proj_route_paths",
+        environmentId: "env_route_paths",
+        resourceId: "res_route_paths",
+        serverId: "srv_route_paths",
+      };
+
+      const distinctRoutes = await store.upsertDesired({
+        target,
+        updatedAt: "2026-07-18T00:00:00.000Z",
+        domains: [
+          { host: "app.example.com", pathPrefix: "/api", tlsMode: "auto" },
+          { host: "APP.EXAMPLE.COM", pathPrefix: "/v1", tlsMode: "auto" },
+        ],
+      });
+      expect(distinctRoutes.isOk()).toBe(true);
+
+      const duplicateRoute = await store.upsertDesired({
+        target,
+        updatedAt: "2026-07-18T00:01:00.000Z",
+        domains: [
+          { host: "app.example.com", pathPrefix: "/api", tlsMode: "auto" },
+          { host: "APP.EXAMPLE.COM", pathPrefix: "/api", tlsMode: "auto" },
+        ],
+      });
+      expect(duplicateRoute.isErr()).toBe(true);
+      expect(duplicateRoute.isErr() ? duplicateRoute.error.message : "").toContain(
+        "duplicate host and pathPrefix routes",
+      );
+
+      const pathLoop = await store.upsertDesired({
+        target,
+        updatedAt: "2026-07-18T00:02:00.000Z",
+        domains: [
+          { host: "a.example.com", pathPrefix: "/", tlsMode: "auto" },
+          { host: "b.example.com", pathPrefix: "/", tlsMode: "auto" },
+          {
+            host: "a.example.com",
+            pathPrefix: "/api/",
+            tlsMode: "auto",
+            redirectTo: "b.example.com",
+          },
+          {
+            host: "b.example.com",
+            pathPrefix: "/api/legacy",
+            tlsMode: "auto",
+            redirectTo: "a.example.com",
+          },
+        ],
+      });
+      expect(pathLoop.isErr()).toBe(true);
+      expect(pathLoop.isErr() ? pathLoop.error.message : "").toContain(
+        "redirect target must be a served domain",
+      );
+
+      const trailingSlashMismatch = await store.upsertDesired({
+        target,
+        updatedAt: "2026-07-18T00:03:00.000Z",
+        domains: [
+          {
+            host: "a.example.com",
+            pathPrefix: "/api",
+            tlsMode: "auto",
+            redirectTo: "b.example.com",
+          },
+          { host: "b.example.com", pathPrefix: "/api/", tlsMode: "auto" },
+        ],
+      });
+      expect(trailingSlashMismatch.isErr()).toBe(true);
+      expect(trailingSlashMismatch.isErr() ? trailingSlashMismatch.error.message : "").toContain(
+        "redirect target must be a served domain",
+      );
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   test("[CONFIG-FILE-DOMAIN-001] destination-scoped route state takes precedence over default scope", async () => {
     const root = await tempStateRoot();
     try {
@@ -492,11 +573,13 @@ describe("CLI server-applied route desired state", () => {
         {
           host: "example.com",
           pathPrefix: "/",
+          pathHandling: "preserve" as const,
           tlsMode: "auto" as const,
         },
         {
           host: "www.example.com",
           pathPrefix: "/",
+          pathHandling: "preserve" as const,
           tlsMode: "auto" as const,
           redirectTo: "example.com",
           redirectStatus: 308 as const,

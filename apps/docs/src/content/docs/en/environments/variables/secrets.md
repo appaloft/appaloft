@@ -32,8 +32,18 @@ payloads, or effective-config responses as plaintext.
 Users should see the existence and state of a secret, such as masked value, last update time, source environment, and whether it participates in deployment snapshots. They should not see plaintext values.
 
 Resource-level secrets can be created with `appaloft resource secrets create`, rotated with
-`update`, removed with `delete`, and inspected with `list`/`show`. Those operations affect future
+`rotate`, removed with `delete`, and inspected with `list`/`show`. Those operations affect future
 deployment snapshots only; they do not hot-update a running instance.
+
+Pass new secret material on standard input so it does not appear in the process argument list:
+
+```bash
+appaloft resource secrets create res_web APP_SECRET --stdin
+appaloft resource secrets rotate res_web APP_SECRET --stdin
+```
+
+`--stdin` cannot be combined with a positional value. Appaloft removes one trailing newline and
+rejects empty input without printing the secret.
 
 When pasted `.env` content is imported into a resource, Appaloft treats secret-like keys as runtime
 secrets, such as `DATABASE_URL`, `*_TOKEN`, `*_PASSWORD`, and `*_PRIVATE_KEY`. Import summaries,
