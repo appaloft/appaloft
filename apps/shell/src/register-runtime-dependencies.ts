@@ -1672,6 +1672,7 @@ export function registerRuntimeDependencies(
               swarmBackend: new DockerSwarmExecutionBackend(
                 new DockerSwarmShellCommandRunner({
                   timeoutMs: input.config.dockerSwarmExecution.commandTimeoutMs,
+                  serverRepository: dependencyContainer.resolve(tokens.serverRepository),
                 }),
                 undefined,
                 {

@@ -31,6 +31,8 @@ stack/service fields into `deployments.create`.
 | Stack identity | Adapter-owned Swarm stack/service naming derived from Appaloft resource, deployment, target, and destination context. | Runtime adapter boundary | Compose project name, Swarm stack name |
 | Swarm service instance | Adapter-owned runtime identity for a deployed workload service or stack service. | Runtime adapter boundary | Docker service id/name |
 | Swarm route attachment | Provider-neutral access route realization mapped to Swarm service/network identity by the runtime and edge proxy adapters. | Runtime target observation | Swarm ingress/overlay routing |
+| Swarm manager credential store | Docker registry credentials configured by the operator for the SSH user on the registered Swarm manager. | Runtime target execution | Docker config, registry login |
+| Swarm service convergence | The desired replica count is matched by running tasks before route promotion or superseded cleanup. | Runtime target verification | rollout ready, service ready |
 
 ## Target Operation Position
 
@@ -62,6 +64,8 @@ No new public operation key is accepted in this Spec Round.
 | SWARM-SPEC-010 | Route realization maps through Swarm networks | A reverse-proxy resource deploys on Swarm | Access routes are realized | Edge proxy and runtime adapters connect provider-neutral route intent to the selected Swarm service/network without requiring public host-port exposure for the workload. |
 | SWARM-SPEC-011 | Unsupported Swarm capability is structured | A target lacks required Swarm capabilities | Deployment admission or runtime progression checks capabilities | Safe pre-acceptance failures use `runtime_target_unsupported` in phase `runtime-target-resolution`; post-acceptance failures persist deployment failure state and keep the original accepted command result. |
 | SWARM-SPEC-012 | Public surfaces stay normalized | Web, CLI, HTTP/oRPC, or future MCP surfaces show Swarm-backed state | Users inspect deployment, logs, health, proxy, diagnostics, or capacity | Output uses Appaloft deployment/resource/target language with sanitized Swarm summaries and stable help anchors, not provider-native payloads. |
+| SWARM-SPEC-013 | Registry auth uses the registered manager identity | A workload marks registry auth as required and the selected target is a registered Swarm manager | Appaloft applies the Swarm plan | Every Docker apply/verify command executes through that manager's SSH identity; Docker uses that remote user's credential store and Appaloft never copies registry credentials into control-plane state or a temporary `DOCKER_CONFIG`. |
+| SWARM-SPEC-014 | Candidate service converges before promotion | A candidate service schedules one or more desired replicas across Swarm nodes | Appaloft verifies the candidate | Verification waits within the bounded command timeout until desired replicas equal running tasks; rejected, failed, pending, or under-replicated tasks fail the deployment before route promotion and expose bounded task/node diagnostics with secrets redacted. |
 
 ## Domain Ownership
 
@@ -102,6 +106,8 @@ No new public operation key is accepted in this Spec Round.
 - General cluster management, node scheduling, node drain, or Docker volume prune commands.
 - Provider-native secret storage implementation beyond masked secret references required for image
   pulls.
+- Product-managed registry login, credential rotation, temporary `DOCKER_CONFIG`, or logout/cleanup;
+  registry credentials remain owned by the registered manager operator in this slice.
 - State or data rollback for volumes and stateful services.
 
 ## Current Implementation Notes And Migration Gaps
@@ -132,7 +138,8 @@ No new public operation key is accepted in this Spec Round.
   runtime identity on success.
 - The runtime adapter package also renders a label-scoped Swarm cleanup plan for services owned by
   the same Appaloft resource, deployment, target, destination, and runtime-target identity. The plan
-  is wired only through the explicit fake-runner Swarm backend, not through default real execution.
+  is executed through the same registered-manager runner for explicit cancel/rollback and failed-
+  candidate cleanup; fake runners remain the default-CI acceptance seam.
 - An explicit `DockerSwarmExecutionBackend` now exists for fake-runner acceptance coverage and
   default shell composition. It can execute the adapter-owned image or Compose stack apply plan and
   label-scoped cleanup plan through an injected command runner and records sanitized Swarm runtime
@@ -172,6 +179,21 @@ No new public operation key is accepted in this Spec Round.
   `APPALOFT_DOCKER_SWARM_COMMAND_TIMEOUT_MS` controlling per-command timeout and
   `APPALOFT_DOCKER_SWARM_EDGE_NETWORK` selecting the Swarm overlay network used for service
   attachment and route labels.
+- Default shell/server composition resolves the registered Swarm manager and executes apply,
+  verify, route promotion, and cleanup through its SSH identity. The local shell fallback exists
+  only for an explicitly local runner such as the opt-in real Swarm smoke. Registry-authenticated
+  image pulls therefore use the remote manager user's Docker credential store; Appaloft does not
+  create a temporary Docker config or own login/logout cleanup.
+- Image-service and Compose-stack plans both add `--with-registry-auth` when masked registry-auth
+  metadata requires it. Docker CLI owns Docker Hub alias/canonical-host resolution; the operator's
+  manager login must match the registry identity in workload image references.
+- Compose-stack execution streams the control-plane-local Compose file to the registered manager
+  over SSH stdin and invokes `docker stack deploy -c -`; the file path is neither assumed to exist
+  on the manager nor exposed in deployment logs.
+- Candidate verification waits for desired replicas to match running task count before route
+  promotion. Bounded `docker service ps` diagnostics retain task/node placement evidence when an
+  image cannot be pulled or a task cannot reach Running, without claiming unused nodes were
+  independently tested.
 - Postgres/PGlite deployment persistence and the deployment read model preserve sanitized Swarm
   runtime identity metadata, including stack name, service name, and apply-plan schema version,
   through the existing deployment execution metadata boundary. Raw Docker commands, provider

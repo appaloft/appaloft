@@ -1,4 +1,9 @@
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
+  DeploymentTargetByIdSpec,
+  DeploymentTargetId,
   DeploymentTimelineJournalEntry,
   DeploymentTimelineSourceValue,
   DeploymentPhaseValue,
@@ -32,6 +37,8 @@ import {
   type RuntimeTargetBackend,
   type RuntimeTargetBackendDescriptor,
   type RuntimeTargetCapability,
+  type ServerRepository,
+  toRepositoryContext,
 } from "@appaloft/application";
 import {
   renderDockerSwarmApplyPlan,
@@ -46,9 +53,12 @@ import {
 import { resolveDependencyRuntimeEnvironment } from "./dependency-runtime-secrets";
 
 export interface DockerSwarmCommandRunnerInput {
+  context?: ExecutionContext;
+  targetId?: string;
   step: string;
   command: string;
   displayCommand: string;
+  stdinFile?: string;
 }
 
 export interface DockerSwarmCommandRunnerResult {
@@ -63,6 +73,20 @@ export interface DockerSwarmCommandRunner {
 
 export interface DockerSwarmShellCommandRunnerOptions {
   timeoutMs?: number;
+  processRunner?: DockerSwarmProcessRunner;
+  serverRepository?: ServerRepository;
+}
+
+export interface DockerSwarmProcessRunnerInput {
+  executable: string;
+  args: string[];
+  step: string;
+  stdinFile?: string;
+  timeoutMs: number;
+}
+
+export interface DockerSwarmProcessRunner {
+  run(input: DockerSwarmProcessRunnerInput): Promise<Result<DockerSwarmCommandRunnerResult>>;
 }
 
 export interface DockerSwarmExecutionBackendOptions {
@@ -187,24 +211,19 @@ function failedExecutionResult(
   });
 }
 
-export class DockerSwarmShellCommandRunner implements DockerSwarmCommandRunner {
-  private readonly timeoutMs: number;
-
-  constructor(options: DockerSwarmShellCommandRunnerOptions = {}) {
-    this.timeoutMs = options.timeoutMs ?? defaultDockerSwarmShellCommandTimeoutMs;
-  }
-
-  async run(input: DockerSwarmCommandRunnerInput): Promise<Result<DockerSwarmCommandRunnerResult>> {
+class BunDockerSwarmProcessRunner implements DockerSwarmProcessRunner {
+  async run(input: DockerSwarmProcessRunnerInput): Promise<Result<DockerSwarmCommandRunnerResult>> {
     try {
-      const process = Bun.spawn(["sh", "-lc", input.command], {
+      const process = Bun.spawn([input.executable, ...input.args], {
         stdout: "pipe",
         stderr: "pipe",
+        ...(input.stdinFile ? { stdin: Bun.file(input.stdinFile) } : {}),
       });
       const stdoutPromise = new Response(process.stdout).text();
       const stderrPromise = new Response(process.stderr).text();
       let timeout: Timer | undefined;
       const timedOut = new Promise<"timeout">((resolve) => {
-        timeout = setTimeout(() => resolve("timeout"), this.timeoutMs);
+        timeout = setTimeout(() => resolve("timeout"), input.timeoutMs);
       });
       const outcome = await Promise.race([process.exited, timedOut]);
       if (timeout) {
@@ -237,6 +256,124 @@ export class DockerSwarmShellCommandRunner implements DockerSwarmCommandRunner {
         ),
       );
     }
+  }
+}
+
+interface DockerSwarmSshTarget {
+  host: string;
+  port: string;
+  identityFile?: string;
+  cleanup(): void;
+}
+
+function hostWithUsername(host: string, username?: string): string {
+  return username && !host.includes("@") ? `${username}@${host}` : host;
+}
+
+export class DockerSwarmShellCommandRunner implements DockerSwarmCommandRunner {
+  private readonly timeoutMs: number;
+  private readonly processRunner: DockerSwarmProcessRunner;
+
+  constructor(private readonly options: DockerSwarmShellCommandRunnerOptions = {}) {
+    this.timeoutMs = options.timeoutMs ?? defaultDockerSwarmShellCommandTimeoutMs;
+    this.processRunner = options.processRunner ?? new BunDockerSwarmProcessRunner();
+  }
+
+  async run(input: DockerSwarmCommandRunnerInput): Promise<Result<DockerSwarmCommandRunnerResult>> {
+    if (!this.options.serverRepository) {
+      return await this.processRunner.run({
+        executable: "sh",
+        args: ["-lc", input.command],
+        step: input.step,
+        ...(input.stdinFile ? { stdinFile: input.stdinFile } : {}),
+        timeoutMs: this.timeoutMs,
+      });
+    }
+
+    const targetResult = await this.resolveSshTarget(input);
+    if (targetResult.isErr()) {
+      return err(targetResult.error);
+    }
+
+    const target = targetResult.value;
+    try {
+      return await this.processRunner.run({
+        executable: "ssh",
+        args: [
+          "-p",
+          target.port,
+          ...(target.identityFile
+            ? ["-i", target.identityFile, "-o", "IdentitiesOnly=yes"]
+            : []),
+          "-o",
+          "BatchMode=yes",
+          "-o",
+          "StrictHostKeyChecking=accept-new",
+          "-o",
+          "ServerAliveInterval=30",
+          "-o",
+          "ServerAliveCountMax=20",
+          target.host,
+          input.command,
+        ],
+        step: input.step,
+        ...(input.stdinFile ? { stdinFile: input.stdinFile } : {}),
+        timeoutMs: this.timeoutMs,
+      });
+    } finally {
+      target.cleanup();
+    }
+  }
+
+  private async resolveSshTarget(
+    input: DockerSwarmCommandRunnerInput,
+  ): Promise<Result<DockerSwarmSshTarget>> {
+    if (!input.context || !input.targetId) {
+      return err(
+        domainError.infra("Docker Swarm registered manager context is unavailable", {
+          phase: input.step,
+          reason: "swarm-manager-context-unavailable",
+        }),
+      );
+    }
+
+    const server = await this.options.serverRepository?.findOne(
+      toRepositoryContext(input.context),
+      DeploymentTargetByIdSpec.create(DeploymentTargetId.rehydrate(input.targetId)),
+    );
+    const state = server?.toState();
+    if (!state) {
+      return err(
+        domainError.infra("Docker Swarm registered manager was not found", {
+          phase: input.step,
+          reason: "swarm-manager-not-found",
+          targetId: input.targetId,
+        }),
+      );
+    }
+
+    let identityDirectory: string | undefined;
+    let identityFile: string | undefined;
+    const privateKey = state.credential?.privateKey?.value;
+    if (state.credential?.kind.value === "ssh-private-key" && privateKey) {
+      identityDirectory = mkdtempSync(join(tmpdir(), "appaloft-swarm-ssh-"));
+      identityFile = join(identityDirectory, "id_swarm_manager");
+      writeFileSync(identityFile, privateKey.endsWith("\n") ? privateKey : `${privateKey}\n`, {
+        mode: 0o600,
+      });
+      chmodSync(identityFile, 0o600);
+    }
+
+    return ok({
+      host: hostWithUsername(state.host.value, state.credential?.username?.value),
+      port: String(state.port.value),
+      ...(identityFile ? { identityFile } : {}),
+      cleanup: () => {
+        if (identityDirectory) {
+          rmSync(identityDirectory, { recursive: true, force: true });
+        }
+      },
+    });
   }
 }
 
@@ -350,7 +487,7 @@ export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
         message: step.displayCommand,
         source: "docker",
       });
-      const result = await this.runStep(step);
+      const result = await this.runStep(step, context, identity.targetId);
 
       if (result.isOk()) {
         await this.pushCommandOutput(timeline, {
@@ -369,7 +506,7 @@ export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
           message,
           level: "error",
         });
-        await this.cleanupFailedCandidate(deployment, timeline, redactions);
+        await this.cleanupFailedCandidate(context, deployment, timeline, redactions);
         return applyExecutionResult(
           deployment,
           failedExecutionResult(deployment, {
@@ -392,7 +529,7 @@ export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
           message,
           level: "error",
         });
-        await this.cleanupFailedCandidate(deployment, timeline, redactions);
+        await this.cleanupFailedCandidate(context, deployment, timeline, redactions);
         return applyExecutionResult(
           deployment,
           failedExecutionResult(deployment, {
@@ -426,13 +563,17 @@ export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
   }
 
   async cancel(
-    _context: ExecutionContext,
+    context: ExecutionContext,
     deployment: Deployment,
   ): Promise<Result<{ timeline: DeploymentTimelineJournalEntry[] }>> {
     const cleanupPlan = renderDockerSwarmCleanupPlan(deploymentIdentity(deployment));
     const timeline: DeploymentTimelineJournalEntry[] = [];
     for (const command of cleanupPlan.commands) {
-      const result = await this.runner.run(command);
+      const result = await this.runner.run({
+        ...command,
+        context,
+        targetId: deploymentIdentity(deployment).targetId,
+      });
       timeline.push(phaseLog("rollback", command.step));
       if (result.isErr()) {
         return err(result.error);
@@ -473,11 +614,16 @@ export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
 
   private async runStep(
     step: DockerSwarmCommandRunnerInput,
+    context: ExecutionContext,
+    targetId: string,
   ): Promise<Result<DockerSwarmCommandRunnerResult>> {
     return await this.runner.run({
+      context,
+      targetId,
       step: step.step,
       command: step.command,
       displayCommand: step.displayCommand,
+      ...(step.stdinFile ? { stdinFile: step.stdinFile } : {}),
     });
   }
 
@@ -550,13 +696,18 @@ export class DockerSwarmExecutionBackend implements RuntimeTargetBackend {
   }
 
   private async cleanupFailedCandidate(
+    context: ExecutionContext,
     deployment: Deployment,
     timeline: DeploymentTimelineJournalEntry[],
     redactions: readonly string[],
   ): Promise<void> {
     const cleanupPlan = renderDockerSwarmCleanupPlan(deploymentIdentity(deployment));
     for (const command of cleanupPlan.commands) {
-      const result = await this.runner.run(command);
+      const result = await this.runner.run({
+        ...command,
+        context,
+        targetId: deploymentIdentity(deployment).targetId,
+      });
       timeline.push(phaseLog("rollback", `cleanup-failed-candidate:${command.step}`));
       if (result.isErr()) {
         timeline.push(
