@@ -36,6 +36,9 @@
   `42P01` as the only undefined-table empty-source signal.
 - Compile Environment and Resource secret filters as parameter-free PostgreSQL `IS TRUE`
   predicates so embedded runtimes do not need to infer a bound boolean type.
+- When a legacy embedded runtime still cannot execute the source query, select the boolean marker
+  without a database predicate and exclude non-secret rows in memory before inspection or plan
+  accounting. Keep all source read failures other than exact `42P01` fail-closed.
 - Extend Deployment Proof with value-free planned/observed environment key-set evidence.
 
 ## Persistence And Migration

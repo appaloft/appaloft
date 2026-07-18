@@ -214,7 +214,7 @@ describe("control-plane secret rotation", () => {
     }
   });
 
-  test("[CPS-COMPAT-024] secret source filters use parameter-free boolean predicates", () =>
+  test("[CPS-COMPAT-025] secret source filters avoid database boolean predicates", () =>
     withDatabase(async (database) => {
       const queries: string[] = [];
       const compiler = new PostgresQueryCompiler();
@@ -228,6 +228,52 @@ describe("control-plane secret rotation", () => {
         },
       };
       const { rotatingProtector } = protectors();
+      await database.db
+        .insertInto("projects")
+        .values({
+          id: "prj_secret_filter",
+          name: "Secret filter",
+          slug: "secret-filter",
+          created_at: "2026-01-01T00:00:00.000Z",
+        })
+        .execute();
+      await database.db
+        .insertInto("environments")
+        .values({
+          id: "env_secret_filter",
+          project_id: "prj_secret_filter",
+          name: "production",
+          kind: "production",
+          created_at: "2026-01-01T00:00:00.000Z",
+        })
+        .execute();
+      await database.db
+        .insertInto("environment_variables")
+        .values([
+          {
+            id: "env_var_secret",
+            environment_id: "env_secret_filter",
+            key: "SECRET_VALUE",
+            value: "legacy-secret",
+            kind: "literal",
+            exposure: "runtime",
+            scope: "resource",
+            is_secret: true,
+            updated_at: "2026-01-01T00:00:00.000Z",
+          },
+          {
+            id: "env_var_public",
+            environment_id: "env_secret_filter",
+            key: "PUBLIC_VALUE",
+            value: "not-a-secret",
+            kind: "literal",
+            exposure: "runtime",
+            scope: "resource",
+            is_secret: false,
+            updated_at: "2026-01-01T00:00:00.000Z",
+          },
+        ])
+        .execute();
 
       const plan = await new PgControlPlaneSecretRotationService(
         database.db.withPlugin(capturePlugin),
@@ -235,6 +281,11 @@ describe("control-plane secret rotation", () => {
       ).plan();
 
       expect(plan.isOk()).toBe(true);
+      expect(plan._unsafeUnwrap()).toMatchObject({
+        recordCount: 1,
+        variableKeyCount: 1,
+        requiresLegacyAuthorization: true,
+      });
       const variableQueries = queries.filter(
         (query) =>
           query.includes('from "environment_variables"') ||
@@ -242,8 +293,8 @@ describe("control-plane secret rotation", () => {
       );
       expect(variableQueries).toHaveLength(2);
       for (const query of variableQueries) {
-        expect(query).toContain('where "is_secret" is true');
-        expect(query).not.toContain("$1");
+        expect(query).toContain('"is_secret"');
+        expect(query).not.toContain(" where ");
       }
     }));
 
