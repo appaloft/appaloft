@@ -158,6 +158,46 @@ describe("control-plane secret rotation", () => {
       expect(JSON.stringify(plan)).not.toContain("environment_variables");
     }));
 
+  test("[CPS-DIAG-027] bounded probes publish only an allowlisted SQLSTATE class", () =>
+    withDatabase(async (database) => {
+      const compiler = new PostgresQueryCompiler();
+      const privateDetail = "private malformed identifier detail";
+      const failingPlugin: KyselyPlugin = {
+        transformQuery(args) {
+          const query = compiler.compileQuery(args.node, args.queryId).sql;
+          if (
+            query.includes('from "environment_variables"') &&
+            query.includes('select "id", "environment_id"')
+          ) {
+            throw new Error("private combined row detail");
+          }
+          if (query.includes('from "environment_variables"') && query.includes('select "id"')) {
+            throw Object.assign(new Error(privateDetail), { code: "22P02" });
+          }
+          return args.node;
+        },
+        async transformResult(args) {
+          return args.result;
+        },
+      };
+      const { rotatingProtector } = protectors();
+
+      const plan = await new PgControlPlaneSecretRotationService(
+        database.db.withPlugin(failingPlugin),
+        rotatingProtector,
+      ).plan();
+
+      expect(plan._unsafeUnwrapErr()).toMatchObject({
+        code: "control_plane_secret_rotation_source_read_failed",
+        details: {
+          phase: "control-plane-secret-rotation",
+          reason: "environment-variables-id-data-invalid",
+        },
+      });
+      expect(JSON.stringify(plan)).not.toContain("22P02");
+      expect(JSON.stringify(plan)).not.toContain(privateDetail);
+    }));
+
   test("[CPS-COMPAT-019] optional source failures other than undefined-table stay fail-closed", () =>
     withDatabase(async (database) => {
       const failingDatabase = new Proxy(database.db, {
