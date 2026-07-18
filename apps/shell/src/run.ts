@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import {
   createRemoteCliProgram,
   defaultCliControlPlaneProfileStore,
+  formatSafeCliError,
   resolveCliExecutionTarget,
   runStandaloneControlPlaneCli,
 } from "@appaloft/adapter-cli";
@@ -111,7 +112,11 @@ export function formatDomainError(error: DomainError): string {
 }
 
 function writeDomainError(error: DomainError): void {
-  process.stderr.write(formatDomainError(error));
+  process.stderr.write(
+    process.env.APPALOFT_ERROR_FORMAT === "safe-json"
+      ? formatSafeCliError(error)
+      : formatDomainError(error),
+  );
 }
 
 function errorMessage(error: unknown): string {

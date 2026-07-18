@@ -223,6 +223,53 @@ export const print = (value: unknown) =>
     createCliLogRenderer().json(value);
   });
 
+export interface SafeCliErrorEvidence {
+  schemaVersion: "appaloft.cli-error/v1";
+  code: string;
+  category: string;
+  phase: string | null;
+  reason: string | null;
+  stateBackend: string | null;
+  exitCode: number | null;
+  retryable: boolean;
+}
+
+function safeErrorDetail(error: DomainError, key: string): string | null {
+  const value = error.details?.[key];
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+export function safeCliErrorEvidence(error: unknown): SafeCliErrorEvidence {
+  if (!isDomainError(error)) {
+    return {
+      schemaVersion: "appaloft.cli-error/v1",
+      code: "cli_error_unclassified",
+      category: "infra",
+      phase: null,
+      reason: null,
+      stateBackend: null,
+      exitCode: null,
+      retryable: false,
+    };
+  }
+
+  const exitCode = error.details?.exitCode;
+  return {
+    schemaVersion: "appaloft.cli-error/v1",
+    code: error.code,
+    category: error.category,
+    phase: safeErrorDetail(error, "phase"),
+    reason: safeErrorDetail(error, "reason"),
+    stateBackend: safeErrorDetail(error, "stateBackend"),
+    exitCode: typeof exitCode === "number" && Number.isInteger(exitCode) ? exitCode : null,
+    retryable: error.retryable,
+  };
+}
+
+export function formatSafeCliError(error: unknown): string {
+  return `${JSON.stringify(safeCliErrorEvidence(error))}\n`;
+}
+
 export const resultToEffect = <T>(result: Result<T>): Effect.Effect<T, DomainError> =>
   result.match<Effect.Effect<T, DomainError>>(
     (value) => Effect.succeed(value),
@@ -702,6 +749,12 @@ export const runOperatorWorkEventStreamQuery = (
 
 export const printCliError = (error: unknown) =>
   Effect.sync(() => {
+    if (process.env.APPALOFT_ERROR_FORMAT === "safe-json") {
+      process.stderr.write(formatSafeCliError(error));
+      process.exitCode = 1;
+      return;
+    }
+
     createCliLogRenderer().plain({
       label: "error",
       level: "error",
