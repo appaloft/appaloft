@@ -32,6 +32,7 @@ This command family inherits:
 
 - [ADR-003: Server Connect Public Versus Internal](../decisions/ADR-003-server-connect-public-vs-internal.md)
 - [ADR-004: Server Readiness State Storage](../decisions/ADR-004-server-readiness-state-storage.md)
+- [ADR-090: Server Host Identity](../decisions/ADR-090-server-host-identity.md)
 - [ADR-019: Edge Proxy Provider And Observable Configuration](../decisions/ADR-019-edge-proxy-provider-and-observable-configuration.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
@@ -58,7 +59,7 @@ If only one public command exists in a transitional implementation, the source-o
 | Field | Requirement | Meaning |
 | --- | --- | --- |
 | `name` | Required | Human-readable deployment target name. |
-| `host` | Required | Host or address used by runtime providers. |
+| `host` | Required | One explicit hostname, IPv4 address, raw/bracketed IPv6 literal, or retained `user@host` form. CIDR, URL, and combined host-port input are rejected; `port` stays separate. |
 | `providerKey` | Required | Provider/runtime adapter key such as local shell or generic SSH. |
 | `targetKind` | Optional | Target shape. Defaults to `single-server`. `orchestrator-cluster` is accepted for future cluster runtime targets such as Docker Swarm, but runtime readiness and deployment support still depend on the registered backend capabilities. |
 | `port` | Optional | Provider connection port. Defaults to provider policy, typically SSH port `22`. |
@@ -99,7 +100,7 @@ If only one public command exists in a transitional implementation, the source-o
 - provider key format and support at the application boundary;
 - port validity;
 - edge proxy mode/provider support;
-- duplicate server registration policy.
+- duplicate server registration by canonical provider/host/port within the organization; a non-deleted duplicate returns `conflict`.
 
 `servers.connect` must synchronously validate:
 
@@ -225,7 +226,7 @@ Server/proxy-specific dedupe keys:
 - proxy bootstrap attempt: `serverId + edgeProxyProviderKey + attemptId`;
 - events: exact event id when available, otherwise semantic keys from the event specs.
 
-Duplicate registration returns the existing server id or a stable `conflict` according to product policy.
+Duplicate registration returns a stable `conflict` and publishes no duplicate registration event.
 
 Duplicate connectivity or proxy events must not repeat side effects when state is already `connected`, `ready`, or terminal failed for the same attempt.
 
@@ -277,7 +278,9 @@ attempt id for public repair calls, publishes canonical `proxy-bootstrap-request
 `proxy-installed` or `proxy-install-failed` events, and executes the existing provider-backed proxy
 bootstrapper synchronously during the command.
 
-Current `servers.register` persists a `DeploymentTarget`, stores canonical target kind
+Current `servers.register` persists a `DeploymentTarget`, canonicalizes explicit DNS/IP host
+identity, rejects network prefixes/URLs/combined host-port input, rejects duplicate non-deleted
+provider/host/port endpoints, stores canonical target kind
 `single-server` or `orchestrator-cluster`, and emits `deployment_target.registered`. When
 `targetKind` is omitted, it defaults to `single-server`. When `proxyKind` is omitted, it defaults to
 `traefik`.
@@ -299,7 +302,3 @@ Current aggregate records `deployment_target.edge_proxy_bootstrap_started`, `dep
 Current server state has persisted edge proxy fields, but no first-class persisted top-level server lifecycle status such as `registered`, `connected`, or `ready`.
 
 The accepted operation key for explicit proxy repair/retry is `servers.bootstrap-proxy`. Human-facing CLI text may use `server proxy repair` because the action repairs provider-owned proxy infrastructure, but the business operation remains the lifecycle bootstrap command and must create a new attempt id.
-
-## Open Questions
-
-- Should duplicate registration return the existing server id or a `conflict` error?

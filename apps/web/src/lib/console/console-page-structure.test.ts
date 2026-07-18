@@ -2090,7 +2090,8 @@ describe("console page structure", () => {
     expect(serverRowHeaderSource.indexOf("data-server-row-lifecycle")).toBeGreaterThan(
       serverRowHeaderSource.indexOf("<h3"),
     );
-    const serverHostPortTitleSource = "title={`" + "$" + "{server.host}:$" + "{server.port}`}";
+    const serverHostPortTitleSource =
+      "title={HostAddress.rehydrate(server.host).formatWithPort(server.port)}";
     expect(serverRowHeaderSource.indexOf("data-server-row-lifecycle")).toBeLessThan(
       serverRowHeaderSource.indexOf(serverHostPortTitleSource),
     );

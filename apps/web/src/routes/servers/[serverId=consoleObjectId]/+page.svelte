@@ -32,6 +32,7 @@
     SshCredentialUsageServer,
     TestServerConnectivityResponse,
   } from "@appaloft/contracts";
+  import { HostAddress } from "@appaloft/core";
 
   import { readErrorMessage } from "$lib/api/client";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
@@ -1011,7 +1012,7 @@
             <div class="space-y-2">
               <h1 class="text-2xl font-semibold md:text-3xl">{server.name}</h1>
               <p class="text-sm leading-6 text-muted-foreground">
-                {server.host}:{server.port}
+                {HostAddress.rehydrate(server.host).formatWithPort(server.port)}
               </p>
             </div>
             <p class="text-xs text-muted-foreground">
@@ -1825,7 +1826,9 @@
               <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 {$t(i18nKeys.common.domain.host)}
               </dt>
-              <dd class="mt-2 break-all font-mono text-xs">{server.host}:{server.port}</dd>
+              <dd class="mt-2 break-all font-mono text-xs">
+                {HostAddress.rehydrate(server.host).formatWithPort(server.port)}
+              </dd>
             </div>
             <div class="console-subtle-panel px-4 py-3">
               <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">

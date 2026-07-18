@@ -5,6 +5,7 @@ import {
   type DeploymentTargetByIdSpec,
   type DeploymentTargetByProviderAndHostSpec,
   type DeploymentTargetSelectionSpecVisitor,
+  type NonDeletedDeploymentTargetByEndpointSpec,
   ok,
   type Result,
   type ServerSelectionSpec,
@@ -35,6 +36,13 @@ class ServerIdSelectionVisitor implements DeploymentTargetSelectionSpecVisitor<s
   visitDeploymentTargetByProviderAndHost(
     query: string | null,
     _spec: DeploymentTargetByProviderAndHostSpec,
+  ): string | null {
+    return query;
+  }
+
+  visitNonDeletedDeploymentTargetByEndpoint(
+    query: string | null,
+    _spec: NonDeletedDeploymentTargetByEndpointSpec,
   ): string | null {
     return query;
   }
