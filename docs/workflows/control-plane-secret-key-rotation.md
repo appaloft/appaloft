@@ -19,12 +19,14 @@ row without explicit authorization.
 Dry-run runs before application migrations. A fresh or partially initialized state can therefore
 lack any rotation source table. Direct source reads treat only PostgreSQL's exact undefined-table
 code `42P01` as an empty source; any other read failure remains a safe, fail-closed source error.
-Known SQLSTATE families are reduced to fixed categories such as schema-incompatible,
+Allowlisted SQLSTATE classes are reduced to fixed categories such as schema-incompatible,
 feature-unsupported, state-unavailable, or storage-corrupt. The raw SQLSTATE, database message,
 query, relation, host, and path are never published; unknown failures keep the generic read-failed
 category.
 Known driver wrapper fields and SQLSTATE aliases are inspected only within a bounded traversal;
 arbitrary payload fields are ignored.
+Exact `42P01` remains the only SQLSTATE that represents an absent source; other class `42` failures
+remain fail-closed as schema-incompatible.
 
 Use the source CLI from the repository checkout:
 
