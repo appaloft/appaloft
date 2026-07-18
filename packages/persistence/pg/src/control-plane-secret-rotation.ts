@@ -111,6 +111,30 @@ function sqlStateCode(error: unknown): string | undefined {
   return undefined;
 }
 
+function runtimeFailureKind(error: unknown): string | undefined {
+  const pending: Array<{ candidate: unknown; depth: number }> = [{ candidate: error, depth: 0 }];
+  const visited = new Set<object>();
+  let inspected = 0;
+  while (pending.length > 0 && inspected < 8) {
+    const next = pending.shift();
+    if (!next || typeof next.candidate !== "object" || next.candidate === null) continue;
+    if (visited.has(next.candidate)) continue;
+    visited.add(next.candidate);
+    inspected += 1;
+    const candidate = next.candidate as Record<string, unknown>;
+    const name = candidate.name;
+    if (name === "RuntimeError") return "runtime-failed";
+    if (name === "ErrnoError") return "filesystem-unavailable";
+    if (name === "AbortError") return "operation-aborted";
+    if (name === "DatabaseError") return "database-protocol-failed";
+    if (next.depth >= 3) continue;
+    for (const key of ["cause", "originalError", "error"] as const) {
+      if (key in candidate) pending.push({ candidate: candidate[key], depth: next.depth + 1 });
+    }
+  }
+  return undefined;
+}
+
 function sourceReadFailureReason(source: string, error: unknown): string {
   const code = sqlStateCode(error);
   if (code?.startsWith("08")) return `${source}-connection-unavailable`;
@@ -130,6 +154,8 @@ function sourceReadFailureReason(source: string, error: unknown): string {
   if (code?.startsWith("HV")) return `${source}-foreign-data-failed`;
   if (code?.startsWith("P0")) return `${source}-procedural-failed`;
   if (code?.startsWith("XX")) return `${source}-storage-corrupt`;
+  const runtimeKind = runtimeFailureKind(error);
+  if (runtimeKind) return `${source}-${runtimeKind}`;
   return `${source}-read-failed`;
 }
 

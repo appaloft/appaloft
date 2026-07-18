@@ -161,6 +161,47 @@ describe("control-plane secret rotation", () => {
       expect(JSON.stringify(plan)).not.toContain("private source detail");
     }));
 
+  test("[CPS-DIAG-033] runtime database failures use a fixed safe classification", () =>
+    withDatabase(async (database) => {
+      const privateDetail = "private runtime path and state detail";
+      const failingDatabase = new Proxy(database.db, {
+        get(target, property) {
+          if (property === "selectFrom") {
+            return (table: string) => {
+              if (table === "environment_variables") throw new Error("private source detail");
+              const selectFrom = target.selectFrom.bind(target) as unknown as (
+                source: string,
+              ) => ReturnType<typeof target.selectFrom>;
+              return selectFrom(table);
+            };
+          }
+          if (property === "selectNoFrom") {
+            throw new WebAssembly.RuntimeError(privateDetail);
+          }
+          const value = Reflect.get(target, property, target);
+          return typeof value === "function" ? value.bind(target) : value;
+        },
+      }) as typeof database.db;
+      const { rotatingProtector } = protectors();
+
+      const plan = await new PgControlPlaneSecretRotationService(
+        failingDatabase,
+        rotatingProtector,
+      ).plan();
+
+      expect(plan._unsafeUnwrapErr()).toMatchObject({
+        code: "control_plane_secret_rotation_source_read_failed",
+        category: "infra",
+        retryable: false,
+        details: {
+          phase: "control-plane-secret-rotation",
+          reason: "environment-variables-database-runtime-failed",
+        },
+      });
+      expect(JSON.stringify(plan)).not.toContain(privateDetail);
+      expect(JSON.stringify(plan)).not.toContain("private source detail");
+    }));
+
   test("[CPS-DIAG-032] real PGlite schema mismatch keeps a safe source classification", async () => {
     const dataDir = mkdtempSync(join(tmpdir(), "appaloft-secret-rotation-schema-"));
     const database = await createDatabase({ driver: "pglite", pgliteDataDir: dataDir });
