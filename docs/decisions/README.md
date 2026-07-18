@@ -109,6 +109,7 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-086: Preview Operable Runtime Scope](./ADR-086-preview-operable-runtime-scope.md) | Accepted | Defines Preview Environment as a Resource-derived operable runtime scope for service/runtime operations, without creating preview-only operation shortcuts. |
 | [ADR-088: Deployment Stale Attempt Reconciliation](./ADR-088-deployment-stale-attempt-reconciliation.md) | Accepted | Defines conservative stale observation and coordinated interrupted terminal transition for lost deployment ownership. |
 | [ADR-089: Control-Plane Secret Protection And Key Rotation](./ADR-089-control-plane-secret-protection-and-key-rotation.md) | Accepted | Defines versioned authenticated secret envelopes, fail-closed deployment materialization, atomic key rotation, and value-free runtime key proof. |
+| [ADR-090: Server Host Identity](./ADR-090-server-host-identity.md) | Accepted | Defines explicit canonical server hosts, CIDR/URL rejection, endpoint uniqueness, IPv6 display, and SSH failure categories. |
 
 ## Authoring Rules
 

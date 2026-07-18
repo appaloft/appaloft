@@ -71,11 +71,19 @@ Admission errors reject the command and return `err(DomainError)`.
 | `provider_error` | `connect`, `proxy-bootstrap` | Conditional | Provider rejects or cannot perform requested operation before acceptance. |
 | `infra_error` | repository/adapter boundary | Conditional | Persistence, shell, SSH, Docker, or local runtime boundary failed before state could be safely persisted. |
 
+Host admission `validation_error` details include `field = host`, `phase = register`, and a safe
+`hostInputKind` such as `network-prefix`, `url`, or `invalid-ipv6-or-host-port`. Duplicate canonical
+provider/host/port admission returns `conflict` with the existing server id and no new event.
+
 ## Async Failure Profile
 
 | Error condition | Required representation | Retriable |
 | --- | --- | --- |
 | Connectivity check fails | No `server-connected`; record failed connect attempt with `phase = connect`. | Depends on check failure. |
+| SSH host cannot be resolved | Diagnostic check metadata uses `failureKind = host-resolution-failed`. | Yes after DNS/input repair. |
+| SSH network has no route | Diagnostic check metadata uses `failureKind = network-unreachable`. | Usually yes after network repair. |
+| SSH authentication fails | Diagnostic check metadata uses `failureKind = authentication-failed`. | No until credentials change. |
+| SSH host key fails verification | Diagnostic check metadata uses `failureKind = host-key-verification-failed`. | No until an operator verifies and repairs trust. |
 | Readiness not achieved | No `server-ready`; record failure with `phase = server-ready` and related state. | Depends on missing gate. |
 | Edge proxy kind unsupported | `proxy-install-failed` with `errorCode = edge_proxy_kind_unsupported`. | No unless configuration or compatibility aliases change. |
 | Edge proxy provider key unsupported | `proxy-install-failed` with `errorCode = edge_proxy_provider_unsupported`. | No unless provider capability changes are expected. |

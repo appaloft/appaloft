@@ -3,9 +3,11 @@ import {
   DeploymentTarget,
   DeploymentTargetId,
   DeploymentTargetName,
+  domainError,
   EdgeProxyKindValue,
   err,
   HostAddress,
+  NonDeletedDeploymentTargetByEndpointSpec,
   ok,
   PortNumber,
   ProviderKey,
@@ -84,6 +86,23 @@ export class RegisterServerUseCase {
       const createdAt = yield* CreatedAt.create(clock.now());
       const port = yield* PortNumber.create(input.port ?? 22);
       const edgeProxyKind = yield* EdgeProxyKindValue.create(input.proxyKind ?? "traefik");
+
+      const existing = await serverRepository.findOne(
+        repositoryContext,
+        NonDeletedDeploymentTargetByEndpointSpec.create(providerKey, host, port),
+      );
+      if (existing) {
+        return err(
+          domainError.conflict("Server endpoint is already registered", {
+            commandName: "servers.register",
+            existingServerId: existing.toState().id.value,
+            host: host.value,
+            phase: "register",
+            port: port.value,
+            providerKey: providerKey.value,
+          }),
+        );
+      }
 
       const server = yield* DeploymentTarget.register({
         id: serverId,

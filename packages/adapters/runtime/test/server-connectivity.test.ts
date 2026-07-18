@@ -149,6 +149,15 @@ function createSwarmServer(): DeploymentTargetState {
   };
 }
 
+function createIpv6Server(): DeploymentTargetState {
+  return {
+    ...createServer(),
+    id: DeploymentTargetId.rehydrate("srv_ipv6"),
+    host: HostAddress.rehydrate("2001:db8::1"),
+    providerKey: ProviderKey.rehydrate("generic-ssh"),
+  };
+}
+
 function createContext(): ExecutionContext {
   return {
     requestId: "req_server_connectivity",
@@ -172,6 +181,43 @@ function createContext(): ExecutionContext {
 }
 
 describe("RuntimeServerConnectivityChecker", () => {
+  test("[SERVER-BOOT-HOST-005] passes an IPv6 SSH destination as one argv value", async () => {
+    const invocations: Array<{ command: string; args: string[] }> = [];
+    const checker = new RuntimeServerConnectivityChecker(undefined, async (command, args) => {
+      invocations.push({ command, args });
+      return { status: 0, stdout: "ok", stderr: "" };
+    });
+
+    const result = await checker.test(createContext(), { server: createIpv6Server() });
+
+    expect(result.isOk()).toBe(true);
+    const sshInvocation = invocations.find((invocation) => invocation.command === "ssh");
+    expect(sshInvocation?.args).toContain("2001:db8::1");
+    expect(sshInvocation?.args).toContain("22");
+    expect(sshInvocation?.args).not.toContain("[2001:db8::1]:22");
+  });
+
+  test("[SERVER-BOOT-HOST-006] distinguishes an unreachable IPv6 network from authentication failure", async () => {
+    const checker = new RuntimeServerConnectivityChecker(undefined, async () => ({
+      status: 255,
+      stdout: "",
+      stderr: "ssh: connect to host 2001:db8::1 port 22: Network is unreachable",
+    }));
+
+    const result = await checker.test(createContext(), { server: createIpv6Server() });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap().checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "ssh",
+          status: "failed",
+          metadata: expect.objectContaining({ failureKind: "network-unreachable" }),
+        }),
+      ]),
+    );
+  });
+
   test("includes provider-rendered edge proxy diagnostics in server doctor checks", async () => {
     const checker = new RuntimeServerConnectivityChecker(
       new StaticProviderRegistry(new DiagnosticProvider()),

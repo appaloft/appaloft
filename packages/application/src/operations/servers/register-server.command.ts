@@ -1,4 +1,4 @@
-import { type Result } from "@appaloft/core";
+import { HostAddress, type Result } from "@appaloft/core";
 
 import { Command } from "../../cqrs";
 import { parseOperationInput } from "../shared-schema";
@@ -25,16 +25,18 @@ export class RegisterServerCommand extends Command<{ id: string }> {
   }
 
   static create(input: RegisterServerCommandInput): Result<RegisterServerCommand> {
-    return parseOperationInput(registerServerCommandInputSchema, input).map(
-      (parsed) =>
-        new RegisterServerCommand(
-          parsed.name,
-          parsed.host,
-          parsed.providerKey,
-          parsed.targetKind,
-          parsed.port,
-          parsed.proxyKind,
-        ),
+    return parseOperationInput(registerServerCommandInputSchema, input).andThen((parsed) =>
+      HostAddress.create(parsed.host).map(
+        (host) =>
+          new RegisterServerCommand(
+            parsed.name,
+            host.value,
+            parsed.providerKey,
+            parsed.targetKind,
+            parsed.port,
+            parsed.proxyKind,
+          ),
+      ),
     );
   }
 }

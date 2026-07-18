@@ -837,6 +837,9 @@ Already done:
 - [x] Deployment list/logs and resource health/log/diagnostic read surfaces exist.
 
 Current verification notes:
+- 2026-07-18 server host identity slice added ADR-090 and canonical explicit DNS/IPv4/IPv6 host
+  validation, rejects CIDR/URL/combined host-port input, blocks duplicate non-deleted endpoints,
+  formats IPv6 endpoints unambiguously, and classifies SSH connectivity failures.
 - 2026-05-04 Phase 7 baseline slice implemented resource-scoped `.env` import,
   resource secret classification/masking, and `resources.effective-config` override summaries. This
   does not satisfy the full `0.9.0` release rule while storage, dependency resources, recovery,

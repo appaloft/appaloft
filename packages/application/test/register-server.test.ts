@@ -189,7 +189,50 @@ describe("servers.register command", () => {
     expect(command._unsafeUnwrapErr().code).toBe("validation_error");
   });
 
-  test("[SERVER-BOOT-CMD-004] servers.register applies operation guard before persistence", async () => {
+  test("[SERVER-BOOT-CMD-004] servers.register rejects a duplicate canonical endpoint", async () => {
+    const { eventBus, handler, serverRepository } = createHarness();
+    const first = RegisterServerCommand.create({
+      name: "IPv6 target",
+      host: "[2001:0db8::1]",
+      providerKey: "generic-ssh",
+      port: 22,
+    });
+    const duplicate = RegisterServerCommand.create({
+      name: "Same IPv6 target",
+      host: "2001:db8::1",
+      providerKey: "generic-ssh",
+      port: 22,
+    });
+
+    expect(first.isOk()).toBe(true);
+    expect(duplicate.isOk()).toBe(true);
+    expect((await handler.handle(createTestContext(), first._unsafeUnwrap())).isOk()).toBe(true);
+
+    const result = await handler.handle(createTestContext(), duplicate._unsafeUnwrap());
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "conflict",
+      details: {
+        commandName: "servers.register",
+        host: "2001:db8::1",
+        phase: "register",
+        port: 22,
+        providerKey: "generic-ssh",
+      },
+    });
+    expect(serverRepository.items.size).toBe(1);
+    expect(
+      eventBus.events.filter(
+        (event) =>
+          typeof event === "object" &&
+          event !== null &&
+          "type" in event &&
+          event.type === "deployment_target.registered",
+      ),
+    ).toHaveLength(1);
+  });
+
+  test("[SERVER-BOOT-GUARD-001] servers.register applies operation guard before persistence", async () => {
     const operationGuardPort = new DenyingOperationGuardPort();
     const { eventBus, handler, serverRepository } = createHarness({ operationGuardPort });
     const command = RegisterServerCommand.create({

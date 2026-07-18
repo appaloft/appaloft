@@ -57,6 +57,21 @@ function trimOutput(stdout: string | undefined, stderr: string | undefined): str
   return output.length > 0 ? output.slice(0, 240) : "";
 }
 
+function classifySshFailure(output: string): string {
+  if (/network is unreachable|no route to host/i.test(output)) return "network-unreachable";
+  if (/could not resolve hostname|name or service not known|nodename nor servname/i.test(output)) {
+    return "host-resolution-failed";
+  }
+  if (/connection timed out|connection refused|operation timed out/i.test(output)) {
+    return "host-unreachable";
+  }
+  if (/permission denied/i.test(output)) return "authentication-failed";
+  if (/host key verification failed|remote host identification has changed/i.test(output)) {
+    return "host-key-verification-failed";
+  }
+  return "ssh-failed";
+}
+
 async function processCheck(input: ProcessCheckInput): Promise<ServerConnectivityCheck> {
   const startedAt = Date.now();
   const result = await input.runner(input.command, input.args, input.timeoutMs);
@@ -81,7 +96,16 @@ async function processCheck(input: ProcessCheckInput): Promise<ServerConnectivit
         ? `${input.failureMessage}: ${result.error.message}`
         : details || input.failureMessage,
     durationMs,
-    ...(input.metadata ? { metadata: input.metadata } : {}),
+    ...(input.metadata || input.command === "ssh"
+      ? {
+          metadata: {
+            ...input.metadata,
+            ...(input.command === "ssh"
+              ? { failureKind: classifySshFailure(`${details}\n${result.error?.message ?? ""}`) }
+              : {}),
+          },
+        }
+      : {}),
   };
 }
 

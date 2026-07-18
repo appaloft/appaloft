@@ -21,6 +21,7 @@ This test matrix inherits:
 
 - [ADR-003: Server Connect Public Versus Internal](../decisions/ADR-003-server-connect-public-vs-internal.md)
 - [ADR-004: Server Readiness State Storage](../decisions/ADR-004-server-readiness-state-storage.md)
+- [ADR-090: Server Host Identity](../decisions/ADR-090-server-host-identity.md)
 - [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
@@ -70,7 +71,7 @@ Then:
 | SERVER-BOOT-CMD-001 | integration | Register with default proxy | `name`, `host`, `providerKey`; no edge proxy override | `ok({ id })` | None | Registration accepted event; connect workflow can start | Server registered; edge proxy pending/provider-backed | No |
 | SERVER-BOOT-CMD-002 | integration | Register with proxy disabled | `edgeProxyMode = disabled` | `ok({ id })` | None | Registration accepted event; connect workflow can start | Server registered; edge proxy disabled | No |
 | SERVER-BOOT-CMD-003 | integration | Register with invalid input | Missing name/host/provider | `err` | `validation_error`, phase `register` | None | No server created | No |
-| SERVER-BOOT-CMD-004 | integration | Duplicate registration | Same provider/host/port or idempotency key | Existing id or `err` per policy | `conflict` if rejected | No duplicate lifecycle event | No duplicate server | No |
+| SERVER-BOOT-CMD-004 | integration | Duplicate registration | Same organization and canonical provider/host/port | `err` | `conflict`, phase `register` | No duplicate lifecycle event | No duplicate server | No |
 | SERVER-BOOT-CMD-005 | integration | Connect existing server | Valid `serverId`, usable credentials | `ok({ id })` | None | `server-connected` | Server connected | No |
 | SERVER-BOOT-CMD-006 | integration | Connect missing server | Unknown `serverId` | `err` | `not_found`, phase `connect` | None | No state change | No |
 | SERVER-BOOT-CMD-007 | integration | Connect unreachable server | Connectivity probes fail after connect attempt accepted | Accepted attempt result or persisted failed attempt | Async connect failure with phase `connect` | No `server-connected` | Server not ready | Depends |
@@ -80,6 +81,18 @@ Then:
 | SERVER-BOOT-CMD-011 | integration | Repair proxy after doctor failure | `serverId`, reason `repair`, no attempt id | `ok({ serverId, attemptId })` with a new attempt id | None | `proxy-bootstrap-requested` | New proxy bootstrap attempt starts; provider-owned proxy may be recreated; user workload containers untouched | Depends on underlying proxy failure |
 | SERVER-BOOT-CMD-012 | integration | Repair proxy when already ready | `serverId`, reason `repair`, proxy already ready but compatible | `ok({ serverId, attemptId })` or idempotent ready result per implementation policy | None | None or `proxy-bootstrap-requested` only if a new verification attempt is intentionally recorded | Proxy remains ready; no duplicate provider-owned containers | No |
 | SERVER-BOOT-CMD-013 | integration | Bootstrap proxy when disabled | `edgeProxyMode = disabled` | `err` or no-op per command policy | `validation_error` or invariant, phase `proxy-bootstrap` | None | Edge proxy disabled | No |
+
+## Host Identity Matrix
+
+| Test ID | Layer | Case | Expected result |
+| --- | --- | --- | --- |
+| SERVER-BOOT-HOST-001 | core | Equivalent raw/bracketed IPv6 | Canonical compressed host without brackets |
+| SERVER-BOOT-HOST-002 | core | DNS, URL, combined host-port | DNS canonicalized; URL and host-port rejected |
+| SERVER-BOOT-HOST-003 | core | IPv4/IPv6 CIDR | Rejected as `network-prefix`; no address inferred |
+| SERVER-BOOT-HOST-004 | core/presentation | IPv6 endpoint display | `[host]:port` |
+| SERVER-BOOT-HOST-005 | runtime adapter | IPv6-only SSH | Host is one argv value; port is separate |
+| SERVER-BOOT-HOST-006 | runtime adapter | SSH reachability failure | Stable `failureKind` metadata |
+| SERVER-BOOT-HOST-007 | persistence migration | Existing valid IPv6 spelling | Canonical host row; invalid input is not guessed or rewritten |
 
 ## Entrypoint Matrix
 

@@ -105,6 +105,7 @@ import { domainBindingPathHandlingMigration } from "./migrations/096_domain_bind
 import { hotDeploymentForeignKeyIndexesMigration } from "./migrations/097_hot_deployment_foreign_key_indexes";
 import { hotRuntimeForeignKeyIndexesMigration } from "./migrations/098_hot_runtime_foreign_key_indexes";
 import { sourceEventChangeSetMigration } from "./migrations/099_source_event_change_set";
+import { serverHostIdentityMigration } from "./migrations/100_server_host_identity";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -302,6 +303,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "097_hot_deployment_foreign_key_indexes": hotDeploymentForeignKeyIndexesMigration,
       "098_hot_runtime_foreign_key_indexes": hotRuntimeForeignKeyIndexesMigration,
       "099_source_event_change_set": sourceEventChangeSetMigration,
+      "100_server_host_identity": serverHostIdentityMigration,
     };
   }
 }

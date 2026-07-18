@@ -669,6 +669,88 @@ export class ArtifactDigest extends NonEmptyTextValue {
 }
 
 const hostAddressBrand: unique symbol = Symbol("HostAddress");
+
+function hostValidationError(message: string, hostInputKind: string): Result<string> {
+  return err(domainError.validation(message, { field: "host", hostInputKind, phase: "register" }));
+}
+
+function canonicalizeIpv6(value: string): string | null {
+  try {
+    const hostname = new URL(`http://[${value}]/`).hostname;
+    return hostname.startsWith("[") && hostname.endsWith("]")
+      ? hostname.slice(1, -1).toLowerCase()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeExplicitHostAddress(value: string): Result<string> {
+  const required = validateRequiredText(value, "Host");
+  if (required.isErr()) return required;
+
+  const input = required.value;
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(input)) {
+    return hostValidationError("Host must not include a URL scheme", "url");
+  }
+  if (input.includes("/")) {
+    return hostValidationError(
+      "Host must be one explicit address, not a network prefix or URL",
+      "network-prefix",
+    );
+  }
+  if (/\s|["'`\\]/.test(input)) {
+    return hostValidationError("Host contains unsupported characters", "invalid-host");
+  }
+
+  const at = input.indexOf("@");
+  if (at !== input.lastIndexOf("@")) {
+    return hostValidationError("Host may contain at most one SSH username", "invalid-host");
+  }
+  const username = at >= 0 ? input.slice(0, at) : undefined;
+  let host = at >= 0 ? input.slice(at + 1) : input;
+  if (username !== undefined && !/^[a-zA-Z0-9._-]+$/.test(username)) {
+    return hostValidationError("SSH username contains unsupported characters", "invalid-user");
+  }
+  if (host.startsWith("[") || host.endsWith("]")) {
+    if (!(host.startsWith("[") && host.endsWith("]"))) {
+      return hostValidationError("IPv6 brackets must be balanced", "invalid-host");
+    }
+    host = host.slice(1, -1);
+  }
+
+  let normalizedHost: string;
+  if (host.includes(":")) {
+    const ipv6 = canonicalizeIpv6(host);
+    if (!ipv6) {
+      return hostValidationError(
+        "Host must be a valid IPv6 address; specify the port separately",
+        "invalid-ipv6-or-host-port",
+      );
+    }
+    normalizedHost = ipv6;
+  } else {
+    if (!/^[a-zA-Z0-9_](?:[a-zA-Z0-9_.-]*[a-zA-Z0-9_])?\.?$/.test(host)) {
+      return hostValidationError("Host must be a valid hostname or IP address", "invalid-host");
+    }
+    const unqualifiedHost = host.replace(/\.$/, "");
+    if (/^[0-9.]+$/.test(unqualifiedHost)) {
+      const octets = unqualifiedHost.split(".");
+      if (
+        octets.length !== 4 ||
+        octets.some((octet) => !/^\d{1,3}$/.test(octet) || Number(octet) > 255)
+      ) {
+        return hostValidationError("Host must be a valid IPv4 address", "invalid-ipv4");
+      }
+      normalizedHost = octets.map((octet) => String(Number(octet))).join(".");
+    } else {
+      normalizedHost = unqualifiedHost.toLowerCase();
+    }
+  }
+
+  return ok(username ? `${username}@${normalizedHost}` : normalizedHost);
+}
+
 export class HostAddress extends NonEmptyTextValue {
   private [hostAddressBrand]!: void;
 
@@ -677,11 +759,19 @@ export class HostAddress extends NonEmptyTextValue {
   }
 
   static create(value: string): Result<HostAddress> {
-    return createRequiredTextValue(value, "Host", (normalized) => new HostAddress(normalized));
+    return normalizeExplicitHostAddress(value).map((normalized) => new HostAddress(normalized));
   }
 
   static rehydrate(value: string): HostAddress {
-    return new HostAddress(rehydrateRequiredText(value));
+    const normalized = normalizeExplicitHostAddress(value);
+    return new HostAddress(normalized.isOk() ? normalized.value : rehydrateRequiredText(value));
+  }
+
+  formatWithPort(port: number): string {
+    const at = this.value.indexOf("@");
+    const username = at >= 0 ? this.value.slice(0, at + 1) : "";
+    const host = at >= 0 ? this.value.slice(at + 1) : this.value;
+    return `${username}${host.includes(":") ? `[${host}]` : host}:${port}`;
   }
 }
 

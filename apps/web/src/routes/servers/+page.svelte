@@ -18,6 +18,7 @@
     Terminal,
   } from "@lucide/svelte";
   import type { ServerSummary, SystemPluginWebExtension } from "@appaloft/contracts";
+  import { HostAddress } from "@appaloft/core";
   import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
   import Sortable from "sortablejs";
 
@@ -668,9 +669,9 @@
                       </div>
                       <p
                         class="truncate font-mono text-sm text-muted-foreground"
-                        title={`${server.host}:${server.port}`}
+                        title={HostAddress.rehydrate(server.host).formatWithPort(server.port)}
                       >
-                        {server.host}:{server.port}
+                        {HostAddress.rehydrate(server.host).formatWithPort(server.port)}
                       </p>
                     </div>
                   </div>

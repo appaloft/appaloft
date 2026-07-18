@@ -8,6 +8,7 @@ import {
   type DeploymentTargetByIdSpec,
   type DeploymentTargetByProviderAndHostSpec,
   type DeploymentTargetSelectionSpecVisitor,
+  type NonDeletedDeploymentTargetByEndpointSpec,
 } from "@appaloft/core";
 import { type Kysely, type Selectable, type SelectQueryBuilder } from "kysely";
 
@@ -46,6 +47,17 @@ class KyselyServerSelectionVisitor
     return query
       .where("provider_key", "=", spec.providerKey.value)
       .where("host", "=", spec.host.value);
+  }
+
+  visitNonDeletedDeploymentTargetByEndpoint(
+    query: ServerSelectionQuery,
+    spec: NonDeletedDeploymentTargetByEndpointSpec,
+  ): ServerSelectionQuery {
+    return query
+      .where("provider_key", "=", spec.providerKey.value)
+      .where("host", "=", spec.host.value)
+      .where("port", "=", spec.port.value)
+      .where("lifecycle_status", "!=", "deleted");
   }
 }
 

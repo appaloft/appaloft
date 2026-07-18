@@ -149,6 +149,7 @@ import {
   err,
   type LatestDeploymentSpec,
   type LatestRuntimeOwningDeploymentSpec,
+  NonDeletedDeploymentTargetByEndpointSpec,
   ok,
   Project,
   ProjectByIdSpec,
@@ -921,6 +922,20 @@ export class MemoryServerRepository implements ServerRepository {
       for (const server of this.items.values()) {
         const state = server.toState();
         if (state.providerKey.equals(spec.providerKey) && state.host.equals(spec.host)) {
+          return server;
+        }
+      }
+    }
+
+    if (spec instanceof NonDeletedDeploymentTargetByEndpointSpec) {
+      for (const server of this.items.values()) {
+        const state = server.toState();
+        if (
+          !state.lifecycleStatus.isDeleted() &&
+          state.providerKey.equals(spec.providerKey) &&
+          state.host.equals(spec.host) &&
+          state.port.equals(spec.port)
+        ) {
           return server;
         }
       }
