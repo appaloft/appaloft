@@ -2046,6 +2046,35 @@ describe("Appaloft deployment config schema", () => {
     }
   });
 
+  test("[CONFIG-FILE-DOMAIN-010] accepts distinct path routes on one host and rejects an exact duplicate", () => {
+    const distinctRoutes = parseAppaloftDeploymentConfig({
+      access: {
+        domains: [
+          { host: "app.example.com", pathPrefix: "/api" },
+          { host: "app.example.com", pathPrefix: "/v1" },
+        ],
+      },
+    });
+
+    expect(distinctRoutes.success).toBe(true);
+
+    const duplicateRoute = parseAppaloftDeploymentConfig({
+      access: {
+        domains: [
+          { host: "app.example.com", pathPrefix: "/api" },
+          { host: "APP.EXAMPLE.COM", pathPrefix: "/api" },
+        ],
+      },
+    });
+
+    expect(duplicateRoute.success).toBe(false);
+    if (!duplicateRoute.success) {
+      expect(duplicateRoute.error.issues[0]?.message).toContain(
+        "duplicate host and pathPrefix routes",
+      );
+    }
+  });
+
   test("[CONFIG-FILE-DOMAIN-002] rejects domain identity selectors", () => {
     const parsed = parseAppaloftDeploymentConfig({
       access: {
@@ -2213,6 +2242,51 @@ describe("Appaloft deployment config schema", () => {
             host: "example.com",
             redirectTo: "www.example.com",
           },
+        ],
+      },
+      {
+        name: "path-level loop hidden by unrelated served routes",
+        domains: [
+          { host: "a.example.com", pathPrefix: "/api" },
+          { host: "b.example.com", pathPrefix: "/api" },
+          {
+            host: "a.example.com",
+            pathPrefix: "/legacy",
+            redirectTo: "b.example.com",
+          },
+          {
+            host: "b.example.com",
+            pathPrefix: "/legacy",
+            redirectTo: "a.example.com",
+          },
+        ],
+      },
+      {
+        name: "path-level loop hidden by a trailing slash prefix",
+        domains: [
+          { host: "a.example.com", pathPrefix: "/" },
+          { host: "b.example.com", pathPrefix: "/" },
+          {
+            host: "a.example.com",
+            pathPrefix: "/api/",
+            redirectTo: "b.example.com",
+          },
+          {
+            host: "b.example.com",
+            pathPrefix: "/api/legacy",
+            redirectTo: "a.example.com",
+          },
+        ],
+      },
+      {
+        name: "redirect target only serves a trailing-slash descendant",
+        domains: [
+          {
+            host: "a.example.com",
+            pathPrefix: "/api",
+            redirectTo: "b.example.com",
+          },
+          { host: "b.example.com", pathPrefix: "/api/" },
         ],
       },
     ];

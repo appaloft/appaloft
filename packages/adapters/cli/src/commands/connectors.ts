@@ -71,8 +71,10 @@ const catalogCommand = EffectCommand.make(
   ({ category, includeUnavailable }) =>
     runQuery(
       ListConnectorsQuery.create({
-        category: optionalValue(category) as ListConnectorsQueryInput["category"],
-        includeUnavailable,
+        ...(optionalValue(category)
+          ? { category: optionalValue(category) as ListConnectorsQueryInput["category"] }
+          : {}),
+        ...(includeUnavailable ? { includeUnavailable: true } : {}),
       }),
     ),
 ).pipe(EffectCommand.withDescription("List connector catalog entries"));

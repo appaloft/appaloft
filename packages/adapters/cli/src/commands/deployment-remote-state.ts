@@ -447,17 +447,27 @@ function validateServerAppliedRouteDomains(
     }
   }
 
-  const byHost = new Map<string, ServerAppliedRouteDomainIntent>();
+  const byHost = new Map<string, ServerAppliedRouteDomainIntent[]>();
+  const routeKeys = new Set<string>();
   for (const domain of domains) {
-    if (byHost.has(domain.host)) {
+    const normalizedHost = domain.host.trim().toLowerCase();
+    const routeKey = `${normalizedHost}\u0000${domain.pathPrefix.trim()}`;
+    if (routeKeys.has(routeKey)) {
       return err(
-        domainError.validation("Server-applied route domains cannot contain duplicate hosts", {
-          phase: "config-domain-resolution",
-          host: domain.host,
-        }),
+        domainError.validation(
+          "Server-applied route domains cannot contain duplicate host and pathPrefix routes",
+          {
+            phase: "config-domain-resolution",
+            host: domain.host,
+            pathPrefix: domain.pathPrefix,
+          },
+        ),
       );
     }
-    byHost.set(domain.host, domain);
+    routeKeys.add(routeKey);
+    const hostDomains = byHost.get(normalizedHost) ?? [];
+    hostDomains.push(domain);
+    byHost.set(normalizedHost, hostDomains);
   }
 
   for (const domain of domains) {
@@ -474,8 +484,10 @@ function validateServerAppliedRouteDomains(
       continue;
     }
 
-    const target = byHost.get(domain.redirectTo);
-    if (!target) {
+    const normalizedHost = domain.host.trim().toLowerCase();
+    const normalizedRedirectTarget = domain.redirectTo.trim().toLowerCase();
+    const targets = byHost.get(normalizedRedirectTarget);
+    if (!targets || targets.length === 0) {
       return err(
         domainError.validation("Server-applied route redirect target is missing", {
           phase: "config-domain-resolution",
@@ -485,7 +497,7 @@ function validateServerAppliedRouteDomains(
       );
     }
 
-    if (target.host === domain.host) {
+    if (normalizedRedirectTarget === normalizedHost) {
       return err(
         domainError.validation("Server-applied route redirect cannot target itself", {
           phase: "config-domain-resolution",
@@ -494,7 +506,7 @@ function validateServerAppliedRouteDomains(
       );
     }
 
-    if (target.redirectTo) {
+    if (!redirectTargetServesPath(domain.pathPrefix, targets)) {
       return err(
         domainError.validation(
           "Server-applied route redirect target must be a served domain, not another redirect",
@@ -509,6 +521,33 @@ function validateServerAppliedRouteDomains(
   }
 
   return ok(undefined);
+}
+
+function domainRouteMatchesPath(routePathPrefix: string, requestPath: string): boolean {
+  const route = routePathPrefix.trim();
+  const request = requestPath.trim();
+  return (
+    route === "/" ||
+    request === route ||
+    request.startsWith(route.endsWith("/") ? route : `${route}/`)
+  );
+}
+
+function redirectTargetServesPath(
+  sourcePathPrefix: string,
+  targets: readonly ServerAppliedRouteDomainIntent[],
+): boolean {
+  const baseTarget = targets
+    .filter((target) => domainRouteMatchesPath(target.pathPrefix, sourcePathPrefix))
+    .sort((left, right) => right.pathPrefix.length - left.pathPrefix.length)[0];
+  if (!baseTarget || baseTarget.redirectTo) {
+    return false;
+  }
+
+  return !targets.some(
+    (target) =>
+      Boolean(target.redirectTo) && domainRouteMatchesPath(sourcePathPrefix, target.pathPrefix),
+  );
 }
 
 function serverAppliedRouteStateError(

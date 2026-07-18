@@ -123,8 +123,10 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft resource storage attach <resourceId>` - `resources.attach-storage`
 - `appaloft resource storage detach <resourceId> <attachmentId>` - `resources.detach-storage`
 - `appaloft resource set-variable <resourceId> <key> <value>` - `resources.set-variable`
-- `appaloft resource secrets create <resourceId> <key> <value>` - `resources.secrets.create`
-- `appaloft resource secrets rotate <resourceId> <key> <value>` - `resources.secrets.rotate`
+- `appaloft resource secrets create <resourceId> <key> [<value> | --stdin]` - `resources.secrets.create`
+- `appaloft resource secrets rotate <resourceId> <key> [<value> | --stdin]` - `resources.secrets.rotate`
+- `appaloft github status` - `system.github-app-connection.show`
+- `appaloft github repositories [--search <text>]` - `system.github-repositories.list`
 - `appaloft resource secrets delete <resourceId> <key>` - `resources.secrets.delete`
 - `appaloft resource secrets list <resourceId>` - `resources.secrets.list`
 - `appaloft resource secrets show <resourceId> <key>` - `resources.secrets.show`
@@ -252,7 +254,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft audit-event show <auditEventId> --aggregate <aggregateId>` - `audit-events.show`
 - `appaloft audit-event prune --before <iso>` - `audit-events.prune`
 - `appaloft audit-event export --aggregate <aggregateId>` - `audit-events.export`
-- `appaloft audit-event export-global --from <iso> --to <iso>` - `audit-events.export-global`
+- `appaloft audit-event export-global --from <iso> --to <iso> [--cursor <iso>] [--order asc|desc]` - `audit-events.export-global`
 - `appaloft audit-event archive create` - `audit-events.archives.create`
 - `appaloft audit-event archive list` - `audit-events.archives.list`
 - `appaloft audit-event archive show <archiveId>` - `audit-events.archives.show`
@@ -295,6 +297,8 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft doctor` - `system.doctor`
 - `appaloft upgrade check` - `system.instance-upgrade.check`
 - `appaloft upgrade apply` - `system.instance-upgrade.apply`
+- `appaloft db secret-rotation plan [--state-backend ssh-pglite --server-host <host>]` - `system.control-plane-secret-rotation.plan`
+- `appaloft db secret-rotation apply --plan-digest <digest> --backup-reference <reference> [--state-backend ssh-pglite --server-host <host>]` - `system.control-plane-secret-rotation.apply`
 - `appaloft db status` - `system.db-status`
 - `appaloft db migrate` - `system.db-migrate`
 - `appaloft connectors categories` - `connections.categories.list`

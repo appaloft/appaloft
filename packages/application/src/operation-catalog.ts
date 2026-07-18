@@ -1853,7 +1853,7 @@ export const operationCatalog = [
     inputSchema: createResourceSecretReferenceCommandInputSchema,
     serviceToken: tokens.createResourceSecretReferenceUseCase,
     transports: {
-      cli: "appaloft resource secrets create <resourceId> <key> <value>",
+      cli: "appaloft resource secrets create <resourceId> <key> [<value> | --stdin]",
       orpc: { method: "POST", path: "/api/resources/{resourceId}/secrets" },
     },
   },
@@ -1867,7 +1867,7 @@ export const operationCatalog = [
     inputSchema: rotateResourceSecretReferenceCommandInputSchema,
     serviceToken: tokens.rotateResourceSecretReferenceUseCase,
     transports: {
-      cli: "appaloft resource secrets rotate <resourceId> <key> <value>",
+      cli: "appaloft resource secrets rotate <resourceId> <key> [<value> | --stdin]",
       orpc: { method: "POST", path: "/api/resources/{resourceId}/secrets/{key}" },
     },
   },
@@ -4481,6 +4481,7 @@ export const operationCatalog = [
     inputSchema: listGitHubRepositoriesQueryInputSchema,
     serviceToken: tokens.listGitHubRepositoriesQueryService,
     transports: {
+      cli: "appaloft github repositories [--search <text>]",
       orpc: { method: "GET", path: "/api/integrations/github/repositories" },
     },
   },
@@ -4494,6 +4495,7 @@ export const operationCatalog = [
     inputSchema: githubAppConnectionQueryInputSchema,
     serviceToken: tokens.githubAppConnectionQueryService,
     transports: {
+      cli: "appaloft github status",
       orpc: { method: "GET", path: "/api/integrations/github/app-connection" },
     },
   },

@@ -73,6 +73,12 @@ export const cliDocsHrefs = {
 
 export const cliCommandDescriptions = {
   deploy: withDocs("Create a deployment", "deployment.source"),
+  github: withDocs("GitHub source operations", "deployment.source"),
+  githubStatus: withDocs("Show GitHub App source connection status", "deployment.source"),
+  githubRepositories: withDocs(
+    "List repositories available to the GitHub App",
+    "deployment.source",
+  ),
   deploymentPlan: withDocs("Preview deployment plan without execution", "deployment.plan-preview"),
   deploymentCreate: withDocs(
     "Create a deployment from an existing Resource profile and target context",
@@ -789,29 +795,26 @@ export const cliCommandDescriptions = {
     "Set a resource-scoped variable override",
     "environment.variable-precedence",
   ),
-  resourceSecrets: withDocs(
-    "Manage resource-owned secret references",
-    "environment.variable-precedence",
-  ),
+  resourceSecrets: withDocs("Manage resource-owned secret references", "environment.secret-values"),
   resourceSecretsCreate: withDocs(
     "Create a resource-owned secret reference",
-    "environment.variable-precedence",
+    "environment.secret-values",
   ),
   resourceSecretsRotate: withDocs(
     "Rotate a resource-owned secret reference",
-    "environment.variable-precedence",
+    "environment.secret-values",
   ),
   resourceSecretsDelete: withDocs(
     "Delete a resource-owned secret reference",
-    "environment.variable-precedence",
+    "environment.secret-values",
   ),
   resourceSecretsList: withDocs(
     "List masked resource-owned secret references",
-    "environment.variable-precedence",
+    "environment.secret-values",
   ),
   resourceSecretsShow: withDocs(
     "Show one masked resource-owned secret reference",
-    "environment.variable-precedence",
+    "environment.secret-values",
   ),
   resourceImportVariables: withDocs(
     "Import pasted .env variables into one resource",
