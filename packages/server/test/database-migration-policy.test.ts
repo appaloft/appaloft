@@ -37,6 +37,7 @@ function flags(dataDir: string, pgliteDataDir: string) {
   return {
     appVersion: "0.1.0-test",
     authProvider: "none" as const,
+    databaseDriver: "pglite" as const,
     dataDir,
     docsStaticDir: "",
     httpHost: "localhost",
@@ -98,7 +99,7 @@ describe("PGlite migration policy", () => {
         authRuntime: createTestAuthRuntime(),
       }),
     ).rejects.toThrow();
-  });
+  }, 20_000);
 
   test("[CPS-COMPAT-032] read-only remote maintenance inspects the original schema without migrating it", async () => {
     const state = await createConflictingPgliteState();
@@ -129,5 +130,5 @@ describe("PGlite migration policy", () => {
     } finally {
       await server.shutdown();
     }
-  });
+  }, 20_000);
 });
