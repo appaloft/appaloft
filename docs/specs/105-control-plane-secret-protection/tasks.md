@@ -19,6 +19,7 @@
 - [x] Implement atomic dry-run/apply migration with plan digest, backup reference, and retry.
 - [x] Add bounded safe unreadable-record findings and coordinated SSH PGlite plan/apply support.
 - [x] Keep SSH PGlite plan preparation free of durable marker, migration, stale-lock recovery, and upload writes.
+- [x] Stream SSH PGlite plan/apply archives through private temporary files with bounded process memory.
 - [x] Make Swarm env semantics and runtime key proof consistent with other substrates.
 
 ## Verification And Sync

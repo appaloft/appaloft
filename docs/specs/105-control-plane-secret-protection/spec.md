@@ -44,6 +44,7 @@ runtime materialization, and rotated through an explicit atomic migration.
 | CPS-COMPAT-012 | Retained legal ciphertext | A historical envelope uses a retained supported key/version | It is planned, retried, rolled back, or migrated | It decrypts under the documented compatibility window and can be rewrapped to the active key. |
 | CPS-REMOTE-013 | SSH PGlite maintenance | A pure CLI installation keeps Appaloft state on an SSH server | Rotation plan or apply runs with an explicit SSH target | Plan reads a coordinated local mirror without creating backend markers, migrating schema markers, recovering stale locks, or uploading state; apply alone performs durable preparation, guarded backup, revision-fenced upload, and conflict-safe merge. |
 | CPS-DIAG-014 | Unreadable record diagnosis | One or more persisted envelopes cannot be authenticated or parsed | Rotation dry-run classifies the state | The bounded result identifies the record source, business ids, variable key when applicable, and stable reason without returning values, ciphertext, key material, or secret length. |
+| CPS-REMOTE-015 | Bounded-memory SSH PGlite archive transfer | A server-owned PGlite state is larger than a practical process output buffer | Rotation plan downloads or rotation apply uploads the coordinated mirror | The shell streams the compressed archive through a private temporary file instead of retaining the complete archive in process memory; cleanup removes the temporary archive on success or failure. |
 
 ## Domain Ownership
 

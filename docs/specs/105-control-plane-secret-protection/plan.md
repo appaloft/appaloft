@@ -18,6 +18,8 @@
 - Return bounded safe findings for unreadable rows and let the source CLI run plan/apply against the
   existing coordinated SSH PGlite mirror lifecycle. Read-only plan only holds an ephemeral lock; it
   never creates durable markers, migrates schema, recovers stale locks, or uploads the mirror.
+  Download and upload use private temporary archive files so mirror size does not become process
+  output-buffer or input-buffer pressure; cleanup removes those files on every exit path.
 - Extend Deployment Proof with value-free planned/observed environment key-set evidence.
 
 ## Persistence And Migration
@@ -37,6 +39,8 @@
 - Use marker keys and assert only key presence/count/fingerprint at runtime.
 - Verify red-green behavior for missing/wrong/corrupt keys and mid-transaction rollback.
 - Verify SSH plan leaves the remote sync revision unchanged and apply retains backup/revision fencing.
+- Verify SSH archive download uses a file sink and upload uses a file source rather than returning or
+  accepting the complete compressed archive as an in-memory byte array.
 
 ## Risks And Deferred Gaps
 
