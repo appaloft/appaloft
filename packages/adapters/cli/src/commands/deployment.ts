@@ -2046,7 +2046,7 @@ const createDeploymentCommand = EffectCommand.make(
       environmentId: environment,
       resourceId: resource,
       serverId: server,
-      ...(destinationId ? { destinationId } : {}),
+      ...(destinationId === undefined ? {} : { destinationId }),
     } satisfies Omit<CreateDeploymentCommandInput, "executionMode">;
 
     return Effect.gen(function* () {

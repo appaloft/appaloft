@@ -87,5 +87,33 @@ describe("CLI deployment create command", () => {
       executionMode: "synchronous",
     });
     expect(workerStarts).toBe(1);
+
+    const writeStderr = process.stderr.write;
+    const exitCode = process.exitCode;
+    try {
+      process.stderr.write = (() => true) as typeof process.stderr.write;
+      await expect(
+        program.parseAsync([
+          "node",
+          "appaloft",
+          "deployments",
+          "create",
+          "--project",
+          "prj_remote",
+          "--environment",
+          "env_production",
+          "--resource",
+          "res_api",
+          "--server",
+          "srv_production",
+          "--destination",
+          "",
+        ]),
+      ).rejects.toBeDefined();
+    } finally {
+      process.stderr.write = writeStderr;
+      process.exitCode = exitCode ?? 0;
+    }
+    expect(commands).toHaveLength(1);
   });
 });

@@ -37,7 +37,7 @@ appaloft deployments create \
   --server <serverId>
 ```
 
-This command sends only the existing context ids through the shared `deployments.create` contract. It does not read or upload a local source package or repository config. The returned deployment id means the attempt was accepted; use the timeline and proof commands to verify execution.
+This command sends only the existing context ids through the shared `deployments.create` contract. It does not upload a local source package or use repository deployment-profile fields; normal CLI target selection may still inspect repository `controlPlane` config. The returned deployment id means the attempt was accepted; use the timeline and proof commands to verify execution.
 
 ![Deployment lifecycle](/docs/diagrams/deployment-lifecycle.svg)
 

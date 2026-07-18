@@ -433,7 +433,8 @@ Allowed entry differences:
 - CLI can prompt interactively before dispatch.
 - CLI can dispatch the complete ids-only context through `appaloft deployments create`; this
   namespaced surface is remote-control-plane capable because it does not perform local
-  source-package, repository-config, SSH-state, or prompt work.
+  source-package, deployment-profile bootstrap, SSH-state, or prompt work. Normal CLI target
+  selection may still inspect repository `controlPlane` config before dispatch.
 - The namespaced surface submits detached durable work when a remote control-plane profile is
   selected. In pure local mode it executes synchronously and rejects the CLI invocation unless the
   deployment reaches `succeeded`.
