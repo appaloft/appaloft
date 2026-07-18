@@ -32,8 +32,9 @@ rewraps in one transaction. Failure rolls back the entire migration; retry is id
 Because dry-run precedes application migrations, every source is read directly and exact PostgreSQL
 `42P01` is treated as an empty source for fresh or partially initialized state. All other source
 failures remain fail closed and expose only their fixed safe classification.
-For unattended diagnosis, a bounded SQLSTATE allowlist maps to fixed operational categories without
-publishing the SQLSTATE or database detail; unknown failures retain the generic read-failed reason.
+For unattended diagnosis, a bounded SQLSTATE class allowlist maps to fixed operational categories
+without publishing the SQLSTATE or database detail; exact `42P01` alone means an empty source and
+unknown failures retain the generic read-failed reason.
 Only known driver wrapper fields and SQLSTATE aliases are traversed, with bounded depth and node count.
 
 Dry-run may return a bounded list of unreadable findings containing only record source, stable
