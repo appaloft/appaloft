@@ -87,13 +87,36 @@ function unreadableReason(error: DomainError): string {
   return typeof error.details?.reason === "string" ? error.details.reason : "unreadable";
 }
 
-function isUndefinedTableError(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code?: unknown }).code === "42P01"
-  );
+function sqlStateCode(error: unknown): string | undefined {
+  let candidate = error;
+  for (let depth = 0; depth < 4; depth += 1) {
+    if (typeof candidate !== "object" || candidate === null) return undefined;
+    if (
+      "code" in candidate &&
+      typeof (candidate as { code?: unknown }).code === "string" &&
+      /^[0-9A-Z]{5}$/.test((candidate as { code: string }).code)
+    ) {
+      return (candidate as { code: string }).code;
+    }
+    candidate = "cause" in candidate ? (candidate as { cause?: unknown }).cause : undefined;
+  }
+  return undefined;
+}
+
+function sourceReadFailureReason(source: string, error: unknown): string {
+  switch (sqlStateCode(error)) {
+    case "42703":
+      return `${source}-schema-incompatible`;
+    case "0A000":
+      return `${source}-feature-unsupported`;
+    case "55000":
+      return `${source}-state-unavailable`;
+    case "XX001":
+    case "XX002":
+      return `${source}-storage-corrupt`;
+    default:
+      return `${source}-read-failed`;
+  }
 }
 
 async function readOptionalRotationSource<T>(
@@ -103,11 +126,11 @@ async function readOptionalRotationSource<T>(
   try {
     return await read();
   } catch (error) {
-    if (isUndefinedTableError(error)) return [];
+    if (sqlStateCode(error) === "42P01") return [];
     throw rotationError(
       "control_plane_secret_rotation_source_read_failed",
       "A control-plane secret rotation source could not be read",
-      `${source}-read-failed`,
+      sourceReadFailureReason(source, error),
     );
   }
 }
