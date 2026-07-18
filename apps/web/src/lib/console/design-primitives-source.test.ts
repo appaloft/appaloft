@@ -42,4 +42,17 @@ describe("community design primitives CSS source", () => {
     expect(subtlePanelSource).toContain("background: var(--card)");
     expect(subtlePanelSource).not.toMatch(/destructive|red|rose|pink|color-mix/);
   });
+
+  test("[APPALOFT-WEB-ILLUSTRATION-001] uses decorative human workplace illustrations for collection empty states", async () => {
+    const emptyStateSource = await readFile(
+      new URL("../components/console/ConsoleEmptyState.svelte", import.meta.url),
+      "utf8",
+    );
+
+    expect(emptyStateSource).toContain("illustrationForTone");
+    expect(emptyStateSource).toContain("/illustrations/console-empty-workstation.png");
+    expect(emptyStateSource).toContain("/illustrations/console-empty-infrastructure.png");
+    expect(emptyStateSource).toContain('alt=""');
+    expect(emptyStateSource).not.toContain("<svg");
+  });
 });

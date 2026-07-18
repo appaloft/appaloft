@@ -110,6 +110,8 @@ identity.
   typography, surface tint, and a crisp 1px directional shadow; reserve primary color for hover,
   focus, selected, warning, and destructive states.
 - Cards frame repeated object tiles, framed tools, and empty states. Avoid nested cards.
+- Product illustrations use human-centered workplace scenes: an operator at a workstation, reviewing a deployment graph, or maintaining server infrastructure. Keep the line work calm and sparse, with neutral ink, white space, and a restrained Appaloft blue accent. Avoid text inside artwork, fake UI screenshots, logos, watermarks, ornamental gradients, and isolated oversized resource icons.
+- Collection empty states may map several resource tones to a small neutral illustration set. The illustration is decorative context, never the only explanation: preserve the semantic title, description, and primary action, use an empty `alt`, and keep the artwork responsive without page overflow.
 - Overview pages must not place variable-height primary content beside a vertical stack of summary
   cards when that stack would delay the next full-width section. Keep equal-role summaries in their
   own responsive grid: stretch cards to the shared desktop row, then let them return to natural
