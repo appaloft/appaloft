@@ -1,4 +1,5 @@
 import { type DeploymentTargetId } from "../shared/identifiers";
+import { type PortNumber } from "../shared/numeric-values";
 import { type HostAddress, type ProviderKey } from "../shared/text-values";
 import { type DeploymentTarget, type DeploymentTargetState } from "./deployment-target";
 
@@ -8,6 +9,30 @@ export interface DeploymentTargetSelectionSpecVisitor<TResult> {
     query: TResult,
     spec: DeploymentTargetByProviderAndHostSpec,
   ): TResult;
+  visitNonDeletedDeploymentTargetByEndpoint(
+    query: TResult,
+    spec: NonDeletedDeploymentTargetByEndpointSpec,
+  ): TResult;
+}
+
+export class NonDeletedDeploymentTargetByEndpointSpec implements DeploymentTargetSelectionSpec {
+  private constructor(
+    public readonly providerKey: ProviderKey,
+    public readonly host: HostAddress,
+    public readonly port: PortNumber,
+  ) {}
+
+  static create(
+    providerKey: ProviderKey,
+    host: HostAddress,
+    port: PortNumber,
+  ): NonDeletedDeploymentTargetByEndpointSpec {
+    return new NonDeletedDeploymentTargetByEndpointSpec(providerKey, host, port);
+  }
+
+  accept<TResult>(query: TResult, visitor: DeploymentTargetSelectionSpecVisitor<TResult>): TResult {
+    return visitor.visitNonDeletedDeploymentTargetByEndpoint(query, this);
+  }
 }
 
 export interface DeploymentTargetMutationSpecVisitor<TResult> {

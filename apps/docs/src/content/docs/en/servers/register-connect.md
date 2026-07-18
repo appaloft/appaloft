@@ -65,7 +65,9 @@ Register host, port, user, credential source, and optional labels. Do not put re
 
 Common inputs:
 
-- `host`: server address.
+- `host`: one explicit hostname, IPv4 address, or IPv6 address. Raw and bracketed IPv6 are accepted
+  and stored canonically; CIDR/network prefixes, URLs, and `host:port` are rejected. Appaloft never
+  guesses a host such as `::1` from an allocated `/64`; pass `port` separately.
 - `port`: SSH port, usually 22.
 - `user`: system user.
 - credential: SSH key path, saved credential, or one-time secret input.
@@ -88,6 +90,11 @@ Common failures:
 - Permission failure: check whether the user can run required deployment commands.
 - Missing runtime: follow diagnostic instructions or select a supported provider/runtime.
 
+SSH connectivity results distinguish host resolution, unreachable network/host, authentication,
+and host-key verification failures. Appaloft passes the canonical host and port separately to
+OpenSSH; OpenSSH continues to own `known_hosts` and strict host-key checking. IPv6 endpoints are
+displayed as `[2001:db8::1]:22`.
+
 After connectivity passes, continue with [SSH credentials](/docs/en/servers/credentials/ssh-keys/) and [Proxy readiness](/docs/en/servers/operations/proxy-and-terminal/).
 
 CLI examples:
@@ -99,6 +106,16 @@ appaloft server register \
   --port 22 \
   --provider generic-ssh \
   --target-kind single-server
+```
+
+IPv6 example:
+
+```bash title="Register an IPv6-only server"
+appaloft server register \
+  --name ipv6-primary \
+  --host 2001:db8::1 \
+  --port 22 \
+  --provider generic-ssh
 ```
 
 `--target-kind orchestrator-cluster` records a cluster-shaped deployment target for future

@@ -98,6 +98,7 @@ import {
   type EnvironmentKind,
   environmentKinds,
   err,
+  HostAddress,
   ok,
   type Result,
 } from "@appaloft/core";
@@ -1156,7 +1157,7 @@ function findServer(
 ): ServerSummary | undefined {
   return servers.find(
     (server) =>
-      server.host === input.host &&
+      server.host === HostAddress.rehydrate(input.host).value &&
       server.port === input.port &&
       server.providerKey === input.providerKey,
   );
@@ -3922,7 +3923,7 @@ function resolveServer(input: {
             id: existing.id,
             ...(credential ? { credential } : {}),
           },
-          label: `${existing.name} ${existing.providerKey} ${existing.host}:${existing.port}`,
+          label: `${existing.name} ${existing.providerKey} ${HostAddress.rehydrate(existing.host).formatWithPort(existing.port)}`,
         };
       }
 
@@ -3948,7 +3949,7 @@ function resolveServer(input: {
           },
           ...(credential ? { credential } : {}),
         },
-        label: `${name.trim()} ${providerKey.trim()} ${host.trim()}:${port}`,
+        label: `${name.trim()} ${providerKey.trim()} ${HostAddress.rehydrate(host.trim()).formatWithPort(port)}`,
       };
     }),
   );
