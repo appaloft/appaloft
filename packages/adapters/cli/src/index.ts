@@ -67,6 +67,11 @@ export {
 } from "./control-plane-target.js";
 export { createRemoteCliProgram } from "./remote-cli-program.js";
 export type { CliSourceLinkStore } from "./runtime.js";
+export {
+  formatSafeCliError,
+  type SafeCliErrorEvidence,
+  safeCliErrorEvidence,
+} from "./runtime.js";
 export { runStandaloneControlPlaneCli } from "./standalone-control-plane.js";
 
 export function createCliProgram(input: CliProgramInput): CliProgram {

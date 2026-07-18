@@ -20,6 +20,8 @@
   never creates durable markers, migrates schema, recovers stale locks, or uploads the mirror.
   Download and upload use private temporary archive files so mirror size does not become process
   output-buffer or input-buffer pressure; cleanup removes those files on every exit path.
+- Add an opt-in safe JSON CLI error renderer for unattended maintenance. It serializes a fixed
+  allowlist of stable classification fields and replaces unknown failures with an unclassified code.
 - Extend Deployment Proof with value-free planned/observed environment key-set evidence.
 
 ## Persistence And Migration
@@ -41,6 +43,8 @@
 - Verify SSH plan leaves the remote sync revision unchanged and apply retains backup/revision fencing.
 - Verify SSH archive download uses a file sink and upload uses a file source rather than returning or
   accepting the complete compressed archive as an in-memory byte array.
+- Verify the safe CLI error contract omits arbitrary messages, stderr, hosts, paths, ciphertext, and
+  secret markers for both domain and unknown failures.
 
 ## Risks And Deferred Gaps
 
