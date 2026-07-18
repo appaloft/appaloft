@@ -325,6 +325,43 @@ describe("control-plane secret rotation", () => {
       expect(JSON.stringify(plan)).not.toContain("42703");
     }));
 
+  test("[CPS-DIAG-023] SQLSTATE classes preserve fixed safe source categories", () =>
+    withDatabase(async (database) => {
+      const failingDatabase = new Proxy(database.db, {
+        get(target, property) {
+          if (property === "selectFrom") {
+            return (table: string) => {
+              if (table === "environment_variables") {
+                throw Object.assign(new Error("private operator detail"), { code: "42883" });
+              }
+              const selectFrom = target.selectFrom.bind(target) as unknown as (
+                source: string,
+              ) => ReturnType<typeof target.selectFrom>;
+              return selectFrom(table);
+            };
+          }
+          const value = Reflect.get(target, property, target);
+          return typeof value === "function" ? value.bind(target) : value;
+        },
+      }) as typeof database.db;
+      const { rotatingProtector } = protectors();
+
+      const plan = await new PgControlPlaneSecretRotationService(
+        failingDatabase,
+        rotatingProtector,
+      ).plan();
+
+      expect(plan._unsafeUnwrapErr()).toMatchObject({
+        code: "control_plane_secret_rotation_source_read_failed",
+        details: {
+          phase: "control-plane-secret-rotation",
+          reason: "environment-variables-schema-incompatible",
+        },
+      });
+      expect(JSON.stringify(plan)).not.toContain("private operator detail");
+      expect(JSON.stringify(plan)).not.toContain("42883");
+    }));
+
   test("[CPS-FAIL-003][CPS-ROTATE-006] same key id with wrong material is unreadable, never already-active", () =>
     withDatabase(async (database) => {
       const { oldProtector } = protectors();

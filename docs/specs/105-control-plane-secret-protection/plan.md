@@ -32,6 +32,8 @@
   classify exact PostgreSQL `42P01` as empty without weakening any other source failure.
 - Reduce a bounded SQLSTATE allowlist to fixed safe operational categories while keeping raw codes,
   database messages, queries, relations, hosts, and paths outside the published contract.
+- Classify allowlisted SQLSTATE classes rather than a few exact members, while preserving exact
+  `42P01` as the only undefined-table empty-source signal.
 - Extend Deployment Proof with value-free planned/observed environment key-set evidence.
 
 ## Persistence And Migration

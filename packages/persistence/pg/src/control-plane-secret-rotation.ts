@@ -111,19 +111,12 @@ function sqlStateCode(error: unknown): string | undefined {
 }
 
 function sourceReadFailureReason(source: string, error: unknown): string {
-  switch (sqlStateCode(error)) {
-    case "42703":
-      return `${source}-schema-incompatible`;
-    case "0A000":
-      return `${source}-feature-unsupported`;
-    case "55000":
-      return `${source}-state-unavailable`;
-    case "XX001":
-    case "XX002":
-      return `${source}-storage-corrupt`;
-    default:
-      return `${source}-read-failed`;
-  }
+  const code = sqlStateCode(error);
+  if (code?.startsWith("42") && code !== "42P01") return `${source}-schema-incompatible`;
+  if (code?.startsWith("0A")) return `${source}-feature-unsupported`;
+  if (code?.startsWith("55")) return `${source}-state-unavailable`;
+  if (code?.startsWith("XX")) return `${source}-storage-corrupt`;
+  return `${source}-read-failed`;
 }
 
 async function readOptionalRotationSource<T>(
