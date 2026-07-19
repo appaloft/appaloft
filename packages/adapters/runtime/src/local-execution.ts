@@ -2920,6 +2920,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
           labels: dockerLabelsFromAssignments(target.labels),
           ...(target.networkName ? { networkName: target.networkName } : {}),
         })),
+        sharedNetworkNames: [...runtimeEnv.value.networkNames],
         mounts: storageMounts.value,
         volumeRealizations: storageVolumeRealizations.value,
         environmentKeys: Object.keys(runtimeEnvPlaceholders),

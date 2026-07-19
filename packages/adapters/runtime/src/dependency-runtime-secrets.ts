@@ -25,6 +25,42 @@ export interface DependencyRuntimeEnvironment {
   env: NodeJS.ProcessEnv;
   redactions: string[];
   dependencyTargetNames: Set<string>;
+  networkNames: Set<string>;
+}
+
+const dockerManagedDependencyNetworkName = "appaloft-edge";
+
+function safeDockerToken(input: string): string {
+  const normalized = input
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9_.-]/g, "-")
+    .replaceAll(/^[^a-z0-9]+|[^a-z0-9]+$/g, "");
+  return normalized || "resource";
+}
+
+function shortDockerToken(input: string, maxLength: number): string {
+  const token = safeDockerToken(input);
+  return token.length <= maxLength ? token : token.slice(0, maxLength).replaceAll(/[-_.]+$/g, "");
+}
+
+function managedDependencyNetworkName(input: {
+  reference: DeploymentDependencyBindingReferenceState;
+  secretValue: string;
+}): string | undefined {
+  let hostname: string;
+  try {
+    hostname = new URL(input.secretValue).hostname;
+  } catch {
+    return undefined;
+  }
+  const hostSegment = input.reference.kind.value === "object-storage"
+    ? "minio"
+    : input.reference.kind.value;
+  const expectedHostname = shortDockerToken(
+    `appaloft-${hostSegment}-${input.reference.dependencyResourceId.value}`,
+    58,
+  );
+  return hostname === expectedHostname ? dockerManagedDependencyNetworkName : undefined;
 }
 
 const appaloftDeploymentRuntimeEnvironmentKeys = new Set([
@@ -160,6 +196,7 @@ export async function resolveDependencyRuntimeEnvironment(input: {
   } as NodeJS.ProcessEnv;
   const redactions: string[] = [];
   const dependencyTargetNames = new Set<string>();
+  const networkNames = new Set<string>();
 
   const materializedSnapshotVariables: Array<{ key: string; value: string; isSecret: boolean }> = [];
   for (const variable of state.environmentSnapshot.variables) {
@@ -208,6 +245,13 @@ export async function resolveDependencyRuntimeEnvironment(input: {
       env[reference.targetName.value] = resolved.value;
       redactions.push(resolved.value);
       dependencyTargetNames.add(reference.targetName.value);
+      const networkName = managedDependencyNetworkName({
+        reference,
+        secretValue: resolved.value,
+      });
+      if (networkName) {
+        networkNames.add(networkName);
+      }
     }
   }
 
@@ -215,5 +259,5 @@ export async function resolveDependencyRuntimeEnvironment(input: {
     env.PORT = String(input.port);
   }
 
-  return ok({ env, redactions, dependencyTargetNames });
+  return ok({ env, redactions, dependencyTargetNames, networkNames });
 }

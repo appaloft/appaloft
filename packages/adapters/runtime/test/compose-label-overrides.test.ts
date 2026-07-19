@@ -98,6 +98,23 @@ describe("compose ownership label overrides", () => {
     expect(script).toContain('    name: "appaloft-edge"');
   });
 
+  test("[DEP-BIND-SECRET-RESOLVE-008] attaches every Compose service to a managed dependency network", () => {
+    const script = renderComposeOwnershipLabelOverrideScript({
+      composeFile: "/srv/app/docker-compose.yml",
+      overrideFile: "/srv/app/.appaloft.compose.labels.override.yml",
+      labels: dockerLabelsFromAssignments(["appaloft.managed=true"]),
+      targetServiceName: "web",
+      targetLabels: dockerLabelsFromAssignments(["traefik.enable=true"]),
+      targetNetworkName: "appaloft-edge",
+      sharedNetworkNames: ["appaloft-edge"],
+      quote: shellQuote,
+    });
+
+    expect(script).toContain("managed dependency networks");
+    expect(script.match(/      - \"appaloft-edge\"/g)).toHaveLength(1);
+    expect(script.match(/  \"appaloft-edge\":/g)).toHaveLength(1);
+  });
+
   test("[ROUTE-TLS-ENTRY-023] scopes route labels to multiple compose services", () => {
     const script = renderComposeOwnershipLabelOverrideScript({
       composeFile: "/srv/app/docker-compose.yml",
