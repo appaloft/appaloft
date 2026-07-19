@@ -149,13 +149,23 @@ function hasDbMigrateCommand(argv: readonly string[]): boolean {
   return dbIndex !== -1 && argv[dbIndex + 1] === "migrate";
 }
 
+function hasEnvironmentVariableMutationCommand(argv: readonly string[]): boolean {
+  const environmentIndex = argv.indexOf("env");
+  if (environmentIndex === -1) {
+    return false;
+  }
+
+  return argv[environmentIndex + 1] === "set" || argv[environmentIndex + 1] === "unset";
+}
+
 function requiresRemotePgliteStateCommand(argv: readonly string[]): boolean {
   return (
     hasDeployCommand(argv) ||
     hasSourceLinkRelinkCommand(argv) ||
     hasPreviewCleanupCommand(argv) ||
     hasSecretRotationCommand(argv) ||
-    hasDbMigrateCommand(argv)
+    hasDbMigrateCommand(argv) ||
+    hasEnvironmentVariableMutationCommand(argv)
   );
 }
 
