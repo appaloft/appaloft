@@ -1198,6 +1198,9 @@ export class CreateDeploymentUseCase {
         const scheduled = yield* await scheduler.scheduleAcceptedDeployment(repositoryContext, {
           operationKey: recovery?.ownerLabel ?? "deployments.create",
           acceptedAt: deploymentState.startedAt?.value ?? deploymentState.createdAt.value,
+          ...(projectState.organizationId
+            ? { ownerOrganizationId: projectState.organizationId.value }
+            : {}),
           deployment: {
             id: deploymentState.id.value,
             projectId: deploymentState.projectId.value,

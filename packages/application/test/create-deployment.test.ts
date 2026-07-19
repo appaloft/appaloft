@@ -1902,7 +1902,7 @@ describe("CreateDeploymentUseCase", () => {
     });
   });
 
-  test("[PROC-DELIVERY-WORKER-021A] worker restores tenant context captured with deployment work", async () => {
+  test("[PROC-DELIVERY-WORKER-021A] worker restores the authoritative project owner tenant", async () => {
     const durableWork = new RecordingDurableWorkAdapter();
     const executionBackend = new CountingExecutionBackend();
     const {
@@ -1917,22 +1917,15 @@ describe("CreateDeploymentUseCase", () => {
       durableWorkQueueAdapter: durableWork,
       executionBackend,
     });
-    const tenantContext: ExecutionContext = {
-      ...context,
-      tenant: {
-        tenantId: "tenant_demo",
-        organizationId: "org_demo",
-      },
-    };
-    const accepted = await createDeploymentUseCase.execute(tenantContext, {
+    const accepted = await createDeploymentUseCase.execute(context, {
       ...createDeploymentInput,
       executionMode: "detached",
     });
     expect(accepted.isOk()).toBe(true);
     if (accepted.isErr()) throw new Error(accepted.error.message);
     expect(durableWork.items.get(`dw_deployment_${accepted.value.id}`)?.safeDetails).toMatchObject({
-      tenantId: "tenant_demo",
-      tenantOrganizationId: "org_demo",
+      tenantId: "org_self_hosted",
+      tenantOrganizationId: "org_self_hosted",
     });
 
     const handler = new DeploymentDurableWorkHandler(
@@ -1963,8 +1956,8 @@ describe("CreateDeploymentUseCase", () => {
 
     expect(drained.isOk()).toBe(true);
     expect(executionBackend.lastContext?.tenant).toEqual({
-      tenantId: "tenant_demo",
-      organizationId: "org_demo",
+      tenantId: "org_self_hosted",
+      organizationId: "org_self_hosted",
       source: "durable-work-item",
     });
   });

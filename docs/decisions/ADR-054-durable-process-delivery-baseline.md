@@ -39,6 +39,9 @@ Every accepted long-running workflow that moves to durable delivery must define:
 - failure visibility through `operator-work.list` / `operator-work.show`;
 - safe details that exclude secrets, raw provider payloads, shell output, private key paths, and
   environment values;
+- the authoritative owner identity needed to restore tenant context after handoff; organization-
+  owned work must persist the owning aggregate's organization id rather than an ambient or default
+  request tenant;
 - retention/prune behavior through existing operator-work retention commands or a governed
   operation-specific retention command.
 

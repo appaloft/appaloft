@@ -168,6 +168,9 @@ The command must perform or delegate these admission steps before returning acce
 17. Create durable deployment state.
     When a previous same-resource runtime-owning deployment exists, the new deployment state must
     record the explicit superseded deployment id that cleanup and replacement logic may touch.
+    When execution is detached, the durable work handoff must capture the resolved Project
+    `organizationId` as its tenant owner. An ambient or default request tenant must not replace the
+    authoritative Project owner used when the worker restores execution context.
 18. Publish or record `deployment-requested`.
 19. Return `ok({ id })`.
 
@@ -436,8 +439,9 @@ Allowed entry differences:
   source-package, deployment-profile bootstrap, SSH-state, or prompt work. Normal CLI target
   selection may still inspect repository `controlPlane` config before dispatch.
 - The namespaced surface submits detached durable work when a remote control-plane profile is
-  selected. In pure local mode it executes synchronously and rejects the CLI invocation unless the
-  deployment reaches `succeeded`.
+  selected. The handoff preserves the resolved Project owner for worker-side tenant restoration. In
+  pure local mode it executes synchronously and rejects the CLI invocation unless the deployment
+  reaches `succeeded`.
 - Web can provide UX preflight validation and Quick Deploy input collection before dispatch.
 - API remains strict and non-interactive.
 - Stream/progress APIs can expose technical progress.
