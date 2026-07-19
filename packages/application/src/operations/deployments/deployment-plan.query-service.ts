@@ -99,6 +99,7 @@ interface DomainBindingRouteGroup {
   pathPrefix: DomainRouteBindingCandidate["pathPrefix"];
   pathHandling?: DomainRouteBindingCandidate["pathHandling"];
   tlsMode: DomainRouteBindingCandidate["tlsMode"];
+  targetServiceName?: string;
   redirectTo?: string;
   redirectStatus?: 301 | 302 | 307 | 308;
 }
@@ -121,6 +122,7 @@ function domainBindingRouteGroups(
         pathPrefix: binding.pathPrefix,
         pathHandling: binding.pathHandling ?? "preserve",
         tlsMode: binding.tlsMode,
+        ...(binding.targetServiceName ? { targetServiceName: binding.targetServiceName } : {}),
         redirectTo: binding.redirectTo,
         redirectStatus: binding.redirectStatus ?? 308,
       });
@@ -128,7 +130,7 @@ function domainBindingRouteGroups(
     }
 
     const pathHandling = binding.pathHandling ?? "preserve";
-    const groupKey = `${binding.pathPrefix}\u0000${pathHandling}\u0000${binding.tlsMode}`;
+    const groupKey = `${binding.pathPrefix}\u0000${pathHandling}\u0000${binding.tlsMode}\u0000${binding.targetServiceName ?? ""}`;
     const existingIndex = groupIndexes.get(groupKey);
     if (existingIndex === undefined) {
       groupIndexes.set(groupKey, groups.length);
@@ -137,6 +139,7 @@ function domainBindingRouteGroups(
         pathPrefix: binding.pathPrefix,
         pathHandling,
         tlsMode: binding.tlsMode,
+        ...(binding.targetServiceName ? { targetServiceName: binding.targetServiceName } : {}),
       });
       continue;
     }
@@ -206,6 +209,7 @@ function requestedDeploymentWithDurableDomainBindings(
       pathPrefix: group.pathPrefix,
       pathHandling: group.pathHandling ?? "preserve",
       tlsMode: group.tlsMode,
+      ...(group.targetServiceName ? { targetServiceName: group.targetServiceName } : {}),
       ...(group.redirectTo
         ? {
             routeBehavior: "redirect" as const,

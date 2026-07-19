@@ -43,6 +43,7 @@ import {
   ResourceInjectionModeValue,
   ResourceInstanceId,
   ResourceInstanceKindValue,
+  ResourceServiceName,
   PublicDomainName,
   RoutePathPrefix,
   RuntimeArtifactIntentValue,
@@ -227,7 +228,10 @@ function imageRuntimePlan(metadata?: Record<string, string>): RuntimePlan {
   });
 }
 
-function composeRuntimePlan(metadata?: Record<string, string>): RuntimePlan {
+function composeRuntimePlan(
+  metadata?: Record<string, string>,
+  accessRoutes?: AccessRoute[],
+): RuntimePlan {
   return RuntimePlan.rehydrate({
     id: RuntimePlanId.rehydrate("rtp_swarm_compose"),
     source: baseSource(),
@@ -236,6 +240,7 @@ function composeRuntimePlan(metadata?: Record<string, string>): RuntimePlan {
     execution: RuntimeExecutionPlan.rehydrate({
       kind: ExecutionStrategyKindValue.rehydrate("docker-compose-stack"),
       composeFile: FilePathText.rehydrate("docker-compose.yml"),
+      ...(accessRoutes ? { accessRoutes } : {}),
     }),
     runtimeArtifact: RuntimeArtifactSnapshot.rehydrate({
       kind: RuntimeArtifactKindValue.rehydrate("compose-project"),
@@ -511,6 +516,49 @@ describe("renderDockerSwarmRuntimeIntent", () => {
       targetServiceName: "web",
     });
     expect(result._unsafeUnwrap().stackName).toBe("appaloft-res-api-dst-preview-dep-124");
+  });
+
+  test("[ROUTE-TLS-ENTRY-023] promotes compose routes on their selected services", () => {
+    const runtimePlan = composeRuntimePlan(
+      { swarmTargetService: "web" },
+      [
+        AccessRoute.rehydrate({
+          proxyKind: EdgeProxyKindValue.rehydrate("traefik"),
+          domains: [PublicDomainName.rehydrate("app.example.com")],
+          pathPrefix: RoutePathPrefix.rehydrate("/"),
+          tlsMode: TlsModeValue.rehydrate("auto"),
+          targetPort: PortNumber.rehydrate(3000),
+          targetServiceName: ResourceServiceName.rehydrate("web"),
+        }),
+        AccessRoute.rehydrate({
+          proxyKind: EdgeProxyKindValue.rehydrate("traefik"),
+          domains: [PublicDomainName.rehydrate("app.example.com")],
+          pathPrefix: RoutePathPrefix.rehydrate("/api"),
+          tlsMode: TlsModeValue.rehydrate("auto"),
+          targetPort: PortNumber.rehydrate(3001),
+          targetServiceName: ResourceServiceName.rehydrate("api"),
+        }),
+      ],
+    );
+    const intent = renderDockerSwarmRuntimeIntent({
+      runtimePlan,
+      identity: {
+        resourceId: "res_platform",
+        deploymentId: "dep_platform",
+        targetId: "dtg_swarm_1",
+        destinationId: "dst_prod",
+      },
+    })._unsafeUnwrap();
+
+    const plan = renderDockerSwarmApplyPlan(intent)._unsafeUnwrap();
+    const createCommand = plan.steps.find((step) => step.step === "deploy-candidate-stack")?.command ?? "";
+    const promoteCommand = plan.steps.find((step) => step.step === "promote-route-target")?.command ?? "";
+
+    expect(createCommand).toContain('"api":');
+    expect(createCommand).toContain('"appaloft-edge"');
+    expect(promoteCommand).toContain("appaloft-res-platform-dst-prod-dep-platform_web");
+    expect(promoteCommand).toContain("appaloft-res-platform-dst-prod-dep-platform_api");
+    expect(promoteCommand).toContain("loadbalancer.server.port=3001");
   });
 
   test("[SWARM-TARGET-SECRET-001] keeps registry auth metadata redacted while requiring Swarm registry auth", () => {

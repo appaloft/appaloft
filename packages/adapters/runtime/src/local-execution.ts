@@ -49,6 +49,7 @@ import {
 } from "@appaloft/core";
 import {
   createEdgeProxyEnsurePlan,
+  createComposeProxyRouteRealizationPlan,
   createProxyReloadPlan,
   createProxyRouteRealizationPlan,
   proxyBootstrapOptionsFromEnv,
@@ -2789,15 +2790,16 @@ export class LocalExecutionBackend implements ExecutionBackend {
     const resourceAccessFailureRenderer = this.resourceAccessFailureRenderer?.();
     const proxyRoutePlanResult =
       this.edgeProxyProviderRegistry && composePort
-        ? await createProxyRouteRealizationPlan({
+        ? await createComposeProxyRouteRealizationPlan({
             providerRegistry: this.edgeProxyProviderRegistry,
             context: { correlationId: context.requestId },
             deploymentId: state.id.value,
             port: composePort,
             accessRoutes,
+            ...(targetServiceName ? { defaultTargetServiceName: targetServiceName } : {}),
             ...(resourceAccessFailureRenderer ? { resourceAccessFailureRenderer } : {}),
           })
-        : ok(null);
+        : ok({ routePlan: null, targets: [] });
     if (proxyRoutePlanResult.isErr()) {
       return ok({
         deployment: this.applyFailure(deployment, {
@@ -2902,10 +2904,20 @@ export class LocalExecutionBackend implements ExecutionBackend {
         overrideFile: composeOwnershipOverrideFile,
         labels: composeOwnershipLabels,
         ...(targetServiceName ? { targetServiceName } : {}),
-        targetLabels: dockerLabelsFromAssignments(proxyRoutePlanResult.value?.labels ?? []),
-        ...(proxyRoutePlanResult.value?.networkName
-          ? { targetNetworkName: proxyRoutePlanResult.value.networkName }
+        targetLabels: dockerLabelsFromAssignments(
+          proxyRoutePlanResult.value.targets.length === 0
+            ? (proxyRoutePlanResult.value.routePlan?.labels ?? [])
+            : [],
+        ),
+        ...(proxyRoutePlanResult.value.targets.length === 0 &&
+        proxyRoutePlanResult.value.routePlan?.networkName
+          ? { targetNetworkName: proxyRoutePlanResult.value.routePlan.networkName }
           : {}),
+        serviceTargets: proxyRoutePlanResult.value.targets.map((target) => ({
+          serviceName: target.serviceName,
+          labels: dockerLabelsFromAssignments(target.labels),
+          ...(target.networkName ? { networkName: target.networkName } : {}),
+        })),
         mounts: storageMounts.value,
         volumeRealizations: storageVolumeRealizations.value,
         environmentKeys: Object.keys(runtimeEnvPlaceholders),
@@ -3035,7 +3047,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
           context: { correlationId: context.requestId },
           deploymentId: state.id.value,
           accessRoutes,
-          routePlan: proxyRoutePlanResult.value,
+          routePlan: proxyRoutePlanResult.value.routePlan,
           reason: "route-realization",
         })
       : ok(null);

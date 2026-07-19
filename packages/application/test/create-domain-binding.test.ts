@@ -32,6 +32,8 @@ import {
   ResourceId,
   ResourceKindValue,
   ResourceName,
+  ResourceServiceKindValue,
+  ResourceServiceName,
   type Result,
   RoutePathPrefix,
   TlsModeValue,
@@ -123,6 +125,22 @@ describe("CreateDomainBindingCommand input", () => {
     expect(command._unsafeUnwrap().serverId).toBeUndefined();
     expect(command._unsafeUnwrap().destinationId).toBeUndefined();
   });
+
+  test("ROUTE-TLS-ENTRY-023 accepts a compose service route target", () => {
+    const command = CreateDomainBindingCommand.create({
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      domainName: "app.example.com",
+      pathPrefix: "/api",
+      proxyKind: "traefik",
+      tlsMode: "auto",
+      targetServiceName: "api",
+    });
+
+    expect(command.isOk()).toBe(true);
+    expect(command._unsafeUnwrap().targetServiceName).toBe("api");
+  });
 });
 
 class RecordingProcessAttemptRecorder implements ProcessAttemptRecorder {
@@ -171,6 +189,7 @@ async function seedRoutingContext(input?: {
   destinationServerId?: string;
   resourceDestinationId?: string;
   guard?: OperationGuardPort;
+  serviceNames?: Array<"web" | "api">;
 }) {
   const context = createTestContext();
   const repositoryContext = toRepositoryContext(context);
@@ -218,7 +237,15 @@ async function seedRoutingContext(input?: {
     environmentId: EnvironmentId.rehydrate(input?.resourceEnvironmentId ?? "env_demo"),
     destinationId: DestinationId.rehydrate(input?.resourceDestinationId ?? "dst_demo"),
     name: ResourceName.rehydrate("web"),
-    kind: ResourceKindValue.rehydrate("application"),
+    kind: ResourceKindValue.rehydrate(input?.serviceNames ? "compose-stack" : "application"),
+    ...(input?.serviceNames
+      ? {
+          services: input.serviceNames.map((name) => ({
+            name: ResourceServiceName.rehydrate(name),
+            kind: ResourceServiceKindValue.rehydrate(name),
+          })),
+        }
+      : {}),
     createdAt: CreatedAt.rehydrate(clock.now()),
   })._unsafeUnwrap();
 
@@ -267,6 +294,52 @@ async function seedRoutingContext(input?: {
 }
 
 describe("CreateDomainBindingUseCase", () => {
+  test("ROUTE-TLS-ENTRY-023 persists and publishes a validated compose service target", async () => {
+    const { context, domainBindings, eventBus, repositoryContext, useCase } =
+      await seedRoutingContext({ serviceNames: ["web", "api"] });
+
+    const result = await useCase.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      serverId: "srv_demo",
+      destinationId: "dst_demo",
+      domainName: "app.example.com",
+      pathPrefix: "/api",
+      proxyKind: "traefik",
+      tlsMode: "auto",
+      targetServiceName: "api",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const id = result._unsafeUnwrap().id;
+    const persisted = await domainBindings.findOne(
+      repositoryContext,
+      DomainBindingByIdSpec.create(DomainBindingId.rehydrate(id)),
+    );
+    expect(persisted?.toState().targetServiceName?.value).toBe("api");
+    expect(domainBindingRequestedEvent(eventBus.events).payload).toMatchObject({
+      domainBindingId: id,
+      targetServiceName: "api",
+    });
+
+    const rejected = await useCase.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      serverId: "srv_demo",
+      destinationId: "dst_demo",
+      domainName: "admin.example.com",
+      proxyKind: "traefik",
+      targetServiceName: "admin",
+    });
+    expect(rejected.isErr()).toBe(true);
+    expect(rejected._unsafeUnwrapErr().details).toMatchObject({
+      phase: "domain-binding-admission",
+      targetServiceName: "admin",
+    });
+  });
+
   test("DOMAIN-BINDING-VARIANT-001 creates resource-scoped bindings for route-provider backed resources", async () => {
     const {
       context,

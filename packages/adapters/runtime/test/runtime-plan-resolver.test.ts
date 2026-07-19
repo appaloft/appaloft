@@ -2577,6 +2577,57 @@ describe("DefaultRuntimePlanResolver", () => {
     ]);
   });
 
+  test("[ROUTE-TLS-ENTRY-023] resolves each compose route to its selected service port", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_compose_service_routes",
+      source: createSource({
+        kind: "compose",
+        locator: "/tmp/compose-app/docker-compose.yml",
+        displayName: "compose-app",
+      }),
+      server: { id: "srv_compose_service_routes", providerKey: "local-shell" },
+      environmentSnapshot: createEnvironmentSnapshot("snap_compose_service_routes"),
+      detectedReasoning: ["durable compose service routes"],
+      requestedDeployment: {
+        method: "docker-compose",
+        port: 3000,
+        targetServiceName: "web",
+        services: [
+          { name: "web", kind: "web", network: { internalPort: 3000 } },
+          { name: "api", kind: "api", network: { internalPort: 3001 } },
+        ],
+        accessRoutes: [
+          {
+            proxyKind: "traefik",
+            domains: ["app.example.com"],
+            pathPrefix: "/",
+            tlsMode: "auto",
+            targetServiceName: "web",
+          },
+          {
+            proxyKind: "traefik",
+            domains: ["app.example.com"],
+            pathPrefix: "/api",
+            tlsMode: "auto",
+            targetServiceName: "api",
+          },
+        ],
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap().execution.accessRoutes).toEqual([
+      expect.objectContaining({ targetServiceName: "web", targetPort: 3000 }),
+      expect.objectContaining({ targetServiceName: "api", targetPort: 3001 }),
+    ]);
+  });
+
   test("[DEP-CREATE-ADM-026] static strategy packages publish directory as static server image artifact", async () => {
     ensureReflectMetadata();
     const { DefaultRuntimePlanResolver } = await import("../src");
