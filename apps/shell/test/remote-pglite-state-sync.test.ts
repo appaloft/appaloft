@@ -520,6 +520,46 @@ describe("remote PGlite state sync", () => {
     }
   });
 
+  test("[CPS-REMOTE-035] environment variable repair targets an explicit isolated SSH runtime root", async () => {
+    const dataDir = await mkdtemp(join(tmpdir(), "appaloft-remote-env-repair-"));
+    try {
+      for (const command of ["set", "unset"] as const) {
+        const plan = resolveRemotePgliteStateSyncPlan(
+          [
+            "appaloft",
+            "env",
+            command,
+            "env_demo",
+            "APP_SECRET",
+            ...(command === "set" ? ["private-value", "--kind", "secret", "--secret"] : []),
+            "--exposure",
+            "runtime",
+            "--scope",
+            "environment",
+            "--state-backend",
+            "ssh-pglite",
+            "--server-host",
+            "203.0.113.10",
+            "--remote-runtime-root",
+            "/var/lib/appaloft/recovery/candidate-123",
+          ],
+          {},
+          testConfig(dataDir),
+        );
+
+        expect(plan.isOk()).toBe(true);
+        if (plan.isErr() || !plan.value) {
+          throw new Error(`Expected isolated remote PGlite env ${command} plan`);
+        }
+        expect(plan.value.dataRoot).toBe("/var/lib/appaloft/recovery/candidate-123/state");
+        expect(plan.value.readOnly).toBe(false);
+        expect(plan.value.target.host).toBe("203.0.113.10");
+      }
+    } finally {
+      await rm(dataDir, { recursive: true, force: true });
+    }
+  });
+
   test("[CONFIG-FILE-STATE-007] local or control-plane state skips remote PGlite sync", async () => {
     const dataDir = await mkdtemp(join(tmpdir(), "appaloft-remote-sync-"));
     try {

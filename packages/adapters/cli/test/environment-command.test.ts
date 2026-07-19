@@ -25,6 +25,110 @@ function ensureReflectMetadata(): void {
 }
 
 describe("CLI environment commands", () => {
+  test("[CPS-REMOTE-035] environment variable commands accept isolated SSH state options", async () => {
+    ensureReflectMetadata();
+    const {
+      SetEnvironmentVariableCommand,
+      UnsetEnvironmentVariableCommand,
+      createExecutionContext,
+    } = await import("@appaloft/application");
+    const { createCliProgram } = await import("../src");
+    const commands: AppCommand<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, command: AppCommand<T>) => {
+        commands.push(command as AppCommand<unknown>);
+        return ok({ environmentId: "env_demo", key: "APP_SECRET" } as T);
+      },
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, _query: AppQuery<T>) => ok({} as T),
+    } as unknown as QueryBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) =>
+        createExecutionContext({
+          ...input,
+          requestId: "req_cli_environment_remote_repair_test",
+        }),
+    };
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory,
+    });
+    const remoteOptions = [
+      "--state-backend",
+      "ssh-pglite",
+      "--server-host",
+      "203.0.113.10",
+      "--server-port",
+      "22",
+      "--server-ssh-username",
+      "deploy",
+      "--server-ssh-private-key-file",
+      "/tmp/appaloft-test-key",
+      "--remote-runtime-root",
+      "/var/lib/appaloft/recovery/candidate-123",
+    ];
+
+    const writeStdout = process.stdout.write;
+    try {
+      process.stdout.write = (() => true) as typeof process.stdout.write;
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "env",
+        "set",
+        "env_demo",
+        "APP_SECRET",
+        "private-value",
+        "--kind",
+        "secret",
+        "--exposure",
+        "runtime",
+        "--scope",
+        "environment",
+        "--secret",
+        ...remoteOptions,
+      ]);
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "env",
+        "unset",
+        "env_demo",
+        "APP_SECRET",
+        "--exposure",
+        "runtime",
+        "--scope",
+        "environment",
+        ...remoteOptions,
+      ]);
+    } finally {
+      process.stdout.write = writeStdout;
+    }
+
+    expect(commands).toHaveLength(2);
+    expect(commands[0]).toBeInstanceOf(SetEnvironmentVariableCommand);
+    expect(commands[0]).toMatchObject({
+      environmentId: "env_demo",
+      key: "APP_SECRET",
+      value: "private-value",
+      kind: "secret",
+      exposure: "runtime",
+      scope: "environment",
+      isSecret: true,
+    });
+    expect(commands[1]).toBeInstanceOf(UnsetEnvironmentVariableCommand);
+    expect(commands[1]).toMatchObject({
+      environmentId: "env_demo",
+      key: "APP_SECRET",
+      exposure: "runtime",
+      scope: "environment",
+    });
+  });
+
   test("[ENV-LIFE-RENAME-ENTRY-001] environment rename dispatches the application command", async () => {
     ensureReflectMetadata();
     const { RenameEnvironmentCommand, createExecutionContext } = await import(
