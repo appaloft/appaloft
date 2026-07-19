@@ -9733,7 +9733,7 @@ export interface RequestedDeploymentStorageMount {
 }
 
 export interface RequestedDeploymentServiceSource {
-  type?: "git" | "image";
+  type?: "git" | "github" | "image";
   repository?: string;
   image?: string;
   gitRef?: string;
@@ -9951,7 +9951,7 @@ export interface DeploymentConfiguredResource {
 }
 
 export interface DeploymentConfiguredSource {
-  type?: "git" | "image";
+  type?: "git" | "github" | "image";
   repository?: string;
   image?: string;
   gitRef?: string;

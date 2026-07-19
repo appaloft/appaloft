@@ -402,6 +402,20 @@ function isSafeGitRepositoryUrl(value: string): boolean {
   }
 }
 
+function isGitHubHttpsRepositoryUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value.trim());
+    const segments = parsed.pathname.split("/").filter(Boolean);
+    return (
+      parsed.protocol === "https:" &&
+      parsed.hostname.toLowerCase() === "github.com" &&
+      segments.length === 2
+    );
+  } catch {
+    return false;
+  }
+}
+
 function normalizeImageReference(value: string): string {
   return value
     .trim()
@@ -449,7 +463,7 @@ function isSafeDockerImageReference(value: string): boolean {
 
 export const appaloftDeploymentSourceConfigSchema = z
   .object({
-    type: z.enum(["git", "image"]).optional().describe("Repository source kind."),
+    type: z.enum(["git", "github", "image"]).optional().describe("Repository source kind."),
     repository: nonEmptyStringSchema
       .refine(isSafeGitRepositoryUrl, sourceRepositoryUrlError)
       .optional()
@@ -484,11 +498,25 @@ export const appaloftDeploymentSourceConfigSchema = z
   })
   .strict()
   .superRefine((value, context) => {
-    if (value.type === "git" && !value.repository) {
+    if ((value.type === "git" || value.type === "github") && !value.repository) {
       context.addIssue({
         code: "custom",
         path: ["repository"],
-        message: "config_source_resolution: source.repository is required when source.type is git",
+        message:
+          "config_source_resolution: source.repository is required when source.type is git or github",
+      });
+    }
+
+    if (
+      value.type === "github" &&
+      value.repository &&
+      !isGitHubHttpsRepositoryUrl(value.repository)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["repository"],
+        message:
+          "config_source_resolution: source.type github requires a GitHub HTTPS repository URL",
       });
     }
 

@@ -850,6 +850,34 @@ describe("CLI deployment config entry workflow", () => {
       kind: "docker-image",
       locator: "ghcr.io/acme/api:1.7.3",
     });
+
+    const githubSeed = deploymentPromptSeedFromConfig({
+      source: {
+        type: "github",
+        repository: "https://github.com/acme/private-app.git",
+        gitRef: "main",
+      },
+      runtime: {
+        strategy: "docker-compose",
+        dockerComposeFilePath: "compose.yaml",
+      },
+    });
+    expect(githubSeed.sourceProfile).toMatchObject({
+      kind: "git-github-app",
+      repositoryFullName: "acme/private-app",
+      gitRef: "main",
+    });
+    expect(
+      sourceBindingForDeploymentInput(
+        githubSeed.sourceLocator ?? "",
+        githubSeed.deploymentMethod ?? "docker-compose",
+        githubSeed.sourceProfile,
+      ),
+    ).toMatchObject({
+      kind: "git-github-app",
+      locator: "https://github.com/acme/private-app.git",
+      repositoryFullName: "acme/private-app",
+    });
   });
 
   test("[CONFIG-FILE-PROFILE-003] runtime healthCheckPath produces a reusable health policy seed", async () => {
