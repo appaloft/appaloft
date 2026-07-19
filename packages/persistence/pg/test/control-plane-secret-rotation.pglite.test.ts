@@ -933,4 +933,76 @@ describe("control-plane secret rotation", () => {
       expect(migrated._unsafeUnwrap().rotatedRecordCount).toBe(1);
       expect(await envelopeStates(database, rotatingProtector)).toEqual(["active-key"]);
     }));
+
+  test("[CPS-COMPAT-036] empty legacy secret remains readable after rotation", () =>
+    withDatabase(async (database) => {
+      await database.db
+        .insertInto("projects")
+        .values({
+          id: "prj_empty_secret",
+          name: "Empty secret",
+          slug: "empty-secret",
+          created_at: "2026-01-01T00:00:00.000Z",
+        })
+        .execute();
+      await database.db
+        .insertInto("environments")
+        .values({
+          id: "env_empty_secret",
+          project_id: "prj_empty_secret",
+          name: "production",
+          kind: "production",
+          created_at: "2026-01-01T00:00:00.000Z",
+        })
+        .execute();
+      await database.db
+        .insertInto("environment_variables")
+        .values({
+          id: "env_var_empty_secret",
+          environment_id: "env_empty_secret",
+          key: "EMPTY_SECRET",
+          value: "",
+          kind: "literal",
+          exposure: "runtime",
+          scope: "environment",
+          is_secret: true,
+          updated_at: "2026-01-01T00:00:00.000Z",
+        })
+        .execute();
+      const { rotatingProtector } = protectors();
+      const service = new PgControlPlaneSecretRotationService(database.db, rotatingProtector);
+      const plan = (await service.plan())._unsafeUnwrap();
+
+      expect(plan).toMatchObject({
+        stateCounts: { "legacy-plaintext": 1, unreadable: 0 },
+        requiresLegacyAuthorization: true,
+        ready: true,
+      });
+      expect(
+        (
+          await service.apply({
+            planDigest: plan.planDigest,
+            backupReference: "backup:test-empty-secret",
+            allowLegacyPlaintext: true,
+          })
+        )._unsafeUnwrap(),
+      ).toMatchObject({ rotatedRecordCount: 1, status: "applied" });
+
+      const postPlan = (await service.plan())._unsafeUnwrap();
+      expect(postPlan).toMatchObject({
+        stateCounts: { "active-key": 1, "legacy-plaintext": 0, unreadable: 0 },
+        requiresLegacyAuthorization: false,
+        ready: true,
+      });
+      const row = await database.db
+        .selectFrom("environment_variables")
+        .select("value")
+        .where("id", "=", "env_var_empty_secret")
+        .executeTakeFirstOrThrow();
+      expect(
+        (
+          await rotatingProtector.unprotect({ purpose: "environment-variable" }, row.value)
+        )._unsafeUnwrap(),
+      ).toEqual({ keyId: "key-v2", plaintext: "" });
+    }));
 });
