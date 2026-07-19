@@ -576,6 +576,30 @@ describe("Appaloft deployment config schema", () => {
     expect(explicitStrategy.success).toBe(true);
   });
 
+  test("[CONFIG-FILE-GITHUB-SOURCE-001] accepts explicit GitHub App repository sources", () => {
+    const parsed = parseAppaloftDeploymentConfig({
+      source: {
+        type: "github",
+        repository: "https://github.com/acme/private-app.git",
+        gitRef: "main",
+      },
+      runtime: {
+        strategy: "docker-compose",
+        dockerComposeFilePath: "compose.yaml",
+      },
+    });
+
+    expect(parsed.success).toBe(true);
+
+    const nonGitHub = parseAppaloftDeploymentConfig({
+      source: {
+        type: "github",
+        repository: "https://git.example.com/acme/private-app.git",
+      },
+    });
+    expect(nonGitHub.success).toBe(false);
+  });
+
   test("[CONFIG-FILE-IMAGE-SOURCE-002][CONFIG-FILE-IMAGE-SOURCE-005] rejects unsafe image source declarations", () => {
     const gitFields = parseAppaloftDeploymentConfig({
       source: {
