@@ -20,6 +20,7 @@ export class ConfigureResourceRuntimeCommandHandler
     return this.useCase.execute(context, {
       resourceId: command.resourceId,
       runtimeProfile: command.runtimeProfile,
+      ...(command.services ? { services: command.services } : {}),
       ...(command.idempotencyKey ? { idempotencyKey: command.idempotencyKey } : {}),
     });
   }
