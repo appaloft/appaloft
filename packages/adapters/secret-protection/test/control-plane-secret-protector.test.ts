@@ -115,4 +115,25 @@ describe("control-plane secret protector", () => {
       changed: true,
     });
   });
+
+  test("[CPS-COMPAT-036] empty legacy secret migrates to an authenticated envelope", async () => {
+    const protector = AesGcmControlPlaneSecretProtector.create({
+      activeKeyId: "key-v1",
+      keys: { "key-v1": key(7) },
+    })._unsafeUnwrap();
+
+    const migrated = await protector.rewrap(context, "", { allowLegacyPlaintext: true });
+    const envelope = migrated._unsafeUnwrap().envelope;
+
+    expect(migrated._unsafeUnwrap()).toMatchObject({
+      previousState: "legacy-plaintext",
+      keyId: "key-v1",
+      changed: true,
+    });
+    expect(protector.inspect(envelope)).toEqual({ state: "active-key", keyId: "key-v1" });
+    expect((await protector.unprotect(context, envelope))._unsafeUnwrap()).toEqual({
+      keyId: "key-v1",
+      plaintext: "",
+    });
+  });
 });

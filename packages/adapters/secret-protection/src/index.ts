@@ -97,7 +97,7 @@ function parseEnvelope(value: string):
     !keyId ||
     !KEY_ID_PATTERN.test(keyId) ||
     !ivEncoded ||
-    !ciphertextEncoded ||
+    ciphertextEncoded === undefined ||
     !tagEncoded
   ) {
     return { state: "unreadable" };
@@ -106,7 +106,7 @@ function parseEnvelope(value: string):
     const iv = Buffer.from(ivEncoded, "base64url");
     const ciphertext = Buffer.from(ciphertextEncoded, "base64url");
     const tag = Buffer.from(tagEncoded, "base64url");
-    if (iv.byteLength !== 12 || tag.byteLength !== 16 || ciphertext.byteLength === 0) {
+    if (iv.byteLength !== 12 || tag.byteLength !== 16) {
       return { state: "unreadable", keyId };
     }
     return { state: "parsed", keyId, iv, ciphertext, tag };
