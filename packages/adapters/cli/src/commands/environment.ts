@@ -88,6 +88,18 @@ const exposureOption = Options.choice("exposure", variableExposures);
 const scopeOption = Options.choice("scope", configScopes).pipe(Options.optional);
 const secretOption = Options.boolean("secret").pipe(Options.withDefault(false));
 const variableKindOption = Options.choice("kind", variableKinds);
+const remoteStateOptions = {
+  stateBackend: Options.choice("state-backend", [
+    "ssh-pglite",
+    "local-pglite",
+    "postgres-control-plane",
+  ] as const).pipe(Options.optional),
+  serverHost: Options.text("server-host").pipe(Options.optional),
+  serverPort: Options.text("server-port").pipe(Options.optional),
+  serverSshUsername: Options.text("server-ssh-username").pipe(Options.optional),
+  serverSshPrivateKeyFile: Options.text("server-ssh-private-key-file").pipe(Options.optional),
+  remoteRuntimeRoot: Options.text("remote-runtime-root").pipe(Options.optional),
+};
 
 type CopyDependencyDecision = NonNullable<
   DuplicateEnvironmentProfileCommandInput["dependencyDecisions"]
@@ -218,9 +230,11 @@ const setCommand = EffectCommand.make(
     exposure: exposureOption,
     scope: scopeOption,
     secret: secretOption,
+    ...remoteStateOptions,
   },
-  ({ environmentId, exposure, key, kind, scope, secret, value }) =>
-    runCommand(
+  ({ environmentId, exposure, key, kind, scope, secret, value, ...remoteOptions }) => {
+    void remoteOptions;
+    return runCommand(
       SetEnvironmentVariableCommand.create({
         environmentId,
         key,
@@ -230,7 +244,8 @@ const setCommand = EffectCommand.make(
         scope: optionalValue(scope),
         isSecret: secret,
       }),
-    ),
+    );
+  },
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.environmentSet));
 
 const unsetCommand = EffectCommand.make(
@@ -240,16 +255,19 @@ const unsetCommand = EffectCommand.make(
     key: keyArg,
     exposure: exposureOption,
     scope: scopeOption,
+    ...remoteStateOptions,
   },
-  ({ environmentId, exposure, key, scope }) =>
-    runCommand(
+  ({ environmentId, exposure, key, scope, ...remoteOptions }) => {
+    void remoteOptions;
+    return runCommand(
       UnsetEnvironmentVariableCommand.create({
         environmentId,
         key,
         exposure,
         scope: optionalValue(scope),
       }),
-    ),
+    );
+  },
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.environmentUnset));
 
 const diffCommand = EffectCommand.make(
