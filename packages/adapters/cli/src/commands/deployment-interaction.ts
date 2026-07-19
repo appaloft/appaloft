@@ -159,7 +159,16 @@ export interface DeploymentPromptSeed {
   buildTarget?: string;
   replicas?: number;
   sourceProfile?: Partial<
-    Pick<ResourceSourceInput, "gitRef" | "commitSha" | "baseDirectory" | "version" | "versionKind">
+    Pick<
+      ResourceSourceInput,
+      | "kind"
+      | "gitRef"
+      | "commitSha"
+      | "baseDirectory"
+      | "repositoryFullName"
+      | "version"
+      | "versionKind"
+    >
   >;
   sourceFingerprint?: string;
   stateBackend?: DeploymentStateBackendDecision;
@@ -445,20 +454,50 @@ export function sourceKindForDeploymentInput(
   return "local-folder";
 }
 
+function githubRepositoryFullNameFromLocator(locator: string | undefined): string | undefined {
+  if (!locator) {
+    return undefined;
+  }
+
+  try {
+    const parsed = new URL(locator);
+    if (parsed.protocol !== "https:" || parsed.hostname.toLowerCase() !== "github.com") {
+      return undefined;
+    }
+    const segments = parsed.pathname.split("/").filter(Boolean);
+    if (segments.length !== 2) {
+      return undefined;
+    }
+    return `${segments[0]}/${segments[1]?.replace(/\.git$/i, "")}`;
+  } catch {
+    return undefined;
+  }
+}
+
 export function sourceBindingForDeploymentInput(
   sourceLocator: string,
   deploymentMethod: DeploymentMethod,
   profile: Partial<
-    Pick<ResourceSourceInput, "gitRef" | "commitSha" | "baseDirectory" | "version" | "versionKind">
+    Pick<
+      ResourceSourceInput,
+      | "kind"
+      | "gitRef"
+      | "commitSha"
+      | "baseDirectory"
+      | "repositoryFullName"
+      | "version"
+      | "versionKind"
+    >
   > = {},
 ): ResourceSourceInput {
   return {
-    kind: sourceKindForDeploymentInput(sourceLocator, deploymentMethod),
+    kind: profile.kind ?? sourceKindForDeploymentInput(sourceLocator, deploymentMethod),
     locator: sourceLocator,
     displayName: inferNameFromSource(sourceLocator),
     ...(profile.gitRef ? { gitRef: profile.gitRef } : {}),
     ...(profile.commitSha ? { commitSha: profile.commitSha } : {}),
     ...(profile.baseDirectory ? { baseDirectory: profile.baseDirectory } : {}),
+    ...(profile.repositoryFullName ? { repositoryFullName: profile.repositoryFullName } : {}),
     ...(profile.version ? { version: profile.version } : {}),
     ...(profile.versionKind ? { versionKind: profile.versionKind } : {}),
   };
@@ -687,9 +726,19 @@ export function deploymentPromptSeedFromConfig(
   config: AppaloftDeploymentConfig,
 ): DeploymentPromptSeed {
   const sourceIsImage = config.source?.type === "image";
+  const sourceIsGitHub = config.source?.type === "github";
+  const githubRepositoryFullName = sourceIsGitHub
+    ? githubRepositoryFullNameFromLocator(config.source?.repository)
+    : undefined;
   const healthCheckPath =
     config.runtime?.healthCheckPath ?? config.runtime?.healthCheck?.path ?? config.health?.path;
   const sourceProfile = {
+    ...(sourceIsGitHub
+      ? {
+          kind: "git-github-app" as const,
+          ...(githubRepositoryFullName ? { repositoryFullName: githubRepositoryFullName } : {}),
+        }
+      : {}),
     ...(!sourceIsImage && config.source?.baseDirectory
       ? { baseDirectory: config.source.baseDirectory }
       : {}),

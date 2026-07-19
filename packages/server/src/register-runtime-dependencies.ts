@@ -55,6 +55,7 @@ import {
   type DefaultAccessDomainPolicyRepository,
   DefaultAccessDomainRuntimePlanResolver,
   DefaultOperationAuditSink,
+  DefaultTenantContextResolver,
   type DependencyResourceBackupPolicyRepository,
   type DeploymentProgressReporter,
   DeploymentTimelineProgressRecorder,
@@ -66,6 +67,8 @@ import {
   eventHandlerTypesFor,
   FakeDnsConnectorProviderAdapter,
   type FirstAdminPasswordIssuer,
+  type GitHubAppInstallationRepository,
+  type GitHubAppRuntime,
   getExecutionAuthProviderAccessToken,
   type IdGenerator,
   InMemoryAcceptedConnectionCapabilityPlanStore,
@@ -107,6 +110,7 @@ import {
   type StaticArtifactRouteProviderPort,
   type StaticArtifactStorePort,
   type StorageRuntimeCleaner,
+  type TenantContextResolver,
   tokens,
   toRepositoryContext,
 } from "@appaloft/application";
@@ -755,7 +759,7 @@ class NoopServerAppliedRouteStateRepository implements ServerAppliedRouteStateRe
   }
 }
 
-class RequestScopedIntegrationAuthPort implements IntegrationAuthPort {
+export class RequestScopedIntegrationAuthPort implements IntegrationAuthPort {
   private readonly storage = new AsyncLocalStorage<{
     context: ExecutionContext;
     providerAccessTokens?: {
@@ -767,6 +771,9 @@ class RequestScopedIntegrationAuthPort implements IntegrationAuthPort {
   constructor(
     private readonly authRuntime: AuthRuntime,
     private readonly logger: AppLogger,
+    private readonly githubAppInstallationRepository?: GitHubAppInstallationRepository,
+    private readonly githubAppRuntime?: GitHubAppRuntime,
+    private readonly tenantContextResolver: TenantContextResolver = new DefaultTenantContextResolver(),
   ) {}
 
   runWithRequest<T>(
@@ -802,25 +809,66 @@ class RequestScopedIntegrationAuthPort implements IntegrationAuthPort {
 
     const scope = this.storage.getStore();
 
-    if (!scope) {
+    if (scope) {
+      const scopedAccessToken = scope.providerAccessTokens?.[providerKey]?.trim();
+      if (scopedAccessToken) {
+        return scopedAccessToken;
+      }
+
+      try {
+        const userAccessToken = await this.authRuntime.getProviderAccessToken(
+          scope.request,
+          providerKey,
+        );
+        if (userAccessToken?.trim()) {
+          return userAccessToken;
+        }
+      } catch (error) {
+        this.logger.warn("integration_auth_port.get_provider_access_token_failed", {
+          requestId: context.requestId,
+          providerKey,
+          message: error instanceof Error ? error.message : "Unknown auth runtime error",
+        });
+      }
+    }
+
+    return this.getGitHubAppInstallationAccessToken(context);
+  }
+
+  private async getGitHubAppInstallationAccessToken(
+    context: ExecutionContext,
+  ): Promise<string | null> {
+    if (!this.githubAppInstallationRepository || !this.githubAppRuntime) {
       return null;
     }
 
-    const scopedAccessToken = scope.providerAccessTokens?.[providerKey]?.trim();
-    if (scopedAccessToken) {
-      return scopedAccessToken;
+    const tenant = await this.tenantContextResolver.resolveTenantContext(context);
+    if (!tenant.tenantId) {
+      return null;
+    }
+    const effectiveContext = { ...context, tenant };
+    const installation = await this.githubAppInstallationRepository.findForTenant(
+      toRepositoryContext(effectiveContext),
+      { providerKey: "github", tenantId: tenant.tenantId },
+    );
+    if (installation.isErr() || !installation.value || installation.value.suspendedAt) {
+      return null;
     }
 
-    try {
-      return await this.authRuntime.getProviderAccessToken(scope.request, providerKey);
-    } catch (error) {
-      this.logger.warn("integration_auth_port.get_provider_access_token_failed", {
+    const token = await this.githubAppRuntime.createInstallationAccessToken(effectiveContext, {
+      installationId: installation.value.installationId,
+    });
+    if (token.isErr()) {
+      this.logger.warn("integration_auth_port.github_app_installation_token_failed", {
         requestId: context.requestId,
-        providerKey,
-        message: error instanceof Error ? error.message : "Unknown auth runtime error",
+        providerKey: "github",
+        installationId: installation.value.installationId,
+        errorCode: token.error.code,
       });
       return null;
     }
+
+    return token.value.token;
   }
 }
 
@@ -1893,6 +1941,8 @@ export function registerRuntimeDependencies(
         new RequestScopedIntegrationAuthPort(
           input.authRuntime,
           dependencyContainer.resolve(tokens.logger),
+          dependencyContainer.resolve(tokens.githubAppInstallationRepository),
+          dependencyContainer.resolve(tokens.githubAppRuntime),
         ),
     ),
   });

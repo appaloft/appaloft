@@ -50,8 +50,10 @@ runtime:
 
 Rules:
 
-- `source.type` supports `git` and `image`; omitted `type` remains the existing Git-compatible
-  behavior when `source.repository` is present.
+- `source.type` supports `git`, `github`, and `image`; omitted `type` remains the existing
+  public-Git-compatible behavior when `source.repository` is present. `github` selects the tenant's
+  authorized GitHub App installation and accepts a credential-free HTTPS
+  `github.com/<owner>/<repository>` locator.
 - `source.image` is required when `source.type = image`.
 - `runtime.strategy` defaults to `prebuilt-image` when `source.type = image`.
 - If `runtime.strategy` is supplied with image source, it must be `prebuilt-image`.
