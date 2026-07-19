@@ -4139,6 +4139,40 @@ export const showDependencyResourceResponseSchema = z.object({
   generatedAt: z.string(),
 });
 
+export const inspectDependencyResourceResponseSchema = z.object({
+  schemaVersion: z.literal("dependency-resources.inspect/v1"),
+  dependencyResourceId: z.string(),
+  kind: dependencyResourceKindSchema,
+  providerKey: z.string(),
+  providerManaged: z.boolean(),
+  sourceMode: z.enum(["appaloft-managed", "imported-external"]),
+  lifecycleStatus: z.enum(["provisioning", "ready", "degraded", "deleted"]),
+  connection: dependencyResourceConnectionSummarySchema.optional(),
+  providerRealization: dependencyResourceProviderRealizationSummarySchema.optional(),
+  desiredCapabilities: z.array(dependencyResourceCapabilityRequirementSchema),
+  capabilityReadbacks: z.array(dependencyResourceCapabilityReadbackSchema),
+  safeQuery: z.object({
+    status: z.enum(["supported", "not-supported", "not-configured"]),
+    allowedFamilies: z.array(z.string()),
+    maxRows: z.number(),
+    timeoutMs: z.number(),
+  }),
+  generatedAt: z.string(),
+});
+
+export const queryDependencyResourceResponseSchema = z.object({
+  schemaVersion: z.literal("dependency-resources.query/v1"),
+  dependencyResourceId: z.string(),
+  kind: dependencyResourceKindSchema,
+  providerKey: z.string(),
+  statement: z.string(),
+  columns: z.array(z.object({ name: z.string(), type: z.string().optional() })),
+  rows: z.array(z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))),
+  rowCount: z.number(),
+  truncated: z.boolean(),
+  executedAt: z.string(),
+});
+
 export const dependencyResourceRestoreAttemptSummarySchema = z.object({
   attemptId: z.string(),
   status: z.enum(["pending", "completed", "failed"]),

@@ -239,6 +239,7 @@ import {
   ImportResourceVariablesCommand,
   IngestPreviewPullRequestEventCommand,
   IngestSourceEventCommand,
+  InspectDependencyResourceQuery,
   InspectDomainBindingDnsReadinessQuery,
   InspectRuntimeUsageQuery,
   type InspectRuntimeUsageQueryInput,
@@ -248,6 +249,7 @@ import {
   importCertificateCommandInputSchema,
   importDependencyResourceCommandInputSchema,
   importResourceVariablesCommandInputSchema,
+  inspectDependencyResourceQueryInputSchema,
   inspectDomainBindingDnsReadinessQueryInputSchema,
   inspectRuntimeUsageQueryInputSchema,
   inspectServerCapacityQueryInputSchema,
@@ -397,9 +399,11 @@ import {
   type Query,
   type QueryBus,
   QueryCapabilitiesQuery,
+  QueryDependencyResourceQuery,
   QueryEntitlementsQuery,
   queryCapabilitiesInputSchema,
   queryCapabilitiesResponseSchema,
+  queryDependencyResourceQueryInputSchema,
   queryEntitlementsInputSchema,
   queryEntitlementsResponseSchema,
   ReactivateOrganizationMemberCommand,
@@ -708,6 +712,7 @@ import {
   type InspectRuntimeUsageResponse,
   importCertificateResponseSchema,
   importResourceVariablesResponseSchema,
+  inspectDependencyResourceResponseSchema,
   inspectRuntimeUsageResponseSchema,
   inspectServerCapacityResponseSchema,
   inviteOrganizationMemberResponseSchema,
@@ -774,6 +779,7 @@ import {
   pruneSourceEventsResponseSchema,
   pruneStorageVolumeBackupResponseSchema,
   publishStaticArtifactResponseSchema,
+  queryDependencyResourceResponseSchema,
   reactivateOrganizationMemberResponseSchema,
   reconcileStaleDeploymentResponseSchema,
   redeployDeploymentResponseSchema,
@@ -6466,6 +6472,32 @@ export const showDependencyResourceProcedure = base
     executeQuery(context, ShowDependencyResourceQuery.create(input)),
   );
 
+export const inspectDependencyResourceProcedure = base
+  .route({
+    method: "GET",
+    path: "/dependency-resources/{dependencyResourceId}/inspect",
+    description: "Inspect dependency resource provider and safe-query readiness.",
+    successStatus: 200,
+  })
+  .input(inspectDependencyResourceQueryInputSchema)
+  .output(inspectDependencyResourceResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, InspectDependencyResourceQuery.create(input)),
+  );
+
+export const queryDependencyResourceProcedure = base
+  .route({
+    method: "POST",
+    path: "/dependency-resources/{dependencyResourceId}/query",
+    description: "Run an allowlisted read-only dependency resource query.",
+    successStatus: 200,
+  })
+  .input(queryDependencyResourceQueryInputSchema)
+  .output(queryDependencyResourceResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, QueryDependencyResourceQuery.create(input)),
+  );
+
 export const renameDependencyResourceProcedure = base
   .route({
     method: "POST",
@@ -7149,6 +7181,8 @@ export const appaloftOrpcRouter = {
     import: importDependencyResourceProcedure,
     list: listDependencyResourcesProcedure,
     show: showDependencyResourceProcedure,
+    inspect: inspectDependencyResourceProcedure,
+    query: queryDependencyResourceProcedure,
     rename: renameDependencyResourceProcedure,
     delete: deleteDependencyResourceProcedure,
     createBackup: createDependencyResourceBackupProcedure,
@@ -9868,6 +9902,8 @@ export function mountAppaloftOrpcRoutes(
     "/api/dependency-resources/backup-policies",
     "/api/dependency-resources/backup-policies/:policyId",
     "/api/dependency-resources/:dependencyResourceId",
+    "/api/dependency-resources/:dependencyResourceId/inspect",
+    "/api/dependency-resources/:dependencyResourceId/query",
     "/api/dependency-resources/:dependencyResourceId/backups",
     "/api/dependency-resources/:dependencyResourceId/rename",
     "/api/operator-work",

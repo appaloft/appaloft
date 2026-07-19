@@ -109,6 +109,70 @@ describe("ShellManagedDependencyProvider", () => {
     }
   });
 
+  test("[DEP-BIND-SECRET-RESOLVE-006] recovers an existing targeted Postgres secret without recreating the container", async () => {
+    const root = await createTempRoot();
+    const binDir = join(root, "bin");
+    const sshLog = join(root, "ssh.log");
+    await mkdir(binDir, { recursive: true });
+    await writeFile(
+      join(binDir, "ssh"),
+      [
+        "#!/bin/sh",
+        `printf '%s\\n' "$*" >> ${JSON.stringify(sshLog)}`,
+        'case "$*" in',
+        '  *"docker inspect"*)',
+        "    printf '%s\\n' 'POSTGRES_DB=stocktruth_postgres' 'POSTGRES_USER=app' 'POSTGRES_PASSWORD=recovered-secret'",
+        "    exit 0",
+        "    ;;",
+        "esac",
+        "exit 1",
+        "",
+      ].join("\n"),
+    );
+    await chmod(join(binDir, "ssh"), 0o755);
+
+    const previousPath = process.env.PATH;
+    process.env.PATH = `${binDir}:/usr/bin:/bin:/usr/sbin:/sbin:${previousPath ?? ""}`;
+    try {
+      const provider = new ShellManagedDependencyProvider(join(root, "data"));
+      const realized = await provider.realize(
+        { requestId: "req_dependency_provider_recovery", entrypoint: "test" },
+        {
+          dependencyResourceId: "rsi_stocktruth",
+          projectId: "prj_stocktruth",
+          environmentId: "env_production",
+          kind: "postgres",
+          providerKey: "appaloft-managed-postgres",
+          name: "StockTruth Postgres",
+          slug: "stocktruth-postgres",
+          attemptId: "dpr_recovery",
+          requestedAt: "2026-07-19T00:00:00.000Z",
+          target: {
+            serverId: "srv_production",
+            providerKey: "generic-ssh",
+            targetKind: "single-server",
+            host: "127.0.0.1",
+            port: 22,
+          },
+        },
+      );
+
+      expect(realized._unsafeUnwrap()).toMatchObject({
+        connectionSecretValue:
+          "postgres://app:recovered-secret@appaloft-postgres-rsi_stocktruth:5432/stocktruth_postgres",
+        endpoint: {
+          databaseName: "stocktruth_postgres",
+        },
+      });
+      const log = await readFile(sshLog, "utf8");
+      expect(log).toContain("docker inspect");
+      expect(log).not.toContain("docker rm");
+      expect(log).not.toContain("docker run");
+    } finally {
+      process.env.PATH = previousPath;
+    }
+  });
+
   test("[DEP-RES-REDIS-NATIVE-005] realizes targeted Redis as Docker-backed runtime secret", async () => {
     const root = await createTempRoot();
     const binDir = join(root, "bin");
