@@ -5,6 +5,7 @@ import { describe, expect, test } from "bun:test";
 import {
   buildLocalWorkspaceUploadCommand,
   buildLocalWorkspaceUploadTarExcludeArgs,
+  buildRemoteComposeFailureLogsCommand,
   buildRemoteDockerImageVersionMetadataCommand,
   buildRemotePreviewArtifactSweepCommand,
   parseDockerRepoDigestFromInspect,
@@ -50,6 +51,23 @@ describe("SSH source upload", () => {
     expect(command).toContain("else tar -czf -");
     expect(command).toContain("'--exclude' '.turbo'");
     expect(command).toContain("ssh '-p' '22' 'deploy@example.test'");
+  });
+});
+
+describe("SSH Compose failure diagnostics", () => {
+  test("[DEP-CREATE-ASYNC-004B] captures bounded stack logs before failed candidate cleanup", () => {
+    const command = buildRemoteComposeFailureLogsCommand({
+      composeFile: "/srv/stocktruth/docker-compose.production.yml",
+      additionalComposeFiles: ["/srv/stocktruth/.appaloft.compose.labels.override.yml"],
+      projectName: "appaloft-dep_failed",
+      tail: 200,
+    });
+
+    expect(command).toContain("docker compose -p 'appaloft-dep_failed'");
+    expect(command).toContain("-f '/srv/stocktruth/docker-compose.production.yml'");
+    expect(command).toContain("-f '/srv/stocktruth/.appaloft.compose.labels.override.yml'");
+    expect(command).toContain("logs --no-color --tail '200'");
+    expect(command).not.toContain("--follow");
   });
 });
 

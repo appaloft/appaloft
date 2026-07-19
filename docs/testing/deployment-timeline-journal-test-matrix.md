@@ -10,6 +10,7 @@ This matrix governs the unified Deployment Timeline Journal selected by ADR-084.
 | DEP-TIMELINE-004 | Cursor replay and follow continue strictly after the last observed timeline cursor. | Application + HTTP/oRPC | Required in Code Round. |
 | DEP-TIMELINE-005 | Domain-event retention rows are not used as the deployment UI timeline source. | Application + persistence | Required in Code Round. |
 | DEP-TIMELINE-006 | Operation catalog, generated SDK fixtures, CLI, HTTP/oRPC, and docs no longer expose `deployments.logs`, `deployments.logs.prune`, or `deployments.stream-events`. | Docs + catalog + adapters | Required in Code Round. |
+| DEP-TIMELINE-007 | SSH Compose startup failure captures a bounded, non-following, redacted stack log command before candidate cleanup. | Runtime adapter | `packages/adapters/runtime/test/ssh-source-upload.test.ts` covers the bounded command contract; `SshExecutionBackend` invokes it before failed candidate cleanup. |
 
 ## Out Of Scope
 
