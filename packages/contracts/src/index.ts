@@ -4425,6 +4425,7 @@ export const createDomainBindingInputSchema = z
     pathHandling: z.enum(["preserve", "strip"]).default("preserve"),
     proxyKind: z.enum(["none", "traefik", "caddy"]),
     tlsMode: z.enum(["auto", "disabled"]).default("auto"),
+    targetServiceName: z.string().min(1).optional(),
     redirectTo: z.string().min(1).optional(),
     redirectStatus: z
       .union([z.literal(301), z.literal(302), z.literal(307), z.literal(308)])
@@ -4472,6 +4473,7 @@ export const domainBindingSummarySchema = z.object({
   pathHandling: z.enum(["preserve", "strip"]).optional(),
   proxyKind: z.enum(["none", "traefik", "caddy"]),
   tlsMode: z.enum(["auto", "disabled"]),
+  targetServiceName: z.string().min(1).optional(),
   redirectTo: z.string().optional(),
   redirectStatus: z
     .union([z.literal(301), z.literal(302), z.literal(307), z.literal(308)])
