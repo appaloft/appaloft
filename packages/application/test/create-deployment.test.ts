@@ -507,12 +507,14 @@ class DurableProgressDeferredExecutionBackend extends HermeticExecutionBackend {
 
 class CountingExecutionBackend extends HermeticExecutionBackend {
   calls = 0;
+  lastContext?: ExecutionContext;
 
   override async execute(
     context: ExecutionContext,
     deployment: Deployment,
   ): Promise<Result<{ deployment: Deployment }>> {
     this.calls += 1;
+    this.lastContext = context;
     return super.execute(context, deployment);
   }
 }
@@ -1897,6 +1899,73 @@ describe("CreateDeploymentUseCase", () => {
       deploymentId: accepted.value.id,
       status: "succeeded",
       operationKey: "deployments.create",
+    });
+  });
+
+  test("[PROC-DELIVERY-WORKER-021A] worker restores tenant context captured with deployment work", async () => {
+    const durableWork = new RecordingDurableWorkAdapter();
+    const executionBackend = new CountingExecutionBackend();
+    const {
+      clock,
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      deployments,
+      eventBus,
+      logger,
+    } = await createDeploymentFixture(undefined, {
+      durableWorkQueueAdapter: durableWork,
+      executionBackend,
+    });
+    const tenantContext: ExecutionContext = {
+      ...context,
+      tenant: {
+        tenantId: "tenant_demo",
+        organizationId: "org_demo",
+      },
+    };
+    const accepted = await createDeploymentUseCase.execute(tenantContext, {
+      ...createDeploymentInput,
+      executionMode: "detached",
+    });
+    expect(accepted.isOk()).toBe(true);
+    if (accepted.isErr()) throw new Error(accepted.error.message);
+    expect(durableWork.items.get(`dw_deployment_${accepted.value.id}`)?.safeDetails).toMatchObject({
+      tenantId: "tenant_demo",
+      tenantOrganizationId: "org_demo",
+    });
+
+    const handler = new DeploymentDurableWorkHandler(
+      deployments,
+      new DeploymentLifecycleService(clock),
+      executionBackend,
+      eventBus,
+      logger,
+    );
+    const drained = await drainDurableWorkOnce(
+      context,
+      durableWork,
+      {
+        resolve(item) {
+          return item.kind === "deployment" ? handler : undefined;
+        },
+      },
+      {
+        worker: {
+          workerId: "deployment-worker-tenant",
+          workerGroup: "deployment-worker",
+          slot: 1,
+        },
+        now: "2026-01-01T00:00:00.000Z",
+        leaseDurationMs: 300000,
+      },
+    );
+
+    expect(drained.isOk()).toBe(true);
+    expect(executionBackend.lastContext?.tenant).toEqual({
+      tenantId: "tenant_demo",
+      organizationId: "org_demo",
+      source: "durable-work-item",
     });
   });
 

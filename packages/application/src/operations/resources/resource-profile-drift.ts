@@ -1,4 +1,9 @@
-import { type ConfigScope, type VariableExposure, type VariableKind } from "@appaloft/core";
+import {
+  type ConfigScope,
+  StaticPublishDirectory,
+  type VariableExposure,
+  type VariableKind,
+} from "@appaloft/core";
 
 import {
   type DeploymentSummary,
@@ -72,7 +77,7 @@ const profileFieldDefinitions: ProfileFieldDefinition[] = [
   runtimeField("runtimeProfile.buildCommand", "buildCommand"),
   runtimeField("runtimeProfile.startCommand", "startCommand"),
   runtimeField("runtimeProfile.runtimeName", "runtimeName"),
-  runtimeField("runtimeProfile.publishDirectory", "publishDirectory"),
+  staticPublishDirectoryRuntimeField(),
   runtimeField("runtimeProfile.dockerfilePath", "dockerfilePath"),
   runtimeField("runtimeProfile.dockerComposeFilePath", "dockerComposeFilePath"),
   runtimeField("runtimeProfile.buildTarget", "buildTarget"),
@@ -109,6 +114,21 @@ function runtimeField(
     fieldPath,
     suggestedCommand: "resources.configure-runtime",
     getValue: (profile) => primitiveValue(profile.runtimeProfile?.[key]),
+  };
+}
+
+function staticPublishDirectoryRuntimeField(): ProfileFieldDefinition {
+  return {
+    section: "runtime",
+    fieldPath: "runtimeProfile.publishDirectory",
+    suggestedCommand: "resources.configure-runtime",
+    getValue: (profile) => {
+      const value = profile.runtimeProfile?.publishDirectory;
+      if (typeof value !== "string") return primitiveValue(value);
+
+      const normalized = StaticPublishDirectory.create(value);
+      return primitiveValue(normalized.isOk() ? normalized.value.value : value);
+    },
   };
 }
 

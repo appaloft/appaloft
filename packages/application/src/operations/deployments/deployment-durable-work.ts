@@ -95,6 +95,10 @@ export class DeploymentDurableWorkScheduler {
         deploymentId: input.deployment.id,
         triggerKind: input.deployment.triggerKind,
         operationKey: input.operationKey,
+        ...(context.tenant?.tenantId ? { tenantId: context.tenant.tenantId } : {}),
+        ...(context.tenant?.organizationId
+          ? { tenantOrganizationId: context.tenant.organizationId }
+          : {}),
       },
     });
     if (recorded.isErr()) {
@@ -154,7 +158,8 @@ export class DeploymentDurableWorkHandler implements DurableWorkHandler {
       return err(deploymentIdResult.error);
     }
 
-    const repositoryContext = toRepositoryContext(context);
+    const executionContext = deploymentWorkExecutionContext(context, item);
+    const repositoryContext = toRepositoryContext(executionContext);
     const deployment = await this.deploymentRepository.findOne(
       repositoryContext,
       DeploymentByIdSpec.create(deploymentIdResult.value),
@@ -163,7 +168,7 @@ export class DeploymentDurableWorkHandler implements DurableWorkHandler {
       return err(domainError.notFound("deployment", deploymentId));
     }
 
-    const executionResult = await this.executionBackend.execute(context, deployment);
+    const executionResult = await this.executionBackend.execute(executionContext, deployment);
     if (executionResult.isErr()) {
       const failureResult = this.deploymentLifecycleService.failExecution(
         deployment,
@@ -182,7 +187,7 @@ export class DeploymentDurableWorkHandler implements DurableWorkHandler {
       }
 
       const persisted = await this.persistAndPublish(
-        context,
+        executionContext,
         repositoryContext,
         persistableDeployment.value,
       );
@@ -212,7 +217,7 @@ export class DeploymentDurableWorkHandler implements DurableWorkHandler {
     }
 
     const persisted = await this.persistAndPublish(
-      context,
+      executionContext,
       repositoryContext,
       persistableDeployment.value,
     );
@@ -293,6 +298,28 @@ export class DeploymentDurableWorkHandler implements DurableWorkHandler {
     }
     return triggerKind === "redeploy" ? "deployments.redeploy" : "deployments.create";
   }
+}
+
+function deploymentWorkExecutionContext(
+  context: ExecutionContext,
+  item: DurableWorkItemRecord,
+): ExecutionContext {
+  const tenantId = durableWorkSafeString(item.safeDetails?.tenantId);
+  if (!tenantId) return context;
+
+  const organizationId = durableWorkSafeString(item.safeDetails?.tenantOrganizationId);
+  return {
+    ...context,
+    tenant: {
+      tenantId,
+      ...(organizationId ? { organizationId } : {}),
+      source: "durable-work-item",
+    },
+  };
+}
+
+function durableWorkSafeString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
 function sameDeploymentTimelineJournalEntry(
