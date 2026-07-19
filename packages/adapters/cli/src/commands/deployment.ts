@@ -1270,26 +1270,27 @@ function runCreateDeploymentCommand(
   },
 ) {
   return Effect.gen(function* () {
-    const output = yield* runDeploymentCommandResult(CreateDeploymentCommand.create(input), {
-      appLogLines: options.appLogLines,
-    });
+    const cli = yield* CliRuntime;
+    const effectiveInput =
+      cli.executionTarget === "remote" ? { ...input, executionMode: "detached" as const } : input;
+    const output = yield* runDeploymentCommandResult(
+      CreateDeploymentCommand.create(effectiveInput),
+      {
+        appLogLines: options.appLogLines,
+      },
+    );
     let deployment: DeploymentSummary | undefined;
-    if (input.executionMode === "detached") {
-      deployment = yield* readDeploymentSummary({
-        deploymentId: output.id,
-        resourceId: input.resourceId,
-      });
-    } else {
+    if (effectiveInput.executionMode !== "detached") {
       deployment = yield* waitForSynchronousDeployment({
         deploymentId: output.id,
-        resourceId: input.resourceId,
+        resourceId: effectiveInput.resourceId,
       });
     }
 
     if (options.requirePreviewUrl || options.previewOutputFile) {
       const resolution = yield* resolvePreviewAccessForDeployment({
         deploymentId: output.id,
-        resourceId: input.resourceId,
+        resourceId: effectiveInput.resourceId,
         requirePreviewUrl: options.requirePreviewUrl,
       });
 
@@ -1302,7 +1303,7 @@ function runCreateDeploymentCommand(
       }
     }
 
-    if (input.executionMode !== "detached") {
+    if (effectiveInput.executionMode !== "detached") {
       yield* failIfSynchronousDeploymentDidNotSucceed(deployment);
     }
   });
@@ -1521,6 +1522,7 @@ export const deployCommand = EffectCommand.make(
     upstreamProtocol,
   }) =>
     Effect.gen(function* () {
+      const cli = yield* CliRuntime;
       const sourceLocator = optionalValue(pathOrSource);
       const requestedEntryMode = optionalValue(entryMode);
       const requestedDeploymentMethodFromFlag = optionalValue(method);
@@ -1791,7 +1793,9 @@ export const deployCommand = EffectCommand.make(
                 : {}),
               ...(Bun.env.APPALOFT_CONTROL_PLANE_URL
                 ? { controlPlaneUrl: Bun.env.APPALOFT_CONTROL_PLANE_URL }
-                : {}),
+                : cli.executionTarget === "remote"
+                  ? { controlPlaneUrl: "remote-control-plane" }
+                  : {}),
               ...(serverSpec?.host
                 ? {
                     trustedSshTarget: {

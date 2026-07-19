@@ -2431,19 +2431,62 @@ describe("CLI remote control-plane client", () => {
     expect(stored._unsafeUnwrap()).toEqual({ profiles: {} });
   });
 
-  test("[CONTROL-PLANE-CLI-008] explicit remote mode for local-only deploy fails before local mutation", async () => {
+  test("[CONTROL-PLANE-CLI-008] explicit remote mode routes deploy through the active control plane", async () => {
     const result = await resolveCliExecutionTarget({
       argv: ["node", "appaloft", "--control-plane-mode", "self-hosted", "deploy", "."],
       store: activeStore(),
     });
 
-    expect(result._unsafeUnwrapErr()).toMatchObject({
-      code: "control_plane_unsupported",
-      details: {
-        phase: "control-plane-resolution",
+    expect(result._unsafeUnwrap()).toMatchObject({
+      kind: "remote",
+      profile: {
+        mode: "self-hosted",
+      },
+      diagnostics: {
         command: "deploy",
+        effectiveMode: "self-hosted",
       },
     });
+  });
+
+  test("[CONTROL-PLANE-CLI-008][DEP-CREATE-ENTRY-008] top-level deploy dispatches detached through the remote control plane", async () => {
+    const requests: Request[] = [];
+    const program = createRemoteCliProgram({
+      version: "0.12.5-test",
+      profile: profile("local"),
+      fetch: createControlPlaneFetch(requests, {
+        "/api/deployments": jsonResponse({ id: "dep_remote" }, 202),
+      }),
+      now: () => "2026-05-17T00:00:00.000Z",
+    });
+
+    const created = await captureProcessOutput(() =>
+      program.parseAsync([
+        "node",
+        "appaloft",
+        "deploy",
+        "--project",
+        "prj_remote",
+        "--environment",
+        "env_production",
+        "--resource",
+        "res_api",
+        "--server",
+        "srv_remote",
+      ]),
+    );
+
+    expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual(
+      ["GET /api/version", "GET /api/organizations/current-context", "POST /api/deployments"],
+    );
+    expect(await requests[2]?.json()).toEqual({
+      projectId: "prj_remote",
+      environmentId: "env_production",
+      resourceId: "res_api",
+      serverId: "srv_remote",
+      executionMode: "detached",
+    });
+    expect(created.stdout).toContain("dep_remote");
   });
 
   test("[CONTROL-PLANE-CLI-008] explicit remote mode for terminal attach local gateway fails before local mutation", async () => {

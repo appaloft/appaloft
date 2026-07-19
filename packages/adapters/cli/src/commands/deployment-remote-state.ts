@@ -135,6 +135,7 @@ export interface ServerAppliedRouteDomainIntent {
   pathPrefix: string;
   pathHandling?: "preserve" | "strip";
   tlsMode: ServerAppliedRouteTlsMode;
+  targetServiceName?: string;
   redirectTo?: string;
   redirectStatus?: 301 | 302 | 307 | 308;
 }
@@ -1508,6 +1509,7 @@ export class FileSystemServerAppliedRouteDesiredStateStore
         pathPrefix: domain.pathPrefix,
         pathHandling: domain.pathHandling ?? "preserve",
         tlsMode: domain.tlsMode,
+        ...(domain.targetServiceName ? { targetServiceName: domain.targetServiceName } : {}),
         ...(domain.redirectTo ? { redirectTo: domain.redirectTo } : {}),
         ...(domain.redirectStatus ? { redirectStatus: domain.redirectStatus } : {}),
       })),

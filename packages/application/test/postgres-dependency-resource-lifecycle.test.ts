@@ -332,6 +332,48 @@ describe("Postgres dependency resource lifecycle use cases", () => {
     ]);
   });
 
+  test("[DEP-BIND-SECRET-RESOLVE-006] repeated targeted provision reconciles the managed connection secret", async () => {
+    const {
+      context,
+      dependencyResourceSecretStore,
+      managedDependencyProvider,
+      provisionDependencyResource,
+    } = await createHarness();
+    managedDependencyProvider.setRealizationResult(
+      ok({
+        providerResourceHandle: "docker-single-server:v1:postgres:srv_demo:appaloft-postgres-rsi_1",
+        endpoint: {
+          host: "appaloft-postgres-rsi_1",
+          port: 5432,
+          databaseName: "main_db",
+          maskedConnection: "postgres://app:********@appaloft-postgres-rsi_1:5432/main_db",
+        },
+        connectionSecretValue: "postgres://app:recovered@appaloft-postgres-rsi_1:5432/main_db",
+        realizedAt: "2026-01-01T00:00:00.000Z",
+      }),
+    );
+
+    const first = await provisionDependencyResource.execute(context, {
+      kind: "postgres",
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      name: "Main DB",
+      serverId: "srv_demo",
+    });
+    const second = await provisionDependencyResource.execute(context, {
+      kind: "postgres",
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      name: "Main DB",
+      serverId: "srv_demo",
+    });
+
+    expect(second._unsafeUnwrap().id).toBe(first._unsafeUnwrap().id);
+    expect(managedDependencyProvider.realized).toHaveLength(2);
+    expect(dependencyResourceSecretStore.stored).toHaveLength(2);
+    expect(dependencyResourceSecretStore.stored.at(-1)?.secretValue).toContain("recovered");
+  });
+
   test("[DEP-RES-IMPORT-AUTHZ-001] import can be denied before secret storage and persistence", async () => {
     const {
       context,

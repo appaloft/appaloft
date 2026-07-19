@@ -17,6 +17,7 @@ import {
   type ConfigureServerCredentialCommandInput,
   CreateDependencyResourceProvisioningPlanCommand,
   type CreateDeploymentCommandInput,
+  CreateDomainBindingCommand,
   CreateEnvironmentCommand,
   CreateProjectCommand,
   CreateResourceCommand,
@@ -29,10 +30,12 @@ import {
   type DependencyResourceBackupPolicyRead,
   type DependencyResourceSummary,
   type DeploymentConfiguredRuntimePrunePolicy,
+  type DomainBindingSummary,
   deploymentSnapshotRuntimePrunePolicyId,
   type EnvironmentSummary,
   ListDependencyResourceBackupPoliciesQuery,
   ListDependencyResourcesQuery,
+  ListDomainBindingsQuery,
   ListEnvironmentsQuery,
   ListProjectsQuery,
   ListResourceDependencyBindingsQuery,
@@ -701,6 +704,7 @@ export function deploymentPromptSeedFromConfig(
     pathPrefix: domain.pathPrefix,
     pathHandling: domain.pathHandling,
     tlsMode: domain.tlsMode,
+    ...(domain.targetServiceName ? { targetServiceName: domain.targetServiceName } : {}),
     ...(domain.redirectTo ? { redirectTo: domain.redirectTo } : {}),
     ...(domain.redirectStatus ? { redirectStatus: domain.redirectStatus } : {}),
   }));
@@ -4409,13 +4413,7 @@ function requireServerAppliedRouteStateSupportIfNeeded(seed: DeploymentPromptSee
     }
 
     if (seed.stateBackend?.kind === "postgres-control-plane") {
-      return yield* Effect.fail(
-        configDomainResolutionError({
-          message: "Config access domains require managed domain workflow mapping",
-          reason: "managed_config_domains_not_implemented",
-          domainCount: routes.length,
-        }),
-      );
+      return;
     }
 
     if (seed.stateBackend?.kind !== "ssh-pglite") {
@@ -4771,6 +4769,90 @@ function persistServerAppliedRouteDesiredStateIfNeeded(input: {
     }
 
     const cli = yield* CliRuntime;
+    if (input.seed.stateBackend?.kind === "postgres-control-plane") {
+      const listedMessage = yield* resultToEffect(
+        ListDomainBindingsQuery.create({
+          projectId: input.projectId,
+          environmentId: input.environmentId,
+          resourceId: input.resourceId,
+        }),
+      );
+      const listedResult = yield* Effect.promise(() =>
+        cli.executeQuery<{ items: DomainBindingSummary[] }>(listedMessage),
+      );
+      const existingBindings = (yield* resultToEffect(listedResult)).items;
+      const orderedRoutes = [...routes].sort(
+        (left, right) => Number(Boolean(left.redirectTo)) - Number(Boolean(right.redirectTo)),
+      );
+
+      for (const route of orderedRoutes) {
+        const existing = existingBindings.find(
+          (binding) =>
+            binding.domainName.toLowerCase() === route.host.toLowerCase() &&
+            binding.pathPrefix === route.pathPrefix,
+        );
+        const desired = {
+          pathHandling: route.pathHandling ?? "preserve",
+          tlsMode: route.tlsMode,
+          targetServiceName: route.targetServiceName,
+          redirectTo: route.redirectTo,
+          redirectStatus: route.redirectStatus,
+        };
+
+        if (existing) {
+          const current = {
+            pathHandling: existing.pathHandling ?? "preserve",
+            tlsMode: existing.tlsMode,
+            targetServiceName: existing.targetServiceName,
+            redirectTo: existing.redirectTo,
+            redirectStatus: existing.redirectStatus,
+          };
+          if (JSON.stringify(current) !== JSON.stringify(desired)) {
+            return yield* Effect.fail(
+              domainError.validation("Existing managed domain binding differs from config", {
+                phase: "config-domain-resolution",
+                reason: "managed_domain_binding_drift",
+                domainBindingId: existing.id,
+                domainName: route.host,
+                pathPrefix: route.pathPrefix,
+              }),
+            );
+          }
+          continue;
+        }
+
+        const message = yield* resultToEffect(
+          CreateDomainBindingCommand.create({
+            projectId: input.projectId,
+            environmentId: input.environmentId,
+            resourceId: input.resourceId,
+            ...(input.destinationId
+              ? { serverId: input.serverId, destinationId: input.destinationId }
+              : {}),
+            domainName: route.host,
+            pathPrefix: route.pathPrefix,
+            pathHandling: route.pathHandling ?? "preserve",
+            proxyKind: "traefik",
+            tlsMode: route.tlsMode,
+            ...(route.targetServiceName ? { targetServiceName: route.targetServiceName } : {}),
+            ...(route.redirectTo ? { redirectTo: route.redirectTo } : {}),
+            ...(route.redirectStatus ? { redirectStatus: route.redirectStatus } : {}),
+            idempotencyKey: [
+              "repository-config-domain",
+              input.projectId,
+              input.environmentId,
+              input.resourceId,
+              route.host.toLowerCase(),
+              route.pathPrefix,
+            ].join(":"),
+          }),
+        );
+        const createdResult = yield* Effect.promise(() => cli.executeCommand(message));
+        yield* resultToEffect(createdResult);
+      }
+      return;
+    }
+
     if (!cli.serverAppliedRouteStore) {
       return yield* Effect.fail(
         configDomainResolutionError({

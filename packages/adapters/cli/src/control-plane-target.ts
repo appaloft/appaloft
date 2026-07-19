@@ -76,6 +76,7 @@ const remoteCapableTopLevelCommands = new Set([
   "certificate",
   "default-access",
   "dependency",
+  "deploy",
   "deploy-token",
   "deployments",
   "connectors",
@@ -109,7 +110,7 @@ const remoteCapableTopLevelCommands = new Set([
   "work",
 ]);
 
-const localOnlyTopLevelCommands = new Set(["db", "deploy", "init", "mcp", "remote-state", "serve"]);
+const localOnlyTopLevelCommands = new Set(["db", "init", "mcp", "remote-state", "serve"]);
 
 function localOnlyCommandLabel(argv: readonly string[]): string | null {
   const args = commandArgs(argv);

@@ -282,6 +282,52 @@ export class ProvisionDependencyResourceUseCase {
         ResourceInstanceByEnvironmentAndSlugSpec.create(projectId, environmentId, kind, slug),
       );
       if (existing && existing.toState().status.value !== "deleted") {
+        const existingState = existing.toState();
+        if (
+          existingState.providerManaged === true &&
+          existingState.kind.value === input.kind &&
+          existingState.providerKey.value === providerKey.value &&
+          realizationTarget
+        ) {
+          const reconciled = await managedDependencyProvider.realize(context, {
+            dependencyResourceId: existingState.id.value,
+            projectId: projectId.value,
+            environmentId: environmentId.value,
+            kind: input.kind,
+            providerKey: providerKey.value,
+            name: existingState.name.value,
+            slug: existingState.slug?.value ?? slug.value,
+            attemptId: idGenerator.next("dpr"),
+            requestedAt: attemptedAt.value,
+            capabilities,
+            target: realizationTarget,
+          });
+          if (reconciled.isErr()) {
+            return err(reconciled.error);
+          }
+          if (!reconciled.value.connectionSecretValue) {
+            return err(
+              domainError.infra("Managed dependency reconciliation returned no connection secret", {
+                phase: "dependency-resource-secret-reconciliation",
+                dependencyResourceId: existingState.id.value,
+                providerKey: providerKey.value,
+              }),
+            );
+          }
+          const stored = await dependencyResourceSecretStore.storeConnection(context, {
+            dependencyResourceId: existingState.id.value,
+            projectId: projectId.value,
+            environmentId: environmentId.value,
+            kind: input.kind,
+            purpose: "connection",
+            secretValue: reconciled.value.connectionSecretValue,
+            storedAt: reconciled.value.realizedAt,
+          });
+          if (stored.isErr()) {
+            return err(stored.error);
+          }
+          return ok({ id: existingState.id.value });
+        }
         return err(
           domainError.conflict("dependency_resource_slug_conflict", {
             phase: "dependency-resource-validation",
