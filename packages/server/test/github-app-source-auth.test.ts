@@ -13,12 +13,12 @@ import { ok } from "@appaloft/core";
 import { RequestScopedIntegrationAuthPort } from "../src/register-runtime-dependencies";
 
 describe("RequestScopedIntegrationAuthPort", () => {
-  test("[GITHUB-APP-SOURCE-001] deployment workers fall back to tenant installation tokens", async () => {
+  test("[GITHUB-APP-SOURCE-001] deployment sources explicitly select tenant installation tokens", async () => {
     let requestedInstallationId: string | undefined;
     const port = new RequestScopedIntegrationAuthPort(
       {
         async getProviderAccessToken() {
-          return null;
+          return "stale-user-oauth-token";
         },
       } as AuthRuntime,
       {
@@ -59,12 +59,17 @@ describe("RequestScopedIntegrationAuthPort", () => {
       } satisfies GitHubAppRuntime,
     );
 
-    const token = await port.getProviderAccessToken(
-      createExecutionContext({
-        entrypoint: "worker",
-        tenant: { tenantId: "org_1" },
-      }),
-      "github",
+    const context = createExecutionContext({
+      entrypoint: "worker",
+      tenant: { tenantId: "org_1" },
+    });
+    const token = await port.runWithRequest(
+      new Request("https://appaloft.test/api/deployments"),
+      context,
+      () =>
+        port.getProviderAccessToken(context, "github", {
+          accessTokenKind: "installation",
+        }),
     );
 
     expect(token).toBe("installation-token");

@@ -801,7 +801,12 @@ export class RequestScopedIntegrationAuthPort implements IntegrationAuthPort {
   async getProviderAccessToken(
     context: ExecutionContext,
     providerKey: "github",
+    request?: { accessTokenKind?: "installation" | "user" },
   ): Promise<string | null> {
+    if (request?.accessTokenKind === "installation") {
+      return this.getGitHubAppInstallationAccessToken(context);
+    }
+
     const contextAccessToken = getExecutionAuthProviderAccessToken(context, providerKey);
     if (contextAccessToken) {
       return contextAccessToken;
@@ -832,7 +837,9 @@ export class RequestScopedIntegrationAuthPort implements IntegrationAuthPort {
       }
     }
 
-    return this.getGitHubAppInstallationAccessToken(context);
+    return request?.accessTokenKind === "user"
+      ? null
+      : this.getGitHubAppInstallationAccessToken(context);
   }
 
   private async getGitHubAppInstallationAccessToken(
