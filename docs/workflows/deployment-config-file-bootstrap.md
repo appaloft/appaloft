@@ -532,6 +532,18 @@ Recovery requirements:
   recovery or superseding takeover;
 - failed migrations must leave either the previous state readable or an explicit recovery marker
   with the backup/journal location;
+- production repair of server-owned SSH PGlite state must begin with an operator-authorized,
+  state-root-coordinated immutable backup. The backup records a bounded reference, archive digest,
+  source-tree digest, revision, and PostgreSQL major without publishing database contents;
+- repair must restore that immutable backup to a distinct candidate runtime root, run database
+  migration and read-only validation against the candidate, and keep the live state unchanged until
+  validation succeeds;
+- candidate promotion must reacquire live state-root coordination, prove that the live source-tree
+  digest still matches the immutable backup (the write-freeze guard), and atomically replace only
+  `pglite`, `source-links`, and `server-applied-routes`. Digest drift fails closed;
+- rollback must restore the named immutable backup through the same coordinated staged-swap path;
+  direct SQL edits, direct mutation of the live PGlite directory, and unreferenced backup paths are
+  not supported recovery paths;
 - deploy commands must not continue after a failed ensure, lock, migration, or integrity check;
 - command-level mutation waiting belongs to the explicit operation scope, for example
   `resource-runtime`, `preview-lifecycle`, or `source-link`, and must not be modeled only as a

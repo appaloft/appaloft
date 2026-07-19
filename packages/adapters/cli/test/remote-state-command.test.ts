@@ -1,16 +1,48 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { ash } from "@appaloft/ash";
 import {
   buildSshRemoteStateDiagnosticsCommand,
+  buildSshRemoteStateImmutableBackupCreateCommand,
   buildSshRemoteStateLockInspectCommand,
   buildSshRemoteStateLockRecoverStaleCommand,
+  buildSshRemoteStatePromoteCopyCommand,
+  buildSshRemoteStateRestoreCopyCommand,
+  buildSshRemoteStateRollbackCommand,
   renderSshRemoteStateDiagnosticsScript,
+  renderSshRemoteStateImmutableBackupCreateScript,
   renderSshRemoteStateLockInspectScript,
   renderSshRemoteStateLockRecoverStaleScript,
+  renderSshRemoteStatePromoteCopyScript,
+  renderSshRemoteStateRestoreCopyScript,
+  renderSshRemoteStateRollbackScript,
 } from "../src/commands/remote-state";
+
+function createRemoteStateFixture(root: string): string {
+  const dataRoot = join(root, "runtime", "state");
+  mkdirSync(join(dataRoot, "pglite"), { recursive: true });
+  mkdirSync(join(dataRoot, "source-links"), { recursive: true });
+  mkdirSync(join(dataRoot, "server-applied-routes"), { recursive: true });
+  mkdirSync(join(dataRoot, "locks"), { recursive: true });
+  writeFileSync(join(dataRoot, "pglite", "PG_VERSION"), "18\n");
+  writeFileSync(join(dataRoot, "pglite", "state.bin"), "original-state\n");
+  writeFileSync(join(dataRoot, "source-links", "source.json"), "{}\n");
+  writeFileSync(join(dataRoot, "server-applied-routes", "routes.json"), "{}\n");
+  writeFileSync(join(dataRoot, "sync-revision.txt"), "4\n");
+  writeFileSync(join(dataRoot, "schema-version.json"), '{"version":1}\n');
+  writeFileSync(
+    join(dataRoot, "server-state-backend.json"),
+    '{"schemaVersion":"1","stateBackend":"ssh-pglite"}\n',
+  );
+  return dataRoot;
+}
+
+function removeRemoteStateFixture(root: string): void {
+  Bun.spawnSync(["chmod", "-R", "u+w", root]);
+  rmSync(root, { force: true, recursive: true });
+}
 
 describe("CLI SSH remote-state lock commands", () => {
   test("[CONFIG-FILE-STATE-018] inspect reads lock metadata without acquiring the mutation lock", () => {
@@ -160,7 +192,144 @@ describe("CLI SSH remote-state lock commands", () => {
         stale: false,
       });
     } finally {
-      rmSync(tempRoot, { force: true, recursive: true });
+      removeRemoteStateFixture(tempRoot);
+    }
+  });
+
+  test("[CONFIG-FILE-STATE-021] immutable backup records bounded evidence and preserves live state", () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "appaloft-remote-backup-"));
+    try {
+      const dataRoot = createRemoteStateFixture(tempRoot);
+      const before = readFileSync(join(dataRoot, "pglite", "state.bin"), "utf8");
+      const result = ash.execute(renderSshRemoteStateImmutableBackupCreateScript({ dataRoot }));
+
+      expect(result.success).toBe(true);
+      const output = JSON.parse(result.stdout) as {
+        backupReference: string;
+        archiveDigest: string;
+        sourceTreeDigest: string;
+        sourceRevision: number;
+        postgresMajor: string;
+      };
+      expect(output).toMatchObject({
+        sourceRevision: 4,
+        postgresMajor: "18",
+      });
+      expect(output.backupReference).toMatch(/^remote-state-backup:immutable-/);
+      expect(output.archiveDigest).toMatch(/^sha256:[0-9a-f]{64}$/);
+      expect(output.sourceTreeDigest).toMatch(/^sha256:[0-9a-f]{64}$/);
+      expect(readFileSync(join(dataRoot, "pglite", "state.bin"), "utf8")).toBe(before);
+      expect(existsSync(join(dataRoot, "locks", "mutation.lock"))).toBe(false);
+
+      const command = buildSshRemoteStateImmutableBackupCreateCommand({ dataRoot });
+      expect(command).toContain("state.tar.gz");
+      expect(command).toContain("sourceTreeDigest");
+      expect(command).not.toContain("OPENSSH PRIVATE KEY");
+    } finally {
+      removeRemoteStateFixture(tempRoot);
+    }
+  });
+
+  test("[CONFIG-FILE-STATE-022][CONFIG-FILE-STATE-023][CONFIG-FILE-STATE-024] isolated copy promotes and rolls back through the immutable reference", () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "appaloft-remote-recovery-"));
+    try {
+      const dataRoot = createRemoteStateFixture(tempRoot);
+      const backup = ash.execute(renderSshRemoteStateImmutableBackupCreateScript({ dataRoot }));
+      expect(backup.success).toBe(true);
+      const backupReference = (JSON.parse(backup.stdout) as { backupReference: string })
+        .backupReference;
+      const candidateRuntimeRoot = join(tempRoot, "recovery", "candidate");
+
+      const restored = ash.execute(
+        renderSshRemoteStateRestoreCopyScript({
+          dataRoot,
+          backupReference,
+          targetRemoteRuntimeRoot: candidateRuntimeRoot,
+        }),
+      );
+      expect(restored.success).toBe(true);
+      expect(readFileSync(join(candidateRuntimeRoot, "state", "pglite", "state.bin"), "utf8")).toBe(
+        "original-state\n",
+      );
+      writeFileSync(join(candidateRuntimeRoot, "state", "pglite", "state.bin"), "repaired-state\n");
+
+      const planDigest = `sha256:${"a".repeat(64)}`;
+      const promoted = ash.execute(
+        renderSshRemoteStatePromoteCopyScript({
+          dataRoot,
+          backupReference,
+          candidateRemoteRuntimeRoot: candidateRuntimeRoot,
+          candidatePlanDigest: planDigest,
+        }),
+      );
+      expect(promoted.success).toBe(true);
+      expect(readFileSync(join(dataRoot, "pglite", "state.bin"), "utf8")).toBe("repaired-state\n");
+      expect(readFileSync(join(dataRoot, "sync-revision.txt"), "utf8")).toBe("5\n");
+
+      const rolledBack = ash.execute(
+        renderSshRemoteStateRollbackScript({ dataRoot, backupReference }),
+      );
+      expect(rolledBack.success).toBe(true);
+      expect(readFileSync(join(dataRoot, "pglite", "state.bin"), "utf8")).toBe("original-state\n");
+      expect(readFileSync(join(dataRoot, "sync-revision.txt"), "utf8")).toBe("6\n");
+
+      expect(
+        buildSshRemoteStateRestoreCopyCommand({
+          dataRoot,
+          backupReference,
+          targetRemoteRuntimeRoot: candidateRuntimeRoot,
+        }),
+      ).toContain("candidate source digest mismatch");
+      expect(
+        buildSshRemoteStatePromoteCopyCommand({
+          dataRoot,
+          backupReference,
+          candidateRemoteRuntimeRoot: candidateRuntimeRoot,
+          candidatePlanDigest: planDigest,
+        }),
+      ).toContain("live state changed after immutable backup");
+      expect(buildSshRemoteStateRollbackCommand({ dataRoot, backupReference })).toContain(
+        "restored state digest mismatch",
+      );
+    } finally {
+      removeRemoteStateFixture(tempRoot);
+    }
+  });
+
+  test("[CONFIG-FILE-STATE-023] promotion fails closed when live state drifted after backup", () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), "appaloft-remote-freeze-"));
+    try {
+      const dataRoot = createRemoteStateFixture(tempRoot);
+      const backup = ash.execute(renderSshRemoteStateImmutableBackupCreateScript({ dataRoot }));
+      const backupReference = (JSON.parse(backup.stdout) as { backupReference: string })
+        .backupReference;
+      const candidateRuntimeRoot = join(tempRoot, "recovery", "candidate");
+      expect(
+        ash.execute(
+          renderSshRemoteStateRestoreCopyScript({
+            dataRoot,
+            backupReference,
+            targetRemoteRuntimeRoot: candidateRuntimeRoot,
+          }),
+        ).success,
+      ).toBe(true);
+      writeFileSync(join(dataRoot, "pglite", "state.bin"), "unexpected-live-write\n");
+
+      const promoted = ash.execute(
+        renderSshRemoteStatePromoteCopyScript({
+          dataRoot,
+          backupReference,
+          candidateRemoteRuntimeRoot: candidateRuntimeRoot,
+          candidatePlanDigest: `sha256:${"b".repeat(64)}`,
+        }),
+      );
+      expect(promoted.success).toBe(false);
+      expect(promoted.stderr).toContain("live state changed after immutable backup");
+      expect(readFileSync(join(dataRoot, "pglite", "state.bin"), "utf8")).toBe(
+        "unexpected-live-write\n",
+      );
+    } finally {
+      removeRemoteStateFixture(tempRoot);
     }
   });
 });
