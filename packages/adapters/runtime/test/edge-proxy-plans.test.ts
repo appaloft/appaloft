@@ -17,6 +17,7 @@ import {
 } from "@appaloft/application";
 import { domainError, err, ok, type Result } from "@appaloft/core";
 import {
+  createComposeProxyRouteRealizationPlan,
   createProxyReloadPlan,
   createProxyRouteRealizationPlan,
 } from "../src/edge-proxy-plans";
@@ -35,6 +36,7 @@ class ReloadAwareProvider implements EdgeProxyProvider {
 
   lastReloadInput: ProxyReloadInput | null = null;
   lastRealizeInput: ProxyRouteRealizationInput | null = null;
+  readonly realizeInputs: ProxyRouteRealizationInput[] = [];
 
   async ensureProxy(
     _context: EdgeProxyExecutionContext,
@@ -55,6 +57,7 @@ class ReloadAwareProvider implements EdgeProxyProvider {
     input: ProxyRouteRealizationInput,
   ): Promise<Result<ProxyRouteRealizationPlan>> {
     this.lastRealizeInput = input;
+    this.realizeInputs.push(input);
     return ok({
       providerKey: this.key,
       networkName: "appaloft-edge",
@@ -112,6 +115,46 @@ class StaticRegistry implements EdgeProxyProviderRegistry {
 }
 
 describe("edge proxy plans", () => {
+  test("[ROUTE-TLS-ENTRY-023] renders one provider plan per compose target service", async () => {
+    const provider = new ReloadAwareProvider();
+    const result = await createComposeProxyRouteRealizationPlan({
+      providerRegistry: new StaticRegistry(provider),
+      context: { correlationId: "req_compose_route_targets" },
+      deploymentId: "dep_compose_routes",
+      port: 3000,
+      defaultTargetServiceName: "web",
+      accessRoutes: [
+        {
+          proxyKind: "traefik" as const,
+          domains: ["app.example.test"],
+          pathPrefix: "/",
+          tlsMode: "auto" as const,
+          targetPort: 3000,
+          targetServiceName: "web",
+        },
+        {
+          proxyKind: "traefik" as const,
+          domains: ["app.example.test"],
+          pathPrefix: "/api",
+          tlsMode: "auto" as const,
+          targetPort: 3001,
+          targetServiceName: "api",
+        },
+      ],
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap().targets.map((target) => target.serviceName)).toEqual([
+      "web",
+      "api",
+    ]);
+    expect(provider.realizeInputs.map((input) => input.port)).toEqual([3000, 3001]);
+    expect(provider.realizeInputs[1]?.accessRoutes[0]).toMatchObject({
+      pathPrefix: "/api",
+      targetServiceName: "api",
+    });
+  });
+
   test("EDGE-PROXY-PROVIDER-009 resolves provider-owned reload plans from route realization", async () => {
     const provider = new ReloadAwareProvider();
     const registry = new StaticRegistry(provider);

@@ -1891,6 +1891,10 @@ export class Resource extends AggregateRoot<ResourceState> {
     return ok(undefined);
   }
 
+  hasService(serviceName: ResourceServiceName): boolean {
+    return this.state.services.some((service) => service.name.equals(serviceName));
+  }
+
   configureAccessProfile(input: {
     accessProfile: ResourceAccessProfileState;
     configuredAt: UpdatedAt;

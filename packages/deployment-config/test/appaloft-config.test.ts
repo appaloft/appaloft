@@ -2179,6 +2179,7 @@ describe("Appaloft deployment config schema", () => {
             pathPrefix: "/api",
             pathHandling: "strip",
             tlsMode: "disabled",
+            targetServiceName: "api",
           },
         ],
       },
@@ -2198,6 +2199,7 @@ describe("Appaloft deployment config schema", () => {
           pathPrefix: "/api",
           pathHandling: "strip",
           tlsMode: "disabled",
+          targetServiceName: "api",
         },
       ]);
     }

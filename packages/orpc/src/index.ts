@@ -8918,6 +8918,7 @@ async function applyActionServerConfigProfileCommands(input: {
         pathHandling: domain.pathHandling ?? "preserve",
         proxyKind: domainContext.value.proxyKind,
         tlsMode: domain.tlsMode,
+        ...(domain.targetServiceName ? { targetServiceName: domain.targetServiceName } : {}),
         ...(domain.redirectTo ? { redirectTo: domain.redirectTo } : {}),
         ...(domain.redirectStatus ? { redirectStatus: domain.redirectStatus } : {}),
         idempotencyKey: actionServerConfigDomainIdempotencyKey({

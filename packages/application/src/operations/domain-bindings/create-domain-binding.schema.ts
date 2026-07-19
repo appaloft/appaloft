@@ -20,6 +20,7 @@ export const createDomainBindingCommandInputSchema = z
     pathHandling: z.enum(routePathHandlingModes).default("preserve"),
     proxyKind: z.enum(edgeProxyKinds),
     tlsMode: z.enum(tlsModes).default("auto"),
+    targetServiceName: nonEmptyTrimmedString("Target service name").optional(),
     redirectTo: nonEmptyTrimmedString("Canonical redirect target").optional(),
     redirectStatus: z
       .union([z.literal(301), z.literal(302), z.literal(307), z.literal(308)])
@@ -41,6 +42,14 @@ export const createDomainBindingCommandInputSchema = z
         code: "custom",
         path: ["redirectStatus"],
         message: "Domain binding redirect status requires redirectTo",
+      });
+    }
+
+    if (value.redirectTo && value.targetServiceName) {
+      context.addIssue({
+        code: "custom",
+        path: ["targetServiceName"],
+        message: "Redirect domain bindings cannot declare a target service",
       });
     }
   });

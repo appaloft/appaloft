@@ -72,6 +72,11 @@ export function renderComposeOwnershipLabelOverrideScript(input: {
   targetServiceName?: string;
   targetLabels?: readonly RuntimeCommandLabel[];
   targetNetworkName?: string;
+  serviceTargets?: readonly {
+    serviceName: string;
+    labels: readonly RuntimeCommandLabel[];
+    networkName?: string;
+  }[];
   environmentKeys?: readonly string[];
   mounts?: readonly DockerRunMountInput[];
   volumeRealizations?: readonly DockerStorageVolumeRealization[];
@@ -79,6 +84,10 @@ export function renderComposeOwnershipLabelOverrideScript(input: {
 }): string {
   const labelLines = renderLabelLines(input.labels);
   const targetLabelLines = renderLabelLines(input.targetLabels ?? []);
+  const serviceTargets = (input.serviceTargets ?? []).map((target) => ({
+    ...target,
+    labelLines: renderLabelLines(target.labels),
+  }));
   const environmentLines = [...new Set(input.environmentKeys ?? [])]
     .sort()
     .flatMap((key, index) => [
@@ -90,12 +99,21 @@ export function renderComposeOwnershipLabelOverrideScript(input: {
     mounts: input.mounts ?? [],
     volumeRealizations: input.volumeRealizations ?? [],
   });
-  const topLevelNetworkLines = input.targetNetworkName
+  const targetNetworkNames = [
+    ...new Set(
+      [input.targetNetworkName, ...serviceTargets.map((target) => target.networkName)].filter(
+        (name): name is string => Boolean(name),
+      ),
+    ),
+  ].sort();
+  const topLevelNetworkLines = targetNetworkNames.length > 0
     ? [
         "networks:",
-        `  ${yamlQuoted(input.targetNetworkName)}:`,
-        "    external: true",
-        `    name: ${yamlQuoted(input.targetNetworkName)}`,
+        ...targetNetworkNames.flatMap((networkName) => [
+          `  ${yamlQuoted(networkName)}:`,
+          "    external: true",
+          `    name: ${yamlQuoted(networkName)}`,
+        ]),
       ]
     : [];
   const requiresTargetService =
@@ -160,6 +178,17 @@ export function renderComposeOwnershipLabelOverrideScript(input: {
           "    fi",
         ]
       : []),
+    ...serviceTargets.flatMap((target) => [
+      `    if [ "$service" = ${input.quote(target.serviceName)} ]; then`,
+      ...target.labelLines.map((line) => `      printf '%s\\n' ${input.quote(line)}`),
+      ...(target.networkName
+        ? [
+            `      printf '%s\\n' ${input.quote("    networks:")}`,
+            `      printf '%s\\n' ${input.quote(`      - ${yamlQuoted(target.networkName)}`)}`,
+          ]
+        : []),
+      "    fi",
+    ]),
     "  done",
     ...topLevelVolumeLines.map((line) => `  printf '%s\\n' ${input.quote(line)}`),
     ...topLevelNetworkLines.map((line) => `  printf '%s\\n' ${input.quote(line)}`),

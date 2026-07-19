@@ -85,6 +85,7 @@ command.
 | `pathHandling` | Optional | `preserve` or `strip`. Defaults to `preserve`. `strip` removes `pathPrefix` before proxying served traffic upstream. |
 | `edgeProxyProviderKey` | Optional | Opaque provider key. When omitted, the binding uses the target/server's resolved edge proxy provider. |
 | `tlsMode` | Optional | `auto` or `disabled`. Defaults to `auto`. |
+| `targetServiceName` | Optional | Named service within a compose-stack resource that receives this served route. Omit for the resource's default network target. Redirect bindings cannot set it. |
 | `redirectTo` | Optional | Existing served domain binding target for a managed canonical redirect. Must be a hostname in the same project/environment/resource/path owner scope. |
 | `redirectStatus` | Optional | One of `301`, `302`, `307`, or `308`. Defaults to `308` when `redirectTo` is supplied. |
 | `certificatePolicy` | Optional | `auto`, `manual`, or `disabled`. Defaults from `tlsMode`. |
@@ -100,17 +101,18 @@ The command must:
 
 1. Validate command input.
 2. Normalize and validate `domainName`.
-3. Validate `pathPrefix`, `pathHandling`, optional edge proxy provider key, and `tlsMode`.
+3. Validate `pathPrefix`, `pathHandling`, optional edge proxy provider key, `tlsMode`, and optional compose target service.
 4. Resolve project, environment, resource, and any supplied server/destination target hints.
 5. Reject cross-project/environment/destination mismatches when server target hints are supplied.
-6. Reject duplicate active bindings for the same normalized `domainName`, `pathPrefix`, and environment/resource scope.
-7. When `redirectTo` is supplied, reject missing redirect targets, self redirects, and redirect chains; the target must be an existing served binding in the same project/environment/resource/path owner scope.
-8. Reject durable bindings when the target resolves to no edge proxy provider or to a provider that does not support durable domain routes.
-9. Persist a durable binding in `requested` or `pending_verification`.
-10. Allocate and persist the first domain verification attempt id according to ADR-006.
-11. Persist initial DNS observation state such as `pending` with the expected Appaloft edge target.
-12. Publish or record `domain-binding-requested` with the verification attempt id and redirect metadata when present.
-13. Return `ok({ id })`.
+6. Reject a `targetServiceName` that is not declared by the resource, or any target service on a redirect binding.
+7. Reject duplicate active bindings for the same normalized `domainName`, `pathPrefix`, and environment/resource scope.
+8. When `redirectTo` is supplied, reject missing redirect targets, self redirects, and redirect chains; the target must be an existing served binding in the same project/environment/resource/path owner scope.
+9. Reject durable bindings when the target resolves to no edge proxy provider or to a provider that does not support durable domain routes.
+10. Persist a durable binding in `requested` or `pending_verification`.
+11. Allocate and persist the first domain verification attempt id according to ADR-006.
+12. Persist initial DNS observation state such as `pending` with the expected Appaloft edge target.
+13. Publish or record `domain-binding-requested` with the verification attempt id and redirect metadata when present.
+14. Return `ok({ id })`.
 
 ## Async Progression
 

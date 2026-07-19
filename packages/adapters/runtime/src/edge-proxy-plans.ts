@@ -46,10 +46,81 @@ export function routeInputsFromAccessRoutes(accessRoutes: AccessRoute[]): EdgePr
     pathHandling: route.pathHandling,
     tlsMode: route.tlsMode,
     ...(route.targetPort === undefined ? {} : { targetPort: route.targetPort }),
+    ...(route.targetServiceName ? { targetServiceName: route.targetServiceName } : {}),
     ...(route.routeBehavior === "redirect" ? { routeBehavior: route.routeBehavior } : {}),
     ...(route.redirectTo ? { redirectTo: route.redirectTo } : {}),
     ...(route.redirectStatus ? { redirectStatus: route.redirectStatus } : {}),
   }));
+}
+
+export interface ComposeProxyRouteTargetPlan {
+  serviceName: string;
+  labels: string[];
+  networkName?: string;
+}
+
+export async function createComposeProxyRouteRealizationPlan(input: {
+  providerRegistry: EdgeProxyProviderRegistry;
+  context: EdgeProxyExecutionContext;
+  deploymentId: string;
+  port: number;
+  accessRoutes: AccessRoute[];
+  defaultTargetServiceName?: string;
+  resourceAccessFailureRenderer?: ResourceAccessFailureRendererTarget;
+}): Promise<
+  Result<
+    {
+      routePlan: ProxyRouteRealizationPlan | null;
+      targets: ComposeProxyRouteTargetPlan[];
+    },
+    DomainError
+  >
+> {
+  const groupedRoutes = new Map<string, AccessRoute[]>();
+  for (const route of input.accessRoutes) {
+    const serviceName = route.targetServiceName ?? input.defaultTargetServiceName ?? "";
+    groupedRoutes.set(serviceName, [...(groupedRoutes.get(serviceName) ?? []), route]);
+  }
+
+  const targets: ComposeProxyRouteTargetPlan[] = [];
+  const plans: ProxyRouteRealizationPlan[] = [];
+  for (const [serviceName, accessRoutes] of groupedRoutes) {
+    const routePlan = await createProxyRouteRealizationPlan({
+      providerRegistry: input.providerRegistry,
+      context: input.context,
+      deploymentId: input.deploymentId,
+      port: accessRoutes[0]?.targetPort ?? input.port,
+      accessRoutes,
+      ...(input.resourceAccessFailureRenderer
+        ? { resourceAccessFailureRenderer: input.resourceAccessFailureRenderer }
+        : {}),
+    });
+    if (routePlan.isErr()) {
+      return err(routePlan.error);
+    }
+    if (!routePlan.value) {
+      continue;
+    }
+    plans.push(routePlan.value);
+    if (serviceName) {
+      targets.push({
+        serviceName,
+        labels: routePlan.value.labels,
+        ...(routePlan.value.networkName ? { networkName: routePlan.value.networkName } : {}),
+      });
+    }
+  }
+
+  const firstPlan = plans[0];
+  return ok({
+    routePlan: firstPlan
+      ? {
+          ...firstPlan,
+          labels: [...new Set(plans.flatMap((plan) => plan.labels))],
+        }
+      : null,
+    targets,
+  });
 }
 
 function firstProviderRoute(routes: EdgeProxyRouteInput[]): EdgeProxyRouteInput | undefined {

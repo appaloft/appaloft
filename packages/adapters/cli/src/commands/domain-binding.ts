@@ -18,8 +18,8 @@ import { cliCommandDescriptions } from "./docs-help.js";
 const projectIdOption = Options.text("project-id");
 const environmentIdOption = Options.text("environment-id");
 const resourceIdOption = Options.text("resource-id");
-const serverIdOption = Options.text("server-id");
-const destinationIdOption = Options.text("destination-id");
+const serverIdOption = Options.text("server-id").pipe(Options.optional);
+const destinationIdOption = Options.text("destination-id").pipe(Options.optional);
 const domainNameArg = Args.text({ name: "domainName" });
 const domainBindingIdArg = Args.text({ name: "domainBindingId" });
 const pathPrefixOption = Options.text("path-prefix").pipe(Options.withDefault("/"));
@@ -27,6 +27,7 @@ const pathHandlingOption = Options.choice("path-handling", routePathHandlingMode
   Options.withDefault("preserve"),
 );
 const tlsModeOption = Options.choice("tls-mode", tlsModes).pipe(Options.withDefault("auto"));
+const targetServiceNameOption = Options.text("target-service-name").pipe(Options.optional);
 const redirectToOption = Options.text("redirect-to").pipe(Options.optional);
 const redirectStatusOption = Options.choice("redirect-status", [
   "301",
@@ -76,6 +77,7 @@ const createCommand = EffectCommand.make(
     pathPrefix: pathPrefixOption,
     pathHandling: pathHandlingOption,
     tlsMode: tlsModeOption,
+    targetServiceName: targetServiceNameOption,
     redirectTo: redirectToOption,
     redirectStatus: redirectStatusOption,
     certificatePolicy: certificatePolicyOption,
@@ -94,25 +96,30 @@ const createCommand = EffectCommand.make(
     redirectTo,
     resourceId,
     serverId,
+    targetServiceName,
     tlsMode,
   }) => {
     const certificatePolicyValue = optionalValue(certificatePolicy);
     const idempotencyKeyValue = optionalValue(idempotencyKey);
     const redirectToValue = optionalValue(redirectTo);
     const redirectStatusValue = optionalValue(redirectStatus);
+    const serverIdValue = optionalValue(serverId);
+    const destinationIdValue = optionalValue(destinationId);
+    const targetServiceNameValue = optionalValue(targetServiceName);
 
     return runCommand(
       CreateDomainBindingCommand.create({
         projectId,
         environmentId,
         resourceId,
-        serverId,
-        destinationId,
+        ...(serverIdValue ? { serverId: serverIdValue } : {}),
+        ...(destinationIdValue ? { destinationId: destinationIdValue } : {}),
         domainName,
         pathPrefix,
         pathHandling,
         proxyKind: "traefik",
         tlsMode,
+        ...(targetServiceNameValue ? { targetServiceName: targetServiceNameValue } : {}),
         ...(redirectToValue ? { redirectTo: redirectToValue } : {}),
         ...(redirectStatusValue
           ? { redirectStatus: Number(redirectStatusValue) as 301 | 302 | 307 | 308 }

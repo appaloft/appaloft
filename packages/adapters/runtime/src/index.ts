@@ -40,6 +40,7 @@ import {
   PublicDomainName,
   RoutePathHandlingValue,
   RoutePathPrefix,
+  ResourceServiceName,
   RuntimeArtifactIntentValue,
   RuntimeArtifactKindValue,
   RuntimeArtifactSnapshot,
@@ -439,7 +440,22 @@ function createAccessRoutes(input: {
               requestedAccessRoute.pathHandling ?? "preserve",
             ),
             tlsMode: TlsModeValue.rehydrate(requestedAccessRoute.tlsMode),
-            ...(input.fallbackPort ? { targetPort: PortNumber.rehydrate(input.fallbackPort) } : {}),
+            ...(requestedAccessRoute.targetServiceName
+              ? {
+                  targetServiceName: yield* ResourceServiceName.create(
+                    requestedAccessRoute.targetServiceName,
+                  ),
+                }
+              : {}),
+            ...(() => {
+              const selectedService = requestedAccessRoute.targetServiceName
+                ? input.requestedDeployment.services?.find(
+                    (service) => service.name === requestedAccessRoute.targetServiceName,
+                  )
+                : undefined;
+              const targetPort = selectedService?.network?.internalPort ?? input.fallbackPort;
+              return targetPort ? { targetPort: PortNumber.rehydrate(targetPort) } : {};
+            })(),
             ...(requestedAccessRoute.redirectTo
               ? { redirectTo: yield* PublicDomainName.create(requestedAccessRoute.redirectTo) }
               : {}),

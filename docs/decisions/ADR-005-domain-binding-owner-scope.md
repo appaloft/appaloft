@@ -49,6 +49,9 @@ Future environment/project-level bindings must not be faked by using a placehold
 
 Deployment admission can reuse ready domain bindings for a specific resource without guessing route ownership.
 
+A resource-owned binding may select one service declared by that resource's compose stack. This
+does not transfer route ownership to the service and does not allow provider-native service names.
+
 The first implementation avoids ambiguous questions such as cross-environment domain promotion, shared apex domains, and path-based routing to multiple resources.
 
 The model remains extensible: environment-level and project-level routing can be added later without changing the meaning of existing resource-owned bindings.

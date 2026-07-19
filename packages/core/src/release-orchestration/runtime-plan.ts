@@ -56,6 +56,7 @@ import {
   type PlanStepText,
   type ProviderKey,
   type PublicDomainName,
+  type ResourceServiceName,
   type RoutePathPrefix,
   type SourceLocator,
 } from "../shared/text-values";
@@ -268,6 +269,7 @@ export interface AccessRouteState {
   pathHandling?: RoutePathHandlingValue;
   tlsMode: TlsModeValue;
   targetPort?: PortNumber;
+  targetServiceName?: ResourceServiceName;
   redirectTo?: PublicDomainName;
   redirectStatus?: CanonicalRedirectStatusCode;
 }
@@ -844,6 +846,10 @@ export class AccessRoute extends ValueObject<AccessRouteState> {
     return this.state.targetPort?.value;
   }
 
+  get targetServiceName(): string | undefined {
+    return this.state.targetServiceName?.value;
+  }
+
   get routeBehavior(): "serve" | "redirect" {
     return this.state.redirectTo ? "redirect" : "serve";
   }
@@ -872,6 +878,7 @@ export class AccessRoute extends ValueObject<AccessRouteState> {
       pathHandling: this.state.pathHandling ?? RoutePathHandlingValue.default(),
       tlsMode: this.state.tlsMode,
       ...(this.state.targetPort ? { targetPort: this.state.targetPort } : {}),
+      ...(this.state.targetServiceName ? { targetServiceName: this.state.targetServiceName } : {}),
       ...(this.state.redirectTo ? { redirectTo: this.state.redirectTo } : {}),
       ...(this.state.redirectStatus ? { redirectStatus: this.state.redirectStatus } : {}),
     };

@@ -2617,6 +2617,9 @@ export class MemoryDomainBindingReadModel implements DomainBindingReadModel {
           pathPrefix: domainBinding.pathPrefix.value,
           proxyKind: domainBinding.proxyKind.value,
           tlsMode: domainBinding.tlsMode.value,
+          ...(domainBinding.targetServiceName
+            ? { targetServiceName: domainBinding.targetServiceName.value }
+            : {}),
           ...(domainBinding.redirectTo ? { redirectTo: domainBinding.redirectTo.value } : {}),
           ...(domainBinding.redirectStatus
             ? { redirectStatus: domainBinding.redirectStatus.value }
@@ -2698,6 +2701,9 @@ export class MemoryDomainRouteBindingReader implements DomainRouteBindingReader 
         pathPrefix: domainBinding.pathPrefix.value,
         proxyKind: domainBinding.proxyKind.value,
         tlsMode: domainBinding.tlsMode.value,
+        ...(domainBinding.targetServiceName
+          ? { targetServiceName: domainBinding.targetServiceName.value }
+          : {}),
         ...(domainBinding.redirectTo ? { redirectTo: domainBinding.redirectTo.value } : {}),
         ...(domainBinding.redirectStatus
           ? { redirectStatus: domainBinding.redirectStatus.value }

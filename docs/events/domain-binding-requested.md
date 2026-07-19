@@ -51,6 +51,7 @@ type DomainBindingRequestedPayload = {
   destinationId: string;
   domainName: string;
   pathPrefix: string;
+  targetServiceName?: string;
   edgeProxyProviderKey?: string;
   tlsMode: "auto" | "disabled";
   redirectTo?: string;
@@ -67,6 +68,9 @@ Payload must not contain DNS provider credentials, certificate private keys, or 
 
 When `redirectTo` is present, the event still represents ownership verification for the source
 hostname. It does not mean the redirect route has been realized by the edge proxy.
+
+When `targetServiceName` is present, it is the validated service inside the resource-owned compose
+stack that receives the served route. It contains no provider-native service identifier.
 
 ## State Progression
 

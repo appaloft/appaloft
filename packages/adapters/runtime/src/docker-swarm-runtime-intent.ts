@@ -87,6 +87,7 @@ export interface DockerSwarmRouteIntent {
   pathHandling: "preserve" | "strip";
   tlsMode: string;
   targetPort?: number;
+  targetServiceName?: string;
   routeBehavior: "serve" | "redirect";
   redirectTo?: string;
   redirectStatus?: 301 | 302 | 307 | 308;
@@ -308,6 +309,15 @@ function dockerComposeOverrideContent(input: {
       realization.labels,
     ]),
   );
+  const routeTargetServiceNames = [
+    ...new Set(
+      input.intent.routes
+        .map((route) => route.targetServiceName)
+        .filter(
+          (name): name is string => Boolean(name && name !== input.intent.targetServiceName),
+        ),
+    ),
+  ].sort();
   const serviceLines = [
     "services:",
     `  ${yamlQuoted(input.intent.targetServiceName)}:`,
@@ -342,6 +352,11 @@ function dockerComposeOverrideContent(input: {
       : []),
     "    networks:",
     ...input.networkNames.map((networkName) => `      - ${yamlQuoted(networkName)}`),
+    ...routeTargetServiceNames.flatMap((serviceName) => [
+      `  ${yamlQuoted(serviceName)}:`,
+      "    networks:",
+      ...input.networkNames.map((networkName) => `      - ${yamlQuoted(networkName)}`),
+    ]),
   ];
   const networkLines = [
     "networks:",
@@ -708,6 +723,7 @@ function renderRoutes(input: {
         pathHandling: route.pathHandling,
         tlsMode: route.tlsMode,
         ...(targetPort ? { targetPort } : {}),
+        ...(route.targetServiceName ? { targetServiceName: route.targetServiceName } : {}),
         routeBehavior: route.routeBehavior,
         ...(route.redirectTo ? { redirectTo: route.redirectTo } : {}),
         ...(route.redirectStatus ? { redirectStatus: route.redirectStatus } : {}),
@@ -1218,12 +1234,44 @@ export function renderDockerSwarmApplyPlan(
     'if [ "$desired_replicas" -le 0 ] || [ "$running_count" -ne "$desired_replicas" ]; then docker service ps --no-trunc "$service_name"; exit 1; fi',
     ...(verifyEnvironmentKeys ? [verifyEnvironmentKeys] : []),
   ].join("; ");
-  const promoteCommand = commandParts([
-    "docker service update",
-    `--label-add ${shellQuote("appaloft.route-candidate=ready")}`,
-    routeLabelFlags(labels),
-    shellQuote(intent.serviceName),
-  ]);
+  const composeDefaultTargetServiceName =
+    intent.workload.kind === "compose" ? intent.workload.targetServiceName : undefined;
+  const promoteCommand =
+    intent.workload.kind === "compose"
+      ? [
+          ...new Set(
+            intent.routes.map(
+              (route) => route.targetServiceName ?? composeDefaultTargetServiceName ?? "",
+            ),
+          ),
+        ]
+          .map((targetServiceName) => {
+            const serviceName = `${intent.stackName}_${targetServiceName}`;
+            const targetLabels = routeLabels({
+              serviceName,
+              routes: intent.routes.filter(
+                (route) =>
+                  (route.targetServiceName ?? composeDefaultTargetServiceName) ===
+                  targetServiceName,
+              ),
+              ...(intent.resourceAccessFailureRenderer
+                ? { resourceAccessFailureRenderer: intent.resourceAccessFailureRenderer }
+                : {}),
+            });
+            return commandParts([
+              "docker service update",
+              `--label-add ${shellQuote("appaloft.route-candidate=ready")}`,
+              routeLabelFlags(targetLabels),
+              shellQuote(serviceName),
+            ]);
+          })
+          .join("; ")
+      : commandParts([
+          "docker service update",
+          `--label-add ${shellQuote("appaloft.route-candidate=ready")}`,
+          routeLabelFlags(labels),
+          shellQuote(intent.serviceName),
+        ]);
   const cleanupCommand = commandParts([
     "docker service ls -q",
     dockerServiceLabelFilters({

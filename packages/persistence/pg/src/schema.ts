@@ -430,6 +430,7 @@ export interface DomainBindingsTable {
   path_handling: string;
   proxy_kind: string;
   tls_mode: string;
+  target_service_name: string | null;
   redirect_to: string | null;
   redirect_status: number | null;
   certificate_policy: string;

@@ -328,6 +328,7 @@ export interface SerializedRuntimeExecutionPlan extends Record<string, unknown> 
     pathPrefix: string;
     tlsMode: TlsModeInput;
     targetPort?: number;
+    targetServiceName?: string;
   }>;
   verificationSteps?: Array<{
     kind: "internal-http" | "public-http";
@@ -795,6 +796,7 @@ export function serializeRuntimePlan(plan: RuntimePlanType): SerializedRuntimePl
               pathPrefix: route.pathPrefix,
               tlsMode: route.tlsMode,
               ...(typeof route.targetPort === "number" ? { targetPort: route.targetPort } : {}),
+              ...(route.targetServiceName ? { targetServiceName: route.targetServiceName } : {}),
             })),
           }
         : {}),
@@ -875,6 +877,9 @@ export function rehydrateRuntimePlan(raw: unknown): RuntimePlan {
                 tlsMode: TlsModeValue.rehydrate(route.tlsMode),
                 ...(typeof route.targetPort === "number"
                   ? { targetPort: PortNumber.rehydrate(route.targetPort) }
+                  : {}),
+                ...(route.targetServiceName
+                  ? { targetServiceName: ResourceServiceName.rehydrate(route.targetServiceName) }
                   : {}),
               }),
             ),
@@ -1355,6 +1360,9 @@ export function rehydrateDomainBindingRow(row: Selectable<Database["domain_bindi
     ),
     proxyKind: EdgeProxyKindValue.rehydrate(row.proxy_kind as EdgeProxyKindInput),
     tlsMode: TlsModeValue.rehydrate(row.tls_mode as TlsModeInput),
+    ...(row.target_service_name
+      ? { targetServiceName: ResourceServiceName.rehydrate(row.target_service_name) }
+      : {}),
     ...(row.redirect_to ? { redirectTo: PublicDomainName.rehydrate(row.redirect_to) } : {}),
     ...(row.redirect_status
       ? {
