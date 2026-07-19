@@ -1696,6 +1696,7 @@ export class Resource extends AggregateRoot<ResourceState> {
 
   configureRuntimeProfile(input: {
     runtimeProfile: ResourceRuntimeProfileState;
+    services?: ResourceServiceState[];
     configuredAt: UpdatedAt;
   }): Result<void> {
     const lifecycleGuard = this.rejectInactiveResource("resources.configure-runtime");
@@ -1726,7 +1727,32 @@ export class Resource extends AggregateRoot<ResourceState> {
       return err(validation.error);
     }
 
+    const services = input.services ?? this.state.services;
+    if (!this.state.kind.allowsMultipleServices() && services.length > 1) {
+      return err(
+        domainError.invariant("Only compose-stack resources can declare multiple services", {
+          phase: "resource-runtime-resolution",
+          resourceId: this.state.id.value,
+          kind: this.state.kind.value,
+          serviceCount: services.length,
+        }),
+      );
+    }
+    if (this.state.networkProfile) {
+      const networkValidation = validateResourceNetworkProfile({
+        resourceId: this.state.id,
+        kind: this.state.kind,
+        services,
+        networkProfile: this.state.networkProfile,
+        directPortAllowed: false,
+      });
+      if (networkValidation.isErr()) {
+        return err(networkValidation.error);
+      }
+    }
+
     const currentProfile = this.state.runtimeProfile;
+    this.state.services = [...services];
     this.state.runtimeProfile = {
       ...cloneResourceRuntimeProfileState(input.runtimeProfile),
       ...(currentProfile?.healthCheckPath
@@ -1746,6 +1772,14 @@ export class Resource extends AggregateRoot<ResourceState> {
         ? { runtimeName: input.runtimeProfile.runtimeName.value }
         : {}),
       ...(input.runtimeProfile.replicas ? { replicas: input.runtimeProfile.replicas.value } : {}),
+      ...(input.services
+        ? {
+            services: input.services.map((service) => ({
+              name: service.name.value,
+              kind: service.kind.value,
+            })),
+          }
+        : {}),
       configuredAt: input.configuredAt.value,
     });
 

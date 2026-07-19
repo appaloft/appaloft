@@ -1,11 +1,15 @@
 import { z } from "zod";
 
 import { nonEmptyTrimmedString } from "../shared-schema";
-import { configureResourceRuntimeProfileInputSchema } from "./create-resource.schema";
+import {
+  configureResourceRuntimeProfileInputSchema,
+  createResourceServiceInputSchema,
+} from "./create-resource.schema";
 
 export const configureResourceRuntimeCommandInputSchema = z.object({
   resourceId: nonEmptyTrimmedString("Resource id"),
   runtimeProfile: configureResourceRuntimeProfileInputSchema,
+  services: z.array(createResourceServiceInputSchema).optional(),
   idempotencyKey: nonEmptyTrimmedString("Idempotency key").optional(),
 });
 

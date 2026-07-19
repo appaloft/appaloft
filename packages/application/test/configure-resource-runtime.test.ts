@@ -5,6 +5,7 @@ import {
   ArchivedAt,
   CommandText,
   CreatedAt,
+  DockerComposeFilePath,
   type DomainEvent,
   EnvironmentId,
   HealthCheckExpectedStatusCode,
@@ -78,6 +79,23 @@ function archivedApplicationResourceFixture(): Resource {
     })
     ._unsafeUnwrap();
   return resource;
+}
+
+function composeResourceFixture(): Resource {
+  return Resource.rehydrate({
+    id: ResourceId.rehydrate("res_web"),
+    projectId: ProjectId.rehydrate("prj_demo"),
+    environmentId: EnvironmentId.rehydrate("env_demo"),
+    name: ResourceName.rehydrate("Platform"),
+    slug: ResourceSlug.rehydrate("platform"),
+    kind: ResourceKindValue.rehydrate("compose-stack"),
+    services: [],
+    runtimeProfile: {
+      strategy: RuntimePlanStrategyValue.rehydrate("docker-compose"),
+      dockerComposeFilePath: DockerComposeFilePath.rehydrate("/docker-compose.production.yml"),
+    },
+    createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+  });
 }
 
 function configuredEvent(events: unknown[]): DomainEvent {
@@ -254,5 +272,49 @@ describe("ConfigureResourceRuntimeUseCase", () => {
       },
     });
     expect(eventBus.events).toHaveLength(0);
+  });
+
+  test("[RES-PROFILE-RUNTIME-006] replaces the compose service graph", async () => {
+    const { context, eventBus, repositoryContext, resources, useCase } = await createHarness(
+      composeResourceFixture(),
+    );
+
+    const result = await useCase.execute(context, {
+      resourceId: "res_web",
+      runtimeProfile: {
+        strategy: "docker-compose",
+        dockerComposeFilePath: "docker-compose.production.yml",
+      },
+      services: [
+        { name: "web", kind: "web" },
+        { name: "api", kind: "api" },
+        { name: "projection-worker", kind: "worker" },
+      ],
+    });
+
+    expect(result.isOk()).toBe(true);
+    const persisted = await resources.findOne(
+      repositoryContext,
+      ResourceByIdSpec.create(ResourceId.rehydrate("res_web")),
+    );
+    expect(
+      persisted?.toState().services.map((service) => ({
+        name: service.name.value,
+        kind: service.kind.value,
+      })),
+    ).toEqual([
+      { name: "web", kind: "web" },
+      { name: "api", kind: "api" },
+      { name: "projection-worker", kind: "worker" },
+    ]);
+    expect(configuredEvent(eventBus.events).payload).toMatchObject({
+      resourceId: "res_web",
+      runtimePlanStrategy: "docker-compose",
+      services: [
+        { name: "web", kind: "web" },
+        { name: "api", kind: "api" },
+        { name: "projection-worker", kind: "worker" },
+      ],
+    });
   });
 });

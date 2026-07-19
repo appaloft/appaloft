@@ -846,7 +846,7 @@ The drift comparison uses the same Resource Profile Drift Visibility vocabulary 
 | Drift section | Config concern examples | Required command when the workflow applies the change |
 | --- | --- | --- |
 | `source` | source kind, locator, Git ref, base directory, Docker image tag/digest | `resources.configure-source` |
-| `runtime` | runtime strategy, install/build/start commands, runtime name, Dockerfile/Compose path, publish directory, build target | `resources.configure-runtime` |
+| `runtime` | runtime strategy, install/build/start commands, runtime name, Dockerfile/Compose path, publish directory, build target, and the complete named service graph for an explicitly applied existing Compose Resource | `resources.configure-runtime` |
 | `network` | internal port, upstream protocol, exposure mode, target service, host port | `resources.configure-network` |
 | `access` | generated access mode and generated route path prefix from trusted entry inputs when supported | `resources.configure-access` |
 | `health` | HTTP health policy fields | `resources.configure-health` |
@@ -868,6 +868,11 @@ reconciled through `resources.configure-health` after Resource identity is known
 ids-only deployment admission. `runtime.healthCheckPath` is only a shorthand for the same Resource
 HTTP health policy. The workflow must not smuggle health fields through `resources.configure-runtime`
 or `deployments.create`.
+
+When that explicit apply acknowledges service-graph drift, the workflow sends the complete graph
+through `resources.configure-runtime` before creating any domain binding whose
+`targetServiceName` depends on it. The command persists Resource authority first; domain routing
+does not infer or fabricate services from Compose text.
 
 ## Secret And Credential Rules
 

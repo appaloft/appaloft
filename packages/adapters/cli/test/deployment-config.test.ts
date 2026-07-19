@@ -2032,7 +2032,7 @@ describe("CLI deployment config entry workflow", () => {
     expect("tlsMode" in (deployment as Record<string, unknown>)).toBe(false);
   });
 
-  test("[CONFIG-FILE-DOMAIN-005] control-plane config domains reconcile through managed domain bindings", async () => {
+  test("[CONFIG-FILE-DOMAIN-005][CONFIG-FILE-SERVICE-GRAPH-006] control-plane config reconciles services before managed domain bindings", async () => {
     ensureReflectMetadata();
     const { resolveInteractiveDeploymentInput } = await import(
       "../src/commands/deployment-interaction"
@@ -2056,6 +2056,31 @@ describe("CLI deployment config entry workflow", () => {
       },
       executeQuery: async <T>(message: AppQuery<T>) => {
         queries.push(message.constructor.name);
+        if (message.constructor.name === "ShowResourceQuery") {
+          return ok({
+            resource: {
+              id: "res_existing",
+              projectId: "proj_existing",
+              environmentId: "env_existing",
+              name: "Platform",
+              slug: "platform",
+              kind: "compose-stack",
+              services: [],
+              lifecycleStatus: "active",
+              createdAt: "2026-07-19T00:00:00.000Z",
+            },
+            runtimeProfile: {
+              strategy: "docker-compose",
+              dockerComposeFilePath: "/docker-compose.yml",
+            },
+            networkProfile: {
+              internalPort: 3000,
+              upstreamProtocol: "http",
+              exposureMode: "reverse-proxy",
+              targetServiceName: "web",
+            },
+          } as T);
+        }
         if (message.constructor.name === "ListDomainBindingsQuery") {
           return ok({
             items: [
@@ -2148,6 +2173,21 @@ describe("CLI deployment config entry workflow", () => {
     const domainCommands = commands.filter(
       (command) => command.constructor.name === "CreateDomainBindingCommand",
     );
+    const runtimeCommandIndex = commands.findIndex(
+      (command) => command.constructor.name === "ConfigureResourceRuntimeCommand",
+    );
+    const firstDomainCommandIndex = commands.findIndex(
+      (command) => command.constructor.name === "CreateDomainBindingCommand",
+    );
+    expect(runtimeCommandIndex).toBeGreaterThanOrEqual(0);
+    expect(runtimeCommandIndex).toBeLessThan(firstDomainCommandIndex);
+    expect(commands[runtimeCommandIndex]).toMatchObject({
+      resourceId: "res_existing",
+      services: [
+        { name: "web", kind: "web" },
+        { name: "api", kind: "web" },
+      ],
+    });
     expect(domainCommands).toHaveLength(3);
     expect(domainCommands).toMatchObject([
       {

@@ -183,6 +183,7 @@ This matrix inherits:
 | CONFIG-FILE-SERVICE-GRAPH-003 | integration | First-run Resource services created | Config declares multiple services and no existing Resource is selected | Config deploy creates a Resource with `kind = compose-stack` and declared service names/kinds; deployment remains ids-only | None | `resources.create(services)` -> `deployments.create(ids only)` |
 | CONFIG-FILE-SERVICE-GRAPH-004 | integration | Existing Resource service drift blocks deploy | Selected Resource declares different service metadata from config | Config deploy fails before deployment instead of ignoring the graph | `resource_profile_drift`, phase `resource-profile-resolution` | `resources.show`; no `deployments.create` |
 | CONFIG-FILE-SERVICE-GRAPH-005 | integration | Workspace services plan as one Compose stack | Config declares `services.web` and `services.worker` with `workspace-commands`, exposed web network profile, private worker profile, and worker replicas | Runtime planning produces `buildStrategy = workspace-commands`, `execution.kind = docker-compose-stack`, generated Compose metadata, exposed-service route metadata, and private service metadata for workers | None | config entry workflow -> `deployments.create(ids only + internal service graph planning snapshot)` -> runtime planner |
+| CONFIG-FILE-SERVICE-GRAPH-006 | integration | Explicit apply reconciles existing Resource service graph | Selected Compose Resource differs from config and the caller acknowledges profile drift | Workflow dispatches `resources.configure-runtime` with the complete service graph before service-targeted domain bindings and ids-only deployment admission | None | `resources.show` -> `resources.configure-runtime(runtime + services)` -> `domain-bindings.create(targetServiceName)` -> `deployments.create(ids only)` |
 
 ## Application Graph Matrix
 
@@ -457,9 +458,11 @@ Current implemented coverage:
   `CONFIG-FILE-PREVIEW-OVERLAY-001` through `CONFIG-FILE-PREVIEW-OVERLAY-002`, and
   `CONFIG-FILE-NAMED-PROFILE-001` through `CONFIG-FILE-NAMED-PROFILE-002` are covered in
   `packages/deployment-config/test/appaloft-config.test.ts`.
-- `CONFIG-FILE-SERVICE-GRAPH-003` through `CONFIG-FILE-SERVICE-GRAPH-004` are covered in
+- `CONFIG-FILE-SERVICE-GRAPH-003`, `CONFIG-FILE-SERVICE-GRAPH-004`, and
+  `CONFIG-FILE-SERVICE-GRAPH-006` are covered in
   `packages/adapters/cli/test/deployment-config.test.ts`, proving first-run Resource service
-  metadata creation and existing Resource service drift blocking.
+  metadata creation, existing Resource service drift blocking, and explicit existing-Resource
+  service reconciliation before service-targeted domain commands.
 - `CONFIG-FILE-DISC-002` and config identity rejection through the filesystem adapter are covered in
   `packages/adapters/filesystem/test/deployment-config-reader.test.ts`.
 - `QUICK-DEPLOY-ENTRY-010` and `CONFIG-FILE-ENTRY-001` profile-to-quick-deploy resource draft
