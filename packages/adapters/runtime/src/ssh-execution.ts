@@ -168,6 +168,30 @@ function shellQuote(input: string): string {
   return `'${input.replaceAll("'", "'\\''")}'`;
 }
 
+export function buildRemoteComposeFailureLogsCommand(input: {
+  composeFile: string;
+  additionalComposeFiles?: readonly string[];
+  projectName: string;
+  tail: number;
+}): string {
+  const tail = Math.max(1, Math.min(1_000, Math.trunc(input.tail)));
+  return [
+    "docker compose",
+    "-p",
+    shellQuote(input.projectName),
+    "-f",
+    shellQuote(input.composeFile),
+    ...(input.additionalComposeFiles ?? []).flatMap((composeFile) => [
+      "-f",
+      shellQuote(composeFile),
+    ]),
+    "logs",
+    "--no-color",
+    "--tail",
+    shellQuote(String(tail)),
+  ].join(" ");
+}
+
 function remoteGeneratedDockerBuildAssetPath(remoteWorkdir: string, relativePath: string): string {
   return `${remoteWorkdir.replace(/\/+$/, "")}/${normalizeGeneratedDockerBuildAssetPath(
     relativePath,
@@ -3875,6 +3899,36 @@ export class SshExecutionBackend implements ExecutionBackend {
         });
 
       if (up.failed) {
+        const failureLogsMessage = "Capture bounded Docker Compose failure logs";
+        timeline.push(phaseLog("deploy", failureLogsMessage, "warn"));
+        await this.report(context, {
+          deploymentId: state.id.value,
+          phase: "deploy",
+          status: "running",
+          message: failureLogsMessage,
+        });
+        await this.runRemoteCommandStreaming({
+          target,
+          command: withRemoteRuntimeEnvironmentFile({
+            envFile: remoteRuntimeEnvFile,
+            command: buildRemoteComposeFailureLogsCommand({
+              composeFile: remoteComposeFile,
+              additionalComposeFiles: [remoteComposeOwnershipOverrideFile],
+              projectName: runtimeInstanceNames.composeProjectName,
+              tail: 200,
+            }),
+          }),
+          cwd: runtimeDir,
+          env: runtimeEnv.value.env,
+          redactions: runtimeEnv.value.redactions,
+          timeoutMs: 30_000,
+          timeoutMessage: "Docker Compose failure log capture timed out",
+          onOutput: this.createStreamingOutputSink(timeline, {
+            context,
+            deploymentId: state.id.value,
+            phase: "deploy",
+          }),
+        });
         await cleanupCandidate();
         const message = "SSH Docker Compose deployment failed";
         timeline.push(phaseLog("deploy", message, "error"));

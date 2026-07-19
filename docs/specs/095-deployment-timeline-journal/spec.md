@@ -32,6 +32,7 @@ without creating two competing timelines.
 | DEP-TIMELINE-004 | Durable reconnect | a client disconnects after receiving a cursor | it follows `deployments.timeline.stream` with that cursor | replay resumes strictly after the cursor or returns a governed gap entry. |
 | DEP-TIMELINE-005 | Domain events are not the UI timeline | deployment domain events are recorded for retention | deployment detail opens | domain events may produce journal entries, but the UI reads the timeline journal, not `domain_event_stream_records`. |
 | DEP-TIMELINE-006 | Legacy surfaces removed | code or generated SDK scans active operations | operation catalog is built | `deployments.logs`, `deployments.logs.prune`, and `deployments.stream-events` are absent; timeline operations are present. |
+| DEP-TIMELINE-007 | Failed Compose startup keeps bounded candidate logs | `docker compose up` fails after one or more candidate services start or exit | the SSH execution adapter records failure and cleans up the candidate | Appaloft captures at most 200 non-following Compose log lines through the redacted deployment timeline before removing candidate containers, so init-job and service failures remain diagnosable after cleanup. |
 
 ## Domain Ownership
 
