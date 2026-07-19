@@ -2022,6 +2022,27 @@ describe("CLI deployment config entry workflow", () => {
       },
       executeQuery: async <T>(message: AppQuery<T>) => {
         queries.push(message.constructor.name);
+        if (message.constructor.name === "ListDomainBindingsQuery") {
+          return ok({
+            items: [
+              {
+                id: "dmb_deleted",
+                projectId: "proj_existing",
+                environmentId: "env_existing",
+                resourceId: "res_existing",
+                domainName: "app.example.com",
+                pathPrefix: "/",
+                pathHandling: "preserve",
+                proxyKind: "traefik",
+                tlsMode: "auto",
+                status: "deleted",
+                certificatePolicy: "auto",
+                verificationAttemptCount: 1,
+                createdAt: "2026-07-19T00:00:00.000Z",
+              },
+            ],
+          } as T);
+        }
         return ok({ items: [] } as T);
       },
     });
@@ -2099,6 +2120,8 @@ describe("CLI deployment config entry workflow", () => {
         domainName: "app.example.com",
         pathPrefix: "/",
         targetServiceName: "web",
+        idempotencyKey:
+          "repository-config-domain:proj_existing:env_existing:res_existing:app.example.com:/:replaces:dmb_deleted",
       },
       {
         domainName: "app.example.com",

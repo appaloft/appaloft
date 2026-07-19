@@ -1165,7 +1165,9 @@ e2e, HTTP-schema
 contract coverage, existing-resource profile drift handling, stored/external secret adapters beyond
 `ci-env:` and `resource-secret:`, Dockerfile/Compose path mapping, operational provisioning of the external SSH e2e
 secrets/target, real HTTP/HTTPS public validation for canonical redirects, provider-owned ACME
-history, and managed domain control-plane mapping remain follow-up work.
+history, and broader managed-domain production coverage remain follow-up work. Control-plane config
+deploys reconcile managed domain bindings, retain active-binding drift protection, and replace
+failed or deleted historical bindings with a replacement-specific idempotency key.
 
 ## Open Questions
 
