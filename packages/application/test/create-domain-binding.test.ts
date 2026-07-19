@@ -77,6 +77,7 @@ import {
   toRepositoryContext,
 } from "../src";
 import { CreateDomainBindingCommand } from "../src/operations/domain-bindings/create-domain-binding.command";
+import { CreateDomainBindingCommandHandler } from "../src/operations/domain-bindings/create-domain-binding.handler";
 import {
   CreateDomainBindingUseCase,
   InspectDomainBindingDnsReadinessQueryService,
@@ -298,7 +299,7 @@ describe("CreateDomainBindingUseCase", () => {
     const { context, domainBindings, eventBus, repositoryContext, useCase } =
       await seedRoutingContext({ serviceNames: ["web", "api"] });
 
-    const result = await useCase.execute(context, {
+    const command = CreateDomainBindingCommand.create({
       projectId: "prj_demo",
       environmentId: "env_demo",
       resourceId: "res_demo",
@@ -309,7 +310,8 @@ describe("CreateDomainBindingUseCase", () => {
       proxyKind: "traefik",
       tlsMode: "auto",
       targetServiceName: "api",
-    });
+    })._unsafeUnwrap();
+    const result = await new CreateDomainBindingCommandHandler(useCase).handle(context, command);
 
     expect(result.isOk()).toBe(true);
     const id = result._unsafeUnwrap().id;
