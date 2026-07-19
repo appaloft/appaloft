@@ -3817,6 +3817,7 @@ export class SshExecutionBackend implements ExecutionBackend {
               labels: dockerLabelsFromAssignments(target.labels),
               ...(target.networkName ? { networkName: target.networkName } : {}),
             })),
+            sharedNetworkNames: [...runtimeEnv.value.networkNames],
             mounts: storageMounts.value,
             volumeRealizations: storageVolumeRealizations.value,
             environmentKeys: runtimeEnvVariables.map((variable) => variable.name),

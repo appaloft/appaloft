@@ -72,6 +72,7 @@ export function renderComposeOwnershipLabelOverrideScript(input: {
   targetServiceName?: string;
   targetLabels?: readonly RuntimeCommandLabel[];
   targetNetworkName?: string;
+  sharedNetworkNames?: readonly string[];
   serviceTargets?: readonly {
     serviceName: string;
     labels: readonly RuntimeCommandLabel[];
@@ -101,11 +102,20 @@ export function renderComposeOwnershipLabelOverrideScript(input: {
   });
   const targetNetworkNames = [
     ...new Set(
-      [input.targetNetworkName, ...serviceTargets.map((target) => target.networkName)].filter(
+      [
+        ...(input.sharedNetworkNames ?? []),
+        input.targetNetworkName,
+        ...serviceTargets.map((target) => target.networkName),
+      ].filter(
         (name): name is string => Boolean(name),
       ),
     ),
   ].sort();
+  const sharedNetworkNames = [...new Set(input.sharedNetworkNames ?? [])].sort();
+  const targetOnlyNetworkName =
+    input.targetNetworkName && !sharedNetworkNames.includes(input.targetNetworkName)
+      ? input.targetNetworkName
+      : undefined;
   const topLevelNetworkLines = targetNetworkNames.length > 0
     ? [
         "networks:",
@@ -150,6 +160,9 @@ export function renderComposeOwnershipLabelOverrideScript(input: {
         ]
       : []),
     "tmp_file=\"${override_file}.tmp\"",
+    ...(sharedNetworkNames.length > 0
+      ? ["# managed dependency networks are attached to every service"]
+      : []),
     "{",
     "  printf '%s\\n' 'services:'",
     '  printf "%s\\n" "$services" | while IFS= read -r service; do',
@@ -169,10 +182,10 @@ export function renderComposeOwnershipLabelOverrideScript(input: {
           '    if [ "$service" = "$target_service" ]; then',
           ...targetLabelLines.map((line) => `      printf '%s\\n' ${input.quote(line)}`),
           ...environmentLines.map((line) => `      printf '%s\\n' ${input.quote(line)}`),
-          ...(input.targetNetworkName
+          ...(targetOnlyNetworkName
             ? [
                 `      printf '%s\\n' ${input.quote("    networks:")}`,
-                `      printf '%s\\n' ${input.quote(`      - ${yamlQuoted(input.targetNetworkName)}`)}`,
+                `      printf '%s\\n' ${input.quote(`      - ${yamlQuoted(targetOnlyNetworkName)}`)}`,
               ]
             : []),
           "    fi",
@@ -181,7 +194,7 @@ export function renderComposeOwnershipLabelOverrideScript(input: {
     ...serviceTargets.flatMap((target) => [
       `    if [ "$service" = ${input.quote(target.serviceName)} ]; then`,
       ...target.labelLines.map((line) => `      printf '%s\\n' ${input.quote(line)}`),
-      ...(target.networkName
+      ...(target.networkName && !sharedNetworkNames.includes(target.networkName)
         ? [
             `      printf '%s\\n' ${input.quote("    networks:")}`,
             `      printf '%s\\n' ${input.quote(`      - ${yamlQuoted(target.networkName)}`)}`,
@@ -200,6 +213,15 @@ export function renderComposeOwnershipLabelOverrideScript(input: {
     ...staticLines,
     ...labelLines.map((line) => `    printf '%s\\n' ${input.quote(line)}`),
     ...mountLines.map((line) => `    printf '%s\\n' ${input.quote(line)}`),
+    ...(sharedNetworkNames.length > 0
+      ? [
+          `    printf '%s\\n' ${input.quote("    networks:")}`,
+          ...sharedNetworkNames.map(
+            (networkName) =>
+              `    printf '%s\\n' ${input.quote(`      - ${yamlQuoted(networkName)}`)}`,
+          ),
+        ]
+      : []),
     ...footerLines,
   ].join("\n");
 }
