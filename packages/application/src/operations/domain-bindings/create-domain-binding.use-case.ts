@@ -281,7 +281,7 @@ export class CreateDomainBindingUseCase {
       }
 
       let dnsExpectedTargetValue = `Route provider target for resource ${resourceId.value}`;
-      if (serverId && destinationId) {
+      if (serverId) {
         const server = await serverRepository.findOne(
           repositoryContext,
           DeploymentTargetByIdSpec.create(serverId),
@@ -291,18 +291,20 @@ export class CreateDomainBindingUseCase {
         }
         const serverState = server.toState();
 
-        const destination = await destinationRepository.findOne(
-          repositoryContext,
-          DestinationByIdSpec.create(destinationId),
-        );
-        if (!destination) {
-          return err(domainError.notFound("Destination", destinationId.value));
-        }
-        if (!destination.belongsToServer(serverId)) {
-          return contextMismatch("Destination does not belong to server", {
-            serverId: serverId.value,
-            destinationId: destinationId.value,
-          });
+        if (destinationId) {
+          const destination = await destinationRepository.findOne(
+            repositoryContext,
+            DestinationByIdSpec.create(destinationId),
+          );
+          if (!destination) {
+            return err(domainError.notFound("Destination", destinationId.value));
+          }
+          if (!destination.belongsToServer(serverId)) {
+            return contextMismatch("Destination does not belong to server", {
+              serverId: serverId.value,
+              destinationId: destinationId.value,
+            });
+          }
         }
 
         dnsExpectedTargetValue = serverState.host.value;
