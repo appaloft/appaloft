@@ -1673,6 +1673,12 @@ export const deployCommand = EffectCommand.make(
         selectedConfig && previewContext
           ? applyAppaloftDeploymentPreviewProfile(selectedConfig)
           : selectedConfig;
+      const configuredDeploymentContext = effectiveConfig?.controlPlane?.deploymentContext;
+      const effectiveProjectId = projectId ?? configuredDeploymentContext?.projectId;
+      const effectiveServerId = serverId ?? configuredDeploymentContext?.serverId;
+      const effectiveDestinationId = destinationId ?? configuredDeploymentContext?.destinationId;
+      const effectiveEnvironmentId = environmentId ?? configuredDeploymentContext?.environmentId;
+      const effectiveResourceId = resourceId ?? configuredDeploymentContext?.resourceId;
       const configPreviewDomainTemplate = previewContext
         ? effectiveConfig?.preview?.pullRequest?.domainTemplate
         : undefined;
@@ -1733,7 +1739,7 @@ export const deployCommand = EffectCommand.make(
         : undefined;
       const configuredSourceLocator = normalizedSourceLocator;
       const resourceSpec =
-        !resourceId && (resourceNameValue || configuredSourceLocator)
+        !effectiveResourceId && (resourceNameValue || configuredSourceLocator)
           ? withConfigServiceGraph(
               {
                 name: resourceNameValue ?? inferResourceName(configuredSourceLocator ?? "."),
@@ -1844,13 +1850,13 @@ export const deployCommand = EffectCommand.make(
           });
         });
       const commonSeedInput = {
-        ...(projectId ? { projectId } : {}),
-        ...(serverId ? { serverId } : {}),
+        ...(effectiveProjectId ? { projectId: effectiveProjectId } : {}),
+        ...(effectiveServerId ? { serverId: effectiveServerId } : {}),
         ...(serverSpec ? { serverSpec } : {}),
-        ...(destinationId ? { destinationId } : {}),
-        ...(environmentId ? { environmentId } : {}),
+        ...(effectiveDestinationId ? { destinationId: effectiveDestinationId } : {}),
+        ...(effectiveEnvironmentId ? { environmentId: effectiveEnvironmentId } : {}),
         ...(previewContext ? { previewContext } : {}),
-        ...(resourceId ? { resourceId } : {}),
+        ...(effectiveResourceId ? { resourceId: effectiveResourceId } : {}),
         ...(resourceSpec ? { resourceSpec } : {}),
         ...(deploymentMethod ? { deploymentMethod } : {}),
         ...(installCommand ? { installCommand } : {}),

@@ -1086,6 +1086,14 @@ describe("CLI deployment config entry workflow", () => {
     writeFileSync(
       configPath,
       [
+        "controlPlane:",
+        "  mode: cloud",
+        "  deploymentContext:",
+        "    projectId: proj_1",
+        "    environmentId: env_1",
+        "    resourceId: res_context_default",
+        "    serverId: srv_1",
+        "    destinationId: dst_context",
         "applications:",
         "  api:",
         "    resource:",
@@ -1167,10 +1175,6 @@ describe("CLI deployment config entry workflow", () => {
               workspace,
               "--config",
               configPath,
-              "--server-host",
-              "203.0.113.93",
-              "--server-provider",
-              "generic-ssh",
             ]);
           }),
       );
@@ -1228,12 +1232,14 @@ describe("CLI deployment config entry workflow", () => {
       expect.objectContaining({
         projectId: "proj_1",
         serverId: "srv_1",
+        destinationId: "dst_context",
         environmentId: "env_1",
         resourceId: "res_1",
       }),
       expect.objectContaining({
         projectId: "proj_1",
         serverId: "srv_1",
+        destinationId: "dst_context",
         environmentId: "env_1",
         resourceId: "res_2",
       }),
