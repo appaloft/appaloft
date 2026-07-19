@@ -2,6 +2,51 @@ import { describe, expect, test } from "bun:test";
 import { renderTraefikResourceAccessFailureMiddleware, TraefikEdgeProxyProvider } from "../src";
 
 describe("TraefikEdgeProxyProvider", () => {
+  test("[ROUTE-TLS-ENTRY-023] namespaces router labels by compose target service", async () => {
+    const provider = new TraefikEdgeProxyProvider();
+    const web = await provider.realizeRoutes(
+      { correlationId: "req_web_route" },
+      {
+        deploymentId: "dep_platform",
+        port: 3000,
+        accessRoutes: [
+          {
+            proxyKind: "traefik",
+            domains: ["app.example.com"],
+            pathPrefix: "/",
+            tlsMode: "auto",
+            targetPort: 3000,
+            targetServiceName: "web",
+          },
+        ],
+      },
+    );
+    const api = await provider.realizeRoutes(
+      { correlationId: "req_api_route" },
+      {
+        deploymentId: "dep_platform",
+        port: 3001,
+        accessRoutes: [
+          {
+            proxyKind: "traefik",
+            domains: ["app.example.com"],
+            pathPrefix: "/api",
+            tlsMode: "auto",
+            targetPort: 3001,
+            targetServiceName: "api",
+          },
+        ],
+      },
+    );
+
+    expect(web._unsafeUnwrap().labels).toContain(
+      "traefik.http.routers.dep-platform-web.rule=Host(`app.example.com`)",
+    );
+    expect(api._unsafeUnwrap().labels).toContain(
+      "traefik.http.routers.dep-platform-api.rule=(Host(`app.example.com`)) && PathPrefix(`/api`)",
+    );
+  });
+
   test("renders provider-owned Docker labels and ensure plan", async () => {
     const provider = new TraefikEdgeProxyProvider();
     const ensure = await provider.ensureProxy(

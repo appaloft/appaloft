@@ -263,11 +263,12 @@ function routeAccessFailureMiddlewareConfig(input: {
   if (!query) {
     return input.base;
   }
+  const suffix = routeNameSuffix(input.route, input.index);
 
   const middlewareName = safeTraefikName(
     `${sanitizeRouteName({
       deploymentId: input.deploymentId,
-      ...(input.index === 0 ? {} : { suffix: String(input.index) }),
+      ...(suffix ? { suffix } : {}),
     })}-access-errors`,
     input.base.middlewareName,
   );
@@ -278,6 +279,13 @@ function routeAccessFailureMiddlewareConfig(input: {
     ...(input.base.serviceUrl ? { serviceUrl: input.base.serviceUrl } : {}),
     queryParams: query,
   });
+}
+
+function routeNameSuffix(route: EdgeProxyRouteInput, index: number): string | undefined {
+  const parts = [route.targetServiceName, index === 0 ? undefined : String(index)].filter(
+    (part): part is string => Boolean(part),
+  );
+  return parts.length > 0 ? parts.join("-") : undefined;
 }
 
 function traefikRule(route: EdgeProxyRouteInput): string {
@@ -422,9 +430,10 @@ function labelsForTraefik(input: {
   index: number;
   accessFailureMiddlewareName?: string;
 }): string[] {
+  const suffix = routeNameSuffix(input.route, input.index);
   const router = sanitizeRouteName({
     deploymentId: input.deploymentId,
-    ...(input.index === 0 ? {} : { suffix: String(input.index) }),
+    ...(suffix ? { suffix } : {}),
   });
   const autoTlsLabels =
     input.route.tlsMode === "auto"

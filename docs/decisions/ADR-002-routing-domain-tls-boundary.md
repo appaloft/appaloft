@@ -59,6 +59,7 @@ Route snapshots must be resolved from:
 - `ResourceNetworkProfile`;
 - ready or pending durable `DomainBinding` state when explicitly allowed, including redirect-only
   aliases that still require ownership and TLS coverage for the redirecting host;
+- an optional resource-owned compose service target selected by each served binding;
 - configured default access domain policy;
 - selected deployment target/server public address and proxy readiness;
 - certificate/TLS state when TLS is required.

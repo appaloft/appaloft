@@ -98,6 +98,39 @@ describe("compose ownership label overrides", () => {
     expect(script).toContain('    name: "appaloft-edge"');
   });
 
+  test("[ROUTE-TLS-ENTRY-023] scopes route labels to multiple compose services", () => {
+    const script = renderComposeOwnershipLabelOverrideScript({
+      composeFile: "/srv/app/docker-compose.yml",
+      overrideFile: "/srv/app/.appaloft.compose.labels.override.yml",
+      labels: dockerLabelsFromAssignments(["appaloft.managed=true"]),
+      targetServiceName: "web",
+      environmentKeys: ["DATABASE_URL"],
+      serviceTargets: [
+        {
+          serviceName: "web",
+          labels: dockerLabelsFromAssignments([
+            "traefik.http.routers.web.rule=Host(`app.example.com`)",
+          ]),
+          networkName: "appaloft-edge",
+        },
+        {
+          serviceName: "api",
+          labels: dockerLabelsFromAssignments([
+            "traefik.http.routers.api.rule=Host(`app.example.com`) && PathPrefix(`/api`)",
+          ]),
+          networkName: "appaloft-edge",
+        },
+      ],
+      quote: shellQuote,
+    });
+
+    expect(script).toContain('if [ "$service" = \'web\' ]; then');
+    expect(script).toContain('if [ "$service" = \'api\' ]; then');
+    expect(script).toContain('"traefik.http.routers.web.rule"');
+    expect(script).toContain('"traefik.http.routers.api.rule"');
+    expect(script.match(/  "appaloft-edge":/g)).toHaveLength(1);
+  });
+
   test("[CPS-SUBSTRATE-009] injects runtime environment keys into the target service without values", () => {
     const script = renderComposeOwnershipLabelOverrideScript({
       composeFile: "/srv/app/docker-compose.yml",

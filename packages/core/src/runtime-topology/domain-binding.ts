@@ -22,6 +22,7 @@ import {
   type ErrorCodeText,
   type MessageText,
   type PublicDomainName,
+  type ResourceServiceName,
   type RoutePathPrefix,
 } from "../shared/text-values";
 import { ScalarValueObject } from "../shared/value-object";
@@ -406,6 +407,7 @@ export interface DomainBindingState {
   pathHandling?: RoutePathHandlingValue;
   proxyKind: EdgeProxyKindValue;
   tlsMode: TlsModeValue;
+  targetServiceName?: ResourceServiceName;
   redirectTo?: PublicDomainName;
   redirectStatus?: CanonicalRedirectStatusCode;
   certificatePolicy: CertificatePolicyValue;
@@ -463,6 +465,7 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
     pathHandling?: RoutePathHandlingValue;
     proxyKind: EdgeProxyKindValue;
     tlsMode: TlsModeValue;
+    targetServiceName?: ResourceServiceName;
     redirectTo?: PublicDomainName;
     redirectStatus?: CanonicalRedirectStatusCode;
     certificatePolicy?: CertificatePolicyValue;
@@ -488,6 +491,16 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
         domainError.validation("Domain binding redirect status requires redirect target", {
           phase: "domain-binding-admission",
           domainName: input.domainName.value,
+        }),
+      );
+    }
+
+    if (input.redirectTo && input.targetServiceName) {
+      return err(
+        domainError.validation("Redirect domain bindings cannot declare a target service", {
+          phase: "domain-binding-admission",
+          domainName: input.domainName.value,
+          targetServiceName: input.targetServiceName.value,
         }),
       );
     }
@@ -521,6 +534,7 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
       pathHandling: input.pathHandling ?? RoutePathHandlingValue.default(),
       proxyKind: input.proxyKind,
       tlsMode: input.tlsMode,
+      ...(input.targetServiceName ? { targetServiceName: input.targetServiceName } : {}),
       ...(input.redirectTo ? { redirectTo: input.redirectTo } : {}),
       ...(redirectStatus ? { redirectStatus } : {}),
       certificatePolicy,
@@ -560,6 +574,7 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
       pathHandling: (input.pathHandling ?? RoutePathHandlingValue.default()).value,
       proxyKind: input.proxyKind.value,
       tlsMode: input.tlsMode.value,
+      ...(input.targetServiceName ? { targetServiceName: input.targetServiceName.value } : {}),
       ...(input.redirectTo
         ? {
             redirectTo: input.redirectTo.value,
@@ -1015,6 +1030,19 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
           phase: "domain-binding-route-configuration",
           domainBindingId: this.state.id.value,
         }),
+      );
+    }
+
+    if (input.redirectTo && this.state.targetServiceName) {
+      return err(
+        domainError.validation(
+          "A service-targeted domain binding cannot be changed into a redirect",
+          {
+            phase: "domain-binding-route-configuration",
+            domainBindingId: this.state.id.value,
+            targetServiceName: this.state.targetServiceName.value,
+          },
+        ),
       );
     }
 

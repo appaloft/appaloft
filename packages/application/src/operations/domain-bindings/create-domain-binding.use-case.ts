@@ -24,6 +24,7 @@ import {
   PublicDomainName,
   ResourceByIdSpec,
   ResourceId,
+  ResourceServiceName,
   type Result,
   RoutePathHandlingValue,
   RoutePathPrefix,
@@ -187,6 +188,9 @@ export class CreateDomainBindingUseCase {
       const pathHandling = yield* RoutePathHandlingValue.create(input.pathHandling ?? "preserve");
       const proxyKind = yield* EdgeProxyKindValue.create(input.proxyKind);
       const tlsMode = yield* TlsModeValue.create(input.tlsMode ?? "auto");
+      const targetServiceName = input.targetServiceName
+        ? yield* ResourceServiceName.create(input.targetServiceName)
+        : undefined;
       if (input.redirectStatus && !input.redirectTo) {
         return err(
           domainError.validation("Canonical redirect status requires redirect target", {
@@ -258,6 +262,15 @@ export class CreateDomainBindingUseCase {
           environmentId: environmentId.value,
           resourceId: resourceId.value,
         });
+      }
+      if (targetServiceName && !resource.hasService(targetServiceName)) {
+        return err(
+          domainError.validation("Domain route target service must be declared on the resource", {
+            phase: "domain-binding-admission",
+            resourceId: resourceId.value,
+            targetServiceName: targetServiceName.value,
+          }),
+        );
       }
       if (destinationId && !resource.canDeployToDestination(destinationId)) {
         return contextMismatch("Resource default destination does not match binding destination", {
@@ -399,6 +412,7 @@ export class CreateDomainBindingUseCase {
         pathHandling,
         proxyKind,
         tlsMode,
+        ...(targetServiceName ? { targetServiceName } : {}),
         ...(redirectTo ? { redirectTo } : {}),
         ...(redirectStatus ? { redirectStatus } : {}),
         ...(certificatePolicy ? { certificatePolicy } : {}),
