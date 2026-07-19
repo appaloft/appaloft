@@ -4786,10 +4786,16 @@ function persistServerAppliedRouteDesiredStateIfNeeded(input: {
       );
 
       for (const route of orderedRoutes) {
-        const existing = existingBindings.find(
+        const matchingBindings = existingBindings.filter(
           (binding) =>
             binding.domainName.toLowerCase() === route.host.toLowerCase() &&
             binding.pathPrefix === route.pathPrefix,
+        );
+        const existing = matchingBindings.find(
+          (binding) => binding.status !== "failed" && binding.status !== "deleted",
+        );
+        const replacedBinding = matchingBindings.find(
+          (binding) => binding.status === "failed" || binding.status === "deleted",
         );
         const desired = {
           pathHandling: route.pathHandling ?? "preserve",
@@ -4844,6 +4850,7 @@ function persistServerAppliedRouteDesiredStateIfNeeded(input: {
               input.resourceId,
               route.host.toLowerCase(),
               route.pathPrefix,
+              ...(replacedBinding ? ["replaces", replacedBinding.id] : []),
             ].join(":"),
           }),
         );
