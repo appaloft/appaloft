@@ -17,6 +17,7 @@ export class ConfigureResourceRuntimeCommand extends Command<{ id: string }> {
   constructor(
     public readonly resourceId: string,
     public readonly runtimeProfile: ConfigureResourceRuntimeCommandPayload["runtimeProfile"],
+    public readonly services?: ConfigureResourceRuntimeCommandPayload["services"],
     public readonly idempotencyKey?: string,
   ) {
     super();
@@ -30,6 +31,7 @@ export class ConfigureResourceRuntimeCommand extends Command<{ id: string }> {
         new ConfigureResourceRuntimeCommand(
           parsed.resourceId,
           parsed.runtimeProfile,
+          parsed.services,
           trimToUndefined(parsed.idempotencyKey),
         ),
     );

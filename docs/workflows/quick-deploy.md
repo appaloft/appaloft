@@ -654,9 +654,10 @@ by [Deployment Config File Test Matrix](../testing/deployment-config-file-test-m
 [Source Link State Test Matrix](../testing/source-link-state-test-matrix.md).
 
 Provider-backed disambiguation for slash-containing Git refs remains follow-up work. Dockerfile
-path, Docker Compose file path, Docker build target, and static publish directory are typed runtime
-profile fields accepted by Web QuickDeploy, CLI deploy, and repository config; entry workflows map
-them to `resources.create` or `resources.configure-runtime` before ids-only deployment admission.
+path, Docker Compose file path, Docker build target, static publish directory, and an optional
+complete named Compose service graph are typed runtime planning fields accepted by Web QuickDeploy,
+CLI deploy, and repository config; entry workflows map them to `resources.create` or
+`resources.configure-runtime` before service-targeted routes and ids-only deployment admission.
 
 First-class static site deployment is aligned at the shared workflow and command
 admission layers. Web and CLI now dispatch

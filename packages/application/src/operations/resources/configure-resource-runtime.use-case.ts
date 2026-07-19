@@ -4,6 +4,9 @@ import {
   ok,
   ResourceByIdSpec,
   ResourceId,
+  ResourceServiceKindValue,
+  ResourceServiceName,
+  type ResourceServiceState,
   type Result,
   safeTry,
   UpdatedAt,
@@ -52,9 +55,17 @@ export class ConfigureResourceRuntimeUseCase {
       const runtimeProfile = yield* resourceRuntimeProfileFromInput(input.runtimeProfile, {
         allowHealthPolicy: false,
       });
+      const services: ResourceServiceState[] = [];
+      for (const service of input.services ?? []) {
+        services.push({
+          name: yield* ResourceServiceName.create(service.name),
+          kind: yield* ResourceServiceKindValue.create(service.kind),
+        });
+      }
       const configuredAt = yield* UpdatedAt.create(clock.now());
       yield* resource.configureRuntimeProfile({
         runtimeProfile,
+        ...(input.services ? { services } : {}),
         configuredAt,
       });
 

@@ -1424,18 +1424,10 @@ function createResource(input: CreateResourceInput) {
   });
 }
 
-function configureResourceRuntime(input: {
-  resourceId: string;
-  runtimeProfile: ResourceRuntimeProfileInput;
-}) {
+function configureResourceRuntime(input: ConfigureResourceRuntimeInput) {
   return Effect.gen(function* () {
     const cli = yield* CliRuntime;
-    const message = yield* resultToEffect(
-      ConfigureResourceRuntimeCommand.create({
-        resourceId: input.resourceId,
-        runtimeProfile: input.runtimeProfile,
-      }),
-    );
+    const message = yield* resultToEffect(ConfigureResourceRuntimeCommand.create(input));
     const result = yield* Effect.promise(() => cli.executeCommand(message));
     return yield* resultToEffect(result);
   });
@@ -1891,15 +1883,31 @@ function resolveReusableResourceRuntimeProfile(input: {
   runtimeProfile: ResourceRuntimeProfileInput;
 }) {
   return Effect.gen(function* () {
-    if (!shouldConfigureReusableResourceRuntime(input.seed)) {
+    if (!shouldConfigureReusableResourceRuntime(input.seed) && input.seed.services === undefined) {
       return undefined;
     }
 
     const resource = yield* showResource(input.resourceId);
-    return runtimeProfileUpdateForReusedResource({
+    const runtimeProfile = runtimeProfileUpdateForReusedResource({
       currentRuntimeProfile: resource.runtimeProfile,
       desiredRuntimeProfile: input.runtimeProfile,
     });
+    const servicesDiffer =
+      input.seed.services !== undefined &&
+      normalizedServiceDriftValue(resource.resource.services) !==
+        normalizedServiceDriftValue(input.seed.services);
+
+    if (!runtimeProfile && !servicesDiffer) {
+      return undefined;
+    }
+
+    return {
+      runtimeProfile:
+        runtimeProfile ??
+        configurableRuntimeProfileFromDetail(resource.runtimeProfile) ??
+        configurableRuntimeProfileFromDeploymentInput(input.runtimeProfile),
+      ...(servicesDiffer ? { services: input.seed.services } : {}),
+    } satisfies Omit<ConfigureResourceRuntimeInput, "resourceId">;
   });
 }
 
@@ -4109,7 +4117,7 @@ function resolveResource(input: {
               input.seed.sourceProfile,
             ),
           });
-          const runtimeProfile = yield* resolveReusableResourceRuntimeProfile({
+          const runtimeConfiguration = yield* resolveReusableResourceRuntimeProfile({
             seed: input.seed,
             resourceId: resource.id,
             runtimeProfile: input.runtimeProfile,
@@ -4129,7 +4137,7 @@ function resolveResource(input: {
               id: resource.id,
               ...(source ? { configureSource: { source } } : {}),
               ...(networkProfile ? { configureNetwork: { networkProfile } } : {}),
-              ...(runtimeProfile ? { configureRuntime: { runtimeProfile } } : {}),
+              ...(runtimeConfiguration ? { configureRuntime: runtimeConfiguration } : {}),
               ...(healthCheck ? { configureHealth: { healthCheck } } : {}),
             },
             label: resource.label,

@@ -17,6 +17,7 @@ type ResourceRuntimeConfiguredEventPayload = {
   environmentId: string;
   runtimePlanStrategy: string;
   runtimeName?: string;
+  services?: Array<{ name: string; kind: "web" | "api" | "worker" }>;
   configuredAt: string;
   correlationId?: string;
   causationId?: string;
@@ -25,6 +26,8 @@ type ResourceRuntimeConfiguredEventPayload = {
 
 Payloads must not include command output, environment secret values, provider credentials, build
 logs, runtime logs, or filesystem absolute host paths.
+
+`services` is present only when the command replaced the Resource-owned service graph.
 
 ## Consumers
 

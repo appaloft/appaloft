@@ -80,6 +80,7 @@ generic `resources.update`.
 | RES-PROFILE-RUNTIME-004B | `resources.configure-runtime` | Command use case | Duplicate requested runtime name matches another resource's requested name. | Command still succeeds because uniqueness is derived later during deployment execution. |
 | RES-PROFILE-RUNTIME-004C | `resources.configure-runtime` | Command use case | Runtime name is malformed or unsafe. | Rejects with `validation_error`, `phase = resource-runtime-resolution`. |
 | RES-PROFILE-RUNTIME-005 | `resources.configure-runtime` | Command use case | Archived resource. | Returns `resource_archived`, no event. |
+| RES-PROFILE-RUNTIME-006 | `resources.configure-runtime` | Command use case | Existing Compose Resource receives a complete named service graph. | Replaces the graph atomically, publishes it in `resource-runtime-configured`, and future network/domain planning can target the declared services. |
 | RES-PROFILE-NETWORK-001 | `resources.configure-network` | Command use case | Valid reverse-proxy HTTP profile with `internalPort`. | Persists network profile, publishes `resource-network-configured`. |
 | RES-PROFILE-NETWORK-002 | `resources.configure-network` | Command use case | HTTP inbound resource without internal port. | Rejects with `validation_error`, `phase = resource-network-resolution`. |
 | RES-PROFILE-NETWORK-003 | `resources.configure-network` | Command use case | Compose stack lacks required `targetServiceName`. | Rejects with structured validation error. |
@@ -210,7 +211,7 @@ Automated coverage now exists for:
   `RES-PROFILE-SOURCE-004`, and `RES-PROFILE-SOURCE-005` in
   `packages/application/test/configure-resource-source.test.ts`;
 - `RES-PROFILE-RUNTIME-001`, `RES-PROFILE-RUNTIME-002`, `RES-PROFILE-RUNTIME-003`,
-  `RES-PROFILE-RUNTIME-004`, and `RES-PROFILE-RUNTIME-005` in
+  `RES-PROFILE-RUNTIME-004`, `RES-PROFILE-RUNTIME-005`, and `RES-PROFILE-RUNTIME-006` in
   `packages/application/test/configure-resource-runtime.test.ts`;
 - `RES-PROFILE-NETWORK-006` in
   `packages/application/test/configure-resource-network.test.ts`;

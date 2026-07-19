@@ -3,7 +3,7 @@
 ## Normative Contract
 
 `resources.configure-runtime` is the source-of-truth command for changing the durable runtime
-planning profile owned by one resource.
+planning profile and, when supplied, the named runtime service graph owned by one resource.
 
 Command success means the new runtime profile was durably stored on the resource. It does not
 create a deployment, run detection, build images, restart runtime, mutate health policy, change
@@ -59,6 +59,7 @@ It is not:
 type ConfigureResourceRuntimeCommandInput = {
   resourceId: string;
   runtimeProfile: ResourceRuntimeProfileInput;
+  services?: Array<{ name: string; kind: "web" | "api" | "worker" }>;
   idempotencyKey?: string;
 };
 ```
@@ -79,6 +80,7 @@ type ConfigureResourceRuntimeCommandInput = {
 | `runtimeProfile.dockerComposeFilePath` | Conditional | Source-root-relative Compose file path for Compose strategy. |
 | `runtimeProfile.publishDirectory` | Conditional | Source-root-relative static publish directory for static strategy. |
 | `runtimeProfile.buildTarget` | Optional | Docker build target when the Dockerfile strategy accepts it. |
+| `services` | Optional | Complete replacement service graph used by future Compose deployment and route planning. Multiple services require a `compose-stack` Resource. |
 | `idempotencyKey` | Optional | Deduplicates retries for the same intended runtime profile change. |
 
 The command must reject `runtimeProfile.healthCheck` or health-check path mutation when supplied as
@@ -95,11 +97,14 @@ The command must:
 5. Normalize and validate runtime strategy and strategy-specific fields through value objects.
 6. Reject unsupported runtime target/orchestrator fields such as Kubernetes namespace, Helm chart,
    Swarm stack, replica count, node selector, ingress class, or provider-native runtime options.
-7. Preserve source binding, network profile, health policy, access summary, deployments, domains,
+7. When `services` is supplied, replace the complete named service graph atomically, reject
+   multiple services on non-Compose Resources, and revalidate the existing network target against
+   the replacement graph.
+8. Preserve source binding, network profile, health policy, access summary, deployments, domains,
    and lifecycle state.
-8. Persist the updated `Resource` aggregate.
-9. Publish or record `resource-runtime-configured`.
-10. Return `ok({ id })`.
+9. Persist the updated `Resource` aggregate.
+10. Publish or record `resource-runtime-configured`.
+11. Return `ok({ id })`.
 
 ## Resource-Specific Rules
 
@@ -123,6 +128,10 @@ resource-owned runtime profile state once persisted.
 
 Changing runtime profile affects only future deployment admission. It does not mutate any current
 runtime instance or deployment snapshot.
+
+When supplied, `services` is a complete Resource-owned graph rather than a partial patch. Config
+entry workflows use it to reconcile an existing Compose Resource before service-targeted network
+and domain routes are admitted. Omitting `services` preserves the current graph.
 
 When the submitted runtime profile is incompatible with the current source binding, the command
 should reject combinations that can be decided synchronously from the submitted values. Other
@@ -149,7 +158,8 @@ Canonical event spec:
 
 `resources.configure-runtime` is active in core, application command handling, operation catalog,
 CLI, HTTP/oRPC, and the Web resource detail runtime profile form. Current implementation persists
-runtime planning fields on the `Resource` aggregate, emits `resource-runtime-configured`, rejects
+runtime planning fields and an optional replacement service graph on the `Resource` aggregate,
+emits `resource-runtime-configured`, rejects
 health policy mutation through this command, and rejects unsupported target/orchestrator fields.
 The Web form states that runtime profile edits affect future deployments and do not rewrite
 historical deployment snapshots or restart current runtime.
