@@ -58,6 +58,7 @@ export interface DeploymentDurableWorkScheduleInput {
     | "deployments.redeploy"
     | "deployments.force-redeploy";
   readonly acceptedAt: string;
+  readonly ownerOrganizationId?: string;
 }
 
 export class DeploymentDurableWorkScheduler {
@@ -68,6 +69,8 @@ export class DeploymentDurableWorkScheduler {
     input: DeploymentDurableWorkScheduleInput,
   ): Promise<Result<{ workItemId: string }>> {
     const workItemId = deploymentDurableWorkItemId(input.deployment.id);
+    const tenantId = input.ownerOrganizationId ?? context.tenant?.tenantId;
+    const tenantOrganizationId = input.ownerOrganizationId ?? context.tenant?.organizationId;
     const recorded = await this.adapter.recordItem(context, {
       id: workItemId,
       kind: deploymentDurableWorkKind,
@@ -95,10 +98,8 @@ export class DeploymentDurableWorkScheduler {
         deploymentId: input.deployment.id,
         triggerKind: input.deployment.triggerKind,
         operationKey: input.operationKey,
-        ...(context.tenant?.tenantId ? { tenantId: context.tenant.tenantId } : {}),
-        ...(context.tenant?.organizationId
-          ? { tenantOrganizationId: context.tenant.organizationId }
-          : {}),
+        ...(tenantId ? { tenantId } : {}),
+        ...(tenantOrganizationId ? { tenantOrganizationId } : {}),
       },
     });
     if (recorded.isErr()) {

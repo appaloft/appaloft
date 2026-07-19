@@ -238,6 +238,7 @@ acceptance harness without changing the command input boundary.
 | DEP-CREATE-ENTRY-007 | contract | HTTP repository config non-support | HTTP `POST /api/deployments` does not read a repository config file or accept config-file profile fields; clients must call explicit operations. |
 | DEP-CREATE-ENTRY-008 | CLI adapter + remote client | Namespaced ids-only create | `appaloft deployments create` requires project, environment, Resource, and server ids, accepts an optional non-empty destination id, constructs the shared `CreateDeploymentCommandInput`, and dispatches the generated `POST /api/deployments` operation when a remote control-plane profile is active without invoking top-level Quick Deploy or local source/profile-bootstrap/SSH state. Normal target selection may inspect repository `controlPlane` config. |
 | DEP-CREATE-ENTRY-009 | CLI adapter | Namespaced local execution ownership | Pure local `appaloft deployments create` executes synchronously, starts local progression, reads terminal deployment state, and rejects non-succeeded completion instead of leaving detached work queued after process shutdown. |
+| PROC-DELIVERY-WORKER-021A | application | Detached remote execution ownership | The accepted durable work item carries the resolved Project `organizationId` and the worker restores it as tenant context even when the request context has an absent, default, or different tenant. |
 
 ## Deployment Error Assertion Example
 
