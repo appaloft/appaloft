@@ -21,6 +21,13 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   state. They must not create projects, resources, deployments, source links, or domain bindings.
 - `appaloft deploy` is the CLI entrypoint used by Pure SSH Action. SSH targets default to
   server-owned `ssh-pglite` state when no control plane is selected.
+- Server-owned SSH PGlite maintenance is explicit and coordinated: create an immutable backup with
+  `appaloft remote-state backup create`, restore it only to a distinct
+  `<runtime-parent>/recovery/<candidate>` root with `remote-state backup restore-copy`, run
+  `appaloft db migrate --remote-runtime-root <candidate>` and read-only validation there, then use
+  `remote-state backup promote-copy` with the validated plan digest. Use
+  `remote-state backup rollback` with the immutable reference if later smoke fails. Never edit the
+  live PGlite directory or database files directly.
 - Self-hosted Server Action does not call the CLI for deployment. It calls self-hosted Action API
   endpoints with `control-plane-url` and `appaloft-token`; server-config deploy then resolves
   source-link context and dispatches ids-only `deployments.create`.
@@ -300,7 +307,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft db secret-rotation plan [--state-backend ssh-pglite --server-host <host>]` - `system.control-plane-secret-rotation.plan`
 - `appaloft db secret-rotation apply --plan-digest <digest> --backup-reference <reference> [--state-backend ssh-pglite --server-host <host>]` - `system.control-plane-secret-rotation.apply`
 - `appaloft db status` - `system.db-status`
-- `appaloft db migrate` - `system.db-migrate`
+- `appaloft db migrate [--state-backend ssh-pglite --server-host <host> --remote-runtime-root <root>]` - `system.db-migrate`; an explicit recovery root targets the isolated candidate rather than live state
 - `appaloft connectors categories` - `connections.categories.list`
 - `appaloft connectors catalog` - `connections.catalog.list`
 - `appaloft connectors list` - `connections.list`

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { cp, mkdir, open, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
@@ -143,12 +144,18 @@ function hasSecretRotationPlanCommand(argv: readonly string[]): boolean {
   return dbIndex !== -1 && argv[dbIndex + 1] === "secret-rotation" && argv[dbIndex + 2] === "plan";
 }
 
+function hasDbMigrateCommand(argv: readonly string[]): boolean {
+  const dbIndex = argv.indexOf("db");
+  return dbIndex !== -1 && argv[dbIndex + 1] === "migrate";
+}
+
 function requiresRemotePgliteStateCommand(argv: readonly string[]): boolean {
   return (
     hasDeployCommand(argv) ||
     hasSourceLinkRelinkCommand(argv) ||
     hasPreviewCleanupCommand(argv) ||
-    hasSecretRotationCommand(argv)
+    hasSecretRotationCommand(argv) ||
+    hasDbMigrateCommand(argv)
   );
 }
 
@@ -161,8 +168,9 @@ function normalizePort(value: string | undefined): number | undefined {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
 }
 
-function safeTargetKey(target: SshRemoteStateTarget): string {
-  return [target.username ?? "ssh", target.host, String(target.port ?? 22)]
+function safeTargetKey(target: SshRemoteStateTarget, dataRoot: string): string {
+  const rootDigest = createHash("sha256").update(dataRoot).digest("hex").slice(0, 12);
+  return [target.username ?? "ssh", target.host, String(target.port ?? 22), rootDigest]
     .join("-")
     .toLowerCase()
     .replace(/[^a-z0-9_.-]/g, "-")
@@ -533,10 +541,11 @@ export function resolveRemotePgliteStateSyncPlan(
     return ok(null);
   }
 
-  const dataRoot = `${config.remoteRuntimeRoot.replace(/\/+$/, "")}/state`;
+  const remoteRuntimeRoot = readOption(argv, "--remote-runtime-root") ?? config.remoteRuntimeRoot;
+  const dataRoot = `${remoteRuntimeRoot.replace(/\/+$/, "")}/state`;
   const localPgliteDataDir = resolve(
     env.APPALOFT_PGLITE_DATA_DIR ??
-      join(config.dataDir, "remote-pglite", safeTargetKey(target), "pglite"),
+      join(config.dataDir, "remote-pglite", safeTargetKey(target, dataRoot), "pglite"),
   );
   const localDataRoot = dirname(localPgliteDataDir);
 
@@ -586,7 +595,9 @@ async function verifyControlPlaneRemoteStateBackend(input: {
     return ok(undefined);
   }
 
-  const dataRoot = `${input.config.remoteRuntimeRoot.replace(/\/+$/, "")}/state`;
+  const remoteRuntimeRoot =
+    readOption(input.argv, "--remote-runtime-root") ?? input.config.remoteRuntimeRoot;
+  const dataRoot = `${remoteRuntimeRoot.replace(/\/+$/, "")}/state`;
   const runner = input.runner ?? defaultRunner();
   const remoteMarker = runner.run({
     command: "ssh",
