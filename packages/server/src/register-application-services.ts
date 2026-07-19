@@ -1029,6 +1029,17 @@ export class ShellManagedDependencyProvider implements ManagedDependencyProvider
         input.kind,
         input.dependencyResourceId,
       );
+      if (input.kind === "postgres") {
+        const recovered = await recoverExistingDockerManagedPostgresRealization({
+          target: input.target,
+          containerName: container,
+          slug: input.slug,
+          requestedAt: input.requestedAt,
+        });
+        if (recovered) {
+          return ok(recovered);
+        }
+      }
       const volume = dockerManagedDependencyVolumeName(container);
       const spec =
         input.kind === "postgres"
@@ -1413,6 +1424,55 @@ function dockerManagedPostgresRealizationSpec(
         "exit 1",
       ].join("\n"),
     ].join("\n"),
+  };
+}
+
+async function recoverExistingDockerManagedPostgresRealization(input: {
+  target: ManagedDependencySingleServerTarget;
+  containerName: string;
+  slug: string;
+  requestedAt: string;
+}): Promise<ManagedDependencyRealizationResult | undefined> {
+  const inspected = await runManagedDependencyTargetCommand(
+    input.target,
+    `docker inspect --format ${shellQuote("{{range .Config.Env}}{{println .}}{{end}}")} ${shellQuote(input.containerName)}`,
+  );
+  if (inspected.exitCode !== 0) {
+    return undefined;
+  }
+
+  const environment = new Map(
+    inspected.stdout
+      .split(/\r?\n/u)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const separator = line.indexOf("=");
+        return separator < 1 ? [line, ""] : [line.slice(0, separator), line.slice(separator + 1)];
+      }),
+  );
+  const password = environment.get("POSTGRES_PASSWORD");
+  if (!password) {
+    return undefined;
+  }
+  const user = environment.get("POSTGRES_USER") || "app";
+  const databaseName =
+    environment.get("POSTGRES_DB") || shellManagedDatabaseName("postgres", input.slug) || "app";
+
+  return {
+    providerResourceHandle: dockerManagedDependencyHandle({
+      kind: "postgres",
+      serverId: input.target.serverId,
+      containerName: input.containerName,
+    }),
+    endpoint: {
+      host: input.containerName,
+      port: 5432,
+      databaseName,
+      maskedConnection: `postgres://${user}:********@${input.containerName}:5432/${databaseName}`,
+    },
+    connectionSecretValue: `postgres://${user}:${password}@${input.containerName}:5432/${databaseName}`,
+    realizedAt: input.requestedAt,
   };
 }
 

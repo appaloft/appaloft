@@ -1998,6 +1998,121 @@ describe("CLI deployment config entry workflow", () => {
     expect("tlsMode" in (deployment as Record<string, unknown>)).toBe(false);
   });
 
+  test("[CONFIG-FILE-DOMAIN-005] control-plane config domains reconcile through managed domain bindings", async () => {
+    ensureReflectMetadata();
+    const { resolveInteractiveDeploymentInput } = await import(
+      "../src/commands/deployment-interaction"
+    );
+    const { CliRuntime } = await import("../src/runtime");
+
+    const commands: AppCommand<unknown>[] = [];
+    const queries: string[] = [];
+    let domainSequence = 0;
+    const runtime = Layer.succeed(CliRuntime, {
+      version: "test",
+      executionTarget: "remote" as const,
+      startServer: async () => {},
+      executeCommand: async <T>(message: AppCommand<T>) => {
+        commands.push(message as AppCommand<unknown>);
+        if (message.constructor.name === "CreateDomainBindingCommand") {
+          domainSequence += 1;
+          return ok({ id: `dmb_${domainSequence}` } as T);
+        }
+        return ok(null as T);
+      },
+      executeQuery: async <T>(message: AppQuery<T>) => {
+        queries.push(message.constructor.name);
+        return ok({ items: [] } as T);
+      },
+    });
+
+    const input = await Effect.runPromise(
+      Effect.provide(
+        resolveInteractiveDeploymentInput({
+          sourceLocator: ".",
+          deploymentMethod: "docker-compose",
+          projectId: "proj_existing",
+          serverId: "srv_existing",
+          destinationId: "dst_existing",
+          environmentId: "env_existing",
+          resourceId: "res_existing",
+          stateBackend: {
+            kind: "postgres-control-plane",
+            storageScope: "control-plane",
+            databaseUrlRequired: true,
+            requiresRemoteStateLifecycle: false,
+            reason: "Remote control plane selected.",
+          },
+          exposureMode: "reverse-proxy",
+          targetServiceName: "web",
+          services: [
+            { name: "web", kind: "web" },
+            { name: "api", kind: "web" },
+          ],
+          serverAppliedRoutes: [
+            {
+              host: "app.example.com",
+              pathPrefix: "/",
+              tlsMode: "auto",
+              targetServiceName: "web",
+            },
+            {
+              host: "app.example.com",
+              pathPrefix: "/api",
+              tlsMode: "auto",
+              targetServiceName: "api",
+            },
+            {
+              host: "www.example.com",
+              pathPrefix: "/",
+              tlsMode: "auto",
+              redirectTo: "app.example.com",
+              redirectStatus: 308,
+            },
+          ],
+        }),
+        runtime,
+      ),
+    );
+
+    expect(input).toEqual({
+      projectId: "proj_existing",
+      serverId: "srv_existing",
+      destinationId: "dst_existing",
+      environmentId: "env_existing",
+      resourceId: "res_existing",
+    });
+    expect(queries).toEqual([
+      "ListProjectsQuery",
+      "ListServersQuery",
+      "ShowResourceQuery",
+      "ShowResourceQuery",
+      "ShowResourceQuery",
+      "ListDomainBindingsQuery",
+    ]);
+    const domainCommands = commands.filter(
+      (command) => command.constructor.name === "CreateDomainBindingCommand",
+    );
+    expect(domainCommands).toHaveLength(3);
+    expect(domainCommands).toMatchObject([
+      {
+        domainName: "app.example.com",
+        pathPrefix: "/",
+        targetServiceName: "web",
+      },
+      {
+        domainName: "app.example.com",
+        pathPrefix: "/api",
+        targetServiceName: "api",
+      },
+      {
+        domainName: "www.example.com",
+        redirectTo: "app.example.com",
+        redirectStatus: 308,
+      },
+    ]);
+  });
+
   test("[CONFIG-FILE-DOMAIN-001] access domains fail before mutation when route store is unavailable", async () => {
     ensureReflectMetadata();
     const { createExecutionContext } = await import("@appaloft/application");
