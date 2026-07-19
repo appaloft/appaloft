@@ -246,6 +246,7 @@ describe("dependency runtime secret resolution", () => {
     expect(runtime.redactions).toContain(secretValue);
     expect(runtime.redactions).toContain("environment-secret");
     expect(runtime.dependencyTargetNames.has("DATABASE_URL")).toBe(true);
+    expect(runtime.networkNames.size).toBe(0);
 
     const command = RuntimeCommandBuilder.docker().runContainer({
       image: "registry.example.com/app:latest",
@@ -262,6 +263,31 @@ describe("dependency runtime secret resolution", () => {
     const display = renderRuntimeCommandString(command, { quote: shellQuote, mode: "display" });
     expect(display).toContain("DATABASE_URL=[redacted]");
     expect(display).not.toContain(secretValue);
+  });
+
+  test("[DEP-BIND-SECRET-RESOLVE-008] selects the shared Docker network for a realized single-server dependency", async () => {
+    const context = testContext("req_managed_dependency_network_test");
+    const store = new MemoryDependencyResourceSecretStore();
+    const secretValue =
+      "postgres://app:super-secret@appaloft-postgres-rsi_pg:5432/app";
+    store.store({
+      dependencyResourceId: "rsi_pg",
+      purpose: "connection",
+      secretValue,
+    });
+
+    const resolved = await resolveDependencyRuntimeEnvironment({
+      context,
+      deployment: createDeploymentWithDependencyRef(
+        "appaloft://dependency-resources/rsi_pg/connection",
+      ),
+      dependencyResourceSecretStore: store,
+      controlPlaneSecretProtector: testSecretProtector,
+      baseEnv: {},
+    });
+
+    expect(resolved.isOk()).toBe(true);
+    expect([...resolved._unsafeUnwrap().networkNames]).toEqual(["appaloft-edge"]);
   });
 
   test("[DEP-RES-REDIS-NATIVE-005] resolves realized managed Redis refs into REDIS_URL with redaction metadata", async () => {

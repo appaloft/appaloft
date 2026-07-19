@@ -18,6 +18,8 @@
   `DEP-BIND-SECRET-RESOLVE-005`.
 - [x] Add Swarm secret materialization tests for `DEP-BIND-SECRET-RESOLVE-006`.
 - [x] Add historical rotation resolution tests for `DEP-BIND-SECRET-RESOLVE-007`.
+- [x] Add managed single-server dependency network selection and Compose-wide attachment tests for
+  `DEP-BIND-SECRET-RESOLVE-008`.
 
 ## Code Round
 
