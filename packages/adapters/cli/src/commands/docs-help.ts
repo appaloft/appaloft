@@ -227,6 +227,26 @@ export const cliCommandDescriptions = {
     "Archive a stale SSH remote-state mutation lock",
     "errors.remote-state-lock",
   ),
+  remoteStateBackup: withDocs(
+    "Create and recover server-owned SSH PGlite backups",
+    "errors.remote-state-lock",
+  ),
+  remoteStateBackupCreate: withDocs(
+    "Create a coordinated immutable SSH PGlite backup",
+    "errors.remote-state-lock",
+  ),
+  remoteStateBackupRestoreCopy: withDocs(
+    "Restore an immutable SSH PGlite backup to an isolated runtime root",
+    "errors.remote-state-lock",
+  ),
+  remoteStateBackupPromoteCopy: withDocs(
+    "Promote a validated isolated SSH PGlite copy",
+    "errors.remote-state-lock",
+  ),
+  remoteStateBackupRollback: withDocs(
+    "Restore live SSH PGlite state from an immutable backup",
+    "errors.remote-state-lock",
+  ),
   operatorWork: withDocs("Background work visibility", "operator.work-ledger"),
   operatorWorkList: withDocs(
     "List background work and latest failure state without recovery mutation",

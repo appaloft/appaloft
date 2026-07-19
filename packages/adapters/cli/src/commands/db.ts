@@ -8,10 +8,6 @@ import { Command as EffectCommand, Options } from "@effect/cli";
 
 import { runCommand, runQuery } from "../runtime.js";
 
-const migrateCommand = EffectCommand.make("migrate", {}, () =>
-  runCommand(DbMigrateCommand.create()),
-).pipe(EffectCommand.withDescription("Apply pending migrations"));
-
 const statusCommand = EffectCommand.make("status", {}, () => runQuery(DbStatusQuery.create())).pipe(
   EffectCommand.withDescription("Show migration status"),
 );
@@ -26,7 +22,13 @@ const remoteStateOptions = {
   serverPort: Options.text("server-port").pipe(Options.optional),
   serverSshUsername: Options.text("server-ssh-username").pipe(Options.optional),
   serverSshPrivateKeyFile: Options.text("server-ssh-private-key-file").pipe(Options.optional),
+  remoteRuntimeRoot: Options.text("remote-runtime-root").pipe(Options.optional),
 };
+
+const migrateCommand = EffectCommand.make("migrate", remoteStateOptions, (options) => {
+  void options;
+  return runCommand(DbMigrateCommand.create());
+}).pipe(EffectCommand.withDescription("Apply pending migrations"));
 
 const secretRotationPlanCommand = EffectCommand.make("plan", remoteStateOptions, (options) => {
   void options;

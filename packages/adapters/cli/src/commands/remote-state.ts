@@ -24,6 +24,11 @@ const remoteRuntimeRootOption = Options.text("remote-runtime-root").pipe(
 const staleAfterSecondsOption = Options.text("stale-after-seconds").pipe(
   Options.withDefault(String(defaultLockStaleAfterSeconds)),
 );
+const backupReferenceOption = Options.text("backup-reference");
+const targetRemoteRuntimeRootOption = Options.text("target-remote-runtime-root");
+const candidateRemoteRuntimeRootOption = Options.text("candidate-remote-runtime-root");
+const candidatePlanDigestOption = Options.text("candidate-plan-digest");
+const confirmOption = Options.boolean("confirm").pipe(Options.withDefault(false));
 
 type RemoteStateLockStatus = Record<string, string | number | boolean | null>;
 
@@ -329,6 +334,238 @@ export function buildSshRemoteStateDiagnosticsCommand(input: {
   return renderShLcCommand(renderSshRemoteStateDiagnosticsScript(input));
 }
 
+function remoteStateMaintenancePrelude(input: {
+  dataRoot: string;
+  owner: string;
+  correlationId: string;
+}): AshScript {
+  return ash`
+    set -eu
+    ${ash.env("data_root", input.dataRoot)}
+    ${ash.env("owner", input.owner)}
+    ${ash.env("correlation_id", input.correlationId)}
+    ${ash.raw(`json_string() { if [ "$#" -eq 0 ] || [ -z "$1" ]; then printf null; return; fi; printf '"'; printf "%s" "$1" | sed 's/\\\\/\\\\\\\\/g; s/"/\\\\"/g'; printf '"'; }
+    sha256_file() { if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | awk '{print $1}'; else shasum -a 256 "$1" | awk '{print $1}'; fi; }
+    sha256_stream() { if command -v sha256sum >/dev/null 2>&1; then sha256sum | awk '{print $1}'; else shasum -a 256 | awk '{print $1}'; fi; }
+    state_tree_digest() { tar -cf - -C "$1" pglite source-links server-applied-routes | sha256_stream; }
+    lock_dir="$data_root/locks/mutation.lock"
+    owner_file="$lock_dir/owner.json"
+    lock_acquired=false
+    heartbeat_pid=""
+    cleanup_maintenance_lock() { status=$?; trap - EXIT HUP INT TERM; if [ -n "$heartbeat_pid" ]; then kill "$heartbeat_pid" 2>/dev/null || true; wait "$heartbeat_pid" 2>/dev/null || true; fi; if [ "$lock_acquired" = true ] && [ -d "$lock_dir" ]; then rm -rf "$lock_dir"; fi; exit "$status"; }
+    trap cleanup_maintenance_lock EXIT HUP INT TERM
+    [ -d "$data_root/pglite" ] || { echo "remote PGlite state is unavailable" >&2; exit 1; }
+    [ -d "$data_root/source-links" ] || { echo "remote source-link state is unavailable" >&2; exit 1; }
+    [ -d "$data_root/server-applied-routes" ] || { echo "remote route state is unavailable" >&2; exit 1; }
+    mkdir -p "$data_root/locks" "$data_root/backups" "$data_root/recovery"
+    if ! mkdir "$lock_dir" 2>/dev/null; then echo "remote state mutation lock is active" >&2; exit 73; fi
+    lock_acquired=true
+    now="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+    printf '{"owner":%s,"correlationId":%s,"startedAt":"%s","lastHeartbeatAt":"%s","staleAfterSeconds":1200}\n' "$(json_string "$owner")" "$(json_string "$correlation_id")" "$now" "$now" > "$owner_file"
+    maintenance_heartbeat() { while sleep 15; do heartbeat_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"; heartbeat_tmp="$owner_file.heartbeat.$$"; printf '{"owner":%s,"correlationId":%s,"startedAt":"%s","lastHeartbeatAt":"%s","staleAfterSeconds":1200}\n' "$(json_string "$owner")" "$(json_string "$correlation_id")" "$now" "$heartbeat_at" > "$heartbeat_tmp" && mv "$heartbeat_tmp" "$owner_file" || exit; done; }
+    maintenance_heartbeat &
+    heartbeat_pid=$!`)}
+  `;
+}
+
+function immutableBackupReferencePrelude(reference: string): AshScript {
+  return ash`
+    ${ash.env("backup_reference", reference)}
+    ${ash.raw(`case "$backup_reference" in remote-state-backup:immutable-[A-Za-z0-9._-]*) ;; *) echo "invalid immutable backup reference" >&2; exit 2 ;; esac
+    backup_id="\${backup_reference#remote-state-backup:}"
+    case "$backup_id" in *[!A-Za-z0-9._-]*|'') echo "invalid immutable backup id" >&2; exit 2 ;; esac
+    backup_root="$data_root/backups/$backup_id"
+    archive="$backup_root/state.tar.gz"
+    manifest="$backup_root/manifest.json"
+    [ -f "$archive" ] && [ -f "$manifest" ] || { echo "immutable backup is unavailable" >&2; exit 2; }
+    expected_archive_digest="$(sed -n 's/.*"archiveDigest"[[:space:]]*:[[:space:]]*"sha256:\\([0-9a-f][0-9a-f]*\\)".*/\\1/p' "$manifest" | head -n 1)"
+    expected_source_digest="$(sed -n 's/.*"sourceTreeDigest"[[:space:]]*:[[:space:]]*"sha256:\\([0-9a-f][0-9a-f]*\\)".*/\\1/p' "$manifest" | head -n 1)"
+    [ "\${#expected_archive_digest}" -eq 64 ] && [ "\${#expected_source_digest}" -eq 64 ] || { echo "immutable backup manifest is invalid" >&2; exit 2; }
+    actual_archive_digest="$(sha256_file "$archive")"
+    [ "$actual_archive_digest" = "$expected_archive_digest" ] || { echo "immutable backup digest mismatch" >&2; exit 2; }`)}
+  `;
+}
+
+export function renderSshRemoteStateImmutableBackupCreateScript(input: {
+  dataRoot: string;
+  owner?: string;
+  correlationId?: string;
+}): AshScript {
+  return ash`
+    ${remoteStateMaintenancePrelude({
+      dataRoot: input.dataRoot,
+      owner: input.owner ?? "appaloft-cli-backup",
+      correlationId: input.correlationId ?? "remote_state_backup",
+    })}
+    ${ash.raw(`stamp="$(date -u +"%Y%m%dT%H%M%SZ")"
+    backup_id="immutable-$stamp-$$"
+    incoming="$data_root/backups/.incoming-$backup_id"
+    backup_root="$data_root/backups/$backup_id"
+    archive="$incoming/state.tar.gz"
+    manifest="$incoming/manifest.json"
+    rm -rf "$incoming"
+    mkdir -p "$incoming"
+    source_tree_digest="$(state_tree_digest "$data_root")"
+    revision="$(cat "$data_root/sync-revision.txt" 2>/dev/null || printf 0)"
+    case "$revision" in ''|*[!0-9]*) revision=0 ;; esac
+    pg_major="$(cat "$data_root/pglite/PG_VERSION" 2>/dev/null || true)"
+    case "$pg_major" in ''|*[!0-9]*) echo "remote PGlite PostgreSQL major is invalid" >&2; exit 2 ;; esac
+    tar -czf "$archive" -C "$data_root" pglite source-links server-applied-routes
+    archive_digest="$(sha256_file "$archive")"
+    archive_size="$(wc -c < "$archive" | tr -d ' ')"
+    for marker in schema-version.json server-state-backend.json sync-revision.txt; do [ ! -f "$data_root/$marker" ] || cp -p "$data_root/$marker" "$incoming/$marker"; done
+    printf '{"schemaVersion":"appaloft.remote-state-backup/v1","reference":"remote-state-backup:%s","createdAt":"%s","archiveDigest":"sha256:%s","sourceTreeDigest":"sha256:%s","archiveSizeBytes":%s,"sourceRevision":%s,"postgresMajor":"%s"}\n' "$backup_id" "$now" "$archive_digest" "$source_tree_digest" "$archive_size" "$revision" "$pg_major" > "$manifest"
+    chmod 0440 "$incoming"/*
+    chmod 0550 "$incoming"
+    mv "$incoming" "$backup_root"
+    printf '{"status":"created","phase":"remote-state-backup","stateBackend":"ssh-pglite","backupReference":"remote-state-backup:%s","archiveDigest":"sha256:%s","sourceTreeDigest":"sha256:%s","archiveSizeBytes":%s,"sourceRevision":%s,"postgresMajor":"%s"}\n' "$backup_id" "$archive_digest" "$source_tree_digest" "$archive_size" "$revision" "$pg_major"`)}
+  `;
+}
+
+export function buildSshRemoteStateImmutableBackupCreateCommand(input: {
+  dataRoot: string;
+  owner?: string;
+  correlationId?: string;
+}): string {
+  return renderShLcCommand(renderSshRemoteStateImmutableBackupCreateScript(input));
+}
+
+export function renderSshRemoteStateRestoreCopyScript(input: {
+  dataRoot: string;
+  backupReference: string;
+  targetRemoteRuntimeRoot: string;
+}): AshScript {
+  return ash`
+    ${remoteStateMaintenancePrelude({
+      dataRoot: input.dataRoot,
+      owner: "appaloft-cli-restore-copy",
+      correlationId: "remote_state_restore_copy",
+    })}
+    ${immutableBackupReferencePrelude(input.backupReference)}
+    ${ash.env("target_runtime_root", input.targetRemoteRuntimeRoot.replace(/\/+$/, ""))}
+    ${ash.raw(`source_runtime_root="\${data_root%/state}"
+    runtime_parent="\${source_runtime_root%/*}"
+    [ -n "$target_runtime_root" ] && [ "$target_runtime_root" != "/" ] && [ "$target_runtime_root" != "$source_runtime_root" ] || { echo "candidate runtime root must be distinct" >&2; exit 2; }
+    case "$target_runtime_root" in "$runtime_parent"/recovery/*) ;; *) echo "candidate runtime root must be under the recovery directory" >&2; exit 2 ;; esac
+    target_state="$target_runtime_root/state"
+    [ ! -e "$target_state" ] || { echo "candidate state root already exists" >&2; exit 2; }
+    incoming="$target_runtime_root/.incoming-state-$$"
+    rm -rf "$incoming"
+    mkdir -p "$incoming"
+    tar -xzf "$archive" -C "$incoming"
+    [ -f "$incoming/pglite/PG_VERSION" ] && [ -d "$incoming/source-links" ] && [ -d "$incoming/server-applied-routes" ] || { echo "candidate archive contents are invalid" >&2; exit 2; }
+    mkdir -p "$incoming/locks/recovered" "$incoming/backups" "$incoming/journals" "$incoming/recovery"
+    for marker in schema-version.json server-state-backend.json sync-revision.txt; do [ ! -f "$backup_root/$marker" ] || { cp -p "$backup_root/$marker" "$incoming/$marker"; chmod 0640 "$incoming/$marker"; }; done
+    mkdir -p "$target_runtime_root"
+    mv "$incoming" "$target_state"
+    candidate_digest="$(state_tree_digest "$target_state")"
+    [ "$candidate_digest" = "$expected_source_digest" ] || { rm -rf "$target_state"; echo "candidate source digest mismatch" >&2; exit 2; }
+    printf '{"status":"restored-copy","phase":"remote-state-recovery","stateBackend":"ssh-pglite","backupReference":%s,"candidateRuntimeRoot":%s,"candidateTreeDigest":"sha256:%s"}\n' "$(json_string "$backup_reference")" "$(json_string "$target_runtime_root")" "$candidate_digest"`)}
+  `;
+}
+
+export function buildSshRemoteStateRestoreCopyCommand(input: {
+  dataRoot: string;
+  backupReference: string;
+  targetRemoteRuntimeRoot: string;
+}): string {
+  return renderShLcCommand(renderSshRemoteStateRestoreCopyScript(input));
+}
+
+function stagedStateSwapBody(input: { source: "candidate" | "backup" }): string {
+  const sourcePreparation =
+    input.source === "candidate"
+      ? 'candidate_state="$candidate_runtime_root/state"; [ -f "$candidate_state/pglite/PG_VERSION" ] && [ -d "$candidate_state/source-links" ] && [ -d "$candidate_state/server-applied-routes" ] || { echo "candidate state is invalid" >&2; exit 2; }; cp -a "$candidate_state/pglite" "$incoming/pglite"; cp -a "$candidate_state/source-links" "$incoming/source-links"; cp -a "$candidate_state/server-applied-routes" "$incoming/server-applied-routes"'
+      : 'tar -xzf "$archive" -C "$incoming"; [ -f "$incoming/pglite/PG_VERSION" ] && [ -d "$incoming/source-links" ] && [ -d "$incoming/server-applied-routes" ] || { echo "backup contents are invalid" >&2; exit 2; }';
+  return `incoming="$data_root/.incoming-recovery-$$"
+    rollback_dir="$data_root/backups/replaced-$(date -u +"%Y%m%dT%H%M%SZ")-$$"
+    recovery_file="$data_root/recovery/remote-state-${input.source === "candidate" ? "promotion" : "rollback"}.json"
+    rm -rf "$incoming"
+    mkdir -p "$incoming" "$rollback_dir"
+    ${sourcePreparation}
+    restore_previous() { rm -rf "$data_root/pglite" "$data_root/source-links" "$data_root/server-applied-routes"; cp -a "$rollback_dir/pglite" "$data_root/pglite"; cp -a "$rollback_dir/source-links" "$data_root/source-links"; cp -a "$rollback_dir/server-applied-routes" "$data_root/server-applied-routes"; }
+    cp -a "$data_root/pglite" "$rollback_dir/pglite"
+    cp -a "$data_root/source-links" "$rollback_dir/source-links"
+    cp -a "$data_root/server-applied-routes" "$rollback_dir/server-applied-routes"
+    if rm -rf "$data_root/pglite" "$data_root/source-links" "$data_root/server-applied-routes" && mv "$incoming/pglite" "$data_root/pglite" && mv "$incoming/source-links" "$data_root/source-links" && mv "$incoming/server-applied-routes" "$data_root/server-applied-routes"; then
+      rm -rf "$incoming"
+    else
+      status=$?
+      rm -rf "$incoming"
+      restore_previous
+      exit "$status"
+    fi
+    current_revision="$(cat "$data_root/sync-revision.txt" 2>/dev/null || printf 0)"
+    case "$current_revision" in ''|*[!0-9]*) current_revision=0 ;; esac
+    next_revision=$((current_revision + 1))
+    printf "%s\n" "$next_revision" > "$data_root/sync-revision.txt"`;
+}
+
+export function renderSshRemoteStatePromoteCopyScript(input: {
+  dataRoot: string;
+  backupReference: string;
+  candidateRemoteRuntimeRoot: string;
+  candidatePlanDigest: string;
+}): AshScript {
+  return ash`
+    ${remoteStateMaintenancePrelude({
+      dataRoot: input.dataRoot,
+      owner: "appaloft-cli-promote-copy",
+      correlationId: "remote_state_promote_copy",
+    })}
+    ${immutableBackupReferencePrelude(input.backupReference)}
+    ${ash.env("candidate_runtime_root", input.candidateRemoteRuntimeRoot.replace(/\/+$/, ""))}
+    ${ash.env("candidate_plan_digest", input.candidatePlanDigest)}
+    ${ash.raw(`candidate_plan_hex="\${candidate_plan_digest#sha256:}"
+    [ "$candidate_plan_digest" = "sha256:$candidate_plan_hex" ] && [ "\${#candidate_plan_hex}" -eq 64 ] || { echo "candidate plan digest is invalid" >&2; exit 2; }
+    case "$candidate_plan_hex" in *[!0-9a-f]*|'') echo "candidate plan digest is invalid" >&2; exit 2 ;; esac
+    source_runtime_root="\${data_root%/state}"
+    runtime_parent="\${source_runtime_root%/*}"
+    case "$candidate_runtime_root" in "$runtime_parent"/recovery/*) ;; *) echo "candidate runtime root must be under the recovery directory" >&2; exit 2 ;; esac
+    live_digest="$(state_tree_digest "$data_root")"
+    [ "$live_digest" = "$expected_source_digest" ] || { echo "live state changed after immutable backup" >&2; exit 77; }
+    ${stagedStateSwapBody({ source: "candidate" })}
+    promoted_digest="$(state_tree_digest "$data_root")"
+    printf '{"phase":"remote-state-recovery","step":"promote-copy","backupReference":%s,"candidatePlanDigest":%s,"promotedTreeDigest":"sha256:%s","revision":%s,"recordedAt":"%s"}\n' "$(json_string "$backup_reference")" "$(json_string "$candidate_plan_digest")" "$promoted_digest" "$next_revision" "$now" > "$recovery_file"
+    printf '{"status":"promoted","phase":"remote-state-recovery","stateBackend":"ssh-pglite","backupReference":%s,"candidatePlanDigest":%s,"promotedTreeDigest":"sha256:%s","revision":%s}\n' "$(json_string "$backup_reference")" "$(json_string "$candidate_plan_digest")" "$promoted_digest" "$next_revision"`)}
+  `;
+}
+
+export function buildSshRemoteStatePromoteCopyCommand(input: {
+  dataRoot: string;
+  backupReference: string;
+  candidateRemoteRuntimeRoot: string;
+  candidatePlanDigest: string;
+}): string {
+  return renderShLcCommand(renderSshRemoteStatePromoteCopyScript(input));
+}
+
+export function renderSshRemoteStateRollbackScript(input: {
+  dataRoot: string;
+  backupReference: string;
+}): AshScript {
+  return ash`
+    ${remoteStateMaintenancePrelude({
+      dataRoot: input.dataRoot,
+      owner: "appaloft-cli-rollback",
+      correlationId: "remote_state_rollback",
+    })}
+    ${immutableBackupReferencePrelude(input.backupReference)}
+    ${ash.raw(`${stagedStateSwapBody({ source: "backup" })}
+    restored_digest="$(state_tree_digest "$data_root")"
+    [ "$restored_digest" = "$expected_source_digest" ] || { restore_previous; echo "restored state digest mismatch" >&2; exit 2; }
+    printf '{"phase":"remote-state-recovery","step":"rollback","backupReference":%s,"restoredTreeDigest":"sha256:%s","revision":%s,"recordedAt":"%s"}\n' "$(json_string "$backup_reference")" "$restored_digest" "$next_revision" "$now" > "$recovery_file"
+    printf '{"status":"rolled-back","phase":"remote-state-recovery","stateBackend":"ssh-pglite","backupReference":%s,"restoredTreeDigest":"sha256:%s","revision":%s}\n' "$(json_string "$backup_reference")" "$restored_digest" "$next_revision"`)}
+  `;
+}
+
+export function buildSshRemoteStateRollbackCommand(input: {
+  dataRoot: string;
+  backupReference: string;
+}): string {
+  return renderShLcCommand(renderSshRemoteStateRollbackScript(input));
+}
+
 function runSshCommand(input: {
   target: SshRemoteStateTarget;
   command: string;
@@ -444,7 +681,152 @@ const remoteStateLockCommand = EffectCommand.make("lock").pipe(
   EffectCommand.withSubcommands([inspectCommand, recoverStaleCommand]),
 );
 
+const sharedBackupOptions = {
+  serverHost: serverHostOption,
+  serverPort: serverPortOption,
+  serverSshUsername: serverSshUsernameOption,
+  serverSshPrivateKeyFile: serverSshPrivateKeyFileOption,
+  remoteRuntimeRoot: remoteRuntimeRootOption,
+};
+
+function backupTarget(options: {
+  serverHost: string;
+  serverPort: ReturnType<typeof optionalValue<string>>;
+  serverSshUsername: ReturnType<typeof optionalValue<string>>;
+  serverSshPrivateKeyFile: ReturnType<typeof optionalValue<string>>;
+}): Result<SshRemoteStateTarget> {
+  return targetFromCommandOptions(options);
+}
+
+function confirmationResult(confirmed: boolean, operation: string): Result<void> {
+  return confirmed
+    ? ok(undefined)
+    : err(
+        domainError.validation(`${operation} requires --confirm`, {
+          phase: "remote-state-recovery",
+          stateBackend: "ssh-pglite",
+        }),
+      );
+}
+
+const backupCreateCommand = EffectCommand.make("create", sharedBackupOptions, (options) =>
+  Effect.gen(function* () {
+    const target = yield* resultToEffect(
+      backupTarget({
+        serverHost: options.serverHost,
+        serverPort: optionalValue(options.serverPort),
+        serverSshUsername: optionalValue(options.serverSshUsername),
+        serverSshPrivateKeyFile: optionalValue(options.serverSshPrivateKeyFile),
+      }),
+    );
+    yield* runRemoteStateLockCommand({
+      target,
+      command: buildSshRemoteStateImmutableBackupCreateCommand({
+        dataRoot: remoteStateDataRoot(options.remoteRuntimeRoot),
+      }),
+    });
+  }),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.remoteStateBackupCreate));
+
+const backupRestoreCopyCommand = EffectCommand.make(
+  "restore-copy",
+  {
+    ...sharedBackupOptions,
+    backupReference: backupReferenceOption,
+    targetRemoteRuntimeRoot: targetRemoteRuntimeRootOption,
+  },
+  (options) =>
+    Effect.gen(function* () {
+      const target = yield* resultToEffect(
+        backupTarget({
+          serverHost: options.serverHost,
+          serverPort: optionalValue(options.serverPort),
+          serverSshUsername: optionalValue(options.serverSshUsername),
+          serverSshPrivateKeyFile: optionalValue(options.serverSshPrivateKeyFile),
+        }),
+      );
+      yield* runRemoteStateLockCommand({
+        target,
+        command: buildSshRemoteStateRestoreCopyCommand({
+          dataRoot: remoteStateDataRoot(options.remoteRuntimeRoot),
+          backupReference: options.backupReference,
+          targetRemoteRuntimeRoot: options.targetRemoteRuntimeRoot,
+        }),
+      });
+    }),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.remoteStateBackupRestoreCopy));
+
+const backupPromoteCopyCommand = EffectCommand.make(
+  "promote-copy",
+  {
+    ...sharedBackupOptions,
+    backupReference: backupReferenceOption,
+    candidateRemoteRuntimeRoot: candidateRemoteRuntimeRootOption,
+    candidatePlanDigest: candidatePlanDigestOption,
+    confirm: confirmOption,
+  },
+  (options) =>
+    Effect.gen(function* () {
+      yield* resultToEffect(confirmationResult(options.confirm, "remote-state backup promotion"));
+      const target = yield* resultToEffect(
+        backupTarget({
+          serverHost: options.serverHost,
+          serverPort: optionalValue(options.serverPort),
+          serverSshUsername: optionalValue(options.serverSshUsername),
+          serverSshPrivateKeyFile: optionalValue(options.serverSshPrivateKeyFile),
+        }),
+      );
+      yield* runRemoteStateLockCommand({
+        target,
+        command: buildSshRemoteStatePromoteCopyCommand({
+          dataRoot: remoteStateDataRoot(options.remoteRuntimeRoot),
+          backupReference: options.backupReference,
+          candidateRemoteRuntimeRoot: options.candidateRemoteRuntimeRoot,
+          candidatePlanDigest: options.candidatePlanDigest,
+        }),
+      });
+    }),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.remoteStateBackupPromoteCopy));
+
+const backupRollbackCommand = EffectCommand.make(
+  "rollback",
+  {
+    ...sharedBackupOptions,
+    backupReference: backupReferenceOption,
+    confirm: confirmOption,
+  },
+  (options) =>
+    Effect.gen(function* () {
+      yield* resultToEffect(confirmationResult(options.confirm, "remote-state backup rollback"));
+      const target = yield* resultToEffect(
+        backupTarget({
+          serverHost: options.serverHost,
+          serverPort: optionalValue(options.serverPort),
+          serverSshUsername: optionalValue(options.serverSshUsername),
+          serverSshPrivateKeyFile: optionalValue(options.serverSshPrivateKeyFile),
+        }),
+      );
+      yield* runRemoteStateLockCommand({
+        target,
+        command: buildSshRemoteStateRollbackCommand({
+          dataRoot: remoteStateDataRoot(options.remoteRuntimeRoot),
+          backupReference: options.backupReference,
+        }),
+      });
+    }),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.remoteStateBackupRollback));
+
+const remoteStateBackupCommand = EffectCommand.make("backup").pipe(
+  EffectCommand.withDescription(cliCommandDescriptions.remoteStateBackup),
+  EffectCommand.withSubcommands([
+    backupCreateCommand,
+    backupRestoreCopyCommand,
+    backupPromoteCopyCommand,
+    backupRollbackCommand,
+  ]),
+);
+
 export const remoteStateCommand = EffectCommand.make("remote-state").pipe(
   EffectCommand.withDescription(cliCommandDescriptions.remoteState),
-  EffectCommand.withSubcommands([remoteStateLockCommand]),
+  EffectCommand.withSubcommands([remoteStateLockCommand, remoteStateBackupCommand]),
 );
