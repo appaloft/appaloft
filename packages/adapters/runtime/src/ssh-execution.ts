@@ -1525,6 +1525,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         const accessToken = await this.integrationAuthPort?.getProviderAccessToken(
           context,
           "github",
+          { accessTokenKind: "installation" },
         );
         if (!accessToken) {
           const message = "GitHub App source requires a connected GitHub access token";

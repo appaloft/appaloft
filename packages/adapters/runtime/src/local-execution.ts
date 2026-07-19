@@ -982,7 +982,9 @@ export class LocalExecutionBackend implements ExecutionBackend {
     rmSync(sourceDir, { recursive: true, force: true });
 
     const accessToken = source.kind === "git-github-app" && isGitHubHttpsLocator(source.locator)
-      ? await this.integrationAuthPort?.getProviderAccessToken(context, "github")
+      ? await this.integrationAuthPort?.getProviderAccessToken(context, "github", {
+          accessTokenKind: "installation",
+        })
       : null;
     const cloneLocator = accessToken
       ? withGitHubAccessToken(source.locator, accessToken)
