@@ -10656,7 +10656,11 @@ export type {
 };
 
 export interface IntegrationAuthPort {
-  getProviderAccessToken(context: ExecutionContext, providerKey: "github"): Promise<string | null>;
+  getProviderAccessToken(
+    context: ExecutionContext,
+    providerKey: "github",
+    request?: { accessTokenKind?: "installation" | "user" },
+  ): Promise<string | null>;
 }
 
 export interface GitHubAppInstallationRecord {
