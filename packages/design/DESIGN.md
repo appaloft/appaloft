@@ -48,7 +48,7 @@ Resource -> Access -> Health -> Logs -> Diagnostics -> Terminal
 
 ## Color Roles
 
-- Console canvas: very light cool structural gray `#f8fafc` for the workspace outside object panels. It must
+- Console canvas: near-neutral structural gray `#f7f7f8` for the workspace outside object panels. It must
   stay neutral and low-chroma rather than reading as blue decoration, heavy gray-blue, cream, sand,
   beige, or yellow.
 - Console panel: `#ffffff` for object panels, tables, sheets, popovers, and form surfaces.

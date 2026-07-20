@@ -5,7 +5,7 @@
 :root,
 :root[data-theme="light"],
 .light {
-  --background: #f8fafc;
+  --background: #f7f7f8;
   --foreground: #152238;
   --card: #ffffff;
   --card-foreground: #152238;
@@ -19,7 +19,7 @@
   --accent-foreground: #2452bd;
   --border: #c5d1e0;
   --input: #9fadc1;
-  --canvas: #f8fafc;
+  --canvas: #f7f7f8;
   --surface: #ffffff;
   --surface-subtle: #f3f6fa;
   --surface-raised: #ffffff;
