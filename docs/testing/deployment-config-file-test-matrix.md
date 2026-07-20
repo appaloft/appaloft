@@ -230,6 +230,10 @@ This matrix inherits:
 | CONFIG-FILE-DEPENDENCY-008 | integration | Preview ephemeral unprovenanced resource conflict | PR preview config dependency declares `preview.lifecycle = ephemeral` and a matching managed dependency resource exists without matching source-link provenance | Workflow refuses to adopt the resource for cleanup ownership | `repository_config_dependency_resource_conflict`, phase `config-dependency-resolution` | `dependency-resources.list` -> `resources.list-dependency-bindings`; no provision, bind, or `deployments.create` |
 | CONFIG-FILE-DEPENDENCY-009 | integration | Preview ephemeral provenance storage unavailable | PR preview config dependency declares `preview.lifecycle = ephemeral` but the selected entry workflow cannot persist source-link dependency provenance | Workflow fails before dependency mutation | `repository_config_dependency_provenance_unavailable`, phase `config-dependency-resolution` | No provision, bind, or `deployments.create` |
 | CONFIG-FILE-DEPENDENCY-010 | parser/integration | Canonical managed dependency kinds | Config declares managed `postgres`, `redis`, `mysql`, `clickhouse`, `object-storage`, or `opensearch` dependencies with env bindings | Parser accepts canonical kinds; config deploy filters/provisions using the declared kind and records provenance with that same kind | None | Parse or `dependency-resources.list(kind)` -> `dependency-resources.provision(kind)` -> bind |
+| CONFIG-FILE-DEPENDENCY-012 | parser/schema | Imported dependency accepted by stable name | Config declares `source = imported`, required `resourceName`, kind, and env binding | Parser accepts the declaration without identity, provider, credential, or connection material | None | Parse only |
+| CONFIG-FILE-DEPENDENCY-013 | parser/schema | Imported dependency lifecycle safety | Imported config omits `resourceName` or declares ephemeral preview lifecycle | Parser fails before mutation | `validation_error`, phase `config-schema` | No write commands |
+| CONFIG-FILE-DEPENDENCY-014 | integration | Existing imported dependency binding | A ready same-kind imported dependency with the configured stable name exists | Config deploy resolves dependencies | Existing dependency is bound without provision/import; deployment admission remains ids-only | None | list dependencies -> list bindings -> bind -> deploy |
+| CONFIG-FILE-DEPENDENCY-015 | integration | Missing/mismatched imported dependency | Named imported dependency is missing, wrong-kind, not ready, or an existing target binding refers to a differently named dependency | Config deploy resolves dependencies | Workflow fails before provision, bind, or deployment | `repository_config_imported_dependency_not_found`, phase `config-dependency-resolution` | dependency/binding queries only |
 
 ## Dependency Backup Policy Matrix
 
@@ -447,7 +451,8 @@ Current implemented coverage:
   `CONFIG-FILE-SEC-001`, and `CONFIG-FILE-UNSUPPORTED-001` are covered in
   `packages/deployment-config/test/appaloft-config.test.ts`.
 - `CONFIG-FILE-DEPENDENCY-001` through `CONFIG-FILE-DEPENDENCY-003`,
-  `CONFIG-FILE-DEPENDENCY-010` parser coverage, and
+  `CONFIG-FILE-DEPENDENCY-010`, `CONFIG-FILE-DEPENDENCY-012`, and
+  `CONFIG-FILE-DEPENDENCY-013` parser coverage, and
   `CONFIG-FILE-SERVICE-GRAPH-001` through `CONFIG-FILE-SERVICE-GRAPH-002`,
   `CONFIG-FILE-DEPENDENCY-BACKUP-001` through `CONFIG-FILE-DEPENDENCY-BACKUP-002`,
   `CONFIG-FILE-STORAGE-001` through `CONFIG-FILE-STORAGE-003`, and
@@ -469,7 +474,8 @@ Current implemented coverage:
   `packages/adapters/filesystem/test/deployment-config-reader.test.ts`.
 - `QUICK-DEPLOY-ENTRY-010` and `CONFIG-FILE-ENTRY-001` profile-to-quick-deploy resource draft
   mapping are covered in `packages/adapters/cli/test/deployment-config.test.ts`.
-- `CONFIG-FILE-DEPENDENCY-004` through `CONFIG-FILE-DEPENDENCY-010` integration coverage and
+- `CONFIG-FILE-DEPENDENCY-004` through `CONFIG-FILE-DEPENDENCY-010` plus
+  `CONFIG-FILE-DEPENDENCY-014` and `CONFIG-FILE-DEPENDENCY-015` integration coverage and
   `CONFIG-FILE-DEPENDENCY-BACKUP-003` through `CONFIG-FILE-DEPENDENCY-BACKUP-007`,
   `CONFIG-FILE-STORAGE-004` through `CONFIG-FILE-STORAGE-007`, and
   `CONFIG-FILE-SCHED-TASK-004` through `CONFIG-FILE-SCHED-TASK-009`, and

@@ -291,6 +291,24 @@ organization ids, raw connection strings, database passwords, secret values, or 
 realization settings. Those values stay in Appaloft/provider state or trusted entrypoint secret
 stores.
 
+An external dependency already imported through `dependency-resources.import` can be referenced
+without secret material:
+
+```yaml
+dependencies:
+  db:
+    resourceName: StockTruth Supabase
+    kind: postgres
+    source: imported
+    bind:
+      env: DATABASE_URL
+```
+
+Imported declarations resolve only an existing ready `imported-external` resource of the declared
+kind in the selected Project and Environment. They never provision or import infrastructure and
+cannot declare ephemeral preview lifecycle. Missing, wrong-kind, not-ready, or differently named
+bindings fail before mutation.
+
 `dependencies.<key>.backup` uses dependency backup policy language:
 
 ```yaml

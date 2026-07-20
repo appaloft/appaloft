@@ -3,8 +3,8 @@
 ## Status
 
 - Round: Code Round
-- Artifact state: implemented for canonical managed dependency declarations in repository config,
-  CLI/Action config deploy orchestration, and preview cleanup provenance
+- Artifact state: implemented for canonical managed and imported dependency declarations in
+  repository config, CLI/Action config deploy orchestration, and preview cleanup provenance
 - Roadmap target: `0.12.x` repository config hardening
 - Compatibility impact: `pre-1.0-policy`, additive repository config fields
 - Decision state: governed by
@@ -17,6 +17,10 @@ Postgres, Redis, object storage, or OpenSearch and that the app should receive t
 environment variables. CLI and GitHub Action config deploy create or reuse the dependency resource,
 bind it to the Resource, and let existing runtime injection deliver the variable during deployment.
 
+Repository config can also resolve a ready external dependency that was already imported into the
+same Project and Environment. This mode binds by stable Appaloft Resource name without committing a
+connection URL or asking config deploy to provision external infrastructure.
+
 For PR previews, users can mark the declared dependency ephemeral so preview cleanup removes only
 the Appaloft-managed dependency resource that the config workflow created for that preview scope.
 
@@ -26,6 +30,7 @@ the Appaloft-managed dependency resource that the config workflow created for th
 | --- | --- | --- |
 | RepositoryDependencyGraph | User-facing `appaloft.yaml` dependency declarations keyed by application names such as `db`. | Repository config |
 | ManagedDependencyDeclaration | A config entry that asks Appaloft to create or reuse a managed dependency resource. | Config deploy |
+| ImportedDependencyDeclaration | A config entry that resolves a ready, already imported external dependency by stable Appaloft Resource name. | Config deploy |
 | DependencyBindingTarget | The runtime environment variable requested by the config, for example `DATABASE_URL`. | Resource binding |
 | PreviewDependencyProvenance | Safe source-link metadata proving a preview dependency was created and bound by repository config. | Preview cleanup |
 
@@ -42,6 +47,9 @@ the Appaloft-managed dependency resource that the config workflow created for th
 | CONFIG-DEPENDENCY-007 | Cleanup removes only provenance-owned ephemeral dependencies | Preview cleanup runs for a source fingerprint with matching provenance | Runtime cleanup has succeeded | Cleanup unbinds the recorded binding, deletes the recorded dependency resource through existing delete safety, removes route/source-link state, and returns safe cleanup counts. |
 | CONFIG-DEPENDENCY-008 | Cleanup preserves manual/shared dependencies | Preview cleanup runs when no matching dependency provenance exists or delete safety reports another active/shared blocker | Cleanup reaches dependency stage | No unproven dependency is deleted; delete blockers are surfaced without guessing by resource name. |
 | CONFIG-DEPENDENCY-010 | Support canonical dependency kinds | `appaloft.yaml` declares `postgres`, `redis`, `mysql`, `clickhouse`, `object-storage`, or `opensearch` with `source = managed` and an env binding | Parser and config deploy run | The parser accepts the canonical kind, config deploy filters/provisions that kind, records provenance with the same kind, and deployment admission remains ids-only. |
+| CONFIG-DEPENDENCY-012 | Parse imported dependency declaration | Config declares `source = imported`, a stable `resourceName`, kind, and env binding | The config parser runs | The declaration is accepted without connection or provider material. Missing name and ephemeral preview lifecycle are rejected. |
+| CONFIG-DEPENDENCY-014 | Bind a ready imported dependency | The named imported dependency exists and is ready in the selected Project and Environment | Config deploy resolves dependencies | The existing dependency is bound without provisioning or importing infrastructure. |
+| CONFIG-DEPENDENCY-015 | Missing or mismatched imported dependency fails closed | The named dependency is missing, wrong-kind, not ready, or the env target points to a differently named imported dependency | Config deploy resolves dependencies | The workflow fails before provision/bind/deployment with safe project, environment, key, kind, and resource-name details. |
 
 ## Config Contract
 
@@ -61,6 +69,12 @@ dependencies:
       env: REDIS_URL
     preview:
       lifecycle: ephemeral
+  externalDb:
+    resourceName: StockTruth Supabase
+    kind: postgres
+    source: imported
+    bind:
+      env: EXTERNAL_DATABASE_URL
 ```
 
 Rules:
@@ -68,9 +82,11 @@ Rules:
 - dependency keys must be stable repository-local names, not Appaloft ids;
 - `kind` supports the Appaloft canonical managed dependency kinds: `postgres`, `redis`, `mysql`,
   `clickhouse`, `object-storage`, and `opensearch`;
-- `source` supports `managed`;
+- `source` supports `managed` and `imported`;
+- `source: imported` requires `resourceName`, resolves only a ready `imported-external` dependency
+  of the declared kind in the selected Project and Environment, and never provisions/imports it;
 - `bind.env` must be a safe environment variable name;
-- `preview.lifecycle` supports `ephemeral`;
+- `preview.lifecycle` supports `ephemeral` only for managed dependencies;
 - omission of `preview.lifecycle` means normal dependency lifecycle; cleanup must not delete it;
 - repository config must not declare provider account, credential, tenant, org, raw connection URL,
   password, database password, or secret value.
@@ -83,7 +99,7 @@ Config dependency deploy must run before deployment admission and after Resource
 resolve project/environment/resource/server identity
   -> list dependency resources for project/environment/kind
   -> list active resource dependency bindings
-  -> provision missing managed dependency resource
+  -> provision missing managed dependency resource OR fail if a named imported dependency is absent
   -> bind missing dependency to the Resource env target
   -> persist preview provenance when lifecycle is ephemeral
   -> deployments.create(ids only)
@@ -122,7 +138,7 @@ command fails before source-link deletion so a retry can resume with provenance 
 - No dependency fields on `deployments.create`.
 - No raw connection string, database password, provider credential, tenant, organization, or
   provider account in repository config.
-- No external/imported dependency config declaration.
+- No external connection/import operation driven by repository config.
 - No build-time dependency injection.
 - No provider-specific database sizing or backup policy fields in `dependencies`.
 - No deletion of manual, shared, imported, or unproven dependency resources during preview cleanup.

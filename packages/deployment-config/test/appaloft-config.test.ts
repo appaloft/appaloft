@@ -1099,6 +1099,65 @@ describe("Appaloft deployment config schema", () => {
     }
   });
 
+  test("[CONFIG-FILE-DEPENDENCY-012] accepts an existing imported dependency by stable name", () => {
+    const parsed = parseAppaloftDeploymentConfig({
+      dependencies: {
+        db: {
+          resourceName: "StockTruth Supabase",
+          kind: "postgres",
+          source: "imported",
+          bind: {
+            env: "DATABASE_URL",
+          },
+        },
+      },
+    });
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.dependencies?.db).toEqual({
+        resourceName: "StockTruth Supabase",
+        kind: "postgres",
+        source: "imported",
+        bind: {
+          env: "DATABASE_URL",
+        },
+      });
+    }
+  });
+
+  test("[CONFIG-FILE-DEPENDENCY-013] imported dependencies require a name and cannot be ephemeral", () => {
+    const missingName = parseAppaloftDeploymentConfig({
+      dependencies: {
+        db: {
+          kind: "postgres",
+          source: "imported",
+          bind: {
+            env: "DATABASE_URL",
+          },
+        },
+      },
+    });
+    const ephemeral = parseAppaloftDeploymentConfig({
+      dependencies: {
+        db: {
+          resourceName: "StockTruth Supabase",
+          kind: "postgres",
+          source: "imported",
+          bind: {
+            env: "DATABASE_URL",
+          },
+          preview: {
+            lifecycle: "ephemeral",
+          },
+        },
+      },
+    });
+
+    expect(missingName.success).toBe(false);
+    expect(ephemeral.success).toBe(false);
+  });
+
   test("[CONFIG-FILE-DEPENDENCY-BACKUP-001] accepts managed dependency backup policy declarations", () => {
     const parsed = parseAppaloftDeploymentConfig({
       dependencies: {

@@ -5793,6 +5793,166 @@ describe("CLI deployment config entry workflow", () => {
     expect(commands).not.toContain("BindResourceDependencyCommand");
   });
 
+  test("[CONFIG-FILE-DEPENDENCY-014] config dependencies bind an existing imported resource without provisioning", async () => {
+    ensureReflectMetadata();
+    const { resolveInteractiveDeploymentInput } = await import(
+      "../src/commands/deployment-interaction"
+    );
+    const { CliRuntime } = await import("../src/runtime");
+
+    const commands: string[] = [];
+    const runtime = Layer.succeed(CliRuntime, {
+      version: "test",
+      startServer: async () => {},
+      executeCommand: async <T>(message: AppCommand<T>) => {
+        commands.push(message.constructor.name);
+        if (message.constructor.name === "BindResourceDependencyCommand") {
+          return ok({ id: "rbd_imported_db" } as T);
+        }
+        return ok(null as T);
+      },
+      executeQuery: async <T>(message: AppQuery<T>) => {
+        if (message.constructor.name === "ListDependencyResourcesQuery") {
+          return ok({
+            items: [
+              {
+                id: "dep_res_imported_db",
+                projectId: "proj_existing",
+                environmentId: "env_existing",
+                name: "StockTruth Supabase",
+                slug: "stocktruth-supabase",
+                kind: "postgres",
+                sourceMode: "imported-external",
+                providerKey: "external-postgres",
+                providerManaged: false,
+                lifecycleStatus: "ready",
+                bindingReadiness: { status: "ready" },
+                createdAt: "2026-07-20T00:00:00.000Z",
+              },
+            ],
+          } as T);
+        }
+        if (message.constructor.name === "ListResourceDependencyBindingsQuery") {
+          return ok({ items: [] } as T);
+        }
+        return ok({ items: [] } as T);
+      },
+    });
+
+    await Effect.runPromise(
+      Effect.provide(
+        resolveInteractiveDeploymentInput({
+          sourceLocator: ".",
+          deploymentMethod: "workspace-commands",
+          projectId: "proj_existing",
+          serverId: "srv_existing",
+          environmentId: "env_existing",
+          resourceId: "res_existing",
+          dependencyGraph: [
+            {
+              key: "db",
+              resourceName: "StockTruth Supabase",
+              kind: "postgres",
+              source: "imported",
+              bindEnv: "DATABASE_URL",
+            },
+          ],
+        }),
+        runtime,
+      ),
+    );
+
+    expect(commands).not.toContain("ProvisionDependencyResourceCommand");
+    expect(commands).toContain("BindResourceDependencyCommand");
+  });
+
+  test("[CONFIG-FILE-DEPENDENCY-015] config dependencies fail closed when an imported resource is missing", async () => {
+    ensureReflectMetadata();
+    const { resolveInteractiveDeploymentInput } = await import(
+      "../src/commands/deployment-interaction"
+    );
+    const { CliRuntime } = await import("../src/runtime");
+
+    const commands: string[] = [];
+    const runtime = Layer.succeed(CliRuntime, {
+      version: "test",
+      startServer: async () => {},
+      executeCommand: async <T>(message: AppCommand<T>) => {
+        commands.push(message.constructor.name);
+        return ok(null as T);
+      },
+      executeQuery: async <T>(message: AppQuery<T>) => {
+        if (message.constructor.name === "ListResourceDependencyBindingsQuery") {
+          return ok({
+            items: [
+              {
+                id: "rbd_other_imported_db",
+                projectId: "proj_existing",
+                environmentId: "env_existing",
+                resourceId: "res_existing",
+                dependencyResourceId: "dep_res_other_imported_db",
+                kind: "postgres",
+                sourceMode: "imported-external",
+                providerKey: "external-postgres",
+                providerManaged: false,
+                lifecycleStatus: "ready",
+                target: {
+                  targetName: "DATABASE_URL",
+                  scope: "runtime-only",
+                  injectionMode: "env",
+                },
+                bindingReadiness: { status: "ready" },
+                snapshotReadiness: { status: "deferred" },
+                status: "active",
+                createdAt: "2026-07-20T00:00:00.000Z",
+              },
+            ],
+          } as T);
+        }
+        return ok({ items: [] } as T);
+      },
+    });
+
+    const result = await Effect.runPromise(
+      Effect.provide(
+        Effect.either(
+          resolveInteractiveDeploymentInput({
+            sourceLocator: ".",
+            deploymentMethod: "workspace-commands",
+            projectId: "proj_existing",
+            serverId: "srv_existing",
+            environmentId: "env_existing",
+            resourceId: "res_existing",
+            dependencyGraph: [
+              {
+                key: "db",
+                resourceName: "StockTruth Supabase",
+                kind: "postgres",
+                source: "imported",
+                bindEnv: "DATABASE_URL",
+              },
+            ],
+          }),
+        ),
+        runtime,
+      ),
+    );
+
+    expect(Either.isLeft(result)).toBe(true);
+    if (Either.isRight(result)) {
+      throw new Error("Expected missing imported dependency to fail");
+    }
+    expect(result.left).toMatchObject({
+      code: "repository_config_imported_dependency_not_found",
+      details: {
+        dependencyKey: "db",
+        resourceName: "StockTruth Supabase",
+      },
+    });
+    expect(commands).not.toContain("ProvisionDependencyResourceCommand");
+    expect(commands).not.toContain("BindResourceDependencyCommand");
+  });
+
   test("[CONFIG-FILE-DEPENDENCY-BACKUP-004] config dependency backup policy is idempotent for matching owned policy", async () => {
     ensureReflectMetadata();
     const { resolveInteractiveDeploymentInput } = await import(

@@ -131,6 +131,14 @@ apply only after trusted CLI/Action `config-profile` selection, preview profile 
 after trusted PR preview context selects preview scope, and none may be added to
 `deployments.create`.
 
+For application dependency config, use `source: managed` when Appaloft should provision/reuse the
+managed dependency. Use `source: imported` with a required stable `resourceName` only after
+`appaloft dependency import` has created a ready external dependency in the same Project and
+Environment. Imported config references resolve and bind existing Appaloft state; they never import
+or provision infrastructure, cannot use ephemeral preview lifecycle, and must fail before mutation
+when the named resource is absent, has the wrong kind, or is not ready. Never put the external
+connection URL in repository config.
+
 ## Entry Selection
 
 Use this order:
