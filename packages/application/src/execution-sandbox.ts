@@ -171,8 +171,8 @@ export class SandboxProviderRegistry {
   }
 }
 
-type StoredSandbox = { tenantId: string; providerKey: string; sandbox: Sandbox };
-type StoredSnapshot = { tenantId: string; providerKey: string; snapshot: SandboxSnapshot };
+export type StoredSandbox = { tenantId: string; providerKey: string; sandbox: Sandbox };
+export type StoredSnapshot = { tenantId: string; providerKey: string; snapshot: SandboxSnapshot };
 export interface SandboxRepository {
   save(context: RepositoryContext, sandbox: Sandbox, providerKey: string): Promise<void>;
   find(context: RepositoryContext, sandboxId: string): Promise<StoredSandbox | null>;
