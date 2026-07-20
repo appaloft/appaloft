@@ -128,6 +128,15 @@ export function renderComposeOwnershipLabelOverrideScript(input: {
     : [];
   const requiresTargetService =
     targetLabelLines.length > 0 || environmentLines.length > 0 || Boolean(input.targetNetworkName);
+  const serviceNetworkTargets = serviceTargets.flatMap((target) =>
+    target.networkName && !sharedNetworkNames.includes(target.networkName)
+      ? [{ serviceName: target.serviceName, networkName: target.networkName }]
+      : [],
+  );
+  const rendersServiceNetworks =
+    sharedNetworkNames.length > 0 ||
+    Boolean(targetOnlyNetworkName) ||
+    serviceNetworkTargets.length > 0;
   const staticLines = [
     "set -eu",
     `compose_file=${input.quote(input.composeFile)}`,
@@ -177,31 +186,49 @@ export function renderComposeOwnershipLabelOverrideScript(input: {
     "    printf '%s\\n' '    labels:'",
   ];
   const footerLines = [
-    ...(requiresTargetService
+    ...(targetLabelLines.length > 0
       ? [
           '    if [ "$service" = "$target_service" ]; then',
           ...targetLabelLines.map((line) => `      printf '%s\\n' ${input.quote(line)}`),
-          ...environmentLines.map((line) => `      printf '%s\\n' ${input.quote(line)}`),
-          ...(targetOnlyNetworkName
-            ? [
-                `      printf '%s\\n' ${input.quote("    networks:")}`,
-                `      printf '%s\\n' ${input.quote(`      - ${yamlQuoted(targetOnlyNetworkName)}`)}`,
-              ]
-            : []),
           "    fi",
         ]
       : []),
-    ...serviceTargets.flatMap((target) => [
-      `    if [ "$service" = ${input.quote(target.serviceName)} ]; then`,
-      ...target.labelLines.map((line) => `      printf '%s\\n' ${input.quote(line)}`),
-      ...(target.networkName && !sharedNetworkNames.includes(target.networkName)
-        ? [
-            `      printf '%s\\n' ${input.quote("    networks:")}`,
+    ...serviceTargets
+      .filter((target) => target.labelLines.length > 0)
+      .flatMap((target) => [
+        `    if [ "$service" = ${input.quote(target.serviceName)} ]; then`,
+        ...target.labelLines.map((line) => `      printf '%s\\n' ${input.quote(line)}`),
+        "    fi",
+      ]),
+    ...(environmentLines.length > 0
+      ? [
+          '    if [ "$service" = "$target_service" ]; then',
+          ...environmentLines.map((line) => `      printf '%s\\n' ${input.quote(line)}`),
+          "    fi",
+        ]
+      : []),
+    ...mountLines.map((line) => `    printf '%s\\n' ${input.quote(line)}`),
+    ...(rendersServiceNetworks
+      ? [
+          `    printf '%s\\n' ${input.quote("    networks:")}`,
+          ...sharedNetworkNames.map(
+            (networkName) =>
+              `    printf '%s\\n' ${input.quote(`      - ${yamlQuoted(networkName)}`)}`,
+          ),
+          ...(targetOnlyNetworkName
+            ? [
+                '    if [ "$service" = "$target_service" ]; then',
+                `      printf '%s\\n' ${input.quote(`      - ${yamlQuoted(targetOnlyNetworkName)}`)}`,
+                "    fi",
+              ]
+            : []),
+          ...serviceNetworkTargets.flatMap((target) => [
+            `    if [ "$service" = ${input.quote(target.serviceName)} ]; then`,
             `      printf '%s\\n' ${input.quote(`      - ${yamlQuoted(target.networkName)}`)}`,
-          ]
-        : []),
-      "    fi",
-    ]),
+            "    fi",
+          ]),
+        ]
+      : []),
     "  done",
     ...topLevelVolumeLines.map((line) => `  printf '%s\\n' ${input.quote(line)}`),
     ...topLevelNetworkLines.map((line) => `  printf '%s\\n' ${input.quote(line)}`),
@@ -212,16 +239,6 @@ export function renderComposeOwnershipLabelOverrideScript(input: {
   return [
     ...staticLines,
     ...labelLines.map((line) => `    printf '%s\\n' ${input.quote(line)}`),
-    ...mountLines.map((line) => `    printf '%s\\n' ${input.quote(line)}`),
-    ...(sharedNetworkNames.length > 0
-      ? [
-          `    printf '%s\\n' ${input.quote("    networks:")}`,
-          ...sharedNetworkNames.map(
-            (networkName) =>
-              `    printf '%s\\n' ${input.quote(`      - ${yamlQuoted(networkName)}`)}`,
-          ),
-        ]
-      : []),
     ...footerLines,
   ].join("\n");
 }
