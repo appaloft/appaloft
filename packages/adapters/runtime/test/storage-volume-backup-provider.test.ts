@@ -243,7 +243,8 @@ class FakeDialectRenderer implements StorageBackupRuntimeCommandRenderer {
     if (this.failS3Store) {
       return ash`
         ${ash.env("FAKE_SIGNED_UPLOAD_URL", input.uploadUrl)}
-        ${ash.raw(`printf '%s\\n' "$FAKE_SIGNED_UPLOAD_URL" >&2
+        ${ash.env("FAKE_API_KEY_HEADER", input.headers?.["x-api-key"] ?? "")}
+        ${ash.raw(`printf '%s\\n%s\\n' "$FAKE_SIGNED_UPLOAD_URL" "$FAKE_API_KEY_HEADER" >&2
         exit 1`)}
       `;
     }
@@ -273,7 +274,11 @@ class FakeObjectTransferBroker implements StorageBackupObjectTransferBrokerPort 
     this.uploads.push(input);
     return ok({
       url: "https://objects.example.test/backups/svb_fake?X-Amz-Signature=upload-secret",
-      headers: { "content-type": "application/gzip" },
+      headers: {
+        "content-type": "application/gzip",
+        "x-amz-meta-backup-id": "svb_fake",
+        "x-api-key": "upload-secret-header",
+      },
       expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
       artifactHandle: "s3-compatible://backups/storage-volume/svb_fake.tar.gz",
     });
@@ -596,7 +601,7 @@ describe("storage volume backup runtime provider", () => {
       },
       runtimeTarget,
     });
-    expect(stored.isOk()).toBe(true);
+    expect(stored.isOk(), JSON.stringify(stored)).toBe(true);
     expect(stored._unsafeUnwrap().artifactHandle).toBe(
       "s3-compatible://backups/storage-volume/svb_fake.tar.gz",
     );
@@ -657,6 +662,7 @@ describe("storage volume backup runtime provider", () => {
     });
     expect(result.isErr()).toBe(true);
     expect(JSON.stringify(result._unsafeUnwrapErr())).not.toContain("upload-secret");
+    expect(JSON.stringify(result._unsafeUnwrapErr())).not.toContain("upload-secret-header");
     expect(JSON.stringify(result._unsafeUnwrapErr())).not.toContain("X-Amz-Signature");
     expect(
       provider.supports({

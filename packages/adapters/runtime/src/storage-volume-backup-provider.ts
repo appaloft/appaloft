@@ -731,9 +731,12 @@ function safeS3CompatibleTargetRef(targetRef: string): boolean {
 function transferAuthorizationRedactions(
   authorization: StorageBackupObjectTransferAuthorization,
 ): string[] {
-  return [authorization.url, ...Object.values(authorization.headers ?? {})].filter(
-    (value) => value.length > 0,
-  );
+  const sensitiveHeaderName =
+    /(^|[-_])(authorization|token|secret|credential|api[-_]?key|private[-_]?key|customer[-_]?key|cookie)($|[-_])/;
+  const sensitiveHeaderValues = Object.entries(authorization.headers ?? {})
+    .filter(([name]) => sensitiveHeaderName.test(name.toLowerCase()))
+    .map(([, value]) => value);
+  return [authorization.url, ...sensitiveHeaderValues].filter((value) => value.length > 0);
 }
 
 export class PosixShellDockerStorageBackupRuntimeCommandRenderer
