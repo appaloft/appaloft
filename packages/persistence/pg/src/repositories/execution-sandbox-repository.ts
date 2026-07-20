@@ -251,6 +251,28 @@ export class PgExecutionSandboxRepository implements SandboxRepository {
     }));
   }
 
+  async listProviderRuntimes(
+    context: RepositoryContext,
+    input: { providerKey: string; limit: number; offset: number },
+  ): Promise<Array<{ sandboxId: string; providerHandle: string }>> {
+    const rows = await resolveRepositoryExecutor(this.db, context)
+      .selectFrom("execution_sandboxes")
+      .select(["id", "state"])
+      .where("tenant_id", "=", contextTenantId(context))
+      .where("provider_key", "=", input.providerKey)
+      .where(sql<boolean>`state ? 'providerHandle'`)
+      .orderBy("id", "asc")
+      .limit(input.limit)
+      .offset(input.offset)
+      .execute();
+    return rows.flatMap((row) => {
+      const state = row.state as SerializedSandboxState;
+      return state.providerHandle
+        ? [{ sandboxId: row.id, providerHandle: state.providerHandle }]
+        : [];
+    });
+  }
+
   async saveSnapshot(
     context: RepositoryContext,
     snapshot: SandboxSnapshot,

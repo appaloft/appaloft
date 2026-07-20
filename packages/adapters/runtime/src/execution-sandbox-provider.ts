@@ -10,6 +10,7 @@ import { type SandboxIsolation, SandboxWorkspacePath } from "@appaloft/core";
 
 type HermeticRuntime = {
   handle: string;
+  ownerScope: string;
   paused: boolean;
   files: Map<string, Uint8Array>;
   processes: Map<string, SandboxProcessDescriptor>;
@@ -49,6 +50,7 @@ export class HermeticSandboxProvider implements SandboxProvider {
     const handle = `hermetic:${request.sandboxId}`;
     this.runtimes.set(request.sandboxId, {
       handle,
+      ownerScope: request.ownerScope,
       paused: false,
       files:
         request.source.kind === "snapshot"
@@ -81,6 +83,34 @@ export class HermeticSandboxProvider implements SandboxProvider {
 
   async terminate(request: { sandboxId: string; providerHandle: string }): Promise<void> {
     this.runtime(request);
+    this.runtimes.delete(request.sandboxId);
+  }
+
+  async listOwnedRuntimes(request: { ownerScope: string; limit: number; cursor?: string }) {
+    const offset = request.cursor ? Number(request.cursor) : 0;
+    if (!Number.isSafeInteger(offset) || offset < 0) throw new Error("Invalid runtime cursor");
+    const owned = [...this.runtimes.entries()].filter(
+      ([, runtime]) => runtime.ownerScope === request.ownerScope,
+    );
+    const items = owned.slice(offset, offset + request.limit).map(([sandboxId, runtime]) => ({
+      sandboxId,
+      providerHandle: runtime.handle,
+      ownerScope: runtime.ownerScope,
+    }));
+    const nextOffset = offset + items.length;
+    return {
+      items,
+      ...(nextOffset < owned.length ? { nextCursor: String(nextOffset) } : {}),
+    };
+  }
+
+  async removeOwnedRuntime(request: {
+    sandboxId: string;
+    providerHandle: string;
+    ownerScope: string;
+  }): Promise<void> {
+    const runtime = this.runtime(request);
+    if (runtime.ownerScope !== request.ownerScope) throw new Error("Sandbox owner does not match");
     this.runtimes.delete(request.sandboxId);
   }
 

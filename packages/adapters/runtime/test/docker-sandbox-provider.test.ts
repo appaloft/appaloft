@@ -14,6 +14,7 @@ class CapturingRunner implements SandboxDockerCommandRunner {
   runtimes = '{"io.containerd.runc.v2":{"path":"runc"},"runsc":{"path":"runsc"}}';
   resolvedPath: string | undefined;
   executionFailure: SandboxDockerCommandResult["failure"];
+  inventory = "";
 
   async run(
     argv: readonly string[],
@@ -23,13 +24,16 @@ class CapturingRunner implements SandboxDockerCommandRunner {
     const command = argv.join(" ");
     if (command.includes("info --format")) return this.result(this.runtimes);
     if (command.includes("network inspect --format")) return this.result("true\n");
+    if (command.includes("ps -a --filter")) return this.result(this.inventory);
     if (command.includes("realpath"))
       return this.result(`${this.resolvedPath ?? argv.at(-1)}\n`);
     if (command.includes("tar -C /workspace -cf -")) return this.result("archive");
     if (command.includes("inspect --format {{.Config.Image}}"))
       return this.result("python@sha256:abc123\n");
-    if (command.includes("inspect --format") && !command.includes("image inspect"))
+    if (command.includes("inspect --format") && !command.includes("image inspect")) {
+      if (command.includes("appaloft.sandbox.owner")) return this.result("tenant_a\n");
       return this.result("sbx_demo\n");
+    }
     if (command.includes("image inspect")) return this.result("4096\n");
     if (command.includes("exec -w") && !command.includes(" -d "))
       return {
@@ -48,6 +52,7 @@ class CapturingRunner implements SandboxDockerCommandRunner {
 
 const request = {
   sandboxId: "sbx_demo",
+  ownerScope: "tenant_a",
   source: { kind: "image" as const, image: "python@sha256:abc123" },
   requestedIsolation: "gvisor" as const,
   limits: {
@@ -88,6 +93,41 @@ describe("DockerSandboxProvider", () => {
 
     expect(provider.provision(request)).rejects.toThrow("runsc");
     expect(runner.calls.some((call) => call.argv[1] === "create")).toBe(false);
+  });
+
+  test("[SBX-RECONCILE-001] inventories and removes only an exactly owned runtime", async () => {
+    const runner = new CapturingRunner();
+    runner.inventory = "appaloft-sbx_demo\tsbx_demo\ttenant_a\n";
+    const provider = new DockerSandboxProvider({ isolation: "gvisor", runner });
+    await provider.provision(request);
+
+    expect(await provider.listOwnedRuntimes({ ownerScope: "tenant_a", limit: 10 })).toEqual({
+      items: [
+        {
+          ownerScope: "tenant_a",
+          sandboxId: "sbx_demo",
+          providerHandle: "appaloft-sbx_demo",
+        },
+      ],
+    });
+    await provider.removeOwnedRuntime({
+      ownerScope: "tenant_a",
+      sandboxId: "sbx_demo",
+      providerHandle: "appaloft-sbx_demo",
+    });
+
+    expect(runner.calls.find((call) => call.argv[1] === "create")?.argv).toContain(
+      "appaloft.sandbox.owner=tenant_a",
+    );
+    expect(runner.calls.some((call) => call.argv.includes("label=appaloft.sandbox.owner=tenant_a"))).toBe(
+      true,
+    );
+    expect(runner.calls.at(-1)?.argv).toEqual([
+      "docker",
+      "rm",
+      "-f",
+      "appaloft-sbx_demo",
+    ]);
   });
 
   test("[SBX-PORT-001] enables publishing only on a verified internal Docker network", async () => {

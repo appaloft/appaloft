@@ -92,6 +92,20 @@ describe("PgExecutionSandboxRepository", () => {
         mode: "deny",
         rules: [],
       });
+      expect(
+        await repository.listProviderRuntimes(context("tenant_a"), {
+          providerKey: "hermetic",
+          limit: 10,
+          offset: 0,
+        }),
+      ).toEqual([{ sandboxId: "sbx_pg", providerHandle: "opaque:runtime" }]);
+      expect(
+        await repository.listProviderRuntimes(context("tenant_b"), {
+          providerKey: "hermetic",
+          limit: 10,
+          offset: 0,
+        }),
+      ).toEqual([]);
 
       const snapshot = SandboxSnapshot.create({
         id: SandboxSnapshotId.rehydrate("ssn_pg"),

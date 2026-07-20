@@ -211,6 +211,8 @@ export class DockerSandboxProvider implements SandboxProvider {
       "appaloft.managed=true",
       "--label",
       `appaloft.sandbox.id=${request.sandboxId}`,
+      "--label",
+      `appaloft.sandbox.owner=${this.ownerScope(request.ownerScope)}`,
       "--runtime",
       this.runtimeName,
       "--network",
@@ -262,6 +264,62 @@ export class DockerSandboxProvider implements SandboxProvider {
 
   async terminate(request: { sandboxId: string; providerHandle: string }): Promise<void> {
     await this.assertHandle(request);
+    await this.docker(["rm", "-f", request.providerHandle]);
+  }
+
+  async listOwnedRuntimes(request: { ownerScope: string; limit: number; cursor?: string }) {
+    const ownerScope = this.ownerScope(request.ownerScope);
+    const offset = request.cursor ? Number(request.cursor) : 0;
+    if (!Number.isSafeInteger(offset) || offset < 0) throw new Error("Invalid runtime cursor");
+    const listed = await this.docker([
+      "ps",
+      "-a",
+      "--filter",
+      "label=appaloft.managed=true",
+      "--filter",
+      `label=appaloft.sandbox.owner=${ownerScope}`,
+      "--format",
+      '{{.Names}}\t{{.Label "appaloft.sandbox.id"}}\t{{.Label "appaloft.sandbox.owner"}}',
+    ]);
+    const owned = text(listed.stdout)
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => {
+        const [providerHandle, sandboxId, observedOwner] = line.split("\t");
+        if (
+          !providerHandle ||
+          !sandboxId ||
+          observedOwner !== ownerScope ||
+          providerHandle !== containerName(sandboxId)
+        ) {
+          throw new Error("Docker returned an invalid managed Sandbox inventory record");
+        }
+        return { sandboxId, providerHandle, ownerScope };
+      });
+    const items = owned.slice(offset, offset + request.limit);
+    const nextOffset = offset + items.length;
+    return {
+      items,
+      ...(nextOffset < owned.length ? { nextCursor: String(nextOffset) } : {}),
+    };
+  }
+
+  async removeOwnedRuntime(request: {
+    sandboxId: string;
+    providerHandle: string;
+    ownerScope: string;
+  }): Promise<void> {
+    await this.assertHandle(request);
+    const ownerScope = this.ownerScope(request.ownerScope);
+    const inspected = await this.docker([
+      "inspect",
+      "--format",
+      '{{index .Config.Labels "appaloft.sandbox.owner"}}',
+      request.providerHandle,
+    ]);
+    if (text(inspected.stdout).trim() !== ownerScope) {
+      throw new Error("Docker container is not owned by the requested owner scope");
+    }
     await this.docker(["rm", "-f", request.providerHandle]);
   }
 
@@ -636,6 +694,13 @@ export class DockerSandboxProvider implements SandboxProvider {
     const checked = SandboxWorkspacePath.create(path);
     if (checked.isErr()) throw new Error("Sandbox path escaped the workspace");
     return `/workspace/${checked.value.value}`.replace(/\/$/, "");
+  }
+
+  private ownerScope(value: string): string {
+    if (!/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}$/.test(value)) {
+      throw new Error("Sandbox owner scope is invalid");
+    }
+    return value;
   }
 
   private async confinedWorkspacePath(

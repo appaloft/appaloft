@@ -41,10 +41,17 @@ export interface SandboxProviderCapabilities {
 
 export interface SandboxProviderRequest {
   sandboxId: string;
+  ownerScope: string;
   source: { kind: "image"; image: string } | { kind: "snapshot"; providerHandle: string };
   requestedIsolation: SandboxIsolation;
   limits: SandboxResourceLimitsState;
   networkPolicy: SandboxNetworkPolicyState;
+}
+
+export interface SandboxOwnedRuntime {
+  sandboxId: string;
+  providerHandle: string;
+  ownerScope: string;
 }
 
 export type SandboxProcessStreamFrame =
@@ -151,6 +158,12 @@ export interface SandboxProvider {
     providerHandle: string;
     networkPolicy: SandboxNetworkPolicyState;
   }): Promise<void>;
+  listOwnedRuntimes?(request: {
+    ownerScope: string;
+    limit: number;
+    cursor?: string;
+  }): Promise<{ items: SandboxOwnedRuntime[]; nextCursor?: string }>;
+  removeOwnedRuntime?(runtime: SandboxOwnedRuntime): Promise<void>;
 }
 
 export class SandboxProviderRegistry {
@@ -179,6 +192,9 @@ export class SandboxProviderRegistry {
   get(key: string): SandboxProvider | null {
     return this.providers.get(key) ?? null;
   }
+  list(): SandboxProvider[] {
+    return [...this.providers.values()];
+  }
 }
 
 export type StoredSandbox = { tenantId: string; providerKey: string; sandbox: Sandbox };
@@ -195,6 +211,10 @@ export interface SandboxRepository {
     context: RepositoryContext,
     input: { limit: number },
   ): Promise<StoredSandbox[]>;
+  listProviderRuntimes(
+    context: RepositoryContext,
+    input: { providerKey: string; limit: number; offset: number },
+  ): Promise<Array<{ sandboxId: string; providerHandle: string }>>;
   saveSnapshot(
     context: RepositoryContext,
     snapshot: SandboxSnapshot,
@@ -246,6 +266,22 @@ export class InMemorySandboxRepository implements SandboxRepository {
       .filter((item) => item.tenantId === tenantId(context))
       .filter((item) => !item.sandbox.toState().status.isTerminal())
       .slice(0, input.limit);
+  }
+  async listProviderRuntimes(
+    context: RepositoryContext,
+    input: { providerKey: string; limit: number; offset: number },
+  ): Promise<Array<{ sandboxId: string; providerHandle: string }>> {
+    return [...this.items.values()]
+      .filter(
+        (item) => item.tenantId === tenantId(context) && item.providerKey === input.providerKey,
+      )
+      .flatMap((item) => {
+        const state = item.sandbox.toState();
+        return state.providerHandle
+          ? [{ sandboxId: state.id.value, providerHandle: state.providerHandle }]
+          : [];
+      })
+      .slice(input.offset, input.offset + input.limit);
   }
   async saveSnapshot(
     context: RepositoryContext,
@@ -688,6 +724,7 @@ export class ExecutionSandboxService {
     try {
       const observed = await provider.provision({
         sandboxId,
+        ownerScope: tenantId(toRepositoryContext(context)),
         source: providerSource,
         requestedIsolation: state.requestedIsolation.value,
         limits: state.limits.toState(),
@@ -787,6 +824,76 @@ export class ExecutionSandboxService {
       }
     }
     return ok({ expired, reconciled, failed });
+  }
+
+  async reconcileProviderOrphans(
+    context: ExecutionContext,
+    input: { providerKey?: string; limit?: number } = {},
+  ): Promise<Result<{ retained: string[]; removed: string[]; failed: string[] }>> {
+    const repositoryContext = toRepositoryContext(context);
+    const ownerScope = tenantId(repositoryContext);
+    const limit = Math.min(Math.max(input.limit ?? 500, 1), 500);
+    const providers = input.providerKey
+      ? [this.providerRegistry.get(input.providerKey)].filter(
+          (provider): provider is SandboxProvider => provider !== null,
+        )
+      : this.providerRegistry.list();
+    if (providers.length === 0) {
+      return err(
+        domainError.infra("Sandbox provider is unavailable", {
+          phase: "execution-sandbox-provider-reconciliation",
+          ...(input.providerKey ? { providerKey: input.providerKey } : {}),
+        }),
+      );
+    }
+
+    const retained: string[] = [];
+    const removed: string[] = [];
+    const failed: string[] = [];
+    for (const provider of providers) {
+      if (!provider.listOwnedRuntimes || !provider.removeOwnedRuntime) {
+        failed.push(`${provider.key}:inventory-unsupported`);
+        continue;
+      }
+      const persisted = new Set<string>();
+      for (let offset = 0; ; offset += limit) {
+        const page = await this.repository.listProviderRuntimes(repositoryContext, {
+          providerKey: provider.key,
+          limit,
+          offset,
+        });
+        for (const runtime of page) {
+          persisted.add(`${runtime.sandboxId}\0${runtime.providerHandle}`);
+        }
+        if (page.length < limit) break;
+      }
+
+      let cursor: string | undefined;
+      do {
+        const inventory = await this.providerOperation("execution-sandbox-provider-inventory", () =>
+          provider.listOwnedRuntimes!({ ownerScope, limit, ...(cursor ? { cursor } : {}) }),
+        );
+        if (inventory.isErr()) return err(inventory.error);
+        for (const runtime of inventory.value.items) {
+          if (runtime.ownerScope !== ownerScope) {
+            failed.push(runtime.sandboxId);
+            continue;
+          }
+          if (persisted.has(`${runtime.sandboxId}\0${runtime.providerHandle}`)) {
+            retained.push(runtime.sandboxId);
+            continue;
+          }
+          const removal = await this.providerOperation(
+            "execution-sandbox-provider-orphan-removal",
+            () => provider.removeOwnedRuntime!(runtime),
+          );
+          if (removal.isErr()) failed.push(runtime.sandboxId);
+          else removed.push(runtime.sandboxId);
+        }
+        cursor = inventory.value.nextCursor;
+      } while (cursor);
+    }
+    return ok({ retained, removed, failed });
   }
 
   async exec(
