@@ -1,4 +1,5 @@
 import {
+  ConfigureSandboxNetworkPolicyCommand,
   CreateSandboxCommand,
   CreateSandboxSnapshotCommand,
   CreateSandboxTemplateCommand,
@@ -23,7 +24,6 @@ import {
   ShowSandboxTemplateQuery,
   TerminateSandboxCommand,
   TerminateSandboxProcessCommand,
-  UpdateSandboxNetworkPolicyCommand,
   WriteSandboxFileCommand,
 } from "@appaloft/application";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
@@ -192,7 +192,7 @@ const process = EffectCommand.make("process").pipe(
 
 const networkDeny = EffectCommand.make("deny", { sandboxId }, ({ sandboxId }) =>
   runCommand(
-    UpdateSandboxNetworkPolicyCommand.create({
+    ConfigureSandboxNetworkPolicyCommand.create({
       sandboxId,
       networkPolicy: { mode: "deny", rules: [] },
     }),

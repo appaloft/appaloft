@@ -61,6 +61,7 @@ import {
   ConfigureResourceSourceCommand,
   ConfigureRetentionDefaultsCommand,
   ConfigureRuntimeMonitoringThresholdsCommand,
+  ConfigureSandboxNetworkPolicyCommand,
   ConfigureScheduledRuntimePrunePolicyCommand,
   ConfigureScheduledTaskCommand,
   ConfigureServerCredentialCommand,
@@ -122,6 +123,7 @@ import {
   configureResourceSourceCommandInputSchema,
   configureRetentionDefaultsCommandInputSchema,
   configureRuntimeMonitoringThresholdsCommandInputSchema,
+  configureSandboxNetworkPolicyCommandInputSchema,
   configureScheduledRuntimePrunePolicyCommandInputSchema,
   configureScheduledTaskCommandInputSchema,
   configureServerCredentialCommandInputSchema,
@@ -654,12 +656,10 @@ import {
   UnlockEnvironmentCommand,
   UnsetEnvironmentVariableCommand,
   UnsetResourceVariableCommand,
-  UpdateSandboxNetworkPolicyCommand,
   unbindResourceDependencyCommandInputSchema,
   unlockEnvironmentCommandInputSchema,
   unsetEnvironmentVariableCommandInputSchema,
   unsetResourceVariableCommandInputSchema,
-  updateSandboxNetworkPolicyCommandInputSchema,
   WriteSandboxFileCommand,
   withExecutionAuthProviderAccessTokens,
   writeSandboxFileCommandInputSchema,
@@ -7093,16 +7093,16 @@ export const terminateSandboxProcessProcedure = base
     executeCommand(context, TerminateSandboxProcessCommand.create(input)),
   );
 
-export const updateSandboxNetworkPolicyProcedure = base
+export const configureSandboxNetworkPolicyProcedure = base
   .route({
     method: "POST",
     path: "/sandboxes/{sandboxId}/network-policy",
     successStatus: 200,
   })
-  .input(updateSandboxNetworkPolicyCommandInputSchema)
+  .input(configureSandboxNetworkPolicyCommandInputSchema)
   .output(sandboxOperationResponseSchema)
   .handler(async ({ input, context }) =>
-    executeCommand(context, UpdateSandboxNetworkPolicyCommand.create(input)),
+    executeCommand(context, ConfigureSandboxNetworkPolicyCommand.create(input)),
   );
 
 export const exposeSandboxPortProcedure = base
@@ -7232,7 +7232,7 @@ export const appaloftOrpcRouter = {
       terminate: terminateSandboxProcessProcedure,
     },
     networkPolicy: {
-      update: updateSandboxNetworkPolicyProcedure,
+      configure: configureSandboxNetworkPolicyProcedure,
     },
     ports: {
       expose: exposeSandboxPortProcedure,

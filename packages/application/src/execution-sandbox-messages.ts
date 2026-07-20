@@ -98,7 +98,7 @@ export const listSandboxPortsQueryInputSchema = showSandboxQueryInputSchema;
 export const revokeSandboxPortCommandInputSchema = z
   .object({ sandboxId: sandboxIdSchema, exposureId: z.string().trim().min(1).max(160) })
   .strict();
-export const updateSandboxNetworkPolicyCommandInputSchema = z
+export const configureSandboxNetworkPolicyCommandInputSchema = z
   .object({
     sandboxId: sandboxIdSchema,
     networkPolicy: createSandboxCommandInputSchema.shape.networkPolicy,
@@ -267,12 +267,12 @@ export class TerminateSandboxProcessCommand extends SandboxCommandMessage {
     );
   }
 }
-export class UpdateSandboxNetworkPolicyCommand extends SandboxCommandMessage {
+export class ConfigureSandboxNetworkPolicyCommand extends SandboxCommandMessage {
   static create(input: unknown) {
     return commandCreate(
-      updateSandboxNetworkPolicyCommandInputSchema,
+      configureSandboxNetworkPolicyCommandInputSchema,
       input,
-      (value) => new UpdateSandboxNetworkPolicyCommand(value),
+      (value) => new ConfigureSandboxNetworkPolicyCommand(value),
     );
   }
 }

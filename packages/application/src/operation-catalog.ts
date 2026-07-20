@@ -1,5 +1,6 @@
 import { type ZodTypeAny } from "zod";
 import {
+  configureSandboxNetworkPolicyCommandInputSchema,
   createSandboxCommandInputSchema,
   createSandboxSnapshotCommandInputSchema,
   createSandboxTemplateCommandInputSchema,
@@ -21,7 +22,6 @@ import {
   showSandboxSnapshotQueryInputSchema,
   showSandboxTemplateQueryInputSchema,
   terminateSandboxProcessCommandInputSchema,
-  updateSandboxNetworkPolicyCommandInputSchema,
   writeSandboxFileCommandInputSchema,
 } from "./execution-sandbox-messages";
 import { changeAccountProfileCommandInputSchema } from "./operations/account-settings/change-account-profile.command";
@@ -4741,13 +4741,13 @@ export const operationCatalog = [
     },
   },
   {
-    key: "sandboxes.network-policy.update",
+    key: "sandboxes.network-policy.configure",
     kind: "command",
     domain: "sandboxes",
-    messageName: "UpdateSandboxNetworkPolicyCommand",
+    messageName: "ConfigureSandboxNetworkPolicyCommand",
     handlerName: "SandboxCommandHandler",
     serviceName: "ExecutionSandboxService",
-    inputSchema: updateSandboxNetworkPolicyCommandInputSchema,
+    inputSchema: configureSandboxNetworkPolicyCommandInputSchema,
     serviceToken: tokens.executionSandboxService,
     transportAccess: { productSession: { minRole: "member" } },
     transports: {

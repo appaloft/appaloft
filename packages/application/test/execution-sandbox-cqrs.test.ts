@@ -4,6 +4,7 @@ import { describe, expect, test } from "bun:test";
 import { ok } from "@appaloft/core";
 
 import {
+  ConfigureSandboxNetworkPolicyCommand,
   CreateSandboxCommand,
   createExecutionContext,
   type ExecutionSandboxService,
@@ -12,7 +13,6 @@ import {
   SandboxCommandHandler,
   SandboxQueryHandler,
   ShowSandboxProcessQuery,
-  UpdateSandboxNetworkPolicyCommand,
   WriteSandboxFileCommand,
 } from "../src";
 
@@ -140,7 +140,7 @@ describe("execution sandbox CQRS boundary", () => {
     expect(process._unsafeUnwrap()).toMatchObject({ processId: "proc_1" });
     const updated = await commands.handle(
       context,
-      UpdateSandboxNetworkPolicyCommand.create({
+      ConfigureSandboxNetworkPolicyCommand.create({
         sandboxId: "sbx_1",
         networkPolicy: { mode: "deny", rules: [] },
       })._unsafeUnwrap(),

@@ -9,6 +9,7 @@ import {
 import { type ExecutionContext } from "./execution-context";
 import { type ExecutionSandboxService } from "./execution-sandbox";
 import {
+  ConfigureSandboxNetworkPolicyCommand,
   CreateSandboxCommand,
   CreateSandboxSnapshotCommand,
   CreateSandboxTemplateCommand,
@@ -33,7 +34,6 @@ import {
   ShowSandboxTemplateQuery,
   TerminateSandboxCommand,
   TerminateSandboxProcessCommand,
-  UpdateSandboxNetworkPolicyCommand,
   WriteSandboxFileCommand,
 } from "./execution-sandbox-messages";
 import { tokens } from "./tokens";
@@ -47,7 +47,7 @@ type SandboxCommand =
   | WriteSandboxFileCommand
   | RemoveSandboxFileCommand
   | TerminateSandboxProcessCommand
-  | UpdateSandboxNetworkPolicyCommand
+  | ConfigureSandboxNetworkPolicyCommand
   | ExposeSandboxPortCommand
   | RevokeSandboxPortCommand
   | CreateSandboxSnapshotCommand
@@ -146,7 +146,7 @@ export class SandboxCommandHandler implements CommandHandlerContract<SandboxComm
         text(input, "processId"),
       );
     }
-    if (command instanceof UpdateSandboxNetworkPolicyCommand) {
+    if (command instanceof ConfigureSandboxNetworkPolicyCommand) {
       return this.service.updateNetworkPolicy(context, text(input, "sandboxId"), {
         networkPolicy: input.networkPolicy as Parameters<
           ExecutionSandboxService["updateNetworkPolicy"]
@@ -238,7 +238,7 @@ for (const command of [
   WriteSandboxFileCommand,
   RemoveSandboxFileCommand,
   TerminateSandboxProcessCommand,
-  UpdateSandboxNetworkPolicyCommand,
+  ConfigureSandboxNetworkPolicyCommand,
   ExposeSandboxPortCommand,
   RevokeSandboxPortCommand,
   CreateSandboxSnapshotCommand,

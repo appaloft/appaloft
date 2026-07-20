@@ -4529,14 +4529,14 @@ export const generatedSdkOperations = [
     facadeDefault: true,
   },
   {
-    operationKey: "sandboxes.network-policy.update",
+    operationKey: "sandboxes.network-policy.configure",
     operationGroup: "sandboxes",
-    operationMethod: "networkPolicyUpdate",
-    facadePath: ["sandboxes", "networkPolicy", "update"],
-    operationId: "sandboxes.networkPolicy.update",
+    operationMethod: "networkPolicyConfigure",
+    facadePath: ["sandboxes", "networkPolicy", "configure"],
+    operationId: "sandboxes.networkPolicy.configure",
     kind: "command",
     domain: "sandboxes",
-    messageName: "UpdateSandboxNetworkPolicyCommand",
+    messageName: "ConfigureSandboxNetworkPolicyCommand",
     route: {
       method: "POST",
       path: "/sandboxes/{sandboxId}/network-policy",
@@ -6250,7 +6250,7 @@ export interface GeneratedAppaloftClient {
     readonly exec: AppaloftSdkFacadeMethod;
     readonly list: AppaloftSdkFacadeMethod;
     readonly networkPolicy: {
-      readonly update: AppaloftSdkFacadeMethod;
+      readonly configure: AppaloftSdkFacadeMethod;
     };
     readonly pause: AppaloftSdkFacadeMethod;
     readonly resume: AppaloftSdkFacadeMethod;

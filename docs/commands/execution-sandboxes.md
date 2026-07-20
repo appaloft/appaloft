@@ -17,7 +17,7 @@ credentials or resolved secret values.
 | `sandboxes.pause` | Preserve one Sandbox identity while releasing supported compute. | Sandbox | Pausing/paused descriptor plus attempt id. |
 | `sandboxes.resume` | Resume the same paused Sandbox. | Sandbox | Resuming/ready descriptor plus attempt id. |
 | `sandboxes.terminate` | Permanently revoke runtime access and clean up exact provider state. | Sandbox | Terminating/terminated descriptor plus attempt id. |
-| `sandboxes.network-policy.update` | Replace the admitted egress policy when the provider supports it. | Sandbox | Updated descriptor; unsupported policies fail before provider mutation. |
+| `sandboxes.network-policy.configure` | Replace the admitted egress policy when the provider supports it. | Sandbox | Updated descriptor; unsupported policies fail before provider mutation. |
 | `sandboxes.exec` | Execute foreground argv or start a background process. | Sandbox runtime capability | Bounded frames or safe process descriptor. |
 | `sandbox-processes.terminate` | Signal/terminate one Sandbox-owned background process. | Provider runtime capability | Safe process terminal descriptor. |
 | `sandbox-files.write` | Write binary content below the workspace root. | Provider filesystem capability | Path, size, digest and modified time. |
