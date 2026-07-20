@@ -1257,6 +1257,263 @@ describe("CLI deployment config entry workflow", () => {
     expect(harness.sourceLinkCalls.some((call) => call.includes("applications.worker"))).toBe(true);
   });
 
+  test("[CONFIG-FILE-APPLICATION-GRAPH-008] config deploy selects one named application", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-application-selector-"));
+    const configPath = join(workspace, "appaloft.yaml");
+    writeFileSync(
+      configPath,
+      [
+        "controlPlane:",
+        "  mode: cloud",
+        "  deploymentContext:",
+        "    projectId: proj_1",
+        "    environmentId: env_1",
+        "    resourceId: res_context_default",
+        "    serverId: srv_1",
+        "    destinationId: dst_context",
+        "applications:",
+        "  api:",
+        "    resource:",
+        "      name: Acme API",
+        "    source:",
+        "      type: git",
+        "      repository: https://github.com/acme/app",
+        "      baseDirectory: apps/api",
+        "    runtime:",
+        "      strategy: workspace-commands",
+        "  worker:",
+        "    resource:",
+        "      name: Acme Worker",
+        "      kind: worker",
+        "    source:",
+        "      type: git",
+        "      repository: https://github.com/acme/app",
+        "      baseDirectory: apps/worker",
+        "    runtime:",
+        "      strategy: workspace-commands",
+        "",
+      ].join("\n"),
+    );
+    const harness = await createPreviewDeployCliHarness({
+      deploymentSummaries: [
+        {
+          id: "dep_1",
+          resourceId: "res_1",
+          status: "succeeded",
+          runtimePlan: { execution: {} },
+        },
+      ],
+    });
+
+    try {
+      await withBunEnv(
+        {
+          GITHUB_HEAD_REF: undefined,
+          GITHUB_REF: undefined,
+          GITHUB_REPOSITORY: undefined,
+          GITHUB_REPOSITORY_ID: undefined,
+          GITHUB_SHA: undefined,
+          GITHUB_WORKSPACE: undefined,
+        },
+        () =>
+          withMutedProcessOutput(async () => {
+            await harness.program.parseAsync([
+              "node",
+              "appaloft",
+              "deploy",
+              workspace,
+              "--config",
+              configPath,
+              "--application",
+              "worker",
+            ]);
+          }),
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    const resourceCommands = harness.commands.filter(
+      (command) => command.constructor.name === "CreateResourceCommand",
+    ) as Record<string, unknown>[];
+    expect(resourceCommands).toHaveLength(1);
+    expect(resourceCommands[0]).toMatchObject({
+      name: "Acme Worker",
+      kind: "worker",
+      source: {
+        locator: "https://github.com/acme/app",
+        baseDirectory: "apps/worker",
+      },
+    });
+
+    const deployments = harness.commands.filter(
+      (command) => command.constructor.name === "CreateDeploymentCommand",
+    );
+    expect(deployments).toHaveLength(1);
+    expect(harness.sourceLinkCalls.some((call) => call.includes("applications.worker"))).toBe(true);
+    expect(harness.sourceLinkCalls.some((call) => call.includes("applications.api"))).toBe(false);
+  });
+
+  test("[CONFIG-FILE-APPLICATION-GRAPH-008] repeated selectors preserve config key order", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-repeated-application-selector-"));
+    const configPath = join(workspace, "appaloft.yaml");
+    writeFileSync(
+      configPath,
+      [
+        "controlPlane:",
+        "  mode: cloud",
+        "  deploymentContext:",
+        "    projectId: proj_1",
+        "    environmentId: env_1",
+        "    resourceId: res_context_default",
+        "    serverId: srv_1",
+        "applications:",
+        "  api:",
+        "    resource:",
+        "      name: Acme API",
+        "    runtime:",
+        "      strategy: workspace-commands",
+        "  site:",
+        "    resource:",
+        "      name: Acme Site",
+        "      kind: static-site",
+        "    runtime:",
+        "      strategy: workspace-commands",
+        "  worker:",
+        "    resource:",
+        "      name: Acme Worker",
+        "      kind: worker",
+        "    runtime:",
+        "      strategy: workspace-commands",
+        "",
+      ].join("\n"),
+    );
+    const harness = await createPreviewDeployCliHarness({
+      deploymentSummaries: [
+        { id: "dep_1", resourceId: "res_1", status: "succeeded", runtimePlan: { execution: {} } },
+        { id: "dep_2", resourceId: "res_2", status: "succeeded", runtimePlan: { execution: {} } },
+      ],
+    });
+
+    try {
+      await withMutedProcessOutput(() =>
+        harness.program.parseAsync([
+          "node",
+          "appaloft",
+          "deploy",
+          workspace,
+          "--config",
+          configPath,
+          "--application",
+          "worker",
+          "--application",
+          "api",
+        ]),
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    const resourceNames = harness.commands
+      .filter((command) => command.constructor.name === "CreateResourceCommand")
+      .map((command) => (command as unknown as { name: string }).name);
+    expect(resourceNames).toEqual(["Acme API", "Acme Worker"]);
+    expect(harness.sourceLinkCalls.some((call) => call.includes("applications.site"))).toBe(false);
+  });
+
+  test("[CONFIG-FILE-APPLICATION-GRAPH-009] unknown application selector fails before mutation", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-unknown-application-selector-"));
+    const configPath = join(workspace, "appaloft.yaml");
+    writeFileSync(
+      configPath,
+      [
+        "controlPlane:",
+        "  mode: cloud",
+        "  deploymentContext:",
+        "    projectId: proj_1",
+        "    environmentId: env_1",
+        "    resourceId: res_context_default",
+        "    serverId: srv_1",
+        "applications:",
+        "  api:",
+        "    resource:",
+        "      name: Acme API",
+        "    runtime:",
+        "      strategy: workspace-commands",
+        "",
+      ].join("\n"),
+    );
+    const harness = await createPreviewDeployCliHarness();
+
+    try {
+      const result = await withMutedProcessOutput(() =>
+        harness.program
+          .parseAsync([
+            "node",
+            "appaloft",
+            "deploy",
+            workspace,
+            "--config",
+            configPath,
+            "--application",
+            "missing",
+          ])
+          .then(
+            () => ({ ok: true as const }),
+            (error: unknown) => ({ ok: false as const, error }),
+          ),
+      );
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(String(result.error)).toContain("unknown_application");
+        expect(String(result.error)).toContain("missing");
+        expect(String(result.error)).toContain("api");
+      }
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    expect(harness.commands).toHaveLength(0);
+  });
+
+  test("[CONFIG-FILE-APPLICATION-GRAPH-009] application selector bypasses ids-only fast path", async () => {
+    ensureReflectMetadata();
+    const harness = await createPreviewDeployCliHarness();
+
+    const result = await withMutedProcessOutput(() =>
+      harness.program
+        .parseAsync([
+          "node",
+          "appaloft",
+          "deploy",
+          "--project",
+          "proj_1",
+          "--server",
+          "srv_1",
+          "--environment",
+          "env_1",
+          "--resource",
+          "res_1",
+          "--application",
+          "missing",
+        ])
+        .then(
+          () => ({ ok: true as const }),
+          (error: unknown) => ({ ok: false as const, error }),
+        ),
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(String(result.error)).toContain("unknown_application");
+    }
+    expect(harness.commands).toHaveLength(0);
+  });
+
   test("[CONFIG-FILE-APPLICATION-GRAPH-007] application graph provisions one named dependency and binds every consumer", async () => {
     ensureReflectMetadata();
     const workspace = mkdtempSync(join(tmpdir(), "appaloft-application-dependency-config-"));

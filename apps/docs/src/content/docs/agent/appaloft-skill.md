@@ -45,10 +45,19 @@ CLI-approved handoff 授权 scoped、可过期 token，然后使用 `APPALOFT_TO
 推荐安装完整 Appaloft skill：
 
 ```bash
-npx skills add appaloft/appaloft
+# Codex
+npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes
+
+# Claude Code
+npx skills add appaloft/appaloft --skill appaloft --global --agent claude-code --copy --yes
 ```
 
 安装命令只复制 skill 文件，不会部署应用、创建资源、调用 API，也不会包装 CLI。Appaloft 不提供单独的 npm skill installer，避免和 `appaloft` CLI 边界混淆。
+
+运行 `npx skills list --global --agent codex` 或
+`npx skills list --global --agent claude-code` 确认列表中有 Appaloft；同时确认 Codex 的
+`~/.agents/skills/appaloft/SKILL.md` 或 Claude Code 的 `~/.claude/skills/appaloft/SKILL.md`
+存在。然后新开一个 agent 会话，让宿主重新加载 skill 目录。
 
 <h2 id="appaloft-skill-scope">能力范围</h2>
 

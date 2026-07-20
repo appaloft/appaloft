@@ -8,8 +8,12 @@ the same operation catalog and public docs anchors. Do not invent agent-only ope
 Install the full Appaloft skill through the standard skill manager:
 
 ```bash
-npx skills add appaloft/appaloft
+npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes
 ```
+
+Use `--agent claude-code` for Claude Code. Verify the requested host with
+`npx skills list --global --agent <agent>` and start a new agent session before treating the skill
+as available.
 
 Appaloft does not provide a separate npm skill installer. Do not suggest an Appaloft-owned npm
 installer; that would blur the boundary between installing an agent skill and running the

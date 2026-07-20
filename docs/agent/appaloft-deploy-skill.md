@@ -30,8 +30,11 @@ documentation anchors instead of replacing this protocol.
 Install the full Appaloft skill for Codex-compatible skill hosts:
 
 ```bash
-npx skills add appaloft/appaloft
+npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes
 ```
+
+Use `--agent claude-code` for Claude Code. Verify with `npx skills list --global --agent <agent>`
+and start a new agent session before expecting the skill to appear.
 
 The install command only copies the full Appaloft skill into a skill host. It does not deploy an
 app, create resources, call Appaloft deployment APIs, or wrap `appaloft deploy`. Deployment starts

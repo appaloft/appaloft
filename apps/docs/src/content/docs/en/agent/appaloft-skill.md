@@ -51,12 +51,21 @@ profile.
 Install the full Appaloft skill:
 
 ```bash
-npx skills add appaloft/appaloft
+# Codex
+npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes
+
+# Claude Code
+npx skills add appaloft/appaloft --skill appaloft --global --agent claude-code --copy --yes
 ```
 
 The installer only copies skill files. It does not deploy an app, create resources, call APIs, or
 wrap the CLI. Appaloft does not provide a separate npm skill installer, which keeps the boundary
 clear between skill installation and the `appaloft` CLI.
+
+Run `npx skills list --global --agent codex` or
+`npx skills list --global --agent claude-code` to verify that Appaloft is listed, then confirm
+`appaloft/SKILL.md` exists under `~/.agents/skills` for Codex or `~/.claude/skills` for Claude Code.
+Start a new agent session so the host rebuilds its skill catalog.
 
 <h2 id="appaloft-skill-scope">Scope</h2>
 

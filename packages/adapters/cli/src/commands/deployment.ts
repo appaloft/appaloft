@@ -115,6 +115,7 @@ const methodOption = Options.choice("method", deploymentMethods).pipe(Options.op
 const entryModeOption = Options.choice("as", deploymentEntryModes).pipe(Options.optional);
 const configOption = Options.text("config").pipe(Options.optional);
 const configProfileOption = Options.text("config-profile").pipe(Options.optional);
+const applicationOption = Options.text("application").pipe(Options.repeated);
 const previewModes = ["pull-request"] as const;
 const previewOption = Options.choice("preview", previewModes).pipe(Options.optional);
 const previewIdOption = Options.text("preview-id").pipe(Options.optional);
@@ -1444,6 +1445,7 @@ export const deployCommand = EffectCommand.make(
     entryMode: entryModeOption,
     config: configOption,
     configProfile: configProfileOption,
+    application: applicationOption,
     preview: previewOption,
     previewId: previewIdOption,
     previewDomainTemplate: previewDomainTemplateOption,
@@ -1474,6 +1476,7 @@ export const deployCommand = EffectCommand.make(
   },
   ({
     acknowledgeResourceProfileDrift,
+    application,
     appLogLines,
     build,
     buildTarget,
@@ -1528,6 +1531,7 @@ export const deployCommand = EffectCommand.make(
       const requestedDeploymentMethodFromFlag = optionalValue(method);
       const publishDirectoryFromFlag = optionalValue(publishDir);
       const requestedConfigProfile = optionalValue(configProfile);
+      const requestedApplicationKeys = [...new Set(application)];
       const urlFirstEntry = yield* resultToEffect(
         normalizeUrlFirstDeploymentEntry({
           ...(requestedDeploymentMethodFromFlag
@@ -1618,6 +1622,7 @@ export const deployCommand = EffectCommand.make(
           hostPortValue !== undefined ||
           healthCheckPath ||
           requestedConfigProfile ||
+          requestedApplicationKeys.length > 0 ||
           flagEnvironmentVariables.length > 0 ||
           requestedPreviewDomainTemplate ||
           requestedPreviewTlsMode,
@@ -1673,6 +1678,27 @@ export const deployCommand = EffectCommand.make(
         selectedConfig && previewContext
           ? applyAppaloftDeploymentPreviewProfile(selectedConfig)
           : selectedConfig;
+      const configuredApplicationSeeds = effectiveConfig
+        ? applicationDeploymentPromptSeedsFromConfig(effectiveConfig)
+        : [];
+      if (requestedApplicationKeys.length > 0) {
+        const availableApplicationKeys = configuredApplicationSeeds.map(
+          (applicationSeed) => applicationSeed.key,
+        );
+        const unknownApplicationKeys = requestedApplicationKeys.filter(
+          (applicationKey) => !availableApplicationKeys.includes(applicationKey),
+        );
+        if (unknownApplicationKeys.length > 0) {
+          return yield* Effect.fail(
+            domainError.validation("Deployment application selector is not declared in config", {
+              phase: "config-application-resolution",
+              reason: "unknown_application",
+              applicationKeys: unknownApplicationKeys,
+              availableApplicationKeys,
+            }),
+          );
+        }
+      }
       const configuredDeploymentContext = effectiveConfig?.controlPlane?.deploymentContext;
       const effectiveProjectId = projectId ?? configuredDeploymentContext?.projectId;
       const effectiveServerId = serverId ?? configuredDeploymentContext?.serverId;
@@ -1885,15 +1911,21 @@ export const deployCommand = EffectCommand.make(
       } satisfies CommonDeploymentSeedInput;
       const applicationSeeds =
         effectiveConfig && configResolution
-          ? applicationDeploymentPromptSeedsFromConfig(effectiveConfig).map((application) => ({
-              key: application.key,
-              seed: applyPreviewRoutePrecedence({
-                configSeed: application.seed,
-                configResolution,
-                ...(previewContext ? { previewContext } : {}),
-                ...(previewDomainRoutes ? { previewDomainRoutes } : {}),
-              }),
-            }))
+          ? configuredApplicationSeeds
+              .filter(
+                (applicationSeed) =>
+                  requestedApplicationKeys.length === 0 ||
+                  requestedApplicationKeys.includes(applicationSeed.key),
+              )
+              .map((applicationSeed) => ({
+                key: applicationSeed.key,
+                seed: applyPreviewRoutePrecedence({
+                  configSeed: applicationSeed.seed,
+                  configResolution,
+                  ...(previewContext ? { previewContext } : {}),
+                  ...(previewDomainRoutes ? { previewDomainRoutes } : {}),
+                }),
+              }))
           : [];
       const runResolvedDeployment = Effect.gen(function* () {
         if (applicationSeeds.length > 0) {

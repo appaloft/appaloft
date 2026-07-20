@@ -34,8 +34,11 @@ Skill 的目标是覆盖完整 Appaloft 部署入口，让 agent 优先回答用
 推荐安装完整 Appaloft skill：
 
 ```bash
-npx skills add appaloft/appaloft
+npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes
 ```
+
+Claude Code 请把 agent 改为 `claude-code`。确认 `npx skills list --global --agent <agent>`
+包含 Appaloft，且宿主发现目录中存在 `appaloft/SKILL.md` 后，新开一个 agent 会话。
 
 安装命令只复制完整 Appaloft skill，不会部署应用、创建资源、调用部署 API，也不是
 `appaloft deploy` 的包装器。部署子协议属于完整 skill 内部能力，不提供单独的 npm installer。

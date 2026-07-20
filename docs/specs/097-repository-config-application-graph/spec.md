@@ -41,6 +41,8 @@ provider-account choices in public config.
 | CONFIG-FILE-APPLICATION-GRAPH-005 | Parser accepts explicit dependency references | Top-level `dependencies.database` has a stable `resourceName`, while `applications.api.dependencies` and `applications.worker.dependencies` both reference `database` | config parser runs | The shared definition and each consumer reference are accepted and preserved without copying credentials or provider identity into config. |
 | CONFIG-FILE-APPLICATION-GRAPH-006 | Parser rejects ambiguous dependency references | An application references an undefined or duplicate dependency, a definition is unreferenced, multiple applications reference a dependency without `resourceName`, or multiple applications share an ephemeral preview dependency | config parser runs | Parsing fails before mutation with a path-specific application-graph dependency error. |
 | CONFIG-FILE-APPLICATION-GRAPH-007 | CLI reconciles one shared dependency for all consumers | API and worker reference the same named managed Postgres dependency | CLI config workflow expands the graph | The named dependency resource is provisioned at most once, each consumer Resource gets its own `DATABASE_URL` binding, non-consumers stay unbound, and each deployment remains ordinary ids-only admission. |
+| CONFIG-FILE-APPLICATION-GRAPH-008 | CLI selects named applications | Config declares `api`, `site`, and `worker` applications | `appaloft deploy --application site` runs | Only the selected application is reconciled and deployed; omitting the option still deploys every application in stable key order, and repeating the option selects multiple applications. |
+| CONFIG-FILE-APPLICATION-GRAPH-009 | CLI rejects an unknown application selector | Config declares `api` and the caller selects `missing` | CLI config workflow validates selection | The workflow fails before state initialization or mutation with the unknown and available application keys. |
 
 ## Domain Ownership
 
@@ -70,6 +72,9 @@ provider-account choices in public config.
   preview dependency lifecycle and cleanup semantics remain unsupported and fail before mutation.
 - CLI config deploy may expand application entries into multiple Resource-specific deployment
   inputs and execute them sequentially through the existing `deployments.create` command.
+- CLI config deploy may repeat `--application <key>` to select a subset of declared application
+  entries. No selector preserves the all-applications behavior. Every selected key must exist, and
+  selection validation completes before state initialization or mutation.
 - API/HTTP: no new deployment input is added. `deployments.create` stays ids-only and single
   Resource scoped.
 - Runtime planning: each application entry uses its own Resource profile. If an entry also declares

@@ -45,6 +45,7 @@ tools, CLI commands, HTTP/API calls, or Web actions to use.
 | AGENT-SKILL-007 | MCP remains optional | MCP descriptors exist but the current host may or may not configure them | The agent uses Appaloft | The skill remains useful through CLI/API/Web and can use MCP tools without changing business semantics when available. |
 | AGENT-SKILL-008 | Full Appaloft skill is the AI entrypoint | A user asks an agent to configure, observe, recover, administer, or maintain Appaloft beyond deployment | The agent follows the installed Appaloft skill | The skill maps the request to existing operation-catalog entries and includes every CLI transport command as an AI-readable reference. |
 | AGENT-SKILL-009 | Skill evals cover real Appaloft work | Public docs and the operation catalog define core workflows | The skill eval validator runs | The eval suite covers project, server save/manage, SSH credentials, environments, Resource profile configuration, first deploy, observation, recovery, domain/TLS, dependencies, storage, scheduled tasks, monitoring, runtime controls, terminal sessions, source/preview/static artifacts, audit/retention/operator work, organization/auth/deploy tokens, MCP, and secret/bypass refusal tasks. |
+| APPALOFT-SKILL-AVAILABILITY-001 | Standard installation is discoverable | The repository contains the complete Appaloft skill and the supported standard skill manager is installed | A no-network test installs the local repository skill globally for Codex and Claude Code and lists it for both hosts | Each host discovery directory contains the complete `SKILL.md`, deploy protocol, and OpenAI interface metadata; installation or listing failure fails the default test gate. |
 
 ## Required Skill Content
 
@@ -91,11 +92,15 @@ The deploy subprotocol must include:
 - Public docs: stable "Appaloft skill" and "Agent deploy skill" anchors before v1.
 - Repository artifact: standard source `skills/appaloft` with references for entrypoint surfaces,
   CLI operation mapping, and deploy protocol.
-- standard install path: `npx skills add appaloft/appaloft`.
+- standard install path: `npx skills add appaloft/appaloft --skill appaloft --global --agent
+  <agent> --copy --yes`, followed by `npx skills list --global --agent <agent>` and a new agent
+  session so the host reloads its catalog.
 - eval source: `skills/appaloft/evals/evals.json`, validated by
   `scripts/validate-appaloft-skill-evals.ts`.
 - no Appaloft-owned npm skill installer; this keeps skill installation distinct from the Appaloft
   CLI.
+- the supported standard skill manager is pinned as a development dependency so the default test
+  gate validates real local installation without network access.
 - CLI help: short pointer from first-deploy or deploy help to the skill docs when agent deployment
   is documented.
 - MCP/tools: active optional transport when configured; release packaging and hosted gateway policy
