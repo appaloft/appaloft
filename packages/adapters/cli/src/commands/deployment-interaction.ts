@@ -4889,9 +4889,8 @@ function persistServerAppliedRouteDesiredStateIfNeeded(input: {
             projectId: input.projectId,
             environmentId: input.environmentId,
             resourceId: input.resourceId,
-            ...(input.destinationId
-              ? { serverId: input.serverId, destinationId: input.destinationId }
-              : {}),
+            serverId: input.serverId,
+            ...(input.destinationId ? { destinationId: input.destinationId } : {}),
             domainName: route.host,
             pathPrefix: route.pathPrefix,
             pathHandling: route.pathHandling ?? "preserve",

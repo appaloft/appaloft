@@ -2113,7 +2113,6 @@ describe("CLI deployment config entry workflow", () => {
           deploymentMethod: "docker-compose",
           projectId: "proj_existing",
           serverId: "srv_existing",
-          destinationId: "dst_existing",
           environmentId: "env_existing",
           resourceId: "res_existing",
           stateBackend: {
@@ -2158,7 +2157,6 @@ describe("CLI deployment config entry workflow", () => {
     expect(input).toEqual({
       projectId: "proj_existing",
       serverId: "srv_existing",
-      destinationId: "dst_existing",
       environmentId: "env_existing",
       resourceId: "res_existing",
     });
@@ -2191,6 +2189,7 @@ describe("CLI deployment config entry workflow", () => {
     expect(domainCommands).toHaveLength(3);
     expect(domainCommands).toMatchObject([
       {
+        serverId: "srv_existing",
         domainName: "app.example.com",
         pathPrefix: "/",
         targetServiceName: "web",
@@ -2198,11 +2197,13 @@ describe("CLI deployment config entry workflow", () => {
           "repository-config-domain:proj_existing:env_existing:res_existing:app.example.com:/:replaces:dmb_deleted",
       },
       {
+        serverId: "srv_existing",
         domainName: "app.example.com",
         pathPrefix: "/api",
         targetServiceName: "api",
       },
       {
+        serverId: "srv_existing",
         domainName: "www.example.com",
         redirectTo: "app.example.com",
         redirectStatus: 308,
