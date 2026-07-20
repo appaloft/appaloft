@@ -192,7 +192,10 @@ class FakeDialectRenderer implements StorageBackupRuntimeCommandRenderer {
   readonly key = "fake-runtime-dialect";
   readonly calls: string[] = [];
 
-  constructor(private readonly failS3Store = false) {}
+  constructor(
+    private readonly failS3Store = false,
+    private readonly failSqliteSource = false,
+  ) {}
 
   renderDockerVolumeTarBackup(): AshScript {
     this.calls.push("tar-source");
@@ -204,6 +207,13 @@ class FakeDialectRenderer implements StorageBackupRuntimeCommandRenderer {
 
   renderDockerVolumeSqliteOnlineBackup(): AshScript {
     this.calls.push("sqlite-source");
+    if (this.failSqliteSource) {
+      return ash`
+        ${ash.raw(`printf 'APPALOFT_STORAGE_BACKUP_SOURCE_V1\n'
+        printf 'STORAGE_BACKUP_ERROR\tworking-root-unwritable\tbackup working root is not writable\n'
+        exit 1`)}
+      `;
+    }
     return ash`
       ${ash.raw(`printf 'APPALOFT_STORAGE_BACKUP_SOURCE_V1\\n'
       printf 'STORAGE_BACKUP_SOURCE\\t/tmp/fake.sqlite.tar.gz\\t43\\tfake-sqlite-checksum\\n'`)}
@@ -736,6 +746,40 @@ describe("storage volume backup runtime provider", () => {
     });
     expect(restoreResult.isOk()).toBe(true);
     expect(renderer.calls).toEqual(["sqlite-source", "store-target", "restore-target"]);
+  });
+
+  test("[STOR-BACKUP-DIAGNOSTIC-001] persists a bounded source command diagnostic", async () => {
+    const renderer = new FakeDialectRenderer(false, true);
+    const sourceAdapter = new DockerSqliteOnlineStorageBackupSourceAdapter({
+      commandDialect: renderer.key,
+      commandRenderers: [renderer],
+    });
+    const result = await sourceAdapter.createBackup({
+      backupId: "svb_failed",
+      attemptId: "sba_failed",
+      requestedAt: "2026-01-01T00:00:00.000Z",
+      plan: {
+        schemaVersion: "storage-volumes.backup-plan/v1",
+        storageVolumeId: "stv_failed",
+        sourceAdapterKey: "sqlite-online-backup",
+        targetProviderKey: "local-filesystem",
+        consistency: "application-consistent",
+        localOnly: true,
+        retention: { maxCount: 3 },
+        blockers: [],
+      },
+      source: {
+        storageVolumeId: "stv_failed",
+        destinationPath: "/pb_data",
+        dataFormat: "sqlite",
+        liveWrites: true,
+      },
+      runtimeTarget: serverState({ providerKey: "local-shell" }),
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr().message).toContain("working-root-unwritable");
+    expect(result._unsafeUnwrapErr().message.length).toBeLessThanOrEqual(360);
   });
 
   if (!localDockerBackupEnabled) {

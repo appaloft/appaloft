@@ -256,11 +256,28 @@ async function runStorageBackupScript(
 
 function backupCommandError(
   message: string,
-  input: { phase: string; backupId: string; stderr?: string; timedOut?: boolean },
+  input: {
+    phase: string;
+    backupId: string;
+    stdout?: string;
+    stderr?: string;
+    timedOut?: boolean;
+  },
 ) {
-  return domainError.infra(message, {
+  const marker = input.stdout
+    ?.split(/\r?\n/)
+    .find((line) => line.startsWith("STORAGE_BACKUP_ERROR\t"));
+  const diagnostic = (input.stderr?.trim() || marker || (input.timedOut ? "command timed out" : ""))
+    .replace(/[\u0000-\u001f\u007f]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 240);
+  const failureMessage = diagnostic ? `${message}: ${diagnostic}` : message;
+
+  return domainError.infra(failureMessage, {
     phase: input.phase,
     backupId: input.backupId,
+    ...(marker ? { marker: marker.slice(0, 240) } : {}),
     ...(input.stderr ? { stderr: input.stderr.slice(0, 240) } : {}),
     ...(input.timedOut !== undefined ? { timedOut: input.timedOut } : {}),
   });
@@ -799,6 +816,7 @@ export class DockerTarStorageBackupSourceAdapter implements StorageBackupSourceA
         backupCommandError("Storage volume backup source command failed", {
           phase: "storage-volume-backup-source",
           backupId: input.backupId,
+          stdout: result.stdout,
           stderr: result.stderr,
           timedOut: result.timedOut,
         }),
@@ -851,6 +869,7 @@ export class DockerSqliteOnlineStorageBackupSourceAdapter implements StorageBack
         backupCommandError("SQLite storage volume backup source command failed", {
           phase: "storage-volume-backup-source",
           backupId: input.backupId,
+          stdout: result.stdout,
           stderr: result.stderr,
           timedOut: result.timedOut,
         }),
@@ -899,6 +918,7 @@ export class LocalFilesystemStorageBackupTargetProvider implements StorageBackup
         backupCommandError("Storage volume backup target command failed", {
           phase: "storage-volume-backup-target",
           backupId: input.backupId,
+          stdout: result.stdout,
           stderr: result.stderr,
           timedOut: result.timedOut,
         }),
@@ -946,6 +966,7 @@ export class LocalFilesystemStorageBackupTargetProvider implements StorageBackup
         backupCommandError("Storage volume restore target command failed", {
           phase: "storage-volume-restore-target",
           backupId: input.backupId,
+          stdout: result.stdout,
           stderr: result.stderr,
           timedOut: result.timedOut,
         }),
@@ -1048,6 +1069,7 @@ export class S3CompatibleStorageBackupTargetProvider implements StorageBackupTar
         backupCommandError("S3-compatible storage volume backup upload failed", {
           phase: "storage-volume-backup-target",
           backupId: input.backupId,
+          stdout: result.stdout,
           stderr: result.stderr,
           timedOut: result.timedOut,
         }),
@@ -1128,6 +1150,7 @@ export class S3CompatibleStorageBackupTargetProvider implements StorageBackupTar
         backupCommandError("S3-compatible storage volume backup download or restore failed", {
           phase: "storage-volume-restore-target",
           backupId: input.backupId,
+          stdout: result.stdout,
           stderr: result.stderr,
           timedOut: result.timedOut,
         }),
