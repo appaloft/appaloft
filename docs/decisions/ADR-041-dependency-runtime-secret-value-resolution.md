@@ -27,6 +27,12 @@ must either return an externally resolvable provider-owned secret reference or s
 connection value through the same Appaloft dependency secret-value store before the dependency
 resource becomes binding-ready.
 
+Imported-external dependency connection rotation overwrites the protected value behind the same
+Appaloft-owned dependency secret reference and updates only masked endpoint metadata. It preserves
+resource identity and bindings, does not rotate provider-native credentials, and does not redeploy
+or restart consumers. Historical snapshots keep their reference and resolve the current protected
+value if they are later retried or redeployed.
+
 Binding secret rotation may continue to write binding-scoped secret values, but the stored value
 must be resolvable by the same runtime secret resolver. Historical deployment snapshots keep their
 captured secret references; the resolver reads the captured reference for retry, redeploy from a
@@ -62,6 +68,8 @@ files or passing secrets to `deployments.create`.
   persistence adapters and runtime secret resolver implementations may read them back.
 - Read models, contracts, CLI output, Web output, public docs, events, and logs expose only safe
   reference metadata and masked connection summaries.
+- Imported connection replacement must be an explicit operation restricted to active
+  `imported-external` resources; a generic dependency update remains forbidden.
 
 ## Implementation Requirements
 
@@ -79,6 +87,7 @@ files or passing secrets to `deployments.create`.
 ## References
 
 - [Dependency Runtime Secret Value Resolution](../specs/048-dependency-runtime-secret-value-resolution/spec.md)
+- [Imported Dependency Connection Rotation](../specs/109-imported-dependency-connection-rotation/spec.md)
 - [Dependency Binding Runtime Injection](../specs/047-dependency-binding-runtime-injection/spec.md)
 - [Dependency Resource Lifecycle](../workflows/dependency-resource-lifecycle.md)
 - [Dependency Resource Test Matrix](../testing/dependency-resource-test-matrix.md)

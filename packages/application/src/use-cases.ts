@@ -47,6 +47,7 @@ export * from "./operations/dependency-resources/list-dependency-resources.query
 export * from "./operations/dependency-resources/provision-dependency-resource.use-case";
 export * from "./operations/dependency-resources/rename-dependency-resource.use-case";
 export * from "./operations/dependency-resources/restore-dependency-resource-backup.use-case";
+export * from "./operations/dependency-resources/rotate-dependency-resource-connection.use-case";
 export * from "./operations/dependency-resources/show-dependency-resource.query-service";
 export * from "./operations/dependency-resources/show-dependency-resource-backup.query-service";
 export * from "./operations/dependency-resources/show-dependency-resource-backup-policy.query-service";

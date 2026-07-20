@@ -1307,6 +1307,25 @@ export const generatedSdkOperations = [
     facadeDefault: true,
   },
   {
+    operationKey: "dependency-resources.rotate-connection",
+    operationGroup: "dependency-resources",
+    operationMethod: "rotateConnection",
+    facadePath: ["dependencyResources", "rotateConnection"],
+    operationId: "dependencyResources.rotateConnection",
+    kind: "command",
+    domain: "dependency-resources",
+    messageName: "RotateDependencyResourceConnectionCommand",
+    route: {
+      method: "POST",
+      path: "/dependency-resources/{dependencyResourceId}/connection",
+    },
+    docsHref: "/docs/resources/dependencies/#dependency-resource-lifecycle",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
     operationKey: "dependency-resources.show",
     operationGroup: "dependency-resources",
     operationMethod: "show",
@@ -6134,6 +6153,7 @@ export interface GeneratedAppaloftClient {
     readonly query: AppaloftSdkFacadeMethod;
     readonly rename: AppaloftSdkFacadeMethod;
     readonly restoreBackup: AppaloftSdkFacadeMethod;
+    readonly rotateConnection: AppaloftSdkFacadeMethod;
     readonly show: AppaloftSdkFacadeMethod;
     readonly showBackup: AppaloftSdkFacadeMethod;
   };
