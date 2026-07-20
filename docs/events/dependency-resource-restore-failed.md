@@ -13,6 +13,7 @@ Dependency resource restore provider workflow.
 - `backupId`
 - `restoreAttemptId`
 - `dependencyResourceId`
+- optional `targetDependencyResourceId`
 - `projectId`
 - `environmentId`
 - `dependencyKind`
@@ -24,4 +25,3 @@ Dependency resource restore provider workflow.
 
 Failure metadata must be sanitized and must not include dump contents, raw connection URLs,
 passwords, provider credentials, provider SDK payloads, or command output.
-

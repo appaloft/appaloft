@@ -56,6 +56,8 @@ safety checks, and backup/restore.
 ```bash title="Create or import dependency resources"
 appaloft dependency provision --kind postgres --project prj_prod --environment env_prod --name app-db
 appaloft dependency import --kind redis --project prj_prod --environment env_prod --name cache --connection-url redis://cache.internal:6379/0
+# For credentials in automation, pipe the URL instead of putting it in the process arguments.
+printf '%s\n' "$DATABASE_URL" | appaloft dependency import --kind postgres --project prj_prod --environment env_prod --name external-db --connection-url-stdin
 ```
 
 List/show output must mask connection secrets, provider tokens, passwords, and raw connection URLs.
@@ -262,14 +264,16 @@ After rotating, create a new deployment so the workload reads the new snapshot r
 
 <h2 id="dependency-backup-restore">Backup and restore</h2>
 
-Backup creates a safe restore point. Restore performs an in-place restore to the same dependency
-resource after explicit acknowledgement that data may be overwritten and runtime will not restart
-automatically.
+Backup creates a safe restore point. Restore targets the same dependency by default, or an existing
+ready same-kind dependency in the same project and environment when `--target-dependency` is
+supplied. Both paths require explicit acknowledgement that data may be overwritten and runtime will
+not restart automatically.
 
 ```bash title="Backup and restore"
 appaloft dependency backup create dep_db
 appaloft dependency backup list dep_db
 appaloft dependency backup restore bkp_123
+appaloft dependency backup restore bkp_123 --target-dependency dep_external --confirm-data-overwrite --confirm-runtime-not-restarted
 ```
 
 For imported dependencies with an Appaloft-owned connection reference, the shell provider runs
@@ -278,7 +282,8 @@ references still produce safe metadata-only restore points until that provider s
 backup substrate. Raw connection values never appear in backup artifacts, read models, events, or
 errors.
 
-Restore does not mutate ResourceBindings, deployment rollback/redeploy state, workload processes, or
+Cross-resource restore records the selected target but does not switch application traffic. Restore
+does not mutate ResourceBindings, deployment rollback/redeploy state, workload processes, or
 historical deployment snapshots. Dependency delete must be blocked while retained backups or
 in-flight restores remain.
 

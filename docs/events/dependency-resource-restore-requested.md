@@ -2,8 +2,8 @@
 
 ## Meaning
 
-An in-place dependency resource restore request was accepted and durable restore attempt state
-exists.
+A dependency resource restore request was accepted and durable restore attempt state exists. The
+target is the backup owner unless a different ready same-kind dependency was selected.
 
 ## Producer
 
@@ -14,6 +14,7 @@ exists.
 - `backupId`
 - `restoreAttemptId`
 - `dependencyResourceId`
+- optional `targetDependencyResourceId`
 - `projectId`
 - `environmentId`
 - `dependencyKind`
@@ -24,4 +25,3 @@ exists.
 
 The payload must not include dump contents, raw connection URLs, passwords, provider credentials,
 provider SDK payloads, or command output.
-

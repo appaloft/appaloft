@@ -88,6 +88,7 @@ describe("dependency resource backup aggregate", () => {
     const started = backup.startRestore({
       attemptId,
       requestedAt: OccurredAt.rehydrate("2026-01-01T00:01:00.000Z"),
+      targetDependencyResourceId: ResourceInstanceId.rehydrate("rsi_supabase"),
     });
     const completed = backup.markRestoreCompleted({
       attemptId,
@@ -98,6 +99,7 @@ describe("dependency resource backup aggregate", () => {
     expect(completed.isOk()).toBe(true);
     expect(backup.toState().latestRestoreAttempt).toMatchObject({
       status: expect.objectContaining({ value: "completed" }),
+      targetDependencyResourceId: expect.objectContaining({ value: "rsi_supabase" }),
     });
     expect(backup.pullDomainEvents()).toEqual(
       expect.arrayContaining([

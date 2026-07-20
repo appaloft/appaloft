@@ -7,7 +7,7 @@ import {
 } from "../src/index";
 
 describe("dependency resource backup contract", () => {
-  test("[DEP-RES-BACKUP-002] [DEP-RES-BACKUP-007] accepts safe backup and restore summaries", () => {
+  test("[DEP-RES-BACKUP-002] [DEP-RES-BACKUP-007] [DEP-RES-BACKUP-014] accepts safe backup and restore summaries", () => {
     const backup = dependencyResourceBackupSummarySchema.parse({
       id: "drb_1",
       dependencyResourceId: "rsi_pg",
@@ -25,6 +25,7 @@ describe("dependency resource backup contract", () => {
         attemptId: "dra_1",
         status: "completed",
         requestedAt: "2026-01-01T00:01:00.000Z",
+        targetDependencyResourceId: "rsi_supabase",
         completedAt: "2026-01-01T00:02:00.000Z",
       },
       createdAt: "2026-01-01T00:00:00.000Z",
@@ -42,6 +43,7 @@ describe("dependency resource backup contract", () => {
 
     expect(list.items[0]?.retentionStatus).toBe("retained");
     expect(shown.backup.latestRestoreAttempt?.status).toBe("completed");
+    expect(shown.backup.latestRestoreAttempt?.targetDependencyResourceId).toBe("rsi_supabase");
     expect(JSON.stringify(shown)).not.toContain("password");
   });
 });

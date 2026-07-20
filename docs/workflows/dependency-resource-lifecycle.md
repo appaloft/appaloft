@@ -112,7 +112,7 @@ The workflow lets operators:
 | Rename dependency resource | `dependency-resources.rename` | Dependency resource name/slug | Bindings, backup metadata, provider state, runtime, snapshots |
 | Delete dependency resource | `dependency-resources.delete` | Dependency resource lifecycle/tombstone | External/provider database, bindings, backup data, runtime cleanup |
 | Create dependency resource backup | `dependency-resources.create-backup` | `DependencyResourceBackup` attempt/restore point | Resource bindings, dependency resource lifecycle, runtime, deployment snapshots |
-| Restore dependency resource backup | `dependency-resources.restore-backup` | Restore attempt and provider data behind dependency resource | Resource bindings, deployment rollback/redeploy, runtime restart, snapshots |
+| Restore dependency resource backup | `dependency-resources.restore-backup` | Restore attempt and provider data behind the backup owner or explicitly selected ready same-kind target in the same context | Resource bindings, deployment rollback/redeploy, runtime restart, snapshots |
 | List dependency resource backups | `dependency-resources.list-backups` | Nothing | Any aggregate, provider, runtime, or deployment state |
 | Show dependency resource backup | `dependency-resources.show-backup` | Nothing | Any aggregate, provider, runtime, or deployment state |
 | Bind dependency to Resource | `resources.bind-dependency` | ResourceBinding | Provider database, ResourceInstance lifecycle, runtime, historical deployment snapshots |
@@ -229,8 +229,8 @@ The first slice:
 
 - creates one `DependencyResourceBackup` attempt for one ready dependency resource;
 - records a ready restore point only as safe provider artifact metadata;
-- restores in place to the same dependency resource after explicit data-overwrite and
-  runtime-not-restarted acknowledgements;
+- restores to the owner by default, or to an admitted ready same-kind target in the same context,
+  after explicit data-overwrite and runtime-not-restarted acknowledgements;
 - reports backup and restore progress through safe read models and lifecycle events;
 - blocks dependency resource delete while retained restore points or in-flight backup/restore
   attempts exist.
@@ -272,7 +272,7 @@ secret-rotation fields.
 | --- | --- |
 | CLI | Separate dependency and Resource dependency binding commands. No generic `dependency update`. |
 | oRPC / HTTP | Routes reuse command/query schemas and dispatch through bus. |
-| Web | Resource detail Settings provides managed Postgres/Redis provision, external Postgres/Redis import through the safe connection boundary, dependency rename/delete with safety blockers, backup create/list/acknowledged restore, ready dependency bind, active binding list, acknowledged binding-secret rotation, unbind, i18n text, and public help links. Scheduled backup policy, backup prune/delete, export/download, cross-resource restore, and runtime cleanup remain later Web rounds. |
+| Web | Resource detail Settings provides managed Postgres/Redis provision, external Postgres/Redis import through the safe connection boundary, dependency rename/delete with safety blockers, backup create/list/acknowledged in-place restore, ready dependency bind, active binding list, acknowledged binding-secret rotation, unbind, i18n text, and public help links. CLI/API also accept an explicit target dependency for admitted migration paths. Scheduled backup policy, backup prune/delete, export/download, cross-resource target selection in Web, and runtime cleanup remain later Web rounds. |
 | Automation / MCP | Future tools map one-to-one to operation keys. |
 
 ## Current Implementation Notes And Governed Follow-Ups
@@ -302,9 +302,10 @@ Resource-detail Web dependency-resource write affordances are implemented for ma
 Postgres/Redis provision, external import through the safe connection boundary, dependency
 rename/delete with safety blockers, backup create/list/acknowledged restore, ready binding, active
 binding list, acknowledged binding-secret rotation, unbind, and help links. Runtime cleanup,
-scheduled backup policy, backup prune/delete, export/download, and cross-resource restore are
-separate governed Phase 7+ capabilities rather than missing pieces of the current dependency
-resource lifecycle baseline.
+scheduled backup policy, backup prune/delete, export/download, and cross-resource target selection
+in Web are separate governed Phase 7+ capabilities rather than missing pieces of the current
+dependency resource lifecycle baseline. CLI/API cross-resource restore is active only for
+provider-admitted source artifact/target combinations.
 
 ## Open Questions
 

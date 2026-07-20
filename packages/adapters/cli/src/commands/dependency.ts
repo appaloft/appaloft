@@ -19,9 +19,11 @@ import {
   ShowDependencyResourceProvisioningPlanQuery,
   ShowDependencyResourceQuery,
 } from "@appaloft/application";
+import { domainError, err, ok, type Result } from "@appaloft/core";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
+import { Effect } from "effect";
 
-import { optionalValue, runCommand, runQuery } from "../runtime.js";
+import { optionalValue, resultToEffect, runCommand, runQuery } from "../runtime.js";
 import { cliCommandDescriptions } from "./docs-help.js";
 
 const dependencyResourceIdArg = Args.text({ name: "dependencyResourceId" });
@@ -37,8 +39,10 @@ const nameOption = Options.text("name");
 const serverOption = Options.text("server").pipe(Options.optional);
 const providerKeyOption = Options.text("provider-key").pipe(Options.optional);
 const descriptionOption = Options.text("description").pipe(Options.optional);
-const connectionUrlOption = Options.text("connection-url");
 const optionalConnectionUrlOption = Options.text("connection-url").pipe(Options.optional);
+const connectionUrlStdinOption = Options.boolean("connection-url-stdin").pipe(
+  Options.withDefault(false),
+);
 const secretRefOption = Options.text("secret-ref").pipe(Options.optional);
 const acknowledgeMutationOption = Options.boolean("acknowledge-mutation").pipe(
   Options.withDefault(false),
@@ -53,6 +57,7 @@ const confirmDataOverwriteOption = Options.boolean("confirm-data-overwrite").pip
 const confirmRuntimeNotRestartedOption = Options.boolean("confirm-runtime-not-restarted").pipe(
   Options.withDefault(false),
 );
+const targetDependencyOption = Options.text("target-dependency").pipe(Options.optional);
 const retentionDaysOption = Options.integer("retention-days");
 const scheduleIntervalHoursOption = Options.integer("interval-hours");
 const enabledOption = Options.boolean("enabled").pipe(Options.withDefault(true));
@@ -63,6 +68,38 @@ const dueAtOption = Options.text("due-at").pipe(Options.optional);
 const statementOption = Options.text("statement");
 const maxRowsOption = Options.integer("max-rows").pipe(Options.withDefault(100));
 const timeoutMsOption = Options.integer("timeout-ms").pipe(Options.withDefault(5000));
+
+async function readDependencyConnectionUrlStdin(): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
+export async function resolveDependencyConnectionUrl(input: {
+  readonly stdin: boolean;
+  readonly value?: string;
+  readonly readStdin?: () => Promise<string>;
+}): Promise<Result<string>> {
+  const value = input.value ?? "";
+  if (input.stdin && value.length > 0) {
+    return err(
+      domainError.validation("Use either --connection-url or --connection-url-stdin, not both"),
+    );
+  }
+  if (!input.stdin && value.length === 0) {
+    return err(domainError.validation("Provide --connection-url or use --connection-url-stdin"));
+  }
+  const rawValue = input.stdin
+    ? await (input.readStdin ?? readDependencyConnectionUrlStdin)()
+    : value;
+  const resolved = input.stdin ? rawValue.replace(/\r?\n$/u, "") : rawValue;
+  if (resolved.length === 0) {
+    return err(domainError.validation("Connection URL must not be empty"));
+  }
+  return ok(resolved);
+}
 
 function dependencyKindValue(kind: string): ManagedDependencyResourceKind {
   return kind as ManagedDependencyResourceKind;
@@ -218,7 +255,8 @@ const importCommand = EffectCommand.make(
     project: projectOption,
     environment: environmentOption,
     name: nameOption,
-    connectionUrl: connectionUrlOption,
+    connectionUrl: optionalConnectionUrlOption,
+    connectionUrlStdin: connectionUrlStdinOption,
     secretRef: secretRefOption,
     description: descriptionOption,
     backupRetentionRequired: backupRetentionOption,
@@ -228,6 +266,7 @@ const importCommand = EffectCommand.make(
     backupReason,
     backupRetentionRequired,
     connectionUrl,
+    connectionUrlStdin,
     description,
     environment,
     kind,
@@ -236,25 +275,36 @@ const importCommand = EffectCommand.make(
     secretRef,
   }) => {
     const backupReasonValue = optionalValue(backupReason);
-    return runCommand(
-      ImportDependencyResourceCommand.create({
-        kind: dependencyKindValue(kind),
-        projectId: project,
-        environmentId: environment,
-        name,
-        connectionUrl,
-        ...(optionalValue(secretRef) ? { secretRef: optionalValue(secretRef) } : {}),
-        ...(optionalValue(description) ? { description: optionalValue(description) } : {}),
-        ...(backupRetentionRequired || backupReasonValue
-          ? {
-              backupRelationship: {
-                retentionRequired: backupRetentionRequired,
-                ...(backupReasonValue ? { reason: backupReasonValue } : {}),
-              },
-            }
-          : {}),
-      }),
-    );
+    const connectionUrlValue = optionalValue(connectionUrl);
+    return Effect.gen(function* () {
+      const resolvedConnectionUrl = yield* resultToEffect(
+        yield* Effect.promise(() =>
+          resolveDependencyConnectionUrl({
+            stdin: connectionUrlStdin,
+            ...(connectionUrlValue ? { value: connectionUrlValue } : {}),
+          }),
+        ),
+      );
+      yield* runCommand(
+        ImportDependencyResourceCommand.create({
+          kind: dependencyKindValue(kind),
+          projectId: project,
+          environmentId: environment,
+          name,
+          connectionUrl: resolvedConnectionUrl,
+          ...(optionalValue(secretRef) ? { secretRef: optionalValue(secretRef) } : {}),
+          ...(optionalValue(description) ? { description: optionalValue(description) } : {}),
+          ...(backupRetentionRequired || backupReasonValue
+            ? {
+                backupRelationship: {
+                  retentionRequired: backupRetentionRequired,
+                  ...(backupReasonValue ? { reason: backupReasonValue } : {}),
+                },
+              }
+            : {}),
+        }),
+      );
+    });
   },
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.dependencyImport));
 
@@ -369,13 +419,22 @@ const backupRestoreCommand = EffectCommand.make(
     backupId: backupIdArg,
     acknowledgeDataOverwrite: confirmDataOverwriteOption,
     acknowledgeRuntimeNotRestarted: confirmRuntimeNotRestartedOption,
+    targetDependencyResourceId: targetDependencyOption,
   },
-  ({ acknowledgeDataOverwrite, acknowledgeRuntimeNotRestarted, backupId }) =>
+  ({
+    acknowledgeDataOverwrite,
+    acknowledgeRuntimeNotRestarted,
+    backupId,
+    targetDependencyResourceId,
+  }) =>
     runCommand(
       RestoreDependencyResourceBackupCommand.create({
         backupId,
         acknowledgeDataOverwrite: acknowledgeDataOverwrite as true,
         acknowledgeRuntimeNotRestarted: acknowledgeRuntimeNotRestarted as true,
+        ...(optionalValue(targetDependencyResourceId)
+          ? { targetDependencyResourceId: optionalValue(targetDependencyResourceId) }
+          : {}),
       }),
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.dependencyBackupRestore));

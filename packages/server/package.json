@@ -13,6 +13,7 @@
     "@appaloft/adapter-secret-protection": "workspace:*",
     "@appaloft/ai-mcp": "workspace:*",
     "@appaloft/application": "workspace:*",
+    "@appaloft/ash": "workspace:*",
     "@appaloft/auth-better": "workspace:*",
     "@appaloft/blueprints": "workspace:*",
     "@appaloft/config": "workspace:*",

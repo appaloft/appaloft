@@ -37,3 +37,7 @@ mutation, or raw dump export.
 ## Current Implementation Notes
 
 Retention policy selection is deferred; this slice records provider-supplied retained/none metadata.
+Docker single-server backups are stored outside the managed dependency container and volume, so
+their provider result is `none`: the restore point remains usable, but it does not block deletion
+of the source dependency after cutover verification. Provider artifacts whose lifecycle still
+depends on the source resource remain `retained` and continue to block deletion.
