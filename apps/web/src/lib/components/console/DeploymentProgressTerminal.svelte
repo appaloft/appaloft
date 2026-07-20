@@ -91,7 +91,7 @@
       case "application":
         return "text-sky-300";
       case "domain-event":
-        return "text-fuchsia-300";
+        return "text-blue-300";
     }
   }
 

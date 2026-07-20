@@ -22,18 +22,27 @@ describe("design package", () => {
     }
   });
 
-  test("gives the Web console a crisp control-plane theme without changing portable tokens", async () => {
+  test("gives the Web console an explicit canvas, surface, and control hierarchy", async () => {
     const webCss = await readFile(new URL("../styles/web.css", import.meta.url), "utf8");
 
-    expect(webCss).toContain("--background: #f4f7fb");
-    expect(webCss).toContain("--border: #c9d4e3");
-    expect(webCss).toContain("--input: #b5c3d6");
+    expect(webCss).toContain("--background: #fdfdfd");
+    expect(webCss).toContain("--surface: #ffffff");
+    expect(webCss).toContain("--muted: #f7f7f8");
+    expect(webCss).toContain("--surface-subtle: #f7f7f8");
+    expect(webCss).toContain("--surface-overlay: #ffffff");
+    expect(webCss).toContain("--border: #c5d1e0");
+    expect(webCss).toContain("--input: #9fadc1");
+    expect(webCss).toContain("--sidebar: #fafafa");
+    expect(webCss).toContain("--sidebar-accent: #f1f1f2");
+    expect(webCss).toContain("--sidebar-border: #d7d7db");
     expect(webCss).toContain("--radius: 0.25rem");
   });
 
   test("exports portable design tokens for non-CSS renderers", () => {
     expect(appaloftPortableDesignTokens.color.primary).toBe("#4e84ff");
     expect(appaloftPortableDesignTokens.color.background).toBe("#ffffff");
+    expect(appaloftPortableDesignTokens.color.surfaceSubtle).toBe("#f5f7fa");
+    expect(appaloftPortableDesignTokens.color.control).toBe("#aebdd1");
     expect(appaloftPortableDesignTokens.radius.lg).toBe("8px");
     expect(appaloftPortableDesignTokens.fontFamily.sans).toContain("IBM Plex Sans");
   });

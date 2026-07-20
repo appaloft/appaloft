@@ -147,7 +147,6 @@
     detailSubnavContentClass,
     detailSubnavLayoutClass,
     detailTabClass,
-    detailTabPanelFlushClass,
     detailTabPanelScrollClass,
     detailTabPanelSubnavClass,
     detailTabsClass,
@@ -1141,6 +1140,18 @@
   );
   const autoDeployPolicy = $derived(resourceDetail?.autoDeployPolicy ?? null);
   const profileDiagnostics = $derived(resourceDetail?.diagnostics ?? []);
+  function profileDiagnosticSeverityClass(
+    severity: ResourceDetail["diagnostics"][number]["severity"],
+  ): string {
+    switch (severity) {
+      case "info":
+        return "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-400/30 dark:bg-blue-950/40 dark:text-blue-300";
+      case "warning":
+        return "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-400/30 dark:bg-amber-950/40 dark:text-amber-300";
+      case "blocking":
+        return "border-red-200 bg-red-50 text-red-700 dark:border-red-400/30 dark:bg-red-950/40 dark:text-red-300";
+    }
+  }
   const resourceHealthOverall = $derived.by((): ResourceHealthViewStatus => {
     if (latestRuntimeControlActive) {
       return "loading";
@@ -9272,7 +9283,7 @@
             </section>
           </div>
         {:else if activeTab === "audit-log" && resourceAuditLogTabVisible}
-          <div class={detailTabPanelFlushClass}>
+          <div class={detailTabPanelScrollClass}>
             <ConsoleExtensionPage
               projectId={resourceProjectId}
               environmentId={resourceEnvironmentId}
@@ -10907,8 +10918,8 @@
                       </section>
                     {/if}
 
-                    <section class="rounded-md border bg-background p-4">
-                      <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <section class="console-panel overflow-hidden" data-resource-profile-diagnostics>
+                      <div class="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between">
                         <div>
                           <div class="flex items-center gap-2">
                             <h3 class="text-base font-semibold">
@@ -10927,19 +10938,24 @@
                       </div>
 
                       {#if profileDiagnostics.length === 0}
-                        <div class="mt-4 rounded-md border border-dashed bg-muted/25 px-4 py-6 text-sm text-muted-foreground">
+                        <div class="border-t px-4 py-6 text-sm text-muted-foreground">
                           {$t(i18nKeys.console.resources.profileDiagnosticsEmpty)}
                         </div>
                       {:else}
-                        <div class="mt-4 space-y-2">
+                        <div class="divide-y border-t" data-resource-profile-diagnostic-list>
                           {#each profileDiagnostics as diagnostic (`${diagnostic.code}-${diagnostic.fieldPath ?? diagnostic.path ?? diagnostic.message}`)}
-                            <div class="rounded-md border bg-muted/15 px-3 py-2 text-sm">
+                            <article class="px-4 py-3 text-sm" data-resource-profile-diagnostic>
                               <div class="flex flex-wrap items-center gap-2">
-                                <Badge variant={diagnostic.severity === "blocking" ? "destructive" : "outline"}>
+                                <Badge
+                                  variant="outline"
+                                  class={profileDiagnosticSeverityClass(diagnostic.severity)}
+                                >
                                   {diagnostic.severity}
                                 </Badge>
                                 {#if diagnostic.section}
-                                  <Badge variant="secondary">{diagnostic.section}</Badge>
+                                  <Badge variant="outline" class="text-muted-foreground">
+                                    {diagnostic.section}
+                                  </Badge>
                                 {/if}
                                 <span class="font-mono text-xs text-muted-foreground">
                                   {diagnostic.code}
@@ -10954,7 +10970,7 @@
                                   </code>
                                 </p>
                               {/if}
-                            </div>
+                            </article>
                           {/each}
                         </div>
                       {/if}

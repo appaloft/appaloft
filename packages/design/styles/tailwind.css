@@ -18,6 +18,14 @@
   --color-chart-2: var(--chart-2);
   --color-chart-1: var(--chart-1);
   --color-ring: var(--ring);
+  --color-control: var(--control);
+  --color-divider: var(--divider);
+  --color-surface-selected: var(--surface-selected);
+  --color-surface-overlay: var(--surface-overlay);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-subtle: var(--surface-subtle);
+  --color-surface: var(--surface);
+  --color-canvas: var(--canvas);
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
