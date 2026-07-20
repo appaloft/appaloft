@@ -119,6 +119,19 @@ export class Sandbox extends AggregateRoot<SandboxState, SandboxId> {
     return this.state.status.value === "ready";
   }
 
+  updateNetworkPolicy(input: { networkPolicy: SandboxNetworkPolicy; at: UpdatedAt }): Result<void> {
+    if (!this.canUseRuntime() && this.state.status.value !== "paused") {
+      return err(transitionError(this.state.status.value, "update network policy"));
+    }
+    this.state.networkPolicy = input.networkPolicy;
+    this.state.updatedAt = input.at;
+    this.recordDomainEvent("sandbox-network-policy-updated", input.at, {
+      mode: input.networkPolicy.toState().mode,
+      ruleCount: input.networkPolicy.toState().rules.length,
+    });
+    return ok(undefined);
+  }
+
   startProvisioning(input: { attemptId: string; at: UpdatedAt }): Result<void> {
     if (this.state.status.value !== "requested" && this.state.status.value !== "failed") {
       return err(transitionError(this.state.status.value, "start provisioning"));

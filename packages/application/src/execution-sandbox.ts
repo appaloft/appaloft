@@ -146,6 +146,11 @@ export interface SandboxProvider {
     capability: "filesystem" | "filesystem-memory";
   }): Promise<{ providerHandle: string; sizeBytes: number }>;
   deleteSnapshot(request: { snapshotId: string; providerHandle: string }): Promise<void>;
+  updateNetworkPolicy(request: {
+    sandboxId: string;
+    providerHandle: string;
+    networkPolicy: SandboxNetworkPolicyState;
+  }): Promise<void>;
 }
 
 export class SandboxProviderRegistry {
@@ -461,7 +466,7 @@ export class ExecutionSandboxService {
         repositoryContext,
         input.source.snapshotId,
       );
-      if (!snapshot || !snapshot.snapshot.canCreateSandbox()) {
+      if (!snapshot?.snapshot.canCreateSandbox()) {
         return err(domainError.conflict("Sandbox snapshot is unavailable for provisioning"));
       }
       const snapshotState = snapshot.snapshot.toState();
@@ -937,6 +942,20 @@ export class ExecutionSandboxService {
     );
   }
 
+  async showProcess(
+    context: ExecutionContext,
+    sandboxId: string,
+    processId: string,
+  ): Promise<Result<SandboxProcessDescriptor>> {
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,159}$/.test(processId)) {
+      return err(domainError.validation("Sandbox process id is invalid"));
+    }
+    const listed = await this.listProcesses(context, sandboxId);
+    if (listed.isErr()) return err(listed.error);
+    const process = listed.value.find((item) => item.processId === processId);
+    return process ? ok(process) : err(domainError.notFound("SandboxProcess", processId));
+  }
+
   async terminateProcess(
     context: ExecutionContext,
     sandboxId: string,
@@ -973,6 +992,21 @@ export class ExecutionSandboxService {
     }
     const ready = await this.ready(context, sandboxId);
     if (ready.isErr()) return err(ready.error);
+    if (input.expiresAt) {
+      const expiry = ExpiresAt.create(input.expiresAt);
+      if (expiry.isErr()) return err(expiry.error);
+      const sandboxExpiry = ready.value.stored.sandbox.toState().expiresAt;
+      if (
+        expiry.value.toDate() <= new Date(this.clock.now()) ||
+        (sandboxExpiry && expiry.value.toDate() > sandboxExpiry.toDate())
+      ) {
+        return err(
+          domainError.validation("Sandbox port expiry is outside the Sandbox lifetime", {
+            phase: "execution-sandbox-port-admission",
+          }),
+        );
+      }
+    }
     if (!ready.value.provider.capabilities.ports) {
       return err(domainError.conflict("Sandbox provider does not support port publishing"));
     }
@@ -1021,6 +1055,39 @@ export class ExecutionSandboxService {
         exposureId,
       }),
     );
+  }
+
+  async updateNetworkPolicy(
+    context: ExecutionContext,
+    sandboxId: string,
+    input: { networkPolicy: SandboxNetworkPolicyState },
+  ): Promise<Result<SandboxDescriptor>> {
+    const policy = SandboxNetworkPolicy.create(input.networkPolicy);
+    if (policy.isErr()) return err(policy.error);
+    const ready = await this.ready(context, sandboxId);
+    if (ready.isErr()) return err(ready.error);
+    if (!ready.value.provider.capabilities.networkPolicy.includes(policy.value.toState().mode)) {
+      return err(domainError.conflict("Sandbox provider does not support the network policy"));
+    }
+    const applied = await this.providerOperation("execution-sandbox-network-update", () =>
+      ready.value.provider.updateNetworkPolicy({
+        sandboxId,
+        providerHandle: ready.value.providerHandle,
+        networkPolicy: policy.value.toState(),
+      }),
+    );
+    if (applied.isErr()) return err(applied.error);
+    const updated = ready.value.stored.sandbox.updateNetworkPolicy({
+      networkPolicy: policy.value,
+      at: UpdatedAt.rehydrate(this.clock.now()),
+    });
+    if (updated.isErr()) return err(updated.error);
+    await this.repository.save(
+      toRepositoryContext(context),
+      ready.value.stored.sandbox,
+      ready.value.stored.providerKey,
+    );
+    return ok(descriptor(ready.value.stored));
   }
 
   async pause(context: ExecutionContext, sandboxId: string): Promise<Result<SandboxDescriptor>> {

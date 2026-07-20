@@ -17,11 +17,13 @@ import {
   RemoveSandboxFileCommand,
   ResumeSandboxCommand,
   RevokeSandboxPortCommand,
+  ShowSandboxProcessQuery,
   ShowSandboxQuery,
   ShowSandboxSnapshotQuery,
   ShowSandboxTemplateQuery,
   TerminateSandboxCommand,
   TerminateSandboxProcessCommand,
+  UpdateSandboxNetworkPolicyCommand,
   WriteSandboxFileCommand,
 } from "@appaloft/application";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
@@ -173,6 +175,11 @@ const file = EffectCommand.make("file").pipe(
 const processList = EffectCommand.make("list", { sandboxId }, ({ sandboxId }) =>
   runQuery(ListSandboxProcessesQuery.create({ sandboxId })),
 );
+const processShow = EffectCommand.make(
+  "show",
+  { sandboxId, processId },
+  ({ processId, sandboxId }) => runQuery(ShowSandboxProcessQuery.create({ sandboxId, processId })),
+);
 const processTerminate = EffectCommand.make(
   "terminate",
   { sandboxId, processId },
@@ -180,8 +187,18 @@ const processTerminate = EffectCommand.make(
     runCommand(TerminateSandboxProcessCommand.create({ sandboxId, processId })),
 );
 const process = EffectCommand.make("process").pipe(
-  EffectCommand.withSubcommands([processList, processTerminate]),
+  EffectCommand.withSubcommands([processList, processShow, processTerminate]),
 );
+
+const networkDeny = EffectCommand.make("deny", { sandboxId }, ({ sandboxId }) =>
+  runCommand(
+    UpdateSandboxNetworkPolicyCommand.create({
+      sandboxId,
+      networkPolicy: { mode: "deny", rules: [] },
+    }),
+  ),
+);
+const network = EffectCommand.make("network").pipe(EffectCommand.withSubcommands([networkDeny]));
 
 const portExpose = EffectCommand.make(
   "expose",
@@ -299,6 +316,7 @@ export const sandboxCommand = EffectCommand.make("sandbox").pipe(
     exec,
     file,
     process,
+    network,
     port,
     snapshot,
     template,

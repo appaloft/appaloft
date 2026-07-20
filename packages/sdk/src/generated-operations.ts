@@ -4295,6 +4295,24 @@ export const generatedSdkOperations = [
     facadeDefault: true,
   },
   {
+    operationKey: "sandbox-processes.show",
+    operationGroup: "sandbox-processes",
+    operationMethod: "show",
+    facadePath: ["sandboxProcesses", "show"],
+    operationId: "sandboxes.processes.show",
+    kind: "query",
+    domain: "sandboxes",
+    messageName: "ShowSandboxProcessQuery",
+    route: {
+      method: "GET",
+      path: "/sandboxes/{sandboxId}/processes/{processId}",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
     operationKey: "sandbox-processes.terminate",
     operationGroup: "sandbox-processes",
     operationMethod: "terminate",
@@ -4504,6 +4522,24 @@ export const generatedSdkOperations = [
     route: {
       method: "GET",
       path: "/sandboxes",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandboxes.network-policy.update",
+    operationGroup: "sandboxes",
+    operationMethod: "networkPolicyUpdate",
+    facadePath: ["sandboxes", "networkPolicy", "update"],
+    operationId: "sandboxes.networkPolicy.update",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "UpdateSandboxNetworkPolicyCommand",
+    route: {
+      method: "POST",
+      path: "/sandboxes/{sandboxId}/network-policy",
     },
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
@@ -6213,6 +6249,9 @@ export interface GeneratedAppaloftClient {
     readonly create: AppaloftSdkFacadeMethod;
     readonly exec: AppaloftSdkFacadeMethod;
     readonly list: AppaloftSdkFacadeMethod;
+    readonly networkPolicy: {
+      readonly update: AppaloftSdkFacadeMethod;
+    };
     readonly pause: AppaloftSdkFacadeMethod;
     readonly resume: AppaloftSdkFacadeMethod;
     readonly show: AppaloftSdkFacadeMethod;
@@ -6231,6 +6270,7 @@ export interface GeneratedAppaloftClient {
   };
   readonly sandboxProcesses: {
     readonly list: AppaloftSdkFacadeMethod;
+    readonly show: AppaloftSdkFacadeMethod;
     readonly terminate: AppaloftSdkFacadeMethod;
   };
   readonly sandboxSnapshots: {

@@ -242,6 +242,17 @@ export class HermeticSandboxProvider implements SandboxProvider {
     return { providerHandle, sizeBytes };
   }
 
+  async updateNetworkPolicy(request: {
+    sandboxId: string;
+    providerHandle: string;
+    networkPolicy: { mode: "deny" | "allowlist"; rules: unknown[] };
+  }): Promise<void> {
+    this.runtime(request);
+    if (request.networkPolicy.mode !== "deny" || request.networkPolicy.rules.length > 0) {
+      throw new Error("Hermetic provider supports default-deny network policy only");
+    }
+  }
+
   async deleteSnapshot(request: { snapshotId: string; providerHandle: string }): Promise<void> {
     if (request.providerHandle !== `hermetic-snapshot:${request.snapshotId}`) {
       throw new Error("Sandbox snapshot provider handle does not match the snapshot");

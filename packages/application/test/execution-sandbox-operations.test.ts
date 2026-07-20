@@ -17,6 +17,7 @@ const context = createExecutionContext({
 function provider(input: { isolation?: "container-trusted" | "gvisor" } = {}) {
   let provisionCalls = 0;
   let terminateCalls = 0;
+  let updatedNetworkMode: "deny" | "allowlist" | undefined;
   let lastProvisionSource: Parameters<SandboxProvider["provision"]>[0]["source"] | undefined;
   const adapter: SandboxProvider = {
     key: "hermetic",
@@ -81,18 +82,22 @@ function provider(input: { isolation?: "container-trusted" | "gvisor" } = {}) {
     },
     async revokePort() {},
     async listProcesses() {
-      return [];
+      return [{ processId: "proc_1", status: "running" }];
     },
     async terminateProcess() {},
     async captureSnapshot() {
       return { providerHandle: "snapshot:1", sizeBytes: 3 };
     },
     async deleteSnapshot() {},
+    async updateNetworkPolicy(request) {
+      updatedNetworkMode = request.networkPolicy.mode;
+    },
   };
   return {
     adapter,
     provisionCalls: () => provisionCalls,
     terminateCalls: () => terminateCalls,
+    updatedNetworkMode: () => updatedNetworkMode,
     lastProvisionSource: () => lastProvisionSource,
   };
 }
@@ -218,6 +223,23 @@ describe("ExecutionSandboxService", () => {
     expect(restored._unsafeUnwrap()).toMatchObject({ sourceKind: "snapshot", status: "ready" });
     expect(fake.lastProvisionSource()).toEqual({ kind: "snapshot", providerHandle: "snapshot:1" });
     expect((await app.deleteSnapshot(context, "ssn_test"))._unsafeUnwrap().status).toBe("deleted");
+  });
+
+  test("[SBX-PROC-001][SBX-NET-002] reads one process and persists an applied policy", async () => {
+    const fake = provider();
+    const app = service(fake.adapter);
+    await app.createAndReconcile(context, createInput);
+
+    expect((await app.showProcess(context, "sbx_test", "proc_1"))._unsafeUnwrap()).toEqual({
+      processId: "proc_1",
+      status: "running",
+    });
+    expect((await app.showProcess(context, "sbx_test", "missing")).isErr()).toBe(true);
+    const updated = await app.updateNetworkPolicy(context, "sbx_test", {
+      networkPolicy: { mode: "deny", rules: [] },
+    });
+    expect(updated._unsafeUnwrap().networkPolicy).toEqual({ mode: "deny", rules: [] });
+    expect(fake.updatedNetworkMode()).toBe("deny");
   });
 
   test("[SBX-TEMPLATE-001] resolves a governed template without exposing host access", async () => {

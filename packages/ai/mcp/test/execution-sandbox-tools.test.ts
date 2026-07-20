@@ -16,7 +16,7 @@ describe("execution sandbox MCP surface", () => {
       (tool) =>
         tool.operationKey.startsWith("sandbox-") || tool.operationKey.startsWith("sandboxes."),
     );
-    expect(tools).toHaveLength(24);
+    expect(tools).toHaveLength(26);
     expect(tools.find((tool) => tool.operationKey === "sandbox-files.read")).toMatchObject({
       name: "sandbox_files_read",
       httpRoute: "POST /api/sandboxes/{sandboxId}/files/read",

@@ -80,6 +80,9 @@ export const removeSandboxFileCommandInputSchema = sandboxFilePathInputSchema
   .extend({ recursive: z.boolean().optional() })
   .strict();
 export const listSandboxProcessesQueryInputSchema = showSandboxQueryInputSchema;
+export const showSandboxProcessQueryInputSchema = z
+  .object({ sandboxId: sandboxIdSchema, processId: z.string().trim().min(1).max(160) })
+  .strict();
 export const terminateSandboxProcessCommandInputSchema = z
   .object({ sandboxId: sandboxIdSchema, processId: z.string().trim().min(1).max(160) })
   .strict();
@@ -94,6 +97,12 @@ export const exposeSandboxPortCommandInputSchema = z
 export const listSandboxPortsQueryInputSchema = showSandboxQueryInputSchema;
 export const revokeSandboxPortCommandInputSchema = z
   .object({ sandboxId: sandboxIdSchema, exposureId: z.string().trim().min(1).max(160) })
+  .strict();
+export const updateSandboxNetworkPolicyCommandInputSchema = z
+  .object({
+    sandboxId: sandboxIdSchema,
+    networkPolicy: createSandboxCommandInputSchema.shape.networkPolicy,
+  })
   .strict();
 export const createSandboxSnapshotCommandInputSchema = z
   .object({
@@ -258,6 +267,15 @@ export class TerminateSandboxProcessCommand extends SandboxCommandMessage {
     );
   }
 }
+export class UpdateSandboxNetworkPolicyCommand extends SandboxCommandMessage {
+  static create(input: unknown) {
+    return commandCreate(
+      updateSandboxNetworkPolicyCommandInputSchema,
+      input,
+      (value) => new UpdateSandboxNetworkPolicyCommand(value),
+    );
+  }
+}
 export class ExposeSandboxPortCommand extends SandboxCommandMessage {
   static create(input: unknown) {
     return commandCreate(
@@ -351,6 +369,15 @@ export class ListSandboxProcessesQuery extends SandboxQueryMessage {
       listSandboxProcessesQueryInputSchema,
       input,
       (value) => new ListSandboxProcessesQuery(value),
+    );
+  }
+}
+export class ShowSandboxProcessQuery extends SandboxQueryMessage {
+  static create(input: unknown) {
+    return queryCreate(
+      showSandboxProcessQueryInputSchema,
+      input,
+      (value) => new ShowSandboxProcessQuery(value),
     );
   }
 }

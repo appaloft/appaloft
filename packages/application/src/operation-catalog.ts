@@ -16,10 +16,12 @@ import {
   revokeSandboxPortCommandInputSchema,
   sandboxFilePathInputSchema,
   sandboxLifecycleCommandInputSchema,
+  showSandboxProcessQueryInputSchema,
   showSandboxQueryInputSchema,
   showSandboxSnapshotQueryInputSchema,
   showSandboxTemplateQueryInputSchema,
   terminateSandboxProcessCommandInputSchema,
+  updateSandboxNetworkPolicyCommandInputSchema,
   writeSandboxFileCommandInputSchema,
 } from "./execution-sandbox-messages";
 import { changeAccountProfileCommandInputSchema } from "./operations/account-settings/change-account-profile.command";
@@ -4721,6 +4723,36 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft sandbox process terminate <sandboxId> <processId>",
       orpc: { method: "POST", path: "/api/sandboxes/{sandboxId}/processes/{processId}/terminate" },
+    },
+  },
+  {
+    key: "sandbox-processes.show",
+    kind: "query",
+    domain: "sandboxes",
+    messageName: "ShowSandboxProcessQuery",
+    handlerName: "SandboxQueryHandler",
+    serviceName: "ExecutionSandboxService",
+    inputSchema: showSandboxProcessQueryInputSchema,
+    serviceToken: tokens.executionSandboxService,
+    transportAccess: { productSession: { minRole: "member" } },
+    transports: {
+      cli: "appaloft sandbox process show <sandboxId> <processId>",
+      orpc: { method: "GET", path: "/api/sandboxes/{sandboxId}/processes/{processId}" },
+    },
+  },
+  {
+    key: "sandboxes.network-policy.update",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "UpdateSandboxNetworkPolicyCommand",
+    handlerName: "SandboxCommandHandler",
+    serviceName: "ExecutionSandboxService",
+    inputSchema: updateSandboxNetworkPolicyCommandInputSchema,
+    serviceToken: tokens.executionSandboxService,
+    transportAccess: { productSession: { minRole: "member" } },
+    transports: {
+      cli: "appaloft sandbox network deny <sandboxId>",
+      orpc: { method: "POST", path: "/api/sandboxes/{sandboxId}/network-policy" },
     },
   },
   ...(

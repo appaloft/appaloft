@@ -140,6 +140,7 @@ describe("DockerSandboxProvider", () => {
       providerHandle: "appaloft-sbx_demo",
       argv: ["python", "-c", "print('hello')"],
       cwd: "src",
+      stdin: new TextEncoder().encode("input\n"),
     });
 
     expect(result).toEqual({
@@ -163,6 +164,7 @@ describe("DockerSandboxProvider", () => {
         "print('hello')",
       ]),
     );
+    expect(runner.calls.at(-1)?.stdin).toEqual(new TextEncoder().encode("input\n"));
 
     runner.executionFailure = "timeout";
     const timedOut = await provider.exec({
@@ -176,6 +178,20 @@ describe("DockerSandboxProvider", () => {
       expect(timedOut.frames.at(-1)).toMatchObject({
         kind: "error",
         code: "sandbox_exec_timeout",
+        retryable: false,
+      });
+    }
+    runner.executionFailure = "output-limit";
+    const bounded = await provider.exec({
+      sandboxId: "sbx_demo",
+      providerHandle: "appaloft-sbx_demo",
+      argv: ["yes"],
+    });
+    expect(bounded.mode).toBe("foreground");
+    if (bounded.mode === "foreground") {
+      expect(bounded.frames.at(-1)).toMatchObject({
+        kind: "error",
+        code: "sandbox_exec_output_limit",
         retryable: false,
       });
     }

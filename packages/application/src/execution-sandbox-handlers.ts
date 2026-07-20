@@ -27,11 +27,13 @@ import {
   RemoveSandboxFileCommand,
   ResumeSandboxCommand,
   RevokeSandboxPortCommand,
+  ShowSandboxProcessQuery,
   ShowSandboxQuery,
   ShowSandboxSnapshotQuery,
   ShowSandboxTemplateQuery,
   TerminateSandboxCommand,
   TerminateSandboxProcessCommand,
+  UpdateSandboxNetworkPolicyCommand,
   WriteSandboxFileCommand,
 } from "./execution-sandbox-messages";
 import { tokens } from "./tokens";
@@ -45,6 +47,7 @@ type SandboxCommand =
   | WriteSandboxFileCommand
   | RemoveSandboxFileCommand
   | TerminateSandboxProcessCommand
+  | UpdateSandboxNetworkPolicyCommand
   | ExposeSandboxPortCommand
   | RevokeSandboxPortCommand
   | CreateSandboxSnapshotCommand
@@ -57,6 +60,7 @@ type SandboxQuery =
   | ListSandboxFilesQuery
   | ReadSandboxFileQuery
   | ListSandboxProcessesQuery
+  | ShowSandboxProcessQuery
   | ListSandboxPortsQuery
   | ListSandboxSnapshotsQuery
   | ShowSandboxSnapshotQuery
@@ -142,6 +146,13 @@ export class SandboxCommandHandler implements CommandHandlerContract<SandboxComm
         text(input, "processId"),
       );
     }
+    if (command instanceof UpdateSandboxNetworkPolicyCommand) {
+      return this.service.updateNetworkPolicy(context, text(input, "sandboxId"), {
+        networkPolicy: input.networkPolicy as Parameters<
+          ExecutionSandboxService["updateNetworkPolicy"]
+        >[2]["networkPolicy"],
+      });
+    }
     if (command instanceof ExposeSandboxPortCommand) {
       return this.service.exposePort(
         context,
@@ -202,6 +213,8 @@ export class SandboxQueryHandler implements QueryHandlerContract<SandboxQuery, u
     }
     if (query instanceof ListSandboxProcessesQuery)
       return this.service.listProcesses(context, text(input, "sandboxId"));
+    if (query instanceof ShowSandboxProcessQuery)
+      return this.service.showProcess(context, text(input, "sandboxId"), text(input, "processId"));
     if (query instanceof ListSandboxPortsQuery)
       return this.service.listPorts(context, text(input, "sandboxId"));
     if (query instanceof ListSandboxSnapshotsQuery)
@@ -225,6 +238,7 @@ for (const command of [
   WriteSandboxFileCommand,
   RemoveSandboxFileCommand,
   TerminateSandboxProcessCommand,
+  UpdateSandboxNetworkPolicyCommand,
   ExposeSandboxPortCommand,
   RevokeSandboxPortCommand,
   CreateSandboxSnapshotCommand,
@@ -240,6 +254,7 @@ for (const query of [
   ListSandboxFilesQuery,
   ReadSandboxFileQuery,
   ListSandboxProcessesQuery,
+  ShowSandboxProcessQuery,
   ListSandboxPortsQuery,
   ListSandboxSnapshotsQuery,
   ShowSandboxSnapshotQuery,

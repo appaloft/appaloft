@@ -11,6 +11,8 @@ import {
   ReadSandboxFileQuery,
   SandboxCommandHandler,
   SandboxQueryHandler,
+  ShowSandboxProcessQuery,
+  UpdateSandboxNetworkPolicyCommand,
   WriteSandboxFileCommand,
 } from "../src";
 
@@ -44,6 +46,14 @@ function sandboxService() {
         input: { sandboxId, ...(input as Record<string, unknown>) },
       });
       return ok(new Uint8Array([0, 255, 1]));
+    },
+    async showProcess(_context: unknown, sandboxId: string, processId: string) {
+      calls.push({ operation: "showProcess", input: { sandboxId, processId } });
+      return ok({ processId, status: "running" });
+    },
+    async updateNetworkPolicy(_context: unknown, sandboxId: string, input: unknown) {
+      calls.push({ operation: "updateNetworkPolicy", input: { sandboxId, input } });
+      return ok({ sandboxId, networkPolicy: (input as { networkPolicy: unknown }).networkPolicy });
     },
   } as unknown as ExecutionSandboxService;
   return { calls, service };
@@ -117,5 +127,28 @@ describe("execution sandbox CQRS boundary", () => {
       true,
     );
     expect(fake.calls).toEqual([]);
+  });
+
+  test("[SBX-PROC-001][SBX-NET-002] dispatches process readback and network mutation", async () => {
+    const fake = sandboxService();
+    const commands = new SandboxCommandHandler(fake.service);
+    const queries = new SandboxQueryHandler(fake.service);
+    const process = await queries.handle(
+      context,
+      ShowSandboxProcessQuery.create({ sandboxId: "sbx_1", processId: "proc_1" })._unsafeUnwrap(),
+    );
+    expect(process._unsafeUnwrap()).toMatchObject({ processId: "proc_1" });
+    const updated = await commands.handle(
+      context,
+      UpdateSandboxNetworkPolicyCommand.create({
+        sandboxId: "sbx_1",
+        networkPolicy: { mode: "deny", rules: [] },
+      })._unsafeUnwrap(),
+    );
+    expect(updated.isOk()).toBe(true);
+    expect(fake.calls.map((call) => call.operation)).toEqual([
+      "showProcess",
+      "updateNetworkPolicy",
+    ]);
   });
 });

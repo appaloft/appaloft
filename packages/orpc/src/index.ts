@@ -561,6 +561,7 @@ import {
   ShowResourceSecretReferenceQuery,
   ShowRetentionDefaultQuery,
   ShowRuntimeMonitoringThresholdsQuery,
+  ShowSandboxProcessQuery,
   ShowSandboxQuery,
   ShowSandboxSnapshotQuery,
   ShowSandboxTemplateQuery,
@@ -621,6 +622,7 @@ import {
   showResourceSecretReferenceQueryInputSchema,
   showRetentionDefaultQueryInputSchema,
   showRuntimeMonitoringThresholdsQueryInputSchema,
+  showSandboxProcessQueryInputSchema,
   showSandboxQueryInputSchema,
   showSandboxSnapshotQueryInputSchema,
   showSandboxTemplateQueryInputSchema,
@@ -652,10 +654,12 @@ import {
   UnlockEnvironmentCommand,
   UnsetEnvironmentVariableCommand,
   UnsetResourceVariableCommand,
+  UpdateSandboxNetworkPolicyCommand,
   unbindResourceDependencyCommandInputSchema,
   unlockEnvironmentCommandInputSchema,
   unsetEnvironmentVariableCommandInputSchema,
   unsetResourceVariableCommandInputSchema,
+  updateSandboxNetworkPolicyCommandInputSchema,
   WriteSandboxFileCommand,
   withExecutionAuthProviderAccessTokens,
   writeSandboxFileCommandInputSchema,
@@ -7065,6 +7069,18 @@ export const listSandboxProcessesProcedure = base
     executeQuery(context, ListSandboxProcessesQuery.create(input)),
   );
 
+export const showSandboxProcessProcedure = base
+  .route({
+    method: "GET",
+    path: "/sandboxes/{sandboxId}/processes/{processId}",
+    successStatus: 200,
+  })
+  .input(showSandboxProcessQueryInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowSandboxProcessQuery.create(input)),
+  );
+
 export const terminateSandboxProcessProcedure = base
   .route({
     method: "POST",
@@ -7075,6 +7091,18 @@ export const terminateSandboxProcessProcedure = base
   .output(sandboxOperationResponseSchema)
   .handler(async ({ input, context }) =>
     executeCommand(context, TerminateSandboxProcessCommand.create(input)),
+  );
+
+export const updateSandboxNetworkPolicyProcedure = base
+  .route({
+    method: "POST",
+    path: "/sandboxes/{sandboxId}/network-policy",
+    successStatus: 200,
+  })
+  .input(updateSandboxNetworkPolicyCommandInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, UpdateSandboxNetworkPolicyCommand.create(input)),
   );
 
 export const exposeSandboxPortProcedure = base
@@ -7200,7 +7228,11 @@ export const appaloftOrpcRouter = {
     },
     processes: {
       list: listSandboxProcessesProcedure,
+      show: showSandboxProcessProcedure,
       terminate: terminateSandboxProcessProcedure,
+    },
+    networkPolicy: {
+      update: updateSandboxNetworkPolicyProcedure,
     },
     ports: {
       expose: exposeSandboxPortProcedure,
@@ -10053,7 +10085,9 @@ export function mountAppaloftOrpcRoutes(
     "/api/sandboxes/:sandboxId/files/write",
     "/api/sandboxes/:sandboxId/files",
     "/api/sandboxes/:sandboxId/processes",
+    "/api/sandboxes/:sandboxId/processes/:processId",
     "/api/sandboxes/:sandboxId/processes/:processId/terminate",
+    "/api/sandboxes/:sandboxId/network-policy",
     "/api/sandboxes/:sandboxId/ports",
     "/api/sandboxes/:sandboxId/ports/:exposureId",
     "/api/sandboxes/:sandboxId/snapshots",

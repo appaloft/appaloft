@@ -621,6 +621,17 @@ export class DockerSandboxProvider implements SandboxProvider {
     await this.docker(["image", "rm", request.providerHandle]);
   }
 
+  async updateNetworkPolicy(request: {
+    sandboxId: string;
+    providerHandle: string;
+    networkPolicy: { mode: "deny" | "allowlist"; rules: unknown[] };
+  }): Promise<void> {
+    await this.assertHandle(request);
+    if (request.networkPolicy.mode !== "deny" || request.networkPolicy.rules.length > 0) {
+      throw new Error("Docker provider requires an egress adapter for allowlist mode");
+    }
+  }
+
   private workspacePath(path: string): string {
     const checked = SandboxWorkspacePath.create(path);
     if (checked.isErr()) throw new Error("Sandbox path escaped the workspace");
