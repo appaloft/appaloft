@@ -2526,7 +2526,9 @@ Roadmap principles:
   gateway is a policy, audit, identity, rate-limit, approval, redaction, and correlation layer above
   installed tool servers.
 - [ ] Keep AI-native observability, AgentOps, cost governance, eval hooks, model gateway, and agent
-  runtime as long-term themes rather than initial Blueprint/MCP dependencies.
+  orchestration as long-term themes rather than initial Blueprint/MCP dependencies. Execution
+  Sandbox is a separately governed infrastructure capability and does not authorize an agent
+  framework or prompt orchestration product.
 
 Candidate sequencing:
 - [ ] Post-1.0 Track 1: Blueprint Format And Local Registry Foundation. If maintainers deliberately
@@ -2548,6 +2550,11 @@ Candidate sequencing:
 - [ ] Post-1.0 Track 7: MCP Gateway / Tool Gateway. This depends on gateway audit/redaction/
   identity/policy decisions and must not reserve a `0.x` version while it remains post-`1.0.0`
   work.
+- [ ] Post-1.0 Track 8: Execution Sandbox Platform. This is now accepted for Code Round by
+  [ADR-091](./decisions/ADR-091-execution-sandbox-boundary.md) and
+  [Spec 108](./specs/108-execution-sandbox-platform/spec.md). It adds provider-neutral isolated
+  execution, lifecycle, process/file/port, network, template, snapshot, reconciliation, and
+  generated API/SDK/CLI/MCP operations without becoming an Agent Runtime or exposing host access.
 
 ## Future External Edge Access And DNS Track
 

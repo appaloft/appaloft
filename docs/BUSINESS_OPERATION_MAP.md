@@ -138,6 +138,10 @@ flowchart TD
   ServerRoute["Server-Applied Proxy Route"]
   ControlPlane["Control-Plane Mode"]
   Cloud["Appaloft Cloud / Self-hosted Control Plane"]
+  SandboxTemplate["SandboxTemplate"]
+  Sandbox["Sandbox"]
+  SandboxSnapshot["SandboxSnapshot"]
+  SandboxProvider["Sandbox Provider"]
 
   Project --> Environment
   Project --> Resource
@@ -168,6 +172,12 @@ flowchart TD
   Destination --> DomainBinding
   Target --> DomainBinding
   DomainBinding --> Certificate
+  Project -. optional scope .-> Sandbox
+  Environment -. optional scope .-> Sandbox
+  SandboxTemplate --> Sandbox
+  SandboxSnapshot --> Sandbox
+  Sandbox --> SandboxSnapshot
+  SandboxProvider --> Sandbox
 
   QuickDeploy["Quick Deploy Workflow"] --> Project
   QuickDeploy --> Environment
@@ -249,6 +259,24 @@ flowchart TD
 | Show terminal session | Active query | `terminal-sessions.show` | TerminalSession gateway/readback | Reads one active ephemeral terminal session's safe descriptor and lifecycle timestamps without exposing terminal output or secret-bearing transport details. | [Operator Terminal Session](./workflows/operator-terminal-session.md), [terminal-sessions.lifecycle](./queries/terminal-sessions.lifecycle.md), [Operator Terminal Session Test Matrix](./testing/operator-terminal-session-test-matrix.md), [ADR-022](./decisions/ADR-022-operator-terminal-session-boundary.md) |
 | Close terminal session | Active command | `terminal-sessions.close` | TerminalSession gateway lifecycle | Closes one active ephemeral terminal session through the gateway, releases PTY/SSH/process resources, and records safe close audit metadata when audit persistence is configured. It does not persist terminal output or mutate resource/deployment/server aggregates. | [Operator Terminal Session](./workflows/operator-terminal-session.md), [terminal-sessions.lifecycle](./commands/terminal-sessions.lifecycle.md), [Operator Terminal Session Test Matrix](./testing/operator-terminal-session-test-matrix.md), [ADR-022](./decisions/ADR-022-operator-terminal-session-boundary.md) |
 | Expire terminal sessions | Active command | `terminal-sessions.expire` | TerminalSession gateway lifecycle | Closes active ephemeral terminal sessions older than the supplied cutoff or current gateway timeout policy, recording safe close audit metadata and returning only safe counts and session ids. | [Operator Terminal Session](./workflows/operator-terminal-session.md), [terminal-sessions.lifecycle](./commands/terminal-sessions.lifecycle.md), [Operator Terminal Session Test Matrix](./testing/operator-terminal-session-test-matrix.md), [ADR-022](./decisions/ADR-022-operator-terminal-session-boundary.md) |
+
+### Execution Sandbox
+
+The following operations are accepted post-1.0 candidates under ADR-091. They must not be described
+as active until Core Operations, the operation catalog, transports, generated SDK/CLI/MCP metadata,
+persistence, at least one truthful provider, and the test matrix are aligned.
+
+| Behavior | Type | Operation | Owner | Main relationship | Governing docs |
+| --- | --- | --- | --- | --- | --- |
+| Create/list/show/delete Sandbox Templates | Accepted candidate commands/queries | `sandbox-templates.create`, `sandbox-templates.list`, `sandbox-templates.show`, `sandbox-templates.delete` | SandboxTemplate | Reusable admitted startup definition and override policy. | [Commands](./commands/execution-sandboxes.md), [Queries](./queries/execution-sandboxes.md), [ADR-091](./decisions/ADR-091-execution-sandbox-boundary.md), [Spec](./specs/108-execution-sandbox-platform/spec.md), [Test Matrix](./testing/execution-sandbox-test-matrix.md) |
+| Create/list/show Sandbox lifecycle | Accepted candidate command/queries | `sandboxes.create`, `sandboxes.list`, `sandboxes.show` | Sandbox | Creates an addressable desired/observed lifecycle from a template, image, or snapshot without exposing host access. | [Commands](./commands/execution-sandboxes.md), [Queries](./queries/execution-sandboxes.md), [Workflow](./workflows/execution-sandbox.md), [ADR-091](./decisions/ADR-091-execution-sandbox-boundary.md) |
+| Stream Sandbox lifecycle | Accepted candidate query/stream | `sandboxes.stream-events` | Sandbox lifecycle read model | Replays bounded lifecycle/provider attempt facts and follows new progression without process output. | [Queries](./queries/execution-sandboxes.md), [Events](./events/execution-sandbox-lifecycle.md), [Workflow](./workflows/execution-sandbox.md) |
+| Pause/resume/terminate Sandbox | Accepted candidate commands | `sandboxes.pause`, `sandboxes.resume`, `sandboxes.terminate` | Sandbox | Preserves identity across pause/resume and permanently revokes exact owned runtime state on termination. | [Commands](./commands/execution-sandboxes.md), [Workflow](./workflows/execution-sandbox.md), [Errors](./errors/execution-sandboxes.md) |
+| Replace Sandbox network policy | Accepted candidate command | `sandboxes.update-network-policy` | Sandbox | Replaces admitted default-deny/allowlist and destination-bound credential-grant intent without secret values. | [Commands](./commands/execution-sandboxes.md), [ADR-091](./decisions/ADR-091-execution-sandbox-boundary.md), [Test Matrix](./testing/execution-sandbox-test-matrix.md) |
+| Execute and observe Sandbox processes | Accepted candidate command/queries | `sandboxes.exec`, `sandbox-processes.list`, `sandbox-processes.show`, `sandbox-processes.stream-events`, `sandbox-processes.terminate` | Sandbox runtime capability | Executes argv without implicit shell interpolation and exposes safe foreground/background process streams/readback. | [Commands](./commands/execution-sandboxes.md), [Queries](./queries/execution-sandboxes.md), [Errors](./errors/execution-sandboxes.md) |
+| Manage confined Sandbox files | Accepted candidate commands/queries | `sandbox-files.list`, `sandbox-files.read`, `sandbox-files.write`, `sandbox-files.remove` | Sandbox filesystem capability | Performs binary-safe operations below the workspace root and rejects traversal/symlink escape. | [Commands](./commands/execution-sandboxes.md), [Queries](./queries/execution-sandboxes.md), [ADR-091](./decisions/ADR-091-execution-sandbox-boundary.md) |
+| Expose/list/revoke Sandbox ports | Accepted candidate commands/query | `sandbox-ports.expose`, `sandbox-ports.list`, `sandbox-ports.revoke` | Sandbox access capability | Creates expiring controlled access descriptors without returning raw host addresses or provider credentials. | [Commands](./commands/execution-sandboxes.md), [Queries](./queries/execution-sandboxes.md), [Test Matrix](./testing/execution-sandbox-test-matrix.md) |
+| Create/list/show/delete Sandbox Snapshots | Accepted candidate commands/queries | `sandbox-snapshots.create`, `sandbox-snapshots.list`, `sandbox-snapshots.show`, `sandbox-snapshots.delete` | SandboxSnapshot | Captures independent reusable state with truthful filesystem/memory capability and retention. | [Commands](./commands/execution-sandboxes.md), [Queries](./queries/execution-sandboxes.md), [Workflow](./workflows/execution-sandbox.md), [ADR-091](./decisions/ADR-091-execution-sandbox-boundary.md) |
 
 ### Resource And Workload Delivery
 

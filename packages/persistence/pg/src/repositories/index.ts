@@ -28,6 +28,7 @@ export * from "./durable-worker-heartbeat-store";
 export * from "./environment-profile-decision-repository";
 export * from "./environment-read-model";
 export * from "./environment-repository";
+export * from "./execution-sandbox-repository";
 export * from "./github-app-installation-repository";
 export * from "./preview-cleanup-attempt-recorder";
 export * from "./preview-environment-repository";

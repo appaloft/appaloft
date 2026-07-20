@@ -222,6 +222,7 @@ import {
   EvaluateRouteSurfaceCommandHandler,
   EvaluateRouteSurfaceUseCase,
   type ExecutionContext,
+  ExecutionSandboxService,
   ExpireTerminalSessionsCommandHandler,
   ExportAuditEventsQueryHandler,
   ExportAuditEventsQueryService,
@@ -511,6 +512,10 @@ import {
   RuntimeMonitoringSamplesQueryService,
   RuntimePlanResolutionInputBuilder,
   RuntimeUsageInspectionQueryService,
+  SandboxCommandHandler,
+  type SandboxProviderRegistry,
+  SandboxQueryHandler,
+  type SandboxRepository,
   ScheduledDependencyBackupService,
   ScheduledHistoryRetentionService,
   ScheduledRuntimePrunePolicyResolver,
@@ -3203,6 +3208,8 @@ export function registerApplicationServices(
   container.registerSingleton(ReactivateOrganizationMemberCommandHandler);
   container.registerSingleton(CreateDeployTokenCommandHandler);
   container.registerSingleton(RotateDeployTokenCommandHandler);
+  container.registerSingleton(SandboxCommandHandler);
+  container.registerSingleton(SandboxQueryHandler);
   container.registerSingleton(RevokeDeployTokenCommandHandler);
   container.registerSingleton(
     tokens.certificateProviderSelectionPolicy,
@@ -3327,6 +3334,26 @@ export function registerApplicationServices(
   container.registerSingleton(tokens.usageIntentPort, DefaultUsageIntentPort);
   container.registerSingleton(tokens.deploymentOverlayPort, DefaultDeploymentOverlayPort);
   container.registerSingleton(tokens.routeSurfacePort, DefaultRouteSurfacePort);
+  container.register(tokens.executionSandboxService, {
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new ExecutionSandboxService({
+          repository: dependencyContainer.resolve<SandboxRepository>(tokens.sandboxRepository),
+          providerRegistry: dependencyContainer.resolve<SandboxProviderRegistry>(
+            tokens.sandboxProviderRegistry,
+          ),
+          clock: dependencyContainer.resolve(tokens.clock),
+          idGenerator: dependencyContainer.resolve(tokens.idGenerator),
+          eventBus: dependencyContainer.resolve(tokens.eventBus),
+          eventObserver: dependencyContainer.resolve(tokens.sandboxEventObserver),
+          ...(dependencyContainer.isRegistered(tokens.sandboxCredentialBroker)
+            ? {
+                credentialBroker: dependencyContainer.resolve(tokens.sandboxCredentialBroker),
+              }
+            : {}),
+        }),
+    ),
+  });
   container.registerSingleton(tokens.createProjectUseCase, CreateProjectUseCase);
   container.registerSingleton(tokens.queryCapabilitiesQueryService, QueryCapabilitiesQueryService);
   container.registerSingleton(tokens.queryEntitlementsQueryService, QueryEntitlementsQueryService);

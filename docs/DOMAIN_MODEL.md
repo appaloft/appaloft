@@ -314,6 +314,43 @@ Transport compatibility note:
   PostgreSQL/PGlite backends must persist it through a dedicated persistence adapter rather than a
   `Resource` repository or resource aggregate field.
 
+### Execution Sandbox
+
+Owns:
+- `Sandbox`
+- `SandboxTemplate`
+- `SandboxSnapshot`
+- provider-neutral lifecycle, isolation, workspace, network, process, port, and snapshot intent
+
+Accepted target model:
+- `Sandbox` is a task-scoped isolated execution environment. It is not a `Deployment`,
+  `Resource`, `DeploymentTarget`, terminal session, or AI-agent orchestration record.
+- `SandboxTemplate` owns reusable admitted startup policy; `SandboxSnapshot` owns reusable captured
+  state. Pause preserves one Sandbox identity, while snapshot creates an independent source for
+  later Sandboxes.
+- `SandboxProcess`, confined file entries, and port exposures are provider-observed runtime
+  readbacks/capabilities rather than aggregate roots.
+- public callers receive Appaloft ids and safe access descriptors. Host addresses, SSH access,
+  provider credentials, host process ids, and resolved secret values never enter the published
+  language.
+- isolation is an explicit minimum and realized level (`container-trusted`, `gvisor`, `kata`, or
+  `microvm`). Placement must fail closed when a provider cannot prove the requested level.
+- workspace operations are confined below a provider-neutral root; traversal and symlink escape
+  fail closed. Network access is default-deny or explicitly allowlisted.
+- credential grants reference secrets plus allowed destinations and transformations. Resolution
+  belongs to a credential broker port and plaintext must not appear in Sandbox state, output,
+  errors, audit, or snapshots.
+- lifecycle progression and provider effects are asynchronous, attempted, observable, idempotent,
+  and reconciled. TTL and idle expiry use the same aggregate transition and exact owned-resource
+  cleanup as explicit termination.
+- Community, Cloud, Enterprise, Kubernetes, VPS, and third-party implementations translate behind
+  provider ports; their topology, commercial policy, and vendor DTOs do not enter core.
+
+Governing artifacts:
+- [ADR-091](./decisions/ADR-091-execution-sandbox-boundary.md)
+- [Execution Sandbox Platform](./specs/108-execution-sandbox-platform/spec.md)
+- [Execution Sandbox Test Matrix](./testing/execution-sandbox-test-matrix.md)
+
 ### Operator/Internal State
 
 Owns:
@@ -687,6 +724,11 @@ Owns:
 - `IntegrationConnection`
 - `PluginInstallation`
 
+Accepted post-1.0 aggregate roots entering Code Round:
+- `Sandbox`
+- `SandboxTemplate`
+- `SandboxSnapshot`
+
 Implemented now:
 - provider, integration, plugin registries and descriptors
 - foundational `ProviderConnection`
@@ -739,6 +781,9 @@ Implemented now:
 - `EnvironmentRepository` persists only the `Environment` aggregate root
 - `ResourceRepository` persists only the `Resource` aggregate root
 - `DeploymentRepository` persists only the `Deployment` aggregate root
+- `SandboxRepository` persists only the `Sandbox` aggregate root
+- `SandboxTemplateRepository` persists only the `SandboxTemplate` aggregate root
+- `SandboxSnapshotRepository` persists only the `SandboxSnapshot` aggregate root
 - `DomainBindingRepository` persists only the `DomainBinding` aggregate root and its owned
   verification attempts
 - selection spec visitors own the full persistence-query translation
@@ -1209,6 +1254,26 @@ Current scope:
 - foundational aggregates in `core`
 - application persistence and commands are still future work
 
+### Sandbox / SandboxTemplate / SandboxSnapshot
+
+Meaning:
+- `Sandbox` owns one isolated task execution identity and desired lifecycle/policy
+- `SandboxTemplate` owns reusable admitted startup defaults and override policy
+- `SandboxSnapshot` owns independently reusable captured filesystem or memory-capable state
+
+Rules:
+- lifecycle transitions are intention-revealing and reject invalid or terminal-state mutations
+- requested and realized isolation/capabilities remain distinct and observable
+- a Sandbox may reference one Template, image, or Snapshot source without owning that source
+- runtime processes, files, and port exposures remain provider capabilities/readbacks
+- exact provider ownership handles are opaque to callers and cleanup never scans or deletes
+  unrelated runtime state
+
+Current scope:
+- accepted post-1.0 Code Round under [ADR-091](./decisions/ADR-091-execution-sandbox-boundary.md)
+- public operation, persistence, provider, SDK, CLI, and MCP implementation is governed by
+  [Execution Sandbox Platform](./specs/108-execution-sandbox-platform/spec.md)
+
 ## Current Implementation Mapping
 
 These directories are authoritative for current domain code:
@@ -1219,6 +1284,7 @@ packages/core/src/
   workspace/
   configuration/
   runtime-topology/
+  execution-sandbox/
   workload-delivery/
   dependency-resources/
   release-orchestration/
@@ -1237,6 +1303,8 @@ Application slices should be understood through the same contexts:
 - `workload-delivery`: project resources and workloads
 - `runtime-topology`: deployment target registration/listing, destinations, edge proxy state, and
   domain binding admission
+- `execution-sandbox`: Sandbox, Template, Snapshot lifecycle and provider-neutral process,
+  filesystem, network, port, isolation, and reconciliation capability boundaries
 - `release-orchestration`: deployment creation, listing, logs, rollback
 - `extensibility`: providers, plugins, GitHub repository browsing, system diagnostics
 

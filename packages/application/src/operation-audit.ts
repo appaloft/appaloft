@@ -30,6 +30,7 @@ const auditedDomains = new Set([
   "static-artifacts",
   "storage-volumes",
   "credentials",
+  "sandboxes",
 ]);
 
 const ignoredOperationKeys = new Set([
@@ -54,6 +55,7 @@ const resourceTypeByDomain: Record<string, string> = {
   "static-artifacts": "static_artifact",
   "storage-volumes": "storage_volume",
   credentials: "ssh_credential",
+  sandboxes: "sandbox",
 };
 
 const targetFieldByDomain: Record<string, readonly string[]> = {
@@ -66,6 +68,7 @@ const targetFieldByDomain: Record<string, readonly string[]> = {
   "static-artifacts": ["artifactId", "publicationId", "resourceId", "id"],
   "storage-volumes": ["storageVolumeId", "id"],
   credentials: ["credentialId", "sshCredentialId", "id"],
+  sandboxes: ["sandboxId", "snapshotId", "templateId", "id"],
 };
 
 const relatedTargetFields: Record<string, string> = {
