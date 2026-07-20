@@ -122,6 +122,7 @@ describe("compose ownership label overrides", () => {
       labels: dockerLabelsFromAssignments(["appaloft.managed=true"]),
       targetServiceName: "web",
       environmentKeys: ["DATABASE_URL"],
+      sharedNetworkNames: ["appaloft-postgres"],
       serviceTargets: [
         {
           serviceName: "web",
@@ -146,6 +147,12 @@ describe("compose ownership label overrides", () => {
     expect(script).toContain('"traefik.http.routers.web.rule"');
     expect(script).toContain('"traefik.http.routers.api.rule"');
     expect(script.match(/  "appaloft-edge":/g)).toHaveLength(1);
+    expect(script.indexOf('"traefik.http.routers.api.rule"')).toBeLessThan(
+      script.indexOf('      - "appaloft-postgres"'),
+    );
+    expect(script.indexOf('"DATABASE_URL"')).toBeLessThan(
+      script.indexOf('      - "appaloft-postgres"'),
+    );
   });
 
   test("[CPS-SUBSTRATE-009] injects runtime environment keys into the target service without values", () => {
