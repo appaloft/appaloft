@@ -110,7 +110,16 @@ const remoteCapableTopLevelCommands = new Set([
   "work",
 ]);
 
-const localOnlyTopLevelCommands = new Set(["db", "init", "mcp", "remote-state", "serve"]);
+const localOnlyTopLevelCommands = new Set(["db", "init", "mcp", "remote-state", "serve", "worker"]);
+
+const knownTopLevelCommands = new Set([
+  ...remoteCapableTopLevelCommands,
+  ...localOnlyTopLevelCommands,
+  "context",
+  "login",
+  "logout",
+  "version",
+]);
 
 function localOnlyCommandLabel(argv: readonly string[]): string | null {
   const args = commandArgs(argv);
@@ -507,6 +516,14 @@ export async function resolveCliExecutionTarget(
         command,
         source: "default",
         reason: "Control-plane profile commands are handled by the local profile client.",
+      }),
+    );
+  }
+
+  if (command && !command.startsWith("-") && !knownTopLevelCommands.has(command)) {
+    return err(
+      controlPlaneResolutionError("validation_error", "Unknown Appaloft command", {
+        command,
       }),
     );
   }
