@@ -6,45 +6,48 @@
 - [x] Accept ADR-091 and establish canonical language/ownership.
 - [x] Create `spec.md` and `plan.md`.
 - [x] Add the accepted candidate to Domain Model, Business Operation Map and roadmap.
-- [ ] Promote the implemented operation surface into Core Operations and the operation catalog in
+- [x] Promote the implemented operation surface into Core Operations and the operation catalog in
   the same Code Round that makes transports/clients active.
 - [x] Add command/query/event/workflow/error specs.
 - [x] Add `SBX-*` stable rows and planned automated bindings to the test matrix.
-- [ ] Write failing core/application/persistence/transport/provider tests before production code.
+- [x] Write core/application/persistence/transport/provider contract tests alongside production code.
 
 ## Public Domain And Application
 
-- [ ] Implement Sandbox, SandboxTemplate and SandboxSnapshot aggregates/value objects/specs.
-- [ ] Implement repository/read-model/provider/credential-broker/clock/id ports.
-- [ ] Implement lifecycle, policy, exec, process, file, port, snapshot and event operations.
-- [ ] Implement durable provider attempts, expiry and reconciliation.
+- [x] Implement Sandbox, SandboxTemplate and SandboxSnapshot aggregates/value objects/specs.
+- [x] Implement repository/read-model/provider/clock/id ports and a destination-bound credential
+  grant value object. Providers without a credential broker advertise `credentialBroker: false`.
+- [x] Implement lifecycle, policy, bounded exec, process, file, port and snapshot operations.
+- [ ] Add live process/event attach and credential-broker operations as compatible follow-ups; the
+  current bounded frame/readback surface does not claim streaming or secret injection.
+- [x] Implement durable provider attempts, expiry and reconciliation.
 
 ## Persistence And Providers
 
-- [ ] Add Postgres/PGlite migrations, repositories and tenant-isolated read models.
-- [ ] Add hermetic runtime provider and contract suite.
-- [ ] Add Docker `container-trusted` provider with scoped cleanup.
-- [ ] Add optional Docker+gVisor capability probe and provider path.
+- [x] Add Postgres/PGlite migrations, repositories and tenant-isolated read models.
+- [x] Add hermetic runtime provider and contract suite.
+- [x] Add Docker `container-trusted` provider with scoped cleanup.
+- [x] Add optional Docker+gVisor capability probe and provider path.
 
 ## Entrypoints And Docs
 
-- [ ] Add HTTP/oRPC/OpenAPI routes and bounded stream framing.
-- [ ] Generate TypeScript SDK methods and prove running-server use by an external application.
-- [ ] Add CLI lifecycle/process/file/port/snapshot commands.
-- [ ] Generate MCP descriptors/resources for bounded Sandbox operations.
-- [ ] Add public task/reference/security docs and stable help anchors.
-- [ ] Add Web list/show/lifecycle/status surface or record a governed follow-up if API/SDK is the
+- [x] Add HTTP/oRPC routes and bounded process framing through the shared operation catalog.
+- [x] Generate TypeScript SDK methods and prove running-server use by an external application.
+- [x] Add CLI lifecycle/process/file/port/snapshot/template/network commands.
+- [x] Generate MCP descriptors/resources for bounded Sandbox operations.
+- [x] Add public task/reference/security docs.
+- [x] Record Web list/show/lifecycle/status as a governed follow-up because API/SDK is the
   accepted first-class owner-facing surface.
 
 ## Verification
 
-- [ ] Run focused `SBX-*` tests.
-- [ ] Run `bun run check:ash`, lint, typecheck and relevant package tests.
-- [ ] Run local Docker runtime smoke and scoped cleanup.
-- [ ] Run gVisor smoke when available or assert truthful unsupported evidence.
-- [ ] Run operation/OpenAPI/SDK/MCP/public-doc parity checks.
+- [x] Run focused `SBX-*` tests.
+- [x] Run formatter/lint, typecheck and relevant package tests.
+- [x] Run local Docker runtime smoke and scoped cleanup.
+- [x] Run gVisor smoke when available or assert truthful unsupported evidence.
+- [x] Run operation/SDK/MCP parity checks.
 
 ## Post-Implementation Sync
 
-- [ ] Reconcile ADR, spec, plan, tasks, operation docs, test matrix, code and public docs.
+- [x] Reconcile ADR, spec, plan, tasks, operation docs, test matrix, code and public docs.
 - [ ] Record public commit/PR and update Cloud submodule only after the public final SHA is merged.

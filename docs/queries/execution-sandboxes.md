@@ -14,10 +14,8 @@ ids, Kubernetes object names, host process ids, command secret values or unbound
 | `sandbox-templates.show` | One template definition and override policy. |
 | `sandboxes.list` | Bounded Sandbox summaries filtered by safe status/scope/label selectors. |
 | `sandboxes.show` | One desired/observed lifecycle descriptor, policy summary, expiry, placement capability and safe failure summary. |
-| `sandboxes.stream-events` | Bounded replay plus follow stream for lifecycle/provider attempt events; no process output. |
 | `sandbox-processes.list` | Bounded safe process summaries for one Sandbox. |
-| `sandbox-processes.show` | One process descriptor with state, times and terminal exit result. |
-| `sandbox-processes.stream-events` | Bounded process stdout/stderr/status stream with cancellation/reconnect semantics. |
+| `sandbox-processes.show` | One process descriptor with state and terminal exit result when observed. |
 | `sandbox-files.list` | Bounded directory entries below the workspace root. |
 | `sandbox-files.read` | Bounded binary response or signed download resource for one confined file. |
 | `sandbox-ports.list` | Active/revoked safe access descriptors for one Sandbox. |
@@ -28,21 +26,18 @@ ids, Kubernetes object names, host process ids, command secret values or unbound
 
 The Sandbox read model includes:
 
-- `sandboxId`, tenant-visible owner scope and labels;
-- desired and observed status;
+- `sandboxId`, tenant ownership and status;
 - requested and realized isolation levels;
-- safe provider key/server id/region when policy allows readback;
-- requested resource limits and provider-observed usage summary;
+- safe provider key and requested resource limits;
 - template/image digest or snapshot source reference without registry credentials;
-- network policy mode, allowlist summary and credential-grant ids/hosts without secret values;
-- absolute expiry, idle expiry, last activity and lifecycle timestamps;
-- current provider attempt id/status and structured safe error;
-- capability flags and counts for processes, ports and snapshots.
+- network policy mode and normalized allowlist summary;
+- absolute expiry and lifecycle timestamps;
+- current provider attempt count/handle state and structured safe error.
 
 Raw stdout/stderr, file content and process command text are excluded from lifecycle list/show.
 
 ## Consistency
 
 Create and lifecycle commands provide read-your-own-write for desired state. Provider-observed state
-may be eventually consistent and is identified by observed time and attempt id. Stream replay uses
-bounded cursors; an expired cursor returns a typed gap that directs the caller to `sandboxes.show`.
+may be eventually consistent. Callers poll bounded list/show/process queries; live event replay is a
+governed compatible follow-up and is not claimed by the current API.

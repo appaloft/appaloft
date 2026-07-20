@@ -13,12 +13,12 @@ credentials or resolved secret values.
 | --- | --- | --- | --- |
 | `sandbox-templates.create` | Create a reusable admitted starting definition. | SandboxTemplate | Safe template descriptor. |
 | `sandbox-templates.delete` | Retire an unused template after delete safety checks. | SandboxTemplate | Deleted template id. |
-| `sandboxes.create` | Request a new Sandbox from a template, image or snapshot. | Sandbox | Requested/provisioning descriptor plus attempt id. |
+| `sandboxes.create` | Request and perform the first reconciliation for a Sandbox. | Sandbox | Ready/failed descriptor; accepted intent was persisted before provider mutation. |
 | `sandboxes.pause` | Preserve one Sandbox identity while releasing supported compute. | Sandbox | Pausing/paused descriptor plus attempt id. |
 | `sandboxes.resume` | Resume the same paused Sandbox. | Sandbox | Resuming/ready descriptor plus attempt id. |
 | `sandboxes.terminate` | Permanently revoke runtime access and clean up exact provider state. | Sandbox | Terminating/terminated descriptor plus attempt id. |
-| `sandboxes.update-network-policy` | Replace admitted egress and credential-grant policy. | Sandbox | Updated policy revision with no secret values. |
-| `sandboxes.exec` | Execute foreground argv or start a background process. | Sandbox runtime capability | Stream descriptor or safe process descriptor. |
+| `sandboxes.network-policy.update` | Replace the admitted egress policy when the provider supports it. | Sandbox | Updated descriptor; unsupported policies fail before provider mutation. |
+| `sandboxes.exec` | Execute foreground argv or start a background process. | Sandbox runtime capability | Bounded frames or safe process descriptor. |
 | `sandbox-processes.terminate` | Signal/terminate one Sandbox-owned background process. | Provider runtime capability | Safe process terminal descriptor. |
 | `sandbox-files.write` | Write binary content below the workspace root. | Provider filesystem capability | Path, size, digest and modified time. |
 | `sandbox-files.remove` | Remove one confined file or directory under explicit recursive policy. | Provider filesystem capability | Removed path descriptor. |
@@ -31,15 +31,12 @@ credentials or resolved secret values.
 
 `sandboxes.create` accepts:
 
-- exactly one source: `templateId`, `image` or `snapshotId`;
-- optional Project/Environment ownership scope resolved inside the tenant context;
-- optional placement intent: provider key, Appaloft Server id or provider-neutral region;
-- requested isolation minimum and required capabilities;
+- exactly one discriminated source: image, template id or snapshot id;
+- optional provider key selected inside the tenant context;
+- requested isolation minimum;
 - vCPU, memory, disk and process limits;
-- absolute TTL and idle expiry;
-- workspace policy;
-- network policy and destination-bound credential grant references;
-- labels/idempotency key with bounded length and safe character rules.
+- optional absolute TTL;
+- validated network policy.
 
 Provider-specific fields, raw Docker/Kubernetes/VM settings, SSH credentials and tenant ids are not
 accepted through the public command.
@@ -48,11 +45,10 @@ accepted through the public command.
 
 - `argv` is a non-empty string array. The adapter executes tokens without implicit shell joining.
 - `cwd` is a confined workspace-relative path.
-- `env` contains non-secret values or secret references/credential grants, never resolved secrets.
-- `stdin` is bounded bytes or a bounded stream handle.
+- `stdinBase64` is bounded binary input at the transport boundary.
 - `timeoutMs` is required to remain within admitted Sandbox policy.
-- foreground mode returns typed stream frames: `stdout`, `stderr`, then exactly one `exit` or
-  `error` frame;
+- foreground mode returns bounded typed frames: `stdout`, `stderr`, then exactly one `exit` or
+  `error` terminal frame; this is not a live attach/stream contract;
 - background mode returns a safe process id and readback operations own later observation.
 
 ## Lifecycle Rules

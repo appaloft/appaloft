@@ -2,8 +2,9 @@
 
 ## Status
 
-- Round: Spec Round complete; Test-First Round next
-- Artifact state: ready for public Code Round
+- Round: bounded v1 Code Round complete
+- Artifact state: implemented and verified; credential broker, live streams and orphan scanning are
+  governed compatible follow-ups
 - Roadmap target: post-1.0 Execution Sandbox Platform track
 - Compatibility impact: additive public minor capability
 
@@ -46,14 +47,14 @@ Kubernetes, hosted providers and Enterprise customer-owned execution.
 
 | ID | Scenario | Given | When | Then |
 | --- | --- | --- | --- | --- |
-| SANDBOX-SPEC-001 | Create and observe | A caller has an authorized tenant context and a compatible provider/template | `sandboxes.create` is accepted | A Sandbox id is persisted in `requested/provisioning`; list/show/events expose provider progression to `ready` or a structured terminal failure. |
+| SANDBOX-SPEC-001 | Create and observe | A caller has an authorized tenant context and a compatible provider/template | `sandboxes.create` is accepted | Intent persists before mutation; external create returns the first reconciled `ready` or `failed` descriptor and list/show expose later state. |
 | SANDBOX-SPEC-002 | Truthful placement | The request requires an isolation/capability set | Placement evaluates providers/servers | A weaker or unknown provider is rejected before execution; the read model reports requested and realized isolation separately. |
 | SANDBOX-SPEC-003 | Lifecycle | A ready or paused Sandbox exists | Pause, resume, terminate or TTL/idle expiry occurs | Only valid transitions succeed; termination/expiry revoke process/file/port access and reconciliation removes provider-owned runtime state. |
-| SANDBOX-SPEC-004 | Foreground execution | A ready Sandbox exists | The caller executes argv with cwd, env refs, stdin and timeout | Ordered stdout/stderr frames and exactly one exit/error terminal frame are streamed; shell interpolation is never implicit. |
-| SANDBOX-SPEC-005 | Background process | A ready Sandbox exists | The caller starts background execution | A safe process id is returned; list/show/events/terminate work without exposing command secrets or host process ids. |
+| SANDBOX-SPEC-004 | Foreground execution | A ready Sandbox exists | The caller executes argv with cwd, stdin and timeout | Bounded ordered stdout/stderr frames and exactly one exit/error terminal frame return; shell interpolation is never implicit. |
+| SANDBOX-SPEC-005 | Background process | A ready Sandbox exists | The caller starts background execution | A safe process id is returned; list/show/terminate work without exposing host process ids. |
 | SANDBOX-SPEC-006 | Confined files | A ready or paused filesystem-capable Sandbox exists | The caller lists, reads, writes or removes a workspace path | Binary-safe operations remain below the workspace root; traversal, host paths and symlink escape fail closed. |
 | SANDBOX-SPEC-007 | Controlled ports | A ready Sandbox has a listening service | A port is exposed or revoked | The result is an authenticated/signed access descriptor with expiry and visibility; no host IP/provider credential leaks. |
-| SANDBOX-SPEC-008 | Network and credentials | A Sandbox has default-deny egress | Policy or credential grants are updated | Only allowlisted destinations are reachable; secret plaintext is absent from the Sandbox read model, output, errors, audit and snapshots. |
+| SANDBOX-SPEC-008 | Network and credentials | A Sandbox has default-deny egress | Policy is updated | Only provider-declared policies are accepted; current Docker providers support deny only. Credential-broker capability remains false until an adapter can prove destination-bound injection without plaintext persistence. |
 | SANDBOX-SPEC-009 | Pause versus snapshot | A provider declares pause and/or snapshot capabilities | The caller pauses/resumes or captures/restores | Pause keeps one Sandbox identity; snapshot produces an independent reusable Snapshot with explicit filesystem/memory capability truth. |
 | SANDBOX-SPEC-010 | Template reuse | An authorized caller owns a Sandbox Template | A Sandbox is created with allowed overrides | Template defaults and override policy are deterministic; immutable/disallowed fields cannot be weakened by the caller. |
 | SANDBOX-SPEC-011 | External application SDK | An application has a scoped token | It calls generated SDK methods | SDK methods map to catalog operations and typed errors/streams; it does not import application/core or create SDK-only behavior. |
@@ -62,7 +63,7 @@ Kubernetes, hosted providers and Enterprise customer-owned execution.
 
 ## Public Surfaces
 
-- API/SDK: full lifecycle, process, file, port, policy, template, snapshot and event operations.
+- API/SDK: lifecycle, bounded process, file, port, policy, template and snapshot operations.
 - CLI: the same operations for operator automation and local/BYOS use.
 - Web: list/show/lifecycle/usage/status first; interactive file/terminal IDE behavior is optional.
 - MCP: generated descriptors for bounded operations; binary file and process streams may use
@@ -80,9 +81,11 @@ Kubernetes, hosted providers and Enterprise customer-owned execution.
 - Encoding Cloud pricing, official domains, managed fleet topology or Enterprise licensing in the
   public model.
 
-## Open Questions
+## Governed Follow-Ups
 
-- Whether the first real BYOS secure provider should be Docker+gVisor on one Server or Kubernetes
-  Agent Sandbox; both use the same accepted provider contract.
-- Whether terminal attachment should extend `terminal-sessions.open` with Sandbox scope in this PR
-  or follow after process streaming reaches parity.
+- Live process/event attach may extend terminal sessions or add a bounded stream transport; current
+  APIs do not claim real-time streaming.
+- Destination-bound credential brokering requires its own provider port, redaction and adversarial
+  suite before any provider advertises the capability.
+- Restart orphan scanning must enumerate only provider-owned resources and prove exact cleanup;
+  current maintenance uses persisted handles and TTL reconciliation.
