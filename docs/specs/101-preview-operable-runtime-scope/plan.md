@@ -47,5 +47,6 @@
   closed for deployment-specific operations when the preview deployment cannot be resolved safely.
 - Web operational tabs can land after CLI/API/MCP parity if Svelte placement requires a larger UI
   pass, but the oRPC contract must be ready first.
-- Safe dependency query should ship after dependency inspect/readback because it needs stricter
-  provider adapter proof.
+- Postgres safe dependency query is exposed only when its provider adapter is registered and reports
+  support for the selected resource. Redis remains fail-closed and must not report support until its
+  provider adapter and composition proof land.

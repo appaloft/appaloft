@@ -149,5 +149,7 @@ transport alias for the same operation schemas and resolver.
   to the service/runtime-scoped operations listed by the spec.
 - Product-grade preview Web pages show preview identity and cleanup state, but operational tabs
   must be aligned with the same preview scope resolver.
-- Safe dependency query operations are accepted by this ADR but must not be exposed until local
-  command/query specs, adapter policies, and tests are complete.
+- Postgres safe dependency query is implemented for imported-external and Docker single-server
+  managed resources. Runtime composition must register the provider, and inspection reports
+  `supported` only when the selected resource is executable through that provider. Redis remains
+  unexposed/fail-closed until its provider adapter and runtime composition tests are complete.

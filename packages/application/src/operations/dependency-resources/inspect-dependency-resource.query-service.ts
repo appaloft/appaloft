@@ -12,6 +12,7 @@ import { type ExecutionContext, toRepositoryContext } from "../../execution-cont
 import {
   type Clock,
   type DependencyResourceReadModel,
+  type DependencyResourceSafeQueryPort,
   type InspectDependencyResourceResult,
 } from "../../ports";
 import { tokens } from "../../tokens";
@@ -35,6 +36,8 @@ export class InspectDependencyResourceQueryService {
     private readonly dependencyResourceReadModel: DependencyResourceReadModel,
     @inject(tokens.clock)
     private readonly clock: Clock,
+    @inject(tokens.dependencyResourceSafeQueryPort, { isOptional: true })
+    private readonly safeQueryPort?: DependencyResourceSafeQueryPort,
   ) {}
 
   async execute(
@@ -57,7 +60,7 @@ export class InspectDependencyResourceQueryService {
 
     const supportsSafeQuery =
       dependencyResource.lifecycleStatus === "ready" &&
-      (dependencyResource.kind === "postgres" || dependencyResource.kind === "redis");
+      Boolean(this.safeQueryPort?.supports(dependencyResource));
 
     return ok({
       schemaVersion: "dependency-resources.inspect/v1",
@@ -74,7 +77,11 @@ export class InspectDependencyResourceQueryService {
       desiredCapabilities: dependencyResource.desiredCapabilities,
       capabilityReadbacks: dependencyResource.capabilityReadbacks,
       safeQuery: {
-        status: supportsSafeQuery ? "not-configured" : "not-supported",
+        status: supportsSafeQuery
+          ? "supported"
+          : this.safeQueryPort
+            ? "not-supported"
+            : "not-configured",
         allowedFamilies: supportsSafeQuery ? allowedFamilies(dependencyResource.kind) : [],
         maxRows: 100,
         timeoutMs: 5_000,

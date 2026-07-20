@@ -121,6 +121,9 @@ describe("PGlite migration policy", () => {
     });
 
     try {
+      expect(server.container.isRegistered(tokens.dependencyResourceSafeQueryPort, true)).toBe(
+        true,
+      );
       const rotation = server.container.resolve<ControlPlaneSecretRotationPort>(
         tokens.controlPlaneSecretRotationPort,
       );
