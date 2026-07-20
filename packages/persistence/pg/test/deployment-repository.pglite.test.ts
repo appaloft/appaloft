@@ -10,7 +10,9 @@ import {
   toRepositoryContext,
 } from "@appaloft/application";
 import {
+  AccessRoute,
   BuildStrategyKindValue,
+  CanonicalRedirectStatusCode,
   CreatedAt,
   Deployment,
   DeploymentByIdSpec,
@@ -28,6 +30,7 @@ import {
   DestinationName,
   DetectSummary,
   DisplayNameText,
+  EdgeProxyKindValue,
   Environment,
   EnvironmentId,
   EnvironmentKindValue,
@@ -48,6 +51,7 @@ import {
   ProjectId,
   ProjectName,
   ProviderKey,
+  PublicDomainName,
   Resource,
   ResourceBindingId,
   ResourceBindingScopeValue,
@@ -60,6 +64,8 @@ import {
   ResourceKindValue,
   ResourceName,
   ResourceNetworkProtocolValue,
+  RoutePathHandlingValue,
+  RoutePathPrefix,
   RuntimeExecutionPlan,
   RuntimePlan,
   RuntimePlanId,
@@ -68,6 +74,7 @@ import {
   SourceLocator,
   StartedAt,
   TargetKindValue,
+  TlsModeValue,
   UpsertDeploymentSpec,
   UpsertDeploymentTargetSpec,
   UpsertDestinationSpec,
@@ -106,6 +113,7 @@ function createDeploymentRecord(input: {
   targetKind?: TargetKindValue;
   targetProviderKey?: ProviderKey;
   executionMetadata?: Record<string, string>;
+  accessRoutes?: AccessRoute[];
   supersedesDeploymentId?: string;
   supersededByDeploymentId?: string;
   triggerKind?: DeploymentTriggerKindValue;
@@ -142,6 +150,7 @@ function createDeploymentRecord(input: {
         kind: ExecutionStrategyKindValue.rehydrate("docker-container"),
         image: ImageReference.rehydrate("demo:test"),
         port: PortNumber.rehydrate(3000),
+        ...(input.accessRoutes ? { accessRoutes: input.accessRoutes } : {}),
       }),
       target: DeploymentTargetDescriptor.rehydrate({
         kind: targetKind,
@@ -354,6 +363,17 @@ describe("pglite deployment repository", () => {
       sourceDeploymentId: "dep_failed",
       rollbackCandidateDeploymentId: "dep_prev",
       supersedesDeploymentId: "dep_prev",
+      accessRoutes: [
+        AccessRoute.rehydrate({
+          proxyKind: EdgeProxyKindValue.rehydrate("traefik"),
+          domains: [PublicDomainName.rehydrate("www.example.test")],
+          pathPrefix: RoutePathPrefix.rehydrate("/docs"),
+          pathHandling: RoutePathHandlingValue.rehydrate("strip"),
+          tlsMode: TlsModeValue.rehydrate("auto"),
+          redirectTo: PublicDomainName.rehydrate("example.test"),
+          redirectStatus: CanonicalRedirectStatusCode.rehydrate(308),
+        }),
+      ],
     });
     const firstAdmit = await deploymentRepository.insertOne(
       context,
@@ -393,6 +413,12 @@ describe("pglite deployment repository", () => {
     expect(storedDeployment?.toState().sourceDeploymentId?.value).toBe("dep_failed");
     expect(storedDeployment?.toState().rollbackCandidateDeploymentId?.value).toBe("dep_prev");
     expect(storedDeployment?.toState().supersedesDeploymentId?.value).toBe("dep_prev");
+    expect(storedDeployment?.toState().runtimePlan.execution.accessRoutes[0]).toMatchObject({
+      pathHandling: "strip",
+      routeBehavior: "redirect",
+      redirectTo: "example.test",
+      redirectStatus: 308,
+    });
     expect(storedDeployment?.toState().dependencyBindingReferences[0]).toMatchObject({
       bindingId: ResourceBindingId.rehydrate("rbd_pg"),
       dependencyResourceId: ResourceInstanceId.rehydrate("rsi_pg"),
