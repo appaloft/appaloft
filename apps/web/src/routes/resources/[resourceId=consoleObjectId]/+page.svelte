@@ -11463,6 +11463,19 @@
                 </Select.Root>
               </label>
 
+              <label class="space-y-1.5 text-sm font-medium">
+                <span>{$t(i18nKeys.console.resources.storageBackupTargetProvider)}</span>
+                <Select.Root bind:value={storageBackupTargetProvider} type="single">
+                  <Select.Trigger class="w-full">
+                    {storageBackupTargetProvider}
+                  </Select.Trigger>
+                  <Select.Content>
+                    <Select.Item value="local-filesystem">local-filesystem</Select.Item>
+                    <Select.Item value="s3-compatible">s3-compatible</Select.Item>
+                  </Select.Content>
+                </Select.Root>
+              </label>
+
               <label class="space-y-1.5 text-sm font-medium" for="resource-storage-backup-target-ref">
                 <span>{$t(i18nKeys.console.resources.storageBackupTargetRef)}</span>
                 <Input

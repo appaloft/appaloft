@@ -2132,6 +2132,7 @@ export const zhCN = {
       storageBackupDataFormat: "数据格式",
       storageBackupDestinationPath: "挂载路径",
       storageBackupConsistency: "一致性",
+      storageBackupTargetProvider: "目标存储服务",
       storageBackupTargetRef: "目标引用",
       storageBackupRetentionMaxCount: "保留恢复点",
       storageBackupRetentionMinFreeBytes: "最小剩余字节",

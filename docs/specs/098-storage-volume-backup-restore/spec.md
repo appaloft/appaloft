@@ -116,9 +116,9 @@ Current implementation note:
   runtime command renderer/provider instead of changing application use cases or callers.
 - Live SQLite application-consistent backup uses the SQLite-aware source adapter; the runtime tar
   adapter refuses that plan instead of copying live SQLite files unsafely.
-  Offsite targets such as S3/WebDAV/restic and automatic OS/platform target detection remain
-  provider/runtime extensions until concrete target providers and target capability descriptors are
-  registered.
+- S3-compatible offsite transfer is available when a downstream distribution registers the
+  short-lived object-transfer broker governed by Spec 107. WebDAV, restic, and automatic
+  OS/platform target detection remain provider/runtime follow-up work.
 
 ## Consistency Levels
 

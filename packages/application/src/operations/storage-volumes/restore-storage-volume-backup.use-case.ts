@@ -247,6 +247,7 @@ export class RestoreStorageVolumeBackupUseCase {
         restoreAttemptId: restoreAttemptId.value,
         requestedAt: requestedAt.value,
         artifactHandle: backupState.artifactHandle.value,
+        ...(backupState.checksum ? { expectedChecksum: backupState.checksum.value } : {}),
         targetStorageVolumeId: restoredVolumeId.value,
         ...(runtimeTarget ? { runtimeTarget } : {}),
       });

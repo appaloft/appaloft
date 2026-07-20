@@ -2324,6 +2324,7 @@ export const enUS = {
       storageBackupDataFormat: "Data format",
       storageBackupDestinationPath: "Mounted path",
       storageBackupConsistency: "Consistency",
+      storageBackupTargetProvider: "Target provider",
       storageBackupTargetRef: "Target ref",
       storageBackupRetentionMaxCount: "Keep restore points",
       storageBackupRetentionMinFreeBytes: "Minimum free bytes",

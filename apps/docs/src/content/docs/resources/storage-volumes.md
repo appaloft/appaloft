@@ -129,9 +129,11 @@ appaloft storage volume backup prune svb_123
 ```
 
 默认恢复到新的 StorageVolume。把恢复出来的新 volume 挂回 Resource 或替换现有 mount，是单独的显式
-operator 操作。Local filesystem target 只能说明本机/同 failure domain 有一份恢复点，不能当作灾备；
-S3-compatible、WebDAV、Restic repository 或 provider snapshot 需要由 distribution/runtime 注册对应
-target provider 和 secret refs。
+operator 操作。Local filesystem target 只能说明本机/同 failure domain 有一份恢复点，不能当作灾备。
+Public Appaloft 已提供 S3-compatible runtime target，但 distribution 必须显式注册短期 object-transfer
+broker、安全的 bucket/key policy 和 credential reference 后才会启用；长期对象存储凭据不会下发到
+workload server，也不会进入 backup readback。WebDAV、Restic repository 和 provider snapshot 仍需要
+各自的 distribution/runtime adapter。
 
 <h2 id="storage-volume-surfaces">入口差异</h2>
 

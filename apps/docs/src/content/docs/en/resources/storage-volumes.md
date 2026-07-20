@@ -161,9 +161,12 @@ appaloft storage volume backup prune svb_123
 
 Restore defaults to a new StorageVolume. Attaching that restored volume back to a Resource, or
 switching an existing mount, is a separate explicit operator action. A local filesystem target is
-only a same-host or same-failure-domain restore point, not disaster recovery. S3-compatible,
-WebDAV, Restic repository, or provider snapshot targets require the distribution/runtime to
-register the matching target provider and secret refs.
+only a same-host or same-failure-domain restore point, not disaster recovery. Public Appaloft also
+provides an S3-compatible runtime target, but a distribution must explicitly register its
+short-lived object-transfer broker, safe bucket/key policy, and credential reference before the
+target becomes available. Long-lived object-storage credentials are not sent to the workload
+server or persisted in backup readback. WebDAV, Restic repository, and provider snapshot targets
+still require their own distribution/runtime adapters.
 
 <h2 id="storage-volume-surfaces">Entrypoint differences</h2>
 

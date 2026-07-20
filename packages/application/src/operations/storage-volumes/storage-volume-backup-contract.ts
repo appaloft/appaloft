@@ -127,6 +127,34 @@ export interface StorageBackupTargetStoreResult {
   checksum?: string;
 }
 
+export interface StorageBackupObjectTransferAuthorization {
+  url: string;
+  headers?: Readonly<Record<string, string>>;
+  expiresAt: string;
+}
+
+export interface StorageBackupObjectUploadAuthorization
+  extends StorageBackupObjectTransferAuthorization {
+  artifactHandle: string;
+}
+
+export interface StorageBackupObjectTransferBrokerPort {
+  authorizeUpload(input: {
+    backupId: string;
+    target: StorageBackupTargetDescriptor;
+    sourceManifest?: Readonly<Record<string, string | number | boolean>>;
+  }): Promise<Result<StorageBackupObjectUploadAuthorization, DomainError>>;
+  authorizeDownload(input: {
+    backupId: string;
+    artifactHandle: string;
+  }): Promise<Result<StorageBackupObjectTransferAuthorization, DomainError>>;
+  deleteObject(input: {
+    backupId: string;
+    artifactHandle: string;
+    requestedAt: string;
+  }): Promise<Result<{ deletedAt: string }, DomainError>>;
+}
+
 export interface StorageBackupRestoreRequest {
   backupId: string;
   restoreAttemptId: string;
@@ -145,6 +173,7 @@ export interface StorageBackupTargetRestoreRequest {
   restoreAttemptId: string;
   requestedAt: string;
   artifactHandle: string;
+  expectedChecksum?: string;
   targetStorageVolumeId: string;
   runtimeTarget?: DeploymentTargetState | undefined;
 }

@@ -107,6 +107,7 @@ domain as the source volume. Any local-only target must be labeled as such in re
 - [Storage Volume Resource Visibility](../specs/096-storage-volume-resource-visibility/spec.md)
 - [Application Bundle Storage Binding Boundary](../specs/097-application-bundle-storage-binding-boundary/spec.md)
 - [Storage Volume Backup And Restore](../specs/098-storage-volume-backup-restore/spec.md)
+- [S3-Compatible Storage Volume Backup Target](../specs/107-s3-compatible-storage-volume-backup-target/spec.md)
 - [Storage Volume Lifecycle And Resource Attachment](../specs/032-storage-volume-lifecycle-and-resource-attachment/spec.md)
 - [Dependency Resource Backup And Restore](../specs/039-dependency-resource-backup-restore/spec.md)
 - [Storage Volume Runtime Realization And Cleanup](../specs/070-storage-volume-runtime-realization-and-cleanup/spec.md)
@@ -122,3 +123,7 @@ domain as the source volume. Any local-only target must be labeled as such in re
 - Storage backup/restore operations are governed by Spec 098. Resource surfaces must route
   mounted SQLite/application data to StorageVolume backup planning and fail-closed blockers, not to
   DependencyResource backup actions.
+- The first concrete offsite target is governed by Spec 107. It keeps source and target selection
+  independent, transfers artifacts from the runtime through expiring authorization, persists only
+  safe artifact handles, and leaves provider credentials and default-provider policy to downstream
+  composition.

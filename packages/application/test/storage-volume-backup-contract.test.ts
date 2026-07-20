@@ -85,7 +85,7 @@ function backupRequest(input: StorageBackupPlanRequestFixtureInput = {}): Storag
 }
 
 describe("storage volume backup contract", () => {
-  test("[STOR-BACKUP-PLAN-001] separates source adapter consistency from target provider storage", () => {
+  test("[STOR-BACKUP-PLAN-001][STOR-BACKUP-OFFSITE-PLAN-001] separates source adapter consistency from target provider storage", () => {
     const result = planStorageVolumeBackup(
       backupRequest({
         target: {
