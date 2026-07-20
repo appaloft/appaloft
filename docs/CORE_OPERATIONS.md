@@ -474,6 +474,8 @@ Phase 7 dependency resource operations:
 | List dependency resources | Query | `dependency-resources.list` | `ListDependencyResourcesQuery` | `ListDependencyResourcesQueryInput` | `appaloft dependency list` | `GET /api/dependency-resources` |
 | Count dependency resources | Query | `dependency-resources.count` | `CountDependencyResourcesQuery` | `CountDependencyResourcesQueryInput` | `appaloft dependency count` | `GET /api/dependency-resources/count` |
 | Show dependency resource | Query | `dependency-resources.show` | `ShowDependencyResourceQuery` | `ShowDependencyResourceQueryInput` | `appaloft dependency show <dependencyResourceId>` | `GET /api/dependency-resources/{dependencyResourceId}` |
+| Inspect dependency resource | Query | `dependency-resources.inspect` | `InspectDependencyResourceQuery` | `InspectDependencyResourceQueryInput` | `appaloft dependency inspect <dependencyResourceId>` | `GET /api/dependency-resources/{dependencyResourceId}/inspect` |
+| Run safe dependency query | Query | `dependency-resources.query` | `QueryDependencyResourceQuery` | `QueryDependencyResourceQueryInput` | `appaloft dependency query <dependencyResourceId> --statement <select>` | `POST /api/dependency-resources/{dependencyResourceId}/query` |
 | Rename dependency resource | Command | `dependency-resources.rename` | `RenameDependencyResourceCommand` | `RenameDependencyResourceCommandInput` | `appaloft dependency rename <dependencyResourceId> --name <name>` | `POST /api/dependency-resources/{dependencyResourceId}/rename` |
 | Delete dependency resource | Command | `dependency-resources.delete` | `DeleteDependencyResourceCommand` | `DeleteDependencyResourceCommandInput` | `appaloft dependency delete <dependencyResourceId>` | `DELETE /api/dependency-resources/{dependencyResourceId}` |
 | Create dependency resource backup | Command | `dependency-resources.create-backup` | `CreateDependencyResourceBackupCommand` | `CreateDependencyResourceBackupCommandInput` | `appaloft dependency backup create <dependencyResourceId>` | `POST /api/dependency-resources/{dependencyResourceId}/backups` |
@@ -513,6 +515,12 @@ Current boundary:
   `postgres`, `redis`, `mysql`, `clickhouse`, `object-storage`, and `opensearch`. This vocabulary
   now drives the active create/import mutation surface as well as provider packages and higher-level
   planning surfaces. The shell provider has Docker-backed adapters for the same set of kinds.
+- Postgres safe query execution is provider-neutral at the application boundary and is composed at
+  runtime for imported-external Postgres through its Appaloft-owned secret reference and for
+  Docker single-server managed Postgres through the recorded provider realization. Execution uses
+  a read-only transaction, timeout, row/byte bounds, single-statement admission, and redacted
+  provider errors. Unsupported kinds report `not-supported`; an absent runtime provider reports
+  `not-configured` instead of advertising an unusable command.
 - Resource dependency bindings are provider-neutral `ResourceBinding` records in this slice. Bind
   requires matching project/environment ownership, stores only safe target metadata and secret
   reference pointers, and reports safe deployment snapshot-reference readiness. Unbind removes only

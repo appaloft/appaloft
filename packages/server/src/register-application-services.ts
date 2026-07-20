@@ -633,6 +633,12 @@ import {
   type Result,
 } from "@appaloft/core";
 import { type DependencyContainer, instanceCachingFactory } from "tsyringe";
+import {
+  boundedDependencyResourceSafeQueryRows,
+  type DependencyResourcePostgresQueryExecutionResult,
+  type ManagedDependencyResourcePostgresQueryExecutor,
+  PostgresDependencyResourceSafeQueryProvider,
+} from "./dependency-resource-safe-query-provider";
 import { ShellDeploymentTimelineObserver } from "./deployment-timeline-observer";
 import { PublicDnsDomainOwnershipVerifier } from "./domain-ownership-verifier";
 import { ShellPreviewEnvironmentCleaner } from "./preview-environment-cleaner";
@@ -1703,6 +1709,132 @@ async function runManagedDependencyTargetCommand(
     );
   } finally {
     identity?.cleanup();
+  }
+}
+
+class ShellManagedDependencyResourcePostgresQueryExecutor
+  implements ManagedDependencyResourcePostgresQueryExecutor
+{
+  constructor(private readonly serverRepository: ServerRepository) {}
+
+  async execute(
+    input: Parameters<ManagedDependencyResourcePostgresQueryExecutor["execute"]>[0],
+  ): Promise<Result<DependencyResourcePostgresQueryExecutionResult, DomainError>> {
+    const providerResourceHandle =
+      input.dependencyResource.providerRealization?.providerResourceHandle;
+    const handle = providerResourceHandle
+      ? parseDockerManagedDependencyHandle(providerResourceHandle)
+      : undefined;
+    if (handle?.kind !== "postgres") {
+      return err(
+        domainError.providerCapabilityUnsupported(
+          "Managed Postgres safe query requires a Docker single-server realization",
+          {
+            phase: "dependency-resource-safe-query-managed-target",
+            dependencyResourceId: input.dependencyResource.id,
+            providerKey: input.dependencyResource.providerKey,
+          },
+        ),
+      );
+    }
+
+    const target = await resolveManagedDependencySingleServerTarget({
+      context: input.context,
+      serverRepository: this.serverRepository,
+      serverId: handle.serverId,
+      operation: "dependency-resources.query",
+    });
+    if (target.isErr()) {
+      return err(target.error);
+    }
+
+    const statement = input.statement.trim().replace(/;\s*$/u, "");
+    const sql = [
+      "BEGIN READ ONLY;",
+      `SET LOCAL statement_timeout = ${input.timeoutMs};`,
+      "SELECT COALESCE(json_agg(row_to_json(appaloft_safe_query)), '[]'::json)::text",
+      "FROM (",
+      `  SELECT * FROM (${statement}) AS appaloft_safe_query_source LIMIT ${input.maxRows + 1}`,
+      ") AS appaloft_safe_query;",
+      "ROLLBACK;",
+      "",
+    ].join("\n");
+    const inner = ash`PGPASSWORD="$POSTGRES_PASSWORD" psql -X -q -A -t -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"`;
+    const command = ash`docker exec -i ${ash.arg(handle.containerName)} sh -lc ${ash.arg(
+      ash.render(inner),
+    )}`;
+    const executed = await runManagedDependencyTargetCommand(target.value, command, {
+      stdin: Buffer.from(sql, "utf8"),
+    });
+    if (executed.exitCode !== 0) {
+      return err(
+        domainError.provider(
+          "Managed Postgres dependency safe query failed",
+          {
+            phase: "dependency-resource-safe-query-managed-execution",
+            dependencyResourceId: input.dependencyResource.id,
+            providerKey: input.dependencyResource.providerKey,
+            exitCode: executed.exitCode,
+          },
+          true,
+        ),
+      );
+    }
+
+    const start = executed.stdout.indexOf("[");
+    const end = executed.stdout.lastIndexOf("]");
+    if (start < 0 || end < start) {
+      return err(
+        domainError.provider(
+          "Managed Postgres dependency safe query returned an invalid result envelope",
+          {
+            phase: "dependency-resource-safe-query-managed-result",
+            dependencyResourceId: input.dependencyResource.id,
+            providerKey: input.dependencyResource.providerKey,
+          },
+          false,
+        ),
+      );
+    }
+
+    let rows: unknown;
+    try {
+      rows = JSON.parse(executed.stdout.slice(start, end + 1));
+    } catch {
+      return err(
+        domainError.provider(
+          "Managed Postgres dependency safe query returned malformed JSON",
+          {
+            phase: "dependency-resource-safe-query-managed-result",
+            dependencyResourceId: input.dependencyResource.id,
+            providerKey: input.dependencyResource.providerKey,
+          },
+          false,
+        ),
+      );
+    }
+    if (!Array.isArray(rows) || !rows.every((row) => row && typeof row === "object")) {
+      return err(
+        domainError.provider(
+          "Managed Postgres dependency safe query returned an unsupported row shape",
+          {
+            phase: "dependency-resource-safe-query-managed-result",
+            dependencyResourceId: input.dependencyResource.id,
+            providerKey: input.dependencyResource.providerKey,
+          },
+          false,
+        ),
+      );
+    }
+    const limited = boundedDependencyResourceSafeQueryRows(
+      rows as Record<string, unknown>[],
+      input.maxRows,
+    );
+    return ok({
+      columns: Object.keys(rows[0] ?? {}).map((name) => ({ name })),
+      rows: limited.rows,
+      truncated: limited.truncated,
+    });
   }
 }
 
@@ -3101,6 +3233,19 @@ export function registerApplicationServices(
         serverRepository: dependencyContainer.resolve(tokens.serverRepository),
       });
     }),
+  });
+  container.register(tokens.dependencyResourceSafeQueryPort, {
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new PostgresDependencyResourceSafeQueryProvider(
+          dependencyContainer.resolve(tokens.dependencyResourceSecretStore),
+          dependencyContainer.resolve(tokens.clock),
+          undefined,
+          new ShellManagedDependencyResourcePostgresQueryExecutor(
+            dependencyContainer.resolve(tokens.serverRepository),
+          ),
+        ),
+    ),
   });
   container.registerSingleton(tokens.domainOwnershipVerifier, PublicDnsDomainOwnershipVerifier);
   container.registerSingleton(tokens.archiveProjectUseCase, ArchiveProjectUseCase);
