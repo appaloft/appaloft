@@ -101,6 +101,7 @@ export {
   type SandboxPortPublisher,
 } from "./docker-sandbox-provider";
 export { HermeticSandboxProvider } from "./execution-sandbox-provider";
+export * from "./pi-sandbox-agent-harness";
 
 export { RuntimeServerConnectivityChecker } from "./server-connectivity";
 export { RuntimeDeploymentHealthChecker } from "./deployment-health";
@@ -271,7 +272,7 @@ function composeSourcePaths(
       composeFile:
         source.inspection?.composeFilePath ?? source.metadata?.composeFilePath ?? "docker-compose.yml",
       workingDirectory: source.locator,
-    };
+};
   }
 
   const configuredComposeFile =

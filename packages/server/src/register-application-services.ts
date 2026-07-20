@@ -221,6 +221,9 @@ import {
   type DomainBindingReadModel,
   DuplicateEnvironmentProfileCommandHandler,
   DuplicateEnvironmentProfileUseCase,
+  DurableSandboxAgentWorkQueue,
+  type DurableWorkHandlerRegistry,
+  type DurableWorkQueueAdapter,
   EnvironmentEffectivePrecedenceQueryHandler,
   EnvironmentEffectivePrecedenceQueryService,
   EvaluateDeploymentOverlayCommandHandler,
@@ -527,6 +530,13 @@ import {
   RuntimeMonitoringSamplesQueryService,
   RuntimePlanResolutionInputBuilder,
   RuntimeUsageInspectionQueryService,
+  SandboxAgentCommandHandler,
+  type SandboxAgentDeliveryDependencies,
+  type SandboxAgentDeliveryRepository,
+  SandboxAgentDeliveryService,
+  SandboxAgentDurableWorkHandler,
+  SandboxAgentHarnessRegistry,
+  SandboxAgentQueryHandler,
   SandboxCommandHandler,
   type SandboxProviderRegistry,
   SandboxQueryHandler,
@@ -632,6 +642,7 @@ import {
   SwitchCurrentOrganizationUseCase,
   SyncEnvironmentProfileCommandHandler,
   SyncEnvironmentProfileUseCase,
+  sandboxAgentDeliveryDurableWorkKind,
   TerminalSessionLifecycleService,
   TestServerConnectivityUseCase,
   TransferOrganizationOwnerCommandHandler,
@@ -3247,6 +3258,8 @@ export function registerApplicationServices(
   container.registerSingleton(RotateDeployTokenCommandHandler);
   container.registerSingleton(SandboxCommandHandler);
   container.registerSingleton(SandboxQueryHandler);
+  container.registerSingleton(SandboxAgentCommandHandler);
+  container.registerSingleton(SandboxAgentQueryHandler);
   container.registerSingleton(RevokeDeployTokenCommandHandler);
   container.registerSingleton(
     tokens.certificateProviderSelectionPolicy,
@@ -3391,6 +3404,98 @@ export function registerApplicationServices(
         }),
     ),
   });
+  if (!container.isRegistered(tokens.sandboxAgentHarnessRegistry, true)) {
+    container.register(tokens.sandboxAgentHarnessRegistry, {
+      useValue: new SandboxAgentHarnessRegistry(),
+    });
+  }
+  if (!container.isRegistered(tokens.sandboxAgentWorkQueue, true)) {
+    container.register(tokens.sandboxAgentWorkQueue, {
+      useFactory: instanceCachingFactory(
+        (dependencyContainer) =>
+          new DurableSandboxAgentWorkQueue(
+            dependencyContainer.resolve<DurableWorkQueueAdapter>(tokens.durableWorkQueueAdapter),
+            dependencyContainer.resolve(tokens.clock),
+            dependencyContainer.resolve(tokens.idGenerator),
+          ),
+      ),
+    });
+  }
+  const unavailable = (capability: string) => async () => {
+    throw new Error(`${capability} adapter is not configured`);
+  };
+  if (!container.isRegistered(tokens.sandboxAgentArtifactCapture, true)) {
+    container.register(tokens.sandboxAgentArtifactCapture, {
+      useValue: {
+        capture: unavailable("Sandbox Source Artifact"),
+        delete: unavailable("Sandbox Source Artifact"),
+      },
+    });
+  }
+  if (!container.isRegistered(tokens.sandboxAgentPreviewProvider, true)) {
+    container.register(tokens.sandboxAgentPreviewProvider, {
+      useValue: {
+        create: unavailable("Sandbox Candidate Preview"),
+        delete: unavailable("Sandbox Candidate Preview"),
+      },
+    });
+  }
+  if (!container.isRegistered(tokens.sandboxAgentPromotionTarget, true)) {
+    container.register(tokens.sandboxAgentPromotionTarget, {
+      useValue: {
+        createResource: unavailable("Sandbox Promotion"),
+        createDeployment: unavailable("Sandbox Promotion"),
+        readProof: unavailable("Sandbox Promotion"),
+      },
+    });
+  }
+  container.register(tokens.sandboxAgentDeliveryService, {
+    useFactory: instanceCachingFactory((dependencyContainer) => {
+      const sandboxService = dependencyContainer.resolve<ExecutionSandboxService>(
+        tokens.executionSandboxService,
+      );
+      return new SandboxAgentDeliveryService({
+        repository: dependencyContainer.resolve<SandboxAgentDeliveryRepository>(
+          tokens.sandboxAgentDeliveryRepository,
+        ),
+        sandboxReader: {
+          async show(context: ExecutionContext, sandboxId: string) {
+            const shown = await sandboxService.show(context, sandboxId);
+            if (shown.isErr()) throw new Error(shown.error.message);
+            return {
+              sandboxId,
+              status: shown.value.status,
+              workspaceRevision: shown.value.updatedAt ?? shown.value.createdAt,
+              source: shown.value.source,
+            };
+          },
+        },
+        harnessRegistry: dependencyContainer.resolve(tokens.sandboxAgentHarnessRegistry),
+        workQueue: dependencyContainer.resolve(tokens.sandboxAgentWorkQueue),
+        artifactCapture: dependencyContainer.resolve(tokens.sandboxAgentArtifactCapture),
+        previewProvider: dependencyContainer.resolve(tokens.sandboxAgentPreviewProvider),
+        promotionTarget: dependencyContainer.resolve(tokens.sandboxAgentPromotionTarget),
+        taskProtector: dependencyContainer.resolve(tokens.controlPlaneSecretProtector),
+        clock: dependencyContainer.resolve(tokens.clock),
+        idGenerator: dependencyContainer.resolve(tokens.idGenerator),
+      } satisfies SandboxAgentDeliveryDependencies);
+    }),
+  });
+  if (!container.isRegistered(tokens.durableWorkHandlerRegistry, true)) {
+    container.register(tokens.durableWorkHandlerRegistry, {
+      useFactory: instanceCachingFactory(
+        (dependencyContainer): DurableWorkHandlerRegistry => ({
+          resolve(item) {
+            return item.kind === sandboxAgentDeliveryDurableWorkKind
+              ? new SandboxAgentDurableWorkHandler(
+                  dependencyContainer.resolve(tokens.sandboxAgentDeliveryService),
+                )
+              : undefined;
+          },
+        }),
+      ),
+    });
+  }
   container.registerSingleton(tokens.createProjectUseCase, CreateProjectUseCase);
   container.registerSingleton(tokens.queryCapabilitiesQueryService, QueryCapabilitiesQueryService);
   container.registerSingleton(tokens.queryEntitlementsQueryService, QueryEntitlementsQueryService);

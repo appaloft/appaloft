@@ -1240,6 +1240,13 @@ export interface Database {
   execution_sandbox_snapshots: ExecutionSandboxSnapshotsTable;
   execution_sandbox_templates: ExecutionSandboxTemplatesTable;
   execution_sandbox_credential_grants: ExecutionSandboxCredentialGrantsTable;
+  sandbox_agent_runtimes: SandboxAgentRuntimesTable;
+  sandbox_agent_runs: SandboxAgentRunsTable;
+  sandbox_agent_run_events: SandboxAgentRunEventsTable;
+  sandbox_agent_approvals: SandboxAgentApprovalsTable;
+  sandbox_source_artifacts: SandboxSourceArtifactsTable;
+  sandbox_candidate_previews: SandboxCandidatePreviewsTable;
+  sandbox_promotions: SandboxPromotionsTable;
   account: BetterAuthAccountsTable;
   projects: ProjectsTable;
   servers: ServersTable;
@@ -1348,4 +1355,81 @@ export interface ExecutionSandboxCredentialGrantsTable {
   grant_id: string;
   state: ColumnType<Record<string, unknown>, Record<string, unknown>, Record<string, unknown>>;
   created_at: TimestampColumn;
+}
+
+export interface SandboxAgentRuntimesTable {
+  tenant_id: string;
+  id: string;
+  sandbox_id: string;
+  harness_key: string;
+  idempotency_key: string;
+  status: string;
+  state: ColumnType<Record<string, unknown>, Record<string, unknown>, Record<string, unknown>>;
+  created_at: TimestampColumn;
+  updated_at: UpdatableTimestampColumn;
+}
+export interface SandboxAgentRunsTable {
+  tenant_id: string;
+  id: string;
+  runtime_id: string;
+  sandbox_id: string;
+  idempotency_key: string;
+  status: string;
+  task_envelope: string;
+  state: ColumnType<Record<string, unknown>, Record<string, unknown>, Record<string, unknown>>;
+  created_at: TimestampColumn;
+  updated_at: UpdatableTimestampColumn;
+}
+export interface SandboxAgentRunEventsTable {
+  tenant_id: string;
+  event_id: string;
+  run_id: string;
+  sequence: number;
+  type: string;
+  data: ColumnType<Record<string, unknown>, Record<string, unknown>, Record<string, unknown>>;
+  created_at: TimestampColumn;
+}
+export interface SandboxAgentApprovalsTable {
+  tenant_id: string;
+  id: string;
+  runtime_id: string;
+  run_id: string;
+  sandbox_id: string;
+  capability: string;
+  request_digest: string;
+  status: string;
+  state: ColumnType<Record<string, unknown>, Record<string, unknown>, Record<string, unknown>>;
+  created_at: TimestampColumn;
+  updated_at: UpdatableTimestampColumn;
+  expires_at: string;
+}
+export interface SandboxSourceArtifactsTable {
+  tenant_id: string;
+  id: string;
+  sandbox_id: string;
+  digest: string;
+  status: string;
+  state: ColumnType<Record<string, unknown>, Record<string, unknown>, Record<string, unknown>>;
+  created_at: TimestampColumn;
+}
+export interface SandboxCandidatePreviewsTable {
+  tenant_id: string;
+  id: string;
+  artifact_id: string;
+  artifact_digest: string;
+  status: string;
+  state: ColumnType<Record<string, unknown>, Record<string, unknown>, Record<string, unknown>>;
+  expires_at: string;
+}
+export interface SandboxPromotionsTable {
+  tenant_id: string;
+  id: string;
+  sandbox_id: string;
+  artifact_id: string;
+  artifact_digest: string;
+  status: string;
+  state: ColumnType<Record<string, unknown>, Record<string, unknown>, Record<string, unknown>>;
+  created_at: TimestampColumn;
+  updated_at: UpdatableTimestampColumn;
+  expires_at: string;
 }

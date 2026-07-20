@@ -351,6 +351,36 @@ Governing artifacts:
 - [Execution Sandbox Platform](./specs/108-execution-sandbox-platform/spec.md)
 - [Execution Sandbox Test Matrix](./testing/execution-sandbox-test-matrix.md)
 
+### Sandbox Agent Runtime And Application Promotion
+
+Owns:
+- `SandboxAgentRuntime`
+- `SandboxAgentRun`
+- `SourceArtifact`
+- `SandboxPromotion`
+- harness-neutral execution, external capability approval, immutable workspace delivery and
+  Sandbox-to-Resource delivery workflow
+
+Accepted target model:
+- `SandboxAgentRuntime` is addressable but lifecycle-subordinate to exactly one Sandbox. It is not a
+  caller conversation or an Agent identity that can outlive the Sandbox.
+- `SandboxAgentRun` owns one task lifecycle, explicit fresh/continue lineage, bounded redacted
+  events, usage and terminal outcome. Runtime owns the one-active-Run admission claim.
+- Agent harnesses are downstream adapters. Pi is the first adapter and never enters public aggregate
+  state, errors or operation names.
+- `SourceArtifact` is immutable, content-addressed application source with a safe manifest,
+  provenance and opaque ArtifactStore reference. It is not a SandboxSnapshot or live workspace.
+- `SandboxPromotion` owns plan, external acceptance and durable cross-context workflow state. It
+  creates a new Resource, binds the exact artifact as `zip-artifact`, creates the first Deployment
+  and completes only after `DeploymentProof.verdict = verified`.
+- Runtime/Run events are data-plane execution facts. Audit is a separate control-plane governance
+  projection. Domain Events do not become Billing Events without an explicit consumer policy.
+
+Governing artifacts:
+- [ADR-092](./decisions/ADR-092-sandbox-agent-runtime-and-application-promotion-boundary.md)
+- [Spec 109](./specs/109-sandbox-agent-runtime-and-application-promotion/spec.md)
+- [Test Matrix](./testing/sandbox-agent-runtime-and-application-promotion-test-matrix.md)
+
 ### Operator/Internal State
 
 Owns:
@@ -1279,6 +1309,26 @@ Current scope:
 - public operation, persistence, provider, SDK, CLI, and MCP implementation is governed by
   [Execution Sandbox Platform](./specs/108-execution-sandbox-platform/spec.md)
 
+### SandboxAgentRuntime / SandboxAgentRun / SourceArtifact / SandboxPromotion
+
+Meaning:
+- `SandboxAgentRuntime` owns a stable harness-neutral runtime identity under one Sandbox
+- `SandboxAgentRun` owns one submitted task, explicit lineage and observable terminal outcome
+- `SourceArtifact` owns one immutable digest/manifest/provenance/store reference
+- `SandboxPromotion` owns the exact plan/accept/workflow correlation through Deployment proof
+
+Rules:
+- a Runtime may claim at most one active Run and releases the claim only through a terminal transition
+- Run context inheritance is explicit; caller conversation history is outside Appaloft ownership
+- approval cannot be resolved by the harness or a Sandbox-scoped identity
+- Source Artifact capture is safe-root confined and reference-protected after acceptance
+- Promotion plan/accept binds artifact digest and explicit new Resource target
+- partial failures retain Resource, artifact, Deployment attempt and evidence for retry/recovery
+
+Current scope:
+- accepted post-1.0 Code Round under [ADR-092](./decisions/ADR-092-sandbox-agent-runtime-and-application-promotion-boundary.md)
+- implementation is governed by [Spec 109](./specs/109-sandbox-agent-runtime-and-application-promotion/spec.md)
+
 ## Current Implementation Mapping
 
 These directories are authoritative for current domain code:
@@ -1290,6 +1340,7 @@ packages/core/src/
   configuration/
   runtime-topology/
   execution-sandbox/
+  sandbox-agent-runtime/
   workload-delivery/
   dependency-resources/
   release-orchestration/
@@ -1310,6 +1361,9 @@ Application slices should be understood through the same contexts:
   domain binding admission
 - `execution-sandbox`: Sandbox, Template, Snapshot lifecycle and provider-neutral process,
   filesystem, network, port, isolation, and reconciliation capability boundaries
+- `sandbox-agent-runtime`: Runtime/Run/approval lifecycle and harness anticorruption boundary;
+  SourceArtifact and SandboxPromotion cross into workload-delivery/release-orchestration only
+  through application commands/queries
 - `release-orchestration`: deployment creation, listing, logs, rollback
 - `extensibility`: providers, plugins, GitHub repository browsing, system diagnostics
 

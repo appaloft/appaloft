@@ -4699,6 +4699,276 @@ export const generatedSdkOperations = [
     facadeDefault: true,
   },
   {
+    operationKey: "sandboxes.agents.approvals.list",
+    operationGroup: "sandboxes",
+    operationMethod: "agentsApprovalsList",
+    facadePath: ["sandboxes", "agents", "approvals", "list"],
+    operationId: "sandboxes.agents.approvals.list",
+    kind: "query",
+    domain: "sandboxes",
+    messageName: "ListSandboxAgentApprovalsQuery",
+    route: {
+      method: "GET",
+      path: "/sandbox-agent-runs/{runId}/approvals",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandboxes.agents.approvals.resolve",
+    operationGroup: "sandboxes",
+    operationMethod: "agentsApprovalsResolve",
+    facadePath: ["sandboxes", "agents", "approvals", "resolve"],
+    operationId: "sandboxes.agents.approvals.resolve",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "ResolveSandboxAgentApprovalCommand",
+    route: {
+      method: "POST",
+      path: "/sandbox-agent-approvals/{approvalId}/resolve",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandboxes.agents.approvals.show",
+    operationGroup: "sandboxes",
+    operationMethod: "agentsApprovalsShow",
+    facadePath: ["sandboxes", "agents", "approvals", "show"],
+    operationId: "sandboxes.agents.approvals.show",
+    kind: "query",
+    domain: "sandboxes",
+    messageName: "ShowSandboxAgentApprovalQuery",
+    route: {
+      method: "GET",
+      path: "/sandbox-agent-approvals/{approvalId}",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandboxes.agents.runs.cancel",
+    operationGroup: "sandboxes",
+    operationMethod: "agentsRunsCancel",
+    facadePath: ["sandboxes", "agents", "runs", "cancel"],
+    operationId: "sandboxes.agents.runs.cancel",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "CancelSandboxAgentRunCommand",
+    route: {
+      method: "POST",
+      path: "/sandbox-agent-runtimes/{runtimeId}/runs/{runId}/cancel",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandboxes.agents.runs.create",
+    operationGroup: "sandboxes",
+    operationMethod: "agentsRunsCreate",
+    facadePath: ["sandboxes", "agents", "runs", "create"],
+    operationId: "sandboxes.agents.runs.create",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "CreateSandboxAgentRunCommand",
+    route: {
+      method: "POST",
+      path: "/sandboxes/{sandboxId}/agent-runtimes/{runtimeId}/runs",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandboxes.agents.runs.events",
+    operationGroup: "sandboxes",
+    operationMethod: "agentsRunsEvents",
+    facadePath: ["sandboxes", "agents", "runs", "events"],
+    operationId: "sandboxes.agents.runs.events",
+    kind: "query",
+    domain: "sandboxes",
+    messageName: "ListSandboxAgentRunEventsQuery",
+    route: {
+      method: "GET",
+      path: "/sandbox-agent-runs/{runId}/events",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandboxes.agents.runs.list",
+    operationGroup: "sandboxes",
+    operationMethod: "agentsRunsList",
+    facadePath: ["sandboxes", "agents", "runs", "list"],
+    operationId: "sandboxes.agents.runs.list",
+    kind: "query",
+    domain: "sandboxes",
+    messageName: "ListSandboxAgentRunsQuery",
+    route: {
+      method: "GET",
+      path: "/sandbox-agent-runtimes/{runtimeId}/runs",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandboxes.agents.runs.show",
+    operationGroup: "sandboxes",
+    operationMethod: "agentsRunsShow",
+    facadePath: ["sandboxes", "agents", "runs", "show"],
+    operationId: "sandboxes.agents.runs.show",
+    kind: "query",
+    domain: "sandboxes",
+    messageName: "ShowSandboxAgentRunQuery",
+    route: {
+      method: "GET",
+      path: "/sandbox-agent-runtimes/{runtimeId}/runs/{runId}",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandboxes.agents.runtimes.create",
+    operationGroup: "sandboxes",
+    operationMethod: "agentsRuntimesCreate",
+    facadePath: ["sandboxes", "agents", "runtimes", "create"],
+    operationId: "sandboxes.agents.runtimes.create",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "CreateSandboxAgentRuntimeCommand",
+    route: {
+      method: "POST",
+      path: "/sandboxes/{sandboxId}/agent-runtimes",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandboxes.agents.runtimes.list",
+    operationGroup: "sandboxes",
+    operationMethod: "agentsRuntimesList",
+    facadePath: ["sandboxes", "agents", "runtimes", "list"],
+    operationId: "sandboxes.agents.runtimes.list",
+    kind: "query",
+    domain: "sandboxes",
+    messageName: "ListSandboxAgentRuntimesQuery",
+    route: {
+      method: "GET",
+      path: "/sandboxes/{sandboxId}/agent-runtimes",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandboxes.agents.runtimes.show",
+    operationGroup: "sandboxes",
+    operationMethod: "agentsRuntimesShow",
+    facadePath: ["sandboxes", "agents", "runtimes", "show"],
+    operationId: "sandboxes.agents.runtimes.show",
+    kind: "query",
+    domain: "sandboxes",
+    messageName: "ShowSandboxAgentRuntimeQuery",
+    route: {
+      method: "GET",
+      path: "/sandboxes/{sandboxId}/agent-runtimes/{runtimeId}",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandboxes.agents.runtimes.terminate",
+    operationGroup: "sandboxes",
+    operationMethod: "agentsRuntimesTerminate",
+    facadePath: ["sandboxes", "agents", "runtimes", "terminate"],
+    operationId: "sandboxes.agents.runtimes.terminate",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "TerminateSandboxAgentRuntimeCommand",
+    route: {
+      method: "POST",
+      path: "/sandboxes/{sandboxId}/agent-runtimes/{runtimeId}/terminate",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandboxes.candidate-previews.create",
+    operationGroup: "sandboxes",
+    operationMethod: "candidatePreviewsCreate",
+    facadePath: ["sandboxes", "candidatePreviews", "create"],
+    operationId: "sandboxes.candidatePreviews.create",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "CreateSandboxCandidatePreviewCommand",
+    route: {
+      method: "POST",
+      path: "/sandbox-source-artifacts/{artifactId}/candidate-previews",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandboxes.candidate-previews.delete",
+    operationGroup: "sandboxes",
+    operationMethod: "candidatePreviewsDelete",
+    facadePath: ["sandboxes", "candidatePreviews", "delete"],
+    operationId: "sandboxes.candidatePreviews.delete",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "DeleteSandboxCandidatePreviewCommand",
+    route: {
+      method: "DELETE",
+      path: "/sandbox-candidate-previews/{previewId}",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandboxes.candidate-previews.show",
+    operationGroup: "sandboxes",
+    operationMethod: "candidatePreviewsShow",
+    facadePath: ["sandboxes", "candidatePreviews", "show"],
+    operationId: "sandboxes.candidatePreviews.show",
+    kind: "query",
+    domain: "sandboxes",
+    messageName: "ShowSandboxCandidatePreviewQuery",
+    route: {
+      method: "GET",
+      path: "/sandbox-candidate-previews/{previewId}",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
     operationKey: "sandboxes.create",
     operationGroup: "sandboxes",
     operationMethod: "create",
@@ -4807,6 +5077,96 @@ export const generatedSdkOperations = [
     facadeDefault: true,
   },
   {
+    operationKey: "sandboxes.promotions.accept",
+    operationGroup: "sandboxes",
+    operationMethod: "promotionsAccept",
+    facadePath: ["sandboxes", "promotions", "accept"],
+    operationId: "sandboxes.promotions.accept",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "AcceptSandboxPromotionCommand",
+    route: {
+      method: "POST",
+      path: "/sandbox-promotions/{promotionId}/accept",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandboxes.promotions.list",
+    operationGroup: "sandboxes",
+    operationMethod: "promotionsList",
+    facadePath: ["sandboxes", "promotions", "list"],
+    operationId: "sandboxes.promotions.list",
+    kind: "query",
+    domain: "sandboxes",
+    messageName: "ListSandboxPromotionsQuery",
+    route: {
+      method: "GET",
+      path: "/sandboxes/{sandboxId}/promotions",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandboxes.promotions.plan",
+    operationGroup: "sandboxes",
+    operationMethod: "promotionsPlan",
+    facadePath: ["sandboxes", "promotions", "plan"],
+    operationId: "sandboxes.promotions.plan",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "PlanSandboxPromotionCommand",
+    route: {
+      method: "POST",
+      path: "/sandboxes/{sandboxId}/promotions/plan",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandboxes.promotions.retry",
+    operationGroup: "sandboxes",
+    operationMethod: "promotionsRetry",
+    facadePath: ["sandboxes", "promotions", "retry"],
+    operationId: "sandboxes.promotions.retry",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "RetrySandboxPromotionCommand",
+    route: {
+      method: "POST",
+      path: "/sandbox-promotions/{promotionId}/retry",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandboxes.promotions.show",
+    operationGroup: "sandboxes",
+    operationMethod: "promotionsShow",
+    facadePath: ["sandboxes", "promotions", "show"],
+    operationId: "sandboxes.promotions.show",
+    kind: "query",
+    domain: "sandboxes",
+    messageName: "ShowSandboxPromotionQuery",
+    route: {
+      method: "GET",
+      path: "/sandbox-promotions/{promotionId}",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
     operationKey: "sandboxes.resume",
     operationGroup: "sandboxes",
     operationMethod: "resume",
@@ -4836,6 +5196,78 @@ export const generatedSdkOperations = [
     route: {
       method: "GET",
       path: "/sandboxes/{sandboxId}",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandboxes.source-artifacts.create",
+    operationGroup: "sandboxes",
+    operationMethod: "sourceArtifactsCreate",
+    facadePath: ["sandboxes", "sourceArtifacts", "create"],
+    operationId: "sandboxes.sourceArtifacts.create",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "CreateSandboxSourceArtifactCommand",
+    route: {
+      method: "POST",
+      path: "/sandboxes/{sandboxId}/source-artifacts",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandboxes.source-artifacts.delete",
+    operationGroup: "sandboxes",
+    operationMethod: "sourceArtifactsDelete",
+    facadePath: ["sandboxes", "sourceArtifacts", "delete"],
+    operationId: "sandboxes.sourceArtifacts.delete",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "DeleteSandboxSourceArtifactCommand",
+    route: {
+      method: "DELETE",
+      path: "/sandbox-source-artifacts/{artifactId}",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandboxes.source-artifacts.list",
+    operationGroup: "sandboxes",
+    operationMethod: "sourceArtifactsList",
+    facadePath: ["sandboxes", "sourceArtifacts", "list"],
+    operationId: "sandboxes.sourceArtifacts.list",
+    kind: "query",
+    domain: "sandboxes",
+    messageName: "ListSandboxSourceArtifactsQuery",
+    route: {
+      method: "GET",
+      path: "/sandboxes/{sandboxId}/source-artifacts",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandboxes.source-artifacts.show",
+    operationGroup: "sandboxes",
+    operationMethod: "sourceArtifactsShow",
+    facadePath: ["sandboxes", "sourceArtifacts", "show"],
+    operationId: "sandboxes.sourceArtifacts.show",
+    kind: "query",
+    domain: "sandboxes",
+    messageName: "ShowSandboxSourceArtifactQuery",
+    route: {
+      method: "GET",
+      path: "/sandbox-source-artifacts/{artifactId}",
     },
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
@@ -6639,6 +7071,31 @@ export interface GeneratedAppaloftClient {
     readonly revoke: AppaloftSdkFacadeMethod;
   };
   readonly sandboxes: {
+    readonly agents: {
+      readonly approvals: {
+        readonly list: AppaloftSdkFacadeMethod;
+        readonly resolve: AppaloftSdkFacadeMethod;
+        readonly show: AppaloftSdkFacadeMethod;
+      };
+      readonly runs: {
+        readonly cancel: AppaloftSdkFacadeMethod;
+        readonly create: AppaloftSdkFacadeMethod;
+        readonly events: AppaloftSdkFacadeMethod;
+        readonly list: AppaloftSdkFacadeMethod;
+        readonly show: AppaloftSdkFacadeMethod;
+      };
+      readonly runtimes: {
+        readonly create: AppaloftSdkFacadeMethod;
+        readonly list: AppaloftSdkFacadeMethod;
+        readonly show: AppaloftSdkFacadeMethod;
+        readonly terminate: AppaloftSdkFacadeMethod;
+      };
+    };
+    readonly candidatePreviews: {
+      readonly create: AppaloftSdkFacadeMethod;
+      readonly delete: AppaloftSdkFacadeMethod;
+      readonly show: AppaloftSdkFacadeMethod;
+    };
     readonly create: AppaloftSdkFacadeMethod;
     readonly events: {
       readonly stream: AppaloftSdkFacadeMethod;
@@ -6649,8 +7106,21 @@ export interface GeneratedAppaloftClient {
       readonly configure: AppaloftSdkFacadeMethod;
     };
     readonly pause: AppaloftSdkFacadeMethod;
+    readonly promotions: {
+      readonly accept: AppaloftSdkFacadeMethod;
+      readonly list: AppaloftSdkFacadeMethod;
+      readonly plan: AppaloftSdkFacadeMethod;
+      readonly retry: AppaloftSdkFacadeMethod;
+      readonly show: AppaloftSdkFacadeMethod;
+    };
     readonly resume: AppaloftSdkFacadeMethod;
     readonly show: AppaloftSdkFacadeMethod;
+    readonly sourceArtifacts: {
+      readonly create: AppaloftSdkFacadeMethod;
+      readonly delete: AppaloftSdkFacadeMethod;
+      readonly list: AppaloftSdkFacadeMethod;
+      readonly show: AppaloftSdkFacadeMethod;
+    };
     readonly terminate: AppaloftSdkFacadeMethod;
   };
   readonly sandboxFiles: {

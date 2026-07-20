@@ -213,6 +213,7 @@ import {
   PgRuntimeMonitoringSampleRetentionStore,
   PgRuntimeMonitoringSampleWriteStore,
   PgRuntimeMonitoringThresholdPolicyRepository,
+  PgSandboxAgentDeliveryRepository,
   PgScheduledRuntimePrunePolicyReadModel,
   PgScheduledTaskDefinitionRepository,
   PgScheduledTaskDueCandidateReader,
@@ -1201,6 +1202,11 @@ export function registerRuntimeDependencies(
   });
   container.register(tokens.sandboxRepository, {
     useFactory: instanceCachingFactory(() => new PgExecutionSandboxRepository(input.database.db)),
+  });
+  container.register(tokens.sandboxAgentDeliveryRepository, {
+    useFactory: instanceCachingFactory(
+      () => new PgSandboxAgentDeliveryRepository(input.database.db),
+    ),
   });
   container.register(tokens.sandboxProviderRegistry, {
     useFactory: instanceCachingFactory(() => new SandboxProviderRegistry()),

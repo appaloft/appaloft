@@ -278,6 +278,20 @@ persistence, at least one truthful provider, and the test matrix are aligned.
 | Expose/list/revoke Sandbox ports | Accepted candidate commands/query | `sandbox-ports.expose`, `sandbox-ports.list`, `sandbox-ports.revoke` | Sandbox access capability | Creates expiring controlled access descriptors without returning raw host addresses or provider credentials. | [Commands](./commands/execution-sandboxes.md), [Queries](./queries/execution-sandboxes.md), [Test Matrix](./testing/execution-sandbox-test-matrix.md) |
 | Create/list/show/delete Sandbox Snapshots | Accepted candidate commands/queries | `sandbox-snapshots.create`, `sandbox-snapshots.list`, `sandbox-snapshots.show`, `sandbox-snapshots.delete` | SandboxSnapshot | Captures independent reusable state with truthful filesystem/memory capability and retention. | [Commands](./commands/execution-sandboxes.md), [Queries](./queries/execution-sandboxes.md), [Workflow](./workflows/execution-sandbox.md), [ADR-091](./decisions/ADR-091-execution-sandbox-boundary.md) |
 
+### Sandbox Agent Runtime And Application Promotion
+
+The following private-preview operations are implemented under ADR-092 across Core Operations,
+operation catalog, persistence, transports, generated SDK, CLI/MCP metadata and the linked tests.
+
+| Behavior | Type | Operation | Owner | Main relationship | Governing docs |
+| --- | --- | --- | --- | --- | --- |
+| Create/list/show/terminate Runtime | Private-preview commands/queries | `sandboxes.agents.runtimes.create`, `.list`, `.show`, `.terminate` | SandboxAgentRuntime | Addressable harness-neutral Runtime subordinate to one Sandbox. | [Commands](./commands/sandbox-agent-runtime-and-promotion.md), [Queries](./queries/sandbox-agent-runtime-and-promotion.md), [ADR-092](./decisions/ADR-092-sandbox-agent-runtime-and-application-promotion-boundary.md) |
+| Submit/list/show/cancel/read Run events | Private-preview command/query family | `sandboxes.agents.runs.create`, `.list`, `.show`, `.cancel`, `.events` | SandboxAgentRun / Runtime active claim | One durable task with explicit lineage and bounded redacted events. | [Workflow](./workflows/sandbox-agent-runtime-and-application-promotion.md), [Test Matrix](./testing/sandbox-agent-runtime-and-application-promotion-test-matrix.md) |
+| List/show/resolve capability approval | Private-preview query/command family | `sandboxes.agents.approvals.list`, `.show`, `.resolve` | Agent capability approval store | External exact-request approval; harness identity cannot resolve. | [Commands](./commands/sandbox-agent-runtime-and-promotion.md), [Errors](./errors/sandbox-agent-runtime-and-promotion.md) |
+| Capture/list/show/delete Source Artifact | Private-preview command/query family | `sandboxes.source-artifacts.create`, `.list`, `.show`, `.delete` | SourceArtifact | Freezes a safe source root into immutable digest/manifest/provenance. | [Spec 109](./specs/109-sandbox-agent-runtime-and-application-promotion/spec.md), [Test Matrix](./testing/sandbox-agent-runtime-and-application-promotion-test-matrix.md) |
+| Create/show/delete Candidate Preview | Private-preview command/query family | `sandboxes.candidate-previews.create`, `.show`, `.delete` | Promotion candidate readback | Materializes exact Source Artifact digest with TTL/access/verification. | [Workflow](./workflows/sandbox-agent-runtime-and-application-promotion.md) |
+| Plan/list/show/accept/retry Sandbox Promotion | Private-preview command/query family | `sandboxes.promotions.plan`, `.list`, `.show`, `.accept`, `.retry` | SandboxPromotion / application process | Creates a new Resource and Deployment from one approved artifact and completes on verified proof. | [ADR-092](./decisions/ADR-092-sandbox-agent-runtime-and-application-promotion-boundary.md), [Workflow](./workflows/sandbox-agent-runtime-and-application-promotion.md), [Test Matrix](./testing/sandbox-agent-runtime-and-application-promotion-test-matrix.md) |
+
 ### Resource And Workload Delivery
 
 | Behavior | Type | Operation | Owner | Main relationship | Governing docs |

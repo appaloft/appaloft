@@ -5,6 +5,7 @@ export * from "./extensibility";
 export * from "./identity-governance";
 export * from "./release-orchestration";
 export * from "./runtime-topology";
+export * from "./sandbox-agent-runtime";
 export * from "./shared/entity";
 export * from "./shared/enums";
 export * from "./shared/error-knowledge";
