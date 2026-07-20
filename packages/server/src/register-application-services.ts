@@ -1277,6 +1277,10 @@ interface DockerManagedDependencyHandle {
   containerName: string;
 }
 
+interface DockerManagedDependencyBackupHandle extends DockerManagedDependencyHandle {
+  backupId: string;
+}
+
 interface DockerManagedDependencyRealizationSpec {
   command: string;
   endpoint: ManagedDependencyRealizationResult["endpoint"];
@@ -1290,7 +1294,9 @@ interface ManagedDependencyCommandResult {
 }
 
 const dockerSingleServerHandlePrefix = "docker-single-server:v1";
+const dockerSingleServerBackupHandlePrefix = "docker-single-server-backup:v1";
 const dockerManagedDependencyNetworkName = "appaloft-edge";
+const dockerManagedDependencyBackupRoot = "$HOME/.appaloft/dependency-backups";
 const managedDependencyCommandTimeoutMs = 120_000;
 
 function dockerManagedDependencyHandle(input: DockerManagedDependencyHandle): string {
@@ -1317,6 +1323,45 @@ function parseDockerManagedDependencyHandle(
     serverId,
     containerName,
   };
+}
+
+function dockerManagedDependencyBackupHandle(input: DockerManagedDependencyBackupHandle): string {
+  return [
+    dockerSingleServerBackupHandlePrefix,
+    input.kind,
+    input.serverId,
+    input.containerName,
+    input.backupId,
+  ].join(":");
+}
+
+function parseDockerManagedDependencyBackupHandle(
+  providerArtifactHandle: string,
+): DockerManagedDependencyBackupHandle | undefined {
+  const [prefix, version, kind, serverId, containerName, backupId] =
+    providerArtifactHandle.split(":");
+  if (
+    `${prefix}:${version}` !== dockerSingleServerBackupHandlePrefix ||
+    !shellManagedDependencyKinds.includes(kind as ManagedDependencyResourceKind) ||
+    !serverId ||
+    !containerName ||
+    !backupId
+  ) {
+    return undefined;
+  }
+  return {
+    kind: kind as ManagedDependencyResourceKind,
+    serverId,
+    containerName,
+    backupId,
+  };
+}
+
+function dockerManagedDependencyBackupPath(input: DockerManagedDependencyBackupHandle): string {
+  const extension = input.kind === "redis" ? "rdb" : "dump";
+  return `${dockerManagedDependencyBackupRoot}/${safeDockerToken(input.kind)}/${safeDockerToken(
+    input.containerName,
+  )}/${safeDockerToken(input.backupId)}.${extension}`;
 }
 
 function safeDockerToken(input: string): string {
@@ -1612,21 +1657,25 @@ async function resolveManagedDependencySingleServerTarget(input: {
 async function runManagedDependencyTargetCommand(
   target: ManagedDependencySingleServerTarget,
   command: string,
+  options: { stdin?: Uint8Array } = {},
 ): Promise<ManagedDependencyCommandResult> {
   if (target.providerKey === "local-shell") {
-    return spawnManagedDependencyCommand(["sh", "-lc", command]);
+    return spawnManagedDependencyCommand(["sh", "-lc", command], options);
   }
 
   const identity = target.privateKey ? writeSshIdentityFile(target.privateKey) : undefined;
   try {
-    return await spawnManagedDependencyCommand([
-      "ssh",
-      ...sshManagedDependencyArgs({
-        target,
-        remoteCommand: command,
-        ...(identity ? { identityFile: identity.identityFile } : {}),
-      }),
-    ]);
+    return await spawnManagedDependencyCommand(
+      [
+        "ssh",
+        ...sshManagedDependencyArgs({
+          target,
+          remoteCommand: command,
+          ...(identity ? { identityFile: identity.identityFile } : {}),
+        }),
+      ],
+      options,
+    );
   } finally {
     identity?.cleanup();
   }
@@ -1634,9 +1683,11 @@ async function runManagedDependencyTargetCommand(
 
 async function spawnManagedDependencyCommand(
   args: string[],
+  options: { stdin?: Uint8Array } = {},
 ): Promise<ManagedDependencyCommandResult> {
   const child = Bun.spawn(args, {
     env: process.env,
+    ...(options.stdin ? { stdin: options.stdin } : {}),
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -1698,6 +1749,15 @@ function hostWithUsername(host: string, username?: string): string {
 
 function shellQuote(input: string): string {
   return `'${input.replaceAll("'", "'\\''")}'`;
+}
+
+function shellQuotePath(input: string): string {
+  const homePrefix = "$HOME/";
+  if (!input.startsWith(homePrefix)) {
+    return shellQuote(input);
+  }
+  const pathSegments = input.slice(homePrefix.length).split("/").filter(Boolean);
+  return `$HOME/${pathSegments.map(shellQuote).join("/")}`;
 }
 
 function isMissingFileError(cause: unknown): boolean {
@@ -2145,6 +2205,7 @@ export class ShellDependencyResourceBackupProvider implements DependencyResource
     private readonly options: {
       dependencyResourceSecretStore?: DependencyResourceSecretStore;
       nativeCommandRunner?: ShellDependencyResourceNativeCommandRunner;
+      serverRepository?: ServerRepository;
     } = {},
   ) {}
 
@@ -2161,6 +2222,10 @@ export class ShellDependencyResourceBackupProvider implements DependencyResource
     context: ExecutionContext,
     input: DependencyResourceBackupProviderInput,
   ): Promise<Result<DependencyResourceBackupProviderResult, DomainError>> {
+    const dockerBackup = await this.createDockerManagedBackup(context, input);
+    if (dockerBackup) {
+      return dockerBackup;
+    }
     const providerArtifactHandle = `backup/${input.dependencyResourceId}/${input.backupId}`;
     const nativeExecution = await this.runNativeBackupIfAvailable(context, input);
     if (nativeExecution.isErr()) {
@@ -2205,6 +2270,10 @@ export class ShellDependencyResourceBackupProvider implements DependencyResource
     context: ExecutionContext,
     input: DependencyResourceRestoreProviderInput,
   ): Promise<Result<DependencyResourceRestoreProviderResult, DomainError>> {
+    const dockerRestore = await this.restoreDockerManagedBackup(context, input);
+    if (dockerRestore) {
+      return dockerRestore;
+    }
     const artifact = await this.readBackupArtifact(input);
     if (artifact.isErr()) {
       return err(artifact.error);
@@ -2257,6 +2326,227 @@ export class ShellDependencyResourceBackupProvider implements DependencyResource
       );
     }
 
+    return ok({ completedAt: input.requestedAt });
+  }
+
+  private async createDockerManagedBackup(
+    context: ExecutionContext,
+    input: DependencyResourceBackupProviderInput,
+  ): Promise<Result<DependencyResourceBackupProviderResult, DomainError> | undefined> {
+    if (!input.providerResourceHandle || !input.providerKey.startsWith("appaloft-managed-")) {
+      return undefined;
+    }
+    const handle = parseDockerManagedDependencyHandle(input.providerResourceHandle);
+    if (!handle) {
+      return undefined;
+    }
+    if (
+      handle.kind !== input.dependencyKind ||
+      (handle.kind !== "postgres" && handle.kind !== "redis")
+    ) {
+      return err(
+        domainError.providerCapabilityUnsupported(
+          "Docker-backed backup handle does not match dependency resource",
+          {
+            phase: "managed-dependency-docker-backup",
+            providerKey: input.providerKey,
+            dependencyKind: input.dependencyKind,
+          },
+        ),
+      );
+    }
+    if (!this.options.serverRepository) {
+      return err(
+        domainError.providerCapabilityUnsupported(
+          "Server repository is required for Docker-backed dependency backup",
+          {
+            phase: "managed-dependency-target-resolution",
+            providerKey: input.providerKey,
+            dependencyKind: input.dependencyKind,
+          },
+        ),
+      );
+    }
+
+    const target = await resolveManagedDependencySingleServerTarget({
+      context,
+      serverRepository: this.options.serverRepository,
+      serverId: handle.serverId,
+      operation: "dependency-resources.backup.create",
+    });
+    if (target.isErr()) {
+      return err(target.error);
+    }
+    const backupHandle: DockerManagedDependencyBackupHandle = {
+      ...handle,
+      backupId: input.backupId,
+    };
+    const path = dockerManagedDependencyBackupPath(backupHandle);
+    const directory = path.replace(/\/[^/]+$/, "");
+    const command =
+      handle.kind === "postgres"
+        ? [
+            "set -eu",
+            `mkdir -p ${shellQuotePath(directory)}`,
+            `docker exec ${shellQuote(handle.containerName)} sh -lc ${shellQuote(
+              'PGPASSWORD="$POSTGRES_PASSWORD" pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc',
+            )} > ${shellQuotePath(path)}`,
+          ].join("\n")
+        : [
+            "set -eu",
+            `mkdir -p ${shellQuotePath(directory)}`,
+            `docker exec ${shellQuote(handle.containerName)} sh -lc ${shellQuote(
+              'password="$(tr "\\0" "\\n" </proc/1/cmdline | tail -n 1)"; redis-cli -a "$password" --no-auth-warning SAVE >/dev/null',
+            )}`,
+            `docker cp ${shellQuote(`${handle.containerName}:/data/dump.rdb`)} ${shellQuotePath(path)}`,
+          ].join("\n");
+    const executed = await runManagedDependencyTargetCommand(target.value, command);
+    if (executed.exitCode !== 0) {
+      return managedDependencyDockerCommandFailure({
+        message: "Docker-backed dependency backup failed",
+        providerKey: input.providerKey,
+        operation: "dependency-resources.backup.create",
+        exitCode: executed.exitCode,
+      });
+    }
+    return ok({
+      providerArtifactHandle: dockerManagedDependencyBackupHandle(backupHandle),
+      completedAt: input.requestedAt,
+      retentionStatus: "retained",
+    });
+  }
+
+  private async restoreDockerManagedBackup(
+    context: ExecutionContext,
+    input: DependencyResourceRestoreProviderInput,
+  ): Promise<Result<DependencyResourceRestoreProviderResult, DomainError> | undefined> {
+    const backupHandle = parseDockerManagedDependencyBackupHandle(input.providerArtifactHandle);
+    if (!backupHandle) {
+      return undefined;
+    }
+    if (
+      input.sourceProviderKey === "appaloft-managed-postgres" &&
+      input.providerKey === "external-postgres" &&
+      backupHandle.kind === "postgres" &&
+      input.sourceDependencyResourceId &&
+      input.sourceDependencyResourceId !== input.dependencyResourceId
+    ) {
+      if (!this.options.serverRepository || !input.connectionSecretValue) {
+        return err(
+          domainError.providerCapabilityUnsupported(
+            "Cross-resource Postgres restore requires source target access and a target connection",
+            {
+              phase: "managed-dependency-cross-resource-restore",
+              providerKey: input.providerKey,
+              dependencyKind: input.dependencyKind,
+            },
+          ),
+        );
+      }
+      const target = await resolveManagedDependencySingleServerTarget({
+        context,
+        serverRepository: this.options.serverRepository,
+        serverId: backupHandle.serverId,
+        operation: "dependency-resources.backup.restore",
+      });
+      if (target.isErr()) {
+        return err(target.error);
+      }
+      const path = dockerManagedDependencyBackupPath(backupHandle);
+      const command = [
+        "set -eu",
+        `test -f ${shellQuotePath(path)}`,
+        `docker run --rm -i -v ${shellQuotePath(path)}:/appaloft-backup.dump:ro postgres:16-alpine sh -lc ${shellQuote(
+          'IFS= read -r target_url; pg_restore --list /appaloft-backup.dump | sed -e "/ SCHEMA - public /d" -e "/ ACL - SCHEMA public /d" -e "/ COMMENT - SCHEMA public /d" > /tmp/appaloft.restore.list; pg_restore --dbname="$target_url" --use-list=/tmp/appaloft.restore.list --clean --if-exists --no-owner --no-privileges /appaloft-backup.dump',
+        )}`,
+      ].join("\n");
+      const executed = await runManagedDependencyTargetCommand(target.value, command, {
+        stdin: Buffer.from(`${input.connectionSecretValue}\n`, "utf8"),
+      });
+      if (executed.exitCode !== 0) {
+        return managedDependencyDockerCommandFailure({
+          message: "Cross-resource Postgres restore failed",
+          providerKey: input.providerKey,
+          operation: "dependency-resources.backup.restore",
+          exitCode: executed.exitCode,
+        });
+      }
+      return ok({ completedAt: input.requestedAt });
+    }
+    const resourceHandle = input.providerResourceHandle
+      ? parseDockerManagedDependencyHandle(input.providerResourceHandle)
+      : undefined;
+    if (
+      !resourceHandle ||
+      backupHandle.kind !== input.dependencyKind ||
+      backupHandle.kind !== resourceHandle.kind ||
+      backupHandle.serverId !== resourceHandle.serverId ||
+      backupHandle.containerName !== resourceHandle.containerName ||
+      backupHandle.backupId !== input.backupId ||
+      (backupHandle.kind !== "postgres" && backupHandle.kind !== "redis")
+    ) {
+      return err(
+        domainError.providerCapabilityUnsupported(
+          "Docker-backed restore handle does not match dependency resource",
+          {
+            phase: "managed-dependency-docker-restore",
+            providerKey: input.providerKey,
+            dependencyKind: input.dependencyKind,
+          },
+        ),
+      );
+    }
+    if (!this.options.serverRepository) {
+      return err(
+        domainError.providerCapabilityUnsupported(
+          "Server repository is required for Docker-backed dependency restore",
+          {
+            phase: "managed-dependency-target-resolution",
+            providerKey: input.providerKey,
+            dependencyKind: input.dependencyKind,
+          },
+        ),
+      );
+    }
+    const target = await resolveManagedDependencySingleServerTarget({
+      context,
+      serverRepository: this.options.serverRepository,
+      serverId: backupHandle.serverId,
+      operation: "dependency-resources.backup.restore",
+    });
+    if (target.isErr()) {
+      return err(target.error);
+    }
+    const path = dockerManagedDependencyBackupPath(backupHandle);
+    const command =
+      backupHandle.kind === "postgres"
+        ? [
+            "set -eu",
+            `test -f ${shellQuotePath(path)}`,
+            `cat ${shellQuotePath(path)} | docker exec -i ${shellQuote(
+              backupHandle.containerName,
+            )} sh -lc ${shellQuote(
+              'PGPASSWORD="$POSTGRES_PASSWORD" pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists',
+            )}`,
+          ].join("\n")
+        : [
+            "set -eu",
+            `test -f ${shellQuotePath(path)}`,
+            `docker stop ${shellQuote(backupHandle.containerName)} >/dev/null`,
+            `docker cp ${shellQuotePath(path)} ${shellQuote(
+              `${backupHandle.containerName}:/data/dump.rdb`,
+            )}`,
+            `docker start ${shellQuote(backupHandle.containerName)} >/dev/null`,
+          ].join("\n");
+    const executed = await runManagedDependencyTargetCommand(target.value, command);
+    if (executed.exitCode !== 0) {
+      return managedDependencyDockerCommandFailure({
+        message: "Docker-backed dependency restore failed",
+        providerKey: input.providerKey,
+        operation: "dependency-resources.backup.restore",
+        exitCode: executed.exitCode,
+      });
+    }
     return ok({ completedAt: input.requestedAt });
   }
 
@@ -2759,6 +3049,7 @@ export function registerApplicationServices(
       return new ShellDependencyResourceBackupProvider(input.dataDir, {
         ...(dependencyResourceSecretStore ? { dependencyResourceSecretStore } : {}),
         nativeCommandRunner: new BunDependencyResourceNativeCommandRunner(),
+        serverRepository: dependencyContainer.resolve(tokens.serverRepository),
       });
     }),
   });

@@ -112,7 +112,7 @@ The workflow lets operators:
 | Rename dependency resource | `dependency-resources.rename` | Dependency resource name/slug | Bindings, backup metadata, provider state, runtime, snapshots |
 | Delete dependency resource | `dependency-resources.delete` | Dependency resource lifecycle/tombstone | External/provider database, bindings, backup data, runtime cleanup |
 | Create dependency resource backup | `dependency-resources.create-backup` | `DependencyResourceBackup` attempt/restore point | Resource bindings, dependency resource lifecycle, runtime, deployment snapshots |
-| Restore dependency resource backup | `dependency-resources.restore-backup` | Restore attempt and provider data behind dependency resource | Resource bindings, deployment rollback/redeploy, runtime restart, snapshots |
+| Restore dependency resource backup | `dependency-resources.restore-backup` | Restore attempt and provider data behind the backup owner or explicitly selected ready same-kind target in the same context | Resource bindings, deployment rollback/redeploy, runtime restart, snapshots |
 | List dependency resource backups | `dependency-resources.list-backups` | Nothing | Any aggregate, provider, runtime, or deployment state |
 | Show dependency resource backup | `dependency-resources.show-backup` | Nothing | Any aggregate, provider, runtime, or deployment state |
 | Bind dependency to Resource | `resources.bind-dependency` | ResourceBinding | Provider database, ResourceInstance lifecycle, runtime, historical deployment snapshots |

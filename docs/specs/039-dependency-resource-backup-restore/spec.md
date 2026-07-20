@@ -50,7 +50,7 @@ only through `DependencyResourceSecretStore`.
 | Term | Meaning | Context |
 | --- | --- | --- |
 | DependencyResourceBackup | Durable backup attempt and restore point record for one dependency resource. | Dependency Resources |
-| RestorePoint | A ready safe provider artifact handle that can be restored in place to its owning dependency resource. | Dependency Resources |
+| RestorePoint | A ready safe provider artifact handle that can be restored to its owner or an admitted ready same-kind target. | Dependency Resources |
 | BackupAttempt | Durable provider backup execution attempt. | Dependency Resources |
 | RestoreAttempt | Durable provider restore execution attempt from a restore point. | Dependency Resources |
 | BackupRetention | Safe retention metadata that blocks dependency resource deletion while preservation is required. | Dependency Resources |
@@ -73,6 +73,7 @@ only through `DependencyResourceSecretStore`.
 | DEP-RES-BACKUP-011 | Backup Docker-backed managed Postgres/Redis | Ready Appaloft-managed Docker-backed Postgres or Redis has a safe provider handle and resolvable connection secret | `dependency-resources.create-backup` is admitted | Shell provider executes `pg_dump` or Redis `SAVE`/`docker cp` on the owning single-server target, returns a safe provider artifact handle, and exposes no raw dump path or secret in read models. |
 | DEP-RES-BACKUP-012 | Restore Docker-backed managed Postgres/Redis | Ready restore point belongs to the Docker-backed managed dependency resource and acknowledgements are supplied | `dependency-resources.restore-backup` is admitted | Shell provider resolves the same single-server target from the provider handle and restores the target-local artifact in place without restarting Appaloft workloads or rewriting deployment snapshots. |
 | DEP-RES-BACKUP-013 | Entrypoint contract is explicit | CLI/oRPC/HTTP expose backup/restore after Code Round | Operation catalog and transports are inspected | Commands/queries dispatch explicit messages, reuse application schemas, and expose no provider SDK shape, raw dump, or raw secret field. |
+| DEP-RES-BACKUP-014 | Restore into an existing target dependency | Ready Postgres restore point and a different ready Postgres target belong to the same project/environment; overwrite/runtime acknowledgements are supplied | `dependency-resources.restore-backup` supplies `targetDependencyResourceId` | The restore attempt records the target, the provider consumes the source artifact with the target's safe execution context, and no binding, snapshot, deployment, or runtime is changed. Kind/context mismatch, missing target, unsupported artifact transfer, or unusable target fails before provider execution. |
 
 ## Domain Ownership
 
@@ -101,7 +102,7 @@ only through `DependencyResourceSecretStore`.
   - `appaloft dependency backup create <dependencyResourceId>`
   - `appaloft dependency backup list <dependencyResourceId>`
   - `appaloft dependency backup show <backupId>`
-  - `appaloft dependency backup restore <backupId>`
+  - `appaloft dependency backup restore <backupId> [--target-dependency <dependencyResourceId>]`
 - Web/UI: Resource detail dependency backup/restore controls can create backup restore points,
   list safe restore point summaries, configure scheduled backup policy, and start acknowledged
   in-place restores through the active HTTP/oRPC contracts.

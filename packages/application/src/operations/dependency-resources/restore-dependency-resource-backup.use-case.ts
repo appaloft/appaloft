@@ -11,6 +11,7 @@ import {
   OccurredAt,
   ok,
   ResourceInstanceByIdSpec,
+  ResourceInstanceId,
   type Result,
   safeTry,
   UpsertDependencyResourceBackupSpec,
@@ -115,7 +116,21 @@ export class RestoreDependencyResourceBackupUseCase {
           domainError.notFound("dependency_resource", backupState.dependencyResourceId.value),
         );
       }
-      yield* dependencyResource.ensureCanRestoreBackup();
+      const targetDependencyResourceId = input.targetDependencyResourceId
+        ? yield* ResourceInstanceId.create(input.targetDependencyResourceId)
+        : backupState.dependencyResourceId;
+      const targetDependencyResource = targetDependencyResourceId.equals(
+        backupState.dependencyResourceId,
+      )
+        ? dependencyResource
+        : await dependencyResourceRepository.findOne(
+            repositoryContext,
+            ResourceInstanceByIdSpec.create(targetDependencyResourceId),
+          );
+      if (!targetDependencyResource) {
+        return err(domainError.notFound("dependency_resource", targetDependencyResourceId.value));
+      }
+      yield* targetDependencyResource.ensureCanReceiveRestoreFrom(dependencyResource);
       const providerArtifactHandle = backupState.providerArtifactHandle
         ? DependencyResourceProviderArtifactHandle.rehydrate(
             backupState.providerArtifactHandle.value,
@@ -140,7 +155,10 @@ export class RestoreDependencyResourceBackupUseCase {
         );
       }
       if (
-        !dependencyResourceBackupProvider.supports(backupState.providerKey.value, dependencyKind)
+        !dependencyResourceBackupProvider.supports(
+          targetDependencyResource.toState().providerKey.value,
+          dependencyKind,
+        )
       ) {
         return err(
           domainError.providerCapabilityUnsupported(
@@ -148,15 +166,15 @@ export class RestoreDependencyResourceBackupUseCase {
             {
               phase: "dependency-resource-restore-admission",
               backupId: backupId.value,
-              dependencyResourceId: backupState.dependencyResourceId.value,
+              dependencyResourceId: targetDependencyResourceId.value,
               dependencyKind,
-              providerKey: backupState.providerKey.value,
+              providerKey: targetDependencyResource.toState().providerKey.value,
               operation: "dependency-resources.restore-backup",
             },
           ),
         );
       }
-      const dependencyState = dependencyResource.toState();
+      const dependencyState = targetDependencyResource.toState();
       const connectionSecretValue =
         dependencyState.connectionSecretRef &&
         isAppaloftOwnedDependencySecretRef(dependencyState.connectionSecretRef.value)
@@ -172,7 +190,11 @@ export class RestoreDependencyResourceBackupUseCase {
         idGenerator.next("dra"),
       );
       const requestedAt = yield* OccurredAt.create(clock.now());
-      yield* backup.startRestore({ attemptId: restoreAttemptId, requestedAt });
+      yield* backup.startRestore({
+        attemptId: restoreAttemptId,
+        requestedAt,
+        ...(input.targetDependencyResourceId ? { targetDependencyResourceId } : {}),
+      });
       await dependencyResourceBackupRepository.upsert(
         repositoryContext,
         backup,
@@ -206,9 +228,15 @@ export class RestoreDependencyResourceBackupUseCase {
       const providerConnection = dependencyResourceProviderConnectionContext(dependencyState);
       const providerResult = await dependencyResourceBackupProvider.restoreBackup(context, {
         backupId: backupId.value,
-        dependencyResourceId: backupState.dependencyResourceId.value,
+        dependencyResourceId: targetDependencyResourceId.value,
+        ...(input.targetDependencyResourceId
+          ? { sourceDependencyResourceId: backupState.dependencyResourceId.value }
+          : {}),
         dependencyKind,
-        providerKey: backupState.providerKey.value,
+        providerKey: dependencyState.providerKey.value,
+        ...(input.targetDependencyResourceId
+          ? { sourceProviderKey: backupState.providerKey.value }
+          : {}),
         providerArtifactHandle: providerArtifactHandle.value,
         ...(providerResourceHandle ? { providerResourceHandle } : {}),
         ...(providerConnection ? { connection: providerConnection } : {}),
@@ -319,6 +347,9 @@ async function claimRestoreProcessAttempt(input: {
       dependencyKind: state.dependencyKind.value,
       providerKey: state.providerKey.value,
       restoreAttemptId: restore.attemptId.value,
+      ...(restore.targetDependencyResourceId
+        ? { targetDependencyResourceId: restore.targetDependencyResourceId.value }
+        : {}),
     },
   });
   if (recorded.isErr()) {
@@ -335,6 +366,9 @@ async function claimRestoreProcessAttempt(input: {
       dependencyKind: state.dependencyKind.value,
       providerKey: state.providerKey.value,
       restoreAttemptId: restore.attemptId.value,
+      ...(restore.targetDependencyResourceId
+        ? { targetDependencyResourceId: restore.targetDependencyResourceId.value }
+        : {}),
     },
   });
   if (claimed.isErr()) {
@@ -389,6 +423,9 @@ async function completeRestoreProcessAttempt(input: {
       dependencyKind: state.dependencyKind.value,
       providerKey: state.providerKey.value,
       restoreAttemptId: restore.attemptId.value,
+      ...(restore.targetDependencyResourceId
+        ? { targetDependencyResourceId: restore.targetDependencyResourceId.value }
+        : {}),
     },
   });
   if (completed.isErr()) {
@@ -460,6 +497,9 @@ async function recordRestoreProcessAttempt(input: {
       dependencyKind: state.dependencyKind.value,
       providerKey: state.providerKey.value,
       restoreAttemptId: restore.attemptId.value,
+      ...(restore.targetDependencyResourceId
+        ? { targetDependencyResourceId: restore.targetDependencyResourceId.value }
+        : {}),
     },
   });
 

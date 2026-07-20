@@ -1062,6 +1062,48 @@ export class ResourceInstance extends AggregateRoot<ResourceInstanceState> {
     return ok(undefined);
   }
 
+  ensureCanReceiveRestoreFrom(source: ResourceInstance): Result<void> {
+    const readiness = this.ensureCanRestoreBackup();
+    if (readiness.isErr()) {
+      return readiness;
+    }
+    const sourceState = source.toState();
+    if (
+      !this.state.projectId ||
+      !this.state.environmentId ||
+      !sourceState.projectId ||
+      !sourceState.environmentId ||
+      !this.state.projectId.equals(sourceState.projectId) ||
+      !this.state.environmentId.equals(sourceState.environmentId)
+    ) {
+      return err(
+        domainError.resourceContextMismatch(
+          "Restore target must belong to the backup owner's project and environment",
+          {
+            phase: "dependency-resource-restore-admission",
+            sourceDependencyResourceId: sourceState.id.value,
+            targetDependencyResourceId: this.state.id.value,
+          },
+        ),
+      );
+    }
+    if (this.state.kind.value !== sourceState.kind.value) {
+      return err(
+        domainError.dependencyResourceRestoreBlocked(
+          "Restore target kind must match the backup dependency kind",
+          {
+            phase: "dependency-resource-restore-admission",
+            sourceDependencyResourceId: sourceState.id.value,
+            targetDependencyResourceId: this.state.id.value,
+            sourceKind: sourceState.kind.value,
+            targetKind: this.state.kind.value,
+          },
+        ),
+      );
+    }
+    return ok(undefined);
+  }
+
   delete(input: {
     deletedAt: DeletedAt;
     blockers: DependencyResourceDeleteBlockerState[];

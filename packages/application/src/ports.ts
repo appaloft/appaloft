@@ -3753,6 +3753,7 @@ export interface DependencyResourceRestoreAttemptSummary {
   attemptId: string;
   status: "pending" | "completed" | "failed";
   requestedAt: string;
+  targetDependencyResourceId?: string;
   completedAt?: string;
   failedAt?: string;
   failureCode?: string;
@@ -9534,8 +9535,10 @@ export interface DependencyResourceBackupProviderResult {
 export interface DependencyResourceRestoreProviderInput {
   backupId: string;
   dependencyResourceId: string;
+  sourceDependencyResourceId?: string;
   dependencyKind: DependencyResourceKind;
   providerKey: string;
+  sourceProviderKey?: string;
   providerArtifactHandle: string;
   providerResourceHandle?: string;
   connectionSecretValue?: string;

@@ -1999,6 +1999,12 @@ function memoryBackupSummary(backup: DependencyResourceBackup): DependencyResour
             attemptId: state.latestRestoreAttempt.attemptId.value,
             status: state.latestRestoreAttempt.status.value,
             requestedAt: state.latestRestoreAttempt.requestedAt.value,
+            ...(state.latestRestoreAttempt.targetDependencyResourceId
+              ? {
+                  targetDependencyResourceId:
+                    state.latestRestoreAttempt.targetDependencyResourceId.value,
+                }
+              : {}),
             ...(state.latestRestoreAttempt.completedAt
               ? { completedAt: state.latestRestoreAttempt.completedAt.value }
               : {}),

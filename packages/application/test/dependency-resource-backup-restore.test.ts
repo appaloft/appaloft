@@ -57,6 +57,7 @@ import {
 import {
   CreateDependencyResourceBackupUseCase,
   DeleteDependencyResourceUseCase,
+  ImportDependencyResourceUseCase,
   ListDependencyResourceBackupsQueryService,
   ProvisionDependencyResourceUseCase,
   RestoreDependencyResourceBackupUseCase,
@@ -241,6 +242,16 @@ async function createHarness() {
     ),
     dependencyResources,
     eventBus,
+    importDependencyResource: new ImportDependencyResourceUseCase(
+      projects,
+      environments,
+      dependencyResources,
+      dependencyResourceSecretStore,
+      clock,
+      idGenerator,
+      eventBus,
+      logger,
+    ),
     listBackups: new ListDependencyResourceBackupsQueryService(backupReadModel, clock),
     provisionDependencyResource: provisionDependency,
     repositoryContext,
@@ -700,6 +711,72 @@ describe("dependency resource backup and restore use cases", () => {
         },
       },
     ]);
+  });
+
+  test("[DEP-RES-BACKUP-014] restores a ready Postgres backup into a selected target", async () => {
+    const {
+      backupProvider,
+      context,
+      createBackup,
+      importDependencyResource,
+      provisionDependencyResource,
+      restoreBackup,
+      showBackup,
+    } = await createHarness();
+    const sourceDependencyResourceId = (
+      await provisionDependencyResource.execute(context, {
+        kind: "postgres",
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        name: "Source DB",
+      })
+    )._unsafeUnwrap().id;
+    const targetDependencyResourceId = (
+      await importDependencyResource.execute(context, {
+        kind: "postgres",
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        name: "Supabase",
+        connectionUrl: "postgres://app:target-secret@db.example.com:5432/postgres?sslmode=require",
+      })
+    )._unsafeUnwrap().id;
+    const backupId = (
+      await createBackup.execute(context, { dependencyResourceId: sourceDependencyResourceId })
+    )._unsafeUnwrap().id;
+
+    const result = await restoreBackup.execute(context, {
+      backupId,
+      targetDependencyResourceId,
+      acknowledgeDataOverwrite: true,
+      acknowledgeRuntimeNotRestarted: true,
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(backupProvider.restores).toContainEqual(
+      expect.objectContaining({
+        backupId,
+        dependencyResourceId: targetDependencyResourceId,
+        sourceDependencyResourceId,
+        sourceProviderKey: "appaloft-managed-postgres",
+        providerKey: "external-postgres",
+        connection: expect.objectContaining({
+          host: "db.example.com",
+          port: 5432,
+          databaseName: "postgres",
+        }),
+        connectionSecretValue:
+          "postgres://app:target-secret@db.example.com:5432/postgres?sslmode=require",
+      }),
+    );
+    const shown = await showBackup.execute(
+      context,
+      ShowDependencyResourceBackupQuery.create({ backupId })._unsafeUnwrap(),
+    );
+    expect(shown._unsafeUnwrap().backup.latestRestoreAttempt).toMatchObject({
+      attemptId: result._unsafeUnwrap().id,
+      status: "completed",
+      targetDependencyResourceId,
+    });
   });
 
   test("[DEP-RES-BACKUP-008] [PROC-DELIVERY-004] records provider restore failure safely", async () => {

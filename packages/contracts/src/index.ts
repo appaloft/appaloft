@@ -4177,6 +4177,7 @@ export const dependencyResourceRestoreAttemptSummarySchema = z.object({
   attemptId: z.string(),
   status: z.enum(["pending", "completed", "failed"]),
   requestedAt: z.string(),
+  targetDependencyResourceId: z.string().optional(),
   completedAt: z.string().optional(),
   failedAt: z.string().optional(),
   failureCode: z.string().optional(),
