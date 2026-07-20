@@ -326,9 +326,13 @@ export interface SerializedRuntimeExecutionPlan extends Record<string, unknown> 
     proxyKind: EdgeProxyKindInput;
     domains: string[];
     pathPrefix: string;
+    pathHandling?: "preserve" | "strip";
     tlsMode: TlsModeInput;
     targetPort?: number;
     targetServiceName?: string;
+    routeBehavior?: "serve" | "redirect";
+    redirectTo?: string;
+    redirectStatus?: 301 | 302 | 307 | 308;
   }>;
   verificationSteps?: Array<{
     kind: "internal-http" | "public-http";
@@ -794,9 +798,13 @@ export function serializeRuntimePlan(plan: RuntimePlanType): SerializedRuntimePl
               proxyKind: route.proxyKind,
               domains: route.domains,
               pathPrefix: route.pathPrefix,
+              pathHandling: route.pathHandling,
               tlsMode: route.tlsMode,
               ...(typeof route.targetPort === "number" ? { targetPort: route.targetPort } : {}),
               ...(route.targetServiceName ? { targetServiceName: route.targetServiceName } : {}),
+              routeBehavior: route.routeBehavior,
+              ...(route.redirectTo ? { redirectTo: route.redirectTo } : {}),
+              ...(route.redirectStatus ? { redirectStatus: route.redirectStatus } : {}),
             })),
           }
         : {}),
@@ -874,12 +882,21 @@ export function rehydrateRuntimePlan(raw: unknown): RuntimePlan {
                 proxyKind: EdgeProxyKindValue.rehydrate(route.proxyKind),
                 domains: route.domains.map((domain) => PublicDomainName.rehydrate(domain)),
                 pathPrefix: RoutePathPrefix.rehydrate(route.pathPrefix),
+                pathHandling: RoutePathHandlingValue.rehydrate(route.pathHandling ?? "preserve"),
                 tlsMode: TlsModeValue.rehydrate(route.tlsMode),
                 ...(typeof route.targetPort === "number"
                   ? { targetPort: PortNumber.rehydrate(route.targetPort) }
                   : {}),
                 ...(route.targetServiceName
                   ? { targetServiceName: ResourceServiceName.rehydrate(route.targetServiceName) }
+                  : {}),
+                ...(route.redirectTo
+                  ? { redirectTo: PublicDomainName.rehydrate(route.redirectTo) }
+                  : {}),
+                ...(route.redirectStatus
+                  ? {
+                      redirectStatus: CanonicalRedirectStatusCode.rehydrate(route.redirectStatus),
+                    }
                   : {}),
               }),
             ),
