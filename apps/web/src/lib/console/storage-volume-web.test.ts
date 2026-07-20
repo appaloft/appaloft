@@ -92,6 +92,9 @@ describe("storage volume Web console surface", () => {
     expect(storageBackupDialogSource).toContain('type="submit"');
     expect(storageBackupDialogSource).toContain('id="resource-storage-backup-data-format"');
     expect(storageBackupDialogSource).not.toContain("bind:value={storageBackupDataFormat}");
+    expect(storageBackupDialogSource).toContain("bind:value={storageBackupTargetProvider}");
+    expect(storageBackupDialogSource).toContain('<Select.Item value="local-filesystem">');
+    expect(storageBackupDialogSource).toContain('<Select.Item value="s3-compatible">');
     expect(resourceStorageSource).toContain("storageBackupLocalOnly");
     expect(resourceStorageSource).toContain("storageBackupCreateAction");
     expect(storageBackupDialogSource).toContain("storageBackupPlanAction");
