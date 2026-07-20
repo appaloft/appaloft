@@ -9,6 +9,11 @@ export const tokens = {
   logger: Symbol.for("appaloft.logger"),
   eventBus: Symbol.for("appaloft.event_bus"),
   controlPlaneSecretProtector: Symbol.for("appaloft.control_plane_secret_protector"),
+  controlPlanePortabilityPort: Symbol.for("appaloft.control_plane_portability_port"),
+  controlPlanePortabilityService: Symbol.for("appaloft.control_plane_portability_service"),
+  tunnelSessionRepository: Symbol.for("appaloft.tunnel_session_repository"),
+  tunnelProviderRegistry: Symbol.for("appaloft.tunnel_provider_registry"),
+  tunnelSessionService: Symbol.for("appaloft.tunnel_session_service"),
   controlPlaneSecretRotationPort: Symbol.for("appaloft.control_plane_secret_rotation_port"),
   controlPlaneSecretRotationPlanQueryService: Symbol.for(
     "appaloft.control_plane_secret_rotation_plan_query_service",
@@ -86,6 +91,22 @@ export const tokens = {
   ),
   dependencyResourceBackupPolicyReadModel: Symbol.for(
     "appaloft.dependency_resource_backup_policy_read_model",
+  ),
+  storageVolumeBackupPolicyRepository: Symbol.for(
+    "appaloft.storage_volume_backup_policy_repository",
+  ),
+  backupAutomationNotificationPort: Symbol.for("appaloft.backup_automation_notification_port"),
+  storageVolumeBackupAutomationService: Symbol.for(
+    "appaloft.storage_volume_backup_automation_service",
+  ),
+  configureStorageVolumeBackupPolicyUseCase: Symbol.for(
+    "appaloft.configure_storage_volume_backup_policy_use_case",
+  ),
+  listStorageVolumeBackupPoliciesQueryService: Symbol.for(
+    "appaloft.list_storage_volume_backup_policies_query_service",
+  ),
+  showStorageVolumeBackupPolicyQueryService: Symbol.for(
+    "appaloft.show_storage_volume_backup_policy_query_service",
   ),
   previewEnvironmentRepository: Symbol.for("appaloft.preview_environment_repository"),
   previewPolicyRepository: Symbol.for("appaloft.preview_policy_repository"),

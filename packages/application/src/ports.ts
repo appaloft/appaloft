@@ -279,10 +279,12 @@ export type MaintenanceWorkerKey =
   | "durable-worker-runtime"
   | "preview-expiry-cleanup-scheduler"
   | "preview-cleanup-retry-scheduler"
+  | "scheduled-storage-volume-backup-runner"
   | "scheduled-task-runner"
   | "scheduled-runtime-prune-runner"
   | "scheduled-history-retention-runner"
-  | "runtime-monitoring-collector-runner";
+  | "runtime-monitoring-collector-runner"
+  | "tunnel-session-reconciler";
 
 export type MaintenanceWorkerActivation =
   | "disabled-by-config"
@@ -297,6 +299,8 @@ export type MaintenanceWorkerSafetyMode =
   | "runtime-execution"
   | "policy-gated-prune"
   | "policy-gated-retention"
+  | "policy-gated-backup"
+  | "tunnel-session-cleanup"
   | "read-only-collection";
 
 export interface MaintenanceWorkerRuntimeTopology {

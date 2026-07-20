@@ -87,6 +87,20 @@ describe("ConfigMaintenanceWorkerStatusReader", () => {
         operationKeys: ["preview-environments.delete", "deployments.cleanup-preview"],
       },
       {
+        key: "scheduled-storage-volume-backup-runner",
+        enabled: false,
+        activation: "disabled-by-config",
+        intervalSeconds: 300,
+        batchSize: 25,
+        safetyMode: "policy-gated-backup",
+        configurationKeys: [
+          "APPALOFT_SCHEDULED_STORAGE_VOLUME_BACKUP_RUNNER_ENABLED",
+          "APPALOFT_SCHEDULED_STORAGE_VOLUME_BACKUP_RUNNER_INTERVAL_SECONDS",
+          "APPALOFT_SCHEDULED_STORAGE_VOLUME_BACKUP_RUNNER_BATCH_SIZE",
+        ],
+        operationKeys: ["storage-volumes.create-backup", "storage-volumes.prune-backups"],
+      },
+      {
         key: "scheduled-task-runner",
         enabled: false,
         activation: "disabled-by-config",
@@ -125,6 +139,20 @@ describe("ConfigMaintenanceWorkerStatusReader", () => {
           "APPALOFT_SCHEDULED_HISTORY_RETENTION_RUNNER_INTERVAL_SECONDS",
           "APPALOFT_SCHEDULED_HISTORY_RETENTION_RUNNER_BATCH_SIZE",
         ],
+      },
+      {
+        key: "tunnel-session-reconciler",
+        enabled: false,
+        activation: "disabled-by-config",
+        intervalSeconds: 60,
+        batchSize: 100,
+        safetyMode: "tunnel-session-cleanup",
+        configurationKeys: [
+          "APPALOFT_TUNNEL_RECONCILER_ENABLED",
+          "APPALOFT_TUNNEL_RECONCILE_INTERVAL_SECONDS",
+          "APPALOFT_TUNNEL_RECONCILE_BATCH_SIZE",
+        ],
+        operationKeys: ["tunnels.list", "tunnels.show", "tunnels.revoke"],
       },
       {
         key: "runtime-monitoring-collector-runner",
@@ -336,6 +364,12 @@ describe("ConfigMaintenanceWorkerStatusReader", () => {
           APPALOFT_SCHEDULED_TASK_RUNNER_ENABLED: "true",
           APPALOFT_SCHEDULED_TASK_RUNNER_INTERVAL_SECONDS: "15",
           APPALOFT_SCHEDULED_TASK_RUNNER_BATCH_SIZE: "3",
+          APPALOFT_SCHEDULED_STORAGE_VOLUME_BACKUP_RUNNER_ENABLED: "true",
+          APPALOFT_SCHEDULED_STORAGE_VOLUME_BACKUP_RUNNER_INTERVAL_SECONDS: "30",
+          APPALOFT_SCHEDULED_STORAGE_VOLUME_BACKUP_RUNNER_BATCH_SIZE: "2",
+          APPALOFT_TUNNEL_RECONCILER_ENABLED: "true",
+          APPALOFT_TUNNEL_RECONCILE_INTERVAL_SECONDS: "20",
+          APPALOFT_TUNNEL_RECONCILE_BATCH_SIZE: "10",
           APPALOFT_RUNTIME_MONITORING_COLLECTOR_RUNNER_ENABLED: "true",
           APPALOFT_RUNTIME_MONITORING_COLLECTOR_RUNNER_INTERVAL_SECONDS: "90",
           APPALOFT_RUNTIME_MONITORING_COLLECTOR_RUNNER_BATCH_SIZE: "4",
@@ -381,6 +415,18 @@ describe("ConfigMaintenanceWorkerStatusReader", () => {
         "APPALOFT_SCHEDULED_TASK_RUNNER_INTERVAL_SECONDS",
         "APPALOFT_SCHEDULED_TASK_RUNNER_BATCH_SIZE",
       ],
+    });
+    expect(statuses.get("scheduled-storage-volume-backup-runner")).toMatchObject({
+      enabled: true,
+      activation: "starts-with-backend-service",
+      intervalSeconds: 30,
+      batchSize: 2,
+    });
+    expect(statuses.get("tunnel-session-reconciler")).toMatchObject({
+      enabled: true,
+      activation: "starts-with-backend-service",
+      intervalSeconds: 20,
+      batchSize: 10,
     });
     expect(statuses.get("runtime-monitoring-collector-runner")).toMatchObject({
       enabled: true,

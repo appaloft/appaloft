@@ -87,6 +87,7 @@ const remoteCapableTopLevelCommands = new Set([
   "env",
   "github",
   "infrastructure",
+  "instance",
   "logs",
   "operator-work",
   "organization",
@@ -106,6 +107,7 @@ const remoteCapableTopLevelCommands = new Set([
   "static-artifacts",
   "storage",
   "terminal-session",
+  "tunnel",
   "upgrade",
   "work",
 ]);

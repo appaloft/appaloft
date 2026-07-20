@@ -95,6 +95,18 @@ function testConfig(
       intervalSeconds: 3600,
       batchSize: 25,
     },
+    scheduledStorageVolumeBackupRunner: {
+      enabled: false,
+      intervalSeconds: 300,
+      batchSize: 25,
+    },
+    tunnelSessions: {
+      reconcilerEnabled: false,
+      reconcileIntervalSeconds: 60,
+      reconcileBatchSize: 100,
+      cloudflareExecutable: "cloudflared",
+      ngrokExecutable: "ngrok",
+    },
     scheduledHistoryRetentionRunner: {
       enabled: false,
       intervalSeconds: 3600,

@@ -25,6 +25,9 @@ relatedOperations:
   - storage-volumes.restore-plan
   - storage-volumes.restore-backup
   - storage-volumes.prune-backups
+  - storage-volumes.backup-policies.configure
+  - storage-volumes.backup-policies.list
+  - storage-volumes.backup-policies.show
   - resources.attach-storage
   - resources.detach-storage
 sidebar:
@@ -158,6 +161,36 @@ appaloft storage volume backup restore-plan svb_123
 appaloft storage volume backup restore svb_123 --restored-volume-name pb-data-restored
 appaloft storage volume backup prune svb_123
 ```
+
+Automate the same safe plan/create/verify/prune chain with a policy. Scheduled policies are claimed
+with a lease so multiple backend replicas do not run the same due backup concurrently. Pre-deploy
+policies run after deployment admission checks but before deployment state is created; `block`
+prevents the deployment when backup fails, while `continue` records and notifies the failure.
+
+```bash title="Configure scheduled and pre-deploy backup"
+appaloft storage volume backup policy configure \
+  --storage-volume vol_uploads \
+  --scheduled true \
+  --pre-deploy true \
+  --schedule-interval-hours 24 \
+  --failure-mode block \
+  --retry-on-failure true \
+  --notification-ref conn_ops \
+  --target-provider s3-compatible \
+  --target-ref s3://backups/appaloft/vol_uploads \
+  --secret-ref sec_s3_backup \
+  --retention-max-count 14 \
+  --retention-max-age-days 30
+
+appaloft storage volume backup policy list --storage-volume vol_uploads
+appaloft storage volume backup policy show svbp_123
+```
+
+The scheduler verifies the created artifact checksum before applying count, age, and byte retention.
+Failed attempts remain visible on the policy and may emit through the configured connector. Enable
+the worker with `APPALOFT_SCHEDULED_STORAGE_VOLUME_BACKUP_RUNNER_ENABLED=true`; its interval and
+claim batch are controlled by `APPALOFT_SCHEDULED_STORAGE_VOLUME_BACKUP_RUNNER_INTERVAL_SECONDS`
+and `APPALOFT_SCHEDULED_STORAGE_VOLUME_BACKUP_RUNNER_BATCH_SIZE`.
 
 Restore defaults to a new StorageVolume. Attaching that restored volume back to a Resource, or
 switching an existing mount, is a separate explicit operator action. A local filesystem target is

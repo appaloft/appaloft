@@ -79,6 +79,7 @@
     "smoke:storage-backup:docker": "APPALOFT_E2E_STORAGE_BACKUP_DOCKER=true bun test --timeout=300000 packages/adapters/runtime/test/storage-volume-backup-provider.test.ts",
     "smoke:storage-backup:ssh": "bun run smoke:ssh:preflight && APPALOFT_E2E_SSH_STORAGE_BACKUP_DOCKER=true bun test --timeout=300000 packages/adapters/runtime/test/storage-volume-backup-provider.test.ts",
     "smoke:storage-backup": "bun run smoke:storage-backup:docker && bun run smoke:storage-backup:ssh",
+    "smoke:tunnel:cloudflare": "APPALOFT_E2E_TUNNEL_CLOUDFLARE=true bun test --timeout=120000 packages/adapters/runtime/test/tunnel-provider.real-cloudflare.test.ts",
     "smoke:runtime-usage:docker": "APPALOFT_RUNTIME_USAGE_DOCKER_SMOKE=1 bun test --timeout=300000 packages/adapters/runtime/test/runtime-usage-smoke.test.ts",
     "smoke:runtime-usage:ssh": "bun run smoke:ssh:preflight && APPALOFT_RUNTIME_USAGE_SSH_SMOKE=1 bun test --timeout=300000 packages/adapters/runtime/test/runtime-usage-smoke.test.ts",
     "smoke:runtime-usage": "bun run smoke:runtime-usage:docker && bun run smoke:runtime-usage:ssh",

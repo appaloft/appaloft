@@ -13,6 +13,7 @@
     OperatorWorkItem,
     SystemPluginWebExtension,
     TerminalSessionSummary,
+    TunnelSessionSummary,
   } from "@appaloft/contracts";
   import {
     Activity,
@@ -28,13 +29,14 @@
   } from "@lucide/svelte";
 
   import { readErrorMessage, request } from "$lib/api/client";
-  import { capabilities } from "$lib/capabilities";
+  import { capabilities, capabilityKey, type CapabilityQuery } from "$lib/capabilities";
   import ConsoleOrganizationSwitcher from "$lib/components/console/ConsoleOrganizationSwitcher.svelte";
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
   import SettingsShell from "$lib/components/console/SettingsShell.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import * as Dialog from "$lib/components/ui/dialog";
+  import { Input } from "$lib/components/ui/input";
   import { operatorWorkReadableFailure } from "$lib/console/blueprint-install-progress";
   import { webDocsHrefs } from "$lib/console/docs-help";
   import {
@@ -57,7 +59,7 @@
     title: string;
     detail: string;
   };
-  type InstanceSection = "overview" | "workers" | "maintenance" | "sessions" | "guidance";
+  type InstanceSection = "overview" | "workers" | "maintenance" | "sessions" | "tunnels" | "portability" | "guidance";
   type InstanceRuntimeTopology = NonNullable<MaintenanceWorkerStatus["runtimeTopology"]>;
   type Props = {
     section?: InstanceSection | null;
@@ -91,6 +93,15 @@
   let terminalSessionCloseDialogOpen = $state(false);
   let terminalSessionsExpireDialogOpen = $state(false);
   let selectedTerminalSessionId = $state("");
+  let tunnelProviderKey = $state<"cloudflare-quick" | "ngrok">("cloudflare-quick");
+  let tunnelOriginUrl = $state("http://127.0.0.1:3000");
+  let tunnelDurationMinutes = $state("60");
+  let tunnelFeedback = $state<{ kind: "success" | "error"; detail: string } | null>(null);
+  let portabilityPassphrase = $state("");
+  let portabilityEnvelope = $state("");
+  let portabilityMode = $state<"merge" | "replace">("merge");
+  let portabilityAcknowledgeReplace = $state(false);
+  let portabilityFeedback = $state<{ kind: "success" | "error"; detail: string } | null>(null);
   let { section = null }: Props = $props();
   const activeSection = $derived.by<InstanceSection>(() => {
     if (section) {
@@ -106,6 +117,12 @@
     if (page.url.pathname.endsWith("/sessions")) {
       return "sessions";
     }
+    if (page.url.pathname.endsWith("/tunnels")) {
+      return "tunnels";
+    }
+    if (page.url.pathname.endsWith("/portability")) {
+      return "portability";
+    }
     if (page.url.pathname.endsWith("/guidance")) {
       return "guidance";
     }
@@ -115,6 +132,13 @@
   const selectedWorkId = $derived(page.url.searchParams.get("workId") ?? "");
   const instanceAccessAllowed = $derived(
     $capabilities.capabilities[instanceAccessCapabilityKey]?.allowed === true,
+  );
+  const tunnelStartCapabilityQuery = {
+    operationKey: "tunnels.start",
+  } satisfies CapabilityQuery;
+  const tunnelStartCapabilityKey = capabilityKey(tunnelStartCapabilityQuery);
+  const tunnelStartAllowed = $derived(
+    $capabilities.capabilities[tunnelStartCapabilityKey]?.allowed === true,
   );
   const webExtensionsQuery = createQuery(() =>
     queryOptions({
@@ -197,6 +221,108 @@
       retry: 0,
     }),
   );
+  const tunnelSessionsQuery = createQuery(() =>
+    orpc.tunnels.list.queryOptions({
+      input: {},
+      enabled: browser && instanceAccessAllowed && activeSection === "tunnels",
+      staleTime: 5_000,
+      refetchInterval: 10_000,
+      retry: 0,
+    }),
+  );
+  const startTunnelMutation = createMutation(() => ({
+    mutationFn: () => orpcClient.tunnels.start({
+      providerKey: tunnelProviderKey,
+      originUrl: tunnelOriginUrl.trim(),
+      durationMinutes: Number(tunnelDurationMinutes),
+    }),
+    onSuccess: (result) => {
+      tunnelFeedback = { kind: "success", detail: result.session.publicUrl ?? result.session.id };
+      void queryClient.invalidateQueries({ queryKey: orpc.tunnels.key({ type: "query" }) });
+    },
+    onError: (error) => {
+      tunnelFeedback = { kind: "error", detail: readErrorMessage(error) };
+      void queryClient.invalidateQueries({ queryKey: orpc.tunnels.key({ type: "query" }) });
+    },
+  }));
+  const revokeTunnelMutation = createMutation(() => ({
+    mutationFn: (session: TunnelSessionSummary) => orpcClient.tunnels.revoke({ sessionId: session.id }),
+    onSuccess: (result) => {
+      tunnelFeedback = { kind: "success", detail: result.session.id };
+      void queryClient.invalidateQueries({ queryKey: orpc.tunnels.key({ type: "query" }) });
+    },
+    onError: (error) => {
+      tunnelFeedback = { kind: "error", detail: readErrorMessage(error) };
+    },
+  }));
+  const portabilityExportPlanQuery = createQuery(() =>
+    orpc.controlPlanePortability.exportPlan.queryOptions({
+      input: {},
+      enabled: browser && instanceAccessAllowed && activeSection === "portability",
+      retry: 0,
+      staleTime: 30_000,
+    }),
+  );
+  const portabilityArtifactsQuery = createQuery(() =>
+    orpc.controlPlanePortability.artifacts.list.queryOptions({
+      input: {},
+      enabled: browser && instanceAccessAllowed && activeSection === "portability",
+      retry: 0,
+      staleTime: 10_000,
+    }),
+  );
+  const portabilityExportMutation = createMutation(() => ({
+    mutationFn: () => orpcClient.controlPlanePortability.export({ passphrase: portabilityPassphrase }),
+    onSuccess: (result) => {
+      const url = URL.createObjectURL(new Blob([result.encryptedEnvelope], { type: "application/json" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${result.artifact.id}.appaloft-portability.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+      portabilityPassphrase = "";
+      portabilityFeedback = { kind: "success", detail: result.artifact.id };
+      void queryClient.invalidateQueries({ queryKey: orpc.controlPlanePortability.artifacts.key({ type: "query" }) });
+    },
+    onError: (error) => {
+      portabilityFeedback = { kind: "error", detail: readErrorMessage(error) };
+    },
+  }));
+  const portabilityImportPlanMutation = createMutation(() => ({
+    mutationFn: () => orpcClient.controlPlanePortability.importPlan({
+      encryptedEnvelope: portabilityEnvelope,
+      passphrase: portabilityPassphrase,
+      mode: portabilityMode,
+    }),
+    onError: (error) => {
+      portabilityFeedback = { kind: "error", detail: readErrorMessage(error) };
+    },
+  }));
+  const portabilityImportMutation = createMutation(() => ({
+    mutationFn: () => orpcClient.controlPlanePortability.import({
+      encryptedEnvelope: portabilityEnvelope,
+      passphrase: portabilityPassphrase,
+      mode: portabilityMode,
+      acknowledgeReplace: portabilityMode === "replace" && portabilityAcknowledgeReplace,
+    }),
+    onSuccess: (result) => {
+      portabilityPassphrase = "";
+      portabilityFeedback = { kind: "success", detail: result.rollbackArtifactId };
+      void queryClient.invalidateQueries({ queryKey: orpc.controlPlanePortability.artifacts.key({ type: "query" }) });
+    },
+    onError: (error) => {
+      portabilityFeedback = { kind: "error", detail: readErrorMessage(error) };
+    },
+  }));
+  const portabilityDeleteMutation = createMutation(() => ({
+    mutationFn: (artifactId: string) => orpcClient.controlPlanePortability.artifacts.delete({ artifactId }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: orpc.controlPlanePortability.artifacts.key({ type: "query" }) });
+    },
+    onError: (error) => {
+      portabilityFeedback = { kind: "error", detail: readErrorMessage(error) };
+    },
+  }));
   const applyUpgradeMutation = createMutation(() => ({
     mutationFn: () =>
       request<InstanceUpgradeApplyResponse>("/api/instance-upgrade/apply", {
@@ -304,6 +430,12 @@
   });
 
   $effect(() => {
+    if (browser && instanceAccessAllowed && activeSection === "tunnels") {
+      void capabilities.fetch([tunnelStartCapabilityQuery]);
+    }
+  });
+
+  $effect(() => {
     if (browser && instanceAccessChecked && !instanceAccessAllowed && !instanceAccessRedirected) {
       instanceAccessRedirected = true;
       void goto("/");
@@ -365,6 +497,8 @@ server-config-deploy: true`);
       value === "workers" ||
       value === "maintenance" ||
       value === "sessions" ||
+      value === "tunnels" ||
+      value === "portability" ||
       value === "guidance"
     ) {
       return value;
@@ -381,6 +515,10 @@ server-config-deploy: true`);
         return "/instance/maintenance";
       case "sessions":
         return "/instance/sessions";
+      case "tunnels":
+        return "/instance/tunnels";
+      case "portability":
+        return "/instance/portability";
       case "guidance":
         return "/instance/guidance";
       case "overview":
@@ -401,6 +539,22 @@ server-config-deploy: true`);
     }
 
     switchCurrentOrganizationMutation.mutate(organizationId);
+  }
+
+  async function readPortabilityArtifact(event: Event): Promise<void> {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    portabilityFeedback = null;
+    portabilityImportPlanMutation.reset();
+    if (!file) {
+      portabilityEnvelope = "";
+      return;
+    }
+    try {
+      portabilityEnvelope = await file.text();
+    } catch (error) {
+      portabilityFeedback = { kind: "error", detail: readErrorMessage(error) };
+    }
   }
 
   function navigateTo(path: string): void {
@@ -431,6 +585,8 @@ server-config-deploy: true`);
         return i18nKeys.console.instance.workerPreviewExpiryCleanup;
       case "scheduled-history-retention-runner":
         return i18nKeys.console.instance.workerScheduledHistoryRetention;
+      case "scheduled-storage-volume-backup-runner":
+        return i18nKeys.console.instance.workerScheduledStorageVolumeBackup;
       case "scheduled-runtime-prune-runner":
         return i18nKeys.console.instance.workerScheduledRuntimePrune;
       case "scheduled-task-runner":
@@ -439,6 +595,8 @@ server-config-deploy: true`);
         return i18nKeys.console.instance.workerRuntimeMonitoringCollector;
       case "durable-worker-runtime":
         return i18nKeys.console.instance.workerDurableRuntime;
+      case "tunnel-session-reconciler":
+        return i18nKeys.console.instance.workerTunnelSessionReconciler;
     }
   }
 
@@ -466,12 +624,16 @@ server-config-deploy: true`);
         return i18nKeys.console.instance.workerSafetyPolicyGatedPrune;
       case "policy-gated-retention":
         return i18nKeys.console.instance.workerSafetyPolicyGatedRetention;
+      case "policy-gated-backup":
+        return i18nKeys.console.instance.workerSafetyPolicyGatedBackup;
       case "read-only-collection":
         return i18nKeys.console.instance.workerSafetyReadOnlyCollection;
       case "runtime-execution":
         return i18nKeys.console.instance.workerSafetyRuntimeExecution;
       case "durable-process-delivery":
         return i18nKeys.console.instance.workerSafetyDurableProcessDelivery;
+      case "tunnel-session-cleanup":
+        return i18nKeys.console.instance.workerSafetyTunnelSessionCleanup;
     }
   }
 
@@ -1654,6 +1816,271 @@ server-config-deploy: true`);
                 </div>
               {/if}
             </div>
+          </section>
+        {:else if activeSection === "tunnels"}
+          <section class="space-y-5" data-instance-tunnels-surface>
+            <div class="console-panel p-5">
+              <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div class="max-w-2xl">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline">owner</Badge>
+                    <h2 class="text-lg font-semibold">{$t(i18nKeys.console.instance.tunnelsTitle)}</h2>
+                  </div>
+                  <p class="mt-3 text-sm leading-6 text-muted-foreground">
+                    {$t(i18nKeys.console.instance.tunnelsBody)}
+                  </p>
+                </div>
+                <Button type="button" variant="outline" disabled={tunnelSessionsQuery.isFetching} onclick={() => void tunnelSessionsQuery.refetch()}>
+                  <RefreshCw class={["mr-2 size-4", tunnelSessionsQuery.isFetching ? "animate-spin" : ""]} />
+                  {$t(i18nKeys.console.instance.refreshDoctor)}
+                </Button>
+              </div>
+
+              <div class="mt-5 grid gap-4 rounded-md border bg-background p-4 md:grid-cols-3">
+                <label class="space-y-2 text-sm font-medium">
+                  <span>{$t(i18nKeys.console.instance.tunnelProvider)}</span>
+                  <select bind:value={tunnelProviderKey} class="block w-full rounded-md border bg-background px-3 py-2 text-sm">
+                    <option value="cloudflare-quick">Cloudflare Quick Tunnel</option>
+                    <option value="ngrok">ngrok</option>
+                  </select>
+                </label>
+                <label class="space-y-2 text-sm font-medium">
+                  <span>{$t(i18nKeys.console.instance.tunnelOrigin)}</span>
+                  <Input bind:value={tunnelOriginUrl} spellcheck={false} autocomplete="url" />
+                </label>
+                <label class="space-y-2 text-sm font-medium">
+                  <span>{$t(i18nKeys.console.instance.tunnelDurationMinutes)}</span>
+                  <Input bind:value={tunnelDurationMinutes} inputmode="numeric" autocomplete="off" />
+                </label>
+                <div class="md:col-span-3 flex flex-wrap items-center justify-between gap-3">
+                  <p class="text-xs text-muted-foreground">
+                    {$t(i18nKeys.console.instance.tunnelSafetyNotice)}
+                  </p>
+                  <Button
+                    type="button"
+                    disabled={!tunnelStartAllowed || !tunnelOriginUrl.trim() || Number(tunnelDurationMinutes) < 5 || Number(tunnelDurationMinutes) > 1440 || startTunnelMutation.isPending}
+                    onclick={() => startTunnelMutation.mutate()}
+                  >
+                    <Network class="mr-2 size-4" />
+                    {$t(i18nKeys.console.instance.tunnelStart)}
+                  </Button>
+                </div>
+                {#if $capabilities.ready && !tunnelStartAllowed}
+                  <p class="md:col-span-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
+                    {$t(i18nKeys.console.instance.tunnelStartUnavailable)}
+                  </p>
+                {/if}
+              </div>
+
+              {#if tunnelFeedback}
+                <p class={`mt-4 rounded-md border p-3 text-sm ${tunnelFeedback.kind === "success" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-destructive/30 bg-destructive/10 text-destructive"}`}>
+                  {tunnelFeedback.detail}
+                </p>
+              {/if}
+            </div>
+
+            <section class="console-panel p-5">
+              <h3 class="text-base font-semibold">{$t(i18nKeys.console.instance.tunnelSessions)}</h3>
+              <div class="console-record-list mt-4">
+                {#each tunnelSessionsQuery.data?.items ?? [] as session (session.id)}
+                  <article class="console-record-row lg:grid-cols-[minmax(0,1fr)_auto]">
+                    <div class="min-w-0">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <p class="font-mono text-sm font-medium">{session.id}</p>
+                        <Badge variant={session.status === "failed" ? "destructive" : session.status === "ready" ? "default" : "outline"}>
+                          {session.status}
+                        </Badge>
+                        <Badge variant="outline">{session.providerKey}</Badge>
+                      </div>
+                      <p class="mt-2 break-all text-xs text-muted-foreground">{session.originUrl}</p>
+                      {#if session.publicUrl}
+                        <a class="mt-1 block break-all text-sm font-medium text-primary hover:underline" href={session.publicUrl} target="_blank" rel="noreferrer">
+                          {session.publicUrl}
+                        </a>
+                      {/if}
+                      <p class="mt-2 text-xs text-muted-foreground">
+                        {$t(i18nKeys.console.instance.tunnelExpiresAt)} {formatTime(session.expiresAt)}
+                      </p>
+                      {#if session.failureCode}
+                        <p class="mt-1 break-all font-mono text-xs text-destructive">{session.failureCode}</p>
+                      {/if}
+                    </div>
+                    {#if session.status === "ready" || session.status === "starting" || session.status === "failed"}
+                      <Button type="button" variant="outline" size="sm" disabled={revokeTunnelMutation.isPending} onclick={() => revokeTunnelMutation.mutate(session)}>
+                        {$t(i18nKeys.console.instance.tunnelRevoke)}
+                      </Button>
+                    {/if}
+                  </article>
+                {:else}
+                  {#if tunnelSessionsQuery.isPending}
+                    <div class="rounded-md border bg-muted/20 p-4 text-sm text-muted-foreground">{$t(i18nKeys.common.status.loading)}</div>
+                  {:else}
+                    <div class="rounded-md border border-dashed p-4 text-sm text-muted-foreground">{$t(i18nKeys.console.instance.tunnelEmpty)}</div>
+                  {/if}
+                {/each}
+              </div>
+            </section>
+          </section>
+        {:else if activeSection === "portability"}
+          <section class="space-y-5" data-instance-portability-surface>
+            <div class="console-panel p-5">
+              <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div class="max-w-2xl">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline">owner</Badge>
+                    <h2 class="text-lg font-semibold">{$t(i18nKeys.console.instance.portabilityTitle)}</h2>
+                  </div>
+                  <p class="mt-3 text-sm leading-6 text-muted-foreground">
+                    {$t(i18nKeys.console.instance.portabilityBody)}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={portabilityExportPlanQuery.isFetching}
+                  onclick={() => void portabilityExportPlanQuery.refetch()}
+                >
+                  <RefreshCw class="mr-2 size-4" />
+                  {$t(i18nKeys.console.instance.portabilityExportPlan)}
+                </Button>
+              </div>
+
+              {#if portabilityFeedback}
+                <p class={`mt-4 rounded-md border p-3 text-sm ${portabilityFeedback.kind === "success" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-destructive/30 bg-destructive/10 text-destructive"}`}>
+                  {portabilityFeedback.detail}
+                </p>
+              {/if}
+
+              {#if portabilityExportPlanQuery.data}
+                <div class="mt-5 grid gap-3 md:grid-cols-3">
+                  <div class="rounded-md border bg-background p-4">
+                    <p class="text-xs uppercase text-muted-foreground">schema revision</p>
+                    <p class="mt-1 break-all font-mono text-sm">{portabilityExportPlanQuery.data.sourceRevision}</p>
+                  </div>
+                  <div class="rounded-md border bg-background p-4">
+                    <p class="text-xs uppercase text-muted-foreground">tables</p>
+                    <p class="mt-1 text-sm font-medium">{portabilityExportPlanQuery.data.tables.length}</p>
+                  </div>
+                  <div class="rounded-md border bg-background p-4">
+                    <p class="text-xs uppercase text-muted-foreground">rows</p>
+                    <p class="mt-1 text-sm font-medium">{portabilityExportPlanQuery.data.totalRows}</p>
+                  </div>
+                </div>
+              {/if}
+            </div>
+
+            <div class="grid gap-5 xl:grid-cols-2">
+              <section class="console-panel p-5" data-instance-portability-export>
+                <h3 class="text-base font-semibold">{$t(i18nKeys.console.instance.portabilityExport)}</h3>
+                <p class="mt-2 text-sm text-muted-foreground">AES-256-GCM · PBKDF2-SHA256 · 210,000 iterations</p>
+                <label class="mt-5 block space-y-2 text-sm font-medium">
+                  <span>{$t(i18nKeys.console.instance.portabilityPassphraseLabel)}</span>
+                  <Input bind:value={portabilityPassphrase} type="password" autocomplete="new-password" minlength={12} />
+                </label>
+                <Button
+                  class="mt-4"
+                  type="button"
+                  disabled={portabilityPassphrase.length < 12 || portabilityExportMutation.isPending}
+                  onclick={() => portabilityExportMutation.mutate()}
+                >
+                  <Download class="mr-2 size-4" />
+                  {$t(i18nKeys.console.instance.portabilityExport)}
+                </Button>
+              </section>
+
+              <section class="console-panel p-5" data-instance-portability-import>
+                <h3 class="text-base font-semibold">{$t(i18nKeys.console.instance.portabilityImport)}</h3>
+                <label class="mt-5 block space-y-2 text-sm font-medium">
+                  <span>{$t(i18nKeys.console.instance.portabilityArtifactLabel)}</span>
+                  <input class="block w-full rounded-md border bg-background px-3 py-2 text-sm" type="file" accept="application/json,.json" onchange={readPortabilityArtifact} />
+                </label>
+                <label class="mt-4 block space-y-2 text-sm font-medium">
+                  <span>{$t(i18nKeys.console.instance.portabilityPassphraseLabel)}</span>
+                  <Input bind:value={portabilityPassphrase} type="password" autocomplete="current-password" minlength={12} />
+                </label>
+                <label class="mt-4 block space-y-2 text-sm font-medium">
+                  <span>{$t(i18nKeys.console.instance.portabilityModeLabel)}</span>
+                  <select bind:value={portabilityMode} class="block w-full rounded-md border bg-background px-3 py-2 text-sm">
+                    <option value="merge">merge</option>
+                    <option value="replace">replace</option>
+                  </select>
+                </label>
+                {#if portabilityMode === "replace"}
+                  <label class="mt-4 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
+                    <input class="mt-0.5" type="checkbox" bind:checked={portabilityAcknowledgeReplace} />
+                    <span>Replace current portable tables after creating a rollback artifact.</span>
+                  </label>
+                {/if}
+                <div class="mt-4 flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={!portabilityEnvelope || portabilityPassphrase.length < 12 || portabilityImportPlanMutation.isPending}
+                    onclick={() => portabilityImportPlanMutation.mutate()}
+                  >
+                    {$t(i18nKeys.console.instance.portabilityImportPlan)}
+                  </Button>
+                  <Button
+                    type="button"
+                    disabled={!portabilityImportPlanMutation.data?.compatible || portabilityImportMutation.isPending || (portabilityMode === "replace" && !portabilityAcknowledgeReplace)}
+                    onclick={() => portabilityImportMutation.mutate()}
+                  >
+                    {$t(i18nKeys.console.instance.portabilityImport)}
+                  </Button>
+                </div>
+                {#if portabilityImportPlanMutation.data}
+                  <div class="mt-4 rounded-md border bg-muted/20 p-3 text-sm">
+                    <Badge variant={portabilityImportPlanMutation.data.compatible ? "default" : "destructive"}>
+                      {portabilityImportPlanMutation.data.compatible ? "compatible" : "blocked"}
+                    </Badge>
+                    <p class="mt-2 font-mono text-xs">{portabilityImportPlanMutation.data.sourceRevision} → {portabilityImportPlanMutation.data.targetRevision}</p>
+                    {#if portabilityImportPlanMutation.data.blockers.length > 0}
+                      <ul class="mt-2 list-disc space-y-1 pl-5 text-destructive">
+                        {#each portabilityImportPlanMutation.data.blockers as blocker}
+                          <li>{blocker}</li>
+                        {/each}
+                      </ul>
+                    {/if}
+                  </div>
+                {/if}
+              </section>
+            </div>
+
+            <section class="console-panel p-5" data-instance-portability-artifacts>
+              <div class="flex items-center justify-between gap-3">
+                <h3 class="text-base font-semibold">{$t(i18nKeys.console.instance.portabilityArtifactLabel)}</h3>
+                <Button type="button" variant="outline" size="sm" onclick={() => void portabilityArtifactsQuery.refetch()}>
+                  <RefreshCw class="size-4" />
+                </Button>
+              </div>
+              <div class="console-record-list mt-4">
+                {#each portabilityArtifactsQuery.data?.items ?? [] as artifact (artifact.id)}
+                  <article class="console-record-row lg:grid-cols-[minmax(0,1fr)_auto]">
+                    <div class="min-w-0">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <p class="font-mono text-sm font-medium">{artifact.id}</p>
+                        <Badge variant="outline">{artifact.kind}</Badge>
+                      </div>
+                      <p class="mt-2 text-xs text-muted-foreground">{formatTime(artifact.createdAt)} · {artifact.rowCount} rows · {artifact.sizeBytes} bytes</p>
+                      <p class="mt-1 break-all font-mono text-xs text-muted-foreground">{artifact.checksum}</p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={portabilityDeleteMutation.isPending}
+                      onclick={() => {
+                        if (window.confirm(`${$t(i18nKeys.console.instance.portabilityDelete)} ${artifact.id}?`)) portabilityDeleteMutation.mutate(artifact.id);
+                      }}
+                    >
+                      {$t(i18nKeys.console.instance.portabilityDelete)}
+                    </Button>
+                  </article>
+                {:else}
+                  <div class="rounded-md border border-dashed p-4 text-sm text-muted-foreground">No portability artifacts.</div>
+                {/each}
+              </div>
+            </section>
           </section>
         {:else}
           <section class="console-panel p-5" data-instance-guidance-display-surface>

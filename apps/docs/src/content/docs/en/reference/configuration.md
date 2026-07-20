@@ -86,6 +86,12 @@ ticking them.
 | `APPALOFT_SCHEDULED_DEPENDENCY_BACKUP_RUNNER_ENABLED` | `false` | Runs scheduled dependency backup policies. |
 | `APPALOFT_SCHEDULED_DEPENDENCY_BACKUP_RUNNER_INTERVAL_SECONDS` | `3600` | Poll interval for dependency backup policies. |
 | `APPALOFT_SCHEDULED_DEPENDENCY_BACKUP_RUNNER_BATCH_SIZE` | `25` | Maximum dependency backup policies scanned per tick. |
+| `APPALOFT_SCHEDULED_STORAGE_VOLUME_BACKUP_RUNNER_ENABLED` | `false` | Runs due storage volume backup policies; the official self-host Compose/Image explicitly enables it. |
+| `APPALOFT_SCHEDULED_STORAGE_VOLUME_BACKUP_RUNNER_INTERVAL_SECONDS` | `300` | Poll interval for storage volume backup policies. |
+| `APPALOFT_SCHEDULED_STORAGE_VOLUME_BACKUP_RUNNER_BATCH_SIZE` | `25` | Maximum storage volume backup policies claimed per tick. |
+| `APPALOFT_TUNNEL_RECONCILER_ENABLED` | `false` | Cleans up expired or orphan tunnel sessions; the official self-host Compose/Image explicitly enables it. |
+| `APPALOFT_TUNNEL_RECONCILE_INTERVAL_SECONDS` | `60` | Poll interval for tunnel sessions. |
+| `APPALOFT_TUNNEL_RECONCILE_BATCH_SIZE` | `100` | Maximum tunnel sessions inspected per tick. |
 | `APPALOFT_SCHEDULED_HISTORY_RETENTION_RUNNER_ENABLED` | `false` | Runs retention defaults through existing history prune commands or governed retention stores. |
 | `APPALOFT_SCHEDULED_HISTORY_RETENTION_RUNNER_INTERVAL_SECONDS` | `3600` | Poll interval for scheduled history retention. |
 | `APPALOFT_SCHEDULED_HISTORY_RETENTION_RUNNER_BATCH_SIZE` | `25` | Maximum retention default policies scanned per tick. |
