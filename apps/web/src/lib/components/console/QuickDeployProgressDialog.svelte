@@ -65,7 +65,7 @@
     delay: `${(index % 8) * 0.07}s`,
     left: `${8 + ((index * 37) % 84)}%`,
     rotation: `${(index * 29) % 180}deg`,
-    color: ["#4f7cff", "#35d39b", "#ffd166", "#ef476f", "#38bdf8"][index % 5],
+    color: ["#4f7cff", "#35d39b", "#ffd166", "#94a3b8", "#38bdf8"][index % 5],
   }));
 
   function workflowStatusLabel(): string {

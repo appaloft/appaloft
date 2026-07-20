@@ -393,7 +393,7 @@ describe("Console page extension surface", () => {
     expect(rendererSource).not.toContain('from "$lib/components/ui/table"');
   });
 
-  test("[CONSOLE-EXT-PAGE-003] embeds owner-scoped console panel hosts in project and resource pages", () => {
+  test("[CONSOLE-EXT-PAGE-003] embeds and pads owner-scoped console panel hosts in project and resource pages", () => {
     const panelHostSource = readFileSync(
       new URL("../components/console/ConsoleExtensionPanelHost.svelte", import.meta.url),
       "utf8",
@@ -439,9 +439,9 @@ describe("Console page extension surface", () => {
     expect(projectPageSource).toContain("nativeEnvironmentCopyReplaced");
     expect(projectPageSource).toContain('"audit-log"');
     expect(projectPageSource).toContain("visibleProjectDetailTabs");
-    expect(projectPageSource).toContain("detailTabPanelFlushClass");
+    expect(projectPageSource).toContain("detailTabPanelScrollClass");
     expect(projectPageSource).toContain(
-      '<Tabs.Content value="audit-log" class={detailTabPanelFlushClass}>',
+      '<Tabs.Content value="audit-log" class={detailTabPanelScrollClass}>',
     );
     expect(projectPageSource).toContain("<ConsoleExtensionPage {projectId} embedded />");
     expect(projectPageSource).toContain("environmentId={environment.id}");
@@ -449,8 +449,8 @@ describe("Console page extension surface", () => {
     expect(resourcePageSource).toContain('placement="resource-detail-panel"');
     expect(resourcePageSource).toContain('"audit-log"');
     expect(resourcePageSource).toContain("visibleResourceDetailTabs");
-    expect(resourcePageSource).toContain("detailTabPanelFlushClass");
-    expect(resourcePageSource).toContain("<div class={detailTabPanelFlushClass}>");
+    expect(resourcePageSource).toContain("detailTabPanelScrollClass");
+    expect(resourcePageSource).toContain("<div class={detailTabPanelScrollClass}>");
     expect(resourcePageSource).toContain("<ConsoleExtensionPage");
     expect(resourcePageSource).toContain("embedded");
     expect(resourcePageSource).toContain("projectId={resourceProjectId}");

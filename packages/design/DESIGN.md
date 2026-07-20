@@ -48,7 +48,7 @@ Resource -> Access -> Health -> Logs -> Diagnostics -> Terminal
 
 ## Color Roles
 
-- Console canvas: cool structural gray `#f4f7fb` for the workspace outside object panels. It must
+- Console canvas: near-neutral structural gray `#f7f7f8` for the workspace outside object panels. It must
   stay neutral and low-chroma rather than reading as blue decoration, heavy gray-blue, cream, sand,
   beige, or yellow.
 - Console panel: `#ffffff` for object panels, tables, sheets, popovers, and form surfaces.
@@ -56,11 +56,11 @@ Resource -> Access -> Health -> Logs -> Diagnostics -> Terminal
   fill for primary actions.
 - Appaloft blue: `#4e84ff`, taken from the canonical logo asset, for primary actions, selected
   states, links, focus rings, and running/planning status. Use it sparingly.
-- Appaloft soft blue: `#e8f0ff` and `#edf2f8` for selected row, subtle callout, and low-emphasis
+- Appaloft soft blue: `#e8f0ff` and `#eef2f7` for selected row, subtle callout, and low-emphasis
   CTA backgrounds.
-- Quiet border: `#c9d4e3` for panel boundaries, table rows, and dividers.
-- Input hairline: `#b5c3d6` for form controls so fields remain more visible than passive panels.
-- Sidebar rail: `#eef3f8` with `#c2cede` separation. Active navigation keeps the soft-blue row tint
+- Quiet border: `#c5d1e0` for panel boundaries, table rows, and dividers.
+- Input hairline: `#9fadc1` for form controls so fields remain more visible than passive panels.
+- Sidebar rail: `#eef2f7` with `#bcc9da` separation. Active navigation keeps the soft-blue row tint
   and adds a 2px Appaloft-blue inset rail so location remains legible without pill navigation. The
   collapsed icon rail uses a compact Appaloft-blue active square with white ink.
 - Ready green: `oklch(0.58 0.18 145)` for healthy, ready, succeeded, or configured-positive
@@ -68,7 +68,27 @@ Resource -> Access -> Health -> Logs -> Diagnostics -> Terminal
 - Failure red: `oklch(0.61 0.21 27)` for failed, unhealthy, destructive, or unsafe actions. Empty,
   unavailable, unconfigured, and not-yet-created states stay on neutral card or muted surfaces.
 - Warning amber: `oklch(0.66 0.16 75)` for delayed readiness, warnings, or pending verification.
-- Muted text: `#64748d` for secondary labels, timestamps, descriptions, and placeholders.
+- Muted text: `#52647d` in Web and `#586a82` in portable light surfaces for secondary labels,
+  timestamps, descriptions, and placeholders.
+
+Every light surface follows one semantic elevation ladder. The roles are available as CSS variables
+and Tailwind v4 colors; consumers must choose by role rather than sampling a nearby gray:
+
+| Role | Tailwind utility | Purpose |
+| --- | --- | --- |
+| Canvas | `bg-canvas` | Page or workspace floor outside owned content. |
+| Surface | `bg-surface` | Cards, tables, forms, and primary content panels. |
+| Subtle surface | `bg-surface-subtle` | A low-emphasis subsection inside an owning surface. |
+| Raised surface | `bg-surface-raised` | Sticky or elevated content that remains in the page flow. |
+| Overlay surface | `bg-surface-overlay` | Dropdowns, select menus, popovers, sheets, and dialogs. |
+| Selected surface | `bg-surface-selected` | Current choice, active navigation, or selected record only. |
+| Divider | `border-divider` | Passive panel and record boundaries. |
+| Control | `border-control` | Inputs, textareas, selects, and other editable controls. |
+
+The console canvas and surface must never collapse to the same color. A subtle surface must be used
+inside an owning surface, not as an alternate page background. Overlays always use the overlay
+surface plus a divider and shadow. Inputs use the surface fill plus the stronger control hairline;
+browser autofill must preserve the same fill instead of introducing an unrelated blue or gray.
 
 Avoid gradient backgrounds in the console. Depth comes from spacing, borders, typography, and
 restrained shadows. Semantic colors are only for real workflow meaning; absence or missing setup is
@@ -105,6 +125,8 @@ identity.
   grammar; full pills are reserved for badges, compact status, and intentionally pill-shaped input.
 - Form controls are 32px tall by default, with a consistent 4px label-to-control gap and visible
   input hairlines.
+- Dropdown, Select, Popover, Sheet, and Dialog content share one overlay surface, divider, corner,
+  and shadow treatment. Nested dropdown menus must not switch to a different ring-only style.
 - Default console borders use a quiet 1px hairline for primary panels, secondary panels, metric
   strips, and data display rows. Inputs use the stronger input hairline. Show hierarchy with spacing,
   typography, surface tint, and a crisp 1px directional shadow; reserve primary color for hover,
@@ -119,7 +141,8 @@ identity.
   create visual alignment.
 - Tables are dense, scan-friendly records with status badges, owner links, timestamps, and action
   affordances.
-- Status badges use semantic colors and stay compact.
+- Status badges use semantic colors, stay compact, and pair their light fill with a faint
+  tone-matched border so status remains legible against white data surfaces.
 - Text must remain stable and truncated where object names can be long.
 
 ## Console Surface Grammar
@@ -127,11 +150,23 @@ identity.
 Screens must not rely on loose borders or raw `bg-background` blocks to imply ownership. Every major
 area uses one named surface:
 
+- The light Console canvas is a Supabase-like near-white `#fdfdfd`, not a blue or visible gray page
+  fill. White `#ffffff` owner surfaces remain distinct through divider hairlines, spacing, and type;
+  neutral `#f7f7f8` is reserved for table headers and owned subtle groups.
+- Primary and nested sidebars use a neutral near-white surface with neutral hover/active fills.
+  Appaloft blue is reserved for the active rail, icon, focus ring, or compact collapsed navigation
+  marker rather than tinting the whole navigation surface.
+- Owner-scoped extension tabs, including Audit Log, use the same responsive content padding as
+  native detail tabs; only deliberately edge-to-edge tools may opt into a flush container.
+
 - `console-panel`: one command/query form, evidence panel, terminal panel, or framed tool.
 - `console-subtle-panel`: low-emphasis status, empty state, helper, or result block inside a larger
   owner surface.
 - `console-side-panel`: secondary owner-side context such as environment or public access summaries.
 - `console-record-list` and `console-record-row`: repeated operational records.
+- Diagnostic summaries use one owner panel with divider-separated records, not one nested card per
+  finding. Severity badges keep the canonical `info`, `warning`, and `blocking` labels and use
+  distinct blue, amber, and red tone-matched fills/borders; source/category badges remain neutral.
 - Selectable object choices such as repositories, projects, servers, environments, and credentials
   use Tailwind utilities at the consuming component: white `bg-card` row surface, soft Appaloft blue
   `hover:bg-primary/5`, and blue border/tint selected state. Do not use failure red, pink, rose, or
@@ -148,6 +183,10 @@ topology and configuration detail.
 `console-subtle-panel` must use the same border strength as inputs and other console containers. Do
 not use pale inset-shadow borders for data rows inside panels because they make the product feel like
 multiple visual systems.
+
+Legacy business markup that uses a bordered `bg-background` block inside `data-console-main` is
+normalized to the surface role. Bordered rounded muted blocks are normalized to the subtle-surface
+role. New code should use the named Console classes or semantic Tailwind utilities directly.
 
 Use modal dialogs only for destructive confirmation or short blocking review. Routine configuration
 stays inline.
