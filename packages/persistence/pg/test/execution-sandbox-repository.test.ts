@@ -191,6 +191,13 @@ describe("PgExecutionSandboxRepository", () => {
       expect(await repository.find(context("tenant_b"), "sbx_pg")).toBeNull();
       expect(await repository.list(context("tenant_b"), { limit: 10, offset: 0 })).toEqual([]);
       expect(await repository.list(context("tenant_a"), { limit: 1, offset: 0 })).toHaveLength(1);
+      await repository.save(context("tenant_b"), sandbox("sbx_b"), "hermetic");
+      expect(
+        await repository.listMaintenanceTenantIds(context("tenant_instance"), {
+          limit: 10,
+          offset: 0,
+        }),
+      ).toEqual(["tenant_a", "tenant_b"]);
     } finally {
       await database.close();
     }

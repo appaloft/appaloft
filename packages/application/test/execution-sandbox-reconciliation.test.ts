@@ -155,4 +155,37 @@ describe("ExecutionSandboxService provider reconciliation", () => {
     if (result.isErr()) expect(result.error.code).toBe("sandbox_provider_operation_failed");
     expect(adapter.removed).toEqual([]);
   });
+
+  test("[SBX-MAINTENANCE-001] system maintenance enumerates each persisted tenant", async () => {
+    const adapter = provider();
+    adapter.listOwnedRuntimes = async () => ({ items: [] });
+    const app = service(adapter);
+    const tenantA = createExecutionContext({
+      entrypoint: "system",
+      tenant: { tenantId: "tenant_a" },
+    });
+    const tenantB = createExecutionContext({
+      entrypoint: "system",
+      tenant: { tenantId: "tenant_b" },
+    });
+    expect((await app.service.createAndReconcile(tenantA, createInput)).isOk()).toBe(true);
+    expect((await app.service.createAndReconcile(tenantB, createInput)).isOk()).toBe(true);
+
+    const denied = await app.service.maintainAllTenants(tenantA);
+    expect(denied.isErr()).toBe(true);
+    if (denied.isErr()) expect(denied.error.code).toBe("operation_authorization_denied");
+
+    const result = await app.service.maintainAllTenants(
+      createExecutionContext({
+        entrypoint: "system",
+        actor: { kind: "system", id: "sandbox-maintenance-test" },
+      }),
+    );
+
+    expect(result._unsafeUnwrap().tenants.map((item) => item.tenantId)).toEqual([
+      "tenant_a",
+      "tenant_b",
+    ]);
+    expect(result._unsafeUnwrap().tenants.every((item) => item.failed === 0)).toBe(true);
+  });
 });

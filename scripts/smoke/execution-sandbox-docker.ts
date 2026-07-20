@@ -8,6 +8,7 @@ const suffix = `${Date.now()}${Math.floor(Math.random() * 10_000)}`;
 const sourceSandboxId = `sbx_smoke_${suffix}`;
 const restoredSandboxId = `sbx_restore_${suffix}`;
 const snapshotId = `ssn_smoke_${suffix}`;
+const ownerScope = `smoke_${suffix}`;
 const provider = new DockerSandboxProvider({ isolation: "container-trusted" });
 const limits = {
   cpuMillis: 500,
@@ -23,11 +24,11 @@ async function removeOwnedContainer(sandboxId: string, handle: string): Promise<
     "docker",
     "inspect",
     "--format",
-    '{{index .Config.Labels "appaloft.sandbox.id"}}',
+    '{{index .Config.Labels "appaloft.sandbox.id"}} {{index .Config.Labels "appaloft.sandbox.owner"}}',
     handle,
   ]);
   if (inspected.exitCode !== 0) return;
-  if (new TextDecoder().decode(inspected.stdout).trim() !== sandboxId) {
+  if (new TextDecoder().decode(inspected.stdout).trim() !== `${sandboxId} ${ownerScope}`) {
     throw new Error(`Refusing to clean non-owned container ${handle}`);
   }
   Bun.spawnSync(["docker", "rm", "-f", handle]);
@@ -56,6 +57,7 @@ async function cleanup(): Promise<void> {
 try {
   const source = await provider.provision({
     sandboxId: sourceSandboxId,
+    ownerScope,
     source: { kind: "image", image: "alpine:latest" },
     requestedIsolation: "container-trusted",
     limits,
@@ -117,6 +119,7 @@ try {
 
   const restored = await provider.provision({
     sandboxId: restoredSandboxId,
+    ownerScope,
     source: { kind: "snapshot", providerHandle: snapshot.providerHandle },
     requestedIsolation: "container-trusted",
     limits,

@@ -274,6 +274,21 @@ export class PgExecutionSandboxRepository implements SandboxRepository {
     });
   }
 
+  async listMaintenanceTenantIds(
+    context: RepositoryContext,
+    input: { limit: number; offset: number },
+  ): Promise<string[]> {
+    const rows = await resolveRepositoryExecutor(this.db, context)
+      .selectFrom("execution_sandboxes")
+      .select("tenant_id")
+      .distinct()
+      .orderBy("tenant_id", "asc")
+      .limit(input.limit)
+      .offset(input.offset)
+      .execute();
+    return rows.map((row) => row.tenant_id);
+  }
+
   async saveCredentialGrant(
     context: RepositoryContext,
     sandboxId: string,

@@ -275,6 +275,10 @@ export interface SandboxRepository {
     context: RepositoryContext,
     input: { providerKey: string; limit: number; offset: number },
   ): Promise<Array<{ sandboxId: string; providerHandle: string }>>;
+  listMaintenanceTenantIds(
+    context: RepositoryContext,
+    input: { limit: number; offset: number },
+  ): Promise<string[]>;
   saveSnapshot(
     context: RepositoryContext,
     snapshot: SandboxSnapshot,
@@ -362,6 +366,14 @@ export class InMemorySandboxRepository implements SandboxRepository {
           ? [{ sandboxId: state.id.value, providerHandle: state.providerHandle }]
           : [];
       })
+      .slice(input.offset, input.offset + input.limit);
+  }
+  async listMaintenanceTenantIds(
+    _context: RepositoryContext,
+    input: { limit: number; offset: number },
+  ): Promise<string[]> {
+    return [...new Set([...this.items.values()].map((item) => item.tenantId))]
+      .sort()
       .slice(input.offset, input.offset + input.limit);
   }
   async saveCredentialGrant(
@@ -974,7 +986,9 @@ export class ExecutionSandboxService {
     const removed: string[] = [];
     const failed: string[] = [];
     for (const provider of providers) {
-      if (!provider.listOwnedRuntimes || !provider.removeOwnedRuntime) {
+      const listOwnedRuntimes = provider.listOwnedRuntimes?.bind(provider);
+      const removeOwnedRuntime = provider.removeOwnedRuntime?.bind(provider);
+      if (!listOwnedRuntimes || !removeOwnedRuntime) {
         failed.push(`${provider.key}:inventory-unsupported`);
         continue;
       }
@@ -994,7 +1008,7 @@ export class ExecutionSandboxService {
       let cursor: string | undefined;
       do {
         const inventory = await this.providerOperation("execution-sandbox-provider-inventory", () =>
-          provider.listOwnedRuntimes!({ ownerScope, limit, ...(cursor ? { cursor } : {}) }),
+          listOwnedRuntimes({ ownerScope, limit, ...(cursor ? { cursor } : {}) }),
         );
         if (inventory.isErr()) return err(inventory.error);
         for (const runtime of inventory.value.items) {
@@ -1008,7 +1022,7 @@ export class ExecutionSandboxService {
           }
           const removal = await this.providerOperation(
             "execution-sandbox-provider-orphan-removal",
-            () => provider.removeOwnedRuntime!(runtime),
+            () => removeOwnedRuntime(runtime),
           );
           if (removal.isErr()) failed.push(runtime.sandboxId);
           else removed.push(runtime.sandboxId);
@@ -1017,6 +1031,65 @@ export class ExecutionSandboxService {
       } while (cursor);
     }
     return ok({ retained, removed, failed });
+  }
+
+  async maintainAllTenants(
+    context: ExecutionContext,
+    input: { tenantLimit?: number; sandboxLimit?: number } = {},
+  ): Promise<
+    Result<{
+      tenants: Array<{
+        tenantId: string;
+        expired: number;
+        reconciled: number;
+        removedOrphans: number;
+        failed: number;
+      }>;
+    }>
+  > {
+    if (context.entrypoint !== "system" || context.actor?.kind !== "system") {
+      return err(
+        domainError.operationAuthorizationDenied(
+          "Sandbox fleet maintenance requires a system execution context",
+        ),
+      );
+    }
+    const tenantLimit = Math.min(Math.max(input.tenantLimit ?? 100, 1), 500);
+    const tenants: Array<{
+      tenantId: string;
+      expired: number;
+      reconciled: number;
+      removedOrphans: number;
+      failed: number;
+    }> = [];
+    for (let offset = 0; ; offset += tenantLimit) {
+      const tenantIds = await this.repository.listMaintenanceTenantIds(
+        toRepositoryContext(context),
+        { limit: tenantLimit, offset },
+      );
+      for (const maintenanceTenantId of tenantIds) {
+        const tenantContext: ExecutionContext = {
+          ...context,
+          tenant: { tenantId: maintenanceTenantId, source: "sandbox-maintenance-runner" },
+        };
+        const lifecycle = await this.maintain(
+          tenantContext,
+          input.sandboxLimit ? { limit: input.sandboxLimit } : {},
+        );
+        const orphans = await this.reconcileProviderOrphans(tenantContext);
+        tenants.push({
+          tenantId: maintenanceTenantId,
+          expired: lifecycle.isOk() ? lifecycle.value.expired.length : 0,
+          reconciled: lifecycle.isOk() ? lifecycle.value.reconciled.length : 0,
+          removedOrphans: orphans.isOk() ? orphans.value.removed.length : 0,
+          failed:
+            (lifecycle.isOk() ? lifecycle.value.failed.length : 1) +
+            (orphans.isOk() ? orphans.value.failed.length : 1),
+        });
+      }
+      if (tenantIds.length < tenantLimit) break;
+    }
+    return ok({ tenants });
   }
 
   async exec(
