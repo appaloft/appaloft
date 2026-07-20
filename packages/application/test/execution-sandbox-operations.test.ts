@@ -170,4 +170,26 @@ describe("ExecutionSandboxService", () => {
       ).isErr(),
     ).toBe(true);
   });
+
+  test("[SBX-CMD-003] closes pause/resume, port and snapshot capabilities", async () => {
+    const fake = provider();
+    const app = service(fake.adapter);
+    await app.create(context, createInput);
+    await app.reconcile(context, "sbx_test");
+
+    expect((await app.pause(context, "sbx_test"))._unsafeUnwrap().status).toBe("paused");
+    expect((await app.resume(context, "sbx_test"))._unsafeUnwrap().status).toBe("ready");
+    expect(
+      (await app.exposePort(context, "sbx_test", { port: 3000 }))._unsafeUnwrap(),
+    ).toMatchObject({ port: 3000, visibility: "private" });
+    const snapshot = await app.createSnapshot(context, "sbx_test", {
+      capability: "filesystem",
+    });
+    expect(snapshot._unsafeUnwrap()).toMatchObject({
+      snapshotId: "ssn_test",
+      sourceSandboxId: "sbx_test",
+      status: "ready",
+    });
+    expect((await app.listSnapshots(context, {}))._unsafeUnwrap().items).toHaveLength(1);
+  });
 });

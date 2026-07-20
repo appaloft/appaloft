@@ -93,6 +93,8 @@ import {
   generatedServiceGraphComposeFile,
 } from "./service-graph-compose";
 
+export { HermeticSandboxProvider } from "./execution-sandbox-provider";
+
 export { RuntimeServerConnectivityChecker } from "./server-connectivity";
 export { RuntimeDeploymentHealthChecker } from "./deployment-health";
 export {
