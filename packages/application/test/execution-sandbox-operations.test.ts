@@ -16,6 +16,8 @@ const context = createExecutionContext({
 
 function provider(input: { isolation?: "container-trusted" | "gvisor" } = {}) {
   let provisionCalls = 0;
+  let terminateCalls = 0;
+  let lastProvisionSource: Parameters<SandboxProvider["provision"]>[0]["source"] | undefined;
   const adapter: SandboxProvider = {
     key: "hermetic",
     capabilities: {
@@ -25,11 +27,12 @@ function provider(input: { isolation?: "container-trusted" | "gvisor" } = {}) {
       processes: true,
       files: true,
       ports: true,
-      networkPolicy: true,
+      networkPolicy: ["deny"],
       credentialBroker: false,
     },
     async provision(request) {
       provisionCalls += 1;
+      lastProvisionSource = request.source;
       return {
         providerHandle: `handle:${request.sandboxId}`,
         realizedIsolation: input.isolation ?? "gvisor",
@@ -42,7 +45,9 @@ function provider(input: { isolation?: "container-trusted" | "gvisor" } = {}) {
         realizedIsolation: input.isolation ?? "gvisor",
       };
     },
-    async terminate() {},
+    async terminate() {
+      terminateCalls += 1;
+    },
     async exec() {
       return {
         mode: "foreground",
@@ -82,15 +87,21 @@ function provider(input: { isolation?: "container-trusted" | "gvisor" } = {}) {
     async captureSnapshot() {
       return { providerHandle: "snapshot:1", sizeBytes: 3 };
     },
+    async deleteSnapshot() {},
   };
-  return { adapter, provisionCalls: () => provisionCalls };
+  return {
+    adapter,
+    provisionCalls: () => provisionCalls,
+    terminateCalls: () => terminateCalls,
+    lastProvisionSource: () => lastProvisionSource,
+  };
 }
 
-function service(adapter: SandboxProvider) {
+function service(adapter: SandboxProvider, now: () => string = () => "2026-07-20T00:00:00.000Z") {
   return new ExecutionSandboxService({
     repository: new InMemorySandboxRepository(),
     providerRegistry: new SandboxProviderRegistry([adapter]),
-    clock: { now: () => "2026-07-20T00:00:00.000Z" },
+    clock: { now },
     idGenerator: { next: (prefix) => `${prefix}_test` },
   });
 }
@@ -200,5 +211,52 @@ describe("ExecutionSandboxService", () => {
       status: "ready",
     });
     expect((await app.listSnapshots(context, {}))._unsafeUnwrap().items).toHaveLength(1);
+    const restored = await app.createAndReconcile(context, {
+      ...createInput,
+      source: { kind: "snapshot", snapshotId: "ssn_test" },
+    });
+    expect(restored._unsafeUnwrap()).toMatchObject({ sourceKind: "snapshot", status: "ready" });
+    expect(fake.lastProvisionSource()).toEqual({ kind: "snapshot", providerHandle: "snapshot:1" });
+    expect((await app.deleteSnapshot(context, "ssn_test"))._unsafeUnwrap().status).toBe("deleted");
+  });
+
+  test("[SBX-TEMPLATE-001] resolves a governed template without exposing host access", async () => {
+    const fake = provider();
+    const app = service(fake.adapter);
+    const template = await app.createTemplate(context, {
+      name: "Python 3.13",
+      image: "python@sha256:abc123",
+      minimumIsolation: "gvisor",
+      limits: createInput.limits,
+      networkPolicy: createInput.networkPolicy,
+    });
+    expect(template._unsafeUnwrap()).toMatchObject({ templateId: "stp_test", name: "Python 3.13" });
+
+    const sandbox = await app.createAndReconcile(context, {
+      ...createInput,
+      source: { kind: "template", templateId: "stp_test" },
+    });
+    expect(sandbox._unsafeUnwrap()).toMatchObject({ sourceKind: "template", status: "ready" });
+    expect(fake.lastProvisionSource()).toEqual({ kind: "image", image: "python@sha256:abc123" });
+    expect((await app.listTemplates(context, {}))._unsafeUnwrap().items).toHaveLength(1);
+    expect((await app.deleteTemplate(context, "stp_test")).isErr()).toBe(true);
+    await app.terminate(context, "sbx_test");
+    expect((await app.deleteTemplate(context, "stp_test")).isOk()).toBe(true);
+  });
+
+  test("[SBX-TTL-001] maintenance terminates provider runtime before durable expiry", async () => {
+    let current = "2026-07-20T00:00:00.000Z";
+    const fake = provider();
+    const app = service(fake.adapter, () => current);
+    await app.createAndReconcile(context, createInput);
+    current = "2026-07-20T01:00:01.000Z";
+
+    expect((await app.maintain(context))._unsafeUnwrap()).toEqual({
+      expired: ["sbx_test"],
+      reconciled: [],
+      failed: [],
+    });
+    expect(fake.terminateCalls()).toBe(1);
+    expect((await app.show(context, "sbx_test"))._unsafeUnwrap().status).toBe("expired");
   });
 });

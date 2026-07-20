@@ -12,6 +12,8 @@ import {
 class CapturingRunner implements SandboxDockerCommandRunner {
   readonly calls: Array<{ argv: readonly string[]; stdin?: Uint8Array }> = [];
   runtimes = '{"io.containerd.runc.v2":{"path":"runc"},"runsc":{"path":"runsc"}}';
+  resolvedPath: string | undefined;
+  executionFailure: SandboxDockerCommandResult["failure"];
 
   async run(
     argv: readonly string[],
@@ -21,11 +23,21 @@ class CapturingRunner implements SandboxDockerCommandRunner {
     const command = argv.join(" ");
     if (command.includes("info --format")) return this.result(this.runtimes);
     if (command.includes("network inspect --format")) return this.result("true\n");
+    if (command.includes("realpath"))
+      return this.result(`${this.resolvedPath ?? argv.at(-1)}\n`);
+    if (command.includes("tar -C /workspace -cf -")) return this.result("archive");
+    if (command.includes("inspect --format {{.Config.Image}}"))
+      return this.result("python@sha256:abc123\n");
     if (command.includes("inspect --format") && !command.includes("image inspect"))
       return this.result("sbx_demo\n");
     if (command.includes("image inspect")) return this.result("4096\n");
     if (command.includes("exec -w") && !command.includes(" -d "))
-      return { exitCode: 7, stdout: new TextEncoder().encode("out\n"), stderr: "err\n" };
+      return {
+        exitCode: 7,
+        stdout: new TextEncoder().encode("out\n"),
+        stderr: "err\n",
+        ...(this.executionFailure ? { failure: this.executionFailure } : {}),
+      };
     return this.result("");
   }
 
@@ -62,6 +74,8 @@ describe("DockerSandboxProvider", () => {
     expect(create).toContain("none");
     expect(create).toContain("no-new-privileges=true");
     expect(create).toContain("ALL");
+    expect(create).toContain("/workspace:rw,nosuid,nodev,size=2048m");
+    expect(create).not.toContain("--storage-opt");
     expect(create).toContain("python@sha256:abc123");
     expect(create).not.toContain("sh -lc");
     expect(provider.capabilities.ports).toBe(false);
@@ -136,16 +150,35 @@ describe("DockerSandboxProvider", () => {
         { kind: "exit", sequence: 3, exitCode: 7 },
       ],
     });
-    expect(runner.calls.at(-1)?.argv).toEqual([
-      "docker",
-      "exec",
-      "-w",
-      "/workspace/src",
-      "appaloft-sbx_demo",
-      "python",
-      "-c",
-      "print('hello')",
-    ]);
+    expect(runner.calls.at(-1)?.argv).toEqual(
+      expect.arrayContaining([
+        "docker",
+        "exec",
+        "-w",
+        "/workspace/src",
+        "appaloft-sbx_demo",
+        "appaloft-foreground",
+        "python",
+        "-c",
+        "print('hello')",
+      ]),
+    );
+
+    runner.executionFailure = "timeout";
+    const timedOut = await provider.exec({
+      sandboxId: "sbx_demo",
+      providerHandle: "appaloft-sbx_demo",
+      argv: ["sleep", "60"],
+      timeoutMs: 10,
+    });
+    expect(timedOut.mode).toBe("foreground");
+    if (timedOut.mode === "foreground") {
+      expect(timedOut.frames.at(-1)).toMatchObject({
+        kind: "error",
+        code: "sandbox_exec_timeout",
+        retryable: false,
+      });
+    }
   });
 
   test("[SBX-FILE-003] revalidates handles and paths before Docker mutation", async () => {
@@ -172,6 +205,15 @@ describe("DockerSandboxProvider", () => {
       }),
     ).rejects.toThrow("workspace");
     expect(runner.calls.at(-1)?.argv[1]).toBe("inspect");
+
+    runner.resolvedPath = "/etc/passwd";
+    expect(
+      provider.readFile({
+        sandboxId: "sbx_demo",
+        providerHandle: "appaloft-sbx_demo",
+        path: "workspace-link",
+      }),
+    ).rejects.toThrow("symbolic link");
   });
 
   test("[SBX-SNAPSHOT-001] captures a named Docker image and returns observed size", async () => {
@@ -190,5 +232,15 @@ describe("DockerSandboxProvider", () => {
       providerHandle: "appaloft-sandbox-snapshot:ssn_demo",
       sizeBytes: 4096,
     });
+    const helperCreate = runner.calls.find(
+      (call) => call.argv[1] === "create" && call.argv.includes("appaloft.snapshot.id=ssn_demo"),
+    );
+    expect(helperCreate?.argv).not.toContain("--mount");
+    const restoreArchive = runner.calls.find(
+      (call) =>
+        call.argv[1] === "exec" &&
+        call.argv.some((part) => part.includes("appaloft-snapshot-workspace")),
+    );
+    expect(restoreArchive?.stdin).toBeDefined();
   });
 });

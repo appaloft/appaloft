@@ -14,6 +14,7 @@ export interface SandboxDockerCommandResult {
   exitCode: number;
   stdout: Uint8Array;
   stderr: string;
+  failure?: "timeout" | "output-limit";
 }
 
 export interface SandboxDockerCommandRunner {
@@ -53,15 +54,51 @@ export class BunSandboxDockerCommandRunner implements SandboxDockerCommandRunner
       process.stdin.write(input.stdin);
       process.stdin.end();
     }
+    let failure: SandboxDockerCommandResult["failure"];
     let timeout: ReturnType<typeof setTimeout> | undefined;
-    if (input.timeoutMs) timeout = setTimeout(() => process.kill(), input.timeoutMs);
-    const [exitCode, stdout, stderr] = await Promise.all([
+    if (input.timeoutMs)
+      timeout = setTimeout(() => {
+        failure = "timeout";
+        process.kill();
+      }, input.timeoutMs);
+    const readBounded = async (
+      stream: ReadableStream<Uint8Array>,
+      limit: number,
+    ): Promise<Uint8Array> => {
+      const reader = stream.getReader();
+      const chunks: Uint8Array[] = [];
+      let size = 0;
+      while (true) {
+        const item = await reader.read();
+        if (item.done) break;
+        const remaining = limit - size;
+        if (remaining > 0) chunks.push(item.value.slice(0, remaining));
+        size += item.value.byteLength;
+        if (size > limit && !failure) {
+          failure = "output-limit";
+          process.kill();
+        }
+      }
+      const output = new Uint8Array(Math.min(size, limit));
+      let offset = 0;
+      for (const chunk of chunks) {
+        output.set(chunk, offset);
+        offset += chunk.byteLength;
+      }
+      return output;
+    };
+    const [exitCode, stdout, stderrBytes] = await Promise.all([
       process.exited,
-      new Response(process.stdout).bytes(),
-      new Response(process.stderr).text(),
+      readBounded(process.stdout, 1024 * 1024),
+      readBounded(process.stderr, 1024 * 1024),
     ]);
     if (timeout) clearTimeout(timeout);
-    return { exitCode, stdout, stderr };
+    return {
+      exitCode,
+      stdout,
+      stderr: text(stderrBytes),
+      ...(failure ? { failure } : {}),
+    };
   }
 }
 
@@ -112,7 +149,7 @@ export class DockerSandboxProvider implements SandboxProvider {
       processes: true,
       files: true,
       ports: Boolean(input.portPublisher),
-      networkPolicy: true,
+      networkPolicy: ["deny" as const],
       credentialBroker: false,
     };
     this.runner = input.runner ?? new BunSandboxDockerCommandRunner();
@@ -153,6 +190,19 @@ export class DockerSandboxProvider implements SandboxProvider {
     const name = containerName(request.sandboxId);
     const memoryMb = Math.max(4, Math.ceil(request.limits.memoryBytes / (1024 * 1024)));
     const diskMb = Math.max(4, Math.ceil(request.limits.diskBytes / (1024 * 1024)));
+    if (
+      request.source.kind === "snapshot" &&
+      !/^appaloft-sandbox-snapshot:ssn_[A-Za-z0-9_.-]{1,120}$/.test(
+        request.source.providerHandle,
+      )
+    ) {
+      throw new Error("Docker snapshot provider handle is invalid");
+    }
+    const image = request.source.kind === "image" ? request.source.image : request.source.providerHandle;
+    const startup =
+      request.source.kind === "snapshot"
+        ? "cp -a /appaloft-snapshot-workspace/. /workspace/ && trap : TERM INT; sleep infinity & wait"
+        : "trap : TERM INT; sleep infinity & wait";
     await this.docker([
       "create",
       "--name",
@@ -171,8 +221,6 @@ export class DockerSandboxProvider implements SandboxProvider {
       `${memoryMb}m`,
       "--pids-limit",
       String(request.limits.maxProcesses),
-      "--storage-opt",
-      `size=${diskMb}m`,
       "--cap-drop",
       "ALL",
       "--security-opt",
@@ -180,14 +228,14 @@ export class DockerSandboxProvider implements SandboxProvider {
       "--read-only",
       "--tmpfs",
       "/tmp:rw,noexec,nosuid,size=64m",
-      "--mount",
-      `type=volume,source=${name}-workspace,target=/workspace`,
+      "--tmpfs",
+      `/workspace:rw,nosuid,nodev,size=${diskMb}m`,
       "--workdir",
       "/workspace",
-      request.source.image,
+      image,
       "sh",
       "-c",
-      "trap : TERM INT; sleep infinity & wait",
+      startup,
     ]);
     try {
       await this.docker(["start", name]);
@@ -215,7 +263,6 @@ export class DockerSandboxProvider implements SandboxProvider {
   async terminate(request: { sandboxId: string; providerHandle: string }): Promise<void> {
     await this.assertHandle(request);
     await this.docker(["rm", "-f", request.providerHandle]);
-    await this.runner.run(["docker", "volume", "rm", `${request.providerHandle}-workspace`]);
   }
 
   async exec(request: {
@@ -225,14 +272,18 @@ export class DockerSandboxProvider implements SandboxProvider {
     cwd?: string;
     background?: boolean;
     timeoutMs?: number;
+    stdin?: Uint8Array;
   }): Promise<SandboxExecResult> {
     await this.assertHandle(request);
-    const cwd = request.cwd ? this.workspacePath(request.cwd) : "/workspace";
+    const cwd = request.cwd
+      ? await this.confinedWorkspacePath(request, request.cwd, "existing")
+      : "/workspace";
     if (request.background) {
       const processId = `spr_${randomUUID().replaceAll("-", "")}`;
       const pidFile = `/workspace/.appaloft-process-${processId}.pid`;
       await this.docker([
         "exec",
+        ...(request.stdin ? ["-i"] : []),
         "-d",
         "-w",
         cwd,
@@ -246,18 +297,58 @@ export class DockerSandboxProvider implements SandboxProvider {
       ]);
       return { mode: "background", processId };
     }
+    const processId = `spr_${randomUUID().replaceAll("-", "")}`;
+    const pidFile = `/workspace/.appaloft-process-${processId}.pid`;
     const result = await this.docker(
-      ["exec", "-w", cwd, request.providerHandle, ...request.argv],
-      request.timeoutMs ? { timeoutMs: request.timeoutMs } : undefined,
+      [
+        "exec",
+        "-w",
+        cwd,
+        request.providerHandle,
+        "sh",
+        "-c",
+        'echo $$ > "$1"; shift; "$@"; code=$?; rm -f "$1"; exit "$code"',
+        "appaloft-foreground",
+        pidFile,
+        ...request.argv,
+      ],
+      request.timeoutMs || request.stdin
+        ? {
+            ...(request.timeoutMs ? { timeoutMs: request.timeoutMs } : {}),
+            ...(request.stdin ? { stdin: request.stdin } : {}),
+          }
+        : undefined,
       true,
     );
+    if (result.failure) {
+      await this.runner.run([
+        "docker",
+        "exec",
+        request.providerHandle,
+        "sh",
+        "-c",
+        '[ -f "$1" ] && kill "$(cat "$1")" 2>/dev/null; rm -f "$1"',
+        "appaloft-process-limit",
+        pidFile,
+      ]);
+    }
     const frames = [] as Extract<SandboxExecResult, { mode: "foreground" }>["frames"];
     let sequence = 1;
     if (result.stdout.byteLength > 0)
       frames.push({ kind: "stdout", sequence: sequence++, data: text(result.stdout) });
     if (result.stderr.length > 0)
       frames.push({ kind: "stderr", sequence: sequence++, data: result.stderr });
-    frames.push({ kind: "exit", sequence, exitCode: result.exitCode });
+    if (result.failure) {
+      frames.push({
+        kind: "error",
+        sequence,
+        code:
+          result.failure === "timeout" ? "sandbox_exec_timeout" : "sandbox_exec_output_limit",
+        retryable: false,
+      });
+    } else {
+      frames.push({ kind: "exit", sequence, exitCode: result.exitCode });
+    }
     return { mode: "foreground", frames };
   }
 
@@ -319,7 +410,7 @@ export class DockerSandboxProvider implements SandboxProvider {
     path: string;
   }): Promise<SandboxFileDescriptor[]> {
     await this.assertHandle(request);
-    const path = this.workspacePath(request.path);
+    const path = await this.confinedWorkspacePath(request, request.path, "existing");
     const listed = await this.docker([
       "exec",
       request.providerHandle,
@@ -354,7 +445,8 @@ export class DockerSandboxProvider implements SandboxProvider {
     path: string;
   }): Promise<Uint8Array> {
     await this.assertHandle(request);
-    return (await this.docker(["exec", request.providerHandle, "cat", this.workspacePath(request.path)]))
+    const path = await this.confinedWorkspacePath(request, request.path, "existing");
+    return (await this.docker(["exec", request.providerHandle, "cat", path]))
       .stdout;
   }
 
@@ -365,7 +457,7 @@ export class DockerSandboxProvider implements SandboxProvider {
     content: Uint8Array;
   }): Promise<SandboxFileDescriptor> {
     await this.assertHandle(request);
-    const path = this.workspacePath(request.path);
+    const path = await this.confinedWorkspacePath(request, request.path, "write");
     await this.docker(
       [
         "exec",
@@ -389,13 +481,14 @@ export class DockerSandboxProvider implements SandboxProvider {
     recursive?: boolean;
   }): Promise<void> {
     await this.assertHandle(request);
+    const path = await this.confinedWorkspacePath(request, request.path, "existing");
     await this.docker([
       "exec",
       request.providerHandle,
       "rm",
       ...(request.recursive ? ["-rf"] : ["-f"]),
       "--",
-      this.workspacePath(request.path),
+      path,
     ]);
   }
 
@@ -452,30 +545,112 @@ export class DockerSandboxProvider implements SandboxProvider {
     await this.assertHandle(request);
     if (request.capability !== "filesystem") throw new Error("Unsupported snapshot capability");
     const image = `appaloft-sandbox-snapshot:${request.snapshotId}`;
-    await this.docker([
+    const helper = `${containerName(request.sandboxId)}-snapshot-${request.snapshotId}`;
+    const inspectedSource = await this.docker([
+      "inspect",
+      "--format",
+      "{{.Config.Image}}",
+      request.providerHandle,
+    ]);
+    const sourceImage = text(inspectedSource.stdout).trim();
+    const archive = await this.docker([
       "exec",
       request.providerHandle,
+      "tar",
+      "-C",
+      "/workspace",
+      "-cf",
+      "-",
+      ".",
+    ]);
+    await this.docker([
+      "create",
+      "--name",
+      helper,
+      "--label",
+      "appaloft.managed=true",
+      "--label",
+      `appaloft.snapshot.id=${request.snapshotId}`,
+      "--network",
+      "none",
+      "--cap-drop",
+      "ALL",
+      "--security-opt",
+      "no-new-privileges=true",
+      sourceImage,
       "sh",
       "-c",
-      "rm -rf /appaloft-snapshot-workspace && cp -a /workspace /appaloft-snapshot-workspace",
+      "trap : TERM INT; sleep infinity & wait",
     ]);
-    await this.docker(["commit", request.providerHandle, image]);
+    try {
+      await this.docker(["start", helper]);
+      await this.docker(
+        [
+          "exec",
+          "-i",
+          helper,
+          "sh",
+          "-c",
+          "mkdir -p /appaloft-snapshot-workspace && tar -xf - -C /appaloft-snapshot-workspace",
+        ],
+        { stdin: archive.stdout },
+      );
+      await this.docker(["commit", helper, image]);
+    } finally {
+      await this.runner.run(["docker", "rm", "-f", helper]);
+    }
     const inspected = await this.docker(["image", "inspect", "--format", "{{.Size}}", image]);
-    await this.runner.run([
-      "docker",
-      "exec",
-      request.providerHandle,
-      "rm",
-      "-rf",
-      "/appaloft-snapshot-workspace",
-    ]);
     return { providerHandle: image, sizeBytes: Number(text(inspected.stdout).trim()) };
+  }
+
+  async deleteSnapshot(request: { snapshotId: string; providerHandle: string }): Promise<void> {
+    const expected = `appaloft-sandbox-snapshot:${request.snapshotId}`;
+    if (request.providerHandle !== expected) {
+      throw new Error("Sandbox snapshot provider handle does not match the managed image");
+    }
+    const inspected = await this.docker([
+      "image",
+      "inspect",
+      "--format",
+      '{{index .Config.Labels "appaloft.snapshot.id"}}',
+      request.providerHandle,
+    ]);
+    if (text(inspected.stdout).trim() !== request.snapshotId) {
+      throw new Error("Docker snapshot image is not owned by the requested snapshot");
+    }
+    await this.docker(["image", "rm", request.providerHandle]);
   }
 
   private workspacePath(path: string): string {
     const checked = SandboxWorkspacePath.create(path);
     if (checked.isErr()) throw new Error("Sandbox path escaped the workspace");
     return `/workspace/${checked.value.value}`.replace(/\/$/, "");
+  }
+
+  private async confinedWorkspacePath(
+    request: { sandboxId: string; providerHandle: string },
+    path: string,
+    intent: "existing" | "write",
+  ): Promise<string> {
+    const lexical = this.workspacePath(path);
+    const script =
+      intent === "write"
+        ? 'mkdir -p "$(dirname "$1")" || exit 1; if [ -e "$1" ] || [ -L "$1" ]; then realpath "$1"; else parent=$(realpath "$(dirname "$1")") || exit 1; printf "%s/%s\\n" "$parent" "$(basename "$1")"; fi'
+        : 'realpath "$1"';
+    const resolved = await this.docker([
+      "exec",
+      request.providerHandle,
+      "sh",
+      "-c",
+      script,
+      "appaloft-workspace-path",
+      lexical,
+    ]);
+    const absolute = text(resolved.stdout).trim();
+    if (absolute !== "/workspace" && !absolute.startsWith("/workspace/")) {
+      throw new Error("Sandbox path escaped the workspace through a symbolic link");
+    }
+    return absolute;
   }
 
   private async assertHandle(request: {

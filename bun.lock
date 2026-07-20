@@ -143,7 +143,6 @@
       "name": "@appaloft/adapter-cli",
       "dependencies": {
         "@appaloft/application": "workspace:*",
-        "@appaloft/ash": "workspace:*",
         "@appaloft/cli-logging": "workspace:*",
         "@appaloft/contracts": "workspace:*",
         "@appaloft/core": "workspace:*",
@@ -563,12 +562,14 @@
       "name": "@appaloft/sdk",
       "version": "0.1.0",
       "devDependencies": {
+        "@appaloft/adapter-runtime": "workspace:*",
         "@appaloft/application": "workspace:*",
         "@appaloft/core": "workspace:*",
         "@appaloft/openapi": "workspace:*",
         "@appaloft/orpc": "workspace:*",
         "@appaloft/sdk-generator": "workspace:*",
         "elysia": "^1.4.29",
+        "tsyringe": "^4.10.0",
       },
     },
     "packages/sdk-generator": {
@@ -584,6 +585,7 @@
         "@appaloft/adapter-secret-protection": "workspace:*",
         "@appaloft/ai-mcp": "workspace:*",
         "@appaloft/application": "workspace:*",
+        "@appaloft/ash": "workspace:*",
         "@appaloft/auth-better": "workspace:*",
         "@appaloft/blueprints": "workspace:*",
         "@appaloft/config": "workspace:*",

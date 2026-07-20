@@ -108,6 +108,7 @@ import { sourceEventChangeSetMigration } from "./migrations/099_source_event_cha
 import { serverHostIdentityMigration } from "./migrations/100_server_host_identity";
 import { domainBindingTargetServiceMigration } from "./migrations/101_domain_binding_target_service";
 import { executionSandboxesMigration } from "./migrations/102_execution_sandboxes";
+import { executionSandboxTemplatesMigration } from "./migrations/103_execution_sandbox_templates";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -312,6 +313,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "100_server_host_identity": serverHostIdentityMigration,
       "101_domain_binding_target_service": domainBindingTargetServiceMigration,
       "102_execution_sandboxes": executionSandboxesMigration,
+      "103_execution_sandbox_templates": executionSandboxTemplatesMigration,
     };
   }
 }

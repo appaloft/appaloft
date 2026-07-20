@@ -57,6 +57,7 @@ export interface SandboxState {
   updatedAt?: UpdatedAt;
   expiresAt?: ExpiresAt;
   currentAttemptId?: string;
+  provisionAttempts: number;
   providerHandle?: string;
 }
 
@@ -77,7 +78,7 @@ export class Sandbox extends AggregateRoot<SandboxState, SandboxId> {
     super(state);
   }
 
-  static create(input: Omit<SandboxState, "status">): Result<Sandbox> {
+  static create(input: Omit<SandboxState, "status" | "provisionAttempts">): Result<Sandbox> {
     if (input.source.kind === "image" && !safeImage(input.source.image)) {
       return err(
         domainError.validation("Sandbox image reference is invalid", {
@@ -94,7 +95,11 @@ export class Sandbox extends AggregateRoot<SandboxState, SandboxId> {
         }),
       );
     }
-    const sandbox = new Sandbox({ ...input, status: SandboxStatusValue.requested() });
+    const sandbox = new Sandbox({
+      ...input,
+      status: SandboxStatusValue.requested(),
+      provisionAttempts: 0,
+    });
     sandbox.recordDomainEvent("sandbox-requested", input.createdAt, {
       requestedIsolation: input.requestedIsolation.value,
       sourceKind: input.source.kind,
@@ -120,6 +125,7 @@ export class Sandbox extends AggregateRoot<SandboxState, SandboxId> {
     }
     this.state.status = SandboxStatusValue.rehydrate("provisioning");
     this.state.currentAttemptId = input.attemptId;
+    this.state.provisionAttempts += 1;
     this.state.updatedAt = input.at;
     this.recordDomainEvent("sandbox-provisioning-started", input.at, {
       attemptId: input.attemptId,
@@ -185,6 +191,16 @@ export class Sandbox extends AggregateRoot<SandboxState, SandboxId> {
     return ok(undefined);
   }
 
+  markPauseFailed(input: { code: string; at: UpdatedAt }): Result<void> {
+    if (this.state.status.value !== "pausing") {
+      return err(transitionError(this.state.status.value, "fail pause"));
+    }
+    this.state.status = SandboxStatusValue.rehydrate("ready");
+    this.state.updatedAt = input.at;
+    this.recordDomainEvent("sandbox-pause-failed", input.at, { code: input.code });
+    return ok(undefined);
+  }
+
   requestResume(input: { at: UpdatedAt }): Result<void> {
     if (this.state.status.value !== "paused") {
       return err(transitionError(this.state.status.value, "resume"));
@@ -192,6 +208,16 @@ export class Sandbox extends AggregateRoot<SandboxState, SandboxId> {
     this.state.status = SandboxStatusValue.rehydrate("resuming");
     this.state.updatedAt = input.at;
     this.recordDomainEvent("sandbox-resume-requested", input.at, {});
+    return ok(undefined);
+  }
+
+  markResumeFailed(input: { code: string; at: UpdatedAt }): Result<void> {
+    if (this.state.status.value !== "resuming") {
+      return err(transitionError(this.state.status.value, "fail resume"));
+    }
+    this.state.status = SandboxStatusValue.rehydrate("paused");
+    this.state.updatedAt = input.at;
+    this.recordDomainEvent("sandbox-resume-failed", input.at, { code: input.code });
     return ok(undefined);
   }
 

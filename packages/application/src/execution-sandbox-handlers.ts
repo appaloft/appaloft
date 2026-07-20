@@ -11,6 +11,9 @@ import { type ExecutionSandboxService } from "./execution-sandbox";
 import {
   CreateSandboxCommand,
   CreateSandboxSnapshotCommand,
+  CreateSandboxTemplateCommand,
+  DeleteSandboxSnapshotCommand,
+  DeleteSandboxTemplateCommand,
   ExecuteSandboxCommand,
   ExposeSandboxPortCommand,
   ListSandboxesQuery,
@@ -18,6 +21,7 @@ import {
   ListSandboxPortsQuery,
   ListSandboxProcessesQuery,
   ListSandboxSnapshotsQuery,
+  ListSandboxTemplatesQuery,
   PauseSandboxCommand,
   ReadSandboxFileQuery,
   RemoveSandboxFileCommand,
@@ -25,6 +29,7 @@ import {
   RevokeSandboxPortCommand,
   ShowSandboxQuery,
   ShowSandboxSnapshotQuery,
+  ShowSandboxTemplateQuery,
   TerminateSandboxCommand,
   TerminateSandboxProcessCommand,
   WriteSandboxFileCommand,
@@ -42,7 +47,10 @@ type SandboxCommand =
   | TerminateSandboxProcessCommand
   | ExposeSandboxPortCommand
   | RevokeSandboxPortCommand
-  | CreateSandboxSnapshotCommand;
+  | CreateSandboxSnapshotCommand
+  | DeleteSandboxSnapshotCommand
+  | CreateSandboxTemplateCommand
+  | DeleteSandboxTemplateCommand;
 type SandboxQuery =
   | ListSandboxesQuery
   | ShowSandboxQuery
@@ -51,7 +59,9 @@ type SandboxQuery =
   | ListSandboxProcessesQuery
   | ListSandboxPortsQuery
   | ListSandboxSnapshotsQuery
-  | ShowSandboxSnapshotQuery;
+  | ShowSandboxSnapshotQuery
+  | ListSandboxTemplatesQuery
+  | ShowSandboxTemplateQuery;
 
 function text(input: Record<string, unknown>, key: string): string {
   return input[key] as string;
@@ -98,11 +108,17 @@ export class SandboxCommandHandler implements CommandHandlerContract<SandboxComm
     if (command instanceof TerminateSandboxCommand)
       return this.service.terminate(context, text(input, "sandboxId"));
     if (command instanceof ExecuteSandboxCommand) {
-      return this.service.exec(
-        context,
-        text(input, "sandboxId"),
-        input as Parameters<ExecutionSandboxService["exec"]>[2],
-      );
+      const stdinValue = input.stdinBase64;
+      let stdin: Uint8Array | undefined;
+      if (typeof stdinValue === "string") {
+        const decoded = decodeBase64(stdinValue);
+        if (decoded.isErr()) return err(decoded.error);
+        stdin = decoded.value;
+      }
+      return this.service.exec(context, text(input, "sandboxId"), {
+        ...(input as Parameters<ExecutionSandboxService["exec"]>[2]),
+        ...(stdin ? { stdin } : {}),
+      });
     }
     if (command instanceof WriteSandboxFileCommand) {
       const decoded = decodeBase64(text(input, "contentBase64"));
@@ -143,6 +159,18 @@ export class SandboxCommandHandler implements CommandHandlerContract<SandboxComm
         input as Parameters<ExecutionSandboxService["createSnapshot"]>[2],
       );
     }
+    if (command instanceof DeleteSandboxSnapshotCommand) {
+      return this.service.deleteSnapshot(context, text(input, "snapshotId"));
+    }
+    if (command instanceof CreateSandboxTemplateCommand) {
+      return this.service.createTemplate(
+        context,
+        input as Parameters<ExecutionSandboxService["createTemplate"]>[1],
+      );
+    }
+    if (command instanceof DeleteSandboxTemplateCommand) {
+      return this.service.deleteTemplate(context, text(input, "templateId"));
+    }
     return err(domainError.invariant("Sandbox command handler received an unknown message"));
   }
 }
@@ -180,6 +208,10 @@ export class SandboxQueryHandler implements QueryHandlerContract<SandboxQuery, u
       return this.service.listSnapshots(context, input);
     if (query instanceof ShowSandboxSnapshotQuery)
       return this.service.showSnapshot(context, text(input, "snapshotId"));
+    if (query instanceof ListSandboxTemplatesQuery)
+      return this.service.listTemplates(context, input);
+    if (query instanceof ShowSandboxTemplateQuery)
+      return this.service.showTemplate(context, text(input, "templateId"));
     return err(domainError.invariant("Sandbox query handler received an unknown message"));
   }
 }
@@ -196,6 +228,9 @@ for (const command of [
   ExposeSandboxPortCommand,
   RevokeSandboxPortCommand,
   CreateSandboxSnapshotCommand,
+  DeleteSandboxSnapshotCommand,
+  CreateSandboxTemplateCommand,
+  DeleteSandboxTemplateCommand,
 ])
   CommandHandler(command)(SandboxCommandHandler);
 
@@ -208,5 +243,7 @@ for (const query of [
   ListSandboxPortsQuery,
   ListSandboxSnapshotsQuery,
   ShowSandboxSnapshotQuery,
+  ListSandboxTemplatesQuery,
+  ShowSandboxTemplateQuery,
 ])
   QueryHandler(query)(SandboxQueryHandler);

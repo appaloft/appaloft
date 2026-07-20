@@ -1,6 +1,9 @@
 import {
   CreateSandboxCommand,
   CreateSandboxSnapshotCommand,
+  CreateSandboxTemplateCommand,
+  DeleteSandboxSnapshotCommand,
+  DeleteSandboxTemplateCommand,
   ExecuteSandboxCommand,
   ExposeSandboxPortCommand,
   ListSandboxesQuery,
@@ -8,6 +11,7 @@ import {
   ListSandboxPortsQuery,
   ListSandboxProcessesQuery,
   ListSandboxSnapshotsQuery,
+  ListSandboxTemplatesQuery,
   PauseSandboxCommand,
   ReadSandboxFileQuery,
   RemoveSandboxFileCommand,
@@ -15,6 +19,7 @@ import {
   RevokeSandboxPortCommand,
   ShowSandboxQuery,
   ShowSandboxSnapshotQuery,
+  ShowSandboxTemplateQuery,
   TerminateSandboxCommand,
   TerminateSandboxProcessCommand,
   WriteSandboxFileCommand,
@@ -25,6 +30,7 @@ import { optionalNumber, optionalValue, runCommand, runQuery } from "../runtime.
 
 const sandboxId = Args.text({ name: "sandboxId" });
 const snapshotId = Args.text({ name: "snapshotId" });
+const templateId = Args.text({ name: "templateId" });
 const processId = Args.text({ name: "processId" });
 const exposureId = Args.text({ name: "exposureId" });
 const path = Options.text("path");
@@ -44,7 +50,9 @@ function page(
 const create = EffectCommand.make(
   "create",
   {
-    image: Options.text("image"),
+    image: Options.text("image").pipe(Options.optional),
+    snapshot: Options.text("snapshot").pipe(Options.optional),
+    template: Options.text("template").pipe(Options.optional),
     isolation: Options.choice("isolation", [
       "container-trusted",
       "gvisor",
@@ -58,17 +66,40 @@ const create = EffectCommand.make(
     expiresAt: Options.text("expires-at").pipe(Options.optional),
     provider: Options.text("provider").pipe(Options.optional),
   },
-  ({ cpuMillis, diskBytes, expiresAt, image, isolation, maxProcesses, memoryBytes, provider }) =>
-    runCommand(
+  ({
+    cpuMillis,
+    diskBytes,
+    expiresAt,
+    image,
+    isolation,
+    maxProcesses,
+    memoryBytes,
+    provider,
+    snapshot,
+    template,
+  }) => {
+    const imageValue = optionalValue(image);
+    const snapshotValue = optionalValue(snapshot);
+    const templateValue = optionalValue(template);
+    const selectedSources = [imageValue, snapshotValue, templateValue].filter(Boolean);
+    return runCommand(
       CreateSandboxCommand.create({
-        source: { kind: "image", image },
+        source:
+          selectedSources.length !== 1
+            ? { kind: "invalid" }
+            : imageValue
+              ? { kind: "image", image: imageValue }
+              : snapshotValue
+                ? { kind: "snapshot", snapshotId: snapshotValue }
+                : { kind: "template", templateId: templateValue },
         requestedIsolation: isolation,
         limits: { cpuMillis, memoryBytes, diskBytes, maxProcesses },
         networkPolicy: { mode: "deny", rules: [] },
         ...(optionalValue(expiresAt) ? { expiresAt: optionalValue(expiresAt) } : {}),
         ...(optionalValue(provider) ? { providerKey: optionalValue(provider) } : {}),
       }),
-    ),
+    );
+  },
 ).pipe(EffectCommand.withDescription("Create an isolated execution Sandbox"));
 
 const list = EffectCommand.make("list", { limit, offset }, ({ limit, offset }) =>
@@ -94,8 +125,9 @@ const exec = EffectCommand.make(
     cwd: Options.text("cwd").pipe(Options.optional),
     background: Options.boolean("background").pipe(Options.withDefault(false)),
     timeoutMs: Options.text("timeout-ms").pipe(Options.optional),
+    stdinBase64: Options.text("stdin-base64").pipe(Options.optional),
   },
-  ({ arg, background, cwd, sandboxId, timeoutMs }) =>
+  ({ arg, background, cwd, sandboxId, stdinBase64, timeoutMs }) =>
     runCommand(
       ExecuteSandboxCommand.create({
         sandboxId,
@@ -105,6 +137,7 @@ const exec = EffectCommand.make(
         ...(optionalNumber(timeoutMs) !== undefined
           ? { timeoutMs: optionalNumber(timeoutMs) }
           : {}),
+        ...(optionalValue(stdinBase64) ? { stdinBase64: optionalValue(stdinBase64) } : {}),
       }),
     ),
 );
@@ -207,8 +240,51 @@ const snapshotList = EffectCommand.make("list", { limit, offset }, ({ limit, off
 const snapshotShow = EffectCommand.make("show", { snapshotId }, ({ snapshotId }) =>
   runQuery(ShowSandboxSnapshotQuery.create({ snapshotId })),
 );
+const snapshotDelete = EffectCommand.make("delete", { snapshotId }, ({ snapshotId }) =>
+  runCommand(DeleteSandboxSnapshotCommand.create({ snapshotId })),
+);
 const snapshot = EffectCommand.make("snapshot").pipe(
-  EffectCommand.withSubcommands([snapshotCreate, snapshotList, snapshotShow]),
+  EffectCommand.withSubcommands([snapshotCreate, snapshotList, snapshotShow, snapshotDelete]),
+);
+
+const templateCreate = EffectCommand.make(
+  "create",
+  {
+    name: Options.text("name"),
+    image: Options.text("image"),
+    isolation: Options.choice("isolation", [
+      "container-trusted",
+      "gvisor",
+      "kata",
+      "microvm",
+    ] as const),
+    cpuMillis: Options.integer("cpu-millis"),
+    memoryBytes: Options.integer("memory-bytes"),
+    diskBytes: Options.integer("disk-bytes"),
+    maxProcesses: Options.integer("max-processes"),
+  },
+  ({ cpuMillis, diskBytes, image, isolation, maxProcesses, memoryBytes, name }) =>
+    runCommand(
+      CreateSandboxTemplateCommand.create({
+        name,
+        image,
+        minimumIsolation: isolation,
+        limits: { cpuMillis, memoryBytes, diskBytes, maxProcesses },
+        networkPolicy: { mode: "deny", rules: [] },
+      }),
+    ),
+);
+const templateList = EffectCommand.make("list", { limit, offset }, ({ limit, offset }) =>
+  runQuery(ListSandboxTemplatesQuery.create(page(limit, offset))),
+);
+const templateShow = EffectCommand.make("show", { templateId }, ({ templateId }) =>
+  runQuery(ShowSandboxTemplateQuery.create({ templateId })),
+);
+const templateDelete = EffectCommand.make("delete", { templateId }, ({ templateId }) =>
+  runCommand(DeleteSandboxTemplateCommand.create({ templateId })),
+);
+const template = EffectCommand.make("template").pipe(
+  EffectCommand.withSubcommands([templateCreate, templateList, templateShow, templateDelete]),
 );
 
 export const sandboxCommand = EffectCommand.make("sandbox").pipe(
@@ -225,5 +301,6 @@ export const sandboxCommand = EffectCommand.make("sandbox").pipe(
     process,
     port,
     snapshot,
+    template,
   ]),
 );

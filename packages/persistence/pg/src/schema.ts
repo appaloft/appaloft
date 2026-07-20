@@ -1177,6 +1177,7 @@ export interface ConnectorAuthorizationAttemptsTable {
 export interface Database {
   execution_sandboxes: ExecutionSandboxesTable;
   execution_sandbox_snapshots: ExecutionSandboxSnapshotsTable;
+  execution_sandbox_templates: ExecutionSandboxTemplatesTable;
   account: BetterAuthAccountsTable;
   projects: ProjectsTable;
   servers: ServersTable;
@@ -1266,4 +1267,12 @@ export interface ExecutionSandboxSnapshotsTable {
   state: ColumnType<Record<string, unknown>, Record<string, unknown>, Record<string, unknown>>;
   created_at: TimestampColumn;
   updated_at: UpdatableTimestampColumn;
+}
+
+export interface ExecutionSandboxTemplatesTable {
+  tenant_id: string;
+  id: string;
+  name: string;
+  state: ColumnType<Record<string, unknown>, Record<string, unknown>, Record<string, unknown>>;
+  created_at: TimestampColumn;
 }

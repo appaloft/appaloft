@@ -15,6 +15,9 @@ import {
   type SandboxResourceLimitsState,
   SandboxSnapshot,
   SandboxSnapshotId,
+  SandboxTemplate,
+  SandboxTemplateId,
+  SandboxTemplateName,
   SandboxWorkspacePath,
   UpdatedAt,
 } from "@appaloft/core";
@@ -32,13 +35,13 @@ export interface SandboxProviderCapabilities {
   processes: boolean;
   files: boolean;
   ports: boolean;
-  networkPolicy: boolean;
+  networkPolicy: ("deny" | "allowlist")[];
   credentialBroker: boolean;
 }
 
 export interface SandboxProviderRequest {
   sandboxId: string;
-  source: { kind: "image"; image: string };
+  source: { kind: "image"; image: string } | { kind: "snapshot"; providerHandle: string };
   requestedIsolation: SandboxIsolation;
   limits: SandboxResourceLimitsState;
   networkPolicy: SandboxNetworkPolicyState;
@@ -90,6 +93,7 @@ export interface SandboxProvider {
     cwd?: string;
     background?: boolean;
     timeoutMs?: number;
+    stdin?: Uint8Array;
   }): Promise<SandboxExecResult>;
   listProcesses(request: {
     sandboxId: string;
@@ -141,6 +145,7 @@ export interface SandboxProvider {
     snapshotId: string;
     capability: "filesystem" | "filesystem-memory";
   }): Promise<{ providerHandle: string; sizeBytes: number }>;
+  deleteSnapshot(request: { snapshotId: string; providerHandle: string }): Promise<void>;
 }
 
 export class SandboxProviderRegistry {
@@ -173,12 +178,17 @@ export class SandboxProviderRegistry {
 
 export type StoredSandbox = { tenantId: string; providerKey: string; sandbox: Sandbox };
 export type StoredSnapshot = { tenantId: string; providerKey: string; snapshot: SandboxSnapshot };
+export type StoredTemplate = { tenantId: string; template: SandboxTemplate };
 export interface SandboxRepository {
   save(context: RepositoryContext, sandbox: Sandbox, providerKey: string): Promise<void>;
   find(context: RepositoryContext, sandboxId: string): Promise<StoredSandbox | null>;
   list(
     context: RepositoryContext,
     input: { limit: number; offset: number },
+  ): Promise<StoredSandbox[]>;
+  listForMaintenance(
+    context: RepositoryContext,
+    input: { limit: number },
   ): Promise<StoredSandbox[]>;
   saveSnapshot(
     context: RepositoryContext,
@@ -190,6 +200,14 @@ export interface SandboxRepository {
     context: RepositoryContext,
     input: { limit: number; offset: number },
   ): Promise<StoredSnapshot[]>;
+  saveTemplate(context: RepositoryContext, template: SandboxTemplate): Promise<void>;
+  findTemplate(context: RepositoryContext, templateId: string): Promise<StoredTemplate | null>;
+  listTemplates(
+    context: RepositoryContext,
+    input: { limit: number; offset: number },
+  ): Promise<StoredTemplate[]>;
+  deleteTemplate(context: RepositoryContext, templateId: string): Promise<void>;
+  hasActiveTemplateReferences(context: RepositoryContext, templateId: string): Promise<boolean>;
 }
 
 function tenantId(context: RepositoryContext): string {
@@ -199,6 +217,7 @@ function tenantId(context: RepositoryContext): string {
 export class InMemorySandboxRepository implements SandboxRepository {
   private readonly items = new Map<string, StoredSandbox>();
   private readonly snapshots = new Map<string, StoredSnapshot>();
+  private readonly templates = new Map<string, StoredTemplate>();
   async save(context: RepositoryContext, sandbox: Sandbox, providerKey: string): Promise<void> {
     const tenant = tenantId(context);
     this.items.set(`${tenant}:${sandbox.id.value}`, { tenantId: tenant, providerKey, sandbox });
@@ -213,6 +232,15 @@ export class InMemorySandboxRepository implements SandboxRepository {
     return [...this.items.values()]
       .filter((item) => item.tenantId === tenantId(context))
       .slice(input.offset, input.offset + input.limit);
+  }
+  async listForMaintenance(
+    context: RepositoryContext,
+    input: { limit: number },
+  ): Promise<StoredSandbox[]> {
+    return [...this.items.values()]
+      .filter((item) => item.tenantId === tenantId(context))
+      .filter((item) => !item.sandbox.toState().status.isTerminal())
+      .slice(0, input.limit);
   }
   async saveSnapshot(
     context: RepositoryContext,
@@ -240,6 +268,41 @@ export class InMemorySandboxRepository implements SandboxRepository {
       .filter((item) => item.tenantId === tenantId(context))
       .slice(input.offset, input.offset + input.limit);
   }
+  async saveTemplate(context: RepositoryContext, template: SandboxTemplate): Promise<void> {
+    const tenant = tenantId(context);
+    this.templates.set(`${tenant}:${template.id.value}`, { tenantId: tenant, template });
+  }
+  async findTemplate(
+    context: RepositoryContext,
+    templateId: string,
+  ): Promise<StoredTemplate | null> {
+    return this.templates.get(`${tenantId(context)}:${templateId}`) ?? null;
+  }
+  async listTemplates(
+    context: RepositoryContext,
+    input: { limit: number; offset: number },
+  ): Promise<StoredTemplate[]> {
+    return [...this.templates.values()]
+      .filter((item) => item.tenantId === tenantId(context))
+      .slice(input.offset, input.offset + input.limit);
+  }
+  async deleteTemplate(context: RepositoryContext, templateId: string): Promise<void> {
+    this.templates.delete(`${tenantId(context)}:${templateId}`);
+  }
+  async hasActiveTemplateReferences(
+    context: RepositoryContext,
+    templateId: string,
+  ): Promise<boolean> {
+    return [...this.items.values()].some((item) => {
+      const state = item.sandbox.toState();
+      return (
+        item.tenantId === tenantId(context) &&
+        !state.status.isTerminal() &&
+        state.source.kind === "template" &&
+        state.source.templateId.value === templateId
+      );
+    });
+  }
 }
 
 export interface SandboxDescriptor {
@@ -255,6 +318,7 @@ export interface SandboxDescriptor {
   expiresAt?: string;
   providerKey: string;
   attemptId?: string;
+  provisionAttempts: number;
 }
 
 export interface SandboxSnapshotDescriptor {
@@ -265,6 +329,21 @@ export interface SandboxSnapshotDescriptor {
   sizeBytes?: number;
   createdAt: string;
   expiresAt?: string;
+}
+
+export interface SandboxTemplateDescriptor {
+  templateId: string;
+  name: string;
+  image: string;
+  minimumIsolation: SandboxIsolation;
+  limits: SandboxResourceLimitsState;
+  networkPolicy: SandboxNetworkPolicyState;
+  overridePolicy: {
+    isolation: "immutable" | "strengthen-only";
+    limits: "immutable" | "decrease-only";
+    network: "immutable";
+  };
+  createdAt: string;
 }
 
 function descriptor(stored: StoredSandbox): SandboxDescriptor {
@@ -278,6 +357,7 @@ function descriptor(stored: StoredSandbox): SandboxDescriptor {
     networkPolicy: state.networkPolicy.toState(),
     createdAt: state.createdAt.value,
     providerKey: stored.providerKey,
+    provisionAttempts: state.provisionAttempts,
     ...(state.realizedIsolation ? { realizedIsolation: state.realizedIsolation.value } : {}),
     ...(state.updatedAt ? { updatedAt: state.updatedAt.value } : {}),
     ...(state.expiresAt ? { expiresAt: state.expiresAt.value } : {}),
@@ -295,6 +375,20 @@ function snapshotDescriptor(stored: StoredSnapshot): SandboxSnapshotDescriptor {
     createdAt: state.createdAt.value,
     ...(state.sizeBytes !== undefined ? { sizeBytes: state.sizeBytes } : {}),
     ...(state.expiresAt ? { expiresAt: state.expiresAt.value } : {}),
+  };
+}
+
+function templateDescriptor(stored: StoredTemplate): SandboxTemplateDescriptor {
+  const state = stored.template.toState();
+  return {
+    templateId: state.id.value,
+    name: state.name.value,
+    image: state.image,
+    minimumIsolation: state.minimumIsolation.value,
+    limits: state.limits.toState(),
+    networkPolicy: state.networkPolicy.toState(),
+    overridePolicy: { ...state.overridePolicy },
+    createdAt: state.createdAt.value,
   };
 }
 
@@ -329,10 +423,27 @@ export class ExecutionSandboxService {
     this.idGenerator = input.idGenerator;
   }
 
+  private async providerOperation<T>(phase: string, run: () => Promise<T>): Promise<Result<T>> {
+    try {
+      return ok(await run());
+    } catch {
+      return err({
+        code: "sandbox_provider_operation_failed",
+        category: "provider",
+        message: "Sandbox provider operation failed",
+        retryable: true,
+        details: { phase },
+      });
+    }
+  }
+
   async create(
     context: ExecutionContext,
     input: {
-      source: { kind: "image"; image: string };
+      source:
+        | { kind: "image"; image: string }
+        | { kind: "snapshot"; snapshotId: string }
+        | { kind: "template"; templateId: string };
       requestedIsolation: SandboxIsolation;
       limits: SandboxResourceLimitsState;
       networkPolicy: SandboxNetworkPolicyState;
@@ -342,22 +453,77 @@ export class ExecutionSandboxService {
   ): Promise<Result<SandboxDescriptor>> {
     const isolation = SandboxIsolationLevel.create(input.requestedIsolation);
     if (isolation.isErr()) return err(isolation.error);
+    const repositoryContext = toRepositoryContext(context);
+    let source: Parameters<typeof Sandbox.create>[0]["source"];
+    let sourceProviderKey: string | undefined;
+    if (input.source.kind === "snapshot") {
+      const snapshot = await this.repository.findSnapshot(
+        repositoryContext,
+        input.source.snapshotId,
+      );
+      if (!snapshot || !snapshot.snapshot.canCreateSandbox()) {
+        return err(domainError.conflict("Sandbox snapshot is unavailable for provisioning"));
+      }
+      const snapshotState = snapshot.snapshot.toState();
+      if (
+        snapshotState.expiresAt &&
+        snapshotState.expiresAt.toDate() <= new Date(this.clock.now())
+      ) {
+        return err(domainError.conflict("Sandbox snapshot has expired"));
+      }
+      source = { kind: "snapshot", snapshotId: snapshot.snapshot.id };
+      sourceProviderKey = snapshot.providerKey;
+    } else if (input.source.kind === "template") {
+      const template = await this.repository.findTemplate(
+        repositoryContext,
+        input.source.templateId,
+      );
+      if (!template) return err(domainError.notFound("SandboxTemplate", input.source.templateId));
+      source = { kind: "template", templateId: template.template.id };
+    } else {
+      source = input.source;
+    }
+    if (input.providerKey && sourceProviderKey && input.providerKey !== sourceProviderKey) {
+      return err(domainError.conflict("Sandbox snapshot belongs to a different provider"));
+    }
+    const chosenProviderKey = input.providerKey ?? sourceProviderKey;
     const provider = this.providerRegistry.findCompatible({
       isolation: isolation.value,
-      ...(input.providerKey ? { providerKey: input.providerKey } : {}),
+      ...(chosenProviderKey ? { providerKey: chosenProviderKey } : {}),
     });
     if (!provider) return err(isolationUnsupported(input.requestedIsolation, []));
     const limits = SandboxResourceLimits.create(input.limits);
     if (limits.isErr()) return err(limits.error);
     const networkPolicy = SandboxNetworkPolicy.create(input.networkPolicy);
     if (networkPolicy.isErr()) return err(networkPolicy.error);
+    if (!provider.capabilities.networkPolicy.includes(networkPolicy.value.toState().mode)) {
+      return err(
+        domainError.conflict("Sandbox provider does not support the requested network policy", {
+          phase: "execution-sandbox-network-placement",
+          requestedMode: networkPolicy.value.toState().mode,
+        }),
+      );
+    }
+    if (input.source.kind === "template") {
+      const template = await this.repository.findTemplate(
+        repositoryContext,
+        input.source.templateId,
+      );
+      if (!template) return err(domainError.notFound("SandboxTemplate", input.source.templateId));
+      const resolved = template.template.resolveCreatePolicy({
+        requestedIsolation: isolation.value,
+        limits: limits.value,
+        networkPolicy: networkPolicy.value,
+      });
+      if (resolved.isErr()) return err(resolved.error);
+    }
     const createdAt = CreatedAt.create(this.clock.now());
     if (createdAt.isErr()) return err(createdAt.error);
     const expiresAt = input.expiresAt ? ExpiresAt.create(input.expiresAt) : null;
     if (expiresAt?.isErr()) return err(expiresAt.error);
     const sandbox = Sandbox.create({
       id: SandboxId.rehydrate(this.idGenerator.next("sbx")),
-      source: input.source,
+      source,
       requestedIsolation: isolation.value,
       limits: limits.value,
       networkPolicy: networkPolicy.value,
@@ -409,6 +575,30 @@ export class ExecutionSandboxService {
     const stored = await this.repository.find(toRepositoryContext(context), sandboxId);
     if (!stored) return err(domainError.notFound("Sandbox", sandboxId));
     const state = stored.sandbox.toState();
+    if (state.expiresAt && state.expiresAt.toDate() <= new Date(this.clock.now())) {
+      const provider = this.providerRegistry.get(stored.providerKey);
+      if (state.providerHandle && provider) {
+        try {
+          await provider.terminate({ sandboxId, providerHandle: state.providerHandle });
+          const expired = stored.sandbox.expire({ at: UpdatedAt.rehydrate(this.clock.now()) });
+          if (expired.isOk()) {
+            await this.repository.save(
+              toRepositoryContext(context),
+              stored.sandbox,
+              stored.providerKey,
+            );
+          }
+        } catch {
+          // Access remains denied; the maintenance reconciler retains the handle for cleanup retry.
+        }
+      }
+      return err(
+        domainError.conflict("Sandbox has expired", {
+          phase: "execution-sandbox-expiry-admission",
+          expiresAt: state.expiresAt.value,
+        }),
+      );
+    }
     if (!stored.sandbox.canUseRuntime() || !state.providerHandle) {
       return err(
         domainError.conflict("Sandbox runtime is not ready", {
@@ -444,14 +634,56 @@ export class ExecutionSandboxService {
     if (started.isErr()) return err(started.error);
     await this.repository.save(toRepositoryContext(context), stored.sandbox, stored.providerKey);
     const state = stored.sandbox.toState();
-    if (state.source.kind !== "image")
-      return err(
-        domainError.validation("Only image sources are implemented by this provider slice"),
+    let providerSource: SandboxProviderRequest["source"];
+    if (state.source.kind === "image") {
+      providerSource = state.source;
+    } else if (state.source.kind === "snapshot") {
+      const snapshot = await this.repository.findSnapshot(
+        toRepositoryContext(context),
+        state.source.snapshotId.value,
       );
+      const snapshotState = snapshot?.snapshot.toState();
+      if (
+        !snapshot ||
+        snapshot.providerKey !== stored.providerKey ||
+        !snapshot.snapshot.canCreateSandbox() ||
+        !snapshotState?.providerHandle
+      ) {
+        stored.sandbox.markFailed({ code: "sandbox_snapshot_unavailable", retryable: false, at });
+        await this.repository.save(
+          toRepositoryContext(context),
+          stored.sandbox,
+          stored.providerKey,
+        );
+        return err(domainError.conflict("Sandbox snapshot is unavailable for provisioning"));
+      }
+      providerSource = { kind: "snapshot", providerHandle: snapshotState.providerHandle };
+    } else {
+      const template = await this.repository.findTemplate(
+        toRepositoryContext(context),
+        state.source.templateId.value,
+      );
+      if (!template) {
+        stored.sandbox.markFailed({ code: "sandbox_template_unavailable", retryable: false, at });
+        await this.repository.save(
+          toRepositoryContext(context),
+          stored.sandbox,
+          stored.providerKey,
+        );
+        return err(domainError.conflict("Sandbox template is unavailable for provisioning"));
+      }
+      const resolved = template.template.resolveCreatePolicy({
+        requestedIsolation: state.requestedIsolation,
+        limits: state.limits,
+        networkPolicy: state.networkPolicy,
+      });
+      if (resolved.isErr()) return err(resolved.error);
+      providerSource = { kind: "image", image: resolved.value.image };
+    }
     try {
       const observed = await provider.provision({
         sandboxId,
-        source: state.source,
+        source: providerSource,
         requestedIsolation: state.requestedIsolation.value,
         limits: state.limits.toState(),
         networkPolicy: state.networkPolicy.toState(),
@@ -477,10 +709,91 @@ export class ExecutionSandboxService {
     }
   }
 
+  async maintain(
+    context: ExecutionContext,
+    input: { limit?: number; maxProvisionAttempts?: number } = {},
+  ): Promise<Result<{ expired: string[]; reconciled: string[]; failed: string[] }>> {
+    const repositoryContext = toRepositoryContext(context);
+    const now = this.clock.now();
+    const at = UpdatedAt.rehydrate(now);
+    const maxProvisionAttempts = Math.min(Math.max(input.maxProvisionAttempts ?? 3, 1), 10);
+    const candidates = await this.repository.listForMaintenance(repositoryContext, {
+      limit: Math.min(Math.max(input.limit ?? 100, 1), 500),
+    });
+    const expired: string[] = [];
+    const reconciled: string[] = [];
+    const failed: string[] = [];
+    for (const stored of candidates) {
+      const state = stored.sandbox.toState();
+      if (state.expiresAt && state.expiresAt.toDate() <= new Date(now)) {
+        const provider = this.providerRegistry.get(stored.providerKey);
+        if (state.providerHandle && provider) {
+          try {
+            await provider.terminate({
+              sandboxId: state.id.value,
+              providerHandle: state.providerHandle,
+            });
+          } catch {
+            failed.push(state.id.value);
+            continue;
+          }
+        }
+        const result = stored.sandbox.expire({ at });
+        if (result.isErr()) {
+          failed.push(state.id.value);
+          continue;
+        }
+        await this.repository.save(repositoryContext, stored.sandbox, stored.providerKey);
+        expired.push(state.id.value);
+        continue;
+      }
+      if (
+        ["requested", "failed"].includes(state.status.value) &&
+        state.provisionAttempts < maxProvisionAttempts
+      ) {
+        const result = await this.reconcile(context, state.id.value);
+        if (result.isOk()) reconciled.push(state.id.value);
+        else failed.push(state.id.value);
+        continue;
+      }
+      if (state.status.value === "terminating") {
+        const provider = this.providerRegistry.get(stored.providerKey);
+        if (!provider || !state.providerHandle) {
+          failed.push(state.id.value);
+          continue;
+        }
+        const removed = await this.providerOperation("execution-sandbox-terminate-reconcile", () =>
+          provider.terminate({
+            sandboxId: state.id.value,
+            providerHandle: state.providerHandle as string,
+          }),
+        );
+        if (removed.isErr()) {
+          failed.push(state.id.value);
+          continue;
+        }
+        const terminated = stored.sandbox.markTerminated({ at });
+        if (terminated.isErr()) {
+          failed.push(state.id.value);
+          continue;
+        }
+        await this.repository.save(repositoryContext, stored.sandbox, stored.providerKey);
+        reconciled.push(state.id.value);
+      }
+    }
+    return ok({ expired, reconciled, failed });
+  }
+
   async exec(
     context: ExecutionContext,
     sandboxId: string,
-    input: { argv: string[]; cwd?: string; background?: boolean; timeoutMs?: number },
+    input: {
+      argv: string[];
+      cwd?: string;
+      background?: boolean;
+      timeoutMs?: number;
+      stdin?: Uint8Array;
+    },
   ): Promise<Result<SandboxExecResult>> {
     if (
       input.argv.length === 0 ||
@@ -493,6 +806,13 @@ export class ExecutionSandboxService {
         }),
       );
     }
+    if (input.stdin && (input.stdin.byteLength > 16 * 1024 * 1024 || input.background)) {
+      return err(
+        domainError.validation("Sandbox stdin is invalid for this execution mode", {
+          phase: "execution-sandbox-exec-admission",
+        }),
+      );
+    }
     const ready = await this.ready(context, sandboxId);
     if (ready.isErr()) return err(ready.error);
     let cwd: string | undefined;
@@ -501,14 +821,15 @@ export class ExecutionSandboxService {
       if (path.isErr()) return err(path.error);
       cwd = path.value.value;
     }
-    return ok(
-      await ready.value.provider.exec({
+    return this.providerOperation("execution-sandbox-exec", () =>
+      ready.value.provider.exec({
         sandboxId,
         providerHandle: ready.value.providerHandle,
         argv: [...input.argv],
         ...(cwd ? { cwd } : {}),
         ...(input.background !== undefined ? { background: input.background } : {}),
         ...(input.timeoutMs ? { timeoutMs: input.timeoutMs } : {}),
+        ...(input.stdin ? { stdin: input.stdin } : {}),
       }),
     );
   }
@@ -525,8 +846,8 @@ export class ExecutionSandboxService {
     if (!ready.value.provider.capabilities.files) {
       return err(domainError.conflict("Sandbox provider does not support files"));
     }
-    return ok(
-      await ready.value.provider.writeFile({
+    return this.providerOperation("execution-sandbox-file-write", () =>
+      ready.value.provider.writeFile({
         sandboxId,
         providerHandle: ready.value.providerHandle,
         path: path.value.value,
@@ -547,8 +868,8 @@ export class ExecutionSandboxService {
     if (!ready.value.provider.capabilities.files) {
       return err(domainError.conflict("Sandbox provider does not support files"));
     }
-    return ok(
-      await ready.value.provider.listFiles({
+    return this.providerOperation("execution-sandbox-file-list", () =>
+      ready.value.provider.listFiles({
         sandboxId,
         providerHandle: ready.value.providerHandle,
         path: path.value.value,
@@ -568,8 +889,8 @@ export class ExecutionSandboxService {
     if (!ready.value.provider.capabilities.files) {
       return err(domainError.conflict("Sandbox provider does not support files"));
     }
-    return ok(
-      await ready.value.provider.readFile({
+    return this.providerOperation("execution-sandbox-file-read", () =>
+      ready.value.provider.readFile({
         sandboxId,
         providerHandle: ready.value.providerHandle,
         path: path.value.value,
@@ -589,13 +910,14 @@ export class ExecutionSandboxService {
     if (!ready.value.provider.capabilities.files) {
       return err(domainError.conflict("Sandbox provider does not support files"));
     }
-    await ready.value.provider.removeFile({
-      sandboxId,
-      providerHandle: ready.value.providerHandle,
-      path: path.value.value,
-      ...(input.recursive !== undefined ? { recursive: input.recursive } : {}),
-    });
-    return ok(undefined);
+    return this.providerOperation("execution-sandbox-file-remove", () =>
+      ready.value.provider.removeFile({
+        sandboxId,
+        providerHandle: ready.value.providerHandle,
+        path: path.value.value,
+        ...(input.recursive !== undefined ? { recursive: input.recursive } : {}),
+      }),
+    );
   }
 
   async listProcesses(
@@ -607,8 +929,8 @@ export class ExecutionSandboxService {
     if (!ready.value.provider.capabilities.processes) {
       return err(domainError.conflict("Sandbox provider does not support processes"));
     }
-    return ok(
-      await ready.value.provider.listProcesses({
+    return this.providerOperation("execution-sandbox-process-list", () =>
+      ready.value.provider.listProcesses({
         sandboxId,
         providerHandle: ready.value.providerHandle,
       }),
@@ -628,12 +950,13 @@ export class ExecutionSandboxService {
     if (!ready.value.provider.capabilities.processes) {
       return err(domainError.conflict("Sandbox provider does not support processes"));
     }
-    await ready.value.provider.terminateProcess({
-      sandboxId,
-      providerHandle: ready.value.providerHandle,
-      processId,
-    });
-    return ok(undefined);
+    return this.providerOperation("execution-sandbox-process-terminate", () =>
+      ready.value.provider.terminateProcess({
+        sandboxId,
+        providerHandle: ready.value.providerHandle,
+        processId,
+      }),
+    );
   }
 
   async exposePort(
@@ -653,8 +976,8 @@ export class ExecutionSandboxService {
     if (!ready.value.provider.capabilities.ports) {
       return err(domainError.conflict("Sandbox provider does not support port publishing"));
     }
-    return ok(
-      await ready.value.provider.exposePort({
+    return this.providerOperation("execution-sandbox-port-expose", () =>
+      ready.value.provider.exposePort({
         sandboxId,
         providerHandle: ready.value.providerHandle,
         port: input.port,
@@ -673,8 +996,8 @@ export class ExecutionSandboxService {
     if (!ready.value.provider.capabilities.ports) {
       return err(domainError.conflict("Sandbox provider does not support port publishing"));
     }
-    return ok(
-      await ready.value.provider.listPorts({
+    return this.providerOperation("execution-sandbox-port-list", () =>
+      ready.value.provider.listPorts({
         sandboxId,
         providerHandle: ready.value.providerHandle,
       }),
@@ -691,12 +1014,13 @@ export class ExecutionSandboxService {
     if (!ready.value.provider.capabilities.ports) {
       return err(domainError.conflict("Sandbox provider does not support port publishing"));
     }
-    await ready.value.provider.revokePort({
-      sandboxId,
-      providerHandle: ready.value.providerHandle,
-      exposureId,
-    });
-    return ok(undefined);
+    return this.providerOperation("execution-sandbox-port-revoke", () =>
+      ready.value.provider.revokePort({
+        sandboxId,
+        providerHandle: ready.value.providerHandle,
+        exposureId,
+      }),
+    );
   }
 
   async pause(context: ExecutionContext, sandboxId: string): Promise<Result<SandboxDescriptor>> {
@@ -713,10 +1037,21 @@ export class ExecutionSandboxService {
       ready.value.stored.sandbox,
       ready.value.stored.providerKey,
     );
-    await ready.value.provider.pause({
-      sandboxId,
-      providerHandle: ready.value.providerHandle,
-    });
+    const observed = await this.providerOperation("execution-sandbox-pause", () =>
+      ready.value.provider.pause({
+        sandboxId,
+        providerHandle: ready.value.providerHandle,
+      }),
+    );
+    if (observed.isErr()) {
+      ready.value.stored.sandbox.markPauseFailed({ code: observed.error.code, at });
+      await this.repository.save(
+        toRepositoryContext(context),
+        ready.value.stored.sandbox,
+        ready.value.stored.providerKey,
+      );
+      return err(observed.error);
+    }
     const paused = ready.value.stored.sandbox.markPaused({ at });
     if (paused.isErr()) return err(paused.error);
     await this.repository.save(
@@ -741,10 +1076,17 @@ export class ExecutionSandboxService {
     const requested = stored.sandbox.requestResume({ at });
     if (requested.isErr()) return err(requested.error);
     await this.repository.save(repositoryContext, stored.sandbox, stored.providerKey);
-    const observed = await provider.resume({ sandboxId, providerHandle: state.providerHandle });
+    const observed = await this.providerOperation("execution-sandbox-resume", () =>
+      provider.resume({ sandboxId, providerHandle: state.providerHandle as string }),
+    );
+    if (observed.isErr()) {
+      stored.sandbox.markResumeFailed({ code: observed.error.code, at });
+      await this.repository.save(repositoryContext, stored.sandbox, stored.providerKey);
+      return err(observed.error);
+    }
     const resumed = stored.sandbox.markReady({
-      realizedIsolation: SandboxIsolationLevel.rehydrate(observed.realizedIsolation),
-      providerHandle: observed.providerHandle,
+      realizedIsolation: SandboxIsolationLevel.rehydrate(observed.value.realizedIsolation),
+      providerHandle: observed.value.providerHandle,
       at,
     });
     if (resumed.isErr()) return err(resumed.error);
@@ -781,13 +1123,24 @@ export class ExecutionSandboxService {
       snapshot.value,
       ready.value.stored.providerKey,
     );
-    const observed = await ready.value.provider.captureSnapshot({
-      sandboxId,
-      providerHandle: ready.value.providerHandle,
-      snapshotId: snapshot.value.id.value,
-      capability: input.capability,
-    });
-    const captured = snapshot.value.markReady({ ...observed, at });
+    const observed = await this.providerOperation("execution-sandbox-snapshot-capture", () =>
+      ready.value.provider.captureSnapshot({
+        sandboxId,
+        providerHandle: ready.value.providerHandle,
+        snapshotId: snapshot.value.id.value,
+        capability: input.capability,
+      }),
+    );
+    if (observed.isErr()) {
+      snapshot.value.markFailed({ code: observed.error.code, at });
+      await this.repository.saveSnapshot(
+        toRepositoryContext(context),
+        snapshot.value,
+        ready.value.stored.providerKey,
+      );
+      return err(observed.error);
+    }
+    const captured = snapshot.value.markReady({ ...observed.value, at });
     if (captured.isErr()) return err(captured.error);
     await this.repository.saveSnapshot(
       toRepositoryContext(context),
@@ -824,6 +1177,109 @@ export class ExecutionSandboxService {
       : err(domainError.notFound("SandboxSnapshot", snapshotId));
   }
 
+  async createTemplate(
+    context: ExecutionContext,
+    input: {
+      name: string;
+      image: string;
+      minimumIsolation: SandboxIsolation;
+      limits: SandboxResourceLimitsState;
+      networkPolicy: SandboxNetworkPolicyState;
+      overridePolicy?: {
+        isolation: "immutable" | "strengthen-only";
+        limits: "immutable" | "decrease-only";
+        network: "immutable";
+      };
+    },
+  ): Promise<Result<SandboxTemplateDescriptor>> {
+    const name = SandboxTemplateName.create(input.name);
+    if (name.isErr()) return err(name.error);
+    const isolation = SandboxIsolationLevel.create(input.minimumIsolation);
+    if (isolation.isErr()) return err(isolation.error);
+    const limits = SandboxResourceLimits.create(input.limits);
+    if (limits.isErr()) return err(limits.error);
+    const networkPolicy = SandboxNetworkPolicy.create(input.networkPolicy);
+    if (networkPolicy.isErr()) return err(networkPolicy.error);
+    const createdAt = CreatedAt.create(this.clock.now());
+    if (createdAt.isErr()) return err(createdAt.error);
+    const template = SandboxTemplate.create({
+      id: SandboxTemplateId.rehydrate(this.idGenerator.next("stp")),
+      name: name.value,
+      image: input.image,
+      minimumIsolation: isolation.value,
+      limits: limits.value,
+      networkPolicy: networkPolicy.value,
+      overridePolicy: input.overridePolicy ?? {
+        isolation: "strengthen-only",
+        limits: "decrease-only",
+        network: "immutable",
+      },
+      createdAt: createdAt.value,
+    });
+    if (template.isErr()) return err(template.error);
+    const stored = {
+      tenantId: context.tenant?.tenantId ?? "tenant_instance",
+      template: template.value,
+    };
+    await this.repository.saveTemplate(toRepositoryContext(context), template.value);
+    return ok(templateDescriptor(stored));
+  }
+
+  async listTemplates(
+    context: ExecutionContext,
+    input: { limit?: number; offset?: number },
+  ): Promise<Result<{ items: SandboxTemplateDescriptor[] }>> {
+    const items = await this.repository.listTemplates(toRepositoryContext(context), {
+      limit: Math.min(Math.max(input.limit ?? 50, 1), 100),
+      offset: Math.max(input.offset ?? 0, 0),
+    });
+    return ok({ items: items.map(templateDescriptor) });
+  }
+
+  async showTemplate(
+    context: ExecutionContext,
+    templateId: string,
+  ): Promise<Result<SandboxTemplateDescriptor>> {
+    const stored = await this.repository.findTemplate(toRepositoryContext(context), templateId);
+    return stored
+      ? ok(templateDescriptor(stored))
+      : err(domainError.notFound("SandboxTemplate", templateId));
+  }
+
+  async deleteTemplate(context: ExecutionContext, templateId: string): Promise<Result<void>> {
+    const repositoryContext = toRepositoryContext(context);
+    const stored = await this.repository.findTemplate(repositoryContext, templateId);
+    if (!stored) return err(domainError.notFound("SandboxTemplate", templateId));
+    if (await this.repository.hasActiveTemplateReferences(repositoryContext, templateId)) {
+      return err(domainError.conflict("Sandbox template is referenced by an active Sandbox"));
+    }
+    await this.repository.deleteTemplate(repositoryContext, templateId);
+    return ok(undefined);
+  }
+
+  async deleteSnapshot(
+    context: ExecutionContext,
+    snapshotId: string,
+  ): Promise<Result<SandboxSnapshotDescriptor>> {
+    const repositoryContext = toRepositoryContext(context);
+    const stored = await this.repository.findSnapshot(repositoryContext, snapshotId);
+    if (!stored) return err(domainError.notFound("SandboxSnapshot", snapshotId));
+    const state = stored.snapshot.toState();
+    if (state.status.value === "deleted") return ok(snapshotDescriptor(stored));
+    const provider = this.providerRegistry.get(stored.providerKey);
+    if (!provider) return err(domainError.infra("Sandbox provider is unavailable"));
+    if (state.providerHandle) {
+      const removed = await this.providerOperation("execution-sandbox-snapshot-delete", () =>
+        provider.deleteSnapshot({ snapshotId, providerHandle: state.providerHandle as string }),
+      );
+      if (removed.isErr()) return err(removed.error);
+    }
+    const deleted = stored.snapshot.delete({ at: UpdatedAt.rehydrate(this.clock.now()) });
+    if (deleted.isErr()) return err(deleted.error);
+    await this.repository.saveSnapshot(repositoryContext, stored.snapshot, stored.providerKey);
+    return ok(snapshotDescriptor(stored));
+  }
+
   async terminate(
     context: ExecutionContext,
     sandboxId: string,
@@ -839,7 +1295,12 @@ export class ExecutionSandboxService {
     await this.repository.save(repositoryContext, stored.sandbox, stored.providerKey);
     const handle = stored.sandbox.toState().providerHandle;
     const provider = this.providerRegistry.get(stored.providerKey);
-    if (handle && provider) await provider.terminate({ sandboxId, providerHandle: handle });
+    if (handle && provider) {
+      const removed = await this.providerOperation("execution-sandbox-terminate", () =>
+        provider.terminate({ sandboxId, providerHandle: handle }),
+      );
+      if (removed.isErr()) return err(removed.error);
+    }
     const terminated = stored.sandbox.markTerminated({ at });
     if (terminated.isErr()) return err(terminated.error);
     await this.repository.save(repositoryContext, stored.sandbox, stored.providerKey);

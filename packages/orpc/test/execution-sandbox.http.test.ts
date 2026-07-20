@@ -6,6 +6,7 @@ import {
   type Command,
   type CommandBus,
   CreateSandboxCommand,
+  CreateSandboxTemplateCommand,
   createExecutionContext,
   type ExecutionContext,
   type ExecutionContextFactory,
@@ -89,5 +90,26 @@ describe("execution sandbox HTTP routes", () => {
     expect(listed.status).toBe(200);
     expect(query).toBeInstanceOf(ListSandboxesQuery);
     expect(query).toMatchObject({ input: { limit: 20 } });
+
+    const template = await app.handle(
+      new Request("http://localhost/api/sandbox-templates", {
+        method: "POST",
+        headers: { authorization: "Bearer test", "content-type": "application/json" },
+        body: JSON.stringify({
+          name: "Python 3.13",
+          image: "python@sha256:abc123",
+          minimumIsolation: "gvisor",
+          limits: {
+            cpuMillis: 1_000,
+            memoryBytes: 536_870_912,
+            diskBytes: 2_147_483_648,
+            maxProcesses: 32,
+          },
+          networkPolicy: { mode: "deny", rules: [] },
+        }),
+      }),
+    );
+    expect(template.status).toBe(201);
+    expect(command).toBeInstanceOf(CreateSandboxTemplateCommand);
   });
 });

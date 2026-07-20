@@ -3,6 +3,7 @@ import {
   type SandboxRepository,
   type StoredSandbox,
   type StoredSnapshot,
+  type StoredTemplate,
 } from "@appaloft/application";
 import {
   CreatedAt,
@@ -16,22 +17,30 @@ import {
   SandboxSnapshotId,
   SandboxSnapshotStatusValue,
   SandboxStatusValue,
+  SandboxTemplate,
+  SandboxTemplateId,
+  SandboxTemplateName,
   UpdatedAt,
 } from "@appaloft/core";
-import { type Kysely, type Selectable } from "kysely";
+import { type Kysely, type Selectable, sql } from "kysely";
 import { type Database } from "../schema";
 import { normalizeTimestamp, resolveRepositoryExecutor } from "./shared";
 
 type SandboxRow = Selectable<Database["execution_sandboxes"]>;
 type SnapshotRow = Selectable<Database["execution_sandbox_snapshots"]>;
+type TemplateRow = Selectable<Database["execution_sandbox_templates"]>;
 
 type SerializedSandboxState = {
-  source: { kind: "image"; image: string };
+  source:
+    | { kind: "image"; image: string }
+    | { kind: "template"; templateId: string }
+    | { kind: "snapshot"; snapshotId: string };
   realizedIsolation?: "container-trusted" | "gvisor" | "kata" | "microvm";
   limits: { cpuMillis: number; memoryBytes: number; diskBytes: number; maxProcesses: number };
   networkPolicy: ReturnType<SandboxNetworkPolicy["toState"]>;
   currentAttemptId?: string;
   providerHandle?: string;
+  provisionAttempts: number;
 };
 
 function contextTenantId(context: RepositoryContext): string {
@@ -50,13 +59,17 @@ function requiredTimestamp(value: string | Date | null | undefined): string {
 
 function sandboxState(sandbox: Sandbox): SerializedSandboxState {
   const state = sandbox.toState();
-  if (state.source.kind !== "image") {
-    throw new Error("PG Sandbox repository currently requires normalized image source");
-  }
+  const source: SerializedSandboxState["source"] =
+    state.source.kind === "image"
+      ? state.source
+      : state.source.kind === "template"
+        ? { kind: "template", templateId: state.source.templateId.value }
+        : { kind: "snapshot", snapshotId: state.source.snapshotId.value };
   return {
-    source: state.source,
+    source,
     limits: state.limits.toState(),
     networkPolicy: state.networkPolicy.toState(),
+    provisionAttempts: state.provisionAttempts,
     ...(state.realizedIsolation ? { realizedIsolation: state.realizedIsolation.value } : {}),
     ...(state.currentAttemptId ? { currentAttemptId: state.currentAttemptId } : {}),
     ...(state.providerHandle ? { providerHandle: state.providerHandle } : {}),
@@ -65,9 +78,21 @@ function sandboxState(sandbox: Sandbox): SerializedSandboxState {
 
 function sandboxFromRow(row: SandboxRow): Sandbox {
   const state = objectState<SerializedSandboxState>(row.state);
+  const source =
+    state.source.kind === "image"
+      ? state.source
+      : state.source.kind === "template"
+        ? {
+            kind: "template" as const,
+            templateId: SandboxTemplateId.rehydrate(state.source.templateId),
+          }
+        : {
+            kind: "snapshot" as const,
+            snapshotId: SandboxSnapshotId.rehydrate(state.source.snapshotId),
+          };
   return Sandbox.rehydrate({
     id: SandboxId.rehydrate(row.id),
-    source: state.source,
+    source,
     status: SandboxStatusValue.rehydrate(
       row.status as Parameters<typeof SandboxStatusValue.rehydrate>[0],
     ),
@@ -78,6 +103,7 @@ function sandboxFromRow(row: SandboxRow): Sandbox {
     networkPolicy: SandboxNetworkPolicy.rehydrate(state.networkPolicy),
     createdAt: CreatedAt.rehydrate(requiredTimestamp(row.created_at)),
     updatedAt: UpdatedAt.rehydrate(requiredTimestamp(row.updated_at)),
+    provisionAttempts: state.provisionAttempts ?? 0,
     ...(row.expires_at
       ? { expiresAt: ExpiresAt.rehydrate(requiredTimestamp(row.expires_at)) }
       : {}),
@@ -95,6 +121,32 @@ type SerializedSnapshotState = {
   providerHandle?: string;
   sizeBytes?: number;
 };
+
+type SerializedTemplateState = {
+  image: string;
+  minimumIsolation: "container-trusted" | "gvisor" | "kata" | "microvm";
+  limits: { cpuMillis: number; memoryBytes: number; diskBytes: number; maxProcesses: number };
+  networkPolicy: ReturnType<SandboxNetworkPolicy["toState"]>;
+  overridePolicy: {
+    isolation: "immutable" | "strengthen-only";
+    limits: "immutable" | "decrease-only";
+    network: "immutable";
+  };
+};
+
+function templateFromRow(row: TemplateRow): SandboxTemplate {
+  const state = objectState<SerializedTemplateState>(row.state);
+  return SandboxTemplate.rehydrate({
+    id: SandboxTemplateId.rehydrate(row.id),
+    name: SandboxTemplateName.rehydrate(row.name),
+    image: state.image,
+    minimumIsolation: SandboxIsolationLevel.rehydrate(state.minimumIsolation),
+    limits: SandboxResourceLimits.rehydrate(state.limits),
+    networkPolicy: SandboxNetworkPolicy.rehydrate(state.networkPolicy),
+    overridePolicy: state.overridePolicy,
+    createdAt: CreatedAt.rehydrate(requiredTimestamp(row.created_at)),
+  });
+}
 
 function snapshotFromRow(row: SnapshotRow): SandboxSnapshot {
   const state = objectState<SerializedSnapshotState>(row.state);
@@ -180,6 +232,25 @@ export class PgExecutionSandboxRepository implements SandboxRepository {
     }));
   }
 
+  async listForMaintenance(
+    context: RepositoryContext,
+    input: { limit: number },
+  ): Promise<StoredSandbox[]> {
+    const rows = await resolveRepositoryExecutor(this.db, context)
+      .selectFrom("execution_sandboxes")
+      .selectAll()
+      .where("tenant_id", "=", contextTenantId(context))
+      .where("status", "not in", ["terminated", "expired"])
+      .orderBy("updated_at", "asc")
+      .limit(input.limit)
+      .execute();
+    return rows.map((row) => ({
+      tenantId: row.tenant_id,
+      providerKey: row.provider_key,
+      sandbox: sandboxFromRow(row),
+    }));
+  }
+
   async saveSnapshot(
     context: RepositoryContext,
     snapshot: SandboxSnapshot,
@@ -250,5 +321,84 @@ export class PgExecutionSandboxRepository implements SandboxRepository {
       providerKey: row.provider_key,
       snapshot: snapshotFromRow(row),
     }));
+  }
+
+  async saveTemplate(context: RepositoryContext, template: SandboxTemplate): Promise<void> {
+    const executor = resolveRepositoryExecutor(this.db, context);
+    const state = template.toState();
+    const serialized: SerializedTemplateState = {
+      image: state.image,
+      minimumIsolation: state.minimumIsolation.value,
+      limits: state.limits.toState(),
+      networkPolicy: state.networkPolicy.toState(),
+      overridePolicy: { ...state.overridePolicy },
+    };
+    await executor
+      .insertInto("execution_sandbox_templates")
+      .values({
+        tenant_id: contextTenantId(context),
+        id: state.id.value,
+        name: state.name.value,
+        state: serialized,
+        created_at: state.createdAt.value,
+      })
+      .onConflict((conflict) =>
+        conflict.columns(["tenant_id", "id"]).doUpdateSet({
+          name: state.name.value,
+          state: serialized,
+        }),
+      )
+      .execute();
+  }
+
+  async findTemplate(
+    context: RepositoryContext,
+    templateId: string,
+  ): Promise<StoredTemplate | null> {
+    const row = await resolveRepositoryExecutor(this.db, context)
+      .selectFrom("execution_sandbox_templates")
+      .selectAll()
+      .where("tenant_id", "=", contextTenantId(context))
+      .where("id", "=", templateId)
+      .executeTakeFirst();
+    return row ? { tenantId: row.tenant_id, template: templateFromRow(row) } : null;
+  }
+
+  async listTemplates(
+    context: RepositoryContext,
+    input: { limit: number; offset: number },
+  ): Promise<StoredTemplate[]> {
+    const rows = await resolveRepositoryExecutor(this.db, context)
+      .selectFrom("execution_sandbox_templates")
+      .selectAll()
+      .where("tenant_id", "=", contextTenantId(context))
+      .orderBy("created_at", "desc")
+      .limit(input.limit)
+      .offset(input.offset)
+      .execute();
+    return rows.map((row) => ({ tenantId: row.tenant_id, template: templateFromRow(row) }));
+  }
+
+  async deleteTemplate(context: RepositoryContext, templateId: string): Promise<void> {
+    await resolveRepositoryExecutor(this.db, context)
+      .deleteFrom("execution_sandbox_templates")
+      .where("tenant_id", "=", contextTenantId(context))
+      .where("id", "=", templateId)
+      .execute();
+  }
+
+  async hasActiveTemplateReferences(
+    context: RepositoryContext,
+    templateId: string,
+  ): Promise<boolean> {
+    const row = await resolveRepositoryExecutor(this.db, context)
+      .selectFrom("execution_sandboxes")
+      .select(({ fn }) => fn.countAll<number>().as("count"))
+      .where("tenant_id", "=", contextTenantId(context))
+      .where("status", "not in", ["terminated", "expired"])
+      .where(sql<boolean>`state -> 'source' ->> 'kind' = 'template'`)
+      .where(sql<boolean>`state -> 'source' ->> 'templateId' = ${templateId}`)
+      .executeTakeFirst();
+    return Number(row?.count ?? 0) > 0;
   }
 }

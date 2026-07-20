@@ -88,6 +88,7 @@ import {
   CreateResourceSecretReferenceCommand,
   CreateSandboxCommand,
   CreateSandboxSnapshotCommand,
+  CreateSandboxTemplateCommand,
   CreateScheduledTaskCommand,
   CreateSshCredentialCommand,
   CreateStorageVolumeBackupCommand,
@@ -146,6 +147,7 @@ import {
   createResourceSecretReferenceCommandInputSchema,
   createSandboxCommandInputSchema,
   createSandboxSnapshotCommandInputSchema,
+  createSandboxTemplateCommandInputSchema,
   createScheduledTaskCommandInputSchema,
   createSshCredentialCommandInputSchema,
   createStorageVolumeBackupCommandInputSchema,
@@ -163,6 +165,8 @@ import {
   DeleteProjectCommand,
   DeleteResourceCommand,
   DeleteResourceSecretReferenceCommand,
+  DeleteSandboxSnapshotCommand,
+  DeleteSandboxTemplateCommand,
   DeleteScheduledTaskCommand,
   DeleteServerCommand,
   DeleteSourceLinkCommand,
@@ -190,6 +194,8 @@ import {
   deleteProjectCommandInputSchema,
   deleteResourceCommandInputSchema,
   deleteResourceSecretReferenceCommandInputSchema,
+  deleteSandboxSnapshotCommandInputSchema,
+  deleteSandboxTemplateCommandInputSchema,
   deleteScheduledTaskCommandInputSchema,
   deleteServerCommandInputSchema,
   deleteSourceLinkCommandInputSchema,
@@ -302,6 +308,7 @@ import {
   ListSandboxPortsQuery,
   ListSandboxProcessesQuery,
   ListSandboxSnapshotsQuery,
+  ListSandboxTemplatesQuery,
   ListScheduledRuntimePrunePoliciesQuery,
   ListScheduledTaskRunsQuery,
   ListScheduledTasksQuery,
@@ -351,6 +358,7 @@ import {
   listSandboxPortsQueryInputSchema,
   listSandboxProcessesQueryInputSchema,
   listSandboxSnapshotsQueryInputSchema,
+  listSandboxTemplatesQueryInputSchema,
   listScheduledRuntimePrunePoliciesQueryInputSchema,
   listScheduledTaskRunsQueryInputSchema,
   listScheduledTasksQueryInputSchema,
@@ -555,6 +563,7 @@ import {
   ShowRuntimeMonitoringThresholdsQuery,
   ShowSandboxQuery,
   ShowSandboxSnapshotQuery,
+  ShowSandboxTemplateQuery,
   ShowScheduledRuntimePrunePolicyQuery,
   ShowScheduledTaskQuery,
   ShowScheduledTaskRunQuery,
@@ -614,6 +623,7 @@ import {
   showRuntimeMonitoringThresholdsQueryInputSchema,
   showSandboxQueryInputSchema,
   showSandboxSnapshotQueryInputSchema,
+  showSandboxTemplateQueryInputSchema,
   showScheduledRuntimePrunePolicyQueryInputSchema,
   showScheduledTaskQueryInputSchema,
   showScheduledTaskRunQueryInputSchema,
@@ -7119,6 +7129,46 @@ export const showSandboxSnapshotProcedure = base
     executeQuery(context, ShowSandboxSnapshotQuery.create(input)),
   );
 
+export const deleteSandboxSnapshotProcedure = base
+  .route({ method: "DELETE", path: "/sandbox-snapshots/{snapshotId}", successStatus: 200 })
+  .input(deleteSandboxSnapshotCommandInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, DeleteSandboxSnapshotCommand.create(input)),
+  );
+
+export const createSandboxTemplateProcedure = base
+  .route({ method: "POST", path: "/sandbox-templates", successStatus: 201 })
+  .input(createSandboxTemplateCommandInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, CreateSandboxTemplateCommand.create(input)),
+  );
+
+export const listSandboxTemplatesProcedure = base
+  .route({ method: "GET", path: "/sandbox-templates", successStatus: 200 })
+  .input(listSandboxTemplatesQueryInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListSandboxTemplatesQuery.create(input)),
+  );
+
+export const showSandboxTemplateProcedure = base
+  .route({ method: "GET", path: "/sandbox-templates/{templateId}", successStatus: 200 })
+  .input(showSandboxTemplateQueryInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowSandboxTemplateQuery.create(input)),
+  );
+
+export const deleteSandboxTemplateProcedure = base
+  .route({ method: "DELETE", path: "/sandbox-templates/{templateId}", successStatus: 200 })
+  .input(deleteSandboxTemplateCommandInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, DeleteSandboxTemplateCommand.create(input)),
+  );
+
 export const appaloftOrpcRouter = {
   auth: {
     bootstrapStatus: authBootstrapStatusProcedure,
@@ -7164,6 +7214,13 @@ export const appaloftOrpcRouter = {
   sandboxSnapshots: {
     list: listSandboxSnapshotsProcedure,
     show: showSandboxSnapshotProcedure,
+    delete: deleteSandboxSnapshotProcedure,
+  },
+  sandboxTemplates: {
+    create: createSandboxTemplateProcedure,
+    list: listSandboxTemplatesProcedure,
+    show: showSandboxTemplateProcedure,
+    delete: deleteSandboxTemplateProcedure,
   },
   deploymentOverlays: {
     evaluate: evaluateDeploymentOverlayProcedure,
@@ -10002,6 +10059,8 @@ export function mountAppaloftOrpcRoutes(
     "/api/sandboxes/:sandboxId/snapshots",
     "/api/sandbox-snapshots",
     "/api/sandbox-snapshots/:snapshotId",
+    "/api/sandbox-templates",
+    "/api/sandbox-templates/:templateId",
     "/api/servers/:serverId/rename",
     "/api/servers/reorder",
     "/api/servers/:serverId/edge-proxy/configuration",

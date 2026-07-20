@@ -60,20 +60,40 @@ describe("HermeticSandboxProvider", () => {
     expect(exposure.url).toStartWith("https://sandbox.invalid/");
     expect(exposure.url).not.toContain("127.0.0.1");
 
-    expect(
-      await provider.captureSnapshot({
+    const snapshot = await provider.captureSnapshot({
         sandboxId: "sbx_demo",
         providerHandle: provisioned.providerHandle,
         snapshotId: "ssn_demo",
         capability: "filesystem",
-      }),
-    ).toMatchObject({ providerHandle: "hermetic-snapshot:ssn_demo", sizeBytes: 3 });
+      });
+    expect(snapshot).toMatchObject({ providerHandle: "hermetic-snapshot:ssn_demo", sizeBytes: 3 });
 
     await provider.terminate({
       sandboxId: "sbx_demo",
       providerHandle: provisioned.providerHandle,
     });
     expect(provider.hasRuntime("sbx_demo")).toBe(false);
+
+    const restored = await provider.provision({
+      sandboxId: "sbx_restored",
+      source: { kind: "snapshot", providerHandle: snapshot.providerHandle },
+      requestedIsolation: "gvisor",
+      limits: {
+        cpuMillis: 1_000,
+        memoryBytes: 512 * 1024 * 1024,
+        diskBytes: 1024 * 1024 * 1024,
+        maxProcesses: 32,
+      },
+      networkPolicy: { mode: "deny", rules: [] },
+    });
+    expect(
+      await provider.readFile({
+        sandboxId: "sbx_restored",
+        providerHandle: restored.providerHandle,
+        path: "input/data.bin",
+      }),
+    ).toEqual(new Uint8Array([0, 255, 1]));
+    await provider.deleteSnapshot({ snapshotId: "ssn_demo", providerHandle: snapshot.providerHandle });
   });
 
   test("[SBX-FILE-002] revalidates traversal at the provider boundary", async () => {

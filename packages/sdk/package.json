@@ -19,12 +19,14 @@
     "access": "public"
   },
   "devDependencies": {
+    "@appaloft/adapter-runtime": "workspace:*",
     "@appaloft/application": "workspace:*",
     "@appaloft/core": "workspace:*",
     "@appaloft/openapi": "workspace:*",
     "@appaloft/orpc": "workspace:*",
     "@appaloft/sdk-generator": "workspace:*",
-    "elysia": "^1.4.29"
+    "elysia": "^1.4.29",
+    "tsyringe": "^4.10.0"
   },
   "scripts": {
     "build": "bun run generate:operations && rm -rf dist && bun build src/index.ts src/internal.ts src/generated-operations.ts --target node --format esm --packages external --outdir dist && tsc -p tsconfig.build.json",

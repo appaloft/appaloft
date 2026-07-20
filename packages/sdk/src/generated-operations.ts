@@ -4331,6 +4331,24 @@ export const generatedSdkOperations = [
     facadeDefault: true,
   },
   {
+    operationKey: "sandbox-snapshots.delete",
+    operationGroup: "sandbox-snapshots",
+    operationMethod: "delete",
+    facadePath: ["sandboxSnapshots", "delete"],
+    operationId: "sandboxSnapshots.delete",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "DeleteSandboxSnapshotCommand",
+    route: {
+      method: "DELETE",
+      path: "/sandbox-snapshots/{snapshotId}",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
     operationKey: "sandbox-snapshots.list",
     operationGroup: "sandbox-snapshots",
     operationMethod: "list",
@@ -4360,6 +4378,78 @@ export const generatedSdkOperations = [
     route: {
       method: "GET",
       path: "/sandbox-snapshots/{snapshotId}",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandbox-templates.create",
+    operationGroup: "sandbox-templates",
+    operationMethod: "create",
+    facadePath: ["sandboxTemplates", "create"],
+    operationId: "sandboxTemplates.create",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "CreateSandboxTemplateCommand",
+    route: {
+      method: "POST",
+      path: "/sandbox-templates",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandbox-templates.delete",
+    operationGroup: "sandbox-templates",
+    operationMethod: "delete",
+    facadePath: ["sandboxTemplates", "delete"],
+    operationId: "sandboxTemplates.delete",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "DeleteSandboxTemplateCommand",
+    route: {
+      method: "DELETE",
+      path: "/sandbox-templates/{templateId}",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandbox-templates.list",
+    operationGroup: "sandbox-templates",
+    operationMethod: "list",
+    facadePath: ["sandboxTemplates", "list"],
+    operationId: "sandboxTemplates.list",
+    kind: "query",
+    domain: "sandboxes",
+    messageName: "ListSandboxTemplatesQuery",
+    route: {
+      method: "GET",
+      path: "/sandbox-templates",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandbox-templates.show",
+    operationGroup: "sandbox-templates",
+    operationMethod: "show",
+    facadePath: ["sandboxTemplates", "show"],
+    operationId: "sandboxTemplates.show",
+    kind: "query",
+    domain: "sandboxes",
+    messageName: "ShowSandboxTemplateQuery",
+    route: {
+      method: "GET",
+      path: "/sandbox-templates/{templateId}",
     },
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
@@ -6145,6 +6235,13 @@ export interface GeneratedAppaloftClient {
   };
   readonly sandboxSnapshots: {
     readonly create: AppaloftSdkFacadeMethod;
+    readonly delete: AppaloftSdkFacadeMethod;
+    readonly list: AppaloftSdkFacadeMethod;
+    readonly show: AppaloftSdkFacadeMethod;
+  };
+  readonly sandboxTemplates: {
+    readonly create: AppaloftSdkFacadeMethod;
+    readonly delete: AppaloftSdkFacadeMethod;
     readonly list: AppaloftSdkFacadeMethod;
     readonly show: AppaloftSdkFacadeMethod;
   };

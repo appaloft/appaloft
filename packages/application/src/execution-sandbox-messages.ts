@@ -5,6 +5,7 @@ import { parseOperationInput } from "./operations/shared-schema";
 
 const sandboxIdSchema = z.string().trim().min(1).max(160);
 const snapshotIdSchema = z.string().trim().min(1).max(160);
+const templateIdSchema = z.string().trim().min(1).max(160);
 const pathSchema = z.string().trim().min(1).max(1024);
 const paginationSchema = z
   .object({
@@ -15,9 +16,11 @@ const paginationSchema = z
 
 export const createSandboxCommandInputSchema = z
   .object({
-    source: z
-      .object({ kind: z.literal("image"), image: z.string().trim().min(1).max(512) })
-      .strict(),
+    source: z.discriminatedUnion("kind", [
+      z.object({ kind: z.literal("image"), image: z.string().trim().min(1).max(512) }).strict(),
+      z.object({ kind: z.literal("snapshot"), snapshotId: snapshotIdSchema }).strict(),
+      z.object({ kind: z.literal("template"), templateId: templateIdSchema }).strict(),
+    ]),
     requestedIsolation: z.enum(["container-trusted", "gvisor", "kata", "microvm"]),
     limits: z
       .object({
@@ -61,6 +64,10 @@ export const executeSandboxCommandInputSchema = z
     cwd: pathSchema.optional(),
     background: z.boolean().optional(),
     timeoutMs: z.number().int().min(1).max(3_600_000).optional(),
+    stdinBase64: z
+      .string()
+      .max(16 * 1024 * 1024)
+      .optional(),
   })
   .strict();
 export const sandboxFilePathInputSchema = z
@@ -99,6 +106,55 @@ export const listSandboxSnapshotsQueryInputSchema = paginationSchema;
 export const showSandboxSnapshotQueryInputSchema = z
   .object({ snapshotId: snapshotIdSchema })
   .strict();
+export const deleteSandboxSnapshotCommandInputSchema = showSandboxSnapshotQueryInputSchema;
+export const createSandboxTemplateCommandInputSchema = z
+  .object({
+    name: z.string().trim().min(1).max(120),
+    image: z.string().trim().min(1).max(512),
+    minimumIsolation: z.enum(["container-trusted", "gvisor", "kata", "microvm"]),
+    limits: z
+      .object({
+        cpuMillis: z.number().int().positive(),
+        memoryBytes: z.number().int().positive(),
+        diskBytes: z.number().int().positive(),
+        maxProcesses: z.number().int().positive(),
+      })
+      .strict(),
+    networkPolicy: z.discriminatedUnion("mode", [
+      z.object({ mode: z.literal("deny"), rules: z.array(z.never()).max(0).default([]) }).strict(),
+      z
+        .object({
+          mode: z.literal("allowlist"),
+          rules: z
+            .array(
+              z
+                .object({
+                  kind: z.enum(["domain", "cidr"]),
+                  value: z.string().trim().min(1).max(253),
+                  ports: z.array(z.number().int().min(1).max(65535)).min(1).max(64),
+                })
+                .strict(),
+            )
+            .min(1)
+            .max(128),
+        })
+        .strict(),
+    ]),
+    overridePolicy: z
+      .object({
+        isolation: z.enum(["immutable", "strengthen-only"]),
+        limits: z.enum(["immutable", "decrease-only"]),
+        network: z.literal("immutable"),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+export const listSandboxTemplatesQueryInputSchema = paginationSchema;
+export const showSandboxTemplateQueryInputSchema = z
+  .object({ templateId: templateIdSchema })
+  .strict();
+export const deleteSandboxTemplateCommandInputSchema = showSandboxTemplateQueryInputSchema;
 
 abstract class SandboxCommandMessage extends Command<unknown> {
   constructor(readonly input: Record<string, unknown>) {
@@ -229,6 +285,33 @@ export class CreateSandboxSnapshotCommand extends SandboxCommandMessage {
     );
   }
 }
+export class DeleteSandboxSnapshotCommand extends SandboxCommandMessage {
+  static create(input: unknown) {
+    return commandCreate(
+      deleteSandboxSnapshotCommandInputSchema,
+      input,
+      (value) => new DeleteSandboxSnapshotCommand(value),
+    );
+  }
+}
+export class CreateSandboxTemplateCommand extends SandboxCommandMessage {
+  static create(input: unknown) {
+    return commandCreate(
+      createSandboxTemplateCommandInputSchema,
+      input,
+      (value) => new CreateSandboxTemplateCommand(value),
+    );
+  }
+}
+export class DeleteSandboxTemplateCommand extends SandboxCommandMessage {
+  static create(input: unknown) {
+    return commandCreate(
+      deleteSandboxTemplateCommandInputSchema,
+      input,
+      (value) => new DeleteSandboxTemplateCommand(value),
+    );
+  }
+}
 
 export class ListSandboxesQuery extends SandboxQueryMessage {
   static create(input: unknown = {}) {
@@ -295,6 +378,24 @@ export class ShowSandboxSnapshotQuery extends SandboxQueryMessage {
       showSandboxSnapshotQueryInputSchema,
       input,
       (value) => new ShowSandboxSnapshotQuery(value),
+    );
+  }
+}
+export class ListSandboxTemplatesQuery extends SandboxQueryMessage {
+  static create(input: unknown = {}) {
+    return queryCreate(
+      listSandboxTemplatesQueryInputSchema,
+      input,
+      (value) => new ListSandboxTemplatesQuery(value),
+    );
+  }
+}
+export class ShowSandboxTemplateQuery extends SandboxQueryMessage {
+  static create(input: unknown) {
+    return queryCreate(
+      showSandboxTemplateQueryInputSchema,
+      input,
+      (value) => new ShowSandboxTemplateQuery(value),
     );
   }
 }

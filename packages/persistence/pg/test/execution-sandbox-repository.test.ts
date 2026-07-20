@@ -14,6 +14,10 @@ import {
   SandboxResourceLimits,
   SandboxSnapshot,
   SandboxSnapshotId,
+  type SandboxSource,
+  SandboxTemplate,
+  SandboxTemplateId,
+  SandboxTemplateName,
   UpdatedAt,
 } from "@appaloft/core";
 import { createDatabase, createMigrator, PgExecutionSandboxRepository } from "../src";
@@ -34,10 +38,13 @@ function context(tenantId: string) {
   );
 }
 
-function sandbox(id = "sbx_pg") {
+function sandbox(
+  id = "sbx_pg",
+  source: SandboxSource = { kind: "image", image: "python@sha256:abc123" },
+) {
   return Sandbox.create({
     id: SandboxId.rehydrate(id),
-    source: { kind: "image", image: "python@sha256:abc123" },
+    source,
     requestedIsolation: SandboxIsolationLevel.gvisor(),
     limits: SandboxResourceLimits.create({
       cpuMillis: 1000,
@@ -109,6 +116,34 @@ describe("PgExecutionSandboxRepository", () => {
       expect(
         (await repository.findSnapshot(context("tenant_a"), "ssn_pg"))?.snapshot.toState(),
       ).toMatchObject({ sizeBytes: 3, providerHandle: "opaque:snapshot" });
+
+      const restored = sandbox("sbx_restored", {
+        kind: "snapshot",
+        snapshotId: SandboxSnapshotId.rehydrate("ssn_pg"),
+      });
+      await repository.save(context("tenant_a"), restored, "hermetic");
+      expect(
+        (await repository.find(context("tenant_a"), "sbx_restored"))?.sandbox.toState().source,
+      ).toMatchObject({ kind: "snapshot", snapshotId: { value: "ssn_pg" } });
+
+      const template = SandboxTemplate.create({
+        id: SandboxTemplateId.rehydrate("stp_python"),
+        name: SandboxTemplateName.rehydrate("Python"),
+        image: "python@sha256:abc123",
+        minimumIsolation: SandboxIsolationLevel.gvisor(),
+        limits: aggregate.toState().limits,
+        networkPolicy: SandboxNetworkPolicy.defaultDeny(),
+        overridePolicy: {
+          isolation: "strengthen-only",
+          limits: "decrease-only",
+          network: "immutable",
+        },
+        createdAt: CreatedAt.rehydrate("2026-07-20T00:00:00.000Z"),
+      })._unsafeUnwrap();
+      await repository.saveTemplate(context("tenant_a"), template);
+      expect(
+        (await repository.findTemplate(context("tenant_a"), "stp_python"))?.template.toState(),
+      ).toMatchObject({ image: "python@sha256:abc123", name: { value: "Python" } });
     } finally {
       await database.close();
     }

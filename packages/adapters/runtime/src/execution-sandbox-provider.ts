@@ -18,10 +18,13 @@ type HermeticRuntime = {
   nextExposure: number;
 };
 
+type HermeticSnapshot = { files: Map<string, Uint8Array> };
+
 export class HermeticSandboxProvider implements SandboxProvider {
   readonly key = "hermetic";
   readonly capabilities;
   private readonly runtimes = new Map<string, HermeticRuntime>();
+  private readonly snapshots = new Map<string, HermeticSnapshot>();
   private readonly now: () => string;
 
   constructor(input: { isolation?: SandboxIsolation; now?: () => string } = {}) {
@@ -32,7 +35,7 @@ export class HermeticSandboxProvider implements SandboxProvider {
       processes: true,
       files: true,
       ports: true,
-      networkPolicy: true,
+      networkPolicy: ["deny" as const],
       credentialBroker: false,
     };
     this.now = input.now ?? (() => "2030-01-01T00:00:00.000Z");
@@ -47,7 +50,14 @@ export class HermeticSandboxProvider implements SandboxProvider {
     this.runtimes.set(request.sandboxId, {
       handle,
       paused: false,
-      files: new Map(),
+      files:
+        request.source.kind === "snapshot"
+          ? new Map(
+              [...(this.snapshots.get(request.source.providerHandle)?.files ?? new Map())].map(
+                ([path, content]) => [path, content.slice()],
+              ),
+            )
+          : new Map(),
       processes: new Map(),
       ports: new Map(),
       nextProcess: 1,
@@ -81,6 +91,7 @@ export class HermeticSandboxProvider implements SandboxProvider {
     cwd?: string;
     background?: boolean;
     timeoutMs?: number;
+    stdin?: Uint8Array;
   }): Promise<SandboxExecResult> {
     const runtime = this.runtime(request);
     if (runtime.paused) throw new Error("Sandbox runtime is paused");
@@ -222,7 +233,20 @@ export class HermeticSandboxProvider implements SandboxProvider {
       (total, content) => total + content.byteLength,
       0,
     );
-    return { providerHandle: `hermetic-snapshot:${request.snapshotId}`, sizeBytes };
+    const providerHandle = `hermetic-snapshot:${request.snapshotId}`;
+    this.snapshots.set(providerHandle, {
+      files: new Map(
+        [...this.runtime(request).files].map(([path, content]) => [path, content.slice()]),
+      ),
+    });
+    return { providerHandle, sizeBytes };
+  }
+
+  async deleteSnapshot(request: { snapshotId: string; providerHandle: string }): Promise<void> {
+    if (request.providerHandle !== `hermetic-snapshot:${request.snapshotId}`) {
+      throw new Error("Sandbox snapshot provider handle does not match the snapshot");
+    }
+    this.snapshots.delete(request.providerHandle);
   }
 
   private runtime(request: { sandboxId: string; providerHandle: string }): HermeticRuntime {
