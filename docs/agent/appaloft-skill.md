@@ -21,13 +21,23 @@ semantics aligned with `docs/CORE_OPERATIONS.md` and `packages/application/src/o
 Install the full AI-facing Appaloft entrypoint:
 
 ```bash
-npx skills add appaloft/appaloft
+# Codex
+npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes
+
+# Claude Code
+npx skills add appaloft/appaloft --skill appaloft --global --agent claude-code --copy --yes
 ```
 
 This only copies skill files into the target skill host. It does not deploy, create resources, call
 Appaloft APIs, or wrap the Appaloft CLI.
 Appaloft does not provide a separate npm skill installer; `npx skills add appaloft/appaloft` is the
 single skill-manager entrypoint.
+
+Verify installation with `npx skills list --global --agent codex` or
+`npx skills list --global --agent claude-code`, then start a new agent session so its skill catalog
+is rebuilt. A successful copy alone is not availability evidence unless the list includes
+`appaloft` and the host discovery directory contains `appaloft/SKILL.md` (`~/.agents/skills` for
+Codex and `~/.claude/skills` for Claude Code).
 
 ## Entry Surface
 

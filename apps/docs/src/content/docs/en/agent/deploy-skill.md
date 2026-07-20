@@ -38,8 +38,12 @@ collapsing them into one template.
 Install the full Appaloft skill:
 
 ```bash
-npx skills add appaloft/appaloft
+npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes
 ```
+
+Use `--agent claude-code` for Claude Code. Verify that `npx skills list --global --agent <agent>`
+includes Appaloft and the host discovery directory contains `appaloft/SKILL.md`, then start a new
+agent session.
 
 The installer only copies the full Appaloft skill. It does not deploy an app, create resources, call
 deployment APIs, or wrap `appaloft deploy`. The deploy protocol is part of the full skill, not a

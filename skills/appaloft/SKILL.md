@@ -135,7 +135,9 @@ surface available in the session.
 
 ## Installation Boundary
 
-`npx skills add appaloft/appaloft` installs this skill into a skill host through the standard skill
-manager. It only copies skill files. It does not deploy, create resources, call APIs, or wrap the
-Appaloft CLI. Appaloft does not ship a separate npm skill installer; AI-facing behavior enters
-through the standard skill manager only.
+`npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes` installs
+this skill for Codex through the standard skill manager; use `--agent claude-code` for Claude Code.
+Verify with `npx skills list --global --agent <agent>` and start a new agent session before treating
+the skill as available. Installation only copies skill files. It does not deploy, create resources,
+call APIs, or wrap the Appaloft CLI. Appaloft does not ship a separate npm skill installer;
+AI-facing behavior enters through the standard skill manager only.

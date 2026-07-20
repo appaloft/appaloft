@@ -184,6 +184,10 @@ When `applications.<key>` is present, config-file bootstrap treats each applicat
 Resource-specific Quick Deploy draft. The workflow may iterate the entries in stable key order and
 dispatch one ordinary ids-only `deployments.create` per application. The application graph itself is
 not a cross-Resource transaction, not a release group, and not a new `deployments.create` input.
+CLI callers may repeat `--application <key>` to deploy only a named subset. Omitting the option
+preserves the stable all-application expansion. The workflow validates every selected key against
+the effective config before state initialization or mutation and reports both unknown and available
+keys on failure.
 Each application may also declare a `services.<key>` Resource service graph; those services remain
 inside that application's Resource profile and are governed by the repository service graph spec.
 An application may reference a top-level managed dependency by key through

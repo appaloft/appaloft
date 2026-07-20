@@ -142,6 +142,16 @@ Appaloft 会协调一个具名 Postgres Resource，并为每个消费者 Resourc
 binding。所有顶层依赖都必须被引用，每个引用都必须能解析，临时 preview 依赖不能被多个应用共用。
 连接值和 dependency Resource id 不会写进提交的配置文件。
 
+默认情况下，一次 config deploy 会展开所有声明的 application。只部署其中一个时，传入它的 config
+key；需要选择多个时可以重复该参数：
+
+```bash
+appaloft deploy . --application site
+appaloft deploy . --application api --application worker
+```
+
+如果 key 不存在，Appaloft 会在初始化部署状态或修改资源之前失败，并列出可用的 application key。
+
 <h2 id="local-static-output">本地静态输出</h2>
 
 当用户已经有 `dist`、`build` 或类似静态输出目录时，可以把这个目录作为 source 直接交给 Appaloft：

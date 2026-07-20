@@ -143,6 +143,17 @@ each consuming Resource. Every top-level dependency must be referenced, every re
 resolve, and ephemeral preview dependencies cannot be shared. Connection values and dependency
 Resource ids stay out of committed config.
 
+By default, one config deploy expands every declared application. To deploy only one application,
+select its config key; repeat the option to select more than one:
+
+```bash
+appaloft deploy . --application site
+appaloft deploy . --application api --application worker
+```
+
+An unknown key fails before Appaloft initializes deployment state or changes resources and reports
+the available application keys.
+
 <h2 id="local-static-output">Local static output</h2>
 
 When you already have a `dist`, `build`, or similar static output directory, pass that directory as

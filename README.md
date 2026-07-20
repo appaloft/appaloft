@@ -112,7 +112,7 @@ Choose the entry point that matches how you want to use Appaloft.
 | Homebrew CLI | `brew install appaloft/tap/appaloft` |
 | GitHub Release | Download platform archives from [latest releases](https://github.com/appaloft/appaloft/releases/latest). |
 | MCP launcher | `npx @appaloft/mcp` |
-| AI skill | `npx skills add appaloft/appaloft` |
+| AI skill | `npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes` |
 | Source checkout | `bun install && bun run --cwd apps/shell src/index.ts --help` |
 
 ## One File Deploy Config
@@ -233,8 +233,11 @@ appaloft auth mcp codex install
 Install the Appaloft skill in an AI host that supports skills:
 
 ```bash
-npx skills add appaloft/appaloft
+npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes
 ```
+
+Use `--agent claude-code` for Claude Code. Verify with
+`npx skills list --global --agent <agent>` and start a new agent session.
 
 Then ask your agent to deploy or operate a project through Appaloft. The skill tells the agent to
 use Appaloft operations instead of bypassing the product with direct Docker, SSH, database, or cloud

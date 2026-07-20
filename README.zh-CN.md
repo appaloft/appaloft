@@ -107,7 +107,7 @@ curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- --version 1.0.1
 | Homebrew CLI | `brew install appaloft/tap/appaloft` |
 | GitHub Release | 从 [latest releases](https://github.com/appaloft/appaloft/releases/latest) 下载对应平台 archive。 |
 | MCP launcher | `npx @appaloft/mcp` |
-| AI skill | `npx skills add appaloft/appaloft` |
+| AI skill | `npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes` |
 | 源码运行 | `bun install && bun run --cwd apps/shell src/index.ts --help` |
 
 ## 单文件部署配置
@@ -227,8 +227,11 @@ appaloft auth mcp codex install
 在支持 skills 的 AI host 里安装 Appaloft skill：
 
 ```bash
-npx skills add appaloft/appaloft
+npx skills add appaloft/appaloft --skill appaloft --global --agent codex --copy --yes
 ```
+
+Claude Code 请改用 `--agent claude-code`。通过 `npx skills list --global --agent <agent>`
+确认安装后，新开一个 agent 会话。
 
 然后让 Agent 通过 Appaloft 部署或运维项目。skill 会约束 Agent 使用 Appaloft operation，而不是直接绕过产品去操作 Docker、SSH、数据库或云厂商。
 

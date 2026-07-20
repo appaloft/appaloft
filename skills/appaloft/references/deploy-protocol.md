@@ -139,9 +139,10 @@ Use this order:
    create --project <projectId> --environment <environmentId> --resource <resourceId> --server
    <serverId> [--destination <destinationId>]`; it is ids-only and does not replace source/profile
    configuration or proof verification.
-2. Existing Appaloft config: `appaloft deploy <source>`; `source.type: image` in config is a
-   Resource source/runtime profile declaration, not a deployment command field or registry secret
-   surface.
+2. Existing Appaloft config: `appaloft deploy <source>`; for an application graph, repeat
+   `--application <key>` to deploy only the requested applications or omit it to deploy all entries.
+   `source.type: image` in config is a Resource source/runtime profile declaration, not a deployment
+   command field or registry secret surface.
 3. Docker/OCI image: `appaloft deploy image://<image>:<tag> --method prebuilt-image`.
 4. Compose source: `appaloft deploy <source> --method docker-compose`.
 5. Dockerfile source: `appaloft deploy <source> --method dockerfile`.
