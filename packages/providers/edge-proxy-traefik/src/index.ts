@@ -309,7 +309,21 @@ function redirectStatus(route: EdgeProxyRouteInput): 301 | 302 | 307 | 308 {
 
 function redirectReplacement(route: EdgeProxyRouteInput): string {
   const scheme = route.tlsMode === "auto" ? "https" : "http";
-  return [`${scheme}://${route.redirectTo}/$$`, "{1}"].join("");
+  return [`${scheme}://${route.redirectTo}/$`, "{1}"].join("");
+}
+
+function unsupportedRedirectStatus(routes: readonly EdgeProxyRouteInput[]): 307 | 308 | undefined {
+  for (const route of routes) {
+    if (!isRedirectRoute(route)) {
+      continue;
+    }
+    const status = redirectStatus(route);
+    if (status === 307 || status === 308) {
+      return status;
+    }
+  }
+
+  return undefined;
 }
 
 function httpToHttpsRedirectRule(route: EdgeProxyRouteInput): string {
@@ -735,6 +749,20 @@ export class TraefikEdgeProxyProvider implements EdgeProxyProvider {
     input: ProxyRouteRealizationInput,
   ): Promise<Result<ProxyRouteRealizationPlan, DomainError>> {
     const providerRoutes = input.accessRoutes.filter((route) => route.proxyKind === "traefik");
+    const unsupportedStatus = unsupportedRedirectStatus(providerRoutes);
+    if (unsupportedStatus) {
+      return err(
+        domainError.proxyProviderUnavailable(
+          "Traefik redirect routes support only HTTP 301 and 302 status codes",
+          {
+            phase: "proxy-route-plan-render",
+            providerKey: this.key,
+            proxyKind: "traefik",
+            redirectStatus: String(unsupportedStatus),
+          },
+        ),
+      );
+    }
     const accessFailureConfig = providerRoutes.some((route) => !isRedirectRoute(route))
       ? accessFailureMiddlewareConfig(input.resourceAccessFailureRenderer)
       : null;

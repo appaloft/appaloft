@@ -155,6 +155,26 @@ describe("compose ownership label overrides", () => {
     );
   });
 
+  test("[EDGE-PROXY-ROUTE-008B] escapes literal dollar signs only at the Compose boundary", () => {
+    const script = renderComposeOwnershipLabelOverrideScript({
+      composeFile: "/srv/app/docker-compose.yml",
+      overrideFile: "/srv/app/.appaloft.compose.labels.override.yml",
+      labels: dockerLabelsFromAssignments(["appaloft.managed=true"]),
+      targetServiceName: "web",
+      targetLabels: dockerLabelsFromAssignments([
+        "traefik.http.middlewares.canonical.redirectregex.replacement=https://example.test/${1}",
+      ]),
+      quote: shellQuote,
+    });
+
+    expect(script).toContain(
+      '"traefik.http.middlewares.canonical.redirectregex.replacement": "https://example.test/$${1}"',
+    );
+    expect(script).not.toContain(
+      '"traefik.http.middlewares.canonical.redirectregex.replacement": "https://example.test/${1}"',
+    );
+  });
+
   test("[CPS-SUBSTRATE-009] injects runtime environment keys into the target service without values", () => {
     const script = renderComposeOwnershipLabelOverrideScript({
       composeFile: "/srv/app/docker-compose.yml",

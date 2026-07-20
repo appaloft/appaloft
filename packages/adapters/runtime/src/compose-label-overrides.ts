@@ -9,7 +9,7 @@ function yamlQuoted(value: string): string {
 function renderLabelLines(labels: readonly RuntimeCommandLabel[]): string[] {
   return labels.map((label) => {
     const key = yamlQuoted(label.name.value);
-    const value = yamlQuoted(label.value.value);
+    const value = yamlQuoted(label.value.value.replaceAll("$", () => "$$"));
     return `      ${key}: ${value}`;
   });
 }

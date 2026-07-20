@@ -298,7 +298,7 @@ describe("TraefikEdgeProxyProvider", () => {
         pathPrefix: "/",
         tlsMode: "auto" as const,
         redirectTo: "example.test",
-        redirectStatus: 308 as const,
+        redirectStatus: 301 as const,
       },
     ];
 
@@ -316,7 +316,14 @@ describe("TraefikEdgeProxyProvider", () => {
     expect(labels).toContain("www.example.test");
     expect(labels).toContain("example.test");
     expect(labels).toContain("redirect");
-    expect(labels).toContain("308");
+    expect(labels).toContain("301");
+    expect(labels).toContain(
+      [
+        "traefik.http.middlewares.dep-canonical-1-redirect.redirectregex.replacement=https://example.test/$",
+        "{1}",
+      ].join(""),
+    );
+    expect(labels).not.toContain("https://example.test/$${1}");
     expect(labels).toContain("traefik.http.routers.dep-canonical.tls.certresolver=appaloft");
     expect(labels).toContain("traefik.http.routers.dep-canonical-1.tls.certresolver=appaloft");
     expect(labels).toContain("traefik.http.routers.dep-canonical-http-redirect.entrypoints=web");
@@ -331,6 +338,30 @@ describe("TraefikEdgeProxyProvider", () => {
     expect(labels).not.toContain(
       "dep-canonical-1-route-proof.headers.customresponseheaders.X-Appaloft-Deployment-Id",
     );
+  });
+
+  test("[EDGE-PROXY-ROUTE-008A] rejects redirect status codes Traefik cannot preserve", async () => {
+    const provider = new TraefikEdgeProxyProvider();
+    const realized = await provider.realizeRoutes(
+      { correlationId: "req_traefik_unsupported_redirect_status_test" },
+      {
+        deploymentId: "dep_unsupported_redirect",
+        port: 3000,
+        accessRoutes: [
+          {
+            proxyKind: "traefik",
+            domains: ["www.example.test"],
+            pathPrefix: "/",
+            tlsMode: "auto",
+            redirectTo: "example.test",
+            redirectStatus: 308,
+          },
+        ],
+      },
+    );
+
+    expect(realized.isErr()).toBe(true);
+    expect(realized._unsafeUnwrapErr().message).toContain("301 and 302");
   });
 
   test("[EDGE-PROXY-ROUTE-009] renders strip-prefix middleware for explicit strip path handling", async () => {
@@ -378,7 +409,7 @@ describe("TraefikEdgeProxyProvider", () => {
         pathPrefix: "/",
         tlsMode: "auto" as const,
         redirectTo: "example.test",
-        redirectStatus: 308 as const,
+        redirectStatus: 301 as const,
       },
     ];
 
@@ -404,7 +435,7 @@ describe("TraefikEdgeProxyProvider", () => {
           hostname: "www.example.test",
           routeBehavior: "redirect",
           redirectTo: "example.test",
-          redirectStatus: 308,
+          redirectStatus: 301,
         }),
       ]),
     );
@@ -451,7 +482,7 @@ describe("TraefikEdgeProxyProvider", () => {
         pathPrefix: "/",
         tlsMode: "disabled" as const,
         redirectTo: "example.test",
-        redirectStatus: 308 as const,
+        redirectStatus: 301 as const,
       },
     ];
 
