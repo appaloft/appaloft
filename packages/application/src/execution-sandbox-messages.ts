@@ -8,8 +8,8 @@ const snapshotIdSchema = z.string().trim().min(1).max(160);
 const pathSchema = z.string().trim().min(1).max(1024);
 const paginationSchema = z
   .object({
-    limit: z.number().int().min(1).max(100).optional(),
-    offset: z.number().int().min(0).optional(),
+    limit: z.coerce.number().int().min(1).max(100).optional(),
+    offset: z.coerce.number().int().min(0).optional(),
   })
   .strict();
 

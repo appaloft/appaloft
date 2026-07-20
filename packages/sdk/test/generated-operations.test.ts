@@ -3,6 +3,36 @@ import { describe, expect, test } from "bun:test";
 import { generatedSdkOperations } from "../src/internal";
 
 describe("generated SDK operation metadata", () => {
+  test("[SBX-SDK-001] exposes the complete external sandbox capability surface", () => {
+    const operations = generatedSdkOperations.filter(
+      (operation) =>
+        operation.operationGroup === "sandboxes" || operation.operationGroup.startsWith("sandbox-"),
+    );
+
+    expect(operations).toHaveLength(19);
+    expect(
+      operations.find((operation) => operation.operationKey === "sandboxes.create"),
+    ).toMatchObject({
+      facadePath: ["sandboxes", "create"],
+      kind: "command",
+      route: { method: "POST", path: "/sandboxes" },
+    });
+    expect(
+      operations.find((operation) => operation.operationKey === "sandbox-files.read"),
+    ).toMatchObject({
+      facadePath: ["sandboxFiles", "read"],
+      kind: "query",
+      route: { method: "POST", path: "/sandboxes/{sandboxId}/files/read" },
+    });
+    expect(
+      operations.find((operation) => operation.operationKey === "sandbox-snapshots.create"),
+    ).toMatchObject({
+      facadePath: ["sandboxSnapshots", "create"],
+      kind: "command",
+      route: { method: "POST", path: "/sandboxes/{sandboxId}/snapshots" },
+    });
+  });
+
   test("[DEP-PROOF-CONTRACT-001] exposes deployment proof metadata", () => {
     expect(
       generatedSdkOperations.find((item) => item.operationKey === "deployments.proof"),

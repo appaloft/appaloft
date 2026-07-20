@@ -1123,7 +1123,7 @@ export const generatedSdkOperations = [
     operationGroup: "dependency-resources",
     operationMethod: "inspect",
     facadePath: ["dependencyResources", "inspect"],
-    operationId: "dependency-resources.inspect",
+    operationId: "dependencyResources.inspect",
     kind: "query",
     domain: "dependency-resources",
     messageName: "InspectDependencyResourceQuery",
@@ -1255,7 +1255,7 @@ export const generatedSdkOperations = [
     operationGroup: "dependency-resources",
     operationMethod: "query",
     facadePath: ["dependencyResources", "query"],
-    operationId: "dependency-resources.query",
+    operationId: "dependencyResources.query",
     kind: "query",
     domain: "dependency-resources",
     messageName: "QueryDependencyResourceQuery",
@@ -1649,6 +1649,25 @@ export const generatedSdkOperations = [
     facadeDefault: true,
   },
   {
+    operationKey: "deployments.reconcile-stale",
+    operationGroup: "deployments",
+    operationMethod: "reconcileStale",
+    facadePath: ["deployments", "reconcileStale"],
+    operationId: "deployments.reconcileStale",
+    kind: "command",
+    domain: "deployments",
+    messageName: "ReconcileStaleDeploymentCommand",
+    route: {
+      method: "POST",
+      path: "/deployments/{deploymentId}/reconcile-stale",
+    },
+    docsHref: "/docs/deploy/recovery/#deployment-recovery-readiness",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
     operationKey: "deployments.recovery-readiness",
     operationGroup: "deployments",
     operationMethod: "recoveryReadiness",
@@ -1738,6 +1757,25 @@ export const generatedSdkOperations = [
       path: "/deployments/{deploymentId}",
     },
     docsHref: "/docs/deploy/lifecycle/#deployment-lifecycle",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "deployments.stale-attempts",
+    operationGroup: "deployments",
+    operationMethod: "staleAttempts",
+    facadePath: ["deployments", "staleAttempts"],
+    operationId: "deployments.stale",
+    kind: "query",
+    domain: "deployments",
+    messageName: "ListStaleDeploymentAttemptsQuery",
+    route: {
+      method: "GET",
+      path: "/deployments/stale",
+    },
+    docsHref: "/docs/deploy/recovery/#deployment-recovery-readiness",
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -3783,7 +3821,7 @@ export const generatedSdkOperations = [
       method: "POST",
       path: "/resources/{resourceId}/secrets",
     },
-    docsHref: "/docs/environments/variables/precedence/#environment-variable-precedence",
+    docsHref: "/docs/environments/variables/secrets/#environment-secret-values",
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -3802,7 +3840,7 @@ export const generatedSdkOperations = [
       method: "DELETE",
       path: "/resources/{resourceId}/secrets/{key}",
     },
-    docsHref: "/docs/environments/variables/precedence/#environment-variable-precedence",
+    docsHref: "/docs/environments/variables/secrets/#environment-secret-values",
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -3821,7 +3859,7 @@ export const generatedSdkOperations = [
       method: "GET",
       path: "/resources/{resourceId}/secrets",
     },
-    docsHref: "/docs/environments/variables/precedence/#environment-variable-precedence",
+    docsHref: "/docs/environments/variables/secrets/#environment-secret-values",
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -3840,7 +3878,7 @@ export const generatedSdkOperations = [
       method: "POST",
       path: "/resources/{resourceId}/secrets/{key}",
     },
-    docsHref: "/docs/environments/variables/precedence/#environment-variable-precedence",
+    docsHref: "/docs/environments/variables/secrets/#environment-secret-values",
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -3859,7 +3897,7 @@ export const generatedSdkOperations = [
       method: "GET",
       path: "/resources/{resourceId}/secrets/{key}",
     },
-    docsHref: "/docs/environments/variables/precedence/#environment-variable-precedence",
+    docsHref: "/docs/environments/variables/secrets/#environment-secret-values",
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -4107,6 +4145,348 @@ export const generatedSdkOperations = [
       path: "/runtime-usage/inspect",
     },
     docsHref: "/docs/observe/diagnostics/#runtime-usage-inspect",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandbox-files.list",
+    operationGroup: "sandbox-files",
+    operationMethod: "list",
+    facadePath: ["sandboxFiles", "list"],
+    operationId: "sandboxes.files.list",
+    kind: "query",
+    domain: "sandboxes",
+    messageName: "ListSandboxFilesQuery",
+    route: {
+      method: "POST",
+      path: "/sandboxes/{sandboxId}/files/list",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandbox-files.read",
+    operationGroup: "sandbox-files",
+    operationMethod: "read",
+    facadePath: ["sandboxFiles", "read"],
+    operationId: "sandboxes.files.read",
+    kind: "query",
+    domain: "sandboxes",
+    messageName: "ReadSandboxFileQuery",
+    route: {
+      method: "POST",
+      path: "/sandboxes/{sandboxId}/files/read",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandbox-files.remove",
+    operationGroup: "sandbox-files",
+    operationMethod: "remove",
+    facadePath: ["sandboxFiles", "remove"],
+    operationId: "sandboxes.files.remove",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "RemoveSandboxFileCommand",
+    route: {
+      method: "DELETE",
+      path: "/sandboxes/{sandboxId}/files",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandbox-files.write",
+    operationGroup: "sandbox-files",
+    operationMethod: "write",
+    facadePath: ["sandboxFiles", "write"],
+    operationId: "sandboxes.files.write",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "WriteSandboxFileCommand",
+    route: {
+      method: "POST",
+      path: "/sandboxes/{sandboxId}/files/write",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandbox-ports.expose",
+    operationGroup: "sandbox-ports",
+    operationMethod: "expose",
+    facadePath: ["sandboxPorts", "expose"],
+    operationId: "sandboxes.ports.expose",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "ExposeSandboxPortCommand",
+    route: {
+      method: "POST",
+      path: "/sandboxes/{sandboxId}/ports",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandbox-ports.list",
+    operationGroup: "sandbox-ports",
+    operationMethod: "list",
+    facadePath: ["sandboxPorts", "list"],
+    operationId: "sandboxes.ports.list",
+    kind: "query",
+    domain: "sandboxes",
+    messageName: "ListSandboxPortsQuery",
+    route: {
+      method: "GET",
+      path: "/sandboxes/{sandboxId}/ports",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandbox-ports.revoke",
+    operationGroup: "sandbox-ports",
+    operationMethod: "revoke",
+    facadePath: ["sandboxPorts", "revoke"],
+    operationId: "sandboxes.ports.revoke",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "RevokeSandboxPortCommand",
+    route: {
+      method: "DELETE",
+      path: "/sandboxes/{sandboxId}/ports/{exposureId}",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandbox-processes.list",
+    operationGroup: "sandbox-processes",
+    operationMethod: "list",
+    facadePath: ["sandboxProcesses", "list"],
+    operationId: "sandboxes.processes.list",
+    kind: "query",
+    domain: "sandboxes",
+    messageName: "ListSandboxProcessesQuery",
+    route: {
+      method: "GET",
+      path: "/sandboxes/{sandboxId}/processes",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandbox-processes.terminate",
+    operationGroup: "sandbox-processes",
+    operationMethod: "terminate",
+    facadePath: ["sandboxProcesses", "terminate"],
+    operationId: "sandboxes.processes.terminate",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "TerminateSandboxProcessCommand",
+    route: {
+      method: "POST",
+      path: "/sandboxes/{sandboxId}/processes/{processId}/terminate",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandbox-snapshots.create",
+    operationGroup: "sandbox-snapshots",
+    operationMethod: "create",
+    facadePath: ["sandboxSnapshots", "create"],
+    operationId: "sandboxes.snapshots.create",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "CreateSandboxSnapshotCommand",
+    route: {
+      method: "POST",
+      path: "/sandboxes/{sandboxId}/snapshots",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandbox-snapshots.list",
+    operationGroup: "sandbox-snapshots",
+    operationMethod: "list",
+    facadePath: ["sandboxSnapshots", "list"],
+    operationId: "sandboxSnapshots.list",
+    kind: "query",
+    domain: "sandboxes",
+    messageName: "ListSandboxSnapshotsQuery",
+    route: {
+      method: "GET",
+      path: "/sandbox-snapshots",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandbox-snapshots.show",
+    operationGroup: "sandbox-snapshots",
+    operationMethod: "show",
+    facadePath: ["sandboxSnapshots", "show"],
+    operationId: "sandboxSnapshots.show",
+    kind: "query",
+    domain: "sandboxes",
+    messageName: "ShowSandboxSnapshotQuery",
+    route: {
+      method: "GET",
+      path: "/sandbox-snapshots/{snapshotId}",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandboxes.create",
+    operationGroup: "sandboxes",
+    operationMethod: "create",
+    facadePath: ["sandboxes", "create"],
+    operationId: "sandboxes.create",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "CreateSandboxCommand",
+    route: {
+      method: "POST",
+      path: "/sandboxes",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandboxes.exec",
+    operationGroup: "sandboxes",
+    operationMethod: "exec",
+    facadePath: ["sandboxes", "exec"],
+    operationId: "sandboxes.exec",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "ExecuteSandboxCommand",
+    route: {
+      method: "POST",
+      path: "/sandboxes/{sandboxId}/exec",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandboxes.list",
+    operationGroup: "sandboxes",
+    operationMethod: "list",
+    facadePath: ["sandboxes", "list"],
+    operationId: "sandboxes.list",
+    kind: "query",
+    domain: "sandboxes",
+    messageName: "ListSandboxesQuery",
+    route: {
+      method: "GET",
+      path: "/sandboxes",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandboxes.pause",
+    operationGroup: "sandboxes",
+    operationMethod: "pause",
+    facadePath: ["sandboxes", "pause"],
+    operationId: "sandboxes.pause",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "PauseSandboxCommand",
+    route: {
+      method: "POST",
+      path: "/sandboxes/{sandboxId}/pause",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandboxes.resume",
+    operationGroup: "sandboxes",
+    operationMethod: "resume",
+    facadePath: ["sandboxes", "resume"],
+    operationId: "sandboxes.resume",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "ResumeSandboxCommand",
+    route: {
+      method: "POST",
+      path: "/sandboxes/{sandboxId}/resume",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandboxes.show",
+    operationGroup: "sandboxes",
+    operationMethod: "show",
+    facadePath: ["sandboxes", "show"],
+    operationId: "sandboxes.show",
+    kind: "query",
+    domain: "sandboxes",
+    messageName: "ShowSandboxQuery",
+    route: {
+      method: "GET",
+      path: "/sandboxes/{sandboxId}",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandboxes.terminate",
+    operationGroup: "sandboxes",
+    operationMethod: "terminate",
+    facadePath: ["sandboxes", "terminate"],
+    operationId: "sandboxes.terminate",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "TerminateSandboxCommand",
+    route: {
+      method: "POST",
+      path: "/sandboxes/{sandboxId}/terminate",
+    },
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -5552,11 +5932,13 @@ export interface GeneratedAppaloftClient {
     readonly plan: AppaloftSdkFacadeMethod;
     readonly proof: AppaloftSdkFacadeMethod;
     readonly prune: AppaloftSdkFacadeMethod;
+    readonly reconcileStale: AppaloftSdkFacadeMethod;
     readonly recoveryReadiness: AppaloftSdkFacadeMethod;
     readonly redeploy: AppaloftSdkFacadeMethod;
     readonly retry: AppaloftSdkFacadeMethod;
     readonly rollback: AppaloftSdkFacadeMethod;
     readonly show: AppaloftSdkFacadeMethod;
+    readonly staleAttempts: AppaloftSdkFacadeMethod;
     readonly timeline: AppaloftSdkFacadeMethod & {
       readonly stream: AppaloftSdkFacadeMethod;
     };
@@ -5736,6 +6118,35 @@ export interface GeneratedAppaloftClient {
   };
   readonly runtimeUsage: {
     readonly inspect: AppaloftSdkFacadeMethod;
+  };
+  readonly sandboxes: {
+    readonly create: AppaloftSdkFacadeMethod;
+    readonly exec: AppaloftSdkFacadeMethod;
+    readonly list: AppaloftSdkFacadeMethod;
+    readonly pause: AppaloftSdkFacadeMethod;
+    readonly resume: AppaloftSdkFacadeMethod;
+    readonly show: AppaloftSdkFacadeMethod;
+    readonly terminate: AppaloftSdkFacadeMethod;
+  };
+  readonly sandboxFiles: {
+    readonly list: AppaloftSdkFacadeMethod;
+    readonly read: AppaloftSdkFacadeMethod;
+    readonly remove: AppaloftSdkFacadeMethod;
+    readonly write: AppaloftSdkFacadeMethod;
+  };
+  readonly sandboxPorts: {
+    readonly expose: AppaloftSdkFacadeMethod;
+    readonly list: AppaloftSdkFacadeMethod;
+    readonly revoke: AppaloftSdkFacadeMethod;
+  };
+  readonly sandboxProcesses: {
+    readonly list: AppaloftSdkFacadeMethod;
+    readonly terminate: AppaloftSdkFacadeMethod;
+  };
+  readonly sandboxSnapshots: {
+    readonly create: AppaloftSdkFacadeMethod;
+    readonly list: AppaloftSdkFacadeMethod;
+    readonly show: AppaloftSdkFacadeMethod;
   };
   readonly scheduledRuntimePrunePolicies: {
     readonly configure: AppaloftSdkFacadeMethod;
