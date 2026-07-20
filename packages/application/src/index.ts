@@ -34,6 +34,7 @@ export * from "./entitlement-messages";
 export * from "./environment-handlers";
 export * from "./environment-messages";
 export * from "./execution-context";
+export * from "./execution-sandbox";
 export * from "./extensibility";
 export * from "./operation-audit";
 export * from "./operation-audit-domain-event-projector";
