@@ -107,6 +107,7 @@ import {
   runtimeTargetCapacityAwareFailureFields,
 } from "./runtime-target-failure-classification";
 import { createPreviewRuntimeArtifactCleanupPlan } from "./preview-artifact-cleanup";
+import { selectPublicHealthRoute } from "./public-health-route";
 import {
   dockerStorageMountsFromRuntimeMetadata,
   dockerStorageVolumeRealizationsFromRuntimeMetadata,
@@ -3272,7 +3273,8 @@ export class LocalExecutionBackend implements ExecutionBackend {
 
     const verificationSteps = state.runtimePlan.execution.verificationSteps.map((step) => step.kind);
     if (healthOptions && verificationSteps.includes("public-http") && containerPort) {
-      for (const route of accessRoutes) {
+      const publicHealthRoute = selectPublicHealthRoute(accessRoutes, targetServiceName);
+      for (const route of publicHealthRoute ? [publicHealthRoute] : []) {
         const publicUrl = composePublicHealthUrl({
           route,
           healthPath: state.runtimePlan.execution.healthCheckPath ?? "/",
