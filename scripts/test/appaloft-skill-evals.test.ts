@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { spawn, spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { operationCatalog } from "../../packages/application/src/operation-catalog";
@@ -27,6 +28,75 @@ async function collectProcessOutput(child: ReturnType<typeof spawn>) {
 }
 
 describe("Appaloft skill eval suite", () => {
+  test("[APPALOFT-SKILL-AVAILABILITY-001] standard installer exposes the complete skill to Codex and Claude Code", () => {
+    const installRoot = mkdtempSync(join(tmpdir(), "appaloft-skill-availability-"));
+    const skillsBinary = resolve(repositoryRoot, "node_modules/.bin/skills");
+    const isolatedEnvironment = {
+      ...process.env,
+      CLAUDE_CONFIG_DIR: resolve(installRoot, ".claude"),
+      CODEX_HOME: resolve(installRoot, ".codex"),
+      DISABLE_TELEMETRY: "1",
+      HOME: installRoot,
+      USERPROFILE: installRoot,
+    };
+
+    try {
+      const result = spawnSync(
+        skillsBinary,
+        [
+          "add",
+          repositoryRoot,
+          "--skill",
+          "appaloft",
+          "--agent",
+          "codex",
+          "--agent",
+          "claude-code",
+          "--global",
+          "--copy",
+          "--yes",
+        ],
+        {
+          cwd: installRoot,
+          encoding: "utf8",
+          env: isolatedEnvironment,
+        },
+      );
+
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("Installed 1 skill");
+
+      const sourceSkill = readFileSync(resolve(repositoryRoot, "skills/appaloft/SKILL.md"), "utf8");
+      for (const agentSkillRoot of [".agents/skills/appaloft", ".claude/skills/appaloft"]) {
+        expect(readFileSync(resolve(installRoot, agentSkillRoot, "SKILL.md"), "utf8")).toBe(
+          sourceSkill,
+        );
+        expect(
+          readFileSync(
+            resolve(installRoot, agentSkillRoot, "references/deploy-protocol.md"),
+            "utf8",
+          ),
+        ).toContain("# Deploy Protocol");
+        expect(
+          readFileSync(resolve(installRoot, agentSkillRoot, "agents/openai.yaml"), "utf8"),
+        ).toContain('display_name: "Appaloft"');
+      }
+
+      for (const agent of ["codex", "claude-code"]) {
+        const listResult = spawnSync(skillsBinary, ["list", "--global", "--agent", agent], {
+          cwd: installRoot,
+          encoding: "utf8",
+          env: isolatedEnvironment,
+        });
+        expect(listResult.status).toBe(0);
+        expect(listResult.stdout).toContain("appaloft");
+        expect(listResult.stdout).not.toContain("Agents: not linked");
+      }
+    } finally {
+      rmSync(installRoot, { recursive: true, force: true });
+    }
+  });
+
   test("[APPALOFT-SKILL-EVAL-001] evals cover core Appaloft docs and operation families", () => {
     const suite = JSON.parse(readFileSync("skills/appaloft/evals/evals.json", "utf8")) as {
       evals: unknown[];

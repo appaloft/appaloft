@@ -30,11 +30,14 @@
 - [x] Add skill source validation through docs registry and operation coverage tests.
 - [x] Add Agent Skills best-practice eval suite and validator for real Appaloft task families,
   including server save/manage, MCP, and secret/bypass refusal.
+- [x] Add a no-network standard-installer availability test for Codex and Claude Code discovery
+  paths and complete packaged references.
 
 ## Code Round
 
 - [x] Add CLI help pointer if the deploy help should reference the skill.
-- [x] Document standard full skill install with `npx skills add appaloft/appaloft`.
+- [x] Document explicit global Codex/Claude Code installation, list/discovery-directory
+  verification, and new session reload through the standard skill manager.
 - [x] Remove npm skill installer fallback and keep deploy as an internal full-skill subprotocol.
 - [x] Keep MCP integration optional at host setup time and separate from skill workflow semantics.
 
