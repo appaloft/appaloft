@@ -164,6 +164,9 @@ area uses one named surface:
   owner surface.
 - `console-side-panel`: secondary owner-side context such as environment or public access summaries.
 - `console-record-list` and `console-record-row`: repeated operational records.
+- Diagnostic summaries use one owner panel with divider-separated records, not one nested card per
+  finding. Severity badges keep the canonical `info`, `warning`, and `blocking` labels and use
+  distinct blue, amber, and red tone-matched fills/borders; source/category badges remain neutral.
 - Selectable object choices such as repositories, projects, servers, environments, and credentials
   use Tailwind utilities at the consuming component: white `bg-card` row surface, soft Appaloft blue
   `hover:bg-primary/5`, and blue border/tint selected state. Do not use failure red, pink, rose, or

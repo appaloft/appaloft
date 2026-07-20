@@ -65,6 +65,22 @@ describe("community design primitives CSS source", () => {
     expect(feedbackSources.join("\n")).not.toMatch(/pink|rose|fuchsia|#ef476f/i);
   });
 
+  test("[CLOUD-WWW-SHADCN-SYSTEM-018] renders profile diagnostics as divided records with semantic severity badges", async () => {
+    const resourcePageSource = await readFile(
+      new URL("../../routes/resources/[resourceId=consoleObjectId]/+page.svelte", import.meta.url),
+      "utf8",
+    );
+
+    expect(resourcePageSource).toContain("data-resource-profile-diagnostics");
+    expect(resourcePageSource).toContain(
+      'class="divide-y border-t" data-resource-profile-diagnostic-list',
+    );
+    expect(resourcePageSource).toContain("data-resource-profile-diagnostic");
+    expect(resourcePageSource).toContain("border-blue-200 bg-blue-50 text-blue-700");
+    expect(resourcePageSource).toContain("border-amber-200 bg-amber-50 text-amber-800");
+    expect(resourcePageSource).toContain("border-red-200 bg-red-50 text-red-700");
+  });
+
   test("[APPALOFT-WEB-ILLUSTRATION-001] uses decorative human workplace illustrations for collection empty states", async () => {
     const emptyStateSource = await readFile(
       new URL("../components/console/ConsoleEmptyState.svelte", import.meta.url),
