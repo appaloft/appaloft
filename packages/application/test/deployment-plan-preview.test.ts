@@ -38,6 +38,7 @@ import {
   ResourceBindingScopeValue,
   ResourceBindingTargetName,
   ResourceExposureModeValue,
+  ResourceGeneratedAccessModeValue,
   ResourceId,
   ResourceInjectionModeValue,
   ResourceInstance,
@@ -48,6 +49,7 @@ import {
   ResourceName,
   ResourceNetworkProtocolValue,
   type Result,
+  RoutePathPrefix,
   RuntimeExecutionPlan,
   RuntimeNameText,
   RuntimePlan,
@@ -57,6 +59,7 @@ import {
   SourceKindValue,
   SourceLocator,
   TargetKindValue,
+  UpdatedAt,
   UpsertDeploymentTargetSpec,
   UpsertDestinationSpec,
   UpsertEnvironmentSpec,
@@ -89,6 +92,8 @@ import {
 import { DeploymentPlanQuery } from "../src/messages";
 import {
   type DeploymentPlanPreview,
+  type DomainRouteBindingCandidate,
+  type DomainRouteBindingReader,
   type ResourceDependencyBindingReadModel,
   type ResourceDependencyBindingSummary,
   type RuntimePlanResolver,
@@ -118,7 +123,10 @@ class StaticSourceDetector implements SourceDetector {
 }
 
 class StaticRuntimePlanResolver implements RuntimePlanResolver {
+  public input?: Parameters<RuntimePlanResolver["resolve"]>[1];
+
   async resolve(_context: ExecutionContext, input: Parameters<RuntimePlanResolver["resolve"]>[1]) {
+    this.input = input;
     return RuntimePlan.create({
       id: RuntimePlanId.rehydrate(input.id),
       source: input.source,
@@ -138,6 +146,14 @@ class StaticRuntimePlanResolver implements RuntimePlanResolver {
       steps: [PlanStepText.rehydrate("deploy")],
       generatedAt: GeneratedAt.rehydrate(input.generatedAt),
     });
+  }
+}
+
+class StaticDomainRouteBindingReader implements DomainRouteBindingReader {
+  constructor(private readonly bindings: DomainRouteBindingCandidate[]) {}
+
+  async listDeployableBindings(): Promise<DomainRouteBindingCandidate[]> {
+    return this.bindings;
   }
 }
 
@@ -209,6 +225,8 @@ async function createHarness(input?: {
   blockedBinding?: boolean;
   unresolvedSecret?: boolean;
   pendingProfileDecision?: boolean;
+  disabledGeneratedAccess?: boolean;
+  domainBindings?: DomainRouteBindingCandidate[];
 }) {
   const testContext = context();
   const repositoryContext = toRepositoryContext(testContext);
@@ -282,6 +300,17 @@ async function createHarness(input?: {
     },
     createdAt,
   })._unsafeUnwrap();
+  if (input?.disabledGeneratedAccess) {
+    resource
+      .configureAccessProfile({
+        accessProfile: {
+          generatedAccessMode: ResourceGeneratedAccessModeValue.rehydrate("disabled"),
+          pathPrefix: RoutePathPrefix.rehydrate("/"),
+        },
+        configuredAt: UpdatedAt.rehydrate("2026-01-01T00:00:05.000Z"),
+      })
+      ._unsafeUnwrap();
+  }
   const dependencyResource = ResourceInstance.createPostgresDependencyResource({
     id: ResourceInstanceId.rehydrate("rsi_pg"),
     projectId: ProjectId.rehydrate("prj_demo"),
@@ -365,17 +394,19 @@ async function createHarness(input?: {
     });
   }
 
+  const runtimePlanResolver = new StaticRuntimePlanResolver();
   return {
     context: testContext,
+    runtimePlanResolver,
     service: new DeploymentPlanQueryService(
       new DeploymentContextResolver(projects, servers, destinations, environments, resources),
       new StaticSourceDetector(),
-      new StaticRuntimePlanResolver(),
+      runtimePlanResolver,
       new DeploymentSnapshotFactory(clock, idGenerator),
       new RuntimePlanResolutionInputBuilder(clock, idGenerator),
       new StaticRuntimeTargetBackendRegistry(),
       new TestControlPlaneSecretProtector(),
-      undefined,
+      input?.domainBindings ? new StaticDomainRouteBindingReader(input.domainBindings) : undefined,
       undefined,
       bindingReadModel,
       dependencyResourceSecretStore,
@@ -388,6 +419,7 @@ async function createHarness(input?: {
       serverId: "srv_demo",
       destinationId: "dst_demo",
       includeCommandSpecs: true,
+      includeAccessPlan: true,
     })._unsafeUnwrap(),
   };
 }
@@ -410,6 +442,44 @@ function unwrap(
 }
 
 describe("DeploymentPlanQueryService", () => {
+  test("[RES-PROFILE-ACCESS-001] previews durable domains when generated access is disabled", async () => {
+    const harness = await createHarness({
+      disabledGeneratedAccess: true,
+      domainBindings: [
+        {
+          id: "dmb_custom",
+          domainName: "app.example.test",
+          pathPrefix: "/",
+          proxyKind: "traefik",
+          tlsMode: "auto",
+          status: "ready",
+          createdAt: "2026-01-01T00:02:00.000Z",
+        },
+      ],
+    });
+
+    const preview = unwrap(await harness.service.execute(harness.context, harness.query));
+
+    expect(preview.readiness.status).toBe("ready");
+    expect(harness.runtimePlanResolver.input?.requestedDeployment.accessContext).toBeUndefined();
+    expect(harness.runtimePlanResolver.input?.requestedDeployment).toMatchObject({
+      exposureMode: "reverse-proxy",
+      domains: ["app.example.test"],
+      accessRoutes: [
+        {
+          proxyKind: "traefik",
+          domains: ["app.example.test"],
+          pathPrefix: "/",
+          tlsMode: "auto",
+        },
+      ],
+      accessRouteMetadata: {
+        "access.routeSource": "durable-domain-binding",
+        "access.domainBindingId": "dmb_custom",
+      },
+    });
+  });
+
   test("[DEP-BIND-SNAP-REF-005] reports safe dependency binding readiness without side effects", async () => {
     const harness = await createHarness();
 

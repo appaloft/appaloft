@@ -3165,9 +3165,20 @@ describe("CreateDeploymentUseCase", () => {
     });
   });
 
-  test("[RES-PROFILE-ACCESS-001] disabled resource access profile skips generated route resolution", async () => {
+  test("[RES-PROFILE-ACCESS-001] disabled generated access still resolves durable domain bindings", async () => {
     const innerRuntimePlanResolver = new CapturingRuntimePlanResolver();
     const defaultAccessDomainProvider = new StaticDefaultAccessDomainProvider();
+    const routeBindingReader = new StaticDomainRouteBindingReader([
+      {
+        id: "dmb_custom",
+        domainName: "app.example.test",
+        pathPrefix: "/",
+        proxyKind: "traefik",
+        tlsMode: "auto",
+        status: "ready",
+        createdAt: "2026-01-01T00:02:00.000Z",
+      },
+    ]);
     const {
       context,
       createDeploymentInput,
@@ -3180,6 +3191,7 @@ describe("CreateDeploymentUseCase", () => {
         defaultAccessDomainProvider,
       ),
       edgeProxyKind: "traefik",
+      domainRouteBindingReader: routeBindingReader,
     });
     const resource = await resources.findOne(
       repositoryContext,
@@ -3204,7 +3216,28 @@ describe("CreateDeploymentUseCase", () => {
     expect(result.isOk()).toBe(true);
     expect(defaultAccessDomainProvider.calls).toHaveLength(0);
     expect(innerRuntimePlanResolver.input?.requestedDeployment.accessContext).toBeUndefined();
-    expect(innerRuntimePlanResolver.input?.requestedDeployment.domains).toBeUndefined();
+    expect(innerRuntimePlanResolver.input?.requestedDeployment).toMatchObject({
+      exposureMode: "reverse-proxy",
+      proxyKind: "traefik",
+      domains: ["app.example.test"],
+      pathPrefix: "/",
+      tlsMode: "auto",
+      accessRoutes: [
+        {
+          proxyKind: "traefik",
+          domains: ["app.example.test"],
+          pathPrefix: "/",
+          tlsMode: "auto",
+        },
+      ],
+      accessRouteMetadata: {
+        "access.routeSource": "durable-domain-binding",
+        "access.domainBindingId": "dmb_custom",
+        "access.domainBindingStatus": "ready",
+        "access.hostname": "app.example.test",
+        "access.scheme": "https",
+      },
+    });
   });
 
   test("[RES-PROFILE-ARCHIVE-004] rejects deployment creation for archived resources", async () => {
