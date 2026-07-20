@@ -3,12 +3,13 @@
 ## Code Round Plan
 
 1. Extend repository config schema and generated JSON schema with strict `dependencies` support for
-   canonical managed dependency kinds, `bind.env`, and preview `ephemeral` lifecycle.
+   canonical managed dependency kinds, ready imported dependency references by stable Resource
+   name, `bind.env`, and managed preview `ephemeral` lifecycle.
 2. Normalize CLI config seed so dependency declarations flow into config deploy without changing
    `deployments.create`.
 3. Add CLI orchestration that lists dependency resources and bindings, provisions missing managed
-   dependency resources by kind, binds missing env targets, and reports conflicts for mismatched
-   active env targets.
+   dependency resources by kind, resolves imported resources without provisioning, binds missing
+   env targets, and reports conflicts for missing/mismatched active env targets.
 4. Persist safe preview dependency provenance on the selected source link after successful
    provision/bind.
 5. Extend PG/PGlite and file-backed source-link state to retain dependency provenance metadata.

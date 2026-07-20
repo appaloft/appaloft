@@ -1086,23 +1086,25 @@ export const appaloftDeploymentDependencyBackupConfigSchema = z
   })
   .describe("User-facing dependency resource scheduled backup policy declaration.");
 
-export const appaloftDeploymentDependencyConfigSchema = z
+const appaloftDeploymentDependencyBindConfigSchema = z
+  .object({
+    env: nonEmptyStringSchema
+      .regex(
+        environmentVariableNamePattern,
+        "config_dependency_resolution: dependencies.<key>.bind.env must be an environment variable name",
+      )
+      .describe("Runtime environment variable target for this dependency."),
+  })
+  .strict();
+
+const appaloftDeploymentManagedDependencyConfigSchema = z
   .object({
     resourceName: nonEmptyStringSchema
       .optional()
       .describe("Stable managed dependency Resource name for application-graph reuse."),
     kind: z.enum(appaloftDeploymentDependencyKinds).describe("Application dependency kind."),
     source: z.literal("managed").describe("Managed dependencies are created by Appaloft."),
-    bind: z
-      .object({
-        env: nonEmptyStringSchema
-          .regex(
-            environmentVariableNamePattern,
-            "config_dependency_resolution: dependencies.<key>.bind.env must be an environment variable name",
-          )
-          .describe("Runtime environment variable target for this dependency."),
-      })
-      .strict(),
+    bind: appaloftDeploymentDependencyBindConfigSchema,
     backup: appaloftDeploymentDependencyBackupConfigSchema.optional(),
     preview: z
       .object({
@@ -1111,7 +1113,27 @@ export const appaloftDeploymentDependencyConfigSchema = z
       .strict()
       .optional(),
   })
-  .strict()
+  .strict();
+
+const appaloftDeploymentImportedDependencyConfigSchema = z
+  .object({
+    resourceName: nonEmptyStringSchema.describe(
+      "Stable name of an existing imported dependency Resource.",
+    ),
+    kind: z.enum(appaloftDeploymentDependencyKinds).describe("Application dependency kind."),
+    source: z
+      .literal("imported")
+      .describe("Imported dependencies must already exist in the target Environment."),
+    bind: appaloftDeploymentDependencyBindConfigSchema,
+    backup: appaloftDeploymentDependencyBackupConfigSchema.optional(),
+  })
+  .strict();
+
+export const appaloftDeploymentDependencyConfigSchema = z
+  .discriminatedUnion("source", [
+    appaloftDeploymentManagedDependencyConfigSchema,
+    appaloftDeploymentImportedDependencyConfigSchema,
+  ])
   .describe("User-facing application dependency declaration.");
 
 export const appaloftDeploymentStorageConfigSchema = z
@@ -1568,7 +1590,11 @@ export const appaloftDeploymentConfigSchema = z
             message: sharedApplicationDependencyNameError,
           });
         }
-        if (consumers.length > 1 && dependency.preview?.lifecycle === "ephemeral") {
+        if (
+          consumers.length > 1 &&
+          "preview" in dependency &&
+          dependency.preview?.lifecycle === "ephemeral"
+        ) {
           context.addIssue({
             code: "custom",
             path: ["dependencies", dependencyKey, "preview", "lifecycle"],

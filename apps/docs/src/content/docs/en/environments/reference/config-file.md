@@ -197,6 +197,23 @@ existing dependency binding runtime path as environment variables such as `DATAB
 `object-storage`, and `opensearch`. The final deployment command still contains only Appaloft ids;
 connection strings and database passwords do not belong in `appaloft.yaml`.
 
+Use `source: imported` with a required `resourceName` to reference a ready external dependency that
+was already imported into the same Project and Environment:
+
+```yaml
+dependencies:
+  db:
+    resourceName: StockTruth Supabase
+    kind: postgres
+    source: imported
+    bind:
+      env: DATABASE_URL
+```
+
+This mode only resolves and binds existing Appaloft dependency state. It never provisions or imports
+the external service, and it fails before mutation when the named resource is missing, has the wrong
+kind, or is not ready. Imported dependencies cannot declare ephemeral preview lifecycle.
+
 `backup` configures scheduled backup policy for the dependency resource. It does not run a backup
 or restore during deploy. Do not commit backup policy ids, provider keys, backup artifact handles,
 restore point ids, or raw dump paths.

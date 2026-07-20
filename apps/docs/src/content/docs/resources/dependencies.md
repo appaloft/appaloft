@@ -172,6 +172,25 @@ appaloft dependency backup policy list dep_db
 appaloft dependency backup policy show dbp_123
 ```
 
+<h2 id="dependency-config-file">在 appaloft.yaml 中引用已导入依赖</h2>
+
+外部数据库先通过 `appaloft dependency import` 导入，再在仓库配置中按 Appaloft 资源名引用：
+
+```yaml
+dependencies:
+  db:
+    resourceName: StockTruth Supabase
+    kind: postgres
+    source: imported
+    bind:
+      env: DATABASE_URL
+```
+
+`source: imported` 只解析并绑定同一 Project、Environment 中已经存在且 ready 的依赖，不会创建或
+导入外部服务。名称不存在、类型不匹配或资源未就绪时，部署会在任何 provision/bind 之前失败。
+连接串和 provider credential 继续由 Appaloft 的 dependency secret custody 保存，不能写进
+`appaloft.yaml`。已导入依赖不能声明 ephemeral preview lifecycle。
+
 <h2 id="dependency-delete-safety">删除安全</h2>
 
 删除 dependency resource 前，Appaloft 会检查活动 binding、backup retention、deployment snapshot

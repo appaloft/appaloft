@@ -195,6 +195,25 @@ and then creates the deployment with ids only. Repository config accepts `postgr
 `mysql`, `clickhouse`, `object-storage`, and `opensearch` for managed dependency declarations. The
 runtime receives the value through the same safe dependency runtime injection path described below.
 
+To bind an external dependency that was already imported through `appaloft dependency import`, use
+its stable Appaloft Resource name:
+
+```yaml
+dependencies:
+  db:
+    resourceName: StockTruth Supabase
+    kind: postgres
+    source: imported
+    bind:
+      env: DATABASE_URL
+```
+
+`source: imported` never creates or imports infrastructure. The named dependency must already exist
+in the same Project and Environment, match the declared kind, and be ready; otherwise deployment
+fails before provisioning or binding. Imported dependencies cannot use ephemeral preview lifecycle.
+Connection strings and provider credentials remain in Appaloft's dependency secret custody, not in
+repository config.
+
 Do not put provider accounts, tenants, credentials, database passwords, raw connection strings, or
 secret values in `appaloft.yaml`. `controlPlane.install.database` is only for the Appaloft
 control-plane installer database and is not an application dependency database.
