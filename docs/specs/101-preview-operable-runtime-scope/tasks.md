@@ -21,6 +21,8 @@
 - [x] Batch 1: add preview selectors to logs, health, diagnostics, effective config, and deployment readback operations.
 - [x] Batch 2: add preview selectors to runtime control and terminal operations.
 - [x] Batch 3: add dependency preview readback, dependency inspect, and safe dependency query contracts.
+- [x] Register the Postgres safe-query provider for imported-external and Appaloft-managed resources.
+- [ ] Add and register the Redis safe-query provider before reporting Redis query support.
 
 ## Entrypoints And Docs
 
@@ -35,6 +37,7 @@
 - [x] Run targeted CLI typecheck for preview flags.
 - [x] Run targeted oRPC/MCP schema parity through application operation catalog typecheck.
 - [x] Run dependency safe query policy tests.
+- [x] Run Postgres provider, secret-redaction, and runtime composition tests.
 
 ## Post-Implementation Sync
 

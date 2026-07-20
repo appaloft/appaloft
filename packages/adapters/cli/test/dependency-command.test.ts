@@ -11,11 +11,13 @@ import {
   CreateDependencyResourceProvisioningPlanCommand,
   type ExecutionContextFactory,
   ImportDependencyResourceCommand,
+  InspectDependencyResourceQuery,
   ListDependencyResourceBackupsQuery,
   ListDependencyResourcesQuery,
   ListResourceDependencyBindingsQuery,
   ProvisionDependencyResourceCommand,
   type QueryBus,
+  QueryDependencyResourceQuery,
   RestoreDependencyResourceBackupCommand,
   RotateResourceDependencyBindingSecretCommand,
   ShowDependencyResourceBackupQuery,
@@ -285,6 +287,34 @@ describe("CLI dependency commands", () => {
 
     expect(queries[0]).toBeInstanceOf(ListDependencyResourcesQuery);
     expect(queries[1]).toBeInstanceOf(ShowDependencyResourceQuery);
+  });
+
+  test("[DEP-SAFE-QRY-009] dependency inspect/query dispatch the shared query operations", async () => {
+    const { program, queries } = await createCommandCaptureHarness("req_cli_dep_safe_query");
+
+    await parseCli(program, ["node", "appaloft", "dependency", "inspect", "rsi_pg"]);
+    await parseCli(program, [
+      "node",
+      "appaloft",
+      "dependency",
+      "query",
+      "rsi_pg",
+      "--statement",
+      "select count(*) as count from products",
+      "--max-rows",
+      "10",
+      "--timeout-ms",
+      "3000",
+    ]);
+
+    expect(queries[0]).toBeInstanceOf(InspectDependencyResourceQuery);
+    expect(queries[1]).toBeInstanceOf(QueryDependencyResourceQuery);
+    expect(queries[1]).toMatchObject({
+      dependencyResourceId: "rsi_pg",
+      statement: "select count(*) as count from products",
+      maxRows: 10,
+      timeoutMs: 3_000,
+    });
   });
 
   test("[DEP-RES-BACKUP-011] dependency backup commands dispatch buses", async () => {

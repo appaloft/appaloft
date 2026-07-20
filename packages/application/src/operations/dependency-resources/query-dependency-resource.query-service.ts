@@ -38,8 +38,16 @@ function validateSafeStatement(
     case "postgres": {
       const token = firstToken(normalized);
       const forbidden =
-        /\b(insert|update|delete|drop|alter|create|truncate|copy|grant|revoke|call|do|listen|notify|vacuum|analyze|set|reset)\b/iu;
-      if (token !== "SELECT" || forbidden.test(normalized)) {
+        /\b(insert|update|delete|drop|alter|create|truncate|copy|grant|revoke|call|do|listen|notify|vacuum|analyze|set|reset|begin|commit|rollback|prepare|execute|deallocate|lock|refresh)\b/iu;
+      const withoutTrailingSemicolon = normalized.replace(/;\s*$/u, "");
+      const containsMultipleStatements = withoutTrailingSemicolon.includes(";");
+      const containsSqlComment = /--|\/\*|\*\//u.test(normalized);
+      if (
+        token !== "SELECT" ||
+        forbidden.test(normalized) ||
+        containsMultipleStatements ||
+        containsSqlComment
+      ) {
         return err(
           domainError.validation("Postgres dependency safe query only accepts read-only SELECT"),
         );
@@ -115,6 +123,19 @@ export class QueryDependencyResourceQueryService {
           kind: dependencyResource.kind,
           providerKey: dependencyResource.providerKey,
         }),
+      );
+    }
+
+    if (!this.safeQueryPort.supports(dependencyResource)) {
+      return err(
+        domainError.providerCapabilityUnsupported(
+          "Dependency resource safe query provider does not support this resource",
+          {
+            dependencyResourceId: dependencyResource.id,
+            kind: dependencyResource.kind,
+            providerKey: dependencyResource.providerKey,
+          },
+        ),
       );
     }
 

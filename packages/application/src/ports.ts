@@ -9320,6 +9320,7 @@ export interface DependencyResourceSafeQueryInput {
 }
 
 export interface DependencyResourceSafeQueryPort {
+  supports(dependencyResource: DependencyResourceSummary): boolean;
   execute(
     context: ExecutionContext,
     input: DependencyResourceSafeQueryInput,

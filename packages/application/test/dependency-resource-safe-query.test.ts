@@ -37,6 +37,10 @@ import {
 class CapturingSafeQueryPort implements DependencyResourceSafeQueryPort {
   inputs: DependencyResourceSafeQueryInput[] = [];
 
+  supports(): boolean {
+    return true;
+  }
+
   async execute(
     _context: ExecutionContext,
     input: DependencyResourceSafeQueryInput,
@@ -110,7 +114,11 @@ async function createHarness(kind: "postgres" | "redis" = "postgres") {
 describe("dependency resource inspect and safe query", () => {
   test("[DEP-SAFE-QRY-001] inspects masked dependency readback and safe query readiness", async () => {
     const { clock, context, readModel } = await createHarness();
-    const service = new InspectDependencyResourceQueryService(readModel, clock);
+    const service = new InspectDependencyResourceQueryService(
+      readModel,
+      clock,
+      new CapturingSafeQueryPort(),
+    );
     const query = InspectDependencyResourceQuery.create({ dependencyResourceId: "rsi_dep" });
 
     expect(query.isOk()).toBe(true);
@@ -118,7 +126,18 @@ describe("dependency resource inspect and safe query", () => {
 
     expect(result.isOk()).toBe(true);
     expect(result._unsafeUnwrap().connection?.maskedConnection).toContain("********");
+    expect(result._unsafeUnwrap().safeQuery.status).toBe("supported");
     expect(result._unsafeUnwrap().safeQuery.allowedFamilies).toContain("select");
+  });
+
+  test("[DEP-SAFE-QRY-001] reports not-configured when no safe query provider is composed", async () => {
+    const { clock, context, readModel } = await createHarness();
+    const service = new InspectDependencyResourceQueryService(readModel, clock);
+    const query = InspectDependencyResourceQuery.create({ dependencyResourceId: "rsi_dep" });
+
+    const result = await service.execute(context, query._unsafeUnwrap());
+
+    expect(result._unsafeUnwrap().safeQuery.status).toBe("not-configured");
   });
 
   test("[DEP-SAFE-QRY-002] runs allowlisted Postgres SELECT through the safe query port", async () => {
@@ -149,6 +168,24 @@ describe("dependency resource inspect and safe query", () => {
     const result = await service.execute(context, query._unsafeUnwrap());
 
     expect(result.isErr()).toBe(true);
+    expect(port.inputs).toHaveLength(0);
+  });
+
+  test("[DEP-SAFE-QRY-003] rejects stacked statements and SQL comments before execution", async () => {
+    const { clock, context, readModel } = await createHarness();
+    const port = new CapturingSafeQueryPort();
+    const service = new QueryDependencyResourceQueryService(readModel, clock, port);
+    const stacked = QueryDependencyResourceQuery.create({
+      dependencyResourceId: "rsi_dep",
+      statement: "select 1; select 2",
+    })._unsafeUnwrap();
+    const commented = QueryDependencyResourceQuery.create({
+      dependencyResourceId: "rsi_dep",
+      statement: "select 1 -- hidden follow-up",
+    })._unsafeUnwrap();
+
+    expect((await service.execute(context, stacked)).isErr()).toBe(true);
+    expect((await service.execute(context, commented)).isErr()).toBe(true);
     expect(port.inputs).toHaveLength(0);
   });
 
