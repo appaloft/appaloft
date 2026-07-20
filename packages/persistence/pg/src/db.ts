@@ -111,6 +111,9 @@ import { executionSandboxesMigration } from "./migrations/102_execution_sandboxe
 import { executionSandboxTemplatesMigration } from "./migrations/103_execution_sandbox_templates";
 import { domainEventStreamTenantScopeMigration } from "./migrations/104_domain_event_stream_tenant_scope";
 import { executionSandboxCredentialGrantsMigration } from "./migrations/105_execution_sandbox_credential_grants";
+import { storageVolumeBackupPoliciesMigration } from "./migrations/106_storage_volume_backup_policies";
+import { controlPlanePortabilityArtifactsMigration } from "./migrations/107_control_plane_portability_artifacts";
+import { tunnelSessionsMigration } from "./migrations/108_tunnel_sessions";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -318,6 +321,9 @@ class StaticMigrationProvider implements MigrationProvider {
       "103_execution_sandbox_templates": executionSandboxTemplatesMigration,
       "104_domain_event_stream_tenant_scope": domainEventStreamTenantScopeMigration,
       "105_execution_sandbox_credential_grants": executionSandboxCredentialGrantsMigration,
+      "106_storage_volume_backup_policies": storageVolumeBackupPoliciesMigration,
+      "107_control_plane_portability_artifacts": controlPlanePortabilityArtifactsMigration,
+      "108_tunnel_sessions": tunnelSessionsMigration,
     };
   }
 }

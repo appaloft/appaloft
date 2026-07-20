@@ -68,8 +68,11 @@ import {
   ConfigureScheduledTaskCommand,
   ConfigureServerCredentialCommand,
   ConfigureServerEdgeProxyCommand,
+  ConfigureStorageVolumeBackupPolicyCommand,
   ConfirmActionPreviewRouteCommand,
   ConfirmDomainBindingOwnershipCommand,
+  ControlPlanePortabilityExportPlanQuery,
+  ControlPlanePortabilityImportPlanQuery,
   CountDependencyResourcesQuery,
   CountDeploymentsQuery,
   CountEnvironmentsQuery,
@@ -130,8 +133,11 @@ import {
   configureScheduledTaskCommandInputSchema,
   configureServerCredentialCommandInputSchema,
   configureServerEdgeProxyCommandInputSchema,
+  configureStorageVolumeBackupPolicyCommandInputSchema,
   confirmDomainBindingOwnershipCommandInputSchema,
   connectorCapabilityPlanInputSchema,
+  controlPlanePortabilityExportPlanQueryInputSchema,
+  controlPlanePortabilityImportPlanQueryInputSchema,
   countDependencyResourcesQueryInputSchema,
   countDeploymentsQueryInputSchema,
   countEnvironmentsQueryInputSchema,
@@ -162,6 +168,7 @@ import {
   DeadLetterOperatorWorkCommand,
   DeleteAccountCommand,
   DeleteCertificateCommand,
+  DeleteControlPlanePortabilityArtifactCommand,
   DeleteDependencyResourceCommand,
   DeleteDomainBindingCommand,
   DeleteOrganizationCommand,
@@ -191,6 +198,7 @@ import {
   deadLetterOperatorWorkCommandInputSchema,
   deleteAccountCommandInputSchema,
   deleteCertificateCommandInputSchema,
+  deleteControlPlanePortabilityArtifactCommandInputSchema,
   deleteDependencyResourceCommandInputSchema,
   deleteDomainBindingCommandInputSchema,
   deleteOrganizationCommandInputSchema,
@@ -229,6 +237,7 @@ import {
   type ExecutionRequestSecurityContext,
   ExpireTerminalSessionsCommand,
   ExportAuditEventsQuery,
+  ExportControlPlaneCommand,
   ExportGlobalAuditEventsQuery,
   ExposeSandboxPortCommand,
   environmentEffectivePrecedenceQueryInputSchema,
@@ -239,6 +248,7 @@ import {
   executeSandboxCommandInputSchema,
   expireTerminalSessionsCommandInputSchema,
   exportAuditEventsQueryInputSchema,
+  exportControlPlaneCommandInputSchema,
   exportGlobalAuditEventsQueryInputSchema,
   exposeSandboxPortCommandInputSchema,
   ForceRedeployDeploymentCommand,
@@ -255,6 +265,7 @@ import {
   githubAppConnectionQueryInputSchema,
   grantSandboxCredentialCommandInputSchema,
   ImportCertificateCommand,
+  ImportControlPlaneCommand,
   ImportDependencyResourceCommand,
   ImportResourceVariablesCommand,
   IngestPreviewPullRequestEventCommand,
@@ -267,6 +278,7 @@ import {
   InviteOrganizationMemberCommand,
   IssueOrRenewCertificateCommand,
   importCertificateCommandInputSchema,
+  importControlPlaneCommandInputSchema,
   importDependencyResourceCommandInputSchema,
   importResourceVariablesCommandInputSchema,
   inspectDependencyResourceQueryInputSchema,
@@ -284,6 +296,7 @@ import {
   ListConnectionsQuery,
   ListConnectorCategoriesQuery,
   ListConnectorsQuery,
+  ListControlPlanePortabilityArtifactsQuery,
   ListDefaultAccessDomainPoliciesQuery,
   ListDependencyResourceBackupPoliciesQuery,
   ListDependencyResourceBackupsQuery,
@@ -325,9 +338,11 @@ import {
   ListSshCredentialsQuery,
   ListStaleDeploymentAttemptsQuery,
   ListStaticArtifactPublicationsQuery,
+  ListStorageVolumeBackupPoliciesQuery,
   ListStorageVolumeBackupsQuery,
   ListStorageVolumesQuery,
   ListTerminalSessionsQuery,
+  ListTunnelSessionsQuery,
   ListUsageIntentRecordsQuery,
   LockEnvironmentCommand,
   listAccountSessionsQueryInputSchema,
@@ -337,6 +352,7 @@ import {
   listCertificatesQueryInputSchema,
   listConnectionsQueryInputSchema,
   listConnectorsQueryInputSchema,
+  listControlPlanePortabilityArtifactsQueryInputSchema,
   listDefaultAccessDomainPoliciesQueryInputSchema,
   listDependencyResourceBackupPoliciesQueryInputSchema,
   listDependencyResourceBackupsQueryInputSchema,
@@ -376,9 +392,11 @@ import {
   listSshCredentialsQueryInputSchema,
   listStaleDeploymentAttemptsQueryInputSchema,
   listStaticArtifactPublicationsQueryInputSchema,
+  listStorageVolumeBackupPoliciesQueryInputSchema,
   listStorageVolumeBackupsQueryInputSchema,
   listStorageVolumesQueryInputSchema,
   listTerminalSessionsQueryInputSchema,
+  listTunnelSessionsQueryInputSchema,
   listUsageIntentRecordsInputSchema,
   listUsageIntentRecordsResponseSchema,
   lockEnvironmentCommandInputSchema,
@@ -489,6 +507,7 @@ import {
   RevokeDeployTokenCommand,
   RevokeSandboxCredentialCommand,
   RevokeSandboxPortCommand,
+  RevokeTunnelSessionCommand,
   RollbackDeploymentCommand,
   RotateDependencyResourceConnectionCommand,
   RotateDeployTokenCommand,
@@ -533,6 +552,7 @@ import {
   revokeDeployTokenCommandInputSchema,
   revokeSandboxCredentialCommandInputSchema,
   revokeSandboxPortCommandInputSchema,
+  revokeTunnelSessionCommandInputSchema,
   rollbackDeploymentCommandInputSchema,
   rotateDependencyResourceConnectionCommandInputSchema,
   rotateDeployTokenCommandInputSchema,
@@ -553,6 +573,7 @@ import {
   ShowBlueprintQuery,
   ShowCertificateQuery,
   ShowConnectionQuery,
+  ShowControlPlanePortabilityArtifactQuery,
   ShowDefaultAccessDomainPolicyQuery,
   ShowDependencyResourceBackupPolicyQuery,
   ShowDependencyResourceBackupQuery,
@@ -584,12 +605,15 @@ import {
   ShowSourceEventQuery,
   ShowSourceLinkQuery,
   ShowSshCredentialQuery,
+  ShowStorageVolumeBackupPolicyQuery,
   ShowStorageVolumeBackupQuery,
   ShowStorageVolumeQuery,
   ShowTerminalSessionQuery,
+  ShowTunnelSessionQuery,
   type SourceEventVerificationPort,
   StartConnectionCommand,
   StartResourceRuntimeCommand,
+  StartTunnelCommand,
   type StaticArtifactPublicationSummary,
   StopResourceRuntimeCommand,
   StreamDeploymentTimelineQuery,
@@ -616,6 +640,7 @@ import {
   showBlueprintQueryInputSchema,
   showCertificateQueryInputSchema,
   showConnectionQueryInputSchema,
+  showControlPlanePortabilityArtifactQueryInputSchema,
   showDefaultAccessDomainPolicyQueryInputSchema,
   showDependencyResourceBackupPolicyQueryInputSchema,
   showDependencyResourceBackupQueryInputSchema,
@@ -647,10 +672,13 @@ import {
   showSourceEventQueryInputSchema,
   showSourceLinkQueryInputSchema,
   showSshCredentialQueryInputSchema,
+  showStorageVolumeBackupPolicyQueryInputSchema,
   showStorageVolumeBackupQueryInputSchema,
   showStorageVolumeQueryInputSchema,
   showTerminalSessionQueryInputSchema,
+  showTunnelSessionQueryInputSchema,
   startConnectionCommandInputSchema,
+  startTunnelCommandInputSchema,
   streamDeploymentTimelineQueryInputSchema,
   streamOperatorWorkEventsQueryInputSchema,
   streamSandboxEventsQueryInputSchema,
@@ -723,9 +751,12 @@ import {
   configureRuntimeMonitoringThresholdsResponseSchema,
   configureScheduledRuntimePrunePolicyResponseSchema,
   configureServerEdgeProxyResponseSchema,
+  configureStorageVolumeBackupPolicyResponseSchema,
   confirmDomainBindingOwnershipResponseSchema,
   connectorCapabilityApplyResponseSchema,
   connectorCapabilityPlanResponseSchema,
+  controlPlanePortabilityExportPlanResponseSchema,
+  controlPlanePortabilityImportPlanResponseSchema,
   countResponseSchema,
   createDeploymentResponseSchema,
   createDeployTokenResponseSchema,
@@ -742,6 +773,7 @@ import {
   deadLetterOperatorWorkResponseSchema,
   deleteAccountResponseSchema,
   deleteCertificateResponseSchema,
+  deleteControlPlanePortabilityArtifactResponseSchema,
   deleteDomainBindingResponseSchema,
   deleteOrganizationResponseSchema,
   deletePreviewEnvironmentResponseSchema,
@@ -768,11 +800,13 @@ import {
   environmentSummarySchema,
   expireTerminalSessionsResponseSchema,
   exportAuditEventsResponseSchema,
+  exportControlPlaneResponseSchema,
   exportGlobalAuditEventsResponseSchema,
   forceRedeployDeploymentResponseSchema,
   githubAppConnectionResponseSchema,
   type InspectRuntimeUsageResponse,
   importCertificateResponseSchema,
+  importControlPlaneResponseSchema,
   importResourceVariablesResponseSchema,
   inspectDependencyResourceResponseSchema,
   inspectRuntimeUsageResponseSchema,
@@ -787,6 +821,7 @@ import {
   listConnectionsResponseSchema,
   listConnectorCategoriesResponseSchema,
   listConnectorsResponseSchema,
+  listControlPlanePortabilityArtifactsResponseSchema,
   listDefaultAccessDomainPoliciesResponseSchema,
   listDependencyResourceBackupPoliciesResponseSchema,
   listDependencyResourceBackupsResponseSchema,
@@ -817,9 +852,11 @@ import {
   listSshCredentialsResponseSchema,
   listStaleDeploymentAttemptsResponseSchema,
   listStaticArtifactPublicationsResponseSchema,
+  listStorageVolumeBackupPoliciesResponseSchema,
   listStorageVolumeBackupsResponseSchema,
   listStorageVolumesResponseSchema,
   listTerminalSessionsResponseSchema,
+  listTunnelSessionsResponseSchema,
   lockEnvironmentResponseSchema,
   markOperatorWorkRecoveredResponseSchema,
   operatorWorkEventStreamEnvelopeSchema,
@@ -876,6 +913,7 @@ import {
   revokeCertificateResponseSchema,
   revokeConnectionResponseSchema,
   revokeDeployTokenResponseSchema,
+  revokeTunnelSessionResponseSchema,
   rollbackDeploymentResponseSchema,
   rotateDeployTokenResponseSchema,
   rotateResourceDependencyBindingSecretResponseSchema,
@@ -894,6 +932,7 @@ import {
   showAuditEventResponseSchema,
   showCertificateResponseSchema,
   showConnectionResponseSchema,
+  showControlPlanePortabilityArtifactResponseSchema,
   showDefaultAccessDomainPolicyResponseSchema,
   showDependencyResourceBackupPolicyResponseSchema,
   showDependencyResourceBackupResponseSchema,
@@ -915,11 +954,14 @@ import {
   showServerResponseSchema,
   showSourceEventResponseSchema,
   showSshCredentialResponseSchema,
+  showStorageVolumeBackupPolicyResponseSchema,
   showStorageVolumeBackupResponseSchema,
   showStorageVolumeResponseSchema,
   showTerminalSessionResponseSchema,
+  showTunnelSessionResponseSchema,
   startConnectionResponseSchema,
   startResourceRuntimeResponseSchema,
+  startTunnelResponseSchema,
   stopResourceRuntimeResponseSchema,
   storageVolumeBackupPlanResponseSchema,
   storageVolumeRestorePlanResponseSchema,
@@ -6693,6 +6735,186 @@ export const configureDependencyResourceBackupPolicyProcedure = base
     executeCommand(context, ConfigureDependencyResourceBackupPolicyCommand.create(input)),
   );
 
+export const configureStorageVolumeBackupPolicyProcedure = base
+  .route({
+    method: "POST",
+    path: "/storage-volumes/backup-policies",
+    description: "Configure storage volume backup automation policy",
+    successStatus: 201,
+  })
+  .input(configureStorageVolumeBackupPolicyCommandInputSchema)
+  .output(configureStorageVolumeBackupPolicyResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ConfigureStorageVolumeBackupPolicyCommand.create(input)),
+  );
+
+export const controlPlanePortabilityExportPlanProcedure = base
+  .route({
+    method: "GET",
+    path: "/control-plane-portability/export-plan",
+    description: "Plan a whole-instance encrypted control-plane export",
+    successStatus: 200,
+  })
+  .input(controlPlanePortabilityExportPlanQueryInputSchema)
+  .output(controlPlanePortabilityExportPlanResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ControlPlanePortabilityExportPlanQuery.create(input)),
+  );
+
+export const exportControlPlaneProcedure = base
+  .route({
+    method: "POST",
+    path: "/control-plane-portability/exports",
+    description: "Create an encrypted whole-instance control-plane export",
+    successStatus: 201,
+  })
+  .input(exportControlPlaneCommandInputSchema)
+  .output(exportControlPlaneResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ExportControlPlaneCommand.create(input)),
+  );
+
+export const controlPlanePortabilityImportPlanProcedure = base
+  .route({
+    method: "POST",
+    path: "/control-plane-portability/import-plan",
+    description: "Validate and plan an encrypted whole-instance import",
+    successStatus: 200,
+  })
+  .input(controlPlanePortabilityImportPlanQueryInputSchema)
+  .output(controlPlanePortabilityImportPlanResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ControlPlanePortabilityImportPlanQuery.create(input)),
+  );
+
+export const importControlPlaneProcedure = base
+  .route({
+    method: "POST",
+    path: "/control-plane-portability/imports",
+    description: "Import an encrypted whole-instance control-plane artifact",
+    successStatus: 202,
+  })
+  .input(importControlPlaneCommandInputSchema)
+  .output(importControlPlaneResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ImportControlPlaneCommand.create(input)),
+  );
+
+export const listControlPlanePortabilityArtifactsProcedure = base
+  .route({
+    method: "GET",
+    path: "/control-plane-portability/artifacts",
+    description: "List encrypted control-plane portability artifacts",
+    successStatus: 200,
+  })
+  .input(listControlPlanePortabilityArtifactsQueryInputSchema)
+  .output(listControlPlanePortabilityArtifactsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListControlPlanePortabilityArtifactsQuery.create(input)),
+  );
+
+export const showControlPlanePortabilityArtifactProcedure = base
+  .route({
+    method: "GET",
+    path: "/control-plane-portability/artifacts/{artifactId}",
+    description: "Show encrypted control-plane portability artifact metadata",
+    successStatus: 200,
+  })
+  .input(showControlPlanePortabilityArtifactQueryInputSchema)
+  .output(showControlPlanePortabilityArtifactResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowControlPlanePortabilityArtifactQuery.create(input)),
+  );
+
+export const deleteControlPlanePortabilityArtifactProcedure = base
+  .route({
+    method: "DELETE",
+    path: "/control-plane-portability/artifacts/{artifactId}",
+    description: "Delete one exact encrypted control-plane portability artifact",
+    successStatus: 200,
+  })
+  .input(deleteControlPlanePortabilityArtifactCommandInputSchema)
+  .output(deleteControlPlanePortabilityArtifactResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, DeleteControlPlanePortabilityArtifactCommand.create(input)),
+  );
+
+export const startTunnelProcedure = base
+  .route({
+    method: "POST",
+    path: "/tunnels",
+    description: "Start a temporary tunnel session",
+    successStatus: 201,
+  })
+  .input(startTunnelCommandInputSchema)
+  .output(startTunnelResponseSchema)
+  .handler(async ({ input, context }) => executeCommand(context, StartTunnelCommand.create(input)));
+
+export const listTunnelSessionsProcedure = base
+  .route({
+    method: "GET",
+    path: "/tunnels",
+    description: "List tunnel sessions",
+    successStatus: 200,
+  })
+  .input(listTunnelSessionsQueryInputSchema)
+  .output(listTunnelSessionsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListTunnelSessionsQuery.create(input)),
+  );
+
+export const showTunnelSessionProcedure = base
+  .route({
+    method: "GET",
+    path: "/tunnels/{sessionId}",
+    description: "Show a tunnel session",
+    successStatus: 200,
+  })
+  .input(showTunnelSessionQueryInputSchema)
+  .output(showTunnelSessionResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowTunnelSessionQuery.create(input)),
+  );
+
+export const revokeTunnelSessionProcedure = base
+  .route({
+    method: "DELETE",
+    path: "/tunnels/{sessionId}",
+    description: "Revoke a tunnel session",
+    successStatus: 200,
+  })
+  .input(revokeTunnelSessionCommandInputSchema)
+  .output(revokeTunnelSessionResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RevokeTunnelSessionCommand.create(input)),
+  );
+
+export const listStorageVolumeBackupPoliciesProcedure = base
+  .route({
+    method: "GET",
+    path: "/storage-volumes/backup-policies",
+    description: "List storage volume backup automation policies",
+    successStatus: 200,
+  })
+  .input(listStorageVolumeBackupPoliciesQueryInputSchema)
+  .output(listStorageVolumeBackupPoliciesResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListStorageVolumeBackupPoliciesQuery.create(input)),
+  );
+
+export const showStorageVolumeBackupPolicyProcedure = base
+  .route({
+    method: "GET",
+    path: "/storage-volumes/backup-policies/{policyId}",
+    description: "Show storage volume backup automation policy",
+    successStatus: 200,
+  })
+  .input(showStorageVolumeBackupPolicyQueryInputSchema)
+  .output(showStorageVolumeBackupPolicyResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowStorageVolumeBackupPolicyQuery.create(input)),
+  );
+
 export const listDependencyResourceBackupPoliciesProcedure = base
   .route({
     method: "GET",
@@ -7559,6 +7781,23 @@ export const appaloftOrpcRouter = {
     publishArchive: publishStaticArtifactArchiveProcedure,
     publishPayload: publishStaticArtifactPayloadProcedure,
   },
+  controlPlanePortability: {
+    exportPlan: controlPlanePortabilityExportPlanProcedure,
+    export: exportControlPlaneProcedure,
+    importPlan: controlPlanePortabilityImportPlanProcedure,
+    import: importControlPlaneProcedure,
+    artifacts: {
+      list: listControlPlanePortabilityArtifactsProcedure,
+      show: showControlPlanePortabilityArtifactProcedure,
+      delete: deleteControlPlanePortabilityArtifactProcedure,
+    },
+  },
+  tunnels: {
+    start: startTunnelProcedure,
+    list: listTunnelSessionsProcedure,
+    show: showTunnelSessionProcedure,
+    revoke: revokeTunnelSessionProcedure,
+  },
   storageVolumes: {
     create: createStorageVolumeProcedure,
     list: listStorageVolumesProcedure,
@@ -7574,6 +7813,11 @@ export const appaloftOrpcRouter = {
       restorePlan: createStorageVolumeRestorePlanProcedure,
       restore: restoreStorageVolumeBackupProcedure,
       prune: pruneStorageVolumeBackupProcedure,
+    },
+    backupPolicies: {
+      configure: configureStorageVolumeBackupPolicyProcedure,
+      list: listStorageVolumeBackupPoliciesProcedure,
+      show: showStorageVolumeBackupPolicyProcedure,
     },
   },
   scheduledTasks: {
@@ -10276,6 +10520,8 @@ export function mountAppaloftOrpcRoutes(
     "/api/resources/:resourceId/dependency-bindings",
     "/api/resources/:resourceId/dependency-bindings/:bindingId",
     "/api/resources/:resourceId/dependency-bindings/:bindingId/secret-rotations",
+    "/api/storage-volumes/backup-policies",
+    "/api/storage-volumes/backup-policies/:policyId",
     "/api/storage-volumes",
     "/api/storage-volumes/:storageVolumeId",
     "/api/storage-volumes/:storageVolumeId/rename",
@@ -10296,6 +10542,14 @@ export function mountAppaloftOrpcRoutes(
     "/api/terminal-sessions/expire",
     "/api/terminal-sessions/:sessionId",
     "/api/terminal-sessions/:sessionId/close",
+    "/api/tunnels",
+    "/api/tunnels/:sessionId",
+    "/api/control-plane-portability/export-plan",
+    "/api/control-plane-portability/exports",
+    "/api/control-plane-portability/import-plan",
+    "/api/control-plane-portability/imports",
+    "/api/control-plane-portability/artifacts",
+    "/api/control-plane-portability/artifacts/:artifactId",
     "/api/domain-bindings",
     "/api/domain-bindings/:domainBindingId",
     "/api/domain-bindings/:domainBindingId/dns-plan",

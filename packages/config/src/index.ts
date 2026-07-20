@@ -51,6 +51,20 @@ export interface ScheduledDependencyBackupRunnerConfig {
   batchSize: number;
 }
 
+export interface ScheduledStorageVolumeBackupRunnerConfig {
+  enabled: boolean;
+  intervalSeconds: number;
+  batchSize: number;
+}
+
+export interface TunnelSessionsConfig {
+  reconcilerEnabled: boolean;
+  reconcileIntervalSeconds: number;
+  reconcileBatchSize: number;
+  cloudflareExecutable: string;
+  ngrokExecutable: string;
+}
+
 export interface ScheduledHistoryRetentionRunnerConfig {
   enabled: boolean;
   intervalSeconds: number;
@@ -204,6 +218,8 @@ export interface AppConfig {
   scheduledTaskRunner: ScheduledTaskRunnerConfig;
   scheduledRuntimePruneRunner: ScheduledRuntimePruneRunnerConfig;
   scheduledDependencyBackupRunner: ScheduledDependencyBackupRunnerConfig;
+  scheduledStorageVolumeBackupRunner: ScheduledStorageVolumeBackupRunnerConfig;
+  tunnelSessions: TunnelSessionsConfig;
   scheduledHistoryRetentionRunner: ScheduledHistoryRetentionRunnerConfig;
   runtimeMonitoringCollectorRunner: RuntimeMonitoringCollectorRunnerConfig;
   workerRuntime: WorkerRuntimeConfig;
@@ -297,6 +313,18 @@ const defaults: Omit<AppConfig, "dataDir" | "pgliteDataDir"> & { databasePoolMax
     enabled: false,
     intervalSeconds: 3600,
     batchSize: 25,
+  },
+  scheduledStorageVolumeBackupRunner: {
+    enabled: false,
+    intervalSeconds: 300,
+    batchSize: 25,
+  },
+  tunnelSessions: {
+    reconcilerEnabled: false,
+    reconcileIntervalSeconds: 60,
+    reconcileBatchSize: 100,
+    cloudflareExecutable: "cloudflared",
+    ngrokExecutable: "ngrok",
   },
   scheduledHistoryRetentionRunner: {
     enabled: false,
@@ -656,6 +684,12 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
     source.flags?.scheduledDependencyBackupRunner ??
     fileConfig.scheduledDependencyBackupRunner ??
     defaults.scheduledDependencyBackupRunner;
+  const scheduledStorageVolumeBackupRunner =
+    source.flags?.scheduledStorageVolumeBackupRunner ??
+    fileConfig.scheduledStorageVolumeBackupRunner ??
+    defaults.scheduledStorageVolumeBackupRunner;
+  const tunnelSessions =
+    source.flags?.tunnelSessions ?? fileConfig.tunnelSessions ?? defaults.tunnelSessions;
   const scheduledHistoryRetentionRunner =
     source.flags?.scheduledHistoryRetentionRunner ??
     fileConfig.scheduledHistoryRetentionRunner ??
@@ -734,6 +768,31 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
     parsePositiveInteger(env.APPALOFT_SCHEDULED_DEPENDENCY_BACKUP_RUNNER_BATCH_SIZE) ??
     parsePositiveInteger(scheduledDependencyBackupRunner.batchSize) ??
     defaults.scheduledDependencyBackupRunner.batchSize;
+  const scheduledStorageVolumeBackupRunnerEnabled =
+    parseBoolean(env.APPALOFT_SCHEDULED_STORAGE_VOLUME_BACKUP_RUNNER_ENABLED) ??
+    scheduledStorageVolumeBackupRunner.enabled;
+  const scheduledStorageVolumeBackupRunnerIntervalSeconds =
+    parsePositiveInteger(env.APPALOFT_SCHEDULED_STORAGE_VOLUME_BACKUP_RUNNER_INTERVAL_SECONDS) ??
+    parsePositiveInteger(scheduledStorageVolumeBackupRunner.intervalSeconds) ??
+    defaults.scheduledStorageVolumeBackupRunner.intervalSeconds;
+  const scheduledStorageVolumeBackupRunnerBatchSize =
+    parsePositiveInteger(env.APPALOFT_SCHEDULED_STORAGE_VOLUME_BACKUP_RUNNER_BATCH_SIZE) ??
+    parsePositiveInteger(scheduledStorageVolumeBackupRunner.batchSize) ??
+    defaults.scheduledStorageVolumeBackupRunner.batchSize;
+  const tunnelSessionsReconcilerEnabled =
+    parseBoolean(env.APPALOFT_TUNNEL_RECONCILER_ENABLED) ?? tunnelSessions.reconcilerEnabled;
+  const tunnelSessionsReconcileIntervalSeconds =
+    parsePositiveInteger(env.APPALOFT_TUNNEL_RECONCILE_INTERVAL_SECONDS) ??
+    parsePositiveInteger(tunnelSessions.reconcileIntervalSeconds) ??
+    defaults.tunnelSessions.reconcileIntervalSeconds;
+  const tunnelSessionsReconcileBatchSize =
+    parsePositiveInteger(env.APPALOFT_TUNNEL_RECONCILE_BATCH_SIZE) ??
+    parsePositiveInteger(tunnelSessions.reconcileBatchSize) ??
+    defaults.tunnelSessions.reconcileBatchSize;
+  const tunnelCloudflareExecutable =
+    env.APPALOFT_CLOUDFLARED_EXECUTABLE?.trim() || tunnelSessions.cloudflareExecutable;
+  const tunnelNgrokExecutable =
+    env.APPALOFT_NGROK_EXECUTABLE?.trim() || tunnelSessions.ngrokExecutable;
   const scheduledHistoryRetentionRunnerEnabled =
     parseBoolean(env.APPALOFT_SCHEDULED_HISTORY_RETENTION_RUNNER_ENABLED) ??
     scheduledHistoryRetentionRunner.enabled;
@@ -1346,6 +1405,18 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
       enabled: scheduledDependencyBackupRunnerEnabled,
       intervalSeconds: scheduledDependencyBackupRunnerIntervalSeconds,
       batchSize: scheduledDependencyBackupRunnerBatchSize,
+    },
+    scheduledStorageVolumeBackupRunner: {
+      enabled: scheduledStorageVolumeBackupRunnerEnabled,
+      intervalSeconds: scheduledStorageVolumeBackupRunnerIntervalSeconds,
+      batchSize: scheduledStorageVolumeBackupRunnerBatchSize,
+    },
+    tunnelSessions: {
+      reconcilerEnabled: tunnelSessionsReconcilerEnabled,
+      reconcileIntervalSeconds: tunnelSessionsReconcileIntervalSeconds,
+      reconcileBatchSize: tunnelSessionsReconcileBatchSize,
+      cloudflareExecutable: tunnelCloudflareExecutable,
+      ngrokExecutable: tunnelNgrokExecutable,
     },
     scheduledHistoryRetentionRunner: {
       enabled: scheduledHistoryRetentionRunnerEnabled,

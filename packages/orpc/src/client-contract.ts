@@ -38,8 +38,16 @@ import {
   type ConfigureScheduledTaskCommandInput,
   type ConfigureServerCredentialCommandInput,
   type ConfigureServerEdgeProxyCommandInput,
+  type ConfigureStorageVolumeBackupPolicyCommandInput,
+  type ConfigureStorageVolumeBackupPolicyResponse,
   type ConfirmDomainBindingOwnershipCommandInput,
   type ConnectorCapabilityPlanQueryInput,
+  type ControlPlaneExportPlan,
+  type ControlPlaneExportResult,
+  type ControlPlaneImportPlan,
+  type ControlPlaneImportResult,
+  type ControlPlanePortabilityExportPlanQueryInput,
+  type ControlPlanePortabilityImportPlanQueryInput,
   type CountDependencyResourcesQueryInput,
   type CountDeploymentsQueryInput,
   type CountEnvironmentsQueryInput,
@@ -65,6 +73,8 @@ import {
   type DeactivateServerCommandInput,
   type DeleteAccountCommandInput,
   type DeleteCertificateCommandInput,
+  type DeleteControlPlanePortabilityArtifactCommandInput,
+  type DeleteControlPlanePortabilityArtifactResponse,
   type DeleteDependencyResourceCommandInput,
   type DeleteDomainBindingCommandInput,
   type DeleteOrganizationCommandInput,
@@ -84,11 +94,13 @@ import {
   type DomainBindingDnsReadiness,
   type EnvironmentEffectivePrecedenceQueryInput,
   type ExpireTerminalSessionsCommandInput,
+  type ExportControlPlaneCommandInput,
   type ForceRedeployDeploymentCommandInput,
   type GetAuthBootstrapStatusQueryInput,
   type GetCurrentOrganizationContextQueryInput,
   type GitHubAppConnectionQueryInput,
   type ImportCertificateCommandInput,
+  type ImportControlPlaneCommandInput,
   type ImportDependencyResourceCommandInput,
   type ImportResourceVariablesCommandInput,
   type InspectDomainBindingDnsReadinessQueryInput,
@@ -103,6 +115,8 @@ import {
   type ListConnectionsQueryInput,
   type ListConnectorCategoriesQueryInput,
   type ListConnectorsQueryInput,
+  type ListControlPlanePortabilityArtifactsQueryInput,
+  type ListControlPlanePortabilityArtifactsResponse,
   type ListDefaultAccessDomainPoliciesQueryInput,
   type ListDependencyResourceBackupPoliciesQueryInput,
   type ListDependencyResourceBackupsQueryInput,
@@ -128,8 +142,11 @@ import {
   type ListSourceLinksQueryInput,
   type ListSshCredentialsQueryInput,
   type ListStaticArtifactPublicationsQueryInput,
+  type ListStorageVolumeBackupPoliciesQueryInput,
   type ListStorageVolumeBackupsQueryInput,
   type ListTerminalSessionsQueryInput,
+  type ListTunnelSessionsQueryInput,
+  type ListTunnelSessionsResponse,
   type LockEnvironmentCommandInput,
   type OpenTerminalSessionCommandInput,
   type PlanDomainBindingDnsQueryInput,
@@ -179,6 +196,8 @@ import {
   type RevokeCertificateCommandInput,
   type RevokeConnectionCommandInput,
   type RevokeDeployTokenCommandInput,
+  type RevokeTunnelSessionCommandInput,
+  type RevokeTunnelSessionResponse,
   type RollbackDeploymentCommandInput,
   type RotateDependencyResourceConnectionCommandInput,
   type RotateDeployTokenCommandInput,
@@ -198,6 +217,8 @@ import {
   type ShowBlueprintResponse,
   type ShowCertificateQueryInput,
   type ShowConnectionQueryInput,
+  type ShowControlPlanePortabilityArtifactQueryInput,
+  type ShowControlPlanePortabilityArtifactResponse,
   type ShowDefaultAccessDomainPolicyQueryInput,
   type ShowDependencyResourceBackupPolicyQueryInput,
   type ShowDependencyResourceBackupQueryInput,
@@ -222,11 +243,18 @@ import {
   type ShowSourceEventQueryInput,
   type ShowSourceLinkQueryInput,
   type ShowSshCredentialQueryInput,
+  type ShowStorageVolumeBackupPolicyQueryInput,
   type ShowStorageVolumeBackupQueryInput,
   type ShowTerminalSessionQueryInput,
+  type ShowTunnelSessionQueryInput,
+  type ShowTunnelSessionResponse,
   type StartConnectionCommandInput,
   type StartResourceRuntimeCommandInput,
+  type StartTunnelCommandInput,
+  type StartTunnelResponse,
   type StopResourceRuntimeCommandInput,
+  type StorageVolumeBackupPolicyListReadback,
+  type StorageVolumeBackupPolicyReadback,
   type StreamDeploymentTimelineQueryInput,
   type StreamOperatorWorkEventsQueryInput,
   type SwitchCurrentOrganizationCommandInput,
@@ -1364,6 +1392,78 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientError
     >;
   };
+  controlPlanePortability: {
+    exportPlan: Client<
+      AppaloftClientContext,
+      ControlPlanePortabilityExportPlanQueryInput,
+      ControlPlaneExportPlan,
+      AppaloftClientError
+    >;
+    export: Client<
+      AppaloftClientContext,
+      ExportControlPlaneCommandInput,
+      ControlPlaneExportResult,
+      AppaloftClientError
+    >;
+    importPlan: Client<
+      AppaloftClientContext,
+      ControlPlanePortabilityImportPlanQueryInput,
+      ControlPlaneImportPlan,
+      AppaloftClientError
+    >;
+    import: Client<
+      AppaloftClientContext,
+      ImportControlPlaneCommandInput,
+      ControlPlaneImportResult,
+      AppaloftClientError
+    >;
+    artifacts: {
+      list: Client<
+        AppaloftClientContext,
+        ListControlPlanePortabilityArtifactsQueryInput,
+        ListControlPlanePortabilityArtifactsResponse,
+        AppaloftClientError
+      >;
+      show: Client<
+        AppaloftClientContext,
+        ShowControlPlanePortabilityArtifactQueryInput,
+        ShowControlPlanePortabilityArtifactResponse,
+        AppaloftClientError
+      >;
+      delete: Client<
+        AppaloftClientContext,
+        DeleteControlPlanePortabilityArtifactCommandInput,
+        DeleteControlPlanePortabilityArtifactResponse,
+        AppaloftClientError
+      >;
+    };
+  };
+  tunnels: {
+    start: Client<
+      AppaloftClientContext,
+      StartTunnelCommandInput,
+      StartTunnelResponse,
+      AppaloftClientError
+    >;
+    list: Client<
+      AppaloftClientContext,
+      ListTunnelSessionsQueryInput,
+      ListTunnelSessionsResponse,
+      AppaloftClientError
+    >;
+    show: Client<
+      AppaloftClientContext,
+      ShowTunnelSessionQueryInput,
+      ShowTunnelSessionResponse,
+      AppaloftClientError
+    >;
+    revoke: Client<
+      AppaloftClientContext,
+      RevokeTunnelSessionCommandInput,
+      RevokeTunnelSessionResponse,
+      AppaloftClientError
+    >;
+  };
   storageVolumes: {
     create: Client<
       AppaloftClientContext,
@@ -1442,6 +1542,26 @@ export type AppaloftOrpcClientContract = {
         AppaloftClientContext,
         PruneStorageVolumeBackupCommandInput,
         PruneStorageVolumeBackupResponse,
+        AppaloftClientError
+      >;
+    };
+    backupPolicies: {
+      configure: Client<
+        AppaloftClientContext,
+        ConfigureStorageVolumeBackupPolicyCommandInput,
+        ConfigureStorageVolumeBackupPolicyResponse,
+        AppaloftClientError
+      >;
+      list: Client<
+        AppaloftClientContext,
+        ListStorageVolumeBackupPoliciesQueryInput,
+        StorageVolumeBackupPolicyListReadback,
+        AppaloftClientError
+      >;
+      show: Client<
+        AppaloftClientContext,
+        ShowStorageVolumeBackupPolicyQueryInput,
+        StorageVolumeBackupPolicyReadback,
         AppaloftClientError
       >;
     };

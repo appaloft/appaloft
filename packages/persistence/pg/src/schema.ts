@@ -288,6 +288,66 @@ export interface DependencyResourceBackupPoliciesTable {
   updated_at: UpdatableTimestampColumn;
 }
 
+export interface StorageVolumeBackupPoliciesTable {
+  id: string;
+  version: string;
+  storage_volume_id: string;
+  plan_request: ColumnType<
+    Record<string, unknown>,
+    Record<string, unknown>,
+    Record<string, unknown>
+  >;
+  scheduled_enabled: boolean;
+  pre_deploy_enabled: boolean;
+  schedule_interval_hours: number;
+  retry_on_failure: boolean;
+  failure_mode: string;
+  notification_ref: string | null;
+  last_run_at: NullableUpdatableTimestampColumn;
+  next_run_at: UpdatableTimestampColumn;
+  claim_until: NullableUpdatableTimestampColumn;
+  last_trigger: string | null;
+  last_status: string;
+  last_backup_id: string | null;
+  last_process_attempt_id: string | null;
+  last_pruned_count: number;
+  last_notification_status: string;
+  last_error_code: string | null;
+  updated_at: UpdatableTimestampColumn;
+}
+
+export interface ControlPlanePortabilityArtifactsTable {
+  id: string;
+  schema_version: string;
+  created_at: TimestampColumn;
+  source_revision: string;
+  table_count: number;
+  row_count: number;
+  checksum: string;
+  size_bytes: ColumnType<number, number, number>;
+  kind: string;
+  encrypted_envelope: string;
+}
+
+export interface TunnelSessionsTable {
+  id: string;
+  organization_id: string | null;
+  provider_key: string;
+  origin_url: string;
+  public_url: string | null;
+  status: string;
+  expires_at: TimestampColumn;
+  created_at: TimestampColumn;
+  updated_at: UpdatableTimestampColumn;
+  revoked_at: NullableUpdatableTimestampColumn;
+  failure_code: string | null;
+  provider_handle: ColumnType<
+    Record<string, unknown> | null,
+    Record<string, unknown> | null,
+    Record<string, unknown> | null
+  >;
+}
+
 export interface ResourceRuntimeLogArchivesTable {
   id: string;
   resource_id: string;
@@ -1193,6 +1253,9 @@ export interface Database {
   dependency_resource_backups: DependencyResourceBackupsTable;
   storage_volume_backups: StorageVolumeBackupsTable;
   dependency_resource_backup_policies: DependencyResourceBackupPoliciesTable;
+  storage_volume_backup_policies: StorageVolumeBackupPoliciesTable;
+  control_plane_portability_artifacts: ControlPlanePortabilityArtifactsTable;
+  tunnel_sessions: TunnelSessionsTable;
   resource_dependency_bindings: ResourceDependencyBindingsTable;
   environment_profile_decisions: EnvironmentProfileDecisionsTable;
   resource_runtime_log_archives: ResourceRuntimeLogArchivesTable;

@@ -26,6 +26,9 @@ relatedOperations:
   - storage-volumes.restore-plan
   - storage-volumes.restore-backup
   - storage-volumes.prune-backups
+  - storage-volumes.backup-policies.configure
+  - storage-volumes.backup-policies.list
+  - storage-volumes.backup-policies.show
   - resources.attach-storage
   - resources.detach-storage
 sidebar:
@@ -127,6 +130,35 @@ appaloft storage volume backup restore-plan svb_123
 appaloft storage volume backup restore svb_123 --restored-volume-name pb-data-restored
 appaloft storage volume backup prune svb_123
 ```
+
+可以用 policy 自动执行同一条安全的 plan/create/verify/prune 链路。Scheduled policy 使用 lease
+claim，多副本 backend 不会并发执行同一个到期备份。Pre-deploy policy 会在部署准入检查之后、创建
+deployment 状态之前执行；`block` 会在备份失败时阻止部署，`continue` 则记录失败、发送通知并继续。
+
+```bash title="配置定时和部署前备份"
+appaloft storage volume backup policy configure \
+  --storage-volume vol_uploads \
+  --scheduled true \
+  --pre-deploy true \
+  --schedule-interval-hours 24 \
+  --failure-mode block \
+  --retry-on-failure true \
+  --notification-ref conn_ops \
+  --target-provider s3-compatible \
+  --target-ref s3://backups/appaloft/vol_uploads \
+  --secret-ref sec_s3_backup \
+  --retention-max-count 14 \
+  --retention-max-age-days 30
+
+appaloft storage volume backup policy list --storage-volume vol_uploads
+appaloft storage volume backup policy show svbp_123
+```
+
+Scheduler 会先验证新备份的 checksum，再应用数量、时长和字节数 retention。失败 attempt 会保留在
+policy readback，并可通过配置的 connector 发出通知。用
+`APPALOFT_SCHEDULED_STORAGE_VOLUME_BACKUP_RUNNER_ENABLED=true` 启用 worker；轮询间隔和 claim batch
+分别由 `APPALOFT_SCHEDULED_STORAGE_VOLUME_BACKUP_RUNNER_INTERVAL_SECONDS` 和
+`APPALOFT_SCHEDULED_STORAGE_VOLUME_BACKUP_RUNNER_BATCH_SIZE` 控制。
 
 默认恢复到新的 StorageVolume。把恢复出来的新 volume 挂回 Resource 或替换现有 mount，是单独的显式
 operator 操作。Local filesystem target 只能说明本机/同 failure domain 有一份恢复点，不能当作灾备。

@@ -6,9 +6,11 @@ import {
   Building2,
   ClipboardList,
   Globe2,
+  HardDriveDownload,
   KeyRound,
   Link2,
   MailPlus,
+  Route,
   ShieldAlert,
   ShieldCheck,
   Terminal,
@@ -115,6 +117,16 @@ export function instanceSettingsItems(
       href: "/instance/sessions",
       labelKey: i18nKeys.console.terminal.lifecycleTitle,
       icon: Terminal,
+    },
+    {
+      href: "/instance/portability",
+      labelKey: i18nKeys.console.instance.portabilityTitle,
+      icon: HardDriveDownload,
+    },
+    {
+      href: "/instance/tunnels",
+      labelKey: i18nKeys.console.instance.tunnelsTitle,
+      icon: Route,
     },
     ...settingsExtensionItems(extensions, "/instance", locale),
     {

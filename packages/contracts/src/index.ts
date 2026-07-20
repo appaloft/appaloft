@@ -1593,6 +1593,185 @@ export const configureDependencyResourceBackupPolicyResponseSchema = z.object({
   id: z.string(),
 });
 
+export const storageVolumeBackupPolicyRecordSchema = z.object({
+  id: z.string(),
+  version: z.string(),
+  storageVolumeId: z.string(),
+  planRequest: z.object({
+    source: z.object({
+      storageVolumeId: z.string(),
+      resourceId: z.string().optional(),
+      serverId: z.string().optional(),
+      attachmentId: z.string().optional(),
+      destinationPath: z.string().optional(),
+      dataFormat: z
+        .enum(["sqlite", "json-files", "filesystem", "application-export", "unknown"])
+        .optional(),
+      liveWrites: z.boolean().optional(),
+    }),
+    requestedConsistency: z.enum([
+      "crash-consistent",
+      "quiesced",
+      "application-consistent",
+      "provider-snapshot-consistent",
+    ]),
+    preferredSourceAdapter: z
+      .enum([
+        "tar-volume",
+        "sqlite-online-backup",
+        "quiesce-and-copy",
+        "app-export",
+        "provider-snapshot",
+        "unsupported",
+      ])
+      .optional(),
+    target: z.object({
+      providerKey: z.enum([
+        "local-filesystem",
+        "s3-compatible",
+        "webdav",
+        "restic-repository",
+        "provider-volume-snapshot",
+      ]),
+      targetRef: z.string(),
+      failureDomain: z.string().optional(),
+      secretRef: z.string().optional(),
+    }),
+    retention: z.object({
+      maxCount: z.number(),
+      maxAgeDays: z.number().optional(),
+      maxBytes: z.number().optional(),
+      minFreeBytes: z.number().optional(),
+    }),
+  }),
+  scheduledEnabled: z.boolean(),
+  preDeployEnabled: z.boolean(),
+  scheduleIntervalHours: z.number(),
+  retryOnFailure: z.boolean(),
+  failureMode: z.enum(["block", "continue"]),
+  notificationRef: z.string().nullable(),
+  lastRunAt: z.string().nullable(),
+  nextRunAt: z.string(),
+  lastTrigger: z.enum(["scheduled", "pre-deploy"]).nullable(),
+  lastStatus: z.enum(["never", "succeeded", "failed"]),
+  lastBackupId: z.string().nullable(),
+  lastProcessAttemptId: z.string().nullable(),
+  lastPrunedCount: z.number(),
+  lastNotificationStatus: z.enum(["not-requested", "delivered", "failed"]),
+  lastErrorCode: z.string().nullable(),
+  updatedAt: z.string(),
+});
+
+export const configureStorageVolumeBackupPolicyResponseSchema = z.object({ id: z.string() });
+export const listStorageVolumeBackupPoliciesResponseSchema = z.object({
+  schemaVersion: z.literal("storage-volume-backup-policies.list/v1"),
+  items: z.array(storageVolumeBackupPolicyRecordSchema),
+});
+export const showStorageVolumeBackupPolicyResponseSchema = z.object({
+  schemaVersion: z.literal("storage-volume-backup-policies.policy/v1"),
+  policy: storageVolumeBackupPolicyRecordSchema,
+});
+
+export type StorageVolumeBackupPolicyRecord = z.infer<typeof storageVolumeBackupPolicyRecordSchema>;
+
+export const tunnelSessionSummarySchema = z.object({
+  id: z.string(),
+  providerKey: z.enum(["cloudflare-quick", "ngrok"]),
+  originUrl: z.string(),
+  publicUrl: z.string().nullable(),
+  status: z.enum(["starting", "ready", "failed", "revoked", "expired"]),
+  expiresAt: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  revokedAt: z.string().nullable(),
+  failureCode: z.string().nullable(),
+});
+export const startTunnelResponseSchema = z.object({
+  schemaVersion: z.literal("tunnel-sessions.start/v1"),
+  session: tunnelSessionSummarySchema,
+});
+export const listTunnelSessionsResponseSchema = z.object({
+  schemaVersion: z.literal("tunnel-sessions.list/v1"),
+  items: z.array(tunnelSessionSummarySchema),
+});
+export const showTunnelSessionResponseSchema = z.object({
+  schemaVersion: z.literal("tunnel-sessions.show/v1"),
+  session: tunnelSessionSummarySchema,
+});
+export const revokeTunnelSessionResponseSchema = z.object({
+  schemaVersion: z.literal("tunnel-sessions.revoke/v1"),
+  session: tunnelSessionSummarySchema,
+});
+export type TunnelSessionSummary = z.infer<typeof tunnelSessionSummarySchema>;
+
+export const controlPlanePortabilityArtifactSummarySchema = z.object({
+  id: z.string(),
+  schemaVersion: z.literal("appaloft.control-plane-portability/v1"),
+  createdAt: z.string(),
+  sourceRevision: z.string(),
+  tableCount: z.number(),
+  rowCount: z.number(),
+  checksum: z.string(),
+  sizeBytes: z.number(),
+  kind: z.enum(["export", "rollback", "imported"]),
+});
+
+export const controlPlanePortabilityExportPlanResponseSchema = z.object({
+  schemaVersion: z.literal("control-plane-portability.export-plan/v1"),
+  sourceRevision: z.string(),
+  tables: z.array(z.object({ name: z.string(), rowCount: z.number() })),
+  totalRows: z.number(),
+  warnings: z.array(z.string()),
+});
+
+export const exportControlPlaneResponseSchema = z.object({
+  schemaVersion: z.literal("control-plane-portability.export/v1"),
+  artifact: controlPlanePortabilityArtifactSummarySchema,
+  encryptedEnvelope: z.string(),
+});
+
+export const controlPlanePortabilityImportPlanResponseSchema = z.object({
+  schemaVersion: z.literal("control-plane-portability.import-plan/v1"),
+  compatible: z.boolean(),
+  mode: z.enum(["merge", "replace"]),
+  sourceRevision: z.string(),
+  targetRevision: z.string(),
+  tables: z.array(
+    z.object({
+      name: z.string(),
+      incomingRows: z.number(),
+      existingRows: z.number(),
+      conflicts: z.number(),
+    }),
+  ),
+  blockers: z.array(z.string()),
+  warnings: z.array(z.string()),
+});
+
+export const importControlPlaneResponseSchema = z.object({
+  schemaVersion: z.literal("control-plane-portability.import/v1"),
+  mode: z.enum(["merge", "replace"]),
+  importedRows: z.number(),
+  updatedRows: z.number(),
+  rollbackArtifactId: z.string(),
+  completedAt: z.string(),
+});
+
+export const listControlPlanePortabilityArtifactsResponseSchema = z.object({
+  schemaVersion: z.literal("control-plane-portability.artifacts.list/v1"),
+  items: z.array(controlPlanePortabilityArtifactSummarySchema),
+});
+
+export const showControlPlanePortabilityArtifactResponseSchema = z.object({
+  schemaVersion: z.literal("control-plane-portability.artifacts.show/v1"),
+  artifact: controlPlanePortabilityArtifactSummarySchema,
+});
+
+export const deleteControlPlanePortabilityArtifactResponseSchema = z.object({
+  id: z.string(),
+  deletedAt: z.string(),
+});
+
 export const listDependencyResourceBackupPoliciesResponseSchema = z.object({
   schemaVersion: z.literal("dependency-resource-backup-policies.list/v1"),
   items: z.array(dependencyResourceBackupPolicyReadSchema),
@@ -7147,6 +7326,8 @@ export const maintenanceWorkerSafetyModeSchema = z.enum([
   "runtime-execution",
   "policy-gated-prune",
   "policy-gated-retention",
+  "policy-gated-backup",
+  "tunnel-session-cleanup",
   "read-only-collection",
 ]);
 
@@ -7194,10 +7375,12 @@ export const maintenanceWorkerStatusSchema = z.object({
     "durable-worker-runtime",
     "preview-expiry-cleanup-scheduler",
     "preview-cleanup-retry-scheduler",
+    "scheduled-storage-volume-backup-runner",
     "scheduled-task-runner",
     "scheduled-runtime-prune-runner",
     "scheduled-history-retention-runner",
     "runtime-monitoring-collector-runner",
+    "tunnel-session-reconciler",
   ]),
   label: z.string(),
   enabled: z.boolean(),

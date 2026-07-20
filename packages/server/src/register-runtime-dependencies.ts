@@ -19,6 +19,7 @@ import {
   DockerSwarmExecutionBackend,
   DockerSwarmShellCommandRunner,
   InMemoryExecutionBackend,
+  LocalAgentTunnelProvider,
   LocalExecutionBackend,
   RoutingExecutionBackend,
   RuntimeControlShellCommandExecutor,
@@ -51,6 +52,7 @@ import {
   type CertificateProviderPort,
   type Clock,
   CommandBus,
+  ConnectorBackupAutomationNotificationPort,
   createDefaultConnectorDefinitions,
   type DefaultAccessDomainPolicyRepository,
   DefaultAccessDomainRuntimePlanResolver,
@@ -75,6 +77,7 @@ import {
   InMemoryConnectorProviderAdapterRegistry,
   InMemoryConnectorRegistry,
   InMemoryEdgeProxyProviderRegistry,
+  InMemoryTunnelProviderRegistry,
   type IntegrationAuthPort,
   type MutationCoordinator,
   type OperationAuditSink,
@@ -111,6 +114,7 @@ import {
   type StaticArtifactRouteProviderPort,
   type StaticArtifactStorePort,
   type StorageRuntimeCleaner,
+  type StorageVolumeBackupPolicyRepository,
   type TenantContextResolver,
   tokens,
   toRepositoryContext,
@@ -150,6 +154,7 @@ import {
   PgCertificateSecretStore,
   PgConnectorAuthorizationAttemptStore,
   PgConnectorConnectionStore,
+  PgControlPlanePortabilityService,
   PgControlPlaneSecretRotationService,
   PgDefaultAccessDomainPolicyRepository,
   PgDependencyBindingSecretStore,
@@ -226,11 +231,13 @@ import {
   PgSshCredentialReadModel,
   PgSshCredentialRepository,
   PgSshCredentialUsageReader,
+  PgStorageVolumeBackupPolicyRepository,
   PgStorageVolumeBackupReadModel,
   PgStorageVolumeBackupRepository,
   PgStorageVolumeBackupSafetyReader,
   PgStorageVolumeReadModel,
   PgStorageVolumeRepository,
+  PgTunnelSessionRepository,
 } from "@appaloft/persistence-pg";
 import { createBuiltinPlugins } from "@appaloft/plugin-builtins";
 import { LocalPluginHost } from "@appaloft/plugin-host";
@@ -947,6 +954,7 @@ export interface RegisterRuntimeDependenciesInput {
   scheduledRuntimePrunePolicyRepository?: ScheduledRuntimePrunePolicyRepository;
   scheduledRuntimePrunePolicyReadModel?: ScheduledRuntimePrunePolicyReadModel;
   dependencyResourceBackupPolicyRepository?: DependencyResourceBackupPolicyRepository;
+  storageVolumeBackupPolicyRepository?: StorageVolumeBackupPolicyRepository;
   resourceAccessFailureRenderer?: () => ResourceAccessFailureRendererTarget | undefined;
   systemPlugins?: readonly SystemPluginDefinition[];
 }
@@ -1443,6 +1451,42 @@ export function registerRuntimeDependencies(
       () =>
         input.dependencyResourceBackupPolicyRepository ??
         new PgDependencyResourceBackupPolicyRepository(input.database.db),
+    ),
+  });
+  container.register(tokens.storageVolumeBackupPolicyRepository, {
+    useFactory: instanceCachingFactory(
+      () =>
+        input.storageVolumeBackupPolicyRepository ??
+        new PgStorageVolumeBackupPolicyRepository(input.database.db),
+    ),
+  });
+  container.register(tokens.backupAutomationNotificationPort, {
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new ConnectorBackupAutomationNotificationPort(
+          dependencyContainer.resolve(tokens.connectorProviderAdapterRegistry),
+        ),
+    ),
+  });
+  container.register(tokens.controlPlanePortabilityPort, {
+    useFactory: instanceCachingFactory(
+      () => new PgControlPlanePortabilityService(input.database.db),
+    ),
+  });
+  container.register(tokens.tunnelSessionRepository, {
+    useFactory: instanceCachingFactory(() => new PgTunnelSessionRepository(input.database.db)),
+  });
+  container.register(tokens.tunnelProviderRegistry, {
+    useFactory: instanceCachingFactory(
+      () =>
+        new InMemoryTunnelProviderRegistry([
+          new LocalAgentTunnelProvider("cloudflare-quick", {
+            executable: input.config.tunnelSessions.cloudflareExecutable,
+          }),
+          new LocalAgentTunnelProvider("ngrok", {
+            executable: input.config.tunnelSessions.ngrokExecutable,
+          }),
+        ]),
     ),
   });
   container.register(tokens.sourceEventRecorder, {

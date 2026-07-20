@@ -9,6 +9,8 @@ export * from "./domain-binding-messages";
 export * from "./domain-event-messages";
 export * from "./environment-messages";
 export * from "./operation-catalog";
+export * from "./operations/system/control-plane-portability";
+export * from "./operations/tunnels/tunnel-session";
 export * from "./operator-work-messages";
 export * from "./organization-messages";
 export * from "./project-messages";

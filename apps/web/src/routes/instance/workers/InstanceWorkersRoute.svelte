@@ -7,7 +7,7 @@
   import { request } from "$lib/api/client";
   import ConsoleExtensionPage from "$lib/components/console/ConsoleExtensionPage.svelte";
   import { findConsolePageExtensionByPath } from "$lib/console/console-page-extension";
-  import InstancePage from "../+page.svelte";
+  import InstancePage from "../InstancePage.svelte";
 
   type SystemPluginWebExtensionsResponse = {
     items: SystemPluginWebExtension[];

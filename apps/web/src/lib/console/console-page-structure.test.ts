@@ -254,7 +254,7 @@ const organizationPageSource = readFileSync(
   "utf8",
 );
 const instancePageSource = readFileSync(
-  fileURLToPath(new URL("../../routes/instance/+page.svelte", import.meta.url)),
+  fileURLToPath(new URL("../../routes/instance/InstancePage.svelte", import.meta.url)),
   "utf8",
 );
 const consoleExtensionRouteLoadSource = readFileSync(

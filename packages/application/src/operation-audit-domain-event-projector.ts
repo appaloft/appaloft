@@ -81,7 +81,7 @@ const relatedTargetFields: Record<string, string> = {
 };
 
 const secretLikeKeyPattern =
-  /(authorization|certificate|credential|env|password|payload|private|secret|signature|token|value)/i;
+  /(authorization|certificate|credential|env|envelope|passphrase|password|payload|private|secret|signature|token|value)/i;
 
 function LifecycleEventHandler(eventType: (typeof lifecycleEventTypes)[number]) {
   return EventHandler(eventType);

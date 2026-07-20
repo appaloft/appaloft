@@ -737,6 +737,40 @@ describe("resolveConfig", () => {
     });
   });
 
+  test("[STOR-BACKUP-AUTO-SCHEDULE-002] configures the storage backup runner through environment", () => {
+    const config = resolveConfig({
+      env: {
+        APPALOFT_SCHEDULED_STORAGE_VOLUME_BACKUP_RUNNER_ENABLED: "true",
+        APPALOFT_SCHEDULED_STORAGE_VOLUME_BACKUP_RUNNER_INTERVAL_SECONDS: "120",
+        APPALOFT_SCHEDULED_STORAGE_VOLUME_BACKUP_RUNNER_BATCH_SIZE: "7",
+      },
+    });
+    expect(config.scheduledStorageVolumeBackupRunner).toEqual({
+      enabled: true,
+      intervalSeconds: 120,
+      batchSize: 7,
+    });
+  });
+
+  test("[TUNNEL-EXPIRY-006] configures tunnel agents and reconciler through environment", () => {
+    const config = resolveConfig({
+      env: {
+        APPALOFT_TUNNEL_RECONCILER_ENABLED: "true",
+        APPALOFT_TUNNEL_RECONCILE_INTERVAL_SECONDS: "30",
+        APPALOFT_TUNNEL_RECONCILE_BATCH_SIZE: "12",
+        APPALOFT_CLOUDFLARED_EXECUTABLE: "/opt/bin/cloudflared",
+        APPALOFT_NGROK_EXECUTABLE: "/opt/bin/ngrok",
+      },
+    });
+    expect(config.tunnelSessions).toEqual({
+      reconcilerEnabled: true,
+      reconcileIntervalSeconds: 30,
+      reconcileBatchSize: 12,
+      cloudflareExecutable: "/opt/bin/cloudflared",
+      ngrokExecutable: "/opt/bin/ngrok",
+    });
+  });
+
   test("[SCHED-HISTORY-RETENTION-006] allows configuring the scheduled history retention runner through environment", () => {
     const config = resolveConfig({
       env: {

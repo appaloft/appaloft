@@ -83,6 +83,12 @@ environments，或已经记录为 retry-scheduled 的 cleanup attempts。
 | `APPALOFT_SCHEDULED_DEPENDENCY_BACKUP_RUNNER_ENABLED` | `false` | 运行 scheduled dependency backup policies。 |
 | `APPALOFT_SCHEDULED_DEPENDENCY_BACKUP_RUNNER_INTERVAL_SECONDS` | `3600` | dependency backup policy 轮询间隔。 |
 | `APPALOFT_SCHEDULED_DEPENDENCY_BACKUP_RUNNER_BATCH_SIZE` | `25` | 每次 tick 最多扫描的 dependency backup policies。 |
+| `APPALOFT_SCHEDULED_STORAGE_VOLUME_BACKUP_RUNNER_ENABLED` | `false` | 运行到期的 storage volume backup policies；官方 self-host Compose/Image 默认显式启用。 |
+| `APPALOFT_SCHEDULED_STORAGE_VOLUME_BACKUP_RUNNER_INTERVAL_SECONDS` | `300` | storage volume backup policy 轮询间隔。 |
+| `APPALOFT_SCHEDULED_STORAGE_VOLUME_BACKUP_RUNNER_BATCH_SIZE` | `25` | 每次 tick 最多 claim 的 storage volume backup policies。 |
+| `APPALOFT_TUNNEL_RECONCILER_ENABLED` | `false` | 清理到期或 orphan 的 Tunnel session；官方 self-host Compose/Image 默认显式启用。 |
+| `APPALOFT_TUNNEL_RECONCILE_INTERVAL_SECONDS` | `60` | Tunnel session 轮询间隔。 |
+| `APPALOFT_TUNNEL_RECONCILE_BATCH_SIZE` | `100` | 每次 tick 最多检查的 Tunnel sessions。 |
 | `APPALOFT_SCHEDULED_HISTORY_RETENTION_RUNNER_ENABLED` | `false` | 通过已有 history prune commands 或受治理的 retention stores 运行 retention defaults。 |
 | `APPALOFT_SCHEDULED_HISTORY_RETENTION_RUNNER_INTERVAL_SECONDS` | `3600` | scheduled history retention 轮询间隔。 |
 | `APPALOFT_SCHEDULED_HISTORY_RETENTION_RUNNER_BATCH_SIZE` | `25` | 每次 tick 最多扫描的 retention default policies。 |

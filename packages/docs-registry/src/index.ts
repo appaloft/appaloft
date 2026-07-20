@@ -3396,6 +3396,21 @@ export const publicDocsOperationCoverage = [
     topicId: "storage.volume-backup-restore",
   },
   {
+    operationKey: "storage-volumes.backup-policies.configure",
+    status: "documented",
+    topicId: "storage.volume-backup-restore",
+  },
+  {
+    operationKey: "storage-volumes.backup-policies.list",
+    status: "documented",
+    topicId: "storage.volume-backup-restore",
+  },
+  {
+    operationKey: "storage-volumes.backup-policies.show",
+    status: "documented",
+    topicId: "storage.volume-backup-restore",
+  },
+  {
     operationKey: "scheduled-tasks.create",
     status: "documented",
     topicId: "scheduled-task.resource-lifecycle",
@@ -4255,6 +4270,45 @@ export const publicDocsOperationCoverage = [
   },
   { operationKey: "system.db-status", status: "documented", topicId: "advanced.control-plane" },
   { operationKey: "system.db-migrate", status: "documented", topicId: "advanced.control-plane" },
+  {
+    operationKey: "control-plane-portability.export-plan",
+    status: "documented",
+    topicId: "advanced.control-plane",
+  },
+  {
+    operationKey: "control-plane-portability.export",
+    status: "documented",
+    topicId: "advanced.control-plane",
+  },
+  {
+    operationKey: "control-plane-portability.import-plan",
+    status: "documented",
+    topicId: "advanced.control-plane",
+  },
+  {
+    operationKey: "control-plane-portability.import",
+    status: "documented",
+    topicId: "advanced.control-plane",
+  },
+  {
+    operationKey: "control-plane-portability.artifacts.list",
+    status: "documented",
+    topicId: "advanced.control-plane",
+  },
+  {
+    operationKey: "control-plane-portability.artifacts.show",
+    status: "documented",
+    topicId: "advanced.control-plane",
+  },
+  {
+    operationKey: "control-plane-portability.artifacts.delete",
+    status: "documented",
+    topicId: "advanced.control-plane",
+  },
+  { operationKey: "tunnels.start", status: "documented", topicId: "advanced.control-plane" },
+  { operationKey: "tunnels.list", status: "documented", topicId: "advanced.control-plane" },
+  { operationKey: "tunnels.show", status: "documented", topicId: "advanced.control-plane" },
+  { operationKey: "tunnels.revoke", status: "documented", topicId: "advanced.control-plane" },
   {
     operationKey: "system.control-plane-secret-rotation.plan",
     status: "migration-gap",

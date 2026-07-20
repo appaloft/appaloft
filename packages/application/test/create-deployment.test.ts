@@ -199,6 +199,7 @@ import {
   type ScheduledRuntimePrunePolicyRecord,
   type ScheduledRuntimePrunePolicyRepository,
 } from "../src/operations/servers/scheduled-runtime-prune.service";
+import { type StorageVolumeBackupAutomationService } from "../src/operations/storage-volumes/storage-volume-backup-automation";
 import {
   type ControlPlaneSecretProtector,
   type DefaultAccessDomainProvider,
@@ -1001,6 +1002,7 @@ async function createDeploymentFixture(
     environmentProfileDecisionReadModel?: MemoryEnvironmentProfileDecisionStore;
     sourceVersionDetector?: SourceVersionDetector;
     controlPlaneSecretProtector?: ControlPlaneSecretProtector;
+    storageVolumeBackupAutomationService?: StorageVolumeBackupAutomationService;
   } = {},
 ) {
   const projects = new MemoryProjectRepository();
@@ -1146,6 +1148,7 @@ async function createDeploymentFixture(
     options.environmentProfileDecisionReadModel,
     options.sourceVersionDetector,
     options.durableWorkQueueAdapter,
+    options.storageVolumeBackupAutomationService,
   );
   const provisionDependency = new ProvisionDependencyResourceUseCase(
     projects,
@@ -1632,6 +1635,32 @@ class RaceLosingMemoryDeploymentRepository extends MemoryDeploymentRepository {
 }
 
 describe("CreateDeploymentUseCase", () => {
+  test("[STOR-BACKUP-AUTO-PREDEPLOY-003] blocks deployment mutations when required pre-deploy backup fails", async () => {
+    const calls: string[] = [];
+    const backupAutomationService = {
+      async runPreDeploy(_context: ExecutionContext, resourceId: string) {
+        calls.push(resourceId);
+        return err(
+          domainError.infra("Required pre-deploy backup failed", {
+            phase: "storage-volume-backup-automation",
+          }),
+        );
+      },
+    } as unknown as StorageVolumeBackupAutomationService;
+    const fixture = await createDeploymentFixture(new ExplicitContextRequiredPolicy(), {
+      storageVolumeBackupAutomationService: backupAutomationService,
+    });
+
+    const result = await fixture.createDeploymentUseCase.execute(
+      fixture.context,
+      fixture.createDeploymentInput,
+    );
+
+    expect(result.isErr()).toBe(true);
+    expect(calls).toEqual(["res_demo"]);
+    expect(fixture.deployments.items.size).toBe(0);
+  });
+
   test("[CPS-FAIL-002] missing keyring blocks deployment before persistence or execution", async () => {
     const fixture = await createDeploymentFixture(new ExplicitContextRequiredPolicy(), {
       controlPlaneSecretProtector: unavailableSecretProtector,

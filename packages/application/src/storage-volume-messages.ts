@@ -11,4 +11,12 @@ export * from "./operations/storage-volumes/rename-storage-volume.command";
 export * from "./operations/storage-volumes/restore-storage-volume-backup.command";
 export * from "./operations/storage-volumes/show-storage-volume.query";
 export * from "./operations/storage-volumes/show-storage-volume-backup.query";
+export {
+  ConfigureStorageVolumeBackupPolicyCommand,
+  configureStorageVolumeBackupPolicyCommandInputSchema,
+  ListStorageVolumeBackupPoliciesQuery,
+  listStorageVolumeBackupPoliciesQueryInputSchema,
+  ShowStorageVolumeBackupPolicyQuery,
+  showStorageVolumeBackupPolicyQueryInputSchema,
+} from "./operations/storage-volumes/storage-volume-backup-automation";
 export * from "./operations/storage-volumes/storage-volume-backup-contract";

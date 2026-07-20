@@ -208,10 +208,12 @@ export class ConfigMaintenanceWorkerStatusReader implements MaintenanceWorkerSta
       certificateRetryScheduler,
       previewExpiryCleanupScheduler,
       previewCleanupRetryScheduler,
+      scheduledStorageVolumeBackupRunner,
       scheduledTaskRunner,
       scheduledRuntimePruneRunner,
       scheduledHistoryRetentionRunner,
       runtimeMonitoringCollectorRunner,
+      tunnelSessions,
     } = this.config;
 
     return [
@@ -261,6 +263,20 @@ export class ConfigMaintenanceWorkerStatusReader implements MaintenanceWorkerSta
         operationKeys: ["preview-environments.delete", "deployments.cleanup-preview"],
       }),
       status({
+        key: "scheduled-storage-volume-backup-runner",
+        label: "Scheduled storage volume backup runner",
+        enabled: scheduledStorageVolumeBackupRunner.enabled,
+        safetyMode: "policy-gated-backup",
+        intervalSeconds: scheduledStorageVolumeBackupRunner.intervalSeconds,
+        batchSize: scheduledStorageVolumeBackupRunner.batchSize,
+        configurationKeys: [
+          "APPALOFT_SCHEDULED_STORAGE_VOLUME_BACKUP_RUNNER_ENABLED",
+          "APPALOFT_SCHEDULED_STORAGE_VOLUME_BACKUP_RUNNER_INTERVAL_SECONDS",
+          "APPALOFT_SCHEDULED_STORAGE_VOLUME_BACKUP_RUNNER_BATCH_SIZE",
+        ],
+        operationKeys: ["storage-volumes.create-backup", "storage-volumes.prune-backups"],
+      }),
+      status({
         key: "scheduled-task-runner",
         label: "Scheduled task runner",
         enabled: scheduledTaskRunner.enabled,
@@ -308,6 +324,20 @@ export class ConfigMaintenanceWorkerStatusReader implements MaintenanceWorkerSta
           "resources.runtime-log-archives.prune",
           "runtime-monitoring.samples.prune",
         ],
+      }),
+      status({
+        key: "tunnel-session-reconciler",
+        label: "Tunnel session reconciler",
+        enabled: tunnelSessions.reconcilerEnabled,
+        safetyMode: "tunnel-session-cleanup",
+        intervalSeconds: tunnelSessions.reconcileIntervalSeconds,
+        batchSize: tunnelSessions.reconcileBatchSize,
+        configurationKeys: [
+          "APPALOFT_TUNNEL_RECONCILER_ENABLED",
+          "APPALOFT_TUNNEL_RECONCILE_INTERVAL_SECONDS",
+          "APPALOFT_TUNNEL_RECONCILE_BATCH_SIZE",
+        ],
+        operationKeys: ["tunnels.list", "tunnels.show", "tunnels.revoke"],
       }),
       status({
         key: "runtime-monitoring-collector-runner",
