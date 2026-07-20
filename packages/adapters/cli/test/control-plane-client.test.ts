@@ -1609,6 +1609,25 @@ describe("CLI remote control-plane client", () => {
     });
   });
 
+  test("[CONTROL-PLANE-CLI-019] unknown top-level commands fail before runtime initialization", async () => {
+    const argv = ["node", "appaloft", "deployment", "proof", "dep_123"];
+    const results = await Promise.all([
+      resolveCliExecutionTarget({ argv, store: activeStore() }),
+      resolveCliExecutionTarget({ argv, store: new MemoryCliControlPlaneProfileStore() }),
+    ]);
+
+    for (const result of results) {
+      expect(result._unsafeUnwrapErr()).toMatchObject({
+        code: "validation_error",
+        message: "Unknown Appaloft command",
+        details: {
+          phase: "control-plane-resolution",
+          command: "deployment",
+        },
+      });
+    }
+  });
+
   test("[CONTROL-PLANE-CLI-006][BP-CATALOG-API-001] blueprint catalog commands dispatch through public generated SDK routes", async () => {
     const requests: Request[] = [];
     const program = createRemoteCliProgram({
