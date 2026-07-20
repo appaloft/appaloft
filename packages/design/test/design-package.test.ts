@@ -25,9 +25,10 @@ describe("design package", () => {
   test("gives the Web console an explicit canvas, surface, and control hierarchy", async () => {
     const webCss = await readFile(new URL("../styles/web.css", import.meta.url), "utf8");
 
-    expect(webCss).toContain("--background: #f7f7f8");
+    expect(webCss).toContain("--background: #fdfdfd");
     expect(webCss).toContain("--surface: #ffffff");
-    expect(webCss).toContain("--surface-subtle: #f3f6fa");
+    expect(webCss).toContain("--muted: #f7f7f8");
+    expect(webCss).toContain("--surface-subtle: #f7f7f8");
     expect(webCss).toContain("--surface-overlay: #ffffff");
     expect(webCss).toContain("--border: #c5d1e0");
     expect(webCss).toContain("--input: #9fadc1");

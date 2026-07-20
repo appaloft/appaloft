@@ -45,6 +45,26 @@ describe("community design primitives CSS source", () => {
     expect(subtlePanelSource).not.toMatch(/destructive|red|rose|pink|color-mix/);
   });
 
+  test("[CLOUD-WWW-SHADCN-SYSTEM-018] keeps status borders visible and non-error feedback free of pink", async () => {
+    const statusBadgeSource = await readFile(
+      new URL("../components/console/DeploymentStatusBadge.svelte", import.meta.url),
+      "utf8",
+    );
+    const feedbackSources = await Promise.all(
+      [
+        "../components/console/OperationProgressPanel.svelte",
+        "../components/console/QuickDeployProgressDialog.svelte",
+        "../components/console/DeploymentProgressTerminal.svelte",
+      ].map((path) => readFile(new URL(path, import.meta.url), "utf8")),
+    );
+
+    expect(statusBadgeSource).toContain("border-emerald-200 bg-emerald-50");
+    expect(statusBadgeSource).toContain("border-amber-200 bg-amber-50");
+    expect(statusBadgeSource).toContain("border-red-200 bg-red-50");
+    expect(statusBadgeSource).not.toContain("border-transparent");
+    expect(feedbackSources.join("\n")).not.toMatch(/pink|rose|fuchsia|#ef476f/i);
+  });
+
   test("[APPALOFT-WEB-ILLUSTRATION-001] uses decorative human workplace illustrations for collection empty states", async () => {
     const emptyStateSource = await readFile(
       new URL("../components/console/ConsoleEmptyState.svelte", import.meta.url),

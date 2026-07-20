@@ -141,13 +141,18 @@ identity.
   create visual alignment.
 - Tables are dense, scan-friendly records with status badges, owner links, timestamps, and action
   affordances.
-- Status badges use semantic colors and stay compact.
+- Status badges use semantic colors, stay compact, and pair their light fill with a faint
+  tone-matched border so status remains legible against white data surfaces.
 - Text must remain stable and truncated where object names can be long.
 
 ## Console Surface Grammar
 
 Screens must not rely on loose borders or raw `bg-background` blocks to imply ownership. Every major
 area uses one named surface:
+
+- The light Console canvas is a Supabase-like near-white `#fdfdfd`, not a blue or visible gray page
+  fill. White `#ffffff` owner surfaces remain distinct through divider hairlines, spacing, and type;
+  neutral `#f7f7f8` is reserved for table headers and owned subtle groups.
 
 - `console-panel`: one command/query form, evidence panel, terminal panel, or framed tool.
 - `console-subtle-panel`: low-emphasis status, empty state, helper, or result block inside a larger
