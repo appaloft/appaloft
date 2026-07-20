@@ -1,4 +1,22 @@
 import { type ZodTypeAny } from "zod";
+import {
+  createSandboxCommandInputSchema,
+  createSandboxSnapshotCommandInputSchema,
+  executeSandboxCommandInputSchema,
+  exposeSandboxPortCommandInputSchema,
+  listSandboxesQueryInputSchema,
+  listSandboxPortsQueryInputSchema,
+  listSandboxProcessesQueryInputSchema,
+  listSandboxSnapshotsQueryInputSchema,
+  removeSandboxFileCommandInputSchema,
+  revokeSandboxPortCommandInputSchema,
+  sandboxFilePathInputSchema,
+  sandboxLifecycleCommandInputSchema,
+  showSandboxQueryInputSchema,
+  showSandboxSnapshotQueryInputSchema,
+  terminateSandboxProcessCommandInputSchema,
+  writeSandboxFileCommandInputSchema,
+} from "./execution-sandbox-messages";
 import { changeAccountProfileCommandInputSchema } from "./operations/account-settings/change-account-profile.command";
 import { deleteAccountCommandInputSchema } from "./operations/account-settings/delete-account.command";
 import { listAccountSessionsQueryInputSchema } from "./operations/account-settings/list-account-sessions.query";
@@ -321,7 +339,8 @@ type OperationDomain =
   | "static-artifacts"
   | "connections"
   | "system"
-  | "terminal-sessions";
+  | "terminal-sessions"
+  | "sandboxes";
 
 export interface OperationCatalogEntry {
   key: string;
@@ -4540,6 +4559,249 @@ export const operationCatalog = [
       orpc: { method: "POST", path: "/api/instance-upgrade/apply" },
     },
   },
+  {
+    key: "sandboxes.create",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "CreateSandboxCommand",
+    handlerName: "SandboxCommandHandler",
+    serviceName: "ExecutionSandboxService",
+    inputSchema: createSandboxCommandInputSchema,
+    serviceToken: tokens.executionSandboxService,
+    transportAccess: { productSession: { minRole: "member" } },
+    transports: {
+      cli: "appaloft sandbox create",
+      orpc: { method: "POST", path: "/api/sandboxes" },
+    },
+  },
+  {
+    key: "sandboxes.list",
+    kind: "query",
+    domain: "sandboxes",
+    messageName: "ListSandboxesQuery",
+    handlerName: "SandboxQueryHandler",
+    serviceName: "ExecutionSandboxService",
+    inputSchema: listSandboxesQueryInputSchema,
+    serviceToken: tokens.executionSandboxService,
+    transportAccess: { productSession: { minRole: "member" } },
+    transports: { cli: "appaloft sandbox list", orpc: { method: "GET", path: "/api/sandboxes" } },
+  },
+  {
+    key: "sandboxes.show",
+    kind: "query",
+    domain: "sandboxes",
+    messageName: "ShowSandboxQuery",
+    handlerName: "SandboxQueryHandler",
+    serviceName: "ExecutionSandboxService",
+    inputSchema: showSandboxQueryInputSchema,
+    serviceToken: tokens.executionSandboxService,
+    transportAccess: { productSession: { minRole: "member" } },
+    transports: {
+      cli: "appaloft sandbox show <sandboxId>",
+      orpc: { method: "GET", path: "/api/sandboxes/{sandboxId}" },
+    },
+  },
+  ...(
+    [
+      ["sandboxes.pause", "PauseSandboxCommand", "pause"],
+      ["sandboxes.resume", "ResumeSandboxCommand", "resume"],
+      ["sandboxes.terminate", "TerminateSandboxCommand", "terminate"],
+    ] as const
+  ).map(([key, messageName, action]) => ({
+    key,
+    kind: "command" as const,
+    domain: "sandboxes" as const,
+    messageName,
+    handlerName: "SandboxCommandHandler",
+    serviceName: "ExecutionSandboxService",
+    inputSchema: sandboxLifecycleCommandInputSchema,
+    serviceToken: tokens.executionSandboxService,
+    transportAccess: { productSession: { minRole: "member" as const } },
+    transports: {
+      cli: `appaloft sandbox ${action} <sandboxId>`,
+      orpc: { method: "POST" as const, path: `/api/sandboxes/{sandboxId}/${action}` },
+    },
+  })),
+  {
+    key: "sandboxes.exec",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "ExecuteSandboxCommand",
+    handlerName: "SandboxCommandHandler",
+    serviceName: "ExecutionSandboxService",
+    inputSchema: executeSandboxCommandInputSchema,
+    serviceToken: tokens.executionSandboxService,
+    transportAccess: { productSession: { minRole: "member" } },
+    transports: {
+      cli: "appaloft sandbox exec <sandboxId> -- <argv...>",
+      orpc: { method: "POST", path: "/api/sandboxes/{sandboxId}/exec" },
+    },
+  },
+  ...(
+    [
+      [
+        "sandbox-files.list",
+        "ListSandboxFilesQuery",
+        "query",
+        sandboxFilePathInputSchema,
+        "POST",
+        "/api/sandboxes/{sandboxId}/files/list",
+        "appaloft sandbox files list <sandboxId> <path>",
+      ],
+      [
+        "sandbox-files.read",
+        "ReadSandboxFileQuery",
+        "query",
+        sandboxFilePathInputSchema,
+        "POST",
+        "/api/sandboxes/{sandboxId}/files/read",
+        "appaloft sandbox files read <sandboxId> <path>",
+      ],
+      [
+        "sandbox-files.write",
+        "WriteSandboxFileCommand",
+        "command",
+        writeSandboxFileCommandInputSchema,
+        "POST",
+        "/api/sandboxes/{sandboxId}/files/write",
+        "appaloft sandbox files write <sandboxId> <path>",
+      ],
+      [
+        "sandbox-files.remove",
+        "RemoveSandboxFileCommand",
+        "command",
+        removeSandboxFileCommandInputSchema,
+        "DELETE",
+        "/api/sandboxes/{sandboxId}/files",
+        "appaloft sandbox files remove <sandboxId> <path>",
+      ],
+    ] as const
+  ).map(([key, messageName, kind, inputSchema, method, path, cli]) => ({
+    key,
+    kind,
+    domain: "sandboxes" as const,
+    messageName,
+    handlerName: kind === "command" ? "SandboxCommandHandler" : "SandboxQueryHandler",
+    serviceName: "ExecutionSandboxService",
+    inputSchema,
+    serviceToken: tokens.executionSandboxService,
+    transportAccess: { productSession: { minRole: "member" as const } },
+    transports: { cli, orpc: { method, path } },
+  })),
+  {
+    key: "sandbox-processes.list",
+    kind: "query",
+    domain: "sandboxes",
+    messageName: "ListSandboxProcessesQuery",
+    handlerName: "SandboxQueryHandler",
+    serviceName: "ExecutionSandboxService",
+    inputSchema: listSandboxProcessesQueryInputSchema,
+    serviceToken: tokens.executionSandboxService,
+    transportAccess: { productSession: { minRole: "member" } },
+    transports: {
+      cli: "appaloft sandbox process list <sandboxId>",
+      orpc: { method: "GET", path: "/api/sandboxes/{sandboxId}/processes" },
+    },
+  },
+  {
+    key: "sandbox-processes.terminate",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "TerminateSandboxProcessCommand",
+    handlerName: "SandboxCommandHandler",
+    serviceName: "ExecutionSandboxService",
+    inputSchema: terminateSandboxProcessCommandInputSchema,
+    serviceToken: tokens.executionSandboxService,
+    transportAccess: { productSession: { minRole: "member" } },
+    transports: {
+      cli: "appaloft sandbox process terminate <sandboxId> <processId>",
+      orpc: { method: "POST", path: "/api/sandboxes/{sandboxId}/processes/{processId}/terminate" },
+    },
+  },
+  ...(
+    [
+      [
+        "sandbox-ports.expose",
+        "ExposeSandboxPortCommand",
+        "command",
+        exposeSandboxPortCommandInputSchema,
+        "POST",
+        "/api/sandboxes/{sandboxId}/ports",
+        "appaloft sandbox port expose <sandboxId> <port>",
+      ],
+      [
+        "sandbox-ports.list",
+        "ListSandboxPortsQuery",
+        "query",
+        listSandboxPortsQueryInputSchema,
+        "GET",
+        "/api/sandboxes/{sandboxId}/ports",
+        "appaloft sandbox port list <sandboxId>",
+      ],
+      [
+        "sandbox-ports.revoke",
+        "RevokeSandboxPortCommand",
+        "command",
+        revokeSandboxPortCommandInputSchema,
+        "DELETE",
+        "/api/sandboxes/{sandboxId}/ports/{exposureId}",
+        "appaloft sandbox port revoke <sandboxId> <exposureId>",
+      ],
+    ] as const
+  ).map(([key, messageName, kind, inputSchema, method, path, cli]) => ({
+    key,
+    kind,
+    domain: "sandboxes" as const,
+    messageName,
+    handlerName: kind === "command" ? "SandboxCommandHandler" : "SandboxQueryHandler",
+    serviceName: "ExecutionSandboxService",
+    inputSchema,
+    serviceToken: tokens.executionSandboxService,
+    transportAccess: { productSession: { minRole: "member" as const } },
+    transports: { cli, orpc: { method, path } },
+  })),
+  ...(
+    [
+      [
+        "sandbox-snapshots.create",
+        "CreateSandboxSnapshotCommand",
+        "command",
+        createSandboxSnapshotCommandInputSchema,
+        "POST",
+        "/api/sandboxes/{sandboxId}/snapshots",
+        "appaloft sandbox snapshot create <sandboxId>",
+      ],
+      [
+        "sandbox-snapshots.list",
+        "ListSandboxSnapshotsQuery",
+        "query",
+        listSandboxSnapshotsQueryInputSchema,
+        "GET",
+        "/api/sandbox-snapshots",
+        "appaloft sandbox snapshot list",
+      ],
+      [
+        "sandbox-snapshots.show",
+        "ShowSandboxSnapshotQuery",
+        "query",
+        showSandboxSnapshotQueryInputSchema,
+        "GET",
+        "/api/sandbox-snapshots/{snapshotId}",
+        "appaloft sandbox snapshot show <snapshotId>",
+      ],
+    ] as const
+  ).map(([key, messageName, kind, inputSchema, method, path, cli]) => ({
+    key,
+    kind,
+    domain: "sandboxes" as const,
+    messageName,
+    handlerName: kind === "command" ? "SandboxCommandHandler" : "SandboxQueryHandler",
+    serviceName: "ExecutionSandboxService",
+    inputSchema,
+    serviceToken: tokens.executionSandboxService,
+    transportAccess: { productSession: { minRole: "member" as const } },
+    transports: { cli, orpc: { method, path } },
+  })),
   {
     key: "system.control-plane-secret-rotation.plan",
     kind: "query",

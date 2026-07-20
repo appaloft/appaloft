@@ -1,6 +1,7 @@
 export const tokens = {
   clock: Symbol.for("appaloft.clock"),
   idGenerator: Symbol.for("appaloft.id_generator"),
+  executionSandboxService: Symbol.for("appaloft.execution_sandbox_service"),
   logger: Symbol.for("appaloft.logger"),
   eventBus: Symbol.for("appaloft.event_bus"),
   controlPlaneSecretProtector: Symbol.for("appaloft.control_plane_secret_protector"),
