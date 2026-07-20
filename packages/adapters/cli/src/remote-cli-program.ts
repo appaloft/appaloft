@@ -18,7 +18,14 @@ import {
   requestControlPlaneStreamOperation,
 } from "./control-plane-client.js";
 import { type CliControlPlaneProfile } from "./control-plane-profile.js";
-import { type CliProgram, CliRuntime, type CliTerminalIO, printCliError } from "./runtime.js";
+import {
+  type CliProgram,
+  CliRuntime,
+  type CliTerminalIO,
+  cliArgvRequestsStdinText,
+  printCliError,
+  readProcessStdinText,
+} from "./runtime.js";
 
 export interface RemoteCliProgramInput {
   readonly version: string;
@@ -26,6 +33,7 @@ export interface RemoteCliProgramInput {
   readonly fetch?: AppaloftSdkFetch;
   readonly now?: () => string;
   readonly terminalIO?: CliTerminalIO;
+  readonly readStdinText?: () => Promise<string>;
 }
 
 type RemoteOperationMessage = AppCommand<unknown> | AppQuery<unknown>;
@@ -388,6 +396,8 @@ function unsupportedLocalRemoteError(message: string): DomainError {
 }
 
 export function createRemoteCliProgram(input: RemoteCliProgramInput): CliProgram {
+  const sourceStdinReader = input.readStdinText ?? readProcessStdinText;
+  let capturedStdinText: Promise<string> | undefined;
   let handshake: Promise<Result<void>> | undefined;
   const ensureHandshake = async (): Promise<Result<void>> => {
     handshake ??= performControlPlaneHandshake({
@@ -439,18 +449,30 @@ export function createRemoteCliProgram(input: RemoteCliProgramInput): CliProgram
         });
       },
       terminalIO,
+      readStdinText: () => capturedStdinText ?? sourceStdinReader(),
     }),
   );
 
   return {
-    parseAsync: (argv = process.argv) =>
-      EffectCommand.run(mainCommand, {
-        name: "appaloft",
-        version: input.version,
-      })(argv).pipe(
-        Effect.provide(live),
-        Effect.catchAll((error) => printCliError(error).pipe(Effect.zipRight(Effect.fail(error)))),
-        Effect.runPromise,
-      ),
+    parseAsync: async (argv = process.argv) => {
+      capturedStdinText = cliArgvRequestsStdinText(argv) ? sourceStdinReader() : undefined;
+      if (capturedStdinText) {
+        await capturedStdinText;
+      }
+      try {
+        await EffectCommand.run(mainCommand, {
+          name: "appaloft",
+          version: input.version,
+        })(argv).pipe(
+          Effect.provide(live),
+          Effect.catchAll((error) =>
+            printCliError(error).pipe(Effect.zipRight(Effect.fail(error))),
+          ),
+          Effect.runPromise,
+        );
+      } finally {
+        capturedStdinText = undefined;
+      }
+    },
   };
 }

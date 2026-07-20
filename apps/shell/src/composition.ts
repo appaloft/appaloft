@@ -239,6 +239,7 @@ function createCliServerAppliedRouteStore(
 export async function createAppComposition(
   flags?: Partial<AppConfig>,
   options?: ShellRuntimeOptions,
+  capturedStdinText?: string,
 ): Promise<AppComposition> {
   const server = await createAppaloftServer({
     ...options,
@@ -271,6 +272,7 @@ export async function createAppComposition(
     commandBus,
     queryBus,
     executionContextFactory: server.executionContextFactory,
+    ...(capturedStdinText === undefined ? {} : { readStdinText: async () => capturedStdinText }),
     terminalSessionGateway,
     deploymentProgressObserver,
     sourceLinkStore: createCliSourceLinkStore(sourceLinkRepository),
