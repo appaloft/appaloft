@@ -1,13 +1,33 @@
 import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
-import { chmod, mkdir, mkdtemp, readFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createExecutionContext, type DependencyResourceSecretStore } from "@appaloft/application";
-import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
+import {
+  createExecutionContext,
+  type DependencyResourceSecretStore,
+  type ServerRepository,
+} from "@appaloft/application";
+import {
+  CreatedAt,
+  DeploymentTarget,
+  DeploymentTargetId,
+  DeploymentTargetName,
+  type DomainError,
+  domainError,
+  err,
+  HostAddress,
+  ok,
+  PortNumber,
+  ProviderKey,
+  type Result,
+} from "@appaloft/core";
 
-import { DockerBackedManagedDependencyProvider } from "../src/managed-dependency-providers";
+import {
+  DockerBackedDependencyResourceBackupProvider,
+  DockerBackedManagedDependencyProvider,
+} from "../src/managed-dependency-providers";
 import {
   BunDependencyResourceNativeCommandRunner,
   ShellDependencyResourceBackupProvider,
@@ -54,7 +74,99 @@ class RecordingNativeCommandRunner implements ShellDependencyResourceNativeComma
   }
 }
 
+class SingleServerRepository implements ServerRepository {
+  readonly server = DeploymentTarget.register({
+    id: DeploymentTargetId.rehydrate("srv_production"),
+    name: DeploymentTargetName.rehydrate("Production"),
+    host: HostAddress.rehydrate("127.0.0.1"),
+    port: PortNumber.rehydrate(22),
+    providerKey: ProviderKey.rehydrate("generic-ssh"),
+    createdAt: CreatedAt.rehydrate("2026-07-20T00:00:00.000Z"),
+  })._unsafeUnwrap();
+
+  async findOne() {
+    return this.server;
+  }
+
+  async upsert(): Promise<void> {}
+}
+
 describe("Shell managed dependency resource providers", () => {
+  test("[DEP-RES-BACKUP-014] admits only matching managed Postgres artifacts for external restore", () => {
+    const provider = new DockerBackedDependencyResourceBackupProvider({} as never);
+    const providerArtifactHandle =
+      "docker-single-server-backup:v1:postgres:srv_production:appaloft-postgres-rsi_managed:drb_managed";
+
+    expect(
+      provider.supportsRestore({
+        backupId: "drb_managed",
+        sourceProviderKey: "appaloft-managed-postgres",
+        targetProviderKey: "external-postgres",
+        dependencyKind: "postgres",
+        providerArtifactHandle,
+        sameDependencyResource: false,
+      }),
+    ).toBe(true);
+    expect(
+      provider.supportsRestore({
+        backupId: "drb_other",
+        sourceProviderKey: "appaloft-managed-postgres",
+        targetProviderKey: "external-postgres",
+        dependencyKind: "postgres",
+        providerArtifactHandle,
+        sameDependencyResource: false,
+      }),
+    ).toBe(false);
+  });
+
+  test("[DEP-RES-BACKUP-014] restores a managed Postgres artifact without exposing the target URL in SSH argv", async () => {
+    const root = await mkdtemp(join(tmpdir(), "appaloft-ash-managed-restore-"));
+    const binDir = join(root, "bin");
+    const sshLog = join(root, "ssh.log");
+    await mkdir(binDir, { recursive: true });
+    await writeFile(
+      join(binDir, "ssh"),
+      ["#!/bin/sh", `printf '%s\\n' "$*" >> ${JSON.stringify(sshLog)}`, "exit 0", ""].join("\n"),
+    );
+    await chmod(join(binDir, "ssh"), 0o755);
+
+    const previousPath = process.env.PATH;
+    process.env.PATH = `${binDir}:/usr/bin:/bin:/usr/sbin:/sbin:${previousPath ?? ""}`;
+    try {
+      const provider = new DockerBackedDependencyResourceBackupProvider(
+        new SingleServerRepository(),
+      );
+      const connectionSecretValue =
+        "postgres://postgres.project:target-secret@pooler.example.com:5432/postgres?sslmode=require";
+      const restored = await provider.restoreBackup(
+        createExecutionContext({ requestId: "req_cross_restore", entrypoint: "system" }),
+        {
+          backupId: "drb_managed",
+          dependencyResourceId: "rsi_supabase",
+          sourceDependencyResourceId: "rsi_managed",
+          dependencyKind: "postgres",
+          providerKey: "external-postgres",
+          sourceProviderKey: "appaloft-managed-postgres",
+          providerArtifactHandle:
+            "docker-single-server-backup:v1:postgres:srv_production:appaloft-postgres-rsi_managed:drb_managed",
+          connectionSecretValue,
+          restoreAttemptId: "dra_migration",
+          requestedAt: "2026-07-20T00:01:00.000Z",
+        },
+      );
+
+      expect(restored.isOk()).toBe(true);
+      const log = await readFile(sshLog, "utf8");
+      expect(log).toContain("pg_restore");
+      expect(log).toContain("PGDATABASE");
+      expect(log).not.toContain("--dbname");
+      expect(log).not.toContain("target-secret");
+      expect(log).not.toContain(connectionSecretValue);
+    } finally {
+      process.env.PATH = previousPath;
+    }
+  });
+
   test("[CLOUD-DEP-PROV-CAPABILITY-052] Docker-backed dependency provider rejects required unsupported capabilities", () => {
     const provider = new DockerBackedManagedDependencyProvider({} as never);
 
@@ -89,6 +201,56 @@ describe("Shell managed dependency resource providers", () => {
       "opensearch",
     ]) {
       expect(genericProviderSource).toContain(`case "${dependencyKind}"`);
+    }
+  });
+
+  test("[DEP-BIND-SECRET-RESOLVE-005] Docker-backed provision renders ash and sends its password over stdin", async () => {
+    const root = await mkdtemp(join(tmpdir(), "appaloft-ash-managed-postgres-"));
+    const binDir = join(root, "bin");
+    const sshLog = join(root, "ssh.log");
+    await mkdir(binDir, { recursive: true });
+    await writeFile(
+      join(binDir, "ssh"),
+      ["#!/bin/sh", `printf '%s\\n' "$*" >> ${JSON.stringify(sshLog)}`, "exit 0", ""].join("\n"),
+    );
+    await chmod(join(binDir, "ssh"), 0o755);
+
+    const previousPath = process.env.PATH;
+    process.env.PATH = `${binDir}:/usr/bin:/bin:/usr/sbin:/sbin:${previousPath ?? ""}`;
+    try {
+      const provider = new DockerBackedManagedDependencyProvider({} as never);
+      const realized = await provider.realize(
+        createExecutionContext({
+          requestId: "req_ash_dependency_provider",
+          entrypoint: "system",
+        }),
+        {
+          dependencyResourceId: "rsi_ash",
+          projectId: "prj_ash",
+          environmentId: "env_ash",
+          kind: "postgres",
+          providerKey: "appaloft-managed-postgres",
+          name: "Ash Postgres",
+          slug: "ash-postgres",
+          attemptId: "dpr_ash",
+          requestedAt: "2026-07-20T00:00:00.000Z",
+          target: {
+            serverId: "srv_ash",
+            providerKey: "generic-ssh",
+            targetKind: "single-server",
+            host: "127.0.0.1",
+            port: 22,
+          },
+        },
+      );
+
+      const state = realized._unsafeUnwrap();
+      const log = await readFile(sshLog, "utf8");
+      expect(log).toContain("docker run -d '--name' 'appaloft-postgres-rsi_ash'");
+      expect(log).toContain("IFS= read -r APPALOFT_MANAGED_DEPENDENCY_PASSWORD");
+      expect(log).not.toContain(new URL(state.connectionSecretValue ?? "").password);
+    } finally {
+      process.env.PATH = previousPath;
     }
   });
 

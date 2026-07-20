@@ -9,6 +9,7 @@ import {
   type ServerRepository,
   toRepositoryContext,
 } from "@appaloft/application";
+import { type AshScript, ash } from "@appaloft/ash";
 import {
   DeploymentTargetByIdSpec,
   DeploymentTargetId,
@@ -122,19 +123,6 @@ export function serviceForProvider(
   return undefined;
 }
 
-export function shellQuote(input: string): string {
-  return `'${input.replaceAll("'", "'\\''")}'`;
-}
-
-export function shellQuotePath(input: string): string {
-  const homePrefix = "$HOME/";
-  if (!input.startsWith(homePrefix)) {
-    return shellQuote(input);
-  }
-  const pathSegments = input.slice(homePrefix.length).split("/").filter(Boolean);
-  return `$HOME/${pathSegments.map(shellQuote).join("/")}`;
-}
-
 export function safeDockerToken(input: string): string {
   const normalized = input
     .toLowerCase()
@@ -217,10 +205,10 @@ export function backupPath(
   )}.${definition.backupFileExtension}`;
 }
 
-export function ensureNetworkCommand(): string {
-  return `docker network inspect ${shellQuote(dockerNetworkName)} >/dev/null 2>&1 || docker network create ${shellQuote(
-    dockerNetworkName,
-  )}`;
+export function ensureNetworkCommand(): AshScript {
+  return ash`
+    docker network inspect ${ash.arg(dockerNetworkName)} >/dev/null 2>&1 || docker network create ${ash.arg(dockerNetworkName)}
+  `;
 }
 
 export function commandFailure(input: {
@@ -241,22 +229,27 @@ export function commandFailure(input: {
 
 export async function runTargetCommand(
   target: ManagedDependencySingleServerTarget,
-  command: string,
+  command: AshScript,
+  options: { stdin?: Uint8Array } = {},
 ): Promise<CommandResult> {
+  const renderedCommand = ash.render(command);
   if (target.providerKey === "local-shell") {
-    return spawnCommand(["sh", "-lc", command]);
+    return spawnCommand(["sh", "-lc", renderedCommand], options);
   }
 
   const identity = target.privateKey ? writeSshIdentityFile(target.privateKey) : undefined;
   try {
-    return await spawnCommand([
-      "ssh",
-      ...sshArgs({
-        target,
-        remoteCommand: command,
-        ...(identity ? { identityFile: identity.identityFile } : {}),
-      }),
-    ]);
+    return await spawnCommand(
+      [
+        "ssh",
+        ...sshArgs({
+          target,
+          remoteCommand: renderedCommand,
+          ...(identity ? { identityFile: identity.identityFile } : {}),
+        }),
+      ],
+      options,
+    );
   } finally {
     identity?.cleanup();
   }
@@ -343,30 +336,6 @@ export async function resolveSingleServerTarget(input: {
   });
 }
 
-export function requireConnectionUrl(input: {
-  connectionSecretValue: string | undefined;
-  dependencyKind: DependencyResourceKind;
-}): Result<URL, DomainError> {
-  if (!input.connectionSecretValue) {
-    return err(
-      domainError.providerCapabilityUnsupported("Connection secret is required for backup", {
-        phase: "managed-dependency-docker-secret-resolution",
-        dependencyKind: input.dependencyKind,
-      }),
-    );
-  }
-  try {
-    return ok(new URL(input.connectionSecretValue));
-  } catch {
-    return err(
-      domainError.providerCapabilityUnsupported("Connection secret URL is invalid", {
-        phase: "managed-dependency-docker-secret-resolution",
-        dependencyKind: input.dependencyKind,
-      }),
-    );
-  }
-}
-
 function isManagedDependencyKind(
   input: string | undefined,
 ): input is ManagedDependencyResourceKind {
@@ -380,17 +349,22 @@ function isManagedDependencyKind(
   );
 }
 
-async function spawnCommand(args: string[]): Promise<CommandResult> {
-  const process = Bun.spawn(args, {
+async function spawnCommand(
+  args: string[],
+  options: { stdin?: Uint8Array } = {},
+): Promise<CommandResult> {
+  const child = Bun.spawn(args, {
+    env: process.env,
+    ...(options.stdin ? { stdin: options.stdin } : {}),
     stdout: "pipe",
     stderr: "pipe",
   });
-  const timeout = setTimeout(() => process.kill(), commandTimeoutMs);
+  const timeout = setTimeout(() => child.kill(), commandTimeoutMs);
   try {
     const [exitCode, stdout, stderr] = await Promise.all([
-      process.exited,
-      new Response(process.stdout).text(),
-      new Response(process.stderr).text(),
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
     ]);
     return { exitCode, stdout, stderr };
   } finally {

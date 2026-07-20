@@ -17,6 +17,7 @@ export class RestoreDependencyResourceBackupCommand extends Command<{ id: string
     public readonly backupId: string,
     public readonly acknowledgeDataOverwrite: true,
     public readonly acknowledgeRuntimeNotRestarted: true,
+    public readonly targetDependencyResourceId?: string,
     public readonly restoreLabel?: string,
   ) {
     super();
@@ -31,6 +32,7 @@ export class RestoreDependencyResourceBackupCommand extends Command<{ id: string
           parsed.backupId,
           parsed.acknowledgeDataOverwrite,
           parsed.acknowledgeRuntimeNotRestarted,
+          parsed.targetDependencyResourceId,
           parsed.restoreLabel,
         ),
     );

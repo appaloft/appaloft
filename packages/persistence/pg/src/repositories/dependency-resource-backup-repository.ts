@@ -50,6 +50,7 @@ interface SerializedRestoreAttempt extends Record<string, unknown> {
   attemptId: string;
   status: "pending" | "completed" | "failed";
   requestedAt: string;
+  targetDependencyResourceId?: string;
   completedAt?: string;
   failedAt?: string;
   failureCode?: string;
@@ -87,6 +88,12 @@ class KyselyBackupMutationVisitor
           attemptId: state.latestRestoreAttempt.attemptId.value,
           status: state.latestRestoreAttempt.status.value,
           requestedAt: state.latestRestoreAttempt.requestedAt.value,
+          ...(state.latestRestoreAttempt.targetDependencyResourceId
+            ? {
+                targetDependencyResourceId:
+                  state.latestRestoreAttempt.targetDependencyResourceId.value,
+              }
+            : {}),
           ...(state.latestRestoreAttempt.completedAt
             ? { completedAt: state.latestRestoreAttempt.completedAt.value }
             : {}),
@@ -184,6 +191,13 @@ function rehydrateBackup(row: BackupRow): DependencyResourceBackup {
               latestRestoreAttempt.status,
             ),
             requestedAt: OccurredAt.rehydrate(latestRestoreAttempt.requestedAt),
+            ...(latestRestoreAttempt.targetDependencyResourceId
+              ? {
+                  targetDependencyResourceId: ResourceInstanceId.rehydrate(
+                    latestRestoreAttempt.targetDependencyResourceId,
+                  ),
+                }
+              : {}),
             ...(latestRestoreAttempt.completedAt
               ? { completedAt: OccurredAt.rehydrate(latestRestoreAttempt.completedAt) }
               : {}),
@@ -235,6 +249,11 @@ function toBackupSummary(row: BackupRow): DependencyResourceBackupSummary {
             attemptId: latestRestoreAttempt.attemptId,
             status: latestRestoreAttempt.status,
             requestedAt: latestRestoreAttempt.requestedAt,
+            ...(latestRestoreAttempt.targetDependencyResourceId
+              ? {
+                  targetDependencyResourceId: latestRestoreAttempt.targetDependencyResourceId,
+                }
+              : {}),
             ...(latestRestoreAttempt.completedAt
               ? { completedAt: latestRestoreAttempt.completedAt }
               : {}),

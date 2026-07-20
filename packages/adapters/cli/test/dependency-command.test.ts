@@ -145,6 +145,49 @@ describe("CLI dependency commands", () => {
     });
   });
 
+  test("[DEP-RES-ENTRY-001] dependency import accepts a connection URL from stdin", async () => {
+    const { commands, program } = await createCommandCaptureHarness("req_cli_dep_import_stdin");
+    const stdin = process.stdin as typeof process.stdin & {
+      [Symbol.asyncIterator](): AsyncIterableIterator<Buffer>;
+    };
+    const originalIterator = stdin[Symbol.asyncIterator];
+    stdin[Symbol.asyncIterator] = async function* () {
+      yield Buffer.from("postgres://app:secret@db.example.com/app\n");
+    };
+    try {
+      await parseCli(program, [
+        "node",
+        "appaloft",
+        "dependency",
+        "import",
+        "--kind",
+        "postgres",
+        "--project",
+        "prj_demo",
+        "--environment",
+        "env_demo",
+        "--name",
+        "Supabase",
+        "--connection-url-stdin",
+      ]);
+    } finally {
+      stdin[Symbol.asyncIterator] = originalIterator;
+    }
+
+    expect(commands[0]).toBeInstanceOf(ImportDependencyResourceCommand);
+    expect(commands[0]).toMatchObject({
+      connectionUrl: "postgres://app:secret@db.example.com/app",
+    });
+
+    const { resolveDependencyConnectionUrl } = await import("../src/commands/dependency");
+    const conflict = await resolveDependencyConnectionUrl({
+      stdin: true,
+      value: "postgres://secret-in-argv",
+      readStdin: async () => "postgres://secret-from-stdin",
+    });
+    expect(conflict.isErr()).toBe(true);
+  });
+
   test("[DEP-RES-ENTRY-001] dependency provision/import support additional kinds", async () => {
     const { commands, program } = await createCommandCaptureHarness("req_cli_dep_redis");
 
@@ -266,6 +309,8 @@ describe("CLI dependency commands", () => {
       "backup",
       "restore",
       "drb_1",
+      "--target-dependency",
+      "rsi_supabase",
       "--confirm-data-overwrite",
       "--confirm-runtime-not-restarted",
     ]);
@@ -275,6 +320,7 @@ describe("CLI dependency commands", () => {
     expect(queries[0]).toBeInstanceOf(ListDependencyResourceBackupsQuery);
     expect(queries[1]).toBeInstanceOf(ShowDependencyResourceBackupQuery);
     expect(commands[1]).toBeInstanceOf(RestoreDependencyResourceBackupCommand);
+    expect(commands[1]).toMatchObject({ targetDependencyResourceId: "rsi_supabase" });
   });
 
   test("[DEP-BIND-PG-ENTRY-001] resource dependency commands dispatch buses", async () => {

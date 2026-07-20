@@ -563,7 +563,11 @@ import { type DomainError, domainError, err, ok, type Result } from "@appaloft/c
 import { type DependencyContainer, instanceCachingFactory } from "tsyringe";
 import { ShellDeploymentTimelineObserver } from "./deployment-timeline-observer";
 import { PublicDnsDomainOwnershipVerifier } from "./domain-ownership-verifier";
-import { DockerBackedManagedDependencyProvider } from "./managed-dependency-providers";
+import {
+  DockerBackedDependencyResourceBackupProvider,
+  DockerBackedManagedDependencyProvider,
+  RoutedDependencyResourceBackupProvider,
+} from "./managed-dependency-providers";
 import { ShellPreviewEnvironmentCleaner } from "./preview-environment-cleaner";
 
 class ShellCertificateProviderSelectionPolicy implements CertificateProviderSelectionPolicy {
@@ -1876,10 +1880,16 @@ export function registerApplicationServices(
             tokens.dependencyResourceSecretStore,
           )
         : undefined;
-      return new ShellDependencyResourceBackupProvider(input.dataDir, {
+      const fallbackProvider = new ShellDependencyResourceBackupProvider(input.dataDir, {
         ...(dependencyResourceSecretStore ? { dependencyResourceSecretStore } : {}),
         nativeCommandRunner: new BunDependencyResourceNativeCommandRunner(),
       });
+      return new RoutedDependencyResourceBackupProvider(
+        new DockerBackedDependencyResourceBackupProvider(
+          dependencyContainer.resolve(tokens.serverRepository),
+        ),
+        fallbackProvider,
+      );
     }),
   });
   container.registerSingleton(tokens.domainOwnershipVerifier, PublicDnsDomainOwnershipVerifier);

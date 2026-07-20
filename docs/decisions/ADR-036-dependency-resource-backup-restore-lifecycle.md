@@ -53,9 +53,15 @@ attempt state, read models, and lifecycle events.
 The first implementation may use a synchronous hermetic provider adapter, but it must preserve the
 same durable attempt/status shape required by future background workers.
 
-Restore is in-place to the same dependency resource in the first slice. Cross-resource clone,
-point-in-time selection beyond explicit restore points, scheduled backup policy, automatic runtime
-restart, deployment redeploy, and stateful rollback are later specs.
+Restore defaults to the same dependency resource. An operator may instead select one ready target
+dependency resource in the same project and environment when source and target kinds match and the
+provider capability can consume the restore point. The restore attempt records the target identity,
+requires the same overwrite and runtime-not-restarted acknowledgements, and never changes bindings,
+deployment snapshots, or either dependency resource lifecycle. This cross-resource branch is a
+data migration primitive, not clone ownership or environment switching.
+
+Point-in-time selection beyond explicit restore points, automatic runtime restart, deployment
+redeploy, binding replacement, and stateful rollback remain separate operations.
 
 ## Consequences
 
@@ -79,6 +85,6 @@ restart, deployment redeploy, and stateful rollback are later specs.
 - No provider-native credential rotation.
 - No scheduled backup policies.
 - No backup data deletion/prune command in the first slice.
-- No cross-resource restore, clone, or forked database creation.
+- No provider-created clone or forked database creation; the target dependency resource must already
+  exist and be ready.
 - No raw dump export/download surface.
-

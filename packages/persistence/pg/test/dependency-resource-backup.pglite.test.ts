@@ -76,6 +76,7 @@ describe("dependency resource backup persistence", () => {
         .startRestore({
           attemptId: restoreAttemptId,
           requestedAt: OccurredAt.rehydrate("2026-01-01T00:01:00.000Z"),
+          targetDependencyResourceId: ResourceInstanceId.rehydrate("rsi_supabase"),
         })
         ._unsafeUnwrap();
       backup
@@ -111,6 +112,9 @@ describe("dependency resource backup persistence", () => {
       });
 
       expect(persisted?.toState().latestRestoreAttempt?.status.value).toBe("completed");
+      expect(persisted?.toState().latestRestoreAttempt?.targetDependencyResourceId?.value).toBe(
+        "rsi_supabase",
+      );
       expect(listed).toHaveLength(1);
       expect(shown).toMatchObject({
         id: "drb_1",
@@ -118,6 +122,7 @@ describe("dependency resource backup persistence", () => {
         retentionStatus: "retained",
         latestRestoreAttempt: {
           status: "completed",
+          targetDependencyResourceId: "rsi_supabase",
         },
       });
       expect(many).toHaveLength(1);

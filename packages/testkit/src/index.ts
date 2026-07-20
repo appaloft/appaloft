@@ -670,6 +670,21 @@ export class FakeDependencyResourceBackupProvider implements DependencyResourceB
     return this.supported.has(`${providerKey}:${dependencyKind}`);
   }
 
+  supportsRestore(input: {
+    backupId: string;
+    sourceProviderKey: string;
+    targetProviderKey: string;
+    dependencyKind: "postgres" | "redis";
+    providerArtifactHandle: string;
+    sameDependencyResource: boolean;
+  }): boolean {
+    return (
+      input.providerArtifactHandle.endsWith(`/${input.backupId}`) &&
+      this.supports(input.sourceProviderKey, input.dependencyKind) &&
+      this.supports(input.targetProviderKey, input.dependencyKind)
+    );
+  }
+
   async createBackup(
     context: ExecutionContext,
     input: DependencyResourceBackupProviderInput,
@@ -1999,6 +2014,12 @@ function memoryBackupSummary(backup: DependencyResourceBackup): DependencyResour
             attemptId: state.latestRestoreAttempt.attemptId.value,
             status: state.latestRestoreAttempt.status.value,
             requestedAt: state.latestRestoreAttempt.requestedAt.value,
+            ...(state.latestRestoreAttempt.targetDependencyResourceId
+              ? {
+                  targetDependencyResourceId:
+                    state.latestRestoreAttempt.targetDependencyResourceId.value,
+                }
+              : {}),
             ...(state.latestRestoreAttempt.completedAt
               ? { completedAt: state.latestRestoreAttempt.completedAt.value }
               : {}),

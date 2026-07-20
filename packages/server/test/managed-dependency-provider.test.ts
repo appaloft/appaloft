@@ -4,7 +4,48 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ShellManagedDependencyProvider } from "../src/register-application-services";
+import { type ServerRepository } from "@appaloft/application";
+import {
+  CreatedAt,
+  DeploymentTarget,
+  DeploymentTargetId,
+  DeploymentTargetName,
+  HostAddress,
+  PortNumber,
+  ProviderKey,
+} from "@appaloft/core";
+import {
+  ShellDependencyResourceBackupProvider,
+  type ShellDependencyResourceNativeCommandInput,
+  type ShellDependencyResourceNativeCommandRunner,
+  ShellManagedDependencyProvider,
+} from "../src/register-application-services";
+
+class SingleServerRepository implements ServerRepository {
+  readonly server = DeploymentTarget.register({
+    id: DeploymentTargetId.rehydrate("srv_production"),
+    name: DeploymentTargetName.rehydrate("Production"),
+    host: HostAddress.rehydrate("127.0.0.1"),
+    port: PortNumber.rehydrate(22),
+    providerKey: ProviderKey.rehydrate("generic-ssh"),
+    createdAt: CreatedAt.rehydrate("2026-07-20T00:00:00.000Z"),
+  })._unsafeUnwrap();
+
+  async findOne() {
+    return this.server;
+  }
+
+  async upsert(): Promise<void> {}
+}
+
+class RejectingNativeCommandRunner implements ShellDependencyResourceNativeCommandRunner {
+  readonly calls: ShellDependencyResourceNativeCommandInput[] = [];
+
+  async run(input: ShellDependencyResourceNativeCommandInput) {
+    this.calls.push(input);
+    throw new Error("control-plane native command must not run");
+  }
+}
 
 const tempRoots: string[] = [];
 
@@ -19,6 +60,91 @@ async function createTempRoot(): Promise<string> {
 }
 
 describe("ShellManagedDependencyProvider", () => {
+  test("[DEP-RES-BACKUP-011] backs up managed Postgres on its Docker target", async () => {
+    const root = await createTempRoot();
+    const binDir = join(root, "bin");
+    const sshLog = join(root, "ssh.log");
+    await mkdir(binDir, { recursive: true });
+    await writeFile(
+      join(binDir, "ssh"),
+      ["#!/bin/sh", `printf '%s\\n' "$*" >> ${JSON.stringify(sshLog)}`, "exit 0", ""].join("\n"),
+    );
+    await chmod(join(binDir, "ssh"), 0o755);
+
+    const previousPath = process.env.PATH;
+    process.env.PATH = `${binDir}:/usr/bin:/bin:/usr/sbin:/sbin:${previousPath ?? ""}`;
+    try {
+      const nativeRunner = new RejectingNativeCommandRunner();
+      const provider = new ShellDependencyResourceBackupProvider(join(root, "data"), {
+        nativeCommandRunner: nativeRunner,
+        serverRepository: new SingleServerRepository(),
+      });
+      const backup = await provider.createBackup(
+        { requestId: "req_managed_backup", entrypoint: "test" },
+        {
+          backupId: "drb_managed",
+          dependencyResourceId: "rsi_managed",
+          dependencyKind: "postgres",
+          providerKey: "appaloft-managed-postgres",
+          providerResourceHandle:
+            "docker-single-server:v1:postgres:srv_production:appaloft-postgres-rsi_managed",
+          connectionSecretValue:
+            "postgres://app:managed-secret@appaloft-postgres-rsi_managed:5432/stocktruth_postgres",
+          attemptId: "dba_managed",
+          requestedAt: "2026-07-20T00:00:00.000Z",
+        },
+      );
+
+      expect(backup.isOk()).toBe(true);
+      expect(nativeRunner.calls).toHaveLength(0);
+      expect(backup._unsafeUnwrap().retentionStatus).toBe("none");
+      expect(backup._unsafeUnwrap().providerArtifactHandle).toMatch(
+        /^docker-single-server-backup:v1:postgres:srv_production:appaloft-postgres-rsi_managed:drb_managed$/,
+      );
+      const log = await readFile(sshLog, "utf8");
+      expect(log).toContain("docker exec");
+      expect(log).toContain("pg_dump");
+      expect(log).toContain("appaloft-postgres-rsi_managed");
+      expect(log).not.toContain("managed-secret");
+      expect(
+        provider.supportsRestore({
+          backupId: "drb_other",
+          sourceProviderKey: "appaloft-managed-postgres",
+          targetProviderKey: "external-postgres",
+          dependencyKind: "postgres",
+          providerArtifactHandle: backup._unsafeUnwrap().providerArtifactHandle,
+          sameDependencyResource: false,
+        }),
+      ).toBe(false);
+
+      const restored = await provider.restoreBackup(
+        { requestId: "req_managed_restore_to_external", entrypoint: "test" },
+        {
+          backupId: "drb_managed",
+          dependencyResourceId: "rsi_supabase",
+          sourceDependencyResourceId: "rsi_managed",
+          dependencyKind: "postgres",
+          providerKey: "external-postgres",
+          sourceProviderKey: "appaloft-managed-postgres",
+          providerArtifactHandle: backup._unsafeUnwrap().providerArtifactHandle,
+          connectionSecretValue:
+            "postgres://postgres.project:target-secret@pooler.example.com:5432/postgres?sslmode=require",
+          restoreAttemptId: "dra_migration",
+          requestedAt: "2026-07-20T00:01:00.000Z",
+        },
+      );
+
+      expect(restored.isOk()).toBe(true);
+      expect(nativeRunner.calls).toHaveLength(0);
+      const restoreLog = await readFile(sshLog, "utf8");
+      expect(restoreLog).toContain("pg_restore");
+      expect(restoreLog).toContain("postgres:16-alpine");
+      expect(restoreLog).not.toContain("target-secret");
+    } finally {
+      process.env.PATH = previousPath;
+    }
+  });
+
   test("[CLOUD-DEP-PROV-CAPABILITY-052] rejects required capabilities before shell provider realization", () => {
     const provider = new ShellManagedDependencyProvider();
 
@@ -102,8 +228,9 @@ describe("ShellManagedDependencyProvider", () => {
 
       const log = await readFile(sshLog, "utf8");
       expect(log).toContain("network inspect 'appaloft-edge'");
-      expect(log).toContain("run -d --name 'appaloft-postgres-rsi_preview'");
+      expect(log).toContain("run -d '--name' 'appaloft-postgres-rsi_preview'");
       expect(log).toContain("postgres:16-alpine");
+      expect(log).not.toContain(new URL(state.connectionSecretValue ?? "").password);
     } finally {
       process.env.PATH = previousPath;
     }
@@ -230,9 +357,10 @@ describe("ShellManagedDependencyProvider", () => {
 
       const log = await readFile(sshLog, "utf8");
       expect(log).toContain("network inspect 'appaloft-edge'");
-      expect(log).toContain("run -d --name 'appaloft-redis-rsi_cache'");
+      expect(log).toContain("run -d '--name' 'appaloft-redis-rsi_cache'");
       expect(log).toContain("redis:7-alpine");
-      expect(log).toContain("redis-cli -a");
+      expect(log).toContain("REDISCLI_AUTH");
+      expect(log).not.toContain(new URL(state.connectionSecretValue ?? "").password);
     } finally {
       process.env.PATH = previousPath;
     }

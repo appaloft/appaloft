@@ -2,14 +2,16 @@
 
 ## Intent
 
-Accept an in-place restore request from a ready restore point back into the same dependency
-resource.
+Accept a restore request from a ready restore point into its owning dependency resource by default,
+or into one explicitly selected ready same-kind dependency resource in the same project and
+environment.
 
 ## Input
 
 - `backupId`
 - `acknowledgeDataOverwrite`
 - `acknowledgeRuntimeNotRestarted`
+- optional `targetDependencyResourceId`
 - optional `restoreLabel`
 
 ## Success
@@ -29,7 +31,11 @@ restore attempt state, safe read models, operator-work visibility, and lifecycle
 - `provider_capability_unsupported`, phase `dependency-resource-restore-admission`
 - `provider_error`, phase `dependency-resource-restore`
 
+When `targetDependencyResourceId` is supplied, the restore attempt records both the backup owner and
+target. The command does not rebind resources; switching runtime traffic remains an explicit
+binding/configuration and deployment workflow after restore verification.
+
 ## Non-Goals
 
-No cross-resource restore, clone, export, deployment rollback, redeploy, runtime environment
-injection, workload restart, or historical snapshot rewrite.
+No provider-created clone, export, deployment rollback, automatic rebind/redeploy, runtime
+environment injection, workload restart, or historical snapshot rewrite.

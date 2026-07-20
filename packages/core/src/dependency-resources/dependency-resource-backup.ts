@@ -237,6 +237,7 @@ export interface DependencyResourceRestoreAttemptState {
   attemptId: DependencyResourceRestoreAttemptId;
   status: DependencyResourceRestoreAttemptStatusValue;
   requestedAt: OccurredAt;
+  targetDependencyResourceId?: ResourceInstanceId;
   completedAt?: OccurredAt;
   failedAt?: OccurredAt;
   failureCode?: DependencyResourceBackupFailureCode;
@@ -370,6 +371,7 @@ export class DependencyResourceBackup extends AggregateRoot<DependencyResourceBa
   startRestore(input: {
     attemptId: DependencyResourceRestoreAttemptId;
     requestedAt: OccurredAt;
+    targetDependencyResourceId?: ResourceInstanceId;
   }): Result<void> {
     if (this.state.status.value !== "ready" || !this.state.providerArtifactHandle) {
       return err(
@@ -393,11 +395,17 @@ export class DependencyResourceBackup extends AggregateRoot<DependencyResourceBa
       attemptId: input.attemptId,
       status: DependencyResourceRestoreAttemptStatusValue.pending(),
       requestedAt: input.requestedAt,
+      ...(input.targetDependencyResourceId
+        ? { targetDependencyResourceId: input.targetDependencyResourceId }
+        : {}),
     };
     this.recordDomainEvent("dependency-resource-restore-requested", input.requestedAt, {
       backupId: this.state.id.value,
       restoreAttemptId: input.attemptId.value,
       dependencyResourceId: this.state.dependencyResourceId.value,
+      ...(input.targetDependencyResourceId
+        ? { targetDependencyResourceId: input.targetDependencyResourceId.value }
+        : {}),
       providerKey: this.state.providerKey.value,
     });
     return ok(undefined);
@@ -426,6 +434,12 @@ export class DependencyResourceBackup extends AggregateRoot<DependencyResourceBa
       restoreAttemptId: input.attemptId.value,
       dependencyResourceId: this.state.dependencyResourceId.value,
       providerKey: this.state.providerKey.value,
+      ...(this.state.latestRestoreAttempt.targetDependencyResourceId
+        ? {
+            targetDependencyResourceId:
+              this.state.latestRestoreAttempt.targetDependencyResourceId.value,
+          }
+        : {}),
     });
     return ok(undefined);
   }
@@ -458,6 +472,12 @@ export class DependencyResourceBackup extends AggregateRoot<DependencyResourceBa
       dependencyResourceId: this.state.dependencyResourceId.value,
       providerKey: this.state.providerKey.value,
       failureCode: input.failureCode.value,
+      ...(this.state.latestRestoreAttempt.targetDependencyResourceId
+        ? {
+            targetDependencyResourceId:
+              this.state.latestRestoreAttempt.targetDependencyResourceId.value,
+          }
+        : {}),
     });
     return ok(undefined);
   }
@@ -494,6 +514,9 @@ function cloneRestoreAttempt(
     attemptId: attempt.attemptId,
     status: attempt.status,
     requestedAt: attempt.requestedAt,
+    ...(attempt.targetDependencyResourceId
+      ? { targetDependencyResourceId: attempt.targetDependencyResourceId }
+      : {}),
     ...(attempt.completedAt ? { completedAt: attempt.completedAt } : {}),
     ...(attempt.failedAt ? { failedAt: attempt.failedAt } : {}),
     ...(attempt.failureCode ? { failureCode: attempt.failureCode } : {}),

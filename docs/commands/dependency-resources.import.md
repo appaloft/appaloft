@@ -34,3 +34,8 @@ Returns `ok({ id })`, persists a dependency `ResourceInstance` with source mode
 Raw passwords, tokens, auth headers, cookies, SSH credentials, provider tokens, private keys, and
 sensitive query parameters must not appear in command result, read models, events, errors, logs, or
 deployment snapshots.
+
+CLI automation should pass the connection URL through standard input with
+`appaloft dependency import ... --connection-url-stdin`. `--connection-url` remains available for
+interactive compatibility, but the two inputs are mutually exclusive and empty standard input is
+rejected.
