@@ -12,6 +12,8 @@ import { type DomainError, err, ok, type Result } from "@appaloft/core";
 import {
   type DependencyResourcePostgresQueryExecutor,
   dependencyResourceSafeQueryConnectTimeoutSeconds,
+  dependencyResourceSafeQueryExecutionDeadlineMs,
+  executeDependencyResourceSafeQueryWithDeadline,
   type ManagedDependencyResourcePostgresQueryExecutor,
   PostgresDependencyResourceSafeQueryProvider,
   PostgresJsDependencyResourceQueryExecutor,
@@ -107,6 +109,23 @@ describe("PostgresDependencyResourceSafeQueryProvider", () => {
       details: { phase: "dependency-resource-safe-query-postgres" },
     });
     expect(JSON.stringify(result._unsafeUnwrapErr())).not.toContain("not-a-postgres-url");
+  });
+
+  test("[DEP-SAFE-QRY-011] terminates a hung external operation before the gateway deadline", async () => {
+    expect(dependencyResourceSafeQueryExecutionDeadlineMs(500)).toBe(500);
+    expect(dependencyResourceSafeQueryExecutionDeadlineMs(30_000)).toBe(3_000);
+
+    let timedOut = false;
+    const result = executeDependencyResourceSafeQueryWithDeadline(
+      new Promise<never>(() => undefined),
+      5,
+      () => {
+        timedOut = true;
+      },
+    );
+
+    await expect(result).rejects.toMatchObject({ name: "TimeoutError" });
+    expect(timedOut).toBe(true);
   });
 
   test("[DEP-SAFE-QRY-005] resolves an Appaloft secret reference and executes a bounded query", async () => {

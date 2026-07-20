@@ -12,6 +12,7 @@ import postgres from "postgres";
 
 const maximumResultBytes = 1_048_576;
 const maximumConnectTimeoutSeconds = 3;
+const maximumExecutionDeadlineMs = 3_000;
 
 type SafeQueryScalar = string | number | boolean | null;
 
@@ -120,6 +121,35 @@ export function dependencyResourceSafeQueryConnectTimeoutSeconds(timeoutMs: numb
   return Math.min(maximumConnectTimeoutSeconds, Math.max(1, Math.ceil(timeoutMs / 1_000)));
 }
 
+export function dependencyResourceSafeQueryExecutionDeadlineMs(timeoutMs: number): number {
+  return Math.min(maximumExecutionDeadlineMs, Math.max(1, timeoutMs));
+}
+
+export async function executeDependencyResourceSafeQueryWithDeadline<T>(
+  operation: Promise<T>,
+  timeoutMs: number,
+  onTimeout: () => void,
+): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<never>((_resolve, reject) => {
+        timeout = setTimeout(() => {
+          onTimeout();
+          const cause = new Error("Dependency safe query exceeded its execution deadline");
+          cause.name = "TimeoutError";
+          reject(cause);
+        }, dependencyResourceSafeQueryExecutionDeadlineMs(timeoutMs));
+      }),
+    ]);
+  } finally {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+  }
+}
+
 export class PostgresJsDependencyResourceQueryExecutor
   implements DependencyResourcePostgresQueryExecutor
 {
@@ -135,12 +165,18 @@ export class PostgresJsDependencyResourceQueryExecutor
         max_lifetime: Math.max(1, Math.ceil(input.timeoutMs / 1_000) + 1),
         prepare: false,
       });
-      const result = await sql.begin("read only", async (transaction) => {
-        await transaction.unsafe(`SET LOCAL statement_timeout = ${input.timeoutMs}`);
-        return await transaction.unsafe<Record<string, unknown>[]>(
-          `SELECT * FROM (${normalizedStatement(input.statement)}) AS appaloft_safe_query LIMIT ${input.maxRows + 1}`,
-        );
-      });
+      const result = await executeDependencyResourceSafeQueryWithDeadline(
+        sql.begin("read only", async (transaction) => {
+          await transaction.unsafe(`SET LOCAL statement_timeout = ${input.timeoutMs}`);
+          return await transaction.unsafe<Record<string, unknown>[]>(
+            `SELECT * FROM (${normalizedStatement(input.statement)}) AS appaloft_safe_query LIMIT ${input.maxRows + 1}`,
+          );
+        }),
+        input.timeoutMs,
+        () => {
+          void sql?.end({ timeout: 0 }).catch(() => undefined);
+        },
+      );
       const limited = boundedDependencyResourceSafeQueryRows(result, input.maxRows);
       return ok({
         columns: result.columns.map((column) => ({
@@ -153,7 +189,7 @@ export class PostgresJsDependencyResourceQueryExecutor
     } catch (cause) {
       return err(safeQueryProviderError(cause));
     } finally {
-      await sql?.end({ timeout: 1 }).catch(() => undefined);
+      await sql?.end({ timeout: 0 }).catch(() => undefined);
     }
   }
 }
