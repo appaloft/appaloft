@@ -127,6 +127,15 @@ describe("ExecutionSandboxService", () => {
     expect(fake.provisionCalls()).toBe(1);
   });
 
+  test("[SBX-API-003] public create closes provisioning for synchronous external callers", async () => {
+    const fake = provider();
+    const app = service(fake.adapter);
+
+    const result = await app.createAndReconcile(context, createInput);
+    expect(result._unsafeUnwrap()).toMatchObject({ sandboxId: "sbx_test", status: "ready" });
+    expect(fake.provisionCalls()).toBe(1);
+  });
+
   test("[SBX-CMD-002] rejects weaker provider before persistence or mutation", async () => {
     const fake = provider({ isolation: "container-trusted" });
     const app = service(fake.adapter);

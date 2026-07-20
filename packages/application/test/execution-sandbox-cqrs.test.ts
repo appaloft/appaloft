@@ -23,7 +23,7 @@ const context = createExecutionContext({
 function sandboxService() {
   const calls: Array<{ operation: string; input: unknown }> = [];
   const service = {
-    async create(_context: unknown, input: unknown) {
+    async createAndReconcile(_context: unknown, input: unknown) {
       calls.push({ operation: "create", input });
       return ok({ sandboxId: "sbx_1", status: "requested" });
     },

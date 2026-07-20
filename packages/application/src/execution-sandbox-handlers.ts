@@ -86,7 +86,7 @@ export class SandboxCommandHandler implements CommandHandlerContract<SandboxComm
   async handle(context: ExecutionContext, command: SandboxCommand): Promise<Result<unknown>> {
     const input = command.input;
     if (command instanceof CreateSandboxCommand) {
-      return this.service.create(
+      return this.service.createAndReconcile(
         context,
         input as Parameters<ExecutionSandboxService["create"]>[1],
       );

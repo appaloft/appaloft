@@ -376,6 +376,15 @@ export class ExecutionSandboxService {
     );
   }
 
+  async createAndReconcile(
+    context: ExecutionContext,
+    input: Parameters<ExecutionSandboxService["create"]>[1],
+  ): Promise<Result<SandboxDescriptor>> {
+    const accepted = await this.create(context, input);
+    if (accepted.isErr()) return err(accepted.error);
+    return this.reconcile(context, accepted.value.sandboxId);
+  }
+
   async list(
     context: ExecutionContext,
     input: { limit?: number; offset?: number },
@@ -513,6 +522,9 @@ export class ExecutionSandboxService {
     if (path.isErr()) return err(path.error);
     const ready = await this.ready(context, sandboxId);
     if (ready.isErr()) return err(ready.error);
+    if (!ready.value.provider.capabilities.files) {
+      return err(domainError.conflict("Sandbox provider does not support files"));
+    }
     return ok(
       await ready.value.provider.writeFile({
         sandboxId,
@@ -532,6 +544,9 @@ export class ExecutionSandboxService {
     if (path.isErr()) return err(path.error);
     const ready = await this.ready(context, sandboxId);
     if (ready.isErr()) return err(ready.error);
+    if (!ready.value.provider.capabilities.files) {
+      return err(domainError.conflict("Sandbox provider does not support files"));
+    }
     return ok(
       await ready.value.provider.listFiles({
         sandboxId,
@@ -550,6 +565,9 @@ export class ExecutionSandboxService {
     if (path.isErr()) return err(path.error);
     const ready = await this.ready(context, sandboxId);
     if (ready.isErr()) return err(ready.error);
+    if (!ready.value.provider.capabilities.files) {
+      return err(domainError.conflict("Sandbox provider does not support files"));
+    }
     return ok(
       await ready.value.provider.readFile({
         sandboxId,
@@ -568,6 +586,9 @@ export class ExecutionSandboxService {
     if (path.isErr()) return err(path.error);
     const ready = await this.ready(context, sandboxId);
     if (ready.isErr()) return err(ready.error);
+    if (!ready.value.provider.capabilities.files) {
+      return err(domainError.conflict("Sandbox provider does not support files"));
+    }
     await ready.value.provider.removeFile({
       sandboxId,
       providerHandle: ready.value.providerHandle,
@@ -583,6 +604,9 @@ export class ExecutionSandboxService {
   ): Promise<Result<SandboxProcessDescriptor[]>> {
     const ready = await this.ready(context, sandboxId);
     if (ready.isErr()) return err(ready.error);
+    if (!ready.value.provider.capabilities.processes) {
+      return err(domainError.conflict("Sandbox provider does not support processes"));
+    }
     return ok(
       await ready.value.provider.listProcesses({
         sandboxId,
@@ -601,6 +625,9 @@ export class ExecutionSandboxService {
     }
     const ready = await this.ready(context, sandboxId);
     if (ready.isErr()) return err(ready.error);
+    if (!ready.value.provider.capabilities.processes) {
+      return err(domainError.conflict("Sandbox provider does not support processes"));
+    }
     await ready.value.provider.terminateProcess({
       sandboxId,
       providerHandle: ready.value.providerHandle,
@@ -623,6 +650,9 @@ export class ExecutionSandboxService {
     }
     const ready = await this.ready(context, sandboxId);
     if (ready.isErr()) return err(ready.error);
+    if (!ready.value.provider.capabilities.ports) {
+      return err(domainError.conflict("Sandbox provider does not support port publishing"));
+    }
     return ok(
       await ready.value.provider.exposePort({
         sandboxId,
@@ -640,6 +670,9 @@ export class ExecutionSandboxService {
   ): Promise<Result<SandboxPortExposure[]>> {
     const ready = await this.ready(context, sandboxId);
     if (ready.isErr()) return err(ready.error);
+    if (!ready.value.provider.capabilities.ports) {
+      return err(domainError.conflict("Sandbox provider does not support port publishing"));
+    }
     return ok(
       await ready.value.provider.listPorts({
         sandboxId,
@@ -655,6 +688,9 @@ export class ExecutionSandboxService {
   ): Promise<Result<void>> {
     const ready = await this.ready(context, sandboxId);
     if (ready.isErr()) return err(ready.error);
+    if (!ready.value.provider.capabilities.ports) {
+      return err(domainError.conflict("Sandbox provider does not support port publishing"));
+    }
     await ready.value.provider.revokePort({
       sandboxId,
       providerHandle: ready.value.providerHandle,
