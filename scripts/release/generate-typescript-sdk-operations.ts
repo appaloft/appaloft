@@ -1,5 +1,3 @@
-import "reflect-metadata";
-
 import { join, resolve } from "node:path";
 
 import { createAppaloftOpenApiSpec } from "@appaloft/openapi";

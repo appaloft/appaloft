@@ -1,3 +1,5 @@
+import "reflect-metadata";
+
 import { type ZodTypeAny } from "zod";
 import {
   brokerSandboxCredentialRequestCommandInputSchema,
