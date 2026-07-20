@@ -18,11 +18,13 @@
 - [x] Implement repository/read-model/provider/clock/id ports and a destination-bound credential
   grant value object. Providers without a credential broker advertise `credentialBroker: false`.
 - [x] Implement lifecycle, policy, bounded exec, process, file, port and snapshot operations.
-- [ ] Add live process/event attach and credential-broker operations as compatible follow-ups; the
-  current bounded frame/readback surface does not claim streaming or secret injection.
+- [x] Add persisted lifecycle/process SSE and destination-bound credential-broker operations.
+  Interactive bidirectional process attach remains a compatible follow-up and is not claimed.
 - [x] Implement durable provider attempts, expiry and reconciliation.
 - [x] `SBX-RECONCILE-001`: add provider-owned runtime inventory, persisted-handle comparison and
   exact orphan removal tests/implementation.
+- [x] `SBX-MAINTENANCE-001`: run bounded system-only tenant maintenance automatically with the
+  server worker runtime.
 - [x] `SBX-STREAM-001`: persist Sandbox lifecycle/process events and expose bounded replay/live SSE.
 - [x] `SBX-SECRET-001`: add grant/revoke/list plus destination-bound broker request operations;
   prove plaintext absence across state, output, errors, audit and snapshot.

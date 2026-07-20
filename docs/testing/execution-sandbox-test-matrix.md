@@ -33,6 +33,7 @@ isolation claims.
 | SBX-SECRET-001 | security integration + running-server e2e | Destination-bound credential grant | Grant/list/revoke and brokered request accept only secret refs; plaintext never enters Sandbox state/output/error/audit/snapshot and destination mismatch fails before outbound I/O. | `packages/application/test/execution-sandbox-credential-grants.test.ts`; PG repository and SDK running-server suites; Cloud broker adversarial test | passed |
 | SBX-SNAPSHOT-001 | application/provider | Capture and restore | Restore creates a new Sandbox and preserves declared workspace state only. | application/provider/SDK tests + Docker smoke | passed |
 | SBX-RECONCILE-001 | application/provider + persistence | Restart/orphan reconciliation | Tenant-scoped provider inventory is compared with persisted handles; only an unmatched runtime with matching `ownerScope`, Sandbox id and provider handle is removed. | `packages/application/test/execution-sandbox-reconciliation.test.ts`; Docker provider and PG repository tests | passed |
+| SBX-MAINTENANCE-001 | application/server + persistence | Automatic fleet maintenance | The worker starts a system-only bounded tenant scan, expires/reconciles persisted Sandboxes and removes only exact provider-owned orphans. | application reconciliation, PG tenant enumeration and server runner tests | passed |
 | SBX-PG-001 | PGlite integration | Aggregate/attempt round trip | Desired state/provider handle/attempts round-trip without output payloads. | `packages/persistence/pg/test/execution-sandbox-repository.test.ts` | passed |
 | SBX-PG-002 | PGlite integration | Tenant isolation | Cross-tenant show/list returns not found/empty and lists remain bounded. | same | passed |
 | SBX-RUNTIME-001 | runtime contract | Hermetic provider | Lifecycle/process/file/port/snapshot contracts pass deterministically. | `packages/adapters/runtime/test/execution-sandbox-provider.test.ts` | passed |
@@ -54,5 +55,6 @@ isolation claims.
   truthful unsupported evidence.
 - Kata, microVM and Kubernetes Agent Sandbox providers require their own future runtime rows before
   those capability claims become active.
-- `SBX-SECRET-001`, `SBX-RECONCILE-001` and `SBX-STREAM-001` remain explicit compatible extensions;
-  current providers and APIs fail closed instead of claiming them.
+- Interactive bidirectional terminal attach remains a compatible extension. Current APIs expose
+  persisted lifecycle/process SSE and destination-bound credential brokerage without claiming an
+  interactive terminal session.

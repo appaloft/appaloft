@@ -47,6 +47,9 @@
 - Provider orphan reconciliation enumerates only runtimes carrying the exact provider-owned
   `ownerScope` label, compares them with tenant-scoped persisted handles, and deletes an unmatched
   runtime only through a second ownership-checked provider operation.
+- The server worker runtime immediately starts a bounded system-only maintenance loop. It pages
+  persisted tenant ids, applies TTL/lifecycle reconciliation and then performs exact provider orphan
+  reconciliation for each tenant without exposing this fleet-wide boundary as a public operation.
 
 ## Persistence And Migration
 
