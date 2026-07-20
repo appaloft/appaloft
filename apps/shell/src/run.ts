@@ -181,13 +181,18 @@ export async function quarantineRemotePgliteMirror(
 async function createShellComposition(
   options: ShellRuntimeOptions | undefined,
   remotePgliteStateSyncSession: RemotePgliteStateSyncSession | undefined,
+  capturedStdinText?: string,
 ): Promise<Result<AppComposition>> {
   try {
     return ok(
-      await createAppComposition(undefined, {
-        ...options,
-        ...(remotePgliteStateSyncSession ? { remotePgliteStateSyncSession } : {}),
-      }),
+      await createAppComposition(
+        undefined,
+        {
+          ...options,
+          ...(remotePgliteStateSyncSession ? { remotePgliteStateSyncSession } : {}),
+        },
+        capturedStdinText,
+      ),
     );
   } catch (error) {
     if (!remotePgliteStateSyncSession) {
@@ -214,10 +219,14 @@ async function createShellComposition(
 
     try {
       return ok(
-        await createAppComposition(undefined, {
-          ...options,
-          remotePgliteStateSyncSession,
-        }),
+        await createAppComposition(
+          undefined,
+          {
+            ...options,
+            remotePgliteStateSyncSession,
+          },
+          capturedStdinText,
+        ),
       );
     } catch (retryError) {
       return err(
@@ -387,12 +396,16 @@ async function runShellMcpRemoteStdio(argv: readonly string[]): Promise<void> {
   });
 }
 
-export async function runShellCli(options?: ShellRuntimeOptions): Promise<void> {
+export async function runShellCli(
+  options?: ShellRuntimeOptions,
+  capturedStdinText?: string,
+): Promise<void> {
   const argv = process.argv;
   const mcpCommand = isMcpCommand(argv);
   const controlPlaneCli = await runStandaloneControlPlaneCli({
     argv,
     env: process.env,
+    ...(capturedStdinText === undefined ? {} : { stdinText: capturedStdinText }),
   });
   if (controlPlaneCli.handled) {
     if (controlPlaneCli.exitCode !== 0) {
@@ -416,6 +429,7 @@ export async function runShellCli(options?: ShellRuntimeOptions): Promise<void> 
     const remoteCliProgram = createRemoteCliProgram({
       version: process.env.APPALOFT_APP_VERSION ?? "0.0.0",
       profile: target.profile,
+      ...(capturedStdinText === undefined ? {} : { readStdinText: async () => capturedStdinText }),
     });
     let exitCode = 0;
 
@@ -474,7 +488,11 @@ export async function runShellCli(options?: ShellRuntimeOptions): Promise<void> 
     process.env.APPALOFT_PGLITE_DATA_DIR = remotePgliteStateSyncSession.localPgliteDataDir;
   }
 
-  const appResult = await createShellComposition(options, remotePgliteStateSyncSession);
+  const appResult = await createShellComposition(
+    options,
+    remotePgliteStateSyncSession,
+    capturedStdinText,
+  );
   if (appResult.isErr()) {
     writeDomainError(appResult.error);
     if (remotePgliteStateSyncSession) {

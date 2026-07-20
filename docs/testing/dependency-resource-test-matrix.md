@@ -22,8 +22,8 @@ This matrix covers the Phase 7 dependency resource lifecycle baseline:
 - dependency resource backup/restore scenarios
 - dependency resource scheduled backup policy scenarios
 
-It does not cover provider-native credential rotation, runtime cleanup, backup prune/delete,
-backup export, or cross-resource restore.
+It does not cover provider-native credential rotation, runtime cleanup, backup prune/delete, or
+backup export.
 
 ## Global References
 
@@ -64,6 +64,7 @@ backup export, or cross-resource restore.
 | DEP-RES-KIND-COVERAGE-001 | `dependency-resources.provision`; `dependency-resources.import`; safe dependency contracts; Web dependency resource selector | Core/application/contract/Web | Mainstream dependency kinds are visible and creatable through the same dependency resource mutation surface. | Core and application accept canonical `postgres`, `redis`, `mysql`, `clickhouse`, `object-storage`, and `opensearch` kind values while rejecting S3 as a core kind alias; contracts accept safe summaries, binding summaries, and deployment reference payloads for the canonical kinds without raw secrets; Web can select and create every canonical kind through the generic provision/import client. | `packages/core/test/dependency-resource-kind-vocabulary.test.ts`; `packages/application/test/dependency-resource-kind-vocabulary.test.ts`; `packages/contracts/test/dependency-resource-contract.test.ts`; `packages/contracts/test/resource-dependency-binding-contract.test.ts`; `packages/contracts/test/deployment-plan-preview-contract.test.ts`; `apps/web/src/lib/console/dependency-resource-web.test.ts`; `apps/web` `svelte-check` |
 | DEP-RES-PG-PROVISION-001 | `dependency-resources.provision` | Core/application | Provision managed Postgres record. | Persists Appaloft-managed `postgres` ResourceInstance, emits creation event, and performs no provider-native database action. | `packages/core/test/postgres-dependency-resource.test.ts`; `packages/application/test/postgres-dependency-resource-lifecycle.test.ts` |
 | DEP-RES-PG-IMPORT-001 | `dependency-resources.import` | Application | Import external Postgres. | Persists imported-external Postgres with connection secret boundary and masked read model. | `packages/application/test/postgres-dependency-resource-lifecycle.test.ts` |
+| DEP-RES-PG-IMPORT-CLI-001 | `dependency-resources.import` | Shell/CLI integration | Remote import receives `--connection-url-stdin` from an owner-readable regular file or pipe. | The shell captures standard input before parser/runtime initialization, sends the exact connection URL only in the typed remote request body, and does not expose it in argv, stdout, stderr, diagnostics, or logs; empty input still fails validation. | `apps/shell/test/run-control-plane-cli.test.ts`; `packages/adapters/cli/test/control-plane-client.test.ts` |
 | DEP-RES-PG-VALIDATION-001 | `dependency-resources.provision`; `dependency-resources.import` | Core/application | Invalid name/slug/endpoint/connection metadata. | Returns `validation_error`, `phase = dependency-resource-validation`, no mutation. | `packages/core/test/postgres-dependency-resource.test.ts`; `packages/application/test/postgres-dependency-resource-lifecycle.test.ts` |
 | DEP-RES-PG-READ-001 | `dependency-resources.list`; `dependency-resources.show` | Query/read model | Managed and imported resources exist. | Returns safe ownership, status, exposure, binding readiness, and backup relationship summaries. | `packages/application/test/postgres-dependency-resource-lifecycle.test.ts`; `packages/persistence/pg/test/dependency-resource.pglite.test.ts` |
 | DEP-RES-PG-READ-002 | `dependency-resources.list`; `dependency-resources.show` | Query/read model | Raw connection secret was provided at import. | No raw password, token, auth header, cookie, SSH credential, provider token, private key, or sensitive query appears in output. | `packages/application/test/postgres-dependency-resource-lifecycle.test.ts`; `packages/persistence/pg/test/dependency-resource.pglite.test.ts` |
@@ -169,7 +170,7 @@ backup export, or cross-resource restore.
 Tests must assert dependency resource commands do not:
 
 - rotate provider-native database credentials;
-- run scheduled backup policy, backup prune/delete, export/download, or cross-resource restore;
+- run scheduled backup policy, backup prune/delete, or export/download;
 - mutate historical deployment snapshots;
 - restart, stop, prune, or clean runtime state;
 - expose raw connection strings, passwords, tokens, auth headers, cookies, SSH credentials,

@@ -1495,6 +1495,58 @@ describe("CLI remote control-plane client", () => {
     expect(shown.stdout).toContain("Remote Project");
   });
 
+  test("[CONTROL-PLANE-CLI-006][CONTROL-PLANE-CLI-020][DEP-RES-PG-IMPORT-CLI-001] remote dependency import preserves connection URL stdin", async () => {
+    const requests: Request[] = [];
+    const program = createRemoteCliProgram({
+      version: "0.12.5-test",
+      profile: profile("local"),
+      fetch: createControlPlaneFetch(requests, {
+        "/api/dependency-resources/import": jsonResponse({ id: "rsi_imported" }),
+      }),
+      now: () => "2026-05-17T00:00:00.000Z",
+    });
+    const stdin = process.stdin as typeof process.stdin & {
+      [Symbol.asyncIterator](): AsyncIterableIterator<Buffer>;
+    };
+    const originalIterator = stdin[Symbol.asyncIterator];
+    stdin[Symbol.asyncIterator] = async function* () {
+      yield Buffer.from("postgres://app:secret@db.example.com/app\n");
+    };
+
+    try {
+      await captureProcessOutput(() =>
+        program.parseAsync([
+          "node",
+          "appaloft",
+          "dependency",
+          "import",
+          "--kind",
+          "postgres",
+          "--project",
+          "prj_remote",
+          "--environment",
+          "env_production",
+          "--name",
+          "External Postgres",
+          "--connection-url-stdin",
+        ]),
+      );
+    } finally {
+      stdin[Symbol.asyncIterator] = originalIterator;
+    }
+
+    expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual(
+      [
+        "GET /api/version",
+        "GET /api/organizations/current-context",
+        "POST /api/dependency-resources/import",
+      ],
+    );
+    expect(await requests[2]?.json()).toMatchObject({
+      connectionUrl: "postgres://app:secret@db.example.com/app",
+    });
+  });
+
   test("[CONTROL-PLANE-CLI-006][STOR-BACKUP-PLAN-001] storage backup plan binds the nested source volume to the remote route", async () => {
     const requests: Request[] = [];
     const program = createRemoteCliProgram({

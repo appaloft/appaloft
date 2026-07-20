@@ -65,6 +65,7 @@ import { Args, Command as EffectCommand, Options } from "@effect/cli";
 import { Effect } from "effect";
 
 import {
+  CliRuntime,
   optionalNumber,
   optionalValue,
   resultToEffect,
@@ -787,8 +788,14 @@ function resourceSecretValueTask(
   createCommand: (value: string) => Result<AppCommand<unknown>>,
 ) {
   return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
     const value = yield* resultToEffect(
-      yield* Effect.promise(() => resolveResourceSecretValue(input)),
+      yield* Effect.promise(() =>
+        resolveResourceSecretValue({
+          ...input,
+          readStdin: cli.readStdinText ?? readResourceSecretStdin,
+        }),
+      ),
     );
     yield* runCommand(createCommand(value));
   });

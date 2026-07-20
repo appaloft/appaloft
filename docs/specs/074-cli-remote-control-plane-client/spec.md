@@ -174,6 +174,12 @@ implemented dispatcher uses the application operation catalog to map constructed
 messages to operation keys, then uses generated SDK operation descriptors for method, path, query,
 body, auth, and streaming metadata.
 
+Commands that explicitly request secret material from standard input must capture it at the shell
+entrypoint before parser or runtime initialization. This preserves both pipes and owner-readable
+regular files whose descriptors may otherwise be consumed during module initialization. The
+captured value is scoped to the selected command handler and typed remote request body, and must not
+be rendered in argv, stdout, stderr, diagnostics, or logs.
+
 ### Fallback
 
 Fallback is explicit and observable:
@@ -334,6 +340,7 @@ cookies, database URLs, SSH keys, credential payloads, or secret values.
 | CLI-RCPC-SPEC-015 | MCP login requests bearer material | A remote HTTP MCP client needs bearer auth | The operator runs `appaloft auth mcp login` | The CLI creates the same browser auth session with `requestedCredential: "bearer"`, exchanges only after authorization, verifies current context with the bearer, writes a redacted local `mcp` profile by default, and never prints raw credential material. |
 | CLI-RCPC-SPEC-016 | Codex MCP install keeps bearer outside Codex config | A local bearer-backed `mcp` profile exists | The operator runs `appaloft auth mcp codex install` | The CLI writes or updates a Codex MCP stdio entry that launches `appaloft mcp remote-stdio --profile mcp`, does not copy bearer material into Codex config or stdout, and fails if the profile is missing or not bearer-backed. |
 | CLI-RCPC-SPEC-017 | Unknown command fails before runtime initialization | The operator misspells a top-level command or uses the wrong singular/plural form | The operator runs the invalid command with or without an active remote profile | The CLI returns a structured validation error before creating local shell composition, initializing PGlite, syncing SSH state, handshaking, or dispatching a remote operation. |
+| CLI-RCPC-SPEC-018 | Secret stdin survives entrypoint initialization | A remote-capable command explicitly requests stdin and receives it through a pipe or owner-readable regular file | The operator runs a command such as `dependency import --connection-url-stdin` | The shell captures stdin before parser/runtime initialization, dispatches the exact value only in the typed request body, and never emits it through argv, output, diagnostics, or logs. |
 
 ## Public Surfaces
 
