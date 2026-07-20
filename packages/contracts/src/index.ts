@@ -4434,11 +4434,11 @@ export const createDomainBindingInputSchema = z
     idempotencyKey: z.string().min(1).optional(),
   })
   .superRefine((value, context) => {
-    if ((value.serverId && !value.destinationId) || (!value.serverId && value.destinationId)) {
+    if (!value.serverId && value.destinationId) {
       context.addIssue({
         code: "custom",
-        path: value.serverId ? ["destinationId"] : ["serverId"],
-        message: "Domain binding server target requires both serverId and destinationId",
+        path: ["serverId"],
+        message: "Domain binding destination target requires serverId",
       });
     }
   });

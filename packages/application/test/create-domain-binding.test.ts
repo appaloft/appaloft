@@ -127,6 +127,22 @@ describe("CreateDomainBindingCommand input", () => {
     expect(command._unsafeUnwrap().destinationId).toBeUndefined();
   });
 
+  test("accepts a server target without an explicit destination", () => {
+    const command = CreateDomainBindingCommand.create({
+      projectId: "prj_static",
+      environmentId: "env_static",
+      resourceId: "res_static",
+      serverId: "srv_static",
+      domainName: "static.example.com",
+      proxyKind: "traefik",
+      tlsMode: "auto",
+    });
+
+    expect(command.isOk()).toBe(true);
+    expect(command._unsafeUnwrap().serverId).toBe("srv_static");
+    expect(command._unsafeUnwrap().destinationId).toBeUndefined();
+  });
+
   test("ROUTE-TLS-ENTRY-023 accepts a compose service route target", () => {
     const command = CreateDomainBindingCommand.create({
       projectId: "prj_demo",
@@ -393,6 +409,32 @@ describe("CreateDomainBindingUseCase", () => {
       },
     });
     expect(processAttemptRecorder.records[0]).not.toHaveProperty("serverId");
+  });
+
+  test("creates server-targeted bindings without requiring an explicit destination", async () => {
+    const { context, domainBindings, repositoryContext, useCase } = await seedRoutingContext();
+
+    const result = await useCase.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      serverId: "srv_demo",
+      domainName: "static.example.com",
+      proxyKind: "traefik",
+      tlsMode: "auto",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const persisted = await domainBindings.findOne(
+      repositoryContext,
+      DomainBindingByIdSpec.create(DomainBindingId.rehydrate(result._unsafeUnwrap().id)),
+    );
+    const persistedState = persisted?.toState();
+    expect(persistedState?.serverId?.value).toBe("srv_demo");
+    expect(persistedState?.destinationId).toBeUndefined();
+    expect(persistedState?.dnsObservation?.expectedTargets.map((target) => target.value)).toEqual([
+      "127.0.0.1",
+    ]);
   });
 
   test("ROUTE-TLS-EVT-013 ROUTE-TLS-READMODEL-008 PROC-DELIVERY-001 accepts a binding and exposes pending DNS observation", async () => {
