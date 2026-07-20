@@ -1,5 +1,5 @@
 <script lang="ts">
-  import InstancePage from "../+page.svelte";
+  import InstancePage from "../InstancePage.svelte";
 </script>
 
 <InstancePage section="sessions" />

@@ -834,6 +834,139 @@ export const generatedSdkOperations = [
     facadeDefault: true,
   },
   {
+    operationKey: "control-plane-portability.artifacts.delete",
+    operationGroup: "control-plane-portability",
+    operationMethod: "artifactsDelete",
+    facadePath: ["controlPlanePortability", "artifacts", "delete"],
+    operationId: "controlPlanePortability.artifacts.delete",
+    kind: "command",
+    domain: "control-plane-portability",
+    messageName: "DeleteControlPlanePortabilityArtifactCommand",
+    route: {
+      method: "DELETE",
+      path: "/control-plane-portability/artifacts/{artifactId}",
+    },
+    docsHref: "/docs/self-hosting/advanced/#advanced-control-plane-modes",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "control-plane-portability.artifacts.list",
+    operationGroup: "control-plane-portability",
+    operationMethod: "artifactsList",
+    facadePath: ["controlPlanePortability", "artifacts", "list"],
+    operationId: "controlPlanePortability.artifacts.list",
+    kind: "query",
+    domain: "control-plane-portability",
+    messageName: "ListControlPlanePortabilityArtifactsQuery",
+    route: {
+      method: "GET",
+      path: "/control-plane-portability/artifacts",
+    },
+    docsHref: "/docs/self-hosting/advanced/#advanced-control-plane-modes",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "control-plane-portability.artifacts.show",
+    operationGroup: "control-plane-portability",
+    operationMethod: "artifactsShow",
+    facadePath: ["controlPlanePortability", "artifacts", "show"],
+    operationId: "controlPlanePortability.artifacts.show",
+    kind: "query",
+    domain: "control-plane-portability",
+    messageName: "ShowControlPlanePortabilityArtifactQuery",
+    route: {
+      method: "GET",
+      path: "/control-plane-portability/artifacts/{artifactId}",
+    },
+    docsHref: "/docs/self-hosting/advanced/#advanced-control-plane-modes",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "control-plane-portability.export",
+    operationGroup: "control-plane-portability",
+    operationMethod: "export",
+    facadePath: ["controlPlanePortability", "export"],
+    operationId: "controlPlanePortability.export",
+    kind: "command",
+    domain: "control-plane-portability",
+    messageName: "ExportControlPlaneCommand",
+    route: {
+      method: "POST",
+      path: "/control-plane-portability/exports",
+    },
+    docsHref: "/docs/self-hosting/advanced/#advanced-control-plane-modes",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "control-plane-portability.export-plan",
+    operationGroup: "control-plane-portability",
+    operationMethod: "exportPlan",
+    facadePath: ["controlPlanePortability", "exportPlan"],
+    operationId: "controlPlanePortability.exportPlan",
+    kind: "query",
+    domain: "control-plane-portability",
+    messageName: "ControlPlanePortabilityExportPlanQuery",
+    route: {
+      method: "GET",
+      path: "/control-plane-portability/export-plan",
+    },
+    docsHref: "/docs/self-hosting/advanced/#advanced-control-plane-modes",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "control-plane-portability.import",
+    operationGroup: "control-plane-portability",
+    operationMethod: "import",
+    facadePath: ["controlPlanePortability", "import"],
+    operationId: "controlPlanePortability.import",
+    kind: "command",
+    domain: "control-plane-portability",
+    messageName: "ImportControlPlaneCommand",
+    route: {
+      method: "POST",
+      path: "/control-plane-portability/imports",
+    },
+    docsHref: "/docs/self-hosting/advanced/#advanced-control-plane-modes",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "control-plane-portability.import-plan",
+    operationGroup: "control-plane-portability",
+    operationMethod: "importPlan",
+    facadePath: ["controlPlanePortability", "importPlan"],
+    operationId: "controlPlanePortability.importPlan",
+    kind: "query",
+    domain: "control-plane-portability",
+    messageName: "ControlPlanePortabilityImportPlanQuery",
+    route: {
+      method: "POST",
+      path: "/control-plane-portability/import-plan",
+    },
+    docsHref: "/docs/self-hosting/advanced/#advanced-control-plane-modes",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
     operationKey: "credentials.create-ssh",
     operationGroup: "credentials",
     operationMethod: "createSsh",
@@ -5564,6 +5697,63 @@ export const generatedSdkOperations = [
     facadeDefault: true,
   },
   {
+    operationKey: "storage-volumes.backup-policies.configure",
+    operationGroup: "storage-volumes",
+    operationMethod: "backupPoliciesConfigure",
+    facadePath: ["storageVolumes", "backupPolicies", "configure"],
+    operationId: "storageVolumes.backupPolicies.configure",
+    kind: "command",
+    domain: "storage-volumes",
+    messageName: "ConfigureStorageVolumeBackupPolicyCommand",
+    route: {
+      method: "POST",
+      path: "/storage-volumes/backup-policies",
+    },
+    docsHref: "/docs/resources/storage-volumes/#storage-volume-backup-restore",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "storage-volumes.backup-policies.list",
+    operationGroup: "storage-volumes",
+    operationMethod: "backupPoliciesList",
+    facadePath: ["storageVolumes", "backupPolicies", "list"],
+    operationId: "storageVolumes.backupPolicies.list",
+    kind: "query",
+    domain: "storage-volumes",
+    messageName: "ListStorageVolumeBackupPoliciesQuery",
+    route: {
+      method: "GET",
+      path: "/storage-volumes/backup-policies",
+    },
+    docsHref: "/docs/resources/storage-volumes/#storage-volume-backup-restore",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "storage-volumes.backup-policies.show",
+    operationGroup: "storage-volumes",
+    operationMethod: "backupPoliciesShow",
+    facadePath: ["storageVolumes", "backupPolicies", "show"],
+    operationId: "storageVolumes.backupPolicies.show",
+    kind: "query",
+    domain: "storage-volumes",
+    messageName: "ShowStorageVolumeBackupPolicyQuery",
+    route: {
+      method: "GET",
+      path: "/storage-volumes/backup-policies/{policyId}",
+    },
+    docsHref: "/docs/resources/storage-volumes/#storage-volume-backup-restore",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
     operationKey: "storage-volumes.cleanup-runtime",
     operationGroup: "storage-volumes",
     operationMethod: "cleanupRuntime",
@@ -6038,6 +6228,82 @@ export const generatedSdkOperations = [
     streaming: false,
     facadeDefault: true,
   },
+  {
+    operationKey: "tunnels.list",
+    operationGroup: "tunnels",
+    operationMethod: "list",
+    facadePath: ["tunnels", "list"],
+    operationId: "tunnels.list",
+    kind: "query",
+    domain: "tunnels",
+    messageName: "ListTunnelSessionsQuery",
+    route: {
+      method: "GET",
+      path: "/tunnels",
+    },
+    docsHref: "/docs/self-hosting/advanced/#advanced-control-plane-modes",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "tunnels.revoke",
+    operationGroup: "tunnels",
+    operationMethod: "revoke",
+    facadePath: ["tunnels", "revoke"],
+    operationId: "tunnels.revoke",
+    kind: "command",
+    domain: "tunnels",
+    messageName: "RevokeTunnelSessionCommand",
+    route: {
+      method: "DELETE",
+      path: "/tunnels/{sessionId}",
+    },
+    docsHref: "/docs/self-hosting/advanced/#advanced-control-plane-modes",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "tunnels.show",
+    operationGroup: "tunnels",
+    operationMethod: "show",
+    facadePath: ["tunnels", "show"],
+    operationId: "tunnels.show",
+    kind: "query",
+    domain: "tunnels",
+    messageName: "ShowTunnelSessionQuery",
+    route: {
+      method: "GET",
+      path: "/tunnels/{sessionId}",
+    },
+    docsHref: "/docs/self-hosting/advanced/#advanced-control-plane-modes",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "tunnels.start",
+    operationGroup: "tunnels",
+    operationMethod: "start",
+    facadePath: ["tunnels", "start"],
+    operationId: "tunnels.start",
+    kind: "command",
+    domain: "tunnels",
+    messageName: "StartTunnelCommand",
+    route: {
+      method: "POST",
+      path: "/tunnels",
+    },
+    docsHref: "/docs/self-hosting/advanced/#advanced-control-plane-modes",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
 ] as const satisfies readonly SdkOperationDescriptor[];
 
 export interface GeneratedAppaloftClient {
@@ -6118,6 +6384,17 @@ export interface GeneratedAppaloftClient {
     readonly status: {
       readonly show: AppaloftSdkFacadeMethod;
     };
+  };
+  readonly controlPlanePortability: {
+    readonly artifacts: {
+      readonly delete: AppaloftSdkFacadeMethod;
+      readonly list: AppaloftSdkFacadeMethod;
+      readonly show: AppaloftSdkFacadeMethod;
+    };
+    readonly export: AppaloftSdkFacadeMethod;
+    readonly exportPlan: AppaloftSdkFacadeMethod;
+    readonly import: AppaloftSdkFacadeMethod;
+    readonly importPlan: AppaloftSdkFacadeMethod;
   };
   readonly credentials: {
     readonly createSsh: AppaloftSdkFacadeMethod;
@@ -6466,6 +6743,11 @@ export interface GeneratedAppaloftClient {
   };
   readonly storageVolumes: {
     readonly backupPlan: AppaloftSdkFacadeMethod;
+    readonly backupPolicies: {
+      readonly configure: AppaloftSdkFacadeMethod;
+      readonly list: AppaloftSdkFacadeMethod;
+      readonly show: AppaloftSdkFacadeMethod;
+    };
     readonly cleanupRuntime: AppaloftSdkFacadeMethod;
     readonly create: AppaloftSdkFacadeMethod;
     readonly createBackup: AppaloftSdkFacadeMethod;
@@ -6507,5 +6789,11 @@ export interface GeneratedAppaloftClient {
     readonly list: AppaloftSdkFacadeMethod;
     readonly open: AppaloftSdkFacadeMethod;
     readonly show: AppaloftSdkFacadeMethod;
+  };
+  readonly tunnels: {
+    readonly list: AppaloftSdkFacadeMethod;
+    readonly revoke: AppaloftSdkFacadeMethod;
+    readonly show: AppaloftSdkFacadeMethod;
+    readonly start: AppaloftSdkFacadeMethod;
   };
 }
