@@ -44,6 +44,9 @@
 - Read-your-own-write: create returns the persisted Sandbox descriptor in requested/provisioning
   state; show/events reveal later provider state.
 - Provider reconciliation and event consumers are idempotent by Sandbox id plus attempt id.
+- Provider orphan reconciliation enumerates only runtimes carrying the exact provider-owned
+  `ownerScope` label, compares them with tenant-scoped persisted handles, and deletes an unmatched
+  runtime only through a second ownership-checked provider operation.
 
 ## Persistence And Migration
 

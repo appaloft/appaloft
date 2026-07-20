@@ -21,6 +21,11 @@
 - [ ] Add live process/event attach and credential-broker operations as compatible follow-ups; the
   current bounded frame/readback surface does not claim streaming or secret injection.
 - [x] Implement durable provider attempts, expiry and reconciliation.
+- [x] `SBX-RECONCILE-001`: add provider-owned runtime inventory, persisted-handle comparison and
+  exact orphan removal tests/implementation.
+- [ ] `SBX-STREAM-001`: persist Sandbox lifecycle/process events and expose bounded replay/live SSE.
+- [ ] `SBX-SECRET-001`: add grant/revoke/list plus destination-bound broker request operations;
+  prove plaintext absence across state, output, errors, audit and snapshot.
 
 ## Persistence And Providers
 
