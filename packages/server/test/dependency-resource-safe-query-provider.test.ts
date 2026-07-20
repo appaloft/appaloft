@@ -11,8 +11,10 @@ import { type DomainError, err, ok, type Result } from "@appaloft/core";
 
 import {
   type DependencyResourcePostgresQueryExecutor,
+  dependencyResourceSafeQueryConnectTimeoutSeconds,
   type ManagedDependencyResourcePostgresQueryExecutor,
   PostgresDependencyResourceSafeQueryProvider,
+  PostgresJsDependencyResourceQueryExecutor,
 } from "../src/dependency-resource-safe-query-provider";
 
 const context = createExecutionContext({
@@ -83,6 +85,30 @@ class CapturingPostgresExecutor implements DependencyResourcePostgresQueryExecut
 }
 
 describe("PostgresDependencyResourceSafeQueryProvider", () => {
+  test("[DEP-SAFE-QRY-009] bounds external connection setup below the HTTP gateway deadline", () => {
+    expect(dependencyResourceSafeQueryConnectTimeoutSeconds(500)).toBe(1);
+    expect(dependencyResourceSafeQueryConnectTimeoutSeconds(5_000)).toBe(3);
+    expect(dependencyResourceSafeQueryConnectTimeoutSeconds(30_000)).toBe(3);
+  });
+
+  test("[DEP-SAFE-QRY-010] returns a redacted provider error when connection setup throws", async () => {
+    const executor = new PostgresJsDependencyResourceQueryExecutor();
+    const result = await executor.execute({
+      connectionUrl: "not-a-postgres-url",
+      statement: "select 1",
+      maxRows: 10,
+      timeoutMs: 5_000,
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "provider_error",
+      retryable: true,
+      details: { phase: "dependency-resource-safe-query-postgres" },
+    });
+    expect(JSON.stringify(result._unsafeUnwrapErr())).not.toContain("not-a-postgres-url");
+  });
+
   test("[DEP-SAFE-QRY-005] resolves an Appaloft secret reference and executes a bounded query", async () => {
     const secretStore = new CapturingSecretStore();
     const executor = new CapturingPostgresExecutor();

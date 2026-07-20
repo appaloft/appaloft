@@ -11,6 +11,7 @@ import { type DomainError, domainError, err, ok, type Result } from "@appaloft/c
 import postgres from "postgres";
 
 const maximumResultBytes = 1_048_576;
+const maximumConnectTimeoutSeconds = 3;
 
 type SafeQueryScalar = string | number | boolean | null;
 
@@ -115,20 +116,25 @@ function normalizedStatement(statement: string): string {
   return statement.trim().replace(/;\s*$/u, "");
 }
 
+export function dependencyResourceSafeQueryConnectTimeoutSeconds(timeoutMs: number): number {
+  return Math.min(maximumConnectTimeoutSeconds, Math.max(1, Math.ceil(timeoutMs / 1_000)));
+}
+
 export class PostgresJsDependencyResourceQueryExecutor
   implements DependencyResourcePostgresQueryExecutor
 {
   async execute(
     input: DependencyResourcePostgresQueryExecutorInput,
   ): Promise<Result<DependencyResourcePostgresQueryExecutionResult, DomainError>> {
-    const sql = postgres(input.connectionUrl, {
-      connect_timeout: Math.max(1, Math.ceil(input.timeoutMs / 1_000)),
-      idle_timeout: 1,
-      max: 1,
-      max_lifetime: Math.max(1, Math.ceil(input.timeoutMs / 1_000) + 1),
-      prepare: false,
-    });
+    let sql: ReturnType<typeof postgres> | undefined;
     try {
+      sql = postgres(input.connectionUrl, {
+        connect_timeout: dependencyResourceSafeQueryConnectTimeoutSeconds(input.timeoutMs),
+        idle_timeout: 1,
+        max: 1,
+        max_lifetime: Math.max(1, Math.ceil(input.timeoutMs / 1_000) + 1),
+        prepare: false,
+      });
       const result = await sql.begin("read only", async (transaction) => {
         await transaction.unsafe(`SET LOCAL statement_timeout = ${input.timeoutMs}`);
         return await transaction.unsafe<Record<string, unknown>[]>(
@@ -147,7 +153,7 @@ export class PostgresJsDependencyResourceQueryExecutor
     } catch (cause) {
       return err(safeQueryProviderError(cause));
     } finally {
-      await sql.end({ timeout: 1 }).catch(() => undefined);
+      await sql?.end({ timeout: 1 }).catch(() => undefined);
     }
   }
 }
