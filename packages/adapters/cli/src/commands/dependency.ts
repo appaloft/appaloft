@@ -14,6 +14,7 @@ import {
   QueryDependencyResourceQuery,
   RenameDependencyResourceCommand,
   RestoreDependencyResourceBackupCommand,
+  RotateDependencyResourceConnectionCommand,
   ShowDependencyResourceBackupPolicyQuery,
   ShowDependencyResourceBackupQuery,
   ShowDependencyResourceProvisioningPlanQuery,
@@ -310,6 +311,36 @@ const importCommand = EffectCommand.make(
   },
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.dependencyImport));
 
+const rotateConnectionCommand = EffectCommand.make(
+  "rotate-connection",
+  {
+    dependencyResourceId: dependencyResourceIdArg,
+    connectionUrl: optionalConnectionUrlOption,
+    connectionUrlStdin: connectionUrlStdinOption,
+  },
+  ({ connectionUrl, connectionUrlStdin, dependencyResourceId }) => {
+    const connectionUrlValue = optionalValue(connectionUrl);
+    return Effect.gen(function* () {
+      const cli = yield* CliRuntime;
+      const resolvedConnectionUrl = yield* resultToEffect(
+        yield* Effect.promise(() =>
+          resolveDependencyConnectionUrl({
+            stdin: connectionUrlStdin,
+            ...(connectionUrlValue ? { value: connectionUrlValue } : {}),
+            readStdin: cli.readStdinText ?? readDependencyConnectionUrlStdin,
+          }),
+        ),
+      );
+      yield* runCommand(
+        RotateDependencyResourceConnectionCommand.create({
+          dependencyResourceId,
+          connectionUrl: resolvedConnectionUrl,
+        }),
+      );
+    });
+  },
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.dependencyRotateConnection));
+
 const listCommand = EffectCommand.make(
   "list",
   {
@@ -532,6 +563,7 @@ export const dependencyCommand = EffectCommand.make("dependency").pipe(
     statusCommand,
     provisionCommand,
     importCommand,
+    rotateConnectionCommand,
     backupCommand,
     listCommand,
     showCommand,

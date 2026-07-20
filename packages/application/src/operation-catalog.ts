@@ -82,6 +82,7 @@ import { provisionDependencyResourceCommandInputSchema } from "./operations/depe
 import { queryDependencyResourceQueryInputSchema } from "./operations/dependency-resources/query-dependency-resource.query";
 import { renameDependencyResourceCommandInputSchema } from "./operations/dependency-resources/rename-dependency-resource.command";
 import { restoreDependencyResourceBackupCommandInputSchema } from "./operations/dependency-resources/restore-dependency-resource-backup.command";
+import { rotateDependencyResourceConnectionCommandInputSchema } from "./operations/dependency-resources/rotate-dependency-resource-connection.command";
 import { showDependencyResourceQueryInputSchema } from "./operations/dependency-resources/show-dependency-resource.query";
 import { showDependencyResourceBackupQueryInputSchema } from "./operations/dependency-resources/show-dependency-resource-backup.query";
 import { showDependencyResourceBackupPolicyQueryInputSchema } from "./operations/dependency-resources/show-dependency-resource-backup-policy.query";
@@ -2279,6 +2280,23 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft dependency import --kind <kind>",
       orpc: { method: "POST", path: "/api/dependency-resources/import" },
+    },
+  },
+  {
+    key: "dependency-resources.rotate-connection",
+    kind: "command",
+    domain: "dependency-resources",
+    messageName: "RotateDependencyResourceConnectionCommand",
+    handlerName: "RotateDependencyResourceConnectionCommandHandler",
+    serviceName: "RotateDependencyResourceConnectionUseCase",
+    inputSchema: rotateDependencyResourceConnectionCommandInputSchema,
+    serviceToken: tokens.rotateDependencyResourceConnectionUseCase,
+    transports: {
+      cli: "appaloft dependency rotate-connection <dependencyResourceId> --connection-url-stdin",
+      orpc: {
+        method: "POST",
+        path: "/api/dependency-resources/{dependencyResourceId}/connection",
+      },
     },
   },
   {

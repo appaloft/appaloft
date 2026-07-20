@@ -867,6 +867,48 @@ export class ResourceInstance extends AggregateRoot<ResourceInstanceState> {
     return ok(undefined);
   }
 
+  rotateImportedConnection(input: {
+    endpoint: DependencyResourceEndpointInput;
+    connectionSecretRef: DependencyResourceSecretRef;
+    rotatedAt: UpdatedAt;
+  }): Result<void> {
+    if (this.state.providerManaged || this.state.sourceMode?.value !== "imported-external") {
+      return err(
+        dependencyResourceValidationError(
+          "Only imported external dependency connections can be rotated",
+          {
+            dependencyResourceId: this.state.id.value,
+            sourceMode: this.state.sourceMode?.value ?? "unknown",
+          },
+        ),
+      );
+    }
+    if (this.state.status.value === "deleted") {
+      return err(
+        dependencyResourceValidationError("Deleted dependency resources cannot be rotated", {
+          dependencyResourceId: this.state.id.value,
+        }),
+      );
+    }
+    const endpoint = createEndpointState(input.endpoint);
+    if (endpoint.isErr()) return err(endpoint.error);
+
+    if (this.state.kind.value === "redis") {
+      this.state.redisEndpoint = endpoint.value;
+    } else {
+      this.state.postgresEndpoint = endpoint.value;
+    }
+    this.state.connectionSecretRef = input.connectionSecretRef;
+    this.recordDomainEvent("dependency-resource-connection-rotated", input.rotatedAt, {
+      dependencyResourceId: this.state.id.value,
+      ...(this.state.projectId ? { projectId: this.state.projectId.value } : {}),
+      ...(this.state.environmentId ? { environmentId: this.state.environmentId.value } : {}),
+      kind: this.state.kind.value,
+      rotatedAt: input.rotatedAt.value,
+    });
+    return ok(undefined);
+  }
+
   markProviderRealized(input: {
     attemptId: DependencyResourceProviderRealizationAttemptId;
     providerResourceHandle: DependencyResourceProviderResourceHandle;

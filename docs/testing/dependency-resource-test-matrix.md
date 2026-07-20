@@ -6,6 +6,7 @@ This matrix covers the Phase 7 dependency resource lifecycle baseline:
 
 - `dependency-resources.provision`
 - `dependency-resources.import`
+- `dependency-resources.rotate-connection`
 - `dependency-resources.list`
 - `dependency-resources.show`
 - `dependency-resources.rename`
@@ -22,8 +23,8 @@ This matrix covers the Phase 7 dependency resource lifecycle baseline:
 - dependency resource backup/restore scenarios
 - dependency resource scheduled backup policy scenarios
 
-It does not cover provider-native credential rotation, runtime cleanup, backup prune/delete, or
-backup export.
+It covers replacement of Appaloft-stored imported connection material. It does not cover mutation
+of provider-native credentials, runtime cleanup, backup prune/delete, or backup export.
 
 ## Global References
 
@@ -65,6 +66,10 @@ backup export.
 | DEP-RES-PG-PROVISION-001 | `dependency-resources.provision` | Core/application | Provision managed Postgres record. | Persists Appaloft-managed `postgres` ResourceInstance, emits creation event, and performs no provider-native database action. | `packages/core/test/postgres-dependency-resource.test.ts`; `packages/application/test/postgres-dependency-resource-lifecycle.test.ts` |
 | DEP-RES-PG-IMPORT-001 | `dependency-resources.import` | Application | Import external Postgres. | Persists imported-external Postgres with connection secret boundary and masked read model. | `packages/application/test/postgres-dependency-resource-lifecycle.test.ts` |
 | DEP-RES-PG-IMPORT-CLI-001 | `dependency-resources.import` | Shell/CLI integration | Remote import receives `--connection-url-stdin` from an owner-readable regular file or pipe. | The shell captures standard input before parser/runtime initialization, sends the exact connection URL only in the typed remote request body, and does not expose it in argv, stdout, stderr, diagnostics, or logs; empty input still fails validation. | `apps/shell/test/run-control-plane-cli.test.ts`; `packages/adapters/cli/test/control-plane-client.test.ts` |
+| DEP-RES-CONNECTION-ROTATE-001 | `dependency-resources.rotate-connection` | Core/application | Rotate one active imported dependency connection. | Protected value and masked endpoint change behind the stable resource id/ref; bindings remain unchanged and a safe event follows persistence. | `packages/application/test/postgres-dependency-resource-lifecycle.test.ts` |
+| DEP-RES-CONNECTION-ROTATE-002 | `dependency-resources.rotate-connection` | Core/application | Rotate a missing, managed or deleted dependency. | Fails before secret storage with no provider/runtime/deployment mutation. | `packages/application/test/postgres-dependency-resource-lifecycle.test.ts` |
+| DEP-RES-CONNECTION-ROTATE-003 | `dependency-resources.rotate-connection` | Shell/CLI integration | Remote rotation receives `--connection-url-stdin`. | Exact connection material exists only in the typed request body and is absent from argv, stdout, stderr, diagnostics and logs. | `packages/adapters/cli/test/dependency-command.test.ts`; `apps/shell/test/run-control-plane-cli.test.ts` |
+| DEP-RES-CONNECTION-ROTATE-004 | `dependency-resources.rotate-connection` | HTTP/oRPC | Typed API rotation request is accepted. | Dispatches the explicit command and returns only the safe id. | `packages/orpc/test/dependency-resource.http.test.ts` |
 | DEP-RES-PG-VALIDATION-001 | `dependency-resources.provision`; `dependency-resources.import` | Core/application | Invalid name/slug/endpoint/connection metadata. | Returns `validation_error`, `phase = dependency-resource-validation`, no mutation. | `packages/core/test/postgres-dependency-resource.test.ts`; `packages/application/test/postgres-dependency-resource-lifecycle.test.ts` |
 | DEP-RES-PG-READ-001 | `dependency-resources.list`; `dependency-resources.show` | Query/read model | Managed and imported resources exist. | Returns safe ownership, status, exposure, binding readiness, and backup relationship summaries. | `packages/application/test/postgres-dependency-resource-lifecycle.test.ts`; `packages/persistence/pg/test/dependency-resource.pglite.test.ts` |
 | DEP-RES-PG-READ-002 | `dependency-resources.list`; `dependency-resources.show` | Query/read model | Raw connection secret was provided at import. | No raw password, token, auth header, cookie, SSH credential, provider token, private key, or sensitive query appears in output. | `packages/application/test/postgres-dependency-resource-lifecycle.test.ts`; `packages/persistence/pg/test/dependency-resource.pglite.test.ts` |

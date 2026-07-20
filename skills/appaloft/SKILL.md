@@ -124,9 +124,11 @@ surface available in the session.
   deleting them manually.
 - Add access: use default access policy, domain binding, certificate, and route configuration
   operations rather than editing proxy/provider state by hand.
-- Manage backing services: use dependency-resource provision/import/inspect/query/backup/restore
-  and resource dependency binding operations; do not inject raw connection strings into chat
-  output. Dependency query is allowlisted read-only inspection, not a database mutation escape hatch.
+- Manage backing services: use dependency-resource provision/import/rotate-connection/inspect/query/
+  backup/restore and resource dependency binding operations; do not inject raw connection strings
+  into chat output. Pass imported connection replacements through `--connection-url-stdin` and do
+  not delete/recreate a dependency merely to change its Appaloft-stored credential. Dependency query
+  is allowlisted read-only inspection, not a database mutation escape hatch.
 - Observe and administer: use runtime usage, monitoring, operator work, audit events, retention,
   deploy tokens, organization, auth bootstrap, provider/plugin, upgrade, and database commands.
 - MCP-enabled session: prefer MCP tool calls for precise operation input/output, use MCP resources

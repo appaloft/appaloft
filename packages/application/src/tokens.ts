@@ -439,6 +439,9 @@ export const tokens = {
   ),
   provisionDependencyResourceUseCase: Symbol.for("appaloft.provision_dependency_resource_use_case"),
   importDependencyResourceUseCase: Symbol.for("appaloft.import_dependency_resource_use_case"),
+  rotateDependencyResourceConnectionUseCase: Symbol.for(
+    "appaloft.rotate_dependency_resource_connection_use_case",
+  ),
   renameDependencyResourceUseCase: Symbol.for("appaloft.rename_dependency_resource_use_case"),
   deleteDependencyResourceUseCase: Symbol.for("appaloft.delete_dependency_resource_use_case"),
   managedDependencyProvider: Symbol.for("appaloft.managed_dependency_provider"),
