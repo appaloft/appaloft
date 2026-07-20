@@ -8,6 +8,7 @@ import {
   type HealthFetch,
   type HttpHealthCheckOptions,
 } from "../src/ssh-execution";
+import { selectPublicHealthRoute } from "../src/public-health-route";
 
 const baseOptions: HttpHealthCheckOptions = {
   method: "GET",
@@ -19,6 +20,28 @@ const baseOptions: HttpHealthCheckOptions = {
 };
 
 describe("public route health checks", () => {
+  test("[ROUTE-TLS-ENTRY-023] selects the route owned by the resource health target service", () => {
+    const route = selectPublicHealthRoute(
+      [
+        { pathPrefix: "/v1", targetServiceName: "api" },
+        { pathPrefix: "/api", targetServiceName: "api" },
+        { pathPrefix: "/", targetServiceName: "web" },
+      ],
+      "web",
+    );
+
+    expect(route).toEqual({ pathPrefix: "/", targetServiceName: "web" });
+  });
+
+  test("[ROUTE-TLS-ENTRY-023] falls back to the root served route for legacy route snapshots", () => {
+    const route = selectPublicHealthRoute(
+      [{ pathPrefix: "/v1" }, { pathPrefix: "/api" }, { pathPrefix: "/" }],
+      "web",
+    );
+
+    expect(route).toEqual({ pathPrefix: "/" });
+  });
+
   test("[SSH-DOCKER-HEALTH-001] renders Docker network IP lookup for SSH internal health", () => {
     expect(
       dockerContainerNetworkIpCommand({

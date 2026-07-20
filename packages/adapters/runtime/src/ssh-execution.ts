@@ -111,6 +111,7 @@ import {
   withRemoteRuntimeEnvironmentFile,
 } from "./ssh-runtime-env-file";
 import { createPreviewRuntimeArtifactCleanupPlan } from "./preview-artifact-cleanup";
+import { selectPublicHealthRoute } from "./public-health-route";
 import {
   dockerStorageMountsFromRuntimeMetadata,
   dockerStorageVolumeRealizationsFromRuntimeMetadata,
@@ -2935,10 +2936,20 @@ export class SshExecutionBackend implements ExecutionBackend {
           );
         }
       }
-      const publicRouteHealthChecks = accessRoutes.map((route) => ({
-        route,
-        url: publicHealthUrl({ route, healthPath, publicHost: target.publicHost, port }),
-      }));
+      const publicHealthRoute = selectPublicHealthRoute(accessRoutes);
+      const publicRouteHealthChecks = publicHealthRoute
+        ? [
+            {
+              route: publicHealthRoute,
+              url: publicHealthUrl({
+                route: publicHealthRoute,
+                healthPath,
+                publicHost: target.publicHost,
+                port,
+              }),
+            },
+          ]
+        : [];
       const routeConflictCleanupCommand = !usesDirectHostPort
         ? dockerRemoveConflictingRouteContainersCommand({
             deploymentId: state.id.value,
@@ -4184,7 +4195,8 @@ export class SshExecutionBackend implements ExecutionBackend {
           });
         }
 
-        for (const route of accessRoutes) {
+        const publicHealthRoute = selectPublicHealthRoute(accessRoutes, targetServiceName);
+        for (const route of publicHealthRoute ? [publicHealthRoute] : []) {
           const publicUrl = publicHealthUrl({ route, healthPath, publicHost: target.publicHost, port: port ?? 80 });
           const publicHealth = await waitForHealth(publicUrl, {
             ...healthOptions,
