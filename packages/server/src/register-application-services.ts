@@ -3,7 +3,6 @@ import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { mkdir, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-
 import {
   AcceptBlueprintInstallCommandHandler,
   AcceptConnectorCapabilityPlanCommandHandler,
@@ -623,6 +622,7 @@ import {
   UpsertGitHubAppInstallationCommandHandler,
   UpsertGitHubAppInstallationUseCase,
 } from "@appaloft/application";
+import { type AshScript, ash } from "@appaloft/ash";
 import {
   DeploymentTargetByIdSpec,
   DeploymentTargetId,
@@ -1045,7 +1045,9 @@ export class ShellManagedDependencyProvider implements ManagedDependencyProvider
         input.kind === "postgres"
           ? dockerManagedPostgresRealizationSpec(input, container, volume)
           : dockerManagedRedisRealizationSpec(input, container, volume);
-      const result = await runManagedDependencyTargetCommand(input.target, spec.command);
+      const result = await runManagedDependencyTargetCommand(input.target, spec.command, {
+        stdin: spec.stdin,
+      });
       if (result.exitCode !== 0) {
         return managedDependencyDockerCommandFailure({
           message: `Docker-backed managed ${input.kind} realization failed`,
@@ -1153,13 +1155,13 @@ export class ShellManagedDependencyProvider implements ManagedDependencyProvider
       }
       const result = await runManagedDependencyTargetCommand(
         target.value,
-        [
-          "set -eu",
-          `docker rm -f ${shellQuote(dockerHandle.containerName)} >/dev/null 2>&1 || true`,
-          `docker volume rm ${shellQuote(
+        ash`
+          set -eu
+          docker rm -f ${ash.arg(dockerHandle.containerName)} >/dev/null 2>&1 || true
+          docker volume rm ${ash.arg(
             dockerManagedDependencyVolumeName(dockerHandle.containerName),
-          )} >/dev/null 2>&1 || true`,
-        ].join("\n"),
+          )} >/dev/null 2>&1 || true
+        `,
       );
       if (result.exitCode !== 0) {
         return managedDependencyDockerCommandFailure({
@@ -1282,7 +1284,8 @@ interface DockerManagedDependencyBackupHandle extends DockerManagedDependencyHan
 }
 
 interface DockerManagedDependencyRealizationSpec {
-  command: string;
+  command: AshScript;
+  stdin: Uint8Array;
   endpoint: ManagedDependencyRealizationResult["endpoint"];
   connectionSecretValue: string;
 }
@@ -1364,6 +1367,17 @@ function dockerManagedDependencyBackupPath(input: DockerManagedDependencyBackupH
   )}/${safeDockerToken(input.backupId)}.${extension}`;
 }
 
+function renderManagedDependencyBackupPathSetup(path: string): AshScript {
+  const homePrefix = "$HOME/";
+  if (!path.startsWith(homePrefix)) {
+    throw new TypeError("Managed dependency backup path must be rooted below $HOME");
+  }
+  return ash`
+    ${ash.env("APPALOFT_DEPENDENCY_BACKUP_RELATIVE_PATH", path.slice(homePrefix.length))}
+    APPALOFT_DEPENDENCY_BACKUP_PATH="$HOME/$APPALOFT_DEPENDENCY_BACKUP_RELATIVE_PATH"
+  `;
+}
+
 function safeDockerToken(input: string): string {
   const normalized = input
     .toLowerCase()
@@ -1394,34 +1408,6 @@ function randomManagedDependencyPassword(): string {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-function dockerNetworkEnsureCommand(): string {
-  return `docker network inspect ${shellQuote(dockerManagedDependencyNetworkName)} >/dev/null 2>&1 || docker network create ${shellQuote(
-    dockerManagedDependencyNetworkName,
-  )}`;
-}
-
-function dockerManagedDependencyVolumeCreateCommand(
-  volumeName: string,
-  dependencyResourceId: string,
-): string {
-  return `docker volume create --label ${shellQuote(
-    "appaloft.managed=dependency-resource",
-  )} --label ${shellQuote(
-    `appaloft.dependency-resource-id=${dependencyResourceId}`,
-  )} ${shellQuote(volumeName)} >/dev/null`;
-}
-
-function dockerManagedDependencyLabels(dependencyResourceId: string): string {
-  return [
-    `--label ${shellQuote("appaloft.managed=dependency-resource")}`,
-    `--label ${shellQuote(`appaloft.dependency-resource-id=${dependencyResourceId}`)}`,
-  ].join(" ");
-}
-
-function dockerManagedDependencyRemoveContainerCommand(containerName: string): string {
-  return `docker rm -f ${shellQuote(containerName)} >/dev/null 2>&1 || true`;
-}
-
 function dockerManagedPostgresRealizationSpec(
   input: ManagedDependencyRealizationInput,
   containerName: string,
@@ -1440,35 +1426,45 @@ function dockerManagedPostgresRealizationSpec(
       maskedConnection: `postgres://${user}:********@${containerName}:5432/${databaseName}`,
     },
     connectionSecretValue,
-    command: [
-      "set -eu",
-      dockerNetworkEnsureCommand(),
-      dockerManagedDependencyVolumeCreateCommand(volumeName, input.dependencyResourceId),
-      dockerManagedDependencyRemoveContainerCommand(containerName),
-      [
-        "docker run -d",
-        `--name ${shellQuote(containerName)}`,
-        `--network ${shellQuote(dockerManagedDependencyNetworkName)}`,
-        "--restart unless-stopped",
-        dockerManagedDependencyLabels(input.dependencyResourceId),
-        `-e ${shellQuote(`POSTGRES_DB=${databaseName}`)}`,
-        `-e ${shellQuote(`POSTGRES_USER=${user}`)}`,
-        `-e ${shellQuote(`POSTGRES_PASSWORD=${password}`)}`,
-        `-v ${shellQuote(`${volumeName}:/var/lib/postgresql/data`)}`,
-        "postgres:16-alpine",
-      ].join(" "),
-      [
-        "for attempt in $(seq 1 60); do",
-        `  if PGPASSWORD=${shellQuote(password)} docker exec -e PGPASSWORD ${shellQuote(
-          containerName,
-        )} pg_isready -U ${shellQuote(user)} -d ${shellQuote(databaseName)} >/dev/null 2>&1; then`,
-        "    exit 0",
-        "  fi",
-        "  sleep 1",
-        "done",
-        "exit 1",
-      ].join("\n"),
-    ].join("\n"),
+    stdin: Buffer.from(`${password}\n`, "utf8"),
+    command: ash`
+      set -eu
+      IFS= read -r APPALOFT_MANAGED_DEPENDENCY_PASSWORD
+      docker network inspect ${ash.arg(dockerManagedDependencyNetworkName)} >/dev/null 2>&1 || docker network create ${ash.arg(dockerManagedDependencyNetworkName)}
+      docker volume create ${ash.list([
+        "--label",
+        "appaloft.managed=dependency-resource",
+        "--label",
+        `appaloft.dependency-resource-id=${input.dependencyResourceId}`,
+        volumeName,
+      ])} >/dev/null
+      docker rm -f ${ash.arg(containerName)} >/dev/null 2>&1 || true
+      docker run -d ${ash.list([
+        "--name",
+        containerName,
+        "--network",
+        dockerManagedDependencyNetworkName,
+        "--restart",
+        "unless-stopped",
+        "--label",
+        "appaloft.managed=dependency-resource",
+        "--label",
+        `appaloft.dependency-resource-id=${input.dependencyResourceId}`,
+        "-e",
+        `POSTGRES_DB=${databaseName}`,
+        "-e",
+        `POSTGRES_USER=${user}`,
+        "-v",
+        `${volumeName}:/var/lib/postgresql/data`,
+      ])} -e "POSTGRES_PASSWORD=$APPALOFT_MANAGED_DEPENDENCY_PASSWORD" postgres:16-alpine
+      for attempt in $(seq 1 60); do
+        if PGPASSWORD="$APPALOFT_MANAGED_DEPENDENCY_PASSWORD" docker exec -e PGPASSWORD ${ash.arg(containerName)} pg_isready -U ${ash.arg(user)} -d ${ash.arg(databaseName)} >/dev/null 2>&1; then
+          exit 0
+        fi
+        sleep 1
+      done
+      exit 1
+    `,
   };
 }
 
@@ -1480,7 +1476,7 @@ async function recoverExistingDockerManagedPostgresRealization(input: {
 }): Promise<ManagedDependencyRealizationResult | undefined> {
   const inspected = await runManagedDependencyTargetCommand(
     input.target,
-    `docker inspect --format ${shellQuote("{{range .Config.Env}}{{println .}}{{end}}")} ${shellQuote(input.containerName)}`,
+    ash`docker inspect --format ${ash.arg("{{range .Config.Env}}{{println .}}{{end}}")} ${ash.arg(input.containerName)}`,
   );
   if (inspected.exitCode !== 0) {
     return undefined;
@@ -1536,35 +1532,45 @@ function dockerManagedRedisRealizationSpec(
       maskedConnection: `redis://:********@${containerName}:6379/0`,
     },
     connectionSecretValue,
-    command: [
-      "set -eu",
-      dockerNetworkEnsureCommand(),
-      dockerManagedDependencyVolumeCreateCommand(volumeName, input.dependencyResourceId),
-      dockerManagedDependencyRemoveContainerCommand(containerName),
-      [
-        "docker run -d",
-        `--name ${shellQuote(containerName)}`,
-        `--network ${shellQuote(dockerManagedDependencyNetworkName)}`,
-        "--restart unless-stopped",
-        dockerManagedDependencyLabels(input.dependencyResourceId),
-        `-v ${shellQuote(`${volumeName}:/data`)}`,
+    stdin: Buffer.from(`${password}\n`, "utf8"),
+    command: ash`
+      set -eu
+      IFS= read -r APPALOFT_MANAGED_DEPENDENCY_PASSWORD
+      docker network inspect ${ash.arg(dockerManagedDependencyNetworkName)} >/dev/null 2>&1 || docker network create ${ash.arg(dockerManagedDependencyNetworkName)}
+      docker volume create ${ash.list([
+        "--label",
+        "appaloft.managed=dependency-resource",
+        "--label",
+        `appaloft.dependency-resource-id=${input.dependencyResourceId}`,
+        volumeName,
+      ])} >/dev/null
+      docker rm -f ${ash.arg(containerName)} >/dev/null 2>&1 || true
+      docker run -d ${ash.list([
+        "--name",
+        containerName,
+        "--network",
+        dockerManagedDependencyNetworkName,
+        "--restart",
+        "unless-stopped",
+        "--label",
+        "appaloft.managed=dependency-resource",
+        "--label",
+        `appaloft.dependency-resource-id=${input.dependencyResourceId}`,
+        "-v",
+        `${volumeName}:/data`,
         "redis:7-alpine",
         "redis-server",
-        "--appendonly yes",
-        `--requirepass ${shellQuote(password)}`,
-      ].join(" "),
-      [
-        "for attempt in $(seq 1 60); do",
-        `  if docker exec ${shellQuote(containerName)} redis-cli -a ${shellQuote(
-          password,
-        )} ping 2>/dev/null | grep -q PONG; then`,
-        "    exit 0",
-        "  fi",
-        "  sleep 1",
-        "done",
-        "exit 1",
-      ].join("\n"),
-    ].join("\n"),
+        "--appendonly",
+        "yes",
+      ])} --requirepass "$APPALOFT_MANAGED_DEPENDENCY_PASSWORD"
+      for attempt in $(seq 1 60); do
+        if docker exec ${ash.arg(containerName)} redis-cli -a "$APPALOFT_MANAGED_DEPENDENCY_PASSWORD" ping 2>/dev/null | grep -q PONG; then
+          exit 0
+        fi
+        sleep 1
+      done
+      exit 1
+    `,
   };
 }
 
@@ -1656,11 +1662,12 @@ async function resolveManagedDependencySingleServerTarget(input: {
 
 async function runManagedDependencyTargetCommand(
   target: ManagedDependencySingleServerTarget,
-  command: string,
+  command: AshScript,
   options: { stdin?: Uint8Array } = {},
 ): Promise<ManagedDependencyCommandResult> {
+  const renderedCommand = ash.render(command);
   if (target.providerKey === "local-shell") {
-    return spawnManagedDependencyCommand(["sh", "-lc", command], options);
+    return spawnManagedDependencyCommand(["sh", "-lc", renderedCommand], options);
   }
 
   const identity = target.privateKey ? writeSshIdentityFile(target.privateKey) : undefined;
@@ -1670,7 +1677,7 @@ async function runManagedDependencyTargetCommand(
         "ssh",
         ...sshManagedDependencyArgs({
           target,
-          remoteCommand: command,
+          remoteCommand: renderedCommand,
           ...(identity ? { identityFile: identity.identityFile } : {}),
         }),
       ],
@@ -1745,19 +1752,6 @@ function sshManagedDependencyArgs(input: {
 
 function hostWithUsername(host: string, username?: string): string {
   return username && !host.includes("@") ? `${username}@${host}` : host;
-}
-
-function shellQuote(input: string): string {
-  return `'${input.replaceAll("'", "'\\''")}'`;
-}
-
-function shellQuotePath(input: string): string {
-  const homePrefix = "$HOME/";
-  if (!input.startsWith(homePrefix)) {
-    return shellQuote(input);
-  }
-  const pathSegments = input.slice(homePrefix.length).split("/").filter(Boolean);
-  return `$HOME/${pathSegments.map(shellQuote).join("/")}`;
 }
 
 function isMissingFileError(cause: unknown): boolean {
@@ -2382,24 +2376,30 @@ export class ShellDependencyResourceBackupProvider implements DependencyResource
       backupId: input.backupId,
     };
     const path = dockerManagedDependencyBackupPath(backupHandle);
-    const directory = path.replace(/\/[^/]+$/, "");
+    const pathSetup = renderManagedDependencyBackupPathSetup(path);
     const command =
       handle.kind === "postgres"
-        ? [
-            "set -eu",
-            `mkdir -p ${shellQuotePath(directory)}`,
-            `docker exec ${shellQuote(handle.containerName)} sh -lc ${shellQuote(
-              'PGPASSWORD="$POSTGRES_PASSWORD" pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc',
-            )} > ${shellQuotePath(path)}`,
-          ].join("\n")
-        : [
-            "set -eu",
-            `mkdir -p ${shellQuotePath(directory)}`,
-            `docker exec ${shellQuote(handle.containerName)} sh -lc ${shellQuote(
-              'password="$(tr "\\0" "\\n" </proc/1/cmdline | tail -n 1)"; redis-cli -a "$password" --no-auth-warning SAVE >/dev/null',
-            )}`,
-            `docker cp ${shellQuote(`${handle.containerName}:/data/dump.rdb`)} ${shellQuotePath(path)}`,
-          ].join("\n");
+        ? ash`
+            set -eu
+            ${pathSetup}
+            mkdir -p "$(dirname "$APPALOFT_DEPENDENCY_BACKUP_PATH")"
+            docker exec ${ash.arg(handle.containerName)} sh -lc ${ash.arg(
+              ash.render(
+                ash`PGPASSWORD="$POSTGRES_PASSWORD" pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc`,
+              ),
+            )} > "$APPALOFT_DEPENDENCY_BACKUP_PATH"
+          `
+        : ash`
+            set -eu
+            ${pathSetup}
+            mkdir -p "$(dirname "$APPALOFT_DEPENDENCY_BACKUP_PATH")"
+            docker exec ${ash.arg(handle.containerName)} sh -lc ${ash.arg(
+              ash.render(
+                ash`password="$(tr "\\0" "\\n" </proc/1/cmdline | tail -n 1)"; redis-cli -a "$password" --no-auth-warning SAVE >/dev/null`,
+              ),
+            )}
+            docker cp ${ash.arg(`${handle.containerName}:/data/dump.rdb`)} "$APPALOFT_DEPENDENCY_BACKUP_PATH"
+          `;
     const executed = await runManagedDependencyTargetCommand(target.value, command);
     if (executed.exitCode !== 0) {
       return managedDependencyDockerCommandFailure({
@@ -2453,13 +2453,17 @@ export class ShellDependencyResourceBackupProvider implements DependencyResource
         return err(target.error);
       }
       const path = dockerManagedDependencyBackupPath(backupHandle);
-      const command = [
-        "set -eu",
-        `test -f ${shellQuotePath(path)}`,
-        `docker run --rm -i -v ${shellQuotePath(path)}:/appaloft-backup.dump:ro postgres:16-alpine sh -lc ${shellQuote(
-          'IFS= read -r target_url; pg_restore --list /appaloft-backup.dump | sed -e "/ SCHEMA - public /d" -e "/ ACL - SCHEMA public /d" -e "/ COMMENT - SCHEMA public /d" > /tmp/appaloft.restore.list; pg_restore --dbname="$target_url" --use-list=/tmp/appaloft.restore.list --clean --if-exists --no-owner --no-privileges /appaloft-backup.dump',
-        )}`,
-      ].join("\n");
+      const restoreScript = ash`
+        IFS= read -r target_url
+        pg_restore --list /appaloft-backup.dump | sed -e "/ SCHEMA - public /d" -e "/ ACL - SCHEMA public /d" -e "/ COMMENT - SCHEMA public /d" > /tmp/appaloft.restore.list
+        pg_restore --dbname="$target_url" --use-list=/tmp/appaloft.restore.list --clean --if-exists --no-owner --no-privileges /appaloft-backup.dump
+      `;
+      const command = ash`
+        set -eu
+        ${renderManagedDependencyBackupPathSetup(path)}
+        test -f "$APPALOFT_DEPENDENCY_BACKUP_PATH"
+        docker run --rm -i -v "$APPALOFT_DEPENDENCY_BACKUP_PATH:/appaloft-backup.dump:ro" postgres:16-alpine sh -lc ${ash.arg(ash.render(restoreScript))}
+      `;
       const executed = await runManagedDependencyTargetCommand(target.value, command, {
         stdin: Buffer.from(`${input.connectionSecretValue}\n`, "utf8"),
       });
@@ -2520,24 +2524,28 @@ export class ShellDependencyResourceBackupProvider implements DependencyResource
     const path = dockerManagedDependencyBackupPath(backupHandle);
     const command =
       backupHandle.kind === "postgres"
-        ? [
-            "set -eu",
-            `test -f ${shellQuotePath(path)}`,
-            `cat ${shellQuotePath(path)} | docker exec -i ${shellQuote(
+        ? ash`
+            set -eu
+            ${renderManagedDependencyBackupPathSetup(path)}
+            test -f "$APPALOFT_DEPENDENCY_BACKUP_PATH"
+            cat "$APPALOFT_DEPENDENCY_BACKUP_PATH" | docker exec -i ${ash.arg(
               backupHandle.containerName,
-            )} sh -lc ${shellQuote(
-              'PGPASSWORD="$POSTGRES_PASSWORD" pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists',
-            )}`,
-          ].join("\n")
-        : [
-            "set -eu",
-            `test -f ${shellQuotePath(path)}`,
-            `docker stop ${shellQuote(backupHandle.containerName)} >/dev/null`,
-            `docker cp ${shellQuotePath(path)} ${shellQuote(
+            )} sh -lc ${ash.arg(
+              ash.render(
+                ash`PGPASSWORD="$POSTGRES_PASSWORD" pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists`,
+              ),
+            )}
+          `
+        : ash`
+            set -eu
+            ${renderManagedDependencyBackupPathSetup(path)}
+            test -f "$APPALOFT_DEPENDENCY_BACKUP_PATH"
+            docker stop ${ash.arg(backupHandle.containerName)} >/dev/null
+            docker cp "$APPALOFT_DEPENDENCY_BACKUP_PATH" ${ash.arg(
               `${backupHandle.containerName}:/data/dump.rdb`,
-            )}`,
-            `docker start ${shellQuote(backupHandle.containerName)} >/dev/null`,
-          ].join("\n");
+            )}
+            docker start ${ash.arg(backupHandle.containerName)} >/dev/null
+          `;
     const executed = await runManagedDependencyTargetCommand(target.value, command);
     if (executed.exitCode !== 0) {
       return managedDependencyDockerCommandFailure({

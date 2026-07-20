@@ -217,8 +217,9 @@ describe("ShellManagedDependencyProvider", () => {
 
       const log = await readFile(sshLog, "utf8");
       expect(log).toContain("network inspect 'appaloft-edge'");
-      expect(log).toContain("run -d --name 'appaloft-postgres-rsi_preview'");
+      expect(log).toContain("run -d '--name' 'appaloft-postgres-rsi_preview'");
       expect(log).toContain("postgres:16-alpine");
+      expect(log).not.toContain(new URL(state.connectionSecretValue ?? "").password);
     } finally {
       process.env.PATH = previousPath;
     }
@@ -345,9 +346,10 @@ describe("ShellManagedDependencyProvider", () => {
 
       const log = await readFile(sshLog, "utf8");
       expect(log).toContain("network inspect 'appaloft-edge'");
-      expect(log).toContain("run -d --name 'appaloft-redis-rsi_cache'");
+      expect(log).toContain("run -d '--name' 'appaloft-redis-rsi_cache'");
       expect(log).toContain("redis:7-alpine");
       expect(log).toContain("redis-cli -a");
+      expect(log).not.toContain(new URL(state.connectionSecretValue ?? "").password);
     } finally {
       process.env.PATH = previousPath;
     }

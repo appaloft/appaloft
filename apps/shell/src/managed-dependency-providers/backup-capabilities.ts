@@ -2,14 +2,9 @@ import {
   type DependencyResourceBackupProviderInput,
   type DependencyResourceRestoreProviderInput,
 } from "@appaloft/application";
-import { type DomainError, err, ok, type Result } from "@appaloft/core";
-import {
-  backupPath,
-  dockerManagedDependencyServices,
-  requireConnectionUrl,
-  shellQuote,
-  shellQuotePath,
-} from "./docker-shared";
+import { type AshScript, ash } from "@appaloft/ash";
+import { type DomainError, ok, type Result } from "@appaloft/core";
+import { backupPath, dockerManagedDependencyServices } from "./docker-shared";
 
 const postgresDefinition = dockerManagedDependencyServices.postgres;
 const redisDefinition = dockerManagedDependencyServices.redis;
@@ -54,27 +49,19 @@ function postgresBackupCommand(input: {
   container: string;
   path: string;
   connectionSecretValue?: string;
-}): Result<string, DomainError> {
-  const connection = requireConnectionUrl({
-    connectionSecretValue: input.connectionSecretValue,
-    dependencyKind: postgresDefinition.kind,
-  });
-  if (connection.isErr()) {
-    return err(connection.error);
-  }
-  const username = decodeURIComponent(connection.value.username || "app");
-  const password = decodeURIComponent(connection.value.password);
-  const databaseName = connection.value.pathname.replace(/^\//, "") || "app";
+}): Result<AshScript, DomainError> {
+  void input.connectionSecretValue;
   return ok(
-    [
-      "set -eu",
-      `mkdir -p ${shellQuotePath(input.path.replace(/\/[^/]+$/, ""))}`,
-      `PGPASSWORD=${shellQuote(password)} docker exec -e PGPASSWORD ${shellQuote(
-        input.container,
-      )} pg_dump -U ${shellQuote(username)} -d ${shellQuote(databaseName)} -Fc > ${shellQuotePath(
-        input.path,
-      )}`,
-    ].join("\n"),
+    ash`
+      set -eu
+      ${renderBackupPathSetup(input.path)}
+      mkdir -p "$(dirname "$APPALOFT_DEPENDENCY_BACKUP_PATH")"
+      docker exec ${ash.arg(input.container)} sh -lc ${ash.arg(
+        ash.render(
+          ash`PGPASSWORD="$POSTGRES_PASSWORD" pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc`,
+        ),
+      )} > "$APPALOFT_DEPENDENCY_BACKUP_PATH"
+    `,
   );
 }
 
@@ -82,25 +69,21 @@ function postgresRestoreCommand(input: {
   container: string;
   path: string;
   connectionSecretValue?: string;
-}): Result<string, DomainError> {
-  const connection = requireConnectionUrl({
-    connectionSecretValue: input.connectionSecretValue,
-    dependencyKind: postgresDefinition.kind,
-  });
-  if (connection.isErr()) {
-    return err(connection.error);
-  }
-  const username = decodeURIComponent(connection.value.username || "app");
-  const password = decodeURIComponent(connection.value.password);
-  const databaseName = connection.value.pathname.replace(/^\//, "") || "app";
+}): Result<AshScript, DomainError> {
+  void input.connectionSecretValue;
   return ok(
-    [
-      "set -eu",
-      `test -f ${shellQuotePath(input.path)}`,
-      `cat ${shellQuotePath(input.path)} | PGPASSWORD=${shellQuote(password)} docker exec -i -e PGPASSWORD ${shellQuote(
+    ash`
+      set -eu
+      ${renderBackupPathSetup(input.path)}
+      test -f "$APPALOFT_DEPENDENCY_BACKUP_PATH"
+      cat "$APPALOFT_DEPENDENCY_BACKUP_PATH" | docker exec -i ${ash.arg(
         input.container,
-      )} pg_restore -U ${shellQuote(username)} -d ${shellQuote(databaseName)} --clean --if-exists`,
-    ].join("\n"),
+      )} sh -lc ${ash.arg(
+        ash.render(
+          ash`PGPASSWORD="$POSTGRES_PASSWORD" pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists`,
+        ),
+      )}
+    `,
   );
 }
 
@@ -108,33 +91,41 @@ function redisBackupCommand(input: {
   container: string;
   path: string;
   connectionSecretValue?: string;
-}): Result<string, DomainError> {
-  const connection = requireConnectionUrl({
-    connectionSecretValue: input.connectionSecretValue,
-    dependencyKind: redisDefinition.kind,
-  });
-  if (connection.isErr()) {
-    return err(connection.error);
-  }
-  const password = decodeURIComponent(connection.value.password);
+}): Result<AshScript, DomainError> {
+  void input.connectionSecretValue;
   return ok(
-    [
-      "set -eu",
-      `mkdir -p ${shellQuotePath(input.path.replace(/\/[^/]+$/, ""))}`,
-      `docker exec ${shellQuote(input.container)} redis-cli -a ${shellQuote(
-        password,
-      )} --no-auth-warning SAVE >/dev/null`,
-      `docker cp ${shellQuote(`${input.container}:/data/dump.rdb`)} ${shellQuotePath(input.path)}`,
-    ].join("\n"),
+    ash`
+      set -eu
+      ${renderBackupPathSetup(input.path)}
+      mkdir -p "$(dirname "$APPALOFT_DEPENDENCY_BACKUP_PATH")"
+      docker exec ${ash.arg(input.container)} sh -lc ${ash.arg(
+        ash.render(
+          ash`password="$(tr "\\0" "\\n" </proc/1/cmdline | tail -n 1)"; redis-cli -a "$password" --no-auth-warning SAVE >/dev/null`,
+        ),
+      )}
+      docker cp ${ash.arg(`${input.container}:/data/dump.rdb`)} "$APPALOFT_DEPENDENCY_BACKUP_PATH"
+    `,
   );
 }
 
-function redisRestoreCommand(input: { container: string; path: string }): string {
-  return [
-    "set -eu",
-    `test -f ${shellQuotePath(input.path)}`,
-    `docker stop ${shellQuote(input.container)} >/dev/null`,
-    `docker cp ${shellQuotePath(input.path)} ${shellQuote(`${input.container}:/data/dump.rdb`)}`,
-    `docker start ${shellQuote(input.container)} >/dev/null`,
-  ].join("\n");
+function redisRestoreCommand(input: { container: string; path: string }): AshScript {
+  return ash`
+    set -eu
+    ${renderBackupPathSetup(input.path)}
+    test -f "$APPALOFT_DEPENDENCY_BACKUP_PATH"
+    docker stop ${ash.arg(input.container)} >/dev/null
+    docker cp "$APPALOFT_DEPENDENCY_BACKUP_PATH" ${ash.arg(`${input.container}:/data/dump.rdb`)}
+    docker start ${ash.arg(input.container)} >/dev/null
+  `;
+}
+
+function renderBackupPathSetup(path: string): AshScript {
+  const homePrefix = "$HOME/";
+  if (!path.startsWith(homePrefix)) {
+    throw new TypeError("Managed dependency backup path must be rooted below $HOME");
+  }
+  return ash`
+    ${ash.env("APPALOFT_DEPENDENCY_BACKUP_RELATIVE_PATH", path.slice(homePrefix.length))}
+    APPALOFT_DEPENDENCY_BACKUP_PATH="$HOME/$APPALOFT_DEPENDENCY_BACKUP_RELATIVE_PATH"
+  `;
 }

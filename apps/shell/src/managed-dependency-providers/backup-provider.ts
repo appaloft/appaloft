@@ -8,6 +8,7 @@ import {
   type ExecutionContext,
   type ServerRepository,
 } from "@appaloft/application";
+import { type AshScript } from "@appaloft/ash";
 import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
 import { dockerBackupCapabilities } from "./backup-capabilities";
 import {
@@ -24,10 +25,10 @@ interface DockerDependencyBackupCapability {
   definition: DockerManagedDependencyServiceDefinition;
   createCommand(
     input: DependencyResourceBackupProviderInput & { container: string; path: string },
-  ): Result<string, DomainError>;
+  ): Result<AshScript, DomainError>;
   restoreCommand(
     input: DependencyResourceRestoreProviderInput & { container: string; path: string },
-  ): Result<string, DomainError>;
+  ): Result<AshScript, DomainError>;
   pathForBackup(input: Parameters<typeof backupHandle>[0]): string;
 }
 

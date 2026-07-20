@@ -52,6 +52,9 @@
 
 ## Grounding Rules For Agents
 
+- Read [`ASH_COMMAND_CONSTRUCTION.md`](./ASH_COMMAND_CONSTRUCTION.md) before adding or changing
+  local or remote executable shell commands.
+
 - Read `docs/decisions/README.md` and relevant ADRs before reading local specs.
 - Read global contracts before local specs:
   - `docs/errors/model.md`

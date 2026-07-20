@@ -1,7 +1,7 @@
 import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
-import { chmod, mkdir, mkdtemp, readFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createExecutionContext, type DependencyResourceSecretStore } from "@appaloft/application";
@@ -89,6 +89,56 @@ describe("Shell managed dependency resource providers", () => {
       "opensearch",
     ]) {
       expect(genericProviderSource).toContain(`case "${dependencyKind}"`);
+    }
+  });
+
+  test("[DEP-BIND-SECRET-RESOLVE-005] Docker-backed provision renders ash and sends its password over stdin", async () => {
+    const root = await mkdtemp(join(tmpdir(), "appaloft-ash-managed-postgres-"));
+    const binDir = join(root, "bin");
+    const sshLog = join(root, "ssh.log");
+    await mkdir(binDir, { recursive: true });
+    await writeFile(
+      join(binDir, "ssh"),
+      ["#!/bin/sh", `printf '%s\\n' "$*" >> ${JSON.stringify(sshLog)}`, "exit 0", ""].join("\n"),
+    );
+    await chmod(join(binDir, "ssh"), 0o755);
+
+    const previousPath = process.env.PATH;
+    process.env.PATH = `${binDir}:/usr/bin:/bin:/usr/sbin:/sbin:${previousPath ?? ""}`;
+    try {
+      const provider = new DockerBackedManagedDependencyProvider({} as never);
+      const realized = await provider.realize(
+        createExecutionContext({
+          requestId: "req_ash_dependency_provider",
+          entrypoint: "system",
+        }),
+        {
+          dependencyResourceId: "rsi_ash",
+          projectId: "prj_ash",
+          environmentId: "env_ash",
+          kind: "postgres",
+          providerKey: "appaloft-managed-postgres",
+          name: "Ash Postgres",
+          slug: "ash-postgres",
+          attemptId: "dpr_ash",
+          requestedAt: "2026-07-20T00:00:00.000Z",
+          target: {
+            serverId: "srv_ash",
+            providerKey: "generic-ssh",
+            targetKind: "single-server",
+            host: "127.0.0.1",
+            port: 22,
+          },
+        },
+      );
+
+      const state = realized._unsafeUnwrap();
+      const log = await readFile(sshLog, "utf8");
+      expect(log).toContain("docker run -d '--name' 'appaloft-postgres-rsi_ash'");
+      expect(log).toContain("IFS= read -r APPALOFT_MANAGED_DEPENDENCY_PASSWORD");
+      expect(log).not.toContain(new URL(state.connectionSecretValue ?? "").password);
+    } finally {
+      process.env.PATH = previousPath;
     }
   });
 
