@@ -878,6 +878,7 @@ async function insertDomainBinding(
     domainName: string;
     status: string;
     createdAt: string;
+    destinationId?: string | null;
     tlsMode?: "auto" | "disabled";
     proxyKind?: "traefik" | "caddy";
     pathPrefix?: string;
@@ -894,7 +895,8 @@ async function insertDomainBinding(
       environment_id: target.environmentId,
       resource_id: target.resourceId,
       server_id: target.serverId,
-      destination_id: target.destinationId,
+      destination_id:
+        input.destinationId === undefined ? target.destinationId : input.destinationId,
       domain_name: input.domainName,
       path_prefix: input.pathPrefix ?? "/",
       path_handling: input.pathHandling ?? "preserve",
@@ -960,6 +962,51 @@ describe("pglite persistence integration", () => {
         "domain_bindings_server_id_fkey_idx",
       ]);
 
+      await database.close();
+    } finally {
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  });
+
+  test("[ROUTE-TARGET-001] deployment route lookup includes server-scoped bindings without a destination", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-route-target-"));
+    const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
+
+    try {
+      const { createDatabase, createMigrator, PgDomainRouteBindingReader } = await import(
+        "../src/index"
+      );
+      const database = await createDatabase({
+        driver: "pglite",
+        pgliteDataDir,
+      });
+      const migrationResult = await createMigrator(database.db).migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      const target = await seedSourceLinkContext(database.db, "server_scoped_route");
+      await insertDomainBinding(database.db, target, {
+        id: "dmb_destination_scoped",
+        domainName: "destination.example.test",
+        status: "bound",
+        createdAt: "2026-01-01T00:01:00.000Z",
+      });
+      await insertDomainBinding(database.db, target, {
+        id: "dmb_server_scoped",
+        domainName: "server.example.test",
+        status: "bound",
+        destinationId: null,
+        createdAt: "2026-01-01T00:02:00.000Z",
+      });
+
+      const bindings = await new PgDomainRouteBindingReader(database.db).listDeployableBindings(
+        createRepositoryContext(),
+        target,
+      );
+
+      expect(bindings.map((binding) => binding.id)).toEqual([
+        "dmb_server_scoped",
+        "dmb_destination_scoped",
+      ]);
       await database.close();
     } finally {
       rmSync(workspaceDir, { recursive: true, force: true });
