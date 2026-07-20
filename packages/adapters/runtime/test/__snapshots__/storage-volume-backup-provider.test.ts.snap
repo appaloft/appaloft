@@ -131,7 +131,7 @@ sqlite3 "/source/$sqlite_relative_path" ".backup '$sqlite_export_path'"
 rm -f "$sqlite_export_path-wal" "$sqlite_export_path-shm"
 printf '%s\\n' "$sqlite_relative_path" > /backup/sqlite-path
 APPALOFT_SQLITE_BACKUP_SCRIPT
-docker run --name "$helper_container" --rm --user "$(id -u):$(id -g)" -v "$APPALOFT_DOCKER_VOLUME_NAME:/source:ro" -v "$work_dir:/backup" "$APPALOFT_SQLITE_HELPER_IMAGE" sh /backup/sqlite-online-backup.sh
+docker run --name "$helper_container" --rm --user "$(id -u):$(id -g)" -v "$APPALOFT_DOCKER_VOLUME_NAME:/source" -v "$work_dir:/backup" "$APPALOFT_SQLITE_HELPER_IMAGE" sh /backup/sqlite-online-backup.sh
 source_ref="$APPALOFT_STORAGE_BACKUP_WORKING_ROOT/sources/$APPALOFT_STORAGE_BACKUP_ID.$APPALOFT_STORAGE_BACKUP_ATTEMPT_ID.sqlite.tar.gz"
 rm -f "$source_ref"
 tar -czf "$source_ref" -C "$export_dir" .
