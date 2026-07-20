@@ -53,7 +53,12 @@ export class PgDomainRouteBindingReader implements DomainRouteBindingReader {
           .where("environment_id", "=", input.environmentId)
           .where("resource_id", "=", input.resourceId)
           .where("server_id", "=", input.serverId)
-          .where("destination_id", "=", input.destinationId)
+          .where((expression) =>
+            expression.or([
+              expression("destination_id", "=", input.destinationId),
+              expression("destination_id", "is", null),
+            ]),
+          )
           .where("status", "in", deployableDomainBindingStatuses)
           .orderBy("created_at", "desc")
           .execute();
