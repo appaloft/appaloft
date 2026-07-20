@@ -22,6 +22,7 @@ relatedOperations:
   - blueprints.installation.show
   - dependency-resources.provision
   - dependency-resources.import
+  - dependency-resources.rotate-connection
   - dependency-resources.provisioning.plan
   - dependency-resources.provisioning.accept
   - dependency-resources.provisioning.status
@@ -56,6 +57,14 @@ appaloft dependency import --kind redis --project prj_prod --environment env_pro
 # 自动化中用标准输入传递连接串，避免把凭据放进进程参数。
 printf '%s\n' "$DATABASE_URL" | appaloft dependency import --kind postgres --project prj_prod --environment env_prod --name external-db --connection-url-stdin
 ```
+
+如果外部数据库重置了密码，可保留资源和绑定并安全替换连接：
+
+```sh
+printf '%s\n' "$DATABASE_URL" | appaloft dependency rotate-connection rsi_external --connection-url-stdin
+```
+
+此操作不会修改数据库服务本身的密码，也不会自动重启或重新部署应用。
 
 List/show 输出必须屏蔽连接 secret、provider token、密码和原始连接字符串。
 

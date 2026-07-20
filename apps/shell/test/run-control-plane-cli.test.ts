@@ -333,6 +333,47 @@ describe("shell CLI remote control-plane pre-dispatch", () => {
           connectionUrl: "postgres://app:secret@db.example.com/app",
         },
       });
+
+      const rotateChild = Bun.spawn(
+        [
+          "bun",
+          "run",
+          "--cwd",
+          "apps/shell",
+          "src/index.ts",
+          "dependency",
+          "rotate-connection",
+          "rsi_imported",
+          "--connection-url-stdin",
+        ],
+        {
+          cwd: join(import.meta.dir, "../../.."),
+          env: {
+            ...process.env,
+            APPALOFT_HOME: appaloftHome,
+            OTEL_SDK_DISABLED: "true",
+          },
+          stdin: Bun.file(connectionUrlPath),
+          stdout: "pipe",
+          stderr: "pipe",
+        },
+      );
+      const [rotateExitCode, rotateStdout, rotateStderr] = await Promise.all([
+        rotateChild.exited,
+        new Response(rotateChild.stdout).text(),
+        new Response(rotateChild.stderr).text(),
+      ]);
+      expect(rotateExitCode).toBe(0);
+      expect(rotateStderr).toBe("");
+      expect(rotateStdout).not.toContain("secret");
+      expect(requests.at(-1)).toMatchObject({
+        method: "POST",
+        path: "/api/dependency-resources/rsi_imported/connection",
+        body: {
+          dependencyResourceId: "rsi_imported",
+          connectionUrl: "postgres://app:secret@db.example.com/app",
+        },
+      });
     } finally {
       await new Promise<void>((resolve, reject) =>
         server.close((error) => (error ? reject(error) : resolve())),

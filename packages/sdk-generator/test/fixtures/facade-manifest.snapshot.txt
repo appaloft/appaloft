@@ -67,6 +67,7 @@ appaloft.dependencyResources.provisioning.status -> dependency-resources.provisi
 appaloft.dependencyResources.query -> dependency-resources.query POST /dependency-resources/{dependencyResourceId}/query
 appaloft.dependencyResources.rename -> dependency-resources.rename POST /dependency-resources/{dependencyResourceId}/rename
 appaloft.dependencyResources.restoreBackup -> dependency-resources.restore-backup POST /dependency-resources/backups/{backupId}/restore
+appaloft.dependencyResources.rotateConnection -> dependency-resources.rotate-connection POST /dependency-resources/{dependencyResourceId}/connection
 appaloft.dependencyResources.show -> dependency-resources.show GET /dependency-resources/{dependencyResourceId}
 appaloft.dependencyResources.showBackup -> dependency-resources.show-backup GET /dependency-resources/backups/{backupId}
 appaloft.deployTokens.create -> deploy-tokens.create POST /deploy-tokens
@@ -213,6 +214,10 @@ appaloft.runtimeMonitoring.samples.list -> runtime-monitoring.samples.list GET /
 appaloft.runtimeMonitoring.thresholds.configure -> runtime-monitoring.thresholds.configure POST /runtime-monitoring/thresholds
 appaloft.runtimeMonitoring.thresholds.show -> runtime-monitoring.thresholds.show GET /runtime-monitoring/thresholds
 appaloft.runtimeUsage.inspect -> runtime-usage.inspect GET /runtime-usage/inspect
+appaloft.sandboxCredentials.grant -> sandbox-credentials.grant POST /sandboxes/{sandboxId}/credentials
+appaloft.sandboxCredentials.list -> sandbox-credentials.list GET /sandboxes/{sandboxId}/credentials
+appaloft.sandboxCredentials.request -> sandbox-credentials.request POST /sandboxes/{sandboxId}/credentials/{grantId}/request
+appaloft.sandboxCredentials.revoke -> sandbox-credentials.revoke DELETE /sandboxes/{sandboxId}/credentials/{grantId}
 appaloft.sandboxFiles.list -> sandbox-files.list POST /sandboxes/{sandboxId}/files/list
 appaloft.sandboxFiles.read -> sandbox-files.read POST /sandboxes/{sandboxId}/files/read
 appaloft.sandboxFiles.remove -> sandbox-files.remove DELETE /sandboxes/{sandboxId}/files
@@ -221,13 +226,21 @@ appaloft.sandboxPorts.expose -> sandbox-ports.expose POST /sandboxes/{sandboxId}
 appaloft.sandboxPorts.list -> sandbox-ports.list GET /sandboxes/{sandboxId}/ports
 appaloft.sandboxPorts.revoke -> sandbox-ports.revoke DELETE /sandboxes/{sandboxId}/ports/{exposureId}
 appaloft.sandboxProcesses.list -> sandbox-processes.list GET /sandboxes/{sandboxId}/processes
+appaloft.sandboxProcesses.show -> sandbox-processes.show GET /sandboxes/{sandboxId}/processes/{processId}
 appaloft.sandboxProcesses.terminate -> sandbox-processes.terminate POST /sandboxes/{sandboxId}/processes/{processId}/terminate
 appaloft.sandboxSnapshots.create -> sandbox-snapshots.create POST /sandboxes/{sandboxId}/snapshots
+appaloft.sandboxSnapshots.delete -> sandbox-snapshots.delete DELETE /sandbox-snapshots/{snapshotId}
 appaloft.sandboxSnapshots.list -> sandbox-snapshots.list GET /sandbox-snapshots
 appaloft.sandboxSnapshots.show -> sandbox-snapshots.show GET /sandbox-snapshots/{snapshotId}
+appaloft.sandboxTemplates.create -> sandbox-templates.create POST /sandbox-templates
+appaloft.sandboxTemplates.delete -> sandbox-templates.delete DELETE /sandbox-templates/{templateId}
+appaloft.sandboxTemplates.list -> sandbox-templates.list GET /sandbox-templates
+appaloft.sandboxTemplates.show -> sandbox-templates.show GET /sandbox-templates/{templateId}
 appaloft.sandboxes.create -> sandboxes.create POST /sandboxes
+appaloft.sandboxes.events.stream -> sandboxes.events.stream GET /sandboxes/{sandboxId}/events/stream stream
 appaloft.sandboxes.exec -> sandboxes.exec POST /sandboxes/{sandboxId}/exec
 appaloft.sandboxes.list -> sandboxes.list GET /sandboxes
+appaloft.sandboxes.networkPolicy.configure -> sandboxes.network-policy.configure POST /sandboxes/{sandboxId}/network-policy
 appaloft.sandboxes.pause -> sandboxes.pause POST /sandboxes/{sandboxId}/pause
 appaloft.sandboxes.resume -> sandboxes.resume POST /sandboxes/{sandboxId}/resume
 appaloft.sandboxes.show -> sandboxes.show GET /sandboxes/{sandboxId}

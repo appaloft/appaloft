@@ -145,6 +145,7 @@ describe("operation catalog aggregate mutation boundary", () => {
       "resources.detach-storage",
       "dependency-resources.provision",
       "dependency-resources.import",
+      "dependency-resources.rotate-connection",
       "dependency-resources.list",
       "dependency-resources.show",
       "dependency-resources.rename",

@@ -180,6 +180,7 @@ import {
   type RevokeConnectionCommandInput,
   type RevokeDeployTokenCommandInput,
   type RollbackDeploymentCommandInput,
+  type RotateDependencyResourceConnectionCommandInput,
   type RotateDeployTokenCommandInput,
   type RotateResourceDependencyBindingSecretCommandInput,
   type RotateResourceSecretReferenceCommandInput,
@@ -1481,6 +1482,12 @@ export type AppaloftOrpcClientContract = {
     import: Client<
       AppaloftClientContext,
       ImportDependencyResourceCommandInput,
+      DependencyResourceResponse,
+      AppaloftClientError
+    >;
+    rotateConnection: Client<
+      AppaloftClientContext,
+      RotateDependencyResourceConnectionCommandInput,
       DependencyResourceResponse,
       AppaloftClientError
     >;

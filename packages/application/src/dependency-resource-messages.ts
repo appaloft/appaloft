@@ -13,6 +13,7 @@ export * from "./operations/dependency-resources/provision-dependency-resource.c
 export * from "./operations/dependency-resources/query-dependency-resource.query";
 export * from "./operations/dependency-resources/rename-dependency-resource.command";
 export * from "./operations/dependency-resources/restore-dependency-resource-backup.command";
+export * from "./operations/dependency-resources/rotate-dependency-resource-connection.command";
 export * from "./operations/dependency-resources/show-dependency-resource.query";
 export * from "./operations/dependency-resources/show-dependency-resource-backup.query";
 export * from "./operations/dependency-resources/show-dependency-resource-backup-policy.query";

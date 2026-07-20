@@ -61,6 +61,7 @@ import {
   ListDependencyResourcesQueryService,
   ProvisionDependencyResourceUseCase,
   RenameDependencyResourceUseCase,
+  RotateDependencyResourceConnectionUseCase,
   ShowDependencyResourceQueryService,
 } from "../src/use-cases";
 
@@ -224,10 +225,77 @@ async function createHarness() {
       eventBus,
       logger,
     ),
+    rotateDependencyResourceConnection: new RotateDependencyResourceConnectionUseCase(
+      dependencyResources,
+      dependencyResourceSecretStore,
+      clock,
+      eventBus,
+      logger,
+    ),
     repositoryContext,
     showDependencyResource: new ShowDependencyResourceQueryService(readModel, clock),
   };
 }
+
+describe("dependency resource connection rotation", () => {
+  test("[DEP-RES-CONNECTION-ROTATE-001] replaces imported connection without changing resource identity", async () => {
+    const harness = await createHarness();
+    const imported = await harness.importDependencyResource.execute(harness.context, {
+      kind: "postgres",
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      name: "Supabase",
+      connectionUrl: "postgres://app:old-secret@old.example.test:5432/postgres",
+    });
+    const id = imported._unsafeUnwrap().id;
+
+    const result = await harness.rotateDependencyResourceConnection.execute(harness.context, {
+      dependencyResourceId: id,
+      connectionUrl: "postgres://app:new-secret@new.example.test:5432/postgres?sslmode=require",
+    });
+
+    expect(result._unsafeUnwrap()).toEqual({ id });
+    expect(harness.dependencyResourceSecretStore.stored.at(-1)).toMatchObject({
+      dependencyResourceId: id,
+      secretValue: "postgres://app:new-secret@new.example.test:5432/postgres?sslmode=require",
+    });
+    const stored = await harness.dependencyResources.findOne(
+      harness.repositoryContext,
+      ResourceInstanceByIdSpec.create(ResourceInstanceId.rehydrate(id)),
+    );
+    const state = stored?.toState();
+    expect(state?.id.value).toBe(id);
+    expect(state?.postgresEndpoint?.host.value).toBe("new.example.test");
+    expect(state?.postgresEndpoint?.port?.value).toBe(5432);
+    expect(state?.postgresEndpoint?.databaseName?.value).toBe("postgres");
+    expect(harness.eventBus.events.at(-1)).toMatchObject({
+      type: "dependency-resource-connection-rotated",
+    });
+  });
+
+  test("[DEP-RES-CONNECTION-ROTATE-002] rejects managed and deleted dependencies before secret storage", async () => {
+    const harness = await createHarness();
+    const managed = await harness.provisionDependencyResource.execute(harness.context, {
+      kind: "postgres",
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      name: "Managed",
+      serverId: "srv_demo",
+    });
+    const storedBefore = harness.dependencyResourceSecretStore.stored.length;
+
+    const managedResult = await harness.rotateDependencyResourceConnection.execute(
+      harness.context,
+      {
+        dependencyResourceId: managed._unsafeUnwrap().id,
+        connectionUrl: "postgres://app:secret@db.example.test:5432/postgres",
+      },
+    );
+
+    expect(managedResult.isErr()).toBe(true);
+    expect(harness.dependencyResourceSecretStore.stored).toHaveLength(storedBefore);
+  });
+});
 
 describe("Postgres dependency resource lifecycle use cases", () => {
   test("[DEP-RES-PG-PROVISION-001] [DEP-RES-PG-NATIVE-001] [DEP-RES-PG-NATIVE-002] [DEP-BIND-SECRET-RESOLVE-003] [PROC-DELIVERY-001] provisions managed Postgres through provider realization", async () => {

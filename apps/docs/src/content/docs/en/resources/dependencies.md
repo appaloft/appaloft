@@ -21,6 +21,7 @@ relatedOperations:
   - blueprints.installation.show
   - dependency-resources.provision
   - dependency-resources.import
+  - dependency-resources.rotate-connection
   - dependency-resources.provisioning.plan
   - dependency-resources.provisioning.accept
   - dependency-resources.provisioning.status
@@ -59,6 +60,16 @@ appaloft dependency import --kind redis --project prj_prod --environment env_pro
 # For credentials in automation, pipe the URL instead of putting it in the process arguments.
 printf '%s\n' "$DATABASE_URL" | appaloft dependency import --kind postgres --project prj_prod --environment env_prod --name external-db --connection-url-stdin
 ```
+
+After an external database password reset, preserve the resource and bindings while replacing the
+stored connection safely:
+
+```sh
+printf '%s\n' "$DATABASE_URL" | appaloft dependency rotate-connection rsi_external --connection-url-stdin
+```
+
+This does not change the provider-native password and does not automatically restart or redeploy
+applications.
 
 List/show output must mask connection secrets, provider tokens, passwords, and raw connection URLs.
 

@@ -490,6 +490,7 @@ import {
   RevokeSandboxCredentialCommand,
   RevokeSandboxPortCommand,
   RollbackDeploymentCommand,
+  RotateDependencyResourceConnectionCommand,
   RotateDeployTokenCommand,
   RotateResourceDependencyBindingSecretCommand,
   RotateResourceSecretReferenceCommand,
@@ -533,6 +534,7 @@ import {
   revokeSandboxCredentialCommandInputSchema,
   revokeSandboxPortCommandInputSchema,
   rollbackDeploymentCommandInputSchema,
+  rotateDependencyResourceConnectionCommandInputSchema,
   rotateDeployTokenCommandInputSchema,
   rotateResourceDependencyBindingSecretCommandInputSchema,
   rotateResourceSecretReferenceCommandInputSchema,
@@ -1854,6 +1856,10 @@ export const apiRouteDescriptions = {
   ),
   importDependencyResource: routeDescription(
     "Imports external dependency resource metadata while keeping raw connection secrets outside list and show responses.",
+    "dependency.resource-lifecycle",
+  ),
+  rotateDependencyResourceConnection: routeDescription(
+    "Replaces the stored connection credential and masked endpoint for an imported external dependency resource.",
     "dependency.resource-lifecycle",
   ),
   listDependencyResources: routeDescription(
@@ -6518,6 +6524,19 @@ export const importDependencyResourceProcedure = base
     executeCommand(context, ImportDependencyResourceCommand.create(input)),
   );
 
+export const rotateDependencyResourceConnectionProcedure = base
+  .route({
+    method: "POST",
+    path: "/dependency-resources/{dependencyResourceId}/connection",
+    description: apiRouteDescriptions.rotateDependencyResourceConnection,
+    successStatus: 200,
+  })
+  .input(rotateDependencyResourceConnectionCommandInputSchema)
+  .output(dependencyResourceResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RotateDependencyResourceConnectionCommand.create(input)),
+  );
+
 export const listDependencyResourcesProcedure = base
   .route({
     method: "GET",
@@ -7579,6 +7598,7 @@ export const appaloftOrpcRouter = {
     count: countDependencyResourcesProcedure,
     provision: provisionDependencyResourceProcedure,
     import: importDependencyResourceProcedure,
+    rotateConnection: rotateDependencyResourceConnectionProcedure,
     list: listDependencyResourcesProcedure,
     show: showDependencyResourceProcedure,
     inspect: inspectDependencyResourceProcedure,
@@ -10322,6 +10342,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/dependency-resources/provisioning/:planId/accept",
     "/api/dependency-resources/provision",
     "/api/dependency-resources/import",
+    "/api/dependency-resources/:dependencyResourceId/connection",
     "/api/dependency-resources/backups/:backupId",
     "/api/dependency-resources/backups/:backupId/restore",
     "/api/dependency-resources/backup-policies",

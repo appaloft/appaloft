@@ -21,6 +21,7 @@ import {
   type Query,
   type QueryBus,
   RestoreDependencyResourceBackupCommand,
+  RotateDependencyResourceConnectionCommand,
   RotateResourceDependencyBindingSecretCommand,
   ShowDependencyResourceBackupQuery,
   ShowDependencyResourceProvisioningPlanQuery,
@@ -317,6 +318,24 @@ describe("dependency resource HTTP routes", () => {
     expect(commands[0]).toMatchObject({ kind: "postgres" });
     expect(commands[1]).toBeInstanceOf(ImportDependencyResourceCommand);
     expect(commands[1]).toMatchObject({ kind: "mysql" });
+  });
+
+  test("[DEP-RES-CONNECTION-ROTATE-004] dispatches imported connection rotation through HTTP", async () => {
+    const { app, commands } = createHarness();
+    const response = await app.handle(
+      new Request("http://localhost/api/dependency-resources/rsi_external/connection", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          dependencyResourceId: "rsi_external",
+          connectionUrl: "postgres://app:new-secret@db.example.com:5432/app",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(commands[0]).toBeInstanceOf(RotateDependencyResourceConnectionCommand);
+    expect(commands[0]).toMatchObject({ dependencyResourceId: "rsi_external" });
   });
 
   test("[DEP-RES-ENTRY-003] dispatches additional dependency kinds through one HTTP route", async () => {

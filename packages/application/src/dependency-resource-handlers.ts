@@ -29,6 +29,8 @@ export * from "./operations/dependency-resources/rename-dependency-resource.hand
 export * from "./operations/dependency-resources/rename-dependency-resource.use-case";
 export * from "./operations/dependency-resources/restore-dependency-resource-backup.handler";
 export * from "./operations/dependency-resources/restore-dependency-resource-backup.use-case";
+export * from "./operations/dependency-resources/rotate-dependency-resource-connection.handler";
+export * from "./operations/dependency-resources/rotate-dependency-resource-connection.use-case";
 export * from "./operations/dependency-resources/show-dependency-resource.handler";
 export * from "./operations/dependency-resources/show-dependency-resource.query-service";
 export * from "./operations/dependency-resources/show-dependency-resource-backup.handler";

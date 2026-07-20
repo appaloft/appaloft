@@ -58,6 +58,7 @@ export * from "./operations/dependency-resources/list-dependency-resources.schem
 export * from "./operations/dependency-resources/provision-dependency-resource.schema";
 export * from "./operations/dependency-resources/rename-dependency-resource.schema";
 export * from "./operations/dependency-resources/restore-dependency-resource-backup.schema";
+export * from "./operations/dependency-resources/rotate-dependency-resource-connection.schema";
 export * from "./operations/dependency-resources/show-dependency-resource.schema";
 export * from "./operations/dependency-resources/show-dependency-resource-backup.schema";
 export * from "./operations/dependency-resources/show-dependency-resource-backup-policy.query";

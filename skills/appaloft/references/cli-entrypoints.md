@@ -41,6 +41,34 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 
 ## Catalog
 
+- `appaloft sandbox create` - `sandboxes.create`
+- `appaloft sandbox list` - `sandboxes.list`
+- `appaloft sandbox show <sandboxId>` - `sandboxes.show`
+- `appaloft sandbox events <sandboxId> --follow` - `sandboxes.events.stream`
+- `appaloft sandbox pause <sandboxId>` - `sandboxes.pause`
+- `appaloft sandbox resume <sandboxId>` - `sandboxes.resume`
+- `appaloft sandbox terminate <sandboxId>` - `sandboxes.terminate`
+- `appaloft sandbox exec <sandboxId> -- <argv...>` - `sandboxes.exec`
+- `appaloft sandbox files list <sandboxId> <path>` - `sandbox-files.list`
+- `appaloft sandbox files read <sandboxId> <path>` - `sandbox-files.read`
+- `appaloft sandbox files write <sandboxId> <path>` - `sandbox-files.write`
+- `appaloft sandbox files remove <sandboxId> <path>` - `sandbox-files.remove`
+- `appaloft sandbox process list <sandboxId>` - `sandbox-processes.list`
+- `appaloft sandbox process terminate <sandboxId> <processId>` - `sandbox-processes.terminate`
+- `appaloft sandbox process show <sandboxId> <processId>` - `sandbox-processes.show`
+- `appaloft sandbox network deny <sandboxId>` - `sandboxes.network-policy.configure`
+- `appaloft sandbox port expose <sandboxId> <port>` - `sandbox-ports.expose`
+- `appaloft sandbox port list <sandboxId>` - `sandbox-ports.list`
+- `appaloft sandbox port revoke <sandboxId> <exposureId>` - `sandbox-ports.revoke`
+- `appaloft sandbox snapshot create <sandboxId>` - `sandbox-snapshots.create`
+- `appaloft sandbox snapshot list` - `sandbox-snapshots.list`
+- `appaloft sandbox snapshot show <snapshotId>` - `sandbox-snapshots.show`
+- `appaloft sandbox snapshot delete <snapshotId>` - `sandbox-snapshots.delete`
+- `appaloft sandbox template create` - `sandbox-templates.create`
+- `appaloft sandbox template list` - `sandbox-templates.list`
+- `appaloft sandbox template show <templateId>` - `sandbox-templates.show`
+- `appaloft sandbox template delete <templateId>` - `sandbox-templates.delete`
+
 - `appaloft auth bootstrap-status` - `auth.bootstrap-status`
 - `appaloft auth bootstrap-first-admin` - `auth.bootstrap-first-admin`
 - `appaloft organization context` - `organizations.current-context`
@@ -158,6 +186,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft resource proxy-config <resourceId>` - `resources.proxy-configuration.preview`
 - `appaloft dependency provision --kind <kind>` - `dependency-resources.provision`
 - `appaloft dependency import --kind <kind>` - `dependency-resources.import`
+- `appaloft dependency rotate-connection <dependencyResourceId> --connection-url-stdin` - `dependency-resources.rotate-connection`
 - `appaloft dependency plan --mode <create|reuse>` - `dependency-resources.provisioning.plan`
 - `appaloft dependency accept <planId> --acknowledge-mutation` - `dependency-resources.provisioning.accept`
 - `appaloft dependency status <planId>` - `dependency-resources.provisioning.status`

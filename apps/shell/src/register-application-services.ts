@@ -438,6 +438,8 @@ import {
   RevokeDeployTokenUseCase,
   RollbackDeploymentCommandHandler,
   RollbackDeploymentUseCase,
+  RotateDependencyResourceConnectionCommandHandler,
+  RotateDependencyResourceConnectionUseCase,
   RotateDeployTokenCommandHandler,
   RotateDeployTokenUseCase,
   RotateResourceDependencyBindingSecretCommandHandler,
@@ -1811,6 +1813,7 @@ export function registerApplicationServices(
   container.registerSingleton(ShowDependencyResourceProvisioningPlanQueryHandler);
   container.registerSingleton(ProvisionDependencyResourceCommandHandler);
   container.registerSingleton(ImportDependencyResourceCommandHandler);
+  container.registerSingleton(RotateDependencyResourceConnectionCommandHandler);
   container.registerSingleton(RenameDependencyResourceCommandHandler);
   container.registerSingleton(DeleteDependencyResourceCommandHandler);
   container.registerSingleton(ConfigureDependencyResourceBackupPolicyCommandHandler);
@@ -2138,6 +2141,10 @@ export function registerApplicationServices(
   container.registerSingleton(
     tokens.importDependencyResourceUseCase,
     ImportDependencyResourceUseCase,
+  );
+  container.registerSingleton(
+    tokens.rotateDependencyResourceConnectionUseCase,
+    RotateDependencyResourceConnectionUseCase,
   );
   container.registerSingleton(
     tokens.renameDependencyResourceUseCase,

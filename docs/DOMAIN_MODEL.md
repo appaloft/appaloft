@@ -534,6 +534,11 @@ Boundary rule:
 
 ### Dependency Resources
 
+An active imported-external Dependency Resource may replace its Appaloft-stored connection
+material through the explicit `dependency-resources.rotate-connection` operation. The transition
+preserves resource identity, bindings and safe reference, updates masked endpoint metadata, and
+does not mutate provider-native credentials or runtime state.
+
 Owns:
 - `ResourceInstance`
 - `ResourceBinding`

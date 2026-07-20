@@ -380,6 +380,7 @@ describe("public docs operation coverage", () => {
     const lifecycleOperations = [
       "dependency-resources.provision",
       "dependency-resources.import",
+      "dependency-resources.rotate-connection",
       "dependency-resources.list",
       "dependency-resources.show",
       "dependency-resources.rename",

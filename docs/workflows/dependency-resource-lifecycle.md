@@ -13,6 +13,7 @@ routes. Every mutation must dispatch one explicit operation:
 
 - `dependency-resources.provision`
 - `dependency-resources.import`
+- `dependency-resources.rotate-connection`
 - `dependency-resources.rename`
 - `dependency-resources.delete`
 - `dependency-resources.create-backup`
@@ -58,6 +59,7 @@ entries are superseded by `dependency-resources.provision` and `dependency-resou
 - [Dependency Resource Backup And Restore](../specs/039-dependency-resource-backup-restore/spec.md)
 - [Dependency Binding Runtime Injection](../specs/047-dependency-binding-runtime-injection/spec.md)
 - [Dependency Runtime Secret Value Resolution](../specs/048-dependency-runtime-secret-value-resolution/spec.md)
+- [Imported Dependency Connection Rotation](../specs/109-imported-dependency-connection-rotation/spec.md)
 - [Redis Provider-Native Realization](../specs/049-redis-provider-native-realization/spec.md)
 - [ADR-040: Dependency Binding Runtime Injection Boundary](../decisions/ADR-040-dependency-binding-runtime-injection-boundary.md)
 - [ADR-041: Dependency Runtime Secret Value Resolution](../decisions/ADR-041-dependency-runtime-secret-value-resolution.md)
@@ -83,23 +85,25 @@ The workflow lets operators:
 1. Provision an Appaloft-managed dependency resource record with provider-native realization state
    and operator-visible process-attempt projection.
 2. Import an external dependency resource without exposing raw connection secrets later.
-3. List and show dependency resources with ownership, status, connection exposure policy, binding
+3. Replace Appaloft-stored connection material for an active imported external dependency without
+   changing its identity, bindings, provider credentials, runtime, or snapshots.
+4. List and show dependency resources with ownership, status, connection exposure policy, binding
    readiness, and backup relationship metadata.
-4. Rename a dependency resource without changing bindings, backup metadata, provider state,
+5. Rename a dependency resource without changing bindings, backup metadata, provider state,
    runtime state, or snapshots.
-5. Bind a ready dependency resource to a Resource with safe target metadata.
-6. List/show Resource dependency binding summaries without exposing raw secrets.
-7. Unbind without deleting the dependency resource or any external/provider database.
-8. Record provider-neutral safe dependency binding references in new deployment attempt snapshots.
-9. Rotate a binding-scoped secret reference for future deployment snapshots without changing
+6. Bind a ready dependency resource to a Resource with safe target metadata.
+7. List/show Resource dependency binding summaries without exposing raw secrets.
+8. Unbind without deleting the dependency resource or any external/provider database.
+9. Record provider-neutral safe dependency binding references in new deployment attempt snapshots.
+10. Rotate a binding-scoped secret reference for future deployment snapshots without changing
    historical deployments.
-10. Register and realize dependency resources through the generic provider capability with
+11. Register and realize dependency resources through the generic provider capability with
     operator-visible process-attempt projection, then copy ready bindings into safe deployment
     snapshot references.
-11. Materialize active ready dependency bindings into runtime environment injection snapshots during
+12. Materialize active ready dependency bindings into runtime environment injection snapshots during
     deployment planning/execution.
-12. Create safe backup restore points and restore them in place after explicit acknowledgement.
-13. Delete only dependency resources that pass safety checks.
+13. Create safe backup restore points and restore them in place after explicit acknowledgement.
+14. Delete only dependency resources that pass safety checks.
 
 ## Operation Boundaries
 
@@ -107,6 +111,7 @@ The workflow lets operators:
 | --- | --- | --- | --- |
 | Provision managed dependency | `dependency-resources.provision` | `ResourceInstance`; provider-native realization attempt | Resource bindings, secrets rotation, runtime, deployment snapshots |
 | Import external dependency | `dependency-resources.import` | `ResourceInstance` | External service, Resource bindings, runtime, deployment snapshots |
+| Rotate imported connection | `dependency-resources.rotate-connection` | Protected dependency secret value and masked endpoint metadata | Resource identity, bindings, provider-native credentials, runtime, deployment snapshots |
 | List dependency resources | `dependency-resources.list` | Nothing | Any aggregate or runtime state |
 | Show dependency resource | `dependency-resources.show` | Nothing | Any aggregate or runtime state |
 | Rename dependency resource | `dependency-resources.rename` | Dependency resource name/slug | Bindings, backup metadata, provider state, runtime, snapshots |
@@ -132,6 +137,10 @@ The workflow lets operators:
 
 All canonical dependency kinds reuse these source modes. Imported external records capture only safe
 endpoint metadata and secret references.
+
+Connection replacement is an explicit operation for active `imported-external` records. It reuses
+the stable Appaloft-owned reference, does not accept repository configuration, and does not restart
+or redeploy consumers. There remains no generic dependency update operation.
 
 ## Provider-Native Dependency Realization
 

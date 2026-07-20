@@ -762,6 +762,10 @@ export const cliCommandDescriptions = {
     "Import an external dependency resource by kind",
     "dependency.resource-lifecycle",
   ),
+  dependencyRotateConnection: withDocs(
+    "Replace the stored connection credential for an imported external dependency",
+    "dependency.resource-lifecycle",
+  ),
   dependencyRedisImport: withDocs(
     "Import an external Redis dependency resource",
     "dependency.resource-lifecycle",
