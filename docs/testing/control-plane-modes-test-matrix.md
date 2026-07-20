@@ -104,6 +104,7 @@ These rows are governed by
 | CONTROL-PLANE-CLI-017 | CLI/unit | MCP login writes bearer profile through browser handoff | A remote HTTP MCP client needs bearer auth and the selected control plane supports CLI auth-session exchange | `appaloft auth mcp login` creates an auth session with `requestedCredential: "bearer"`, exchanges after authorization, verifies current organization context, writes a redacted local `mcp` profile by default, and does not print raw token material | Browser auth/session/current-context failures use the same errors as `CONTROL-PLANE-CLI-013` and leave profiles unchanged | Auth session create with bearer request -> poll -> exchange -> version/current-context -> `mcp` profile store write |
 | CONTROL-PLANE-CLI-018 | CLI/unit | Codex MCP install writes token-free bridge config | A local `mcp` profile exists with bearer material from `appaloft auth mcp login` | `appaloft auth mcp codex install` writes or updates a Codex `[mcp_servers.appaloft]` stdio entry that launches `appaloft mcp remote-stdio --profile mcp`, keeps bearer material only in the Appaloft profile store, and prints no raw token material | Missing profile returns `control_plane_profile_not_found`; non-bearer profile returns `validation_error`; config write failure returns `codex_mcp_config_write_failed` | Profile read -> bearer kind check -> Codex config upsert -> redacted install report |
 | CONTROL-PLANE-CLI-019 | CLI/unit | Unknown command fails before runtime setup | A top-level command is misspelled or uses the wrong singular/plural form | The CLI returns a structured `Unknown Appaloft command` validation error before local shell composition, PGlite, SSH state sync, handshake, or remote dispatch | `validation_error`, phase `control-plane-resolution`, with the sanitized unknown command name | Global option parse -> top-level command validation -> structured failure -> no runtime initialization |
+| CONTROL-PLANE-CLI-020 | shell/CLI integration | Secret stdin survives entrypoint initialization | A remote-capable command explicitly requests stdin and receives it from a pipe or owner-readable regular file | The shell captures stdin before parser/runtime initialization, passes the exact value only to the selected handler and typed remote request body, and does not expose it through argv, stdout, stderr, diagnostics, or logs | Empty explicit stdin returns `validation_error`; remote transport failures remain structured and sanitized | Entrypoint stdin capture -> command parse -> typed remote request -> redacted output |
 
 ## Self-Hosted Install Matrix
 
@@ -198,7 +199,8 @@ client bridge:
 - `CONTROL-PLANE-CLI-001`, `CONTROL-PLANE-CLI-002`, `CONTROL-PLANE-CLI-003`,
   `CONTROL-PLANE-CLI-004`, `CONTROL-PLANE-CLI-005`, `CONTROL-PLANE-CLI-007`,
   `CONTROL-PLANE-CLI-008`, `CONTROL-PLANE-CLI-009`, `CONTROL-PLANE-CLI-010`,
-  `CONTROL-PLANE-CLI-011`, `CONTROL-PLANE-CLI-012`, and `CONTROL-PLANE-CLI-013`;
+  `CONTROL-PLANE-CLI-011`, `CONTROL-PLANE-CLI-012`, `CONTROL-PLANE-CLI-013`, and
+  `CONTROL-PLANE-CLI-020`;
 - the adapter-level `CONTROL-PLANE-CLI-006` binding for typed SDK `projects.list/show`,
   `projects.rename`, and `servers.list` remote dispatch;
 - mode/profile mismatch and explicit local-only terminal/deploy unsupported checks under
@@ -206,7 +208,8 @@ client bridge:
 
 `apps/shell/test/run-control-plane-cli.test.ts` covers the shell pre-dispatch portion of
 `CONTROL-PLANE-CLI-006`, proving remote `project list` and `project rename` return before local
-shell composition or SSH PGlite sync. The implemented bridge has a CLI-adapter-local profile store,
+shell composition or SSH PGlite sync, and `CONTROL-PLANE-CLI-020`, proving protected regular-file
+stdin is captured before runtime initialization. The implemented bridge has a CLI-adapter-local profile store,
 login/logout/status commands, context command, self-hosted and explicit-URL Cloud token/cookie
 handshake, full flags/env/profile/config target resolution, dispatch-time handshake, and ordinary
 CLI remote dispatcher for generated SDK non-streaming operations.

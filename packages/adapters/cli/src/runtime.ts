@@ -73,6 +73,7 @@ export interface CliProgramInput {
   executionContextFactory: ExecutionContextFactory;
   terminalSessionGateway?: TerminalSessionGateway;
   terminalIO?: CliTerminalIO;
+  readStdinText?: () => Promise<string>;
   deploymentProgressObserver?: DeploymentProgressObserver;
   prepareDeploymentStateBackend?: (
     decision: DeploymentStateBackendDecision,
@@ -135,6 +136,7 @@ export class CliRuntime extends Context.Tag("CliRuntime")<
     readonly executeQuery: <T>(message: AppQuery<T>) => Promise<Result<T>>;
     readonly terminalSessionGateway?: TerminalSessionGateway;
     readonly terminalIO: CliTerminalIO;
+    readonly readStdinText?: () => Promise<string>;
     readonly prepareDeploymentStateBackend?: (
       decision: DeploymentStateBackendDecision,
     ) => Promise<Result<RemoteStateSession>>;
@@ -203,6 +205,7 @@ export const CliRuntimeLive = (input: CliProgramInput) =>
       stdout: process.stdout,
       stderr: process.stderr,
     },
+    readStdinText: input.readStdinText ?? readProcessStdinText,
     ...(input.prepareDeploymentStateBackend
       ? { prepareDeploymentStateBackend: input.prepareDeploymentStateBackend }
       : {}),
@@ -211,6 +214,18 @@ export const CliRuntimeLive = (input: CliProgramInput) =>
       ? { serverAppliedRouteStore: input.serverAppliedRouteStore }
       : {}),
   });
+
+export async function readProcessStdinText(): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
+export function cliArgvRequestsStdinText(argv: readonly string[]): boolean {
+  return argv.includes("--stdin") || argv.includes("--connection-url-stdin");
+}
 
 export const optionalValue = <T>(value: Option.Option<T>): T | undefined =>
   Option.getOrElse(value, () => undefined);

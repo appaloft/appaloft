@@ -38,4 +38,7 @@ deployment snapshots.
 CLI automation should pass the connection URL through standard input with
 `appaloft dependency import ... --connection-url-stdin`. `--connection-url` remains available for
 interactive compatibility, but the two inputs are mutually exclusive and empty standard input is
-rejected.
+rejected. The shell entrypoint must capture requested standard input before loading the CLI parser
+or runtime so both pipes and owner-readable regular files are preserved. Captured connection
+material is passed only to the selected command handler and remote typed request body; it must not
+appear in argv, stdout, stderr, diagnostics, or logs.

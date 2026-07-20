@@ -23,7 +23,7 @@ import { domainError, err, ok, type Result } from "@appaloft/core";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
 import { Effect } from "effect";
 
-import { optionalValue, resultToEffect, runCommand, runQuery } from "../runtime.js";
+import { CliRuntime, optionalValue, resultToEffect, runCommand, runQuery } from "../runtime.js";
 import { cliCommandDescriptions } from "./docs-help.js";
 
 const dependencyResourceIdArg = Args.text({ name: "dependencyResourceId" });
@@ -277,11 +277,13 @@ const importCommand = EffectCommand.make(
     const backupReasonValue = optionalValue(backupReason);
     const connectionUrlValue = optionalValue(connectionUrl);
     return Effect.gen(function* () {
+      const cli = yield* CliRuntime;
       const resolvedConnectionUrl = yield* resultToEffect(
         yield* Effect.promise(() =>
           resolveDependencyConnectionUrl({
             stdin: connectionUrlStdin,
             ...(connectionUrlValue ? { value: connectionUrlValue } : {}),
+            readStdin: cli.readStdinText ?? readDependencyConnectionUrlStdin,
           }),
         ),
       );
