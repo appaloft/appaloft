@@ -23,8 +23,8 @@
 - [x] Implement durable provider attempts, expiry and reconciliation.
 - [x] `SBX-RECONCILE-001`: add provider-owned runtime inventory, persisted-handle comparison and
   exact orphan removal tests/implementation.
-- [ ] `SBX-STREAM-001`: persist Sandbox lifecycle/process events and expose bounded replay/live SSE.
-- [ ] `SBX-SECRET-001`: add grant/revoke/list plus destination-bound broker request operations;
+- [x] `SBX-STREAM-001`: persist Sandbox lifecycle/process events and expose bounded replay/live SSE.
+- [x] `SBX-SECRET-001`: add grant/revoke/list plus destination-bound broker request operations;
   prove plaintext absence across state, output, errors, audit and snapshot.
 
 ## Persistence And Providers

@@ -3,8 +3,8 @@
 ## Status
 
 - Round: bounded v1 Code Round complete
-- Artifact state: implemented and verified; credential broker, live streams and orphan scanning are
-  governed compatible follow-ups
+- Artifact state: implemented and verified, including credential grants, lifecycle/process SSE and
+  provider-owned orphan reconciliation
 - Roadmap target: post-1.0 Execution Sandbox Platform track
 - Compatibility impact: additive public minor capability
 
@@ -12,8 +12,9 @@
 
 An authorized external application, AI agent, CLI user or MCP client can request an isolated
 execution environment, observe it becoming ready, execute foreground or background processes,
-manage a confined workspace, expose controlled preview ports, pause/resume it, capture reusable
-snapshots and terminate it through the same Appaloft operation catalog.
+manage a confined workspace, broker destination-bound credential requests, subscribe to lifecycle
+and process events, expose controlled preview ports, pause/resume it, capture reusable snapshots and
+terminate it through the same Appaloft operation catalog.
 
 The caller receives an Appaloft Sandbox handle and safe access descriptors rather than host SSH,
 provider credentials or raw host network access. The same contract works with Community BYOS,
@@ -54,7 +55,7 @@ Kubernetes, hosted providers and Enterprise customer-owned execution.
 | SANDBOX-SPEC-005 | Background process | A ready Sandbox exists | The caller starts background execution | A safe process id is returned; list/show/terminate work without exposing host process ids. |
 | SANDBOX-SPEC-006 | Confined files | A ready or paused filesystem-capable Sandbox exists | The caller lists, reads, writes or removes a workspace path | Binary-safe operations remain below the workspace root; traversal, host paths and symlink escape fail closed. |
 | SANDBOX-SPEC-007 | Controlled ports | A ready Sandbox has a listening service | A port is exposed or revoked | The result is an authenticated/signed access descriptor with expiry and visibility; no host IP/provider credential leaks. |
-| SANDBOX-SPEC-008 | Network and credentials | A Sandbox has default-deny egress | Policy is updated | Only provider-declared policies are accepted; current Docker providers support deny only. Credential-broker capability remains false until an adapter can prove destination-bound injection without plaintext persistence. |
+| SANDBOX-SPEC-008 | Network and credentials | A Sandbox has default-deny egress and an authorized secret reference | A policy is updated or credential request is brokered | Only provider-declared policies are accepted; the broker resolves plaintext only in control-plane memory, requires exact public HTTPS destination binding, returns a bounded redacted response and persists only the secret reference. |
 | SANDBOX-SPEC-009 | Pause versus snapshot | A provider declares pause and/or snapshot capabilities | The caller pauses/resumes or captures/restores | Pause keeps one Sandbox identity; snapshot produces an independent reusable Snapshot with explicit filesystem/memory capability truth. |
 | SANDBOX-SPEC-010 | Template reuse | An authorized caller owns a Sandbox Template | A Sandbox is created with allowed overrides | Template defaults and override policy are deterministic; immutable/disallowed fields cannot be weakened by the caller. |
 | SANDBOX-SPEC-011 | External application SDK | An application has a scoped token | It calls generated SDK methods | SDK methods map to catalog operations and typed errors/streams; it does not import application/core or create SDK-only behavior. |
@@ -63,7 +64,8 @@ Kubernetes, hosted providers and Enterprise customer-owned execution.
 
 ## Public Surfaces
 
-- API/SDK: lifecycle, bounded process, file, port, policy, template and snapshot operations.
+- API/SDK: lifecycle, process event SSE, file, port, network policy, credential grant/broker,
+  template and snapshot operations.
 - CLI: the same operations for operator automation and local/BYOS use.
 - Web: list/show/lifecycle/usage/status first; interactive file/terminal IDE behavior is optional.
 - MCP: generated descriptors for bounded operations; binary file and process streams may use
@@ -83,9 +85,6 @@ Kubernetes, hosted providers and Enterprise customer-owned execution.
 
 ## Governed Follow-Ups
 
-- Live process/event attach may extend terminal sessions or add a bounded stream transport; current
-  APIs do not claim real-time streaming.
-- Destination-bound credential brokering requires its own provider port, redaction and adversarial
-  suite before any provider advertises the capability.
-- Restart orphan scanning must enumerate only provider-owned resources and prove exact cleanup;
-  current maintenance uses persisted handles and TTL reconciliation.
+- Allowlist egress requires a provider-enforced network adapter; current Docker execution remains
+  default deny while brokered HTTPS requests use a separate control-plane boundary.
+- Multi-worker capacity placement and warm pools remain compatible provider/scheduler extensions.
