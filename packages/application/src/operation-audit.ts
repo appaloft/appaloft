@@ -86,7 +86,7 @@ const relatedTargetFields: Record<string, string> = {
 };
 
 const secretLikeKeyPattern =
-  /(authorization|certificate|credential|env|password|payload|private|secret|signature|token|value)/i;
+  /(authorization|certificate|credential|env|envelope|passphrase|password|payload|private|secret|signature|token|value)/i;
 
 export class DefaultOperationAuditSink implements OperationAuditSink {
   constructor(

@@ -1848,3 +1848,4 @@ export class RoutingExecutionBackend implements ExecutionBackend {
 export { LocalExecutionBackend };
 export { RuntimeServerEdgeProxyBootstrapper } from "./server-edge-proxy-bootstrapper";
 export { RuntimeServerRuntimePreparer } from "./server-runtime-preparer";
+export { LocalAgentTunnelProvider, type LocalAgentTunnelProviderOptions } from "./tunnel-provider";

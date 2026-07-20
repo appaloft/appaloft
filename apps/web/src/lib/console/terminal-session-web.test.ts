@@ -4,7 +4,7 @@ import { describe, expect, test } from "vitest";
 describe("terminal session Web console surface", () => {
   test("[TERM-SESSION-WEB-001] exposes active terminal lifecycle through Instance management", async () => {
     const [instancePageSource, clientContractSource] = await Promise.all([
-      readFile(new URL("../../routes/instance/+page.svelte", import.meta.url), "utf8"),
+      readFile(new URL("../../routes/instance/InstancePage.svelte", import.meta.url), "utf8"),
       readFile(
         new URL("../../../../../packages/orpc/src/client-contract.ts", import.meta.url),
         "utf8",

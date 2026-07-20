@@ -148,7 +148,7 @@ describe("console docs help links", () => {
           "routes/preview-environments/+page.svelte",
           "routes/preview-environments/[previewEnvironmentId=consoleObjectId]/+page.svelte",
           "routes/preview-policies/+page.svelte",
-          "routes/instance/+page.svelte",
+          "routes/instance/InstancePage.svelte",
           "routes/projects/[projectId=consoleObjectId]/+page.svelte",
           "routes/resources/[resourceId=consoleObjectId]/+page.svelte",
           "routes/servers/+page.svelte",
@@ -173,9 +173,11 @@ describe("console docs help links", () => {
       ],
     ).toContain("productGradePreviews");
     expect(sourceByPath["routes/preview-policies/+page.svelte"]).toContain("productGradePreviews");
-    expect(sourceByPath["routes/instance/+page.svelte"]).toContain("DocsHelpLink");
-    expect(sourceByPath["routes/instance/+page.svelte"]).toContain("serverTerminalSession");
-    expect(sourceByPath["routes/instance/+page.svelte"]).toContain("maintenanceWorkerActivation");
+    expect(sourceByPath["routes/instance/InstancePage.svelte"]).toContain("DocsHelpLink");
+    expect(sourceByPath["routes/instance/InstancePage.svelte"]).toContain("serverTerminalSession");
+    expect(sourceByPath["routes/instance/InstancePage.svelte"]).toContain(
+      "maintenanceWorkerActivation",
+    );
     expect(sourceByPath["routes/projects/[projectId=consoleObjectId]/+page.svelte"]).toContain(
       "environmentLifecycle",
     );

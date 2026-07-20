@@ -1,3 +1,5 @@
+import "reflect-metadata";
+
 import { type ZodTypeAny } from "zod";
 import {
   brokerSandboxCredentialRequestCommandInputSchema,
@@ -294,11 +296,25 @@ import { renameStorageVolumeCommandInputSchema } from "./operations/storage-volu
 import { restoreStorageVolumeBackupCommandInputSchema } from "./operations/storage-volumes/restore-storage-volume-backup.command";
 import { showStorageVolumeQueryInputSchema } from "./operations/storage-volumes/show-storage-volume.query";
 import { showStorageVolumeBackupQueryInputSchema } from "./operations/storage-volumes/show-storage-volume-backup.query";
+import {
+  configureStorageVolumeBackupPolicyCommandInputSchema,
+  listStorageVolumeBackupPoliciesQueryInputSchema,
+  showStorageVolumeBackupPolicyQueryInputSchema,
+} from "./operations/storage-volumes/storage-volume-backup-automation";
 import { acceptConnectorCapabilityPlanCommandInputSchema } from "./operations/system/accept-connector-capability-plan.command";
 import { applyConnectorCapabilityCommandInputSchema } from "./operations/system/apply-connector-capability.command";
 import { applyInstanceUpgradeCommandInputSchema } from "./operations/system/apply-instance-upgrade.command";
 import { checkInstanceUpgradeQueryInputSchema } from "./operations/system/check-instance-upgrade.query";
 import { completeConnectionCallbackCommandInputSchema } from "./operations/system/complete-connection-callback.command";
+import {
+  controlPlanePortabilityExportPlanQueryInputSchema,
+  controlPlanePortabilityImportPlanQueryInputSchema,
+  deleteControlPlanePortabilityArtifactCommandInputSchema,
+  exportControlPlaneCommandInputSchema,
+  importControlPlaneCommandInputSchema,
+  listControlPlanePortabilityArtifactsQueryInputSchema,
+  showControlPlanePortabilityArtifactQueryInputSchema,
+} from "./operations/system/control-plane-portability";
 import { controlPlaneSecretRotationApplyCommandInputSchema } from "./operations/system/control-plane-secret-rotation-apply.command";
 import { githubAppConnectionQueryInputSchema } from "./operations/system/github-app-connection.query";
 import { listConnectionsQueryInputSchema } from "./operations/system/list-connections.query";
@@ -313,6 +329,12 @@ import { expireTerminalSessionsCommandInputSchema } from "./operations/terminal-
 import { listTerminalSessionsQueryInputSchema } from "./operations/terminal-sessions/list-terminal-sessions.query";
 import { openTerminalSessionCommandInputSchema } from "./operations/terminal-sessions/open-terminal-session.command";
 import { showTerminalSessionQueryInputSchema } from "./operations/terminal-sessions/show-terminal-session.query";
+import {
+  listTunnelSessionsQueryInputSchema,
+  revokeTunnelSessionCommandInputSchema,
+  showTunnelSessionQueryInputSchema,
+  startTunnelCommandInputSchema,
+} from "./operations/tunnels/tunnel-session";
 import { type ProductOrganizationRole } from "./ports";
 import { tokens } from "./tokens";
 
@@ -351,6 +373,8 @@ type OperationDomain =
   | "source-links"
   | "static-artifacts"
   | "connections"
+  | "control-plane-portability"
+  | "tunnels"
   | "system"
   | "terminal-sessions"
   | "sandboxes";
@@ -2810,6 +2834,48 @@ export const operationCatalog = [
     },
   },
   {
+    key: "storage-volumes.backup-policies.configure",
+    kind: "command",
+    domain: "storage-volumes",
+    messageName: "ConfigureStorageVolumeBackupPolicyCommand",
+    handlerName: "ConfigureStorageVolumeBackupPolicyCommandHandler",
+    serviceName: "ConfigureStorageVolumeBackupPolicyUseCase",
+    inputSchema: configureStorageVolumeBackupPolicyCommandInputSchema,
+    serviceToken: tokens.configureStorageVolumeBackupPolicyUseCase,
+    transports: {
+      cli: "appaloft storage volume backup policy configure --storage-volume <storageVolumeId>",
+      orpc: { method: "POST", path: "/api/storage-volumes/backup-policies" },
+    },
+  },
+  {
+    key: "storage-volumes.backup-policies.list",
+    kind: "query",
+    domain: "storage-volumes",
+    messageName: "ListStorageVolumeBackupPoliciesQuery",
+    handlerName: "ListStorageVolumeBackupPoliciesQueryHandler",
+    serviceName: "ListStorageVolumeBackupPoliciesQueryService",
+    inputSchema: listStorageVolumeBackupPoliciesQueryInputSchema,
+    serviceToken: tokens.listStorageVolumeBackupPoliciesQueryService,
+    transports: {
+      cli: "appaloft storage volume backup policy list",
+      orpc: { method: "GET", path: "/api/storage-volumes/backup-policies" },
+    },
+  },
+  {
+    key: "storage-volumes.backup-policies.show",
+    kind: "query",
+    domain: "storage-volumes",
+    messageName: "ShowStorageVolumeBackupPolicyQuery",
+    handlerName: "ShowStorageVolumeBackupPolicyQueryHandler",
+    serviceName: "ShowStorageVolumeBackupPolicyQueryService",
+    inputSchema: showStorageVolumeBackupPolicyQueryInputSchema,
+    serviceToken: tokens.showStorageVolumeBackupPolicyQueryService,
+    transports: {
+      cli: "appaloft storage volume backup policy show <policyId>",
+      orpc: { method: "GET", path: "/api/storage-volumes/backup-policies/{policyId}" },
+    },
+  },
+  {
     key: "storage-volumes.list-backups",
     kind: "query",
     domain: "storage-volumes",
@@ -4480,6 +4546,171 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft connectors apply --connector <connector> --capability <capability>",
       orpc: { method: "POST", path: "/api/connections/capabilities/apply" },
+    },
+  },
+  {
+    key: "control-plane-portability.export-plan",
+    kind: "query",
+    domain: "control-plane-portability",
+    messageName: "ControlPlanePortabilityExportPlanQuery",
+    handlerName: "ControlPlanePortabilityExportPlanQueryHandler",
+    serviceName: "ControlPlanePortabilityService",
+    inputSchema: controlPlanePortabilityExportPlanQueryInputSchema,
+    serviceToken: tokens.controlPlanePortabilityService,
+    transportAccess: { productSession: { minRole: "owner" } },
+    transports: {
+      cli: "appaloft instance portability export-plan",
+      orpc: { method: "GET", path: "/api/control-plane-portability/export-plan" },
+    },
+  },
+  {
+    key: "control-plane-portability.export",
+    kind: "command",
+    domain: "control-plane-portability",
+    messageName: "ExportControlPlaneCommand",
+    handlerName: "ExportControlPlaneCommandHandler",
+    serviceName: "ControlPlanePortabilityService",
+    inputSchema: exportControlPlaneCommandInputSchema,
+    serviceToken: tokens.controlPlanePortabilityService,
+    transportAccess: { productSession: { minRole: "owner" } },
+    transports: {
+      cli: "appaloft instance portability export --passphrase-stdin",
+      orpc: { method: "POST", path: "/api/control-plane-portability/exports" },
+    },
+  },
+  {
+    key: "control-plane-portability.import-plan",
+    kind: "query",
+    domain: "control-plane-portability",
+    messageName: "ControlPlanePortabilityImportPlanQuery",
+    handlerName: "ControlPlanePortabilityImportPlanQueryHandler",
+    serviceName: "ControlPlanePortabilityService",
+    inputSchema: controlPlanePortabilityImportPlanQueryInputSchema,
+    serviceToken: tokens.controlPlanePortabilityService,
+    transportAccess: { productSession: { minRole: "owner" } },
+    transports: {
+      cli: "appaloft instance portability import-plan <artifact-file> --mode <merge|replace> --passphrase-stdin",
+      orpc: { method: "POST", path: "/api/control-plane-portability/import-plan" },
+    },
+  },
+  {
+    key: "control-plane-portability.import",
+    kind: "command",
+    domain: "control-plane-portability",
+    messageName: "ImportControlPlaneCommand",
+    handlerName: "ImportControlPlaneCommandHandler",
+    serviceName: "ControlPlanePortabilityService",
+    inputSchema: importControlPlaneCommandInputSchema,
+    serviceToken: tokens.controlPlanePortabilityService,
+    transportAccess: { productSession: { minRole: "owner" } },
+    transports: {
+      cli: "appaloft instance portability import <artifact-file> --mode <merge|replace> --passphrase-stdin [--acknowledge-replace]",
+      orpc: { method: "POST", path: "/api/control-plane-portability/imports" },
+    },
+  },
+  {
+    key: "control-plane-portability.artifacts.list",
+    kind: "query",
+    domain: "control-plane-portability",
+    messageName: "ListControlPlanePortabilityArtifactsQuery",
+    handlerName: "ListControlPlanePortabilityArtifactsQueryHandler",
+    serviceName: "ControlPlanePortabilityService",
+    inputSchema: listControlPlanePortabilityArtifactsQueryInputSchema,
+    serviceToken: tokens.controlPlanePortabilityService,
+    transportAccess: { productSession: { minRole: "owner" } },
+    transports: {
+      cli: "appaloft instance portability artifact list",
+      orpc: { method: "GET", path: "/api/control-plane-portability/artifacts" },
+    },
+  },
+  {
+    key: "control-plane-portability.artifacts.show",
+    kind: "query",
+    domain: "control-plane-portability",
+    messageName: "ShowControlPlanePortabilityArtifactQuery",
+    handlerName: "ShowControlPlanePortabilityArtifactQueryHandler",
+    serviceName: "ControlPlanePortabilityService",
+    inputSchema: showControlPlanePortabilityArtifactQueryInputSchema,
+    serviceToken: tokens.controlPlanePortabilityService,
+    transportAccess: { productSession: { minRole: "owner" } },
+    transports: {
+      cli: "appaloft instance portability artifact show <artifactId>",
+      orpc: { method: "GET", path: "/api/control-plane-portability/artifacts/{artifactId}" },
+    },
+  },
+  {
+    key: "control-plane-portability.artifacts.delete",
+    kind: "command",
+    domain: "control-plane-portability",
+    messageName: "DeleteControlPlanePortabilityArtifactCommand",
+    handlerName: "DeleteControlPlanePortabilityArtifactCommandHandler",
+    serviceName: "ControlPlanePortabilityService",
+    inputSchema: deleteControlPlanePortabilityArtifactCommandInputSchema,
+    serviceToken: tokens.controlPlanePortabilityService,
+    transportAccess: { productSession: { minRole: "owner" } },
+    transports: {
+      cli: "appaloft instance portability artifact delete <artifactId>",
+      orpc: { method: "DELETE", path: "/api/control-plane-portability/artifacts/{artifactId}" },
+    },
+  },
+  {
+    key: "tunnels.start",
+    kind: "command",
+    domain: "tunnels",
+    messageName: "StartTunnelCommand",
+    handlerName: "StartTunnelCommandHandler",
+    serviceName: "TunnelSessionService",
+    inputSchema: startTunnelCommandInputSchema,
+    serviceToken: tokens.tunnelSessionService,
+    transportAccess: { productSession: { minRole: "owner" } },
+    transports: {
+      cli: "appaloft tunnel start --provider <cloudflare-quick|ngrok> --origin <url>",
+      orpc: { method: "POST", path: "/api/tunnels" },
+    },
+  },
+  {
+    key: "tunnels.list",
+    kind: "query",
+    domain: "tunnels",
+    messageName: "ListTunnelSessionsQuery",
+    handlerName: "ListTunnelSessionsQueryHandler",
+    serviceName: "TunnelSessionService",
+    inputSchema: listTunnelSessionsQueryInputSchema,
+    serviceToken: tokens.tunnelSessionService,
+    transportAccess: { productSession: { minRole: "owner" } },
+    transports: {
+      cli: "appaloft tunnel list",
+      orpc: { method: "GET", path: "/api/tunnels" },
+    },
+  },
+  {
+    key: "tunnels.show",
+    kind: "query",
+    domain: "tunnels",
+    messageName: "ShowTunnelSessionQuery",
+    handlerName: "ShowTunnelSessionQueryHandler",
+    serviceName: "TunnelSessionService",
+    inputSchema: showTunnelSessionQueryInputSchema,
+    serviceToken: tokens.tunnelSessionService,
+    transportAccess: { productSession: { minRole: "owner" } },
+    transports: {
+      cli: "appaloft tunnel show <sessionId>",
+      orpc: { method: "GET", path: "/api/tunnels/{sessionId}" },
+    },
+  },
+  {
+    key: "tunnels.revoke",
+    kind: "command",
+    domain: "tunnels",
+    messageName: "RevokeTunnelSessionCommand",
+    handlerName: "RevokeTunnelSessionCommandHandler",
+    serviceName: "TunnelSessionService",
+    inputSchema: revokeTunnelSessionCommandInputSchema,
+    serviceToken: tokens.tunnelSessionService,
+    transportAccess: { productSession: { minRole: "owner" } },
+    transports: {
+      cli: "appaloft tunnel revoke <sessionId>",
+      orpc: { method: "DELETE", path: "/api/tunnels/{sessionId}" },
     },
   },
   {

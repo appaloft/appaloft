@@ -179,7 +179,7 @@ describe("organization auth management console surface", () => {
       settingsNavSource,
     ] = await Promise.all([
       readFile(new URL("../../routes/organization/+page.svelte", import.meta.url), "utf8"),
-      readFile(new URL("../../routes/instance/+page.svelte", import.meta.url), "utf8"),
+      readFile(new URL("../../routes/instance/InstancePage.svelte", import.meta.url), "utf8"),
       readFile(new URL("../../routes/instance/workers/+page.svelte", import.meta.url), "utf8"),
       readFile(
         new URL("../../routes/instance/workers/InstanceWorkersRoute.svelte", import.meta.url),
@@ -258,7 +258,7 @@ describe("organization auth management console surface", () => {
 
   test("[ORG-TEAM-WEB-005] presents instance worker operations through settings routes and work ledger", async () => {
     const [instancePageSource, contractsSource, zhLocaleSource] = await Promise.all([
-      readFile(new URL("../../routes/instance/+page.svelte", import.meta.url), "utf8"),
+      readFile(new URL("../../routes/instance/InstancePage.svelte", import.meta.url), "utf8"),
       readFile(new URL("../../../../../packages/contracts/src/index.ts", import.meta.url), "utf8"),
       readFile(
         new URL("../../../../../packages/i18n/src/locales/zh-CN.ts", import.meta.url),

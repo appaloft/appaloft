@@ -92,6 +92,7 @@
     StopResourceRuntimeInput,
     SystemPluginWebExtension,
     StorageVolumeBackupPlanResponse,
+    StorageVolumeBackupPolicyRecord,
     StorageVolumeBackupSummary,
     StorageVolumeSummary,
     DnsRecordRequirement,
@@ -851,6 +852,15 @@
       staleTime: 5_000,
     }),
   );
+  const storageVolumeBackupPoliciesQuery = createQuery(() =>
+    orpc.storageVolumes.backupPolicies.list.queryOptions({
+      input: {
+        storageVolumeId: storageBackupVolumeId,
+      },
+      enabled: browser && storageBackupVolumeId.length > 0,
+      staleTime: 5_000,
+    }),
+  );
   const project = $derived(resource ? findProject(projects, resource.projectId) : null);
   const environment = $derived(
     resource ? findEnvironment(environments, resource.environmentId) : null,
@@ -1458,8 +1468,16 @@
     CreateStorageVolumeBackupPlanInput["target"]["providerKey"]
   >("local-filesystem");
   let storageBackupTargetRef = $state("/var/lib/appaloft/backups");
+  let storageBackupSecretRef = $state("");
   let storageBackupRetentionMaxCount = $state("3");
   let storageBackupRetentionMinFreeBytes = $state("1073741824");
+  let storageBackupScheduledEnabled = $state(false);
+  let storageBackupPreDeployEnabled = $state(false);
+  let storageBackupScheduleIntervalHours = $state("24");
+  let storageBackupRetryOnFailure = $state(true);
+  let storageBackupFailureMode = $state<"block" | "continue">("block");
+  let storageBackupNotificationRef = $state("");
+  let loadedStorageBackupPolicyKey = $state("");
   let storageBackupDialogOpen = $state(false);
   let storageBackupPlan = $state<StorageVolumeBackupPlanResponse | null>(null);
   let storageBackupRestoreNames = $state<Record<string, string>>({});
@@ -1468,6 +1486,27 @@
     title: string;
     detail: string;
   } | null>(null);
+  $effect(() => {
+    if (!storageBackupDialogOpen || !storageBackupVolumeId) {
+      return;
+    }
+    const policy = storageVolumeBackupPoliciesQuery.data?.items[0] ?? null;
+    const loadKey = `${storageBackupVolumeId}:${policy?.id ?? "none"}:${policy?.updatedAt ?? ""}`;
+    if (loadKey === loadedStorageBackupPolicyKey) {
+      return;
+    }
+    loadedStorageBackupPolicyKey = loadKey;
+    if (policy) {
+      loadStorageBackupPolicy(policy);
+    } else {
+      storageBackupScheduledEnabled = false;
+      storageBackupPreDeployEnabled = false;
+      storageBackupScheduleIntervalHours = "24";
+      storageBackupRetryOnFailure = true;
+      storageBackupFailureMode = "block";
+      storageBackupNotificationRef = "";
+    }
+  });
   let dependencyBindingResourceId = $state("");
   let dependencyBindingTargetName = $state("DATABASE_URL");
   let dependencyBindDialogOpen = $state(false);
@@ -1823,6 +1862,9 @@
       (attachment) => attachment.storageVolumeId === storageBackupVolumeId,
     ) ?? null,
   );
+  const selectedStorageBackupPolicy = $derived<StorageVolumeBackupPolicyRecord | null>(
+    storageVolumeBackupPoliciesQuery.data?.items[0] ?? null,
+  );
   const selectedStorageRuntimeCleanupServer = $derived(
     findServer(servers, storageRuntimeCleanupServerId),
   );
@@ -1867,6 +1909,9 @@
     canPlanStorageBackup &&
       canCreateStorageBackupByCapability &&
       Boolean(storageBackupPlan && storageBackupPlan.blockers.length === 0),
+  );
+  const canConfigureStorageBackupPolicy = $derived(
+    canPlanStorageBackup && isPositiveIntegerText(storageBackupScheduleIntervalHours),
   );
   const canCleanupStorageRuntime = $derived(
     Boolean(
@@ -3365,6 +3410,25 @@
       storageBackupFeedback = {
         kind: "error",
         title: $t(i18nKeys.console.resources.storageBackupCreateFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const configureStorageVolumeBackupPolicyMutation = createMutation(() => ({
+    mutationFn: (input: Parameters<typeof orpcClient.storageVolumes.backupPolicies.configure>[0]) =>
+      orpcClient.storageVolumes.backupPolicies.configure(input),
+    onSuccess: (result) => {
+      storageBackupFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.storageBackupPolicyConfigured),
+        detail: result.id,
+      };
+      void invalidateStorageBackupQueries();
+    },
+    onError: (error) => {
+      storageBackupFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.storageBackupPolicyConfigureFailed),
         detail: readErrorMessage(error),
       };
     },
@@ -5055,6 +5119,7 @@
   async function invalidateStorageBackupQueries(): Promise<void> {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: orpc.storageVolumes.backups.key({ type: "query" }) }),
+      queryClient.invalidateQueries({ queryKey: orpc.storageVolumes.backupPolicies.key({ type: "query" }) }),
       queryClient.invalidateQueries({ queryKey: orpc.storageVolumes.key({ type: "query" }) }),
     ]);
   }
@@ -5719,6 +5784,21 @@
     storageBackupDialogOpen = true;
   }
 
+  function loadStorageBackupPolicy(policy: StorageVolumeBackupPolicyRecord): void {
+    storageBackupScheduledEnabled = policy.scheduledEnabled;
+    storageBackupPreDeployEnabled = policy.preDeployEnabled;
+    storageBackupScheduleIntervalHours = String(policy.scheduleIntervalHours);
+    storageBackupRetryOnFailure = policy.retryOnFailure;
+    storageBackupFailureMode = policy.failureMode;
+    storageBackupNotificationRef = policy.notificationRef ?? "";
+    storageBackupConsistency = policy.planRequest.requestedConsistency;
+    storageBackupTargetProvider = policy.planRequest.target.providerKey;
+    storageBackupTargetRef = policy.planRequest.target.targetRef;
+    storageBackupSecretRef = policy.planRequest.target.secretRef ?? "";
+    storageBackupRetentionMaxCount = String(policy.planRequest.retention.maxCount);
+    storageBackupRetentionMinFreeBytes = String(policy.planRequest.retention.minFreeBytes ?? 0);
+  }
+
   function openStorageRuntimeCleanupDialog(volume?: StorageVolumeSummary): void {
     storageRuntimeCleanupVolumeId = volume?.id ?? storageRuntimeCleanupVolumeId ?? storageVolumes[0]?.id ?? "";
     storageRuntimeCleanupServerId =
@@ -5810,6 +5890,7 @@
       target: {
         providerKey: storageBackupTargetProvider,
         targetRef: storageBackupTargetRef.trim(),
+        ...(storageBackupSecretRef.trim() ? { secretRef: storageBackupSecretRef.trim() } : {}),
       },
       retention: {
         maxCount: Number(storageBackupRetentionMaxCount),
@@ -5837,6 +5918,33 @@
     createStorageVolumeBackupMutation.mutate({
       storageVolumeId: storageBackupVolumeId,
       planRequest: createStorageBackupPlanRequest(),
+    });
+  }
+
+  function configureStorageBackupPolicy(): void {
+    if (!canConfigureStorageBackupPolicy || configureStorageVolumeBackupPolicyMutation.isPending) {
+      return;
+    }
+
+    const plan = createStorageBackupPlanRequest();
+    storageBackupFeedback = null;
+    configureStorageVolumeBackupPolicyMutation.mutate({
+      ...(selectedStorageBackupPolicy ? { policyId: selectedStorageBackupPolicy.id } : {}),
+      storageVolumeId: storageBackupVolumeId,
+      planRequest: {
+        source: plan.source,
+        requestedConsistency: plan.requestedConsistency,
+        target: plan.target,
+        retention: plan.retention,
+      },
+      scheduledEnabled: storageBackupScheduledEnabled,
+      preDeployEnabled: storageBackupPreDeployEnabled,
+      scheduleIntervalHours: Number(storageBackupScheduleIntervalHours),
+      retryOnFailure: storageBackupRetryOnFailure,
+      failureMode: storageBackupFailureMode,
+      ...(storageBackupNotificationRef.trim()
+        ? { notificationRef: storageBackupNotificationRef.trim() }
+        : {}),
     });
   }
 
@@ -11502,6 +11610,17 @@
                 />
               </label>
 
+              <label class="space-y-1.5 text-sm font-medium" for="resource-storage-backup-secret-ref">
+                <span>{$t(i18nKeys.console.resources.storageBackupSecretRef)}</span>
+                <Input
+                  id="resource-storage-backup-secret-ref"
+                  bind:value={storageBackupSecretRef}
+                  placeholder={$t(i18nKeys.console.resources.storageBackupSecretRefPlaceholder)}
+                  spellcheck={false}
+                  autocomplete="off"
+                />
+              </label>
+
               <label class="space-y-1.5 text-sm font-medium" for="resource-storage-backup-retention-max-count">
                 <span>{$t(i18nKeys.console.resources.storageBackupRetentionMaxCount)}</span>
                 <Input
@@ -11521,6 +11640,111 @@
                   autocomplete="off"
                 />
               </label>
+            </section>
+
+            <section class="space-y-4 rounded-md border bg-muted/10 p-4">
+              <div>
+                <p class="text-sm font-semibold">
+                  {$t(i18nKeys.console.resources.storageBackupAutomationTitle)}
+                </p>
+                <p class="mt-1 text-xs text-muted-foreground">
+                  {$t(i18nKeys.console.resources.storageBackupAutomationDescription)}
+                </p>
+              </div>
+
+              <div class="grid gap-3 sm:grid-cols-2">
+                <label class="flex items-center gap-2 text-sm">
+                  <input
+                    bind:checked={storageBackupScheduledEnabled}
+                    type="checkbox"
+                    class="size-4 rounded border-border text-primary"
+                  />
+                  {$t(i18nKeys.console.resources.storageBackupScheduledEnabled)}
+                </label>
+                <label class="flex items-center gap-2 text-sm">
+                  <input
+                    bind:checked={storageBackupPreDeployEnabled}
+                    type="checkbox"
+                    class="size-4 rounded border-border text-primary"
+                  />
+                  {$t(i18nKeys.console.resources.storageBackupPreDeployEnabled)}
+                </label>
+                <label class="space-y-1.5 text-sm font-medium" for="resource-storage-backup-schedule-hours">
+                  <span>{$t(i18nKeys.console.resources.storageBackupScheduleIntervalHours)}</span>
+                  <Input
+                    id="resource-storage-backup-schedule-hours"
+                    bind:value={storageBackupScheduleIntervalHours}
+                    inputmode="numeric"
+                    autocomplete="off"
+                  />
+                </label>
+                <label class="space-y-1.5 text-sm font-medium">
+                  <span>{$t(i18nKeys.console.resources.storageBackupFailureMode)}</span>
+                  <Select.Root bind:value={storageBackupFailureMode} type="single">
+                    <Select.Trigger class="w-full">{storageBackupFailureMode}</Select.Trigger>
+                    <Select.Content>
+                      <Select.Item value="block">block</Select.Item>
+                      <Select.Item value="continue">continue</Select.Item>
+                    </Select.Content>
+                  </Select.Root>
+                </label>
+                <label class="space-y-1.5 text-sm font-medium sm:col-span-2" for="resource-storage-backup-notification-ref">
+                  <span>{$t(i18nKeys.console.resources.storageBackupNotificationRef)}</span>
+                  <Input
+                    id="resource-storage-backup-notification-ref"
+                    bind:value={storageBackupNotificationRef}
+                    placeholder="slack-notification"
+                    spellcheck={false}
+                    autocomplete="off"
+                  />
+                </label>
+                <label class="flex items-center gap-2 text-sm sm:col-span-2">
+                  <input
+                    bind:checked={storageBackupRetryOnFailure}
+                    type="checkbox"
+                    class="size-4 rounded border-border text-primary"
+                  />
+                  {$t(i18nKeys.console.resources.storageBackupRetryOnFailure)}
+                </label>
+              </div>
+
+              {#if selectedStorageBackupPolicy}
+                <div class="rounded-md border bg-background px-3 py-2 text-xs">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <Badge variant={selectedStorageBackupPolicy.lastStatus === "failed" ? "destructive" : "outline"}>
+                      {selectedStorageBackupPolicy.lastStatus}
+                    </Badge>
+                    <span class="text-muted-foreground">
+                      {$t(i18nKeys.console.resources.storageBackupNextRunAt)}:
+                      {formatTime(selectedStorageBackupPolicy.nextRunAt)}
+                    </span>
+                  </div>
+                  {#if selectedStorageBackupPolicy.lastErrorCode}
+                    <p class="mt-2 break-all text-destructive">
+                      {selectedStorageBackupPolicy.lastErrorCode}
+                    </p>
+                  {/if}
+                  <p class="mt-2 text-muted-foreground">
+                    {$t(i18nKeys.console.resources.storageBackupLastOutcome)}:
+                    {selectedStorageBackupPolicy.lastTrigger ?? "—"} ·
+                    {selectedStorageBackupPolicy.lastRunAt
+                      ? formatTime(selectedStorageBackupPolicy.lastRunAt)
+                      : "—"} ·
+                    {$t(i18nKeys.console.resources.storageBackupNotificationStatus)}
+                    {selectedStorageBackupPolicy.lastNotificationStatus}
+                  </p>
+                </div>
+              {/if}
+
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!canConfigureStorageBackupPolicy || configureStorageVolumeBackupPolicyMutation.isPending}
+                onclick={configureStorageBackupPolicy}
+              >
+                <ShieldCheck class="size-4" />
+                {$t(i18nKeys.console.resources.storageBackupPolicyConfigureAction)}
+              </Button>
             </section>
 
             <label class="flex items-center gap-2 text-sm text-muted-foreground">

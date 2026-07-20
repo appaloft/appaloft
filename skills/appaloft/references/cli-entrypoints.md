@@ -231,6 +231,20 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft storage volume backup restore-plan <backupId>` - `storage-volumes.restore-plan`
 - `appaloft storage volume backup restore <backupId>` - `storage-volumes.restore-backup`
 - `appaloft storage volume backup prune <backupId>` - `storage-volumes.prune-backups`
+- `appaloft storage volume backup policy configure --storage-volume <storageVolumeId>` - `storage-volumes.backup-policies.configure`
+- `appaloft storage volume backup policy list` - `storage-volumes.backup-policies.list`
+- `appaloft storage volume backup policy show <policyId>` - `storage-volumes.backup-policies.show`
+- `appaloft instance portability export-plan` - `control-plane-portability.export-plan`
+- `appaloft instance portability export --passphrase-stdin` - `control-plane-portability.export`
+- `appaloft instance portability import-plan <artifact-file> --mode <merge|replace> --passphrase-stdin` - `control-plane-portability.import-plan`
+- `appaloft instance portability import <artifact-file> --mode <merge|replace> --passphrase-stdin [--acknowledge-replace]` - `control-plane-portability.import`
+- `appaloft instance portability artifact list` - `control-plane-portability.artifacts.list`
+- `appaloft instance portability artifact show <artifactId>` - `control-plane-portability.artifacts.show`
+- `appaloft instance portability artifact delete <artifactId>` - `control-plane-portability.artifacts.delete`
+- `appaloft tunnel start --provider <cloudflare-quick|ngrok> --origin <url>` - `tunnels.start`
+- `appaloft tunnel list` - `tunnels.list`
+- `appaloft tunnel show <sessionId>` - `tunnels.show`
+- `appaloft tunnel revoke <sessionId>` - `tunnels.revoke`
 - `appaloft env create` - `environments.create`
 - `appaloft env list` - `environments.list`
 - `appaloft env count` - `environments.count`

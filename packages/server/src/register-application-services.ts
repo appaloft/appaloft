@@ -102,9 +102,14 @@ import {
   ConfigureServerCredentialUseCase,
   ConfigureServerEdgeProxyCommandHandler,
   ConfigureServerEdgeProxyUseCase,
+  ConfigureStorageVolumeBackupPolicyCommandHandler,
+  ConfigureStorageVolumeBackupPolicyUseCase,
   ConfirmActionPreviewRouteCommandHandler,
   ConfirmActionPreviewRouteUseCase,
   ConfirmDomainBindingOwnershipUseCase,
+  ControlPlanePortabilityExportPlanQueryHandler,
+  ControlPlanePortabilityImportPlanQueryHandler,
+  ControlPlanePortabilityService,
   ControlPlaneSecretRotationApplyUseCase,
   ControlPlaneSecretRotationPlanQueryService,
   CountDependencyResourcesQueryService,
@@ -161,6 +166,7 @@ import {
   DeleteAccountUseCase,
   DeleteCertificateCommandHandler,
   DeleteCertificateUseCase,
+  DeleteControlPlanePortabilityArtifactCommandHandler,
   DeleteDependencyResourceCommandHandler,
   DeleteDependencyResourceUseCase,
   DeleteDomainBindingCommandHandler,
@@ -226,6 +232,7 @@ import {
   ExpireTerminalSessionsCommandHandler,
   ExportAuditEventsQueryHandler,
   ExportAuditEventsQueryService,
+  ExportControlPlaneCommandHandler,
   ExportGlobalAuditEventsQueryHandler,
   ExportGlobalAuditEventsQueryService,
   ForceRedeployDeploymentCommandHandler,
@@ -240,6 +247,7 @@ import {
   GitHubAppSourceConnectionProjectionSource,
   ImportCertificateCommandHandler,
   ImportCertificateUseCase,
+  ImportControlPlaneCommandHandler,
   ImportDependencyResourceCommandHandler,
   ImportDependencyResourceUseCase,
   ImportResourceVariablesCommandHandler,
@@ -276,6 +284,7 @@ import {
   ListConnectorCategoriesQueryService,
   ListConnectorsQueryHandler,
   ListConnectorsQueryService,
+  ListControlPlanePortabilityArtifactsQueryHandler,
   ListDefaultAccessDomainPoliciesQueryHandler,
   ListDefaultAccessDomainPoliciesQueryService,
   ListDependencyResourceBackupPoliciesQueryHandler,
@@ -329,11 +338,14 @@ import {
   ListStaleDeploymentAttemptsQueryHandler,
   ListStaleDeploymentAttemptsQueryService,
   ListStaticArtifactPublicationsQueryHandler,
+  ListStorageVolumeBackupPoliciesQueryHandler,
+  ListStorageVolumeBackupPoliciesQueryService,
   ListStorageVolumeBackupsQueryHandler,
   ListStorageVolumeBackupsQueryService,
   ListStorageVolumesQueryHandler,
   ListStorageVolumesQueryService,
   ListTerminalSessionsQueryHandler,
+  ListTunnelSessionsQueryHandler,
   ListUsageIntentRecordsQueryHandler,
   ListUsageIntentRecordsQueryService,
   LockEnvironmentCommandHandler,
@@ -494,6 +506,7 @@ import {
   RevokeConnectionUseCase,
   RevokeDeployTokenCommandHandler,
   RevokeDeployTokenUseCase,
+  RevokeTunnelSessionCommandHandler,
   RollbackDeploymentCommandHandler,
   RollbackDeploymentUseCase,
   RotateDependencyResourceConnectionCommandHandler,
@@ -547,6 +560,7 @@ import {
   ShowCertificateQueryService,
   ShowConnectionQueryHandler,
   ShowConnectionQueryService,
+  ShowControlPlanePortabilityArtifactQueryHandler,
   ShowDefaultAccessDomainPolicyQueryHandler,
   ShowDefaultAccessDomainPolicyQueryService,
   ShowDependencyResourceBackupPolicyQueryHandler,
@@ -596,16 +610,21 @@ import {
   ShowSourceLinkQueryHandler,
   ShowSshCredentialQueryHandler,
   ShowSshCredentialQueryService,
+  ShowStorageVolumeBackupPolicyQueryHandler,
+  ShowStorageVolumeBackupPolicyQueryService,
   ShowStorageVolumeBackupQueryHandler,
   ShowStorageVolumeBackupQueryService,
   ShowStorageVolumeQueryHandler,
   ShowStorageVolumeQueryService,
   ShowTerminalSessionQueryHandler,
+  ShowTunnelSessionQueryHandler,
   SourceLinkQueryService,
   StartConnectionCommandHandler,
   StartConnectionUseCase,
   StartResourceRuntimeCommandHandler,
+  StartTunnelCommandHandler,
   StopResourceRuntimeCommandHandler,
+  StorageVolumeBackupAutomationService,
   StreamDeploymentTimelineQueryHandler,
   StreamOperatorWorkEventsQueryHandler,
   StreamOperatorWorkEventsQueryService,
@@ -617,6 +636,7 @@ import {
   TestServerConnectivityUseCase,
   TransferOrganizationOwnerCommandHandler,
   TransferOrganizationOwnerUseCase,
+  TunnelSessionService,
   tokens,
   toRepositoryContext,
   UnbindResourceDependencyCommandHandler,
@@ -3165,6 +3185,20 @@ export function registerApplicationServices(
   container.registerSingleton(RenameDependencyResourceCommandHandler);
   container.registerSingleton(DeleteDependencyResourceCommandHandler);
   container.registerSingleton(ConfigureDependencyResourceBackupPolicyCommandHandler);
+  container.registerSingleton(ConfigureStorageVolumeBackupPolicyCommandHandler);
+  container.registerSingleton(ListStorageVolumeBackupPoliciesQueryHandler);
+  container.registerSingleton(ShowStorageVolumeBackupPolicyQueryHandler);
+  container.registerSingleton(ControlPlanePortabilityExportPlanQueryHandler);
+  container.registerSingleton(ExportControlPlaneCommandHandler);
+  container.registerSingleton(ControlPlanePortabilityImportPlanQueryHandler);
+  container.registerSingleton(ImportControlPlaneCommandHandler);
+  container.registerSingleton(ListControlPlanePortabilityArtifactsQueryHandler);
+  container.registerSingleton(ShowControlPlanePortabilityArtifactQueryHandler);
+  container.registerSingleton(DeleteControlPlanePortabilityArtifactCommandHandler);
+  container.registerSingleton(StartTunnelCommandHandler);
+  container.registerSingleton(ListTunnelSessionsQueryHandler);
+  container.registerSingleton(ShowTunnelSessionQueryHandler);
+  container.registerSingleton(RevokeTunnelSessionCommandHandler);
   container.registerSingleton(CreateDependencyResourceBackupCommandHandler);
   container.registerSingleton(RestoreDependencyResourceBackupCommandHandler);
   container.registerSingleton(ListDependencyResourcesQueryHandler);
@@ -3752,6 +3786,27 @@ export function registerApplicationServices(
     tokens.createStorageVolumeBackupUseCase,
     CreateStorageVolumeBackupUseCase,
   );
+  container.registerSingleton(
+    tokens.configureStorageVolumeBackupPolicyUseCase,
+    ConfigureStorageVolumeBackupPolicyUseCase,
+  );
+  container.registerSingleton(
+    tokens.listStorageVolumeBackupPoliciesQueryService,
+    ListStorageVolumeBackupPoliciesQueryService,
+  );
+  container.registerSingleton(
+    tokens.showStorageVolumeBackupPolicyQueryService,
+    ShowStorageVolumeBackupPolicyQueryService,
+  );
+  container.registerSingleton(
+    tokens.storageVolumeBackupAutomationService,
+    StorageVolumeBackupAutomationService,
+  );
+  container.registerSingleton(
+    tokens.controlPlanePortabilityService,
+    ControlPlanePortabilityService,
+  );
+  container.registerSingleton(tokens.tunnelSessionService, TunnelSessionService);
   container.registerSingleton(
     tokens.listStorageVolumeBackupsQueryService,
     ListStorageVolumeBackupsQueryService,

@@ -1,3 +1,4 @@
+import "../../application/node_modules/reflect-metadata/Reflect.js";
 import { describe, expect, test } from "bun:test";
 
 import { operationCatalog } from "../../application/src/operation-catalog";

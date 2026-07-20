@@ -65,7 +65,9 @@ import {
   SourceLinkBySourceFingerprintSpec,
   type SourceLinkRecord,
   type SourceLinkRepository,
+  type StorageVolumeBackupAutomationService,
   type TerminalSessionGateway,
+  type TunnelSessionService,
   tokens,
   UpsertServerAppliedRouteDesiredStateSpec,
   UpsertSourceLinkSpec,
@@ -150,9 +152,17 @@ import {
   createScheduledRuntimePruneRunner,
 } from "./scheduled-runtime-prune-runner";
 import {
+  createDisabledScheduledStorageVolumeBackupRunner,
+  createScheduledStorageVolumeBackupRunner,
+} from "./scheduled-storage-volume-backup-runner";
+import {
   createDisabledScheduledTaskRunner,
   createScheduledTaskRunner,
 } from "./scheduled-task-runner";
+import {
+  createDisabledTunnelSessionReconciler,
+  createTunnelSessionReconciler,
+} from "./tunnel-session-reconciler";
 
 type MaybePromise<T> = T | Promise<T>;
 
@@ -1898,6 +1908,25 @@ export async function createAppaloftServer(
         logger,
       })
     : createDisabledScheduledDependencyBackupRunner();
+  const scheduledStorageVolumeBackupRunner = config.scheduledStorageVolumeBackupRunner.enabled
+    ? createScheduledStorageVolumeBackupRunner({
+        config: config.scheduledStorageVolumeBackupRunner,
+        service: resolveToken<StorageVolumeBackupAutomationService>(
+          childContainer,
+          tokens.storageVolumeBackupAutomationService,
+        ),
+        executionContextFactory,
+        logger,
+      })
+    : createDisabledScheduledStorageVolumeBackupRunner();
+  const tunnelSessionReconciler = config.tunnelSessions.reconcilerEnabled
+    ? createTunnelSessionReconciler({
+        config: config.tunnelSessions,
+        service: resolveToken<TunnelSessionService>(childContainer, tokens.tunnelSessionService),
+        executionContextFactory,
+        logger,
+      })
+    : createDisabledTunnelSessionReconciler();
   const scheduledHistoryRetentionRunner = config.scheduledHistoryRetentionRunner.enabled
     ? createScheduledHistoryRetentionRunner({
         config: config.scheduledHistoryRetentionRunner,
@@ -2049,6 +2078,8 @@ export async function createAppaloftServer(
     scheduledTaskRunner.start();
     scheduledRuntimePruneRunner.start();
     scheduledDependencyBackupRunner.start();
+    scheduledStorageVolumeBackupRunner.start();
+    tunnelSessionReconciler.start();
     scheduledHistoryRetentionRunner.start();
     runtimeMonitoringCollectorRunner.start();
     executionSandboxMaintenanceRunner.start();
@@ -2099,6 +2130,8 @@ export async function createAppaloftServer(
       scheduledTaskRunner.stop();
       scheduledRuntimePruneRunner.stop();
       scheduledDependencyBackupRunner.stop();
+      scheduledStorageVolumeBackupRunner.stop();
+      tunnelSessionReconciler.stop();
       scheduledHistoryRetentionRunner.stop();
       runtimeMonitoringCollectorRunner.stop();
       executionSandboxMaintenanceRunner.stop();

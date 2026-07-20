@@ -321,10 +321,12 @@ export * from "./operations/storage-volumes/prune-storage-volume-backup.command"
 export * from "./operations/storage-volumes/restore-storage-volume-backup.command";
 export * from "./operations/storage-volumes/show-storage-volume-backup.query";
 export * from "./operations/storage-volumes/storage-volume-backup.schema";
+export * from "./operations/storage-volumes/storage-volume-backup-automation";
 export * from "./operations/system/accept-connector-capability-plan.command";
 export * from "./operations/system/apply-connector-capability.command";
 export * from "./operations/system/complete-connection-callback.command";
 export * from "./operations/system/connections.schema";
+export * from "./operations/system/control-plane-portability";
 export * from "./operations/system/github-app-connection.schema";
 export * from "./operations/system/list-connections.query";
 export * from "./operations/system/list-connector-categories.query";
@@ -336,4 +338,5 @@ export * from "./operations/system/show-connection.query";
 export * from "./operations/system/start-connection.command";
 export * from "./operations/terminal-sessions/open-terminal-session.schema";
 export * from "./operations/terminal-sessions/terminal-session-lifecycle.schema";
+export * from "./operations/tunnels/tunnel-session";
 export type { DomainBindingDnsReadiness } from "./ports";

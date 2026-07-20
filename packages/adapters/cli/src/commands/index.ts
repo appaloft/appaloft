@@ -16,6 +16,7 @@ import { domainBindingCommand } from "./domain-binding.js";
 import { domainEventCommand } from "./domain-event.js";
 import { envCommand } from "./environment.js";
 import { infrastructureCommand } from "./infrastructure.js";
+import { instanceCommand } from "./instance.js";
 import { githubCommand, pluginsCommand, providersCommand } from "./integrations.js";
 import {
   doctorCommand,
@@ -41,6 +42,7 @@ import { sourceLinksCommand } from "./source-link.js";
 import { staticArtifactCommand } from "./static-artifact.js";
 import { storageCommand } from "./storage.js";
 import { terminalSessionCommand } from "./terminal-session.js";
+import { tunnelCommand } from "./tunnel.js";
 import { upgradeCommand } from "./upgrade.js";
 
 export const mainCommand = EffectCommand.make("appaloft").pipe(
@@ -86,10 +88,12 @@ export const mainCommand = EffectCommand.make("appaloft").pipe(
     remoteStateCommand,
     operatorWorkCommand,
     terminalSessionCommand,
+    tunnelCommand,
     upgradeCommand,
     connectorsCommand,
     dnsCommand,
     infrastructureCommand,
+    instanceCommand,
     pluginsCommand,
     providersCommand,
     githubCommand,

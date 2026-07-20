@@ -58,6 +58,7 @@ import { NoopProcessAttemptRecorder } from "../../process-attempt-journal";
 import { tokens } from "../../tokens";
 import { evaluateDeploymentOverlayWithPort } from "../deployment-overlays/evaluate-deployment-overlay.use-case";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
+import { type StorageVolumeBackupAutomationService } from "../storage-volumes/storage-volume-backup-automation";
 import { type CreateDeploymentCommandInput } from "./create-deployment.command";
 import {
   createDependencyBindingSnapshotReferences,
@@ -617,6 +618,8 @@ export class CreateDeploymentUseCase {
     private readonly sourceVersionDetector?: SourceVersionDetector,
     @inject(tokens.durableWorkQueueAdapter, { isOptional: true })
     private readonly durableWorkQueueAdapter?: DurableWorkQueueAdapter,
+    @inject(tokens.storageVolumeBackupAutomationService, { isOptional: true })
+    private readonly storageVolumeBackupAutomationService?: StorageVolumeBackupAutomationService,
   ) {}
 
   private async persistDeployment(
@@ -777,6 +780,7 @@ export class CreateDeploymentUseCase {
       durableWorkQueueAdapter,
       environmentProfileDecisionReadModel,
       controlPlaneSecretProtector,
+      storageVolumeBackupAutomationService,
     } = this;
     const persistDeployment = this.persistDeployment.bind(this);
     const supersedeActiveDeployment = this.supersedeActiveDeployment.bind(this);
@@ -860,6 +864,12 @@ export class CreateDeploymentUseCase {
         }
       }
       yield* project.ensureCanAcceptMutation("deployments.create");
+      if (storageVolumeBackupAutomationService) {
+        yield* await storageVolumeBackupAutomationService.runPreDeploy(
+          context,
+          resourceState.id.value,
+        );
+      }
       if (environmentProfileDecisionReadModel) {
         const environmentProfileDecisions = await listPendingEnvironmentProfileDecisions(
           environmentProfileDecisionReadModel,

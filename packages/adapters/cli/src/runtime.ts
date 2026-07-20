@@ -224,7 +224,11 @@ export async function readProcessStdinText(): Promise<string> {
 }
 
 export function cliArgvRequestsStdinText(argv: readonly string[]): boolean {
-  return argv.includes("--stdin") || argv.includes("--connection-url-stdin");
+  return (
+    argv.includes("--stdin") ||
+    argv.includes("--connection-url-stdin") ||
+    argv.includes("--passphrase-stdin")
+  );
 }
 
 export const optionalValue = <T>(value: Option.Option<T>): T | undefined =>

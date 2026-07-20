@@ -1,15 +1,18 @@
 import {
   CleanupStorageVolumeRuntimeCommand,
+  ConfigureStorageVolumeBackupPolicyCommand,
   CreateStorageVolumeBackupCommand,
   CreateStorageVolumeBackupPlanQuery,
   CreateStorageVolumeCommand,
   CreateStorageVolumeRestorePlanQuery,
   DeleteStorageVolumeCommand,
+  ListStorageVolumeBackupPoliciesQuery,
   ListStorageVolumeBackupsQuery,
   ListStorageVolumesQuery,
   PruneStorageVolumeBackupCommand,
   RenameStorageVolumeCommand,
   RestoreStorageVolumeBackupCommand,
+  ShowStorageVolumeBackupPolicyQuery,
   ShowStorageVolumeBackupQuery,
   ShowStorageVolumeQuery,
 } from "@appaloft/application";
@@ -99,6 +102,20 @@ const restoredVolumeNameOption = Options.text("restored-volume-name").pipe(Optio
 const acknowledgeDestructiveRestoreOption = Options.boolean("acknowledge-destructive-restore").pipe(
   Options.withDefault(false),
 );
+const backupPolicyIdOption = Options.text("policy-id").pipe(Options.optional);
+const backupPolicyIdArg = Args.text({ name: "policyId" });
+const backupScheduledOption = Options.boolean("scheduled").pipe(Options.withDefault(false));
+const backupPreDeployOption = Options.boolean("pre-deploy").pipe(Options.withDefault(false));
+const backupScheduleIntervalOption = Options.integer("schedule-interval-hours").pipe(
+  Options.withDefault(24),
+);
+const backupRetryOnFailureOption = Options.boolean("retry-on-failure").pipe(
+  Options.withDefault(true),
+);
+const backupFailureModeOption = Options.choice("failure-mode", ["block", "continue"]).pipe(
+  Options.withDefault("block"),
+);
+const backupNotificationRefOption = Options.text("notification-ref").pipe(Options.optional);
 
 type StorageBackupCommandOptions = {
   storageVolume: string;
@@ -451,6 +468,89 @@ const backupPruneCommand = EffectCommand.make(
   ({ backupId }) => runCommand(PruneStorageVolumeBackupCommand.create({ backupId })),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.storageVolumeBackupPrune));
 
+const backupPolicyConfigureCommand = EffectCommand.make(
+  "configure",
+  {
+    storageVolume: backupStorageVolumeOption,
+    policyId: backupPolicyIdOption,
+    scheduled: backupScheduledOption,
+    preDeploy: backupPreDeployOption,
+    scheduleIntervalHours: backupScheduleIntervalOption,
+    retryOnFailure: backupRetryOnFailureOption,
+    failureMode: backupFailureModeOption,
+    notificationRef: backupNotificationRefOption,
+    resource: backupResourceOption,
+    server: backupServerOption,
+    attachment: backupAttachmentOption,
+    destinationPath: backupDestinationPathOption,
+    dataFormat: backupDataFormatOption,
+    liveWrites: backupLiveWritesOption,
+    consistency: backupConsistencyOption,
+    sourceAdapter: backupSourceAdapterOption,
+    targetProvider: backupTargetProviderOption,
+    targetRef: backupTargetRefOption,
+    failureDomain: backupFailureDomainOption,
+    secretRef: backupSecretRefOption,
+    retentionMaxCount: backupRetentionMaxCountOption,
+    retentionMaxAgeDays: backupRetentionMaxAgeDaysOption,
+    retentionMaxBytes: backupRetentionMaxBytesOption,
+    retentionMinFreeBytes: backupRetentionMinFreeBytesOption,
+  },
+  (input) =>
+    runCommand(
+      ConfigureStorageVolumeBackupPolicyCommand.create({
+        policyId: optionalValue(input.policyId),
+        storageVolumeId: input.storageVolume,
+        planRequest: createBackupPlanRequest({
+          ...input,
+          resource: optionalValue(input.resource),
+          server: optionalValue(input.server),
+          attachment: optionalValue(input.attachment),
+          destinationPath: optionalValue(input.destinationPath),
+          dataFormat: optionalValue(input.dataFormat),
+          sourceAdapter: optionalValue(input.sourceAdapter),
+          failureDomain: optionalValue(input.failureDomain),
+          secretRef: optionalValue(input.secretRef),
+          retentionMaxAgeDays: optionalValue(input.retentionMaxAgeDays),
+          retentionMaxBytes: optionalValue(input.retentionMaxBytes),
+          retentionMinFreeBytes: optionalValue(input.retentionMinFreeBytes),
+        }),
+        scheduledEnabled: input.scheduled,
+        preDeployEnabled: input.preDeploy,
+        scheduleIntervalHours: input.scheduleIntervalHours,
+        retryOnFailure: input.retryOnFailure,
+        failureMode: input.failureMode,
+        notificationRef: optionalValue(input.notificationRef),
+      }),
+    ),
+).pipe(EffectCommand.withDescription("Configure scheduled and pre-deploy storage backup policy"));
+
+const backupPolicyListCommand = EffectCommand.make(
+  "list",
+  { storageVolume: Options.text("storage-volume").pipe(Options.optional) },
+  ({ storageVolume }) =>
+    runQuery(
+      ListStorageVolumeBackupPoliciesQuery.create({
+        storageVolumeId: optionalValue(storageVolume),
+      }),
+    ),
+).pipe(EffectCommand.withDescription("List storage backup automation policies"));
+
+const backupPolicyShowCommand = EffectCommand.make(
+  "show",
+  { policyId: backupPolicyIdArg },
+  ({ policyId }) => runQuery(ShowStorageVolumeBackupPolicyQuery.create({ policyId })),
+).pipe(EffectCommand.withDescription("Show storage backup automation policy and last outcome"));
+
+const backupPolicyCommand = EffectCommand.make("policy").pipe(
+  EffectCommand.withDescription("Manage scheduled and pre-deploy storage backup policies"),
+  EffectCommand.withSubcommands([
+    backupPolicyConfigureCommand,
+    backupPolicyListCommand,
+    backupPolicyShowCommand,
+  ]),
+);
+
 const backupCommand = EffectCommand.make("backup").pipe(
   EffectCommand.withDescription(cliCommandDescriptions.storageVolumeBackup),
   EffectCommand.withSubcommands([
@@ -461,6 +561,7 @@ const backupCommand = EffectCommand.make("backup").pipe(
     backupRestorePlanCommand,
     backupRestoreCommand,
     backupPruneCommand,
+    backupPolicyCommand,
   ]),
 );
 
