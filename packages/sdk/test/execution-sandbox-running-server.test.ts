@@ -6,14 +6,19 @@ import {
   type AppLogger,
   CommandBus,
   createExecutionContext,
+  type EventBus,
   type ExecutionContext,
   type ExecutionContextFactory,
   ExecutionSandboxService,
   InMemorySandboxRepository,
   QueryBus,
+  type SandboxCredentialBroker,
+  type SandboxEventEnvelope,
+  type SandboxEventObserver,
   SandboxProviderRegistry,
   tokens,
 } from "@appaloft/application";
+import { type DomainEvent, ok } from "@appaloft/core";
 import { mountAppaloftOrpcRoutes } from "@appaloft/orpc";
 import { Elysia } from "elysia";
 import { container } from "tsyringe";
@@ -39,6 +44,55 @@ class SandboxContextFactory implements ExecutionContextFactory {
   }
 }
 
+class MemorySandboxEvents implements EventBus, SandboxEventObserver, SandboxCredentialBroker {
+  private readonly events: DomainEvent[] = [];
+  async publish(_context: ExecutionContext, events: DomainEvent[]): Promise<void> {
+    this.events.push(...events);
+  }
+  async open(
+    _context: ExecutionContext,
+    request: { sandboxId: string; untilTerminal: boolean },
+    _signal: AbortSignal,
+  ) {
+    const events = this.events.filter((event) => event.aggregateId === request.sandboxId);
+    return ok({
+      async *[Symbol.asyncIterator]() {
+        for (const [index, event] of events.entries()) {
+          const envelope: SandboxEventEnvelope = {
+            kind: "event",
+            schemaVersion: "sandbox.events/v1",
+            cursor: `cursor_${index + 1}`,
+            sandboxId: request.sandboxId,
+            occurredAt: event.occurredAt,
+            eventType: event.type,
+            source: event.type.startsWith("sandbox-process-") ? "process" : "lifecycle",
+            payload: event.payload,
+          };
+          yield envelope;
+          if (
+            request.untilTerminal &&
+            event.type === "sandbox-process-frame" &&
+            ["exit", "error"].includes(
+              String((event.payload.frame as Record<string, unknown> | undefined)?.kind),
+            )
+          ) {
+            yield {
+              kind: "closed" as const,
+              schemaVersion: "sandbox.events/v1" as const,
+              reason: "terminal" as const,
+            };
+            return;
+          }
+        }
+      },
+      async close() {},
+    });
+  }
+  async request() {
+    return ok({ status: 200, headers: {}, bodyBase64: "c2FmZQ==", sizeBytes: 4 });
+  }
+}
+
 const servers: Bun.Server<unknown>[] = [];
 afterEach(() => {
   for (const server of servers.splice(0)) server.stop(true);
@@ -48,13 +102,17 @@ describe("external application sandbox SDK", () => {
   test("[SBX-SDK-001] operates a sandbox through a real HTTP server and public SDK", async () => {
     const child = container.createChildContainer();
     let sequence = 0;
+    const events = new MemorySandboxEvents();
     const service = new ExecutionSandboxService({
       repository: new InMemorySandboxRepository(),
       providerRegistry: new SandboxProviderRegistry([
-        new HermeticSandboxProvider({ isolation: "gvisor" }),
+        new HermeticSandboxProvider({ isolation: "gvisor", credentialBroker: true }),
       ]),
       clock: { now: () => "2026-07-20T00:00:00.000Z" },
       idGenerator: { next: (prefix) => `${prefix}_sdk_${++sequence}` },
+      eventBus: events,
+      eventObserver: events,
+      credentialBroker: events,
     });
     child.register(tokens.executionSandboxService, { useValue: service });
     const logger = new NoopLogger();
@@ -122,6 +180,43 @@ describe("external application sandbox SDK", () => {
       ok: true,
       data: { mode: "foreground" },
     });
+    const streamed = [];
+    for await (const envelope of client.sandboxes.events.stream({
+      sandboxId,
+      untilTerminal: true,
+    })) {
+      streamed.push(envelope);
+    }
+    expect(streamed).toContainEqual(
+      expect.objectContaining({ kind: "event", eventType: "sandbox-process-frame" }),
+    );
+    expect(streamed.filter((item) => (item as { kind?: string }).kind === "closed")).toEqual([
+      expect.objectContaining({ kind: "closed", reason: "terminal" }),
+    ]);
+    expect(
+      await client.sandboxCredentials.grant({
+        sandboxId,
+        grantId: "grant_sdk",
+        secretRef: "vault://sandbox/api-token",
+        destination: "api.example.com",
+        transformation: "authorization-bearer",
+      }),
+    ).toMatchObject({ ok: true, data: { grantId: "grant_sdk" } });
+    expect(
+      await client.sandboxCredentials.request({
+        sandboxId,
+        grantId: "grant_sdk",
+        method: "GET",
+        url: "https://api.example.com/v1/data",
+      }),
+    ).toMatchObject({ ok: true, data: { status: 200, bodyBase64: "c2FmZQ==" } });
+    expect(await client.sandboxCredentials.list({ sandboxId })).toMatchObject({
+      ok: true,
+      data: { items: [{ grantId: "grant_sdk", secretRef: "vault://sandbox/api-token" }] },
+    });
+    expect(
+      await client.sandboxCredentials.revoke({ sandboxId, grantId: "grant_sdk" }),
+    ).toMatchObject({ ok: true, data: { revoked: true } });
 
     const captured = await client.sandboxSnapshots.create({
       sandboxId,

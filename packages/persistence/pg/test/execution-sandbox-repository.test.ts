@@ -8,6 +8,7 @@ import {
   CreatedAt,
   ExpiresAt,
   Sandbox,
+  SandboxCredentialGrant,
   SandboxId,
   SandboxIsolationLevel,
   SandboxNetworkPolicy,
@@ -106,6 +107,22 @@ describe("PgExecutionSandboxRepository", () => {
           offset: 0,
         }),
       ).toEqual([]);
+
+      const grant = SandboxCredentialGrant.create({
+        grantId: "grant_pg",
+        secretRef: "vault://sandbox/api-token",
+        destination: "api.example.com",
+        transformation: "authorization-bearer",
+      })._unsafeUnwrap();
+      await repository.saveCredentialGrant(context("tenant_a"), "sbx_pg", grant);
+      expect(
+        (
+          await repository.findCredentialGrant(context("tenant_a"), "sbx_pg", "grant_pg")
+        )?.toState(),
+      ).toEqual(grant.toState());
+      expect(
+        await repository.findCredentialGrant(context("tenant_b"), "sbx_pg", "grant_pg"),
+      ).toBeNull();
 
       const snapshot = SandboxSnapshot.create({
         id: SandboxSnapshotId.rehydrate("ssn_pg"),

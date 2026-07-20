@@ -9,6 +9,7 @@ import {
 import { type ExecutionContext } from "./execution-context";
 import { type ExecutionSandboxService } from "./execution-sandbox";
 import {
+  BrokerSandboxCredentialRequestCommand,
   ConfigureSandboxNetworkPolicyCommand,
   CreateSandboxCommand,
   CreateSandboxSnapshotCommand,
@@ -17,6 +18,8 @@ import {
   DeleteSandboxTemplateCommand,
   ExecuteSandboxCommand,
   ExposeSandboxPortCommand,
+  GrantSandboxCredentialCommand,
+  ListSandboxCredentialGrantsQuery,
   ListSandboxesQuery,
   ListSandboxFilesQuery,
   ListSandboxPortsQuery,
@@ -27,11 +30,13 @@ import {
   ReadSandboxFileQuery,
   RemoveSandboxFileCommand,
   ResumeSandboxCommand,
+  RevokeSandboxCredentialCommand,
   RevokeSandboxPortCommand,
   ShowSandboxProcessQuery,
   ShowSandboxQuery,
   ShowSandboxSnapshotQuery,
   ShowSandboxTemplateQuery,
+  StreamSandboxEventsQuery,
   TerminateSandboxCommand,
   TerminateSandboxProcessCommand,
   WriteSandboxFileCommand,
@@ -53,7 +58,10 @@ type SandboxCommand =
   | CreateSandboxSnapshotCommand
   | DeleteSandboxSnapshotCommand
   | CreateSandboxTemplateCommand
-  | DeleteSandboxTemplateCommand;
+  | DeleteSandboxTemplateCommand
+  | GrantSandboxCredentialCommand
+  | RevokeSandboxCredentialCommand
+  | BrokerSandboxCredentialRequestCommand;
 type SandboxQuery =
   | ListSandboxesQuery
   | ShowSandboxQuery
@@ -65,7 +73,9 @@ type SandboxQuery =
   | ListSandboxSnapshotsQuery
   | ShowSandboxSnapshotQuery
   | ListSandboxTemplatesQuery
-  | ShowSandboxTemplateQuery;
+  | ShowSandboxTemplateQuery
+  | StreamSandboxEventsQuery
+  | ListSandboxCredentialGrantsQuery;
 
 function text(input: Record<string, unknown>, key: string): string {
   return input[key] as string;
@@ -182,6 +192,31 @@ export class SandboxCommandHandler implements CommandHandlerContract<SandboxComm
     if (command instanceof DeleteSandboxTemplateCommand) {
       return this.service.deleteTemplate(context, text(input, "templateId"));
     }
+    if (command instanceof GrantSandboxCredentialCommand) {
+      return this.service.grantCredential(context, text(input, "sandboxId"), {
+        grantId: text(input, "grantId"),
+        secretRef: text(input, "secretRef"),
+        destination: text(input, "destination"),
+        transformation: input.transformation as Parameters<
+          ExecutionSandboxService["grantCredential"]
+        >[2]["transformation"],
+        ...(typeof input.parameterName === "string" ? { parameterName: input.parameterName } : {}),
+      });
+    }
+    if (command instanceof RevokeSandboxCredentialCommand) {
+      return this.service.revokeCredential(
+        context,
+        text(input, "sandboxId"),
+        text(input, "grantId"),
+      );
+    }
+    if (command instanceof BrokerSandboxCredentialRequestCommand) {
+      return this.service.brokerCredentialRequest(
+        context,
+        text(input, "sandboxId"),
+        input as Parameters<ExecutionSandboxService["brokerCredentialRequest"]>[2],
+      );
+    }
     return err(domainError.invariant("Sandbox command handler received an unknown message"));
   }
 }
@@ -198,6 +233,14 @@ export class SandboxQueryHandler implements QueryHandlerContract<SandboxQuery, u
     if (query instanceof ListSandboxesQuery) return this.service.list(context, input);
     if (query instanceof ShowSandboxQuery)
       return this.service.show(context, text(input, "sandboxId"));
+    if (query instanceof StreamSandboxEventsQuery)
+      return this.service.streamEvents(context, text(input, "sandboxId"), {
+        ...(input as Parameters<ExecutionSandboxService["streamEvents"]>[2]),
+        follow: true,
+        ...(query.signal ? { signal: query.signal } : {}),
+      });
+    if (query instanceof ListSandboxCredentialGrantsQuery)
+      return this.service.listCredentialGrants(context, text(input, "sandboxId"), input);
     if (query instanceof ListSandboxFilesQuery)
       return this.service.listFiles(context, text(input, "sandboxId"), {
         path: text(input, "path"),
@@ -245,6 +288,9 @@ for (const command of [
   DeleteSandboxSnapshotCommand,
   CreateSandboxTemplateCommand,
   DeleteSandboxTemplateCommand,
+  GrantSandboxCredentialCommand,
+  RevokeSandboxCredentialCommand,
+  BrokerSandboxCredentialRequestCommand,
 ])
   CommandHandler(command)(SandboxCommandHandler);
 
@@ -260,5 +306,7 @@ for (const query of [
   ShowSandboxSnapshotQuery,
   ListSandboxTemplatesQuery,
   ShowSandboxTemplateQuery,
+  StreamSandboxEventsQuery,
+  ListSandboxCredentialGrantsQuery,
 ])
   QueryHandler(query)(SandboxQueryHandler);

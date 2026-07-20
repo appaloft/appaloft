@@ -117,6 +117,7 @@ export interface SandboxCredentialGrantState {
   secretRef: string;
   destination: string;
   transformation: SandboxCredentialTransformation;
+  parameterName?: string;
 }
 
 export class SandboxCredentialGrant extends ValueObject<SandboxCredentialGrantState> {
@@ -131,7 +132,9 @@ export class SandboxCredentialGrant extends ValueObject<SandboxCredentialGrantSt
     if (!/^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,159}$/.test(grantId)) {
       return err(networkError("Credential grant id is invalid", "grantId"));
     }
-    if (!/^(secret|vault):\/\/[a-zA-Z0-9][a-zA-Z0-9_./:-]{1,511}$/.test(secretRef)) {
+    if (
+      !/^(secret|vault|supabase-vault):\/\/[a-zA-Z0-9][a-zA-Z0-9_./:#-]{1,511}$/.test(secretRef)
+    ) {
       return err(networkError("Credential grant requires a secret reference", "secretRef"));
     }
     if (domain.isErr()) return err(domain.error);
@@ -142,12 +145,32 @@ export class SandboxCredentialGrant extends ValueObject<SandboxCredentialGrantSt
     ) {
       return err(networkError("Credential transformation is unsupported", "transformation"));
     }
+    const parameterName = input.parameterName?.trim();
+    if (
+      ["header", "query-parameter"].includes(input.transformation) &&
+      (!parameterName ||
+        !/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(parameterName) ||
+        ["authorization", "cookie", "host", "proxy-authorization"].includes(
+          parameterName.toLowerCase(),
+        ))
+    ) {
+      return err(networkError("Credential parameter name is invalid", "parameterName"));
+    }
+    if (!["header", "query-parameter"].includes(input.transformation) && parameterName) {
+      return err(
+        networkError(
+          "Credential parameter name is not used by this transformation",
+          "parameterName",
+        ),
+      );
+    }
     return ok(
       new SandboxCredentialGrant({
         grantId,
         secretRef,
         destination: domain.value,
         transformation: input.transformation,
+        ...(parameterName ? { parameterName } : {}),
       }),
     );
   }

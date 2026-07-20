@@ -4151,6 +4151,78 @@ export const generatedSdkOperations = [
     facadeDefault: true,
   },
   {
+    operationKey: "sandbox-credentials.grant",
+    operationGroup: "sandbox-credentials",
+    operationMethod: "grant",
+    facadePath: ["sandboxCredentials", "grant"],
+    operationId: "sandboxes.credentials.grant",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "GrantSandboxCredentialCommand",
+    route: {
+      method: "POST",
+      path: "/sandboxes/{sandboxId}/credentials",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandbox-credentials.list",
+    operationGroup: "sandbox-credentials",
+    operationMethod: "list",
+    facadePath: ["sandboxCredentials", "list"],
+    operationId: "sandboxes.credentials.list",
+    kind: "query",
+    domain: "sandboxes",
+    messageName: "ListSandboxCredentialGrantsQuery",
+    route: {
+      method: "GET",
+      path: "/sandboxes/{sandboxId}/credentials",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandbox-credentials.request",
+    operationGroup: "sandbox-credentials",
+    operationMethod: "request",
+    facadePath: ["sandboxCredentials", "request"],
+    operationId: "sandboxes.credentials.request",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "BrokerSandboxCredentialRequestCommand",
+    route: {
+      method: "POST",
+      path: "/sandboxes/{sandboxId}/credentials/{grantId}/request",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandbox-credentials.revoke",
+    operationGroup: "sandbox-credentials",
+    operationMethod: "revoke",
+    facadePath: ["sandboxCredentials", "revoke"],
+    operationId: "sandboxes.credentials.revoke",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "RevokeSandboxCredentialCommand",
+    route: {
+      method: "DELETE",
+      path: "/sandboxes/{sandboxId}/credentials/{grantId}",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
     operationKey: "sandbox-files.list",
     operationGroup: "sandbox-files",
     operationMethod: "list",
@@ -4490,6 +4562,24 @@ export const generatedSdkOperations = [
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandboxes.events.stream",
+    operationGroup: "sandboxes",
+    operationMethod: "eventsStream",
+    facadePath: ["sandboxes", "events", "stream"],
+    operationId: "sandboxes.events.stream",
+    kind: "query",
+    domain: "sandboxes",
+    messageName: "StreamSandboxEventsQuery",
+    route: {
+      method: "GET",
+      path: "/sandboxes/{sandboxId}/events/stream",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: true,
     facadeDefault: true,
   },
   {
@@ -6245,8 +6335,17 @@ export interface GeneratedAppaloftClient {
   readonly runtimeUsage: {
     readonly inspect: AppaloftSdkFacadeMethod;
   };
+  readonly sandboxCredentials: {
+    readonly grant: AppaloftSdkFacadeMethod;
+    readonly list: AppaloftSdkFacadeMethod;
+    readonly request: AppaloftSdkFacadeMethod;
+    readonly revoke: AppaloftSdkFacadeMethod;
+  };
   readonly sandboxes: {
     readonly create: AppaloftSdkFacadeMethod;
+    readonly events: {
+      readonly stream: AppaloftSdkFacadeMethod;
+    };
     readonly exec: AppaloftSdkFacadeMethod;
     readonly list: AppaloftSdkFacadeMethod;
     readonly networkPolicy: {

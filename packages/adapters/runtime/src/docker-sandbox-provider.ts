@@ -109,6 +109,7 @@ type DockerSandboxProviderInput = {
   portPublisher?: SandboxPortPublisher;
   internalNetwork?: string;
   now?: () => string;
+  credentialBroker?: boolean;
 };
 
 function text(bytes: Uint8Array): string {
@@ -150,7 +151,7 @@ export class DockerSandboxProvider implements SandboxProvider {
       files: true,
       ports: Boolean(input.portPublisher),
       networkPolicy: ["deny" as const],
-      credentialBroker: false,
+      credentialBroker: input.credentialBroker ?? false,
     };
     this.runner = input.runner ?? new BunSandboxDockerCommandRunner();
     this.portPublisher = input.portPublisher;

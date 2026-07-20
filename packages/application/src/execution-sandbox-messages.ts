@@ -1,6 +1,7 @@
 import { type Result } from "@appaloft/core";
 import { z } from "zod";
 import { Command, Query } from "./cqrs";
+import { type StreamSandboxEventsResult } from "./execution-sandbox";
 import { parseOperationInput } from "./operations/shared-schema";
 
 const sandboxIdSchema = z.string().trim().min(1).max(160);
@@ -56,6 +57,44 @@ export const createSandboxCommandInputSchema = z
   .strict();
 export const listSandboxesQueryInputSchema = paginationSchema;
 export const showSandboxQueryInputSchema = z.object({ sandboxId: sandboxIdSchema }).strict();
+export const streamSandboxEventsQueryInputSchema = z
+  .object({
+    sandboxId: sandboxIdSchema,
+    cursor: z.string().trim().min(1).max(160).optional(),
+    limit: z.coerce.number().int().min(1).max(500).optional(),
+    untilTerminal: z.coerce.boolean().optional(),
+  })
+  .strict();
+export const grantSandboxCredentialCommandInputSchema = z
+  .object({
+    sandboxId: sandboxIdSchema,
+    grantId: z.string().trim().min(1).max(160),
+    secretRef: z.string().trim().min(1).max(512),
+    destination: z.string().trim().min(1).max(253),
+    transformation: z.enum(["authorization-bearer", "basic-auth", "header", "query-parameter"]),
+    parameterName: z.string().trim().min(1).max(64).optional(),
+  })
+  .strict();
+export const listSandboxCredentialGrantsQueryInputSchema = paginationSchema
+  .extend({ sandboxId: sandboxIdSchema })
+  .strict();
+export const revokeSandboxCredentialCommandInputSchema = z
+  .object({ sandboxId: sandboxIdSchema, grantId: z.string().trim().min(1).max(160) })
+  .strict();
+export const brokerSandboxCredentialRequestCommandInputSchema = z
+  .object({
+    sandboxId: sandboxIdSchema,
+    grantId: z.string().trim().min(1).max(160),
+    method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]),
+    url: z.string().trim().min(1).max(4096),
+    headers: z.record(z.string(), z.string()).optional(),
+    bodyBase64: z
+      .string()
+      .max(2 * 1024 * 1024)
+      .optional(),
+    timeoutMs: z.number().int().min(1).max(60_000).optional(),
+  })
+  .strict();
 export const sandboxLifecycleCommandInputSchema = showSandboxQueryInputSchema;
 export const executeSandboxCommandInputSchema = z
   .object({
@@ -330,6 +369,33 @@ export class DeleteSandboxTemplateCommand extends SandboxCommandMessage {
     );
   }
 }
+export class GrantSandboxCredentialCommand extends SandboxCommandMessage {
+  static create(input: unknown) {
+    return commandCreate(
+      grantSandboxCredentialCommandInputSchema,
+      input,
+      (value) => new GrantSandboxCredentialCommand(value),
+    );
+  }
+}
+export class RevokeSandboxCredentialCommand extends SandboxCommandMessage {
+  static create(input: unknown) {
+    return commandCreate(
+      revokeSandboxCredentialCommandInputSchema,
+      input,
+      (value) => new RevokeSandboxCredentialCommand(value),
+    );
+  }
+}
+export class BrokerSandboxCredentialRequestCommand extends SandboxCommandMessage {
+  static create(input: unknown) {
+    return commandCreate(
+      brokerSandboxCredentialRequestCommandInputSchema,
+      input,
+      (value) => new BrokerSandboxCredentialRequestCommand(value),
+    );
+  }
+}
 
 export class ListSandboxesQuery extends SandboxQueryMessage {
   static create(input: unknown = {}) {
@@ -343,6 +409,29 @@ export class ListSandboxesQuery extends SandboxQueryMessage {
 export class ShowSandboxQuery extends SandboxQueryMessage {
   static create(input: unknown) {
     return queryCreate(showSandboxQueryInputSchema, input, (value) => new ShowSandboxQuery(value));
+  }
+}
+export class ListSandboxCredentialGrantsQuery extends SandboxQueryMessage {
+  static create(input: unknown) {
+    return queryCreate(
+      listSandboxCredentialGrantsQueryInputSchema,
+      input,
+      (value) => new ListSandboxCredentialGrantsQuery(value),
+    );
+  }
+}
+export class StreamSandboxEventsQuery extends Query<StreamSandboxEventsResult> {
+  readonly input: Record<string, unknown>;
+  readonly signal: AbortSignal | undefined;
+  constructor(input: Record<string, unknown>, signal?: AbortSignal) {
+    super();
+    this.input = input;
+    this.signal = signal;
+  }
+  static create(input: unknown, signal?: AbortSignal) {
+    return parseOperationInput(streamSandboxEventsQueryInputSchema, input).map(
+      (value) => new StreamSandboxEventsQuery(value as Record<string, unknown>, signal),
+    );
   }
 }
 export class ListSandboxFilesQuery extends SandboxQueryMessage {

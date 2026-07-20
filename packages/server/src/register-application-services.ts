@@ -3199,6 +3199,13 @@ export function registerApplicationServices(
           ),
           clock: dependencyContainer.resolve(tokens.clock),
           idGenerator: dependencyContainer.resolve(tokens.idGenerator),
+          eventBus: dependencyContainer.resolve(tokens.eventBus),
+          eventObserver: dependencyContainer.resolve(tokens.sandboxEventObserver),
+          ...(dependencyContainer.isRegistered(tokens.sandboxCredentialBroker)
+            ? {
+                credentialBroker: dependencyContainer.resolve(tokens.sandboxCredentialBroker),
+              }
+            : {}),
         }),
     ),
   });

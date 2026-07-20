@@ -28,7 +28,9 @@ export class HermeticSandboxProvider implements SandboxProvider {
   private readonly snapshots = new Map<string, HermeticSnapshot>();
   private readonly now: () => string;
 
-  constructor(input: { isolation?: SandboxIsolation; now?: () => string } = {}) {
+  constructor(
+    input: { isolation?: SandboxIsolation; now?: () => string; credentialBroker?: boolean } = {},
+  ) {
     this.capabilities = {
       isolation: input.isolation ?? ("container-trusted" as const),
       pause: true,
@@ -37,7 +39,7 @@ export class HermeticSandboxProvider implements SandboxProvider {
       files: true,
       ports: true,
       networkPolicy: ["deny" as const],
-      credentialBroker: false,
+      credentialBroker: input.credentialBroker ?? false,
     };
     this.now = input.now ?? (() => "2030-01-01T00:00:00.000Z");
   }

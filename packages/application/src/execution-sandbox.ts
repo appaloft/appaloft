@@ -1,11 +1,14 @@
 import {
   CreatedAt,
+  createDomainEvent,
   domainError,
   ExpiresAt,
   err,
   ok,
   type Result,
   Sandbox,
+  SandboxCredentialGrant,
+  type SandboxCredentialGrantState,
   SandboxId,
   type SandboxIsolation,
   SandboxIsolationLevel,
@@ -26,7 +29,7 @@ import {
   type RepositoryContext,
   toRepositoryContext,
 } from "./execution-context";
-import { type Clock, type IdGenerator } from "./ports";
+import { type Clock, type EventBus, type IdGenerator } from "./ports";
 
 export interface SandboxProviderCapabilities {
   isolation: SandboxIsolation;
@@ -58,6 +61,63 @@ export type SandboxProcessStreamFrame =
   | { kind: "stdout" | "stderr"; sequence: number; data: string }
   | { kind: "exit"; sequence: number; exitCode: number }
   | { kind: "error"; sequence: number; code: string; retryable: boolean };
+export type SandboxEventEnvelope =
+  | {
+      kind: "event";
+      schemaVersion: "sandbox.events/v1";
+      cursor: string;
+      sandboxId: string;
+      occurredAt: string;
+      eventType: string;
+      source: "lifecycle" | "process";
+      payload: Record<string, unknown>;
+    }
+  | {
+      kind: "error";
+      schemaVersion: "sandbox.events/v1";
+      code: "cursor-gap" | "stream-failed";
+      retryable: boolean;
+    }
+  | { kind: "closed"; schemaVersion: "sandbox.events/v1"; reason: "aborted" | "terminal" };
+export interface SandboxEventStream extends AsyncIterable<SandboxEventEnvelope> {
+  close(): Promise<void>;
+}
+export interface SandboxEventObserver {
+  open(
+    context: ExecutionContext,
+    request: {
+      sandboxId: string;
+      cursor?: string;
+      limit: number;
+      follow: boolean;
+      untilTerminal: boolean;
+    },
+    signal: AbortSignal,
+  ): Promise<Result<SandboxEventStream>>;
+}
+export type StreamSandboxEventsResult =
+  | { mode: "bounded"; sandboxId: string; envelopes: SandboxEventEnvelope[] }
+  | { mode: "stream"; sandboxId: string; stream: SandboxEventStream };
+export interface SandboxCredentialBrokerResponse {
+  status: number;
+  headers: Record<string, string>;
+  bodyBase64: string;
+  sizeBytes: number;
+}
+export interface SandboxCredentialBroker {
+  request(
+    context: ExecutionContext,
+    input: {
+      sandboxId: string;
+      grant: SandboxCredentialGrantState;
+      method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+      url: string;
+      headers: Record<string, string>;
+      body?: Uint8Array;
+      timeoutMs: number;
+    },
+  ): Promise<Result<SandboxCredentialBrokerResponse>>;
+}
 export type SandboxExecResult =
   | { mode: "foreground"; frames: SandboxProcessStreamFrame[] }
   | { mode: "background"; processId: string };
@@ -233,6 +293,26 @@ export interface SandboxRepository {
   ): Promise<StoredTemplate[]>;
   deleteTemplate(context: RepositoryContext, templateId: string): Promise<void>;
   hasActiveTemplateReferences(context: RepositoryContext, templateId: string): Promise<boolean>;
+  saveCredentialGrant(
+    context: RepositoryContext,
+    sandboxId: string,
+    grant: SandboxCredentialGrant,
+  ): Promise<void>;
+  findCredentialGrant(
+    context: RepositoryContext,
+    sandboxId: string,
+    grantId: string,
+  ): Promise<SandboxCredentialGrant | null>;
+  listCredentialGrants(
+    context: RepositoryContext,
+    sandboxId: string,
+    input: { limit: number; offset: number },
+  ): Promise<SandboxCredentialGrant[]>;
+  deleteCredentialGrant(
+    context: RepositoryContext,
+    sandboxId: string,
+    grantId: string,
+  ): Promise<void>;
 }
 
 function tenantId(context: RepositoryContext): string {
@@ -243,6 +323,7 @@ export class InMemorySandboxRepository implements SandboxRepository {
   private readonly items = new Map<string, StoredSandbox>();
   private readonly snapshots = new Map<string, StoredSnapshot>();
   private readonly templates = new Map<string, StoredTemplate>();
+  private readonly credentialGrants = new Map<string, SandboxCredentialGrant>();
   async save(context: RepositoryContext, sandbox: Sandbox, providerKey: string): Promise<void> {
     const tenant = tenantId(context);
     this.items.set(`${tenant}:${sandbox.id.value}`, { tenantId: tenant, providerKey, sandbox });
@@ -282,6 +363,41 @@ export class InMemorySandboxRepository implements SandboxRepository {
           : [];
       })
       .slice(input.offset, input.offset + input.limit);
+  }
+  async saveCredentialGrant(
+    context: RepositoryContext,
+    sandboxId: string,
+    grant: SandboxCredentialGrant,
+  ): Promise<void> {
+    this.credentialGrants.set(
+      `${tenantId(context)}:${sandboxId}:${grant.toState().grantId}`,
+      grant,
+    );
+  }
+  async findCredentialGrant(
+    context: RepositoryContext,
+    sandboxId: string,
+    grantId: string,
+  ): Promise<SandboxCredentialGrant | null> {
+    return this.credentialGrants.get(`${tenantId(context)}:${sandboxId}:${grantId}`) ?? null;
+  }
+  async listCredentialGrants(
+    context: RepositoryContext,
+    sandboxId: string,
+    input: { limit: number; offset: number },
+  ): Promise<SandboxCredentialGrant[]> {
+    const prefix = `${tenantId(context)}:${sandboxId}:`;
+    return [...this.credentialGrants.entries()]
+      .filter(([key]) => key.startsWith(prefix))
+      .map(([, grant]) => grant)
+      .slice(input.offset, input.offset + input.limit);
+  }
+  async deleteCredentialGrant(
+    context: RepositoryContext,
+    sandboxId: string,
+    grantId: string,
+  ): Promise<void> {
+    this.credentialGrants.delete(`${tenantId(context)}:${sandboxId}:${grantId}`);
   }
   async saveSnapshot(
     context: RepositoryContext,
@@ -452,16 +568,35 @@ export class ExecutionSandboxService {
   private readonly providerRegistry: SandboxProviderRegistry;
   private readonly clock: Clock;
   private readonly idGenerator: IdGenerator;
+  private readonly eventBus: EventBus | undefined;
+  private readonly eventObserver: SandboxEventObserver | undefined;
+  private readonly credentialBroker: SandboxCredentialBroker | undefined;
   constructor(input: {
     repository: SandboxRepository;
     providerRegistry: SandboxProviderRegistry;
     clock: Clock;
     idGenerator: IdGenerator;
+    eventBus?: EventBus;
+    eventObserver?: SandboxEventObserver;
+    credentialBroker?: SandboxCredentialBroker;
   }) {
     this.repository = input.repository;
     this.providerRegistry = input.providerRegistry;
     this.clock = input.clock;
     this.idGenerator = input.idGenerator;
+    this.eventBus = input.eventBus;
+    this.eventObserver = input.eventObserver;
+    this.credentialBroker = input.credentialBroker;
+  }
+
+  private async saveSandbox(
+    context: ExecutionContext,
+    sandbox: Sandbox,
+    providerKey: string,
+  ): Promise<void> {
+    await this.repository.save(toRepositoryContext(context), sandbox, providerKey);
+    const events = sandbox.pullDomainEvents();
+    if (events.length > 0) await this.eventBus?.publish(context, events);
   }
 
   private async providerOperation<T>(phase: string, run: () => Promise<T>): Promise<Result<T>> {
@@ -573,7 +708,7 @@ export class ExecutionSandboxService {
       currentAttemptId: this.idGenerator.next("sat"),
     });
     if (sandbox.isErr()) return err(sandbox.error);
-    await this.repository.save(toRepositoryContext(context), sandbox.value, provider.key);
+    await this.saveSandbox(context, sandbox.value, provider.key);
     return ok(
       descriptor({
         tenantId: context.tenant?.tenantId ?? "tenant_instance",
@@ -623,11 +758,7 @@ export class ExecutionSandboxService {
           await provider.terminate({ sandboxId, providerHandle: state.providerHandle });
           const expired = stored.sandbox.expire({ at: UpdatedAt.rehydrate(this.clock.now()) });
           if (expired.isOk()) {
-            await this.repository.save(
-              toRepositoryContext(context),
-              stored.sandbox,
-              stored.providerKey,
-            );
+            await this.saveSandbox(context, stored.sandbox, stored.providerKey);
           }
         } catch {
           // Access remains denied; the maintenance reconciler retains the handle for cleanup retry.
@@ -673,7 +804,7 @@ export class ExecutionSandboxService {
       at,
     });
     if (started.isErr()) return err(started.error);
-    await this.repository.save(toRepositoryContext(context), stored.sandbox, stored.providerKey);
+    await this.saveSandbox(context, stored.sandbox, stored.providerKey);
     const state = stored.sandbox.toState();
     let providerSource: SandboxProviderRequest["source"];
     if (state.source.kind === "image") {
@@ -691,11 +822,7 @@ export class ExecutionSandboxService {
         !snapshotState?.providerHandle
       ) {
         stored.sandbox.markFailed({ code: "sandbox_snapshot_unavailable", retryable: false, at });
-        await this.repository.save(
-          toRepositoryContext(context),
-          stored.sandbox,
-          stored.providerKey,
-        );
+        await this.saveSandbox(context, stored.sandbox, stored.providerKey);
         return err(domainError.conflict("Sandbox snapshot is unavailable for provisioning"));
       }
       providerSource = { kind: "snapshot", providerHandle: snapshotState.providerHandle };
@@ -706,11 +833,7 @@ export class ExecutionSandboxService {
       );
       if (!template) {
         stored.sandbox.markFailed({ code: "sandbox_template_unavailable", retryable: false, at });
-        await this.repository.save(
-          toRepositoryContext(context),
-          stored.sandbox,
-          stored.providerKey,
-        );
+        await this.saveSandbox(context, stored.sandbox, stored.providerKey);
         return err(domainError.conflict("Sandbox template is unavailable for provisioning"));
       }
       const resolved = template.template.resolveCreatePolicy({
@@ -736,11 +859,11 @@ export class ExecutionSandboxService {
         at,
       });
       if (ready.isErr()) return err(ready.error);
-      await this.repository.save(toRepositoryContext(context), stored.sandbox, stored.providerKey);
+      await this.saveSandbox(context, stored.sandbox, stored.providerKey);
       return ok(descriptor(stored));
     } catch {
       stored.sandbox.markFailed({ code: "sandbox_provision_failed", retryable: true, at });
-      await this.repository.save(toRepositoryContext(context), stored.sandbox, stored.providerKey);
+      await this.saveSandbox(context, stored.sandbox, stored.providerKey);
       return err({
         code: "sandbox_provision_failed",
         category: "provider",
@@ -785,7 +908,7 @@ export class ExecutionSandboxService {
           failed.push(state.id.value);
           continue;
         }
-        await this.repository.save(repositoryContext, stored.sandbox, stored.providerKey);
+        await this.saveSandbox(context, stored.sandbox, stored.providerKey);
         expired.push(state.id.value);
         continue;
       }
@@ -819,7 +942,7 @@ export class ExecutionSandboxService {
           failed.push(state.id.value);
           continue;
         }
-        await this.repository.save(repositoryContext, stored.sandbox, stored.providerKey);
+        await this.saveSandbox(context, stored.sandbox, stored.providerKey);
         reconciled.push(state.id.value);
       }
     }
@@ -933,7 +1056,7 @@ export class ExecutionSandboxService {
       if (path.isErr()) return err(path.error);
       cwd = path.value.value;
     }
-    return this.providerOperation("execution-sandbox-exec", () =>
+    const executed = await this.providerOperation("execution-sandbox-exec", () =>
       ready.value.provider.exec({
         sandboxId,
         providerHandle: ready.value.providerHandle,
@@ -944,6 +1067,180 @@ export class ExecutionSandboxService {
         ...(input.stdin ? { stdin: input.stdin } : {}),
       }),
     );
+    if (executed.isOk() && this.eventBus) {
+      const occurredAt = this.clock.now();
+      const events =
+        executed.value.mode === "foreground"
+          ? executed.value.frames.map((frame) =>
+              createDomainEvent("sandbox-process-frame", sandboxId, occurredAt, { frame }),
+            )
+          : [
+              createDomainEvent("sandbox-process-started", sandboxId, occurredAt, {
+                processId: executed.value.processId,
+              }),
+            ];
+      await this.eventBus.publish(context, events);
+    }
+    return executed;
+  }
+
+  async streamEvents(
+    context: ExecutionContext,
+    sandboxId: string,
+    input: {
+      cursor?: string;
+      limit?: number;
+      follow?: boolean;
+      untilTerminal?: boolean;
+      signal?: AbortSignal;
+    } = {},
+  ): Promise<Result<StreamSandboxEventsResult>> {
+    const visible = await this.repository.find(toRepositoryContext(context), sandboxId);
+    if (!visible) return err(domainError.notFound("Sandbox", sandboxId));
+    if (!this.eventObserver) {
+      return err(
+        domainError.infra("Sandbox event streaming is unavailable", {
+          phase: "execution-sandbox-event-stream",
+        }),
+      );
+    }
+    const follow = input.follow ?? false;
+    const opened = await this.eventObserver.open(
+      context,
+      {
+        sandboxId,
+        ...(input.cursor ? { cursor: input.cursor } : {}),
+        limit: Math.min(Math.max(input.limit ?? 100, 1), 500),
+        follow,
+        untilTerminal: input.untilTerminal ?? false,
+      },
+      input.signal ?? new AbortController().signal,
+    );
+    if (opened.isErr()) return err(opened.error);
+    if (follow) return ok({ mode: "stream", sandboxId, stream: opened.value });
+    const envelopes: SandboxEventEnvelope[] = [];
+    try {
+      for await (const envelope of opened.value) envelopes.push(envelope);
+    } finally {
+      await opened.value.close();
+    }
+    return ok({ mode: "bounded", sandboxId, envelopes });
+  }
+
+  private async credentialCapableSandbox(
+    context: ExecutionContext,
+    sandboxId: string,
+  ): Promise<Result<StoredSandbox>> {
+    const stored = await this.repository.find(toRepositoryContext(context), sandboxId);
+    if (!stored) return err(domainError.notFound("Sandbox", sandboxId));
+    const provider = this.providerRegistry.get(stored.providerKey);
+    if (!provider?.capabilities.credentialBroker || !this.credentialBroker) {
+      return err(
+        domainError.conflict("Sandbox credential brokerage is unavailable", {
+          phase: "execution-sandbox-credential-broker",
+        }),
+      );
+    }
+    return ok(stored);
+  }
+
+  async grantCredential(
+    context: ExecutionContext,
+    sandboxId: string,
+    input: SandboxCredentialGrantState,
+  ): Promise<Result<SandboxCredentialGrantState>> {
+    const capable = await this.credentialCapableSandbox(context, sandboxId);
+    if (capable.isErr()) return err(capable.error);
+    const grant = SandboxCredentialGrant.create(input);
+    if (grant.isErr()) return err(grant.error);
+    await this.repository.saveCredentialGrant(toRepositoryContext(context), sandboxId, grant.value);
+    return ok(grant.value.toState());
+  }
+
+  async listCredentialGrants(
+    context: ExecutionContext,
+    sandboxId: string,
+    input: { limit?: number; offset?: number } = {},
+  ): Promise<Result<{ items: SandboxCredentialGrantState[] }>> {
+    const capable = await this.credentialCapableSandbox(context, sandboxId);
+    if (capable.isErr()) return err(capable.error);
+    const items = await this.repository.listCredentialGrants(
+      toRepositoryContext(context),
+      sandboxId,
+      {
+        limit: Math.min(Math.max(input.limit ?? 50, 1), 100),
+        offset: Math.max(input.offset ?? 0, 0),
+      },
+    );
+    return ok({ items: items.map((grant) => grant.toState()) });
+  }
+
+  async revokeCredential(
+    context: ExecutionContext,
+    sandboxId: string,
+    grantId: string,
+  ): Promise<Result<{ grantId: string; revoked: true }>> {
+    const capable = await this.credentialCapableSandbox(context, sandboxId);
+    if (capable.isErr()) return err(capable.error);
+    await this.repository.deleteCredentialGrant(toRepositoryContext(context), sandboxId, grantId);
+    return ok({ grantId, revoked: true });
+  }
+
+  async brokerCredentialRequest(
+    context: ExecutionContext,
+    sandboxId: string,
+    input: {
+      grantId: string;
+      method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+      url: string;
+      headers?: Record<string, string>;
+      bodyBase64?: string;
+      timeoutMs?: number;
+    },
+  ): Promise<Result<SandboxCredentialBrokerResponse>> {
+    const ready = await this.ready(context, sandboxId);
+    if (ready.isErr()) return err(ready.error);
+    if (!ready.value.provider.capabilities.credentialBroker || !this.credentialBroker) {
+      return err(domainError.conflict("Sandbox credential brokerage is unavailable"));
+    }
+    const grant = await this.repository.findCredentialGrant(
+      toRepositoryContext(context),
+      sandboxId,
+      input.grantId,
+    );
+    if (!grant) return err(domainError.notFound("SandboxCredentialGrant", input.grantId));
+    const headers = input.headers ?? {};
+    if (
+      Object.keys(headers).length > 64 ||
+      Object.entries(headers).some(
+        ([name, value]) =>
+          !/^[A-Za-z][A-Za-z0-9-]{0,63}$/.test(name) ||
+          /[\r\n\0]/.test(value) ||
+          value.length > 8_192,
+      )
+    ) {
+      return err(domainError.validation("Sandbox broker request headers are invalid"));
+    }
+    let body: Uint8Array | undefined;
+    if (input.bodyBase64) {
+      try {
+        body = Uint8Array.from(atob(input.bodyBase64), (character) => character.charCodeAt(0));
+      } catch {
+        return err(domainError.validation("Sandbox broker request body must be valid base64"));
+      }
+      if (body.byteLength > 1024 * 1024) {
+        return err(domainError.validation("Sandbox broker request body exceeds the size limit"));
+      }
+    }
+    return this.credentialBroker.request(context, {
+      sandboxId,
+      grant: grant.toState(),
+      method: input.method,
+      url: input.url,
+      headers: { ...headers },
+      ...(body ? { body } : {}),
+      timeoutMs: Math.min(Math.max(input.timeoutMs ?? 30_000, 1), 60_000),
+    });
   }
 
   async writeFile(
@@ -1189,11 +1486,7 @@ export class ExecutionSandboxService {
       at: UpdatedAt.rehydrate(this.clock.now()),
     });
     if (updated.isErr()) return err(updated.error);
-    await this.repository.save(
-      toRepositoryContext(context),
-      ready.value.stored.sandbox,
-      ready.value.stored.providerKey,
-    );
+    await this.saveSandbox(context, ready.value.stored.sandbox, ready.value.stored.providerKey);
     return ok(descriptor(ready.value.stored));
   }
 
@@ -1206,11 +1499,7 @@ export class ExecutionSandboxService {
     const at = UpdatedAt.rehydrate(this.clock.now());
     const requested = ready.value.stored.sandbox.requestPause({ at });
     if (requested.isErr()) return err(requested.error);
-    await this.repository.save(
-      toRepositoryContext(context),
-      ready.value.stored.sandbox,
-      ready.value.stored.providerKey,
-    );
+    await this.saveSandbox(context, ready.value.stored.sandbox, ready.value.stored.providerKey);
     const observed = await this.providerOperation("execution-sandbox-pause", () =>
       ready.value.provider.pause({
         sandboxId,
@@ -1219,20 +1508,12 @@ export class ExecutionSandboxService {
     );
     if (observed.isErr()) {
       ready.value.stored.sandbox.markPauseFailed({ code: observed.error.code, at });
-      await this.repository.save(
-        toRepositoryContext(context),
-        ready.value.stored.sandbox,
-        ready.value.stored.providerKey,
-      );
+      await this.saveSandbox(context, ready.value.stored.sandbox, ready.value.stored.providerKey);
       return err(observed.error);
     }
     const paused = ready.value.stored.sandbox.markPaused({ at });
     if (paused.isErr()) return err(paused.error);
-    await this.repository.save(
-      toRepositoryContext(context),
-      ready.value.stored.sandbox,
-      ready.value.stored.providerKey,
-    );
+    await this.saveSandbox(context, ready.value.stored.sandbox, ready.value.stored.providerKey);
     return ok(descriptor(ready.value.stored));
   }
 
@@ -1249,13 +1530,13 @@ export class ExecutionSandboxService {
     const at = UpdatedAt.rehydrate(this.clock.now());
     const requested = stored.sandbox.requestResume({ at });
     if (requested.isErr()) return err(requested.error);
-    await this.repository.save(repositoryContext, stored.sandbox, stored.providerKey);
+    await this.saveSandbox(context, stored.sandbox, stored.providerKey);
     const observed = await this.providerOperation("execution-sandbox-resume", () =>
       provider.resume({ sandboxId, providerHandle: state.providerHandle as string }),
     );
     if (observed.isErr()) {
       stored.sandbox.markResumeFailed({ code: observed.error.code, at });
-      await this.repository.save(repositoryContext, stored.sandbox, stored.providerKey);
+      await this.saveSandbox(context, stored.sandbox, stored.providerKey);
       return err(observed.error);
     }
     const resumed = stored.sandbox.markReady({
@@ -1264,7 +1545,7 @@ export class ExecutionSandboxService {
       at,
     });
     if (resumed.isErr()) return err(resumed.error);
-    await this.repository.save(repositoryContext, stored.sandbox, stored.providerKey);
+    await this.saveSandbox(context, stored.sandbox, stored.providerKey);
     return ok(descriptor(stored));
   }
 
@@ -1466,7 +1747,7 @@ export class ExecutionSandboxService {
     const at = UpdatedAt.rehydrate(this.clock.now());
     const requested = stored.sandbox.requestTermination({ at });
     if (requested.isErr()) return err(requested.error);
-    await this.repository.save(repositoryContext, stored.sandbox, stored.providerKey);
+    await this.saveSandbox(context, stored.sandbox, stored.providerKey);
     const handle = stored.sandbox.toState().providerHandle;
     const provider = this.providerRegistry.get(stored.providerKey);
     if (handle && provider) {
@@ -1477,7 +1758,7 @@ export class ExecutionSandboxService {
     }
     const terminated = stored.sandbox.markTerminated({ at });
     if (terminated.isErr()) return err(terminated.error);
-    await this.repository.save(repositoryContext, stored.sandbox, stored.providerKey);
+    await this.saveSandbox(context, stored.sandbox, stored.providerKey);
     return ok(descriptor(stored));
   }
 }

@@ -1402,6 +1402,11 @@ export function registerRuntimeDependencies(
       () => new PgDomainEventStreamRetentionStore(input.database.db),
     ),
   });
+  container.register(tokens.sandboxEventObserver, {
+    useFactory: instanceCachingFactory(
+      () => new PgDomainEventStreamRetentionStore(input.database.db),
+    ),
+  });
   container.register(tokens.resourceRuntimeLogArchiveStore, {
     useFactory: instanceCachingFactory(
       () => new PgResourceRuntimeLogArchiveStore(input.database.db),

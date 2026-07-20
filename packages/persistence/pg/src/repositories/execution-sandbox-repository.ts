@@ -9,6 +9,7 @@ import {
   CreatedAt,
   ExpiresAt,
   Sandbox,
+  SandboxCredentialGrant,
   SandboxId,
   SandboxIsolationLevel,
   SandboxNetworkPolicy,
@@ -271,6 +272,82 @@ export class PgExecutionSandboxRepository implements SandboxRepository {
         ? [{ sandboxId: row.id, providerHandle: state.providerHandle }]
         : [];
     });
+  }
+
+  async saveCredentialGrant(
+    context: RepositoryContext,
+    sandboxId: string,
+    grant: SandboxCredentialGrant,
+  ): Promise<void> {
+    const state = grant.toState();
+    await resolveRepositoryExecutor(this.db, context)
+      .insertInto("execution_sandbox_credential_grants")
+      .values({
+        tenant_id: contextTenantId(context),
+        sandbox_id: sandboxId,
+        grant_id: state.grantId,
+        state: { ...state },
+        created_at: new Date().toISOString(),
+      })
+      .onConflict((conflict) =>
+        conflict
+          .columns(["tenant_id", "sandbox_id", "grant_id"])
+          .doUpdateSet({ state: { ...state } }),
+      )
+      .execute();
+  }
+
+  async findCredentialGrant(
+    context: RepositoryContext,
+    sandboxId: string,
+    grantId: string,
+  ): Promise<SandboxCredentialGrant | null> {
+    const row = await resolveRepositoryExecutor(this.db, context)
+      .selectFrom("execution_sandbox_credential_grants")
+      .select("state")
+      .where("tenant_id", "=", contextTenantId(context))
+      .where("sandbox_id", "=", sandboxId)
+      .where("grant_id", "=", grantId)
+      .executeTakeFirst();
+    return row
+      ? SandboxCredentialGrant.rehydrate(
+          row.state as unknown as ReturnType<SandboxCredentialGrant["toState"]>,
+        )
+      : null;
+  }
+
+  async listCredentialGrants(
+    context: RepositoryContext,
+    sandboxId: string,
+    input: { limit: number; offset: number },
+  ): Promise<SandboxCredentialGrant[]> {
+    const rows = await resolveRepositoryExecutor(this.db, context)
+      .selectFrom("execution_sandbox_credential_grants")
+      .select("state")
+      .where("tenant_id", "=", contextTenantId(context))
+      .where("sandbox_id", "=", sandboxId)
+      .orderBy("grant_id", "asc")
+      .limit(input.limit)
+      .offset(input.offset)
+      .execute();
+    return rows.map((row) =>
+      SandboxCredentialGrant.rehydrate(
+        row.state as unknown as ReturnType<SandboxCredentialGrant["toState"]>,
+      ),
+    );
+  }
+
+  async deleteCredentialGrant(
+    context: RepositoryContext,
+    sandboxId: string,
+    grantId: string,
+  ): Promise<void> {
+    await resolveRepositoryExecutor(this.db, context)
+      .deleteFrom("execution_sandbox_credential_grants")
+      .where("tenant_id", "=", contextTenantId(context))
+      .where("sandbox_id", "=", sandboxId)
+      .where("grant_id", "=", grantId)
+      .execute();
   }
 
   async saveSnapshot(

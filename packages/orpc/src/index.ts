@@ -29,9 +29,11 @@ import {
   BindResourceDependencyCommand,
   BootstrapFirstAdminCommand,
   BootstrapServerProxyCommand,
+  BrokerSandboxCredentialRequestCommand,
   bindResourceDependencyCommandInputSchema,
   bootstrapFirstAdminCommandInputSchema,
   bootstrapServerProxyCommandInputSchema,
+  brokerSandboxCredentialRequestCommandInputSchema,
   CancelDeploymentCommand,
   CancelOperatorWorkCommand,
   ChangeAccountProfileCommand,
@@ -247,9 +249,11 @@ import {
   GitHubAppConnectionQuery,
   type GitHubPreviewPullRequestWebhookVerifier,
   type GitHubSourceEventWebhookVerifier,
+  GrantSandboxCredentialCommand,
   getAuthBootstrapStatusQueryInputSchema,
   getCurrentOrganizationContextQueryInputSchema,
   githubAppConnectionQueryInputSchema,
+  grantSandboxCredentialCommandInputSchema,
   ImportCertificateCommand,
   ImportDependencyResourceCommand,
   ImportResourceVariablesCommand,
@@ -305,6 +309,7 @@ import {
   ListRetentionDefaultsQuery,
   ListRouteSurfaceDecisionsQuery,
   ListRuntimeMonitoringSamplesQuery,
+  ListSandboxCredentialGrantsQuery,
   ListSandboxesQuery,
   ListSandboxFilesQuery,
   ListSandboxPortsQuery,
@@ -356,6 +361,7 @@ import {
   listRouteSurfaceDecisionsInputSchema,
   listRouteSurfaceDecisionsResponseSchema,
   listRuntimeMonitoringSamplesQueryInputSchema,
+  listSandboxCredentialGrantsQueryInputSchema,
   listSandboxesQueryInputSchema,
   listSandboxPortsQueryInputSchema,
   listSandboxProcessesQueryInputSchema,
@@ -481,6 +487,7 @@ import {
   RevokeCertificateCommand,
   RevokeConnectionCommand,
   RevokeDeployTokenCommand,
+  RevokeSandboxCredentialCommand,
   RevokeSandboxPortCommand,
   RollbackDeploymentCommand,
   RotateDeployTokenCommand,
@@ -523,6 +530,7 @@ import {
   revokeCertificateCommandInputSchema,
   revokeConnectionCommandInputSchema,
   revokeDeployTokenCommandInputSchema,
+  revokeSandboxCredentialCommandInputSchema,
   revokeSandboxPortCommandInputSchema,
   rollbackDeploymentCommandInputSchema,
   rotateDeployTokenCommandInputSchema,
@@ -588,6 +596,8 @@ import {
   StreamOperatorWorkEventsQuery,
   type StreamOperatorWorkEventsQueryInput,
   type StreamOperatorWorkEventsResult,
+  StreamSandboxEventsQuery,
+  type StreamSandboxEventsResult,
   SwitchCurrentOrganizationCommand,
   SyncEnvironmentProfileCommand,
   sandboxFilePathInputSchema,
@@ -641,6 +651,7 @@ import {
   startConnectionCommandInputSchema,
   streamDeploymentTimelineQueryInputSchema,
   streamOperatorWorkEventsQueryInputSchema,
+  streamSandboxEventsQueryInputSchema,
   switchCurrentOrganizationCommandInputSchema,
   syncEnvironmentProfileCommandInputSchema,
   TerminateSandboxCommand,
@@ -3238,6 +3249,31 @@ function createOperatorWorkEventStream(
       return {
         workId: result.workId,
       };
+    } finally {
+      await result.stream.close();
+    }
+  })();
+}
+
+function createSandboxEventStream(
+  context: AppaloftOrpcRequestContext,
+  input: z.infer<typeof streamSandboxEventsQueryInputSchema>,
+) {
+  return (async function* streamSandboxEvents() {
+    const result = await executeQuery<StreamSandboxEventsQuery, StreamSandboxEventsResult>(
+      context,
+      StreamSandboxEventsQuery.create(input, context.currentRequest?.signal),
+    );
+    if (result.mode !== "stream") {
+      for (const envelope of result.envelopes) yield envelope;
+      return { sandboxId: result.sandboxId };
+    }
+    try {
+      for await (const envelope of result.stream) {
+        yield envelope;
+        if (envelope.kind === "closed" || envelope.kind === "error") break;
+      }
+      return { sandboxId: result.sandboxId };
     } finally {
       await result.stream.close();
     }
@@ -6999,6 +7035,52 @@ export const showSandboxProcedure = base
   .output(sandboxOperationResponseSchema)
   .handler(async ({ input, context }) => executeQuery(context, ShowSandboxQuery.create(input)));
 
+export const streamSandboxEventsProcedure = base
+  .route({ method: "GET", path: "/sandboxes/{sandboxId}/events/stream", successStatus: 200 })
+  .input(streamSandboxEventsQueryInputSchema)
+  .output(eventIterator(z.unknown(), z.object({ sandboxId: z.string() })))
+  .handler(({ input, context }) => createSandboxEventStream(context, input));
+
+export const grantSandboxCredentialProcedure = base
+  .route({ method: "POST", path: "/sandboxes/{sandboxId}/credentials", successStatus: 201 })
+  .input(grantSandboxCredentialCommandInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, GrantSandboxCredentialCommand.create(input)),
+  );
+
+export const listSandboxCredentialGrantsProcedure = base
+  .route({ method: "GET", path: "/sandboxes/{sandboxId}/credentials", successStatus: 200 })
+  .input(listSandboxCredentialGrantsQueryInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListSandboxCredentialGrantsQuery.create(input)),
+  );
+
+export const revokeSandboxCredentialProcedure = base
+  .route({
+    method: "DELETE",
+    path: "/sandboxes/{sandboxId}/credentials/{grantId}",
+    successStatus: 200,
+  })
+  .input(revokeSandboxCredentialCommandInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RevokeSandboxCredentialCommand.create(input)),
+  );
+
+export const brokerSandboxCredentialRequestProcedure = base
+  .route({
+    method: "POST",
+    path: "/sandboxes/{sandboxId}/credentials/{grantId}/request",
+    successStatus: 200,
+  })
+  .input(brokerSandboxCredentialRequestCommandInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, BrokerSandboxCredentialRequestCommand.create(input)),
+  );
+
 export const pauseSandboxProcedure = base
   .route({ method: "POST", path: "/sandboxes/{sandboxId}/pause", successStatus: 200 })
   .input(sandboxLifecycleCommandInputSchema)
@@ -7216,6 +7298,13 @@ export const appaloftOrpcRouter = {
     create: createSandboxProcedure,
     list: listSandboxesProcedure,
     show: showSandboxProcedure,
+    events: { stream: streamSandboxEventsProcedure },
+    credentials: {
+      grant: grantSandboxCredentialProcedure,
+      list: listSandboxCredentialGrantsProcedure,
+      revoke: revokeSandboxCredentialProcedure,
+      request: brokerSandboxCredentialRequestProcedure,
+    },
     pause: pauseSandboxProcedure,
     resume: resumeSandboxProcedure,
     terminate: terminateSandboxProcedure,
@@ -10076,6 +10165,10 @@ export function mountAppaloftOrpcRoutes(
     "/api/runtime-monitoring/thresholds",
     "/api/sandboxes",
     "/api/sandboxes/:sandboxId",
+    "/api/sandboxes/:sandboxId/events/stream",
+    "/api/sandboxes/:sandboxId/credentials",
+    "/api/sandboxes/:sandboxId/credentials/:grantId",
+    "/api/sandboxes/:sandboxId/credentials/:grantId/request",
     "/api/sandboxes/:sandboxId/pause",
     "/api/sandboxes/:sandboxId/resume",
     "/api/sandboxes/:sandboxId/terminate",
