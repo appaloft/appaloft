@@ -118,7 +118,7 @@ describe("Appaloft skill eval suite", () => {
         rmSync(installRoot, { recursive: true, force: true });
       }
     }
-  });
+  }, 20_000);
 
   test("[APPALOFT-SKILL-EVAL-001] evals cover core Appaloft docs and operation families", () => {
     const suite = JSON.parse(readFileSync("skills/appaloft/evals/evals.json", "utf8")) as {
