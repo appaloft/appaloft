@@ -70,6 +70,7 @@ type DockerSandboxProviderInput = {
   isolation?: Extract<SandboxIsolation, "container-trusted" | "gvisor">;
   runner?: SandboxDockerCommandRunner;
   portPublisher?: SandboxPortPublisher;
+  internalNetwork?: string;
   now?: () => string;
 };
 
@@ -91,11 +92,19 @@ export class DockerSandboxProvider implements SandboxProvider {
   private readonly portPublisher: SandboxPortPublisher | undefined;
   private readonly now: () => string;
   private readonly runtimeName: "runc" | "runsc";
+  private readonly networkName: string;
 
   constructor(input: DockerSandboxProviderInput = {}) {
     const isolation = input.isolation ?? "container-trusted";
     this.key = input.key ?? (isolation === "gvisor" ? "docker-gvisor" : "docker");
     this.runtimeName = isolation === "gvisor" ? "runsc" : "runc";
+    if (input.internalNetwork && !/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$/.test(input.internalNetwork)) {
+      throw new Error("Sandbox internal Docker network name is invalid");
+    }
+    if (input.portPublisher && !input.internalNetwork) {
+      throw new Error("Sandbox port publishing requires an internal Docker network");
+    }
+    this.networkName = input.internalNetwork ?? "none";
     this.capabilities = {
       isolation,
       pause: true,
@@ -117,6 +126,18 @@ export class DockerSandboxProvider implements SandboxProvider {
       const result = await this.docker(["info", "--format", "{{json .Runtimes}}"]);
       if (!text(result.stdout).includes('"runsc"')) {
         throw new Error("Docker worker does not expose the required runsc runtime");
+      }
+    }
+    if (this.networkName !== "none") {
+      const result = await this.docker([
+        "network",
+        "inspect",
+        "--format",
+        "{{.Internal}}",
+        this.networkName,
+      ]);
+      if (text(result.stdout).trim() !== "true") {
+        throw new Error("Sandbox Docker network must be internal to preserve default-deny egress");
       }
     }
   }
@@ -143,7 +164,7 @@ export class DockerSandboxProvider implements SandboxProvider {
       "--runtime",
       this.runtimeName,
       "--network",
-      "none",
+      this.networkName,
       "--cpus",
       String(request.limits.cpuMillis / 1000),
       "--memory",

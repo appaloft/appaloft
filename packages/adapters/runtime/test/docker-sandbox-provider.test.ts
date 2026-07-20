@@ -6,6 +6,7 @@ import {
   DockerSandboxProvider,
   type SandboxDockerCommandRunner,
   type SandboxDockerCommandResult,
+  type SandboxPortPublisher,
 } from "../src/docker-sandbox-provider";
 
 class CapturingRunner implements SandboxDockerCommandRunner {
@@ -19,6 +20,7 @@ class CapturingRunner implements SandboxDockerCommandRunner {
     this.calls.push({ argv: [...argv], ...(input.stdin ? { stdin: input.stdin.slice() } : {}) });
     const command = argv.join(" ");
     if (command.includes("info --format")) return this.result(this.runtimes);
+    if (command.includes("network inspect --format")) return this.result("true\n");
     if (command.includes("inspect --format") && !command.includes("image inspect"))
       return this.result("sbx_demo\n");
     if (command.includes("image inspect")) return this.result("4096\n");
@@ -72,6 +74,47 @@ describe("DockerSandboxProvider", () => {
 
     expect(provider.provision(request)).rejects.toThrow("runsc");
     expect(runner.calls.some((call) => call.argv[1] === "create")).toBe(false);
+  });
+
+  test("[SBX-PORT-001] enables publishing only on a verified internal Docker network", async () => {
+    const runner = new CapturingRunner();
+    const exposed: unknown[] = [];
+    const publisher: SandboxPortPublisher = {
+      async expose(input) {
+        exposed.push(input);
+        return {
+          exposureId: "sexp_1",
+          port: input.port,
+          visibility: input.visibility,
+          url: "https://preview.example.test/signed",
+          expiresAt: "2026-07-20T01:00:00.000Z",
+        };
+      },
+      async list() {
+        return [];
+      },
+      async revoke() {},
+    };
+    const provider = new DockerSandboxProvider({
+      isolation: "gvisor",
+      runner,
+      internalNetwork: "appaloft-sandbox-internal",
+      portPublisher: publisher,
+    });
+    await provider.provision(request);
+    expect(provider.capabilities.ports).toBe(true);
+    expect(runner.calls.find((call) => call.argv[1] === "create")?.argv).toContain(
+      "appaloft-sandbox-internal",
+    );
+    expect(
+      await provider.exposePort({
+        sandboxId: "sbx_demo",
+        providerHandle: "appaloft-sbx_demo",
+        port: 3000,
+        visibility: "private",
+      }),
+    ).toMatchObject({ exposureId: "sexp_1", port: 3000 });
+    expect(exposed).toHaveLength(1);
   });
 
   test("[SBX-PROC-001] returns ordered stdout/stderr/exit frames from direct argv execution", async () => {
