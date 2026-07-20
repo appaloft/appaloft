@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { preferredQuickDeployGitHubSourceMode } from "./quick-deploy-github-source-mode";
 
 describe("Quick Deploy GitHub source mode", () => {
