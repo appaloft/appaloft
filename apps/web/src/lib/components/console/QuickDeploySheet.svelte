@@ -106,6 +106,7 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
     observeDeploymentProgressAfterAcceptance,
   } from "$lib/console/deployment-progress";
   import { quickDeploySourceHelpHref, webDocsHrefs } from "$lib/console/docs-help";
+  import { preferredQuickDeployGitHubSourceMode } from "$lib/console/quick-deploy-github-source-mode";
   import { defaultAuthSession, defaultConsoleListLimit } from "$lib/console/queries";
   import {
     environmentKinds,
@@ -2225,14 +2226,18 @@ import postgresqlIcon from "@thesvg/icons/postgresql";
   });
 
   $effect(() => {
-    if (
-      sourceKind === "github" &&
-      githubConnected &&
-      githubSourceMode === "url" &&
-      !githubSourceModeTouched &&
-      !githubLocator.trim()
-    ) {
-      githubSourceMode = "browser";
+    if (sourceKind !== "github") {
+      return;
+    }
+
+    const preferredMode = preferredQuickDeployGitHubSourceMode({
+      currentMode: githubSourceMode,
+      modeTouched: githubSourceModeTouched,
+      sourceLocator: githubLocator,
+      repositoryBrowsingEnabled: githubRepositoryBrowsingEnabled,
+    });
+    if (preferredMode !== githubSourceMode) {
+      githubSourceMode = preferredMode;
     }
   });
 

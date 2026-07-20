@@ -301,6 +301,15 @@ describe("QuickDeploySheet structure", () => {
     expect(quickDeploySheetSource).toContain("githubRepositoriesQuery.isPending");
   });
 
+  test("[QUICK-DEPLOY-ENTRY-018] defaults a ready GitHub connection to repository browsing", () => {
+    expect(quickDeploySheetSource).toContain("preferredQuickDeployGitHubSourceMode");
+    expect(quickDeploySheetSource).toContain(
+      "repositoryBrowsingEnabled: githubRepositoryBrowsingEnabled",
+    );
+    expect(quickDeploySheetSource).toContain("modeTouched: githubSourceModeTouched");
+    expect(quickDeploySheetSource).toContain("sourceLocator: githubLocator");
+  });
+
   test("[QD-GHA-003] preserves public Git URL mode in hosted GitHub App mode", () => {
     expect(quickDeploySheetSource).toContain("data-github-public-url-mode");
     expect(quickDeploySheetSource).toContain("githubSourceUrlModeHint");
