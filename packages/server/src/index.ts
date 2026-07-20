@@ -30,6 +30,7 @@ import {
   type ExecutionContext,
   type ExecutionContextFactory,
   type ExecutionProviderAccessTokens,
+  type ExecutionSandboxService,
   ExportGlobalAuditEventsQuery,
   type GitHubPreviewPullRequestWebhookVerifier,
   type GitHubSourceEventWebhookVerifier,
@@ -112,6 +113,7 @@ import {
 import { writeBootstrapDeployTokenOutput } from "./deploy-token-bootstrap";
 import { ShellDeploymentProgressReporter } from "./deployment-progress-reporter";
 import { createDurableWorkRuntimeRunner } from "./durable-work-runtime-runner";
+import { createExecutionSandboxMaintenanceRunner } from "./execution-sandbox-maintenance-runner";
 import { writeBootstrapFirstAdminOutput } from "./first-admin-bootstrap";
 import { adoptLegacyPgliteState } from "./legacy-pglite-state-adoption";
 import {
@@ -1962,6 +1964,11 @@ export async function createAppaloftServer(
     logger,
     ...(durableWorkHandlerRegistry ? { handlerRegistry: durableWorkHandlerRegistry } : {}),
   });
+  const executionSandboxMaintenanceRunner = createExecutionSandboxMaintenanceRunner({
+    service: resolveToken<ExecutionSandboxService>(childContainer, tokens.executionSandboxService),
+    executionContextFactory,
+    logger,
+  });
   const webStaticDir = await resolveWebStaticDir(config, options);
   const docsStaticDir = await resolveDocsStaticDir(config, options);
 
@@ -2044,6 +2051,7 @@ export async function createAppaloftServer(
     scheduledDependencyBackupRunner.start();
     scheduledHistoryRetentionRunner.start();
     runtimeMonitoringCollectorRunner.start();
+    executionSandboxMaintenanceRunner.start();
   };
 
   const startServer = async (): Promise<void> => {
@@ -2093,6 +2101,7 @@ export async function createAppaloftServer(
       scheduledDependencyBackupRunner.stop();
       scheduledHistoryRetentionRunner.stop();
       runtimeMonitoringCollectorRunner.stop();
+      executionSandboxMaintenanceRunner.stop();
       await durableWorkRuntimeRunner.stop();
       serverHandle?.stop?.();
       await telemetry.shutdown();

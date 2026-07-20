@@ -1,5 +1,6 @@
 export * from "./configuration";
 export * from "./dependency-resources";
+export * from "./execution-sandbox";
 export * from "./extensibility";
 export * from "./identity-governance";
 export * from "./release-orchestration";

@@ -93,6 +93,15 @@ import {
   generatedServiceGraphComposeFile,
 } from "./service-graph-compose";
 
+export {
+  BunSandboxDockerCommandRunner,
+  DockerSandboxProvider,
+  type SandboxDockerCommandResult,
+  type SandboxDockerCommandRunner,
+  type SandboxPortPublisher,
+} from "./docker-sandbox-provider";
+export { HermeticSandboxProvider } from "./execution-sandbox-provider";
+
 export { RuntimeServerConnectivityChecker } from "./server-connectivity";
 export { RuntimeDeploymentHealthChecker } from "./deployment-health";
 export {

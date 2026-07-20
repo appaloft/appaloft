@@ -107,6 +107,10 @@ import { hotRuntimeForeignKeyIndexesMigration } from "./migrations/098_hot_runti
 import { sourceEventChangeSetMigration } from "./migrations/099_source_event_change_set";
 import { serverHostIdentityMigration } from "./migrations/100_server_host_identity";
 import { domainBindingTargetServiceMigration } from "./migrations/101_domain_binding_target_service";
+import { executionSandboxesMigration } from "./migrations/102_execution_sandboxes";
+import { executionSandboxTemplatesMigration } from "./migrations/103_execution_sandbox_templates";
+import { domainEventStreamTenantScopeMigration } from "./migrations/104_domain_event_stream_tenant_scope";
+import { executionSandboxCredentialGrantsMigration } from "./migrations/105_execution_sandbox_credential_grants";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -310,6 +314,10 @@ class StaticMigrationProvider implements MigrationProvider {
       "099_source_event_change_set": sourceEventChangeSetMigration,
       "100_server_host_identity": serverHostIdentityMigration,
       "101_domain_binding_target_service": domainBindingTargetServiceMigration,
+      "102_execution_sandboxes": executionSandboxesMigration,
+      "103_execution_sandbox_templates": executionSandboxTemplatesMigration,
+      "104_domain_event_stream_tenant_scope": domainEventStreamTenantScopeMigration,
+      "105_execution_sandbox_credential_grants": executionSandboxCredentialGrantsMigration,
     };
   }
 }

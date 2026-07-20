@@ -576,6 +576,7 @@ export interface ProviderJobLogsTable {
 
 export interface DomainEventStreamRecordsTable {
   id: string;
+  tenant_id: string | null;
   stream_scope: string;
   stream_id: string;
   cursor: string;
@@ -1175,6 +1176,10 @@ export interface ConnectorAuthorizationAttemptsTable {
 }
 
 export interface Database {
+  execution_sandboxes: ExecutionSandboxesTable;
+  execution_sandbox_snapshots: ExecutionSandboxSnapshotsTable;
+  execution_sandbox_templates: ExecutionSandboxTemplatesTable;
+  execution_sandbox_credential_grants: ExecutionSandboxCredentialGrantsTable;
   account: BetterAuthAccountsTable;
   projects: ProjectsTable;
   servers: ServersTable;
@@ -1240,4 +1245,44 @@ export interface Database {
   session: BetterAuthSessionsTable;
   user: BetterAuthUsersTable;
   verification: BetterAuthVerificationTable;
+}
+
+export interface ExecutionSandboxesTable {
+  tenant_id: string;
+  id: string;
+  provider_key: string;
+  status: string;
+  requested_isolation: string;
+  expires_at: ColumnType<string | null, string | null | undefined, string | null>;
+  state: ColumnType<Record<string, unknown>, Record<string, unknown>, Record<string, unknown>>;
+  created_at: TimestampColumn;
+  updated_at: UpdatableTimestampColumn;
+}
+
+export interface ExecutionSandboxSnapshotsTable {
+  tenant_id: string;
+  id: string;
+  source_sandbox_id: string;
+  provider_key: string;
+  status: string;
+  expires_at: ColumnType<string | null, string | null | undefined, string | null>;
+  state: ColumnType<Record<string, unknown>, Record<string, unknown>, Record<string, unknown>>;
+  created_at: TimestampColumn;
+  updated_at: UpdatableTimestampColumn;
+}
+
+export interface ExecutionSandboxTemplatesTable {
+  tenant_id: string;
+  id: string;
+  name: string;
+  state: ColumnType<Record<string, unknown>, Record<string, unknown>, Record<string, unknown>>;
+  created_at: TimestampColumn;
+}
+
+export interface ExecutionSandboxCredentialGrantsTable {
+  tenant_id: string;
+  sandbox_id: string;
+  grant_id: string;
+  state: ColumnType<Record<string, unknown>, Record<string, unknown>, Record<string, unknown>>;
+  created_at: TimestampColumn;
 }

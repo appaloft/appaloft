@@ -29,9 +29,11 @@ import {
   BindResourceDependencyCommand,
   BootstrapFirstAdminCommand,
   BootstrapServerProxyCommand,
+  BrokerSandboxCredentialRequestCommand,
   bindResourceDependencyCommandInputSchema,
   bootstrapFirstAdminCommandInputSchema,
   bootstrapServerProxyCommandInputSchema,
+  brokerSandboxCredentialRequestCommandInputSchema,
   CancelDeploymentCommand,
   CancelOperatorWorkCommand,
   ChangeAccountProfileCommand,
@@ -61,6 +63,7 @@ import {
   ConfigureResourceSourceCommand,
   ConfigureRetentionDefaultsCommand,
   ConfigureRuntimeMonitoringThresholdsCommand,
+  ConfigureSandboxNetworkPolicyCommand,
   ConfigureScheduledRuntimePrunePolicyCommand,
   ConfigureScheduledTaskCommand,
   ConfigureServerCredentialCommand,
@@ -86,6 +89,9 @@ import {
   CreateProjectCommand,
   CreateResourceCommand,
   CreateResourceSecretReferenceCommand,
+  CreateSandboxCommand,
+  CreateSandboxSnapshotCommand,
+  CreateSandboxTemplateCommand,
   CreateScheduledTaskCommand,
   CreateSshCredentialCommand,
   CreateStorageVolumeBackupCommand,
@@ -119,6 +125,7 @@ import {
   configureResourceSourceCommandInputSchema,
   configureRetentionDefaultsCommandInputSchema,
   configureRuntimeMonitoringThresholdsCommandInputSchema,
+  configureSandboxNetworkPolicyCommandInputSchema,
   configureScheduledRuntimePrunePolicyCommandInputSchema,
   configureScheduledTaskCommandInputSchema,
   configureServerCredentialCommandInputSchema,
@@ -142,6 +149,9 @@ import {
   createProjectCommandInputSchema,
   createResourceCommandInputSchema,
   createResourceSecretReferenceCommandInputSchema,
+  createSandboxCommandInputSchema,
+  createSandboxSnapshotCommandInputSchema,
+  createSandboxTemplateCommandInputSchema,
   createScheduledTaskCommandInputSchema,
   createSshCredentialCommandInputSchema,
   createStorageVolumeBackupCommandInputSchema,
@@ -159,6 +169,8 @@ import {
   DeleteProjectCommand,
   DeleteResourceCommand,
   DeleteResourceSecretReferenceCommand,
+  DeleteSandboxSnapshotCommand,
+  DeleteSandboxTemplateCommand,
   DeleteScheduledTaskCommand,
   DeleteServerCommand,
   DeleteSourceLinkCommand,
@@ -186,6 +198,8 @@ import {
   deleteProjectCommandInputSchema,
   deleteResourceCommandInputSchema,
   deleteResourceSecretReferenceCommandInputSchema,
+  deleteSandboxSnapshotCommandInputSchema,
+  deleteSandboxTemplateCommandInputSchema,
   deleteScheduledTaskCommandInputSchema,
   deleteServerCommandInputSchema,
   deleteSourceLinkCommandInputSchema,
@@ -206,6 +220,7 @@ import {
   type EnvironmentProfileSyncResult,
   EvaluateDeploymentOverlayCommand,
   EvaluateRouteSurfaceCommand,
+  ExecuteSandboxCommand,
   type ExecutionActor,
   type ExecutionContext,
   type ExecutionContextFactory,
@@ -215,14 +230,17 @@ import {
   ExpireTerminalSessionsCommand,
   ExportAuditEventsQuery,
   ExportGlobalAuditEventsQuery,
+  ExposeSandboxPortCommand,
   environmentEffectivePrecedenceQueryInputSchema,
   evaluateDeploymentOverlayInputSchema,
   evaluateDeploymentOverlayResponseSchema,
   evaluateRouteSurfaceInputSchema,
   evaluateRouteSurfaceResponseSchema,
+  executeSandboxCommandInputSchema,
   expireTerminalSessionsCommandInputSchema,
   exportAuditEventsQueryInputSchema,
   exportGlobalAuditEventsQueryInputSchema,
+  exposeSandboxPortCommandInputSchema,
   ForceRedeployDeploymentCommand,
   findOperationCatalogEntryByMessageName,
   forceRedeployDeploymentCommandInputSchema,
@@ -231,9 +249,11 @@ import {
   GitHubAppConnectionQuery,
   type GitHubPreviewPullRequestWebhookVerifier,
   type GitHubSourceEventWebhookVerifier,
+  GrantSandboxCredentialCommand,
   getAuthBootstrapStatusQueryInputSchema,
   getCurrentOrganizationContextQueryInputSchema,
   githubAppConnectionQueryInputSchema,
+  grantSandboxCredentialCommandInputSchema,
   ImportCertificateCommand,
   ImportDependencyResourceCommand,
   ImportResourceVariablesCommand,
@@ -289,6 +309,13 @@ import {
   ListRetentionDefaultsQuery,
   ListRouteSurfaceDecisionsQuery,
   ListRuntimeMonitoringSamplesQuery,
+  ListSandboxCredentialGrantsQuery,
+  ListSandboxesQuery,
+  ListSandboxFilesQuery,
+  ListSandboxPortsQuery,
+  ListSandboxProcessesQuery,
+  ListSandboxSnapshotsQuery,
+  ListSandboxTemplatesQuery,
   ListScheduledRuntimePrunePoliciesQuery,
   ListScheduledTaskRunsQuery,
   ListScheduledTasksQuery,
@@ -334,6 +361,12 @@ import {
   listRouteSurfaceDecisionsInputSchema,
   listRouteSurfaceDecisionsResponseSchema,
   listRuntimeMonitoringSamplesQueryInputSchema,
+  listSandboxCredentialGrantsQueryInputSchema,
+  listSandboxesQueryInputSchema,
+  listSandboxPortsQueryInputSchema,
+  listSandboxProcessesQueryInputSchema,
+  listSandboxSnapshotsQueryInputSchema,
+  listSandboxTemplatesQueryInputSchema,
   listScheduledRuntimePrunePoliciesQueryInputSchema,
   listScheduledTaskRunsQueryInputSchema,
   listScheduledTasksQueryInputSchema,
@@ -355,6 +388,7 @@ import {
   type OperatorWorkEventStreamEnvelope,
   openTerminalSessionCommandInputSchema,
   operationCatalog,
+  PauseSandboxCommand,
   PlanConnectorCapabilityQuery,
   PlanDomainBindingDnsQuery,
   PlanDuplicateEnvironmentQuery,
@@ -407,6 +441,7 @@ import {
   queryEntitlementsInputSchema,
   queryEntitlementsResponseSchema,
   ReactivateOrganizationMemberCommand,
+  ReadSandboxFileQuery,
   ReconcileStaleDeploymentCommand,
   RecordUsageIntentCommand,
   RedeployDeploymentCommand,
@@ -414,6 +449,7 @@ import {
   ReleaseAuditEventLegalHoldCommand,
   RelinkSourceLinkCommand,
   RemoveOrganizationMemberCommand,
+  RemoveSandboxFileCommand,
   RenameDependencyResourceCommand,
   RenameEnvironmentCommand,
   RenameProjectCommand,
@@ -442,6 +478,7 @@ import {
   RestoreProjectCommand,
   RestoreResourceCommand,
   RestoreStorageVolumeBackupCommand,
+  ResumeSandboxCommand,
   RetryCertificateCommand,
   RetryDeploymentCommand,
   RetryDomainBindingVerificationCommand,
@@ -450,6 +487,8 @@ import {
   RevokeCertificateCommand,
   RevokeConnectionCommand,
   RevokeDeployTokenCommand,
+  RevokeSandboxCredentialCommand,
+  RevokeSandboxPortCommand,
   RollbackDeploymentCommand,
   RotateDeployTokenCommand,
   RotateResourceDependencyBindingSecretCommand,
@@ -466,6 +505,7 @@ import {
   releaseAuditEventLegalHoldCommandInputSchema,
   relinkSourceLinkCommandInputSchema,
   removeOrganizationMemberCommandInputSchema,
+  removeSandboxFileCommandInputSchema,
   renameDependencyResourceCommandInputSchema,
   renameEnvironmentCommandInputSchema,
   renameProjectCommandInputSchema,
@@ -490,6 +530,8 @@ import {
   revokeCertificateCommandInputSchema,
   revokeConnectionCommandInputSchema,
   revokeDeployTokenCommandInputSchema,
+  revokeSandboxCredentialCommandInputSchema,
+  revokeSandboxPortCommandInputSchema,
   rollbackDeploymentCommandInputSchema,
   rotateDeployTokenCommandInputSchema,
   rotateResourceDependencyBindingSecretCommandInputSchema,
@@ -529,6 +571,10 @@ import {
   ShowResourceSecretReferenceQuery,
   ShowRetentionDefaultQuery,
   ShowRuntimeMonitoringThresholdsQuery,
+  ShowSandboxProcessQuery,
+  ShowSandboxQuery,
+  ShowSandboxSnapshotQuery,
+  ShowSandboxTemplateQuery,
   ShowScheduledRuntimePrunePolicyQuery,
   ShowScheduledTaskQuery,
   ShowScheduledTaskRunQuery,
@@ -550,8 +596,12 @@ import {
   StreamOperatorWorkEventsQuery,
   type StreamOperatorWorkEventsQueryInput,
   type StreamOperatorWorkEventsResult,
+  StreamSandboxEventsQuery,
+  type StreamSandboxEventsResult,
   SwitchCurrentOrganizationCommand,
   SyncEnvironmentProfileCommand,
+  sandboxFilePathInputSchema,
+  sandboxLifecycleCommandInputSchema,
   scheduledTaskRunLogsQueryInputSchema,
   setEnvironmentVariableCommandInputSchema,
   setProjectDescriptionCommandInputSchema,
@@ -584,6 +634,10 @@ import {
   showResourceSecretReferenceQueryInputSchema,
   showRetentionDefaultQueryInputSchema,
   showRuntimeMonitoringThresholdsQueryInputSchema,
+  showSandboxProcessQueryInputSchema,
+  showSandboxQueryInputSchema,
+  showSandboxSnapshotQueryInputSchema,
+  showSandboxTemplateQueryInputSchema,
   showScheduledRuntimePrunePolicyQueryInputSchema,
   showScheduledTaskQueryInputSchema,
   showScheduledTaskRunQueryInputSchema,
@@ -597,11 +651,15 @@ import {
   startConnectionCommandInputSchema,
   streamDeploymentTimelineQueryInputSchema,
   streamOperatorWorkEventsQueryInputSchema,
+  streamSandboxEventsQueryInputSchema,
   switchCurrentOrganizationCommandInputSchema,
   syncEnvironmentProfileCommandInputSchema,
+  TerminateSandboxCommand,
+  TerminateSandboxProcessCommand,
   TestServerConnectivityCommand,
   TransferOrganizationOwnerCommand,
   tenantContextForPrincipal,
+  terminateSandboxProcessCommandInputSchema,
   testDraftServerConnectivityCommandInputSchema,
   testRegisteredServerConnectivityCommandInputSchema,
   transferOrganizationOwnerCommandInputSchema,
@@ -613,7 +671,9 @@ import {
   unlockEnvironmentCommandInputSchema,
   unsetEnvironmentVariableCommandInputSchema,
   unsetResourceVariableCommandInputSchema,
+  WriteSandboxFileCommand,
   withExecutionAuthProviderAccessTokens,
+  writeSandboxFileCommandInputSchema,
 } from "@appaloft/application";
 import {
   acceptBlueprintInstallResponseSchema,
@@ -3189,6 +3249,31 @@ function createOperatorWorkEventStream(
       return {
         workId: result.workId,
       };
+    } finally {
+      await result.stream.close();
+    }
+  })();
+}
+
+function createSandboxEventStream(
+  context: AppaloftOrpcRequestContext,
+  input: z.infer<typeof streamSandboxEventsQueryInputSchema>,
+) {
+  return (async function* streamSandboxEvents() {
+    const result = await executeQuery<StreamSandboxEventsQuery, StreamSandboxEventsResult>(
+      context,
+      StreamSandboxEventsQuery.create(input, context.currentRequest?.signal),
+    );
+    if (result.mode !== "stream") {
+      for (const envelope of result.envelopes) yield envelope;
+      return { sandboxId: result.sandboxId };
+    }
+    try {
+      for await (const envelope of result.stream) {
+        yield envelope;
+        if (envelope.kind === "closed" || envelope.kind === "error") break;
+      }
+      return { sandboxId: result.sandboxId };
     } finally {
       await result.stream.close();
     }
@@ -6928,6 +7013,272 @@ export const githubAppConnectionProcedure = base
     executeQuery(context, GitHubAppConnectionQuery.create(input)),
   );
 
+const sandboxOperationResponseSchema = z.unknown();
+
+export const createSandboxProcedure = base
+  .route({ method: "POST", path: "/sandboxes", successStatus: 202 })
+  .input(createSandboxCommandInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, CreateSandboxCommand.create(input)),
+  );
+
+export const listSandboxesProcedure = base
+  .route({ method: "GET", path: "/sandboxes", successStatus: 200 })
+  .input(listSandboxesQueryInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) => executeQuery(context, ListSandboxesQuery.create(input)));
+
+export const showSandboxProcedure = base
+  .route({ method: "GET", path: "/sandboxes/{sandboxId}", successStatus: 200 })
+  .input(showSandboxQueryInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) => executeQuery(context, ShowSandboxQuery.create(input)));
+
+export const streamSandboxEventsProcedure = base
+  .route({ method: "GET", path: "/sandboxes/{sandboxId}/events/stream", successStatus: 200 })
+  .input(streamSandboxEventsQueryInputSchema)
+  .output(eventIterator(z.unknown(), z.object({ sandboxId: z.string() })))
+  .handler(({ input, context }) => createSandboxEventStream(context, input));
+
+export const grantSandboxCredentialProcedure = base
+  .route({ method: "POST", path: "/sandboxes/{sandboxId}/credentials", successStatus: 201 })
+  .input(grantSandboxCredentialCommandInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, GrantSandboxCredentialCommand.create(input)),
+  );
+
+export const listSandboxCredentialGrantsProcedure = base
+  .route({ method: "GET", path: "/sandboxes/{sandboxId}/credentials", successStatus: 200 })
+  .input(listSandboxCredentialGrantsQueryInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListSandboxCredentialGrantsQuery.create(input)),
+  );
+
+export const revokeSandboxCredentialProcedure = base
+  .route({
+    method: "DELETE",
+    path: "/sandboxes/{sandboxId}/credentials/{grantId}",
+    successStatus: 200,
+  })
+  .input(revokeSandboxCredentialCommandInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RevokeSandboxCredentialCommand.create(input)),
+  );
+
+export const brokerSandboxCredentialRequestProcedure = base
+  .route({
+    method: "POST",
+    path: "/sandboxes/{sandboxId}/credentials/{grantId}/request",
+    successStatus: 200,
+  })
+  .input(brokerSandboxCredentialRequestCommandInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, BrokerSandboxCredentialRequestCommand.create(input)),
+  );
+
+export const pauseSandboxProcedure = base
+  .route({ method: "POST", path: "/sandboxes/{sandboxId}/pause", successStatus: 200 })
+  .input(sandboxLifecycleCommandInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, PauseSandboxCommand.create(input)),
+  );
+
+export const resumeSandboxProcedure = base
+  .route({ method: "POST", path: "/sandboxes/{sandboxId}/resume", successStatus: 200 })
+  .input(sandboxLifecycleCommandInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ResumeSandboxCommand.create(input)),
+  );
+
+export const terminateSandboxProcedure = base
+  .route({ method: "POST", path: "/sandboxes/{sandboxId}/terminate", successStatus: 200 })
+  .input(sandboxLifecycleCommandInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, TerminateSandboxCommand.create(input)),
+  );
+
+export const executeSandboxProcedure = base
+  .route({ method: "POST", path: "/sandboxes/{sandboxId}/exec", successStatus: 200 })
+  .input(executeSandboxCommandInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ExecuteSandboxCommand.create(input)),
+  );
+
+export const listSandboxFilesProcedure = base
+  .route({ method: "POST", path: "/sandboxes/{sandboxId}/files/list", successStatus: 200 })
+  .input(sandboxFilePathInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListSandboxFilesQuery.create(input)),
+  );
+
+export const readSandboxFileProcedure = base
+  .route({ method: "POST", path: "/sandboxes/{sandboxId}/files/read", successStatus: 200 })
+  .input(sandboxFilePathInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) => executeQuery(context, ReadSandboxFileQuery.create(input)));
+
+export const writeSandboxFileProcedure = base
+  .route({ method: "POST", path: "/sandboxes/{sandboxId}/files/write", successStatus: 200 })
+  .input(writeSandboxFileCommandInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, WriteSandboxFileCommand.create(input)),
+  );
+
+export const removeSandboxFileProcedure = base
+  .route({ method: "DELETE", path: "/sandboxes/{sandboxId}/files", successStatus: 200 })
+  .input(removeSandboxFileCommandInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RemoveSandboxFileCommand.create(input)),
+  );
+
+export const listSandboxProcessesProcedure = base
+  .route({ method: "GET", path: "/sandboxes/{sandboxId}/processes", successStatus: 200 })
+  .input(listSandboxProcessesQueryInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListSandboxProcessesQuery.create(input)),
+  );
+
+export const showSandboxProcessProcedure = base
+  .route({
+    method: "GET",
+    path: "/sandboxes/{sandboxId}/processes/{processId}",
+    successStatus: 200,
+  })
+  .input(showSandboxProcessQueryInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowSandboxProcessQuery.create(input)),
+  );
+
+export const terminateSandboxProcessProcedure = base
+  .route({
+    method: "POST",
+    path: "/sandboxes/{sandboxId}/processes/{processId}/terminate",
+    successStatus: 200,
+  })
+  .input(terminateSandboxProcessCommandInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, TerminateSandboxProcessCommand.create(input)),
+  );
+
+export const configureSandboxNetworkPolicyProcedure = base
+  .route({
+    method: "POST",
+    path: "/sandboxes/{sandboxId}/network-policy",
+    successStatus: 200,
+  })
+  .input(configureSandboxNetworkPolicyCommandInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ConfigureSandboxNetworkPolicyCommand.create(input)),
+  );
+
+export const exposeSandboxPortProcedure = base
+  .route({ method: "POST", path: "/sandboxes/{sandboxId}/ports", successStatus: 201 })
+  .input(exposeSandboxPortCommandInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ExposeSandboxPortCommand.create(input)),
+  );
+
+export const listSandboxPortsProcedure = base
+  .route({ method: "GET", path: "/sandboxes/{sandboxId}/ports", successStatus: 200 })
+  .input(listSandboxPortsQueryInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListSandboxPortsQuery.create(input)),
+  );
+
+export const revokeSandboxPortProcedure = base
+  .route({
+    method: "DELETE",
+    path: "/sandboxes/{sandboxId}/ports/{exposureId}",
+    successStatus: 200,
+  })
+  .input(revokeSandboxPortCommandInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RevokeSandboxPortCommand.create(input)),
+  );
+
+export const createSandboxSnapshotProcedure = base
+  .route({ method: "POST", path: "/sandboxes/{sandboxId}/snapshots", successStatus: 202 })
+  .input(createSandboxSnapshotCommandInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, CreateSandboxSnapshotCommand.create(input)),
+  );
+
+export const listSandboxSnapshotsProcedure = base
+  .route({ method: "GET", path: "/sandbox-snapshots", successStatus: 200 })
+  .input(listSandboxSnapshotsQueryInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListSandboxSnapshotsQuery.create(input)),
+  );
+
+export const showSandboxSnapshotProcedure = base
+  .route({ method: "GET", path: "/sandbox-snapshots/{snapshotId}", successStatus: 200 })
+  .input(showSandboxSnapshotQueryInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowSandboxSnapshotQuery.create(input)),
+  );
+
+export const deleteSandboxSnapshotProcedure = base
+  .route({ method: "DELETE", path: "/sandbox-snapshots/{snapshotId}", successStatus: 200 })
+  .input(deleteSandboxSnapshotCommandInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, DeleteSandboxSnapshotCommand.create(input)),
+  );
+
+export const createSandboxTemplateProcedure = base
+  .route({ method: "POST", path: "/sandbox-templates", successStatus: 201 })
+  .input(createSandboxTemplateCommandInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, CreateSandboxTemplateCommand.create(input)),
+  );
+
+export const listSandboxTemplatesProcedure = base
+  .route({ method: "GET", path: "/sandbox-templates", successStatus: 200 })
+  .input(listSandboxTemplatesQueryInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListSandboxTemplatesQuery.create(input)),
+  );
+
+export const showSandboxTemplateProcedure = base
+  .route({ method: "GET", path: "/sandbox-templates/{templateId}", successStatus: 200 })
+  .input(showSandboxTemplateQueryInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowSandboxTemplateQuery.create(input)),
+  );
+
+export const deleteSandboxTemplateProcedure = base
+  .route({ method: "DELETE", path: "/sandbox-templates/{templateId}", successStatus: 200 })
+  .input(deleteSandboxTemplateCommandInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, DeleteSandboxTemplateCommand.create(input)),
+  );
+
 export const appaloftOrpcRouter = {
   auth: {
     bootstrapStatus: authBootstrapStatusProcedure,
@@ -6942,6 +7293,55 @@ export const appaloftOrpcRouter = {
   usageIntents: {
     record: recordUsageIntentProcedure,
     list: listUsageIntentRecordsProcedure,
+  },
+  sandboxes: {
+    create: createSandboxProcedure,
+    list: listSandboxesProcedure,
+    show: showSandboxProcedure,
+    events: { stream: streamSandboxEventsProcedure },
+    credentials: {
+      grant: grantSandboxCredentialProcedure,
+      list: listSandboxCredentialGrantsProcedure,
+      revoke: revokeSandboxCredentialProcedure,
+      request: brokerSandboxCredentialRequestProcedure,
+    },
+    pause: pauseSandboxProcedure,
+    resume: resumeSandboxProcedure,
+    terminate: terminateSandboxProcedure,
+    exec: executeSandboxProcedure,
+    files: {
+      list: listSandboxFilesProcedure,
+      read: readSandboxFileProcedure,
+      write: writeSandboxFileProcedure,
+      remove: removeSandboxFileProcedure,
+    },
+    processes: {
+      list: listSandboxProcessesProcedure,
+      show: showSandboxProcessProcedure,
+      terminate: terminateSandboxProcessProcedure,
+    },
+    networkPolicy: {
+      configure: configureSandboxNetworkPolicyProcedure,
+    },
+    ports: {
+      expose: exposeSandboxPortProcedure,
+      list: listSandboxPortsProcedure,
+      revoke: revokeSandboxPortProcedure,
+    },
+    snapshots: {
+      create: createSandboxSnapshotProcedure,
+    },
+  },
+  sandboxSnapshots: {
+    list: listSandboxSnapshotsProcedure,
+    show: showSandboxSnapshotProcedure,
+    delete: deleteSandboxSnapshotProcedure,
+  },
+  sandboxTemplates: {
+    create: createSandboxTemplateProcedure,
+    list: listSandboxTemplatesProcedure,
+    show: showSandboxTemplateProcedure,
+    delete: deleteSandboxTemplateProcedure,
   },
   deploymentOverlays: {
     evaluate: evaluateDeploymentOverlayProcedure,
@@ -9763,6 +10163,31 @@ export function mountAppaloftOrpcRoutes(
     "/api/runtime-monitoring/samples",
     "/api/runtime-monitoring/rollup",
     "/api/runtime-monitoring/thresholds",
+    "/api/sandboxes",
+    "/api/sandboxes/:sandboxId",
+    "/api/sandboxes/:sandboxId/events/stream",
+    "/api/sandboxes/:sandboxId/credentials",
+    "/api/sandboxes/:sandboxId/credentials/:grantId",
+    "/api/sandboxes/:sandboxId/credentials/:grantId/request",
+    "/api/sandboxes/:sandboxId/pause",
+    "/api/sandboxes/:sandboxId/resume",
+    "/api/sandboxes/:sandboxId/terminate",
+    "/api/sandboxes/:sandboxId/exec",
+    "/api/sandboxes/:sandboxId/files/list",
+    "/api/sandboxes/:sandboxId/files/read",
+    "/api/sandboxes/:sandboxId/files/write",
+    "/api/sandboxes/:sandboxId/files",
+    "/api/sandboxes/:sandboxId/processes",
+    "/api/sandboxes/:sandboxId/processes/:processId",
+    "/api/sandboxes/:sandboxId/processes/:processId/terminate",
+    "/api/sandboxes/:sandboxId/network-policy",
+    "/api/sandboxes/:sandboxId/ports",
+    "/api/sandboxes/:sandboxId/ports/:exposureId",
+    "/api/sandboxes/:sandboxId/snapshots",
+    "/api/sandbox-snapshots",
+    "/api/sandbox-snapshots/:snapshotId",
+    "/api/sandbox-templates",
+    "/api/sandbox-templates/:templateId",
     "/api/servers/:serverId/rename",
     "/api/servers/reorder",
     "/api/servers/:serverId/edge-proxy/configuration",

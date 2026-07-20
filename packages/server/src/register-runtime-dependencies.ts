@@ -97,6 +97,7 @@ import {
   type RetentionDefaultRepository,
   type RouteRealizationWorkReadModel,
   type RuntimeTargetCapacityInspector,
+  SandboxProviderRegistry,
   type ScheduledRuntimePrunePolicyReadModel,
   type ScheduledRuntimePrunePolicyRepository,
   type ServerAppliedRouteDesiredStateRecord,
@@ -176,6 +177,7 @@ import {
   PgEnvironmentProfileDecisionRepository,
   PgEnvironmentReadModel,
   PgEnvironmentRepository,
+  PgExecutionSandboxRepository,
   PgGitHubAppInstallationRepository,
   PgMutationCoordinator,
   PgPreviewCleanupAttemptRecorder,
@@ -1189,6 +1191,12 @@ export function registerRuntimeDependencies(
   container.register(tokens.projectRepository, {
     useFactory: instanceCachingFactory(() => new PgProjectRepository(input.database.db)),
   });
+  container.register(tokens.sandboxRepository, {
+    useFactory: instanceCachingFactory(() => new PgExecutionSandboxRepository(input.database.db)),
+  });
+  container.register(tokens.sandboxProviderRegistry, {
+    useFactory: instanceCachingFactory(() => new SandboxProviderRegistry()),
+  });
   container.register(tokens.projectDeletionBlockerReader, {
     useFactory: instanceCachingFactory(() => new PgProjectDeletionBlockerReader(input.database.db)),
   });
@@ -1390,6 +1398,11 @@ export function registerRuntimeDependencies(
     ),
   });
   container.register(tokens.domainEventStreamRecorder, {
+    useFactory: instanceCachingFactory(
+      () => new PgDomainEventStreamRetentionStore(input.database.db),
+    ),
+  });
+  container.register(tokens.sandboxEventObserver, {
     useFactory: instanceCachingFactory(
       () => new PgDomainEventStreamRetentionStore(input.database.db),
     ),

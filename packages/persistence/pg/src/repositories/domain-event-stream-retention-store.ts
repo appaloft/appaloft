@@ -5,13 +5,18 @@ import {
   type DomainEventStreamRecorder,
   type DomainEventStreamRecordInput,
   type DomainEventStreamRetentionStore,
+  type ExecutionContext,
   type RepositoryContext,
+  type SandboxEventEnvelope,
+  type SandboxEventObserver,
+  type SandboxEventStream,
+  toRepositoryContext,
 } from "@appaloft/application";
 import { domainError, err, ok, type Result } from "@appaloft/core";
 import { type Kysely, type Selectable, type SelectQueryBuilder } from "kysely";
 
 import { type Database } from "../schema";
-import { resolveRepositoryExecutor } from "./shared";
+import { normalizeTimestamp, resolveRepositoryExecutor } from "./shared";
 
 type DomainEventStreamRecordRow = Pick<
   Selectable<Database["domain_event_stream_records"]>,
@@ -42,7 +47,7 @@ function deploymentIdFromDomainEvent(event: DomainEventStreamRecordInput["event"
 
 function observedEventTypeFromDomainEvent(
   event: DomainEventStreamRecordInput["event"],
-): RetainedDeploymentDomainEventType | undefined {
+): RetainedDeploymentDomainEventType | string | undefined {
   if (event.type === "deployment.started") {
     return "deployment-started";
   }
@@ -52,6 +57,8 @@ function observedEventTypeFromDomainEvent(
       ? "deployment-failed"
       : "deployment-succeeded";
   }
+
+  if (event.type.startsWith("sandbox-")) return event.type;
 
   return undefined;
 }
@@ -105,9 +112,11 @@ function summaryFromDomainEvent(
   }
 }
 
-function stableEventCursor(event: DomainEventStreamRecordInput["event"]): string {
+function stableEventCursor(event: DomainEventStreamRecordInput["event"], tenantId: string): string {
   return createHash("sha256")
-    .update(JSON.stringify([event.aggregateId, event.type, event.occurredAt, event.payload]))
+    .update(
+      JSON.stringify([tenantId, event.aggregateId, event.type, event.occurredAt, event.payload]),
+    )
     .digest("hex")
     .slice(0, 32);
 }
@@ -170,7 +179,7 @@ function summarizeRows(
 }
 
 export class PgDomainEventStreamRetentionStore
-  implements DomainEventStreamRetentionStore, DomainEventStreamRecorder
+  implements DomainEventStreamRetentionStore, DomainEventStreamRecorder, SandboxEventObserver
 {
   constructor(private readonly db: Kysely<Database>) {}
 
@@ -185,36 +194,53 @@ export class PgDomainEventStreamRetentionStore
       return ok(undefined);
     }
 
-    const deploymentId = deploymentIdFromDomainEvent(input.event);
-    if (!deploymentId) {
+    const sandboxEvent = input.event.type.startsWith("sandbox-");
+    const deploymentId = sandboxEvent ? null : deploymentIdFromDomainEvent(input.event);
+    if (!sandboxEvent && !deploymentId) {
       return ok(undefined);
     }
 
     const payload = payloadRecord(input.event.payload);
-    const cursor = stableEventCursor(input.event);
+    const tenantId = context.tenant?.tenantId ?? "tenant_instance";
+    const cursor = stableEventCursor(input.event, tenantId);
 
     try {
       await executor
         .insertInto("domain_event_stream_records")
         .values({
           id: `des_${cursor}`,
-          stream_scope: "deployment",
-          stream_id: deploymentId,
+          tenant_id: tenantId,
+          stream_scope: sandboxEvent ? "sandbox" : "deployment",
+          stream_id: input.event.aggregateId,
           cursor,
           occurred_at: input.event.occurredAt,
           event_type: observedEventType,
-          source_kind: "domain-event",
+          source_kind: sandboxEvent
+            ? input.event.type.startsWith("sandbox-process-")
+              ? "process"
+              : "lifecycle"
+            : "domain-event",
           aggregate_id: input.event.aggregateId,
-          aggregate_type: "deployment",
+          aggregate_type: sandboxEvent ? "sandbox" : "deployment",
           deployment_id: deploymentId,
           correlation_id: null,
           causation_id: null,
           request_id: input.requestId,
-          summary: summaryFromDomainEvent(input.event, observedEventType),
-          payload: {
-            ...payload,
-            status: statusFromDomainEvent(input.event, observedEventType),
-          },
+          summary: sandboxEvent
+            ? input.event.type
+            : summaryFromDomainEvent(
+                input.event,
+                observedEventType as RetainedDeploymentDomainEventType,
+              ),
+          payload: sandboxEvent
+            ? payload
+            : {
+                ...payload,
+                status: statusFromDomainEvent(
+                  input.event,
+                  observedEventType as RetainedDeploymentDomainEventType,
+                ),
+              },
           guard_reason: null,
           created_at: input.event.occurredAt,
         })
@@ -231,6 +257,117 @@ export class PgDomainEventStreamRetentionStore
         }),
       );
     }
+  }
+
+  async open(
+    context: ExecutionContext,
+    request: {
+      sandboxId: string;
+      cursor?: string;
+      limit: number;
+      follow: boolean;
+      untilTerminal: boolean;
+    },
+    signal: AbortSignal,
+  ): Promise<Result<SandboxEventStream>> {
+    const executor = resolveRepositoryExecutor(this.db, toRepositoryContext(context));
+    const tenantId = context.tenant?.tenantId ?? "tenant_instance";
+    const localAbort = new AbortController();
+    const closed = () => signal.aborted || localAbort.signal.aborted;
+    const toEnvelope = (row: {
+      cursor: string;
+      occurred_at: unknown;
+      event_type: string;
+      source_kind: string;
+      payload: Record<string, unknown>;
+    }): SandboxEventEnvelope => ({
+      kind: "event",
+      schemaVersion: "sandbox.events/v1",
+      cursor: row.cursor,
+      sandboxId: request.sandboxId,
+      occurredAt: normalizeTimestamp(row.occurred_at as never) as string,
+      eventType: row.event_type,
+      source: row.source_kind === "process" ? "process" : "lifecycle",
+      payload: row.payload,
+    });
+    const readAfter = async (cursor?: string) => {
+      let anchor: { occurred_at: unknown; id: string } | undefined;
+      if (cursor) {
+        anchor = await executor
+          .selectFrom("domain_event_stream_records")
+          .select(["occurred_at", "id"])
+          .where("tenant_id", "=", tenantId)
+          .where("stream_scope", "=", "sandbox")
+          .where("stream_id", "=", request.sandboxId)
+          .where("cursor", "=", cursor)
+          .executeTakeFirst();
+        if (!anchor) return { gap: true as const, rows: [] };
+      }
+      let query = executor
+        .selectFrom("domain_event_stream_records")
+        .select(["id", "cursor", "occurred_at", "event_type", "source_kind", "payload"])
+        .where("tenant_id", "=", tenantId)
+        .where("stream_scope", "=", "sandbox")
+        .where("stream_id", "=", request.sandboxId);
+      if (anchor) {
+        query = query.where((eb) =>
+          eb.or([
+            eb("occurred_at", ">", anchor!.occurred_at as never),
+            eb.and([
+              eb("occurred_at", "=", anchor!.occurred_at as never),
+              eb("id", ">", anchor!.id),
+            ]),
+          ]),
+        );
+      }
+      const rows = await query
+        .orderBy("occurred_at", "asc")
+        .orderBy("id", "asc")
+        .limit(request.limit + 1)
+        .execute();
+      return { gap: rows.length > request.limit, rows: rows.slice(0, request.limit) };
+    };
+    const stream: SandboxEventStream = {
+      async *[Symbol.asyncIterator]() {
+        let cursor = request.cursor;
+        while (!closed()) {
+          const batch = await readAfter(cursor);
+          if (batch.gap) {
+            yield {
+              kind: "error",
+              schemaVersion: "sandbox.events/v1",
+              code: "cursor-gap",
+              retryable: false,
+            };
+            return;
+          }
+          for (const row of batch.rows) {
+            const envelope = toEnvelope(row);
+            yield envelope;
+            cursor = row.cursor;
+            if (
+              request.untilTerminal &&
+              (row.event_type === "sandbox-terminated" ||
+                row.event_type === "sandbox-expired" ||
+                (row.event_type === "sandbox-process-frame" &&
+                  ["exit", "error"].includes(
+                    String((row.payload.frame as Record<string, unknown> | undefined)?.kind),
+                  )))
+            ) {
+              yield { kind: "closed", schemaVersion: "sandbox.events/v1", reason: "terminal" };
+              return;
+            }
+          }
+          if (!request.follow) return;
+          await new Promise((resolve) => setTimeout(resolve, 200));
+        }
+        yield { kind: "closed", schemaVersion: "sandbox.events/v1", reason: "aborted" };
+      },
+      async close() {
+        localAbort.abort();
+      },
+    };
+    return ok(stream);
   }
 
   async prune(
