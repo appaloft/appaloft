@@ -155,9 +155,22 @@ export class RestoreDependencyResourceBackupUseCase {
         );
       }
       if (
-        !dependencyResourceBackupProvider.supports(
-          targetDependencyResource.toState().providerKey.value,
-          dependencyKind,
+        !(
+          dependencyResourceBackupProvider.supportsRestore?.({
+            backupId: backupState.id.value,
+            sourceProviderKey: backupState.providerKey.value,
+            targetProviderKey: targetDependencyResource.toState().providerKey.value,
+            dependencyKind,
+            providerArtifactHandle: providerArtifactHandle.value,
+            sameDependencyResource: targetDependencyResourceId.equals(
+              backupState.dependencyResourceId,
+            ),
+          }) ??
+          (targetDependencyResourceId.equals(backupState.dependencyResourceId) &&
+            dependencyResourceBackupProvider.supports(
+              targetDependencyResource.toState().providerKey.value,
+              dependencyKind,
+            ))
         )
       ) {
         return err(

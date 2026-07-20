@@ -1161,6 +1161,9 @@ export class ShellManagedDependencyProvider implements ManagedDependencyProvider
           docker volume rm ${ash.arg(
             dockerManagedDependencyVolumeName(dockerHandle.containerName),
           )} >/dev/null 2>&1 || true
+          rm -f "$HOME/.appaloft/dependency-secrets"/${ash.arg(
+            `${dockerHandle.containerName}.redis.conf`,
+          )}
         `,
       );
       if (result.exitCode !== 0) {
@@ -1430,6 +1433,14 @@ function dockerManagedPostgresRealizationSpec(
     command: ash`
       set -eu
       IFS= read -r APPALOFT_MANAGED_DEPENDENCY_PASSWORD
+      umask 077
+      APPALOFT_DEPENDENCY_SECRET_DIR="$HOME/.appaloft/dependency-secrets"
+      APPALOFT_DEPENDENCY_ENV_FILE="$APPALOFT_DEPENDENCY_SECRET_DIR"/${ash.arg(
+        `${containerName}.env`,
+      )}
+      mkdir -p "$APPALOFT_DEPENDENCY_SECRET_DIR"
+      trap 'rm -f "$APPALOFT_DEPENDENCY_ENV_FILE"' EXIT
+      printf 'POSTGRES_PASSWORD=%s\n' "$APPALOFT_MANAGED_DEPENDENCY_PASSWORD" > "$APPALOFT_DEPENDENCY_ENV_FILE"
       docker network inspect ${ash.arg(dockerManagedDependencyNetworkName)} >/dev/null 2>&1 || docker network create ${ash.arg(dockerManagedDependencyNetworkName)}
       docker volume create ${ash.list([
         "--label",
@@ -1456,9 +1467,9 @@ function dockerManagedPostgresRealizationSpec(
         `POSTGRES_USER=${user}`,
         "-v",
         `${volumeName}:/var/lib/postgresql/data`,
-      ])} -e "POSTGRES_PASSWORD=$APPALOFT_MANAGED_DEPENDENCY_PASSWORD" postgres:16-alpine
+      ])} --env-file "$APPALOFT_DEPENDENCY_ENV_FILE" postgres:16-alpine
       for attempt in $(seq 1 60); do
-        if PGPASSWORD="$APPALOFT_MANAGED_DEPENDENCY_PASSWORD" docker exec -e PGPASSWORD ${ash.arg(containerName)} pg_isready -U ${ash.arg(user)} -d ${ash.arg(databaseName)} >/dev/null 2>&1; then
+        if docker exec ${ash.arg(containerName)} pg_isready -U ${ash.arg(user)} -d ${ash.arg(databaseName)} >/dev/null 2>&1; then
           exit 0
         fi
         sleep 1
@@ -1536,6 +1547,13 @@ function dockerManagedRedisRealizationSpec(
     command: ash`
       set -eu
       IFS= read -r APPALOFT_MANAGED_DEPENDENCY_PASSWORD
+      umask 077
+      APPALOFT_DEPENDENCY_SECRET_DIR="$HOME/.appaloft/dependency-secrets"
+      APPALOFT_DEPENDENCY_REDIS_CONFIG="$APPALOFT_DEPENDENCY_SECRET_DIR"/${ash.arg(
+        `${containerName}.redis.conf`,
+      )}
+      mkdir -p "$APPALOFT_DEPENDENCY_SECRET_DIR"
+      printf 'requirepass %s\nappendonly yes\n' "$APPALOFT_MANAGED_DEPENDENCY_PASSWORD" > "$APPALOFT_DEPENDENCY_REDIS_CONFIG"
       docker network inspect ${ash.arg(dockerManagedDependencyNetworkName)} >/dev/null 2>&1 || docker network create ${ash.arg(dockerManagedDependencyNetworkName)}
       docker volume create ${ash.list([
         "--label",
@@ -1558,13 +1576,13 @@ function dockerManagedRedisRealizationSpec(
         `appaloft.dependency-resource-id=${input.dependencyResourceId}`,
         "-v",
         `${volumeName}:/data`,
-        "redis:7-alpine",
-        "redis-server",
-        "--appendonly",
-        "yes",
-      ])} --requirepass "$APPALOFT_MANAGED_DEPENDENCY_PASSWORD"
+      ])} -v "$APPALOFT_DEPENDENCY_REDIS_CONFIG:/usr/local/etc/redis/appaloft.conf:ro" redis:7-alpine redis-server /usr/local/etc/redis/appaloft.conf
       for attempt in $(seq 1 60); do
-        if docker exec ${ash.arg(containerName)} redis-cli -a "$APPALOFT_MANAGED_DEPENDENCY_PASSWORD" ping 2>/dev/null | grep -q PONG; then
+        if docker exec ${ash.arg(containerName)} sh -lc ${ash.arg(
+          ash.render(
+            ash`password="$(awk '$1 == "requirepass" { print $2; exit }' /usr/local/etc/redis/appaloft.conf)"; REDISCLI_AUTH="$password" redis-cli ping`,
+          ),
+        )} 2>/dev/null | grep -q PONG; then
           exit 0
         fi
         sleep 1
@@ -2212,6 +2230,27 @@ export class ShellDependencyResourceBackupProvider implements DependencyResource
     );
   }
 
+  supportsRestore(input: {
+    backupId: string;
+    sourceProviderKey: string;
+    targetProviderKey: string;
+    dependencyKind: DependencyResourceKind;
+    providerArtifactHandle: string;
+    sameDependencyResource: boolean;
+  }): boolean {
+    if (input.sameDependencyResource) {
+      return this.supports(input.targetProviderKey, input.dependencyKind);
+    }
+    const handle = parseDockerManagedDependencyBackupHandle(input.providerArtifactHandle);
+    return (
+      input.sourceProviderKey === "appaloft-managed-postgres" &&
+      input.targetProviderKey === "external-postgres" &&
+      input.dependencyKind === "postgres" &&
+      handle?.kind === "postgres" &&
+      handle.backupId === input.backupId
+    );
+  }
+
   async createBackup(
     context: ExecutionContext,
     input: DependencyResourceBackupProviderInput,
@@ -2395,7 +2434,7 @@ export class ShellDependencyResourceBackupProvider implements DependencyResource
             mkdir -p "$(dirname "$APPALOFT_DEPENDENCY_BACKUP_PATH")"
             docker exec ${ash.arg(handle.containerName)} sh -lc ${ash.arg(
               ash.render(
-                ash`password="$(tr "\\0" "\\n" </proc/1/cmdline | tail -n 1)"; redis-cli -a "$password" --no-auth-warning SAVE >/dev/null`,
+                ash`password="$(awk '$1 == "requirepass" { print $2; exit }' /usr/local/etc/redis/appaloft.conf)"; REDISCLI_AUTH="$password" redis-cli --no-auth-warning SAVE >/dev/null`,
               ),
             )}
             docker cp ${ash.arg(`${handle.containerName}:/data/dump.rdb`)} "$APPALOFT_DEPENDENCY_BACKUP_PATH"
@@ -2412,7 +2451,7 @@ export class ShellDependencyResourceBackupProvider implements DependencyResource
     return ok({
       providerArtifactHandle: dockerManagedDependencyBackupHandle(backupHandle),
       completedAt: input.requestedAt,
-      retentionStatus: "retained",
+      retentionStatus: "none",
     });
   }
 
@@ -2429,7 +2468,8 @@ export class ShellDependencyResourceBackupProvider implements DependencyResource
       input.providerKey === "external-postgres" &&
       backupHandle.kind === "postgres" &&
       input.sourceDependencyResourceId &&
-      input.sourceDependencyResourceId !== input.dependencyResourceId
+      input.sourceDependencyResourceId !== input.dependencyResourceId &&
+      backupHandle.backupId === input.backupId
     ) {
       if (!this.options.serverRepository || !input.connectionSecretValue) {
         return err(
@@ -2455,8 +2495,9 @@ export class ShellDependencyResourceBackupProvider implements DependencyResource
       const path = dockerManagedDependencyBackupPath(backupHandle);
       const restoreScript = ash`
         IFS= read -r target_url
+        export PGDATABASE="$target_url"
         pg_restore --list /appaloft-backup.dump | sed -e "/ SCHEMA - public /d" -e "/ ACL - SCHEMA public /d" -e "/ COMMENT - SCHEMA public /d" > /tmp/appaloft.restore.list
-        pg_restore --dbname="$target_url" --use-list=/tmp/appaloft.restore.list --clean --if-exists --no-owner --no-privileges /appaloft-backup.dump
+        pg_restore --use-list=/tmp/appaloft.restore.list --clean --if-exists --no-owner --no-privileges /appaloft-backup.dump
       `;
       const command = ash`
         set -eu

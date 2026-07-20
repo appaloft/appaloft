@@ -97,6 +97,7 @@ describe("ShellManagedDependencyProvider", () => {
 
       expect(backup.isOk()).toBe(true);
       expect(nativeRunner.calls).toHaveLength(0);
+      expect(backup._unsafeUnwrap().retentionStatus).toBe("none");
       expect(backup._unsafeUnwrap().providerArtifactHandle).toMatch(
         /^docker-single-server-backup:v1:postgres:srv_production:appaloft-postgres-rsi_managed:drb_managed$/,
       );
@@ -105,6 +106,16 @@ describe("ShellManagedDependencyProvider", () => {
       expect(log).toContain("pg_dump");
       expect(log).toContain("appaloft-postgres-rsi_managed");
       expect(log).not.toContain("managed-secret");
+      expect(
+        provider.supportsRestore({
+          backupId: "drb_other",
+          sourceProviderKey: "appaloft-managed-postgres",
+          targetProviderKey: "external-postgres",
+          dependencyKind: "postgres",
+          providerArtifactHandle: backup._unsafeUnwrap().providerArtifactHandle,
+          sameDependencyResource: false,
+        }),
+      ).toBe(false);
 
       const restored = await provider.restoreBackup(
         { requestId: "req_managed_restore_to_external", entrypoint: "test" },
@@ -348,7 +359,7 @@ describe("ShellManagedDependencyProvider", () => {
       expect(log).toContain("network inspect 'appaloft-edge'");
       expect(log).toContain("run -d '--name' 'appaloft-redis-rsi_cache'");
       expect(log).toContain("redis:7-alpine");
-      expect(log).toContain("redis-cli -a");
+      expect(log).toContain("REDISCLI_AUTH");
       expect(log).not.toContain(new URL(state.connectionSecretValue ?? "").password);
     } finally {
       process.env.PATH = previousPath;

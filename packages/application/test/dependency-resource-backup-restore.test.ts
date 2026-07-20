@@ -253,6 +253,7 @@ async function createHarness() {
       logger,
     ),
     listBackups: new ListDependencyResourceBackupsQueryService(backupReadModel, clock),
+    managedDependencyProvider,
     provisionDependencyResource: provisionDependency,
     repositoryContext,
     processAttemptRecorder,
@@ -779,6 +780,52 @@ describe("dependency resource backup and restore use cases", () => {
     });
   });
 
+  test("[DEP-RES-BACKUP-014] rejects an unsupported source artifact and target before provider execution", async () => {
+    const {
+      backupProvider,
+      context,
+      createBackup,
+      importDependencyResource,
+      provisionDependencyResource,
+      restoreBackup,
+    } = await createHarness();
+    backupProvider.setSupported(["appaloft-managed-postgres:postgres"]);
+    const sourceDependencyResourceId = (
+      await provisionDependencyResource.execute(context, {
+        kind: "postgres",
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        name: "Source DB",
+      })
+    )._unsafeUnwrap().id;
+    const targetDependencyResourceId = (
+      await importDependencyResource.execute(context, {
+        kind: "postgres",
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        name: "Unsupported Target",
+        connectionUrl: "postgres://app:target-secret@db.example.com:5432/postgres?sslmode=require",
+      })
+    )._unsafeUnwrap().id;
+    const backupId = (
+      await createBackup.execute(context, { dependencyResourceId: sourceDependencyResourceId })
+    )._unsafeUnwrap().id;
+
+    const result = await restoreBackup.execute(context, {
+      backupId,
+      targetDependencyResourceId,
+      acknowledgeDataOverwrite: true,
+      acknowledgeRuntimeNotRestarted: true,
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "provider_capability_unsupported",
+      details: { phase: "dependency-resource-restore-admission", backupId },
+    });
+    expect(backupProvider.restores).toEqual([]);
+  });
+
   test("[DEP-RES-BACKUP-008] [PROC-DELIVERY-004] records provider restore failure safely", async () => {
     const {
       backupProvider,
@@ -889,6 +936,42 @@ describe("dependency resource backup and restore use cases", () => {
         deletionBlockers: expect.stringContaining("dependency-resource-backup"),
       },
     });
+  });
+
+  test("[DEP-RES-BACKUP-010] provider-independent backups do not block verified source deletion", async () => {
+    const {
+      backupProvider,
+      context,
+      createBackup,
+      deleteDependencyResource,
+      managedDependencyProvider,
+      provisionDependencyResource,
+    } = await createHarness();
+    const dependencyResourceId = (
+      await provisionDependencyResource.execute(context, {
+        kind: "postgres",
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        name: "Main DB",
+      })
+    )._unsafeUnwrap().id;
+    backupProvider.setBackupResult(
+      ok({
+        providerArtifactHandle: `backup/${dependencyResourceId}/drb_0003`,
+        completedAt: "2026-01-01T00:00:00.000Z",
+        retentionStatus: "none",
+      }),
+    );
+    await createBackup.execute(context, { dependencyResourceId });
+
+    const deleted = await deleteDependencyResource.execute(context, {
+      dependencyResourceId,
+    });
+
+    expect(deleted.isOk()).toBe(true);
+    expect(managedDependencyProvider.deleted).toContainEqual(
+      expect.objectContaining({ dependencyResourceId }),
+    );
   });
 });
 

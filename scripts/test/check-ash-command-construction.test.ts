@@ -26,4 +26,14 @@ describe("ash command construction architecture check", () => {
 
     expect(findAshCommandConstructionViolations("managed-provider.ts", source)).toEqual([]);
   });
+
+  test("[ASH-GUARD-003] does not confuse business command fields with executable shell seams", () => {
+    const source = `
+      export interface RequestedDeploymentHealthCheck {
+        command?: { command: string };
+      }
+    `;
+
+    expect(findAshCommandConstructionViolations("application-port.ts", source)).toEqual([]);
+  });
 });

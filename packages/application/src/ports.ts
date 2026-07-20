@@ -9561,6 +9561,14 @@ export interface DependencyResourceProviderConnectionContext {
 
 export interface DependencyResourceBackupProviderPort {
   supports(providerKey: string, dependencyKind: DependencyResourceKind): boolean;
+  supportsRestore?(input: {
+    backupId: string;
+    sourceProviderKey: string;
+    targetProviderKey: string;
+    dependencyKind: DependencyResourceKind;
+    providerArtifactHandle: string;
+    sameDependencyResource: boolean;
+  }): boolean;
   createBackup(
     context: ExecutionContext,
     input: DependencyResourceBackupProviderInput,

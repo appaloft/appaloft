@@ -159,7 +159,7 @@ This repository is a backend-core deployment platform, not a web-first CRUD app.
 - operations such as provision, delete, backup, restore, health checks, credential rotation, import, export, and runtime hooks belong to the provider capability that supports them
 - shared execution plumbing such as Docker, SSH, HTTP clients, retries, and command runners may live in shared helpers, but service-specific command construction and lifecycle assumptions must stay with the provider/service implementation
 - executable local or remote shell scripts must use `@appaloft/ash` and cross execution seams as `AshScript`; dynamic values must use explicit ash interpolation helpers, and contributors must not add local shell quoting helpers, newline-joined command arrays, or plain-string shell command interfaces
-- run `bun run check:ash` after changing command-owning modules; AI contributors must also follow `docs/ai/ASH_COMMAND_CONSTRUCTION.md`
+- run `bun run check:ash` after changing command-owning modules and keep it active in `lint:ci`; AI contributors must also follow `docs/ai/ASH_COMMAND_CONSTRUCTION.md` and must not add new checker allowlist entries
 - adding a new service or provider should add a new descriptor/capability implementation and registry entry, not expand a central `if kind === ...` or `switch providerKey` block
 - UI and test fixtures should use service/provider metadata maps for labels, endpoints, default ports, and operation handlers when behavior differs by service kind
 

@@ -126,6 +126,7 @@ export class DockerBackedManagedDependencyProvider implements ManagedDependencyP
         set -eu
         docker rm -f ${ash.arg(parsed.containerName)} >/dev/null 2>&1 || true
         docker volume rm ${ash.arg(volumeName(parsed.containerName))} >/dev/null 2>&1 || true
+        rm -f "$HOME/.appaloft/dependency-secrets"/${ash.arg(`${parsed.containerName}.redis.conf`)}
       `,
     );
     if (result.exitCode !== 0) {
@@ -186,6 +187,8 @@ function postgresSpec(
     command: ash`
       set -eu
       IFS= read -r APPALOFT_MANAGED_DEPENDENCY_PASSWORD
+      ${transientEnvFileSetupScript(container)}
+      printf 'POSTGRES_PASSWORD=%s\n' "$APPALOFT_MANAGED_DEPENDENCY_PASSWORD" > "$APPALOFT_DEPENDENCY_ENV_FILE"
       ${provisionSetupScript(volume, input.dependencyResourceId, container)}
       docker run -d ${ash.list([
         ...commonDockerRunArgs(input.dependencyResourceId, container),
@@ -195,11 +198,11 @@ function postgresSpec(
         `POSTGRES_USER=${user}`,
         "-v",
         `${volume}:/var/lib/postgresql/data`,
-      ])} -e "POSTGRES_PASSWORD=$APPALOFT_MANAGED_DEPENDENCY_PASSWORD" postgres:16-alpine
+      ])} --env-file "$APPALOFT_DEPENDENCY_ENV_FILE" postgres:16-alpine
       for attempt in $(seq 1 60); do
-        if PGPASSWORD="$APPALOFT_MANAGED_DEPENDENCY_PASSWORD" docker exec -e PGPASSWORD ${ash.arg(
-          container,
-        )} pg_isready -U ${ash.arg(user)} -d ${ash.arg(databaseName)} >/dev/null 2>&1; then
+        if docker exec ${ash.arg(container)} pg_isready -U ${ash.arg(user)} -d ${ash.arg(
+          databaseName,
+        )} >/dev/null 2>&1; then
           exit 0
         fi
         sleep 1
@@ -228,18 +231,25 @@ function redisSpec(
     command: ash`
       set -eu
       IFS= read -r APPALOFT_MANAGED_DEPENDENCY_PASSWORD
+      umask 077
+      APPALOFT_DEPENDENCY_SECRET_DIR="$HOME/.appaloft/dependency-secrets"
+      APPALOFT_DEPENDENCY_REDIS_CONFIG="$APPALOFT_DEPENDENCY_SECRET_DIR"/${ash.arg(
+        `${container}.redis.conf`,
+      )}
+      mkdir -p "$APPALOFT_DEPENDENCY_SECRET_DIR"
+      printf 'requirepass %s\nappendonly yes\n' "$APPALOFT_MANAGED_DEPENDENCY_PASSWORD" > "$APPALOFT_DEPENDENCY_REDIS_CONFIG"
       ${provisionSetupScript(volume, input.dependencyResourceId, container)}
       docker run -d ${ash.list([
         ...commonDockerRunArgs(input.dependencyResourceId, container),
         "-v",
         `${volume}:/data`,
-        "redis:7-alpine",
-        "redis-server",
-        "--appendonly",
-        "yes",
-      ])} --requirepass "$APPALOFT_MANAGED_DEPENDENCY_PASSWORD"
+      ])} -v "$APPALOFT_DEPENDENCY_REDIS_CONFIG:/usr/local/etc/redis/appaloft.conf:ro" redis:7-alpine redis-server /usr/local/etc/redis/appaloft.conf
       for attempt in $(seq 1 60); do
-        if docker exec ${ash.arg(container)} redis-cli -a "$APPALOFT_MANAGED_DEPENDENCY_PASSWORD" --no-auth-warning PING >/dev/null 2>&1; then
+        if docker exec ${ash.arg(container)} sh -lc ${ash.arg(
+          ash.render(
+            ash`password="$(awk '$1 == "requirepass" { print $2; exit }' /usr/local/etc/redis/appaloft.conf)"; REDISCLI_AUTH="$password" redis-cli PING`,
+          ),
+        )} >/dev/null 2>&1; then
           exit 0
         fi
         sleep 1
@@ -273,6 +283,8 @@ function mysqlSpec(
       set -eu
       IFS= read -r APPALOFT_MANAGED_DEPENDENCY_PASSWORD
       IFS= read -r APPALOFT_MANAGED_DEPENDENCY_ROOT_PASSWORD
+      ${transientEnvFileSetupScript(container)}
+      printf 'MYSQL_PASSWORD=%s\nMYSQL_ROOT_PASSWORD=%s\n' "$APPALOFT_MANAGED_DEPENDENCY_PASSWORD" "$APPALOFT_MANAGED_DEPENDENCY_ROOT_PASSWORD" > "$APPALOFT_DEPENDENCY_ENV_FILE"
       ${provisionSetupScript(volume, input.dependencyResourceId, container)}
       docker run -d ${ash.list([
         ...commonDockerRunArgs(input.dependencyResourceId, container),
@@ -282,11 +294,13 @@ function mysqlSpec(
         `MYSQL_USER=${user}`,
         "-v",
         `${volume}:/var/lib/mysql`,
-      ])} -e "MYSQL_PASSWORD=$APPALOFT_MANAGED_DEPENDENCY_PASSWORD" -e "MYSQL_ROOT_PASSWORD=$APPALOFT_MANAGED_DEPENDENCY_ROOT_PASSWORD" mysql:8.4
+      ])} --env-file "$APPALOFT_DEPENDENCY_ENV_FILE" mysql:8.4
       for attempt in $(seq 1 90); do
-        if docker exec -e "MYSQL_PWD=$APPALOFT_MANAGED_DEPENDENCY_PASSWORD" ${ash.arg(
-          container,
-        )} mysqladmin ping -h 127.0.0.1 -u ${ash.arg(user)} --silent >/dev/null 2>&1; then
+        if docker exec ${ash.arg(container)} sh -lc ${ash.arg(
+          ash.render(
+            ash`MYSQL_PWD="$MYSQL_PASSWORD" mysqladmin ping -h 127.0.0.1 -u "$MYSQL_USER" --silent`,
+          ),
+        )} >/dev/null 2>&1; then
           exit 0
         fi
         sleep 1
@@ -319,6 +333,8 @@ function clickHouseSpec(
     command: ash`
       set -eu
       IFS= read -r APPALOFT_MANAGED_DEPENDENCY_PASSWORD
+      ${transientEnvFileSetupScript(container)}
+      printf 'CLICKHOUSE_PASSWORD=%s\n' "$APPALOFT_MANAGED_DEPENDENCY_PASSWORD" > "$APPALOFT_DEPENDENCY_ENV_FILE"
       ${provisionSetupScript(volume, input.dependencyResourceId, container)}
       docker run -d ${ash.list([
         ...commonDockerRunArgs(input.dependencyResourceId, container),
@@ -328,11 +344,17 @@ function clickHouseSpec(
         `CLICKHOUSE_USER=${user}`,
         "-v",
         `${volume}:/var/lib/clickhouse`,
-      ])} -e "CLICKHOUSE_PASSWORD=$APPALOFT_MANAGED_DEPENDENCY_PASSWORD" clickhouse/clickhouse-server:24.8
+      ])} --env-file "$APPALOFT_DEPENDENCY_ENV_FILE" clickhouse/clickhouse-server:24.8
       for attempt in $(seq 1 90); do
-        if docker exec ${ash.arg(container)} clickhouse-client --user ${ash.arg(
-          user,
-        )} --password "$APPALOFT_MANAGED_DEPENDENCY_PASSWORD" --query ${ash.arg("SELECT 1")} >/dev/null 2>&1; then
+        if docker exec ${ash.arg(container)} sh -lc ${ash.arg(
+          ash.render(ash`
+            umask 077
+            client_config=/tmp/appaloft-clickhouse-client.xml
+            trap 'rm -f "$client_config"' EXIT
+            printf '<config><user>%s</user><password>%s</password></config>\n' "$CLICKHOUSE_USER" "$CLICKHOUSE_PASSWORD" > "$client_config"
+            clickhouse-client --config-file "$client_config" --query 'SELECT 1'
+          `),
+        )} >/dev/null 2>&1; then
           exit 0
         fi
         sleep 1
@@ -365,6 +387,10 @@ function objectStorageSpec(
     command: ash`
       set -eu
       IFS= read -r APPALOFT_MANAGED_DEPENDENCY_PASSWORD
+      ${transientEnvFileSetupScript(container)}
+      ${ash.env("APPALOFT_MINIO_ACCESS_KEY", accessKey)}
+      ${ash.env("APPALOFT_MINIO_CONTAINER", container)}
+      printf 'MINIO_ROOT_PASSWORD=%s\n' "$APPALOFT_MANAGED_DEPENDENCY_PASSWORD" > "$APPALOFT_DEPENDENCY_ENV_FILE"
       ${provisionSetupScript(volume, input.dependencyResourceId, container)}
       docker run -d ${ash.list([
         ...commonDockerRunArgs(input.dependencyResourceId, container),
@@ -372,7 +398,7 @@ function objectStorageSpec(
         `MINIO_ROOT_USER=${accessKey}`,
         "-v",
         `${volume}:/data`,
-      ])} -e "MINIO_ROOT_PASSWORD=$APPALOFT_MANAGED_DEPENDENCY_PASSWORD" minio/minio:latest server /data --console-address :9001
+      ])} --env-file "$APPALOFT_DEPENDENCY_ENV_FILE" minio/minio:latest server /data --console-address :9001
       for attempt in $(seq 1 90); do
         if docker exec ${ash.arg(container)} sh -c ${ash.arg(
           "wget -q -O - http://127.0.0.1:9000/minio/health/ready >/dev/null 2>&1 || curl -fsS http://127.0.0.1:9000/minio/health/ready >/dev/null 2>&1",
@@ -381,19 +407,13 @@ function objectStorageSpec(
         fi
         sleep 1
       done
+      MC_HOST_local="http://$APPALOFT_MINIO_ACCESS_KEY:$APPALOFT_MANAGED_DEPENDENCY_PASSWORD@$APPALOFT_MINIO_CONTAINER:9000"
+      export MC_HOST_local
       docker run --rm ${ash.list([
         "--network",
         dockerNetworkName,
-        "minio/mc:latest",
-        "alias",
-        "set",
-        "local",
-        `http://${container}:9000`,
-        accessKey,
-      ])} "$APPALOFT_MANAGED_DEPENDENCY_PASSWORD" >/dev/null
-      docker run --rm ${ash.list([
-        "--network",
-        dockerNetworkName,
+        "-e",
+        "MC_HOST_local",
         "minio/mc:latest",
         "mb",
         "--ignore-existing",
@@ -423,6 +443,8 @@ function openSearchSpec(
     command: ash`
       set -eu
       IFS= read -r APPALOFT_MANAGED_DEPENDENCY_PASSWORD
+      ${transientEnvFileSetupScript(container)}
+      printf 'OPENSEARCH_INITIAL_ADMIN_PASSWORD=%s\n' "$APPALOFT_MANAGED_DEPENDENCY_PASSWORD" > "$APPALOFT_DEPENDENCY_ENV_FILE"
       ${provisionSetupScript(volume, input.dependencyResourceId, container)}
       docker run -d ${ash.list([
         ...commonDockerRunArgs(input.dependencyResourceId, container),
@@ -432,7 +454,7 @@ function openSearchSpec(
         "plugins.security.disabled=true",
         "-v",
         `${volume}:/usr/share/opensearch/data`,
-      ])} -e "OPENSEARCH_INITIAL_ADMIN_PASSWORD=$APPALOFT_MANAGED_DEPENDENCY_PASSWORD" opensearchproject/opensearch:2
+      ])} --env-file "$APPALOFT_DEPENDENCY_ENV_FILE" opensearchproject/opensearch:2
       for attempt in $(seq 1 120); do
         if docker exec ${ash.arg(container)} sh -c ${ash.arg(
           "curl -fsS http://127.0.0.1:9200/_cluster/health >/dev/null 2>&1",
@@ -542,6 +564,16 @@ function commonDockerRunArgs(dependencyResourceId: string, container: string): r
     "--label",
     `appaloft.dependency-resource-id=${dependencyResourceId}`,
   ];
+}
+
+function transientEnvFileSetupScript(container: string): AshScript {
+  return ash`
+    umask 077
+    APPALOFT_DEPENDENCY_SECRET_DIR="$HOME/.appaloft/dependency-secrets"
+    APPALOFT_DEPENDENCY_ENV_FILE="$APPALOFT_DEPENDENCY_SECRET_DIR"/${ash.arg(`${container}.env`)}
+    mkdir -p "$APPALOFT_DEPENDENCY_SECRET_DIR"
+    trap 'rm -f "$APPALOFT_DEPENDENCY_ENV_FILE"' EXIT
+  `;
 }
 
 function sensitiveInput(...values: readonly string[]): Uint8Array {

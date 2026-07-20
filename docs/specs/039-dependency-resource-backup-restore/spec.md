@@ -14,8 +14,8 @@
 ## Business Outcome
 
 Operators can create safe backup restore points for dependency resources and restore a selected
-restore point back into the same dependency resource without exposing raw database dumps, connection
-secrets, provider credentials, or runtime environment values.
+restore point into its owner or an admitted ready same-kind target without exposing raw database
+dumps, connection secrets, provider credentials, or runtime environment values.
 
 This closes the first backup/restore gap in the Phase 7 dependency-resource loop for ready
 Postgres and Redis dependency resources with provider capability support. It does not restart
@@ -34,9 +34,10 @@ only through `DependencyResourceSecretStore`.
 3. Backup command success means accepted, not provider backup completion. Provider completion and
    failure are visible through `DependencyResourceBackup` state, lifecycle events, and safe read
    models.
-4. Restore is destructive provider work. The first slice restores in-place to the same dependency
-   resource and requires explicit acknowledgement that provider data may be overwritten and that
-   runtime workloads are not restarted by Appaloft.
+4. Restore is destructive provider work. It defaults to the backup owner and may target a different
+   ready same-kind dependency in the same project/environment only when the provider admits the
+   source artifact-to-target combination. Both paths require explicit overwrite and runtime
+   acknowledgements.
 5. Delete safety must fail closed while retained backup restore points exist, while backup/restore
    attempts are in progress, or while provider retention metadata requires preservation.
 6. Provider-specific backup APIs remain behind application/provider ports. Core stores only value
@@ -61,7 +62,7 @@ only through `DependencyResourceSecretStore`.
 | ID | Scenario | Given | When | Then |
 | --- | --- | --- | --- | --- |
 | DEP-RES-BACKUP-001 | Accept backup request | Active ready dependency resource has provider backup capability | `dependency-resources.create-backup` is admitted | A `DependencyResourceBackup` attempt is persisted, the provider receives only safe execution context (`providerResourceHandle`, masked endpoint, and safe `secretRef`), command returns `ok({ id })`, and `dependency-resource-backup-requested` is emitted without leaking secrets. |
-| DEP-RES-BACKUP-002 | Mark backup ready | Provider backup succeeds with safe artifact metadata | The backup result is applied | Backup status becomes `ready`, restore point metadata is visible in list/show, delete safety is blocked by retention, and `dependency-resource-backup-completed` is emitted. |
+| DEP-RES-BACKUP-002 | Mark backup ready | Provider backup succeeds with safe artifact metadata | The backup result is applied | Backup status becomes `ready`, restore point metadata is visible in list/show, provider-declared retained artifacts block delete, and `dependency-resource-backup-completed` is emitted. |
 | DEP-RES-BACKUP-003 | Surface backup failure | Provider backup fails after admission | The backup result is applied | Backup status becomes `failed`, sanitized failure code/category/phase are visible, original command remains accepted, and `dependency-resource-backup-failed` is emitted. |
 | DEP-RES-BACKUP-004 | Reject backup for unsupported or not-ready resource | Dependency resource is missing, deleted, pending realization, degraded, unsupported, or lacks required secret reference | `dependency-resources.create-backup` is called | Admission returns structured `not_found`, `dependency_resource_backup_blocked`, or `provider_capability_unsupported`; no backup attempt is persisted when admission fails. |
 | DEP-RES-BACKUP-005 | List/show safe restore points | Backups exist for one dependency resource | `dependency-resources.list-backups` or `dependency-resources.show-backup` runs | Output includes only safe owner, dependency kind, status, attempt ids, artifact handle, retention, size/checksum when safe, and sanitized failure metadata. |
@@ -153,7 +154,7 @@ operation, phase, attempt id, blocker code, and sanitized provider failure metad
 ## Non-Goals
 
 - No backup prune/delete command in this slice.
-- No cross-resource restore, clone, export, or download.
+- No provider-created clone, export, or download.
 - No deployment retry, redeploy, or rollback.
 - No runtime environment injection, workload restart, or runtime cleanup.
 - No provider-native credential rotation.
@@ -180,5 +181,8 @@ operation, phase, attempt id, blocker code, and sanitized provider failure metad
   execution for imported Redis resources with Appaloft-owned connection refs. Provider-specific
   Redis snapshot substrates remain governed follow-up work for providers that need snapshot-native
   restore semantics beyond the shell logical dump/restore path.
+- Managed Docker Postgres artifacts can be restored into an imported external Postgres target after
+  source-artifact/target admission. The connection URL travels over stdin and becomes `PGDATABASE`
+  inside the short-lived restore container; it is not placed in process arguments or logs.
 - Scheduled policy is implemented separately as the disabled-by-default scheduled dependency backup
-  runner. Backup pruning, export/download, and cross-resource restore remain governed follow-up work.
+  runner. Backup pruning and export/download remain governed follow-up work.

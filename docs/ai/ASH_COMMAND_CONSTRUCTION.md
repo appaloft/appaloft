@@ -16,10 +16,14 @@ Executable shell text is a typed runtime artifact in Appaloft. Build it with
 6. Secrets should travel through stdin, a protected file, or an already-owned runtime secret
    boundary. Quoting a secret does not make it safe to include in a process argument or log.
 
-Run `bun run check:ash` before committing. The guard covers both Cloud service registration and
-the standalone CLI managed-dependency providers, because those are separate composition roots.
-When a new command-owning module is added, add it to the guarded paths in
-`scripts/check-ash-command-construction.ts`.
+Run `bun run check:ash` before committing. The guard discovers every production TypeScript module
+under `apps/*/src` and `packages/*/src`; contributors must not maintain a hand-written list of new
+command-owning files. A frozen, counted budget names pre-existing remote-state debt, so even a
+legacy file cannot add one more violation. Do not raise a budget for new or modified executable
+shell code: migrate that seam to `AshScript` instead.
+
+`bun run lint:ci` includes this guard. A change is not CI-complete when Biome passes but the ash
+architecture check has been skipped.
 
 If `ash` cannot express a required portable command safely, extend and test `@appaloft/ash`
 instead of adding a one-off quoting helper or bypassing the typed command seam.

@@ -100,7 +100,7 @@ function redisBackupCommand(input: {
       mkdir -p "$(dirname "$APPALOFT_DEPENDENCY_BACKUP_PATH")"
       docker exec ${ash.arg(input.container)} sh -lc ${ash.arg(
         ash.render(
-          ash`password="$(tr "\\0" "\\n" </proc/1/cmdline | tail -n 1)"; redis-cli -a "$password" --no-auth-warning SAVE >/dev/null`,
+          ash`password="$(awk '$1 == "requirepass" { print $2; exit }' /usr/local/etc/redis/appaloft.conf)"; REDISCLI_AUTH="$password" redis-cli --no-auth-warning SAVE >/dev/null`,
         ),
       )}
       docker cp ${ash.arg(`${input.container}:/data/dump.rdb`)} "$APPALOFT_DEPENDENCY_BACKUP_PATH"

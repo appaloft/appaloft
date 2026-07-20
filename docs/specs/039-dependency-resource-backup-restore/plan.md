@@ -49,7 +49,7 @@
 ## Testing Strategy
 
 - Matrix ids:
-  - DEP-RES-BACKUP-001 through DEP-RES-BACKUP-011
+  - DEP-RES-BACKUP-001 through DEP-RES-BACKUP-014
 - Test-first bindings:
   - Core tests for backup aggregate transitions, restore attempt transitions, retention blockers,
     and unsafe state rejection.
@@ -76,5 +76,6 @@
   providers must fail admission with stable structured errors.
 - Web backup/restore write affordances are active on Resource detail for backup create, safe
   restore-point list, and acknowledged in-place restore. Scheduled backup policy, backup
-  prune/delete, export/download, cross-resource restore, and automatic retry execution are separate
-  governed extensions.
+  prune/delete, export/download, and automatic retry execution are separate governed extensions.
+  Cross-resource restore is admitted only for provider-declared source artifact/target combinations;
+  the current concrete migration path is Docker-managed Postgres to imported external Postgres.

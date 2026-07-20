@@ -33,7 +33,7 @@
     "bun:version:check": "bun run scripts/sync-bun-version.ts --check",
     "lint": "biome check . && bun run check:ash",
     "lint:fix": "biome check --write .",
-    "lint:ci": "biome ci .",
+    "lint:ci": "biome ci . && bun run check:ash",
     "lint:staged": "lint-staged",
     "check:ash": "bun run scripts/check-ash-command-construction.ts",
     "typecheck": "turbo run typecheck",
