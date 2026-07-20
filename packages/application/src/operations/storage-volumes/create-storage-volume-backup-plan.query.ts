@@ -17,7 +17,10 @@ export {
 };
 
 export class CreateStorageVolumeBackupPlanQuery extends Query<StorageBackupPlan> {
-  constructor(public readonly request: StorageBackupPlanRequest) {
+  constructor(
+    public readonly storageVolumeId: string,
+    public readonly request: StorageBackupPlanRequest,
+  ) {
     super();
   }
 
@@ -25,8 +28,8 @@ export class CreateStorageVolumeBackupPlanQuery extends Query<StorageBackupPlan>
     input: CreateStorageVolumeBackupPlanQueryInput,
   ): Result<CreateStorageVolumeBackupPlanQuery> {
     return parseOperationInput(createStorageVolumeBackupPlanQueryInputSchema, input).map(
-      ({ storageVolumeId: _storageVolumeId, ...request }) =>
-        new CreateStorageVolumeBackupPlanQuery(request),
+      ({ storageVolumeId, ...request }) =>
+        new CreateStorageVolumeBackupPlanQuery(storageVolumeId, request),
     );
   }
 }

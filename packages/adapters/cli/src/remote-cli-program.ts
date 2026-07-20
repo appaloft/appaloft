@@ -80,6 +80,11 @@ function readMessagePayload(message: RemoteOperationMessage): Record<string, unk
     return { ...input, ...outer };
   }
 
+  if (isRecord(payload.request)) {
+    const { request, ...outer } = payload;
+    return { ...request, ...outer };
+  }
+
   return payload;
 }
 

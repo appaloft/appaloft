@@ -1495,6 +1495,68 @@ describe("CLI remote control-plane client", () => {
     expect(shown.stdout).toContain("Remote Project");
   });
 
+  test("[CONTROL-PLANE-CLI-006][STOR-BACKUP-PLAN-001] storage backup plan binds the nested source volume to the remote route", async () => {
+    const requests: Request[] = [];
+    const program = createRemoteCliProgram({
+      version: "0.12.5-test",
+      profile: profile("local"),
+      fetch: createControlPlaneFetch(requests, {
+        "/api/storage-volumes/stv_remote/backups/plan": jsonResponse({
+          schemaVersion: "storage-volumes.backup-plan/v1",
+          storageVolumeId: "stv_remote",
+          sourceAdapterKey: "sqlite-online-backup",
+          targetProviderKey: "s3-compatible",
+          consistency: "application-consistent",
+          localOnly: false,
+          blockers: [],
+        }),
+      }),
+      now: () => "2026-05-17T00:00:00.000Z",
+    });
+
+    const planned = await captureProcessOutput(() =>
+      program.parseAsync([
+        "node",
+        "appaloft",
+        "storage",
+        "volume",
+        "backup",
+        "plan",
+        "--storage-volume",
+        "stv_remote",
+        "--destination-path",
+        "/pb_data",
+        "--data-format",
+        "sqlite",
+        "--live-writes",
+        "true",
+        "--consistency",
+        "application-consistent",
+        "--source-adapter",
+        "sqlite-online-backup",
+        "--target-provider",
+        "s3-compatible",
+        "--target-ref",
+        "s3://backups/volumes",
+        "--retention-max-count",
+        "1",
+      ]),
+    );
+
+    expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual(
+      [
+        "GET /api/version",
+        "GET /api/organizations/current-context",
+        "POST /api/storage-volumes/stv_remote/backups/plan",
+      ],
+    );
+    expect(await requests[2]?.json()).toMatchObject({
+      source: { storageVolumeId: "stv_remote" },
+      target: { providerKey: "s3-compatible" },
+    });
+    expect(planned.stdout).toContain('"storageVolumeId": "stv_remote"');
+  });
+
   test("[CONTROL-PLANE-CLI-006][GITHUB-APP-CONNECTION-001] GitHub source status and repository browse dispatch remotely", async () => {
     const requests: Request[] = [];
     const program = createRemoteCliProgram({
