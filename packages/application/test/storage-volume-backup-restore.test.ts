@@ -381,7 +381,7 @@ describe("storage volume backup and restore application flow", () => {
     ]);
   });
 
-  test("[STOR-BACKUP-RESTORE-001] restore defaults to a new storage volume", async () => {
+  test("[STOR-BACKUP-RESTORE-001][STOR-BACKUP-OFFSITE-RESTORE-001] restore defaults to a new storage volume and forwards checksum evidence", async () => {
     const {
       context,
       createBackup,
@@ -422,6 +422,7 @@ describe("storage volume backup and restore application flow", () => {
 
     expect(restored.isOk()).toBe(true);
     expect(targetProvider.restored).toHaveLength(1);
+    expect(targetProvider.restored[0]?.expectedChecksum).toBe("sha256:test");
     const restoredVolumeId = restored._unsafeUnwrap().restoredStorageVolumeId;
     expect(restoredVolumeId).toBeDefined();
     const restoredVolume = await storageVolumes.findOne(
@@ -499,6 +500,39 @@ describe("storage volume backup and restore application flow", () => {
       id: backupId,
       status: "pruned",
       retentionStatus: "pruned",
+    });
+  });
+
+  test("[STOR-BACKUP-OFFSITE-PRUNE-001] provider cleanup failure leaves backup retained", async () => {
+    const { clock, context, createBackup, eventBus, showBackup, storageBackups } =
+      await createHarness();
+    const backupId = (
+      await createBackup.execute(context, {
+        storageVolumeId: "stv_data",
+        planRequest: backupPlanRequest(),
+      })
+    )._unsafeUnwrap().id;
+    const failingTarget = new FakeStorageBackupTargetProvider("local-filesystem");
+    failingTarget.prune = async () =>
+      err(domainError.infra("object delete failed", { phase: "test-provider-delete" }));
+    const prune = new PruneStorageVolumeBackupUseCase(
+      storageBackups,
+      new FakeStorageBackupProviderRegistry([], [failingTarget]),
+      clock,
+      eventBus,
+      new NoopLogger(),
+    );
+
+    const result = await prune.execute(context, { backupId });
+
+    expect(result.isErr()).toBe(true);
+    const shown = await showBackup.execute(
+      context,
+      ShowStorageVolumeBackupQuery.create({ backupId })._unsafeUnwrap(),
+    );
+    expect(shown._unsafeUnwrap().backup).toMatchObject({
+      status: "ready",
+      retentionStatus: "retained",
     });
   });
 

@@ -2061,6 +2061,7 @@ export const i18nKeys = {
       storageBackupDataFormat: "console:resources.storageBackupDataFormat",
       storageBackupDestinationPath: "console:resources.storageBackupDestinationPath",
       storageBackupConsistency: "console:resources.storageBackupConsistency",
+      storageBackupTargetProvider: "console:resources.storageBackupTargetProvider",
       storageBackupTargetRef: "console:resources.storageBackupTargetRef",
       storageBackupRetentionMaxCount: "console:resources.storageBackupRetentionMaxCount",
       storageBackupRetentionMinFreeBytes: "console:resources.storageBackupRetentionMinFreeBytes",
