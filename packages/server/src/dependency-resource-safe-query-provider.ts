@@ -96,12 +96,15 @@ export function boundedDependencyResourceSafeQueryRows(
   return { rows: bounded, truncated };
 }
 
-function safeQueryProviderError(cause: unknown): DomainError {
+function safeQueryProviderError(
+  cause: unknown,
+  phase = "dependency-resource-safe-query-postgres",
+): DomainError {
   const candidate = cause as { code?: unknown; name?: unknown };
   return domainError.provider(
     "Postgres dependency safe query failed",
     {
-      phase: "dependency-resource-safe-query-postgres",
+      phase,
       cause:
         typeof candidate.code === "string"
           ? candidate.code
@@ -276,7 +279,18 @@ export class PostgresDependencyResourceSafeQueryProvider
           }),
         );
       }
-      const secret = await this.secretStore.resolve(context, { secretRef });
+      let secret: Awaited<ReturnType<DependencyResourceSecretStore["resolve"]>>;
+      try {
+        secret = await executeDependencyResourceSafeQueryWithDeadline(
+          this.secretStore.resolve(context, { secretRef }),
+          input.timeoutMs,
+          () => undefined,
+        );
+      } catch (cause) {
+        return err(
+          safeQueryProviderError(cause, "dependency-resource-safe-query-secret-resolution"),
+        );
+      }
       if (secret.isErr()) {
         return err(
           domainError.provider(

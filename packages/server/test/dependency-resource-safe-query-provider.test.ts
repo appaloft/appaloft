@@ -71,6 +71,12 @@ class CapturingSecretStore implements DependencyResourceSecretStore {
   }
 }
 
+class HangingSecretStore extends CapturingSecretStore {
+  override async resolve(): ReturnType<DependencyResourceSecretStore["resolve"]> {
+    return await new Promise(() => undefined);
+  }
+}
+
 class CapturingPostgresExecutor implements DependencyResourcePostgresQueryExecutor {
   inputs: Parameters<DependencyResourcePostgresQueryExecutor["execute"]>[0][] = [];
 
@@ -126,6 +132,31 @@ describe("PostgresDependencyResourceSafeQueryProvider", () => {
 
     await expect(result).rejects.toMatchObject({ name: "TimeoutError" });
     expect(timedOut).toBe(true);
+  });
+
+  test("[DEP-SAFE-QRY-012] fails closed when external secret resolution exceeds the deadline", async () => {
+    const provider = new PostgresDependencyResourceSafeQueryProvider(
+      new HangingSecretStore(),
+      clock,
+      new CapturingPostgresExecutor(),
+    );
+
+    const result = await provider.execute(context, {
+      dependencyResource: postgresDependency,
+      statement: "select 1",
+      maxRows: 10,
+      timeoutMs: 5,
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "provider_error",
+      retryable: true,
+      details: {
+        phase: "dependency-resource-safe-query-secret-resolution",
+        cause: "TimeoutError",
+      },
+    });
   });
 
   test("[DEP-SAFE-QRY-005] resolves an Appaloft secret reference and executes a bounded query", async () => {
