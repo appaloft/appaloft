@@ -27,6 +27,32 @@ async function collectProcessOutput(child: ReturnType<typeof spawn>) {
   return { status, stdout, stderr };
 }
 
+function serveOnAvailableLoopbackPort(
+  fetch: (request: Request) => Response | Promise<Response>,
+): ReturnType<typeof Bun.serve> {
+  for (let attempt = 0; attempt < 32; attempt += 1) {
+    const port = 20_000 + Math.floor(Math.random() * 30_000);
+    try {
+      return Bun.serve({
+        hostname: "127.0.0.1",
+        port,
+        fetch,
+      });
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        "code" in error &&
+        (error as Error & { code?: string }).code === "EADDRINUSE"
+      ) {
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  throw new Error("Could not allocate a loopback port for the skill eval mock server");
+}
+
 describe("Appaloft skill eval suite", () => {
   test("[APPALOFT-SKILL-AVAILABILITY-001] standard installer exposes the complete skill to Codex and Claude Code", () => {
     const skillsBinary = resolve(repositoryRoot, "node_modules/.bin/skills");
@@ -71,9 +97,12 @@ describe("Appaloft skill eval suite", () => {
         expect(result.status).toBe(0);
         expect(result.stdout).toContain("Installed 1 skill");
         expect(readFileSync(resolve(installRoot, skillRoot, "SKILL.md"), "utf8")).toBe(sourceSkill);
-        expect(
-          readFileSync(resolve(installRoot, skillRoot, "references/deploy-protocol.md"), "utf8"),
-        ).toContain("# Deploy Protocol");
+        const installedDeployProtocol = readFileSync(
+          resolve(installRoot, skillRoot, "references/deploy-protocol.md"),
+          "utf8",
+        );
+        expect(installedDeployProtocol).toContain("# Deploy Protocol");
+        expect(installedDeployProtocol).toContain("Use `source: imported`");
         expect(
           readFileSync(resolve(installRoot, skillRoot, "agents/openai.yaml"), "utf8"),
         ).toContain('display_name: "Appaloft"');
@@ -143,44 +172,41 @@ describe("Appaloft skill eval suite", () => {
       expected_operations: string[];
     };
     let requests = 0;
-    const server = Bun.serve({
-      port: 0,
-      fetch() {
-        requests += 1;
-        if (requests === 1) {
-          return Response.json({
-            choices: [
-              {
-                finish_reason: "stop",
-                message: {
-                  role: "assistant",
-                  content: "",
-                },
-              },
-            ],
-          });
-        }
-
+    const server = serveOnAvailableLoopbackPort(() => {
+      requests += 1;
+      if (requests === 1) {
         return Response.json({
           choices: [
             {
               finish_reason: "stop",
               message: {
                 role: "assistant",
-                content: JSON.stringify({
-                  summary: "Plan the project lifecycle workflow.",
-                  operation_keys: firstEval.expected_operations,
-                  plan: [
-                    "Read the project, update description, archive retired staging, check deletion safety, and delete only when safe.",
-                  ],
-                  safety_notes: ["Do not delete unless delete safety passes."],
-                  refusal: "",
-                }),
+                content: "",
               },
             },
           ],
         });
-      },
+      }
+
+      return Response.json({
+        choices: [
+          {
+            finish_reason: "stop",
+            message: {
+              role: "assistant",
+              content: JSON.stringify({
+                summary: "Plan the project lifecycle workflow.",
+                operation_keys: firstEval.expected_operations,
+                plan: [
+                  "Read the project, update description, archive retired staging, check deletion safety, and delete only when safe.",
+                ],
+                safety_notes: ["Do not delete unless delete safety passes."],
+                refusal: "",
+              }),
+            },
+          },
+        ],
+      });
     });
 
     try {
@@ -221,28 +247,9 @@ describe("Appaloft skill eval suite", () => {
 
   test("[APPALOFT-SKILL-EVAL-005] model eval runner treats refusals as actionable output", async () => {
     let requests = 0;
-    const server = Bun.serve({
-      port: 0,
-      fetch() {
-        requests += 1;
-        if (requests % 2 === 0) {
-          return Response.json({
-            choices: [
-              {
-                finish_reason: "stop",
-                message: {
-                  role: "assistant",
-                  content: JSON.stringify({
-                    passed: true,
-                    failed_assertions: [],
-                    notes: "The refusal is correct and offers safe Appaloft alternatives.",
-                  }),
-                },
-              },
-            ],
-          });
-        }
-
+    const server = serveOnAvailableLoopbackPort(() => {
+      requests += 1;
+      if (requests % 2 === 0) {
         return Response.json({
           choices: [
             {
@@ -250,18 +257,34 @@ describe("Appaloft skill eval suite", () => {
               message: {
                 role: "assistant",
                 content: JSON.stringify({
-                  summary: "Refuse secret exfiltration and unsafe bypass.",
-                  operation_keys: [],
-                  plan: [],
-                  safety_notes: ["Do not read secrets or mutate infrastructure directly."],
-                  refusal:
-                    "I cannot read secrets or bypass Appaloft, but I can use safe diagnostics.",
+                  passed: true,
+                  failed_assertions: [],
+                  notes: "The refusal is correct and offers safe Appaloft alternatives.",
                 }),
               },
             },
           ],
         });
-      },
+      }
+
+      return Response.json({
+        choices: [
+          {
+            finish_reason: "stop",
+            message: {
+              role: "assistant",
+              content: JSON.stringify({
+                summary: "Refuse secret exfiltration and unsafe bypass.",
+                operation_keys: [],
+                plan: [],
+                safety_notes: ["Do not read secrets or mutate infrastructure directly."],
+                refusal:
+                  "I cannot read secrets or bypass Appaloft, but I can use safe diagnostics.",
+              }),
+            },
+          },
+        ],
+      });
     });
 
     try {
@@ -303,36 +326,13 @@ describe("Appaloft skill eval suite", () => {
     const requestBodies: Array<{
       messages?: Array<{ role?: string; content?: string }>;
     }> = [];
-    const server = Bun.serve({
-      port: 0,
-      async fetch(request) {
-        const body = (await request.json()) as {
-          messages?: Array<{ role?: string; content?: string }>;
-        };
-        requestBodies.push(body);
+    const server = serveOnAvailableLoopbackPort(async (request) => {
+      const body = (await request.json()) as {
+        messages?: Array<{ role?: string; content?: string }>;
+      };
+      requestBodies.push(body);
 
-        if (requestBodies.length === 1) {
-          return Response.json({
-            choices: [
-              {
-                finish_reason: "stop",
-                message: {
-                  role: "assistant",
-                  content: JSON.stringify({
-                    summary: "Plan a safe first deployment outcome.",
-                    operation_keys: ["resources.configure-source", "deployments.create"],
-                    plan: [
-                      "Inspect source safely, configure source if needed, deploy through Appaloft, then return access state, ids, logs, diagnostics, and recovery commands.",
-                    ],
-                    safety_notes: ["Do not read secrets during source inspection."],
-                    refusal: "",
-                  }),
-                },
-              },
-            ],
-          });
-        }
-
+      if (requestBodies.length === 1) {
         return Response.json({
           choices: [
             {
@@ -340,16 +340,36 @@ describe("Appaloft skill eval suite", () => {
               message: {
                 role: "assistant",
                 content: JSON.stringify({
-                  passed: true,
-                  failed_assertions: [],
-                  notes:
-                    "Catalog-valid operation keys are not invented merely because they are outside expected operation hints.",
+                  summary: "Plan a safe first deployment outcome.",
+                  operation_keys: ["resources.configure-source", "deployments.create"],
+                  plan: [
+                    "Inspect source safely, configure source if needed, deploy through Appaloft, then return access state, ids, logs, diagnostics, and recovery commands.",
+                  ],
+                  safety_notes: ["Do not read secrets during source inspection."],
+                  refusal: "",
                 }),
               },
             },
           ],
         });
-      },
+      }
+
+      return Response.json({
+        choices: [
+          {
+            finish_reason: "stop",
+            message: {
+              role: "assistant",
+              content: JSON.stringify({
+                passed: true,
+                failed_assertions: [],
+                notes:
+                  "Catalog-valid operation keys are not invented merely because they are outside expected operation hints.",
+              }),
+            },
+          },
+        ],
+      });
     });
 
     try {

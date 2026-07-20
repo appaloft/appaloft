@@ -200,15 +200,25 @@ type ConfigurableResourceRuntimeProfileInput = ConfigureResourceRuntimeInput["ru
 export type DeploymentEnvironmentVariableSeed = QuickDeployEnvironmentVariableInput;
 export type DeploymentServerAppliedRouteSeed = ServerAppliedRouteDomainIntent;
 export interface DeploymentServiceSeed extends RequestedDeploymentServiceConfig {}
-export interface DeploymentDependencySeed {
+interface DeploymentDependencySeedBase {
   key: string;
-  resourceName?: string;
   kind: ManagedDependencyResourceKind;
-  source: "managed";
   bindEnv: string;
   backupPolicy?: DeploymentDependencyBackupPolicySeed;
   previewLifecycle?: "ephemeral";
 }
+export type DeploymentDependencySeed = DeploymentDependencySeedBase &
+  (
+    | {
+        source: "managed";
+        resourceName?: string;
+      }
+    | {
+        source: "imported";
+        resourceName: string;
+        previewLifecycle?: never;
+      }
+  );
 export interface DeploymentDependencyBackupPolicySeed {
   enabled: boolean;
   intervalHours?: number;
@@ -759,33 +769,44 @@ export function deploymentPromptSeedFromConfig(
   }));
   const dependencyGraph = Object.entries(config.dependencies ?? {})
     .sort(compareConfigKeys)
-    .map(
-      ([key, dependency]) =>
-        ({
-          key,
-          ...(dependency.resourceName ? { resourceName: dependency.resourceName } : {}),
-          kind: dependency.kind,
-          source: dependency.source,
-          bindEnv: dependency.bind.env,
-          ...(dependency.backup
-            ? {
-                backupPolicy: {
-                  enabled: dependency.backup.enabled,
-                  ...(dependency.backup.intervalHours
-                    ? { intervalHours: dependency.backup.intervalHours }
-                    : {}),
-                  ...(dependency.backup.retentionDays
-                    ? { retentionDays: dependency.backup.retentionDays }
-                    : {}),
-                  retryOnFailure: dependency.backup.retryOnFailure,
-                },
-              }
-            : {}),
-          ...(dependency.preview?.lifecycle
-            ? { previewLifecycle: dependency.preview.lifecycle }
-            : {}),
-        }) satisfies DeploymentDependencySeed,
-    );
+    .map(([key, dependency]): DeploymentDependencySeed => {
+      const common = {
+        key,
+        kind: dependency.kind,
+        bindEnv: dependency.bind.env,
+        ...(dependency.backup
+          ? {
+              backupPolicy: {
+                enabled: dependency.backup.enabled,
+                ...(dependency.backup.intervalHours
+                  ? { intervalHours: dependency.backup.intervalHours }
+                  : {}),
+                ...(dependency.backup.retentionDays
+                  ? { retentionDays: dependency.backup.retentionDays }
+                  : {}),
+                retryOnFailure: dependency.backup.retryOnFailure,
+              },
+            }
+          : {}),
+      } satisfies DeploymentDependencySeedBase;
+
+      if (dependency.source === "imported") {
+        return {
+          ...common,
+          source: "imported",
+          resourceName: dependency.resourceName,
+        };
+      }
+
+      return {
+        ...common,
+        source: "managed",
+        ...(dependency.resourceName ? { resourceName: dependency.resourceName } : {}),
+        ...(dependency.preview?.lifecycle
+          ? { previewLifecycle: dependency.preview.lifecycle }
+          : {}),
+      };
+    });
   const storageGraph = Object.entries(config.storage ?? {})
     .sort(compareConfigKeys)
     .map(
@@ -2078,6 +2099,29 @@ function isManagedDependencyResource(
   );
 }
 
+function isImportedDependencyResource(
+  resource: DependencyResourceSummary | undefined,
+  dependency: DeploymentDependencySeed,
+): resource is DependencyResourceSummary {
+  return Boolean(
+    resource &&
+      resource.kind === dependency.kind &&
+      !resource.deletedAt &&
+      resource.sourceMode === "imported-external" &&
+      resource.lifecycleStatus === "ready" &&
+      resource.bindingReadiness.status === "ready",
+  );
+}
+
+function isConfiguredDependencyResource(
+  resource: DependencyResourceSummary | undefined,
+  dependency: DeploymentDependencySeed,
+): resource is DependencyResourceSummary {
+  return dependency.source === "managed"
+    ? isManagedDependencyResource(resource, dependency)
+    : isImportedDependencyResource(resource, dependency);
+}
+
 function isReadyManagedDependencyResource(
   resource: DependencyResourceSummary | undefined,
   dependency: DeploymentDependencySeed,
@@ -2099,7 +2143,7 @@ function findDependencyResourceById(
   return resources.find((resource) => resource.id === dependencyResourceId);
 }
 
-function findManagedDependencyResourceByName(input: {
+function findConfiguredDependencyResourceByName(input: {
   resources: readonly DependencyResourceSummary[];
   dependency: DeploymentDependencySeed;
   name: string;
@@ -2107,9 +2151,31 @@ function findManagedDependencyResourceByName(input: {
   const slug = slugify(input.name);
   return input.resources.find(
     (resource) =>
-      isManagedDependencyResource(resource, input.dependency) &&
+      isConfiguredDependencyResource(resource, input.dependency) &&
       (resource.slug === slug || slugify(resource.name) === slug),
   );
+}
+
+function repositoryConfigImportedDependencyNotFound(input: {
+  dependency: DeploymentDependencySeed;
+  projectId: string;
+  environmentId: string;
+  resourceName: string;
+}): DomainError {
+  return {
+    code: "repository_config_imported_dependency_not_found",
+    category: "user",
+    message: "Repository config imported dependency does not exist or is not ready",
+    retryable: false,
+    details: {
+      phase: "config-dependency-resolution",
+      projectId: input.projectId,
+      environmentId: input.environmentId,
+      dependencyKey: input.dependency.key,
+      dependencyKind: input.dependency.kind,
+      resourceName: input.resourceName,
+    },
+  };
 }
 
 function repositoryConfigDependencyConflict(input: {
@@ -2544,12 +2610,12 @@ function ensureRepositoryConfigDependencies(input: {
             existingProvenanceEntry.dependencyResourceId,
           )
         : undefined;
-      const namedResource = findManagedDependencyResourceByName({
+      const namedResource = findConfiguredDependencyResourceByName({
         resources: dependencyResources,
         dependency,
         name: resourceName,
       });
-      let dependencyResource = isManagedDependencyResource(provenanceResource, dependency)
+      let dependencyResource = isConfiguredDependencyResource(provenanceResource, dependency)
         ? provenanceResource
         : isEphemeralPreviewDependency
           ? undefined
@@ -2631,14 +2697,25 @@ function ensureRepositoryConfigDependencies(input: {
           activeTargetBinding.dependencyResourceId,
         );
         if (
+          dependency.source === "managed" &&
           dependency.previewLifecycle !== "ephemeral" &&
-          isManagedDependencyResource(activeBindingResource, dependency)
+          isConfiguredDependencyResource(activeBindingResource, dependency)
         ) {
           dependencyResource = activeBindingResource;
         }
       }
 
       if (!dependencyResource) {
+        if (dependency.source === "imported") {
+          return yield* Effect.fail(
+            repositoryConfigImportedDependencyNotFound({
+              dependency,
+              projectId: input.projectId,
+              environmentId: input.environmentId,
+              resourceName: dependency.resourceName ?? resourceName,
+            }),
+          );
+        }
         const provisioned = yield* provisionRepositoryConfigDependency({
           dependency,
           projectId: input.projectId,
@@ -2700,9 +2777,9 @@ function ensureRepositoryConfigDependencies(input: {
           resourceId: input.resourceId,
           dependencyResourceId: dependencyResource.id,
           kind: dependency.kind,
-          sourceMode: "appaloft-managed",
+          sourceMode: dependencyResource.sourceMode,
           providerKey: dependencyResource.providerKey,
-          providerManaged: true,
+          providerManaged: dependencyResource.providerManaged,
           lifecycleStatus: dependencyResource.lifecycleStatus,
           target: {
             targetName,
@@ -2716,11 +2793,15 @@ function ensureRepositoryConfigDependencies(input: {
         });
       }
 
-      if (dependency.previewLifecycle === "ephemeral" && input.seed.sourceFingerprint) {
+      if (
+        dependency.source === "managed" &&
+        dependency.previewLifecycle === "ephemeral" &&
+        input.seed.sourceFingerprint
+      ) {
         provenanceEntries.push({
           key: dependency.key,
           kind: dependency.kind,
-          source: dependency.source,
+          source: "managed",
           lifecycle: dependency.previewLifecycle,
           resourceId: input.resourceId,
           dependencyResourceId: dependencyResource.id,
