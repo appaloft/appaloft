@@ -155,7 +155,7 @@ function requestedDeploymentWithDurableDomainBindings(
   bindings: DomainRouteBindingCandidate[],
 ): RequestedDeploymentConfig {
   if (
-    requestedDeployment.accessContext?.exposureMode !== "reverse-proxy" ||
+    requestedDeployment.exposureMode !== "reverse-proxy" ||
     (requestedDeployment.domains?.length ?? 0) > 0 ||
     (requestedDeployment.accessRoutes?.length ?? 0) > 0
   ) {
