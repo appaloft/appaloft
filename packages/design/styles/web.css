@@ -27,11 +27,11 @@
   --surface-selected: #e8f0ff;
   --divider: #c5d1e0;
   --control: #9fadc1;
-  --sidebar: #eef2f7;
-  --sidebar-foreground: #203149;
-  --sidebar-accent: #dfe8f6;
-  --sidebar-accent-foreground: #152b4d;
-  --sidebar-border: #bcc9da;
+  --sidebar: #fafafa;
+  --sidebar-foreground: #242a33;
+  --sidebar-accent: #f1f1f2;
+  --sidebar-accent-foreground: #20252d;
+  --sidebar-border: #d7d7db;
   --radius: 0.25rem;
   --shadow-2xs: 0 1px 0 hsl(214 48% 19% / 7%);
   --shadow-xs: 0 1px 1px hsl(214 48% 19% / 7%), 0 1px 0 hsl(214 48% 19% / 5%);

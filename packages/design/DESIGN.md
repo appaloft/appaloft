@@ -153,6 +153,11 @@ area uses one named surface:
 - The light Console canvas is a Supabase-like near-white `#fdfdfd`, not a blue or visible gray page
   fill. White `#ffffff` owner surfaces remain distinct through divider hairlines, spacing, and type;
   neutral `#f7f7f8` is reserved for table headers and owned subtle groups.
+- Primary and nested sidebars use a neutral near-white surface with neutral hover/active fills.
+  Appaloft blue is reserved for the active rail, icon, focus ring, or compact collapsed navigation
+  marker rather than tinting the whole navigation surface.
+- Owner-scoped extension tabs, including Audit Log, use the same responsive content padding as
+  native detail tabs; only deliberately edge-to-edge tools may opt into a flush container.
 
 - `console-panel`: one command/query form, evidence panel, terminal panel, or framed tool.
 - `console-subtle-panel`: low-emphasis status, empty state, helper, or result block inside a larger

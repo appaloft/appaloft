@@ -147,7 +147,6 @@
     detailSubnavContentClass,
     detailSubnavLayoutClass,
     detailTabClass,
-    detailTabPanelFlushClass,
     detailTabPanelScrollClass,
     detailTabPanelSubnavClass,
     detailTabsClass,
@@ -9272,7 +9271,7 @@
             </section>
           </div>
         {:else if activeTab === "audit-log" && resourceAuditLogTabVisible}
-          <div class={detailTabPanelFlushClass}>
+          <div class={detailTabPanelScrollClass}>
             <ConsoleExtensionPage
               projectId={resourceProjectId}
               environmentId={resourceEnvironmentId}

@@ -32,6 +32,9 @@ describe("design package", () => {
     expect(webCss).toContain("--surface-overlay: #ffffff");
     expect(webCss).toContain("--border: #c5d1e0");
     expect(webCss).toContain("--input: #9fadc1");
+    expect(webCss).toContain("--sidebar: #fafafa");
+    expect(webCss).toContain("--sidebar-accent: #f1f1f2");
+    expect(webCss).toContain("--sidebar-border: #d7d7db");
     expect(webCss).toContain("--radius: 0.25rem");
   });
 
