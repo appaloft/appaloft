@@ -9665,7 +9665,10 @@ export interface SourceDetectionResult {
 
 export interface SourceWorkspaceDiscoveryEvidence {
   selectedRoot: string;
-  selectionReason: "explicit-base-directory" | "single-deployable-root";
+  selectionReason:
+    | "explicit-base-directory"
+    | "explicit-runtime-profile"
+    | "single-deployable-root";
   candidateRoots: string[];
   inspectedDirectoryCount: number;
   inspectionBoundReached: boolean;
@@ -9673,6 +9676,7 @@ export interface SourceWorkspaceDiscoveryEvidence {
 
 export interface SourceDetectionInput {
   baseDirectory?: string;
+  allowUnrecognizedRoot?: boolean;
 }
 
 export type RequestedDeploymentMethod =

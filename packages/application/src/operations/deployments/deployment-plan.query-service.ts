@@ -680,6 +680,9 @@ export class DeploymentPlanQueryService {
           ...(resourceSource.source.metadata?.baseDirectory
             ? { baseDirectory: resourceSource.source.metadata.baseDirectory }
             : {}),
+          ...(resource.toState().runtimeProfile?.strategy.value !== "auto"
+            ? { allowUnrecognizedRoot: true }
+            : {}),
         });
       }
 

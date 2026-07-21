@@ -904,6 +904,9 @@ export class CreateDeploymentUseCase {
           ...(resourceSource.source.metadata?.baseDirectory
             ? { baseDirectory: resourceSource.source.metadata.baseDirectory }
             : {}),
+          ...(resourceState.runtimeProfile?.strategy.value !== "auto"
+            ? { allowUnrecognizedRoot: true }
+            : {}),
         });
         detected = yield* detectedResult;
       }

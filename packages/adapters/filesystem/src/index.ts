@@ -1276,6 +1276,19 @@ function discoverLocalWorkspace(
     }
   }
 
+  if (!inspectionBoundReached && candidates.length === 0 && input?.allowUnrecognizedRoot) {
+    return ok({
+      path: root,
+      evidence: {
+        selectedRoot: "/",
+        selectionReason: "explicit-runtime-profile",
+        candidateRoots: [],
+        inspectedDirectoryCount,
+        inspectionBoundReached: false,
+      },
+    });
+  }
+
   if (inspectionBoundReached || candidates.length !== 1) {
     const ambiguous = candidates.length > 1 || inspectionBoundReached;
     return err(

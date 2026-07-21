@@ -158,6 +158,27 @@ describe("FileSystemSourceDetector", () => {
     });
   });
 
+  test("[WF-PLAN-DET-014] accepts an unrecognized root only for an explicit runtime profile", async () => {
+    ensureReflectMetadata();
+    const [{ createExecutionContext }, { FileSystemSourceDetector }] = await Promise.all([
+      import("@appaloft/application"),
+      import("../src"),
+    ]);
+
+    const result = await new FileSystemSourceDetector().detect(
+      createExecutionContext({ entrypoint: "cli", requestId: "req_explicit_source" }),
+      join(workspaceFixtures, "empty"),
+      { allowUnrecognizedRoot: true },
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap().workspace).toMatchObject({
+      selectedRoot: "/",
+      selectionReason: "explicit-runtime-profile",
+      candidateRoots: [],
+    });
+  });
+
   test("[WF-PLAN-DET-015] reports both deployable roots instead of selecting a monorepo root", async () => {
     ensureReflectMetadata();
     const [{ createExecutionContext }, { FileSystemSourceDetector }] = await Promise.all([
