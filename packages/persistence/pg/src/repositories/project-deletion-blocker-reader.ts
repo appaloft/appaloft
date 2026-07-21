@@ -152,12 +152,15 @@ export class PgProjectDeletionBlockerReader implements ProjectDeletionBlockerRea
             .selectFrom("domain_bindings")
             .select("id")
             .where("project_id", "=", input.projectId)
+            .where("status", "not in", ["failed", "deleted"])
             .execute();
           const certificateRows = await executor
             .selectFrom("certificates")
             .innerJoin("domain_bindings", "domain_bindings.id", "certificates.domain_binding_id")
             .select("certificates.id as id")
             .where("domain_bindings.project_id", "=", input.projectId)
+            .where("domain_bindings.status", "not in", ["failed", "deleted"])
+            .where("certificates.status", "not in", ["deleted", "revoked"])
             .execute();
           const sourceLinkRows = await executor
             .selectFrom("source_links")
