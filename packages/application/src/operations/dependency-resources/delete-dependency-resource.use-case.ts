@@ -55,7 +55,9 @@ export class DeleteDependencyResourceUseCase {
 
   async execute(
     context: ExecutionContext,
-    input: DeleteDependencyResourceCommandInput,
+    input: Omit<DeleteDependencyResourceCommandInput, "confirmBackupRetentionRelease"> & {
+      confirmBackupRetentionRelease?: boolean;
+    },
   ): Promise<Result<{ id: string }>> {
     const repositoryContext = toRepositoryContext(context);
     const {
@@ -102,7 +104,8 @@ export class DeleteDependencyResourceUseCase {
         dependencyState.providerManaged === true &&
         dependencyState.sourceMode?.value === "appaloft-managed" &&
         blockers.length === 0 &&
-        !dependencyState.backupRelationship?.retentionRequired;
+        (!dependencyState.backupRelationship?.retentionRequired ||
+          input.confirmBackupRetentionRelease);
 
       let allowProviderManaged = false;
       if (shouldDeleteProviderManagedDependency && dependencyKind) {
@@ -166,7 +169,12 @@ export class DeleteDependencyResourceUseCase {
         }
       }
 
-      yield* dependencyResource.delete({ deletedAt, blockers, allowProviderManaged });
+      yield* dependencyResource.delete({
+        deletedAt,
+        blockers,
+        allowProviderManaged,
+        allowBackupRetentionRelease: input.confirmBackupRetentionRelease === true,
+      });
       await dependencyResourceRepository.upsert(
         repositoryContext,
         dependencyResource,

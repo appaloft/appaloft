@@ -52,6 +52,9 @@ const backupRetentionOption = Options.boolean("backup-retention-required").pipe(
   Options.withDefault(false),
 );
 const backupReasonOption = Options.text("backup-reason").pipe(Options.optional);
+const confirmBackupRetentionReleaseOption = Options.boolean(
+  "confirm-backup-retention-release",
+).pipe(Options.withDefault(false));
 const confirmDataOverwriteOption = Options.boolean("confirm-data-overwrite").pipe(
   Options.withDefault(false),
 );
@@ -407,9 +410,15 @@ const deleteCommand = EffectCommand.make(
   "delete",
   {
     dependencyResourceId: dependencyResourceIdArg,
+    confirmBackupRetentionRelease: confirmBackupRetentionReleaseOption,
   },
-  ({ dependencyResourceId }) =>
-    runCommand(DeleteDependencyResourceCommand.create({ dependencyResourceId })),
+  ({ confirmBackupRetentionRelease, dependencyResourceId }) =>
+    runCommand(
+      DeleteDependencyResourceCommand.create({
+        dependencyResourceId,
+        confirmBackupRetentionRelease,
+      }),
+    ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.dependencyDelete));
 
 const backupCreateCommand = EffectCommand.make(

@@ -238,7 +238,10 @@
   }));
   const deleteDependencyResourceMutation = createMutation(() => ({
     mutationFn: (inputDependencyResourceId: string) =>
-      orpcClient.dependencyResources.delete({ dependencyResourceId: inputDependencyResourceId }),
+      orpcClient.dependencyResources.delete({
+        dependencyResourceId: inputDependencyResourceId,
+        confirmBackupRetentionRelease: false,
+      }),
     onSuccess: (result) => {
       feedback = {
         kind: "success",
