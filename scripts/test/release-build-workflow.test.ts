@@ -1208,6 +1208,60 @@ describe("release build workflow", () => {
     expect(output).not.toContain("Roadmap gate rejects release 1.0.0");
   });
 
+  test("[RELEASE-HARDENING-008] allows stable post-GA releases in the governed major line", () => {
+    const result = Bun.spawnSync(
+      [
+        "bun",
+        "run",
+        "scripts/release/align-roadmap-for-release.ts",
+        "--target-version",
+        "1.1.0",
+        "--current-version",
+        "1.0.4",
+        "--latest-release-tag",
+        "v1.0.4",
+        "--check",
+      ],
+      {
+        cwd: root,
+        stderr: "pipe",
+        stdout: "pipe",
+      },
+    );
+
+    const output = `${result.stdout.toString()}\n${result.stderr.toString()}`;
+    expect(result.exitCode).toBe(0);
+    expect(output).toContain("docs/PRODUCT_ROADMAP.md release alignment is valid for 1.1.0");
+    expect(output).not.toContain("No roadmap phase target matches release 1.1.0");
+    expect(output).not.toContain("Roadmap gate rejects release 1.1.0");
+  });
+
+  test("[RELEASE-HARDENING-008] does not reuse the GA gate for a new major line", () => {
+    const result = Bun.spawnSync(
+      [
+        "bun",
+        "run",
+        "scripts/release/align-roadmap-for-release.ts",
+        "--target-version",
+        "2.0.0",
+        "--current-version",
+        "1.0.4",
+        "--latest-release-tag",
+        "v1.0.4",
+        "--check",
+      ],
+      {
+        cwd: root,
+        stderr: "pipe",
+        stdout: "pipe",
+      },
+    );
+
+    const output = `${result.stdout.toString()}\n${result.stderr.toString()}`;
+    expect(result.exitCode).not.toBe(0);
+    expect(output).toContain("No roadmap phase target matches release 2.0.0");
+  });
+
   test("[RELEASE-HARDENING-006] keeps local smoke control-plane and cleanup isolated", async () => {
     const smokeScript = await readText("scripts/smoke/local-deploy.ts");
 
