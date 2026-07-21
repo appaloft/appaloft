@@ -294,6 +294,51 @@ describe("DeploymentProofQueryService", () => {
     expect(proof.mismatches.map((item) => item.reasonCode)).toContain("artifact_identity_mismatch");
   });
 
+  test("[DEP-PROOF-VERDICT-007] compose manifest and target container image are not compared as the same identity", async () => {
+    const base = deployment();
+    const proof = unwrap(
+      await service({
+        deployment: deployment({
+          runtimePlan: {
+            ...base.runtimePlan,
+            runtimeArtifact: {
+              kind: "compose-project",
+              intent: "compose-project",
+              composeFile: "docker-compose.production.yml",
+            },
+            execution: {
+              kind: "docker-compose-stack",
+              composeFile: "docker-compose.production.yml",
+              healthCheckPath: "/login",
+              verificationSteps: [
+                { kind: "internal-http", label: "Internal health" },
+                { kind: "public-http", label: "Public access" },
+              ],
+              metadata: { targetServiceName: "web" },
+            },
+            target: {
+              kind: "single-server",
+              providerKey: "generic-ssh",
+              serverIds: ["srv_demo"],
+            },
+          },
+        }),
+        evidence: evidence({
+          artifact: {
+            available: true,
+            reference: "stocktruth-platform:production",
+            resolvedIdentity: "sha256:stocktruth-platform-v2",
+          },
+        }),
+      }).execute(context(), query()),
+    );
+
+    expect(proof.verdict).toBe("verified");
+    expect(proof.planned.artifact.reference).toBe("docker-compose.production.yml");
+    expect(proof.observed.artifact.reference).toBe("stocktruth-platform:production");
+    expect(proof.mismatches).toEqual([]);
+  });
+
   test("[DEP-PROOF-SAFE-001] secret values never appear in proof JSON", async () => {
     const proof = unwrap(await service({}).execute(context(), query()));
     const serialized = JSON.stringify(proof);

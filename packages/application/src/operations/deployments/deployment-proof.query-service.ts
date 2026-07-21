@@ -48,6 +48,15 @@ function artifactReference(deployment: DeploymentSummary): string | undefined {
     deployment.runtimePlan.execution.composeFile
   );
 }
+function comparableArtifactReference(deployment: DeploymentSummary): string | undefined {
+  if (
+    deployment.runtimePlan.runtimeArtifact?.kind === "compose-project" ||
+    deployment.runtimePlan.execution.kind === "docker-compose-stack"
+  ) {
+    return deployment.runtimePlan.runtimeArtifact?.image ?? deployment.runtimePlan.execution.image;
+  }
+  return artifactReference(deployment);
+}
 function artifactDigest(reference: string | undefined): string | undefined {
   return reference?.match(/(?:@|^)(sha256:[a-f0-9]+)$/iu)?.[1]?.toLowerCase();
 }
@@ -178,7 +187,7 @@ export class DeploymentProofQueryService {
         summary: "Resolved runtime artifact",
         observedAt: observed.observedAt,
       });
-      const plannedArtifact = artifactReference(deployment);
+      const plannedArtifact = comparableArtifactReference(deployment);
       const plannedDigest = artifactDigest(plannedArtifact);
       const observedDigest = artifactDigest(observed.artifact.resolvedIdentity);
       const referenceMismatch = Boolean(

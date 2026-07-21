@@ -1840,7 +1840,12 @@ export function registerRuntimeDependencies(
     ),
   });
   container.register(tokens.deploymentProofRuntimeEvidenceReader, {
-    useClass: RuntimeDeploymentProofEvidenceReader,
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new RuntimeDeploymentProofEvidenceReader(
+          dependencyContainer.resolve(tokens.serverRepository),
+        ),
+    ),
   });
   container.register(tokens.resourceRuntimeLogReader, {
     useFactory: instanceCachingFactory(
