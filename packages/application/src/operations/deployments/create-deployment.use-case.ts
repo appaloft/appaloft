@@ -900,7 +900,14 @@ export class CreateDeploymentUseCase {
       const resourceSource = yield* resourceSourceResult;
       let detected = resourceSource;
       if (shouldEnrichSourceFromDetector(resource)) {
-        const detectedResult = await sourceDetector.detect(context, resourceSource.source.locator);
+        const detectedResult = await sourceDetector.detect(context, resourceSource.source.locator, {
+          ...(resourceSource.source.metadata?.baseDirectory
+            ? { baseDirectory: resourceSource.source.metadata.baseDirectory }
+            : {}),
+          ...(resourceState.runtimeProfile?.strategy.value !== "auto"
+            ? { allowUnrecognizedRoot: true }
+            : {}),
+        });
         detected = yield* detectedResult;
       }
       if (sourceVersionDetector && detected.source.kind !== "docker-image") {

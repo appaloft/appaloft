@@ -49,6 +49,81 @@ Common kinds:
 
 If unsure, choose the kind closest to the artifact you already have. The runtime profile explains how Appaloft should run it.
 
+## Zero-configuration support [#zero-configuration-support]
+
+Here, zero-configuration means Appaloft can inspect one selected application directory, derive a
+safe production build/start or static artifact plan, and pass the real Appaloft Docker path without
+runtime-profile overrides. The generic-SSH gate is tracked separately. You still choose deployment context such as the server,
+project, environment, credentials, secrets, and domain policy.
+
+Status meanings:
+
+- **Supported**: current detection/planning and matching real-smoke evidence exist.
+- **Preview**: part of the path is implemented, but complete source-to-runtime smoke evidence is
+  missing or explicit profile input is required. Preview is not a zero-configuration promise.
+- **Unsupported**: Appaloft cannot safely derive the complete plan and stops instead of guessing.
+
+| Source or application shape | Status | Evidence or reason |
+| --- | --- | --- |
+| Local single-app root: Next.js runtime/standalone/static export | Supported | Active real Docker and generic-SSH fixture descriptors cover these exact modes. |
+| Local single-app root: Vite, React, Vue, Svelte, Solid, Angular static SPA | Supported | Active static fixture smoke builds and verifies the Appaloft static server. |
+| Local single-app root: Astro static, Nuxt generate, SvelteKit adapter-static | Supported | Smoke covers only these static modes. |
+| Local single-app root: Remix, Express, Fastify, NestJS, Hono, Koa, generic Node with a production start script | Supported | Active workspace-image fixture smoke covers build, start, and HTTP verification. |
+| Local single-app root: FastAPI, Django, Flask, deterministic ASGI/WSGI, supported Poetry web app | Supported | Active Python fixture smoke covers current tool and app-target rules. |
+| Local single-app root: Spring Boot Maven/Gradle, Quarkus Maven JVM mode, deterministic runnable jar | Supported | Active JVM fixture smoke covers these exact build and start paths. |
+| Explicit Dockerfile, Compose, prebuilt image, or install/build/start commands | Supported | Real substrate/fixture smoke exists, but you supply the profile; this is an explicit fallback, not zero-configuration detection. |
+| Local Sinatra/Rack, Go Gin, ASP.NET Core, or Rust Axum app | Supported | Real Appaloft Docker smoke passed build, run, and HTTP verification for these exact fixtures. The generic-SSH gate is wired separately. |
+| Local Rails, Laravel, Symfony, or Phoenix app | Preview | Detection/planning exists, but these exact paths do not have passed real Appaloft Docker smoke. |
+| Public remote Git relying on automatic framework/runtime detection | Unsupported | Appaloft does not clone remote repositories for framework inspection during create or plan. Clone the repository locally for automatic detection. |
+| Public remote Git with an explicit Dockerfile, Compose, prebuilt-image, or install/build/start command profile | Preview | The explicit profile avoids automatic framework inspection, but dedicated remote source-to-runtime smoke is incomplete. Authenticated remote-Git parity is not claimed. |
+| General workload `.zip` or source archive relying on detection | Unsupported | General archive extraction-to-framework planning is incomplete. Static artifact publishing is a separate workflow for already-built files. |
+| Bounded local monorepo discovery with one app, or explicit `baseDirectory` | Preview | Discovery is implemented and explicit selection works in create and plan, but dedicated real Appaloft Docker monorepo smoke is incomplete. |
+| Monorepo root with multiple candidate apps and no selection | Unsupported | Appaloft reports candidate roots and blocks until `baseDirectory` selects one; it never picks the first app. |
+| SvelteKit server adapter, Astro SSR, Nuxt SSR, inferred worker, ambiguous hybrid mode, or buildpack execution | Unsupported | No complete deterministic planner plus current real-smoke support exists for these inferred paths. |
+
+### What detection reads [#zero-configuration-detection]
+
+Detection reads files only under the selected application root. It may use manifests, lockfiles,
+framework configuration, production scripts, runtime version files, well-known project files, and
+deterministic artifact paths. It does not install dependencies or execute project code while
+detecting.
+
+The plan should explain the selected root, detected runtime/framework/tool and files/scripts,
+selected planner, inferred commands/artifact/port, or the blocked phase and reason. It also returns
+`planVersion = "1"`, a stable `sha256:` fingerprint for the effective plan, and command provenance:
+`planner` for inferred commands or `resource-runtime-profile` for explicit commands. Missing
+evidence does not authorize a generic production command.
+
+### Override order [#zero-configuration-overrides]
+
+When you provide explicit values, Appaloft uses this order:
+
+1. Dockerfile, Compose, prebuilt-image, or static strategy and its fields.
+2. Explicit install/build/start commands and publish/artifact fields.
+3. Explicit source `baseDirectory` selecting one application root.
+4. Explicit Resource internal port and health policy.
+5. Framework evidence, then generic language evidence.
+6. Buildpack diagnostic evidence, then an Unsupported/ambiguous result.
+
+Explicit profile values are not silently replaced by detection.
+
+### Fail-closed recovery [#zero-configuration-troubleshooting]
+
+If planning blocks, do not keep retrying the same deployment. Use the reported evidence and reason:
+
+- pass the exact local application directory, or set `baseDirectory` for a repository root;
+- choose Dockerfile, Compose, prebuilt image, or static strategy explicitly;
+- provide install/build/start commands or the static publish directory;
+- provide the Resource internal port and health policy for an inbound app;
+- for remote Git automatic detection, clone locally; otherwise provide an explicit Dockerfile,
+  Compose, prebuilt-image, or command profile and treat that remote path as Preview;
+- extract a workload archive locally before relying on auto-detection;
+- run `appaloft deployments plan ...` and confirm the selected root, planner, commands, artifact,
+  port, and warnings before creating the deployment.
+
+Appaloft fails closed rather than selecting the first monorepo app, guessing an archive layout, or
+using a development/watch server in production.
+
 ## Integration connection modes [#deployment-source-integration-connection-modes]
 
 External source integrations can declare connection modes so Web, CLI, and tools share neutral language for who completes provider setup.

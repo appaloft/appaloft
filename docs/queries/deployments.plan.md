@@ -60,6 +60,10 @@ type DeploymentPlanQueryResult = Result<DeploymentPlanPreview, DomainError>;
 
 `DeploymentPlanPreview` uses schema version `deployments.plan/v1` and includes:
 
+- `planVersion` and a stable SHA-256 `fingerprint`; the fingerprint excludes `generatedAt`, so
+  repeating the same source/profile/target plan produces the same value while an accepted manual
+  override or selected application root produces a new value;
+
 - context ids and safe labels;
 - readiness status and reason codes;
 - source inspection evidence;

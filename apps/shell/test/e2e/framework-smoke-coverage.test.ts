@@ -189,6 +189,46 @@ const requiredCatalogCoverage: RequiredCatalogCoverage[] = [
     },
   },
   {
+    matrixId: "ZSSH-CATALOG-018",
+    catalogEntry: "Sinatra/Rack",
+    localDocker: { status: "active-fixture-smoke", fixture: "sinatra-rack" },
+    genericSsh: {
+      status: "secret-gated-fixture-smoke",
+      fixture: "sinatra-rack",
+      reason: "generic-SSH fixture smoke uses the shared framework descriptor",
+    },
+  },
+  {
+    matrixId: "ZSSH-CATALOG-020",
+    catalogEntry: "Go Gin",
+    localDocker: { status: "active-fixture-smoke", fixture: "go-gin" },
+    genericSsh: {
+      status: "secret-gated-fixture-smoke",
+      fixture: "go-gin",
+      reason: "generic-SSH fixture smoke uses the shared framework descriptor",
+    },
+  },
+  {
+    matrixId: "ZSSH-CATALOG-021",
+    catalogEntry: "ASP.NET Core",
+    localDocker: { status: "active-fixture-smoke", fixture: "dotnet-aspnet" },
+    genericSsh: {
+      status: "secret-gated-fixture-smoke",
+      fixture: "dotnet-aspnet",
+      reason: "generic-SSH fixture smoke uses the shared framework descriptor",
+    },
+  },
+  {
+    matrixId: "ZSSH-CATALOG-022",
+    catalogEntry: "Rust Axum",
+    localDocker: { status: "active-fixture-smoke", fixture: "rust-axum" },
+    genericSsh: {
+      status: "secret-gated-fixture-smoke",
+      fixture: "rust-axum",
+      reason: "generic-SSH fixture smoke uses the shared framework descriptor",
+    },
+  },
+  {
     matrixId: "ZSSH-CATALOG-013",
     catalogEntry: "Dockerfile",
     localDocker: { status: "active-substrate-smoke", coveredBy: localDockerSubstrateSmoke },
@@ -261,9 +301,33 @@ const requiredFrameworkSmokeFixtures = [
   "spring-boot-gradle-wrapper",
   "spring-boot-gradle-kts",
   "python-explicit-start",
+  "sinatra-rack",
+  "go-gin",
+  "dotnet-aspnet",
+  "rust-axum",
 ] as const;
 
 describe("framework fixture real smoke coverage", () => {
+  test("[WF-PLAN-SMOKE-003][WF-PLAN-SMOKE-005][WF-PLAN-SMOKE-006] inventories only verified representative polyglot fixtures", () => {
+    const fixtureIds = frameworkDockerSmokeFixtures.map((fixture) => fixture.fixture);
+    const workflow = readFileSync(frameworkFixtureWorkflow, "utf8");
+    const expectedBodies = new Set<string>();
+
+    for (const fixtureId of ["sinatra-rack", "go-gin", "dotnet-aspnet", "rust-axum"]) {
+      const fixture = frameworkDockerSmokeFixtures.find(
+        (candidate) => candidate.fixture === fixtureId,
+      );
+      expect(fixture, fixtureId).toBeDefined();
+      expect(fixture?.expectedRuntimeText, fixtureId).toBeTruthy();
+      expect(expectedBodies.has(fixture?.expectedRuntimeText ?? ""), fixtureId).toBe(false);
+      expectedBodies.add(fixture?.expectedRuntimeText ?? "");
+      expect(workflow, fixtureId).toContain(`- ${fixtureId}`);
+    }
+
+    expect(fixtureIds).not.toContain("elixir-phoenix");
+    expect(workflow).not.toContain("- elixir-phoenix");
+  });
+
   test("[WF-PLAN-SMOKE-005][WF-PLAN-SMOKE-006] records local Docker and generic-SSH smoke status for every supported catalog entry", () => {
     const localDockerSmokeSource = readFileSync(localDockerFrameworkSmoke, "utf8");
     const localDockerSubstrateSmokeSource = readFileSync(localDockerSubstrateSmoke, "utf8");
@@ -316,10 +380,9 @@ describe("framework fixture real smoke coverage", () => {
     expect(matrixIds.toSorted()).toEqual(
       [
         ...Array.from(
-          { length: 16 },
+          { length: 23 },
           (_, index) => `ZSSH-CATALOG-${String(index + 1).padStart(3, "0")}`,
-        ),
-        "ZSSH-CATALOG-017",
+        ).filter((matrixId) => matrixId !== "ZSSH-CATALOG-019" && matrixId !== "ZSSH-CATALOG-023"),
       ].toSorted(),
     );
 
@@ -339,6 +402,14 @@ describe("framework fixture real smoke coverage", () => {
       [...requiredFrameworkSmokeFixtures].toSorted(),
     );
 
+    const representativePolyglotBodies = frameworkDockerSmokeFixtures
+      .filter((fixture) =>
+        ["sinatra-rack", "go-gin", "dotnet-aspnet", "rust-axum"].includes(fixture.fixture),
+      )
+      .map((fixture) => fixture.expectedRuntimeText);
+    expect(representativePolyglotBodies.every(Boolean)).toBe(true);
+    expect(new Set(representativePolyglotBodies).size).toBe(representativePolyglotBodies.length);
+
     for (const fixture of frameworkDockerSmokeFixtures) {
       const fixturePath = join(frameworkFixturesRoot, fixture.fixture);
       expect(existsSync(fixturePath), fixture.fixture).toBe(true);
@@ -348,10 +419,14 @@ describe("framework fixture real smoke coverage", () => {
       expect(fixture.expectedPlanner.length).toBeGreaterThan(0);
 
       if (fixture.fixture === "generic-java-jar") {
-        const jarBytes = readFileSync(join(fixturePath, "target/generic-java-jar-1.0.0.jar"));
+        const jarPath = join(fixturePath, "target/generic-java-jar-1.0.0.jar");
+        const jarBytes = readFileSync(jarPath);
         expect(jarBytes.subarray(0, 4).toString("hex")).toBe("504b0304");
-        expect(jarBytes.includes(Buffer.from("Main-Class: GenericJavaJarServer"))).toBe(true);
-        expect(jarBytes.includes(Buffer.from([0xca, 0xfe, 0xba, 0xbe]))).toBe(true);
+        const manifest = Bun.spawnSync(["unzip", "-p", jarPath, "META-INF/MANIFEST.MF"]);
+        const mainClass = Bun.spawnSync(["unzip", "-p", jarPath, "GenericJavaJarServer.class"]);
+        expect(manifest.exitCode).toBe(0);
+        expect(manifest.stdout.toString()).toContain("Main-Class: GenericJavaJarServer");
+        expect(mainClass.stdout.subarray(0, 4).toString("hex")).toBe("cafebabe");
       }
 
       if (fixture.fixture === "next-static-export" || fixture.fixture === "next-standalone") {

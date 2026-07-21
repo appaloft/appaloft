@@ -50,6 +50,78 @@ sidebar:
 
 用户不确定时，应先选择最接近当前交付物的来源。后续 runtime profile 会描述如何运行它。
 
+## 零配置部署支持范围 [#zero-configuration-support]
+
+这里的“零配置”是指：Appaloft 能检查一个已经选定的应用目录，安全推导生产构建/启动方式或静态
+产物计划，并在不填写 runtime profile override 的情况下通过真实 Appaloft Docker 路径。
+generic-SSH gate 单独记录。服务器、项目、环境、凭据、secret 和域名策略仍需显式选择或配置。
+
+状态含义：
+
+- **Supported**：当前检测/规划实现和对应真实 smoke 证据都存在。
+- **Preview**：部分链路已实现，但缺少完整 source-to-runtime smoke 证据，或仍需显式 profile
+  输入。Preview 不等于零配置承诺。
+- **Unsupported**：Appaloft 无法安全生成完整计划，会停止而不是猜测。
+
+| 来源或应用形态 | 状态 | 证据或原因 |
+| --- | --- | --- |
+| 本地单应用根目录：Next.js runtime/standalone/static export | Supported | 这些精确模式有启用的真实 Docker 和 generic-SSH fixture descriptor。 |
+| 本地单应用根目录：Vite、React、Vue、Svelte、Solid、Angular 静态 SPA | Supported | 静态 fixture smoke 会真实构建并验证 Appaloft static server。 |
+| 本地单应用根目录：Astro static、Nuxt generate、SvelteKit adapter-static | Supported | 当前 smoke 只覆盖这些静态模式。 |
+| 本地单应用根目录：Remix、Express、Fastify、NestJS、Hono、Koa、带生产 start script 的 generic Node | Supported | Workspace image fixture smoke 覆盖构建、启动和 HTTP 验证。 |
+| 本地单应用根目录：FastAPI、Django、Flask、可确定的 ASGI/WSGI、受支持的 Poetry Web 应用 | Supported | Python fixture smoke 覆盖当前 package tool 和 app target 规则。 |
+| 本地单应用根目录：Spring Boot Maven/Gradle、Quarkus Maven JVM mode、可确定的 runnable jar | Supported | JVM fixture smoke 覆盖这些精确构建和启动路径。 |
+| 显式 Dockerfile、Compose、prebuilt image 或 install/build/start commands | Supported | 有真实 substrate/fixture smoke，但 profile 由用户提供；这是显式 fallback，不属于零配置检测。 |
+| 本地 Sinatra/Rack、Go Gin、ASP.NET Core 或 Rust Axum 应用 | Supported | 这些精确 fixture 已通过真实 Appaloft Docker build、run 和 HTTP verification；generic-SSH gate 单独处于已接线状态。 |
+| 本地 Rails、Laravel、Symfony 或 Phoenix 应用 | Preview | Detection/planning 已实现，但这些精确路径没有通过真实 Appaloft Docker smoke。 |
+| Public remote Git 依赖自动 framework/runtime detection | Unsupported | Create 和 plan 不会为了 framework inspection clone 远程仓库；需要自动检测时，应先在本地 clone。 |
+| Public remote Git 使用显式 Dockerfile、Compose、prebuilt-image 或 install/build/start command profile | Preview | 显式 profile 不依赖自动 framework inspection，但专门的远程 source-to-runtime smoke 尚未完成；不声明 authenticated remote-Git parity。 |
+| 通用 workload `.zip` 或 source archive 依赖自动检测 | Unsupported | 通用 archive extraction-to-framework planning 链路未完成。已经构建好的静态文件应使用独立的 static artifact publishing workflow。 |
+| Bounded local monorepo discovery 只有一个应用，或显式 `baseDirectory` | Preview | Discovery 已实现，显式选择在 create 和 plan 中生效，但专门的真实 Appaloft Docker monorepo smoke 尚未完成。 |
+| Monorepo 根目录包含多个 candidate app 且未选择 | Unsupported | Appaloft 返回 candidate roots 并阻塞，直到 `baseDirectory` 选中一个；不会选择第一个应用。 |
+| SvelteKit server adapter、Astro SSR、Nuxt SSR、自动推断 worker、ambiguous hybrid mode 或 buildpack execution | Unsupported | 这些推断路径没有完整、确定的 planner 和当前真实 smoke 支持。 |
+
+### 检测会读取什么 [#zero-configuration-detection]
+
+Detection 只读取所选应用根目录下的文件，可使用 manifest、lockfile、framework config、生产
+script、runtime version file、well-known project file 和可确定的 artifact path。检测阶段不会安装
+依赖或执行项目代码。
+
+Plan 应说明所选根目录、检测到的 runtime/framework/tool 和 files/scripts、planner、推导出的
+commands/artifact/port；若被阻塞，则应说明 phase 和 reason。Plan 还会返回
+`planVersion = "1"`、有效计划的稳定 `sha256:` fingerprint，以及 command provenance：推导命令为
+`planner`，显式命令为 `resource-runtime-profile`。缺失证据不能被当作通用生产命令。
+
+### Override 优先级 [#zero-configuration-overrides]
+
+用户提供显式值时，Appaloft 按以下顺序处理：
+
+1. Dockerfile、Compose、prebuilt-image 或 static strategy 及其字段。
+2. 显式 install/build/start commands 和 publish/artifact 字段。
+3. 用于选择单个应用根目录的显式 source `baseDirectory`。
+4. 显式 Resource internal port 和 health policy。
+5. Framework evidence，然后是 generic language evidence。
+6. Buildpack diagnostic evidence，最后才是 Unsupported/ambiguous 结果。
+
+检测不会静默替换显式 profile 值。
+
+### Fail-closed 排查 [#zero-configuration-troubleshooting]
+
+Planning 被阻塞后，不要重复提交相同部署。根据返回的 evidence 和 reason 处理：
+
+- 直接传入准确的本地应用目录，或为仓库根目录设置 `baseDirectory`；
+- 显式选择 Dockerfile、Compose、prebuilt image 或 static strategy；
+- 提供 install/build/start commands 或静态 publish directory；
+- 为入站应用提供 Resource internal port 和 health policy；
+- Remote Git 需要自动检测时，先 clone 到本地；否则提供显式 Dockerfile、Compose、
+  prebuilt-image 或 command profile，并将该远程路径视为 Preview；
+- 在依赖自动检测前，先在本地解压 workload archive；
+- 先运行 `appaloft deployments plan ...`，确认所选根目录、planner、commands、artifact、port 和
+  warnings，再创建部署。
+
+Appaloft 会 fail closed，不会选择 monorepo 中的第一个应用、猜测 archive layout，或把开发/watch
+server 用作生产启动命令。
+
 ## Integration connection modes [#deployment-source-integration-connection-modes]
 
 外部 source integration 可以声明连接模式，帮助 Web、CLI 和工具用同一套中性词汇解释“谁来完成 provider 配置”。

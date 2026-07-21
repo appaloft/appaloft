@@ -102,14 +102,14 @@ test expectations in the same change.
 | `spring-boot-gradle-kts` | `WF-PLAN-JVM-004` | Spring Boot `3.4.4`, Gradle wrapper marker, Kotlin DSL | `java`, `spring-boot`, `gradle`, `serverful-http`, `gradle-wrapper`, `build.gradle.kts`, Spring Boot plugin/dependency evidence | `spring-boot`, workspace image, `sh ./gradlew bootJar -x test`, deterministic `java -jar` start from `build/libs`, Gradle build image |
 | `jvm-explicit-start` | `WF-PLAN-JVM-005` | JVM project evidence plus explicit resource runtime start command | `java`, selected build tool or generic JVM evidence, `serverful-http` | generic JVM/custom fallback workspace image using explicit commands |
 | `generic-java-jar` | `WF-PLAN-JVM-006` | Generic Java/JVM project with exactly one deterministic runnable jar evidence item | `java`, no named framework, selected build tool or jar evidence, `serverful-http` | generic JVM planner, workspace image, deterministic `java -jar` start |
-| `rails-ruby` | `WF-PLAN-CAT-011` | Rails `7.2.2`, Ruby `3.3` marker | `ruby`, `rails`, `serverful-http` | `ruby`, workspace image, `bundle install`, deterministic Rails server start bound to the resource-owned port |
-| `sinatra-rack` | `WF-PLAN-CAT-011` | Sinatra `4.1.1`, Rack `3.1.8` | `ruby`, `sinatra`, `serverful-http` | `ruby`, workspace image, `bundle install`, deterministic Rack start bound to the resource-owned port |
-| `laravel-composer` | `WF-PLAN-CAT-011` | Laravel framework `11.44.2`, Composer metadata | `php`, `laravel`, `composer`, `serverful-http` | `php`, workspace image, Composer install, deterministic Artisan server start bound to the resource-owned port |
-| `symfony-composer` | `WF-PLAN-CAT-011` | Symfony framework bundle `7.2.3`, Symfony runtime `7.2.3`, Composer metadata | `php`, `symfony`, `composer`, `serverful-http` | `php`, workspace image, Composer install, deterministic PHP public-directory server start bound to the resource-owned port |
-| `go-gin` | `WF-PLAN-CAT-012` | Go module `1.23`, Gin `1.10.0` | `go`, `gin`, `go`, `serverful-http` | `go`, workspace image, `go build` binary artifact, deterministic binary start |
-| `dotnet-aspnet` | `WF-PLAN-CAT-014` | ASP.NET Core `net8.0`, Web SDK project | `dotnet`, `aspnet-core`, `dotnet`, `serverful-http` | `dotnet`, workspace image, `dotnet publish`, deterministic published assembly start |
-| `rust-axum` | `WF-PLAN-CAT-015` | Rust package, Axum `0.8.1`, Tokio `1.43.0` | `rust`, `axum`, `cargo`, `serverful-http` | `rust`, workspace image, `cargo build --release`, deterministic release binary start |
-| `elixir-phoenix` | `WF-PLAN-CAT-015` | Phoenix `1.7.18`, Mix project | `elixir`, `phoenix`, `mix`, `serverful-http` | `elixir`, workspace image, Mix dependency/release commands, deterministic Phoenix release start |
+| `rails-ruby` | `WF-PLAN-CAT-011` | Rails `7.2.2`, Ruby `3.3` marker | `ruby`, `rails`, `serverful-http` | Preview only: detector/planner command evidence exists, but the fixture is not a complete Rails application and has no real Docker fixture smoke. |
+| `sinatra-rack` | `WF-PLAN-CAT-011` | Sinatra `4.1.1`, Rack `3.1.8`, Rackup `2.2.1`, WEBrick `1.9.1` | `ruby`, `sinatra`, `serverful-http` | Supported: real Rack/Sinatra app, workspace image, `bundle install`, deterministic Rack start bound to the resource-owned port, and shared Docker/SSH smoke descriptor. |
+| `laravel-composer` | `WF-PLAN-CAT-011` | Laravel framework `11.44.2`, Composer metadata | `php`, `laravel`, `composer`, `serverful-http` | Preview only: detector/planner command evidence exists, but the fixture is not a complete Laravel application and has no real Docker fixture smoke. |
+| `symfony-composer` | `WF-PLAN-CAT-011` | Symfony framework bundle `7.2.3`, Symfony runtime `7.2.3`, Composer metadata | `php`, `symfony`, `composer`, `serverful-http` | Preview only: Composer install and generic PHP public-directory planning are covered, but the fixture does not boot Symfony and has no real framework smoke. |
+| `go-gin` | `WF-PLAN-CAT-012` | Go module `1.23`, Gin `1.10.0` | `go`, `gin`, `go`, `serverful-http` | Supported: real Gin server, `go build` binary artifact, deterministic binary start, `PORT` fallback, unique response body, and shared Docker/SSH smoke descriptor. |
+| `dotnet-aspnet` | `WF-PLAN-CAT-014` | ASP.NET Core `net8.0`, Web SDK project | `dotnet`, `aspnet-core`, `dotnet`, `serverful-http` | Supported: real ASP.NET Core server, `dotnet publish`, deterministic published assembly start, `PORT` binding, unique response body, and shared Docker/SSH smoke descriptor. |
+| `rust-axum` | `WF-PLAN-CAT-015` | Rust package, Axum `0.8.1`, Tokio `1.43.0` | `rust`, `axum`, `cargo`, `serverful-http` | Supported: real Axum/Tokio server, `cargo build --release`, deterministic release binary start, `PORT` fallback, unique response body, and shared Docker/SSH smoke descriptor. |
+| `elixir-phoenix` | `WF-PLAN-CAT-015` | Phoenix `1.7.18`, Plug Cowboy `2.7.2`, Mix release project | `elixir`, `phoenix`, `mix`, `serverful-http` | Preview only: the fixture now contains a minimal endpoint/router, supervised application, release config, `PORT` runtime config, and unique response body, but local Docker dependency installation could not pass the `builds.hex.pm` TLS/Rebar bootstrap boundary; it is excluded from active Docker/SSH inventory until a full release build and HTTP response pass. |
 
 ## Detection Evidence Matrix
 
@@ -128,6 +128,10 @@ test expectations in the same change.
 | WF-PLAN-DET-011 | integration | Inbound app lacks port | Serverful/SSR source has no persisted port and no deterministic accepted inference | Deployment admission rejects before acceptance | `validation_error`, phase `resource-network-resolution` |
 | WF-PLAN-DET-012 | integration | Unsupported framework without fallback | Source detects a framework/runtime family with no active planner and no explicit custom commands | Deployment admission rejects before acceptance with safe evidence details | `validation_error`, phase `runtime-plan-resolution` |
 | WF-PLAN-DET-013 | unit | Next.js output/router evidence | `next.config.*`, `app`/`src/app`, `pages`/`src/pages`, and `output: "standalone"` or `output: "export"` evidence | Detection records output and App/Pages Router evidence for planner diagnostics without creating deployment command fields | Conflicting Next output evidence fails as ambiguous unless explicit custom commands select a Docker/OCI image plan |
+| WF-PLAN-DET-014 | unit | Empty source workspace | Bounded filesystem inspection finds no deployable root | Detection fails closed with structured `missing-source-root` evidence and does not treat the repository root as deployable | `validation_error`, phase `source-detection` |
+| WF-PLAN-DET-015 | unit | Monorepo contains multiple deployable apps | Bounded filesystem inspection finds two deployable application roots and no explicit base directory | Detection reports both safe source-root-relative candidates and does not select the workspace root | `validation_error`, reason `ambiguous-framework-evidence`, phase `source-detection` |
+| WF-PLAN-DET-016 | unit | Explicit monorepo application root | Resource source selects a safe existing `baseDirectory` containing one deployable app | The selected subdirectory wins; structured evidence records `explicit-base-directory`, and inspection uses only that app root | None |
+| WF-PLAN-DET-017 | unit | Node lockfile conflict | Selected deployable root contains multiple lockfiles and no valid explicit `packageManager` | Detection fails closed and reports safe conflicting lockfile identifiers | `validation_error`, reason `ambiguous-build-tool`, phase `source-detection` |
 
 ## Planner Catalog Matrix
 
@@ -282,8 +286,8 @@ planner and declaration code already rely on.
 
 ## Fixture Deploy Smoke Matrix
 
-These rows prove that each currently supported JavaScript/TypeScript and Python fixture moves
-beyond detect/plan evidence into Docker/OCI execution readiness. Real Docker runs are preferred
+These rows prove that each fixture named by the active shared descriptor inventory moves beyond
+detect/plan evidence into Docker/OCI execution readiness. Real Docker runs are preferred
 where the environment provides Docker and dependency installs; headless smoke is acceptable when it
 asserts the equivalent Dockerfile/build/run/verification evidence without executing framework CLIs.
 
@@ -291,9 +295,9 @@ asserts the equivalent Dockerfile/build/run/verification evidence without execut
 | --- | --- | --- | --- | --- |
 | WF-PLAN-SMOKE-001 | integration + GitHub Actions Docker/SSH e2e | Static frontend | Next static export, Vite, React, Vue, Svelte, Solid, Angular, Nuxt generate, Astro static, and SvelteKit static fixtures start from source/runtime/network resource profile fields | Planner selects a static image artifact, generated Dockerfile packages the publish directory into the adapter-owned static server, internal port is 80 unless the resource profile overrides it, and typed Docker build/run commands are renderable from the plan. The active static fixture descriptor set is shared by `WF-PLAN-SMOKE-005` and `WF-PLAN-SMOKE-006`; GitHub Actions runs the local Docker matrix and secret-gated SSH matrix from nightly/release. |
 | WF-PLAN-SMOKE-002 | integration + GitHub Actions Docker/SSH e2e | Node HTTP and SSR server | Next SSR/standalone, Remix, Express, Fastify, NestJS, Hono, Koa, and generic Node fixtures start from the same profile vocabulary | Planner selects a workspace-command image artifact with Node/Bun base policy, install/build/start commands, resource-owned internal port, internal HTTP verification, and no deployment-owned framework fields. The active Node fixture descriptor set is shared by `WF-PLAN-SMOKE-005` and `WF-PLAN-SMOKE-006`; GitHub Actions runs the local Docker matrix and secret-gated SSH matrix from nightly/release. |
-| WF-PLAN-SMOKE-003 | integration + GitHub Actions Docker/SSH e2e | Python, JVM, Ruby, PHP, Go, .NET, Rust, and Elixir HTTP server | FastAPI, Django, Flask, generic Python, Spring Boot, Quarkus, generic JVM, Rails, Sinatra/Rack, Laravel, Symfony, Gin, ASP.NET Core, Axum, and Phoenix fixtures when present start from the same profile vocabulary | Planner selects a workspace-command image artifact with language-family base policy, package/build-tool install/build/start command, resource-owned internal port, internal HTTP verification, and no deployment-owned framework fields. The active Python, Spring Boot Maven/Gradle, Quarkus Maven, generic JVM, Ruby, PHP, Go, .NET, Rust, and Elixir fixture descriptor set is shared by `WF-PLAN-SMOKE-005` and `WF-PLAN-SMOKE-006`; GitHub Actions runs the local Docker matrix and secret-gated SSH matrix from nightly/release. |
+| WF-PLAN-SMOKE-003 | integration + GitHub Actions Docker/SSH e2e | Python, JVM, Ruby, Go, .NET, and Rust HTTP server | Existing Python/JVM fixtures plus Sinatra/Rack, Gin, ASP.NET Core, and Axum start from the same profile vocabulary; Rails, Laravel, Symfony, and Phoenix remain Preview-only fixtures | Planner selects a workspace-command image artifact with language-family base policy, package/build-tool install/build/start command, resource-owned internal port, internal HTTP verification, and no deployment-owned framework fields. Only fixtures in the active shared descriptor inventory are claimed as real Docker/secret-gated SSH smoke coverage. |
 | WF-PLAN-SMOKE-004 | integration | Unsupported or ambiguous fixture boundary | Unsupported framework evidence or ambiguous hybrid evidence lacks explicit fallback commands | Planning fails with `validation_error` in phase `runtime-plan-resolution`; explicit fallback commands may instead produce a Docker/OCI image plan without adding deployment command fields. |
-| WF-PLAN-SMOKE-005 | GitHub Actions + local explicit Docker e2e | Real local Docker catalog slice | Next static export, Vite, React, Vue, Svelte, Solid, Angular, Astro, Nuxt generate, and SvelteKit static; Next SSR, Next standalone, Remix, Express, Fastify, NestJS, Hono, Koa, and generic Node; FastAPI, generic ASGI, generic WSGI, Poetry Flask, Django, Flask, explicit custom Python, generic Java jar, Spring Boot Maven wrapper/no-wrapper, Quarkus Maven JVM jar mode, Spring Boot Gradle, and explicit-start JVM; Dockerfile, Docker Compose, and prebuilt-image substrates. | The same resource source/runtime/network profile draft used by Quick Deploy is persisted before ids-only `deployments.create` or equivalent shell workflow; Docker really builds an image, starts a container, resolves the published internal HTTP verification URL, records runtime metadata/logs, and exposes typed Docker build/run command evidence without framework/base-image/buildpack deployment fields. `.github/workflows/framework-fixture-e2e.yml` runs this matrix from nightly/release; local developer runs remain explicit. |
+| WF-PLAN-SMOKE-005 | GitHub Actions + local explicit Docker e2e | Real local Docker catalog slice | Existing static, Node, Python, and JVM descriptor inventory; Sinatra/Rack, Gin, ASP.NET Core, and Axum; Dockerfile, Docker Compose, and prebuilt-image substrates. Rails, Laravel, Symfony, and Phoenix are excluded because they lack a passing real framework build/HTTP smoke. | The same resource source/runtime/network profile draft used by Quick Deploy is persisted before ids-only `deployments.create` or equivalent shell workflow; Docker really builds an image, starts a container, resolves the published internal HTTP verification URL, asserts each descriptor's expected response body when declared, records runtime metadata/logs, and exposes typed Docker build/run command evidence without framework/base-image/buildpack deployment fields. `.github/workflows/framework-fixture-e2e.yml` runs this matrix from nightly/release; local developer runs remain explicit. |
 | WF-PLAN-SMOKE-006 | GitHub Actions secret-gated + local explicit SSH e2e | Real generic-SSH fixture slice | The framework fixture descriptors used by `WF-PLAN-SMOKE-005`, executed through generic-SSH when a real target is configured; Dockerfile/Compose/prebuilt-image generic-SSH paths are covered by the SSH substrate smoke. | The harness selects the generic-SSH backend from the same resource profile and proves remote Docker build/run/verification when enabled. Without a configured SSH target, the coverage inventory records which catalog entries have fixture or substrate smoke paths and treats the external target as an explicit confidence-gate prerequisite, not a catalog support gap. Release dispatch can require SSH evidence and fail closed when secrets are absent. |
 
 The full catalog smoke gates are exposed as first-class root scripts:
@@ -329,12 +333,12 @@ layers.
 | ZSSH-CATALOG-011 | integration | Generic Python | Generic Python or explicit-command fixture resolves only when app target or explicit commands make a Docker/OCI image plan possible. |
 | ZSSH-CATALOG-012 | integration | Generic Java | Generic deterministic jar or explicit-command JVM fixture resolves to Java Docker/OCI image intent with resource-owned internal port. |
 | ZSSH-CATALOG-017 | integration | Quarkus Maven | Quarkus Maven JVM jar fixture resolves to a `quarkus` workspace-command Docker/OCI image intent, Maven build command, deterministic `target/quarkus-app/quarkus-run.jar` start command, resource-owned internal port, and shared local Docker/generic-SSH smoke descriptor coverage. |
-| ZSSH-CATALOG-018 | integration | Rails and Sinatra/Rack | Ruby fixtures resolve to workspace-command Docker/OCI image intent with Bundle install, deterministic Rails or Rack start command, and resource-owned internal port. |
-| ZSSH-CATALOG-019 | integration | Laravel and Symfony | PHP Composer fixtures resolve to workspace-command Docker/OCI image intent with Composer install, deterministic framework/public-directory start command, and resource-owned internal port. |
-| ZSSH-CATALOG-020 | integration | Go HTTP service | Go fixture resolves module/framework metadata, `go build` binary artifact intent, deterministic binary start command, and resource-owned internal port. |
-| ZSSH-CATALOG-021 | integration | ASP.NET Core | ASP.NET Core fixture resolves Web SDK project evidence, `dotnet publish` artifact rules, deterministic published assembly start, and resource-owned internal port. |
-| ZSSH-CATALOG-022 | integration | Rust HTTP service | Rust fixture resolves Cargo/framework metadata, release binary artifact intent, deterministic release binary start, and resource-owned internal port. |
-| ZSSH-CATALOG-023 | integration | Phoenix | Elixir/Phoenix fixture resolves Mix/Phoenix metadata, dependency/release command specs, deterministic release start, and resource-owned internal port. |
+| ZSSH-CATALOG-018 | integration + GitHub Actions Docker/SSH e2e | Sinatra/Rack supported; Rails Preview | Sinatra/Rack resolves to workspace-command Docker/OCI image intent and has real Docker plus secret-gated SSH descriptor coverage. Rails retains detector/planner Preview evidence only because `rails-ruby` is not a complete Rails application. |
+| ZSSH-CATALOG-019 | integration | Laravel and Symfony Preview | PHP Composer fixtures resolve planner intent, but neither fixture proves a complete framework boot in real Docker; no Supported claim is made. |
+| ZSSH-CATALOG-020 | integration + GitHub Actions Docker/SSH e2e | Go HTTP service | Real Gin fixture resolves module/framework metadata, builds and starts its binary, binds the environment port when present, and returns its unique smoke body. |
+| ZSSH-CATALOG-021 | integration + GitHub Actions Docker/SSH e2e | ASP.NET Core | Real ASP.NET Core fixture publishes and starts its assembly, binds `PORT`, and returns its unique smoke body. |
+| ZSSH-CATALOG-022 | integration + GitHub Actions Docker/SSH e2e | Rust HTTP service | Real Axum fixture builds and starts its release binary, binds the environment port when present, and returns its unique smoke body. |
+| ZSSH-CATALOG-023 | integration / Preview | Phoenix | The fixture has a minimal endpoint/router, supervised application, Mix release intent, `PORT` runtime config, and a unique body. It remains Preview because local Docker dependency installation failed at the external `builds.hex.pm` TLS/Rebar bootstrap boundary before a release build or HTTP response could be verified; it is not in the active Docker/SSH descriptor inventory. |
 | ZSSH-CATALOG-013 | integration | Dockerfile | Container-native Dockerfile profile wins over framework/buildpack evidence and resolves a build-image artifact intent. |
 | ZSSH-CATALOG-014 | integration | Docker Compose | Container-native Compose profile wins over framework/buildpack evidence and resolves a Compose project intent with target service behavior. |
 | ZSSH-CATALOG-015 | integration | Prebuilt image | Prebuilt image profile resolves image artifact intent, skips source build commands, and keeps network/health profile resource-owned. |
@@ -352,6 +356,30 @@ layers.
 | ZSSH-RUNTIME-003 | integration | Observation contract | Readiness, health, logs, and access/proxy summaries are normalized observation expectations, not Docker/SSH payloads. |
 | ZSSH-RUNTIME-004 | GitHub Actions + local explicit Docker e2e | Real Docker smoke gate | `.github/workflows/framework-fixture-e2e.yml` runs the local Docker fixture matrix from nightly/release; local reproduction runs only with `APPALOFT_E2E_FRAMEWORK_DOCKER=true`. |
 | ZSSH-RUNTIME-005 | GitHub Actions secret-gated + local explicit SSH e2e | Real SSH smoke gate | `.github/workflows/framework-fixture-e2e.yml` runs the generic-SSH fixture matrix when SSH secrets exist; local reproduction requires explicit SSH target configuration. Absence of target is an external confidence-gate prerequisite, not a pass and not a catalog support gap; release dispatch can require SSH evidence and fail closed. |
+
+## Zero-Configuration Support Documentation Matrix
+
+These stable rows govern support claims and synchronize already-implemented behavior with public
+documentation. This docs pass does not add further runtime implementation coverage.
+
+| Test ID | Preferred automation | Case | Expected result |
+| --- | --- | --- | --- |
+| ZERO-CONFIG-SUPPORT-001 | contract/manual evidence audit | Supported classification | Every Supported framework group maps to a passed real Appaloft Docker fixture or substrate smoke. Generic-SSH wired/passed status is reported separately; detector/planner-only coverage is insufficient. |
+| ZERO-CONFIG-SUPPORT-002 | contract/manual source audit | Public remote Git zero-configuration boundary | Automatic framework/runtime detection is Unsupported because create and plan do not clone remote repositories for inspection. Explicit container-native or command profiles remain Preview pending dedicated real smoke; authenticated parity is not claimed. |
+| ZERO-CONFIG-SUPPORT-003 | contract/manual source audit | Workload archive boundary | General workload archive auto-detection remains Unsupported and is not conflated with the separate already-built `static-artifacts.*` publication workflow. |
+| ZERO-CONFIG-SUPPORT-004 | contract/integration | Bounded monorepo application-root selection | Discovery inspects a bounded workspace, explicit `source.baseDirectory` works in create and plan, and zero/multiple candidate roots block with safe evidence; the source shape remains Preview until dedicated real smoke. |
+| ZERO-CONFIG-SUPPORT-005 | contract | Override precedence | Explicit container-native/static strategy, explicit commands/artifact fields, selected base directory, and explicit network/health policy win over inferred framework, generic language, and buildpack evidence in that order. |
+| ZERO-CONFIG-SUPPORT-006 | docs contract | Fail-closed troubleshooting | English and Chinese public docs use the same stable anchor, status matrix, evidence/reason guidance, override order, and recovery paths without promising incomplete remote Git/archive/monorepo support. |
+| ZERO-CONFIG-SUPPORT-007 | contract/integration | Stable plan identity | `deployments.plan` returns `planVersion = "1"` and a stable SHA-256 fingerprint that excludes generation time, remains equal for the same effective plan, and changes when the selected root or accepted override changes. |
+| ZERO-CONFIG-SUPPORT-008 | contract/integration | Command provenance | Every returned install/build/start command identifies `planner` or `resource-runtime-profile` as its source. |
+
+Evidence source of truth for `ZERO-CONFIG-SUPPORT-001` is the active descriptor/substrate inventory,
+not target-catalog prose. Passed real Appaloft Docker smoke promotes Sinatra/Rack, Go Gin, ASP.NET
+Core, and Rust Axum. Rails, Laravel, Symfony, and Phoenix remain Preview. Public remote Git automatic
+detection is Unsupported; explicit container-native or command remote-Git profiles and bounded local
+monorepo discovery remain Preview pending dedicated real smoke. Multiple candidate roots remain
+blocked until explicit selection. Workload ZIP, buildpack execution, and inferred SvelteKit
+server/Astro SSR/Nuxt SSR modes remain Unsupported.
 
 ## Entry Parity Matrix
 
@@ -411,7 +439,7 @@ unsupported catalog families, SvelteKit server-adapter start inference, Astro SS
 full browser-level Web/CLI entry parity for every catalog fixture.
 
 `WF-PLAN-SMOKE-001` through `WF-PLAN-SMOKE-003` cover the current supported
-JavaScript/TypeScript/Python/JVM fixture catalog through headless Docker/OCI execution readiness. They
+JavaScript/TypeScript/Python/JVM/polyglot fixture catalog through headless Docker/OCI execution readiness. They
 prove the resource source/runtime/network profile can resolve to generated Dockerfile evidence,
 image artifact intent, docker-container execution, internal HTTP verification, and typed Docker
 command rendering without adding framework-specific deployment fields. Python coverage includes
@@ -426,7 +454,8 @@ release dispatch.
 
 `WF-PLAN-SMOKE-005` is the real Docker fixture slice. It records explicit local Docker
 coverage state for every Phase 5 supported catalog entry and proves the active static/frontend,
-Node/server, Python/server, and container-native substrate set can actually build, run, and verify
+Node/server, Python/server, JVM, Sinatra/Rack, Go Gin, ASP.NET Core, Rust Axum, and container-native
+substrate set can actually build, run, and verify
 through the local Docker path. `WF-PLAN-SMOKE-006` reuses the same fixture descriptors for
 generic-SSH smoke through
 `apps/shell/test/e2e/quick-deploy-framework-fixtures-ssh.workflow.e2e.ts`; full browser/CLI entry
@@ -448,7 +477,7 @@ Current `WF-PLAN-SMOKE-005` local Docker coverage runs Next static export, Vite 
 Vue SPA, Svelte SPA, Solid SPA, Angular SPA, Astro static, Nuxt generate, SvelteKit static, Next
 SSR, Next standalone, Remix, Express, Fastify, NestJS, Hono, Koa, generic Node, generic ASGI,
 generic WSGI, Poetry Flask, Django, Flask, explicit custom Python, generic Java jar, Spring Boot
-Maven wrapper, Spring Boot Maven no-wrapper, Quarkus Maven JVM jar mode, Spring Boot Gradle Groovy DSL, and Spring Boot Gradle Kotlin DSL through real image build, container run,
+ Maven wrapper, Spring Boot Maven no-wrapper, Quarkus Maven JVM jar mode, Spring Boot Gradle Groovy DSL, Spring Boot Gradle Kotlin DSL, Sinatra/Rack, Go Gin, ASP.NET Core, and Rust Axum through real image build, container run,
 internal HTTP verification,
 deployment detail runtime metadata, resource detail state, generated Dockerfile assertions, and
 Docker build/run log evidence. Dockerfile, Docker Compose, and prebuilt-image substrates are
@@ -469,11 +498,18 @@ binaries. Prebuilt-image generic-SSH execution is covered by the GitHub Actions 
 local explicit `QUICK-DEPLOY-WF-061` substrate smoke in
 `quick-deploy-ssh.workflow.e2e.ts`.
 
+Rails, Laravel, Symfony, and Phoenix remain Preview because their exact paths have no passed real
+Appaloft Docker smoke. Public remote Git automatic framework/runtime detection is Unsupported;
+explicit container-native or command remote-Git profiles remain Preview pending dedicated
+source-to-runtime real smoke. Bounded local monorepo root discovery is implemented but remains
+Preview pending dedicated source-to-runtime real smoke. General workload ZIP auto-detection remains
+Unsupported.
+
 Before a framework family can be marked first-class, Code Round must add at least one planner or
 fallback test for its `WF-PLAN-CAT-*` row plus boundary coverage proving base-image policy,
 artifact output, network/readiness behavior, and absence of deployment command fields.
 
 ## Open Questions
 
-- Which unsupported catalog families should be implemented first after the current JavaScript,
-  Python, Spring Boot/JVM, static, and custom-command slices?
+- Which Preview path should receive dedicated real smoke first: explicit-profile public remote Git,
+  bounded monorepos, Rails, Laravel/Symfony, or Phoenix?

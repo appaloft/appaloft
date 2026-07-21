@@ -5873,6 +5873,8 @@ export const deploymentPlanReasonSchema = z.object({
 
 export const deploymentPlanResponseSchema = z.object({
   schemaVersion: z.literal("deployments.plan/v1"),
+  planVersion: z.literal("1"),
+  fingerprint: z.string().regex(/^sha256:[a-f0-9]{64}$/),
   context: z.object({
     projectId: z.string(),
     environmentId: z.string(),
@@ -5880,6 +5882,7 @@ export const deploymentPlanResponseSchema = z.object({
     serverId: z.string(),
     destinationId: z.string(),
     projectName: z.string().optional(),
+    selectedRoot: z.string().optional(),
     environmentName: z.string().optional(),
     resourceName: z.string().optional(),
     serverName: z.string().optional(),
