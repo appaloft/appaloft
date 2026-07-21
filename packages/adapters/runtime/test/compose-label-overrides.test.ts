@@ -1,4 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { parse } from "yaml";
 
 import { renderComposeOwnershipLabelOverrideScript } from "../src/compose-label-overrides";
 import { dockerLabelsFromAssignments } from "../src/runtime-commands";
@@ -92,6 +96,9 @@ describe("compose ownership label overrides", () => {
     expect(script).toContain('"traefik.enable": "true"');
     expect(script).toContain("    networks:");
     expect(script).toContain('      - "appaloft-edge"');
+    expect(script).toContain('if [ "$service" = "$target_service" ]; then');
+    expect(script).toContain("printf '%s\\n' '    networks:'");
+    expect(script).not.toContain("    printf '%s\\n' '    networks:'\n    if");
     expect(script).toContain("networks:");
     expect(script).toContain('  "appaloft-edge":');
     expect(script).toContain("    external: true");
@@ -113,6 +120,60 @@ describe("compose ownership label overrides", () => {
     expect(script).toContain("managed dependency networks");
     expect(script.match(/      - \"appaloft-edge\"/g)).toHaveLength(1);
     expect(script.match(/  \"appaloft-edge\":/g)).toHaveLength(1);
+  });
+
+  test("[DEP-CREATE-ASYNC-016A] omits empty networks nodes from non-target Compose services", () => {
+    const script = renderComposeOwnershipLabelOverrideScript({
+      composeFile: "/srv/app/docker-compose.yml",
+      overrideFile: "/srv/app/.appaloft.compose.labels.override.yml",
+      labels: dockerLabelsFromAssignments(["appaloft.managed=true"]),
+      targetServiceName: "web",
+      targetNetworkName: "appaloft-edge",
+      quote: shellQuote,
+    });
+
+    expect(script).toContain(
+      'if [ "$service" = "$target_service" ]; then\n      printf \'%s\\n\' \'    networks:\'',
+    );
+    expect(script).not.toContain(
+      "    printf '%s\\n' '    networks:'\n    if [ \"$service\" = \"$target_service\" ]",
+    );
+  });
+
+  test("[DEP-CREATE-ASYNC-016A] generates a valid target-only network override for init jobs", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "appaloft-compose-override-"));
+    const composeFile = join(directory, "compose.yml");
+    const overrideFile = join(directory, "override.yml");
+    const fakeDocker = join(directory, "docker");
+    await writeFile(composeFile, "services:\n  migrate:\n    image: migrate\n  web:\n    image: web\n");
+    await writeFile(fakeDocker, "#!/bin/sh\nprintf 'migrate\\nweb\\n'\n");
+    await chmod(fakeDocker, 0o755);
+
+    try {
+      const script = renderComposeOwnershipLabelOverrideScript({
+        composeFile,
+        overrideFile,
+        labels: dockerLabelsFromAssignments(["appaloft.managed=true"]),
+        targetServiceName: "web",
+        targetNetworkName: "appaloft-edge",
+        quote: shellQuote,
+      });
+      const process = Bun.spawn(["/bin/sh", "-c", script], {
+        env: { ...Bun.env, PATH: `${directory}:${Bun.env.PATH ?? ""}` },
+        stderr: "pipe",
+      });
+      const exitCode = await process.exited;
+      expect(await new Response(process.stderr).text()).toBe("");
+      expect(exitCode).toBe(0);
+
+      const override = parse(await readFile(overrideFile, "utf8")) as {
+        services: Record<string, { networks?: string[] }>;
+      };
+      expect(override.services.migrate?.networks).toBeUndefined();
+      expect(override.services.web?.networks).toEqual(["appaloft-edge"]);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 
   test("[ROUTE-TLS-ENTRY-023] scopes route labels to multiple compose services", () => {
