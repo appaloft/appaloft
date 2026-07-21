@@ -21,23 +21,23 @@ sidebar:
   order: 5
 ---
 
-<h2 id="server-deployment-target">What a server means</h2>
+## What a server means [#server-deployment-target]
 
 A server is a target Appaloft can connect to, inspect, and deploy onto.
 
-<h2 id="server-ssh-credential-path">SSH credentials</h2>
+## SSH credentials [#server-ssh-credential-path]
 
 SSH credentials may be one-time input or reusable saved credentials. Plain secret values must not appear in read models, logs, or diagnostics.
 
-<h2 id="server-connectivity-test">Connectivity test</h2>
+## Connectivity test [#server-connectivity-test]
 
 Connectivity tests confirm Appaloft can reach the server and inspect the required runtime context.
 
-<h2 id="server-proxy-readiness">Proxy readiness</h2>
+## Proxy readiness [#server-proxy-readiness]
 
 Proxy readiness controls whether generated access routes and routing checks can work.
 
-<h2 id="server-terminal-session">Open a terminal session</h2>
+## Open a terminal session [#server-terminal-session]
 
 Terminal sessions are for controlled server or resource troubleshooting, not the normal deployment path. Before opening one, confirm the target, identity, and purpose. Web, CLI, and API descriptions should remind users to enter only the commands needed for the current task.
 

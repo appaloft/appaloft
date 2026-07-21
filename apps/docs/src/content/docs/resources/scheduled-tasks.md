@@ -27,7 +27,7 @@ sidebar:
   order: 7
 ---
 
-<h2 id="scheduled-task-resource-lifecycle">Scheduled task 生命周期</h2>
+## Scheduled task 生命周期 [#scheduled-task-resource-lifecycle]
 
 Scheduled task 是 Resource 拥有的重复任务定义，用来运行迁移、同步、cache warm、维护脚本或其他
 不会替换线上服务进程的命令。任务定义保存 schedule、timezone、command、timeout、retry、
@@ -51,7 +51,7 @@ Docker Compose 或 Docker Swarm image service。Appaloft 会在保留的 runtime
 container、Compose run 或 Swarm replicated-job，所以任务命令可以访问相同的内部 runtime network，
 同时不替换正在服务的进程。长驻 scheduled task runner 仍然默认关闭，需要在配置里显式启用。
 
-<h2 id="scheduled-task-run-now">立即运行</h2>
+## 立即运行 [#scheduled-task-run-now]
 
 `scheduled-tasks.run-now` 接受一次 manual run attempt。命令返回 run id 后，实际执行和完成状态通过
 run detail、run list 和 run logs 查看。
@@ -72,7 +72,7 @@ job service。
 任务进程还会收到系统拥有的 `APPALOFT_*` context variables，包括 run id、task id、Resource id
 以及拥有 runtime 的 deployment 身份。如果 manual run 传入同名保留变量，Appaloft 会用系统值覆盖它们。
 
-<h2 id="scheduled-task-run-history">运行历史</h2>
+## 运行历史 [#scheduled-task-run-history]
 
 Task runs 是独立于 Deployment 的历史记录。它们记录 manual 或 scheduled trigger、
 accepted/running/succeeded/failed/skipped 状态、开始和结束时间、退出码和安全失败摘要。
@@ -85,7 +85,7 @@ appaloft scheduled-task runs show str_daily_migration_1 --task-id tsk_daily_migr
 运行失败不会自动 rollback 或 redeploy 正在服务的 Resource。需要修复任务命令、Resource runtime
 profile、依赖或环境变量后，再手动运行任务或等待下一次 schedule。
 
-<h2 id="scheduled-task-run-logs">任务日志</h2>
+## 任务日志 [#scheduled-task-run-logs]
 
 Task run logs 只属于对应的 run。它们不会混入 Deployment logs 或 Resource runtime logs。
 

@@ -21,7 +21,7 @@ sidebar:
 
 ![Appaloft docs surface](/docs/diagrams/docs-surface.svg)
 
-<h2 id="deployment-source">Choose a deployment source</h2>
+## Choose a deployment source [#deployment-source]
 
 A deployment source can be a local folder, Git repository, Docker image, Compose manifest, or static site. This choice controls what Appaloft reads during detect and what runtime strategy the plan can produce.
 
@@ -59,39 +59,39 @@ Content-Type: application/json
 }
 ```
 
-<h2 id="deployment-source-relink">Relink a deployment source</h2>
+## Relink a deployment source [#deployment-source-relink]
 
 Source relink is an explicit recovery action when the source attached to a resource or deployment history is no longer reachable, or when the user needs to move the same resource to a new repository, path, or image. It changes what later detect and plan stages read, so it should not be treated as an ordinary retry.
 
 Before relinking, confirm the target resource, current source, new source, and expected environment. After relinking, use the next deployment or resource detail view to confirm Appaloft reads from the new source.
 
-<h2 id="deployment-lifecycle">Deployment lifecycle</h2>
+## Deployment lifecycle [#deployment-lifecycle]
 
 Appaloft models deployment as `detect -> plan -> execute -> verify -> rollback`.
 
 ![Deployment lifecycle](/docs/diagrams/deployment-lifecycle.svg)
 
-<h3 id="deployment-detect">Detect</h3>
+### Detect [#deployment-detect]
 
 Detect reads source and configuration evidence to identify the app type, build flow, runtime entrypoint, and network needs.
 
-<h3 id="deployment-plan">Plan</h3>
+### Plan [#deployment-plan]
 
 Plan turns resource source, runtime, health, and network settings into an executable plan.
 
-<h3 id="deployment-execute">Execute</h3>
+### Execute [#deployment-execute]
 
 Execute builds, uploads, starts, and routes the app in the selected target environment.
 
-<h3 id="deployment-verify">Verify</h3>
+### Verify [#deployment-verify]
 
 Verify checks process state, health policy, proxy route, and reachable access URLs.
 
-<h3 id="deployment-rollback">Rollback</h3>
+### Rollback [#deployment-rollback]
 
 Rollback is the recovery path. Failure pages should explain what can be retried and what requires a manual fix.
 
-<h2 id="deployment-preview-cleanup">Clean up preview deployments</h2>
+## Clean up preview deployments [#deployment-preview-cleanup]
 
 Preview cleanup removes deployments created for a pull request, branch, or temporary source. It is an explicit lifecycle operation: the cleanup target must be identified by preview type and preview id, and must not delete production environments or ordinary deployment history by accident.
 

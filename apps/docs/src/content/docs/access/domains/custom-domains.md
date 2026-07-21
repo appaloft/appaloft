@@ -21,7 +21,7 @@ sidebar:
   order: 3
 ---
 
-<h2 id="domain-binding-purpose">自定义域名绑定</h2>
+## 自定义域名绑定 [#domain-binding-purpose]
 
 自定义域名绑定表示“这个 hostname 应该访问这个资源”。它是访问配置，不是部署输入，也不是证书签发的隐式副作用。
 
@@ -33,7 +33,7 @@ sidebar:
 - 要给 staging、preview 或客户环境配置独立 hostname。
 - 要在资源部署稳定后再接入外部访问入口。
 
-<h2 id="domain-binding-inputs">绑定输入</h2>
+## 绑定输入 [#domain-binding-inputs]
 
 用户需要明确这些输入：
 
@@ -45,7 +45,7 @@ sidebar:
 
 域名不应该用来代替资源名、服务器名或环境名。一个域名绑定只描述访问意图。
 
-<h2 id="domain-binding-surfaces">Web、CLI 和 API</h2>
+## Web、CLI 和 API [#domain-binding-surfaces]
 
 Web console 应让用户从资源页或访问页创建绑定，并在同一流程中提示所有权检查、route readiness、proxy readiness、diagnostics 和 TLS readiness。
 
@@ -53,7 +53,7 @@ CLI 适合自动化绑定，例如在发布脚本里把 hostname 绑定到已存
 
 HTTP API 使用同一组 operation contract。API 不应把 DNS/TLS 语义藏在普通部署状态里。
 
-<h2 id="domain-binding-output">创建后会看到什么</h2>
+## 创建后会看到什么 [#domain-binding-output]
 
 创建绑定后，用户应该能看到：
 
@@ -62,7 +62,7 @@ HTTP API 使用同一组 operation contract。API 不应把 DNS/TLS 语义藏在
 - `ready`：域名和证书都可以使用。
 - `failed` 或具体错误：需要用户修正 DNS、证书材料或代理入口。
 
-<h2 id="domain-binding-provider-dns">提供商 DNS 自动配置</h2>
+## 提供商 DNS 自动配置 [#domain-binding-provider-dns]
 
 当用户输入 `pocketbase.example.com` 这类 hostname 时，Appaloft 会先把它归约到 base domain，例如 `example.com`，再通过公开 DNS 查询 NS/authoritative nameserver。这个探测不需要授权，只能说明域名大概率由哪个 DNS provider 托管，例如 Cloudflare、GoDaddy、Route53、Namecheap、Vercel、DNSPod、阿里云、腾讯云，或未知 provider。
 
@@ -74,7 +74,7 @@ HTTP API 使用同一组 operation contract。API 不应把 DNS/TLS 语义藏在
 - 检测到 GoDaddy 等 provider 但没有对应 connector：页面显示手动 DNS fallback。
 - 未识别 provider：用户可以使用手动 DNS，未来也可以选择其他 connector。
 
-<h3 id="domain-binding-dns-connector-flow">DNS connector 操作方式</h3>
+### DNS connector 操作方式 [#domain-binding-dns-connector-flow]
 
 在资源的 Networking > Custom domains 或域名绑定详情页，DNS connector 的流程是：
 
@@ -85,7 +85,7 @@ HTTP API 使用同一组 operation contract。API 不应把 DNS/TLS 语义藏在
 5. 回到 Appaloft 后，刷新 DNS plan 或重新验证绑定。Appaloft 会重新读取 public DNS/ownership readiness；DNS 传播可能需要一点时间。
 6. 如果 provider 不支持自动连接、授权账号没有覆盖 zone，或 Domain Connect 暂时不可用，按 Manual DNS 表格把记录复制到当前 DNS provider。
 
-<h2 id="domain-binding-recovery">失败恢复</h2>
+## 失败恢复 [#domain-binding-recovery]
 
 如果绑定失败，先不要重新部署应用。按顺序检查：
 

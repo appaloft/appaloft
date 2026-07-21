@@ -19,7 +19,7 @@ sidebar:
   order: 4
 ---
 
-<h2 id="resource-health-profile">Health profile</h2>
+## Health profile [#resource-health-profile]
 
 The health profile controls how verify decides whether the app is usable. It should match the path users actually depend on, not only process existence.
 
@@ -34,7 +34,7 @@ If no health check is configured, Appaloft can fall back to weaker runtime check
 
 Resetting the health profile removes the reusable health policy for future deployments and current health observation. It keeps runtime commands, network settings, deployment history, and the current runtime unchanged.
 
-<h2 id="resource-network-profile">Network profile</h2>
+## Network profile [#resource-network-profile]
 
 The network profile describes listener ports, protocols, and proxy targets. It answers where the proxy should send traffic.
 
@@ -49,7 +49,7 @@ Custom domains are separate access configuration. Make network profile and gener
 
 Saving the network profile is a durable resource profile edit. It only affects future deployment admission and route planning. It does not edit historical deployment snapshots, immediately apply proxy routes, or restart the current runtime.
 
-<h2 id="resource-readiness-failures">Readiness failures</h2>
+## Readiness failures [#resource-readiness-failures]
 
 If health checks fail, inspect the listener port, path, startup time, and proxy target before retrying or changing the profile.
 
@@ -61,7 +61,7 @@ Troubleshooting order:
 4. Confirm start period is long enough.
 5. Confirm proxy readiness and generated access.
 
-<h2 id="resource-health-network-surfaces">Entrypoints</h2>
+## Entrypoints [#resource-health-network-surfaces]
 
 The Web console should expose health/network fields during resource creation and configuration, including defaults.
 

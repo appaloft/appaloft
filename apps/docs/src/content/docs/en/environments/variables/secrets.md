@@ -24,7 +24,7 @@ sidebar:
   order: 4
 ---
 
-<h2 id="environment-secret-values">Secret values</h2>
+## Secret values [#environment-secret-values]
 
 Secret values are for runtime use and should not appear in read models, logs, diagnostics, support
 payloads, or effective-config responses as plaintext.
@@ -49,7 +49,7 @@ When pasted `.env` content is imported into a resource, Appaloft treats secret-l
 secrets, such as `DATABASE_URL`, `*_TOKEN`, `*_PASSWORD`, and `*_PRIVATE_KEY`. Import summaries,
 API, CLI, Web, logs, and diagnostics should show only masked values.
 
-<h2 id="environment-secret-build-time">Build-time limit</h2>
+## Build-time limit [#environment-secret-build-time]
 
 Build-time variables cannot be marked secret because they can become part of build artifacts.
 
@@ -58,7 +58,7 @@ If a variable can enter a browser bundle, static file, or build artifact, it is 
 Build-time variables must use the `PUBLIC_` or `VITE_` prefix. Build-time variables with
 secret-like names are rejected instead of being silently downgraded to plain config.
 
-<h2 id="environment-secret-rotation">Rotate secrets</h2>
+## Rotate secrets [#environment-secret-rotation]
 
 After rotating a secret, redeploy resources so running instances read the new deployment snapshot.
 
@@ -71,7 +71,7 @@ Recommended flow:
 4. Confirm the old secret is no longer used.
 5. Revoke the old secret in the external system.
 
-<h2 id="environment-secret-diagnostics">Diagnostics and support</h2>
+## Diagnostics and support [#environment-secret-diagnostics]
 
 When copying diagnostics, copy key names, masked state, error codes, and related deployment ids. Do not copy `.env` files, full variable tables, or secret values.
 

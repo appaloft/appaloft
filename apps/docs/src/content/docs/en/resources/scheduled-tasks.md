@@ -25,7 +25,7 @@ sidebar:
   order: 7
 ---
 
-<h2 id="scheduled-task-resource-lifecycle">Scheduled task lifecycle</h2>
+## Scheduled task lifecycle [#scheduled-task-resource-lifecycle]
 
 A scheduled task is a Resource-owned recurring task definition for migrations, sync jobs, cache
 warmers, maintenance scripts, or other commands that do not replace the live service process. The
@@ -52,7 +52,7 @@ task container, Compose run, or Swarm replicated-job in the retained runtime con
 can reach the same internal runtime network without replacing the serving process. The long-running
 scheduled task runner is still disabled by default and must be enabled in configuration.
 
-<h2 id="scheduled-task-config-file">Declare scheduled tasks in appaloft.yaml</h2>
+## Declare scheduled tasks in appaloft.yaml [#scheduled-task-config-file]
 
 For repository-driven deploys, you can ask Appaloft to create or configure Resource-owned scheduled
 tasks before deployment:
@@ -76,7 +76,7 @@ For pull request previews, add `preview.lifecycle: ephemeral` only when the prev
 deleted on PR close. Preview cleanup removes a task only when source-link provenance proves that
 repository config created or adopted that exact preview task.
 
-<h2 id="scheduled-task-run-now">Run now</h2>
+## Run now [#scheduled-task-run-now]
 
 `scheduled-tasks.run-now` accepts one manual run attempt. After the command returns a run id,
 execution and completion are visible through run detail, run list, and run logs.
@@ -99,7 +99,7 @@ Task processes also receive system-owned `APPALOFT_*` context variables for the 
 Resource id, and runtime-owning deployment identity. Appaloft overwrites those reserved keys if a
 manual run supplies the same names.
 
-<h2 id="scheduled-task-run-history">Run history</h2>
+## Run history [#scheduled-task-run-history]
 
 Task runs are history records separate from Deployments. They record manual or scheduled trigger,
 accepted/running/succeeded/failed/skipped state, start and finish time, exit code, and safe failure
@@ -114,7 +114,7 @@ A failed run does not automatically roll back or redeploy the serving Resource. 
 command, Resource runtime profile, dependency, or environment variable, then run the task manually
 or wait for the next schedule.
 
-<h2 id="scheduled-task-run-logs">Task logs</h2>
+## Task logs [#scheduled-task-run-logs]
 
 Task run logs belong only to the corresponding run. They are not mixed into Deployment logs or Resource runtime logs.
 

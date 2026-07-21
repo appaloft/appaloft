@@ -23,22 +23,22 @@ sidebar:
   order: 4
 ---
 
-<h2 id="resource-profile-purpose">资源配置的作用</h2>
+## 资源配置的作用 [#resource-profile-purpose]
 
 资源配置描述未来部署应该如何读取源代码、构建应用、启动进程、检查健康状态和暴露网络入口。它不是某一次部署的临时参数。
 
-<h2 id="resource-source-profile">Source</h2>
+## Source [#resource-source-profile]
 
 Source 告诉 Appaloft 从哪里读取应用，例如本地目录、Git 仓库或自动化运行环境提供的源码快照。
 
-<h2 id="resource-runtime-profile">Runtime</h2>
+## Runtime [#resource-runtime-profile]
 
 Runtime 描述安装、构建、启动、静态输出目录、容器命名意图和运行策略。部署时 Appaloft 会把这些输入转成运行计划。
 
-<h2 id="resource-health-profile">Health</h2>
+## Health [#resource-health-profile]
 
 Health 决定 verify 阶段如何判断应用是否可用。健康策略应该和用户实际访问路径保持一致。
 
-<h2 id="resource-network-profile">Network</h2>
+## Network [#resource-network-profile]
 
 Network 描述应用监听端口、协议和代理目标。绑定自定义域名是单独的访问配置，不应该混进基础部署输入。

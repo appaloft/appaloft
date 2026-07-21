@@ -16,11 +16,11 @@ sidebar:
   order: 3
 ---
 
-<h2 id="advanced-plugin-boundary">Plugin boundary</h2>
+## Plugin boundary [#advanced-plugin-boundary]
 
 Plugins extend Appaloft through explicit capabilities. User docs should explain compatibility, permissions, and sandbox assumptions.
 
-<h2 id="plugin-safety">Safety assumptions</h2>
+## Safety assumptions [#plugin-safety]
 
 Plugin docs should explain what the plugin can read, what it can change, how to disable it, and what users see when it is incompatible.
 
@@ -28,7 +28,7 @@ Plugin docs should explain what the plugin can read, what it can change, how to 
 
 Incompatible plugins remain visible but inactive so operators can tell the difference between an unavailable extension and an unknown plugin. Plugin diagnostics should not expose plugin implementation internals, provider SDK objects, access tokens, private keys, secret references, or raw runtime output.
 
-<h2 id="server-composition-extensions">Server composition extensions</h2>
+## Server composition extensions [#server-composition-extensions]
 
 Integrators that compose Appaloft with additional runtime behavior should import the public server factory instead of app source files:
 

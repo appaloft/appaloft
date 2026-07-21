@@ -29,7 +29,7 @@ sidebar:
   order: 3
 ---
 
-<h2 id="environment-variable-precedence">变量优先级</h2>
+## 变量优先级 [#environment-variable-precedence]
 
 Appaloft 的配置优先级是 defaults、system、organization、project、environment、resource、deployment snapshot。用户不需要记住内部层级，但需要知道最终部署使用的是快照值。
 
@@ -43,7 +43,7 @@ Appaloft 的配置优先级是 defaults、system、organization、project、envi
 
 这让用户可以安全地修改 staging 或 production 配置，而不用担心历史部署被悄悄改写。
 
-<h2 id="environment-variable-build-vs-runtime">构建时和运行时变量</h2>
+## 构建时和运行时变量 [#environment-variable-build-vs-runtime]
 
 构建时变量会进入构建产物，不能标记为 secret。运行时变量用于应用启动和运行环境。
 
@@ -56,13 +56,13 @@ Appaloft 的配置优先级是 defaults、system、organization、project、envi
 
 如果一个变量会被浏览器看到，例如 `PUBLIC_` 或 `VITE_` 前缀变量，不要把它标记或当作 secret 使用。
 
-<h2 id="environment-snapshot">部署快照</h2>
+## 部署快照 [#environment-snapshot]
 
 每次部署都保存不可变环境快照。这个快照可能同时包含环境级变量和资源级覆盖值。后续修改变量不会改变已经完成或正在运行的部署。
 
 用户应该在部署详情中看到“这次部署使用的配置摘要”，而不是只能看到当前环境变量表。
 
-<h2 id="environment-variable-surfaces">入口说明</h2>
+## 入口说明 [#environment-variable-surfaces]
 
 Web console 应显示环境变量和资源级变量列表、secret 屏蔽状态、最近修改时间、作用域和部署快照提示。
 
@@ -74,7 +74,7 @@ HTTP API 应返回变量 key、作用域、是否 secret、来源层级和 maske
 `resources.secrets.create/rotate/delete/list/show` 是资源级 secret reference 的显式生命周期入口。
 `resources.import-variables` 用于把粘贴的 `.env` 内容导入单个资源；重复 key 采用最后一行生效，并在结果里报告覆盖信息。`resources.effective-config` 用于检查资源级变量覆盖环境变量之后的部署输入视图，并显示安全的来源/覆盖摘要。
 
-<h2 id="environment-variable-recovery">常见问题</h2>
+## 常见问题 [#environment-variable-recovery]
 
 如果部署没有读到新变量：
 

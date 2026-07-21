@@ -20,24 +20,24 @@ sidebar:
   order: 11
 ---
 
-<h2 id="web-help-question-mark">问号帮助</h2>
+## 问号帮助 [#web-help-question-mark]
 
 Web 表单里容易误解的字段应该有 `?` 帮助链接。链接目标必须是稳定 public docs anchor，而不是翻译标题生成的临时 id。
 
-<h2 id="web-owner-scoped-actions">资源视角操作</h2>
+## 资源视角操作 [#web-owner-scoped-actions]
 
 资源相关操作应优先出现在资源详情页，例如新部署、运行时日志、健康状态、代理配置和域名动作。
 
-<h2 id="web-no-business-logic">不隐藏业务逻辑</h2>
+## 不隐藏业务逻辑 [#web-no-business-logic]
 
 Web console 只收集输入、显示状态并调用 HTTP/oRPC 合同。部署规则和生命周期解释必须来自共享业务语义和 public docs。
 
-<h2 id="web-local-docs-links">本地文档链接</h2>
+## 本地文档链接 [#web-local-docs-links]
 
 自托管时，Web `?` 链接应优先打开本地 `/docs/*`，保持离线可用。
 
 单独运行 Web Vite dev server 时，`/docs/*` 会重定向到本地 Docs dev server。根 `bun dev` 会同时启动 docs；如需调整本地 docs 地址，可设置 `APPALOFT_DEV_DOCS_HOST` / `APPALOFT_DEV_DOCS_PORT`，或用 `APPALOFT_WEB_DEV_DOCS_TARGET` 覆盖完整目标。
 
-<h2 id="web-product-version">产品版本</h2>
+## 产品版本 [#web-product-version]
 
 Web console 会显示后端 `/api/version` 返回的 Appaloft 产品版本。release 和 binary 打包会通过 `APPALOFT_APP_VERSION` 注入，开发环境默认使用仓库根 `package.json` 的版本。

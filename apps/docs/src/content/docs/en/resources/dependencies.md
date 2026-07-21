@@ -47,7 +47,7 @@ sidebar:
   order: 6
 ---
 
-<h2 id="dependency-resource-lifecycle">Dependency resource lifecycle</h2>
+## Dependency resource lifecycle [#dependency-resource-lifecycle]
 
 A dependency resource is Appaloft's record for a database or service dependency. Phase 7 supports
 provider-neutral Postgres, Redis, MySQL, ClickHouse, S3/MinIO object storage, and OpenSearch
@@ -73,7 +73,7 @@ applications.
 
 List/show output must mask connection secrets, provider tokens, passwords, and raw connection URLs.
 
-<h2 id="blueprint-dependency-contract">Blueprint dependency contract</h2>
+## Blueprint dependency contract [#blueprint-dependency-contract]
 
 Blueprint resources declare dependency requirements with a neutral contract. Use `kind` for the
 portable provisioning primitive, `engine.family` for the concrete engine family, `version` for a
@@ -140,7 +140,7 @@ Use `kind: mysql` with `engine.family: mariadb` for MariaDB. The dependency rema
 MySQL-compatible provisioning and binding primitive, while the engine family drives provider
 selection, readiness, version matching, and generated output semantics.
 
-<h2 id="blueprint-catalog-installation">Blueprint catalog and installation</h2>
+## Blueprint catalog and installation [#blueprint-catalog-installation]
 
 The Blueprint catalog is the neutral Blueprint discovery and installation entrypoint. It is not the
 same as Cloud marketplace policy. List/show expose portable manifests, components, dependency
@@ -162,7 +162,7 @@ DependencyResource. PocketBase SQLite files, uploads, model caches, and other mo
 data use StorageVolume. Blueprint installation must not turn volumes into dependency resources, and
 volume data must not be handled through dependency backup/restore.
 
-<h2 id="dependency-resource-binding">Bind to a Resource</h2>
+## Bind to a Resource [#dependency-resource-binding]
 
 A Resource dependency binding lets future deployment snapshots reference a dependency resource. The
 binding stores only provider-neutral safe metadata and secret references. It does not place database
@@ -175,7 +175,7 @@ appaloft resource dependency bind res_web --dependency dep_db --target DATABASE_
 Unbind removes only the association. It does not delete the database, restart runtime, or rewrite
 historical deployment snapshots.
 
-<h2 id="dependency-config-file">Declare dependencies in appaloft.yaml</h2>
+## Declare dependencies in appaloft.yaml [#dependency-config-file]
 
 Repository config can declare an application dependency graph for config-driven CLI and GitHub
 Action deployments:
@@ -253,7 +253,7 @@ Config deploy reconciles this through dependency backup policy operations. It do
 restore work, and `appaloft.yaml` must not contain policy ids, provider keys, backup artifact
 handles, restore point ids, raw dump paths, provider accounts, credentials, or secret values.
 
-<h2 id="dependency-runtime-injection">Deploy with bound dependencies</h2>
+## Deploy with bound dependencies [#dependency-runtime-injection]
 
 When a Resource has active ready dependency bindings, Appaloft includes safe runtime injection
 readiness in deployment plan and deployment detail output. A binding can be delivered when the
@@ -270,7 +270,7 @@ safe binding reference in the deployment snapshot and asks the runtime target to
 configured environment variable to the workload. Historical deployment snapshots keep their captured
 reference after later binding secret rotation.
 
-<h2 id="dependency-runtime-injection-blocked">Blocked runtime injection</h2>
+## Blocked runtime injection [#dependency-runtime-injection-blocked]
 
 Plan and show output report dependency runtime injection as `ready`, `blocked`, or
 `not-applicable`. `blocked` means at least one active binding cannot be delivered safely for the
@@ -284,7 +284,7 @@ with `dependency_runtime_injection_blocked`. No deployment attempt is created, a
 not expose raw connection strings, passwords, or provider payloads. Fix the dependency resource,
 binding, target name, or runtime target, then run plan again before deploying.
 
-<h2 id="dependency-secret-rotation">Binding secret rotation</h2>
+## Binding secret rotation [#dependency-secret-rotation]
 
 `resources.rotate-dependency-binding-secret` replaces only the safe secret reference or version on
 the binding. It affects future deployment snapshots. It does not rotate provider-native database
@@ -292,7 +292,7 @@ passwords, update running container environment variables, or rewrite historical
 
 After rotating, create a new deployment so the workload reads the new snapshot reference.
 
-<h2 id="dependency-backup-restore">Backup and restore</h2>
+## Backup and restore [#dependency-backup-restore]
 
 Backup creates a safe restore point. Restore targets the same dependency by default, or an existing
 ready same-kind dependency in the same project and environment when `--target-dependency` is
@@ -328,7 +328,7 @@ appaloft dependency backup policy list dep_db
 appaloft dependency backup policy show dbp_123
 ```
 
-<h2 id="dependency-delete-safety">Delete safety</h2>
+## Delete safety [#dependency-delete-safety]
 
 Before deleting a dependency resource, Appaloft checks active bindings, backup retention, deployment
 snapshot references, and provider-managed safety state. Imported external delete removes only the

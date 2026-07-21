@@ -22,13 +22,13 @@ sidebar:
   order: 11
 ---
 
-<h2 id="typescript-sdk-operation-client">Operation client</h2>
+## Operation client [#typescript-sdk-operation-client]
 
 `@appaloft/sdk` is an operation client for automation and integrations. It calls the Appaloft HTTP/oRPC API. It does not embed the application runtime or expose internal use cases, repositories, handlers, or domain objects.
 
 SDK methods must come from the OpenAPI SDK contract and `x-appaloft-*` operation metadata. Do not add SDK-only business methods. Add or extend a command/query in the operation catalog when a new business capability is needed.
 
-<h2 id="typescript-sdk-install">Install and configure</h2>
+## Install and configure [#typescript-sdk-install]
 
 After publication, Node, Bun, or browser automation can install `@appaloft/sdk` and create a client with a `baseUrl`.
 
@@ -42,7 +42,7 @@ const appaloft = createAppaloftClient({
 
 `baseUrl` should point to the `/api` root of the same Appaloft instance. For self-hosted installs, prefer the console/API URL printed by the installer.
 
-<h2 id="typescript-sdk-authentication">Authentication</h2>
+## Authentication [#typescript-sdk-authentication]
 
 Interactive product operations use a product-session cookie. Machine automation uses a deploy-token bearer credential. Do not store deploy tokens in repository config files. In CI, pass them through trusted secrets or environment variables.
 
@@ -66,7 +66,7 @@ const actionClient = createAppaloftClient({
 
 Organization scope is passed through the concrete operation path, query, or body fields, such as `organizationId`. Switching the current organization should still call the public organization-switch operation instead of relying on hidden SDK state.
 
-<h2 id="typescript-sdk-operation-examples">Operation examples</h2>
+## Operation examples [#typescript-sdk-operation-examples]
 
 Every SDK call should correspond to an operation key. Input fields come from the same command/query schema, and output comes from the HTTP/oRPC contract.
 
@@ -94,7 +94,7 @@ Operation descriptors are generated internals. Public SDK callers should use the
 
 The SDK is the right boundary for API tests and external automation. Domain rules, application handlers, repositories, and adapter unit tests should stay at the layer they prove.
 
-<h2 id="typescript-sdk-errors">Structured errors</h2>
+## Structured errors [#typescript-sdk-errors]
 
 The SDK returns stable structured error fields: `code`, `category`, `message`, `retryable`, and optional `details`. Automation should branch on `code`, `category`, or `retryable`, not the human-readable `message`.
 
@@ -105,7 +105,7 @@ Common auth errors include:
 - `action_auth_missing` or `action_auth_invalid`: the Action/deploy-token credential is missing or invalid.
 - `action_auth_forbidden`: the deploy token is valid, but its scope does not cover the current request.
 
-<h2 id="typescript-sdk-streaming">Streaming events</h2>
+## Streaming events [#typescript-sdk-streaming]
 
 Only operations marked with `x-appaloft-streaming: true` in OpenAPI metadata can use the SDK stream helper. Callers should pass an `AbortSignal` to cancel long-lived connections and handle structured envelopes for events, heartbeats, gaps, close signals, and errors.
 

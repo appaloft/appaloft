@@ -21,11 +21,11 @@ sidebar:
   order: 4
 ---
 
-<h2 id="reference-error-shape">Error shape</h2>
+## Error shape [#reference-error-shape]
 
 User-visible errors should include stable code, category, phase, and actionable recovery guidance.
 
-<h2 id="error-knowledge-contract">Error Knowledge Contract</h2>
+## Error Knowledge Contract [#error-knowledge-contract]
 
 Appaloft errors should not collapse to a message string. Public entrypoints should preserve stable `code`, `category`, `phase`, `retryable`, safe details, and known error knowledge:
 
@@ -36,7 +36,7 @@ Appaloft errors should not collapse to a message string. Public entrypoints shou
 
 Web, CLI, HTTP/API, and MCP tools should render errors from those fields instead of branching on message text.
 
-<h2 id="agent-readable-errors">Agent-readable errors</h2>
+## Agent-readable errors [#agent-readable-errors]
 
 When an AI agent handles a deployment failure, it should read stable `code`, `category`, `phase`,
 `retryable`, safe details, docs links, and remedies first. It should not infer behavior from message
@@ -46,7 +46,7 @@ If an error has no clear remedy, the agent should run safe diagnostics such as
 `appaloft resource diagnose <resourceId>` before choosing retry, redeploy, or rollback from
 recovery readiness.
 
-<h2 id="operator-work-ledger">Operator work ledger</h2>
+## Operator work ledger [#operator-work-ledger]
 
 When deployment, proxy bootstrap, certificate, or remote-state background work does not finish as expected, inspect the work ledger before guessing which recovery command to run:
 
@@ -59,7 +59,7 @@ The work ledger is read-only. It summarizes attempt kind, status, phase, related
 
 This entrypoint does not retry, cancel, recover, dead-letter, delete, or prune anything. Recovery, cleanup, and retry capabilities are exposed through separate explicit commands so viewing status cannot accidentally mutate runtime or remote SSH state.
 
-<h2 id="operator-audit-events">Audit events</h2>
+## Audit events [#operator-audit-events]
 
 When you need to explain historical changes for one resource, server, certificate, or other object, inspect retained audit events by aggregate id:
 
@@ -94,7 +94,7 @@ appaloft audit-event legal-hold release <holdId> --reason "review complete"
 
 Legal holds are retention blockers, not immutable archives or discovery workflows. `appaloft audit-event prune` reports held rows and skips rows matched by active holds until every matching hold is released.
 
-<h2 id="operator-provider-job-logs">Provider job logs</h2>
+## Provider job logs [#operator-provider-job-logs]
 
 Provider job logs are retained separately from deployment rows and embedded deployment logs. Run a dry-run before destructive cleanup:
 
@@ -110,7 +110,7 @@ appaloft provider-job-log prune --before 2026-01-01T00:00:00.000Z --provider gen
 
 The command deletes only `provider_job_logs` rows older than the cutoff when `--dry-run false` is explicit. It does not delete deployment rows, embedded deployment logs, runtime logs, audit rows, events, process attempts, snapshots, runtime artifacts, provider resources, or business state.
 
-<h2 id="operator-retention-defaults">Organization retention defaults</h2>
+## Organization retention defaults [#operator-retention-defaults]
 
 Retention defaults are non-executing policy records. They store the default retention window for each governed history category and whether future scheduled retention may request dry-run or destructive work. They do not delete rows or let manual prune commands infer a cutoff.
 
@@ -123,7 +123,7 @@ appaloft retention-default show provider-job-logs --scope system
 
 Even when a category allows destructive scheduling, manual prune still requires explicit cutoff and dry-run/destructive input. Legal holds, immutable archives, replay guards, active attempts, and category-specific skip rules remain authoritative.
 
-<h2 id="operator-domain-events">Domain event stream retention</h2>
+## Domain event stream retention [#operator-domain-events]
 
 Domain event stream retention only targets retained event stream observation rows. Dry-run first, then delete by explicit cutoff:
 
@@ -133,7 +133,7 @@ appaloft domain-event prune --before 2026-01-01T00:00:00.000Z
 
 This command does not delete deployments, audit rows, provider logs, process attempts, snapshots, rollback candidates, runtime artifacts, or business state. Replay guards, cursor continuity, and recovery evidence take precedence over deletion.
 
-<h2 id="remote-state-resolution">SSH remote state resolution</h2>
+## SSH remote state resolution [#remote-state-resolution]
 
 `infra_error` + `remote-state-resolution` means Appaloft reached the SSH target but could not prepare the server-owned `ssh-pglite` state root before deployment identity resolution. Common causes are insufficient disk or inode capacity, a read-only filesystem, missing write permission for the configured runtime root, an older incompatible PGlite state directory from a pre-upgrade deployment, or a remote shell command failure while creating the state, lock, backup, or journal directories.
 
@@ -144,7 +144,7 @@ Recommended handling:
 3. Run `appaloft server capacity inspect` or an equivalent SSH diagnostic before retrying when the error points at target capacity.
 4. Retry the deploy after the target can create and write the Appaloft state directories.
 
-<h2 id="remote-state-lock">SSH remote state lock</h2>
+## SSH remote state lock [#remote-state-lock]
 
 `infra_error` + `remote-state-lock` means the SSH `ssh-pglite` state root is protected by another Appaloft process, or a previously cancelled process left a lock that has not aged past its stale window. It is usually an operator-diagnosable infrastructure error, not invalid deployment input.
 
@@ -157,6 +157,6 @@ Recommended handling:
 5. Run `appaloft remote-state lock recover-stale --server-host <host>` only when diagnostics show the heartbeat is older than the stale window. This archives stale lock metadata and does not force-delete active locks.
 6. Do not directly delete the remote lock directory unless diagnostics prove no active process owns it and a recovered journal is retained.
 
-<h2 id="reference-status-shape">Status shape</h2>
+## Status shape [#reference-status-shape]
 
 Statuses should distinguish resource, deployment, runtime, proxy, access URL, and certificate readiness.

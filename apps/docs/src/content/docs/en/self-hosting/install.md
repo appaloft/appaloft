@@ -15,15 +15,15 @@ sidebar:
   order: 1
 ---
 
-<h2 id="self-hosting-serve-paths">Serve paths</h2>
+## Serve paths [#self-hosting-serve-paths]
 
 `appaloft serve` serves the Web console at the root path and public docs under `/docs/*`.
 
-<h2 id="self-hosting-install-binary">Install binary</h2>
+## Install binary [#self-hosting-install-binary]
 
 The binary includes runtime entrypoints, Web console static assets, and public docs static assets.
 
-<h2 id="self-hosting-install-docker">Install with Docker</h2>
+## Install with Docker [#self-hosting-install-docker]
 
 The release `install.sh` script installs Appaloft as a Docker Compose stack and serves the console
 and docs from the same Appaloft server:

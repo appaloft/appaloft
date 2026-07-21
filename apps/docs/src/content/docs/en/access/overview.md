@@ -19,18 +19,18 @@ sidebar:
   order: 7
 ---
 
-<h2 id="access-generated-route">Generated access URL</h2>
+## Generated access URL [#access-generated-route]
 
 Generated access URLs depend on server public address, proxy readiness, and resource network settings.
 
-<h2 id="domain-binding-purpose">Custom domain binding</h2>
+## Custom domain binding [#domain-binding-purpose]
 
 A domain binding means the user wants a domain to point at a resource. It is not deployment input.
 
-<h2 id="domain-binding-ownership-check">Ownership check</h2>
+## Ownership check [#domain-binding-ownership-check]
 
 Ownership checks prove the user controls the domain.
 
-<h2 id="certificate-readiness">Certificate readiness</h2>
+## Certificate readiness [#certificate-readiness]
 
 Certificate readiness describes whether TLS is usable separately from app runtime health.

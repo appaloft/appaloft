@@ -21,15 +21,15 @@ sidebar:
   order: 9
 ---
 
-<h2 id="cli-command-shape">Command shape</h2>
+## Command shape [#cli-command-shape]
 
 The CLI is a first-class input surface. Commands collect user input and execute shared business operations.
 
-<h2 id="cli-help-links">Help links</h2>
+## Help links [#cli-help-links]
 
 CLI help, interactive prompts, and recovery messages should point to stable public docs anchors.
 
-<h2 id="cli-remote-control-plane-login">Appaloft login and CLI profiles</h2>
+## Appaloft login and CLI profiles [#cli-remote-control-plane-login]
 
 `appaloft login` and `appaloft auth login` default to Appaloft Cloud at `https://app.appaloft.com`. Pass `--url <url>` to connect to self-hosted Appaloft or another trusted endpoint. After verification, the CLI stores the endpoint, profile name, auth reference, and handshake summary in a local CLI profile. The profile lives under `APPALOFT_HOME` or the user's local Appaloft home, not in repository config.
 
@@ -52,7 +52,7 @@ config. `APPALOFT_AUTH_COOKIE` is only trusted local operator legacy/diagnostic 
 an AI-agent setup path. `APPALOFT_TOKEN` takes precedence over the legacy cookie in env credential
 resolution.
 
-<h2 id="cli-remote-control-plane-dispatch">Remote Appaloft dispatch</h2>
+## Remote Appaloft dispatch [#cli-remote-control-plane-dispatch]
 
 With an active profile, or with explicit `--control-plane-mode cloud|self-hosted`, `--control-plane-url <url>`, `APPALOFT_CONTROL_PLANE_MODE`, or `APPALOFT_CONTROL_PLANE_URL`, ordinary CLI business commands resolve an execution target first. `controlPlane.mode: none` and `--control-plane-mode none` continue to use the local CLI/SSH runtime.
 
@@ -62,10 +62,10 @@ Without a profile, URL, token, or other trusted remote source, `auto` and defaul
 
 `serve`, `db`, `remote-state`, `init`, top-level quick `deploy`, local terminal attach, source-package, and streaming commands remain local or return `control_plane_unsupported` when remote mode is selected explicitly. If remote mode is selected and auth, handshake, or operation capability is not available, the CLI fails instead of silently rerunning locally.
 
-<h2 id="cli-local-server-docs">Local docs path</h2>
+## Local docs path [#cli-local-server-docs]
 
 When the local Appaloft server is running, CLI docs links should prefer local `/docs/*` URLs.
 
-<h2 id="cli-automation">Automation</h2>
+## Automation [#cli-automation]
 
 Automation should prefer explicit flags or config-file fields over non-replayable interactive input.

@@ -17,14 +17,14 @@ sidebar:
   order: 5
 ---
 
-<h2 id="environment-diff">Compare environments</h2>
+## Compare environments [#environment-diff]
 
 Diff shows missing variables, changed values, and secret state differences between environments.
 
-<h2 id="environment-promote">Promote environment settings</h2>
+## Promote environment settings [#environment-promote]
 
 Promote creates new configuration state for the target environment instead of changing historical deployments.
 
-<h2 id="environment-promote-safety">Safety checks</h2>
+## Safety checks [#environment-promote-safety]
 
 Confirm the target environment, secret handling, and whether a new deployment should be triggered.

@@ -21,7 +21,7 @@ sidebar:
   order: 2
 ---
 
-<h2 id="self-hosting-first-admin-bootstrap">First admin bootstrap</h2>
+## First admin bootstrap [#self-hosting-first-admin-bootstrap]
 
 A self-hosted Appaloft instance needs one local admin the first time it starts. This account logs in
 to the Web console, finishes organization setup, and can manage deploy tokens and members after
@@ -81,7 +81,7 @@ appaloft auth bootstrap-first-admin \
   --display-name "Admin"
 ```
 
-<h2 id="self-hosting-first-admin-login">Log in to the console</h2>
+## Log in to the console [#self-hosting-first-admin-login]
 
 The installer prints the console URL. Without a domain, it is usually the server's `3721` port. With
 `--domain`, use that HTTPS domain.
@@ -94,7 +94,7 @@ and protects product mutations by organization role. A mutation without a sessio
 To end the browser session, use the **Sign out** control in the console header or user menu. The
 console clears its cached session state and returns to `/login`.
 
-<h2 id="self-hosting-first-admin-public-api">Bootstrap status and setup API</h2>
+## Bootstrap status and setup API [#self-hosting-first-admin-public-api]
 
 Install and console setup flows can read the public bootstrap status:
 
@@ -114,7 +114,7 @@ direct setup-page visitors return to login, and the setup endpoint returns
 `404 first_admin_bootstrap_disabled` without dispatching the create command, creating another admin,
 or returning a password.
 
-<h2 id="self-hosting-first-admin-oauth">OAuth is optional</h2>
+## OAuth is optional [#self-hosting-first-admin-oauth]
 
 Google, GitHub, or generic OIDC can be configured later. When the client id, client secret,
 callback URL, or trusted origin is missing, OAuth login should stay disabled, but local first-admin
@@ -135,7 +135,7 @@ through `APPALOFT_WEB_ORIGIN` so it is trusted by the auth runtime.
 
 Do not manually edit database user, member, or organization rows to bypass first login.
 
-<h2 id="self-hosting-first-admin-next-team">Next: manage organization members</h2>
+## Next: manage organization members [#self-hosting-first-admin-next-team]
 
 The first admin becomes the owner of the initial organization. After login, use
 [Organization team management](/docs/en/self-hosting/organization-team-management/) to read the
@@ -143,7 +143,7 @@ current organization context, invite members, update non-owner roles, transfer o
 non-owner members, and recover from
 `401 product_auth_missing` or `403 product_auth_forbidden`.
 
-<h2 id="self-hosting-first-admin-recovery">Recovery and troubleshooting</h2>
+## Recovery and troubleshooting [#self-hosting-first-admin-recovery]
 
 If the generated one-time password is lost, rerunning the installer will not show the old password
 again. Prefer an existing admin session or a formal admin recovery flow when available. For early

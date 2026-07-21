@@ -23,13 +23,13 @@ sidebar:
   order: 5
 ---
 
-<h2 id="self-hosting-action-deploy-token-auth">Action deploy token authentication</h2>
+## Action deploy token authentication [#self-hosting-action-deploy-token-auth]
 
 Self-hosted server API mode rejects GitHub Action mutation requests that do not include a deploy
 token. A deploy token is a machine credential for automation. It is not a Web console login session,
 and it should not be committed to repository config, workflow file text, URL query strings, or logs.
 
-<h2 id="self-hosting-action-token-setup">Save the GitHub Secret after install</h2>
+## Save the GitHub Secret after install [#self-hosting-action-token-setup]
 
 Plain SSH install does not create an Action deploy token by default. If you need GitHub Action
 server API mode immediately, pass `--bootstrap-deploy-token` during install. The installer prints a
@@ -62,7 +62,7 @@ to the Action through the `appaloft-token` input:
 When the installer is rerun and an active deploy token already exists, the output contains safe
 metadata only and does not show the raw token again.
 
-<h2 id="self-hosting-action-token-scope">Scopes and current limits</h2>
+## Scopes and current limits [#self-hosting-action-token-scope]
 
 Deploy tokens can be limited by workflow command, project, environment, resource, server, and
 repository. When a token uniquely names project, environment, resource, and server, ordinary
@@ -88,7 +88,7 @@ HTTP/API entrypoints are:
 Web token management and MCP descriptors use the same deploy-token operation contracts. Do not rely
 on manual database edits to expand or bypass token scopes.
 
-<h2 id="self-hosting-action-auth-errors">401 and 403</h2>
+## 401 and 403 [#self-hosting-action-auth-errors]
 
 `401 action_auth_missing` means the Action did not send a bearer token. Check that the workflow
 passes `appaloft-token: ${{ secrets.APPALOFT_TOKEN }}` and that the GitHub Secret name matches.
@@ -102,7 +102,7 @@ usual causes are a repository, project, environment, resource, server, or workfl
 It also happens when explicit bootstrap ids or an existing source link point outside the token
 scope. Update the token scope, relink the source, or remove the conflicting bootstrap ids.
 
-<h2 id="self-hosting-action-token-rotation">Rotation and revocation</h2>
+## Rotation and revocation [#self-hosting-action-token-rotation]
 
 The raw token is shown once. Do not place it in issues, pull request comments, workflow logs, or
 deployment output.

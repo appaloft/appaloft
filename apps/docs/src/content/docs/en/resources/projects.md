@@ -24,40 +24,40 @@ sidebar:
   order: 2
 ---
 
-<h2 id="concept-project">Project</h2>
+## Project [#concept-project]
 
 A project is the user boundary for a set of resources, environments, and deployment history. It is not a server or source repository.
 
-<h2 id="project-lifecycle">Project lifecycle</h2>
+## Project lifecycle [#project-lifecycle]
 
 Projects can be read, renamed, described, archived, restored, checked for delete safety, and deleted after blockers are clear. Archiving a project keeps the project, resources, and deployment history visible, but blocks new environments, resources, and deployments under that project. Restoring a project reopens future project-scoped creation and deployment admission.
 
 Rename, description, archive, restore, and delete changes in project settings only change project-level metadata or lifecycle. They do not create a deployment, rewrite historical deployment snapshots, or immediately stop, restart, or delete running runtime state.
 
-<h3 id="project-rename">Rename a project</h3>
+### Rename a project [#project-rename]
 
 When you rename a project through Web, CLI, or API, Appaloft derives a new project slug from the new name. Pick a different name if another project already owns that slug.
 
-<h3 id="project-description">Set a project description</h3>
+### Set a project description [#project-description]
 
 Use the project description for human-facing metadata only. Clearing the description does not change the project slug, resources, environments, deployments, access routes, or runtime state.
 
-<h3 id="project-archive">Archive a project</h3>
+### Archive a project [#project-archive]
 
 Archive projects that should no longer receive new deployments. Archive does not delete resources, environments, domains, certificates, logs, or deployment history. Use the resource lifecycle actions when you need to clean up individual resources.
 
-<h3 id="project-restore">Restore a project</h3>
+### Restore a project [#project-restore]
 
 Restore archived projects that should receive new resources, environments, or deployments again. Restore only changes the project lifecycle back to active; it does not restore deleted child objects, retry deployments, change domains or certificates, clean logs, or touch runtime state.
 
-<h3 id="project-delete">Delete a project</h3>
+### Delete a project [#project-delete]
 
 Run delete-check before deleting an archived project. Delete is enabled only when no retained environments, resources, deployment history, source events, domains, certificates, logs, audit, or runtime support records still depend on the project. Empty environments with no environment variables and no non-deleted resources do not block deletion; project delete archives those empty environments through the environment lifecycle before removing the project from normal project lists through a tombstone. It does not cascade other cleanup or erase retained history.
 
-<h2 id="concept-resource">Resource</h2>
+## Resource [#concept-resource]
 
 A resource is an application or service that can be deployed. It owns source, runtime, health, and network profiles.
 
-<h2 id="resource-profile-purpose">Why resource profiles exist</h2>
+## Why resource profiles exist [#resource-profile-purpose]
 
 Resource configuration describes future deployment behavior. It is not a one-off deployment parameter bag.

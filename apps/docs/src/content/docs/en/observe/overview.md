@@ -21,22 +21,22 @@ sidebar:
   order: 8
 ---
 
-<h2 id="observe-status-first">Check status first</h2>
+## Check status first [#observe-status-first]
 
 Start with resource, deployment, runtime, proxy, and access route status before assuming the whole deployment failed.
 
-<h2 id="observe-runtime-logs">Runtime logs</h2>
+## Runtime logs [#observe-runtime-logs]
 
 Runtime logs come from application stdout/stderr and help identify startup, port, configuration, and runtime failures.
 
-<h2 id="observe-health-summary">Health summary</h2>
+## Health summary [#observe-health-summary]
 
 The health summary combines deployment, runtime, health policy, proxy, and public access observations.
 
-<h2 id="diagnostic-summary-copy-support-payload">Copy diagnostic summary</h2>
+## Copy diagnostic summary [#diagnostic-summary-copy-support-payload]
 
 Diagnostic summaries should include stable IDs, status, error codes, and safe context while masking secrets.
 
-<h2 id="observe-safe-recovery">Safe recovery</h2>
+## Safe recovery [#observe-safe-recovery]
 
 Prefer retryable operations first. Change server, credential, proxy, or domain configuration only when the status explains why.

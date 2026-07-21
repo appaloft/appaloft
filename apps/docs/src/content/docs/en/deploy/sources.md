@@ -27,7 +27,7 @@ sidebar:
   order: 2
 ---
 
-<h2 id="deployment-source">Choose a deployment source</h2>
+## Choose a deployment source [#deployment-source]
 
 A deployment source answers what Appaloft should deploy. It can be a local folder, Git repository, Docker image, Compose file, or static site output.
 
@@ -35,7 +35,7 @@ The source is not a substitute for project, server, environment, or domain field
 
 Existing entrypoints should use the same source vocabulary. A Web source field, CLI positional source or `--source`, and API source input should all point here instead of redefining the concept.
 
-<h2 id="deployment-source-kind">Source kinds</h2>
+## Source kinds [#deployment-source-kind]
 
 Common kinds:
 
@@ -49,7 +49,7 @@ Common kinds:
 
 If unsure, choose the kind closest to the artifact you already have. The runtime profile explains how Appaloft should run it.
 
-<h2 id="deployment-source-integration-connection-modes">Integration connection modes</h2>
+## Integration connection modes [#deployment-source-integration-connection-modes]
 
 External source integrations can declare connection modes so Web, CLI, and tools share neutral language for who completes provider setup.
 
@@ -75,7 +75,7 @@ appaloft github repositories --search web
 If `status` reports that the App is not installed for the current workspace, use its returned install
 URL and select the intended GitHub account and repository before listing repositories again.
 
-<h2 id="deployment-source-validation">Input checks</h2>
+## Input checks [#deployment-source-validation]
 
 Users should see whether the source is readable, whether the ref or path exists, whether the static output is clear, and whether the source conflicts with the resource runtime profile.
 
@@ -108,7 +108,7 @@ appaloft resource configure-source res_web \
   --base-directory apps/web
 ```
 
-<h2 id="application-graph-dependencies">Share a dependency across applications</h2>
+## Share a dependency across applications [#application-graph-dependencies]
 
 In an application graph, define a managed dependency once at the top level and reference its key
 from every application that consumes it. A dependency shared by multiple applications requires a
@@ -154,7 +154,7 @@ appaloft deploy . --application api --application worker
 An unknown key fails before Appaloft initializes deployment state or changes resources and reports
 the available application keys.
 
-<h2 id="local-static-output">Local static output</h2>
+## Local static output [#local-static-output]
 
 When you already have a `dist`, `build`, or similar static output directory, pass that directory as
 the Appaloft source:
@@ -168,13 +168,13 @@ ordinary deployment request; it does not add a `quick-deploy.create` operation o
 directory to an Appaloft hosted cloud. Unless you explicitly choose a hosted feature, the target is
 still the server or environment you selected.
 
-<h2 id="deployment-source-output">What you see after deployment</h2>
+## What you see after deployment [#deployment-source-output]
 
 Once accepted, source becomes part of the deployment snapshot. Later resource source profile changes do not change completed or running deployments.
 
 Deployment details should show a safe source summary, such as repository, ref, base directory, image tag, or static output directory. Secret tokens, private repository credentials, and sensitive local path fragments should not appear in logs or diagnostics.
 
-<h2 id="deployment-source-errors">Common errors</h2>
+## Common errors [#deployment-source-errors]
 
 Recovery examples:
 
@@ -185,7 +185,7 @@ Recovery examples:
 
 If the resource already points at an old source, use [Deployment recovery](/docs/en/deploy/recovery/#deployment-source-relink).
 
-<h2 id="static-artifact-publishing">Static artifact publishing</h2>
+## Static artifact publishing [#static-artifact-publishing]
 
 Direct static artifact publishing is a deployment source extension point. Use it for an already
 built `dist` directory or `.zip` archive; it enters the same operation catalog through
@@ -203,7 +203,7 @@ API callers can use `POST /api/static-artifacts/publish`,
 route, or access-control boundaries; hosted alias/default-domain routing remains a separate
 capability.
 
-<h2 id="source-auto-deploy-setup">Auto-deploy setup</h2>
+## Auto-deploy setup [#source-auto-deploy-setup]
 
 Source auto-deploy turns a verified source event into an ordinary deployment request, without adding
 branch, webhook, or delivery fields to `deployments.create`. The first active ingestion route is the
@@ -217,7 +217,7 @@ When enabled, the policy belongs to one Resource and is bound to that Resource's
 profile. If the Resource source changes later, the old policy becomes blocked until a user
 explicitly acknowledges that the new source should still trigger auto-deploy.
 
-<h2 id="source-auto-deploy-config-file">Declare auto-deploy in appaloft.yaml</h2>
+## Declare auto-deploy in appaloft.yaml [#source-auto-deploy-config-file]
 
 For repository-driven deploys, the common git-push policy can live in the config file:
 
@@ -246,7 +246,7 @@ first, then excludes. It never unions intermediate commit arrays. A deleted ref 
 the provider comparison is unavailable or truncated, path-filtered policies fail closed; policies
 without path rules retain ref-only behavior.
 
-<h2 id="source-auto-deploy-signatures">Signatures and secrets</h2>
+## Signatures and secrets [#source-auto-deploy-signatures]
 
 Git provider webhooks and generic signed webhooks must be verified before policy matching. Generic
 signed webhooks use `X-Appaloft-Signature` with `sha256=<hex>` or bare HMAC SHA-256 hex. The policy
@@ -257,7 +257,7 @@ raw payloads.
 To rotate a secret, replace the underlying secret reference first, then acknowledge the auto-deploy
 policy when needed.
 
-<h2 id="source-auto-deploy-dedupe">Duplicate deliveries</h2>
+## Duplicate deliveries [#source-auto-deploy-dedupe]
 
 The source event is written to a durable record before deployment dispatch. Duplicate delivery uses
 the provider delivery id, generic idempotency key, or a bounded-window key over source, ref,
@@ -266,7 +266,7 @@ revision, and event kind. Generic signed route dedupe is scoped to the route Res
 A duplicate event must not create a second deployment. Users should be able to see `deduped` status
 and the original source event id in the source event read model.
 
-<h2 id="source-auto-deploy-ignored-events">Ignored and blocked events</h2>
+## Ignored and blocked events [#source-auto-deploy-ignored-events]
 
 A verified event may still create no deployment. Common reasons include unmatched ref, unmatched
 final paths, unavailable/truncated final diff, deleted ref, no enabled policy, disabled policy, or a
@@ -276,7 +276,7 @@ policy blocked pending acknowledgement after a source binding change.
 and created deployment ids. Logs and UI must not expose webhook secrets, provider tokens, or raw
 payloads.
 
-<h2 id="source-auto-deploy-recovery">Auto-deploy recovery</h2>
+## Auto-deploy recovery [#source-auto-deploy-recovery]
 
 The first Phase 7 ingestion path records source event state and synchronous dispatch results; it
 does not promise automatic background retry. If dispatch fails, inspect source event detail first,
@@ -290,7 +290,7 @@ read raw webhook payloads, signatures, provider tokens, or webhook secrets.
 If a deployment was created, use ordinary deployment recovery/readiness, retry, redeploy, or
 rollback semantics rather than replaying the webhook payload.
 
-<h2 id="source-auto-deploy-retention">Source event retention</h2>
+## Source event retention [#source-auto-deploy-retention]
 
 Use `appaloft source-event prune --before <iso>` or `POST /api/source-events/prune` to inspect
 retained source event deliveries before cleanup. Prune defaults to dry-run and returns matched
