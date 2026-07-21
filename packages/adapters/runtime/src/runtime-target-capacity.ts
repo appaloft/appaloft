@@ -199,6 +199,7 @@ export function renderRuntimeTargetCapacityPruneScript(input: {
   categories: string[];
   target?: string;
   dryRun: boolean;
+  includeOrphanRunning?: boolean;
 }): AshScript {
   const runtimeRoot = input.runtimeRoot.replace(/\/+$/, "");
   const stateRoot = input.stateRoot ?? `${runtimeRoot}/state`;
@@ -214,6 +215,10 @@ export function renderRuntimeTargetCapacityPruneScript(input: {
     ${ash.env("APPALOFT_PRUNE_CATEGORIES", categories)}
     ${ash.env("APPALOFT_PRUNE_TARGET_FILTER", input.target ?? "")}
     ${ash.env("APPALOFT_PRUNE_DRY_RUN", input.dryRun ? "1" : "0")}
+    ${ash.env(
+      "APPALOFT_PRUNE_INCLUDE_ORPHAN_RUNNING",
+      input.includeOrphanRunning ? "1" : "0",
+    )}
     ${ash.raw(String.raw`
     if [ -z "$APPALOFT_PRUNE_CANDIDATE_LIMIT" ]; then APPALOFT_PRUNE_CANDIDATE_LIMIT=200; fi
     APPALOFT_PRUNE_TMP_ROOT="$TMPDIR"
@@ -275,7 +280,19 @@ export function renderRuntimeTargetCapacityPruneScript(input: {
           ccreated=$(docker inspect -f '{{.Created}}' "$cid" 2>/dev/null)
           matches_prune_target "$cid" "$cname" || continue
           case "$cstatus" in
-            Up*) emit_candidate stopped-containers "$cid" "$cname" "$ccreated" "0" skipped active-runtime ;;
+            Up*)
+              if [ "$APPALOFT_PRUNE_INCLUDE_ORPHAN_RUNNING" = "1" ] && [ -n "$APPALOFT_PRUNE_TARGET_FILTER" ] && older_than_cutoff "$ccreated"; then
+                if [ "$APPALOFT_PRUNE_DRY_RUN" = "1" ]; then
+                  emit_candidate stopped-containers "$cid" "$cname" "$ccreated" "0" matched ""
+                else
+                  docker stop "$cid" >/dev/null 2>&1
+                  docker rm "$cid" >/dev/null 2>&1
+                  if [ "$?" = "0" ]; then emit_candidate stopped-containers "$cid" "$cname" "$ccreated" "0" pruned ""; else emit_candidate stopped-containers "$cid" "$cname" "$ccreated" "0" skipped safety-evidence-missing; fi
+                fi
+              else
+                emit_candidate stopped-containers "$cid" "$cname" "$ccreated" "0" skipped active-runtime
+              fi
+              ;;
             *)
               if older_than_cutoff "$ccreated"; then
                 if [ "$APPALOFT_PRUNE_DRY_RUN" = "1" ]; then
@@ -1096,6 +1113,7 @@ export class RuntimeTargetCapacityPrunerAdapter implements RuntimeTargetCapacity
       categories: input.categories,
       ...(input.target ? { target: input.target } : {}),
       dryRun: input.dryRun,
+      ...(input.includeOrphanRunning ? { includeOrphanRunning: true } : {}),
     });
     const result =
       providerKey === "generic-ssh"

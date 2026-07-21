@@ -87,6 +87,7 @@ export class PruneServerCapacityUseCase {
         categories: input.categories,
         ...(input.target ? { target: input.target } : {}),
         dryRun: input.dryRun,
+        ...(input.includeOrphanRunning ? { includeOrphanRunning: true } : {}),
       });
 
       if (pruneResult.isErr()) {
