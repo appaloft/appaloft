@@ -10,7 +10,10 @@ import {
 export { type DeleteDependencyResourceCommandInput, deleteDependencyResourceCommandInputSchema };
 
 export class DeleteDependencyResourceCommand extends Command<{ id: string }> {
-  constructor(public readonly dependencyResourceId: string) {
+  constructor(
+    public readonly dependencyResourceId: string,
+    public readonly confirmBackupRetentionRelease: boolean,
+  ) {
     super();
   }
 
@@ -18,7 +21,11 @@ export class DeleteDependencyResourceCommand extends Command<{ id: string }> {
     input: DeleteDependencyResourceCommandInput,
   ): Result<DeleteDependencyResourceCommand> {
     return parseOperationInput(deleteDependencyResourceCommandInputSchema, input).map(
-      (parsed) => new DeleteDependencyResourceCommand(parsed.dependencyResourceId),
+      (parsed) =>
+        new DeleteDependencyResourceCommand(
+          parsed.dependencyResourceId,
+          parsed.confirmBackupRetentionRelease,
+        ),
     );
   }
 }

@@ -1150,13 +1150,14 @@ export class ResourceInstance extends AggregateRoot<ResourceInstanceState> {
     deletedAt: DeletedAt;
     blockers: DependencyResourceDeleteBlockerState[];
     allowProviderManaged?: boolean;
+    allowBackupRetentionRelease?: boolean;
   }): Result<{ changed: boolean; blockers: DependencyResourceDeleteBlockerState[] }> {
     if (this.state.status.value === "deleted") {
       return ok({ changed: false, blockers: [] });
     }
 
     const blockers = [...input.blockers];
-    if (this.state.backupRelationship?.retentionRequired) {
+    if (this.state.backupRelationship?.retentionRequired && !input.allowBackupRetentionRelease) {
       blockers.push({ kind: "backup-relationship" });
     }
     if (this.state.providerManaged && !input.allowProviderManaged) {

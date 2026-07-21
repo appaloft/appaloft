@@ -9,6 +9,7 @@ import {
   type CommandBus,
   CreateDependencyResourceBackupCommand,
   CreateDependencyResourceProvisioningPlanCommand,
+  DeleteDependencyResourceCommand,
   type ExecutionContextFactory,
   ImportDependencyResourceCommand,
   InspectDependencyResourceQuery,
@@ -344,6 +345,25 @@ describe("CLI dependency commands", () => {
       statement: "select count(*) as count from products",
       maxRows: 10,
       timeoutMs: 3_000,
+    });
+  });
+
+  test("[DEP-RES-ENTRY-001] dependency delete forwards backup retention release confirmation", async () => {
+    const { commands, program } = await createCommandCaptureHarness("req_cli_dep_delete");
+
+    await parseCli(program, [
+      "node",
+      "appaloft",
+      "dependency",
+      "delete",
+      "rsi_pg",
+      "--confirm-backup-retention-release",
+    ]);
+
+    expect(commands[0]).toBeInstanceOf(DeleteDependencyResourceCommand);
+    expect(commands[0]).toMatchObject({
+      dependencyResourceId: "rsi_pg",
+      confirmBackupRetentionRelease: true,
     });
   });
 

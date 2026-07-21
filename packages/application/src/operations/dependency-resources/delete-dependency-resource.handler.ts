@@ -23,6 +23,7 @@ export class DeleteDependencyResourceCommandHandler
   ): Promise<Result<{ id: string }>> {
     return this.useCase.execute(context, {
       dependencyResourceId: command.dependencyResourceId,
+      confirmBackupRetentionRelease: command.confirmBackupRetentionRelease,
     });
   }
 }
