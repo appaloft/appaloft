@@ -2451,6 +2451,7 @@ describe("CLI deployment config entry workflow", () => {
         serverId: "srv_existing",
         domainName: "app.example.com",
         pathPrefix: "/",
+        certificatePolicy: "disabled",
         targetServiceName: "web",
         idempotencyKey:
           "repository-config-domain:proj_existing:env_existing:res_existing:app.example.com:/:replaces:dmb_deleted",
@@ -2459,11 +2460,13 @@ describe("CLI deployment config entry workflow", () => {
         serverId: "srv_existing",
         domainName: "app.example.com",
         pathPrefix: "/api",
+        certificatePolicy: "disabled",
         targetServiceName: "api",
       },
       {
         serverId: "srv_existing",
         domainName: "www.example.com",
+        certificatePolicy: "disabled",
         redirectTo: "app.example.com",
         redirectStatus: 308,
       },
