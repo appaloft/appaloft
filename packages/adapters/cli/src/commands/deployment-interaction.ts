@@ -4938,6 +4938,7 @@ function persistServerAppliedRouteDesiredStateIfNeeded(input: {
         const desired = {
           pathHandling: route.pathHandling ?? "preserve",
           tlsMode: route.tlsMode,
+          certificatePolicy: "disabled",
           targetServiceName: route.targetServiceName,
           redirectTo: route.redirectTo,
           redirectStatus: route.redirectStatus,
@@ -4947,6 +4948,7 @@ function persistServerAppliedRouteDesiredStateIfNeeded(input: {
           const current = {
             pathHandling: existing.pathHandling ?? "preserve",
             tlsMode: existing.tlsMode,
+            certificatePolicy: existing.certificatePolicy,
             targetServiceName: existing.targetServiceName,
             redirectTo: existing.redirectTo,
             redirectStatus: existing.redirectStatus,
@@ -4977,6 +4979,7 @@ function persistServerAppliedRouteDesiredStateIfNeeded(input: {
             pathHandling: route.pathHandling ?? "preserve",
             proxyKind: "traefik",
             tlsMode: route.tlsMode,
+            certificatePolicy: "disabled",
             ...(route.targetServiceName ? { targetServiceName: route.targetServiceName } : {}),
             ...(route.redirectTo ? { redirectTo: route.redirectTo } : {}),
             ...(route.redirectStatus ? { redirectStatus: route.redirectStatus } : {}),
