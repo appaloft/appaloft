@@ -49,6 +49,8 @@ describe("deployment plan preview contract", () => {
 
     const plan = deploymentPlanResponseSchema.parse({
       schemaVersion: "deployments.plan/v1",
+      planVersion: "1",
+      fingerprint: `sha256:${"1".repeat(64)}`,
       context: {
         projectId: "proj_demo",
         environmentId: "env_demo",
@@ -104,6 +106,11 @@ describe("deployment plan preview contract", () => {
         projectId: "proj_demo",
         environmentId: "env_demo",
         resourceId: "res_web",
+        target: {
+          kind: "server-backed",
+          serverId: "srv_local",
+          destinationId: "dst_local",
+        },
         serverId: "srv_local",
         destinationId: "dst_local",
         status: "succeeded",
@@ -174,7 +181,7 @@ describe("deployment plan preview contract", () => {
         },
         dependencyBindings,
       },
-      nextActions: ["logs"],
+      nextActions: ["timeline"],
       sectionErrors: [],
       generatedAt: "2026-05-05T00:00:01.000Z",
     });
@@ -191,6 +198,8 @@ describe("deployment plan preview contract", () => {
   test("[DPP-CATALOG-001][WF-PLAN-JS-001] exposes ready JavaScript planner catalog output", () => {
     const parsed = deploymentPlanResponseSchema.parse({
       schemaVersion: "deployments.plan/v1",
+      planVersion: "1",
+      fingerprint: `sha256:${"2".repeat(64)}`,
       context: {
         projectId: "proj_demo",
         environmentId: "env_demo",
@@ -275,6 +284,8 @@ describe("deployment plan preview contract", () => {
   test("[DPP-CATALOG-002][WF-PLAN-JS-007][WF-PLAN-JS-012] exposes blocked JavaScript planner reasons", () => {
     const parsed = deploymentPlanResponseSchema.parse({
       schemaVersion: "deployments.plan/v1",
+      planVersion: "1",
+      fingerprint: `sha256:${"3".repeat(64)}`,
       context: {
         projectId: "proj_demo",
         environmentId: "env_demo",
@@ -350,6 +361,8 @@ describe("deployment plan preview contract", () => {
   test("[DPP-CATALOG-003][WF-PLAN-PY-001][WF-PLAN-PY-012] exposes ready Python planner catalog output", () => {
     const parsed = deploymentPlanResponseSchema.parse({
       schemaVersion: "deployments.plan/v1",
+      planVersion: "1",
+      fingerprint: `sha256:${"4".repeat(64)}`,
       context: {
         projectId: "proj_demo",
         environmentId: "env_demo",
@@ -440,6 +453,8 @@ describe("deployment plan preview contract", () => {
   test("[DPP-CATALOG-004][WF-PLAN-PY-009][WF-PLAN-PY-010] exposes blocked Python planner reasons", () => {
     const parsed = deploymentPlanResponseSchema.parse({
       schemaVersion: "deployments.plan/v1",
+      planVersion: "1",
+      fingerprint: `sha256:${"5".repeat(64)}`,
       context: {
         projectId: "proj_demo",
         environmentId: "env_demo",
@@ -514,6 +529,8 @@ describe("deployment plan preview contract", () => {
   test("[DPP-CATALOG-005][WF-PLAN-JVM-001][WF-PLAN-JVM-014] exposes ready JVM planner catalog output", () => {
     const parsed = deploymentPlanResponseSchema.parse({
       schemaVersion: "deployments.plan/v1",
+      planVersion: "1",
+      fingerprint: `sha256:${"6".repeat(64)}`,
       context: {
         projectId: "proj_demo",
         environmentId: "env_demo",
@@ -602,6 +619,8 @@ describe("deployment plan preview contract", () => {
   test("[DPP-CATALOG-006][WF-PLAN-JVM-011][WF-PLAN-JVM-012] exposes blocked JVM planner reasons", () => {
     const parsed = deploymentPlanResponseSchema.parse({
       schemaVersion: "deployments.plan/v1",
+      planVersion: "1",
+      fingerprint: `sha256:${"7".repeat(64)}`,
       context: {
         projectId: "proj_demo",
         environmentId: "env_demo",
@@ -676,6 +695,8 @@ describe("deployment plan preview contract", () => {
   test("[WF-PLAN-BP-001] keeps explicit framework planner ahead of buildpack evidence", () => {
     const parsed = deploymentPlanResponseSchema.parse({
       schemaVersion: "deployments.plan/v1",
+      planVersion: "1",
+      fingerprint: `sha256:${"8".repeat(64)}`,
       context: {
         projectId: "proj_demo",
         environmentId: "env_demo",
@@ -773,6 +794,8 @@ describe("deployment plan preview contract", () => {
   test("[WF-PLAN-BP-002][WF-PLAN-BP-008] keeps explicit custom runtime overrides ahead of buildpack candidate", () => {
     const parsed = deploymentPlanResponseSchema.parse({
       schemaVersion: "deployments.plan/v1",
+      planVersion: "1",
+      fingerprint: `sha256:${"9".repeat(64)}`,
       context: {
         projectId: "proj_demo",
         environmentId: "env_demo",
@@ -873,6 +896,8 @@ describe("deployment plan preview contract", () => {
   test("[WF-PLAN-BP-004] exposes disabled or unavailable buildpack accelerator as blocked preview", () => {
     const parsed = deploymentPlanResponseSchema.parse({
       schemaVersion: "deployments.plan/v1",
+      planVersion: "1",
+      fingerprint: `sha256:${"a".repeat(64)}`,
       context: {
         projectId: "proj_demo",
         environmentId: "env_demo",
@@ -970,6 +995,8 @@ describe("deployment plan preview contract", () => {
   test("[DPP-CATALOG-BP-001][WF-PLAN-BP-003][WF-PLAN-BP-009] exposes ready buildpack accelerator output", () => {
     const parsed = deploymentPlanResponseSchema.parse({
       schemaVersion: "deployments.plan/v1",
+      planVersion: "1",
+      fingerprint: `sha256:${"b".repeat(64)}`,
       context: {
         projectId: "proj_demo",
         environmentId: "env_demo",
@@ -1084,6 +1111,8 @@ describe("deployment plan preview contract", () => {
   test("[DPP-CATALOG-BP-002][WF-PLAN-BP-005][WF-PLAN-BP-006][WF-PLAN-BP-007] exposes blocked buildpack guardrails", () => {
     const parsed = deploymentPlanResponseSchema.parse({
       schemaVersion: "deployments.plan/v1",
+      planVersion: "1",
+      fingerprint: `sha256:${"c".repeat(64)}`,
       context: {
         projectId: "proj_demo",
         environmentId: "env_demo",
@@ -1221,6 +1250,8 @@ describe("deployment plan preview contract", () => {
   test("[DPP-PLAN-FAIL-001][WF-PLAN-FAIL-001][WF-PLAN-FAIL-002][WF-PLAN-FAIL-003][WF-PLAN-FAIL-009] exposes shared blocked preview shape", () => {
     const parsed = deploymentPlanResponseSchema.parse({
       schemaVersion: "deployments.plan/v1",
+      planVersion: "1",
+      fingerprint: `sha256:${"d".repeat(64)}`,
       context: {
         projectId: "proj_demo",
         environmentId: "env_demo",
@@ -1363,6 +1394,8 @@ describe("deployment plan preview contract", () => {
   test("[DPP-PLAN-FAIL-002][DPP-PLAN-FAIL-003][DPP-PLAN-FAIL-004][WF-PLAN-FAIL-006][WF-PLAN-FAIL-008] preserves explicit override and static ready parity", () => {
     const parsed = deploymentPlanResponseSchema.parse({
       schemaVersion: "deployments.plan/v1",
+      planVersion: "1",
+      fingerprint: `sha256:${"e".repeat(64)}`,
       context: {
         projectId: "proj_demo",
         environmentId: "env_demo",
@@ -1459,6 +1492,8 @@ describe("deployment plan preview contract", () => {
   test("[DPP-PLAN-FAIL-005][DPP-PLAN-FAIL-006][WF-PLAN-FAIL-004][WF-PLAN-FAIL-005][WF-PLAN-FAIL-007][WF-PLAN-FAIL-010][WF-PLAN-FAIL-011][WF-PLAN-FAIL-012] exposes fix and override paths for missing configuration", () => {
     const parsed = deploymentPlanResponseSchema.parse({
       schemaVersion: "deployments.plan/v1",
+      planVersion: "1",
+      fingerprint: `sha256:${"f".repeat(64)}`,
       context: {
         projectId: "proj_demo",
         environmentId: "env_demo",

@@ -1,0 +1,10 @@
+{
+  "name": "lockfile-conflict",
+  "version": "1.0.0",
+  "dependencies": {
+    "vite": "6.1.0"
+  },
+  "scripts": {
+    "build": "vite build"
+  }
+}

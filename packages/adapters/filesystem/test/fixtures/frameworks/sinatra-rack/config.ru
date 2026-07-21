@@ -1,7 +1,7 @@
 require "sinatra/base"
 
 class AppaloftFixture < Sinatra::Base
-  get("/") { "ok" }
+  get("/") { "Ruby Sinatra fixture ready" }
 end
 
 run AppaloftFixture

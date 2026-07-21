@@ -11,12 +11,13 @@ defmodule AppaloftPhoenix.MixProject do
   end
 
   def application do
-    [mod: {AppaloftPhoenix.Application, []}]
+    [extra_applications: [:logger, :runtime_tools], mod: {AppaloftPhoenix.Application, []}]
   end
 
   defp deps do
     [
-      {:phoenix, "1.7.18"}
+      {:phoenix, "1.7.18"},
+      {:plug_cowboy, "2.7.2"}
     ]
   end
 end

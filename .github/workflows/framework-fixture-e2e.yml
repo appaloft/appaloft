@@ -118,6 +118,10 @@ jobs:
           - spring-boot-gradle-wrapper
           - spring-boot-gradle-kts
           - python-explicit-start
+          - sinatra-rack
+          - go-gin
+          - dotnet-aspnet
+          - rust-axum
     steps:
       - uses: actions/checkout@v4
 
@@ -179,6 +183,10 @@ jobs:
           - spring-boot-gradle-wrapper
           - spring-boot-gradle-kts
           - python-explicit-start
+          - sinatra-rack
+          - go-gin
+          - dotnet-aspnet
+          - rust-axum
     env:
       HAS_SSH_FRAMEWORK_SECRETS: ${{ secrets.APPALOFT_E2E_SSH_HOST != '' && secrets.APPALOFT_E2E_SSH_PRIVATE_KEY != '' }}
     steps:

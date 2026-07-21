@@ -141,6 +141,26 @@ Minimum evidence categories:
 | Runtime endpoint hint | Framework default listener only when deterministic. User-supplied `ResourceNetworkProfile.internalPort` wins. |
 | Buildpack accelerator | Platform files, language-family hints, framework hints, builder evidence, detected buildpacks, lifecycle feature hints, and unsupported/ambiguous/missing evidence reason codes. |
 
+### Source Workspace Discovery
+
+Filesystem source inspection must resolve one deployable application root before framework and
+runtime evidence is selected. An explicit normalized `ResourceSourceBinding.baseDirectory` is
+resolved below the materialized source root and wins over inferred roots. Without an explicit base
+directory, an adapter may discover deployable roots through bounded, read-only filesystem
+inspection, but it must not execute source code, follow symbolic links, inspect generated/vendor
+trees, or traverse without fixed depth and entry limits.
+
+Discovery returns structured evidence containing the selected source-root-relative path, selection
+reason, deployable candidate paths, inspected directory count, and whether the inspection bound was
+reached. Exactly one discovered deployable root may be selected. No deployable root, an unsafe or
+missing explicit base directory, multiple deployable roots, or an exhausted inspection bound fails
+closed with `missing-source-root` or `ambiguous-framework-evidence`; the repository/workspace root
+must not be selected merely because it contains workspace metadata.
+
+Package-manager/build-tool conflicts under the selected deployable root remain structured planning
+failures. In particular, multiple Node lockfiles without an explicit valid `packageManager` do not
+select a tool by incidental precedence.
+
 Detectors must not:
 
 - install dependencies or execute untrusted project code during admission-time detection;
@@ -397,6 +417,59 @@ entry-workflow hints only until persisted as `networkProfile.internalPort`.
   default only as a probe target, not proof of app-level health.
 
 ## Support Catalog
+
+### Current Zero-Configuration Support Status
+
+The target catalog below describes planner contracts, not a blanket current support claim. Public
+status is governed by
+[Zero-Configuration Deployment Support Contract](../specs/108-zero-configuration-deployment-support-contract/spec.md):
+
+- `Supported` requires current detector/planner behavior plus passed real Appaloft Docker fixture or
+  substrate smoke. A wired generic-SSH gate is separate evidence and is not called passed unless it
+  ran successfully.
+- `Preview` means a bounded implementation path exists but complete source-materialization and
+  real-smoke evidence is missing or explicit profile input is still required.
+- `Unsupported` means Appaloft cannot safely derive the complete current plan and must fail closed.
+
+Current `Supported` zero-configuration inputs are local, selected single-application roots for the
+exact active smoke descriptors: Next.js runtime/standalone/static export; Vite/React/Vue/Svelte/
+Solid/Angular static SPA; Astro static; Nuxt generate; SvelteKit adapter-static; Remix; Express,
+Fastify, NestJS, Hono, Koa, and generic Node with production scripts; FastAPI, Django, Flask,
+deterministic generic ASGI/WSGI, and supported Poetry web projects; Spring Boot Maven/Gradle,
+Quarkus Maven JVM mode, a deterministic generic runnable jar, Sinatra/Rack, Go Gin, ASP.NET Core,
+and Rust Axum. The last four have passed real Appaloft Docker build/run/HTTP smoke.
+
+Explicit Dockerfile, Compose, prebuilt-image, and custom-command profiles have real substrate or
+fixture smoke, but they are explicit supported fallbacks rather than zero-configuration detection.
+Rails, Laravel, Symfony, and Phoenix remain `Preview`; Sinatra/Rack smoke does not promote Rails,
+and no passed PHP or Phoenix smoke exists.
+
+Source-mode limits are independent of framework support:
+
+| Source mode | Status | Current reason |
+| --- | --- | --- |
+| Local selected single-app directory | Supported for the active descriptor catalog | Detection inspects that directory and active fixture smoke proves Docker and generic-SSH execution paths. |
+| Public remote Git with automatic framework/runtime detection | Unsupported | Create and plan do not clone remote repositories for framework inspection. Clone the repository locally for automatic detection. |
+| Public remote Git with an explicit Dockerfile, Compose, prebuilt-image, or command profile | Preview | The explicit profile avoids automatic framework inspection, but dedicated remote source-to-runtime smoke is incomplete and authenticated remote-Git parity is not claimed. |
+| General workload archive relying on automatic detection | Unsupported | No completed archive extraction-to-inspection-to-runtime path exists; static artifact publication is separate. |
+| Bounded local monorepo discovery with one candidate root | Preview | Discovery is implemented, but no dedicated monorepo real-smoke row exists. |
+| Explicit `source.baseDirectory` in a local monorepo | Preview | Create and plan inspect the selected root; dedicated source-to-runtime real smoke is incomplete. Remote Git still requires an explicit container-native or command profile. |
+| Monorepo root with multiple candidate apps and no selection | Unsupported input | Discovery returns candidates and blocks until `source.baseDirectory` selects one. |
+
+Detection remains file-only under the selected application root. A ready or blocked plan must
+explain the selected root, runtime/framework/tool evidence, planner, commands/artifact/port facts,
+and safe reason/fix/override fields. Plan output includes stable `planVersion = "1"`, a deterministic
+`sha256:` fingerprint, and command provenance (`planner` or `resource-runtime-profile`). The
+override order is explicit container-native/static
+strategy, explicit commands/artifact fields, explicit base directory, explicit network and health
+policy, framework evidence, generic language evidence, buildpack diagnostics, then blocked.
+
+Troubleshooting must fail closed: select the exact local application directory or
+`source.baseDirectory`, choose an explicit container-native strategy, provide explicit commands or
+publish output, and set the Resource port/health policy as needed. Clone remote Git locally for
+automatic detection; an explicit container-native or command remote-Git profile is Preview. Workload archives must be
+extracted locally before automatic detection. Appaloft must not
+pick the first monorepo app, infer an archive layout, or use a development server as fallback.
 
 The target support catalog for mainstream web application deployment is:
 

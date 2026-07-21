@@ -459,8 +459,12 @@ describe("DeploymentPlanQueryService", () => {
     });
 
     const preview = unwrap(await harness.service.execute(harness.context, harness.query));
+    const repeated = unwrap(await harness.service.execute(harness.context, harness.query));
 
     expect(preview.readiness.status).toBe("ready");
+    expect(preview.planVersion).toBe("1");
+    expect(preview.fingerprint).toMatch(/^sha256:[a-f0-9]{64}$/);
+    expect(repeated.fingerprint).toBe(preview.fingerprint);
     expect(harness.runtimePlanResolver.input?.requestedDeployment.accessContext).toBeUndefined();
     expect(harness.runtimePlanResolver.input?.requestedDeployment).toMatchObject({
       exposureMode: "reverse-proxy",
