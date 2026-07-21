@@ -212,6 +212,23 @@ function findTargetPhase(phases: readonly PhaseSection[], targetVersion: string)
     return currentMinorPhase;
   }
 
+  const latestStablePhase = phases
+    .filter((phase): phase is PhaseSection & { target: string } => {
+      return Boolean(phase.target && /^\d+\.\d+\.\d+$/u.test(phase.target));
+    })
+    .sort((left, right) => compareSemver(left.target, right.target))
+    .at(-1);
+  if (latestStablePhase && !target.prerelease) {
+    const latestStableTarget = parseSemver(latestStablePhase.target);
+    if (
+      latestStableTarget.major >= 1 &&
+      target.major === latestStableTarget.major &&
+      compareSemver(targetVersion, latestStablePhase.target) > 0
+    ) {
+      return latestStablePhase;
+    }
+  }
+
   throw new Error(`No roadmap phase target matches release ${targetVersion}.`);
 }
 
