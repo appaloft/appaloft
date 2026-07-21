@@ -33,6 +33,10 @@ contracts, and stream semantics as CLI, Web, generated OpenAPI, and generated MC
 | TS-SDK-DOCS-001 | public docs | TypeScript SDK reference docs | Public docs expose a stable TypeScript SDK help anchor covering installation, authentication, generated operation descriptors, structured errors, and streaming. |
 | TS-SDK-BLACKBOX-001 | e2e | Running-server representative SDK smoke | A running Appaloft server can be exercised through the published SDK for representative create/list/show flows where HTTP/auth/serialization is the behavior under test. |
 | TS-SDK-RELEASE-001 | release packaging | Published SDK package readiness | The npm release job prepares and publishes `@appaloft/sdk` with generated operation descriptors, built JavaScript, type declarations, public package metadata, and no runtime `workspace:*` dependencies. |
+| TS-SDK-RESOURCE-001 | SDK runtime/running server | Sandbox to Agent to Run resource handles | `sandboxes.create` returns a Sandbox handle; `sandbox.agents.create({ harness: "pi" })` calls the generated Runtime create operation with the Sandbox id and admitted template; `agent.runs.create({ task })` calls the generated Run create operation with parent ids, fresh context and idempotency keys. |
+| TS-SDK-RESOURCE-002 | SDK runtime | Structured resource error | A failed generated operation becomes `AppaloftSdkRequestError` with safe status, code, category, retryability and details, without raw body or credential output. |
+| TS-SDK-RESOURCE-003 | SDK compatibility | Generated operation escape hatch | `appaloft.operations` exposes the complete generated non-throwing facade, including the original Sandbox/Runtime/Run methods and `AppaloftSdkOperationResult` semantics. |
+| TS-SDK-RELEASE-002 | release packaging/runtime | Executable package root | After SDK release preparation, Node and Bun can import `@appaloft/sdk` from the package root and observe a callable `createAppaloftClient`; a missing re-export or malformed ESM bundle fails the release test. |
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -48,3 +52,8 @@ create/list/show calls through the SDK against a real local Elysia/oRPC HTTP mou
 `TS-SDK-RELEASE-001` is automated by `scripts/test/sdk-release-packaging.test.ts` and the
 `release:npm:prepare -- --sdk-only` dry run, which prove the SDK package metadata, generated
 operation descriptor outputs, build outputs, and release publish job wiring.
+`TS-SDK-RESOURCE-001`, `TS-SDK-RESOURCE-002`, and `TS-SDK-RESOURCE-003` are automated by
+`packages/sdk/test/sandbox-resource-handles.test.ts`; the running-server ownership chain is also
+bound in `packages/sdk/test/sandbox-agent-delivery-running-server.test.ts`.
+`TS-SDK-RELEASE-002` is automated by `scripts/test/sdk-release-packaging.test.ts`, which imports the
+built package root with both Node and Bun so an undefined ESM re-export blocks release.

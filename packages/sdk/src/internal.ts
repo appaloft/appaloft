@@ -1,8 +1,8 @@
-import { type GeneratedAppaloftClient, generatedSdkOperations } from "./generated-operations";
+import { type GeneratedAppaloftClient, generatedSdkOperations } from "./generated-operations.js";
 
 export const apiVersion = "v1";
 
-export { generatedSdkOperations } from "./generated-operations";
+export { generatedSdkOperations } from "./generated-operations.js";
 
 export type DomainErrorDetailValue = string | number | boolean | null | readonly string[];
 
@@ -143,6 +143,25 @@ export class AppaloftSdkStreamError extends Error {
   ) {
     super(message);
     this.name = "AppaloftSdkStreamError";
+  }
+}
+
+export class AppaloftSdkRequestError extends Error {
+  readonly code: string;
+  readonly category: DomainErrorResponse["category"];
+  readonly retryable: boolean;
+  readonly details: DomainErrorResponse["details"];
+
+  constructor(
+    public readonly status: number,
+    public readonly error: DomainErrorResponse,
+  ) {
+    super(error.message);
+    this.name = "AppaloftSdkRequestError";
+    this.code = error.code;
+    this.category = error.category;
+    this.retryable = error.retryable;
+    this.details = error.details;
   }
 }
 

@@ -62,6 +62,7 @@ describe("TypeScript SDK release packaging", () => {
     expect(prepareScript).toContain('"dist/index.js"');
     expect(prepareScript).toContain('"dist/index.d.ts"');
     expect(prepareScript).toContain('"dist/internal.js"');
+    expect(prepareScript).toContain('"dist/resource-client.js"');
     expect(prepareScript).toContain('"dist/generated-operations.js"');
   });
 
@@ -75,5 +76,19 @@ describe("TypeScript SDK release packaging", () => {
     expect(declaration).not.toContain("SdkOperationDescriptor");
     expect(declaration).not.toContain("request:");
     expect(declaration).not.toContain("stream:");
+  });
+
+  test("[TS-SDK-RELEASE-002] built package root imports in Bun and Node", () => {
+    const sdkDir = join(root, "packages", "sdk");
+    const importScript =
+      'import("./dist/index.js").then((sdk) => { if (typeof sdk.createAppaloftClient !== "function") process.exit(2); })';
+
+    for (const command of [
+      ["bun", "-e", importScript],
+      ["node", "--input-type=module", "-e", importScript],
+    ]) {
+      const result = Bun.spawnSync(command, { cwd: sdkDir, stderr: "pipe", stdout: "pipe" });
+      expect(result.exitCode, `${command[0]} import failed: ${result.stderr.toString()}`).toBe(0);
+    }
   });
 });

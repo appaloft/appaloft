@@ -94,9 +94,37 @@ operation descriptor 是生成器内部元数据。公开 SDK 调用方应使用
 
 SDK 是 API 边界测试和外部自动化的合适入口。领域规则、应用 handler、repository 或 adapter 单元测试仍应在它们各自的层级测试。
 
+## Sandbox 资源句柄 [#typescript-sdk-resource-handles]
+
+Sandbox 所有权链使用资源句柄，调用方不需要重复传递父级 id：
+
+```ts
+const sandbox = await appaloft.sandboxes.create(sandboxInput);
+
+try {
+  const agent = await sandbox.agents.create({ harness: "pi" });
+  const run = await agent.runs.create({ task: "Analyze and update the workspace" });
+} finally {
+  await sandbox.terminate();
+}
+```
+
+`Agent` 是 Sandbox Agent Runtime 的 SDK 别名。Pi 简写默认使用已准入的
+`aht_pi_managed_v1` harness template、fresh Run context 和自动生成的 idempotency key；显式传入
+`harnessTemplateId`、`context` 或 `idempotencyKey` 会覆盖这些 SDK 默认值。
+
+Sandbox handle 还提供 `sandbox.files.read/write`、`sandbox.exec` 和 `sandbox.terminate`。这些方法
+只注入 handle 自己的 `sandboxId`，底层仍调用 generated public operation。
+
+资源方法直接返回 descriptor，失败时抛出 `AppaloftSdkRequestError`。需要完整且不抛异常的
+`{ ok, status, data/error }` facade 时使用 `appaloft.operations`，例如
+`appaloft.operations.sandboxes.create(input)`。
+
 ## 结构化错误 [#typescript-sdk-errors]
 
-SDK 返回稳定的结构化错误字段：`code`、`category`、`message`、`retryable` 和可选 `details`。自动化应判断 `code`、`category` 或 `retryable`，不要解析人类可读的 `message`。
+Generated operation 返回稳定的结构化错误字段：`code`、`category`、`message`、`retryable` 和可选
+`details`；资源句柄会把相同安全字段暴露在 `AppaloftSdkRequestError` 上。自动化应判断 `code`、
+`category` 或 `retryable`，不要解析人类可读的 `message`。
 
 常见认证错误包括：
 
