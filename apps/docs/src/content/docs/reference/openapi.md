@@ -18,13 +18,13 @@ sidebar:
   order: 11
 ---
 
-<h2 id="openapi-generated-reference">生成的 operation 页面</h2>
+## 生成的 operation 页面 [#openapi-generated-reference]
 
 公共文档站点会从 Appaloft 的 OpenAPI 3.1 schema 生成每个 HTTP operation 的独立 reference 页面。
 
 这些页面位于 `/docs/reference/openapi/*`，并保留稳定的 `/docs/reference/openapi/` 入口，方便 Web help、CLI help 和外部书签指向同一个位置。
 
-<h2 id="openapi-source-of-truth">契约来源</h2>
+## 契约来源 [#openapi-source-of-truth]
 
 OpenAPI schema 由 `@appaloft/openapi` 生成，operation 名称、输入 schema、输出形状和错误描述必须继续来自共享业务操作契约。
 

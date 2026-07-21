@@ -17,11 +17,11 @@ sidebar:
   order: 2
 ---
 
-<h2 id="entrypoint-web-console">Web console</h2>
+## Web console [#entrypoint-web-console]
 
 适合第一次配置、查看状态、理解输入含义和跟随 `?` 帮助链接完成任务。
 
-<h2 id="entrypoint-cli">CLI</h2>
+## CLI [#entrypoint-cli]
 
 适合本地开发、SSH 服务器 bootstrap、CI 脚本和需要交互式确认的操作。
 
@@ -29,14 +29,14 @@ GitHub Action 的默认 BYOS 形态也是 CLI 表面：Pure SSH Action 使用
 `control-plane-mode: none`，在 Action 中安装/运行 CLI，通过 SSH 部署，并把状态保存在目标服务器的
 `ssh-pglite` 中。
 
-<h2 id="entrypoint-http-api">HTTP API</h2>
+## HTTP API [#entrypoint-http-api]
 
 适合自动化系统。API 描述应链接到同一 public docs anchor，不能重新定义一套输入语义。
 
 Self-hosted Server Action 使用 HTTP API 表面：`control-plane-url` 显式选择 Appaloft instance，
 `appaloft-token` 提供 deploy-token 认证。Action 不运行 CLI、不 SSH，也不会扫描目标机发现控制面。
 
-<h2 id="entrypoint-mcp-tools">MCP tools</h2>
+## MCP tools [#entrypoint-mcp-tools]
 
 当 agent host 配置 Appaloft MCP 时，使用 `appaloft mcp stdio`、`appaloft mcp serve` 或
 `npx appaloft-mcp` 暴露同一 operation catalog。

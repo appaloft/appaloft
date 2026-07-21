@@ -18,13 +18,13 @@ sidebar:
   order: 4
 ---
 
-<h2 id="domain-binding-ownership-check">Domain ownership check</h2>
+## Domain ownership check [#domain-binding-ownership-check]
 
 Ownership checks prove that the user controls a hostname. Appaloft should not mark a custom domain as ready until control is verified, and ownership failures should not be reported as deployment failures.
 
 Ownership checks usually happen after creating or updating a custom domain binding. Add the DNS record Appaloft provides, then check again.
 
-<h2 id="domain-binding-dns-records">DNS records</h2>
+## DNS records [#domain-binding-dns-records]
 
 DNS instructions should include:
 
@@ -35,7 +35,7 @@ DNS instructions should include:
 
 Copy the value Appaloft provides. Do not search logs for tokens or use secrets as DNS values.
 
-<h2 id="domain-binding-ownership-status">Status meanings</h2>
+## Status meanings [#domain-binding-ownership-status]
 
 Common states:
 
@@ -46,7 +46,7 @@ Common states:
 
 After DNS changes, `pending` can simply mean propagation has not completed.
 
-<h2 id="domain-binding-ownership-retry">When to retry</h2>
+## When to retry [#domain-binding-ownership-retry]
 
 Retry when:
 

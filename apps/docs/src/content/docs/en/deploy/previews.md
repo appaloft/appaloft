@@ -24,7 +24,7 @@ sidebar:
   order: 3
 ---
 
-<h2 id="deployment-pr-preview-action-workflow">Action-only pull request previews</h2>
+## Action-only pull request previews [#deployment-pr-preview-action-workflow]
 
 Action-only previews run from a GitHub Actions workflow that you own. The workflow checks out a pull request, maps trusted GitHub context into Appaloft preview flags, deploys through the normal deployment path, and optionally publishes a preview URL.
 
@@ -56,7 +56,7 @@ The preview flags select preview identity and route policy outside committed con
 
 The public `appaloft/deploy-action` wrapper maps trusted workflow inputs to the same preview flags. Use the CLI shape directly when you need local debugging or wrapper behavior that has not shipped yet.
 
-<h2 id="deployment-action-self-hosted-server-mode">Self-hosted server Action mode</h2>
+## Self-hosted server Action mode [#deployment-action-self-hosted-server-mode]
 
 For repositories that already have a self-hosted Appaloft console/API,
 `appaloft/deploy-action` can trigger the server API instead of running CLI/SSH from the GitHub
@@ -154,13 +154,13 @@ Keep token, SSH, database identity, organization/tenant/provider account identit
 binding a repository to an existing self-hosted project/environment/resource/server. It is not a
 default set of ids every workflow should maintain.
 
-<h2 id="deployment-pr-preview-output">Preview URL output</h2>
+## Preview URL output [#deployment-pr-preview-output]
 
 Preview deploys can expose a URL from generated/default access or from a trusted preview domain template. Generated access works when the selected server has a usable generated access provider and public address. A custom preview host such as `pr-123.preview.example.com` requires wildcard DNS that already points at the selected server.
 
 Use `--require-preview-url` when the workflow should fail if Appaloft cannot observe a public preview route. Without that flag, deployment may still be accepted and visible with diagnostics even when no public URL is available.
 
-<h2 id="deployment-pr-preview-cleanup-workflow">Close-event cleanup</h2>
+## Close-event cleanup [#deployment-pr-preview-cleanup-workflow]
 
 Action-only cleanup is explicit. Add a `pull_request.closed` workflow that runs:
 
@@ -173,13 +173,13 @@ appaloft preview cleanup . \
 
 Cleanup is idempotent. It stops preview-owned runtime state when present, removes preview route desired state, unlinks preview source identity, and preserves production deployments and ordinary deployment history.
 
-<h2 id="deployment-preview-fork-safety">Fork safety and secrets</h2>
+## Fork safety and secrets [#deployment-preview-fork-safety]
 
 Do not expose deployment credentials to untrusted fork pull requests. The default safe pattern is to skip fork previews unless you have an explicit reduced-credential policy.
 
 Secrets should come from GitHub Secrets or another trusted workflow secret store and be passed as secret references such as `ci-env:NAME`. Do not commit SSH keys, tokens, database URLs, production secret values, or Appaloft project/resource/server identity into `appaloft.yml`. Use narrow `controlPlane.deploymentContext` only for one-time bootstrap or advanced override.
 
-<h2 id="product-grade-preview-deployments">Product-grade control-plane previews</h2>
+## Product-grade control-plane previews [#product-grade-preview-deployments]
 
 Product-grade previews are an Appaloft Cloud or self-hosted control-plane workflow. They are not the same as Action-only previews maintained by each repository's workflow file.
 
@@ -200,7 +200,7 @@ For self-hosted control planes, webhook verification uses `APPALOFT_GITHUB_WEBHO
 
 Use product-grade previews when you need Appaloft to own preview orchestration, policy, feedback, cleanup retries, and team-visible audit instead of relying on every repository to maintain its own workflow file.
 
-<h2 id="deployment-preview-troubleshooting">Troubleshoot previews</h2>
+## Troubleshoot previews [#deployment-preview-troubleshooting]
 
 Common checks:
 

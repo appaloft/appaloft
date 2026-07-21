@@ -36,7 +36,7 @@ sidebar:
   order: 5
 ---
 
-<h2 id="storage-volume-lifecycle">存储卷生命周期</h2>
+## 存储卷生命周期 [#storage-volume-lifecycle]
 
 Storage volume 是 Appaloft 记录的持久化存储意图。它可以是 named volume，也可以是受信任的
 bind mount。创建存储卷不会创建 deployment，也不会立即修改运行中的容器。
@@ -52,7 +52,7 @@ appaloft storage volume list --project prj_prod
 appaloft storage volume show vol_uploads
 ```
 
-<h2 id="storage-volume-attachment">挂载到 Resource</h2>
+## 挂载到 Resource [#storage-volume-attachment]
 
 Resource storage attachment 描述未来部署应该把哪个 storage volume 挂到容器内哪个路径。它只影响
 之后的部署快照，不会改写已经完成或正在运行的部署。
@@ -63,7 +63,7 @@ appaloft resource storage attach res_web vol_uploads --destination-path /app/upl
 
 一个 Resource 不能在同一个 destination path 上挂载两个存储卷。destination path 必须是容器内绝对路径，不是宿主机路径。
 
-<h2 id="storage-volume-delete-safety">删除安全</h2>
+## 删除安全 [#storage-volume-delete-safety]
 
 删除存储卷前，Appaloft 必须确认没有活动 Resource attachment、备份保留或其他安全 blocker。删除不会自动
 detach Resource，也不会清理运行时 provider volume、备份数据或历史 deployment snapshot。
@@ -84,7 +84,7 @@ bind-mount source path、provider-native storage handle、备份数据或 broad 
 的 storage mount realization 发生在 deployment execution 里：Appaloft 会为明确 target service 的
 Compose workload 生成 stack override，部署候选 stack，验证后再清理 superseded Appaloft stack/service。
 
-<h2 id="storage-volume-backup-restore">Storage volume 备份和恢复</h2>
+## Storage volume 备份和恢复 [#storage-volume-backup-restore]
 
 Storage volume backup 用来保护挂载在 Resource 上的应用数据，例如 PocketBase 的 `/pb_data`、
 上传目录、JSON 文件或 SQLite 文件。它不是 DependencyResource backup：Postgres、Redis 这类服务依赖
@@ -167,7 +167,7 @@ broker、安全的 bucket/key policy 和 credential reference 后才会启用；
 workload server，也不会进入 backup readback。WebDAV、Restic repository 和 provider snapshot 仍需要
 各自的 distribution/runtime adapter。
 
-<h2 id="storage-volume-surfaces">入口差异</h2>
+## 入口差异 [#storage-volume-surfaces]
 
 CLI 适合创建、查看、重命名、删除和 attach/detach。HTTP API 使用相同 command/query schema。
 Web Resource detail 的 Storage 区域可以列出当前项目/环境下可用的 storage volumes，展示安全的

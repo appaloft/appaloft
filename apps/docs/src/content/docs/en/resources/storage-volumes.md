@@ -35,7 +35,7 @@ sidebar:
   order: 5
 ---
 
-<h2 id="storage-volume-lifecycle">Storage volume lifecycle</h2>
+## Storage volume lifecycle [#storage-volume-lifecycle]
 
 A storage volume is Appaloft's durable storage intent. It can be a named volume or a trusted bind
 mount. Creating a storage volume does not create a deployment and does not immediately change a
@@ -52,7 +52,7 @@ appaloft storage volume list --project prj_prod
 appaloft storage volume show vol_uploads
 ```
 
-<h2 id="storage-volume-attachment">Attach to a Resource</h2>
+## Attach to a Resource [#storage-volume-attachment]
 
 A Resource storage attachment describes which storage volume a future deployment should mount and
 which container path should receive it. It affects later deployment snapshots only. It does not
@@ -65,7 +65,7 @@ appaloft resource storage attach res_web vol_uploads --destination-path /app/upl
 A Resource cannot have two storage attachments at the same destination path. The destination path is
 an absolute path inside the workload container, not a host path.
 
-<h2 id="storage-volume-config-file">Declare storage in appaloft.yaml</h2>
+## Declare storage in appaloft.yaml [#storage-volume-config-file]
 
 For repository-driven deploys, you can ask Appaloft to create or reuse a managed named volume and
 attach it before deployment:
@@ -88,7 +88,7 @@ For pull request previews, add `preview.lifecycle: ephemeral` only when the prev
 be cleaned up on PR close. Preview cleanup removes storage only when the source link proves that
 repository config created and attached that exact preview volume.
 
-<h2 id="storage-volume-delete-safety">Delete safety</h2>
+## Delete safety [#storage-volume-delete-safety]
 
 Before deleting a storage volume, Appaloft must confirm that no active Resource attachment, backup
 retention rule, or other safety blocker remains. Delete does not automatically detach Resources,
@@ -114,7 +114,7 @@ Swarm Compose stack storage mount realization happens during deployment executio
 a stack override for Compose workloads with explicit target service metadata, deploys a candidate
 stack, verifies it, then cleans superseded Appaloft stacks/services.
 
-<h2 id="storage-volume-backup-restore">Storage volume backup and restore</h2>
+## Storage volume backup and restore [#storage-volume-backup-restore]
 
 Storage volume backup protects application data mounted into a Resource, such as PocketBase
 `/pb_data`, upload directories, JSON files, or SQLite files. It is not DependencyResource backup:
@@ -201,7 +201,7 @@ target becomes available. Long-lived object-storage credentials are not sent to 
 server or persisted in backup readback. WebDAV, Restic repository, and provider snapshot targets
 still require their own distribution/runtime adapters.
 
-<h2 id="storage-volume-surfaces">Entrypoint differences</h2>
+## Entrypoint differences [#storage-volume-surfaces]
 
 The CLI fits create, inspect, rename, delete, attach, and detach workflows. The HTTP API uses the
 same command/query schemas. Web Resource detail includes a Storage section that lists available

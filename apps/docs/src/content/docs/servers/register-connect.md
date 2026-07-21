@@ -28,7 +28,7 @@ sidebar:
 
 ![Server connectivity flow](/docs/diagrams/server-connectivity.svg)
 
-<h2 id="server-deployment-target">服务器是什么</h2>
+## 服务器是什么 [#server-deployment-target]
 
 服务器是 Appaloft 可以连接、检查和部署应用的目标。用户看到的是 SSH 地址、凭据、连接状态、运行环境摘要和代理准备状态。
 
@@ -48,7 +48,7 @@ sidebar:
 
 删除服务器只适用于已经停用且检查没有 blocker 的服务器。删除会把服务器从普通列表、详情和新部署目标选择中移除，但不会自动清理部署历史、资源、域名、证书、凭据、路由、日志或审计记录。CLI 删除需要显式确认，例如 `--confirm srv_primary`；Web 的服务器详情危险操作页也需要输入完全一致的 server id 才会提交删除。
 
-<h2 id="server-connectivity-test">连接测试</h2>
+## 连接测试 [#server-connectivity-test]
 
 连接测试用于确认 Appaloft 能到达服务器，并能读取必要的运行环境信息。测试失败不等于已有部署失败，但会阻止依赖该服务器的新部署。
 
@@ -60,7 +60,7 @@ sidebar:
 - 基础运行环境是否满足当前 provider/runtime 要求。
 - 必要时返回代理或 Docker 相关诊断。
 
-<h2 id="server-registration-inputs">注册输入</h2>
+## 注册输入 [#server-registration-inputs]
 
 注册服务器时应明确 host、port、user、凭据来源和可选标签。不要把资源、环境或域名写进服务器注册输入。
 
@@ -74,7 +74,7 @@ sidebar:
 - credential：SSH key 路径、已保存凭据或一次性 secret 输入。
 - display name / labels：帮助用户区分服务器。
 
-<h2 id="server-registration-surfaces">入口说明</h2>
+## 入口说明 [#server-registration-surfaces]
 
 Web console 应把注册和连接测试放在同一条引导路径中。用户输入 SSH 信息后，应能立即看到连接测试结果和下一步。
 
@@ -82,7 +82,7 @@ CLI 适合本地 SSH 服务器 bootstrap，因为它能读取本机 key path 并
 
 HTTP API 适合自动化注册服务器，但应避免回显 secret。连接测试结果应以结构化状态返回。
 
-<h2 id="server-registration-recovery">失败恢复</h2>
+## 失败恢复 [#server-registration-recovery]
 
 常见失败和恢复：
 
@@ -121,7 +121,7 @@ appaloft server register \
 `--target-kind orchestrator-cluster` 会记录一个集群形态的部署目标，用于未来的 Docker Swarm
 等集群 backend。它本身不会让目标可用于部署；是否就绪仍取决于已注册的 runtime backend 能力和连接检查。
 
-<h2 id="docker-swarm-runtime-target">Docker Swarm runtime target</h2>
+## Docker Swarm runtime target [#docker-swarm-runtime-target]
 
 Docker Swarm 目标应注册为集群形态的部署目标。只有当目标是 Appaloft 能通过所选连接方式访问的
 Swarm manager endpoint 时，才使用 `--target-kind orchestrator-cluster --provider docker-swarm`。

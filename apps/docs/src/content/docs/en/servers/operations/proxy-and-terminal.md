@@ -19,7 +19,7 @@ sidebar:
   order: 4
 ---
 
-<h2 id="server-proxy-readiness">Proxy readiness</h2>
+## Proxy readiness [#server-proxy-readiness]
 
 Proxy readiness determines whether default access URLs and routes work. Proxy repair is an explicit operation.
 
@@ -35,7 +35,7 @@ When changing from `none` to `traefik` or `caddy`, run explicit repair or let a 
 appaloft server proxy repair srv_primary
 ```
 
-<h2 id="server-terminal-session">Open a terminal session</h2>
+## Open a terminal session [#server-terminal-session]
 
 Terminal sessions are controlled troubleshooting tools, not the normal deployment path.
 
@@ -54,6 +54,6 @@ Opening and closing a terminal writes safe audit metadata: session id, scope, ta
 entrypoint, provider key, timestamps, and close reason. Audit records do not store terminal input,
 terminal output, raw commands, private keys, access tokens, or environment secret values.
 
-<h2 id="server-terminal-safe-copy">Copy output safely</h2>
+## Copy output safely [#server-terminal-safe-copy]
 
 Terminal output can contain paths, environment details, or runtime data. Prefer diagnostic summaries before sharing output.

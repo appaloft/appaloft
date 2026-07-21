@@ -26,7 +26,7 @@ sidebar:
 
 ![Resource profile flow](/docs/diagrams/resource-profiles.svg)
 
-<h2 id="resource-source-profile">Source profile</h2>
+## Source profile [#resource-source-profile]
 
 The source profile tells Appaloft where to read the application from. It belongs to the resource, not to one temporary deployment request.
 
@@ -39,7 +39,7 @@ Existing entrypoints should cover:
 
 After source profile changes, new deployments read the new source. Completed and running deployments keep their own deployment snapshots. Saving the source profile does not pull source, create a deployment, or restart the current runtime.
 
-<h2 id="resource-runtime-profile">Runtime profile</h2>
+## Runtime profile [#resource-runtime-profile]
 
 The runtime profile describes how Appaloft should run the resource. It includes install, build, start, static output, container naming intent, and runtime strategy.
 
@@ -55,7 +55,7 @@ During deployment, Appaloft combines source and runtime profiles into a runtime 
 
 Saving the runtime profile is a durable resource profile edit. It only changes planning input for future deployments. It does not edit historical deployment snapshots or immediately restart, rename, or replace a running workload.
 
-<h2 id="resource-source-runtime-fit">Source and runtime fit</h2>
+## Source and runtime fit [#resource-source-runtime-fit]
 
 If source and runtime settings clearly conflict, users should see actionable correction guidance before deployment.
 
@@ -66,7 +66,7 @@ Common mismatches:
 - Image source combined with source build commands.
 - Application listener port does not match the network profile.
 
-<h2 id="resource-profile-drift">Profile drift</h2>
+## Profile drift [#resource-profile-drift]
 
 Profile drift means the resource's saved profile, the profile in an entry config file, or the profile captured by the latest deployment snapshot no longer match. It often appears after an existing resource is changed through repository config, a GitHub Action, CLI flags, or the Web console.
 
@@ -86,7 +86,7 @@ resource, and optional server a repository source should reuse. Use `appaloft so
 `show` to inspect that safe mapping, `relink` to retarget it intentionally, and `delete` to remove
 the mapping without deleting the resource or deployment history.
 
-<h2 id="resource-source-runtime-surfaces">Entrypoints</h2>
+## Entrypoints [#resource-source-runtime-surfaces]
 
 The Web console should show source/runtime profile in resource creation and resource configuration screens with field-level help.
 
@@ -94,7 +94,7 @@ The CLI should map `resources create`, `resources configure-source`, and `resour
 
 The HTTP API should reuse resource configuration schemas and avoid transport-only source/runtime shapes.
 
-<h2 id="resource-source-runtime-verification">Verify the configuration</h2>
+## Verify the configuration [#resource-source-runtime-verification]
 
 After configuration, inspect resource details for the source/runtime summary. The next deployment writes these profiles into its deployment snapshot, while old deployment details keep the values captured at the time. If deployment fails, detect failures usually point to source, while plan failures usually point to source/runtime/profile mismatch.
 

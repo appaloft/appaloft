@@ -20,7 +20,7 @@ sidebar:
   order: 0
 ---
 
-<h2 id="appaloft-skill">Appaloft AI entrypoint</h2>
+## Appaloft AI entrypoint [#appaloft-skill]
 
 The Appaloft Skill is the full product entrypoint for AI agents. It maps to the same Appaloft
 operation catalog as the CLI, HTTP API, Web console, and MCP tools; the difference is that
@@ -46,7 +46,7 @@ environment variable, or CLI-approved handoff, then use `APPALOFT_TOKEN` or
 `appaloft auth token login --stdin` / `--token-file <path>` so the CLI verifies and stores the
 profile.
 
-<h2 id="appaloft-skill-install">Install</h2>
+## Install [#appaloft-skill-install]
 
 Install the full Appaloft skill:
 
@@ -67,7 +67,7 @@ Run `npx skills list --global --agent codex` or
 `appaloft/SKILL.md` exists under `~/.agents/skills` for Codex or `~/.claude/skills` for Claude Code.
 Start a new agent session so the host rebuilds its skill catalog.
 
-<h2 id="appaloft-skill-scope">Scope</h2>
+## Scope [#appaloft-skill-scope]
 
 The full skill covers every entrypoint in the Appaloft CLI operation catalog, including:
 
@@ -83,7 +83,7 @@ The full skill covers every entrypoint in the Appaloft CLI operation catalog, in
 
 The complete CLI map ships with the package at `skills/appaloft/references/cli-entrypoints.md`.
 
-<h2 id="appaloft-skill-evals">Best-practice validation</h2>
+## Best-practice validation [#appaloft-skill-evals]
 
 The Appaloft skill follows the Agent Skills progressive-disclosure model: keep `SKILL.md` short,
 and put long command maps, deploy protocol, and MCP guidance in one-level `references/` files. To
@@ -126,7 +126,7 @@ GitHub Actions does not run real-model evals on normal pull requests. Configure
 
 Add `--dry-run` to verify prompt construction without calling a model.
 
-<h2 id="appaloft-skill-mcp">MCP Tools</h2>
+## MCP Tools [#appaloft-skill-mcp]
 
 MCP is Appaloft's machine-callable tool layer. Run `appaloft mcp stdio` to start the stdio MCP
 server, `appaloft mcp serve` to start a local HTTP `/mcp` endpoint, or `npx appaloft-mcp` for the
@@ -137,7 +137,7 @@ command/query schemas, and calls still enter the Appaloft command/query buses.
 See [Appaloft MCP server](/docs/en/agent/mcp-server/#appaloft-mcp-server) for tool naming,
 resources, prompts, and safety boundaries.
 
-<h2 id="appaloft-skill-safety">Safety boundary</h2>
+## Safety boundary [#appaloft-skill-safety]
 
 - Do not read `.env`, private keys, token file contents, cloud credentials, deploy tokens, SSH
   material, cookies, or unmasked secrets.
@@ -149,7 +149,7 @@ resources, prompts, and safety boundaries.
 - Do not assume hosted artifact storage. By default, deployment still targets the user's selected
   BYOS destination.
 
-<h2 id="appaloft-skill-reference">Source document</h2>
+## Source document [#appaloft-skill-reference]
 
 The complete governing source lives in `docs/agent/appaloft-skill.md`. The standard skill source is
 `skills/appaloft`; deploy protocol and entrypoint boundaries live under

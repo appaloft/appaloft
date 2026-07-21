@@ -28,14 +28,14 @@ sidebar:
   order: 12
 ---
 
-<h2 id="advanced-control-plane-modes">Control-plane modes</h2>
+## Control-plane modes [#advanced-control-plane-modes]
 
 Appaloft supports local-first, self-hosted, and future cloud-assisted control-plane paths.
 `appaloft doctor`, `GET /api/system/doctor`, and the Web Instance page expose local readiness,
 provider/plugin diagnostics, and configured scheduled worker activation without starting workers or
 dispatching maintenance work.
 
-<h2 id="whole-instance-portability">Whole-instance portability</h2>
+## Whole-instance portability [#whole-instance-portability]
 
 Owners can export the control-plane database to a passphrase-encrypted artifact and validate it
 before importing. The artifact uses AES-256-GCM with a per-artifact salt and authenticated checksum;
@@ -55,7 +55,7 @@ leaves the target unchanged if validation or import fails. Source and target mus
 supported schema revision. List, inspect, and explicitly delete artifact metadata with
 `appaloft instance portability artifact list|show|delete`.
 
-<h2 id="temporary-tunnels">Temporary tunnels</h2>
+## Temporary tunnels [#temporary-tunnels]
 
 Self-hosted Appaloft can start time-bounded Cloudflare Quick Tunnel or ngrok sessions for a local or
 private HTTP origin. Public origins, credential-bearing URLs, non-HTTP schemes, and unsafe provider
@@ -75,7 +75,7 @@ interval and claim batch using `APPALOFT_TUNNEL_RECONCILE_INTERVAL_SECONDS` and
 capability and authorization readback rather than assuming that the installed provider binary
 implies access.
 
-<h2 id="maintenance-worker-activation">Maintenance worker activation</h2>
+## Maintenance worker activation [#maintenance-worker-activation]
 
 Maintenance workers are background pollers. `appaloft doctor`, `GET /api/system/doctor`, and the
 Web Instance page show configured worker status only; they do not start workers, tick schedulers, or
@@ -95,14 +95,14 @@ collector records bounded samples, and the scheduled task runner only runs due s
 The doctor output and Web Instance panel also show the safe `APPALOFT_*` configuration keys for each
 worker, so a disabled worker remains explicit until an operator changes the matching setting.
 
-<h2 id="advanced-binary-packaging">Binary packaging</h2>
+## Binary packaging [#advanced-binary-packaging]
 
 The binary embeds Web console assets and public docs assets separately. Docs are served under `/docs/*`. When `APPALOFT_DOCS_STATIC_DIR` is set, Appaloft serves docs from that directory while Web console assets keep their own source.
 
-<h2 id="advanced-provider-boundary">Provider boundary</h2>
+## Provider boundary [#advanced-provider-boundary]
 
 Provider docs explain what users can configure and observe without leaking provider SDK types.
 
-<h2 id="advanced-plugin-boundary">Plugin boundary</h2>
+## Plugin boundary [#advanced-plugin-boundary]
 
 Plugin docs explain compatibility, permissions, and sandbox assumptions.

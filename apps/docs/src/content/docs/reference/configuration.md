@@ -18,15 +18,15 @@ sidebar:
   order: 5
 ---
 
-<h2 id="reference-runtime-configuration">运行时配置</h2>
+## 运行时配置 [#reference-runtime-configuration]
 
 运行时配置控制 Appaloft serve、数据库、静态资源目录和自托管行为。
 
-<h2 id="reference-docs-static-dir">Docs 静态资源目录</h2>
+## Docs 静态资源目录 [#reference-docs-static-dir]
 
 `APPALOFT_DOCS_STATIC_DIR` 覆盖 public docs 静态资源，不覆盖 Web console。
 
-<h2 id="reference-durable-worker-runtime">Durable worker runtime</h2>
+## Durable worker runtime [#reference-durable-worker-runtime]
 
 Durable worker runtime 配置控制已经 accepted 的长耗时工作在请求返回 id 之后如何被 claim、执行和监控。
 默认 `embedded` 模式会随 `appaloft serve` 一起启动 worker slots，降低自托管部署难度。operator 也可以运行
@@ -52,7 +52,7 @@ worker group、worker ids 和 coordinator role。Web/API 进程不执行 durable
 | `APPALOFT_WORKER_OBSERVED_GROUPS` | unset | 逗号分隔的 `worker-group:count` 列表。doctor 和 Web Instance 页面会从 durable worker 心跳 read model 读取这些 group，即使当前 Web/API 进程配置为 `APPALOFT_WORKER_RUNTIME_MODE=disabled`。 |
 | `APPALOFT_DATABASE_POOL_MAX` | `10` | PostgreSQL runtime 每个进程最多保留的连接数。多 Web/worker 进程共享较小 session pool 时应按进程数降低这个值。 |
 
-<h2 id="reference-scheduled-workers">Scheduled workers</h2>
+## Scheduled workers [#reference-scheduled-workers]
 
 除非另有说明，scheduled worker 默认关闭。只在应拥有周期性工作的实例上启用它们。
 

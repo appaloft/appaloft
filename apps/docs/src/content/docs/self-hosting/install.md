@@ -16,15 +16,15 @@ sidebar:
   order: 1
 ---
 
-<h2 id="self-hosting-serve-paths">Serve 路径</h2>
+## Serve 路径 [#self-hosting-serve-paths]
 
 `appaloft serve` 根路径提供 Web console，`/docs/*` 提供 public docs。
 
-<h2 id="self-hosting-install-binary">安装 binary</h2>
+## 安装 binary [#self-hosting-install-binary]
 
 Binary 包含运行时入口、Web console 静态资源和 public docs 静态资源。
 
-<h2 id="self-hosting-install-docker">使用 Docker 安装</h2>
+## 使用 Docker 安装 [#self-hosting-install-docker]
 
 Release 里的 `install.sh` 会把 Appaloft 安装成 Docker Compose stack，同一个 Appaloft server
 同时提供 console 和 docs：

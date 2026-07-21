@@ -22,7 +22,7 @@ sidebar:
 
 ![Access readiness chain](/docs/diagrams/access-readiness.svg)
 
-<h2 id="access-generated-route">Generated access URL</h2>
+## Generated access URL [#access-generated-route]
 
 The generated access URL is the URL Appaloft provides before a custom domain is ready. Use it to confirm that a deployment is reachable from a browser and to separate app/proxy problems from DNS or TLS problems.
 
@@ -34,7 +34,7 @@ domain, then the latest generated URL, then a planned generated URL before first
 Generated URLs are still labeled separately as default access and are not treated as custom domain
 bindings.
 
-<h2 id="default-access-policy">Default access policy</h2>
+## Default access policy [#default-access-policy]
 
 The default access policy decides how Appaloft will generate default access URLs in the future. It is not input for one deployment and it is not a custom domain binding.
 
@@ -58,7 +58,7 @@ Common uses:
 - Validate a resource before configuring a custom domain.
 - Troubleshoot whether a failure belongs to the app/proxy layer or the domain layer.
 
-<h2 id="resource-access-profile">Resource access profile</h2>
+## Resource access profile [#resource-access-profile]
 
 A resource access profile controls whether one resource participates in generated default access.
 It does not bind a custom domain and it does not change the system or server default access policy.
@@ -70,7 +70,7 @@ The profile has two generated access modes:
 
 The optional path prefix changes the path Appaloft asks the generated access provider to route for future planned routes and deployment snapshots. Existing deployment snapshots are not rewritten after the profile changes.
 
-<h2 id="access-generated-route-inputs">Inputs it depends on</h2>
+## Inputs it depends on [#access-generated-route-inputs]
 
 Generated access depends on user-visible inputs:
 
@@ -81,7 +81,7 @@ Generated access depends on user-visible inputs:
 
 If the resource has no listener port, or the proxy is not ready, Appaloft may show resource and deployment state but should not mark the generated URL as ready.
 
-<h2 id="access-generated-route-readiness">Readiness conditions</h2>
+## Readiness conditions [#access-generated-route-readiness]
 
 The generated URL is ready when:
 
@@ -93,7 +93,7 @@ The generated URL is ready when:
 
 These states should be shown separately. Runtime failure, health failure, proxy failure, and DNS/TLS failure are different recovery paths.
 
-<h2 id="access-generated-route-surfaces">Where to inspect it</h2>
+## Where to inspect it [#access-generated-route-surfaces]
 
 The Web console should show generated access in resource details, deployment results, and access sections with nearby status and troubleshooting links.
 
@@ -101,7 +101,7 @@ The CLI should print generated access in deployment results, resource details, o
 
 The HTTP API should return the URL, readiness state, last observation time, and failure reason so automation can decide whether to wait, retry, or ask for user action.
 
-<h2 id="access-generated-route-troubleshooting">Troubleshooting order</h2>
+## Troubleshooting order [#access-generated-route-troubleshooting]
 
 If the generated URL does not open:
 

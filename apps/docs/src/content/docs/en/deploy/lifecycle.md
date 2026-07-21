@@ -21,7 +21,7 @@ sidebar:
   order: 3
 ---
 
-<h2 id="deployment-lifecycle">Deployment lifecycle</h2>
+## Deployment lifecycle [#deployment-lifecycle]
 
 Appaloft models deployment as `detect -> plan -> execute -> verify -> rollback`.
 
@@ -41,7 +41,7 @@ This command sends only the existing context ids through the shared `deployments
 
 ![Deployment lifecycle](/docs/diagrams/deployment-lifecycle.svg)
 
-<h3 id="deployment-detect">Detect</h3>
+### Detect [#deployment-detect]
 
 Detect reads source and configuration evidence to identify application type, build behavior, runtime entrypoint, and network exposure.
 
@@ -51,13 +51,13 @@ Common failures:
 - Repository ref or base directory does not exist.
 - App type cannot be detected and no runtime profile was supplied.
 
-<h3 id="deployment-plan">Plan</h3>
+### Plan [#deployment-plan]
 
 Plan turns source, runtime, health, and network configuration into an executable plan that explains what Appaloft will run.
 
 The plan should summarize build, start, health check, and access routing decisions.
 
-<h3 id="deployment-plan-preview">Deployment plan preview</h3>
+### Deployment plan preview [#deployment-plan-preview]
 
 Plan preview runs only `detect -> plan`. It does not create a deployment attempt, write deployment events, or run build, run, verify, or proxy changes.
 
@@ -65,7 +65,7 @@ The preview shows detected framework/runtime evidence, selected planner, support
 
 Explicit planner/profile choices win over inference. Custom install/build/start commands, Dockerfile, Compose, prebuilt image, source base directory, internal port, and explicit health policy can repair unsupported, ambiguous, or missing evidence before you run `deployments.create`. Static deployments use the Appaloft static server on internal port `80`; server-rendered or HTTP services need an internal port in the resource network profile.
 
-<h3 id="deployment-execute">Execute</h3>
+### Execute [#deployment-execute]
 
 Execute builds, uploads, starts, and routes the application in the selected target environment.
 
@@ -73,7 +73,7 @@ Execution failures often involve network, credentials, image pulls, build comman
 
 Compose updates run an image preflight before starting the candidate project: pull image-backed services, build buildable services, then run the replacement. A failed preflight starts no candidate containers. Compose public routing also requires an explicit `targetServiceName`, so Appaloft applies proxy labels and the edge network only to that service.
 
-<h3 id="deployment-verify">Verify</h3>
+### Verify [#deployment-verify]
 
 Verify checks process state, health policy, proxy routing, and access URLs.
 
@@ -83,17 +83,17 @@ A successful `docker compose up` is not deployment success. Appaloft still check
 
 Use `appaloft deployments timeline <deploymentId> --follow --json` when you need a structured replay or live timeline stream after the original deploy command has disconnected. The stream can return entry, heartbeat, gap, closed, or error envelopes; a gap means re-open observation or inspect deployment detail before choosing recovery.
 
-<h3 id="deployment-proof">Deployment proof</h3>
+### Deployment proof [#deployment-proof]
 
 Run `appaloft deployments proof <deploymentId> --json` or read `GET /api/deployments/{deploymentId}/proof` when automation needs to know whether the accepted source, artifact, and configuration became the workload observed now.
 
 The result distinguishes `verified`, `partially-verified`, `unverified`, `stale`, and `failed`. It compares safe source/artifact/configuration fingerprints with resolved runtime identity, workload generation, health, access-route ownership, and recovery evidence. Missing adapter evidence is reported as unavailable and never counts as verified. A healthy old workload can therefore remain healthy while the attempted deployment proof fails or becomes stale.
 
-<h3 id="deployment-rollback">Rollback</h3>
+### Rollback [#deployment-rollback]
 
 Rollback is the recovery path after failure. It should not hide failure as success.
 
-<h2 id="deployment-status-reading">How to read status</h2>
+## How to read status [#deployment-status-reading]
 
 Start from the latest failed phase:
 
