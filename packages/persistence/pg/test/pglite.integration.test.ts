@@ -1547,6 +1547,88 @@ describe("pglite persistence integration", () => {
     }
   }, 15000);
 
+  test("[RES-PROFILE-DELETE-006B] ignores soft-deleted domain bindings and revoked certificates as resource blockers", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-deleted-domain-blocker-"));
+    const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
+    const context = createRepositoryContext();
+    let closeDatabase: (() => Promise<void>) | undefined;
+
+    try {
+      const { createDatabase, createMigrator, PgResourceDeletionBlockerReader } = await import(
+        "../src/index"
+      );
+      const database = await createDatabase({
+        driver: "pglite",
+        pgliteDataDir,
+      });
+      closeDatabase = () => database.close();
+      const migrator = createMigrator(database.db);
+      const migrationResult = await migrator.migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      const target = await seedSourceLinkContext(database.db, "deleted_domain_blocker", {
+        lifecycleStatus: "archived",
+        archivedAt: "2026-01-01T00:01:00.000Z",
+      });
+      await insertDomainBinding(database.db, target, {
+        id: "dmb_deleted_domain_blocker",
+        domainName: "deleted.example.test",
+        status: "deleted",
+        createdAt: "2026-01-01T00:02:00.000Z",
+      });
+      await insertDomainBinding(database.db, target, {
+        id: "dmb_failed_domain_blocker",
+        domainName: "failed.example.test",
+        status: "failed",
+        createdAt: "2026-01-01T00:02:30.000Z",
+      });
+      await insertDomainBinding(database.db, target, {
+        id: "dmb_active_domain_blocker",
+        domainName: "active.example.test",
+        status: "bound",
+        createdAt: "2026-01-01T00:03:00.000Z",
+      });
+      await database.db
+        .insertInto("certificates")
+        .values({
+          id: "crt_deleted_domain_blocker",
+          domain_binding_id: "dmb_deleted_domain_blocker",
+          domain_name: "deleted.example.test",
+          status: "revoked",
+          source: "managed",
+          provider_key: "acme",
+          challenge_type: "http-01",
+          issued_at: "2026-01-01T00:03:30.000Z",
+          expires_at: "2026-04-01T00:03:30.000Z",
+          fingerprint: "sha256:deleted-domain-blocker",
+          secret_ref: "appaloft+pg://certificate/crt_deleted_domain_blocker/managed-bundle",
+          safe_metadata: {},
+          secret_refs: {},
+          attempts: [],
+          created_at: "2026-01-01T00:03:30.000Z",
+        })
+        .execute();
+
+      const reader = new PgResourceDeletionBlockerReader(database.db);
+      const result = await reader.findBlockers(context, {
+        resourceId: target.resourceId,
+      });
+
+      expect(result.isOk()).toBe(true);
+      expect(result._unsafeUnwrap()).toEqual([
+        {
+          kind: "domain-binding",
+          relatedEntityId: "dmb_active_domain_blocker",
+          relatedEntityType: "domain-binding",
+          count: 1,
+        },
+      ]);
+    } finally {
+      await closeDatabase?.();
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  }, 15000);
+
   test("[SOURCE-LINK-STATE-015] pg source link store persists and reads mappings", async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-source-links-"));
     const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");

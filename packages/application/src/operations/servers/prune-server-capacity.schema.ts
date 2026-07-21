@@ -18,16 +18,27 @@ export const defaultRuntimeTargetPruneCategories = [
 ] as const satisfies RuntimeTargetPruneCategory[];
 export const runtimeTargetPruneCategories = runtimeTargetPruneCategorySchema.options;
 
-export const pruneServerCapacityCommandInputSchema = z.object({
-  serverId: nonEmptyTrimmedString("Server id"),
-  before: z.string().datetime(),
-  categories: z
-    .array(runtimeTargetPruneCategorySchema)
-    .min(1)
-    .default([...defaultRuntimeTargetPruneCategories]),
-  target: nonEmptyTrimmedString("Runtime prune candidate target").optional(),
-  dryRun: z.boolean().default(true),
-});
+export const pruneServerCapacityCommandInputSchema = z
+  .object({
+    serverId: nonEmptyTrimmedString("Server id"),
+    before: z.string().datetime(),
+    categories: z
+      .array(runtimeTargetPruneCategorySchema)
+      .min(1)
+      .default([...defaultRuntimeTargetPruneCategories]),
+    target: nonEmptyTrimmedString("Runtime prune candidate target").optional(),
+    dryRun: z.boolean().default(true),
+    includeOrphanRunning: z.boolean().default(false),
+  })
+  .superRefine((value, ctx) => {
+    if (value.includeOrphanRunning && !value.target) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["target"],
+        message: "includeOrphanRunning requires an explicit target filter",
+      });
+    }
+  });
 
 export type RuntimeTargetPruneCategory = z.output<typeof runtimeTargetPruneCategorySchema>;
 export type PruneServerCapacityCommandInput = z.input<typeof pruneServerCapacityCommandInputSchema>;

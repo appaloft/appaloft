@@ -74,12 +74,15 @@ export class PgServerDeletionBlockerReader implements ServerDeletionBlockerReade
             .selectFrom("domain_bindings")
             .select("id")
             .where("server_id", "=", input.serverId)
+            .where("status", "not in", ["failed", "deleted"])
             .execute();
           const certificateRows = await executor
             .selectFrom("certificates")
             .innerJoin("domain_bindings", "domain_bindings.id", "certificates.domain_binding_id")
             .select("certificates.id as id")
             .where("domain_bindings.server_id", "=", input.serverId)
+            .where("domain_bindings.status", "not in", ["failed", "deleted"])
+            .where("certificates.status", "not in", ["deleted", "revoked"])
             .execute();
           const credentialRows = await executor
             .selectFrom("servers")

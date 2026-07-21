@@ -9,6 +9,7 @@ APPALOFT_PRUNE_BEFORE='2026-01-01T00:05:00.000Z'
 APPALOFT_PRUNE_CATEGORIES='docker-build-cache,unused-images'
 APPALOFT_PRUNE_TARGET_FILTER=''
 APPALOFT_PRUNE_DRY_RUN='1'
+APPALOFT_PRUNE_INCLUDE_ORPHAN_RUNNING='0'
 
 if [ -z "$APPALOFT_PRUNE_CANDIDATE_LIMIT" ]; then APPALOFT_PRUNE_CANDIDATE_LIMIT=200; fi
 APPALOFT_PRUNE_TMP_ROOT="$TMPDIR"
@@ -70,7 +71,19 @@ if has_category stopped-containers; then
       ccreated=$(docker inspect -f '{{.Created}}' "$cid" 2>/dev/null)
       matches_prune_target "$cid" "$cname" || continue
       case "$cstatus" in
-        Up*) emit_candidate stopped-containers "$cid" "$cname" "$ccreated" "0" skipped active-runtime ;;
+        Up*)
+          if [ "$APPALOFT_PRUNE_INCLUDE_ORPHAN_RUNNING" = "1" ] && [ -n "$APPALOFT_PRUNE_TARGET_FILTER" ] && older_than_cutoff "$ccreated"; then
+            if [ "$APPALOFT_PRUNE_DRY_RUN" = "1" ]; then
+              emit_candidate stopped-containers "$cid" "$cname" "$ccreated" "0" matched ""
+            else
+              docker stop "$cid" >/dev/null 2>&1
+              docker rm "$cid" >/dev/null 2>&1
+              if [ "$?" = "0" ]; then emit_candidate stopped-containers "$cid" "$cname" "$ccreated" "0" pruned ""; else emit_candidate stopped-containers "$cid" "$cname" "$ccreated" "0" skipped safety-evidence-missing; fi
+            fi
+          else
+            emit_candidate stopped-containers "$cid" "$cname" "$ccreated" "0" skipped active-runtime
+          fi
+          ;;
         *)
           if older_than_cutoff "$ccreated"; then
             if [ "$APPALOFT_PRUNE_DRY_RUN" = "1" ]; then
@@ -200,6 +213,7 @@ APPALOFT_PRUNE_BEFORE='2026-01-01T00:05:00.000Z'
 APPALOFT_PRUNE_CATEGORIES='remote-state-markers'
 APPALOFT_PRUNE_TARGET_FILTER=''
 APPALOFT_PRUNE_DRY_RUN='0'
+APPALOFT_PRUNE_INCLUDE_ORPHAN_RUNNING='0'
 
 if [ -z "$APPALOFT_PRUNE_CANDIDATE_LIMIT" ]; then APPALOFT_PRUNE_CANDIDATE_LIMIT=200; fi
 APPALOFT_PRUNE_TMP_ROOT="$TMPDIR"
@@ -261,7 +275,19 @@ if has_category stopped-containers; then
       ccreated=$(docker inspect -f '{{.Created}}' "$cid" 2>/dev/null)
       matches_prune_target "$cid" "$cname" || continue
       case "$cstatus" in
-        Up*) emit_candidate stopped-containers "$cid" "$cname" "$ccreated" "0" skipped active-runtime ;;
+        Up*)
+          if [ "$APPALOFT_PRUNE_INCLUDE_ORPHAN_RUNNING" = "1" ] && [ -n "$APPALOFT_PRUNE_TARGET_FILTER" ] && older_than_cutoff "$ccreated"; then
+            if [ "$APPALOFT_PRUNE_DRY_RUN" = "1" ]; then
+              emit_candidate stopped-containers "$cid" "$cname" "$ccreated" "0" matched ""
+            else
+              docker stop "$cid" >/dev/null 2>&1
+              docker rm "$cid" >/dev/null 2>&1
+              if [ "$?" = "0" ]; then emit_candidate stopped-containers "$cid" "$cname" "$ccreated" "0" pruned ""; else emit_candidate stopped-containers "$cid" "$cname" "$ccreated" "0" skipped safety-evidence-missing; fi
+            fi
+          else
+            emit_candidate stopped-containers "$cid" "$cname" "$ccreated" "0" skipped active-runtime
+          fi
+          ;;
         *)
           if older_than_cutoff "$ccreated"; then
             if [ "$APPALOFT_PRUNE_DRY_RUN" = "1" ]; then
