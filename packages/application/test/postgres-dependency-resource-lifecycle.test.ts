@@ -1844,6 +1844,44 @@ describe("Postgres dependency resource lifecycle use cases", () => {
     expect(managedDependencyProvider.deleted).toEqual([]);
   });
 
+  test("[DEP-RES-REDIS-NATIVE-007] explicitly releases backup retention before managed provider deletion", async () => {
+    const {
+      context,
+      deleteDependencyResource,
+      managedDependencyProvider,
+      provisionDependencyResource,
+      showDependencyResource,
+    } = await createHarness();
+    const retained = (
+      await provisionDependencyResource.execute(context, {
+        kind: "redis",
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        name: "Retained Cache",
+        backupRelationship: {
+          retentionRequired: true,
+          reason: "Retained by restore point",
+        },
+      })
+    )._unsafeUnwrap();
+
+    const deleted = await deleteDependencyResource.execute(context, {
+      dependencyResourceId: retained.id,
+      confirmBackupRetentionRelease: true,
+    });
+
+    expect(deleted.isOk()).toBe(true);
+    expect(managedDependencyProvider.deleted).toContainEqual(
+      expect.objectContaining({ dependencyResourceId: retained.id, kind: "redis" }),
+    );
+    const shown = await showDependencyResource.execute(
+      context,
+      ShowDependencyResourceQuery.create({ dependencyResourceId: retained.id })._unsafeUnwrap(),
+    );
+    expect(shown.isErr()).toBe(true);
+    expect(shown._unsafeUnwrapErr().code).toBe("not_found");
+  });
+
   test("[DEP-RES-REDIS-IMPORT-001] [DEP-RES-REDIS-READ-002] imports external Redis with masked read model", async () => {
     const { context, importDependencyResource, showDependencyResource } = await createHarness();
 

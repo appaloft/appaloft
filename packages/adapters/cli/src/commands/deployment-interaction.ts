@@ -2313,6 +2313,7 @@ function deleteRepositoryConfigDependency(input: { dependencyResourceId: string 
     const message = yield* resultToEffect(
       DeleteDependencyResourceCommand.create({
         dependencyResourceId: input.dependencyResourceId,
+        confirmBackupRetentionRelease: false,
       }),
     );
     const result = yield* Effect.promise(() => cli.executeCommand(message));
