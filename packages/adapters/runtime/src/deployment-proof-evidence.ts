@@ -1,4 +1,7 @@
+import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { connect as connectTcp, isIP } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { connect as connectTls } from "node:tls";
 import {
   deploymentProofConfigurationFingerprint,
@@ -7,8 +10,19 @@ import {
   type DeploymentProofRuntimeEvidenceReader,
   type DeploymentSummary,
   type ExecutionContext,
+  type ServerRepository,
+  toRepositoryContext,
 } from "@appaloft/application";
-import { deploymentRouteIdentityHeaderName, ok, type Result } from "@appaloft/core";
+import { ash, type AshScript } from "@appaloft/ash";
+import {
+  DeploymentTargetByIdSpec,
+  DeploymentTargetId,
+  deploymentRouteIdentityHeaderName,
+  ok,
+  type DeploymentTargetState,
+  type Result,
+} from "@appaloft/core";
+import { runBufferedProcess } from "./buffered-process";
 
 export interface DockerInspectState {
   Id?: string;
@@ -119,19 +133,27 @@ function joinRoutePath(pathPrefix: string, healthPath: string): string {
 
 function managedRouteUrls(deployment: DeploymentSummary): string[] {
   const healthPath = deployment.runtimePlan.execution.healthCheckPath ?? "/";
-  return (deployment.runtimePlan.execution.accessRoutes ?? [])
-    .filter(
-      (route) =>
-        route.proxyKind !== "none" &&
-        route.routeBehavior !== "redirect" &&
-        !route.redirectTo,
-    )
-    .flatMap((route) =>
-      route.domains.map((domain) => {
-        const scheme = route.tlsMode === "auto" ? "https" : "http";
-        return `${scheme}://${domain}${joinRoutePath(route.pathPrefix, healthPath)}`;
-      }),
-    );
+  const canonicalRouteByOrigin = new Map<
+    string,
+    { domain: string; pathPrefix: string; scheme: string }
+  >();
+  for (const route of deployment.runtimePlan.execution.accessRoutes ?? []) {
+    if (route.proxyKind === "none" || route.routeBehavior === "redirect" || route.redirectTo) {
+      continue;
+    }
+    const scheme = route.tlsMode === "auto" ? "https" : "http";
+    for (const domain of route.domains) {
+      const origin = `${scheme}://${domain}`;
+      const current = canonicalRouteByOrigin.get(origin);
+      if (!current || route.pathPrefix.length < current.pathPrefix.length) {
+        canonicalRouteByOrigin.set(origin, { domain, pathPrefix: route.pathPrefix, scheme });
+      }
+    }
+  }
+  return [...canonicalRouteByOrigin.values()].map(
+    ({ domain, pathPrefix, scheme }) =>
+      `${scheme}://${domain}${joinRoutePath(pathPrefix, healthPath)}`,
+  );
 }
 
 export async function readDeploymentProofManagedRouteEvidence(
@@ -211,14 +233,132 @@ export async function readDeploymentProofManagedRouteEvidence(
   };
 }
 
-async function run(args: string[]): Promise<{ ok: boolean; stdout: string }> {
+export type DeploymentProofCommandRunner = (
+  args: string[],
+) => Promise<{ ok: boolean; stdout: string }>;
+
+const deploymentProofCommandTimeoutMs = 10_000;
+
+export async function runDeploymentProofCommand(
+  args: string[],
+  timeoutMs = deploymentProofCommandTimeoutMs,
+): Promise<{ ok: boolean; stdout: string }> {
+  const result = await runBufferedProcess({
+    command: args,
+    timeoutMs,
+    timeoutMessage: "Deployment proof runtime readback timed out",
+  });
+  return { ok: !result.failed, stdout: result.stdout.trim() };
+}
+
+interface SshProofTarget {
+  cleanup(): Promise<void>;
+  host: string;
+  identityFile: string;
+  port: string;
+}
+
+export interface DeploymentProofIdentityFileOperations {
+  chmod(path: string, mode: number): Promise<void>;
+  mkdtemp(prefix: string): Promise<string>;
+  rm(path: string, options: { force: boolean; recursive: boolean }): Promise<void>;
+  writeFile(path: string, data: string, options: { mode: number }): Promise<void>;
+}
+
+const defaultIdentityFileOperations: DeploymentProofIdentityFileOperations = {
+  chmod,
+  mkdtemp,
+  rm,
+  writeFile,
+};
+
+export async function writeDeploymentProofSshIdentityFile(
+  privateKey: string,
+  operations: DeploymentProofIdentityFileOperations = defaultIdentityFileOperations,
+): Promise<{ cleanup(): Promise<void>; identityFile: string }> {
+  const directory = await operations.mkdtemp(join(tmpdir(), "appaloft-deployment-proof-ssh-"));
+  const identityFile = join(directory, "id_deployment_proof");
   try {
-    const process = Bun.spawn(args, { stdout: "pipe", stderr: "pipe" });
-    const [stdout, exitCode] = await Promise.all([new Response(process.stdout).text(), process.exited]);
-    return { ok: exitCode === 0, stdout: stdout.trim() };
-  } catch {
-    return { ok: false, stdout: "" };
+    await operations.writeFile(
+      identityFile,
+      privateKey.endsWith("\n") ? privateKey : `${privateKey}\n`,
+      { mode: 0o600 },
+    );
+    await operations.chmod(identityFile, 0o600);
+  } catch (error) {
+    await operations.rm(directory, { recursive: true, force: true });
+    throw error;
   }
+  return {
+    cleanup: () => operations.rm(directory, { recursive: true, force: true }),
+    identityFile,
+  };
+}
+
+function hostWithUsername(host: string, username?: string): string {
+  return username && !host.includes("@") ? `${username}@${host}` : host;
+}
+
+async function sshProofTarget(server: DeploymentTargetState): Promise<SshProofTarget | undefined> {
+  const credential = server.credential;
+  const privateKey = credential?.privateKey?.value;
+  if (credential?.kind.value !== "ssh-private-key" || !privateKey) return undefined;
+  const identity = await writeDeploymentProofSshIdentityFile(privateKey);
+
+  return {
+    cleanup: identity.cleanup,
+    host: hostWithUsername(server.host.value, credential?.username?.value),
+    identityFile: identity.identityFile,
+    port: String(server.port.value),
+  };
+}
+
+function sshProofArgs(target: SshProofTarget, remoteCommand: string): string[] {
+  return [
+    "-p",
+    target.port,
+    "-i",
+    target.identityFile,
+    "-o",
+    "IdentitiesOnly=yes",
+    "-o",
+    "BatchMode=yes",
+    "-o",
+    "ConnectTimeout=5",
+    "-o",
+    "PreferredAuthentications=publickey",
+    "-o",
+    "PasswordAuthentication=no",
+    "-o",
+    "KbdInteractiveAuthentication=no",
+    "-o",
+    "NumberOfPasswordPrompts=0",
+    "-o",
+    "StrictHostKeyChecking=accept-new",
+    target.host,
+    remoteCommand,
+  ];
+}
+
+export function renderGenericSshDeploymentProofInspectScript(
+  deployment: DeploymentSummary,
+): AshScript {
+  const deploymentFilter = `label=appaloft.deployment-id=${deployment.id}`;
+  const resourceFilter = `label=appaloft.resource-id=${deployment.resourceId}`;
+  const targetServiceName = deployment.runtimePlan.execution.metadata?.targetServiceName;
+  const selectContainer = targetServiceName
+    ? ash`container_id="$(docker ps -q --filter ${ash.arg(deploymentFilter)} --filter ${ash.arg(resourceFilter)} --filter ${ash.arg(`label=com.docker.compose.service=${targetServiceName}`)} | sed -n '1p')"`
+    : ash`container_id="$(docker ps -q --filter ${ash.arg(deploymentFilter)} --filter ${ash.arg(resourceFilter)} | sed -n '1p')"`;
+
+  return ash`
+    set -eu
+    ${selectContainer}
+    if [ -z "$container_id" ]; then
+      printf '%s\n' 'No running labeled workload found for deployment proof' >&2
+      exit 42
+    fi
+    docker inspect --format ${ash.arg("{{json .}}")} "$container_id"
+  `;
 }
 
 function unavailable(deployment: DeploymentSummary, reasonCode: string): DeploymentProofRuntimeEvidence {
@@ -339,14 +479,63 @@ export function deploymentProofEvidenceFromDockerInspect(
 }
 
 export class RuntimeDeploymentProofEvidenceReader implements DeploymentProofRuntimeEvidenceReader {
-  async read(_context: ExecutionContext, deployment: DeploymentSummary): Promise<Result<DeploymentProofRuntimeEvidence>> {
+  constructor(
+    private readonly serverRepository?: ServerRepository,
+    private readonly commandRunner: DeploymentProofCommandRunner = runDeploymentProofCommand,
+    private readonly routeFetch: DeploymentProofRouteFetch = directManagedRouteFetch,
+  ) {}
+
+  async read(context: ExecutionContext, deployment: DeploymentSummary): Promise<Result<DeploymentProofRuntimeEvidence>> {
     const provider = deployment.runtimePlan.target.providerKey;
-    if (provider === "generic-ssh") return ok(unavailable(deployment, "generic_ssh_runtime_readback_unavailable"));
+    if (provider === "generic-ssh") {
+      const serverId = deployment.runtimePlan.target.serverIds[0];
+      if (!serverId || !this.serverRepository) {
+        return ok(unavailable(deployment, "generic_ssh_runtime_readback_unavailable"));
+      }
+      const server = await this.serverRepository.findOne(
+        toRepositoryContext(context),
+        DeploymentTargetByIdSpec.create(DeploymentTargetId.rehydrate(serverId)),
+      );
+      const state = server?.toState();
+      if (!state) {
+        return ok(unavailable(deployment, "generic_ssh_runtime_target_unavailable"));
+      }
+      const target = await sshProofTarget(state);
+      if (!target) {
+        return ok(unavailable(deployment, "generic_ssh_governed_credential_unavailable"));
+      }
+      try {
+        const inspect = await this.commandRunner([
+          "ssh",
+          ...sshProofArgs(
+            target,
+            ash.render(renderGenericSshDeploymentProofInspectScript(deployment)),
+          ),
+        ]);
+        if (!inspect.ok) {
+          return ok(unavailable(deployment, "generic_ssh_docker_inspect_unavailable"));
+        }
+        try {
+          const evidence = deploymentProofEvidenceFromDockerInspect(
+            deployment,
+            JSON.parse(inspect.stdout) as DockerInspectState,
+          );
+          return ok({
+            ...evidence,
+            access: await readDeploymentProofManagedRouteEvidence(deployment, this.routeFetch),
+          });
+        } catch {
+          return ok(unavailable(deployment, "generic_ssh_docker_inspect_invalid"));
+        }
+      } finally {
+        await target.cleanup();
+      }
+    }
 
     if (provider === "docker-swarm") {
-      const serviceId = await run(["docker", "service", "ls", "-q", "--filter", `label=appaloft.resource-id=${deployment.resourceId}`]);
+      const serviceId = await this.commandRunner(["docker", "service", "ls", "-q", "--filter", `label=appaloft.resource-id=${deployment.resourceId}`]);
       if (!serviceId.ok || !serviceId.stdout.split(/\s+/u)[0]) return ok(unavailable(deployment, "docker_swarm_service_unavailable"));
-      const inspect = await run(["docker", "service", "inspect", serviceId.stdout.split(/\s+/u)[0]!, "--format", "{{json .}}"]);
+      const inspect = await this.commandRunner(["docker", "service", "inspect", serviceId.stdout.split(/\s+/u)[0]!, "--format", "{{json .}}"]);
       if (!inspect.ok) return ok(unavailable(deployment, "docker_swarm_inspect_unavailable"));
       try {
         const evidence = deploymentProofEvidenceFromDockerInspect(
@@ -355,7 +544,7 @@ export class RuntimeDeploymentProofEvidenceReader implements DeploymentProofRunt
         );
         return ok({
           ...evidence,
-          access: await readDeploymentProofManagedRouteEvidence(deployment),
+          access: await readDeploymentProofManagedRouteEvidence(deployment, this.routeFetch),
         });
       } catch {
         return ok(unavailable(deployment, "docker_swarm_inspect_invalid"));
@@ -363,10 +552,10 @@ export class RuntimeDeploymentProofEvidenceReader implements DeploymentProofRunt
     }
 
     if (provider !== "local-shell") return ok(unavailable(deployment, "runtime_target_readback_unsupported"));
-    const containerId = await run(["docker", "ps", "-aq", "--filter", `label=appaloft.resource-id=${deployment.resourceId}`]);
+    const containerId = await this.commandRunner(["docker", "ps", "-aq", "--filter", `label=appaloft.resource-id=${deployment.resourceId}`]);
     const firstContainerId = containerId.stdout.split(/\s+/u)[0];
     if (!containerId.ok || !firstContainerId) return ok(unavailable(deployment, "docker_container_unavailable"));
-    const inspect = await run(["docker", "inspect", firstContainerId, "--format", "{{json .}}"]);
+    const inspect = await this.commandRunner(["docker", "inspect", firstContainerId, "--format", "{{json .}}"]);
     if (!inspect.ok) return ok(unavailable(deployment, "docker_inspect_unavailable"));
     try {
       const evidence = deploymentProofEvidenceFromDockerInspect(
@@ -375,7 +564,7 @@ export class RuntimeDeploymentProofEvidenceReader implements DeploymentProofRunt
       );
       return ok({
         ...evidence,
-        access: await readDeploymentProofManagedRouteEvidence(deployment),
+        access: await readDeploymentProofManagedRouteEvidence(deployment, this.routeFetch),
       });
     } catch {
       return ok(unavailable(deployment, "docker_inspect_invalid"));

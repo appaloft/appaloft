@@ -55,6 +55,8 @@ deployment proof by itself.
 | DEP-PROOF-011 | Scope and not found | Deployment is absent, outside tenant/project scope, or resource context mismatches | API/CLI/SDK/MCP reads proof | Existing not-found/forbidden/context error policy applies without leaking cross-scope facts. |
 | DEP-PROOF-012 | Published-language parity | A consumer reads API, CLI JSON, SDK, MCP, or Web | The same deployment is requested | Every surface consumes the same `deployments.proof/v1` schema and operation. |
 | DEP-PROOF-013 | Route identity unavailable | A managed Caddy or Traefik route responds without the Appaloft deployment identity marker | Proof is read | Verdict is never `verified`; missing route identity is explicit instead of inferred from the observed container label. |
+| DEP-PROOF-014 | Generic SSH workload readback | A successful single-server deployment is managed through the Generic SSH provider | Proof is read | The adapter resolves the governed server credential, inspects only the running container matching deployment/resource and compose target-service labels, and returns sanitized identity, configuration-key, health, and route evidence without raw environment values. |
+| DEP-PROOF-015 | Canonical path-routed access probe | One domain has multiple managed path routes for one Compose stack | Proof is read | The adapter probes the most general non-redirect route once for that origin, preferring `/`, so one health path is not incorrectly appended to every service prefix. |
 
 ## Domain Ownership
 
