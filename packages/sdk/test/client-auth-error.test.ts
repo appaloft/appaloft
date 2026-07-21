@@ -240,4 +240,36 @@ describe("Appaloft SDK auth and structured errors", () => {
       },
     });
   });
+
+  test("[TS-SDK-ERROR-002] classifies transient HTML gateway responses as retryable without exposing the body", async () => {
+    const client = createAppaloftSdkClient({
+      baseUrl: "https://appaloft.example/api",
+      fetch: async () =>
+        new Response("<html><body>secret gateway payload</body></html>", {
+          headers: {
+            "content-type": "text/html; charset=utf-8",
+          },
+          status: 502,
+        }),
+    });
+
+    const result = await client.request({
+      operation: productSessionOperation,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      status: 502,
+      error: {
+        code: "control_plane_unexpected_html_response",
+        category: "infra",
+        retryable: true,
+        details: {
+          status: 502,
+          bodyKind: "html",
+        },
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain("secret gateway payload");
+  });
 });
