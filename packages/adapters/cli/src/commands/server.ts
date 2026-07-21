@@ -376,8 +376,11 @@ const capacityPruneCommand = EffectCommand.make(
     category: Options.choice("category", runtimeTargetPruneCategories).pipe(Options.repeated),
     target: Options.text("target").pipe(Options.optional),
     dryRun: Options.boolean("dry-run").pipe(Options.withDefault(true)),
+    includeOrphanRunning: Options.boolean("include-orphan-running").pipe(
+      Options.withDefault(false),
+    ),
   },
-  ({ serverId, before, category, target, dryRun }) =>
+  ({ serverId, before, category, target, dryRun, includeOrphanRunning }) =>
     runCommand(
       PruneServerCapacityCommand.create({
         serverId,
@@ -385,6 +388,7 @@ const capacityPruneCommand = EffectCommand.make(
         categories: category.length > 0 ? [...category] : undefined,
         target: optionalValue(target),
         dryRun,
+        includeOrphanRunning,
       }),
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverCapacityPrune));

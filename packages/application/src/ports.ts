@@ -2454,6 +2454,7 @@ export interface RuntimeTargetCapacityPruner {
       categories: RuntimeTargetCapacityPruneCategory[];
       target?: string;
       dryRun: boolean;
+      includeOrphanRunning?: boolean;
     },
   ): Promise<Result<RuntimeTargetCapacityPruneResult>>;
 }
