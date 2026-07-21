@@ -5,6 +5,7 @@
 
 ### Features
 
+* add sandbox agent runtime and promotion workflow ([#774](https://github.com/appaloft/appaloft/issues/774)) ([e696f0f](https://github.com/appaloft/appaloft/commit/e696f0ff3e2d093aac6b86f80d6fe33b600f580e))
 * add execution sandbox platform ([#768](https://github.com/appaloft/appaloft/issues/768)) ([cd02348](https://github.com/appaloft/appaloft/commit/cd0234885b2d0925be7e52a29479c5d759b09a5b))
 * **auto-deploy:** match GitHub final path diff ([#697](https://github.com/appaloft/appaloft/issues/697)) ([e3f227d](https://github.com/appaloft/appaloft/commit/e3f227d652465a20c900eb095d187599830bbb9f))
 * **cli:** add isolated SSH state recovery ([#728](https://github.com/appaloft/appaloft/issues/728)) ([54de608](https://github.com/appaloft/appaloft/commit/54de608b3b73795fe884a44f92164b99f53ec18b))
