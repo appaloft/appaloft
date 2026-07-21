@@ -34,6 +34,23 @@ await appaloft.sandboxes.promotions.accept({
 });
 ```
 
+In a product, stop after `plan` by default. Show the candidate URL and exact digest to the user,
+then call `accept` only from an explicit external control-plane action:
+
+```ts
+if (preview.data.artifactDigest !== artifact.data.digest) throw new Error("digest mismatch");
+if (userConfirmedPromotion) {
+  await appaloft.sandboxes.promotions.accept({
+    promotionId: plan.data.promotionId,
+    expectedArtifactDigest: artifact.data.digest,
+    idempotencyKey: crypto.randomUUID(),
+  });
+}
+```
+
 The plan binds the artifact digest, verified candidate, target, and expiry. Accept is an external
 control-plane action; a Runtime or harness identity cannot self-publish. The durable workflow saves
 Resource and Deployment checkpoints so restart does not duplicate an already recorded Resource.
+
+See the complete [Preview-to-Promotion example](https://github.com/appaloft/examples/blob/main/sandbox-agent/src/preview-promote.ts),
+including digest verification and the opt-in acceptance gate.
