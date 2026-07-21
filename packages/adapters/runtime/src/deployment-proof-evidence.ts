@@ -6,7 +6,9 @@ import { connect as connectTls } from "node:tls";
 import {
   deploymentProofConfigurationFingerprint,
   deploymentProofEnvironmentKeyFingerprint,
+  type DeploymentProofManagedRoute,
   type DeploymentProofRuntimeEvidence,
+  type DeploymentProofRuntimeEvidenceInput,
   type DeploymentProofRuntimeEvidenceReader,
   type DeploymentSummary,
   type ExecutionContext,
@@ -131,18 +133,43 @@ function joinRoutePath(pathPrefix: string, healthPath: string): string {
   return `${prefix}${path}` || "/";
 }
 
-function managedRouteUrls(deployment: DeploymentSummary): string[] {
+interface DeploymentProofManagedRouteProbe {
+  requireSuccessfulResponse: boolean;
+  url: string;
+}
+
+function managedRouteKey(input: {
+  domainName: string;
+  pathPrefix: string;
+  tlsMode: DeploymentProofManagedRoute["tlsMode"];
+}): string {
+  const scheme = input.tlsMode === "auto" ? "https" : "http";
+  return `${scheme}://${input.domainName}${input.pathPrefix}`;
+}
+
+function managedRouteProbes(
+  deployment: DeploymentSummary,
+  currentManagedRoutes: readonly DeploymentProofManagedRoute[] = [],
+): DeploymentProofManagedRouteProbe[] {
   const healthPath = deployment.runtimePlan.execution.healthCheckPath ?? "/";
   const canonicalRouteByOrigin = new Map<
     string,
     { domain: string; pathPrefix: string; scheme: string }
   >();
+  const plannedRouteKeys = new Set<string>();
   for (const route of deployment.runtimePlan.execution.accessRoutes ?? []) {
     if (route.proxyKind === "none" || route.routeBehavior === "redirect" || route.redirectTo) {
       continue;
     }
     const scheme = route.tlsMode === "auto" ? "https" : "http";
     for (const domain of route.domains) {
+      plannedRouteKeys.add(
+        managedRouteKey({
+          domainName: domain,
+          pathPrefix: route.pathPrefix,
+          tlsMode: route.tlsMode,
+        }),
+      );
       const origin = `${scheme}://${domain}`;
       const current = canonicalRouteByOrigin.get(origin);
       if (!current || route.pathPrefix.length < current.pathPrefix.length) {
@@ -150,18 +177,33 @@ function managedRouteUrls(deployment: DeploymentSummary): string[] {
       }
     }
   }
-  return [...canonicalRouteByOrigin.values()].map(
-    ({ domain, pathPrefix, scheme }) =>
-      `${scheme}://${domain}${joinRoutePath(pathPrefix, healthPath)}`,
-  );
+  const probes: DeploymentProofManagedRouteProbe[] = [
+    ...canonicalRouteByOrigin.values(),
+  ].map(({ domain, pathPrefix, scheme }) => ({
+    requireSuccessfulResponse: true,
+    url: `${scheme}://${domain}${joinRoutePath(pathPrefix, healthPath)}`,
+  }));
+  const currentRouteKeys = new Set<string>();
+  for (const route of currentManagedRoutes) {
+    if (route.proxyKind === "none") continue;
+    const routeKey = managedRouteKey(route);
+    if (plannedRouteKeys.has(routeKey) || currentRouteKeys.has(routeKey)) continue;
+    currentRouteKeys.add(routeKey);
+    probes.push({
+      requireSuccessfulResponse: false,
+      url: routeKey,
+    });
+  }
+  return probes;
 }
 
 export async function readDeploymentProofManagedRouteEvidence(
   deployment: DeploymentSummary,
   fetchImpl: DeploymentProofRouteFetch = directManagedRouteFetch,
+  currentManagedRoutes: readonly DeploymentProofManagedRoute[] = [],
 ): Promise<DeploymentProofRuntimeEvidence["access"]> {
-  const urls = managedRouteUrls(deployment);
-  if (urls.length === 0) {
+  const probes = managedRouteProbes(deployment, currentManagedRoutes);
+  if (probes.length === 0) {
     return {
       status: "passed",
       routeTargetsWorkload: true,
@@ -169,12 +211,13 @@ export async function readDeploymentProofManagedRouteEvidence(
     };
   }
 
-  for (const url of urls) {
+  for (const probe of probes) {
+    const { requireSuccessfulResponse, url } = probe;
     for (let attempt = 0; attempt < 6; attempt += 1) {
       let response: Response;
       try {
         response = await fetchImpl(url, {
-          redirect: "follow",
+          redirect: requireSuccessfulResponse ? "follow" : "manual",
           signal: AbortSignal.timeout(5_000),
         });
       } catch (error) {
@@ -188,7 +231,7 @@ export async function readDeploymentProofManagedRouteEvidence(
         };
       }
 
-      if (!response.ok) {
+      if (!response.ok && (requireSuccessfulResponse || response.status >= 500)) {
         if ([502, 503, 504].includes(response.status) && attempt < 5) {
           await Bun.sleep(200);
           continue;
@@ -485,7 +528,11 @@ export class RuntimeDeploymentProofEvidenceReader implements DeploymentProofRunt
     private readonly routeFetch: DeploymentProofRouteFetch = directManagedRouteFetch,
   ) {}
 
-  async read(context: ExecutionContext, deployment: DeploymentSummary): Promise<Result<DeploymentProofRuntimeEvidence>> {
+  async read(
+    context: ExecutionContext,
+    deployment: DeploymentSummary,
+    input: DeploymentProofRuntimeEvidenceInput = { currentManagedRoutes: [] },
+  ): Promise<Result<DeploymentProofRuntimeEvidence>> {
     const provider = deployment.runtimePlan.target.providerKey;
     if (provider === "generic-ssh") {
       const serverId = deployment.runtimePlan.target.serverIds[0];
@@ -522,7 +569,11 @@ export class RuntimeDeploymentProofEvidenceReader implements DeploymentProofRunt
           );
           return ok({
             ...evidence,
-            access: await readDeploymentProofManagedRouteEvidence(deployment, this.routeFetch),
+            access: await readDeploymentProofManagedRouteEvidence(
+              deployment,
+              this.routeFetch,
+              input.currentManagedRoutes,
+            ),
           });
         } catch {
           return ok(unavailable(deployment, "generic_ssh_docker_inspect_invalid"));
@@ -544,7 +595,11 @@ export class RuntimeDeploymentProofEvidenceReader implements DeploymentProofRunt
         );
         return ok({
           ...evidence,
-          access: await readDeploymentProofManagedRouteEvidence(deployment, this.routeFetch),
+          access: await readDeploymentProofManagedRouteEvidence(
+            deployment,
+            this.routeFetch,
+            input.currentManagedRoutes,
+          ),
         });
       } catch {
         return ok(unavailable(deployment, "docker_swarm_inspect_invalid"));
@@ -564,7 +619,11 @@ export class RuntimeDeploymentProofEvidenceReader implements DeploymentProofRunt
       );
       return ok({
         ...evidence,
-        access: await readDeploymentProofManagedRouteEvidence(deployment, this.routeFetch),
+        access: await readDeploymentProofManagedRouteEvidence(
+          deployment,
+          this.routeFetch,
+          input.currentManagedRoutes,
+        ),
       });
     } catch {
       return ok(unavailable(deployment, "docker_inspect_invalid"));

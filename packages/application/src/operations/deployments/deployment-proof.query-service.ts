@@ -12,6 +12,7 @@ import {
   type Clock,
   type DeploymentProof,
   type DeploymentProofEvidenceReference,
+  type DeploymentProofManagedRoute,
   type DeploymentProofMismatch,
   type DeploymentProofReasonCode,
   type DeploymentProofRuntimeEvidence,
@@ -20,6 +21,7 @@ import {
   type DeploymentProofVerdict,
   type DeploymentReadModel,
   type DeploymentSummary,
+  type DomainBindingReadModel,
 } from "../../ports";
 import { tokens } from "../../tokens";
 import { type DeploymentProofQuery } from "./deployment-proof.query";
@@ -27,6 +29,8 @@ import {
   deploymentProofConfigurationFingerprint,
   deploymentProofFingerprint,
 } from "./deployment-proof-fingerprint";
+
+const deploymentProofDomainBindingReadLimit = 1_001;
 
 function configurationFingerprint(deployment: DeploymentSummary): string {
   return deploymentProofConfigurationFingerprint(deployment.environmentSnapshot.variables);
@@ -123,6 +127,8 @@ export class DeploymentProofQueryService {
     @inject(tokens.deploymentReadModel) private readonly deploymentReadModel: DeploymentReadModel,
     @inject(tokens.deploymentProofRuntimeEvidenceReader)
     private readonly runtimeEvidenceReader: DeploymentProofRuntimeEvidenceReader,
+    @inject(tokens.domainBindingReadModel)
+    private readonly domainBindingReadModel: DomainBindingReadModel,
     @inject(tokens.clock) private readonly clock: Clock,
   ) {}
 
@@ -148,7 +154,46 @@ export class DeploymentProofQueryService {
         ),
       );
     }
-    const runtimeResult = await this.runtimeEvidenceReader.read(context, deployment);
+    let currentManagedRoutes: DeploymentProofManagedRoute[];
+    try {
+      const domainBindings = await this.domainBindingReadModel.list(toRepositoryContext(context), {
+        projectId: deployment.projectId,
+        environmentId: deployment.environmentId,
+        resourceId: deployment.resourceId,
+        limit: deploymentProofDomainBindingReadLimit,
+      });
+      if (domainBindings.length >= deploymentProofDomainBindingReadLimit) {
+        return err(
+          domainError.infra("Deployment proof route evidence is incomplete", {
+            queryName: "deployments.proof",
+            deploymentId: deployment.id,
+            causeCode: "domain_binding_read_incomplete",
+          }),
+        );
+      }
+      currentManagedRoutes = domainBindings
+        .filter(
+          (binding) =>
+            binding.status === "ready" && binding.proxyKind !== "none" && !binding.redirectTo,
+        )
+        .map((binding) => ({
+          domainName: binding.domainName,
+          pathPrefix: binding.pathPrefix,
+          proxyKind: binding.proxyKind,
+          tlsMode: binding.tlsMode,
+        }));
+    } catch {
+      return err(
+        domainError.infra("Deployment proof route evidence could not be assembled", {
+          queryName: "deployments.proof",
+          deploymentId: deployment.id,
+          causeCode: "domain_binding_read_failed",
+        }),
+      );
+    }
+    const runtimeResult = await this.runtimeEvidenceReader.read(context, deployment, {
+      currentManagedRoutes,
+    });
     if (runtimeResult.isErr())
       return err(
         domainError.infra("Deployment proof evidence could not be assembled", {

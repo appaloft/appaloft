@@ -470,6 +470,7 @@ function publicAccessSection(
   resource: ResourceSummary,
   domainBindings: DomainBindingSummary[],
   sourceErrors: ResourceHealthSourceError[],
+  latestDeployment: DeploymentSummary | undefined,
 ): ResourcePublicAccessHealthSection {
   const access = resource.accessSummary;
   const nonReadyDurableBinding = currentNonReadyDurableDomainBinding(domainBindings, access);
@@ -564,6 +565,37 @@ function publicAccessSection(
             },
           }
         : {}),
+    };
+  }
+
+  const realizedDeploymentId = access?.lastRouteRealizationDeploymentId;
+  if (
+    route &&
+    access?.proxyRouteStatus === "ready" &&
+    latestDeployment?.status === "succeeded" &&
+    realizedDeploymentId &&
+    realizedDeploymentId !== latestDeployment.id
+  ) {
+    sourceErrors.push(
+      sourceError({
+        source: "public-access",
+        code: "resource_public_access_stale_deployment",
+        category: "infra",
+        phase: "proxy-route-observation",
+        retriable: true,
+        relatedEntityId: realizedDeploymentId,
+        relatedState: latestDeployment.id,
+        message: "The public route still serves an older deployment generation.",
+      }),
+    );
+
+    return {
+      status: "failed",
+      url: route.url,
+      ...(kind ? { kind } : {}),
+      reasonCode: "resource_public_access_stale_deployment",
+      phase: "proxy-route-observation",
+      ...(routeIntentStatus ? { routeIntentStatus } : {}),
     };
   }
 
@@ -1095,7 +1127,12 @@ export class ResourceHealthQueryService {
       healthPolicy.status === "configured",
     );
     runtime = runtimeSectionWithLatestControl(runtime, latestRuntimeControl);
-    let publicAccess = publicAccessSection(resource, domainBindings, sourceErrors);
+    let publicAccess = publicAccessSection(
+      resource,
+      domainBindings,
+      sourceErrors,
+      latestDeployment,
+    );
     const proxy = proxySection(resource, sourceErrors);
     const liveChecks: ResourceHealthCheck[] = [];
 
@@ -1265,15 +1302,17 @@ export class ResourceHealthQueryService {
           liveChecks.push(check);
 
           if (probeResult.value.status === "passed") {
-            const { phase, reasonCode, routeIntentStatus, ...readyPublicAccess } = publicAccess;
-            void phase;
-            void reasonCode;
-            void routeIntentStatus;
-            removeResolvedPublicAccessSourceErrors(publicAccess, sourceErrors);
-            publicAccess = {
-              ...readyPublicAccess,
-              status: "ready",
-            };
+            if (publicAccess.reasonCode !== "resource_public_access_stale_deployment") {
+              const { phase, reasonCode, routeIntentStatus, ...readyPublicAccess } = publicAccess;
+              void phase;
+              void reasonCode;
+              void routeIntentStatus;
+              removeResolvedPublicAccessSourceErrors(publicAccess, sourceErrors);
+              publicAccess = {
+                ...readyPublicAccess,
+                status: "ready",
+              };
+            }
           } else {
             publicAccess = {
               ...publicAccess,

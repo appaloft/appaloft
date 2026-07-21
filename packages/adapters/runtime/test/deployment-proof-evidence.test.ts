@@ -263,6 +263,96 @@ describe("deployment proof runtime evidence", () => {
     expect(requested).toEqual(["https://app.example.test/login"]);
   });
 
+  test("[DEP-PROOF-ADAPTER-004] probes a current ready managed route that was absent from the deployment snapshot", async () => {
+    const requested: string[] = [];
+    const evidence = await readDeploymentProofManagedRouteEvidence(
+      {
+        ...deployment,
+        runtimePlan: {
+          ...deployment.runtimePlan,
+          execution: {
+            ...deployment.runtimePlan.execution,
+            healthCheckPath: "/login",
+            accessRoutes: [],
+          },
+        },
+      } as DeploymentSummary,
+      async (url) => {
+        requested.push(url);
+        return new Response("ok", {
+          status: 200,
+          headers: { "X-Appaloft-Deployment-Id": "dep_v1" },
+        });
+      },
+      [
+        {
+          domainName: "app.example.test",
+          pathPrefix: "/",
+          proxyKind: "traefik",
+          tlsMode: "auto",
+        },
+      ],
+    );
+
+    expect(requested).toHaveLength(6);
+    expect(new Set(requested)).toEqual(new Set(["https://app.example.test/"]));
+    expect(evidence).toMatchObject({
+      status: "failed",
+      routeTargetsWorkload: false,
+      reasonCode: "public_route_deployment_identity_mismatch",
+    });
+  });
+
+  test("[DEP-PROOF-ADAPTER-004] separately probes a current route absent from a more general planned route", async () => {
+    const requested: string[] = [];
+    const evidence = await readDeploymentProofManagedRouteEvidence(
+      {
+        ...deployment,
+        runtimePlan: {
+          ...deployment.runtimePlan,
+          execution: {
+            ...deployment.runtimePlan.execution,
+            healthCheckPath: "/health",
+            accessRoutes: [
+              {
+                proxyKind: "traefik",
+                domains: ["app.example.test"],
+                pathPrefix: "/",
+                tlsMode: "auto",
+              },
+            ],
+          },
+        },
+      } as DeploymentSummary,
+      async (url, init) => {
+        requested.push(url);
+        expect(init?.redirect).toBe(url.endsWith("/api") ? "manual" : "follow");
+        return new Response(url.endsWith("/api") ? "not found" : "ok", {
+          status: url.endsWith("/api") ? 404 : 200,
+          headers: {
+            "X-Appaloft-Deployment-Id": url.endsWith("/api") ? "dep_v1" : "dep_v2",
+          },
+        });
+      },
+      [
+        {
+          domainName: "app.example.test",
+          pathPrefix: "/api",
+          proxyKind: "traefik",
+          tlsMode: "auto",
+        },
+      ],
+    );
+
+    expect(requested[0]).toBe("https://app.example.test/health");
+    expect(requested.filter((url) => url === "https://app.example.test/api")).toHaveLength(6);
+    expect(evidence).toMatchObject({
+      status: "failed",
+      routeTargetsWorkload: false,
+      reasonCode: "public_route_deployment_identity_mismatch",
+    });
+  });
+
   test("[DEP-PROOF-ADAPTER-003] rejects healthy managed routes with stale or missing identity", async () => {
     const managedDeployment = {
       ...deployment,

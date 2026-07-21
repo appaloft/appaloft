@@ -8,9 +8,12 @@ import { DeploymentProofQuery } from "../src/messages";
 import {
   type DeploymentProof,
   type DeploymentProofRuntimeEvidence,
+  type DeploymentProofRuntimeEvidenceInput,
   type DeploymentProofRuntimeEvidenceReader,
   type DeploymentReadModel,
   type DeploymentSummary,
+  type DomainBindingReadModel,
+  type DomainBindingSummary,
 } from "../src/ports";
 import { DeploymentProofQueryService } from "../src/use-cases";
 
@@ -46,10 +49,31 @@ class StaticDeploymentReadModel implements DeploymentReadModel {
 }
 
 class StaticRuntimeEvidenceReader implements DeploymentProofRuntimeEvidenceReader {
+  input: DeploymentProofRuntimeEvidenceInput | undefined;
+
   constructor(private readonly evidence: DeploymentProofRuntimeEvidence) {}
 
-  async read(): Promise<Result<DeploymentProofRuntimeEvidence>> {
+  async read(
+    _context: ExecutionContext,
+    _deployment: DeploymentSummary,
+    input?: DeploymentProofRuntimeEvidenceInput,
+  ): Promise<Result<DeploymentProofRuntimeEvidence>> {
+    this.input = input;
     return ok(this.evidence);
+  }
+}
+
+class StaticDomainBindingReadModel implements DomainBindingReadModel {
+  readonly inputs: Parameters<DomainBindingReadModel["list"]>[1][] = [];
+
+  constructor(private readonly bindings: DomainBindingSummary[] = []) {}
+
+  async list(
+    _context: Parameters<DomainBindingReadModel["list"]>[0],
+    input?: Parameters<DomainBindingReadModel["list"]>[1],
+  ): Promise<DomainBindingSummary[]> {
+    this.inputs.push(input);
+    return this.bindings;
   }
 }
 
@@ -160,12 +184,18 @@ function evidence(
 function service(input: {
   deployment?: DeploymentSummary | null;
   evidence?: DeploymentProofRuntimeEvidence;
+  domainBindings?: DomainBindingSummary[];
+  domainBindingReadModel?: DomainBindingReadModel;
+  evidenceReader?: StaticRuntimeEvidenceReader;
 }) {
+  const evidenceReader =
+    input.evidenceReader ?? new StaticRuntimeEvidenceReader(input.evidence ?? evidence());
   return new DeploymentProofQueryService(
     new StaticDeploymentReadModel(
       input.deployment === null ? [] : [input.deployment ?? deployment()],
     ),
-    new StaticRuntimeEvidenceReader(input.evidence ?? evidence()),
+    evidenceReader,
+    input.domainBindingReadModel ?? new StaticDomainBindingReadModel(input.domainBindings),
     new FixedClock(),
   );
 }
@@ -191,6 +221,73 @@ describe("DeploymentProofQueryService", () => {
     expect(proof.planned.source.revision).toBe("2222222222222222222222222222222222222222");
     expect(proof.observed.workload.generation).toBe("dep_v2");
     expect(proof.mismatches).toEqual([]);
+  });
+
+  test("[DEP-PROOF-ADAPTER-004] supplies current ready managed routes to runtime proof", async () => {
+    const evidenceReader = new StaticRuntimeEvidenceReader(evidence());
+    const queryService = service({
+      evidenceReader,
+      domainBindings: [
+        {
+          id: "dmb_web",
+          projectId: "prj_demo",
+          environmentId: "env_demo",
+          resourceId: "res_web",
+          domainName: "app.example.test",
+          pathPrefix: "/",
+          proxyKind: "traefik",
+          tlsMode: "auto",
+          certificatePolicy: "disabled",
+          status: "ready",
+          verificationAttemptCount: 1,
+          createdAt: "2026-07-12T09:59:15.000Z",
+        },
+      ],
+    });
+
+    unwrap(await queryService.execute(context(), query()));
+
+    expect(evidenceReader.input?.currentManagedRoutes).toEqual([
+      {
+        domainName: "app.example.test",
+        pathPrefix: "/",
+        proxyKind: "traefik",
+        tlsMode: "auto",
+      },
+    ]);
+  });
+
+  test("[DEP-PROOF-ADAPTER-005] fails closed when current managed route readback reaches its completeness bound", async () => {
+    const evidenceReader = new StaticRuntimeEvidenceReader(evidence());
+    const binding: DomainBindingSummary = {
+      id: "dmb_web",
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resourceId: "res_web",
+      domainName: "app.example.test",
+      pathPrefix: "/",
+      proxyKind: "traefik",
+      tlsMode: "auto",
+      certificatePolicy: "disabled",
+      status: "ready",
+      verificationAttemptCount: 1,
+      createdAt: "2026-07-12T09:59:15.000Z",
+    };
+    const domainBindingReadModel = new StaticDomainBindingReadModel(
+      Array.from({ length: 1_001 }, (_, index) => ({
+        ...binding,
+        id: `dmb_web_${index}`,
+      })),
+    );
+
+    const result = await service({
+      evidenceReader,
+      domainBindingReadModel,
+    }).execute(context(), query());
+
+    expect(result.isErr()).toBe(true);
+    expect(evidenceReader.input).toBeUndefined();
+    expect(domainBindingReadModel.inputs[0]?.limit).toBe(1_001);
   });
 
   test("[DEP-PROOF-VERDICT-002] health 200 with unchanged workload generation is never verified", async () => {
