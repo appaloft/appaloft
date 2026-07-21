@@ -1,0 +1,8 @@
+{
+  "name": "two-apps-workspace",
+  "private": true,
+  "packageManager": "pnpm@10.0.0",
+  "workspaces": [
+    "apps/*"
+  ]
+}

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import {
   mkdir,
   readdir as readDir,
@@ -21,10 +21,12 @@ import {
   type ListStaticArtifactPublicationsInput,
   type RecordStaticArtifactPublicationInput,
   type RequestedDeploymentServiceConfig,
+  type SourceDetectionInput,
   type SourceDetectionResult,
   type SourceDetector,
   type SourceVersionDetectionResult,
   type SourceVersionDetector,
+  type SourceWorkspaceDiscoveryEvidence,
   type StaticArtifactFilePayload,
   type StaticArtifactPayloadReaderPort,
   type StaticArtifactPayloadReadResult,
@@ -1103,6 +1105,222 @@ function detectLocalInspection(path: string): SourceInspectionSnapshot {
   });
 }
 
+const workspaceInspectionMaxDepth = 4;
+const workspaceInspectionMaxDirectories = 256;
+const ignoredWorkspaceDirectories = new Set([
+  ".git",
+  ".next",
+  ".output",
+  ".turbo",
+  "build",
+  "coverage",
+  "dist",
+  "node_modules",
+  "target",
+  "vendor",
+]);
+
+interface LocalWorkspaceDiscovery {
+  path: string;
+  evidence: SourceWorkspaceDiscoveryEvidence;
+}
+
+function sourceRelativePath(root: string, path: string): string {
+  const value = relative(root, path).split("\\").join("/");
+  return value ? `/${value}` : "/";
+}
+
+function isDeployableInspection(path: string, inspection: SourceInspectionSnapshot): boolean {
+  const packageJson = readJsonObject(join(path, "package.json"));
+  const isNodeWorkspaceContainer =
+    packageJson !== null &&
+    (Array.isArray(packageJson.workspaces) ||
+      (packageJson.workspaces !== null && typeof packageJson.workspaces === "object") ||
+      existsSync(join(path, "pnpm-workspace.yaml")) ||
+      existsSync(join(path, "turbo.json")) ||
+      existsSync(join(path, "nx.json"))) &&
+    !inspection.framework &&
+    !inspection.applicationShape;
+
+  return Boolean(
+    !isNodeWorkspaceContainer &&
+      (inspection.runtimeFamily ||
+        inspection.applicationShape ||
+        inspection.framework ||
+        inspection.hasDetectedFile("dockerfile") ||
+        inspection.hasDetectedFile("compose-manifest")),
+  );
+}
+
+function selectedWorkspacePath(root: string, baseDirectory: string): Result<string> {
+  const normalized = baseDirectory.trim().replaceAll("\\", "/");
+  const segments = normalized.split("/").filter(Boolean);
+  if (
+    !normalized ||
+    /^[a-z]:/iu.test(normalized) ||
+    segments.some((segment) => segment === "." || segment === "..")
+  ) {
+    return err(
+      domainError.validation("Source base directory cannot be resolved safely", {
+        phase: "source-detection",
+        reasonCode: "missing-source-root",
+        affectedProfileField: "source.baseDirectory",
+      }),
+    );
+  }
+
+  const canonicalRoot = realpathSync(root);
+  const candidate = resolve(canonicalRoot, ...segments);
+  const relativeCandidate = relative(canonicalRoot, candidate);
+  if (relativeCandidate.startsWith("..") || isAbsolute(relativeCandidate)) {
+    return err(
+      domainError.validation("Source base directory escapes the source workspace", {
+        phase: "source-detection",
+        reasonCode: "missing-source-root",
+        affectedProfileField: "source.baseDirectory",
+      }),
+    );
+  }
+
+  try {
+    if (!lstatSync(candidate).isDirectory()) {
+      throw new Error("not a safe directory");
+    }
+  } catch {
+    return err(
+      domainError.validation("Source base directory does not identify a safe directory", {
+        phase: "source-detection",
+        reasonCode: "missing-source-root",
+        affectedProfileField: "source.baseDirectory",
+      }),
+    );
+  }
+
+  return ok(candidate);
+}
+
+function discoverLocalWorkspace(
+  root: string,
+  input: SourceDetectionInput | undefined,
+): Result<LocalWorkspaceDiscovery> {
+  if (input?.baseDirectory) {
+    return selectedWorkspacePath(root, input.baseDirectory).andThen((path) => {
+      const inspection = detectLocalInspection(path);
+      const selectedRoot = sourceRelativePath(root, path);
+      if (!isDeployableInspection(path, inspection)) {
+        return err(
+          domainError.validation("Selected source base directory is not deployable", {
+            phase: "source-detection",
+            reasonCode: "missing-source-root",
+            affectedProfileField: "source.baseDirectory",
+            selectedRoot,
+          }),
+        );
+      }
+
+      return ok<LocalWorkspaceDiscovery>({
+        path,
+        evidence: {
+          selectedRoot,
+          selectionReason: "explicit-base-directory",
+          candidateRoots: [selectedRoot],
+          inspectedDirectoryCount: 1,
+          inspectionBoundReached: false,
+        },
+      });
+    });
+  }
+
+  const queue: Array<{ path: string; depth: number }> = [{ path: root, depth: 0 }];
+  const candidates: string[] = [];
+  let inspectedDirectoryCount = 0;
+  let inspectionBoundReached = false;
+
+  while (queue.length > 0) {
+    if (inspectedDirectoryCount >= workspaceInspectionMaxDirectories) {
+      inspectionBoundReached = true;
+      break;
+    }
+
+    const current = queue.shift();
+    if (!current) {
+      break;
+    }
+    inspectedDirectoryCount += 1;
+    const inspection = detectLocalInspection(current.path);
+    if (isDeployableInspection(current.path, inspection)) {
+      candidates.push(sourceRelativePath(root, current.path));
+      continue;
+    }
+
+    if (current.depth >= workspaceInspectionMaxDepth) {
+      continue;
+    }
+
+    let directoryNames: string[];
+    try {
+      directoryNames = readdirSync(current.path, { withFileTypes: true })
+        .filter(
+          (entry) =>
+            entry.isDirectory() &&
+            !entry.isSymbolicLink() &&
+            !ignoredWorkspaceDirectories.has(entry.name),
+        )
+        .map((entry) => entry.name)
+        .sort((left, right) => left.localeCompare(right));
+    } catch {
+      continue;
+    }
+    for (const directoryName of directoryNames) {
+      queue.push({ path: join(current.path, directoryName), depth: current.depth + 1 });
+    }
+  }
+
+  if (inspectionBoundReached || candidates.length !== 1) {
+    const ambiguous = candidates.length > 1 || inspectionBoundReached;
+    return err(
+      domainError.validation(
+        ambiguous
+          ? "Source workspace does not identify one deployable application root"
+          : "Source workspace does not contain a deployable application root",
+        {
+          phase: "source-detection",
+          reasonCode: ambiguous ? "ambiguous-framework-evidence" : "missing-source-root",
+          affectedProfileField: "source.baseDirectory",
+          candidateRoots: candidates,
+          inspectedDirectoryCount,
+          inspectionBoundReached,
+        },
+      ),
+    );
+  }
+
+  const selectedRoot = candidates[0] ?? "/";
+  return ok({
+    path: resolve(root, `.${selectedRoot}`),
+    evidence: {
+      selectedRoot,
+      selectionReason: "single-deployable-root",
+      candidateRoots: candidates,
+      inspectedDirectoryCount,
+      inspectionBoundReached: false,
+    },
+  });
+}
+
+function conflictingNodeLockfiles(path: string): SourceDetectedFile[] {
+  return nodeDetectedFiles(path).filter((file) =>
+    ["bun-lock", "package-lock", "pnpm-lock", "yarn-lock"].includes(file),
+  );
+}
+
+function hasExplicitNodePackageManager(packageJson: Record<string, unknown> | null): boolean {
+  return (
+    typeof packageJson?.packageManager === "string" &&
+    /^(bun|npm|pnpm|yarn)@[^\s]+$/u.test(packageJson.packageManager.trim())
+  );
+}
+
 function resolveSourceKind(locator: string): {
   kind: SourceKind;
   inspection?: SourceInspectionSnapshot;
@@ -1143,7 +1361,11 @@ function resolveSourceKind(locator: string): {
 }
 
 export class FileSystemSourceDetector implements SourceDetector {
-  async detect(context: ExecutionContext, locator: string): Promise<Result<SourceDetectionResult>> {
+  async detect(
+    context: ExecutionContext,
+    locator: string,
+    input?: SourceDetectionInput,
+  ): Promise<Result<SourceDetectionResult>> {
     return context.tracer.startActiveSpan(
       createAdapterSpanName("filesystem_source_detector", "detect"),
       {
@@ -1157,9 +1379,44 @@ export class FileSystemSourceDetector implements SourceDetector {
         }
 
         const absolutePath = resolve(locator);
-        const resolved = resolveSourceKind(locator);
+        const localWorkspace =
+          existsSync(absolutePath) && statSync(absolutePath).isDirectory()
+            ? discoverLocalWorkspace(absolutePath, input)
+            : undefined;
+        let workspace: LocalWorkspaceDiscovery | undefined;
+        if (localWorkspace) {
+          if (localWorkspace.isErr()) {
+            return err(localWorkspace.error);
+          }
+          workspace = localWorkspace.value;
+        }
+        const resolved = workspace
+          ? {
+              ...resolveSourceKind(locator),
+              inspection: detectLocalInspection(workspace.path),
+            }
+          : resolveSourceKind(locator);
+        const packageJson = workspace ? readJsonObject(join(workspace.path, "package.json")) : null;
+        const lockfiles = workspace ? conflictingNodeLockfiles(workspace.path) : [];
+        const hasExplicitPackageManager = workspace
+          ? hasExplicitNodePackageManager(packageJson)
+          : false;
+        if (lockfiles.length > 1 && !hasExplicitPackageManager) {
+          return err(
+            domainError.validation("Source workspace has conflicting Node package manager locks", {
+              phase: "source-detection",
+              reasonCode: "ambiguous-build-tool",
+              affectedProfileField: "source.baseDirectory",
+              selectedRoot: workspace?.evidence.selectedRoot ?? "/",
+              detectedFiles: lockfiles,
+            }),
+          );
+        }
         const reasoning = [
           `Detected source kind: ${resolved.kind}`,
+          ...(workspace
+            ? [`Selected deployable source root: ${workspace.evidence.selectedRoot}`]
+            : []),
           resolved.inspection?.hasDetectedFile("dockerfile")
             ? "Dockerfile present in workspace"
             : "Dockerfile not detected",
@@ -1175,9 +1432,21 @@ export class FileSystemSourceDetector implements SourceDetector {
           ),
           displayName: DisplayNameText.rehydrate(basename(locator) || basename(absolutePath)),
           ...(resolved.inspection ? { inspection: resolved.inspection } : {}),
+          ...(workspace
+            ? {
+                metadata: {
+                  baseDirectory: workspace.evidence.selectedRoot,
+                  detectedSourceRoot: workspace.evidence.selectedRoot,
+                },
+              }
+            : {}),
         });
 
-        return ok({ source, reasoning });
+        return ok({
+          source,
+          reasoning,
+          ...(workspace ? { workspace: workspace.evidence } : {}),
+        });
       },
     );
   }

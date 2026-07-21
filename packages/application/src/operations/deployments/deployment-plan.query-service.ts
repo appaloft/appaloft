@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import {
   type DomainError,
   domainError,
@@ -674,7 +676,11 @@ export class DeploymentPlanQueryService {
       const resourceSource = yield* createResourceSourceDescriptor(resource);
       let detected = resourceSource;
       if (shouldEnrichSourceFromDetector(resource)) {
-        detected = yield* await sourceDetector.detect(context, resourceSource.source.locator);
+        detected = yield* await sourceDetector.detect(context, resourceSource.source.locator, {
+          ...(resourceSource.source.metadata?.baseDirectory
+            ? { baseDirectory: resourceSource.source.metadata.baseDirectory }
+            : {}),
+        });
       }
 
       const snapshot = yield* deploymentSnapshotFactory.create(environment, resource);
@@ -955,7 +961,7 @@ function blockedDeploymentPlanPreview(input: {
   const unsupportedReasons = [...(input.unsupportedReasons ?? []), unsupportedReason];
   const runtimeStrategy = resourceState.runtimeProfile?.strategy.value;
 
-  return {
+  return withPlanFingerprint({
     schemaVersion: "deployments.plan/v1",
     context: {
       projectId: projectState.id.value,
@@ -989,6 +995,9 @@ function blockedDeploymentPlanPreview(input: {
         ? { runtimeVersion: sourceInspection.runtimeVersion }
         : {}),
       ...(sourceInspection?.projectName ? { projectName: sourceInspection.projectName } : {}),
+      ...(input.source.metadata?.detectedSourceRoot
+        ? { selectedRoot: input.source.metadata.detectedSourceRoot }
+        : {}),
       detectedFiles: sourceInspection?.detectedFiles ?? [],
       detectedScripts: sourceInspection?.detectedScripts ?? [],
       ...(sourceInspection?.dockerfilePath
@@ -1051,7 +1060,7 @@ function blockedDeploymentPlanPreview(input: {
     unsupportedReasons,
     nextActions: nextActions(unsupportedReasons),
     generatedAt: new Date().toISOString(),
-  };
+  });
 }
 
 /*
@@ -1107,7 +1116,7 @@ function deploymentPlanPreview(input: {
 
   const reasonCodes = unsupportedReasons.map((item) => item.code);
 
-  return {
+  return withPlanFingerprint({
     schemaVersion: "deployments.plan/v1",
     context: {
       projectId: projectState.id.value,
@@ -1141,6 +1150,9 @@ function deploymentPlanPreview(input: {
         ? { runtimeVersion: sourceInspection.runtimeVersion }
         : {}),
       ...(sourceInspection?.projectName ? { projectName: sourceInspection.projectName } : {}),
+      ...(source.metadata?.detectedSourceRoot
+        ? { selectedRoot: source.metadata.detectedSourceRoot }
+        : {}),
       detectedFiles: sourceInspection?.detectedFiles ?? [],
       detectedScripts: sourceInspection?.detectedScripts ?? [],
       ...(sourceInspection?.dockerfilePath
@@ -1173,6 +1185,9 @@ function deploymentPlanPreview(input: {
           installCommand: execution.installCommand,
           buildCommand: execution.buildCommand,
           startCommand: execution.startCommand,
+          explicitInstallCommand: resourceState.runtimeProfile?.installCommand?.value,
+          explicitBuildCommand: resourceState.runtimeProfile?.buildCommand?.value,
+          explicitStartCommand: resourceState.runtimeProfile?.startCommand?.value,
         })
       : [],
     network: {
@@ -1206,7 +1221,17 @@ function deploymentPlanPreview(input: {
     unsupportedReasons,
     nextActions: nextActions(unsupportedReasons),
     generatedAt: runtimePlanState.generatedAt.value,
-  };
+  });
+}
+
+function withPlanFingerprint(
+  preview: Omit<DeploymentPlanPreview, "planVersion" | "fingerprint">,
+): DeploymentPlanPreview {
+  const { generatedAt: _generatedAt, ...stablePlan } = preview;
+  const fingerprint = `sha256:${createHash("sha256")
+    .update(JSON.stringify({ planVersion: "1", ...stablePlan }))
+    .digest("hex")}`;
+  return { ...preview, planVersion: "1", fingerprint };
 }
 
 function supportTier(
@@ -1260,16 +1285,46 @@ function commandSpecs(input: {
   installCommand: string | undefined;
   buildCommand: string | undefined;
   startCommand: string | undefined;
+  explicitInstallCommand: string | undefined;
+  explicitBuildCommand: string | undefined;
+  explicitStartCommand: string | undefined;
 }): DeploymentPlanPreview["commands"] {
   return [
     ...(input.installCommand
-      ? [{ kind: "install" as const, command: input.installCommand, source: "planner" as const }]
+      ? [
+          {
+            kind: "install" as const,
+            command: input.installCommand,
+            source:
+              input.explicitInstallCommand === input.installCommand
+                ? ("resource-runtime-profile" as const)
+                : ("planner" as const),
+          },
+        ]
       : []),
     ...(input.buildCommand
-      ? [{ kind: "build" as const, command: input.buildCommand, source: "planner" as const }]
+      ? [
+          {
+            kind: "build" as const,
+            command: input.buildCommand,
+            source:
+              input.explicitBuildCommand === input.buildCommand
+                ? ("resource-runtime-profile" as const)
+                : ("planner" as const),
+          },
+        ]
       : []),
     ...(input.startCommand
-      ? [{ kind: "start" as const, command: input.startCommand, source: "planner" as const }]
+      ? [
+          {
+            kind: "start" as const,
+            command: input.startCommand,
+            source:
+              input.explicitStartCommand === input.startCommand
+                ? ("resource-runtime-profile" as const)
+                : ("planner" as const),
+          },
+        ]
       : []),
   ];
 }

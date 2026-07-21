@@ -5605,6 +5605,8 @@ export interface DeploymentPlanReason {
 
 export interface DeploymentPlanPreview {
   schemaVersion: "deployments.plan/v1";
+  planVersion: "1";
+  fingerprint: string;
   context: {
     projectId: string;
     environmentId: string;
@@ -5612,6 +5614,7 @@ export interface DeploymentPlanPreview {
     serverId: string;
     destinationId: string;
     projectName?: string;
+    selectedRoot?: string;
     environmentName?: string;
     resourceName?: string;
     serverName?: string;
@@ -9657,6 +9660,19 @@ export interface CertificateReadModel {
 export interface SourceDetectionResult {
   source: SourceDescriptor;
   reasoning: string[];
+  workspace?: SourceWorkspaceDiscoveryEvidence;
+}
+
+export interface SourceWorkspaceDiscoveryEvidence {
+  selectedRoot: string;
+  selectionReason: "explicit-base-directory" | "single-deployable-root";
+  candidateRoots: string[];
+  inspectedDirectoryCount: number;
+  inspectionBoundReached: boolean;
+}
+
+export interface SourceDetectionInput {
+  baseDirectory?: string;
 }
 
 export type RequestedDeploymentMethod =
@@ -10144,7 +10160,11 @@ export interface DeploymentContextDefaultsFactoryPort {
 }
 
 export interface SourceDetector {
-  detect(context: ExecutionContext, locator: string): Promise<Result<SourceDetectionResult>>;
+  detect(
+    context: ExecutionContext,
+    locator: string,
+    input?: SourceDetectionInput,
+  ): Promise<Result<SourceDetectionResult>>;
 }
 
 export interface SourceVersionDetectionResult {

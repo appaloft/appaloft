@@ -38,6 +38,13 @@ Agent deployment is not a new business operation. It translates "deploy this pro
 
 For an already built static directory, an agent can use `appaloft deploy ./dist --as static-site`. This behaves like publishing a static output directory, while Appaloft still deploys to the user's selected BYOS target by default instead of silently uploading to a hosted cloud.
 
+Before relying on automatic runtime detection, check the current
+[zero-configuration support matrix](/docs/en/deploy/sources/#zero-configuration-support). Local
+single-app roots have the broadest proven coverage. Automatic framework detection from public
+remote Git is Unsupported; explicit container-native or command remote-Git profiles and bounded
+local monorepo discovery are Preview. General workload archives are Unsupported, and ambiguous
+monorepo roots block until you select `baseDirectory`.
+
 ## Success check [#start-success-check]
 
 A successful minimal deployment should answer:
