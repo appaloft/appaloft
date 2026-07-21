@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.2.0](https://github.com/appaloft/appaloft/compare/v1.1.0...v1.2.0) (2026-07-21)
+
+
+### Features
+
+* **sdk:** add sandbox resource handles ([#785](https://github.com/appaloft/appaloft/issues/785)) ([9e3454b](https://github.com/appaloft/appaloft/commit/9e3454b18294b805fdf64a2c9329d01bcacf0d00))
+
+
+### Bug Fixes
+
+* scope config domain idempotency by attempt ([#784](https://github.com/appaloft/appaloft/issues/784)) ([35d7ba5](https://github.com/appaloft/appaloft/commit/35d7ba59f2e3efa769f67afc9294efbe791b244c))
+* use proxy-local TLS for config domains ([#783](https://github.com/appaloft/appaloft/issues/783)) ([312e3aa](https://github.com/appaloft/appaloft/commit/312e3aa23eaf200b7367023c787ff1f54f8cba3f))
+* verify generic SSH deployment proof ([#782](https://github.com/appaloft/appaloft/issues/782)) ([a0e9e68](https://github.com/appaloft/appaloft/commit/a0e9e68d251e1a13a16b6e8aac137fe3da7846b0))
+
+
+### Documentation
+
+* add Sandbox Agent use cases and examples ([1e43474](https://github.com/appaloft/appaloft/commit/1e43474b12237e2d654e4ed71beb3de3b02a4bfe))
+
 ## [1.1.0](https://github.com/appaloft/appaloft/compare/v1.0.4...v1.1.0) (2026-07-21)
 
 
