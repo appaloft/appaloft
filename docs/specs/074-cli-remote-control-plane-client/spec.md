@@ -174,6 +174,14 @@ implemented dispatcher uses the application operation catalog to map constructed
 messages to operation keys, then uses generated SDK operation descriptors for method, path, query,
 body, auth, and streaming metadata.
 
+Remote dispatch may automatically replay a request only when the operation catalog classifies the
+operation as a `query`. A query that receives an HTML gateway response with HTTP status 502, 503,
+or 504 is retried once through the same authenticated typed request. Commands are never
+automatically replayed, including commands whose HTTP method is `GET` or whose failure is marked
+retriable. After the bounded query retry is exhausted, the CLI returns the structured
+`control_plane_unexpected_html_response` error with `retryable = true`, safe method/URL/status and
+content metadata, and no response body, credential, or secret material.
+
 Commands that explicitly request secret material from standard input must capture it at the shell
 entrypoint before parser or runtime initialization. This preserves both pipes and owner-readable
 regular files whose descriptors may otherwise be consumed during module initialization. The

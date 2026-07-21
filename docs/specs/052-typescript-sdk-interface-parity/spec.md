@@ -162,7 +162,9 @@ streaming operations, and to JSON body for other methods. Callers can always pas
 - `packages/sdk` defines the runtime SDK package boundary and exposes `createAppaloftClient` as the
   public root API. It has no runtime dependencies, uses generated operation descriptors internally,
   supports product-session cookie auth, deploy-token bearer auth, operation input/path/query
-  organization scoping, and typed structured errors without parsing human message text.
+  organization scoping, and typed structured errors without parsing human message text. Unexpected
+  HTML/non-JSON responses remain sanitized; HTTP 502, 503, and 504 variants are classified as
+  retriable transport failures while non-gateway variants remain non-retriable.
 - The SDK root does not export generated descriptors, descriptor request clients, or low-level
   `request(...)`/`stream(...)` helpers. Those remain package-internal implementation details for
   transport tests and repository-internal adapters.
