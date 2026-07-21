@@ -33,6 +33,9 @@ This is the minimum proof comparison, not a general Change Effect planner.
   the attempted rollout failed.
 - A managed route that returns HTTP success with a missing or different deployment identity is a
   route/workload mismatch, not successful access evidence.
+- When one origin has multiple non-redirect path routes, proof selects the most general route once
+  (preferring `/`) before joining the health path; it does not invent one health endpoint per service
+  prefix.
 - Managed route readback bypasses ambient `HTTP_PROXY`/`HTTPS_PROXY`; those control-plane settings
   must not redirect deployment verification away from the configured domain.
 - Raw provider output is logged only through existing redaction/diagnostic policy and never copied

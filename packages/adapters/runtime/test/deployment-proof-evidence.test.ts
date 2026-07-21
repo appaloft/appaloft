@@ -1,11 +1,30 @@
 import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
-import { deploymentProofConfigurationFingerprint, type DeploymentSummary } from "@appaloft/application";
+import {
+  deploymentProofConfigurationFingerprint,
+  type DeploymentSummary,
+  type ServerRepository,
+} from "@appaloft/application";
+import {
+  CreatedAt,
+  DeploymentTargetCredentialKindValue,
+  DeploymentTargetId,
+  DeploymentTargetName,
+  DeploymentTargetUsername,
+  HostAddress,
+  PortNumber,
+  ProviderKey,
+  Server,
+  SshPrivateKeyText,
+  TargetKindValue,
+} from "@appaloft/core";
 import {
   deploymentProofEvidenceFromDockerInspect,
   readDeploymentProofManagedRouteEvidence,
+  runDeploymentProofCommand,
   RuntimeDeploymentProofEvidenceReader,
+  writeDeploymentProofSshIdentityFile,
 } from "../src";
 
 const variables = [
@@ -19,7 +38,69 @@ const deployment = {
   environmentSnapshot: { variables },
 } as DeploymentSummary;
 
+class StaticServerRepository implements ServerRepository {
+  constructor(private readonly server: Server | null) {}
+
+  async findOne(): Promise<Server | null> {
+    return this.server;
+  }
+
+  async upsert(): Promise<void> {}
+}
+
+function sshServer(): Server {
+  return Server.rehydrate({
+    id: DeploymentTargetId.rehydrate("srv_ssh"),
+    name: DeploymentTargetName.rehydrate("SSH server"),
+    host: HostAddress.rehydrate("203.0.113.10"),
+    port: PortNumber.rehydrate(2222),
+    providerKey: ProviderKey.rehydrate("generic-ssh"),
+    targetKind: TargetKindValue.rehydrate("single-server"),
+    credential: {
+      kind: DeploymentTargetCredentialKindValue.rehydrate("ssh-private-key"),
+      username: DeploymentTargetUsername.rehydrate("deployer"),
+      privateKey: SshPrivateKeyText.rehydrate(
+        "-----BEGIN TEST KEY-----\nsecret\n-----END TEST KEY-----",
+      ),
+    },
+    createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+  });
+}
+
 describe("deployment proof runtime evidence", () => {
+  test("[DEP-PROOF-ADAPTER-002] bounds runtime readback commands", async () => {
+    const startedAt = Date.now();
+    const result = await runDeploymentProofCommand(["sleep", "1"], 20);
+
+    expect(result.ok).toBe(false);
+    expect(Date.now() - startedAt).toBeLessThan(500);
+  });
+
+  test("[DEP-PROOF-ADAPTER-002] removes partial SSH identity material when writing fails", async () => {
+    const removed: string[] = [];
+    let failure: unknown;
+    try {
+      await writeDeploymentProofSshIdentityFile("private-key", {
+        async mkdtemp() {
+          return "/tmp/appaloft-proof-test";
+        },
+        async writeFile() {
+          throw new Error("disk full");
+        },
+        async chmod() {},
+        async rm(path) {
+          removed.push(path);
+        },
+      });
+    } catch (error) {
+      failure = error;
+    }
+
+    expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error).message).toBe("disk full");
+    expect(removed).toEqual(["/tmp/appaloft-proof-test"]);
+  });
+
   test("[DEP-PROOF-ADAPTER-001][CPS-PROOF-010] verifies environment keys without returning values", () => {
     const configurationFingerprint = deploymentProofConfigurationFingerprint(variables);
     const evidence = deploymentProofEvidenceFromDockerInspect(deployment, {
@@ -136,6 +217,52 @@ describe("deployment proof runtime evidence", () => {
     expect(attempts).toBe(2);
   });
 
+  test("[DEP-PROOF-ADAPTER-003] probes one canonical route per domain when a compose stack has path routing", async () => {
+    const requested: string[] = [];
+    const evidence = await readDeploymentProofManagedRouteEvidence(
+      {
+        ...deployment,
+        runtimePlan: {
+          ...deployment.runtimePlan,
+          execution: {
+            ...deployment.runtimePlan.execution,
+            healthCheckPath: "/login",
+            accessRoutes: [
+              {
+                proxyKind: "traefik",
+                domains: ["app.example.test"],
+                pathPrefix: "/v1",
+                tlsMode: "auto",
+              },
+              {
+                proxyKind: "traefik",
+                domains: ["app.example.test"],
+                pathPrefix: "/api",
+                tlsMode: "auto",
+              },
+              {
+                proxyKind: "traefik",
+                domains: ["app.example.test"],
+                pathPrefix: "/",
+                tlsMode: "auto",
+              },
+            ],
+          },
+        },
+      } as DeploymentSummary,
+      async (url) => {
+        requested.push(url);
+        return new Response("ok", {
+          status: 200,
+          headers: { "X-Appaloft-Deployment-Id": "dep_v2" },
+        });
+      },
+    );
+
+    expect(evidence.status).toBe("passed");
+    expect(requested).toEqual(["https://app.example.test/login"]);
+  });
+
   test("[DEP-PROOF-ADAPTER-003] rejects healthy managed routes with stale or missing identity", async () => {
     const managedDeployment = {
       ...deployment,
@@ -200,20 +327,82 @@ describe("deployment proof runtime evidence", () => {
     });
   });
 
-  test("[DEP-PROOF-ADAPTER-002] generic SSH reports a truthful readback gap", async () => {
-    const reader = new RuntimeDeploymentProofEvidenceReader();
+  test("[DEP-PROOF-ADAPTER-002] generic SSH reads the current labeled workload without exposing environment values", async () => {
+    const calls: string[][] = [];
+    const configurationFingerprint = deploymentProofConfigurationFingerprint(variables);
+    const reader = new RuntimeDeploymentProofEvidenceReader(
+      new StaticServerRepository(sshServer()),
+      async (args) => {
+        calls.push(args);
+        return {
+          ok: true,
+          stdout: JSON.stringify({
+            Id: "container-v2",
+            Image: "sha256:image-v2",
+            State: { Running: true, Health: { Status: "healthy" } },
+            Config: {
+              Image: "stocktruth-platform:production",
+              Env: ["APP_VERSION=v2", "TOKEN=runtime-marker"],
+              Labels: {
+                "appaloft.deployment-id": "dep_v2",
+                "appaloft.configuration-fingerprint": configurationFingerprint,
+              },
+            },
+          }),
+        };
+      },
+    );
     const result = await reader.read({} as never, {
       ...deployment,
       runtimePlan: {
         ...deployment.runtimePlan,
-        target: { kind: "single-server", providerKey: "generic-ssh", serverIds: ["srv_demo"] },
+        execution: {
+          ...deployment.runtimePlan.execution,
+          metadata: { targetServiceName: "web" },
+        },
+        target: { kind: "single-server", providerKey: "generic-ssh", serverIds: ["srv_ssh"] },
       },
     } as DeploymentSummary);
 
     expect(result._unsafeUnwrap()).toMatchObject({
+      available: true,
+      workload: { available: true, generation: "dep_v2" },
+      configuration: { matchesPlanned: true, matchesPlannedKeySet: true },
+      health: { status: "passed" },
+    });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.[0]).toBe("ssh");
+    expect(calls[0]?.at(-1)).toContain("label=appaloft.deployment-id=dep_v2");
+    expect(calls[0]?.at(-1)).toContain("label=com.docker.compose.service=web");
+    expect(JSON.stringify(result._unsafeUnwrap())).not.toContain("runtime-marker");
+  });
+
+  test("[DEP-PROOF-ADAPTER-002] generic SSH fails closed without a governed private key", async () => {
+    let commandInvoked = false;
+    const serverWithoutCredential = Server.rehydrate({
+      ...sshServer().toState(),
+      credential: undefined,
+    });
+    const reader = new RuntimeDeploymentProofEvidenceReader(
+      new StaticServerRepository(serverWithoutCredential),
+      async () => {
+        commandInvoked = true;
+        return { ok: true, stdout: "{}" };
+      },
+    );
+
+    const result = await reader.read({} as never, {
+      ...deployment,
+      runtimePlan: {
+        ...deployment.runtimePlan,
+        target: { kind: "single-server", providerKey: "generic-ssh", serverIds: ["srv_ssh"] },
+      },
+    } as DeploymentSummary);
+
+    expect(commandInvoked).toBe(false);
+    expect(result._unsafeUnwrap()).toMatchObject({
       available: false,
-      reasonCode: "generic_ssh_runtime_readback_unavailable",
-      workload: { available: false },
+      reasonCode: "generic_ssh_governed_credential_unavailable",
     });
   });
 

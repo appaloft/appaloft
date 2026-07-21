@@ -108,7 +108,11 @@ export { RuntimeDeploymentHealthChecker } from "./deployment-health";
 export {
   deploymentProofEvidenceFromDockerInspect,
   readDeploymentProofManagedRouteEvidence,
+  runDeploymentProofCommand,
   RuntimeDeploymentProofEvidenceReader,
+  writeDeploymentProofSshIdentityFile,
+  type DeploymentProofCommandRunner,
+  type DeploymentProofIdentityFileOperations,
   type DockerInspectState,
   type DeploymentProofRouteFetch,
 } from "./deployment-proof-evidence";
