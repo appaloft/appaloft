@@ -13,6 +13,7 @@ import {
 } from "@appaloft/application";
 import { domainError, err, ok } from "@appaloft/core";
 import { Effect, Either, Layer } from "effect";
+import { type DeploymentPromptSeed } from "../src/commands/deployment-interaction";
 import { resolveDeploymentStateBackend } from "../src/commands/deployment-state";
 
 function ensureReflectMetadata(): void {
@@ -2365,49 +2366,53 @@ describe("CLI deployment config entry workflow", () => {
       },
     });
 
+    const deploymentSeed: DeploymentPromptSeed = {
+      sourceLocator: ".",
+      deploymentMethod: "docker-compose",
+      projectId: "proj_existing",
+      serverId: "srv_existing",
+      environmentId: "env_existing",
+      resourceId: "res_existing",
+      stateBackend: {
+        kind: "postgres-control-plane",
+        storageScope: "control-plane",
+        databaseUrlRequired: true,
+        requiresRemoteStateLifecycle: false,
+        reason: "Remote control plane selected.",
+      },
+      exposureMode: "reverse-proxy",
+      targetServiceName: "web",
+      services: [
+        { name: "web", kind: "web" },
+        { name: "api", kind: "web" },
+      ],
+      serverAppliedRoutes: [
+        {
+          host: "app.example.com",
+          pathPrefix: "/",
+          tlsMode: "auto",
+          targetServiceName: "web",
+        },
+        {
+          host: "app.example.com",
+          pathPrefix: "/api",
+          tlsMode: "auto",
+          targetServiceName: "api",
+        },
+        {
+          host: "www.example.com",
+          pathPrefix: "/",
+          tlsMode: "auto",
+          redirectTo: "app.example.com",
+          redirectStatus: 308,
+        },
+      ],
+    };
     const input = await Effect.runPromise(
       Effect.provide(
         resolveInteractiveDeploymentInput({
-          sourceLocator: ".",
-          deploymentMethod: "docker-compose",
-          projectId: "proj_existing",
-          serverId: "srv_existing",
-          environmentId: "env_existing",
-          resourceId: "res_existing",
-          stateBackend: {
-            kind: "postgres-control-plane",
-            storageScope: "control-plane",
-            databaseUrlRequired: true,
-            requiresRemoteStateLifecycle: false,
-            reason: "Remote control plane selected.",
-          },
-          exposureMode: "reverse-proxy",
-          targetServiceName: "web",
-          services: [
-            { name: "web", kind: "web" },
-            { name: "api", kind: "web" },
-          ],
-          serverAppliedRoutes: [
-            {
-              host: "app.example.com",
-              pathPrefix: "/",
-              tlsMode: "auto",
-              targetServiceName: "web",
-            },
-            {
-              host: "app.example.com",
-              pathPrefix: "/api",
-              tlsMode: "auto",
-              targetServiceName: "api",
-            },
-            {
-              host: "www.example.com",
-              pathPrefix: "/",
-              tlsMode: "auto",
-              redirectTo: "app.example.com",
-              redirectStatus: 308,
-            },
-          ],
+          ...deploymentSeed,
+          reconciliationAttemptId: "attempt_1",
         }),
         runtime,
       ),
@@ -2454,7 +2459,7 @@ describe("CLI deployment config entry workflow", () => {
         certificatePolicy: "disabled",
         targetServiceName: "web",
         idempotencyKey:
-          "repository-config-domain:proj_existing:env_existing:res_existing:app.example.com:/:replaces:dmb_deleted",
+          "repository-config-domain:attempt_1:proj_existing:env_existing:res_existing:app.example.com:/:replaces:dmb_deleted",
       },
       {
         serverId: "srv_existing",
@@ -2471,6 +2476,24 @@ describe("CLI deployment config entry workflow", () => {
         redirectStatus: 308,
       },
     ]);
+
+    commands.length = 0;
+    await Effect.runPromise(
+      Effect.provide(
+        resolveInteractiveDeploymentInput({
+          ...deploymentSeed,
+          reconciliationAttemptId: "attempt_2",
+        }),
+        runtime,
+      ),
+    );
+    const retriedDomainCommands = commands.filter(
+      (command) => command.constructor.name === "CreateDomainBindingCommand",
+    );
+    expect(retriedDomainCommands[0]).toMatchObject({
+      idempotencyKey:
+        "repository-config-domain:attempt_2:proj_existing:env_existing:res_existing:app.example.com:/:replaces:dmb_deleted",
+    });
   });
 
   test("[CONFIG-FILE-DOMAIN-001] access domains fail before mutation when route store is unavailable", async () => {
