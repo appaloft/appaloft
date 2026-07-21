@@ -133,6 +133,12 @@ export function renderComposeOwnershipLabelOverrideScript(input: {
       ? [{ serviceName: target.serviceName, networkName: target.networkName }]
       : [],
   );
+  const scopedNetworkHeaderConditions = [
+    ...(targetOnlyNetworkName ? ['[ "$service" = "$target_service" ]'] : []),
+    ...serviceNetworkTargets.map(
+      (target) => `[ "$service" = ${input.quote(target.serviceName)} ]`,
+    ),
+  ].filter((condition, index, conditions) => conditions.indexOf(condition) === index);
   const rendersServiceNetworks =
     sharedNetworkNames.length > 0 ||
     Boolean(targetOnlyNetworkName) ||
@@ -210,7 +216,13 @@ export function renderComposeOwnershipLabelOverrideScript(input: {
     ...mountLines.map((line) => `    printf '%s\\n' ${input.quote(line)}`),
     ...(rendersServiceNetworks
       ? [
-          `    printf '%s\\n' ${input.quote("    networks:")}`,
+          ...(sharedNetworkNames.length > 0
+            ? [`    printf '%s\\n' ${input.quote("    networks:")}`]
+            : [
+                `    if ${scopedNetworkHeaderConditions.join(" || ")}; then`,
+                `      printf '%s\\n' ${input.quote("    networks:")}`,
+                "    fi",
+              ]),
           ...sharedNetworkNames.map(
             (networkName) =>
               `    printf '%s\\n' ${input.quote(`      - ${yamlQuoted(networkName)}`)}`,
