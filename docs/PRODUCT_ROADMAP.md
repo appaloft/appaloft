@@ -110,6 +110,13 @@ Internal governing sources:
 - [x] [AI-Native Blueprint And MCP Roadmap](./implementation/ai-native-resource-template-roadmap.md)
 
 Product constraints:
+- [x] Position Appaloft as an AI application delivery platform: Run Agents -> Work in Sandboxes ->
+  Preview & Promote -> Deploy & Verify, while keeping traditional application deployment first-class.
+- [x] Use `Build with agents. Ship with proof.` as the product slogan and label Agent Runtime,
+  Source Artifact/Candidate Preview, and Sandbox Promotion as private preview until their named
+  acceptance matrices pass in a configured hosted environment.
+- [x] Keep Delivery Evidence Chain claims limited to observed delivery evidence; do not imply
+  formal correctness, security, vulnerability absence, or compliance.
 - [x] Treat Appaloft as a self-hosted deployment control plane, not a web-first CRUD app.
 - [x] Keep `detect -> plan -> execute -> verify -> rollback` as the core product shape.
 - [x] Keep CLI, HTTP/oRPC, Web, and future MCP/tool entrypoints aligned through the same operation

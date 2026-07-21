@@ -1723,6 +1723,21 @@ describe("CLI remote control-plane client", () => {
     });
   });
 
+  test("[SBX-CLI-AGENT-001][CONTROL-PLANE-CLI-006] sandbox commands are remote-capable", async () => {
+    const result = await resolveCliExecutionTarget({
+      argv: ["node", "appaloft", "sandbox", "agent", "runtime", "list", "sbx_123"],
+      store: activeStore(),
+    });
+
+    expect(result._unsafeUnwrap()).toMatchObject({
+      kind: "remote",
+      diagnostics: {
+        command: "sandbox",
+        effectiveMode: "self-hosted",
+      },
+    });
+  });
+
   test("[CONTROL-PLANE-CLI-019] unknown top-level commands fail before runtime initialization", async () => {
     const argv = ["node", "appaloft", "deployment", "proof", "dep_123"];
     const results = await Promise.all([

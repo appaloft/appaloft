@@ -100,6 +100,10 @@ const zhTree: NavFolder[] = [
   {
     name: "Agent 工作流",
     children: [
+      page("运行 Agent", "agent/run-agents"),
+      page("Agent Sandboxes", "agent/sandboxes"),
+      page("预览与 Promote", "agent/preview-promote"),
+      page("Delivery Evidence Chain", "agent/delivery-evidence"),
       page("Appaloft skill", "agent/appaloft-skill"),
       page("部署 skill", "agent/deploy-skill"),
       page("MCP 服务器", "agent/mcp-server"),
@@ -220,6 +224,10 @@ const enTree = prefixTree(
     {
       name: "Agent Workflows",
       children: [
+        page("Run agents", "agent/run-agents"),
+        page("Agent Sandboxes", "agent/sandboxes"),
+        page("Preview and promote", "agent/preview-promote"),
+        page("Delivery Evidence Chain", "agent/delivery-evidence"),
         page("Appaloft skill", "agent/appaloft-skill"),
         page("Deploy skill", "agent/deploy-skill"),
         page("MCP server", "agent/mcp-server"),
