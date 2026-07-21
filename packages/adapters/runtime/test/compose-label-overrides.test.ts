@@ -2,7 +2,6 @@ import { describe, expect, test } from "bun:test";
 import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parse } from "yaml";
 
 import { renderComposeOwnershipLabelOverrideScript } from "../src/compose-label-overrides";
 import { dockerLabelsFromAssignments } from "../src/runtime-commands";
@@ -166,11 +165,17 @@ describe("compose ownership label overrides", () => {
       expect(await new Response(process.stderr).text()).toBe("");
       expect(exitCode).toBe(0);
 
-      const override = parse(await readFile(overrideFile, "utf8")) as {
-        services: Record<string, { networks?: string[] }>;
-      };
-      expect(override.services.migrate?.networks).toBeUndefined();
-      expect(override.services.web?.networks).toEqual(["appaloft-edge"]);
+      const override = await readFile(overrideFile, "utf8");
+      const migrateService = override.slice(
+        override.indexOf('  "migrate":'),
+        override.indexOf('  "web":'),
+      );
+      const webService = override.slice(
+        override.indexOf('  "web":'),
+        override.indexOf("\nnetworks:\n"),
+      );
+      expect(migrateService).not.toContain("    networks:");
+      expect(webService).toContain('    networks:\n      - "appaloft-edge"');
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
