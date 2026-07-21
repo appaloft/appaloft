@@ -1,3 +1,5 @@
+import "../../../application/node_modules/reflect-metadata/Reflect.js";
+
 import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -5826,7 +5828,7 @@ describe("CLI deployment config entry workflow", () => {
                 providerKey: "external-postgres",
                 providerManaged: false,
                 lifecycleStatus: "ready",
-                bindingReadiness: { status: "ready" },
+                bindingReadiness: { status: "not-implemented" },
                 createdAt: "2026-07-20T00:00:00.000Z",
               },
             ],
@@ -5866,7 +5868,7 @@ describe("CLI deployment config entry workflow", () => {
     expect(commands).toContain("BindResourceDependencyCommand");
   });
 
-  test("[CONFIG-FILE-DEPENDENCY-015] config dependencies fail closed when an imported resource is missing", async () => {
+  test("[CONFIG-FILE-DEPENDENCY-015] config dependencies fail closed when an imported resource is binding-blocked", async () => {
     ensureReflectMetadata();
     const { resolveInteractiveDeploymentInput } = await import(
       "../src/commands/deployment-interaction"
@@ -5882,6 +5884,26 @@ describe("CLI deployment config entry workflow", () => {
         return ok(null as T);
       },
       executeQuery: async <T>(message: AppQuery<T>) => {
+        if (message.constructor.name === "ListDependencyResourcesQuery") {
+          return ok({
+            items: [
+              {
+                id: "dep_res_blocked_imported_db",
+                projectId: "proj_existing",
+                environmentId: "env_existing",
+                name: "StockTruth Supabase",
+                slug: "stocktruth-supabase",
+                kind: "postgres",
+                sourceMode: "imported-external",
+                providerKey: "external-postgres",
+                providerManaged: false,
+                lifecycleStatus: "ready",
+                bindingReadiness: { status: "blocked", reason: "connection unavailable" },
+                createdAt: "2026-07-20T00:00:00.000Z",
+              },
+            ],
+          } as T);
+        }
         if (message.constructor.name === "ListResourceDependencyBindingsQuery") {
           return ok({
             items: [

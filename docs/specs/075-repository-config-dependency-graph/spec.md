@@ -48,7 +48,7 @@ the Appaloft-managed dependency resource that the config workflow created for th
 | CONFIG-DEPENDENCY-008 | Cleanup preserves manual/shared dependencies | Preview cleanup runs when no matching dependency provenance exists or delete safety reports another active/shared blocker | Cleanup reaches dependency stage | No unproven dependency is deleted; delete blockers are surfaced without guessing by resource name. |
 | CONFIG-DEPENDENCY-010 | Support canonical dependency kinds | `appaloft.yaml` declares `postgres`, `redis`, `mysql`, `clickhouse`, `object-storage`, or `opensearch` with `source = managed` and an env binding | Parser and config deploy run | The parser accepts the canonical kind, config deploy filters/provisions that kind, records provenance with the same kind, and deployment admission remains ids-only. |
 | CONFIG-DEPENDENCY-012 | Parse imported dependency declaration | Config declares `source = imported`, a stable `resourceName`, kind, and env binding | The config parser runs | The declaration is accepted without connection or provider material. Missing name and ephemeral preview lifecycle are rejected. |
-| CONFIG-DEPENDENCY-014 | Bind a ready imported dependency | The named imported dependency exists and is ready in the selected Project and Environment | Config deploy resolves dependencies | The existing dependency is bound without provisioning or importing infrastructure. |
+| CONFIG-DEPENDENCY-014 | Bind a ready imported dependency | The named imported dependency exists, has ready lifecycle state, and is not binding-blocked in the selected Project and Environment | Config deploy resolves dependencies | The existing dependency is bound without provisioning or importing infrastructure; imported resources whose provider realization readiness is `not-implemented` remain eligible because the binding command admits every non-blocked imported connection. |
 | CONFIG-DEPENDENCY-015 | Missing or mismatched imported dependency fails closed | The named dependency is missing, wrong-kind, not ready, or the env target points to a differently named imported dependency | Config deploy resolves dependencies | The workflow fails before provision/bind/deployment with safe project, environment, key, kind, and resource-name details. |
 
 ## Config Contract
@@ -83,8 +83,10 @@ Rules:
 - `kind` supports the Appaloft canonical managed dependency kinds: `postgres`, `redis`, `mysql`,
   `clickhouse`, `object-storage`, and `opensearch`;
 - `source` supports `managed` and `imported`;
-- `source: imported` requires `resourceName`, resolves only a ready `imported-external` dependency
-  of the declared kind in the selected Project and Environment, and never provisions/imports it;
+- `source: imported` requires `resourceName`, resolves only a lifecycle-ready,
+  non-binding-blocked `imported-external` dependency of the declared kind in the selected Project
+  and Environment, and never provisions/imports it; `bindingReadiness = not-implemented` is eligible
+  for imported connections because only explicit `blocked` readiness prevents binding;
 - `bind.env` must be a safe environment variable name;
 - `preview.lifecycle` supports `ephemeral` only for managed dependencies;
 - omission of `preview.lifecycle` means normal dependency lifecycle; cleanup must not delete it;

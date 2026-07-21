@@ -2109,7 +2109,7 @@ function isImportedDependencyResource(
       !resource.deletedAt &&
       resource.sourceMode === "imported-external" &&
       resource.lifecycleStatus === "ready" &&
-      resource.bindingReadiness.status === "ready",
+      resource.bindingReadiness.status !== "blocked",
   );
 }
 
