@@ -45,6 +45,7 @@ class RecordingBus {
     const name = message.constructor.name;
     this.messages.push({ name, input });
     const values: Record<string, unknown> = {
+      CreateSandboxCommand: { sandboxId: "sbx_sdk", status: "ready" },
       CreateSandboxAgentRuntimeCommand: { runtimeId: "srt_sdk", status: "ready" },
       CreateSandboxAgentRunCommand: { runId: "srun_sdk", status: "queued" },
       ListSandboxAgentApprovalsQuery: { items: [], total: 0 },
@@ -101,7 +102,7 @@ describe("sandbox agent delivery SDK running server", () => {
 
   afterAll(() => server?.stop(true));
 
-  test("[TS-SDK-AGENT-001] executes the nested agent-to-promotion contract over HTTP", async () => {
+  test("[TS-SDK-AGENT-001][TS-SDK-RESOURCE-001] executes the Sandbox handle to promotion contract over HTTP", async () => {
     if (!server) throw new Error("SDK test server was not started");
     const client = createAppaloftClient({
       baseUrl: `http://127.0.0.1:${server.port}/api`,
@@ -109,23 +110,25 @@ describe("sandbox agent delivery SDK running server", () => {
     });
     const digest = `sha256:${"a".repeat(64)}`;
 
-    expect(
-      await client.sandboxes.agents.runtimes.create({
-        sandboxId: "sbx_sdk",
-        harnessKey: "pi",
-        harnessTemplateId: "sbt_pi",
-        idempotencyKey: "runtime-sdk",
-      }),
-    ).toMatchObject({ ok: true, data: { runtimeId: "srt_sdk" } });
-    expect(
-      await client.sandboxes.agents.runs.create({
-        sandboxId: "sbx_sdk",
-        runtimeId: "srt_sdk",
-        task: "Build the application",
-        context: { mode: "fresh" },
-        idempotencyKey: "run-sdk",
-      }),
-    ).toMatchObject({ ok: true, data: { runId: "srun_sdk" } });
+    const sandbox = await client.sandboxes.create({
+      source: { kind: "template", templateId: "sbt_pi" },
+      requestedIsolation: "gvisor",
+      limits: {
+        cpuMillis: 1_000,
+        memoryBytes: 256 * 1024 * 1024,
+        diskBytes: 512 * 1024 * 1024,
+        maxProcesses: 32,
+      },
+      networkPolicy: { mode: "deny", rules: [] },
+    });
+    const agent = await sandbox.agents.create({ harness: "pi", idempotencyKey: "runtime-sdk" });
+    const run = await agent.runs.create({
+      task: "Build the application",
+      idempotencyKey: "run-sdk",
+    });
+
+    expect(agent).toMatchObject({ runtimeId: "srt_sdk", sandboxId: "sbx_sdk" });
+    expect(run).toMatchObject({ runId: "srun_sdk", runtimeId: "srt_sdk" });
     expect(await client.sandboxes.agents.approvals.list({ runId: "srun_sdk" })).toMatchObject({
       ok: true,
       data: { items: [] },
@@ -161,6 +164,7 @@ describe("sandbox agent delivery SDK running server", () => {
     ).toMatchObject({ ok: true, data: { status: "accepted" } });
 
     expect(bus.messages.map(({ name }) => name)).toEqual([
+      "CreateSandboxCommand",
       "CreateSandboxAgentRuntimeCommand",
       "CreateSandboxAgentRunCommand",
       "ListSandboxAgentApprovalsQuery",

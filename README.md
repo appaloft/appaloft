@@ -110,23 +110,10 @@ const sandbox = await appaloft.sandboxes.create({
   networkPolicy: { mode: "deny", rules: [] },
 });
 
-if (!sandbox.ok) throw sandbox.error;
-const runtime = await appaloft.sandboxes.agents.runtimes.create({
-  sandboxId: sandbox.data.sandboxId,
-  harnessKey: "pi",
-  harnessTemplateId: "aht_pi_managed_v1",
-  idempotencyKey: crypto.randomUUID(),
-});
-if (!runtime.ok) throw runtime.error;
-
-const run = await appaloft.sandboxes.agents.runs.create({
-  sandboxId: sandbox.data.sandboxId,
-  runtimeId: runtime.data.runtimeId,
+const agent = await sandbox.agents.create({ harness: "pi" });
+const run = await agent.runs.create({
   task: "Build the requested application in /workspace/app",
-  context: { mode: "fresh" },
-  idempotencyKey: crypto.randomUUID(),
 });
-if (!run.ok) throw run.error;
 ```
 
 The caller owns chat/session state. Appaloft owns the isolated execution, lifecycle, event readback,
@@ -134,8 +121,11 @@ artifact boundary, Promotion checkpoints, and production delivery evidence.
 
 See the official [Sandbox Agent examples](https://github.com/appaloft/examples/tree/main/sandbox-agent)
 for complete Chat-to-App, human approval, and Preview-to-Promotion flows. The feature is Private
-Preview and requires an Appaloft 1.1+ control plane and matching SDK; Agent operations currently
+Preview and requires an Appaloft 1.2+ control plane and matching SDK; Agent operations currently
 use a product session rather than a deploy token.
+
+Resource-handle methods throw `AppaloftSdkRequestError` on failure. The complete generated,
+non-throwing operation facade remains available under `appaloft.operations`.
 
 ## Quick Start
 

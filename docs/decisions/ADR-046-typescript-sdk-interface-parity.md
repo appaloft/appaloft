@@ -36,6 +36,17 @@ operation metadata.
   - `x-appaloft-streaming`.
 - The SDK generator must use the annotated OpenAPI artifact as the source for TypeScript operation
   groups and methods. It must not maintain a handwritten method inventory.
+- The public SDK may layer typed resource handles over generated operations when one returned
+  resource owns the identity required by its child operations. A resource handle is transport-only
+  composition: it may inject parent ids, safe SDK defaults and idempotency keys, unwrap structured
+  operation results and expose child handles, but it must not add business operations, bypass the
+  generated operation client, or redefine command/query schemas.
+- `createAppaloftClient` exposes resource handles as the primary ergonomic surface and retains the
+  complete generated operation-result facade under `appaloft.operations`. This keeps interface
+  parity inspectable and gives callers an explicit compatibility/error-control escape hatch.
+- SDK resource methods throw `AppaloftSdkRequestError` for failed operation results. The error keeps
+  the structured HTTP status, code, category, retryability and safe details; it must not parse or
+  expose raw response bodies.
 - CLI and SDK remain sibling adapters. CLI keeps local parsing, pure SSH, and local-state ownership
   where those entry workflows require it. SDK calls the authenticated HTTP/oRPC API.
 - Product-session operations use the accepted Phase 8 product-auth rules. Bootstrap status and
@@ -56,6 +67,9 @@ operation metadata.
   descriptors.
 - Missing metadata is a release blocker for public SDK publication because it would allow generated
   clients to drift from Appaloft command/query semantics.
+- Resource handles make ownership visible in code (`Sandbox -> Agent -> Run`) without changing the
+  underlying aggregate or operation boundaries. `Agent` is an SDK convenience alias for the
+  canonical `Sandbox Agent Runtime`, not a new aggregate.
 - The SDK can become a stable black-box testing boundary only after auth/session/deploy-token,
   organization scope, 401/403, structured errors, and selected streaming semantics are covered by
   tests.
