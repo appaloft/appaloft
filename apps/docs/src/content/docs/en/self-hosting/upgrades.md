@@ -17,11 +17,11 @@ sidebar:
   order: 4
 ---
 
-<h2 id="self-hosting-upgrade-order">Upgrade order</h2>
+## Upgrade order [#self-hosting-upgrade-order]
 
 Back up state first, then upgrade the binary or image, then verify the Web console, `/docs/*`, database state, and provider/plugin status.
 
-<h2 id="self-hosting-upgrade-check">Check for updates</h2>
+## Check for updates [#self-hosting-upgrade-check]
 
 Run this from SSH or a local CLI:
 
@@ -31,7 +31,7 @@ appaloft upgrade check
 
 The Web console Instance page also shows the current version, latest version, target version, and a copyable SSH update command.
 
-<h2 id="self-hosting-upgrade-apply">Apply an update</h2>
+## Apply an update [#self-hosting-upgrade-apply]
 
 The standard self-hosted installation can still be updated by rerunning the installer. It reuses `/opt/appaloft/.env` and the existing data volumes:
 
@@ -47,6 +47,6 @@ appaloft upgrade apply --version 0.2.1 --confirm
 
 The Web console “Update now” button is enabled only when a host-side process explicitly sets `APPALOFT_INSTANCE_UPGRADE_APPLY_ENABLED=1`. Default container deployments do not let the Web process mutate the host Docker installation directly.
 
-<h2 id="self-hosting-upgrade-rollback">Upgrade rollback</h2>
+## Upgrade rollback [#self-hosting-upgrade-rollback]
 
 Before rolling back, confirm whether database migrations are reversible and whether the old version can read current state.

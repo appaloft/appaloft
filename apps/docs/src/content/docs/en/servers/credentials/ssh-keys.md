@@ -20,13 +20,13 @@ sidebar:
   order: 3
 ---
 
-<h2 id="server-ssh-credential-path">SSH credential</h2>
+## SSH credential [#server-ssh-credential-path]
 
 SSH credentials let Appaloft connect to servers and execute deployment plans. Credentials may be one-time inputs or saved reusable credentials.
 
 Credentials are a security boundary. Web, CLI, API, logs, and diagnostics should not show plaintext private keys, passphrases, or tokens.
 
-<h2 id="server-ssh-key-path">Key path</h2>
+## Key path [#server-ssh-key-path]
 
 The CLI can read local key paths explicitly passed by the user. Web and API flows should prefer saved credentials or controlled secret inputs because remote entrypoints cannot assume access to local files.
 
@@ -36,7 +36,7 @@ Distinguish:
 - Private key content: sensitive secret, never echoed after submit.
 - Saved credential: reusable credential reference.
 
-<h2 id="server-credential-validation">Credential validation</h2>
+## Credential validation [#server-credential-validation]
 
 After creating or configuring credentials, verify with a connectivity check instead of only saving fields.
 
@@ -48,7 +48,7 @@ Validation should cover:
 - Server accepts the key.
 - Appaloft can read required runtime information.
 
-<h2 id="server-credential-rotation">Credential rotation</h2>
+## Credential rotation [#server-credential-rotation]
 
 Saved reusable SSH credentials can be rotated in place. In-place rotation preserves the credential id and existing server references, and replaces the material used by later connectivity, deployment, and recovery operations. A successful rotation does not prove that the new key can reach the server; run a connectivity test after rotation.
 
@@ -77,7 +77,7 @@ The Web console saved SSH credentials surface opens a rotation dialog. It rechec
 
 If you want a new credential id instead of preserving the existing references, add a new credential, switch servers to it, run connectivity tests, and then delete the old credential.
 
-<h2 id="server-credential-delete-unused">Delete an unused saved credential</h2>
+## Delete an unused saved credential [#server-credential-delete-unused]
 
 Only a saved credential with no active or inactive server references can be deleted. Check credential detail and usage first:
 

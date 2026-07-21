@@ -28,7 +28,7 @@ sidebar:
   order: 1
 ---
 
-<h2 id="connections-model">Model</h2>
+## Model [#connections-model]
 
 A Connection is an authorization relationship that Appaloft stores for a user or operator. It can come from a GitHub App installation, DNS provider authorization, infrastructure provider credential, Slack webhook, or a future billing, identity, or observability provider.
 
@@ -38,7 +38,7 @@ A ConnectionCategory is a capability family such as `source`, `dns`, `infrastruc
 
 A ConnectionCapability is a deterministic action Appaloft can plan or execute, such as `dns.records.plan`, `dns.records.apply`, `source.repositories.list`, `infrastructure.servers.plan`, or `notification.messages.send`.
 
-<h2 id="connector-naming">Naming boundary</h2>
+## Naming boundary [#connector-naming]
 
 | Layer | Example | Purpose |
 | --- | --- | --- |
@@ -49,7 +49,7 @@ A ConnectionCapability is a deterministic action Appaloft can plan or execute, s
 
 So "DNS connector" is shorthand for "a concrete connector in the DNS category." API payloads, CLI JSON, audit records, and tests should use a concrete key such as `cloudflare-dns`. Commands such as `appaloft dns ...` are DNS capability shortcuts; underneath they should translate to `connections.capability.*` and a concrete connector key.
 
-<h2 id="dns-connections">DNS connections</h2>
+## DNS connections [#dns-connections]
 
 DNS connections are used to plan, apply, verify, and clean up Appaloft-managed DNS records. Appaloft can create these records automatically, but it should do so through deterministic provider adapters: generate a plan, detect conflicts, wait for acceptance, and then call the provider API. LLMs may explain the plan or help choose an entrypoint, but they should not hold tokens or directly mutate DNS.
 
@@ -81,27 +81,27 @@ The current Cloudflare DNS connector uses Temporary setup by default through Dom
 
 This flow still belongs to the concrete `cloudflare-dns` connector; `dns` is only the capability category. Audit, plan, and status records should store the concrete connector, Domain Connect operation, target hostname, record types, and readback result.
 
-<h2 id="source-connections">Source connections</h2>
+## Source connections [#source-connections]
 
 GitHub login is identity, not automatic source access. Repository access, repository listing, webhooks, and deployment status writes need a source connector such as `github-source`. Existing GitHub App installations can be presented as source connection readback while keeping provider-app permissions and short-lived token exchange boundaries.
 
-<h2 id="infrastructure-connections">Infrastructure connections</h2>
+## Infrastructure connections [#infrastructure-connections]
 
 Infrastructure connectors can plan or import external runtime targets, such as asking Vultr, DigitalOcean, Hetzner, or another provider for a reviewable SSH server proposal. Paid or scarce resource creation must first return a plan, cost/risk summary, cleanup path, and provider readback, then require explicit user or operator acceptance.
 
-<h2 id="notification-connections">Notification connections</h2>
+## Notification connections [#notification-connections]
 
 Notification connectors route deployment, resource, or workflow status to external systems such as a Slack channel or webhook. Readback should show the destination and safe status only; it must not return webhook URLs, tokens, or raw provider payloads.
 
-<h2 id="billing-connections">Billing connections</h2>
+## Billing connections [#billing-connections]
 
 Billing is a connection category, but billing policy does not own Appaloft domain facts. Deployment, resource, and connection lifecycle events may be observed by billing policy and converted into metering facts; connection commands should not directly write invoices, subscriptions, or ledgers.
 
-<h2 id="connections-ai-boundary">AI boundary</h2>
+## AI boundary [#connections-ai-boundary]
 
 Connectors are not AI-specific. Humans, CLI, Web, API, and agents all use the same operation catalog. An AI agent may call Appaloft operations to request a plan, show risk, wait for user confirmation, or read status. Long-lived provider tokens, private keys, webhook secrets, and raw provider responses should not enter model context, logs, error messages, or public read models.
 
-<h2 id="connections-entrypoints">Entrypoints</h2>
+## Entrypoints [#connections-entrypoints]
 
 Generic entrypoints use connector or connection semantics:
 

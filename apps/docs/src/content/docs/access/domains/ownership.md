@@ -19,13 +19,13 @@ sidebar:
   order: 4
 ---
 
-<h2 id="domain-binding-ownership-check">域名所有权检查</h2>
+## 域名所有权检查 [#domain-binding-ownership-check]
 
 域名所有权检查用于证明用户能控制这个 hostname。Appaloft 不应该在无法确认控制权时把域名标记为 ready，也不应该把所有权失败伪装成部署失败。
 
 所有权检查通常发生在创建或更新自定义域名绑定之后。用户需要根据 Appaloft 给出的 DNS 指令添加记录，然后重新检查。
 
-<h2 id="domain-binding-dns-records">DNS 记录</h2>
+## DNS 记录 [#domain-binding-dns-records]
 
 DNS 指令应该至少包含：
 
@@ -36,7 +36,7 @@ DNS 指令应该至少包含：
 
 用户复制 DNS 记录时，只需要复制 Appaloft 提供的值。不要从日志里找 token，也不要把 secret 或私钥作为 DNS 值。
 
-<h2 id="domain-binding-ownership-status">状态含义</h2>
+## 状态含义 [#domain-binding-ownership-status]
 
 常见状态：
 
@@ -47,7 +47,7 @@ DNS 指令应该至少包含：
 
 如果 DNS 刚刚修改，`pending` 不一定表示配置错误。先等待 TTL 或 DNS 传播窗口，再重新检查。
 
-<h2 id="domain-binding-ownership-retry">什么时候重试</h2>
+## 什么时候重试 [#domain-binding-ownership-retry]
 
 可以重试检查的情况：
 

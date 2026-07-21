@@ -20,22 +20,22 @@ sidebar:
   order: 2
 ---
 
-<h2 id="concept-project">Project</h2>
+## Project [#concept-project]
 
 A project is the work boundary that groups resources, environments, and deployment history.
 
-<h2 id="concept-resource">Resource</h2>
+## Resource [#concept-resource]
 
 A resource is a deployable unit, such as a web app, backend service, static site, worker, or Compose stack.
 
-<h2 id="concept-server">Server</h2>
+## Server [#concept-server]
 
 A server is a deployment target Appaloft can connect to and operate. Users see SSH details, credential state, connectivity, and proxy readiness.
 
-<h2 id="concept-environment">Environment</h2>
+## Environment [#concept-environment]
 
 An environment stores configuration context before deployment. Deployments persist immutable snapshots so later edits do not rewrite history.
 
-<h2 id="concept-deployment">Deployment</h2>
+## Deployment [#concept-deployment]
 
 A deployment is one attempt. Appaloft uses it to detect, plan, execute, verify, and preserve recovery context.

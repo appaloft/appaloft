@@ -23,15 +23,15 @@ sidebar:
   order: 2
 ---
 
-<h2 id="concept-environment">Environment</h2>
+## Environment [#concept-environment]
 
 An environment is the user boundary for deploy-time configuration, such as development, staging, or production.
 
-<h2 id="environment-deployment-scope">Deployment scope</h2>
+## Deployment scope [#environment-deployment-scope]
 
 A resource can be deployed in different environments. Each deployment reads the target environment configuration and stores an immutable snapshot.
 
-<h2 id="environment-lifecycle">Environment lifecycle</h2>
+## Environment lifecycle [#environment-lifecycle]
 
 Environments start as active. Locking an environment keeps the environment, variables, resources, deployments, and history readable, but blocks new environment variable writes, promotion, resource creation, and deployment admission. Unlocking returns it to active.
 
@@ -39,7 +39,7 @@ Renaming an active environment changes only the environment name. It does not ch
 
 Cloning an active environment creates a new active environment in the same project with a new name and a copy of the source environment variables. It does not copy resources, deployments, domains, certificates, or runtime state.
 
-<h2 id="environment-copy">Copy environment</h2>
+## Copy environment [#environment-copy]
 
 Copy environment is for staging, test, preview, or one-off demo environments. It is broader than cloning an environment: by default it copies service and resource shape, redeploys in the target environment, and keeps the data plane isolated.
 

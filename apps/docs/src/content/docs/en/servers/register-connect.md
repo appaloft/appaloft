@@ -27,7 +27,7 @@ sidebar:
 
 ![Server connectivity flow](/docs/diagrams/server-connectivity.svg)
 
-<h2 id="server-deployment-target">What a server is</h2>
+## What a server is [#server-deployment-target]
 
 A server is a target Appaloft can connect to, inspect, and deploy applications onto. Users see SSH address, credential, connectivity state, runtime summary, and proxy readiness.
 
@@ -47,7 +47,7 @@ Before deletion, run the delete safety check. The check returns blocker reasons 
 
 Server deletion is only for a deactivated server with no blockers. Deletion removes the server from normal list, detail, and new deployment target selection, but it does not automatically clean up deployment history, resources, domains, certificates, credentials, routes, logs, or audit records. CLI deletion requires explicit confirmation, such as `--confirm srv_primary`; the Web server detail danger tab requires the same exact server id before it dispatches deletion.
 
-<h2 id="server-connectivity-test">Connectivity test</h2>
+## Connectivity test [#server-connectivity-test]
 
 Connectivity checks confirm that Appaloft can reach the server and read required runtime information. A failed check does not mean old deployments failed, but it should block new deployments that depend on the server.
 
@@ -59,7 +59,7 @@ Checks should cover:
 - Basic runtime environment requirements.
 - Proxy or Docker diagnostics when relevant.
 
-<h2 id="server-registration-inputs">Registration inputs</h2>
+## Registration inputs [#server-registration-inputs]
 
 Register host, port, user, credential source, and optional labels. Do not put resource, environment, or domain concerns into server registration.
 
@@ -73,7 +73,7 @@ Common inputs:
 - credential: SSH key path, saved credential, or one-time secret input.
 - display name / labels: helps users identify the server.
 
-<h2 id="server-registration-surfaces">Entrypoints</h2>
+## Entrypoints [#server-registration-surfaces]
 
 The Web console should guide registration and connectivity testing together. After SSH input, users should immediately see test results and next steps.
 
@@ -81,7 +81,7 @@ The CLI fits local SSH bootstrap because it can read local key paths and ask for
 
 The HTTP API fits automated server registration, but should never echo secrets. Connectivity results should be structured.
 
-<h2 id="server-registration-recovery">Recovery</h2>
+## Recovery [#server-registration-recovery]
 
 Common failures:
 
@@ -122,7 +122,7 @@ appaloft server register \
 cluster backends such as Docker Swarm. It does not by itself make the target ready for deployments;
 readiness still depends on the registered runtime backend capabilities and connectivity checks.
 
-<h2 id="docker-swarm-runtime-target">Docker Swarm runtime target</h2>
+## Docker Swarm runtime target [#docker-swarm-runtime-target]
 
 Docker Swarm targets are registered as cluster-shaped deployment targets. Use
 `--target-kind orchestrator-cluster --provider docker-swarm` only for a Swarm manager endpoint that

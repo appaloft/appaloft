@@ -21,7 +21,7 @@ sidebar:
   order: 5
 ---
 
-<h2 id="certificate-readiness">Certificate readiness</h2>
+## Certificate readiness [#certificate-readiness]
 
 Certificate readiness describes whether HTTPS is usable. It is separate from application deployment state, generated access readiness, and domain ownership.
 
@@ -33,7 +33,7 @@ Certificate readiness should answer:
 - Does the certificate cover the hostname and remain valid?
 - Is the proxy serving this certificate for HTTPS traffic?
 
-<h2 id="certificate-inputs">Certificate inputs</h2>
+## Certificate inputs [#certificate-inputs]
 
 Existing flows should cover:
 
@@ -42,7 +42,7 @@ Existing flows should cover:
 
 Imported private keys are secrets. Web, CLI, API, logs, and diagnostics must not echo full key material.
 
-<h2 id="certificate-validation">Validation</h2>
+## Validation [#certificate-validation]
 
 Readiness checks should validate:
 
@@ -52,7 +52,7 @@ Readiness checks should validate:
 - Certificate is not expired or near expiry.
 - Algorithm and key size meet runtime requirements.
 
-<h2 id="certificate-renewal">Renewal</h2>
+## Renewal [#certificate-renewal]
 
 Renewal status should be observable and point to DNS, ownership, or certificate material issues when it fails.
 
@@ -63,7 +63,7 @@ If renewal fails, do not redeploy the app first. Check:
 3. Certificate material is not expired, incomplete, or mismatched.
 4. The proxy reloaded the new certificate.
 
-<h2 id="certificate-lifecycle">Certificate lifecycle operations</h2>
+## Certificate lifecycle operations [#certificate-lifecycle]
 
 `certificate show` returns only safe metadata, status, and attempt history. It does not return certificate PEM, private key, passphrase, or secret refs.
 

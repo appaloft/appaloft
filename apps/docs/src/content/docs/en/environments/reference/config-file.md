@@ -15,15 +15,15 @@ sidebar:
   order: 6
 ---
 
-<h2 id="environment-config-file-purpose">Configuration file purpose</h2>
+## Configuration file purpose [#environment-config-file-purpose]
 
 Configuration files are for reviewable project, resource, environment, and deployment defaults. Do not commit secret values.
 
-<h2 id="environment-config-file-fields">Field groups</h2>
+## Field groups [#environment-config-file-fields]
 
 Explain fields by project, resource, environment, deployment, and access concerns instead of internal implementation terms.
 
-<h2 id="environment-config-file-runtime">Source and runtime</h2>
+## Source and runtime [#environment-config-file-runtime]
 
 Use `source` and `runtime` to describe where the app lives and how Appaloft should build or start
 it:
@@ -57,7 +57,7 @@ use `strategy: static` with `publishDirectory`. These paths are relative to the 
 root and must not escape it. Keep provider accounts, credentials, registry pull secrets, host paths,
 resource sizing, replicas, and rollout policy outside `appaloft.yaml`.
 
-<h2 id="environment-config-file-named-profiles">Named config profiles</h2>
+## Named config profiles [#environment-config-file-named-profiles]
 
 Use `profiles.<key>` for reviewable variants such as staging or smoke deploys. The file declares
 the variant, but a trusted entrypoint selects it:
@@ -88,7 +88,7 @@ can overlay runtime, network, health, access, monitoring, non-secret env values,
 references. It cannot choose project, environment, resource, server, destination, provider account,
 or credentials, and it cannot add fields to the final deployment command.
 
-<h2 id="environment-config-file-preview-profile">PR preview profile</h2>
+## PR preview profile [#environment-config-file-preview-profile]
 
 Use `preview.pullRequest.profile` for profile differences that should apply only to a PR preview
 deploy selected by trusted entrypoint context:
@@ -118,7 +118,7 @@ config validation and before applying profile/env commands. It cannot choose pro
 environment, resource, server, destination, provider account, or credentials, and it cannot add
 fields to the final deployment command.
 
-<h2 id="environment-config-file-preview-policy">PR preview policy</h2>
+## PR preview policy [#environment-config-file-preview-policy]
 
 Use `preview.pullRequest.policy` when the selected Resource should have reviewable product-grade
 preview rules:
@@ -143,7 +143,7 @@ Keep GitHub App installation ids, webhook secrets, feedback tokens, provider acc
 organization or tenant identity, project/global scope selectors, cleanup credentials, raw secret
 values, and Appaloft ids outside `appaloft.yaml`.
 
-<h2 id="environment-config-file-health">Health policy</h2>
+## Health policy [#environment-config-file-health]
 
 Use `health` when the Resource should have a reusable HTTP health policy:
 
@@ -166,7 +166,7 @@ snapshots.
 request headers, raw probe response bodies, credentials, tokens, local file paths, and provider
 accounts outside `appaloft.yaml`.
 
-<h2 id="environment-config-file-dependencies">Application dependencies</h2>
+## Application dependencies [#environment-config-file-dependencies]
 
 Use `dependencies` when the application needs Appaloft to manage and bind an application dependency
 before deployment:
@@ -222,7 +222,7 @@ For pull request previews, `preview.lifecycle: ephemeral` allows preview cleanup
 dependency resource that Appaloft can prove was created and bound by this config for that preview.
 Manual or shared dependency resources are preserved.
 
-<h2 id="environment-config-file-storage">Application storage</h2>
+## Application storage [#environment-config-file-storage]
 
 Use `storage` when the application needs Appaloft to manage and mount a persistent named volume
 before deployment:
@@ -248,7 +248,7 @@ For pull request previews, `preview.lifecycle: ephemeral` allows preview cleanup
 delete only the storage volume that Appaloft can prove was created and attached by this config for
 that preview. Manual or shared storage is preserved.
 
-<h2 id="environment-config-file-generated-access">Generated access</h2>
+## Generated access [#environment-config-file-generated-access]
 
 Use `access.generated` when the Resource should opt in or out of generated default access, or when
 generated access should use a path prefix:
@@ -269,7 +269,7 @@ or add access fields to the final deployment command. Keep provider accounts, DN
 provider credentials, route ids, certificate ids, private keys, tokens, and raw certificate material
 outside `appaloft.yaml`.
 
-<h2 id="environment-config-file-monitoring-thresholds">Runtime monitoring thresholds</h2>
+## Runtime monitoring thresholds [#environment-config-file-monitoring-thresholds]
 
 Use `monitoring.thresholds` when the Resource should have reviewable, non-enforcing runtime
 monitoring warning or critical thresholds:
@@ -294,7 +294,7 @@ Keep policy ids, scope ids, provider accounts, container ids, sample ids, host p
 payloads, log lines, credentials, private keys, tokens, and raw secret values outside
 `appaloft.yaml`.
 
-<h2 id="environment-config-file-runtime-prune">Runtime prune policy</h2>
+## Runtime prune policy [#environment-config-file-runtime-prune]
 
 Use `retention.runtimePrune` when a selected deployment target should have a scheduled runtime
 cleanup policy for deployment-snapshot cleanup:
@@ -320,7 +320,7 @@ Docker/SSH command, volume prune, audit/event/log retention policy, or secret va
 `destructive` defaults to `false`. Destructive scheduled cleanup is still gated by the policy and
 runs through the existing server capacity prune safety checks.
 
-<h2 id="environment-config-file-scheduled-tasks">Scheduled tasks</h2>
+## Scheduled tasks [#environment-config-file-scheduled-tasks]
 
 Use `scheduledTasks` when the application needs recurring Resource-owned jobs:
 
@@ -344,7 +344,7 @@ For pull request previews, `preview.lifecycle: ephemeral` allows preview cleanup
 scheduled task that Appaloft can prove was created or adopted by this config for that preview.
 Manual or shared scheduled tasks are preserved.
 
-<h2 id="environment-config-file-auto-deploy">Auto-deploy policy</h2>
+## Auto-deploy policy [#environment-config-file-auto-deploy]
 
 Use `autoDeploy` when the Resource should deploy after matching source events:
 
@@ -372,7 +372,7 @@ existing auto-deploy policy from config.
 the final provider `before..after` change set, applying includes before excludes. Omit both fields
 to keep ref-only triggering. Absolute paths, parent traversal, and backslashes are rejected.
 
-<h2 id="environment-config-file-env">Environment values</h2>
+## Environment values [#environment-config-file-env]
 
 Use `env` for non-secret values and `secrets` for references to values supplied outside the
 repository:
@@ -398,7 +398,7 @@ Secret values themselves must stay in GitHub Secrets, the selected CI runner env
 Resource secret commands. External secret adapters beyond `ci-env:` and `resource-secret:` are not
 repository config resolvers yet.
 
-<h2 id="environment-config-file-control-plane">Control plane</h2>
+## Control plane [#environment-config-file-control-plane]
 
 Use `controlPlane` for reviewable deployment ownership defaults:
 

@@ -19,7 +19,7 @@ sidebar:
   order: 1
 ---
 
-<h2 id="agent-deploy-skill">Agent deploy protocol</h2>
+## Agent deploy protocol [#agent-deploy-skill]
 
 The Appaloft Deploy Skill is the deploy subprotocol inside the full
 [Appaloft Skill](/docs/en/agent/appaloft-skill/#appaloft-skill). It is not a new deployment
@@ -33,7 +33,7 @@ one fast entrypoint, not the boundary of the skill. For GitHub Actions, the agen
 distinguish Pure SSH Action, Self-hosted Server Action, and Product-grade Preview instead of
 collapsing them into one template.
 
-<h2 id="agent-deploy-install">Install the skill</h2>
+## Install the skill [#agent-deploy-install]
 
 Install the full Appaloft skill:
 
@@ -49,7 +49,7 @@ The installer only copies the full Appaloft skill. It does not deploy an app, cr
 deployment APIs, or wrap `appaloft deploy`. The deploy protocol is part of the full skill, not a
 separate npm installer.
 
-<h2 id="agent-deploy-flow">Recommended flow</h2>
+## Recommended flow [#agent-deploy-flow]
 
 1. Inspect the source safely: read only project structure, build scripts, runtime ports, image
    references, Docker/Compose files, static output directories, and Appaloft config.
@@ -60,7 +60,7 @@ separate npm installer.
 4. Return the outcome: access URL first, then deployment id, resource id, logs command, diagnostic
    command, and recovery readiness command.
 
-<h2 id="agent-deploy-action-modes">GitHub Action deployment modes</h2>
+## GitHub Action deployment modes [#agent-deploy-action-modes]
 
 - Pure SSH Action: default `control-plane-mode: none`; the Action installs/runs the CLI, deploys
   over SSH, and uses server-owned `ssh-pglite` state on the SSH target. Do not require an Appaloft
@@ -77,7 +77,7 @@ When source-link or repository binding context is missing, prompt the user to es
 or run one trusted bootstrap context. Project/resource/server ids are for first bootstrap, advanced
 override, or debugging, not the default input an ordinary user should provide.
 
-<h2 id="agent-deploy-safety">Safety boundary</h2>
+## Safety boundary [#agent-deploy-safety]
 
 - Do not read `.env`, private keys, token files, or cloud credential files.
 - Do not put secret values in logs, pull requests, diagnostic summaries, or chat replies.
@@ -87,7 +87,7 @@ override, or debugging, not the default input an ordinary user should provide.
 - Do not assume Appaloft uploads artifacts to a hosted cloud. By default, deployment still targets
   the user's selected BYOS destination.
 
-<h2 id="agent-deploy-follow-up">What to return</h2>
+## What to return [#agent-deploy-follow-up]
 
 Return a compact outcome:
 
@@ -101,7 +101,7 @@ Return a compact outcome:
 If the deployment fails, read structured errors, logs, diagnostics, and recovery readiness before
 suggesting the next action.
 
-<h2 id="agent-deploy-reference">Source document</h2>
+## Source document [#agent-deploy-reference]
 
 The complete governing source lives in `docs/agent/appaloft-deploy-skill.md`. The installable full
 skill lives at `skills/appaloft`; its deploy protocol lives at

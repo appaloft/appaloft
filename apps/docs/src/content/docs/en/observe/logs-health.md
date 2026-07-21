@@ -22,7 +22,7 @@ sidebar:
 
 ![Diagnostics loop](/docs/diagrams/diagnostics-loop.svg)
 
-<h2 id="observe-runtime-logs">Runtime logs</h2>
+## Runtime logs [#observe-runtime-logs]
 
 Runtime logs come from application stdout and stderr. They are useful for startup failures, port mistakes, missing configuration, and runtime exceptions.
 
@@ -36,7 +36,7 @@ Logs help answer:
 
 Logs do not prove domain ownership or certificate readiness. DNS and TLS issues belong in access and certificate status.
 
-<h2 id="observe-health-summary">Health summary</h2>
+## Health summary [#observe-health-summary]
 
 Health summaries combine deployment, runtime, health policy, proxy, and public access observations to guide retry, repair, or rollback.
 
@@ -54,7 +54,7 @@ Retained health history is read through `resources.health-history`. It returns
 `ResourceHealthSummary` snapshots that an internal observer has already recorded, without running
 live probes, deployments, restarts, or policy changes.
 
-<h2 id="resource-runtime-controls">Runtime controls</h2>
+## Runtime controls [#resource-runtime-controls]
 
 Runtime controls are a planned Phase 7 capability for stopping, starting, or restarting the current runtime instance for one resource. They only affect current process or container state. They do not delete resources, deployment history, storage, dependency bindings, routes, certificates, logs, or audit data.
 
@@ -66,13 +66,13 @@ When runtime controls are available, Web, CLI, and HTTP API surfaces should use 
 
 The latest runtime-control attempt status belongs in the health summary. If there is no runtime-control attempt, or the feature is not active yet, the health summary should omit that section.
 
-<h2 id="runtime-restart-vs-redeploy">Restart is not redeploy</h2>
+## Restart is not redeploy [#runtime-restart-vs-redeploy]
 
 Restart does not re-run detect, plan, build, pull a new artifact, refresh source, refresh configuration or secrets, apply resource profile changes, attach storage, bind dependencies, update domains, or issue certificates.
 
 After changing source, environment variables, secrets, runtime profile, network profile, access profile, health profile, storage, or dependency bindings, use redeploy, retry, rollback, or recovery readiness instead of restart.
 
-<h2 id="runtime-control-blocked-start">When start is blocked</h2>
+## When start is blocked [#runtime-control-blocked-start]
 
 Start can only use retained safe runtime metadata for the same resource. It is blocked when runtime metadata is missing, stale, or unsafe, the resource is archived or deleted, another deployment is mutating the same resource-runtime scope, or current profile drift needs acknowledgement.
 
@@ -82,7 +82,7 @@ When start is blocked, inspect the health summary blocked reason, then choose on
 - Check recovery readiness to decide whether retry, redeploy, or rollback is safer.
 - Inspect runtime logs for diagnostics left by the previous runtime.
 
-<h2 id="observe-log-health-surfaces">Entrypoints</h2>
+## Entrypoints [#observe-log-health-surfaces]
 
 The Web console should place logs and health near resource or deployment details. Users should not need raw server logs to understand deployment result.
 
@@ -90,7 +90,7 @@ The CLI should expose logs and health summaries for SSH and CI workflows.
 
 The HTTP API should return paginated logs, health summary, and structured status for automation.
 
-<h2 id="agent-deploy-follow-up">Agent deploy follow-up</h2>
+## Agent deploy follow-up [#agent-deploy-follow-up]
 
 After a deployment, an agent should use logs and health summaries as the follow-up entrypoints
 instead of sending the user to raw server logs. Recommended commands:
@@ -101,7 +101,7 @@ instead of sending the user to raw server logs. Recommended commands:
 
 If the access URL is unavailable, read those structured signals before suggesting the next action.
 
-<h2 id="observe-log-health-recovery">Recover from results</h2>
+## Recover from results [#observe-log-health-recovery]
 
 Common decisions:
 

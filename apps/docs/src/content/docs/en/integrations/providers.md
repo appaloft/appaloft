@@ -16,11 +16,11 @@ sidebar:
   order: 2
 ---
 
-<h2 id="advanced-provider-boundary">Provider boundary</h2>
+## Provider boundary [#advanced-provider-boundary]
 
 Providers own external-system or infrastructure capabilities. Public docs should explain what users can configure and observe, not provider SDK types.
 
-<h2 id="provider-capabilities">Capabilities</h2>
+## Capabilities [#provider-capabilities]
 
 Capabilities should be shown in user-facing terms such as runtime target, proxy capability, certificate capability, or diagnostics capability.
 

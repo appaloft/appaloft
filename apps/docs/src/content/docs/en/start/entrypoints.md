@@ -16,11 +16,11 @@ sidebar:
   order: 2
 ---
 
-<h2 id="entrypoint-web-console">Web console</h2>
+## Web console [#entrypoint-web-console]
 
 Use the Web console for first-time setup, status inspection, field-level help, and guided tasks.
 
-<h2 id="entrypoint-cli">CLI</h2>
+## CLI [#entrypoint-cli]
 
 Use the CLI for local development, SSH server bootstrap, CI scripts, and interactive confirmation.
 
@@ -28,7 +28,7 @@ The default BYOS GitHub Action shape also enters through the CLI surface: Pure S
 `control-plane-mode: none`, installs/runs the CLI in the Action, deploys over SSH, and stores state
 in `ssh-pglite` on the target server.
 
-<h2 id="entrypoint-http-api">HTTP API</h2>
+## HTTP API [#entrypoint-http-api]
 
 Use the HTTP API for automation. API descriptions should link to the same public docs anchors instead of redefining separate input semantics.
 
@@ -36,7 +36,7 @@ Self-hosted Server Action uses the HTTP API surface: `control-plane-url` explici
 Appaloft instance, and `appaloft-token` supplies deploy-token authentication. The Action does not
 run the CLI, open SSH, or scan target machines to discover a control plane.
 
-<h2 id="entrypoint-mcp-tools">MCP tools</h2>
+## MCP tools [#entrypoint-mcp-tools]
 
 When an agent host configures Appaloft MCP, use `appaloft mcp stdio`, `appaloft mcp serve`, or
 `npx appaloft-mcp` to expose the same operation catalog. MCP tools reuse the same topic ids, input

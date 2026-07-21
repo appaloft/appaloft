@@ -22,11 +22,11 @@ sidebar:
   order: 4
 ---
 
-<h2 id="reference-error-shape">错误形状</h2>
+## 错误形状 [#reference-error-shape]
 
 用户可见错误应包含稳定 code、category、phase 和可执行恢复建议。
 
-<h2 id="error-knowledge-contract">Error Knowledge Contract</h2>
+## Error Knowledge Contract [#error-knowledge-contract]
 
 Appaloft 错误不能只给一段 message。公共入口应该保留稳定的 `code`、`category`、`phase`、`retryable` 和安全 details，并为已知错误附上错误知识：
 
@@ -37,13 +37,13 @@ Appaloft 错误不能只给一段 message。公共入口应该保留稳定的 `c
 
 Web、CLI、HTTP/API 和未来 MCP 工具都应该按这些字段渲染错误，不能依赖 message 文本来判断错误类型。
 
-<h2 id="agent-readable-errors">Agent 可读错误</h2>
+## Agent 可读错误 [#agent-readable-errors]
 
 AI agent 处理部署失败时，应优先读取稳定 `code`、`category`、`phase`、`retryable`、安全 details、docs link 和 remedies。Agent 不应该从自然语言 message 里猜测失败原因，也不应该要求用户直接修改数据库、远端 Docker 状态或 secret 文件。
 
 如果错误没有明确恢复动作，agent 应先运行安全诊断，例如 `appaloft resource diagnose <resourceId>`，再根据 recovery readiness 决定 retry、redeploy 或 rollback。
 
-<h2 id="operator-work-ledger">Operator work ledger</h2>
+## Operator work ledger [#operator-work-ledger]
 
 当部署、代理引导、证书签发或远端状态维护这类后台工作没有按预期完成时，先查看工作台账，而不是猜测哪个恢复命令应该运行：
 
@@ -56,7 +56,7 @@ appaloft work show <workId>
 
 这个入口不会 retry、cancel、recover、dead-letter、delete 或 prune。恢复、清理和重试能力会通过独立的显式命令暴露，避免用户在查看状态时意外改变运行时或远端 SSH 状态。
 
-<h2 id="operator-audit-events">Audit events</h2>
+## Audit events [#operator-audit-events]
 
 当你需要解释某个 resource、server、certificate 或其他对象的历史变化时，可以按 aggregate id 查看保留的审计事件：
 
@@ -91,7 +91,7 @@ appaloft audit-event legal-hold release <holdId> --reason "review complete"
 
 Legal hold 是 retention blocker，不是 immutable archive 或 discovery workflow。`appaloft audit-event prune` 会报告 held rows，并跳过所有被 active hold 匹配的行，直到匹配的 hold 全部 release。
 
-<h2 id="operator-provider-job-logs">Provider job logs</h2>
+## Provider job logs [#operator-provider-job-logs]
 
 Provider job logs 与 deployment rows 和 deployment 内嵌 logs 分开保留。执行破坏性清理前先 dry-run：
 
@@ -107,7 +107,7 @@ appaloft provider-job-log prune --before 2026-01-01T00:00:00.000Z --provider gen
 
 只有显式传入 `--dry-run false` 时，这个命令才会删除早于 cutoff 的 `provider_job_logs` rows。它不会删除 deployment rows、deployment 内嵌 logs、runtime logs、audit rows、events、process attempts、snapshots、runtime artifacts、provider resources 或业务状态。
 
-<h2 id="operator-retention-defaults">Organization retention defaults</h2>
+## Organization retention defaults [#operator-retention-defaults]
 
 Retention defaults 是非执行型策略记录。它们只保存每类历史的默认保留窗口和未来 scheduled retention 是否允许 dry-run 或 destructive 调度，不会自己删除 rows，也不会让手动 prune 命令推断 cutoff。
 
@@ -120,7 +120,7 @@ appaloft retention-default show provider-job-logs --scope system
 
 即使某个 category 允许 destructive scheduling，manual prune 仍然必须显式提供 cutoff 和 destructive/dry-run 输入。Legal holds、immutable archives、replay guards、active attempts 和各 category 的 skip rules 仍然优先生效。
 
-<h2 id="operator-domain-events">Domain event stream retention</h2>
+## Domain event stream retention [#operator-domain-events]
 
 Domain event stream retention 只针对保留的 event stream observation rows。先 dry-run，再按显式 cutoff 删除：
 
@@ -130,7 +130,7 @@ appaloft domain-event prune --before 2026-01-01T00:00:00.000Z
 
 这个命令不会删除 deployments、audit rows、provider logs、process attempts、snapshots、rollback candidates、runtime artifacts 或业务状态。Replay guards、cursor continuity 和 recovery evidence 会优先阻止不安全删除。
 
-<h2 id="remote-state-resolution">SSH remote state resolution</h2>
+## SSH remote state resolution [#remote-state-resolution]
 
 `infra_error` + `remote-state-resolution` 表示 Appaloft 已经到达 SSH 目标机，但在部署身份解析之前，无法准备这台服务器拥有的 `ssh-pglite` 状态根。常见原因包括磁盘或 inode 容量不足、文件系统只读、配置的 runtime root 没有写权限、升级前部署留下的旧版不兼容 PGlite 状态目录，或远端 shell 在创建 state、lock、backup、journal 目录时失败。
 
@@ -141,7 +141,7 @@ appaloft domain-event prune --before 2026-01-01T00:00:00.000Z
 3. 当错误指向目标机容量时，先运行 `appaloft server capacity inspect` 或等价的 SSH 诊断命令，再重试。
 4. 目标机能够创建并写入 Appaloft 状态目录后，再重新执行部署。
 
-<h2 id="remote-state-lock">SSH remote state lock</h2>
+## SSH remote state lock [#remote-state-lock]
 
 `infra_error` + `remote-state-lock` 表示 SSH `ssh-pglite` 状态根正在被另一个 Appaloft 进程保护，或者前一次被取消的进程留下了仍未过期的 lock。它通常是 operator 可诊断的 infrastructure error，不代表部署请求本身的业务输入无效。
 
@@ -154,6 +154,6 @@ appaloft domain-event prune --before 2026-01-01T00:00:00.000Z
 5. 只有诊断确认 heartbeat 已超过 stale window 后，才运行 `appaloft remote-state lock recover-stale --server-host <host>`。这个命令会归档 stale lock metadata，不会 force 删除 active lock。
 6. 不要直接删除远端 lock 目录，除非诊断确认没有活跃进程并且已保留 recovered journal。
 
-<h2 id="reference-status-shape">状态形状</h2>
+## 状态形状 [#reference-status-shape]
 
 状态应区分资源、部署、运行时、代理、访问地址和证书 readiness。

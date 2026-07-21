@@ -23,7 +23,7 @@ sidebar:
 
 One-click deploy 是一个入口规范，不是新的应用定义格式。按钮只负责把用户带到 Appaloft 的部署入口；应用拓扑继续由 `appaloft.blueprint/v1` Blueprint 描述。
 
-<h2 id="quickstart">快速开始</h2>
+## 快速开始 [#quickstart]
 
 1. 在仓库中维护 `appaloft.blueprint.yaml`，或者先把应用收录到一个 Appaloft Blueprint catalog。
 2. 生成 Appaloft 部署链接。
@@ -50,7 +50,7 @@ README 示例：
 
 也可以打开 [One-click deploy 生成器](https://appaloft.com/deploy/one-click) 生成 Markdown。
 
-<h2 id="deploy-handoff-url">Deploy handoff URL</h2>
+## Deploy handoff URL [#deploy-handoff-url]
 
 标准入口是 `/deploy`，参数描述要打开哪个 Blueprint 和默认项目状态。
 
@@ -68,7 +68,7 @@ README 示例：
 
 不要在 URL 中放真实 secret、数据库密码、provider token 或私有仓库凭据。Secret 应在部署向导里由用户输入，或者通过 Appaloft 的 secret/resource binding 机制引用。
 
-<h2 id="minimal-blueprint">最小 Blueprint</h2>
+## 最小 Blueprint [#minimal-blueprint]
 
 ```yaml title="appaloft.blueprint.yaml"
 schemaVersion: appaloft.blueprint/v1
@@ -96,7 +96,7 @@ profiles:
     label: Production
 ```
 
-<h2 id="boundary">边界</h2>
+## 边界 [#boundary]
 
 - Blueprint 是 portable manifest，不是 Cloud Marketplace listing。
 - Deploy handoff URL 是入口状态，不是新的 deployment command。

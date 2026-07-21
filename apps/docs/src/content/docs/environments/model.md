@@ -24,15 +24,15 @@ sidebar:
   order: 2
 ---
 
-<h2 id="concept-environment">Environment</h2>
+## Environment [#concept-environment]
 
 Environment 是一组部署时配置的用户边界，例如 development、staging 或 production。
 
-<h2 id="environment-deployment-scope">部署作用域</h2>
+## 部署作用域 [#environment-deployment-scope]
 
 资源可以在不同环境下部署。每次部署读取目标环境的配置并保存不可变快照。
 
-<h2 id="environment-lifecycle">环境生命周期</h2>
+## 环境生命周期 [#environment-lifecycle]
 
 环境默认是 active。锁定环境会保留环境、变量、资源、部署和历史记录，并阻止新的环境变量写入、环境提升、新资源创建和新部署准入；解锁后环境回到 active。
 
@@ -40,7 +40,7 @@ Environment 是一组部署时配置的用户边界，例如 development、stagi
 
 克隆 active 环境会在同一项目中创建一个新的 active 环境，使用新的名称并复制源环境变量。它不会复制资源、部署、域名、证书或运行时状态。
 
-<h2 id="environment-copy">复制环境</h2>
+## 复制环境 [#environment-copy]
 
 复制环境用于创建 staging、测试、preview 或一次性演示环境。它比“克隆环境”更完整：默认复制服务和资源配置形状，在新环境中重新部署，并把数据面保持隔离。
 

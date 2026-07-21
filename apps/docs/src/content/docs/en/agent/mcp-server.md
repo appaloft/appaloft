@@ -21,7 +21,7 @@ sidebar:
   order: 2
 ---
 
-<h2 id="appaloft-mcp-server">Appaloft MCP server</h2>
+## Appaloft MCP server [#appaloft-mcp-server]
 
 The Appaloft MCP server is the callable tool entrypoint for Appaloft. It exposes the existing
 operation catalog to MCP clients without creating a separate AI-only product model. The skill owns
@@ -55,7 +55,7 @@ npx appaloft-mcp serve --host 127.0.0.1 --port 3939
 `appaloft-mcp` delegates to the same Appaloft runtime. It does not maintain a second operation list
 or business implementation.
 
-<h2 id="appaloft-mcp-tools">Tool Model</h2>
+## Tool Model [#appaloft-mcp-tools]
 
 Each tool maps to one operation key:
 
@@ -76,7 +76,7 @@ structured content, supporting both older clients and hosts that understand stru
 There is no `quick_deploy_create` agent-only tool. If a behavior is not in the operation catalog, it
 is not an Appaloft MCP operation.
 
-<h2 id="appaloft-mcp-resources">Resources And Prompts</h2>
+## Resources And Prompts [#appaloft-mcp-resources]
 
 Read-only resources:
 
@@ -98,7 +98,7 @@ Prompts:
 Resources and prompts provide context and workflow starters only. They do not own write-side
 policy, tenant selection, background work, or hidden state.
 
-<h2 id="appaloft-mcp-safety">Safety Boundary</h2>
+## Safety Boundary [#appaloft-mcp-safety]
 
 - Do not bypass Appaloft by calling repositories, use cases, provider SDKs, Docker, SSH, proxies, or
   databases directly.
@@ -109,7 +109,7 @@ policy, tenant selection, background work, or hidden state.
 - Delete and destructive operations must still use their schema-level delete-safety and exact
   confirmation fields.
 
-<h2 id="appaloft-mcp-skill">Relationship To The Skill</h2>
+## Relationship To The Skill [#appaloft-mcp-skill]
 
 The Appaloft Skill is the agent workflow protocol: it identifies intent, chooses CLI/API/Web/MCP,
 sequences existing operations, and shapes the final response. MCP is the callable tool layer. When

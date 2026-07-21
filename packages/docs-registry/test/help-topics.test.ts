@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -19,6 +19,14 @@ const docsContentRoot = resolve(repositoryRoot, "apps/docs/src/content/docs");
 
 function docsSourcePath(page: string): string {
   return resolve(docsContentRoot, `${page.replace(/^\/+|\/+$/g, "")}.md`);
+}
+
+function listDocsSourcePaths(directory: string): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = resolve(directory, entry.name);
+    if (entry.isDirectory()) return listDocsSourcePaths(path);
+    return entry.isFile() && entry.name.endsWith(".md") ? [path] : [];
+  });
 }
 
 describe("public docs help registry", () => {
@@ -62,13 +70,19 @@ describe("public docs help registry", () => {
     }
   });
 
+  test("[PUB-DOCS-013] docs headings use Markdown syntax that survives the MDX build", () => {
+    for (const sourcePath of listDocsSourcePaths(docsContentRoot)) {
+      expect(readFileSync(sourcePath, "utf8"), sourcePath).not.toMatch(/<h[2-6]\b/);
+    }
+  });
+
   test("[PUB-DOCS-005] registered help topics resolve to locale docs source and anchors", () => {
     for (const topic of Object.values(publicDocsHelpTopics)) {
       for (const locale of publicDocsLocales) {
         const sourcePath = docsSourcePath(topic.page[locale]);
 
         expect(existsSync(sourcePath), `${topic.id} ${locale} page exists`).toBe(true);
-        expect(readFileSync(sourcePath, "utf8")).toContain(`id="${topic.anchor}"`);
+        expect(readFileSync(sourcePath, "utf8")).toContain(`[#${topic.anchor}]`);
       }
     }
   });
@@ -171,10 +185,10 @@ describe("public docs help registry", () => {
       "utf8",
     );
 
-    expect(zhPage).toContain('id="appaloft-skill-evals"');
+    expect(zhPage).toContain("[#appaloft-skill-evals]");
     expect(zhPage).toContain("skills/appaloft/evals/evals.json");
     expect(zhPage).toContain("保存/注册并管理 server");
-    expect(enPage).toContain('id="appaloft-skill-evals"');
+    expect(enPage).toContain("[#appaloft-skill-evals]");
     expect(enPage).toContain("skills/appaloft/evals/evals.json");
     expect(enPage).toContain("saving/registering and managing servers");
   });
@@ -629,7 +643,7 @@ describe("public docs help registry", () => {
 
     for (const page of [topic.page["zh-CN"], topic.page["en-US"]]) {
       const source = readFileSync(docsSourcePath(page), "utf8");
-      expect(source).toContain('id="external-observability-handoff"');
+      expect(source).toContain("[#external-observability-handoff]");
       expect(source).toMatch(/Prometheus|PromQL/);
       expect(source).toMatch(/APM|tracing|trace/);
       expect(source).toMatch(/custom metric|custom metrics|自定义指标/);

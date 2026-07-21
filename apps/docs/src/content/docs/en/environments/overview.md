@@ -21,18 +21,18 @@ sidebar:
   order: 6
 ---
 
-<h2 id="environment-variable-precedence">Variable precedence</h2>
+## Variable precedence [#environment-variable-precedence]
 
 Appaloft resolves configuration in this order: defaults, system, organization, project, environment, deployment snapshot.
 
-<h2 id="environment-variable-build-vs-runtime">Build-time and runtime variables</h2>
+## Build-time and runtime variables [#environment-variable-build-vs-runtime]
 
 Build-time variables can be included in build output and cannot be marked secret. Runtime variables are supplied to the running app, and secret values must be masked.
 
-<h2 id="environment-snapshot">Deployment snapshot</h2>
+## Deployment snapshot [#environment-snapshot]
 
 Each deployment persists an immutable environment snapshot.
 
-<h2 id="environment-diff">Diff and promote</h2>
+## Diff and promote [#environment-diff]
 
 Diff explains configuration differences. Promote creates a new target environment state instead of rewriting historical deployments.

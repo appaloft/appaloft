@@ -17,15 +17,15 @@ sidebar:
   order: 5
 ---
 
-<h2 id="reference-runtime-configuration">Runtime configuration</h2>
+## Runtime configuration [#reference-runtime-configuration]
 
 Runtime configuration controls Appaloft serve, databases, static asset directories, and self-hosted behavior.
 
-<h2 id="reference-docs-static-dir">Docs static directory</h2>
+## Docs static directory [#reference-docs-static-dir]
 
 `APPALOFT_DOCS_STATIC_DIR` overrides public docs static assets without replacing the Web console.
 
-<h2 id="reference-durable-worker-runtime">Durable worker runtime</h2>
+## Durable worker runtime [#reference-durable-worker-runtime]
 
 Durable worker runtime configuration controls how accepted long-running work is claimed and
 monitored after a request returns an id. The default `embedded` mode keeps self-hosted deployment
@@ -53,7 +53,7 @@ durable work can still observe standalone worker groups by setting `APPALOFT_WOR
 | `APPALOFT_WORKER_OBSERVED_GROUPS` | unset | Comma-separated `worker-group:count` entries that doctor and the Web Instance page should read from the durable worker heartbeat model, even when the current Web/API process uses `APPALOFT_WORKER_RUNTIME_MODE=disabled`. |
 | `APPALOFT_DATABASE_POOL_MAX` | `10` | Maximum PostgreSQL connections held by each runtime process. Lower this when multiple Web/worker processes share a small session pool. |
 
-<h2 id="reference-scheduled-workers">Scheduled workers</h2>
+## Scheduled workers [#reference-scheduled-workers]
 
 Scheduled workers are disabled by default unless noted otherwise. Enable them only on the instance
 that should own the recurring work.

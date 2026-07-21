@@ -20,7 +20,7 @@ sidebar:
   order: 3
 ---
 
-<h2 id="domain-binding-purpose">Custom domain binding</h2>
+## Custom domain binding [#domain-binding-purpose]
 
 A domain binding means the user wants a hostname to point at a resource. It is not deployment input or an implicit certificate side effect.
 
@@ -32,7 +32,7 @@ Use custom domains when:
 - Staging, preview, or customer environments need separate hostnames.
 - External access should be added after deployment is stable.
 
-<h2 id="domain-binding-inputs">Binding inputs</h2>
+## Binding inputs [#domain-binding-inputs]
 
 Choose:
 
@@ -44,7 +44,7 @@ Choose:
 
 A domain name should not replace resource, server, or environment identifiers.
 
-<h2 id="domain-binding-surfaces">Web, CLI, and API</h2>
+## Web, CLI, and API [#domain-binding-surfaces]
 
 The Web console should allow binding from a resource or access page and immediately show ownership, route readiness, proxy readiness, diagnostics, and TLS next steps.
 
@@ -52,7 +52,7 @@ The CLI fits automation and release scripts. Use `appaloft domain-binding show <
 
 The HTTP API uses the same operation contracts. DNS/TLS semantics should not be hidden inside deployment status.
 
-<h2 id="domain-binding-output">What you see after creation</h2>
+## What you see after creation [#domain-binding-output]
 
 Typical states:
 
@@ -61,7 +61,7 @@ Typical states:
 - `ready`: domain and certificate are usable.
 - `failed`: DNS, certificate material, or proxy entrypoint needs action.
 
-<h2 id="domain-binding-provider-dns">Provider DNS automation</h2>
+## Provider DNS automation [#domain-binding-provider-dns]
 
 When a user enters a hostname such as `pocketbase.example.com`, Appaloft first reduces it to the base domain, such as `example.com`, and checks public DNS for NS and authoritative nameserver data. This discovery does not require authorization. It only indicates which DNS provider probably hosts the domain, such as Cloudflare, GoDaddy, Route53, Namecheap, Vercel, DNSPod, Alibaba Cloud, Tencent Cloud, or an unknown provider.
 
@@ -73,7 +73,7 @@ Public DNS discovery does not prove ownership and does not grant Appaloft permis
 - If another provider is detected but no connector exists yet, the page shows the manual DNS fallback.
 - If the provider is unknown, the user can use manual DNS and later choose another connector.
 
-<h3 id="domain-binding-dns-connector-flow">DNS connector workflow</h3>
+### DNS connector workflow [#domain-binding-dns-connector-flow]
 
 From a resource's Networking > Custom domains page or a domain binding detail page, the DNS connector flow is:
 
@@ -84,7 +84,7 @@ From a resource's Networking > Custom domains page or a domain binding detail pa
 5. Return to Appaloft, then refresh the DNS plan or retry verification. Appaloft rechecks public DNS and ownership readiness; propagation can take a little time.
 6. If the provider does not support automatic connection, the authorized account does not cover the zone, or Domain Connect is temporarily unavailable, copy the records from the Manual DNS table into the current DNS provider.
 
-<h2 id="domain-binding-recovery">Recovery</h2>
+## Recovery [#domain-binding-recovery]
 
 If binding fails, do not redeploy first. Check:
 

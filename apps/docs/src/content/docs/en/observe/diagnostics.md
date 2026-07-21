@@ -23,7 +23,7 @@ sidebar:
   order: 4
 ---
 
-<h2 id="diagnostic-summary-copy-support-payload">Copy diagnostic summary</h2>
+## Copy diagnostic summary [#diagnostic-summary-copy-support-payload]
 
 Diagnostic summaries should include stable IDs, status, error codes, and safe context while masking secret values.
 
@@ -39,7 +39,7 @@ Diagnostic summaries should include:
 - Access-failure request id, affected hostname/path, safe related ids, and next action.
 - Masked secret key names and presence, without values.
 
-<h2 id="access-failure-request-id-lookup">Look up an access failure by Request ID</h2>
+## Look up an access failure by Request ID [#access-failure-request-id-lookup]
 
 When an Appaloft generated URL or custom domain fails, the error page shows a request id. Resource
 owners can use that request id to find the short-retention safe evidence:
@@ -59,7 +59,7 @@ and `expiresAt`. If the evidence expired or filters do not match, Appaloft retur
 not-found result instead of leaking other resource details. Do not share screenshots, SSH output,
 raw Traefik logs, cookies, Authorization headers, or provider raw payloads as diagnostic evidence.
 
-<h2 id="runtime-target-capacity-inspect">Runtime target capacity inspect</h2>
+## Runtime target capacity inspect [#runtime-target-capacity-inspect]
 
 When a deployment fails because the target is out of disk, inodes, Docker image store, or build
 cache capacity, start with the read-only capacity diagnostic:
@@ -76,7 +76,7 @@ label/size evidence, source workspace metadata, safe reclaimable estimates, and 
 `safeReclaimableEstimate` is input for a later cleanup or prune decision. It does not mean Appaloft
 has cleaned anything.
 
-<h2 id="runtime-usage-inspect">Runtime usage attribution inspect</h2>
+## Runtime usage attribution inspect [#runtime-usage-inspect]
 
 When you need to see how Appaloft attributes runtime capacity to one scope, use the read-only usage
 attribution query:
@@ -108,7 +108,7 @@ retained sample scope evidence. Server/resource Web Monitor can also configure e
 existing advanced rules for exact-scope edits. Full Observe charts remain a governed follow-up
 slice.
 
-<h2 id="runtime-monitoring-samples-and-rollups">Runtime monitoring samples and rollups</h2>
+## Runtime monitoring samples and rollups [#runtime-monitoring-samples-and-rollups]
 
 `runtime-monitoring.samples.list` and `runtime-monitoring.rollup` expose retained sample and rollup
 read APIs. They return data only when a retained monitoring sample store already contains sanitized
@@ -134,7 +134,7 @@ GET /api/runtime-monitoring/rollup?scope.kind=resource&scope.resourceId=res_api&
 These queries read only bounded, sanitized retained observations. They do not collect fresh metrics,
 run cleanup, stop or restart runtimes, copy log lines into monitoring records, or enforce thresholds.
 
-<h2 id="external-observability-handoff">External observability handoff</h2>
+## External observability handoff [#external-observability-handoff]
 
 Appaloft runtime monitoring is intentionally smaller than a metrics platform. Use external
 observability systems for Prometheus or PromQL, Grafana dashboards, custom metric ingestion,
@@ -144,7 +144,7 @@ view: bounded retained usage samples, shallow rollups, deployment markers, non-e
 state, scoped time-window handoffs to existing logs, health, diagnostics, and safe cleanup
 dry-runs, and target-side filtering where those surfaces already expose a compatible boundary.
 
-<h2 id="runtime-monitoring-thresholds">Runtime monitoring thresholds</h2>
+## Runtime monitoring thresholds [#runtime-monitoring-thresholds]
 
 `runtime-monitoring.thresholds.configure` writes exact-scope warning/critical threshold policy.
 `runtime-monitoring.thresholds.show` reads the exact policy first, then can inherit the nearest
@@ -197,7 +197,7 @@ or Docker volume prune from this command, and it preserves Appaloft state roots,
 live remote state, rollback candidates, deployment snapshots, audit/events, logs, and business
 state.
 
-<h2 id="scheduled-runtime-prune-policy">Scheduled runtime prune policy</h2>
+## Scheduled runtime prune policy [#scheduled-runtime-prune-policy]
 
 Scheduled runtime prune policies let operators configure the retention window that the internal
 runtime prune scheduler reads before it dispatches safe capacity cleanup work. The scheduler still
@@ -249,7 +249,7 @@ Configured policies can use the `deployment-snapshot` scope. Repository or deplo
 configuration does not yet create those policy records automatically, so create them through the
 policy command or API. Use operator work to inspect accepted scheduled prune attempts and failures.
 
-<h2 id="diagnostic-secret-masking">Secret masking</h2>
+## Secret masking [#diagnostic-secret-masking]
 
 Do not copy private keys, full environment variable values, tokens, or database connection strings. Prefer Appaloft-generated safe summaries.
 
@@ -262,7 +262,7 @@ Never share:
 - Certificate private keys.
 - Complete server shell history.
 
-<h2 id="diagnostic-when-to-copy">When to copy diagnostics</h2>
+## When to copy diagnostics [#diagnostic-when-to-copy]
 
 Copy diagnostics when:
 

@@ -28,7 +28,7 @@ sidebar:
   order: 2
 ---
 
-<h2 id="deployment-source">选择部署来源</h2>
+## 选择部署来源 [#deployment-source]
 
 部署来源回答“要部署什么”。它可以是本地目录、Git 仓库、Docker 镜像、Compose 清单或静态站点输出。
 
@@ -36,7 +36,7 @@ sidebar:
 
 已有入口应该把 Web、CLI 和 HTTP API 的 source 解释成同一个概念。Web 里的 source 字段、CLI 的 positional source 或 `--source`、API 的 source input 都应该指向这里，而不是各自定义一套含义。
 
-<h2 id="deployment-source-kind">来源类型</h2>
+## 来源类型 [#deployment-source-kind]
 
 常见来源类型：
 
@@ -50,7 +50,7 @@ sidebar:
 
 用户不确定时，应先选择最接近当前交付物的来源。后续 runtime profile 会描述如何运行它。
 
-<h2 id="deployment-source-integration-connection-modes">Integration connection modes</h2>
+## Integration connection modes [#deployment-source-integration-connection-modes]
 
 外部 source integration 可以声明连接模式，帮助 Web、CLI 和工具用同一套中性词汇解释“谁来完成 provider 配置”。
 
@@ -76,7 +76,7 @@ appaloft github repositories --search web
 如果 `status` 显示当前 workspace 尚未安装 App，请打开它返回的 install URL，选择正确的
 GitHub 账号和仓库，再重新列出仓库。
 
-<h2 id="deployment-source-validation">输入检查</h2>
+## 输入检查 [#deployment-source-validation]
 
 用户应能看到来源是否可读取、ref 或路径是否存在、静态输出目录是否明确，以及来源和资源 runtime profile 是否明显冲突。
 
@@ -109,7 +109,7 @@ appaloft resource configure-source res_web \
   --base-directory apps/web
 ```
 
-<h2 id="application-graph-dependencies">让多个应用共用一个依赖</h2>
+## 让多个应用共用一个依赖 [#application-graph-dependencies]
 
 在 application graph 中，只在顶层定义一次托管依赖，再让每个消费者应用引用它的 key。一个依赖被
 多个应用共用时必须提供稳定的 `resourceName`，这样后续消费者会复用同一个托管 Resource，而不是
@@ -152,7 +152,7 @@ appaloft deploy . --application api --application worker
 
 如果 key 不存在，Appaloft 会在初始化部署状态或修改资源之前失败，并列出可用的 application key。
 
-<h2 id="local-static-output">本地静态输出</h2>
+## 本地静态输出 [#local-static-output]
 
 当用户已经有 `dist`、`build` 或类似静态输出目录时，可以把这个目录作为 source 直接交给 Appaloft：
 
@@ -162,13 +162,13 @@ appaloft deploy ./dist --as static-site
 
 这个入口只改变用户层交互：它会归一化为静态站点资源和普通部署请求，不会新增 `quick-deploy.create` 操作，也不会把目录上传到 Appaloft 托管云。除非用户显式选择托管功能，部署目标仍然是用户选择的服务器或环境。
 
-<h2 id="deployment-source-output">部署后会看到什么</h2>
+## 部署后会看到什么 [#deployment-source-output]
 
 部署被接受后，source 会进入部署快照。后续修改资源 source profile 不会改变已经完成或正在执行的部署。
 
 用户应能在部署详情里看到安全的 source 摘要，例如 repository、ref、base directory、镜像 tag 或静态输出目录。Secret token、私有仓库凭据和完整本地路径中的敏感片段不应出现在日志或诊断摘要中。
 
-<h2 id="deployment-source-errors">常见错误</h2>
+## 常见错误 [#deployment-source-errors]
 
 常见恢复方式：
 
@@ -179,7 +179,7 @@ appaloft deploy ./dist --as static-site
 
 如果资源已经绑定过旧来源，使用 [Deployment recovery](/docs/deploy/recovery/#deployment-source-relink) 重新关联。
 
-<h2 id="static-artifact-publishing">静态产物发布</h2>
+## 静态产物发布 [#static-artifact-publishing]
 
 直接静态产物发布是部署来源的一个扩展点。它适合已经完成构建的 `dist` 目录或 `.zip` 归档，并通过
 `static-artifacts.*` 操作进入同一套 operation catalog：
@@ -195,7 +195,7 @@ API 可以调用 `POST /api/static-artifacts/publish`、
 `GET /api/static-artifacts/publications` 读取。这个入口不会绕过 Resource、Deployment、route 或
 访问控制边界；hosted alias/default-domain routing 仍是单独能力。
 
-<h2 id="source-auto-deploy-setup">自动部署设置</h2>
+## 自动部署设置 [#source-auto-deploy-setup]
 
 Source auto-deploy 会把已验证的 source event 转换为普通部署请求，但不会把 branch、webhook 或
 delivery id 塞进 `deployments.create`。第一条已启用的 ingestion route 是 Resource-scoped generic
@@ -213,7 +213,7 @@ Git push 策略可以额外配置仓库根目录相对的 `includePaths` 和 `ex
 exclude，不会合并中间 commit 的文件列表。删除 ref 永不部署；provider diff 不可用或被截断时，
 带路径规则的策略 fail closed，不带路径规则的策略继续保持 ref-only 行为。
 
-<h2 id="source-auto-deploy-signatures">签名和 secret</h2>
+## 签名和 secret [#source-auto-deploy-signatures]
 
 Git provider webhook 和 generic signed webhook 都必须先完成签名校验，再进入 policy matching。
 generic signed webhook 使用 `X-Appaloft-Signature`，格式可以是 `sha256=<hex>` 或裸 HMAC
@@ -223,7 +223,7 @@ Resource 上的 runtime secret variable。Appaloft 只保存安全的 reference 
 
 轮换 secret 时，应先替换底层 secret reference，再按需要重新确认自动部署策略。
 
-<h2 id="source-auto-deploy-dedupe">重复投递</h2>
+## 重复投递 [#source-auto-deploy-dedupe]
 
 Source event 会先写入 durable record，再尝试创建部署。重复投递使用 provider delivery id、
 generic idempotency key，或 source/ref/revision/event kind 的 bounded-window key 去重。generic
@@ -232,7 +232,7 @@ signed route 的去重范围限定在 route Resource。
 重复事件不会创建第二个部署。用户应能在 source event read model 中看到 `deduped` 状态和原始
 source event id。
 
-<h2 id="source-auto-deploy-ignored-events">忽略和阻塞的事件</h2>
+## 忽略和阻塞的事件 [#source-auto-deploy-ignored-events]
 
 已验证的事件也可能不创建部署。常见原因包括 ref 不匹配、最终路径未匹配、最终 diff 不可用或被
 截断、ref 被删除、没有启用的策略、策略被禁用、或 source binding 变化后策略处于 blocked pending
@@ -242,7 +242,7 @@ acknowledgement。
 Resource、以及已创建的 deployment id。不要在日志或 UI 中暴露 webhook secret、provider token 或
 raw payload。
 
-<h2 id="source-auto-deploy-recovery">自动部署恢复</h2>
+## 自动部署恢复 [#source-auto-deploy-recovery]
 
 第一版 ingestion path 会记录 source event state 和同步 dispatch 结果，不承诺后台自动重试。若事件
 dispatch 失败，先查看 source event detail，再根据情况修复 source profile、secret reference、策略状态或
@@ -256,7 +256,7 @@ webhook payload、signature、provider token 或 webhook secret。
 如果部署已被创建，后续恢复应使用普通 deployment recovery/readiness、retry、redeploy 或 rollback
 语义，而不是重放 webhook payload。
 
-<h2 id="source-auto-deploy-retention">Source event 保留</h2>
+## Source event 保留 [#source-auto-deploy-retention]
 
 使用 `appaloft source-event prune --before <iso>` 或 `POST /api/source-events/prune` 先检查已保留的
 source event delivery。Prune 默认 dry-run，并返回按 status 和 source kind 分组的匹配数量。只有在确认

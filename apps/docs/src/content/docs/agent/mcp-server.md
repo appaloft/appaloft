@@ -21,7 +21,7 @@ sidebar:
   order: 2
 ---
 
-<h2 id="appaloft-mcp-server">Appaloft MCP server</h2>
+## Appaloft MCP server [#appaloft-mcp-server]
 
 Appaloft MCP server 是 Appaloft 的可调用工具入口。它把现有 operation catalog 暴露给 MCP
 client，不创建新的 AI-only 业务模型。Skill 负责流程判断；MCP 负责在已配置工具时执行精确的
@@ -53,7 +53,7 @@ npx appaloft-mcp serve --host 127.0.0.1 --port 3939
 
 `appaloft-mcp` 会委托给同一套 Appaloft runtime，不维护第二套 operation list 或业务实现。
 
-<h2 id="appaloft-mcp-tools">工具模型</h2>
+## 工具模型 [#appaloft-mcp-tools]
 
 每个 tool 都对应一个 operation key：
 
@@ -72,7 +72,7 @@ Tool descriptor 会带 MCP annotations，标记 query 只读、破坏性 command
 不存在 `quick_deploy_create` 这类 agent-only 工具。如果某个行为不在 operation catalog 中，就不是
 Appaloft MCP operation。
 
-<h2 id="appaloft-mcp-resources">资源和 prompts</h2>
+## 资源和 prompts [#appaloft-mcp-resources]
 
 只读 resources：
 
@@ -93,14 +93,14 @@ Prompts：
 
 Resources 和 prompts 只提供上下文和 workflow 起点，不拥有写侧策略、租户选择、后台任务或隐藏状态。
 
-<h2 id="appaloft-mcp-safety">安全边界</h2>
+## 安全边界 [#appaloft-mcp-safety]
 
 - 不绕过 Appaloft 直接调用 repository、use case、provider SDK、Docker、SSH、proxy 或数据库。
 - 不读取或输出 `.env`、私钥、token、cookie、database URL、云厂商凭据、raw secret 或未脱敏日志。
 - 鉴权、tenant context、operation guard、确认字段、redaction 和结构化错误都保留在既有 runtime 边界。
 - 删除和破坏性操作仍必须使用对应 schema 中的 delete-safety 和 exact confirmation 字段。
 
-<h2 id="appaloft-mcp-skill">和 skill 的关系</h2>
+## 和 skill 的关系 [#appaloft-mcp-skill]
 
 Appaloft Skill 是 agent 的流程协议：识别意图、选择 CLI/API/Web/MCP 表面、按顺序调用既有操作，并组织最终回复。MCP 是 callable tool layer：当 host 已配置 Appaloft MCP 时，skill 可以优先使用工具调用。
 

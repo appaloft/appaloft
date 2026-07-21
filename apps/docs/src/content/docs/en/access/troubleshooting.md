@@ -17,7 +17,7 @@ sidebar:
   order: 6
 ---
 
-<h2 id="access-troubleshooting-order">Troubleshooting order</h2>
+## Troubleshooting order [#access-troubleshooting-order]
 
 Check resource runtime state, then proxy readiness, then domain ownership, then certificate readiness.
 
@@ -44,6 +44,6 @@ health, proxy configuration, logs, and diagnostic copy affordances map to
 `/api/resources/{resourceId}/diagnostic-summary`; deployment timeline entries map to
 `/api/deployments/{deploymentId}/logs`.
 
-<h2 id="access-dns-failures">DNS failures</h2>
+## DNS failures [#access-dns-failures]
 
 Confirm record type, target value, TTL, and whether the record points at the current server or proxy entrypoint.

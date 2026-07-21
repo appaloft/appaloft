@@ -33,7 +33,7 @@ sidebar:
   order: 3
 ---
 
-<h2 id="self-hosting-organization-team-management">Organization team management</h2>
+## Organization team management [#self-hosting-organization-team-management]
 
 首次管理员会成为初始 organization 的 owner。登录后，可以读取当前 organization context、切换到当前
 session 已可见的 organization、查看成员和邀请，并用 owner 或 admin role 管理成员。
@@ -42,7 +42,7 @@ session 已可见的 organization、查看成员和邀请，并用 owner 或 adm
 `APPALOFT_AUTH_COOKIE` 或 `APPALOFT_AUTHORIZATION` 读取等价的 session 输入；不要把这些值写入 shell
 history、CI 日志、仓库文件、issue 或 PR 评论。
 
-<h2 id="self-hosting-organization-current-context">查看当前 context</h2>
+## 查看当前 context [#self-hosting-organization-current-context]
 
 ```sh
 appaloft organization context
@@ -53,7 +53,7 @@ appaloft organization switch org_second
 输出不会包含 session token、cookie、OAuth provider token、邀请 secret 或 deploy token 原始值。
 切换命令只允许选择当前产品 session 已可见的 organization；重复选择当前 organization 是幂等操作。
 
-<h2 id="self-hosting-organization-members">查看成员和邀请</h2>
+## 查看成员和邀请 [#self-hosting-organization-members]
 
 ```sh
 appaloft organization members list --organization-id org_self_hosted
@@ -63,7 +63,7 @@ appaloft organization invitations list --organization-id org_self_hosted --statu
 成员列表只返回 member id、用户安全元数据、role、加入时间等字段。邀请列表只返回安全邀请元数据，
 不会返回原始邀请 token。
 
-<h2 id="self-hosting-organization-member-management">邀请、移交 owner、更新 role、移除成员</h2>
+## 邀请、移交 owner、更新 role、移除成员 [#self-hosting-organization-member-management]
 
 ```sh
 appaloft organization member invite --organization-id org_self_hosted --email operator@example.com --role developer
@@ -81,7 +81,7 @@ Owner 不能通过这两个操作被降级、升级出来或移除；需要改 o
 `appaloft organization owner transfer <fromMemberId> <toMemberId>`。移交成功后目标成员成为 owner，
 原 owner 成为 admin。
 
-<h2 id="self-hosting-organization-http-api">HTTP/API routes</h2>
+## HTTP/API routes [#self-hosting-organization-http-api]
 
 同一套操作也可以通过 HTTP/API 调用：
 
@@ -99,14 +99,14 @@ DELETE /api/organizations/{organizationId}/members/{memberId}
 HTTP/API routes 和 CLI 都执行同一组 Appaloft 操作。Auth runtime 是实现细节，调用方不需要也不应该
 依赖底层 auth route、table 或 provider payload。
 
-<h2 id="self-hosting-organization-web-status">Web console status</h2>
+## Web console status [#self-hosting-organization-web-status]
 
 Web console 的 `/organization` 页面可以读取当前 organization context、切换到另一个可见
 organization、查看成员和邀请、邀请成员、更新非 owner role、移交 owner、移除非 owner 成员，并管理
 deploy token 的创建、轮换和撤销。
 浏览器端 self-hosted auth e2e 覆盖仍是后续 Phase 8 工作。
 
-<h2 id="self-hosting-organization-recovery">恢复和排查</h2>
+## 恢复和排查 [#self-hosting-organization-recovery]
 
 - 看到 `401 product_auth_missing` 时，重新登录，或为 CLI 提供受信任的 session handoff。
 - 看到 `403 product_auth_forbidden` 时，确认当前用户属于目标 organization。成员管理和 deploy token

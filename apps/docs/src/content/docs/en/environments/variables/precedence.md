@@ -28,7 +28,7 @@ sidebar:
   order: 3
 ---
 
-<h2 id="environment-variable-precedence">Variable precedence</h2>
+## Variable precedence [#environment-variable-precedence]
 
 Appaloft resolves configuration as defaults, system, organization, project, environment, resource,
 and deployment snapshot. Users mainly need to know that deployments use snapshot values.
@@ -44,7 +44,7 @@ User-visible rules:
 
 This lets users update staging or production configuration without silently rewriting deployment history.
 
-<h2 id="environment-variable-build-vs-runtime">Build-time and runtime variables</h2>
+## Build-time and runtime variables [#environment-variable-build-vs-runtime]
 
 Build-time variables can enter artifacts and cannot be secret. Runtime variables are used when the application starts and runs.
 
@@ -55,7 +55,7 @@ Build-time variables can enter artifacts and cannot be secret. Runtime variables
 
 If a variable is visible to the browser, such as `PUBLIC_` or `VITE_`, do not treat it as a secret.
 
-<h2 id="environment-snapshot">Deployment snapshot</h2>
+## Deployment snapshot [#environment-snapshot]
 
 Every deployment stores an immutable environment snapshot. That snapshot may include inherited
 environment values and resource-specific overrides. Later variable changes do not change running or
@@ -63,7 +63,7 @@ completed deployments.
 
 Deployment details should show the configuration summary used by that deployment, not only the current environment variable table.
 
-<h2 id="environment-variable-surfaces">Entrypoints</h2>
+## Entrypoints [#environment-variable-surfaces]
 
 The Web console should show environment and resource variables, masked secret status, last update
 time, ownership scope, and deployment snapshot hints.
@@ -80,7 +80,7 @@ resource; duplicate keys use the last pasted line and the response reports safe 
 Use `resources.effective-config` to inspect the deployment input view after resource variables
 override environment variables, including safe source and override summaries.
 
-<h2 id="environment-variable-recovery">Common issues</h2>
+## Common issues [#environment-variable-recovery]
 
 If a deployment did not read a new variable:
 

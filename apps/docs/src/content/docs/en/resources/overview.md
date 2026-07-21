@@ -21,22 +21,22 @@ sidebar:
   order: 4
 ---
 
-<h2 id="resource-profile-purpose">Purpose</h2>
+## Purpose [#resource-profile-purpose]
 
 Resource settings describe how future deployments should read source, build the app, start it, check health, and expose network access.
 
-<h2 id="resource-source-profile">Source</h2>
+## Source [#resource-source-profile]
 
 Source tells Appaloft where application code comes from, such as a local directory, Git repository, or automation-provided source snapshot.
 
-<h2 id="resource-runtime-profile">Runtime</h2>
+## Runtime [#resource-runtime-profile]
 
 Runtime describes install, build, start, static output, naming intent, and execution strategy.
 
-<h2 id="resource-health-profile">Health</h2>
+## Health [#resource-health-profile]
 
 Health tells the verify stage how to decide whether the app is usable.
 
-<h2 id="resource-network-profile">Network</h2>
+## Network [#resource-network-profile]
 
 Network describes the app's listening endpoint and proxy target. Custom domain binding is separate access configuration.

@@ -21,7 +21,7 @@ sidebar:
 
 One-click deploy is an entrypoint convention, not another application definition format. The button carries the user into an Appaloft deploy entry; the deployable topology still lives in an `appaloft.blueprint/v1` Blueprint.
 
-<h2 id="quickstart">Quickstart</h2>
+## Quickstart [#quickstart]
 
 1. Maintain `appaloft.blueprint.yaml` in the app repository, or publish the app through an Appaloft Blueprint catalog.
 2. Generate an Appaloft deploy link.
@@ -48,7 +48,7 @@ Remote Blueprint URL example:
 
 You can also use the [One-click deploy generator](https://appaloft.com/deploy/one-click).
 
-<h2 id="deploy-handoff-url">Deploy handoff URL</h2>
+## Deploy handoff URL [#deploy-handoff-url]
 
 The standard entry is `/deploy`. Query parameters describe the Blueprint to open and the default project state.
 
@@ -66,7 +66,7 @@ The standard entry is `/deploy`. Query parameters describe the Blueprint to open
 
 Do not put real secrets, database passwords, provider tokens, or private repository credentials in the URL. Secrets should be entered in the deploy wizard or referenced through Appaloft secret/resource binding mechanisms.
 
-<h2 id="minimal-blueprint">Minimal Blueprint</h2>
+## Minimal Blueprint [#minimal-blueprint]
 
 ```yaml title="appaloft.blueprint.yaml"
 schemaVersion: appaloft.blueprint/v1
@@ -94,7 +94,7 @@ profiles:
     label: Production
 ```
 
-<h2 id="boundary">Boundary</h2>
+## Boundary [#boundary]
 
 - A Blueprint is a portable manifest, not a Cloud Marketplace listing.
 - A deploy handoff URL is entry state, not a new deployment command.

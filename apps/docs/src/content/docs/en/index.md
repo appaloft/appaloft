@@ -27,7 +27,7 @@ hero:
       icon: external
 ---
 
-<h2 id="docs-entry-map">Start From Your Goal</h2>
+## Start From Your Goal [#docs-entry-map]
 
 Appaloft helps you deploy apps into environments you control, then manage access, configuration, status, and recovery in one place. You do not need to learn complex concepts first; start with what you are trying to do.
 
@@ -37,13 +37,13 @@ Appaloft helps you deploy apps into environments you control, then manage access
 - **I need to configure variables**: Read [environment variable precedence](/docs/en/environments/variables/precedence/) and [secret handling](/docs/en/environments/variables/secrets/).
 - **Something failed**: Start with [logs and health](/docs/en/observe/logs-health/) or [diagnostics](/docs/en/observe/diagnostics/).
 
-<h2 id="docs-reader-path">Recommended path</h2>
+## Recommended path [#docs-reader-path]
 
 1. New users should read [Start here](/docs/en/start/first-deployment/) and complete one deployment from input to reachable URL.
 2. When configuring an app, read [Projects and resources](/docs/en/resources/projects/) and [Environment variables](/docs/en/environments/variables/precedence/).
 3. When configuring access, read [Default access](/docs/en/access/generated-routes/), [Custom domains](/docs/en/access/domains/custom-domains/), and [TLS certificates](/docs/en/access/tls/certificates/).
 4. For operations and automation, read [CLI reference](/docs/en/reference/cli/), [HTTP API reference](/docs/en/reference/http-api/), and [Self-hosting](/docs/en/self-hosting/install/).
 
-<h2 id="docs-local-help">Open Help Inside Appaloft</h2>
+## Open Help Inside Appaloft [#docs-local-help]
 
 Fields with a `?` in the Web console open the relevant docs page. Self-hosted and binary installs serve these docs locally with Appaloft, so operators can still read help when the server environment cannot reach the public internet. To replace the local docs site, see [static assets](/docs/en/self-hosting/static-assets/).

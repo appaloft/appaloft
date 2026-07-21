@@ -21,7 +21,7 @@ sidebar:
   order: 0
 ---
 
-<h2 id="appaloft-skill">Appaloft AI 入口</h2>
+## Appaloft AI 入口 [#appaloft-skill]
 
 Appaloft Skill 是面向 AI agent 的完整产品入口。它和 CLI、HTTP API、Web console、MCP
 工具一样，都映射到同一套 Appaloft operation catalog；区别只是它的使用者是 AI。
@@ -40,7 +40,7 @@ cleanup retry、scheduler、audit 和 quota。
 CLI-approved handoff 授权 scoped、可过期 token，然后使用 `APPALOFT_TOKEN` 或
 `appaloft auth token login --stdin` / `--token-file <path>` 让 CLI 自己验证并写入本机 profile。
 
-<h2 id="appaloft-skill-install">安装</h2>
+## 安装 [#appaloft-skill-install]
 
 推荐安装完整 Appaloft skill：
 
@@ -59,7 +59,7 @@ npx skills add appaloft/appaloft --skill appaloft --global --agent claude-code -
 `~/.agents/skills/appaloft/SKILL.md` 或 Claude Code 的 `~/.claude/skills/appaloft/SKILL.md`
 存在。然后新开一个 agent 会话，让宿主重新加载 skill 目录。
 
-<h2 id="appaloft-skill-scope">能力范围</h2>
+## 能力范围 [#appaloft-skill-scope]
 
 完整 skill 覆盖 Appaloft CLI operation catalog 中的所有入口，包括：
 
@@ -74,7 +74,7 @@ npx skills add appaloft/appaloft --skill appaloft --global --agent claude-code -
 
 完整 CLI 映射随安装包一起发布在 `skills/appaloft/references/cli-entrypoints.md`。
 
-<h2 id="appaloft-skill-evals">最佳实践校验</h2>
+## 最佳实践校验 [#appaloft-skill-evals]
 
 Appaloft skill 遵循 Agent Skills 的渐进披露原则：`SKILL.md` 保持短小，长命令表、部署协议和
 MCP 指引放在一层 `references/` 中。为了避免 skill 变成泛泛而谈的部署说明，仓库还维护
@@ -115,7 +115,7 @@ release readiness 检查。
 
 如果只想验证 prompt 构建而不调用模型，可加 `--dry-run`。
 
-<h2 id="appaloft-skill-mcp">MCP 工具</h2>
+## MCP 工具 [#appaloft-skill-mcp]
 
 MCP 是 Appaloft 的机器可调用工具层。运行 `appaloft mcp stdio` 可以启动 stdio MCP server；
 运行 `appaloft mcp serve` 可以启动本地 HTTP `/mcp` endpoint；`npx appaloft-mcp` 则提供独立
@@ -125,7 +125,7 @@ Tool 输入 schema 来自同一套 command/query schema，调用仍进入 Appalo
 查看 [Appaloft MCP server](/docs/agent/mcp-server/#appaloft-mcp-server) 了解工具命名、resources、prompts
 和安全边界。
 
-<h2 id="appaloft-skill-safety">安全边界</h2>
+## 安全边界 [#appaloft-skill-safety]
 
 - 不读取 `.env`、私钥、token 文件内容、云厂商凭据、deploy token、SSH material、cookie 或未脱敏 secret。
 - 不让用户把 product-session cookie、bearer token、deploy token、browser cookie 或 token 文件内容粘贴进 chat；token 只能通过 CLI/env/secret manager 等可信 handoff 进入。
@@ -133,7 +133,7 @@ Tool 输入 schema 来自同一套 command/query schema，调用仍进入 Appalo
 - 不创造 agent-only operation；所有行为必须映射到既有 CLI/API/Web/MCP operation。
 - 不假设产物上传到托管云；默认仍部署到用户选择的 BYOS 目标。
 
-<h2 id="appaloft-skill-reference">规范文档</h2>
+## 规范文档 [#appaloft-skill-reference]
 
 完整规范位于 `docs/agent/appaloft-skill.md`。标准 skill source 位于仓库根目录
 `skills/appaloft`，部署子协议和入口边界分别位于 `skills/appaloft/references/deploy-protocol.md`
