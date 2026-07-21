@@ -26,6 +26,21 @@ Sandbox
     └── Run (terminal lineage)
 ```
 
+应用通常为每个用户任务或隔离工作分支创建一个短生命周期 Sandbox：
+
+```ts
+const sandbox = await appaloft.sandboxes.create({
+  source: { kind: "template", templateId: process.env.APPALOFT_SANDBOX_TEMPLATE_ID! },
+  requestedIsolation: "gvisor",
+  limits: { cpuMillis: 2_000, memoryBytes: 2_147_483_648, diskBytes: 10_737_418_240, maxProcesses: 128 },
+  networkPolicy: { mode: "deny", rules: [] },
+  expiresAt: new Date(Date.now() + 60 * 60 * 1_000).toISOString(),
+});
+```
+
 生产凭据不应写入 Sandbox 环境变量、文件、Run event 或错误。需要调用外部目标时，应使用
 destination-bound credential broker；destination、method、expiry 与变换方式不匹配时 fail closed。
 Appaloft 的隔离边界降低宿主暴露面，但不把任意依赖、模型输出或 Agent 生成代码变成可信代码。
+
+完整 Sandbox → Runtime → Run 所有权链见官方
+[Chat-to-App 示例](https://github.com/appaloft/examples/blob/main/sandbox-agent/src/chat-to-app.ts)。

@@ -92,7 +92,10 @@ import { createAppaloftClient } from "@appaloft/sdk";
 
 const appaloft = createAppaloftClient({
   baseUrl: "https://app.example.com/api",
-  auth: { kind: "deploy-token", token: process.env.APPALOFT_TOKEN! },
+  auth: {
+    kind: "product-session",
+    cookie: process.env.APPALOFT_SESSION_COOKIE!,
+  },
 });
 
 const sandbox = await appaloft.sandboxes.create({
@@ -128,6 +131,11 @@ if (!run.ok) throw run.error;
 
 The caller owns chat/session state. Appaloft owns the isolated execution, lifecycle, event readback,
 artifact boundary, Promotion checkpoints, and production delivery evidence.
+
+See the official [Sandbox Agent examples](https://github.com/appaloft/examples/tree/main/sandbox-agent)
+for complete Chat-to-App, human approval, and Preview-to-Promotion flows. The feature is Private
+Preview and requires an Appaloft 1.1+ control plane and matching SDK; Agent operations currently
+use a product session rather than a deploy token.
 
 ## Quick Start
 
