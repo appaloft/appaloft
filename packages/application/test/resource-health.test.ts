@@ -719,6 +719,65 @@ describe("ResourceHealthQueryService", () => {
     });
   });
 
+  test("[RES-HEALTH-QRY-024] does not report a route realized by an older deployment as ready", async () => {
+    const probeRunner = new StaticResourceHealthProbeRunner();
+    const service = createService({
+      resources: [
+        resourceSummary({
+          lastDeploymentId: "dep_new",
+          accessSummary: {
+            latestDurableDomainRoute: {
+              url: "https://app.example.test",
+              hostname: "app.example.test",
+              scheme: "https",
+              deploymentId: "dep_old",
+              deploymentStatus: "succeeded",
+              pathPrefix: "/",
+              proxyKind: "traefik",
+              targetPort: 3000,
+              updatedAt: "2026-01-01T00:00:07.000Z",
+            },
+            proxyRouteStatus: "ready",
+            lastRouteRealizationDeploymentId: "dep_old",
+          },
+        }),
+      ],
+      deployments: [deploymentSummary({ id: "dep_new" })],
+      probeRunner,
+    });
+
+    const result = await service.execute(
+      createTestContext(),
+      createQuery({ mode: "live", includePublicAccessProbe: true }),
+    );
+
+    expect(result.isOk()).toBe(true);
+    const summary = result._unsafeUnwrap();
+    expect(summary).toMatchObject({
+      overall: "degraded",
+      latestDeployment: { id: "dep_new", status: "succeeded" },
+      publicAccess: {
+        status: "failed",
+        reasonCode: "resource_public_access_stale_deployment",
+      },
+    });
+    expect(summary.sourceErrors).toContainEqual(
+      expect.objectContaining({
+        source: "public-access",
+        code: "resource_public_access_stale_deployment",
+        relatedEntityId: "dep_old",
+        relatedState: "dep_new",
+      }),
+    );
+    expect(probeRunner.requests).toHaveLength(1);
+    expect(probeRunner.requests[0]).toMatchObject({
+      name: "public-access",
+      target: "public-access",
+      url: "https://app.example.test/",
+      expectedStatusCode: 200,
+    });
+  });
+
   test("[RES-HEALTH-QRY-015][ROUTE-STATUS-002][HEALTH-ACCESS-001] reports non-ready durable domain before generated fallback", async () => {
     const service = createService({
       domainBindings: [

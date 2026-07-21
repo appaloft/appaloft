@@ -45,3 +45,12 @@
   changing the `deployments.proof/v1` schema.
 - [x] Run focused provider/application/adapter tests and the real proxy-backed route proof smoke.
 - [x] Complete Post-Implementation Sync and update this artifact state.
+
+## Current Route Reconciliation
+
+- [x] Add a regression for a ready managed domain binding that became available after the immutable
+  deployment plan was accepted.
+- [x] Resolve current ready managed routes through the application-owned read model and require the
+  runtime proof adapter to probe their deployment identity.
+- [x] Degrade Resource health when its ready route realization belongs to an older deployment, even
+  when a generic live HTTP probe succeeds.
