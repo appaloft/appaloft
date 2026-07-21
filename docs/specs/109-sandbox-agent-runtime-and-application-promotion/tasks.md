@@ -38,4 +38,4 @@
 - [x] Run core/application/persistence/adapter/transport/SDK/CLI/catalog-derived MCP suites.
 - [x] Run CLI parsing and generated SDK against the real HTTP/oRPC mount.
 - [x] Update matrix status only after named tests pass.
-- [ ] Complete Post-Implementation Sync and public commit/PR handoff.
+- [x] Complete Post-Implementation Sync and public commit/PR handoff ([PR #774](https://github.com/appaloft/appaloft/pull/774)).
