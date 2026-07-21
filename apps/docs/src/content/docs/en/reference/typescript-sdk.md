@@ -94,9 +94,38 @@ Operation descriptors are generated internals. Public SDK callers should use the
 
 The SDK is the right boundary for API tests and external automation. Domain rules, application handlers, repositories, and adapter unit tests should stay at the layer they prove.
 
+## Sandbox resource handles [#typescript-sdk-resource-handles]
+
+Ownership-led Sandbox flows use resource handles so callers do not repeat parent ids:
+
+```ts
+const sandbox = await appaloft.sandboxes.create(sandboxInput);
+
+try {
+  const agent = await sandbox.agents.create({ harness: "pi" });
+  const run = await agent.runs.create({ task: "Analyze and update the workspace" });
+} finally {
+  await sandbox.terminate();
+}
+```
+
+`Agent` is an SDK alias for a Sandbox Agent Runtime. The Pi shorthand defaults to the admitted
+`aht_pi_managed_v1` harness template, fresh Run context, and generated idempotency keys. Explicit
+`harnessTemplateId`, `context`, and `idempotencyKey` values override those SDK defaults.
+
+Sandbox handles also expose `sandbox.files.read/write`, `sandbox.exec`, and `sandbox.terminate`.
+These methods only inject the handle's `sandboxId`; they still call the generated public operations.
+
+Resource methods return descriptors directly and throw `AppaloftSdkRequestError` on failure. For
+the complete non-throwing `{ ok, status, data/error }` facade, use `appaloft.operations`, for example
+`appaloft.operations.sandboxes.create(input)`.
+
 ## Structured errors [#typescript-sdk-errors]
 
-The SDK returns stable structured error fields: `code`, `category`, `message`, `retryable`, and optional `details`. Automation should branch on `code`, `category`, or `retryable`, not the human-readable `message`.
+Generated operations return stable structured error fields: `code`, `category`, `message`,
+`retryable`, and optional `details`. Resource handles expose the same safe fields on
+`AppaloftSdkRequestError`. Automation should branch on `code`, `category`, or `retryable`, not the
+human-readable `message`.
 
 Common auth errors include:
 

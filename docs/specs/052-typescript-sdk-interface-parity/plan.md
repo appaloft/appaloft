@@ -30,6 +30,10 @@
 - Interface shape: expose operation-grouped client methods such as `projects.create`,
   `deployments.create`, and `deployments.recoveryReadiness`, generated from OpenAPI operation ids
   plus `x-appaloft-operation-key` metadata rather than handwritten parallel semantics.
+- Resource shape: decorate the generated client with thin SDK-owned handles for
+  `Sandbox -> Agent -> Run`. Handles carry returned ids, call only generated operations, preserve
+  explicit overrides and expose the untouched generated result facade under `appaloft.operations`.
+  No core/application import or SDK-only route is permitted.
 - Multi-language shape: treat TypeScript as the first generated SDK language. Future Python, Go, or
   other SDKs should reuse the same OpenAPI SDK contract and generator metadata, with only
   language-specific runtime code for fetch/HTTP, auth, typed errors, cancellation, pagination, and
@@ -58,10 +62,11 @@
 
 ## Roadmap And Compatibility
 
-- Roadmap target: Phase 9, after Phase 8 self-hosted auth and organization bootstrap.
-- Version target: Phase 9 / `0.11.0`, while the overall `0.11.0` release remains blocked by other
-  Phase 9 checklist items.
-- Compatibility impact: `pre-1.0-policy`; new public npm package and public client API.
+- Roadmap target: post-GA TypeScript SDK ergonomics and release hardening.
+- Version target: next feature release after `1.1.0`.
+- Compatibility impact: the Sandbox/Agent surface is private preview and may move to resource
+  handles in a minor release; the previous generated result facade remains available under
+  `appaloft.operations` as the explicit migration path.
 - Release notes: must call out that the SDK is an operation client over authenticated HTTP/oRPC,
   not an embedded application runtime.
 
@@ -79,6 +84,9 @@
   - 401/403 and structured errors are typed and do not rely on message text;
   - SDK e2e tests can create/list/show representative resources against a running PGlite server;
   - streaming/read-follow helpers have explicit behavior and cancellation semantics.
+  - Sandbox, Agent and Run resource handles inject the correct parent ids and defaults;
+  - failed resource calls retain structured error fields;
+  - the built npm package root imports successfully in Node and Bun.
 - The first Code Round closed `TS-SDK-OPENAPI-001`, `TS-SDK-OPENAPI-002`, and
   `TS-SDK-OPENAPI-003`: OpenAPI metadata parity with `operation-catalog.ts`. The next partial Code
   Round added initial SDK generation and package-boundary automation for `TS-SDK-GEN-001` and
@@ -108,6 +116,8 @@
   streaming helper remains the published initial stream surface.
 - A handwritten SDK facade can drift from the operation catalog. The TypeScript SDK must be
   generated from the same OpenAPI SDK contract intended for future non-TypeScript SDKs.
+- Resource handles can drift if they invent routes or schemas. Tests must prove every handle calls
+  a generated method, and `appaloft.operations` remains the canonical complete inventory.
 - Re-exporting too much from contracts could accidentally publish internal DTOs. The first SDK
   should expose only public operation types and safe error shapes.
 - Streaming helpers may expose transport details too early. Treat them as explicit subpath or

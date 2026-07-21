@@ -34,6 +34,13 @@ const sandbox = await appaloft.sandboxes.create({
   networkPolicy: { mode: "deny", rules: [] },
   expiresAt: new Date(Date.now() + 60 * 60 * 1_000).toISOString(),
 });
+
+try {
+  await sandbox.files.write({ path: "job/input.txt", contentBase64: "aGVsbG8=" });
+  await sandbox.exec({ argv: ["python3", "/workspace/job.py"], timeoutMs: 10_000 });
+} finally {
+  await sandbox.terminate();
+}
 ```
 
 Production credentials must not enter Sandbox environment variables, files, Run events, or errors.

@@ -32,3 +32,17 @@
 - [x] Add release packaging and publishing checks for `@appaloft/sdk`.
 - [x] Run Post-Implementation Sync after Code Round: roadmap, operation map, public docs,
   test matrix, package metadata, release notes, and migration gaps.
+
+## Sandbox Resource Handle Follow-Up
+
+- [x] Update ADR-046 and the SDK spec to define resource handles as thin composition over generated
+  operations and `Agent` as an SDK alias for Sandbox Agent Runtime.
+- [x] Add stable matrix rows for `Sandbox -> Agent -> Run`, structured resource errors, generated
+  operation compatibility and executable ESM release output.
+- [x] Add test-first expectations for the resource chain and built-package import.
+- [x] Implement Sandbox, Agent and Run resource handles without importing core/application.
+- [x] Preserve the complete non-throwing generated facade under `appaloft.operations`.
+- [x] Fix SDK build output and execute the built package in release packaging tests.
+- [x] Update TypeScript SDK reference docs and Sandbox/Agent docs; official examples follow after
+  the new npm version is published.
+- [x] Run SDK package, running-server, release-package and repository verification.

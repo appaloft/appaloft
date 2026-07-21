@@ -9,7 +9,7 @@ const outPath = join(root, "packages", "sdk", "src", "generated-operations.ts");
 await Bun.write(
   outPath,
   renderTypescriptSdkFacade(await createAppaloftOpenApiSpec(), {
-    importPath: "./internal",
+    importPath: "./internal.js",
   }),
 );
 

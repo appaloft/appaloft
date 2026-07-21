@@ -160,25 +160,21 @@ describe("external application sandbox SDK", () => {
       },
       networkPolicy: { mode: "deny", rules: [] },
     });
-    expect(created.ok).toBe(true);
-    if (!created.ok) return;
-    const sandboxId = (created.data as { sandboxId: string }).sandboxId;
-    expect(created.data).toMatchObject({ status: "ready", sourceKind: "template" });
+    const sandboxId = created.sandboxId;
+    expect(created).toMatchObject({ status: "ready", sourceKind: "template" });
 
     expect(
-      await client.sandboxFiles.write({
-        sandboxId,
+      await created.files.write({
         path: "input/data.bin",
         contentBase64: btoa(String.fromCharCode(0, 255, 1)),
       }),
-    ).toMatchObject({ ok: true, data: { sizeBytes: 3 } });
-    expect(await client.sandboxFiles.read({ sandboxId, path: "input/data.bin" })).toMatchObject({
-      ok: true,
-      data: { contentBase64: "AP8B", sizeBytes: 3 },
+    ).toMatchObject({ sizeBytes: 3 });
+    expect(await created.files.read({ path: "input/data.bin" })).toMatchObject({
+      contentBase64: "AP8B",
+      sizeBytes: 3,
     });
-    expect(await client.sandboxes.exec({ sandboxId, argv: ["python", "-V"] })).toMatchObject({
-      ok: true,
-      data: { mode: "foreground" },
+    expect(await created.exec({ argv: ["python", "-V"] })).toMatchObject({
+      mode: "foreground",
     });
     const streamed = [];
     for await (const envelope of client.sandboxes.events.stream({
@@ -225,7 +221,7 @@ describe("external application sandbox SDK", () => {
     expect(captured.ok).toBe(true);
     if (!captured.ok) return;
     const snapshotId = (captured.data as { snapshotId: string }).snapshotId;
-    expect(await client.sandboxes.terminate({ sandboxId })).toMatchObject({ ok: true });
+    expect(await created.terminate()).toMatchObject({ status: "terminated" });
 
     const restored = await client.sandboxes.create({
       source: { kind: "snapshot", snapshotId },
@@ -238,16 +234,10 @@ describe("external application sandbox SDK", () => {
       },
       networkPolicy: { mode: "deny", rules: [] },
     });
-    expect(restored.ok).toBe(true);
-    if (!restored.ok) return;
-    const restoredId = (restored.data as { sandboxId: string }).sandboxId;
-    expect(
-      await client.sandboxFiles.read({ sandboxId: restoredId, path: "input/data.bin" }),
-    ).toMatchObject({
-      ok: true,
-      data: { contentBase64: "AP8B" },
+    expect(await restored.files.read({ path: "input/data.bin" })).toMatchObject({
+      contentBase64: "AP8B",
     });
-    expect(await client.sandboxes.terminate({ sandboxId: restoredId })).toMatchObject({ ok: true });
+    expect(await restored.terminate()).toMatchObject({ status: "terminated" });
     expect(await client.sandboxSnapshots.delete({ snapshotId })).toMatchObject({ ok: true });
     expect(await client.sandboxTemplates.delete({ templateId })).toMatchObject({ ok: true });
   });

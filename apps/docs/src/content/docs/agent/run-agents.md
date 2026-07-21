@@ -29,21 +29,15 @@ Agent Runtime 从属于一个已经 ready 的 Sandbox。应用开发者保留 ch
 token 当成等价认证方式。
 
 ```ts
-const runtime = await appaloft.sandboxes.agents.runtimes.create({
-  sandboxId,
-  harnessKey: "pi",
-  harnessTemplateId: "aht_pi_managed_v1",
-  idempotencyKey: crypto.randomUUID(),
-});
-
-const run = await appaloft.sandboxes.agents.runs.create({
-  sandboxId,
-  runtimeId: runtime.data.runtimeId,
-  task: "Build the requested app in /workspace/app",
-  context: { mode: "fresh" },
-  idempotencyKey: crypto.randomUUID(),
-});
+const sandbox = await appaloft.sandboxes.create(sandboxInput);
+const agent = await sandbox.agents.create({ harness: "pi" });
+const run = await agent.runs.create({ task: "Build the requested app in /workspace/app" });
 ```
+
+SDK 中的 `Agent` 是 canonical Sandbox Agent Runtime 的便捷别名。SDK 默认使用已准入的 Pi template，
+并生成 idempotency key；需要显式 pin 或 continuation 时可以传入 `harnessTemplateId`、`context` 或
+`idempotencyKey`。资源方法失败时抛出 `AppaloftSdkRequestError`；不抛异常的完整 generated operation
+facade 保留在 `appaloft.operations`。
 
 Run 事件会限制数量、深度和字符串大小，并递归 redact credential、secret、password、token 与
 authorization 字段。它们不是 audit event，也不能代替完整模型 transcript。

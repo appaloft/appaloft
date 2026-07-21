@@ -29,7 +29,7 @@
     "tsyringe": "^4.10.0"
   },
   "scripts": {
-    "build": "bun run generate:operations && rm -rf dist && bun build src/index.ts src/internal.ts src/generated-operations.ts --target node --format esm --packages external --outdir dist && tsc -p tsconfig.build.json",
+    "build": "bun run generate:operations && rm -rf dist && tsc -p tsconfig.build.json",
     "generate:operations": "bun run ../../scripts/release/generate-typescript-sdk-operations.ts",
     "lint": "biome check package.json tsconfig.json tsconfig.build.json src/index.ts test",
     "test": "bun test",

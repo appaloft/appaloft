@@ -36,6 +36,13 @@ const sandbox = await appaloft.sandboxes.create({
   networkPolicy: { mode: "deny", rules: [] },
   expiresAt: new Date(Date.now() + 60 * 60 * 1_000).toISOString(),
 });
+
+try {
+  await sandbox.files.write({ path: "job/input.txt", contentBase64: "aGVsbG8=" });
+  await sandbox.exec({ argv: ["python3", "/workspace/job.py"], timeoutMs: 10_000 });
+} finally {
+  await sandbox.terminate();
+}
 ```
 
 生产凭据不应写入 Sandbox 环境变量、文件、Run event 或错误。需要调用外部目标时，应使用

@@ -48,6 +48,8 @@ same OpenAPI artifact plus Appaloft operation metadata extensions.
 | SDK generator | Build-time tool that reads the OpenAPI SDK contract and Appaloft extensions to generate language SDK operation methods, types, and parity checks. | Public interface |
 | Interface parity | CLI, HTTP/oRPC, Web, SDK, and generated MCP/tool surfaces use the same operation keys, schemas, error contracts, and public docs/help anchors. | Public interface |
 | SDK test boundary | Internal test style that uses the published SDK against a running Appaloft server only when the server/API boundary is the behavior under test. | Testing |
+| Resource handle | SDK object that carries a returned resource identity and exposes only child operations that can be derived from generated operation contracts. | Public interface |
+| Agent | SDK convenience alias for one Sandbox Agent Runtime subordinate to a Sandbox. It does not introduce a second domain aggregate. | Public interface compatibility alias |
 
 ## Scenarios And Acceptance Criteria
 
@@ -60,6 +62,9 @@ same OpenAPI artifact plus Appaloft operation metadata extensions.
 | TS-SDK-SPEC-005 | Internal tests use the right boundary | A test suite needs to prove HTTP/auth/serialization behavior | The test is written | It may use the published SDK against a running Appaloft server. Domain/application behavior tests still use direct domain objects, handlers, use cases, buses, or testkit fixtures instead of forcing everything through the SDK. |
 | TS-SDK-SPEC-006 | Public package release is intentional | Release packaging prepares npm artifacts | Release preflight runs | `@appaloft/sdk` has exports, type declarations, package metadata, compatibility notes, docs/help anchors, and release notes aligned with the roadmap and operation catalog. |
 | TS-SDK-SPEC-007 | Non-TS SDKs reuse the same generator contract | A future Python, Go, or other language SDK is added | The SDK package is generated | It uses the same OpenAPI SDK contract and Appaloft extensions as the TypeScript SDK, with only language-specific runtime code for auth, transport, errors, cancellation, and streaming. |
+| TS-SDK-SPEC-008 | Sandbox ownership is visible in the SDK | A Sandbox create operation returns a ready descriptor | The caller creates an Agent and submits a Run | The caller can use `sandbox.agents.create({ harness: "pi" })` and `agent.runs.create({ task })`; the SDK injects parent ids, admitted Pi template default, fresh context and idempotency keys into the existing generated operations. |
+| TS-SDK-SPEC-009 | Generated operation facade remains available | A caller needs non-throwing structured operation results or an operation not covered by a resource handle | The caller uses `appaloft.operations` | The complete generated operation facade remains available with the existing `AppaloftSdkOperationResult` behavior and no SDK-only route or business method. |
+| TS-SDK-SPEC-010 | Published ESM entry is executable | Release packaging builds `@appaloft/sdk` | Node or Bun imports the package root | `createAppaloftClient` is defined and callable from the published `dist/index.js`; release tests execute the built package rather than only checking that files exist. |
 
 ## Boundaries
 
@@ -80,9 +85,9 @@ same OpenAPI artifact plus Appaloft operation metadata extensions.
 ## Public Surfaces
 
 - Package: future `@appaloft/sdk` npm package.
-- Typed facade: `createAppaloftClient({ baseUrl, auth })` returns a generated facade tree such as
-  `projects.create`, `projects.list`, `projects.show`, `resources.create`, and
-  `dependencyResources.provisioning.plan`.
+- Typed facade: `createAppaloftClient({ baseUrl, auth })` returns resource handles for ownership-led
+  flows such as `Sandbox -> Agent -> Run`, plus the complete generated operation-result facade at
+  `appaloft.operations`.
 - API contract: generated OpenAPI SDK contract enriched with Appaloft operation metadata.
 - API transport: authenticated HTTP/oRPC routes after Phase 8 auth/org baseline.
 - Generator: future SDK generation tooling that consumes OpenAPI plus `x-appaloft-*` extensions for
@@ -142,6 +147,22 @@ interpolated into the path. Remaining fields default to query parameters for `GE
 streaming operations, and to JSON body for other methods. Callers can always pass explicit
 `pathParams`, `query`, or `body` to override that split.
 
+Resource handles do not replace this generated facade. They call it and carry only identities that
+were returned by the server. The first ownership-led chain is:
+
+```ts
+const sandbox = await appaloft.sandboxes.create(input);
+const agent = await sandbox.agents.create({ harness: "pi" });
+const run = await agent.runs.create({ task });
+```
+
+The SDK maps the public `Agent` alias to the canonical Sandbox Agent Runtime operation, defaults Pi
+to the admitted `aht_pi_managed_v1` harness template used by the CLI, defaults Run context to
+`fresh`, and generates idempotency keys when callers omit them. Callers can override the template,
+context and idempotency keys explicitly. Failed resource operations throw a structured
+`AppaloftSdkRequestError`; callers that prefer non-throwing operation results use
+`appaloft.operations`.
+
 ## Current Implementation Notes And Migration Gaps
 
 - `packages/orpc` already owns typed business transport routes and has a typed client helper for
@@ -180,6 +201,11 @@ streaming operations, and to JSON body for other methods. Callers can always pas
   project create/list/show calls through the SDK with product-session authorization. The command
   and query buses remain stubbed so the test proves the server/API/serialization/auth boundary,
   not persistence or project-domain policy.
+- Sandbox resource handles now expose `sandboxes.create -> sandbox.agents.create ->
+  agent.runs.create` plus Sandbox-scoped file, exec and terminate methods. They call the generated
+  operation client, while `appaloft.operations` retains the complete non-throwing facade.
+- The SDK npm build now uses TypeScript ESM emission with explicit `.js` relative imports. Release
+  tests import the built package in Node and Bun, closing the malformed package-root re-export gap.
 - `scripts/test/sdk-release-packaging.test.ts` and `release:npm:prepare -- --sdk-only` cover
   `TS-SDK-RELEASE-001`: `@appaloft/sdk` builds to `dist/index.js` plus `dist/index.d.ts`, carries
   generated operation descriptor JavaScript and declarations, carries public npm metadata,

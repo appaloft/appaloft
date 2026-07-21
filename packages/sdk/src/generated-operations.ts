@@ -1,4 +1,4 @@
-import { type AppaloftSdkFacadeMethod, type SdkOperationDescriptor } from "./internal";
+import { type AppaloftSdkFacadeMethod, type SdkOperationDescriptor } from "./internal.js";
 
 export const generatedSdkOperations = [
   {

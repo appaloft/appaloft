@@ -31,20 +31,15 @@ Agent operations currently require a product session. Do not substitute a deploy
 backend example until a scoped long-lived application credential is explicitly available.
 
 ```ts
-const runtime = await appaloft.sandboxes.agents.runtimes.create({
-  sandboxId,
-  harnessKey: "pi",
-  harnessTemplateId: "aht_pi_managed_v1",
-  idempotencyKey: crypto.randomUUID(),
-});
-const run = await appaloft.sandboxes.agents.runs.create({
-  sandboxId,
-  runtimeId: runtime.data.runtimeId,
-  task: "Build the requested app in /workspace/app",
-  context: { mode: "fresh" },
-  idempotencyKey: crypto.randomUUID(),
-});
+const sandbox = await appaloft.sandboxes.create(sandboxInput);
+const agent = await sandbox.agents.create({ harness: "pi" });
+const run = await agent.runs.create({ task: "Build the requested app in /workspace/app" });
 ```
+
+The SDK maps `Agent` to the canonical Sandbox Agent Runtime, uses the admitted Pi template default,
+and generates idempotency keys. Pass `harnessTemplateId`, `context`, or `idempotencyKey` when the
+caller needs an explicit pin or continuation. Resource methods throw `AppaloftSdkRequestError`;
+the non-throwing generated operations remain at `appaloft.operations`.
 
 Run events have count, depth, and string bounds and recursively redact credential, secret,
 password, token, and authorization fields. They are not audit events or a full model transcript.

@@ -131,6 +131,8 @@ async function prepareSdkPackage(): Promise<void> {
     "dist/index.d.ts",
     "dist/internal.js",
     "dist/internal.d.ts",
+    "dist/resource-client.js",
+    "dist/resource-client.d.ts",
     "dist/generated-operations.js",
     "dist/generated-operations.d.ts",
   ]) {
