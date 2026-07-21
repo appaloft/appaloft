@@ -26,6 +26,7 @@ import {
 
 const cliUserAgent = "appaloft-cli";
 const webhookSignatureOnlyOperationKeys = new Set(["source-events.ingest"]);
+const transientGatewayStatuses = new Set([502, 503, 504]);
 
 export type CliRemoteProjectOperationKey = "projects.list" | "projects.show";
 
@@ -409,7 +410,7 @@ function unexpectedJsonResponseError(input: {
     code: input.code,
     category: "infra",
     message: input.message,
-    retryable: false,
+    retryable: transientGatewayStatuses.has(input.response.status),
     details: {
       method: input.request.method,
       url: input.request.url,
@@ -784,18 +785,23 @@ export async function requestControlPlaneOperation(input: {
   readonly fetch?: AppaloftSdkFetch;
   readonly phase: string;
 }): Promise<Result<unknown>> {
+  const fetchImplementation = queryGatewayRetryFetch(
+    input.operationKey,
+    input.fetch ?? defaultControlPlaneFetch,
+  );
   const boundedRoute = boundedJsonRouteForOperation(input.operationKey);
   if (boundedRoute) {
     return requestControlPlaneCatalogRoute({
       ...input,
       route: boundedRoute,
+      fetch: fetchImplementation,
     });
   }
 
   const client = createAppaloftClient({
     baseUrl: `${input.profile.baseUrl}/api`,
     auth: authForProfile(input.profile.auth),
-    ...(input.fetch ? { fetch: input.fetch } : {}),
+    fetch: fetchImplementation,
     userAgent: cliUserAgent,
   });
 
@@ -827,6 +833,47 @@ export async function requestControlPlaneOperation(input: {
     return ok(result.data);
   } catch (error) {
     return err(errorFromUnknown(error, input.phase));
+  }
+}
+
+function queryGatewayRetryFetch(
+  operationKey: string,
+  fetchImplementation: AppaloftSdkFetch,
+): AppaloftSdkFetch {
+  const operation = findOperationCatalogEntryByKey(operationKey);
+  if (operation?.kind !== "query") {
+    return fetchImplementation;
+  }
+
+  return async (request) => {
+    const retryRequest = request.clone();
+    const response = await fetchImplementation(request);
+    if (await isTransientHtmlGatewayResponse(response)) {
+      return fetchImplementation(retryRequest);
+    }
+    return response;
+  };
+}
+
+async function isTransientHtmlGatewayResponse(response: Response): Promise<boolean> {
+  if (!transientGatewayStatuses.has(response.status)) {
+    return false;
+  }
+
+  if ((response.headers.get("content-type") ?? "").toLowerCase().includes("text/html")) {
+    return true;
+  }
+
+  try {
+    const prefix = (await response.clone().text()).slice(0, 512).trimStart().toLowerCase();
+    return (
+      prefix.startsWith("<!doctype html") ||
+      prefix.startsWith("<html") ||
+      prefix.startsWith("<head") ||
+      prefix.startsWith("<body")
+    );
+  } catch {
+    return false;
   }
 }
 

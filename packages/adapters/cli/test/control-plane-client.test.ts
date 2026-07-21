@@ -12,6 +12,7 @@ import {
   findControlPlaneOperation,
   loginControlPlane,
   MemoryCliControlPlaneProfileStore,
+  requestControlPlaneOperation,
   resolveCliExecutionTarget,
   runStandaloneControlPlaneCli,
   useControlPlaneProfile,
@@ -1878,6 +1879,92 @@ describe("CLI remote control-plane client", () => {
       projectId: "prj_remote",
       name: "Renamed",
     });
+  });
+
+  test("[CONTROL-PLANE-CLI-021] retries a transient HTML gateway response once for a catalog query", async () => {
+    const requests: Request[] = [];
+    let attempt = 0;
+    const result = await requestControlPlaneOperation({
+      profile: profile("local"),
+      operationKey: "projects.list",
+      fetch: async (request) => {
+        requests.push(request);
+        attempt += 1;
+        if (attempt === 1) {
+          return new Response("<html><body>temporary gateway failure</body></html>", {
+            status: 502,
+            headers: { "content-type": "text/html; charset=utf-8" },
+          });
+        }
+        return jsonResponse({ items: [{ id: "prj_remote", name: "Remote" }] });
+      },
+      phase: "remote-operation-dispatch",
+    });
+
+    expect(result._unsafeUnwrap()).toEqual({
+      items: [{ id: "prj_remote", name: "Remote" }],
+    });
+    expect(requests).toHaveLength(2);
+    expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual(
+      ["GET /api/projects", "GET /api/projects"],
+    );
+  });
+
+  test("[CONTROL-PLANE-CLI-021] does not automatically replay commands after a transient HTML gateway response", async () => {
+    const requests: Request[] = [];
+    const result = await requestControlPlaneOperation({
+      profile: profile("local"),
+      operationKey: "projects.rename",
+      pathParams: { projectId: "prj_remote" },
+      body: { projectId: "prj_remote", name: "Renamed" },
+      fetch: async (request) => {
+        requests.push(request);
+        return new Response("<html><body>temporary gateway failure</body></html>", {
+          status: 502,
+          headers: { "content-type": "text/html; charset=utf-8" },
+        });
+      },
+      phase: "remote-operation-dispatch",
+    });
+
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "control_plane_unexpected_html_response",
+      retryable: true,
+      details: {
+        phase: "remote-operation-dispatch",
+        status: 502,
+      },
+    });
+    expect(requests).toHaveLength(1);
+  });
+
+  test("[CONTROL-PLANE-CLI-021] returns a sanitized retryable error after the bounded query retry is exhausted", async () => {
+    const requests: Request[] = [];
+    const result = await requestControlPlaneOperation({
+      profile: profile("local"),
+      operationKey: "projects.list",
+      fetch: async (request) => {
+        requests.push(request);
+        return new Response("<html><body>secret gateway payload</body></html>", {
+          status: 504,
+          headers: { "content-type": "text/html" },
+        });
+      },
+      phase: "remote-operation-dispatch",
+    });
+
+    const error = result._unsafeUnwrapErr();
+    expect(error).toMatchObject({
+      code: "control_plane_unexpected_html_response",
+      retryable: true,
+      details: {
+        phase: "remote-operation-dispatch",
+        status: 504,
+        bodyKind: "html",
+      },
+    });
+    expect(JSON.stringify(error)).not.toContain("secret gateway payload");
+    expect(requests).toHaveLength(2);
   });
 
   test("[CONTROL-PLANE-CLI-006][CONTROL-PLANE-CLI-010] generated SDK dispatch covers non-project operations", async () => {

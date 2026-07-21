@@ -674,7 +674,7 @@ function unexpectedResponseError(
     code,
     category: "infra",
     message,
-    retryable: false,
+    retryable: response.status === 502 || response.status === 503 || response.status === 504,
     details: {
       method: context.method,
       url: context.url,
