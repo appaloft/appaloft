@@ -14,9 +14,11 @@
 - Add a provider-neutral runtime evidence port. Runtime adapters translate Docker/Compose/Swarm/SSH
   readback to safe artifact/workload/configuration facts or explicit unavailable reasons.
 - Managed edge-proxy providers stamp served responses with the deployment identity. Runtime proof
-  readback probes the planned public route and compares that response identity with the Deployment;
-  it does not derive route ownership from the container label. The route probe uses direct TCP/TLS
-  so an ambient control-plane HTTP proxy cannot intercept a local or private deployment check.
+  readback runs one canonical health-path probe per planned origin plus one identity probe for every
+  current ready managed route absent from the immutable plan, then compares every response identity
+  with the Deployment. It does not derive route ownership from the container label. The route probe
+  uses direct TCP/TLS so an ambient control-plane HTTP proxy cannot intercept a local or private
+  deployment check.
 - Derive planned fingerprints/effects from the immutable Deployment snapshot. Compare on read in the
   application service; adapters never decide the verdict.
 - Reuse deployment timeline, `resources.health`, access/route readback, and

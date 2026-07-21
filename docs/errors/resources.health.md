@@ -129,6 +129,7 @@ Typical source errors:
 | `proxy` | `resource_proxy_route_unavailable` | `proxy-route-observation` | Required proxy route is missing, unapplied, or not ready. |
 | `public-access` | `resource_public_access_unavailable` | `public-access-observation` | No current durable or generated public route is available. |
 | `public-access` | `resource_public_access_probe_failed` | `public-access-observation` | Current public route timed out or returned an unexpected result. |
+| `public-access` | `resource_public_access_stale_deployment` | `proxy-route-observation` | The ready route realization still identifies an older deployment than the latest successful Resource deployment. |
 | `public-access` | `resource_access_route_not_found` | `edge-request-routing` | Edge request reached Appaloft but no active route matched the host/path. |
 | `public-access` | `resource_access_upstream_unavailable` | `upstream-connection` | Edge request matched a route but no current upstream target was available. |
 | `public-access` | `resource_access_upstream_connect_failed` | `upstream-connection` | Edge request could not connect to the resource endpoint. |
@@ -186,6 +187,7 @@ Implemented source errors include:
 - `resource_domain_binding_not_ready`;
 - `resource_public_access_unavailable`;
 - `resource_public_access_probe_failed`;
+- `resource_public_access_stale_deployment`;
 - `resource_proxy_route_unavailable`;
 - `resource_runtime_live_probe_unavailable`.
 

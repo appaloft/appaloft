@@ -201,6 +201,9 @@ Required top-level behavior:
   ready, `publicAccess` stays bound to that durable domain as `status = "not-ready"` instead of
   silently falling back to a generated or server-applied route. Recent safe edge access failure
   diagnostics may explain why the selected current route failed at the gateway.
+  A route projection realized by an older deployment than `latestDeployment` is failed with
+  `resource_public_access_stale_deployment`; a generic HTTP 200 probe cannot override that
+  deployment-generation mismatch.
 - `proxy` reports route readiness and provider key when the resource uses reverse-proxy exposure.
 - `sourceErrors` records per-source observation failures without failing the whole query when the
   resource can still be identified.
@@ -280,6 +283,10 @@ Public access checks target the resource's current route:
 The query must not treat deployment-scoped route snapshots as domain ownership. A deployment
 snapshot records which route was used by that attempt; the current route belongs to resource access
 summary and domain binding state.
+
+When `lastRouteRealizationDeploymentId` differs from the latest successful Deployment, the route is
+stale even if the proxy projection says ready or a generic public HTTP probe returns success. Only
+deployment-aware route identity evidence can prove that the latest workload is serving traffic.
 
 Recent edge access failure diagnostics may be used as public-access/proxy evidence when a safe
 provider-neutral envelope is available. The query maps those `resource_access_*` codes into

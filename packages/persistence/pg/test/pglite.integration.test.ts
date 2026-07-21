@@ -2873,9 +2873,11 @@ describe("pglite persistence integration", () => {
       const healthResult = await healthQueryService.execute(context, healthQuery);
       expect(healthResult.isOk()).toBe(true);
       expect(healthResult._unsafeUnwrap().publicAccess).toMatchObject({
-        status: "ready",
+        status: "failed",
         url: "http://durable.example.test",
         kind: "durable-domain",
+        reasonCode: "resource_public_access_stale_deployment",
+        phase: "proxy-route-observation",
       });
 
       const diagnosticQuery = ResourceDiagnosticSummaryQuery.create({

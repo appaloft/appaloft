@@ -33,6 +33,12 @@ This is the minimum proof comparison, not a general Change Effect planner.
   the attempted rollout failed.
 - A managed route that returns HTTP success with a missing or different deployment identity is a
   route/workload mismatch, not successful access evidence.
+- Proof runs the health-path probe once per planned origin, then separately probes the identity of
+  every current ready managed route absent from the immutable plan, because a binding can become
+  ready after the plan was accepted. A non-success response below 500 may still carry valid route
+  identity for a path prefix without a dedicated health endpoint; gateway and upstream 5xx remain
+  failed access evidence. Identity-only probes do not follow redirects, so another route's final
+  response cannot substitute for the requested prefix's own provider-stamped identity.
 - When one origin has multiple non-redirect path routes, proof selects the most general route once
   (preferring `/`) before joining the health path; it does not invent one health endpoint per service
   prefix.

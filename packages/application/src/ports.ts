@@ -5992,10 +5992,20 @@ export interface DeploymentProofRuntimeEvidence {
   recovery: DeploymentProofRecoveryEvidence;
   reasonCode?: string;
 }
+export interface DeploymentProofManagedRoute {
+  domainName: string;
+  pathPrefix: string;
+  proxyKind: EdgeProxyKind;
+  tlsMode: TlsMode;
+}
+export interface DeploymentProofRuntimeEvidenceInput {
+  currentManagedRoutes: readonly DeploymentProofManagedRoute[];
+}
 export interface DeploymentProofRuntimeEvidenceReader {
   read(
     context: ExecutionContext,
     deployment: DeploymentSummary,
+    input: DeploymentProofRuntimeEvidenceInput,
   ): Promise<Result<DeploymentProofRuntimeEvidence>>;
 }
 export type DeploymentProofExpectedEffect =
