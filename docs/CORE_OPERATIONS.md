@@ -974,6 +974,43 @@ Current boundary:
 - Web Resource detail source-event diagnostics consume `source-events.list`; CLI and HTTP/oRPC
   read surfaces are active for operator diagnostics and API consumers.
 
+## Sandbox Agent Runtime And Application Promotion
+
+These operations implement ADR-092's harness-neutral path from a Sandbox to a proof-verified new
+Resource. Runtime/Run operations are scoped under Sandbox ownership even though every descriptor is
+addressable. Pi is an adapter and therefore does not appear in operation names.
+
+| Operation | Type | Message | Input | CLI | HTTP/oRPC |
+| --- | --- | --- | --- | --- | --- |
+| `sandboxes.agents.runtimes.create` | Command | `CreateSandboxAgentRuntimeCommand` | Sandbox id, harness/template keys, idempotency key | `appaloft sandbox agent runtime create <sandboxId>` | `POST /api/sandboxes/{sandboxId}/agent-runtimes` |
+| `sandboxes.agents.runtimes.list` | Query | `ListSandboxAgentRuntimesQuery` | Sandbox id | `appaloft sandbox agent runtime list <sandboxId>` | `GET /api/sandboxes/{sandboxId}/agent-runtimes` |
+| `sandboxes.agents.runtimes.show` | Query | `ShowSandboxAgentRuntimeQuery` | Sandbox id, runtime id | `appaloft sandbox agent runtime show <sandboxId> <runtimeId>` | `GET /api/sandboxes/{sandboxId}/agent-runtimes/{runtimeId}` |
+| `sandboxes.agents.runtimes.terminate` | Command | `TerminateSandboxAgentRuntimeCommand` | Sandbox id, runtime id | `appaloft sandbox agent runtime terminate <sandboxId> <runtimeId>` | `POST /api/sandboxes/{sandboxId}/agent-runtimes/{runtimeId}/terminate` |
+| `sandboxes.agents.runs.create` | Command | `CreateSandboxAgentRunCommand` | Sandbox/runtime ids, encrypted task input, context mode/parent, idempotency key | `appaloft sandbox agent run create <sandboxId> <runtimeId>` | `POST /api/sandboxes/{sandboxId}/agent-runtimes/{runtimeId}/runs` |
+| `sandboxes.agents.runs.list` | Query | `ListSandboxAgentRunsQuery` | Runtime id | `appaloft sandbox agent run list <runtimeId>` | `GET /api/sandbox-agent-runtimes/{runtimeId}/runs` |
+| `sandboxes.agents.runs.show` | Query | `ShowSandboxAgentRunQuery` | Runtime id, run id | `appaloft sandbox agent run show <runtimeId> <runId>` | `GET /api/sandbox-agent-runtimes/{runtimeId}/runs/{runId}` |
+| `sandboxes.agents.runs.cancel` | Command | `CancelSandboxAgentRunCommand` | Runtime id, run id | `appaloft sandbox agent run cancel <runtimeId> <runId>` | `POST /api/sandbox-agent-runtimes/{runtimeId}/runs/{runId}/cancel` |
+| `sandboxes.agents.runs.events` | Query | `ListSandboxAgentRunEventsQuery` | Run id, cursor, bounded limit | `appaloft sandbox agent run events <runId>` | `GET /api/sandbox-agent-runs/{runId}/events` |
+| `sandboxes.agents.approvals.list` | Query | `ListSandboxAgentApprovalsQuery` | Run id | `appaloft sandbox agent approval list <runId>` | `GET /api/sandbox-agent-runs/{runId}/approvals` |
+| `sandboxes.agents.approvals.show` | Query | `ShowSandboxAgentApprovalQuery` | Approval id | `appaloft sandbox agent approval show <approvalId>` | `GET /api/sandbox-agent-approvals/{approvalId}` |
+| `sandboxes.agents.approvals.resolve` | Command | `ResolveSandboxAgentApprovalCommand` | Approval id, approve/reject decision | `appaloft sandbox agent approval resolve <approvalId>` | `POST /api/sandbox-agent-approvals/{approvalId}/resolve` |
+| `sandboxes.source-artifacts.create` | Command | `CreateSandboxSourceArtifactCommand` | Sandbox id, source root | `appaloft sandbox artifact create <sandboxId>` | `POST /api/sandboxes/{sandboxId}/source-artifacts` |
+| `sandboxes.source-artifacts.list` | Query | `ListSandboxSourceArtifactsQuery` | Sandbox id | `appaloft sandbox artifact list <sandboxId>` | `GET /api/sandboxes/{sandboxId}/source-artifacts` |
+| `sandboxes.source-artifacts.show` | Query | `ShowSandboxSourceArtifactQuery` | Artifact id | `appaloft sandbox artifact show <artifactId>` | `GET /api/sandbox-source-artifacts/{artifactId}` |
+| `sandboxes.source-artifacts.delete` | Command | `DeleteSandboxSourceArtifactCommand` | Artifact id | `appaloft sandbox artifact delete <artifactId>` | `DELETE /api/sandbox-source-artifacts/{artifactId}` |
+| `sandboxes.candidate-previews.create` | Command | `CreateSandboxCandidatePreviewCommand` | Artifact id | `appaloft sandbox preview create <artifactId>` | `POST /api/sandbox-source-artifacts/{artifactId}/candidate-previews` |
+| `sandboxes.candidate-previews.show` | Query | `ShowSandboxCandidatePreviewQuery` | Preview id | `appaloft sandbox preview show <previewId>` | `GET /api/sandbox-candidate-previews/{previewId}` |
+| `sandboxes.candidate-previews.delete` | Command | `DeleteSandboxCandidatePreviewCommand` | Preview id | `appaloft sandbox preview delete <previewId>` | `DELETE /api/sandbox-candidate-previews/{previewId}` |
+| `sandboxes.promotions.plan` | Command | `PlanSandboxPromotionCommand` | Sandbox/artifact/preview ids, expected digest, explicit new Resource target | `appaloft sandbox promote plan <sandboxId> <artifactId>` | `POST /api/sandboxes/{sandboxId}/promotions/plan` |
+| `sandboxes.promotions.list` | Query | `ListSandboxPromotionsQuery` | Sandbox id | `appaloft sandbox promote list <sandboxId>` | `GET /api/sandboxes/{sandboxId}/promotions` |
+| `sandboxes.promotions.show` | Query | `ShowSandboxPromotionQuery` | Promotion id | `appaloft sandbox promote show <promotionId>` | `GET /api/sandbox-promotions/{promotionId}` |
+| `sandboxes.promotions.accept` | Command | `AcceptSandboxPromotionCommand` | Promotion id, expected digest, idempotency key | `appaloft sandbox promote accept <promotionId>` | `POST /api/sandbox-promotions/{promotionId}/accept` |
+| `sandboxes.promotions.retry` | Command | `RetrySandboxPromotionCommand` | Promotion id, idempotency key | `appaloft sandbox promote retry <promotionId>` | `POST /api/sandbox-promotions/{promotionId}/retry` |
+
+`sandboxes.agents.approvals.resolve` and `sandboxes.promotions.accept/retry` require control-plane scopes
+that Sandbox Runtime identities cannot hold. All event/file/output fields follow the bounded and
+redacted contracts in the governing specs.
+
 ## Deployments
 
 Business meaning:

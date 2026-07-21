@@ -4,11 +4,11 @@
   </a>
 
   <p><code>/ˌæp əˈlɔːft/</code></p>
-  <h3>Deploy apps, Docker, and Compose to servers you own.</h3>
+  <h3>Build with agents. Ship with proof.</h3>
   <p>
-    <strong>An open source deployment control plane for developers, small teams, and AI coding agents.</strong><br />
-    Describe the workload once, deploy through CLI, GitHub Actions, Web, MCP, or an AI skill,
-    then verify it with health, logs, retry, and rollback evidence.
+    <strong>An open source AI application delivery platform.</strong><br />
+    From secure agent sandboxes to verified production: run work in isolation, freeze an exact
+    candidate, promote it explicitly, then deploy and verify through one operation catalog.
   </p>
   <p>
     <a href="https://github.com/appaloft/examples/tree/main/hello">5-minute example</a> ·
@@ -54,9 +54,10 @@ health checks, and the exact source/runtime contract.
 
 ## What Is Appaloft?
 
-Appaloft is an open source deployment control plane for shipping apps from local development to
-servers you own. It keeps the same operation catalog behind the CLI, HTTP API, Web console, MCP
-tools, and AI skill, so humans and agents work through the same product boundary.
+Appaloft is an open source AI application delivery platform. It connects coding-agent execution and
+isolated Sandboxes to immutable candidate artifacts, explicit Promotion, production Deployment, and
+delivery evidence. The existing deployment control plane remains the available production
+foundation behind CLI, HTTP API, Web console, MCP tools, and the AI skill.
 
 Use Appaloft when you want:
 
@@ -67,6 +68,66 @@ Use Appaloft when you want:
 - A repeatable deploy loop: detect, plan, execute, verify, observe, retry, redeploy, or rollback.
 - AI-friendly operations without giving agents direct database, Docker, SSH, or provider access.
 - Self-hosted control on your own Linux server or VM.
+
+## Capability Maturity
+
+| Delivery stage | Maturity | Current boundary |
+| --- | --- | --- |
+| Run Agents | Private preview | Harness-neutral Runtime and observable/cancellable Run APIs are implemented; the first adapter is pinned Pi and requires an operator-provisioned Sandbox template. |
+| Work in Sandboxes | Private preview | Resource, network, process, file, lifecycle, snapshot, and credential-broker boundaries are implemented; hosted worker availability is configuration-dependent. |
+| Preview & Promote | Private preview | Idle-workspace capture, immutable Source Artifact, exact-digest candidate preview, and plan/accept/retry Promotion are implemented; candidate preview currently targets statically publishable output. |
+| Deploy & Verify | Available | Existing folder, Git, zip, image, Docker, Compose, static artifact, Deployment, health, logs, retry, rollback, and proof readback remain supported. |
+
+“Delivery Evidence Chain” means Appaloft can preserve and read the observations linking an accepted
+candidate to a Deployment result. It does not claim formal correctness, security, or compliance.
+
+## Agent SDK Quickstart (Private Preview)
+
+The API hierarchy makes Runtime ownership explicit: agents belong to a Sandbox. After an operator
+provisions a Pi-enabled Sandbox template and sets `APPALOFT_PI_SANDBOX_TEMPLATE_ID`, an application
+developer can use the generated SDK without running Pi in the application process:
+
+```ts
+import { createAppaloftClient } from "@appaloft/sdk";
+
+const appaloft = createAppaloftClient({
+  baseUrl: "https://app.example.com/api",
+  auth: { kind: "deploy-token", token: process.env.APPALOFT_TOKEN! },
+});
+
+const sandbox = await appaloft.sandboxes.create({
+  source: { kind: "template", templateId: process.env.PI_SANDBOX_TEMPLATE_ID! },
+  requestedIsolation: "gvisor",
+  limits: {
+    cpuMillis: 2_000,
+    memoryBytes: 2_147_483_648,
+    diskBytes: 10_737_418_240,
+    maxProcesses: 128,
+  },
+  networkPolicy: { mode: "deny", rules: [] },
+});
+
+if (!sandbox.ok) throw sandbox.error;
+const runtime = await appaloft.sandboxes.agents.runtimes.create({
+  sandboxId: sandbox.data.sandboxId,
+  harnessKey: "pi",
+  harnessTemplateId: "aht_pi_managed_v1",
+  idempotencyKey: crypto.randomUUID(),
+});
+if (!runtime.ok) throw runtime.error;
+
+const run = await appaloft.sandboxes.agents.runs.create({
+  sandboxId: sandbox.data.sandboxId,
+  runtimeId: runtime.data.runtimeId,
+  task: "Build the requested application in /workspace/app",
+  context: { mode: "fresh" },
+  idempotencyKey: crypto.randomUUID(),
+});
+if (!run.ok) throw run.error;
+```
+
+The caller owns chat/session state. Appaloft owns the isolated execution, lifecycle, event readback,
+artifact boundary, Promotion checkpoints, and production delivery evidence.
 
 ## Quick Start
 

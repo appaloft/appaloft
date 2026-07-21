@@ -100,6 +100,7 @@ const remoteCapableTopLevelCommands = new Set([
   "retention-default",
   "runtime-monitoring",
   "runtime-usage",
+  "sandbox",
   "scheduled-task",
   "server",
   "source-event",

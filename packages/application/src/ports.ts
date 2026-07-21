@@ -162,7 +162,8 @@ export type ControlPlaneSecretPurpose =
   | "environment-variable"
   | "resource-variable"
   | "dependency-resource"
-  | "dependency-binding";
+  | "dependency-binding"
+  | "sandbox-agent-task";
 
 export interface ControlPlaneSecretContext {
   purpose: ControlPlaneSecretPurpose;
@@ -8414,6 +8415,10 @@ export interface StaticArtifactPublisherPort {
     context: ExecutionContext,
     input: PublishStaticArtifactInput,
   ): Promise<Result<StaticArtifactPublication>>;
+  delete?(
+    context: ExecutionContext,
+    input: { projectId: string; resourceId: string; storageRef?: string },
+  ): Promise<Result<void>>;
 }
 
 export interface StaticArtifactPublicationJournalPort {

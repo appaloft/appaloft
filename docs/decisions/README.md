@@ -111,6 +111,8 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-089: Control-Plane Secret Protection And Key Rotation](./ADR-089-control-plane-secret-protection-and-key-rotation.md) | Accepted | Defines versioned authenticated secret envelopes, fail-closed deployment materialization, atomic key rotation, and value-free runtime key proof. |
 | [ADR-090: Server Host Identity](./ADR-090-server-host-identity.md) | Accepted | Defines explicit canonical server hosts, CIDR/URL rejection, endpoint uniqueness, IPv6 display, and SSH failure categories. |
 | [ADR-091: Execution Sandbox Boundary](./ADR-091-execution-sandbox-boundary.md) | Accepted | Defines provider-neutral isolated execution, lifecycle, process/file/port capability, network and credential policy, templates, snapshots, reconciliation, and safe public handles without creating an Agent Runtime or exposing host access. |
+| [ADR-092: Sandbox Agent Runtime And Application Promotion Boundary](./ADR-092-sandbox-agent-runtime-and-application-promotion-boundary.md) | Accepted | Defines Runtime/Run ownership under Sandbox, immutable Source Artifact, exact Candidate Preview, explicit Promotion, and proof-gated completion. |
+| [ADR-093: AI Application Delivery Positioning And Claim Boundary](./ADR-093-ai-application-delivery-positioning-and-claim-boundary.md) | Accepted | Defines the AI application delivery category, public maturity labels, product path, and bounded Delivery Evidence Chain claim. |
 
 ## Authoring Rules
 

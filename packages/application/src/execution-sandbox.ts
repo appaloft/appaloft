@@ -478,6 +478,10 @@ export interface SandboxDescriptor {
   sandboxId: string;
   status: string;
   sourceKind: string;
+  source:
+    | { kind: "image"; image: string }
+    | { kind: "snapshot"; snapshotId: string }
+    | { kind: "template"; templateId: string };
   requestedIsolation: SandboxIsolation;
   realizedIsolation?: SandboxIsolation;
   limits: SandboxResourceLimitsState;
@@ -517,10 +521,17 @@ export interface SandboxTemplateDescriptor {
 
 function descriptor(stored: StoredSandbox): SandboxDescriptor {
   const state = stored.sandbox.toState();
+  const source =
+    state.source.kind === "image"
+      ? { kind: "image" as const, image: state.source.image }
+      : state.source.kind === "snapshot"
+        ? { kind: "snapshot" as const, snapshotId: state.source.snapshotId.value }
+        : { kind: "template" as const, templateId: state.source.templateId.value };
   return {
     sandboxId: state.id.value,
     status: state.status.value,
     sourceKind: state.source.kind,
+    source,
     requestedIsolation: state.requestedIsolation.value,
     limits: state.limits.toState(),
     networkPolicy: state.networkPolicy.toState(),
