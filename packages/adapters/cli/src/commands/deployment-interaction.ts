@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import {
   AcceptDependencyResourceProvisioningPlanCommand,
   AttachResourceStorageCommand,
@@ -130,6 +132,7 @@ import {
 import { type DeploymentStateBackendDecision } from "./deployment-state.js";
 
 export interface DeploymentPromptSeed {
+  reconciliationAttemptId?: string;
   projectId?: string;
   serverId?: string;
   destinationId?: string;
@@ -4894,6 +4897,7 @@ function persistSourceLinkIfNeeded(input: {
 
 function persistServerAppliedRouteDesiredStateIfNeeded(input: {
   seed: DeploymentPromptSeed;
+  reconciliationAttemptId: string;
   projectId: string;
   serverId: string;
   destinationId?: string;
@@ -4985,6 +4989,7 @@ function persistServerAppliedRouteDesiredStateIfNeeded(input: {
             ...(route.redirectStatus ? { redirectStatus: route.redirectStatus } : {}),
             idempotencyKey: [
               "repository-config-domain",
+              input.reconciliationAttemptId,
               input.projectId,
               input.environmentId,
               input.resourceId,
@@ -5097,6 +5102,7 @@ export function resolveInteractiveDeploymentInput(
 ): Effect.Effect<CreateDeploymentCommandInput, unknown, CliRuntime> {
   return cliRuntimeEffect(
     Effect.gen(function* () {
+      const reconciliationAttemptId = seed.reconciliationAttemptId ?? randomUUID();
       if (!seed.sourceLocator && (!process.stdin.isTTY || !process.stdout.isTTY)) {
         yield* Effect.sync(() => {
           process.exitCode = 1;
@@ -5263,6 +5269,7 @@ export function resolveInteractiveDeploymentInput(
         });
         yield* persistServerAppliedRouteDesiredStateIfNeeded({
           seed: resolvedSeed,
+          reconciliationAttemptId,
           projectId: deploymentInput.projectId,
           serverId: deploymentInput.serverId,
           ...(deploymentInput.destinationId
