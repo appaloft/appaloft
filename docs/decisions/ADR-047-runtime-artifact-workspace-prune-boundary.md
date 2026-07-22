@@ -49,7 +49,7 @@ The first accepted prune categories are:
 
 | Category | Meaning |
 | --- | --- |
-| `stopped-containers` | Appaloft-managed stopped containers whose labels prove target ownership and no active runtime dependency. |
+| `stopped-containers` | Appaloft-managed stopped containers whose labels prove target ownership and whose deployment id is absent from the application-supplied active-runtime and rollback-candidate protection sets. Missing labels or incomplete protection evidence fail closed. |
 | `preview-workspaces` | Preview-owned materialized source workspaces under the runtime source workspace root when ownership and cutoff can be proven. |
 | `source-workspaces` | Deployment-scoped materialized source workspaces under the runtime source workspace root when no active runtime, diagnostic capture, or rollback candidate depends on them. |
 | `remote-state-markers` | Explicit opt-in cleanup of old SSH remote-state journals, backup archives, recovery markers, and recovered-lock archives under fixed state-root subdirectories; the state root and live PGlite state remain excluded. |

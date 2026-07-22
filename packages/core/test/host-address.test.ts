@@ -25,6 +25,10 @@ describe("HostAddress", () => {
     expect(HostAddress.create("999.0.0.1").isErr()).toBe(true);
   });
 
+  test("[SERVER-BOOT-HOST-008] accepts an internal single-label DNS server identity", () => {
+    expect(HostAddress.create("Dokploy-Server.")._unsafeUnwrap().value).toBe("dokploy-server");
+  });
+
   test("[SERVER-BOOT-HOST-003] rejects a network prefix instead of inventing a host address", () => {
     for (const host of ["2001:db8::/64", "192.0.2.0/24"]) {
       const result = HostAddress.create(host);

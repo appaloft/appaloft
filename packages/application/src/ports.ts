@@ -2455,6 +2455,10 @@ export interface RuntimeTargetCapacityPruner {
       target?: string;
       dryRun: boolean;
       includeOrphanRunning?: boolean;
+      runtimeProtection: {
+        activeDeploymentIds: readonly string[];
+        rollbackCandidateDeploymentIds: readonly string[];
+      };
     },
   ): Promise<Result<RuntimeTargetCapacityPruneResult>>;
 }
@@ -9619,6 +9623,7 @@ export interface DeploymentReadModel {
     input?: {
       projectId?: string;
       resourceId?: string;
+      serverId?: string;
       includeArchived?: boolean;
       activeResourcesOnly?: boolean;
       status?: DeploymentStatus;
@@ -9630,6 +9635,7 @@ export interface DeploymentReadModel {
     input?: {
       projectId?: string;
       resourceId?: string;
+      serverId?: string;
       includeArchived?: boolean;
       activeResourcesOnly?: boolean;
       limit?: number;

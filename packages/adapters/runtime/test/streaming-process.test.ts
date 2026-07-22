@@ -49,6 +49,22 @@ describe("streaming process", () => {
     expect(result.stderr).toContain("streaming command timed out");
     expect(lines).toEqual(["first"]);
   });
+
+  test("[CONFIG-FILE-GITHUB-SOURCE-002] forwards ephemeral input without adding it to argv", async () => {
+    const secretInput = "Authorization: Basic ephemeral-value\n";
+    const result = await runStreamingProcess({
+      command: "sh",
+      args: ["-c", "read -r value; printf '%s\\n' \"$value\""],
+      stdin: secretInput,
+      cwd: tmpdir(),
+      env: process.env,
+      redactions: ["ephemeral-value"],
+      onOutput: () => {},
+    });
+
+    expect(result.failed).toBe(false);
+    expect(result.stdout).toBe("Authorization: Basic [redacted]\n");
+  });
 });
 
 async function waitFor(predicate: () => boolean): Promise<void> {

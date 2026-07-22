@@ -357,6 +357,7 @@ export class PgDeploymentReadModel implements DeploymentReadModel {
     input?: {
       projectId?: string;
       resourceId?: string;
+      serverId?: string;
       includeArchived?: boolean;
       activeResourcesOnly?: boolean;
       status?: Awaited<ReturnType<DeploymentReadModel["list"]>>[number]["status"];
@@ -395,6 +396,10 @@ export class PgDeploymentReadModel implements DeploymentReadModel {
           query = query.where("resource_id", "=", input.resourceId);
         }
 
+        if (input?.serverId) {
+          query = query.where("server_id", "=", input.serverId);
+        }
+
         if (!input?.includeArchived) {
           query = query.where("archived_at", "is", null);
         }
@@ -426,6 +431,7 @@ export class PgDeploymentReadModel implements DeploymentReadModel {
     input?: {
       projectId?: string;
       resourceId?: string;
+      serverId?: string;
       includeArchived?: boolean;
       activeResourcesOnly?: boolean;
       limit?: number;
@@ -441,7 +447,11 @@ export class PgDeploymentReadModel implements DeploymentReadModel {
       },
       async () => {
         const organizationId = resolveRepositoryContextOrganizationId(context);
-        let query = executor.selectFrom("deployments").selectAll().orderBy("created_at", "desc");
+        let query = executor
+          .selectFrom("deployments")
+          .selectAll()
+          .orderBy("created_at", "desc")
+          .orderBy("id", "desc");
         if (organizationId) {
           query = query.where(
             "project_id",
@@ -459,6 +469,10 @@ export class PgDeploymentReadModel implements DeploymentReadModel {
 
         if (input?.resourceId) {
           query = query.where("resource_id", "=", input.resourceId);
+        }
+
+        if (input?.serverId) {
+          query = query.where("server_id", "=", input.serverId);
         }
 
         if (!input?.includeArchived) {

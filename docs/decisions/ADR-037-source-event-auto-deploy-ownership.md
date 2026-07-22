@@ -184,7 +184,10 @@ When at least one eligible Resource policy has path selectors, the application r
 changed paths through the GitHub integration. Public repositories may use an unauthenticated
 compare/tree request. Private repositories use the webhook installation id with the configured
 GitHub App runtime to obtain a short-lived installation token. Tokens remain integration material
-and are never persisted or returned. Missing access, provider failure, unrelated revisions that
+and are never persisted or returned. Git transport must keep the repository locator credential-free:
+the token is supplied through ephemeral process input/environment, never embedded in a clone or
+submodule URL, process argv, Git remote/config state, deployment snapshot, error, or log. Missing
+access, provider failure, unrelated revisions that
 cannot be compared, or truncated results become `path-diff-unavailable`; the system never falls
 back to intermediate commit arrays.
 

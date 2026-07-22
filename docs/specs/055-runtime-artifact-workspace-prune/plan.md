@@ -11,10 +11,12 @@
 ## Architecture Approach
 
 - Domain/application placement: command schema, command, handler, and use case live in
-  `packages/application`; the use case loads `DeploymentTarget` and delegates target mutation to a
-  `RuntimeTargetCapacityPruner` port.
+  `packages/application`; the use case loads `DeploymentTarget`, reads a complete server-scoped
+  deployment view, derives active-runtime and rollback-candidate protection sets, and delegates
+  target mutation plus those sets to a `RuntimeTargetCapacityPruner` port.
 - Repository/specification/visitor impact: reuse `ServerRepository.findOne` with
-  `DeploymentTargetByIdSpec`; no new persistence adapter in this slice.
+  `DeploymentTargetByIdSpec`; extend `DeploymentReadModel.count/list` with server scoping so the
+  application can prove a complete protection view before mutation.
 - Event/CQRS/read-model impact: command-side mutation through `CommandBus`; successful destructive
   prune with at least one deleted candidate records one retained audit row through an injected
   application port. No query mutation and no domain event/outbox publication is added in this slice.
@@ -31,7 +33,7 @@
 
 ## Testing Strategy
 
-- Matrix ids: `RT-CAP-PRUNE-001` through `RT-CAP-PRUNE-007` plus `RT-CAP-WEB-001`.
+- Matrix ids: `RT-CAP-PRUNE-001` through `RT-CAP-PRUNE-013` plus `RT-CAP-WEB-001`.
 - Test-first rows: application use case, CLI dispatch, oRPC route, runtime adapter parser/script
   coverage.
 - Acceptance/e2e: focused CLI/oRPC tests prove command bus dispatch and shared schema; Bun.WebView

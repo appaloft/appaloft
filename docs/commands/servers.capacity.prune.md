@@ -55,12 +55,16 @@ The command must:
 2. Normalize omitted `dryRun` to `true`.
 3. Normalize omitted `categories` to all allowed first-slice categories.
 4. Load the target/server by id.
-5. Reject unsupported runtime target providers through the runtime target pruner with
+5. Load a complete server-scoped deployment view and derive the in-flight/current-runtime and
+   rollback-candidate deployment id protection sets. If that view is incomplete or changes while
+   it is being read, fail closed before asking a runtime adapter to mutate anything.
+6. Reject unsupported runtime target providers through the runtime target pruner with
    `runtime_target_unsupported`.
-6. Ask the runtime target pruner to inspect and optionally prune candidates.
-7. When `dryRun` is `false` and at least one candidate was pruned, record one audit row scoped to
+7. Ask the runtime target pruner to inspect and optionally prune candidates, supplying both
+   application-derived protection sets.
+8. When `dryRun` is `false` and at least one candidate was pruned, record one audit row scoped to
    the server id.
-8. Return bounded diagnostic facts including matched, pruned, skipped, excluded, reported,
+9. Return bounded diagnostic facts including matched, pruned, skipped, excluded, reported,
    omitted, and estimated reclaimable-byte counts.
 
 ## Safety Rules
@@ -70,6 +74,9 @@ The command must:
 - Matching uses `updatedAt < before`; cutoff-equal candidates are retained.
 - Active runtimes are always skipped.
 - Rollback candidates and unknown rollback-safety candidates are always skipped.
+- A stopped container is eligible only when Appaloft ownership labels identify both its deployment
+  and resource, and its deployment id is absent from the application-derived active-runtime and
+  rollback-candidate protection sets. Missing labels or incomplete deployment evidence fail closed.
 - Docker volumes and Appaloft state roots are excluded by default and must not be deleted.
 - `docker-build-cache` and `unused-images` must be explicitly selected and must use Docker filtered
   prune commands with `until=<before>`.
@@ -131,6 +138,8 @@ At minimum, Code Round coverage must prove:
 - dry-run and destructive no-op prune do not write audit rows;
 - active runtime, rollback, volume, state-root, and cutoff-equal candidates are skipped or
   excluded;
+- the application supplies complete server-scoped active-runtime and rollback-candidate protection
+  sets, and the adapter checks them before any stopped-container deletion;
 - unsupported target providers return `runtime_target_unsupported` before runtime mutation;
 - CLI and HTTP/oRPC dispatch use the shared command schema.
 - remote-state marker cleanup is opt-in, dry-run-first, and preserves the state root and live

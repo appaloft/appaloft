@@ -23,6 +23,9 @@ import {
   type AuditEventRecorder,
   type AuditEventRecordInput,
   type Clock,
+  type DeploymentReadModel,
+  type DeploymentSummary,
+  type DeploymentTimelineJournalSummary,
   type IdGenerator,
   type RuntimeTargetCapacityPruneResult,
   type RuntimeTargetCapacityPruner,
@@ -57,6 +60,71 @@ class MemoryServerRepository implements ServerRepository {
   async upsert(_context: RepositoryContext, server: DeploymentTarget): Promise<void> {
     this.server = server;
   }
+}
+
+class StaticDeploymentReadModel implements DeploymentReadModel {
+  constructor(private readonly items: DeploymentSummary[] = []) {}
+
+  async count(
+    _context: RepositoryContext,
+    input?: Parameters<DeploymentReadModel["count"]>[1],
+  ): Promise<number> {
+    return this.filtered(input).length;
+  }
+
+  async list(
+    _context: RepositoryContext,
+    input?: Parameters<DeploymentReadModel["list"]>[1],
+  ): Promise<DeploymentSummary[]> {
+    const items = this.filtered(input);
+    return input?.limit === undefined ? items : items.slice(0, input.limit);
+  }
+
+  async findOne(): Promise<DeploymentSummary | null> {
+    return null;
+  }
+
+  async findTimeline(): Promise<DeploymentTimelineJournalSummary[]> {
+    return [];
+  }
+
+  private filtered(input?: Parameters<DeploymentReadModel["list"]>[1]): DeploymentSummary[] {
+    return this.items.filter((item) => (input?.serverId ? item.serverId === input.serverId : true));
+  }
+}
+
+function deploymentSummary(input: {
+  id: string;
+  resourceId: string;
+  status: DeploymentSummary["status"];
+  rollbackCandidateDeploymentId?: string;
+  serverId?: string;
+  createdAt?: string;
+}): DeploymentSummary {
+  return {
+    id: input.id,
+    projectId: "prj_demo",
+    environmentId: "env_demo",
+    resourceId: input.resourceId,
+    serverId: input.serverId ?? "srv_primary",
+    destinationId: "dst_primary",
+    target: {
+      kind: "server-backed",
+      serverId: input.serverId ?? "srv_primary",
+      destinationId: "dst_primary",
+    },
+    status: input.status,
+    triggerKind: "create",
+    runtimePlan: {} as DeploymentSummary["runtimePlan"],
+    environmentSnapshot: {} as DeploymentSummary["environmentSnapshot"],
+    dependencyBindingReferences: [],
+    timeline: [],
+    timelineCount: 0,
+    createdAt: input.createdAt ?? "2026-01-01T00:00:00.000Z",
+    ...(input.rollbackCandidateDeploymentId
+      ? { rollbackCandidateDeploymentId: input.rollbackCandidateDeploymentId }
+      : {}),
+  };
 }
 
 class FakeCapacityPruner implements RuntimeTargetCapacityPruner {
@@ -152,9 +220,11 @@ function createUseCase(input: {
   auditRecorder?: AuditEventRecorder;
   clock?: Clock;
   idGenerator?: IdGenerator;
+  deployments?: DeploymentSummary[];
 }): PruneServerCapacityUseCase {
   return new PruneServerCapacityUseCase(
     new MemoryServerRepository(input.server === undefined ? deploymentTarget() : input.server),
+    new StaticDeploymentReadModel(input.deployments),
     input.pruner ?? new FakeCapacityPruner(),
     input.auditRecorder ?? new MemoryAuditEventRecorder(),
     input.idGenerator ?? new SequenceIdGenerator(),
@@ -163,6 +233,63 @@ function createUseCase(input: {
 }
 
 describe("servers.capacity.prune", () => {
+  test("[RT-CAP-PRUNE-013] supplies complete active-runtime and rollback protection sets", async () => {
+    const pruner = new FakeCapacityPruner();
+    const useCase = createUseCase({
+      pruner,
+      deployments: [
+        deploymentSummary({
+          id: "dep_running",
+          resourceId: "res_api",
+          status: "running",
+          createdAt: "2026-01-01T00:04:00.000Z",
+        }),
+        deploymentSummary({
+          id: "dep_failed",
+          resourceId: "res_web",
+          status: "failed",
+          rollbackCandidateDeploymentId: "dep_previous",
+          createdAt: "2026-01-01T00:03:00.000Z",
+        }),
+        deploymentSummary({
+          id: "dep_current",
+          resourceId: "res_web",
+          status: "succeeded",
+          createdAt: "2026-01-01T00:02:00.000Z",
+        }),
+        deploymentSummary({
+          id: "dep_previous",
+          resourceId: "res_web",
+          status: "succeeded",
+          createdAt: "2026-01-01T00:01:00.000Z",
+        }),
+        deploymentSummary({
+          id: "dep_other_server",
+          resourceId: "res_other",
+          serverId: "srv_other",
+          status: "succeeded",
+        }),
+      ],
+    });
+
+    const result = await useCase.execute(
+      createExecutionContext({ requestId: "req_prune_protection", entrypoint: "system" }),
+      unwrap(
+        PruneServerCapacityCommand.create({
+          serverId: "srv_primary",
+          before: "2026-01-01T00:05:00.000Z",
+          categories: ["stopped-containers"],
+        }),
+      ).input,
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(pruner.inputs[0]?.runtimeProtection).toEqual({
+      activeDeploymentIds: ["dep_running", "dep_current"],
+      rollbackCandidateDeploymentIds: ["dep_previous"],
+    });
+  });
+
   test("[RT-CAP-PRUNE-001] dry-runs runtime target prune by default", async () => {
     const pruner = new FakeCapacityPruner();
     const auditRecorder = new MemoryAuditEventRecorder();

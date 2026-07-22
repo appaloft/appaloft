@@ -200,11 +200,22 @@ export function renderRuntimeTargetCapacityPruneScript(input: {
   target?: string;
   dryRun: boolean;
   includeOrphanRunning?: boolean;
+  runtimeProtection?: {
+    activeDeploymentIds: readonly string[];
+    rollbackCandidateDeploymentIds: readonly string[];
+  };
 }): AshScript {
+  if (input.categories.includes("stopped-containers") && !input.runtimeProtection) {
+    throw new Error("Stopped-container prune requires application runtime protection evidence");
+  }
+
   const runtimeRoot = input.runtimeRoot.replace(/\/+$/, "");
   const stateRoot = input.stateRoot ?? `${runtimeRoot}/state`;
   const sourceWorkspaceRoot = input.sourceWorkspaceRoot ?? `${runtimeRoot}/ssh-deployments`;
   const categories = input.categories.join(",");
+  const activeDeploymentIds = input.runtimeProtection?.activeDeploymentIds.join(",") ?? "";
+  const rollbackCandidateDeploymentIds =
+    input.runtimeProtection?.rollbackCandidateDeploymentIds.join(",") ?? "";
 
   return ash`
     set +e
@@ -215,6 +226,8 @@ export function renderRuntimeTargetCapacityPruneScript(input: {
     ${ash.env("APPALOFT_PRUNE_CATEGORIES", categories)}
     ${ash.env("APPALOFT_PRUNE_TARGET_FILTER", input.target ?? "")}
     ${ash.env("APPALOFT_PRUNE_DRY_RUN", input.dryRun ? "1" : "0")}
+    ${ash.env("APPALOFT_PRUNE_ACTIVE_DEPLOYMENT_IDS", activeDeploymentIds)}
+    ${ash.env("APPALOFT_PRUNE_ROLLBACK_DEPLOYMENT_IDS", rollbackCandidateDeploymentIds)}
     ${ash.env(
       "APPALOFT_PRUNE_INCLUDE_ORPHAN_RUNNING",
       input.includeOrphanRunning ? "1" : "0",
@@ -239,6 +252,16 @@ export function renderRuntimeTargetCapacityPruneScript(input: {
         *",$1,"*) return 0 ;;
         *) return 1 ;;
       esac
+    }
+    protected_deployment_reason() {
+      protected_deployment_id="$1"
+      case ",$APPALOFT_PRUNE_ACTIVE_DEPLOYMENT_IDS," in
+        *",$protected_deployment_id,"*) printf '%s' active-runtime; return 0 ;;
+      esac
+      case ",$APPALOFT_PRUNE_ROLLBACK_DEPLOYMENT_IDS," in
+        *",$protected_deployment_id,"*) printf '%s' rollback-candidate; return 0 ;;
+      esac
+      return 1
     }
     matches_prune_target() {
       candidate_id="$1"; candidate_target="$2"
@@ -279,6 +302,17 @@ export function renderRuntimeTargetCapacityPruneScript(input: {
           [ -n "$cid" ] || continue
           ccreated=$(docker inspect -f '{{.Created}}' "$cid" 2>/dev/null)
           matches_prune_target "$cid" "$cname" || continue
+          cdeployment=$(docker inspect -f '{{ index .Config.Labels "appaloft.deployment-id" }}' "$cid" 2>/dev/null)
+          cresource=$(docker inspect -f '{{ index .Config.Labels "appaloft.resource-id" }}' "$cid" 2>/dev/null)
+          if [ -z "$cdeployment" ] || [ "$cdeployment" = "<no value>" ] || [ -z "$cresource" ] || [ "$cresource" = "<no value>" ]; then
+            emit_candidate stopped-containers "$cid" "$cname" "$ccreated" "0" skipped ownership-unproven
+            continue
+          fi
+          protected_reason=$(protected_deployment_reason "$cdeployment")
+          if [ "$?" = "0" ]; then
+            emit_candidate stopped-containers "$cid" "$cname" "$ccreated" "0" skipped "$protected_reason"
+            continue
+          fi
           case "$cstatus" in
             Up*)
               if [ "$APPALOFT_PRUNE_INCLUDE_ORPHAN_RUNNING" = "1" ] && [ -n "$APPALOFT_PRUNE_TARGET_FILTER" ] && older_than_cutoff "$ccreated"; then
@@ -1114,6 +1148,7 @@ export class RuntimeTargetCapacityPrunerAdapter implements RuntimeTargetCapacity
       ...(input.target ? { target: input.target } : {}),
       dryRun: input.dryRun,
       ...(input.includeOrphanRunning ? { includeOrphanRunning: true } : {}),
+      runtimeProtection: input.runtimeProtection,
     });
     const result =
       providerKey === "generic-ssh"

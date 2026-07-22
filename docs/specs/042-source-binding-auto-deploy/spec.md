@@ -188,6 +188,7 @@ must not be persisted.
 | `SRC-AUTO-SPEC-013` | A force push cannot be compared completely. | Path-filtered Resources fail closed with `path-diff-unavailable`; unfiltered compatible Resources retain ref-based behavior. |
 | `SRC-AUTO-SPEC-014` | A branch or tag is deleted. | The event is retained as ignored with `ref-deleted`; no Resource is dispatched and the all-zero revision is not deployable. |
 | `SRC-AUTO-SPEC-015` | A new ref is pushed. | Path matching compares the empty tree with the new `after` tree. |
+| `SRC-AUTO-SPEC-016` | User saves every supported auto-deploy policy field and reloads the Resource. | HTTP command input, Resource persistence, `resources.show` readback, and Web form rehydration preserve trigger, refs, event kinds, include/exclude paths, generic webhook secret reference when applicable, and dedupe window; unsupported tag-trigger behavior is not implied. |
 
 ## Public Surfaces
 

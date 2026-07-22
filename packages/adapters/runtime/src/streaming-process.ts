@@ -55,6 +55,7 @@ export async function runStreamingProcess(input: {
   cwd: string;
   env: NodeJS.ProcessEnv;
   redactions?: readonly string[];
+  stdin?: string | Uint8Array;
   shell?: boolean;
   timeoutMs?: number;
   timeoutMessage?: string;
@@ -75,7 +76,7 @@ export async function runStreamingProcess(input: {
       cwd: input.cwd,
       env: input.env,
       shell: input.shell ?? false,
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: [input.stdin === undefined ? "ignore" : "pipe", "pipe", "pipe"],
       detached: true,
     });
     const stdout = new LineBuffer();
@@ -116,6 +117,11 @@ export async function runStreamingProcess(input: {
 
     child.stdout?.setEncoding("utf8");
     child.stderr?.setEncoding("utf8");
+
+    if (input.stdin !== undefined) {
+      child.stdin?.on("error", () => {});
+      child.stdin?.end(input.stdin);
+    }
 
     child.stdout?.on("data", (chunk: string) => {
       stdoutText += chunk;

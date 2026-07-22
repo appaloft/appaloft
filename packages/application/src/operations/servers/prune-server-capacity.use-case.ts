@@ -13,6 +13,8 @@ import { type ExecutionContext, toRepositoryContext } from "../../execution-cont
 import {
   type AuditEventRecorder,
   type Clock,
+  type DeploymentReadModel,
+  type DeploymentSummary,
   type IdGenerator,
   type RuntimeTargetCapacityPruneResult,
   type RuntimeTargetCapacityPruner,
@@ -40,6 +42,8 @@ export class PruneServerCapacityUseCase {
   constructor(
     @inject(tokens.serverRepository)
     private readonly serverRepository: ServerRepository,
+    @inject(tokens.deploymentReadModel)
+    private readonly deploymentReadModel: DeploymentReadModel,
     @inject(tokens.runtimeTargetCapacityPruner)
     private readonly capacityPruner: RuntimeTargetCapacityPruner,
     @inject(tokens.auditEventRecorder)
@@ -81,6 +85,10 @@ export class PruneServerCapacityUseCase {
         );
       }
 
+      const runtimeProtection = input.categories.includes("stopped-containers")
+        ? await this.loadRuntimeProtection(repositoryContext, input.serverId)
+        : { activeDeploymentIds: [], rollbackCandidateDeploymentIds: [] };
+
       const pruneResult = await this.capacityPruner.prune(context, {
         server: server.toState(),
         before: input.before,
@@ -88,6 +96,7 @@ export class PruneServerCapacityUseCase {
         ...(input.target ? { target: input.target } : {}),
         dryRun: input.dryRun,
         ...(input.includeOrphanRunning ? { includeOrphanRunning: true } : {}),
+        runtimeProtection,
       });
 
       if (pruneResult.isErr()) {
@@ -110,6 +119,35 @@ export class PruneServerCapacityUseCase {
         }),
       );
     }
+  }
+
+  private async loadRuntimeProtection(
+    context: ReturnType<typeof toRepositoryContext>,
+    serverId: string,
+  ): Promise<{
+    activeDeploymentIds: string[];
+    rollbackCandidateDeploymentIds: string[];
+  }> {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const count = await this.deploymentReadModel.count(context, {
+        serverId,
+        includeArchived: true,
+      });
+      const deployments = await this.deploymentReadModel.list(context, {
+        serverId,
+        includeArchived: true,
+        limit: count + 1,
+      });
+      const confirmedCount = await this.deploymentReadModel.count(context, {
+        serverId,
+        includeArchived: true,
+      });
+      if (deployments.length === count && confirmedCount === count) {
+        return runtimeProtectionFromDeployments(deployments);
+      }
+    }
+
+    throw new Error("Server deployment protection view changed while capacity prune was assembled");
   }
 
   private async recordDestructivePruneAudit(
@@ -153,6 +191,51 @@ export class PruneServerCapacityUseCase {
 
     return ok(withAuditRecordWarning(result));
   }
+}
+
+const activeDeploymentStatuses = new Set<DeploymentSummary["status"]>([
+  "created",
+  "planning",
+  "planned",
+  "running",
+  "cancel-requested",
+]);
+
+export function runtimeProtectionFromDeployments(deployments: readonly DeploymentSummary[]): {
+  activeDeploymentIds: string[];
+  rollbackCandidateDeploymentIds: string[];
+} {
+  const activeDeploymentIds = new Set<string>();
+  const rollbackCandidateDeploymentIds = new Set<string>();
+  const resourcesWithRuntimeOwner = new Set<string>();
+
+  const orderedDeployments = [...deployments].sort(
+    (left, right) =>
+      right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id),
+  );
+
+  for (const deployment of orderedDeployments) {
+    if (activeDeploymentStatuses.has(deployment.status)) {
+      activeDeploymentIds.add(deployment.id);
+    }
+
+    if (
+      !resourcesWithRuntimeOwner.has(deployment.resourceId) &&
+      (deployment.status === "succeeded" || deployment.status === "rolled-back")
+    ) {
+      resourcesWithRuntimeOwner.add(deployment.resourceId);
+      activeDeploymentIds.add(deployment.id);
+    }
+
+    if (deployment.rollbackCandidateDeploymentId) {
+      rollbackCandidateDeploymentIds.add(deployment.rollbackCandidateDeploymentId);
+    }
+  }
+
+  return {
+    activeDeploymentIds: [...activeDeploymentIds],
+    rollbackCandidateDeploymentIds: [...rollbackCandidateDeploymentIds],
+  };
 }
 
 function withAuditRecordWarning(
