@@ -63,7 +63,7 @@ function startFixtureWorkload(input: {
     "--label",
     `traefik.http.middlewares.route-proof-identity.headers.customresponseheaders.X-Appaloft-Deployment-Id=${input.deploymentId}`,
     "--label",
-    "traefik.http.services.route-proof.loadbalancer.server.port=3000",
+    "traefik.http.services.route-proof.loadbalancer.server.port=80",
     "--label",
     "traefik.http.routers.redirect-proof.rule=Host(`old-route-proof.test`)",
     "--label",
@@ -78,10 +78,7 @@ function startFixtureWorkload(input: {
     "traefik.http.middlewares.redirect-proof.redirectregex.replacement=http://route-proof.test/${1}",
     "--label",
     "traefik.http.middlewares.redirect-proof.redirectregex.permanent=true",
-    "alpine:3.20",
-    "sh",
-    "-c",
-    "while true; do printf 'HTTP/1.1 200 OK\\r\\nContent-Length: 2\\r\\nConnection: close\\r\\n\\r\\nok' | nc -l -p 3000; done",
+    "traefik/whoami:v1.11.0",
   ]);
 }
 
