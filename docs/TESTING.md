@@ -50,12 +50,16 @@ Current examples:
 Static checks reject known reliability regressions before runtime tests begin. `bun run lint` and
 `bun run lint:ci` both execute the same guards. The query-batching guard scans production
 TypeScript and rejects asynchronous `map` callbacks that call `findOne`; callers must expose and
-use a batched read-model or repository query instead.
+use a batched read-model or repository query instead. The CI test-boundary guard keeps the
+canonical package-test job database-free and requires PostgreSQL targets to stay scoped to jobs
+that actually start PostgreSQL.
 
 Current examples:
 
 - `scripts/check-query-batching.ts`
 - `scripts/test/check-query-batching.test.ts`
+- `scripts/check-ci-test-boundaries.ts`
+- `scripts/test/check-ci-test-boundaries.test.ts`
 
 ### End-To-End
 
@@ -97,6 +101,8 @@ If tests bypass the runtime or write directly to the database to simulate succes
 
 - `ci.yml`
   - lint, typecheck, full deterministic package tests, integration, build, packaging, docker smoke
+  - the canonical package-test job is hermetic and does not inherit a database target
+  - `APPALOFT_DATABASE_URL` is scoped to integration and build-smoke jobs that start PostgreSQL
 - `e2e.yml`
   - real PostgreSQL, started backend, CLI/API/deployment E2E, Playwright smoke
 - `nightly.yml`
@@ -109,6 +115,7 @@ If tests bypass the runtime or write directly to the database to simulate succes
 bun run lint
 
 # Canonical deterministic gate; this is the same package-test entrypoint used by ci.yml.
+# Do not supply provider, control-plane, or database targets to this command.
 bun run test
 
 # Faster subset for inner-loop feedback; it does not replace the canonical gate.

@@ -17,7 +17,6 @@ concurrency:
 
 env:
   APPALOFT_APP_VERSION: 0.1.0-ci
-  APPALOFT_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/appaloft
   APPALOFT_HTTP_HOST: 127.0.0.1
   APPALOFT_HTTP_PORT: 3101
   APPALOFT_OTEL_ENABLED: "false"
@@ -156,6 +155,8 @@ jobs:
     needs: changes
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      APPALOFT_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/appaloft
     steps:
       - name: Skip Integration Tests
         if: ${{ needs.changes.outputs.lightweight_only == 'true' }}
@@ -204,6 +205,8 @@ jobs:
     needs: changes
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      APPALOFT_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/appaloft
     steps:
       - name: Skip Build And Smoke
         if: ${{ needs.changes.outputs.lightweight_only == 'true' }}
