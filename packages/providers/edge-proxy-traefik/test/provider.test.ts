@@ -1,7 +1,34 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { renderTraefikResourceAccessFailureMiddleware, TraefikEdgeProxyProvider } from "../src";
 
 describe("TraefikEdgeProxyProvider", () => {
+  test("[ASH-PROVIDER-001] snapshots rendered proxy shell commands", async () => {
+    const now = spyOn(Date, "now").mockReturnValue(1_700_000_000_000);
+    try {
+      const provider = new TraefikEdgeProxyProvider();
+      const ensure = await provider.ensureProxy(
+        { correlationId: "req_traefik_ash_snapshot" },
+        { proxyKind: "traefik", httpPort: 8080, httpsPort: 8443 },
+      );
+      const diagnostics = await provider.diagnoseProxy(
+        { correlationId: "req_traefik_ash_snapshot" },
+        { proxyKind: "traefik", httpPort: 8080, httpsPort: 8443 },
+      );
+
+      expect({
+        ensure: {
+          networkCommand: ensure._unsafeUnwrap().networkCommand,
+          containerCommand: ensure._unsafeUnwrap().containerCommand,
+        },
+        diagnostics: diagnostics
+          ._unsafeUnwrap()
+          .checks.map(({ name, command }) => ({ name, command })),
+      }).toMatchSnapshot();
+    } finally {
+      now.mockRestore();
+    }
+  });
+
   test("[ROUTE-TLS-ENTRY-023] namespaces router labels by compose target service", async () => {
     const provider = new TraefikEdgeProxyProvider();
     const web = await provider.realizeRoutes(
@@ -155,7 +182,7 @@ describe("TraefikEdgeProxyProvider", () => {
       "grep -Fx -- '--certificatesresolvers.appaloft.acme.httpchallenge=true'",
     );
     expect(ensure._unsafeUnwrap().containerCommand).toContain(
-      "-v appaloft-traefik-acme:/letsencrypt",
+      "-v 'appaloft-traefik-acme:/letsencrypt'",
     );
     expect(ensure._unsafeUnwrap().metadata).toMatchObject({
       image: "traefik:v3.6.2",

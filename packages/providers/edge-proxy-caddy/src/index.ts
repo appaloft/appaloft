@@ -16,6 +16,7 @@ import {
   type ProxyRouteRealizationInput,
   type ProxyRouteRealizationPlan,
 } from "@appaloft/application";
+import { ash } from "@appaloft/ash";
 import {
   type DomainError,
   deploymentRouteIdentityHeaderName,
@@ -43,10 +44,6 @@ function hostPort(input: number | undefined, fallback: number): number {
   }
 
   return Number.isInteger(input) && input > 0 && input <= 65535 ? input : fallback;
-}
-
-function shellQuote(input: string): string {
-  return `'${input.replaceAll("'", "'\\''")}'`;
 }
 
 function labelsForCaddy(input: {
@@ -198,28 +195,21 @@ export class CaddyEdgeProxyProvider implements EdgeProxyProvider {
     const httpPort = hostPort(input.httpPort, 80);
     const httpsPort = hostPort(input.httpsPort, 443);
     const containerName = "appaloft-caddy";
+    const networkCommand = ash`
+      docker network inspect ${ash.arg(caddyEdgeNetworkName)} >/dev/null 2>&1 || docker network create ${ash.arg(caddyEdgeNetworkName)}
+    `;
+    const containerCommand = ash`
+      docker inspect -f '{{.State.Running}}' ${ash.arg(containerName)} 2>/dev/null | grep true >/dev/null || (docker rm -f ${ash.arg(containerName)} >/dev/null 2>&1 || true; docker run -d --restart unless-stopped --name ${ash.arg(containerName)} --network ${ash.arg(caddyEdgeNetworkName)} -p ${ash.arg(`${httpPort}:80`)} -p ${ash.arg(`${httpsPort}:443`)} -v /var/run/docker.sock:/var/run/docker.sock -v appaloft-caddy-data:/data -v appaloft-caddy-config:/config -e ${ash.arg(`CADDY_INGRESS_NETWORKS=${caddyEdgeNetworkName}`)} ${ash.arg(caddyImage)} )
+    `;
 
     return ok({
       providerKey: this.key,
       proxyKind: "caddy",
       displayName: this.displayName,
       networkName: caddyEdgeNetworkName,
-      networkCommand: `docker network inspect ${caddyEdgeNetworkName} >/dev/null 2>&1 || docker network create ${caddyEdgeNetworkName}`,
+      networkCommand: ash.render(networkCommand).trim(),
       containerName,
-      containerCommand: [
-        `docker inspect -f '{{.State.Running}}' ${containerName} 2>/dev/null | grep true >/dev/null || (docker rm -f ${containerName} >/dev/null 2>&1 || true; docker run -d`,
-        "--restart unless-stopped",
-        `--name ${containerName}`,
-        `--network ${caddyEdgeNetworkName}`,
-        `-p ${httpPort}:80`,
-        `-p ${httpsPort}:443`,
-        "-v /var/run/docker.sock:/var/run/docker.sock",
-        "-v appaloft-caddy-data:/data",
-        "-v appaloft-caddy-config:/config",
-        `-e CADDY_INGRESS_NETWORKS=${caddyEdgeNetworkName}`,
-        caddyImage,
-        ")",
-      ].join(" "),
+      containerCommand: ash.render(containerCommand).trim(),
       metadata: {
         httpPort: String(httpPort),
         httpsPort: String(httpsPort),
@@ -251,11 +241,13 @@ export class CaddyEdgeProxyProvider implements EdgeProxyProvider {
       checks: [
         {
           name: "edge-proxy-container",
-          command: [
-            `actual="$(docker inspect -f 'status={{.State.Status}} image={{.Config.Image}}' ${shellQuote(containerName)} 2>/dev/null)"`,
-            'printf "%s\\n" "$actual"',
-            `[ "$actual" = ${shellQuote(`status=running image=${caddyImage}`)} ]`,
-          ].join("; "),
+          command: ash
+            .render(ash`
+              actual="$(docker inspect -f 'status={{.State.Status}} image={{.Config.Image}}' ${ash.arg(containerName)} 2>/dev/null)"
+              printf "%s\n" "$actual"
+              [ "$actual" = ${ash.arg(`status=running image=${caddyImage}`)} ]
+            `)
+            .trim(),
           timeoutMs: 8_000,
           successMessage: "Caddy proxy container image is compatible",
           failureMessage:
@@ -267,11 +259,13 @@ export class CaddyEdgeProxyProvider implements EdgeProxyProvider {
         },
         {
           name: "edge-proxy-provider-logs",
-          command: [
-            `logs="$(docker logs --tail 80 ${shellQuote(containerName)} 2>&1 || true)"`,
-            'printf "%s\\n" "$logs" | tail -n 20',
-            '! printf "%s\\n" "$logs" | grep -E \'ERROR|Error|failed|Failed\'',
-          ].join("; "),
+          command: ash
+            .render(ash`
+              logs="$(docker logs --tail 80 ${ash.arg(containerName)} 2>&1 || true)"
+              printf "%s\n" "$logs" | tail -n 20
+              ! printf "%s\n" "$logs" | grep -E 'ERROR|Error|failed|Failed'
+            `)
+            .trim(),
           timeoutMs: 8_000,
           successMessage: "Caddy Docker provider logs have no recent errors",
           failureMessage: "Caddy Docker provider logs contain recent errors",

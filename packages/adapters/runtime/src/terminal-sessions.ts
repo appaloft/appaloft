@@ -1,6 +1,7 @@
 import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { ash } from "@appaloft/ash";
 import {
   DeploymentTargetByIdSpec,
   DeploymentTargetId,
@@ -233,23 +234,19 @@ class RuntimeTerminalSession implements TerminalSession {
   }
 }
 
-function shellQuote(input: string): string {
-  return `'${input.replaceAll("'", "'\\''")}'`;
-}
-
 function hostWithUsername(host: string, username?: string): string {
   return username && !host.includes("@") ? `${username}@${host}` : host;
 }
 
 function remoteCommandWithCwd(cwd?: string): string {
-  const prompt = shellQuote("\\u@\\h:\\W\\$ ");
+  const prompt = ash.quote("\\u@\\h:\\W\\$ ");
   const setup = [
     'export APPALOFT_TERMINAL_WORKDIR="$PWD"',
     `export PS1=${prompt}`,
     "if command -v bash >/dev/null 2>&1; then exec bash --noprofile --norc -i; fi",
     "exec ${SHELL:-/bin/sh} -i",
   ].join("; ");
-  return cwd ? `cd ${shellQuote(cwd)} && ${setup}` : setup;
+  return cwd ? `cd ${ash.quote(cwd)} && ${setup}` : setup;
 }
 
 function runtimeMetadata(request: TerminalSessionOpenRequest): Record<string, string> {
@@ -427,8 +424,8 @@ function localDockerComposeExecArgs(input: {
 }
 
 function remoteDockerExecCommand(containerName: string, workdir?: string): string {
-  const workdirArgs = workdir ? ` -w ${shellQuote(workdir)}` : "";
-  return `docker exec -it${workdirArgs} ${shellQuote(containerName)} sh -lc ${shellQuote(
+  const workdirArgs = workdir ? ` -w ${ash.quote(workdir)}` : "";
+  return `docker exec -it${workdirArgs} ${ash.quote(containerName)} sh -lc ${ash.quote(
     remoteCommandWithCwd(),
   )}`;
 }
@@ -439,10 +436,10 @@ function remoteDockerComposeExecCommand(input: {
   serviceName: string;
   workdir?: string;
 }): string {
-  const workdirArgs = input.workdir ? ` --workdir ${shellQuote(input.workdir)}` : "";
-  return `docker compose -p ${shellQuote(input.projectName)} -f ${shellQuote(
+  const workdirArgs = input.workdir ? ` --workdir ${ash.quote(input.workdir)}` : "";
+  return `docker compose -p ${ash.quote(input.projectName)} -f ${ash.quote(
     input.composeFile,
-  )} exec${workdirArgs} ${shellQuote(input.serviceName)} sh -lc ${shellQuote(
+  )} exec${workdirArgs} ${ash.quote(input.serviceName)} sh -lc ${ash.quote(
     remoteCommandWithCwd(),
   )}`;
 }

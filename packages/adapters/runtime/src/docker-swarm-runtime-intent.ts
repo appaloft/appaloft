@@ -2,6 +2,7 @@ import {
   blueprintComponentRuntimePlanFromMetadata,
   type BlueprintComponentRuntimePlan,
 } from "@appaloft/blueprints";
+import { ash } from "@appaloft/ash";
 import {
   domainError,
   type DeploymentDependencyBindingReferenceState,
@@ -241,10 +242,6 @@ export function renderDockerSwarmDependencySecretName(input: {
   );
 }
 
-function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, "'\\''")}'`;
-}
-
 function runtimeIdentityLabels(identity: DockerSwarmRuntimeIdentityInput): Record<string, string> {
   return {
     "appaloft.managed": "true",
@@ -262,24 +259,24 @@ function runtimeIdentityLabels(identity: DockerSwarmRuntimeIdentityInput): Recor
 function dockerServiceLabelFilters(labels: Record<string, string>): string {
   return Object.entries(labels)
     .sort(([left], [right]) => left.localeCompare(right))
-    .map(([key, value]) => `--filter ${shellQuote(`label=${key}=${value}`)}`)
+    .map(([key, value]) => `--filter ${ash.quote(`label=${key}=${value}`)}`)
     .join(" ");
 }
 
 function dockerLabelFlags(labels: Record<string, string>): string {
   return Object.entries(labels)
     .sort(([left], [right]) => left.localeCompare(right))
-    .map(([key, value]) => `--label ${shellQuote(`${key}=${value}`)}`)
+    .map(([key, value]) => `--label ${ash.quote(`${key}=${value}`)}`)
     .join(" ");
 }
 
 function dockerNetworkFlags(networkNames: readonly string[]): string {
-  return networkNames.map((networkName) => `--network ${shellQuote(networkName)}`).join(" ");
+  return networkNames.map((networkName) => `--network ${ash.quote(networkName)}`).join(" ");
 }
 
 function dockerEnvironmentFlags(environment: readonly DockerSwarmEnvironmentVariableIntent[]): string {
   return environment
-    .map((variable) => `--env ${shellQuote(`${variable.name}=${variable.value ?? ""}`)}`)
+    .map((variable) => `--env ${ash.quote(`${variable.name}=${variable.value ?? ""}`)}`)
     .join(" ");
 }
 
@@ -287,7 +284,7 @@ function dockerEnvironmentDisplayFlags(
   environment: readonly DockerSwarmEnvironmentVariableIntent[],
 ): string {
   return environment
-    .map((variable) => `--env ${shellQuote(`${variable.name}=********`)}`)
+    .map((variable) => `--env ${ash.quote(`${variable.name}=********`)}`)
     .join(" ");
 }
 
@@ -402,13 +399,13 @@ function stackDeployCommand(input: {
   const overrideContent = dockerComposeOverrideContent(input);
   return [
     "override_file=$(mktemp -t appaloft-swarm-compose-override.XXXXXX.yml)",
-    `printf %s ${shellQuote(overrideContent)} > "$override_file"`,
+    `printf %s ${ash.quote(overrideContent)} > "$override_file"`,
     commandParts([
       "docker stack deploy",
       "-c -",
       '-c "$override_file"',
       input.intent.workload.registryAuth ? "--with-registry-auth" : "",
-      shellQuote(input.intent.stackName),
+      ash.quote(input.intent.stackName),
     ]),
     'status="$?"',
     'rm -f "$override_file"',
@@ -419,7 +416,7 @@ function stackDeployCommand(input: {
 function dockerMountFlags(mounts: readonly DockerSwarmMountIntent[]): string {
   return mounts
     .map((mount) =>
-      `--mount ${shellQuote(
+      `--mount ${ash.quote(
         [
           `type=${mount.type}`,
           `source=${mount.source}`,
@@ -450,16 +447,16 @@ function dockerHealthFlags(health: DockerSwarmHealthIntent | undefined): string 
   const port = http.port ? `:${http.port}` : "";
   const healthUrl = `${http.scheme}://${http.host}${port}${http.path}`;
   return [
-    `--health-cmd ${shellQuote(`wget -q -O- ${healthUrl} >/dev/null`)}`,
-    `--health-interval ${shellQuote(`${health.intervalSeconds}s`)}`,
-    `--health-timeout ${shellQuote(`${health.timeoutSeconds}s`)}`,
-    `--health-retries ${shellQuote(`${health.retries}`)}`,
-    `--health-start-period ${shellQuote(`${health.startPeriodSeconds}s`)}`,
+    `--health-cmd ${ash.quote(`wget -q -O- ${healthUrl} >/dev/null`)}`,
+    `--health-interval ${ash.quote(`${health.intervalSeconds}s`)}`,
+    `--health-timeout ${ash.quote(`${health.timeoutSeconds}s`)}`,
+    `--health-retries ${ash.quote(`${health.retries}`)}`,
+    `--health-start-period ${ash.quote(`${health.startPeriodSeconds}s`)}`,
   ].join(" ");
 }
 
 function routeLabelFlags(labels: readonly string[]): string {
-  return labels.map((label) => `--label-add ${shellQuote(label)}`).join(" ");
+  return labels.map((label) => `--label-add ${ash.quote(label)}`).join(" ");
 }
 
 function commandParts(parts: readonly string[]): string {
@@ -1118,10 +1115,10 @@ function requiredReadinessStep(
   const command = requiredGates
     .map((gate) =>
       [
-        `echo ${shellQuote(
+        `echo ${ash.quote(
           `Waiting for ${gate.providerServiceName} before ${gate.relationId}`,
         )}`,
-        `until docker service ps --filter ${shellQuote("desired-state=running")} ${shellQuote(
+        `until docker service ps --filter ${ash.quote("desired-state=running")} ${ash.quote(
           gate.providerServiceName,
         )} | grep -q .; do sleep 2; done`,
       ].join("; "),
@@ -1170,25 +1167,25 @@ export function renderDockerSwarmApplyPlan(
           step: "create-candidate-service" as const,
           command: commandParts([
             "docker service create",
-            `--name ${shellQuote(intent.serviceName)}`,
+            `--name ${ash.quote(intent.serviceName)}`,
             dockerLabelFlags(intent.labels),
             dockerNetworkFlags(resolvedNetworkNames),
             intent.workload.registryAuth ? "--with-registry-auth" : "",
             dockerEnvironmentFlags(intent.environment),
             dockerMountFlags(intent.mounts),
             dockerHealthFlags(intent.health),
-            shellQuote(intent.workload.image),
+            ash.quote(intent.workload.image),
           ]),
           displayCommand: commandParts([
             "docker service create",
-            `--name ${shellQuote(intent.serviceName)}`,
+            `--name ${ash.quote(intent.serviceName)}`,
             dockerLabelFlags(intent.labels),
             dockerNetworkFlags(resolvedNetworkNames),
             intent.workload.registryAuth ? "--with-registry-auth" : "",
             dockerEnvironmentDisplayFlags(intent.environment),
             dockerMountFlags(intent.mounts),
             dockerHealthFlags(intent.health),
-            shellQuote(intent.workload.image),
+            ash.quote(intent.workload.image),
           ]),
         }
       : {
@@ -1211,12 +1208,12 @@ export function renderDockerSwarmApplyPlan(
   const verifyEnvironmentKeys = intent.environment
     .map(
       (variable) =>
-        `docker service inspect ${shellQuote(intent.serviceName)} --format ${shellQuote(
+        `docker service inspect ${ash.quote(intent.serviceName)} --format ${ash.quote(
           "{{range .Spec.TaskTemplate.ContainerSpec.Env}}{{println .}}{{end}}",
-        )} | sed 's/=.*//' | grep -Fqx -- ${shellQuote(variable.name)}`,
+        )} | sed 's/=.*//' | grep -Fqx -- ${ash.quote(variable.name)}`,
     )
     .join(" && ");
-  const quotedServiceName = shellQuote(intent.serviceName);
+  const quotedServiceName = ash.quote(intent.serviceName);
   const verifyCommand = [
     `service_name=${quotedServiceName}`,
     "attempt=0",
@@ -1260,17 +1257,17 @@ export function renderDockerSwarmApplyPlan(
             });
             return commandParts([
               "docker service update",
-              `--label-add ${shellQuote("appaloft.route-candidate=ready")}`,
+              `--label-add ${ash.quote("appaloft.route-candidate=ready")}`,
               routeLabelFlags(targetLabels),
-              shellQuote(serviceName),
+              ash.quote(serviceName),
             ]);
           })
           .join("; ")
       : commandParts([
           "docker service update",
-          `--label-add ${shellQuote("appaloft.route-candidate=ready")}`,
+          `--label-add ${ash.quote("appaloft.route-candidate=ready")}`,
           routeLabelFlags(labels),
-          shellQuote(intent.serviceName),
+          ash.quote(intent.serviceName),
         ]);
   const cleanupCommand = commandParts([
     "docker service ls -q",
@@ -1281,8 +1278,8 @@ export function renderDockerSwarmApplyPlan(
       "appaloft.runtime-target": "docker-swarm",
     }),
     "| while read -r service_id; do",
-    `current_deployment=$(docker service inspect "$service_id" --format ${shellQuote("{{ index .Spec.Labels \"appaloft.deployment-id\" }}")});`,
-    `if [ "$current_deployment" != ${shellQuote(intent.labels["appaloft.deployment-id"] ?? "")} ]; then stack_name=$(docker service inspect "$service_id" --format ${shellQuote("{{ index .Spec.Labels \"com.docker.stack.namespace\" }}")}); if [ -n "$stack_name" ] && [ "$stack_name" != "<no value>" ]; then docker stack rm "$stack_name"; else docker service rm "$service_id"; fi; fi;`,
+    `current_deployment=$(docker service inspect "$service_id" --format ${ash.quote("{{ index .Spec.Labels \"appaloft.deployment-id\" }}")});`,
+    `if [ "$current_deployment" != ${ash.quote(intent.labels["appaloft.deployment-id"] ?? "")} ]; then stack_name=$(docker service inspect "$service_id" --format ${ash.quote("{{ index .Spec.Labels \"com.docker.stack.namespace\" }}")}); if [ -n "$stack_name" ] && [ "$stack_name" != "<no value>" ]; then docker stack rm "$stack_name"; else docker service rm "$service_id"; fi; fi;`,
     "done",
   ]);
 

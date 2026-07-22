@@ -23,6 +23,7 @@ import {
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { ash } from "@appaloft/ash";
 import { runBufferedProcess, type BufferedProcessResult } from "./buffered-process";
 import { deriveRuntimeInstanceNames } from "./runtime-instance-names";
 
@@ -112,10 +113,6 @@ class DefaultHermeticScheduledTaskCommandRunner implements ScheduledTaskCommandR
   }
 }
 
-function shellQuote(input: string): string {
-  return `'${input.replaceAll("'", "'\\''")}'`;
-}
-
 function safeMessage(message: string, redactions: readonly string[]): string {
   return redactScheduledTaskSecretText(message, redactions);
 }
@@ -168,7 +165,7 @@ function metadataValue(metadata: Record<string, string> | undefined, keys: reado
 }
 
 function commandWithCwd(command: string, cwd?: string): string {
-  return cwd ? `cd ${shellQuote(cwd)} && ${command}` : command;
+  return cwd ? `cd ${ash.quote(cwd)} && ${command}` : command;
 }
 
 function scheduledTaskRuntimeEnvironment(input: {
@@ -221,7 +218,7 @@ export function renderDockerContainerScheduledTaskCommand(
     return err(environmentValidation.error);
   }
 
-  const quote = input.quote ?? shellQuote;
+  const quote = input.quote ?? ash.quote;
   const envFlags = Object.entries(input.environment).map(
     ([key, value]) => `--env ${quote(`${key}=${value}`)}`,
   );
@@ -257,7 +254,7 @@ export function renderDockerComposeScheduledTaskCommand(
     return err(environmentValidation.error);
   }
 
-  const quote = input.quote ?? shellQuote;
+  const quote = input.quote ?? ash.quote;
   const envFlags = Object.entries(input.environment).flatMap(([key, value]) => [
     "--env",
     quote(`${key}=${value}`),
@@ -291,7 +288,7 @@ export function renderDockerSwarmScheduledTaskCommand(
     return err(environmentValidation.error);
   }
 
-  const quote = input.quote ?? shellQuote;
+  const quote = input.quote ?? ash.quote;
   const envFlags = Object.entries(input.environment).flatMap(([key, value]) => [
     "--env",
     quote(`${key}=${value}`),

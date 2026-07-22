@@ -17,7 +17,8 @@ Executable shell text is a typed runtime artifact in Appaloft. Build it with
    boundary. Quoting a secret does not make it safe to include in a process argument or log.
 
 Run `bun run check:ash` before committing. The guard discovers every production TypeScript module
-under `apps/*/src` and `packages/*/src`; contributors must not maintain a hand-written list of new
+under `apps/*/src`, `packages/*/src`, and nested provider packages under
+`packages/providers/*/src`; contributors must not maintain a hand-written list of new
 command-owning files. A frozen, counted budget names pre-existing remote-state debt, so even a
 legacy file cannot add one more violation. Do not raise a budget for new or modified executable
 shell code: migrate that seam to `AshScript` instead.

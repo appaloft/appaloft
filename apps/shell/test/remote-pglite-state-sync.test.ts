@@ -639,6 +639,7 @@ describe("remote PGlite state sync", () => {
         throw new Error(prepared.error.message);
       }
       expect(prepared.value).toBeNull();
+      expect(calls).toMatchSnapshot();
       expect(calls.map((call) => call.command)).toEqual(["ssh"]);
       expect(calls.map((call) => call.args.join(" ")).join("\n")).toContain("backend.json");
       expect(calls.map((call) => call.args.join(" ")).join("\n")).not.toContain("backups/sync-");

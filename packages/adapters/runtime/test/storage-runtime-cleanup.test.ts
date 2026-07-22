@@ -113,10 +113,6 @@ function docker(args: readonly string[]) {
   };
 }
 
-function shellQuote(value: string): string {
-  return `'${value.replaceAll("'", "'\\''")}'`;
-}
-
 function expandHome(path: string): string {
   return path === "~" || path.startsWith("~/") ? join(homedir(), path.slice(2)) : path;
 }
@@ -525,20 +521,20 @@ describe("storage runtime cleanup adapter", () => {
 
       const storageVolumeId = "stv_real_ssh_cleanup";
       const volumeName = `appaloft-${storageVolumeId}`;
-      ssh(config, `docker volume rm -f ${shellQuote(volumeName)} >/dev/null 2>&1 || true`);
+      ssh(config, `docker volume rm -f ${ash.quote(volumeName)} >/dev/null 2>&1 || true`);
       const created = ssh(
         config,
         [
           "docker volume create",
           "--label",
-          shellQuote("appaloft.managed=true"),
+          ash.quote("appaloft.managed=true"),
           "--label",
-          shellQuote(`appaloft.storage-volume-id=${storageVolumeId}`),
+          ash.quote(`appaloft.storage-volume-id=${storageVolumeId}`),
           "--label",
-          shellQuote("appaloft.storage-volume-kind=named-volume"),
+          ash.quote("appaloft.storage-volume-kind=named-volume"),
           "--label",
-          shellQuote("appaloft.storage-runtime-realized-by=deployment-execution"),
-          shellQuote(volumeName),
+          ash.quote("appaloft.storage-runtime-realized-by=deployment-execution"),
+          ash.quote(volumeName),
         ].join(" "),
       );
       expect(created.exitCode, created.stderr).toBe(0);
@@ -580,7 +576,7 @@ describe("storage runtime cleanup adapter", () => {
           },
           candidates: [expect.objectContaining({ action: "matched", target: volumeName })],
         });
-        expect(ssh(config, `docker volume inspect ${shellQuote(volumeName)} >/dev/null`).exitCode).toBe(0);
+        expect(ssh(config, `docker volume inspect ${ash.quote(volumeName)} >/dev/null`).exitCode).toBe(0);
 
         const destructive = await adapter.cleanup(
           {
@@ -610,11 +606,11 @@ describe("storage runtime cleanup adapter", () => {
           },
           candidates: [expect.objectContaining({ action: "cleaned", target: volumeName })],
         });
-        expect(ssh(config, `docker volume inspect ${shellQuote(volumeName)} >/dev/null`).exitCode).not.toBe(
+        expect(ssh(config, `docker volume inspect ${ash.quote(volumeName)} >/dev/null`).exitCode).not.toBe(
           0,
         );
       } finally {
-        ssh(config, `docker volume rm -f ${shellQuote(volumeName)} >/dev/null 2>&1 || true`);
+        ssh(config, `docker volume rm -f ${ash.quote(volumeName)} >/dev/null 2>&1 || true`);
       }
     }, 120000);
   }
