@@ -45,7 +45,8 @@ docker build --build-arg APPALOFT_APP_VERSION=0.1.0 -t appaloft-all-in-one:local
 ## GitHub Actions
 
 - `ci.yml`: lint, typecheck, unit, integration, build, binary smoke, Docker build smoke.
-- `e2e.yml`: real Postgres, started backend, CLI/API/deployment E2E, web smoke.
+- `e2e.yml`: real Postgres, started backend, CLI/API/deployment E2E, web smoke. It runs for every
+  pull request so the two stable shard checks can be enforced as branch-protection merge gates.
 - `nightly.yml`: scheduled Compose/self-host smoke.
 - `release.yml`: manually creates or updates a Release Please PR on `main`, adds roadmap release
   alignment to that PR, and publishes only when the merged release PR pushes a `chore: release ...`

@@ -107,6 +107,8 @@ If tests bypass the runtime or write directly to the database to simulate succes
     smoke remains within the hosted runner disk budget
 - `e2e.yml`
   - real PostgreSQL, started backend, CLI/API/deployment E2E, Playwright smoke
+  - runs for every non-draft pull request and always publishes both stable shard checks required by
+    branch protection; path filters must not suppress those checks
 - `nightly.yml`
   - higher-cost compose smoke
 
