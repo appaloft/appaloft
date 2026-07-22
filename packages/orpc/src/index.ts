@@ -662,6 +662,8 @@ import {
   StreamOperatorWorkEventsQuery,
   type StreamOperatorWorkEventsQueryInput,
   type StreamOperatorWorkEventsResult,
+  StreamSandboxAgentRunEventsQuery,
+  type StreamSandboxAgentRunEventsResult,
   StreamSandboxEventsQuery,
   type StreamSandboxEventsResult,
   SwitchCurrentOrganizationCommand,
@@ -727,6 +729,7 @@ import {
   startTunnelCommandInputSchema,
   streamDeploymentTimelineQueryInputSchema,
   streamOperatorWorkEventsQueryInputSchema,
+  streamSandboxAgentRunEventsInputSchema,
   streamSandboxEventsQueryInputSchema,
   switchCurrentOrganizationCommandInputSchema,
   syncEnvironmentProfileCommandInputSchema,
@@ -3370,6 +3373,27 @@ function createSandboxEventStream(
         if (envelope.kind === "closed" || envelope.kind === "error") break;
       }
       return { sandboxId: result.sandboxId };
+    } finally {
+      await result.stream.close();
+    }
+  })();
+}
+
+function createSandboxAgentRunEventStream(
+  context: AppaloftOrpcRequestContext,
+  input: z.infer<typeof streamSandboxAgentRunEventsInputSchema>,
+) {
+  return (async function* streamSandboxAgentRunEvents() {
+    const result = await executeQuery<
+      StreamSandboxAgentRunEventsQuery,
+      StreamSandboxAgentRunEventsResult
+    >(context, StreamSandboxAgentRunEventsQuery.create(input, context.currentRequest?.signal));
+    try {
+      for await (const envelope of result.stream) {
+        yield envelope;
+        if (envelope.kind === "closed" || envelope.kind === "error") break;
+      }
+      return { runId: result.runId };
     } finally {
       await result.stream.close();
     }
@@ -7651,6 +7675,11 @@ export const listSandboxAgentRunEventsProcedure = base
   .handler(async ({ input, context }) =>
     executeQuery(context, ListSandboxAgentRunEventsQuery.create(input)),
   );
+export const streamSandboxAgentRunEventsProcedure = base
+  .route({ method: "GET", path: "/sandbox-agent-runs/{runId}/events/stream", successStatus: 200 })
+  .input(streamSandboxAgentRunEventsInputSchema)
+  .output(eventIterator(z.unknown(), z.object({ runId: z.string() })))
+  .handler(({ input, context }) => createSandboxAgentRunEventStream(context, input));
 export const listSandboxAgentApprovalsProcedure = base
   .route({ method: "GET", path: "/sandbox-agent-runs/{runId}/approvals", successStatus: 200 })
   .input(listSandboxAgentApprovalsInputSchema)
@@ -7830,6 +7859,7 @@ export const appaloftOrpcRouter = {
         show: showSandboxAgentRunProcedure,
         cancel: cancelSandboxAgentRunProcedure,
         events: listSandboxAgentRunEventsProcedure,
+        eventStream: streamSandboxAgentRunEventsProcedure,
       },
       approvals: {
         list: listSandboxAgentApprovalsProcedure,
@@ -10739,6 +10769,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/sandbox-agent-runtimes/:runtimeId/runs/:runId",
     "/api/sandbox-agent-runtimes/:runtimeId/runs/:runId/cancel",
     "/api/sandbox-agent-runs/:runId/events",
+    "/api/sandbox-agent-runs/:runId/events/stream",
     "/api/sandbox-agent-runs/:runId/approvals",
     "/api/sandbox-agent-approvals/:approvalId",
     "/api/sandbox-agent-approvals/:approvalId/resolve",

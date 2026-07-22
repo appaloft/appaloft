@@ -69,6 +69,52 @@ export interface AppaloftRunCreateInput {
   readonly idempotencyKey?: string;
 }
 
+export interface AppaloftAgentStreamInput {
+  readonly task?: string;
+  readonly prompt?: string;
+  readonly context?: AppaloftRunCreateInput["context"];
+  readonly idempotencyKey?: string;
+}
+
+export type AppaloftRunEventEnvelope =
+  | {
+      readonly kind: "event";
+      readonly schemaVersion: "sandbox-agent.run-events/v1";
+      readonly cursor: string;
+      readonly runId: string;
+      readonly sequence: number;
+      readonly occurredAt: string;
+      readonly eventType: string;
+      readonly data: Readonly<Record<string, unknown>>;
+    }
+  | {
+      readonly kind: "error";
+      readonly schemaVersion: "sandbox-agent.run-events/v1";
+      readonly runId: string;
+      readonly code: "cursor-gap" | "stream-failed";
+      readonly retryable: boolean;
+    }
+  | {
+      readonly kind: "closed";
+      readonly schemaVersion: "sandbox-agent.run-events/v1";
+      readonly runId: string;
+      readonly reason: "terminal" | "aborted";
+    };
+
+export interface AppaloftRun extends AppaloftRunDescriptor {
+  readonly events: {
+    readonly list: <T = unknown>(input?: {
+      readonly afterSequence?: number;
+      readonly limit?: number;
+    }) => Promise<T>;
+    readonly stream: (input?: {
+      readonly afterSequence?: number;
+      readonly limit?: number;
+      readonly signal?: AbortSignal;
+    }) => AsyncIterable<AppaloftRunEventEnvelope>;
+  };
+}
+
 export interface AppaloftSandboxFileWriteInput {
   readonly path: string;
   readonly contentBase64: string;
@@ -88,8 +134,11 @@ export interface AppaloftSandboxExecInput {
 
 export interface AppaloftAgent extends AppaloftAgentDescriptor {
   readonly runs: {
-    readonly create: (input: AppaloftRunCreateInput) => Promise<AppaloftRunDescriptor>;
+    readonly create: (input: AppaloftRunCreateInput) => Promise<AppaloftRun>;
   };
+  readonly stream: (
+    input: AppaloftAgentStreamInput,
+  ) => Promise<AppaloftRun & { readonly fullStream: AsyncIterable<AppaloftRunEventEnvelope> }>;
 }
 
 export interface AppaloftSandbox extends AppaloftSandboxDescriptor {
@@ -187,30 +236,73 @@ function createAgentHandle(
   descriptor: AppaloftAgentDescriptor,
 ): AppaloftAgent {
   const runtimeId = requiredResourceId(descriptor.runtimeId, "runtimeId");
+  const createRun = async (input: AppaloftRunCreateInput) => {
+    const run = unwrapOperation<AppaloftRunDescriptor>(
+      await operations.sandboxes.agents.runs.create<AppaloftRunDescriptor>({
+        sandboxId,
+        runtimeId,
+        task: input.task,
+        context: input.context ?? { mode: "fresh" },
+        idempotencyKey: input.idempotencyKey ?? crypto.randomUUID(),
+      }),
+    );
+    return createRunHandle(operations, sandboxId, runtimeId, run);
+  };
   return {
     ...descriptor,
     sandboxId,
     runtimeId,
     runs: {
-      create: async (input) => {
-        const run = unwrapOperation<AppaloftRunDescriptor>(
-          await operations.sandboxes.agents.runs.create<AppaloftRunDescriptor>({
-            sandboxId,
-            runtimeId,
-            task: input.task,
-            context: input.context ?? { mode: "fresh" },
-            idempotencyKey: input.idempotencyKey ?? crypto.randomUUID(),
-          }),
-        );
-        return {
-          ...run,
-          sandboxId,
-          runtimeId,
-          runId: requiredResourceId(run.runId, "runId"),
-        };
+      create: createRun,
+    },
+    stream: async (input) => {
+      const task = input.task ?? input.prompt;
+      if (!task?.trim()) throw new TypeError("agent.stream requires task or prompt");
+      const run = await createRun({
+        task,
+        ...(input.context ? { context: input.context } : {}),
+        ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),
+      });
+      return { ...run, fullStream: run.events.stream() };
+    },
+  };
+}
+
+function createRunHandle(
+  operations: GeneratedAppaloftClient,
+  sandboxId: string,
+  runtimeId: string,
+  descriptor: AppaloftRunDescriptor,
+): AppaloftRun {
+  const runId = requiredResourceId(descriptor.runId, "runId");
+  return {
+    ...descriptor,
+    sandboxId,
+    runtimeId,
+    runId,
+    events: {
+      list: async <T>(input = {}) =>
+        unwrapOperation<T>(await operations.sandboxes.agents.runs.events<T>({ runId, ...input })),
+      stream: (input = {}) => {
+        const source = operations.sandboxes.agents.runs.events.stream<unknown>({
+          runId,
+          ...input,
+        });
+        return (async function* runEventEnvelopes() {
+          for await (const value of source) {
+            if (!isRunEventEnvelope(value)) continue;
+            yield value;
+          }
+        })();
       },
     },
   };
+}
+
+function isRunEventEnvelope(value: unknown): value is AppaloftRunEventEnvelope {
+  if (!value || typeof value !== "object") return false;
+  const kind = (value as { kind?: unknown }).kind;
+  return kind === "event" || kind === "error" || kind === "closed";
 }
 
 function unwrapOperation<T>(result: AppaloftSdkOperationResult<T>): T {

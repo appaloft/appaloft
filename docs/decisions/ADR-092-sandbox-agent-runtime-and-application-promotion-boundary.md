@@ -54,7 +54,14 @@ that must never become deployment input.
     Deployment attempt from the same artifact rather than creating another Resource.
 13. Promotion is complete only when the associated `deployments.proof` verdict is `verified`.
     Weaker evidence yields `needs-attention`; provider or deployment failure yields `failed`.
-14. Public HTTP/oRPC, generated TypeScript SDK and CLI expose the complete contract. Web is
+14. Run output/tool/progress frames are appended while the harness is executing, before terminal
+    Run completion. The bounded Run-event query remains the replay/readback boundary; a separate
+    cancellable follow stream replays from `afterSequence`, follows newly persisted frames, and
+    closes explicitly on terminal Run state or caller abort. Reconnect is read behavior, not a Run
+    mutation, and never requires the original Run-create request to remain open.
+15. Public HTTP/oRPC, generated TypeScript SDK and CLI expose the complete contract. SDK resource
+    handles may compose Run creation with the same follow stream for `agent.stream({ task })`
+    ergonomics, but caller conversation/session state remains outside Appaloft. Web is
     readback/diagnostics first. MCP reuses the operation catalog but cannot grant capabilities or
     accept Promotion from a Sandbox-scoped identity.
 
@@ -75,6 +82,8 @@ that must never become deployment input.
   `sandbox.agentRuntimes.create(...)` in SDK ergonomics without creating a top-level independent
   Agent identity.
 - Runtime, Run, artifact and Promotion persistence must be tenant-scoped and durable.
+- Live Run observation uses the persisted redacted event sequence as its source of truth; it does
+  not expose a parallel vendor stream or hidden reasoning channel.
 - A provider can support Sandbox execution without supporting a managed agent harness, artifact
   capture or candidate preview. Capabilities remain truthful and independently admitted.
 - Application delivery is observable from artifact provenance through approval, Deployment and

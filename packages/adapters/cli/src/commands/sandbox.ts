@@ -45,6 +45,7 @@ import {
   ShowSandboxSnapshotQuery,
   ShowSandboxSourceArtifactQuery,
   ShowSandboxTemplateQuery,
+  StreamSandboxAgentRunEventsQuery,
   TerminateSandboxAgentRuntimeCommand,
   TerminateSandboxCommand,
   TerminateSandboxProcessCommand,
@@ -52,7 +53,13 @@ import {
 } from "@appaloft/application";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
 
-import { optionalNumber, optionalValue, runCommand, runQuery } from "../runtime.js";
+import {
+  optionalNumber,
+  optionalValue,
+  runCommand,
+  runQuery,
+  runSandboxAgentRunEventStreamQuery,
+} from "../runtime.js";
 
 const sandboxId = Args.text({ name: "sandboxId" });
 const snapshotId = Args.text({ name: "snapshotId" });
@@ -403,17 +410,24 @@ const agentRunCancel = EffectCommand.make("cancel", { runtimeId, runId }, (input
 );
 const agentRunEvents = EffectCommand.make(
   "events",
-  { runId, afterSequence: Options.text("after-sequence").pipe(Options.optional), limit },
-  ({ afterSequence, limit, runId }) =>
-    runQuery(
-      ListSandboxAgentRunEventsQuery.create({
-        runId,
-        ...(optionalNumber(afterSequence) !== undefined
-          ? { afterSequence: optionalNumber(afterSequence) }
-          : {}),
-        ...(optionalNumber(limit) !== undefined ? { limit: optionalNumber(limit) } : {}),
-      }),
-    ),
+  {
+    runId,
+    afterSequence: Options.text("after-sequence").pipe(Options.optional),
+    limit,
+    follow: Options.boolean("follow").pipe(Options.withDefault(false)),
+  },
+  ({ afterSequence, follow, limit, runId }) => {
+    const input = {
+      runId,
+      ...(optionalNumber(afterSequence) !== undefined
+        ? { afterSequence: optionalNumber(afterSequence) }
+        : {}),
+      ...(optionalNumber(limit) !== undefined ? { limit: optionalNumber(limit) } : {}),
+    };
+    return follow
+      ? runSandboxAgentRunEventStreamQuery(StreamSandboxAgentRunEventsQuery.create(input))
+      : runQuery(ListSandboxAgentRunEventsQuery.create(input));
+  },
 );
 const agentRun = EffectCommand.make("run").pipe(
   EffectCommand.withSubcommands([

@@ -30,6 +30,7 @@ type AgentQuery =
   | messages.ListSandboxAgentRunsQuery
   | messages.ShowSandboxAgentRunQuery
   | messages.ListSandboxAgentRunEventsQuery
+  | messages.StreamSandboxAgentRunEventsQuery
   | messages.ListSandboxSourceArtifactsQuery
   | messages.ListSandboxAgentApprovalsQuery
   | messages.ShowSandboxAgentApprovalQuery
@@ -124,6 +125,13 @@ export class SandboxAgentQueryHandler implements QueryHandlerContract<AgentQuery
         text(input, "runId"),
         input as { afterSequence?: number; limit?: number },
       );
+    if (query instanceof messages.StreamSandboxAgentRunEventsQuery)
+      return this.service.streamRunEvents(
+        context,
+        text(input, "runId"),
+        input as { afterSequence?: number; limit?: number },
+        query.signal,
+      );
     if (query instanceof messages.ListSandboxAgentApprovalsQuery)
       return this.service.listApprovals(context, text(input, "runId"));
     if (query instanceof messages.ShowSandboxAgentApprovalQuery)
@@ -164,6 +172,7 @@ for (const query of [
   messages.ListSandboxAgentRunsQuery,
   messages.ShowSandboxAgentRunQuery,
   messages.ListSandboxAgentRunEventsQuery,
+  messages.StreamSandboxAgentRunEventsQuery,
   messages.ListSandboxSourceArtifactsQuery,
   messages.ListSandboxAgentApprovalsQuery,
   messages.ShowSandboxAgentApprovalQuery,

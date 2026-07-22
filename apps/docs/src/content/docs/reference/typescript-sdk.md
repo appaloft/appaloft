@@ -103,7 +103,12 @@ const sandbox = await appaloft.sandboxes.create(sandboxInput);
 
 try {
   const agent = await sandbox.agents.create({ harness: "pi" });
-  const run = await agent.runs.create({ task: "Analyze and update the workspace" });
+  const run = await agent.stream({ prompt: "Analyze and update the workspace" });
+
+  for await (const envelope of run.fullStream) {
+    if (envelope.kind === "event") console.log(envelope.eventType, envelope.data);
+    if (envelope.kind === "error") throw new Error(envelope.code);
+  }
 } finally {
   await sandbox.terminate();
 }
@@ -112,6 +117,10 @@ try {
 `Agent` 是 Sandbox Agent Runtime 的 SDK 别名。Pi 简写默认使用已准入的
 `aht_pi_managed_v1` harness template、fresh Run context 和自动生成的 idempotency key；显式传入
 `harnessTemplateId`、`context` 或 `idempotencyKey` 会覆盖这些 SDK 默认值。
+`agent.stream({ task })` 会创建一个 Run 并把同一 Run 的持久化事件作为 `fullStream` 返回；
+`prompt` 是方便从 AI SDK 迁移的 `task` 别名。Appaloft 不接管聊天会话：调用方仍负责保存消息和
+决定何时使用 fresh context 或 `parentRunId` 继续。已有 Run 也可通过
+`run.events.list()` 或 `run.events.stream({ afterSequence, signal })` 读取和续接。
 
 Sandbox handle 还提供 `sandbox.files.read/write`、`sandbox.exec` 和 `sandbox.terminate`。这些方法
 只注入 handle 自己的 `sandboxId`，底层仍调用 generated public operation。

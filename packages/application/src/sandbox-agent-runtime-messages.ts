@@ -2,6 +2,7 @@ import { type Result } from "@appaloft/core";
 import { z } from "zod";
 import { Command, Query } from "./cqrs";
 import { parseOperationInput } from "./operations/shared-schema";
+import { type StreamSandboxAgentRunEventsResult } from "./sandbox-agent-runtime";
 
 const id = z.string().trim().min(1).max(160);
 const digest = z.string().regex(/^sha256:[a-f0-9]{64}$/);
@@ -42,6 +43,7 @@ export const listSandboxAgentRunEventsInputSchema = z
     limit: z.coerce.number().int().min(1).max(500).optional(),
   })
   .strict();
+export const streamSandboxAgentRunEventsInputSchema = listSandboxAgentRunEventsInputSchema;
 export const listSandboxAgentApprovalsInputSchema = z.object({ runId: id }).strict();
 export const showSandboxAgentApprovalInputSchema = z.object({ approvalId: id }).strict();
 export const resolveSandboxAgentApprovalInputSchema = z
@@ -202,6 +204,20 @@ export class ShowSandboxAgentRunQuery extends AgentQuery {
 export class ListSandboxAgentRunEventsQuery extends AgentQuery {
   static create(input: unknown) {
     return query(listSandboxAgentRunEventsInputSchema, input, (value) => new this(value));
+  }
+}
+export class StreamSandboxAgentRunEventsQuery extends Query<StreamSandboxAgentRunEventsResult> {
+  readonly input: Input;
+  readonly signal: AbortSignal | undefined;
+  constructor(input: Input, signal?: AbortSignal) {
+    super();
+    this.input = input;
+    this.signal = signal;
+  }
+  static create(input: unknown, signal?: AbortSignal) {
+    return parseOperationInput(streamSandboxAgentRunEventsInputSchema, input).map(
+      (value) => new this(value as Input, signal),
+    );
   }
 }
 export class ListSandboxAgentApprovalsQuery extends AgentQuery {

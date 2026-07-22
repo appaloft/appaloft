@@ -18,21 +18,25 @@
   AgentHarnessRegistry, AgentCapabilityApprovalStore, SourceArtifactStore,
   PromotionCandidatePreviewProvider and PromotionTargetGateway.
 - Pi adapter executes one pinned Pi RPC process through existing Sandbox process/file APIs. Pi
-  session/vendor events are translated to neutral Run events.
+  session/vendor events are translated and appended incrementally to neutral Run events while the
+  process remains active.
 - Use tenant-scoped Postgres/PGlite tables for Runtime, Run/events/approvals, SourceArtifact and
   Promotion. Persist opaque handles and safe metadata only.
 - Source Artifact capture reads the confined workspace through SandboxProvider, validates paths and
   entry types, writes a deterministic archive/manifest through ArtifactStore, and records SHA-256.
 - PromotionTargetGateway composes existing `resources.create`, `deployments.create` and
   `deployments.proof` semantics; it does not mutate repositories directly.
-- HTTP/oRPC, generated SDK, CLI and MCP metadata derive from the operation catalog.
+- HTTP/oRPC, generated SDK, CLI and MCP metadata derive from the operation catalog. The generated
+  stream operation is the transport source of truth; SDK resource handles may compose Run creation
+  and follow without introducing another business operation.
 
 ## CQRS, Events And Consistency
 
 - Commands change Runtime/Run/approval/artifact/Promotion state. Queries return bounded read models.
 - Runtime/Run state is read-your-own-write. Harness execution and Promotion are durable async work.
-- Run events are data-plane events with cursor and retention; operation audit remains control-plane
-  governance and does not copy raw output.
+- Run events are data-plane events with cursor and retention; bounded replay and cancellable live
+  follow read the same persisted sequence. Operation audit remains control-plane governance and
+  does not copy raw output.
 - Domain facts publish only after persistence. Provider/harness progress is application/process
   event input and is redacted before storage.
 - Idempotency identities: runtime create key; run submit key per runtime; approval request digest;
@@ -60,7 +64,8 @@
 - Application: concurrency, idempotency, approvals, redaction, artifact safety and Promotion workflow.
 - Persistence: tenant isolation, round-trip, event cursor and reference protection.
 - Adapter: deterministic fake harness/artifact/preview plus Pi contract tests.
-- Contract: catalog, HTTP/oRPC, SDK, CLI and MCP parity.
+- Contract: catalog, HTTP/oRPC SSE cancellation/terminal close, SDK low-level stream and resource
+  handles, CLI follow and MCP parity.
 - Acceptance: Sandbox→Runtime→Run→Artifact→Candidate→Promotion→verified proof with fake providers;
   real Pi/Docker is opt-in and reports truthful capability.
 
