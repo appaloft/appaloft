@@ -323,6 +323,7 @@ export class PgResourceReadModel implements ResourceReadModel {
     input?: {
       projectId?: string;
       environmentId?: string;
+      resourceIds?: readonly string[];
       includePreviewResources?: boolean;
       lifecycleStatus?: "active" | "archived" | "all";
       limit?: number;
@@ -369,6 +370,10 @@ export class PgResourceReadModel implements ResourceReadModel {
 
         if (input?.environmentId) {
           query = query.where("environment_id", "=", input.environmentId);
+        }
+
+        if (input?.resourceIds?.length) {
+          query = query.where("id", "in", [...input.resourceIds]);
         }
 
         query = query.limit(input?.limit ?? defaultReadModelListLimit);

@@ -12,6 +12,7 @@ import {
   ok,
   PortNumber,
   ProviderKey,
+  ResourceByIdSpec,
   type Result,
   TargetKindValue,
 } from "@appaloft/core";
@@ -27,6 +28,8 @@ import {
   type DeploymentSummary,
   type DeploymentTimelineJournalSummary,
   type IdGenerator,
+  type ResourceReadModel,
+  type ResourceSummary,
   type RuntimeTargetCapacityPruneResult,
   type RuntimeTargetCapacityPruner,
   type ServerRepository,
@@ -91,6 +94,58 @@ class StaticDeploymentReadModel implements DeploymentReadModel {
   private filtered(input?: Parameters<DeploymentReadModel["list"]>[1]): DeploymentSummary[] {
     return this.items.filter((item) => (input?.serverId ? item.serverId === input.serverId : true));
   }
+}
+
+class StaticResourceReadModel implements ResourceReadModel {
+  readonly listInputs: Array<Parameters<ResourceReadModel["list"]>[1]> = [];
+  findOneCalls = 0;
+
+  constructor(private readonly items: ResourceSummary[] = []) {}
+
+  async count(): Promise<number> {
+    return this.items.length;
+  }
+
+  async list(
+    _context: RepositoryContext,
+    input?: Parameters<ResourceReadModel["list"]>[1],
+  ): Promise<ResourceSummary[]> {
+    this.listInputs.push(input);
+    return this.items.filter((item) => {
+      if (input?.resourceIds && !input.resourceIds.includes(item.id)) return false;
+      if (input?.lifecycleStatus && input.lifecycleStatus !== "all") {
+        return item.lifecycleStatus === input.lifecycleStatus;
+      }
+      return true;
+    });
+  }
+
+  async findOne(
+    _context: RepositoryContext,
+    spec: Parameters<ResourceReadModel["findOne"]>[1],
+  ): Promise<ResourceSummary | null> {
+    this.findOneCalls += 1;
+    if (!(spec instanceof ResourceByIdSpec)) return null;
+    return this.items.find((item) => item.id === spec.id.value) ?? null;
+  }
+}
+
+function resourceSummary(
+  id: string,
+  lifecycleStatus: NonNullable<ResourceSummary["lifecycleStatus"]> = "active",
+): ResourceSummary {
+  return {
+    id,
+    projectId: "prj_demo",
+    environmentId: "env_demo",
+    name: id,
+    slug: id,
+    kind: "application",
+    lifecycleStatus,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    services: [{ name: "web", kind: "web" }],
+    deploymentCount: 1,
+  };
 }
 
 function deploymentSummary(input: {
@@ -221,10 +276,19 @@ function createUseCase(input: {
   clock?: Clock;
   idGenerator?: IdGenerator;
   deployments?: DeploymentSummary[];
+  resources?: ResourceSummary[];
+  resourceReadModel?: ResourceReadModel;
 }): PruneServerCapacityUseCase {
+  const deployments = input.deployments ?? [];
+  const resources =
+    input.resources ??
+    [...new Set(deployments.map((deployment) => deployment.resourceId))].map((resourceId) =>
+      resourceSummary(resourceId),
+    );
   return new PruneServerCapacityUseCase(
     new MemoryServerRepository(input.server === undefined ? deploymentTarget() : input.server),
-    new StaticDeploymentReadModel(input.deployments),
+    new StaticDeploymentReadModel(deployments),
+    input.resourceReadModel ?? new StaticResourceReadModel(resources),
     input.pruner ?? new FakeCapacityPruner(),
     input.auditRecorder ?? new MemoryAuditEventRecorder(),
     input.idGenerator ?? new SequenceIdGenerator(),
@@ -287,6 +351,71 @@ describe("servers.capacity.prune", () => {
     expect(pruner.inputs[0]?.runtimeProtection).toEqual({
       activeDeploymentIds: ["dep_running", "dep_current"],
       rollbackCandidateDeploymentIds: ["dep_previous"],
+    });
+  });
+
+  test("[RT-CAP-PRUNE-014] archived Resource releases only current-runtime-owner protection", async () => {
+    const pruner = new FakeCapacityPruner();
+    const resourceReadModel = new StaticResourceReadModel([
+      resourceSummary("res_archived", "archived"),
+      resourceSummary("res_active", "active"),
+    ]);
+    const useCase = createUseCase({
+      pruner,
+      resourceReadModel,
+      deployments: [
+        deploymentSummary({
+          id: "dep_archived_current",
+          resourceId: "res_archived",
+          status: "succeeded",
+          createdAt: "2026-01-01T00:04:00.000Z",
+        }),
+        deploymentSummary({
+          id: "dep_archived_in_flight",
+          resourceId: "res_archived",
+          status: "running",
+          createdAt: "2026-01-01T00:03:00.000Z",
+        }),
+        deploymentSummary({
+          id: "dep_active_current",
+          resourceId: "res_active",
+          status: "succeeded",
+          rollbackCandidateDeploymentId: "dep_retained_rollback",
+          createdAt: "2026-01-01T00:02:00.000Z",
+        }),
+        deploymentSummary({
+          id: "dep_retained_rollback",
+          resourceId: "res_active",
+          status: "succeeded",
+          createdAt: "2026-01-01T00:01:00.000Z",
+        }),
+      ],
+    });
+
+    const result = await useCase.execute(
+      createExecutionContext({ requestId: "req_archived_resource_prune", entrypoint: "system" }),
+      unwrap(
+        PruneServerCapacityCommand.create({
+          serverId: "srv_primary",
+          before: "2026-01-01T00:05:00.000Z",
+          categories: ["stopped-containers"],
+        }),
+      ).input,
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(resourceReadModel.listInputs).toEqual([
+      {
+        resourceIds: ["res_archived", "res_active"],
+        includePreviewResources: true,
+        lifecycleStatus: "archived",
+        limit: 2,
+      },
+    ]);
+    expect(resourceReadModel.findOneCalls).toBe(0);
+    expect(pruner.inputs[0]?.runtimeProtection).toEqual({
+      activeDeploymentIds: ["dep_archived_in_flight", "dep_active_current"],
+      rollbackCandidateDeploymentIds: ["dep_retained_rollback"],
     });
   });
 

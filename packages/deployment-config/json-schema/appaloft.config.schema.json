@@ -121,7 +121,7 @@
         "type": {
           "description": "Repository source kind.",
           "type": "string",
-          "enum": ["git", "image"]
+          "enum": ["git", "github", "image"]
         },
         "repository": {
           "description": "Git repository URL to deploy from.",
@@ -418,6 +418,10 @@
                 "default": "auto",
                 "type": "string",
                 "enum": ["auto", "disabled"]
+              },
+              "targetServiceName": {
+                "type": "string",
+                "minLength": 1
               },
               "redirectTo": {
                 "type": "string",
@@ -1112,6 +1116,10 @@
                       "type": "string",
                       "enum": ["auto", "disabled"]
                     },
+                    "targetServiceName": {
+                      "type": "string",
+                      "minLength": 1
+                    },
                     "redirectTo": {
                       "type": "string",
                       "minLength": 1
@@ -1293,7 +1301,7 @@
               "type": {
                 "description": "Repository source kind.",
                 "type": "string",
-                "enum": ["git", "image"]
+                "enum": ["git", "github", "image"]
               },
               "repository": {
                 "description": "Git repository URL to deploy from.",
@@ -1610,7 +1618,7 @@
               "type": {
                 "description": "Repository source kind.",
                 "type": "string",
-                "enum": ["git", "image"]
+                "enum": ["git", "github", "image"]
               },
               "repository": {
                 "description": "Git repository URL to deploy from.",
@@ -1861,6 +1869,10 @@
                       "type": "string",
                       "enum": ["auto", "disabled"]
                     },
+                    "targetServiceName": {
+                      "type": "string",
+                      "minLength": 1
+                    },
                     "redirectTo": {
                       "type": "string",
                       "minLength": 1
@@ -1988,7 +2000,7 @@
                     "type": {
                       "description": "Repository source kind.",
                       "type": "string",
-                      "enum": ["git", "image"]
+                      "enum": ["git", "github", "image"]
                     },
                     "repository": {
                       "description": "Git repository URL to deploy from.",
@@ -2282,75 +2294,154 @@
         "pattern": "^[a-z][a-z0-9_-]{0,62}$"
       },
       "additionalProperties": {
-        "type": "object",
-        "properties": {
-          "resourceName": {
-            "description": "Stable managed dependency Resource name for application-graph reuse.",
-            "type": "string",
-            "minLength": 1
-          },
-          "kind": {
-            "type": "string",
-            "enum": ["postgres", "redis", "mysql", "clickhouse", "object-storage", "opensearch"],
-            "description": "Application dependency kind."
-          },
-          "source": {
-            "type": "string",
-            "const": "managed",
-            "description": "Managed dependencies are created by Appaloft."
-          },
-          "bind": {
+        "oneOf": [
+          {
             "type": "object",
             "properties": {
-              "env": {
+              "resourceName": {
+                "description": "Stable managed dependency Resource name for application-graph reuse.",
+                "type": "string",
+                "minLength": 1
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "postgres",
+                  "redis",
+                  "mysql",
+                  "clickhouse",
+                  "object-storage",
+                  "opensearch"
+                ],
+                "description": "Application dependency kind."
+              },
+              "source": {
+                "type": "string",
+                "const": "managed",
+                "description": "Managed dependencies are created by Appaloft."
+              },
+              "bind": {
+                "type": "object",
+                "properties": {
+                  "env": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "^[A-Z_][A-Z0-9_]*$",
+                    "description": "Runtime environment variable target for this dependency."
+                  }
+                },
+                "required": ["env"],
+                "additionalProperties": false
+              },
+              "backup": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "default": true,
+                    "type": "boolean"
+                  },
+                  "intervalHours": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 8760
+                  },
+                  "retentionDays": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 3650
+                  },
+                  "retryOnFailure": {
+                    "default": true,
+                    "type": "boolean"
+                  }
+                },
+                "required": ["enabled", "retryOnFailure"],
+                "additionalProperties": false,
+                "description": "User-facing dependency resource scheduled backup policy declaration."
+              },
+              "preview": {
+                "type": "object",
+                "properties": {
+                  "lifecycle": {
+                    "type": "string",
+                    "const": "ephemeral"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": ["kind", "source", "bind"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "resourceName": {
                 "type": "string",
                 "minLength": 1,
-                "pattern": "^[A-Z_][A-Z0-9_]*$",
-                "description": "Runtime environment variable target for this dependency."
-              }
-            },
-            "required": ["env"],
-            "additionalProperties": false
-          },
-          "backup": {
-            "type": "object",
-            "properties": {
-              "enabled": {
-                "default": true,
-                "type": "boolean"
+                "description": "Stable name of an existing imported dependency Resource."
               },
-              "intervalHours": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 8760
-              },
-              "retentionDays": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 3650
-              },
-              "retryOnFailure": {
-                "default": true,
-                "type": "boolean"
-              }
-            },
-            "required": ["enabled", "retryOnFailure"],
-            "additionalProperties": false,
-            "description": "User-facing dependency resource scheduled backup policy declaration."
-          },
-          "preview": {
-            "type": "object",
-            "properties": {
-              "lifecycle": {
+              "kind": {
                 "type": "string",
-                "const": "ephemeral"
+                "enum": [
+                  "postgres",
+                  "redis",
+                  "mysql",
+                  "clickhouse",
+                  "object-storage",
+                  "opensearch"
+                ],
+                "description": "Application dependency kind."
+              },
+              "source": {
+                "type": "string",
+                "const": "imported",
+                "description": "Imported dependencies must already exist in the target Environment."
+              },
+              "bind": {
+                "type": "object",
+                "properties": {
+                  "env": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "^[A-Z_][A-Z0-9_]*$",
+                    "description": "Runtime environment variable target for this dependency."
+                  }
+                },
+                "required": ["env"],
+                "additionalProperties": false
+              },
+              "backup": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "default": true,
+                    "type": "boolean"
+                  },
+                  "intervalHours": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 8760
+                  },
+                  "retentionDays": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 3650
+                  },
+                  "retryOnFailure": {
+                    "default": true,
+                    "type": "boolean"
+                  }
+                },
+                "required": ["enabled", "retryOnFailure"],
+                "additionalProperties": false,
+                "description": "User-facing dependency resource scheduled backup policy declaration."
               }
             },
+            "required": ["resourceName", "kind", "source", "bind"],
             "additionalProperties": false
           }
-        },
-        "required": ["kind", "source", "bind"],
-        "additionalProperties": false,
+        ],
         "description": "User-facing application dependency declaration."
       }
     },

@@ -46,6 +46,8 @@
 
 ## Verification And Sync
 
+- [x] Run docs/operation/skill parity in both local `test` and CI `test:unit` through the
+  docs-registry package.
 - [x] Run core/application/persistence/adapter/transport/SDK/CLI/catalog-derived MCP suites.
 - [x] Run CLI parsing and generated SDK against the real HTTP/oRPC mount.
 - [x] Update matrix status only after named tests pass.

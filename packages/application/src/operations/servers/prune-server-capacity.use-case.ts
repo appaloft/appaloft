@@ -16,6 +16,7 @@ import {
   type DeploymentReadModel,
   type DeploymentSummary,
   type IdGenerator,
+  type ResourceReadModel,
   type RuntimeTargetCapacityPruneResult,
   type RuntimeTargetCapacityPruner,
   type ServerRepository,
@@ -44,6 +45,8 @@ export class PruneServerCapacityUseCase {
     private readonly serverRepository: ServerRepository,
     @inject(tokens.deploymentReadModel)
     private readonly deploymentReadModel: DeploymentReadModel,
+    @inject(tokens.resourceReadModel)
+    private readonly resourceReadModel: ResourceReadModel,
     @inject(tokens.runtimeTargetCapacityPruner)
     private readonly capacityPruner: RuntimeTargetCapacityPruner,
     @inject(tokens.auditEventRecorder)
@@ -143,11 +146,29 @@ export class PruneServerCapacityUseCase {
         includeArchived: true,
       });
       if (deployments.length === count && confirmedCount === count) {
-        return runtimeProtectionFromDeployments(deployments);
+        const archivedResourceIds = await this.loadArchivedResourceIds(context, deployments);
+        return runtimeProtectionFromDeployments(deployments, archivedResourceIds);
       }
     }
 
     throw new Error("Server deployment protection view changed while capacity prune was assembled");
+  }
+
+  private async loadArchivedResourceIds(
+    context: ReturnType<typeof toRepositoryContext>,
+    deployments: readonly DeploymentSummary[],
+  ): Promise<ReadonlySet<string>> {
+    const resourceIds = [...new Set(deployments.map((deployment) => deployment.resourceId))];
+    if (resourceIds.length === 0) return new Set();
+
+    const resources = await this.resourceReadModel.list(context, {
+      resourceIds,
+      includePreviewResources: true,
+      lifecycleStatus: "archived",
+      limit: resourceIds.length,
+    });
+
+    return new Set(resources.map((resource) => resource.id));
   }
 
   private async recordDestructivePruneAudit(
@@ -201,7 +222,10 @@ const activeDeploymentStatuses = new Set<DeploymentSummary["status"]>([
   "cancel-requested",
 ]);
 
-export function runtimeProtectionFromDeployments(deployments: readonly DeploymentSummary[]): {
+export function runtimeProtectionFromDeployments(
+  deployments: readonly DeploymentSummary[],
+  archivedResourceIds: ReadonlySet<string> = new Set(),
+): {
   activeDeploymentIds: string[];
   rollbackCandidateDeploymentIds: string[];
 } {
@@ -221,6 +245,7 @@ export function runtimeProtectionFromDeployments(deployments: readonly Deploymen
 
     if (
       !resourcesWithRuntimeOwner.has(deployment.resourceId) &&
+      !archivedResourceIds.has(deployment.resourceId) &&
       (deployment.status === "succeeded" || deployment.status === "rolled-back")
     ) {
       resourcesWithRuntimeOwner.add(deployment.resourceId);

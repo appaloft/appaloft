@@ -45,6 +45,18 @@ Current examples:
 - `packages/providers/core/test/registry.test.ts`
 - `packages/integrations/github/test/github.test.ts`
 
+### Architecture guards
+
+Static checks reject known reliability regressions before runtime tests begin. `bun run lint` and
+`bun run lint:ci` both execute the same guards. The query-batching guard scans production
+TypeScript and rejects asynchronous `map` callbacks that call `findOne`; callers must expose and
+use a batched read-model or repository query instead.
+
+Current examples:
+
+- `scripts/check-query-batching.ts`
+- `scripts/test/check-query-batching.test.ts`
+
 ### End-To-End
 
 Real backend process + real CLI + real database/backend/runtime boundary where the matrix requires
@@ -84,7 +96,7 @@ If tests bypass the runtime or write directly to the database to simulate succes
 ## GitHub Actions Mapping
 
 - `ci.yml`
-  - lint, typecheck, unit, integration, build, packaging, docker smoke
+  - lint, typecheck, full deterministic package tests, integration, build, packaging, docker smoke
 - `e2e.yml`
   - real PostgreSQL, started backend, CLI/API/deployment E2E, Playwright smoke
 - `nightly.yml`
@@ -93,6 +105,13 @@ If tests bypass the runtime or write directly to the database to simulate succes
 ## Local Commands
 
 ```bash
+# Canonical static and architecture gate; ci.yml uses lint:ci with the same guards.
+bun run lint
+
+# Canonical deterministic gate; this is the same package-test entrypoint used by ci.yml.
+bun run test
+
+# Faster subset for inner-loop feedback; it does not replace the canonical gate.
 bun run test:unit
 APPALOFT_DATABASE_URL=postgres://postgres:postgres@localhost:5432/appaloft bun run test:integration
 APPALOFT_DATABASE_URL=postgres://postgres:postgres@localhost:5432/appaloft APPALOFT_HTTP_PORT=3101 bun run --cwd apps/shell test:e2e

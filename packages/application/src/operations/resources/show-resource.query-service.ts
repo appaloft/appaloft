@@ -14,7 +14,6 @@ import {
   type ResourceState,
   type Result,
   SourceBindingFingerprint,
-  StorageVolumeByIdSpec,
 } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 
@@ -280,27 +279,20 @@ async function storageAttachmentsFromState(
     return attachments;
   }
 
-  const attachmentStatesById = new Map(
-    state.storageAttachments.map((attachment) => [attachment.id.value, attachment]),
-  );
+  const storageVolumes = await storageVolumeReadModel
+    .list(repositoryContext, {
+      storageVolumeIds: attachments.map((attachment) => attachment.storageVolumeId),
+    })
+    .catch(() => []);
+  const storageVolumesById = new Map(storageVolumes.map((volume) => [volume.id, volume]));
 
-  return Promise.all(
-    attachments.map(async (attachment) => {
-      const attachmentState = attachmentStatesById.get(attachment.id);
-      if (!attachmentState) {
-        return attachment;
-      }
-
-      const storageVolume = await storageVolumeReadModel
-        .findOne(repositoryContext, StorageVolumeByIdSpec.create(attachmentState.storageVolumeId))
-        .catch(() => null);
-
-      return {
-        ...attachment,
-        ...(storageVolume?.name ? { storageVolumeName: storageVolume.name } : {}),
-      };
-    }),
-  );
+  return attachments.map((attachment) => {
+    const storageVolume = storageVolumesById.get(attachment.storageVolumeId);
+    return {
+      ...attachment,
+      ...(storageVolume?.name ? { storageVolumeName: storageVolume.name } : {}),
+    };
+  });
 }
 
 function identityFromState(
