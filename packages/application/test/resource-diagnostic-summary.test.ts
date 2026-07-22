@@ -1008,6 +1008,65 @@ describe("ResourceDiagnosticSummaryQueryService", () => {
     expect(summary.copy.json).toContain('"durableUrl": "https://durable.example.test"');
   });
 
+  test("[ROUTE-INTENT-005] current redirect semantics override historical diagnostic snapshot", async () => {
+    const { service } = createService({
+      resources: [
+        resourceSummary({
+          accessSummary: {
+            latestDurableDomainRoute: {
+              url: "https://www.example.test",
+              hostname: "www.example.test",
+              scheme: "https",
+              deploymentId: "dep_web",
+              deploymentStatus: "succeeded",
+              pathPrefix: "/",
+              proxyKind: "traefik",
+              targetPort: 3000,
+              routeBehavior: "serve",
+              updatedAt: "2026-01-01T00:00:07.000Z",
+            },
+            proxyRouteStatus: "ready",
+            lastRouteRealizationDeploymentId: "dep_web",
+          },
+        }),
+      ],
+      domainBindings: [
+        {
+          id: "dmb_www",
+          projectId: "prj_demo",
+          environmentId: "env_demo",
+          resourceId: "res_web",
+          domainName: "www.example.test",
+          pathPrefix: "/",
+          proxyKind: "traefik",
+          tlsMode: "auto",
+          certificatePolicy: "auto",
+          redirectTo: "example.test",
+          redirectStatus: 301,
+          status: "ready",
+          verificationAttemptCount: 1,
+          createdAt: "2026-01-01T00:00:08.000Z",
+        },
+      ],
+    });
+    const query = ResourceDiagnosticSummaryQuery.create({
+      resourceId: "res_web",
+      includeDeploymentTimelineTail: false,
+      includeRuntimeLogTail: false,
+      includeProxyConfiguration: false,
+      tailLines: 10,
+    })._unsafeUnwrap();
+
+    const result = await service.execute(createTestContext(), query);
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap().access.selectedRoute?.intent).toMatchObject({
+      routeBehavior: "redirect",
+      redirectTo: "example.test",
+      redirectStatus: 301,
+    });
+  });
+
   test("[RES-DIAG-QRY-018][ROUTE-STATUS-002][ACCESS-DIAG-003] reports non-ready durable domain without hiding fallback routes", async () => {
     const context = createTestContext();
     const { service } = createService({

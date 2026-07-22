@@ -1946,6 +1946,11 @@ export const resourceAccessRouteSummarySchema = z.object({
   pathPrefix: z.string(),
   proxyKind: z.enum(["none", "traefik", "caddy"]),
   targetPort: z.number().int().positive().optional(),
+  routeBehavior: z.enum(["serve", "redirect"]).optional(),
+  redirectTo: z.string().optional(),
+  redirectStatus: z
+    .union([z.literal(301), z.literal(302), z.literal(307), z.literal(308)])
+    .optional(),
   updatedAt: z.string(),
 });
 
@@ -1957,6 +1962,11 @@ export const plannedResourceAccessRouteSummarySchema = z.object({
   pathPrefix: z.string(),
   proxyKind: z.enum(["none", "traefik", "caddy"]),
   targetPort: z.number().int().positive(),
+  routeBehavior: z.enum(["serve", "redirect"]).optional(),
+  redirectTo: z.string().optional(),
+  redirectStatus: z
+    .union([z.literal(301), z.literal(302), z.literal(307), z.literal(308)])
+    .optional(),
 });
 
 export const resourceStaticArtifactAccessRouteSummarySchema = z.object({
@@ -6117,6 +6127,24 @@ export const deploymentProofRuntimeEvidenceSchema = z.object({
     summary: z.string(),
     reasonCode: z.string().optional(),
     routeTargetsWorkload: z.boolean().optional(),
+    routes: z
+      .array(
+        z.object({
+          url: z.string(),
+          routeBehavior: z.enum(["serve", "redirect"]),
+          expectedDeploymentId: z.string().optional(),
+          expectedRedirectTo: z.string().optional(),
+          expectedRedirectStatus: z
+            .union([z.literal(301), z.literal(302), z.literal(307), z.literal(308)])
+            .optional(),
+          observedDeploymentId: z.string().optional(),
+          observedRedirectTo: z.string().optional(),
+          observedStatus: z.number().int().optional(),
+          matched: z.boolean(),
+          reasonCode: z.string().optional(),
+        }),
+      )
+      .optional(),
   }),
   recovery: z.object({
     previousRuntimeRetained: z.boolean().optional(),
@@ -6139,6 +6167,8 @@ export const deploymentProofReasonCodeSchema = z.enum([
   "public_access_unavailable",
   "public_access_failed",
   "access_route_workload_mismatch",
+  "access_redirect_status_mismatch",
+  "access_redirect_destination_mismatch",
   "recovery_evidence_unavailable",
 ]);
 export const deploymentProofInputSchema = z.object({

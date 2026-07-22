@@ -37,14 +37,19 @@ but must not redefine the proof model.
 For an Appaloft-managed Caddy or Traefik serve route, the edge proxy stamps the response with the
 deployment identity that owns the route. Deployment Proof probes the public route and compares that
 provider-stamped identity with the planned Deployment. The observed container's label remains
-workload evidence only: it cannot prove that the proxy actually served that container. Redirect-only
-routes and direct-port access do not claim this managed-route identity evidence.
+workload evidence only: it cannot prove that the proxy actually served that container. For a current
+redirect route, Deployment Proof instead performs a no-follow request and requires the exact governed
+redirect status and normalized `Location`; following the redirect and proving the destination
+workload cannot prove the source redirect route. Direct-port access does not claim managed-route
+identity or redirect evidence.
 
 ## Consequences
 
 - Runtime adapters need an observation capability or an explicit unavailable result.
 - Managed edge-proxy providers must render the shared deployment identity response marker, and a
   missing or mismatched marker cannot produce `verified`.
+- Current managed redirect routes must expose exact status and destination observations; a missing or
+  mismatched `Location` cannot produce `verified`.
 - Stable artifact/workload/configuration identity is now part of the adapter evidence contract but
   remains outside Deployment command input and aggregate invariants.
 - Deployment Detail gains a multi-dimensional Proof section rather than a success badge.

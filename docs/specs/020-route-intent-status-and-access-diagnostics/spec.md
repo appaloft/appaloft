@@ -142,6 +142,7 @@ is pending verification, missing certificate coverage, DNS-mispointed, or route-
 | ROUTE-INTENT-SPEC-005 | Deployment snapshot immutability | A caller asks for deployment-snapshot route scope | Proxy preview or deployment detail reads it | The immutable snapshot route is labeled historical and does not become current resource access. |
 | ROUTE-INTENT-SPEC-006 | Unavailable observation is typed state | Proxy/readiness/log/access observation cannot run | Health/diagnostics compose summaries | The route is `unknown` or `unavailable` with `observation_unavailable`, not a deployment failure unless deployment execution failed. |
 | ROUTE-INTENT-SPEC-007 | Access diagnostics are copy-safe | Edge/provider failure or route status has unsafe raw detail | Diagnostic summary copy is generated | Copy JSON contains stable ids/codes/phases only and excludes secrets/raw provider or command output. |
+| ROUTE-INTENT-SPEC-008 | Current redirect semantics remain authoritative | A durable binding is configured as a redirect after an older deployment snapshot recorded a serve route | Domain binding detail, current resource health/diagnostics, and latest proxy configuration are read | Every current-state surface reports `redirect` with the exact normalized destination/status; the immutable deployment snapshot remains historical and cannot overwrite current binding semantics. |
 
 ## Domain Ownership
 
@@ -149,7 +150,10 @@ is pending verification, missing certificate coverage, DNS-mispointed, or route-
   and Resource/Deployment read models.
 - Resource owns reusable network/access profile and current resource observation surfaces.
 - Deployment owns accepted attempts and immutable route snapshots only.
-- DomainBinding and Certificate lifecycle remain separate future mutation lifecycles.
+- DomainBinding owns the current durable route behavior, redirect destination, and redirect status;
+  an immutable Deployment route snapshot is historical evidence and cannot overwrite those current
+  semantics in resource observation or proxy diagnostics.
+- DomainBinding and Certificate lifecycle remain separate mutation lifecycles.
 - Runtime/proxy providers own concrete render/apply/readback and provider-native failure
   translation.
 - Core may own only provider-neutral route/access/status value objects when domain state needs them;

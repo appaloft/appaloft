@@ -25,6 +25,9 @@ export interface ResourceAccessSummaryDeployment {
         pathPrefix: string;
         tlsMode: TlsMode;
         targetPort?: number;
+        routeBehavior?: "serve" | "redirect";
+        redirectTo?: string;
+        redirectStatus?: 301 | 302 | 307 | 308;
       }>;
       metadata?: Record<string, string>;
     };
@@ -45,6 +48,8 @@ export interface ResourceAccessSummaryDomainBinding {
   pathHandling?: "preserve" | "strip";
   proxyKind: EdgeProxyKind;
   tlsMode: TlsMode;
+  redirectTo?: string;
+  redirectStatus?: 301 | 302 | 307 | 308;
 }
 
 function deploymentSourceFingerprint(
@@ -226,6 +231,9 @@ export function projectResourceAccessSummary(
         pathPrefix: route.pathPrefix,
         proxyKind: route.proxyKind,
         ...(typeof route.targetPort === "number" ? { targetPort: route.targetPort } : {}),
+        ...(route.routeBehavior ? { routeBehavior: route.routeBehavior } : {}),
+        ...(route.redirectTo ? { redirectTo: route.redirectTo } : {}),
+        ...(route.redirectStatus ? { redirectStatus: route.redirectStatus } : {}),
         updatedAt: deployment.createdAt,
       };
     }
@@ -250,7 +258,18 @@ export function projectResourceAccessSummary(
       deploymentStatus: deployment.status,
       pathPrefix: readyDurableBinding.pathPrefix,
       proxyKind: readyDurableBinding.proxyKind,
-      ...(typeof route.targetPort === "number" ? { targetPort: route.targetPort } : {}),
+      ...(typeof route.targetPort === "number" && !readyDurableBinding.redirectTo
+        ? { targetPort: route.targetPort }
+        : {}),
+      ...(readyDurableBinding.redirectTo
+        ? {
+            routeBehavior: "redirect" as const,
+            redirectTo: readyDurableBinding.redirectTo,
+            redirectStatus: readyDurableBinding.redirectStatus ?? 308,
+          }
+        : route.routeBehavior
+          ? { routeBehavior: route.routeBehavior }
+          : {}),
       updatedAt: readyDurableBinding.createdAt,
     };
   }
@@ -273,6 +292,9 @@ export function projectResourceAccessSummary(
         pathPrefix: route.pathPrefix,
         proxyKind: route.proxyKind,
         ...(typeof route.targetPort === "number" ? { targetPort: route.targetPort } : {}),
+        ...(route.routeBehavior ? { routeBehavior: route.routeBehavior } : {}),
+        ...(route.redirectTo ? { redirectTo: route.redirectTo } : {}),
+        ...(route.redirectStatus ? { redirectStatus: route.redirectStatus } : {}),
         updatedAt: deployment.createdAt,
       };
     }

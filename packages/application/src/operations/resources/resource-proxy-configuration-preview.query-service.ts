@@ -216,6 +216,7 @@ function routeFromSummary(
   deployment?: DeploymentSummary,
   observedAt?: string,
 ): EdgeProxyRouteInput {
+  const redirect = route.routeBehavior === "redirect" || Boolean(route.redirectTo);
   return attachAppliedRouteContext({
     resource,
     ...(deployment ? { deployment } : {}),
@@ -226,8 +227,11 @@ function routeFromSummary(
       domains: [route.hostname],
       pathPrefix: route.pathPrefix,
       tlsMode: route.scheme === "https" ? "auto" : "disabled",
-      ...(route.targetPort === undefined ? {} : { targetPort: route.targetPort }),
+      ...(route.targetPort === undefined || redirect ? {} : { targetPort: route.targetPort }),
       source,
+      ...(route.routeBehavior ? { routeBehavior: route.routeBehavior } : {}),
+      ...(route.redirectTo ? { redirectTo: route.redirectTo } : {}),
+      ...(route.redirectStatus ? { redirectStatus: route.redirectStatus } : {}),
     },
   });
 }
@@ -583,10 +587,6 @@ export class ResourceProxyConfigurationPreviewQueryService {
         deployment?: DeploymentSummary;
       }
     | undefined {
-    if (resource.accessSummary?.latestDurableDomainRoute) {
-      return undefined;
-    }
-
     const binding = domainBindings
       .filter(domainBindingCanPlanRoute)
       .sort(compareBindingsForRoutePlan)[0];
@@ -594,11 +594,26 @@ export class ResourceProxyConfigurationPreviewQueryService {
       return undefined;
     }
 
+    const access = resource.accessSummary;
+    const currentDurableRoute = access?.latestDurableDomainRoute;
+    const bindingIsCurrent =
+      binding.status === "ready" &&
+      currentDurableRoute?.hostname === binding.domainName &&
+      currentDurableRoute.pathPrefix === binding.pathPrefix;
+
     return {
       ...(selectedDeployment ? { deployment: selectedDeployment } : {}),
       routes: [routeFromDomainBinding(binding, resource, selectedDeployment)],
-      status: "planned",
-      stale: Boolean(resource.accessSummary?.lastRouteRealizationDeploymentId),
+      status: bindingIsCurrent
+        ? proxyConfigurationStatusFromAccessSummary(access?.proxyRouteStatus)
+        : "planned",
+      stale: bindingIsCurrent
+        ? Boolean(
+            selectedDeployment &&
+              access?.lastRouteRealizationDeploymentId &&
+              access.lastRouteRealizationDeploymentId !== selectedDeployment.id,
+          )
+        : Boolean(access?.lastRouteRealizationDeploymentId),
     };
   }
 

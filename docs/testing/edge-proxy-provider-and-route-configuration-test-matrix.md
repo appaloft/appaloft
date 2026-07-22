@@ -124,6 +124,7 @@ Then:
 | EDGE-PROXY-QRY-005 | integration | Missing provider | Provider key unavailable | `err` | `proxy_provider_unavailable` | None. |
 | EDGE-PROXY-QRY-006 | integration | Sensitive diagnostic values | Provider returns secrets in diagnostics | `ok` | None | Values redacted. |
 | EDGE-PROXY-QRY-007 | integration | Canonical redirect visible | Latest or planned route state contains an alias redirect | `ok`, status `planned` or `applied` | None | Route view includes `routeBehavior = redirect`, `redirectTo`, and `redirectStatus`; provider-specific redirect syntax appears only in read-only sections. |
+| EDGE-PROXY-QRY-008 | integration | Current redirect supersedes historical serve snapshot | A ready durable binding currently redirects but the selected Deployment snapshot contains a serve route for the same host/path | `ok`, latest scope reports the current redirect; deployment-snapshot scope reports the historical serve route | None | Current proxy diagnostics use DomainBinding semantics and cannot silently borrow route behavior from an older Deployment snapshot. |
 
 ## Proxy Observation Contract Matrix
 

@@ -528,6 +528,7 @@ function publicAccessSection(
   const routeIntentStatus = selectedRouteIntentStatus({
     resourceId: resource.id,
     accessSummary: access,
+    domainBindings,
   });
 
   if (latestAccessFailure) {

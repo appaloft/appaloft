@@ -62,6 +62,7 @@ export class ShowDomainBindingQueryService {
       const routeDescriptors = routeIntentStatusDescriptors({
         resourceId: binding.resourceId,
         accessSummary: resource?.accessSummary,
+        domainBindings: [binding],
       });
       const selectedRoute = selectedRouteIntentStatus({
         resourceId: binding.resourceId,

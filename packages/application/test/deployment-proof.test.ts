@@ -253,6 +253,7 @@ describe("DeploymentProofQueryService", () => {
         pathPrefix: "/",
         proxyKind: "traefik",
         tlsMode: "auto",
+        routeBehavior: "serve",
       },
     ]);
   });
@@ -288,6 +289,79 @@ describe("DeploymentProofQueryService", () => {
     expect(result.isErr()).toBe(true);
     expect(evidenceReader.input).toBeUndefined();
     expect(domainBindingReadModel.inputs[0]?.limit).toBe(1_001);
+  });
+
+  test("[DEP-PROOF-REDIRECT-001] current redirect supersedes historical serve route behavior", async () => {
+    const evidenceReader = new StaticRuntimeEvidenceReader(evidence());
+    const queryService = service({
+      evidenceReader,
+      domainBindings: [
+        {
+          id: "dmb_web",
+          projectId: "prj_demo",
+          environmentId: "env_demo",
+          resourceId: "res_web",
+          domainName: "old.example.test",
+          pathPrefix: "/docs",
+          proxyKind: "traefik",
+          tlsMode: "auto",
+          certificatePolicy: "auto",
+          redirectTo: "app.example.test",
+          redirectStatus: 301,
+          status: "ready",
+          verificationAttemptCount: 1,
+          createdAt: "2026-07-12T09:59:15.000Z",
+        },
+      ],
+    });
+
+    unwrap(await queryService.execute(context(), query()));
+
+    expect(evidenceReader.input?.currentManagedRoutes).toEqual([
+      {
+        domainName: "old.example.test",
+        pathPrefix: "/docs",
+        proxyKind: "traefik",
+        tlsMode: "auto",
+        routeBehavior: "redirect",
+        redirectTo: "app.example.test",
+        redirectStatus: 301,
+      },
+    ]);
+  });
+
+  test("[DEP-PROOF-REDIRECT-003] exact redirect mismatch reason prevents verification", async () => {
+    const proof = unwrap(
+      await service({
+        evidence: evidence({
+          access: {
+            status: "failed",
+            summary: "wrong redirect status",
+            reasonCode: "public_route_redirect_status_mismatch",
+            routes: [
+              {
+                url: "https://old.example.test/docs",
+                routeBehavior: "redirect",
+                expectedRedirectStatus: 301,
+                expectedRedirectTo: "https://app.example.test/docs",
+                observedStatus: 308,
+                observedRedirectTo: "https://app.example.test/docs",
+                matched: false,
+              },
+            ],
+          },
+        }),
+      }).execute(context(), query()),
+    );
+
+    expect(proof.verdict).toBe("failed");
+    expect(proof.mismatches).toContainEqual(
+      expect.objectContaining({
+        reasonCode: "access_redirect_status_mismatch",
+        expected: "301",
+        observed: "308",
+      }),
+    );
   });
 
   test("[DEP-PROOF-VERDICT-002] health 200 with unchanged workload generation is never verified", async () => {

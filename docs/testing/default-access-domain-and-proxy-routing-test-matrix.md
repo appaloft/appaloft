@@ -128,6 +128,7 @@ These rows are governed by
 | ROUTE-INTENT-002 | integration | Durable route descriptor wins | Ready durable, server-applied, and generated routes all exist | Selected route source is `durable-domain-binding` | Durable route wins current-route precedence across access summary consumers. |
 | ROUTE-INTENT-003 | integration | Server-applied route descriptor wins | Server-applied and generated routes exist, with no selected durable route | Selected route source is `server-applied-route` | Server-applied route wins over generated access without creating managed domain/certificate state. |
 | ROUTE-INTENT-004 | integration | Deployment snapshot route is historical | Caller requests deployment snapshot route scope | Descriptor source is `deployment-snapshot-route` and selected-current route remains resource-owned | Historical snapshot route does not overwrite current resource access. |
+| ROUTE-INTENT-005 | integration | Current redirect semantics beat historical serve snapshot | A ready durable binding is a redirect while its owning deployment snapshot still records a serve route | Current selected route descriptors report `redirect`, exact destination, and exact status | Domain binding detail, resource health/diagnostics, and latest proxy configuration agree; deployment-snapshot scope remains historical. |
 
 ## Route Status Diagnostic Matrix
 

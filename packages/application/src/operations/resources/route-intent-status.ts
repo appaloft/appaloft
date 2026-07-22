@@ -90,6 +90,7 @@ function descriptorFromRoute(input: {
   source: RouteIntentStatusDescriptor["source"];
   route: AccessRoute;
   proxyRouteStatus?: ResourceAccessSummary["proxyRouteStatus"];
+  domainBinding?: DomainBindingSummary;
 }): RouteIntentStatusDescriptor {
   const deploymentId = "deploymentId" in input.route ? input.route.deploymentId : undefined;
   const routeId = descriptorId({
@@ -100,6 +101,12 @@ function descriptorFromRoute(input: {
   });
   const reason = blockingReason(input.proxyRouteStatus);
   const status = reason ? (input.proxyRouteStatus ?? "unknown") : "available";
+  const routeBehavior =
+    input.domainBinding?.redirectTo || input.route.redirectTo
+      ? "redirect"
+      : ((input.domainBinding ? undefined : input.route.routeBehavior) ?? "serve");
+  const redirectTo = input.domainBinding?.redirectTo ?? input.route.redirectTo;
+  const redirectStatus = input.domainBinding?.redirectStatus ?? input.route.redirectStatus;
 
   return {
     schemaVersion: "route-intent-status/v1",
@@ -110,11 +117,17 @@ function descriptorFromRoute(input: {
       host: input.route.hostname,
       pathPrefix: input.route.pathPrefix,
       protocol: input.route.scheme,
-      routeBehavior: "serve",
+      routeBehavior,
+      ...(redirectTo ? { redirectTo } : {}),
+      ...(redirectStatus ? { redirectStatus } : {}),
     },
     context: {
       resourceId: input.resourceId,
       ...(deploymentId ? { deploymentId } : {}),
+      ...(input.domainBinding?.serverId ? { serverId: input.domainBinding.serverId } : {}),
+      ...(input.domainBinding?.destinationId
+        ? { destinationId: input.domainBinding.destinationId }
+        : {}),
     },
     proxy: {
       intent: input.route.proxyKind === "none" ? "not-required" : "required",
@@ -144,6 +157,7 @@ function descriptorFromRoute(input: {
 export function routeIntentStatusDescriptors(input: {
   resourceId: string;
   accessSummary?: ResourceAccessSummary | undefined;
+  domainBindings?: DomainBindingSummary[];
 }): RouteIntentStatusDescriptor[] {
   const access = input.accessSummary;
   if (!access) {
@@ -152,12 +166,19 @@ export function routeIntentStatusDescriptors(input: {
 
   const descriptors: RouteIntentStatusDescriptor[] = [];
   if (access.latestDurableDomainRoute) {
+    const domainBinding = input.domainBindings?.find(
+      (binding) =>
+        binding.status !== "deleted" &&
+        binding.domainName === access.latestDurableDomainRoute?.hostname &&
+        binding.pathPrefix === access.latestDurableDomainRoute.pathPrefix,
+    );
     descriptors.push(
       descriptorFromRoute({
         resourceId: input.resourceId,
         source: "durable-domain-binding",
         route: access.latestDurableDomainRoute,
         proxyRouteStatus: access.proxyRouteStatus,
+        ...(domainBinding ? { domainBinding } : {}),
       }),
     );
   }
@@ -226,7 +247,11 @@ export function selectedRouteIntentStatus(input: {
         host: blockingDurable.domainName,
         pathPrefix: blockingDurable.pathPrefix,
         protocol: scheme,
-        routeBehavior: "serve",
+        routeBehavior: blockingDurable.redirectTo ? "redirect" : "serve",
+        ...(blockingDurable.redirectTo ? { redirectTo: blockingDurable.redirectTo } : {}),
+        ...(blockingDurable.redirectStatus
+          ? { redirectStatus: blockingDurable.redirectStatus }
+          : {}),
       },
       context: {
         resourceId: input.resourceId,
@@ -256,6 +281,7 @@ export function selectedRouteIntentStatus(input: {
 
   return routeIntentStatusDescriptors({
     resourceId: input.resourceId,
-    accessSummary: input.accessSummary,
+    ...(input.accessSummary ? { accessSummary: input.accessSummary } : {}),
+    ...(input.domainBindings ? { domainBindings: input.domainBindings } : {}),
   })[0];
 }

@@ -395,6 +395,8 @@ describe("Domain binding lifecycle", () => {
           pathPrefix: "/",
           proxyKind: "traefik",
           tlsMode: "auto",
+          redirectTo: "example.com",
+          redirectStatus: 301,
           certificatePolicy: "auto",
           status: "ready",
           verificationAttemptCount: 1,
@@ -465,11 +467,14 @@ describe("Domain binding lifecycle", () => {
     const value = detail._unsafeUnwrap();
     expect(value.routeReadiness).toMatchObject({
       status: "ready",
-      routeBehavior: "serve",
+      routeBehavior: "redirect",
       selectedRoute: {
         source: "durable-domain-binding",
         intent: {
           host: "www.example.com",
+          routeBehavior: "redirect",
+          redirectTo: "example.com",
+          redirectStatus: 301,
         },
         proxy: {
           applied: "ready",
