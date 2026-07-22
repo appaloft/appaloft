@@ -64,3 +64,15 @@ test("e2e workflow uses weighted shell shards and runs WebView on the lighter sh
     workflow.indexOf("name: Shell CLI + HTTP E2E"),
   );
 });
+
+test("[RELEASE-HARDENING-009] e2e workflow publishes both required shard checks for every pull request", () => {
+  const pullRequestTrigger = workflow.slice(
+    workflow.indexOf("  pull_request:"),
+    workflow.indexOf("  workflow_dispatch:"),
+  );
+
+  expect(pullRequestTrigger).not.toContain("paths:");
+  expect(pullRequestTrigger).not.toContain("paths-ignore:");
+  expect(workflow).toContain("shard: [1, 2]");
+  expect(workflow).toContain("shard_total: [2]");
+});
