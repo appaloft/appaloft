@@ -253,7 +253,7 @@ function createDeploymentRecord(input: {
 }
 
 describe("pglite deployment repository", () => {
-  test("enforces one active deployment per resource and round-trips superseded deployment identity", async () => {
+  test("[RT-CAP-PRUNE-013] enforces active deployment and server-scoped protection readback", async () => {
     const context = createRepositoryContext();
     const {
       createDatabase,
@@ -539,6 +539,26 @@ describe("pglite deployment repository", () => {
     expect(legacySummary?.timeline[0]?.source).toBe("appaloft");
     const legacyLogs = await deploymentReadModel.findTimeline(context, "dep_active");
     expect(legacyLogs[0]?.source).toBe("appaloft");
+
+    const serverScopedCount = await deploymentReadModel.count(context, {
+      serverId: "srv_repo",
+      includeArchived: true,
+    });
+    const serverScopedDeployments = await deploymentReadModel.list(context, {
+      serverId: "srv_repo",
+      includeArchived: true,
+      limit: serverScopedCount + 1,
+    });
+    expect(serverScopedDeployments).toHaveLength(serverScopedCount);
+    expect(serverScopedDeployments.every((deployment) => deployment.serverId === "srv_repo")).toBe(
+      true,
+    );
+    expect(
+      await deploymentReadModel.count(context, {
+        serverId: "srv_missing",
+        includeArchived: true,
+      }),
+    ).toBe(0);
 
     await database.db
       .updateTable("resources")

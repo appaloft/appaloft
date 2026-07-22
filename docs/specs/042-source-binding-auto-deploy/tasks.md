@@ -73,6 +73,8 @@
 
 - [x] Reconcile ADRs, command/query specs, event specs, error specs, test matrix, public docs,
   operation catalog, `CORE_OPERATIONS.md`, and roadmap notes after Code Round.
+- [x] SRC-AUTO-ROUNDTRIP-001: bind HTTP configure input, persistence, Resource show readback, and Web
+  form rehydration to one executable round-trip contract.
 
 ## Final-Diff Path Policy Round
 

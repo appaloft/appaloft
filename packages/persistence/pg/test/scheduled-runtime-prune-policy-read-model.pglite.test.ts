@@ -8,6 +8,7 @@ import {
   type Command,
   type CommandBus,
   createExecutionContext,
+  type DeploymentReadModel,
   type ExecutionContext,
   PruneServerCapacityCommand,
   PruneServerCapacityUseCase,
@@ -19,6 +20,14 @@ import {
   type ServerRepository,
   toRepositoryContext,
 } from "@appaloft/application";
+
+const emptyDeploymentReadModel: DeploymentReadModel = {
+  count: async () => 0,
+  list: async () => [],
+  findOne: async () => null,
+  findTimeline: async () => [],
+};
+
 import {
   CreatedAt,
   DeploymentTarget,
@@ -500,6 +509,7 @@ describe("scheduled runtime prune policy read model", () => {
       const commandBus = new PruneServerCapacityUseCaseCommandBus(
         new PruneServerCapacityUseCase(
           new MemoryServerRepository(deploymentTarget()),
+          emptyDeploymentReadModel,
           new FakeDestructiveCapacityPruner(),
           auditEvents,
           new FixedIdGenerator(),

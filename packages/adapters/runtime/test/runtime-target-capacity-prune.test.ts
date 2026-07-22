@@ -33,6 +33,10 @@ function unwrap<T>(result: Result<T>): T {
 
 const localCapacityPruneEnabled = process.env.APPALOFT_E2E_CAPACITY_PRUNE_LOCAL === "true";
 const sshCapacityPruneEnabled = process.env.APPALOFT_E2E_SSH_CAPACITY_PRUNE === "true";
+const emptyRuntimeProtection = {
+  activeDeploymentIds: [],
+  rollbackCandidateDeploymentIds: [],
+} as const;
 
 function serverState(
   overrides: {
@@ -148,6 +152,7 @@ describe("runtime target capacity prune adapter", () => {
         before: "2026-01-01T00:05:00.000Z",
         categories: ["source-workspaces"],
         dryRun: false,
+        runtimeProtection: emptyRuntimeProtection,
       },
     );
 
@@ -248,6 +253,40 @@ describe("runtime target capacity prune adapter", () => {
     expect(rendered).not.toContain("docker volume prune");
     expect(rendered).not.toContain("docker system prune");
     expect(rendered).not.toContain("docker rmi");
+  });
+
+  test("[RT-CAP-PRUNE-013] rendered stopped-container prune fails closed around protected deployment ids", () => {
+    expect(() =>
+      renderRuntimeTargetCapacityPruneScript({
+        runtimeRoot: "/var/lib/appaloft/runtime",
+        before: "2026-01-01T00:05:00.000Z",
+        categories: ["stopped-containers"],
+        dryRun: false,
+      }),
+    ).toThrow("requires application runtime protection evidence");
+
+    const rendered = ash.render(
+      renderRuntimeTargetCapacityPruneScript({
+        runtimeRoot: "/var/lib/appaloft/runtime",
+        before: "2026-01-01T00:05:00.000Z",
+        categories: ["stopped-containers"],
+        dryRun: false,
+        runtimeProtection: {
+          activeDeploymentIds: ["dep_current"],
+          rollbackCandidateDeploymentIds: ["dep_previous"],
+        },
+      }),
+    );
+
+    expect(rendered).toContain("APPALOFT_PRUNE_ACTIVE_DEPLOYMENT_IDS='dep_current'");
+    expect(rendered).toContain("APPALOFT_PRUNE_ROLLBACK_DEPLOYMENT_IDS='dep_previous'");
+    expect(rendered).toContain('appaloft.deployment-id');
+    expect(rendered).toContain('appaloft.resource-id');
+    expect(rendered).toContain("ownership-unproven");
+    expect(rendered).toContain("protected_deployment_reason");
+    expect(rendered.indexOf("protected_deployment_reason \"$cdeployment\"")).toBeLessThan(
+      rendered.indexOf('docker rm "$cid"'),
+    );
   });
 
   test("[RT-CAP-PRUNE-010] rendered prune script keeps remote-state marker cleanup opt-in and state-root preserving", () => {
@@ -478,6 +517,7 @@ describe("runtime target capacity prune adapter", () => {
             before: "2099-01-01T00:00:00.000Z",
             categories: ["preview-workspaces"],
             dryRun: true,
+            runtimeProtection: emptyRuntimeProtection,
           },
         );
 
@@ -504,6 +544,7 @@ describe("runtime target capacity prune adapter", () => {
             before: "2099-01-01T00:00:00.000Z",
             categories: ["preview-workspaces"],
             dryRun: false,
+            runtimeProtection: emptyRuntimeProtection,
           },
         );
 
@@ -563,6 +604,7 @@ describe("runtime target capacity prune adapter", () => {
             before: "2099-01-01T00:00:00.000Z",
             categories: ["preview-workspaces"],
             dryRun: true,
+            runtimeProtection: emptyRuntimeProtection,
           },
         );
 
@@ -589,6 +631,7 @@ describe("runtime target capacity prune adapter", () => {
             before: "2099-01-01T00:00:00.000Z",
             categories: ["preview-workspaces"],
             dryRun: false,
+            runtimeProtection: emptyRuntimeProtection,
           },
         );
 

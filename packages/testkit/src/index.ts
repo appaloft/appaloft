@@ -3001,6 +3001,9 @@ export class MemoryDeploymentReadModel implements DeploymentReadModel {
       .filter((deployment) =>
         input?.resourceId ? deployment.resourceId.value === input.resourceId : true,
       )
+      .filter((deployment) =>
+        input?.serverId ? deployment.serverId?.value === input.serverId : true,
+      )
       .filter((deployment) => (input?.includeArchived ? true : !deployment.archivedAt))
       .filter((deployment) => (input?.status ? deployment.status.value === input.status : true))
       .filter((deployment) => (statuses ? statuses.has(deployment.status.value) : true)).length;
@@ -3011,6 +3014,7 @@ export class MemoryDeploymentReadModel implements DeploymentReadModel {
     input?: {
       projectId?: string;
       resourceId?: string;
+      serverId?: string;
       includeArchived?: boolean;
       activeResourcesOnly?: boolean;
       limit?: number;
@@ -3024,6 +3028,9 @@ export class MemoryDeploymentReadModel implements DeploymentReadModel {
       )
       .filter((deployment) =>
         input?.resourceId ? deployment.resourceId.value === input.resourceId : true,
+      )
+      .filter((deployment) =>
+        input?.serverId ? deployment.serverId?.value === input.serverId : true,
       )
       .filter((deployment) => (input?.includeArchived ? true : !deployment.archivedAt))
       .slice(0, input?.limit ?? defaultReadModelListLimit)

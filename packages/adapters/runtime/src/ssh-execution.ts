@@ -58,8 +58,11 @@ import {
 } from "./git-source-metadata";
 import {
   gitSubmoduleUpdateArgs,
-  githubHttpsSubmodulePrefix,
 } from "./git-source-submodules";
+import {
+  gitHubHttpAuthRedactions,
+  remoteGitHubHttpAuthInvocation,
+} from "./git-source-auth";
 import {
   dockerContainerEnvironmentKeyVerificationCommand,
   dockerPublishedPortCommand,
@@ -318,13 +321,6 @@ function isGitHubHttpsLocator(locator: string): boolean {
   } catch {
     return false;
   }
-}
-
-function withGitHubAccessToken(locator: string, accessToken: string): string {
-  const parsed = new URL(locator);
-  parsed.username = "x-access-token";
-  parsed.password = accessToken;
-  return parsed.toString();
 }
 
 function hasUrlCredentials(locator: string): boolean {
@@ -1323,6 +1319,7 @@ export class SshExecutionBackend implements ExecutionBackend {
     cwd: string;
     env: NodeJS.ProcessEnv;
     redactions?: readonly string[];
+    stdin?: string | Uint8Array;
     timeoutMs?: number;
     timeoutMessage?: string;
     onOutput(line: string, level: LogLevel, stream: "stdout" | "stderr"): void;
@@ -1333,6 +1330,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       cwd: input.cwd,
       env: input.env,
       ...(input.redactions ? { redactions: input.redactions } : {}),
+      ...(input.stdin !== undefined ? { stdin: input.stdin } : {}),
       ...(input.timeoutMs ? { timeoutMs: input.timeoutMs } : {}),
       ...(input.timeoutMessage ? { timeoutMessage: input.timeoutMessage } : {}),
       onOutput: input.onOutput,
@@ -1528,7 +1526,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       const redactions: string[] = [];
       let setupCommand = "";
       let cloneEnv = "";
-      let tokenizedGithubHttpsPrefix: string | undefined;
+      let githubAccessToken: string | undefined;
 
       if (source.kind === "git-github-app") {
         if (!isGitHubHttpsLocator(source.locator)) {
@@ -1568,12 +1566,8 @@ export class SshExecutionBackend implements ExecutionBackend {
           };
         }
 
-        cloneLocator = withGitHubAccessToken(source.locator, accessToken);
-        tokenizedGithubHttpsPrefix = withGitHubAccessToken(
-          githubHttpsSubmodulePrefix,
-          accessToken,
-        );
-        redactions.push(accessToken, cloneLocator, tokenizedGithubHttpsPrefix);
+        githubAccessToken = accessToken;
+        redactions.push(...gitHubHttpAuthRedactions(accessToken));
       }
 
       if (source.kind === "git-deploy-key") {
@@ -1631,11 +1625,15 @@ export class SshExecutionBackend implements ExecutionBackend {
         ...(setupCommand ? [setupCommand] : []),
         `${cloneEnv} git clone --depth 1 ${branchOption}${shellQuote(cloneLocator)} ${shellQuote(remoteSourceRoot)}`.trim(),
       ].join(" && ");
+      const authenticatedClone = githubAccessToken
+        ? remoteGitHubHttpAuthInvocation(cloneCommand, githubAccessToken)
+        : undefined;
       let cloneStdoutCount = 0;
       let cloneStderrCount = 0;
       const clone = await this.runRemoteCommandStreaming({
         target: input.target,
-        command: cloneCommand,
+        command: authenticatedClone?.command ?? cloneCommand,
+        ...(authenticatedClone ? { stdin: authenticatedClone.stdin } : {}),
         cwd: input.runtimeDir,
         env: input.env,
         redactions,
@@ -1686,8 +1684,12 @@ export class SshExecutionBackend implements ExecutionBackend {
 
       const submoduleArgs = gitSubmoduleUpdateArgs({
         workdir: remoteSourceRoot,
-        tokenizedGithubHttpsPrefix,
+        rewriteGithubSshToHttps: Boolean(githubAccessToken),
       });
+      const submoduleCommand = `${cloneEnv} git ${submoduleArgs.map((arg) => shellQuote(arg)).join(" ")}`.trim();
+      const authenticatedSubmodule = githubAccessToken
+        ? remoteGitHubHttpAuthInvocation(submoduleCommand, githubAccessToken)
+        : undefined;
       timeline.push(phaseLog("package", `Initialize git submodules on ${input.target.host}`));
       await this.report(context, {
         deploymentId: state.id.value,
@@ -1699,7 +1701,8 @@ export class SshExecutionBackend implements ExecutionBackend {
       let submoduleStderrCount = 0;
       const submodule = await this.runRemoteCommandStreaming({
         target: input.target,
-        command: `${cloneEnv} git ${submoduleArgs.map((arg) => shellQuote(arg)).join(" ")}`.trim(),
+        command: authenticatedSubmodule?.command ?? submoduleCommand,
+        ...(authenticatedSubmodule ? { stdin: authenticatedSubmodule.stdin } : {}),
         cwd: input.runtimeDir,
         env: input.env,
         redactions,

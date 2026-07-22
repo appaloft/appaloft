@@ -46,9 +46,11 @@ import {
   RoutePathPrefix,
   RuntimePlanStrategyValue,
   SourceBaseDirectory,
+  SourceEventDedupeWindowSeconds,
   SourceEventKindValue,
   SourceKindValue,
   SourceLocator,
+  SourcePathPattern,
   StorageDestinationPath,
   StorageVolumeByIdSpec,
   StorageVolumeId,
@@ -278,6 +280,9 @@ function detailedResource(): Resource {
       triggerKind: ResourceAutoDeployTriggerKindValue.rehydrate("git-push"),
       refs: [GitRefText.rehydrate("main")],
       eventKinds: [SourceEventKindValue.rehydrate("push")],
+      includePaths: [SourcePathPattern.rehydrate("apps/web/**")],
+      excludePaths: [SourcePathPattern.rehydrate("apps/web/docs/**")],
+      dedupeWindowSeconds: SourceEventDedupeWindowSeconds.rehydrate(120),
       configuredAt: UpdatedAt.rehydrate("2026-01-01T00:00:02.000Z"),
     })
     ._unsafeUnwrap();
@@ -458,7 +463,7 @@ function unwrap(result: Result<ResourceDetail>): ResourceDetail {
 }
 
 describe("ShowResourceQueryService", () => {
-  test("[RES-PROFILE-SHOW-001] returns durable resource profile fields", async () => {
+  test("[RES-PROFILE-SHOW-001] [SRC-AUTO-ROUNDTRIP-001] returns durable resource profile fields", async () => {
     const result = await createService().execute(createTestContext(), createQuery());
 
     const detail = unwrap(result);
@@ -481,6 +486,9 @@ describe("ShowResourceQueryService", () => {
       triggerKind: "git-push",
       refs: ["main"],
       eventKinds: ["push"],
+      includePaths: ["apps/web/**"],
+      excludePaths: ["apps/web/docs/**"],
+      dedupeWindowSeconds: 120,
       sourceBindingFingerprint: detail.source?.sourceBindingFingerprint,
       updatedAt: "2026-01-01T00:00:02.000Z",
     });

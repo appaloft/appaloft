@@ -68,7 +68,9 @@ sidebar:
 
 - `host`：一个明确的 hostname、IPv4 或 IPv6 地址。raw/bracketed IPv6 都可输入并会规范化
   保存；CIDR/network prefix、URL 和 `host:port` 会被拒绝。Appaloft 不会从 `/64` 之类的
-  网络分配中猜测 `::1`，`port` 必须单独传入。
+  网络分配中猜测 `::1`，`port` 必须单独传入。可解析的单标签内部名称（例如
+  `build-node`）可以作为服务器身份；它不是公网自定义域名，也不能用于公网 DNS
+  所有权校验或托管 TLS 签发。
 - `port`：SSH 端口，默认通常是 22。
 - `user`：用于连接的系统用户。
 - credential：SSH key 路径、已保存凭据或一次性 secret 输入。

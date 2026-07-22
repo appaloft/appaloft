@@ -39,7 +39,8 @@ sidebar:
 
 - 资源：域名最终应该访问哪个 resource。
 - 环境：域名绑定在哪个环境下生效，例如 production 或 staging。
-- Hostname：用户控制的完整域名，例如 `app.example.com`。
+- Hostname：用户控制的完整多标签公网域名，例如 `app.example.com`。单标签内部服务器名称
+  属于服务器连接身份；这里会拒绝它，因为无法为其完成公网 DNS 所有权校验和托管 TLS。
 - 访问策略：是否走默认代理入口、是否需要 HTTPS、是否允许临时未 ready 状态。
 - 证书策略：自动签发、导入证书，或稍后再处理 TLS。
 

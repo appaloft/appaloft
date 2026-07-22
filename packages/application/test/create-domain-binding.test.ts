@@ -1299,21 +1299,23 @@ describe("CreateDomainBindingUseCase", () => {
     expect(eventBus.events).toHaveLength(0);
   });
 
-  test("keeps domain value validation on the command admission path", async () => {
+  test("[ROUTE-TLS-CMD-031] keeps public domain value validation on the command admission path", async () => {
     const { context, eventBus, useCase } = await seedRoutingContext();
 
-    const result = await useCase.execute(context, {
-      projectId: "prj_demo",
-      environmentId: "env_demo",
-      resourceId: "res_demo",
-      serverId: "srv_demo",
-      destinationId: "dst_demo",
-      domainName: "https://www.example.com/app",
-      proxyKind: "traefik",
-    });
+    for (const domainName of ["https://www.example.com/app", "dokploy-server"]) {
+      const result = await useCase.execute(context, {
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        resourceId: "res_demo",
+        serverId: "srv_demo",
+        destinationId: "dst_demo",
+        domainName,
+        proxyKind: "traefik",
+      });
 
-    expect(result.isErr()).toBe(true);
-    expect(result._unsafeUnwrapErr().code).toBe("validation_error");
+      expect(result.isErr()).toBe(true);
+      expect(result._unsafeUnwrapErr().code).toBe("validation_error");
+    }
     expect(eventBus.events).toHaveLength(0);
 
     expect(PublicDomainName.create("www.example.com").isOk()).toBe(true);

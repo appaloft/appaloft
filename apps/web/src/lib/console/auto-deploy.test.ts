@@ -112,7 +112,7 @@ describe("resource auto-deploy console settings", () => {
     expect(source).not.toContain("resourceNewDeploymentHref");
   });
 
-  test("[SRC-AUTO-ENTRY-001] Resource detail exposes auto-deploy settings over the shared command", async () => {
+  test("[SRC-AUTO-ENTRY-001] [SRC-AUTO-ROUNDTRIP-001] Resource detail exposes auto-deploy settings over the shared command and readback", async () => {
     const source = await readFile(
       new URL("../../routes/resources/[resourceId=consoleObjectId]/+page.svelte", import.meta.url),
       "utf8",
@@ -125,6 +125,13 @@ describe("resource auto-deploy console settings", () => {
     expect(source).toContain("autoDeployIncludePaths");
     expect(source).toContain("autoDeployExcludePaths");
     expect(source).toContain("parseAutoDeployPatterns");
+    expect(source).toContain("autoDeployPolicy?.refs.join");
+    expect(source).toContain("autoDeployPolicy?.includePaths?.join");
+    expect(source).toContain("autoDeployPolicy?.excludePaths?.join");
+    expect(source).toContain("autoDeployPolicy?.eventKinds[0]");
+    expect(source).toContain("autoDeployPolicy?.genericWebhookSecretRef");
+    expect(source).toContain("autoDeployPolicy?.dedupeWindowSeconds");
+    expect(source).toContain('orpc.resources.key({ type: "query" })');
     expect(source).toContain("<Dialog.Root bind:open={autoDeployDialogOpen}>");
     expect(source).toContain("data-resource-auto-deploy-form");
     expect(source).toContain("acknowledge-source-binding");

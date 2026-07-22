@@ -22,6 +22,7 @@ import {
   ResourceId,
   ResourceKindValue,
   ResourceName,
+  SourceEventDedupeWindowSeconds,
   SourceEventKindValue,
   SourceKindValue,
   SourceLocator,
@@ -33,7 +34,7 @@ import {
 } from "@appaloft/core";
 
 describe("resource auto-deploy policy persistence", () => {
-  test("[SRC-AUTO-POLICY-001] [SRC-AUTO-POLICY-003] persists Resource auto-deploy policy state", async () => {
+  test("[SRC-AUTO-POLICY-001] [SRC-AUTO-POLICY-003] [SRC-AUTO-ROUNDTRIP-001] persists Resource auto-deploy policy state", async () => {
     const dataDir = mkdtempSync(join(tmpdir(), "appaloft-resource-auto-deploy-"));
     const {
       createDatabase,
@@ -95,6 +96,7 @@ describe("resource auto-deploy policy persistence", () => {
           eventKinds: [SourceEventKindValue.rehydrate("push")],
           includePaths: [SourcePathPattern.rehydrate("apps/web/**")],
           excludePaths: [SourcePathPattern.rehydrate("apps/web/docs/**")],
+          dedupeWindowSeconds: SourceEventDedupeWindowSeconds.rehydrate(120),
           configuredAt: UpdatedAt.rehydrate("2026-01-01T00:01:00.000Z"),
         })
         ._unsafeUnwrap();
@@ -131,6 +133,7 @@ describe("resource auto-deploy policy persistence", () => {
       expect(policy?.eventKinds.map((eventKind) => eventKind.value)).toEqual(["push"]);
       expect(policy?.includePaths?.map((pattern) => pattern.value)).toEqual(["apps/web/**"]);
       expect(policy?.excludePaths?.map((pattern) => pattern.value)).toEqual(["apps/web/docs/**"]);
+      expect(policy?.dedupeWindowSeconds?.value).toBe(120);
       expect(policy?.sourceBindingFingerprint.value).toMatch(/^srcfp_[a-f0-9]{8}$/);
     } finally {
       await database.close();
