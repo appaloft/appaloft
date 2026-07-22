@@ -172,15 +172,15 @@ export class DeploymentProofQueryService {
         );
       }
       currentManagedRoutes = domainBindings
-        .filter(
-          (binding) =>
-            binding.status === "ready" && binding.proxyKind !== "none" && !binding.redirectTo,
-        )
+        .filter((binding) => binding.status === "ready" && binding.proxyKind !== "none")
         .map((binding) => ({
           domainName: binding.domainName,
           pathPrefix: binding.pathPrefix,
           proxyKind: binding.proxyKind,
           tlsMode: binding.tlsMode,
+          routeBehavior: binding.redirectTo ? "redirect" : "serve",
+          ...(binding.redirectTo ? { redirectTo: binding.redirectTo } : {}),
+          ...(binding.redirectStatus ? { redirectStatus: binding.redirectStatus } : {}),
         }));
     } catch {
       return err(
@@ -320,17 +320,34 @@ export class DeploymentProofQueryService {
         observed.health.reasonCode ?? "internal_health_unavailable",
         observed.health.summary,
       );
-    if (observed.access.status === "failed")
+    if (observed.access.status === "failed") {
+      const failedRoute = observed.access.routes?.find((route) => !route.matched);
+      const accessReason: DeploymentProofReasonCode =
+        observed.access.reasonCode === "public_route_redirect_status_mismatch"
+          ? "access_redirect_status_mismatch"
+          : observed.access.reasonCode === "public_route_redirect_destination_mismatch"
+            ? "access_redirect_destination_mismatch"
+            : "public_access_failed";
       mismatches.push(
-        mismatch("public_access_failed", {
+        mismatch(accessReason, {
           severity: "critical",
-          expected: "passed",
-          observed: observed.access.summary,
+          expected:
+            accessReason === "access_redirect_status_mismatch"
+              ? String(failedRoute?.expectedRedirectStatus ?? "governed redirect status")
+              : accessReason === "access_redirect_destination_mismatch"
+                ? (failedRoute?.expectedRedirectTo ?? "governed redirect destination")
+                : "passed",
+          observed:
+            accessReason === "access_redirect_status_mismatch"
+              ? String(failedRoute?.observedStatus ?? "unavailable")
+              : accessReason === "access_redirect_destination_mismatch"
+                ? (failedRoute?.observedRedirectTo ?? "unavailable")
+                : observed.access.summary,
           evidence: [],
           recommendedOperations: ["deployments.retry", "resources.diagnostic-summary"],
         }),
       );
-    else if (observed.access.status === "unavailable")
+    } else if (observed.access.status === "unavailable")
       addUnavailable(
         "access",
         observed.access.reasonCode ?? "public_access_unavailable",

@@ -2954,6 +2954,9 @@ export interface ResourceAccessRouteSummary {
   pathPrefix: string;
   proxyKind: EdgeProxyKind;
   targetPort?: number;
+  routeBehavior?: "serve" | "redirect";
+  redirectTo?: string;
+  redirectStatus?: 301 | 302 | 307 | 308;
   updatedAt: string;
 }
 
@@ -2979,6 +2982,9 @@ export interface PlannedResourceAccessRouteSummary {
   pathPrefix: string;
   proxyKind: EdgeProxyKind;
   targetPort: number;
+  routeBehavior?: "serve" | "redirect";
+  redirectTo?: string;
+  redirectStatus?: 301 | 302 | 307 | 308;
 }
 
 export interface ResourceAccessSummary {
@@ -5978,8 +5984,21 @@ export interface DeploymentProofCheckEvidence {
   summary: string;
   reasonCode?: string;
 }
+export interface DeploymentProofAccessRouteEvidence {
+  url: string;
+  routeBehavior: "serve" | "redirect";
+  expectedDeploymentId?: string;
+  expectedRedirectTo?: string;
+  expectedRedirectStatus?: 301 | 302 | 307 | 308;
+  observedDeploymentId?: string;
+  observedRedirectTo?: string;
+  observedStatus?: number;
+  matched: boolean;
+  reasonCode?: string;
+}
 export interface DeploymentProofAccessEvidence extends DeploymentProofCheckEvidence {
   routeTargetsWorkload?: boolean;
+  routes?: DeploymentProofAccessRouteEvidence[];
 }
 export interface DeploymentProofRecoveryEvidence {
   previousRuntimeRetained?: boolean;
@@ -6002,6 +6021,9 @@ export interface DeploymentProofManagedRoute {
   pathPrefix: string;
   proxyKind: EdgeProxyKind;
   tlsMode: TlsMode;
+  routeBehavior: "serve" | "redirect";
+  redirectTo?: string;
+  redirectStatus?: 301 | 302 | 307 | 308;
 }
 export interface DeploymentProofRuntimeEvidenceInput {
   currentManagedRoutes: readonly DeploymentProofManagedRoute[];
@@ -6034,6 +6056,8 @@ export type DeploymentProofReasonCode =
   | "public_access_unavailable"
   | "public_access_failed"
   | "access_route_workload_mismatch"
+  | "access_redirect_status_mismatch"
+  | "access_redirect_destination_mismatch"
   | "recovery_evidence_unavailable";
 export interface DeploymentProofMismatch {
   reasonCode: DeploymentProofReasonCode;
