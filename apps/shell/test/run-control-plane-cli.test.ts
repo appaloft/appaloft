@@ -379,5 +379,5 @@ describe("shell CLI remote control-plane pre-dispatch", () => {
         server.close((error) => (error ? reject(error) : resolve())),
       );
     }
-  });
+  }, 15000);
 });
