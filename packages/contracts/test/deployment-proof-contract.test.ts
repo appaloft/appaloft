@@ -36,7 +36,22 @@ describe("deployment proof contract", () => {
           matchesPlannedKeySet: true,
         },
         health: { status: "passed", summary: "ok" },
-        access: { status: "passed", summary: "ok", routeTargetsWorkload: true },
+        access: {
+          status: "passed",
+          summary: "ok",
+          routeTargetsWorkload: true,
+          routes: [
+            {
+              url: "https://old.example.test/docs",
+              routeBehavior: "redirect",
+              expectedRedirectStatus: 301,
+              expectedRedirectTo: "https://app.example.test/docs",
+              observedStatus: 301,
+              observedRedirectTo: "https://app.example.test/docs",
+              matched: true,
+            },
+          ],
+        },
         recovery: { previousRuntimeRetained: true },
       },
       mismatches: [],
@@ -51,6 +66,12 @@ describe("deployment proof contract", () => {
       plannedKeyCount: 2,
       keyFingerprint: "sha256:keys",
       matchesPlannedKeySet: true,
+    });
+    expect(parsed.observed.access.routes?.[0]).toMatchObject({
+      routeBehavior: "redirect",
+      expectedRedirectStatus: 301,
+      observedRedirectTo: "https://app.example.test/docs",
+      matched: true,
     });
   });
 });

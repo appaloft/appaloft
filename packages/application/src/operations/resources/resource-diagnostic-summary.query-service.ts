@@ -613,7 +613,7 @@ export class ResourceDiagnosticSummaryQueryService {
     const selectedRoute = selectedRouteIntentStatus({
       resourceId: resource.id,
       accessSummary: access,
-      domainBindings: blockingDurableBinding ? [blockingDurableBinding] : [],
+      domainBindings,
     });
     const selectedRouteBlockingReason = selectedRoute?.blockingReason;
     const selectedRouteBlockingPhase =
@@ -671,6 +671,7 @@ export class ResourceDiagnosticSummaryQueryService {
     const routeIntentStatuses = routeIntentStatusDescriptors({
       resourceId: resource.id,
       accessSummary: access,
+      domainBindings,
     });
 
     return {

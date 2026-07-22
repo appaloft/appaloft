@@ -135,8 +135,13 @@ function joinRoutePath(pathPrefix: string, healthPath: string): string {
 
 interface DeploymentProofManagedRouteProbe {
   requireSuccessfulResponse: boolean;
+  routeBehavior: "serve" | "redirect";
   url: string;
+  expectedRedirectTo?: string;
+  expectedRedirectStatus?: 301 | 302 | 307 | 308;
 }
+
+const deploymentProofRedirectQuery = "appaloft-proof=redirect";
 
 function managedRouteKey(input: {
   domainName: string;
@@ -156,6 +161,11 @@ function managedRouteProbes(
     string,
     { domain: string; pathPrefix: string; scheme: string }
   >();
+  const authoritativeCurrentRouteKeys = new Set(
+    currentManagedRoutes
+      .filter((route) => route.proxyKind !== "none")
+      .map((route) => managedRouteKey(route)),
+  );
   const plannedRouteKeys = new Set<string>();
   for (const route of deployment.runtimePlan.execution.accessRoutes ?? []) {
     if (route.proxyKind === "none" || route.routeBehavior === "redirect" || route.redirectTo) {
@@ -163,13 +173,13 @@ function managedRouteProbes(
     }
     const scheme = route.tlsMode === "auto" ? "https" : "http";
     for (const domain of route.domains) {
-      plannedRouteKeys.add(
-        managedRouteKey({
-          domainName: domain,
-          pathPrefix: route.pathPrefix,
-          tlsMode: route.tlsMode,
-        }),
-      );
+      const plannedRouteKey = managedRouteKey({
+        domainName: domain,
+        pathPrefix: route.pathPrefix,
+        tlsMode: route.tlsMode,
+      });
+      if (authoritativeCurrentRouteKeys.has(plannedRouteKey)) continue;
+      plannedRouteKeys.add(plannedRouteKey);
       const origin = `${scheme}://${domain}`;
       const current = canonicalRouteByOrigin.get(origin);
       if (!current || route.pathPrefix.length < current.pathPrefix.length) {
@@ -181,17 +191,28 @@ function managedRouteProbes(
     ...canonicalRouteByOrigin.values(),
   ].map(({ domain, pathPrefix, scheme }) => ({
     requireSuccessfulResponse: true,
+    routeBehavior: "serve",
     url: `${scheme}://${domain}${joinRoutePath(pathPrefix, healthPath)}`,
   }));
   const currentRouteKeys = new Set<string>();
   for (const route of currentManagedRoutes) {
     if (route.proxyKind === "none") continue;
     const routeKey = managedRouteKey(route);
-    if (plannedRouteKeys.has(routeKey) || currentRouteKeys.has(routeKey)) continue;
+    if (currentRouteKeys.has(routeKey)) continue;
     currentRouteKeys.add(routeKey);
+    const routeBehavior = route.routeBehavior ?? (route.redirectTo ? "redirect" : "serve");
+    const redirectScheme = route.tlsMode === "auto" ? "https" : "http";
+    const redirectSuffix = `${route.pathPrefix}?${deploymentProofRedirectQuery}`;
     probes.push({
       requireSuccessfulResponse: false,
-      url: routeKey,
+      routeBehavior,
+      url: routeBehavior === "redirect" ? `${routeKey}?${deploymentProofRedirectQuery}` : routeKey,
+      ...(routeBehavior === "redirect" && route.redirectTo
+        ? {
+            expectedRedirectTo: `${redirectScheme}://${route.redirectTo}${redirectSuffix}`,
+            expectedRedirectStatus: route.redirectStatus ?? 308,
+          }
+        : {}),
     });
   }
   return probes;
@@ -211,8 +232,9 @@ export async function readDeploymentProofManagedRouteEvidence(
     };
   }
 
+  const routes: NonNullable<DeploymentProofRuntimeEvidence["access"]["routes"]> = [];
   for (const probe of probes) {
-    const { requireSuccessfulResponse, url } = probe;
+    const { requireSuccessfulResponse, routeBehavior, url } = probe;
     for (let attempt = 0; attempt < 6; attempt += 1) {
       let response: Response;
       try {
@@ -224,11 +246,103 @@ export async function readDeploymentProofManagedRouteEvidence(
         return {
           status: "failed",
           routeTargetsWorkload: false,
+          routes: [
+            ...routes,
+            {
+              url,
+              routeBehavior,
+              ...(routeBehavior === "serve" ? { expectedDeploymentId: deployment.id } : {}),
+              ...(probe.expectedRedirectTo
+                ? { expectedRedirectTo: probe.expectedRedirectTo }
+                : {}),
+              ...(probe.expectedRedirectStatus
+                ? { expectedRedirectStatus: probe.expectedRedirectStatus }
+                : {}),
+              matched: false,
+              reasonCode: "public_route_probe_failed",
+            },
+          ],
           summary: `Managed public route probe failed for ${url}: ${
             error instanceof Error ? error.message : "unknown fetch error"
           }`,
           reasonCode: "public_route_probe_failed",
         };
+      }
+
+      if (routeBehavior === "redirect") {
+        const observedLocation = response.headers.get("location");
+        const observedRedirectTo = observedLocation
+          ? new URL(observedLocation, url).toString()
+          : undefined;
+        const expectedRedirectTo = probe.expectedRedirectTo
+          ? new URL(probe.expectedRedirectTo).toString()
+          : undefined;
+        if (response.status !== probe.expectedRedirectStatus) {
+          if (attempt < 5) {
+            await Bun.sleep(200);
+            continue;
+          }
+          return {
+            status: "failed",
+            routeTargetsWorkload: routes.every((route) => route.routeBehavior !== "serve" || route.matched),
+            routes: [
+              ...routes,
+              {
+                url,
+                routeBehavior,
+                ...(expectedRedirectTo ? { expectedRedirectTo } : {}),
+                ...(probe.expectedRedirectStatus
+                  ? { expectedRedirectStatus: probe.expectedRedirectStatus }
+                  : {}),
+                observedStatus: response.status,
+                ...(observedRedirectTo ? { observedRedirectTo } : {}),
+                matched: false,
+                reasonCode: "public_route_redirect_status_mismatch",
+              },
+            ],
+            summary: `Managed public redirect returned HTTP ${response.status} instead of ${probe.expectedRedirectStatus} for ${url}`,
+            reasonCode: "public_route_redirect_status_mismatch",
+          };
+        }
+        if (observedRedirectTo !== expectedRedirectTo) {
+          if (attempt < 5) {
+            await Bun.sleep(200);
+            continue;
+          }
+          return {
+            status: "failed",
+            routeTargetsWorkload: routes.every((route) => route.routeBehavior !== "serve" || route.matched),
+            routes: [
+              ...routes,
+              {
+                url,
+                routeBehavior,
+                ...(expectedRedirectTo ? { expectedRedirectTo } : {}),
+                ...(probe.expectedRedirectStatus
+                  ? { expectedRedirectStatus: probe.expectedRedirectStatus }
+                  : {}),
+                observedStatus: response.status,
+                ...(observedRedirectTo ? { observedRedirectTo } : {}),
+                matched: false,
+                reasonCode: "public_route_redirect_destination_mismatch",
+              },
+            ],
+            summary: `Managed public redirect returned ${observedRedirectTo ?? "no Location"} instead of ${expectedRedirectTo ?? "the governed destination"} for ${url}`,
+            reasonCode: "public_route_redirect_destination_mismatch",
+          };
+        }
+        routes.push({
+          url,
+          routeBehavior,
+          ...(expectedRedirectTo ? { expectedRedirectTo } : {}),
+          ...(probe.expectedRedirectStatus
+            ? { expectedRedirectStatus: probe.expectedRedirectStatus }
+            : {}),
+          observedStatus: response.status,
+          ...(observedRedirectTo ? { observedRedirectTo } : {}),
+          matched: true,
+        });
+        break;
       }
 
       if (!response.ok && (requireSuccessfulResponse || response.status >= 500)) {
@@ -245,7 +359,17 @@ export async function readDeploymentProofManagedRouteEvidence(
       }
 
       const observedDeploymentId = response.headers.get(deploymentRouteIdentityHeaderName);
-      if (observedDeploymentId === deployment.id) break;
+      if (observedDeploymentId === deployment.id) {
+        routes.push({
+          url,
+          routeBehavior,
+          expectedDeploymentId: deployment.id,
+          observedDeploymentId,
+          observedStatus: response.status,
+          matched: true,
+        });
+        break;
+      }
       if (attempt < 5) {
         await Bun.sleep(200);
         continue;
@@ -272,7 +396,8 @@ export async function readDeploymentProofManagedRouteEvidence(
   return {
     status: "passed",
     routeTargetsWorkload: true,
-    summary: `Managed public route served deployment ${deployment.id}`,
+    routes,
+    summary: `Managed public route evidence matched deployment ${deployment.id}`,
   };
 }
 

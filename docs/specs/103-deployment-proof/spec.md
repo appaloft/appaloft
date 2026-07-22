@@ -57,7 +57,9 @@ deployment proof by itself.
 | DEP-PROOF-013 | Route identity unavailable | A managed Caddy or Traefik route responds without the Appaloft deployment identity marker | Proof is read | Verdict is never `verified`; missing route identity is explicit instead of inferred from the observed container label. |
 | DEP-PROOF-014 | Generic SSH workload readback | A successful single-server deployment is managed through the Generic SSH provider | Proof is read | The adapter resolves the governed server credential, inspects only the running container matching deployment/resource and compose target-service labels, and returns sanitized identity, configuration-key, health, and route evidence without raw environment values. |
 | DEP-PROOF-015 | Canonical path-routed access probe | One domain has multiple managed path routes already captured by one Compose deployment plan | Proof is read | The adapter runs the health-path probe on the most general non-redirect planned route once for that origin, preferring `/`, so one health path is not incorrectly appended to every service prefix. |
-| DEP-PROOF-016 | Current route created after deployment snapshot | A ready managed domain binding exists for the Resource but was not present in the immutable deployment plan | Proof is read | Each such current route gets a route-identity probe at its own prefix and must serve the requested deployment identity; an older identity or failed route prevents `verified`, even when a more-general planned route on the same origin passes. |
+| DEP-PROOF-016 | Current route created after deployment snapshot | A ready managed domain binding exists for the Resource but was not present in the immutable deployment plan | Proof is read | Each such current serve route gets a route-identity probe at its own prefix and must serve the requested deployment identity; an older identity or failed route prevents `verified`, even when a more-general planned route on the same origin passes. |
+| DEP-PROOF-017 | Exact current redirect proof | A ready managed domain binding currently redirects with a governed status and destination | Proof is read | A no-follow probe records the source URL, expected and observed status, and normalized `Location`, and uses a deterministic query sentinel to prove path/query preservation; only an exact match passes. Following the redirect or proving the destination workload cannot substitute for this evidence. |
+| DEP-PROOF-018 | Current route truth supersedes historical snapshot | The immutable Deployment snapshot described `serve`, but the current ready DomainBinding describes `redirect`, or vice versa | Proof is read | The current DomainBinding determines the route behavior to prove. Historical route behavior remains attempt history and cannot override current access truth. |
 
 ## Domain Ownership
 
@@ -86,9 +88,9 @@ Planned facts include source revision, artifact intent/reference, safe Resource 
 configuration fingerprints, runtime target, expected verification steps, and planned effects.
 Observed facts include resolved artifact identity when supported, workload identity/generation,
 start/update time, safe configuration fingerprint/generation, internal health, public access,
-provider-stamped route deployment identity, route-to-workload comparison, and previous
-runtime/rollback candidate retention. A container's own deployment label proves workload identity;
-it does not prove which workload the public proxy served.
+provider-stamped route deployment identity, exact redirect status and destination observations,
+route-to-workload comparison, and previous runtime/rollback candidate retention. A container's own
+deployment label proves workload identity; it does not prove which workload the public proxy served.
 
 Evidence references existing timeline cursors/entries, runtime readback, artifact identity,
 health/access observations, and recovery readiness. It must never include raw secrets, raw

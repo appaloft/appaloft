@@ -209,10 +209,11 @@ describe("deployment proof runtime evidence", () => {
       },
     );
 
-    expect(evidence).toEqual({
+    expect(evidence).toMatchObject({
       status: "passed",
       routeTargetsWorkload: true,
-      summary: "Managed public route served deployment dep_v2",
+      summary: "Managed public route evidence matched deployment dep_v2",
+      routes: [{ routeBehavior: "serve", expectedDeploymentId: "dep_v2", observedDeploymentId: "dep_v2", matched: true }],
     });
     expect(attempts).toBe(2);
   });
@@ -290,6 +291,7 @@ describe("deployment proof runtime evidence", () => {
           pathPrefix: "/",
           proxyKind: "traefik",
           tlsMode: "auto",
+          routeBehavior: "serve",
         },
       ],
     );
@@ -340,6 +342,7 @@ describe("deployment proof runtime evidence", () => {
           pathPrefix: "/api",
           proxyKind: "traefik",
           tlsMode: "auto",
+          routeBehavior: "serve",
         },
       ],
     );
@@ -350,6 +353,114 @@ describe("deployment proof runtime evidence", () => {
       status: "failed",
       routeTargetsWorkload: false,
       reasonCode: "public_route_deployment_identity_mismatch",
+    });
+  });
+
+  test("[DEP-PROOF-REDIRECT-002] proves the exact current redirect without following it", async () => {
+    const requested: Array<{ url: string; redirect: RequestRedirect | undefined }> = [];
+    const access = await readDeploymentProofManagedRouteEvidence(
+      {
+        ...deployment,
+        runtimePlan: {
+          ...deployment.runtimePlan,
+          execution: {
+            ...deployment.runtimePlan.execution,
+            accessRoutes: [
+              {
+                proxyKind: "traefik",
+                domains: ["old.example.test"],
+                pathPrefix: "/docs",
+                tlsMode: "auto",
+                routeBehavior: "serve",
+              },
+            ],
+          },
+        },
+      } as DeploymentSummary,
+      async (url, init) => {
+        requested.push({ url, redirect: init?.redirect });
+        return new Response(null, {
+          status: 301,
+          headers: { Location: "https://app.example.test/docs?appaloft-proof=redirect" },
+        });
+      },
+      [
+        {
+          domainName: "old.example.test",
+          pathPrefix: "/docs",
+          proxyKind: "traefik",
+          tlsMode: "auto",
+          routeBehavior: "redirect",
+          redirectTo: "app.example.test",
+          redirectStatus: 301,
+        },
+      ],
+    );
+
+    expect(requested).toEqual([
+      {
+        url: "https://old.example.test/docs?appaloft-proof=redirect",
+        redirect: "manual",
+      },
+    ]);
+    expect(access).toMatchObject({
+      status: "passed",
+      routes: [
+        {
+          url: "https://old.example.test/docs?appaloft-proof=redirect",
+          routeBehavior: "redirect",
+          expectedRedirectStatus: 301,
+          expectedRedirectTo: "https://app.example.test/docs?appaloft-proof=redirect",
+          observedStatus: 301,
+          observedRedirectTo: "https://app.example.test/docs?appaloft-proof=redirect",
+          matched: true,
+        },
+      ],
+    });
+  });
+
+  test("[DEP-PROOF-REDIRECT-003] rejects wrong redirect status and destination with stable reasons", async () => {
+    const redirectRoute = [
+      {
+        domainName: "old.example.test",
+        pathPrefix: "/docs",
+        proxyKind: "traefik" as const,
+        tlsMode: "auto" as const,
+        routeBehavior: "redirect" as const,
+        redirectTo: "app.example.test",
+        redirectStatus: 301 as const,
+      },
+    ];
+    const wrongStatus = await readDeploymentProofManagedRouteEvidence(
+      deployment,
+      async () =>
+        new Response(null, {
+          status: 308,
+          headers: { Location: "https://app.example.test/docs?appaloft-proof=redirect" },
+        }),
+      redirectRoute,
+    );
+    const wrongDestination = await readDeploymentProofManagedRouteEvidence(
+      deployment,
+      async () => new Response(null, { status: 301, headers: { Location: "https://wrong.example.test/docs" } }),
+      redirectRoute,
+    );
+
+    expect(wrongStatus).toMatchObject({
+      status: "failed",
+      reasonCode: "public_route_redirect_status_mismatch",
+      routes: [{ matched: false, expectedRedirectStatus: 301, observedStatus: 308 }],
+    });
+    expect(wrongDestination).toMatchObject({
+      status: "failed",
+      reasonCode: "public_route_redirect_destination_mismatch",
+      routes: [
+        {
+          matched: false,
+          expectedRedirectTo: "https://app.example.test/docs?appaloft-proof=redirect",
+          observedRedirectTo: "https://wrong.example.test/docs",
+        },
+      ],
     });
   });
 

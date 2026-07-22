@@ -719,6 +719,58 @@ describe("ResourceHealthQueryService", () => {
     });
   });
 
+  test("[ROUTE-INTENT-005] current redirect semantics override historical health route snapshot", async () => {
+    const service = createService({
+      resources: [
+        resourceSummary({
+          accessSummary: {
+            latestDurableDomainRoute: {
+              url: "https://www.example.test",
+              hostname: "www.example.test",
+              scheme: "https",
+              deploymentId: "dep_web",
+              deploymentStatus: "succeeded",
+              pathPrefix: "/",
+              proxyKind: "traefik",
+              targetPort: 3000,
+              routeBehavior: "serve",
+              updatedAt: "2026-01-01T00:00:07.000Z",
+            },
+            proxyRouteStatus: "ready",
+            lastRouteRealizationDeploymentId: "dep_web",
+          },
+        }),
+      ],
+      domainBindings: [
+        {
+          id: "dmb_www",
+          projectId: "prj_demo",
+          environmentId: "env_demo",
+          resourceId: "res_web",
+          domainName: "www.example.test",
+          pathPrefix: "/",
+          proxyKind: "traefik",
+          tlsMode: "auto",
+          certificatePolicy: "auto",
+          redirectTo: "example.test",
+          redirectStatus: 301,
+          status: "ready",
+          verificationAttemptCount: 1,
+          createdAt: "2026-01-01T00:00:08.000Z",
+        },
+      ],
+    });
+
+    const result = await service.execute(createTestContext(), createQuery());
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap().publicAccess.routeIntentStatus?.intent).toMatchObject({
+      routeBehavior: "redirect",
+      redirectTo: "example.test",
+      redirectStatus: 301,
+    });
+  });
+
   test("[RES-HEALTH-QRY-024] does not report a route realized by an older deployment as ready", async () => {
     const probeRunner = new StaticResourceHealthProbeRunner();
     const service = createService({

@@ -19,7 +19,8 @@ runtime, health, access, timeline, and recovery evidence.
 - `planned`: source/artifact intent, safe profile/configuration fingerprints, runtime target,
   verification steps, and expected effects;
 - `observed`: artifact, workload identity/generation/time, safe configuration fingerprint, internal
-  health, public access/route, and recovery retention;
+  health, public access/route observations, and recovery retention. Each managed route observation
+  records behavior, expected/observed identity or redirect result, match state, and a safe reason;
 - `mismatches`: stable reason code, severity, expected/observed safe summaries, evidence references,
   and existing recommended operation keys;
 - `evidence`: bounded references to timeline, runtime readback, artifact identity, health, access,
@@ -38,6 +39,9 @@ logs, or raw provider/container payloads.
   planned workload.
 - A managed public route is matched from the proxy-stamped deployment identity observed on the
   response. The current container's deployment label cannot satisfy route ownership by itself.
+- A current redirect route is matched only by a no-follow response with the exact governed status
+  and normalized destination, including path/query preservation. Destination workload identity
+  cannot satisfy source redirect behavior.
 - Current identity/configuration drift after a previously successful attempt returns `stale`.
 - Required failed checks or critical attempted-rollout mismatch return `failed`.
 

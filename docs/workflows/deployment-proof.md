@@ -4,7 +4,9 @@
 load scoped Deployment snapshot
   -> derive planned fingerprints, verification steps, and minimum expected effects
   -> request sanitized current runtime/artifact evidence from selected target adapter
-  -> probe managed public routes and read the provider-stamped deployment identity
+  -> load the bounded complete set of current ready DomainBindings
+  -> probe current serve routes for provider-stamped deployment identity
+  -> probe current redirect routes without following and compare exact status/Location
   -> read bounded timeline, Resource health, access/route, and recovery readiness evidence
   -> compare expected and observed identities/effects
   -> emit stable mismatches and unavailable evidence
@@ -33,9 +35,13 @@ This is the minimum proof comparison, not a general Change Effect planner.
   the attempted rollout failed.
 - A managed route that returns HTTP success with a missing or different deployment identity is a
   route/workload mismatch, not successful access evidence.
+- A managed redirect that returns the wrong redirect status, lacks `Location`, changes the normalized
+  destination, or loses the deterministic path/query sentinel is failed access evidence. Proof never
+  follows that redirect to borrow the destination route's deployment identity.
 - Proof runs the health-path probe once per planned origin, then separately probes the identity of
-  every current ready managed route absent from the immutable plan, because a binding can become
-  ready after the plan was accepted. A non-success response below 500 may still carry valid route
+  every current ready managed route, because a binding can become ready or change behavior after the
+  plan was accepted. Current DomainBinding behavior supersedes the same route key in the immutable
+  plan. A non-success response below 500 may still carry valid route
   identity for a path prefix without a dedicated health endpoint; gateway and upstream 5xx remain
   failed access evidence. Identity-only probes do not follow redirects, so another route's final
   response cannot substitute for the requested prefix's own provider-stamped identity.

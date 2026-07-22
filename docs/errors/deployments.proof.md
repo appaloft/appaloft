@@ -10,3 +10,7 @@
 Target-specific inability to inspect artifact/workload/configuration is normally represented inside a
 successful proof response as `unavailableEvidence`, not as a transport error. The query must not turn
 missing evidence into `verified`.
+
+Managed access failures remain inside proof as stable mismatches. Redirect-specific failures use
+`access_redirect_status_mismatch` or `access_redirect_destination_mismatch`; expected and observed
+values are safe route evidence and never include credentials or response bodies.

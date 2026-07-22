@@ -935,4 +935,94 @@ describe("ResourceProxyConfigurationPreviewQueryService", () => {
       ]),
     );
   });
+
+  test("[ROUTE-INTENT-005][EDGE-PROXY-QRY-008] latest current redirect supersedes a historical serve snapshot", async () => {
+    const context = createTestContext();
+    const deployment = deploymentSummary();
+    const historicalServeDeployment: DeploymentSummary = {
+      ...deployment,
+      id: "dep_durable",
+      runtimePlan: {
+        ...deployment.runtimePlan,
+        execution: {
+          ...deployment.runtimePlan.execution,
+          accessRoutes: [
+            {
+              proxyKind: "traefik",
+              domains: ["www.example.test"],
+              pathPrefix: "/",
+              tlsMode: "auto",
+              targetPort: 3000,
+              routeBehavior: "serve",
+            },
+          ],
+          metadata: {
+            "access.routeSource": "durable-domain-binding",
+            "access.domainBindingId": "dmb_redirect",
+          },
+        },
+      },
+    };
+    const { service } = createService({
+      resources: [
+        resourceSummary({
+          lastDeploymentId: "dep_durable",
+          accessSummary: {
+            latestDurableDomainRoute: {
+              url: "https://www.example.test",
+              hostname: "www.example.test",
+              scheme: "https",
+              deploymentId: "dep_durable",
+              deploymentStatus: "succeeded",
+              pathPrefix: "/",
+              proxyKind: "traefik",
+              targetPort: 3000,
+              updatedAt: "2026-01-01T00:00:03.000Z",
+            },
+            proxyRouteStatus: "ready",
+            lastRouteRealizationDeploymentId: "dep_durable",
+          },
+        }),
+      ],
+      deployments: [historicalServeDeployment],
+      domainBindings: [
+        {
+          id: "dmb_redirect",
+          projectId: "prj_demo",
+          environmentId: "env_demo",
+          resourceId: "res_web",
+          serverId: "srv_demo",
+          destinationId: "dst_demo",
+          domainName: "www.example.test",
+          pathPrefix: "/",
+          proxyKind: "traefik",
+          tlsMode: "auto",
+          redirectTo: "example.test",
+          redirectStatus: 301,
+          certificatePolicy: "auto",
+          status: "ready",
+          verificationAttemptCount: 1,
+          createdAt: "2026-01-01T00:00:03.000Z",
+        },
+      ],
+    });
+    const query = ResourceProxyConfigurationPreviewQuery.create({
+      resourceId: "res_web",
+      routeScope: "latest",
+      includeDiagnostics: true,
+    })._unsafeUnwrap();
+
+    const result = await service.execute(context, query);
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap().routes).toEqual([
+      expect.objectContaining({
+        hostname: "www.example.test",
+        source: "domain-binding",
+        routeBehavior: "redirect",
+        redirectTo: "example.test",
+        redirectStatus: 301,
+      }),
+    ]);
+  });
 });
