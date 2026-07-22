@@ -275,6 +275,21 @@ jobs:
         if: ${{ always() && needs.changes.outputs.lightweight_only != 'true' }}
         run: docker rm --force appaloft-postgres || true
 
+      - name: Reclaim Build Artifacts Before Docker Smoke
+        if: ${{ needs.changes.outputs.lightweight_only != 'true' }}
+        run: |
+          rm -rf \
+            .tmp-binary-smoke \
+            .turbo \
+            apps/docs/.next \
+            apps/docs/dist \
+            apps/shell/dist \
+            apps/web/.svelte-kit \
+            apps/web/build \
+            dist
+          docker image prune --all --force
+          df -h /
+
       - name: Docker Build Smoke
         if: ${{ needs.changes.outputs.lightweight_only != 'true' }}
         run: docker build -t appaloft-all-in-one:ci .

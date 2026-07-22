@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 export interface CiTestBoundaryViolation {
-  readonly rule: "hermetic-package-tests" | "postgres-job-scope";
+  readonly rule: "build-smoke-disk-budget" | "hermetic-package-tests" | "postgres-job-scope";
   readonly message: string;
 }
 
@@ -45,6 +45,15 @@ export function findCiTestBoundaryViolations(workflow: string): CiTestBoundaryVi
         message: `The ${name} job must own its APPALOFT_DATABASE_URL explicitly.`,
       });
     }
+  }
+
+  const reclaimDiskIndex = buildSmoke.indexOf("name: Reclaim Build Artifacts Before Docker Smoke");
+  const dockerBuildIndex = buildSmoke.indexOf("name: Docker Build Smoke");
+  if (reclaimDiskIndex < 0 || dockerBuildIndex < 0 || reclaimDiskIndex > dockerBuildIndex) {
+    violations.push({
+      rule: "build-smoke-disk-budget",
+      message: "Build artifacts must be reclaimed before the Docker build smoke runs.",
+    });
   }
 
   return violations;

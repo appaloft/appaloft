@@ -103,6 +103,8 @@ If tests bypass the runtime or write directly to the database to simulate succes
   - lint, typecheck, full deterministic package tests, integration, build, packaging, docker smoke
   - the canonical package-test job is hermetic and does not inherit a database target
   - `APPALOFT_DATABASE_URL` is scoped to integration and build-smoke jobs that start PostgreSQL
+  - generated host build artifacts are reclaimed before the all-in-one Docker rebuild so the
+    smoke remains within the hosted runner disk budget
 - `e2e.yml`
   - real PostgreSQL, started backend, CLI/API/deployment E2E, Playwright smoke
 - `nightly.yml`

@@ -14,6 +14,9 @@ jobs:
   build-smoke:
     env:
       APPALOFT_DATABASE_URL: postgres://smoke
+    steps:
+      - name: Reclaim Build Artifacts Before Docker Smoke
+      - name: Docker Build Smoke
 `;
 
 describe("CI test boundary check", () => {
@@ -37,6 +40,17 @@ describe("CI test boundary check", () => {
 
     expect(findCiTestBoundaryViolations(workflow)).toContainEqual(
       expect.objectContaining({ rule: "hermetic-package-tests" }),
+    );
+  });
+
+  test("[CI-TEST-BOUNDARY-004] requires disk reclamation before Docker build smoke", () => {
+    const workflow = validWorkflow.replace(
+      "      - name: Reclaim Build Artifacts Before Docker Smoke\n",
+      "",
+    );
+
+    expect(findCiTestBoundaryViolations(workflow)).toContainEqual(
+      expect.objectContaining({ rule: "build-smoke-disk-budget" }),
     );
   });
 });
