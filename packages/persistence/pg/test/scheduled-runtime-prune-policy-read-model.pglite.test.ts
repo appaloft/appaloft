@@ -13,6 +13,7 @@ import {
   PruneServerCapacityCommand,
   PruneServerCapacityUseCase,
   type RepositoryContext,
+  type ResourceReadModel,
   type RuntimeTargetCapacityPruneResult,
   type RuntimeTargetCapacityPruner,
   ScheduledRuntimePrunePolicyResolver,
@@ -26,6 +27,12 @@ const emptyDeploymentReadModel: DeploymentReadModel = {
   list: async () => [],
   findOne: async () => null,
   findTimeline: async () => [],
+};
+
+const emptyResourceReadModel: ResourceReadModel = {
+  count: async () => 0,
+  list: async () => [],
+  findOne: async () => null,
 };
 
 import {
@@ -510,6 +517,7 @@ describe("scheduled runtime prune policy read model", () => {
         new PruneServerCapacityUseCase(
           new MemoryServerRepository(deploymentTarget()),
           emptyDeploymentReadModel,
+          emptyResourceReadModel,
           new FakeDestructiveCapacityPruner(),
           auditEvents,
           new FixedIdGenerator(),

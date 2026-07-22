@@ -41,6 +41,5 @@ Verification evidence:
 - `bun test packages/docs-registry/test/help-topics.test.ts`: 22 passed, 0 failed.
 - `bun test packages/docs-registry/test/operation-coverage.test.ts -t
   "ZSSH-RUNTIME-004|ZSSH-RUNTIME-005"`: 1 passed, 0 failed.
-- Full docs-registry execution is not green because concurrent sandbox operation-catalog additions
-  lack matching public-docs coverage entries; that unrelated mismatch is outside this artifact's
-  allowed file scope.
+- Full docs-registry execution was restored by the owning Sandbox Agent artifact after this
+  scoped verification recorded the concurrent catalog mismatch.

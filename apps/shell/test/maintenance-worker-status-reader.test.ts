@@ -2,9 +2,12 @@ import "../../../packages/application/node_modules/reflect-metadata/Reflect.js";
 
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { resolveConfig } from "@appaloft/config";
 
 import { ConfigMaintenanceWorkerStatusReader } from "../src/maintenance-worker-status-reader";
+
+const repositoryRoot = join(import.meta.dir, "../../..");
 
 describe("ConfigMaintenanceWorkerStatusReader", () => {
   test("[SCHED-MAINT-WORKER-001] exposes scheduled maintenance worker defaults to doctor", async () => {
@@ -484,11 +487,11 @@ describe("ConfigMaintenanceWorkerStatusReader", () => {
 
   test("[SCHED-MAINT-WORKER-001] public docs identify the default-on worker exception", () => {
     const englishDocs = readFileSync(
-      "apps/docs/src/content/docs/en/reference/configuration.md",
+      join(repositoryRoot, "apps/docs/src/content/docs/en/reference/configuration.md"),
       "utf8",
     );
     const defaultDocs = readFileSync(
-      "apps/docs/src/content/docs/reference/configuration.md",
+      join(repositoryRoot, "apps/docs/src/content/docs/reference/configuration.md"),
       "utf8",
     );
 

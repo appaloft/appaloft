@@ -37,6 +37,8 @@ import {
   ShellManagedRedisProvider,
 } from "../src/register-application-services";
 
+const repositoryRoot = join(import.meta.dir, "../../..");
+
 class MemoryDependencyResourceSecretStore implements DependencyResourceSecretStore {
   private readonly values = new Map<string, string>();
 
@@ -591,15 +593,15 @@ describe("ShellDependencyResourceBackupProvider", () => {
     expect(JSON.stringify(restoreArtifact)).not.toContain("raw-password");
 
     const backupSpec = await readFile(
-      "docs/specs/039-dependency-resource-backup-restore/spec.md",
+      join(repositoryRoot, "docs/specs/039-dependency-resource-backup-restore/spec.md"),
       "utf8",
     );
     const dependencyMatrix = await readFile(
-      "docs/testing/dependency-resource-test-matrix.md",
+      join(repositoryRoot, "docs/testing/dependency-resource-test-matrix.md"),
       "utf8",
     );
-    const coreOperations = await readFile("docs/CORE_OPERATIONS.md", "utf8");
-    const roadmap = await readFile("docs/PRODUCT_ROADMAP.md", "utf8");
+    const coreOperations = await readFile(join(repositoryRoot, "docs/CORE_OPERATIONS.md"), "utf8");
+    const roadmap = await readFile(join(repositoryRoot, "docs/PRODUCT_ROADMAP.md"), "utf8");
     expect(backupSpec).toContain("native Postgres and Redis backup/restore commands");
     expect(dependencyMatrix).toContain("native Postgres backup and native Redis logical backup");
     expect(coreOperations).toContain("native Redis logical backup/restore commands");

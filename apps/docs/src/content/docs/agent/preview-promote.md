@@ -11,7 +11,7 @@ sidebar: { label: "预览与 Promote", order: 2 }
 > 成熟度：**Private preview**。不可变 capture、exact-digest candidate 与 durable Promotion 已实现；
 > Candidate Preview 当前覆盖可静态发布产物。
 
-# 从工作区到候选产物
+# 从工作区到候选产物 [#sandbox-preview-promotion]
 
 只有 Sandbox ready 且没有 active Run 时才能 capture。Capture 会验证相对路径、文件数量和总大小，
 为每个文件计算 digest，并用有序安全 manifest 计算 Source Artifact digest。后续预览只读取 Artifact

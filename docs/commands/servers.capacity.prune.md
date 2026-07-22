@@ -56,8 +56,10 @@ The command must:
 3. Normalize omitted `categories` to all allowed first-slice categories.
 4. Load the target/server by id.
 5. Load a complete server-scoped deployment view and derive the in-flight/current-runtime and
-   rollback-candidate deployment id protection sets. If that view is incomplete or changes while
-   it is being read, fail closed before asking a runtime adapter to mutate anything.
+   rollback-candidate deployment id protection sets. Resolve Resource lifecycle for current-runtime
+   owners so a Resource whose archive completed its required runtime stop no longer protects that
+   stopped current runtime. If either view is incomplete or changes while it is being read, fail
+   closed before asking a runtime adapter to mutate anything.
 6. Reject unsupported runtime target providers through the runtime target pruner with
    `runtime_target_unsupported`.
 7. Ask the runtime target pruner to inspect and optionally prune candidates, supplying both
@@ -73,6 +75,9 @@ The command must:
 - Destructive prune requires explicit `dryRun = false`.
 - Matching uses `updatedAt < before`; cutoff-equal candidates are retained.
 - Active runtimes are always skipped.
+- A terminal deployment remains the current-runtime owner while its Resource is active. After
+  Resource archive durably completes its required runtime stop, that deployment no longer receives
+  active-runtime-owner protection; explicit rollback-candidate protection remains unchanged.
 - Rollback candidates and unknown rollback-safety candidates are always skipped.
 - A stopped container is eligible only when Appaloft ownership labels identify both its deployment
   and resource, and its deployment id is absent from the application-derived active-runtime and
@@ -140,6 +145,8 @@ At minimum, Code Round coverage must prove:
   excluded;
 - the application supplies complete server-scoped active-runtime and rollback-candidate protection
   sets, and the adapter checks them before any stopped-container deletion;
+- an archived Resource releases only its stopped current-runtime owner protection and does not
+  release in-flight or explicit rollback-candidate protection;
 - unsupported target providers return `runtime_target_unsupported` before runtime mutation;
 - CLI and HTTP/oRPC dispatch use the shared command schema.
 - remote-state marker cleanup is opt-in, dry-run-first, and preserves the state root and live

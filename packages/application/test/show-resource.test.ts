@@ -159,16 +159,26 @@ class StaticDeploymentReadModel implements DeploymentReadModel {
 }
 
 class StaticStorageVolumeReadModel implements StorageVolumeReadModel {
+  readonly listInputs: Array<Parameters<StorageVolumeReadModel["list"]>[1]> = [];
+  findOneCalls = 0;
+
   constructor(private readonly volumes: StorageVolumeSummary[] = []) {}
 
-  async list(): Promise<StorageVolumeSummary[]> {
-    return this.volumes;
+  async list(
+    _context: ReturnType<typeof toRepositoryContext>,
+    input?: Parameters<StorageVolumeReadModel["list"]>[1],
+  ): Promise<StorageVolumeSummary[]> {
+    this.listInputs.push(input);
+    return this.volumes.filter((volume) =>
+      input?.storageVolumeIds ? input.storageVolumeIds.includes(volume.id) : true,
+    );
   }
 
   async findOne(
     _context: ReturnType<typeof toRepositoryContext>,
     spec: StorageVolumeSelectionSpec,
   ): Promise<StorageVolumeSummary | null> {
+    this.findOneCalls += 1;
     if (!(spec instanceof StorageVolumeByIdSpec)) {
       return null;
     }
@@ -430,6 +440,7 @@ function createService(input?: {
   summaries?: ResourceSummary[];
   deployments?: DeploymentSummary[];
   storageVolumes?: StorageVolumeSummary[];
+  storageVolumeReadModel?: StorageVolumeReadModel;
 }): ShowResourceQueryService {
   const listResourcesQueryService = new ListResourcesQueryService(
     new StaticResourceReadModel(input?.summaries ?? [resourceSummary()]),
@@ -443,7 +454,8 @@ function createService(input?: {
     listResourcesQueryService,
     new StaticDeploymentReadModel(input?.deployments ?? [deploymentSummary()]),
     new FixedClock(),
-    input?.storageVolumes ? new StaticStorageVolumeReadModel(input.storageVolumes) : undefined,
+    input?.storageVolumeReadModel ??
+      (input?.storageVolumes ? new StaticStorageVolumeReadModel(input.storageVolumes) : undefined),
   );
 }
 
@@ -599,23 +611,47 @@ describe("ShowResourceQueryService", () => {
         attachedAt: CreatedAt.rehydrate("2026-01-01T00:03:00.000Z"),
       })
       ._unsafeUnwrap();
+    resource
+      .attachStorage({
+        attachmentId: ResourceStorageAttachmentId.rehydrate("rsa_cache"),
+        storageVolumeId: StorageVolumeId.rehydrate("stv_cache"),
+        storageVolumeKind: StorageVolumeKindValue.rehydrate("named-volume"),
+        destinationPath: StorageDestinationPath.create("/cache")._unsafeUnwrap(),
+        mountMode: ResourceStorageMountModeValue.rehydrate("read-write"),
+        attachedAt: CreatedAt.rehydrate("2026-01-01T00:04:00.000Z"),
+      })
+      ._unsafeUnwrap();
+
+    const storageVolumeReadModel = new StaticStorageVolumeReadModel([
+      {
+        id: "stv_data",
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        name: "PocketBase data",
+        slug: "pocketbase-data",
+        kind: "named-volume",
+        lifecycleStatus: "active",
+        attachmentCount: 1,
+        attachments: [],
+        createdAt: "2026-01-01T00:02:00.000Z",
+      },
+      {
+        id: "stv_cache",
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        name: "Application cache",
+        slug: "application-cache",
+        kind: "named-volume",
+        lifecycleStatus: "active",
+        attachmentCount: 1,
+        attachments: [],
+        createdAt: "2026-01-01T00:02:30.000Z",
+      },
+    ]);
 
     const result = await createService({
       resources: [resource],
-      storageVolumes: [
-        {
-          id: "stv_data",
-          projectId: "prj_demo",
-          environmentId: "env_demo",
-          name: "PocketBase data",
-          slug: "pocketbase-data",
-          kind: "named-volume",
-          lifecycleStatus: "active",
-          attachmentCount: 1,
-          attachments: [],
-          createdAt: "2026-01-01T00:02:00.000Z",
-        },
-      ],
+      storageVolumeReadModel,
     }).execute(createTestContext(), createQuery());
 
     const detail = unwrap(result);
@@ -631,7 +667,20 @@ describe("ShowResourceQueryService", () => {
         applicationDataLabel: "PocketBase data",
         attachedAt: "2026-01-01T00:03:00.000Z",
       },
+      {
+        id: "rsa_cache",
+        storageVolumeId: "stv_cache",
+        storageVolumeName: "Application cache",
+        storageVolumeKind: "named-volume",
+        destinationPath: "/cache",
+        mountMode: "read-write",
+        attachedAt: "2026-01-01T00:04:00.000Z",
+      },
     ]);
+    expect(storageVolumeReadModel.listInputs).toEqual([
+      { storageVolumeIds: ["stv_data", "stv_cache"] },
+    ]);
+    expect(storageVolumeReadModel.findOneCalls).toBe(0);
   });
 
   test("[RES-PROFILE-DRIFT-001] reports informational resource versus latest snapshot drift", async () => {

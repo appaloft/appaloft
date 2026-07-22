@@ -322,6 +322,7 @@ export class PgStorageVolumeReadModel implements StorageVolumeReadModel {
     input?: {
       projectId?: string;
       environmentId?: string;
+      storageVolumeIds?: readonly string[];
     },
   ): Promise<StorageVolumeSummary[]> {
     const executor = resolveRepositoryExecutor(this.db, context);
@@ -355,6 +356,9 @@ export class PgStorageVolumeReadModel implements StorageVolumeReadModel {
         }
         if (input?.environmentId) {
           query = query.where("environment_id", "=", input.environmentId);
+        }
+        if (input?.storageVolumeIds?.length) {
+          query = query.where("id", "in", [...input.storageVolumeIds]);
         }
 
         const rows = await query.execute();

@@ -195,7 +195,9 @@ before older archives become eligible for sync retention or explicit marker clea
 Destructive prune still requires `--dry-run false`. Appaloft never runs broad `docker system prune`
 or Docker volume prune from this command, and it preserves Appaloft state roots, active runtimes,
 live remote state, rollback candidates, deployment snapshots, audit/events, logs, and business
-state.
+state. Archiving a Resource first stops its current runtime; after that archive succeeds, its
+stopped current container may become eligible for exact stopped-container prune, but any explicitly
+retained rollback candidate remains protected.
 
 ## Scheduled runtime prune policy [#scheduled-runtime-prune-policy]
 

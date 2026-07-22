@@ -22,7 +22,7 @@
   },
   "scripts": {
     "lint": "biome check .",
-    "test": "bun test",
+    "test": "bun test --max-concurrency=1",
     "typecheck": "tsc -p tsconfig.json --noEmit --checkers 4"
   }
 }

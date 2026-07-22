@@ -68,6 +68,31 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft sandbox template list` - `sandbox-templates.list`
 - `appaloft sandbox template show <templateId>` - `sandbox-templates.show`
 - `appaloft sandbox template delete <templateId>` - `sandbox-templates.delete`
+- `appaloft sandbox agent runtime create <sandboxId>` - `sandboxes.agents.runtimes.create`
+- `appaloft sandbox agent runtime list <sandboxId>` - `sandboxes.agents.runtimes.list`
+- `appaloft sandbox agent runtime show <sandboxId> <runtimeId>` - `sandboxes.agents.runtimes.show`
+- `appaloft sandbox agent runtime terminate <sandboxId> <runtimeId>` - `sandboxes.agents.runtimes.terminate`
+- `appaloft sandbox agent run create <sandboxId> <runtimeId>` - `sandboxes.agents.runs.create`
+- `appaloft sandbox agent run list <runtimeId>` - `sandboxes.agents.runs.list`
+- `appaloft sandbox agent run show <runtimeId> <runId>` - `sandboxes.agents.runs.show`
+- `appaloft sandbox agent run cancel <runtimeId> <runId>` - `sandboxes.agents.runs.cancel`
+- `appaloft sandbox agent run events <runId>` - `sandboxes.agents.runs.events`
+- `appaloft sandbox agent run events <runId> --follow` - `sandboxes.agents.runs.events.stream`
+- `appaloft sandbox agent approval list <runId>` - `sandboxes.agents.approvals.list`
+- `appaloft sandbox agent approval show <approvalId>` - `sandboxes.agents.approvals.show`
+- `appaloft sandbox agent approval resolve <approvalId>` - `sandboxes.agents.approvals.resolve`
+- `appaloft sandbox artifact create <sandboxId>` - `sandboxes.source-artifacts.create`
+- `appaloft sandbox artifact list <sandboxId>` - `sandboxes.source-artifacts.list`
+- `appaloft sandbox artifact show <artifactId>` - `sandboxes.source-artifacts.show`
+- `appaloft sandbox artifact delete <artifactId>` - `sandboxes.source-artifacts.delete`
+- `appaloft sandbox preview create <artifactId>` - `sandboxes.candidate-previews.create`
+- `appaloft sandbox preview show <previewId>` - `sandboxes.candidate-previews.show`
+- `appaloft sandbox preview delete <previewId>` - `sandboxes.candidate-previews.delete`
+- `appaloft sandbox promote plan <sandboxId>` - `sandboxes.promotions.plan`
+- `appaloft sandbox promote list <sandboxId>` - `sandboxes.promotions.list`
+- `appaloft sandbox promote show <promotionId>` - `sandboxes.promotions.show`
+- `appaloft sandbox promote accept <promotionId>` - `sandboxes.promotions.accept`
+- `appaloft sandbox promote retry <promotionId>` - `sandboxes.promotions.retry`
 
 - `appaloft auth bootstrap-status` - `auth.bootstrap-status`
 - `appaloft auth bootstrap-first-admin` - `auth.bootstrap-first-admin`

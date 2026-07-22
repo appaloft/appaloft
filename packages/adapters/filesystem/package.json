@@ -10,9 +10,12 @@
     "@appaloft/core": "workspace:*",
     "@appaloft/deployment-config": "workspace:*"
   },
+  "devDependencies": {
+    "reflect-metadata": "^0.2.2"
+  },
   "scripts": {
     "lint": "biome check .",
-    "test": "bun test",
+    "test": "bun test --preload reflect-metadata",
     "typecheck": "tsc -p tsconfig.json --noEmit --checkers 4"
   }
 }

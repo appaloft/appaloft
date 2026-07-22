@@ -9302,6 +9302,7 @@ export interface ResourceReadModel {
     input?: {
       projectId?: string;
       environmentId?: string;
+      resourceIds?: readonly string[];
       includePreviewResources?: boolean;
       lifecycleStatus?: "active" | "archived" | "all";
       limit?: number;
@@ -9316,6 +9317,7 @@ export interface StorageVolumeReadModel {
     input?: {
       projectId?: string;
       environmentId?: string;
+      storageVolumeIds?: readonly string[];
     },
   ): Promise<StorageVolumeSummary[]>;
   findOne(

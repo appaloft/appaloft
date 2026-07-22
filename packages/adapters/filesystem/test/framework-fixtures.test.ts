@@ -650,7 +650,10 @@ const frameworkFixtures: FrameworkFixtureExpectation[] = [
     detectedFiles: ["cargo-toml"],
     fixedVersions: {
       filesContain: {
-        "Cargo.toml": ['axum = "0.8.1"', 'tokio = "1.43.0"'],
+        "Cargo.toml": [
+          'axum = "0.8.1"',
+          'tokio = { version = "1.43.0", features = ["macros", "net", "rt-multi-thread"] }',
+        ],
       },
     },
   },

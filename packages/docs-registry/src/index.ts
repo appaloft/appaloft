@@ -87,6 +87,50 @@ export interface PublicDocsHelpTopic {
 }
 
 export const publicDocsHelpTopics = {
+  "agent.sandbox-runtime": {
+    id: "agent.sandbox-runtime",
+    title: "Sandbox Agent Runtime",
+    description:
+      "How applications create Sandbox Agent Runtimes, submit and observe Runs, and resolve approval requests.",
+    page: {
+      "zh-CN": "agent/run-agents",
+      "en-US": "en/agent/run-agents",
+    },
+    anchor: "sandbox-agent-runtime",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["cli", "http-api", "mcp"],
+    relatedOperation: "sandboxes.agents.runtimes.create",
+    aliases: ["sandbox agent", "agent runtime", "agent run", "approval", "沙箱 Agent"],
+    specReferences: [
+      "docs/specs/109-sandbox-agent-runtime-and-application-promotion/spec.md",
+      "docs/testing/sandbox-agent-runtime-and-application-promotion-test-matrix.md",
+    ],
+  },
+  "agent.preview-promotion": {
+    id: "agent.preview-promotion",
+    title: "Sandbox preview and promotion",
+    description:
+      "How an immutable Sandbox Source Artifact becomes a verified candidate and an explicitly accepted production promotion.",
+    page: {
+      "zh-CN": "agent/preview-promote",
+      "en-US": "en/agent/preview-promote",
+    },
+    anchor: "sandbox-preview-promotion",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["cli", "http-api", "mcp"],
+    relatedOperation: "sandboxes.source-artifacts.create",
+    aliases: ["source artifact", "candidate preview", "promotion", "候选预览", "发布提升"],
+    specReferences: [
+      "docs/specs/109-sandbox-agent-runtime-and-application-promotion/spec.md",
+      "docs/testing/sandbox-agent-runtime-and-application-promotion-test-matrix.md",
+    ],
+  },
   "errors.knowledge-contract": {
     id: "errors.knowledge-contract",
     title: "Error knowledge contract",
@@ -2955,6 +2999,43 @@ export type PublicDocsOperationCoverage =
     };
 
 export const publicDocsOperationCoverage = [
+  ...[
+    "sandboxes.agents.runtimes.create",
+    "sandboxes.agents.runtimes.list",
+    "sandboxes.agents.runtimes.show",
+    "sandboxes.agents.runtimes.terminate",
+    "sandboxes.agents.runs.create",
+    "sandboxes.agents.runs.list",
+    "sandboxes.agents.runs.show",
+    "sandboxes.agents.runs.cancel",
+    "sandboxes.agents.runs.events",
+    "sandboxes.agents.runs.events.stream",
+    "sandboxes.agents.approvals.list",
+    "sandboxes.agents.approvals.show",
+    "sandboxes.agents.approvals.resolve",
+  ].map((operationKey) => ({
+    operationKey,
+    status: "documented" as const,
+    topicId: "agent.sandbox-runtime" as const,
+  })),
+  ...[
+    "sandboxes.source-artifacts.create",
+    "sandboxes.source-artifacts.list",
+    "sandboxes.source-artifacts.show",
+    "sandboxes.source-artifacts.delete",
+    "sandboxes.candidate-previews.create",
+    "sandboxes.candidate-previews.show",
+    "sandboxes.candidate-previews.delete",
+    "sandboxes.promotions.plan",
+    "sandboxes.promotions.list",
+    "sandboxes.promotions.show",
+    "sandboxes.promotions.accept",
+    "sandboxes.promotions.retry",
+  ].map((operationKey) => ({
+    operationKey,
+    status: "documented" as const,
+    topicId: "agent.preview-promotion" as const,
+  })),
   ...[
     "sandboxes.create",
     "sandboxes.list",
