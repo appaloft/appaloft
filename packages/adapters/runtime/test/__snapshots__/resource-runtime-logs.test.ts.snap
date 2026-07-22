@@ -36,7 +36,7 @@ exports[`RuntimeResourceRuntimeLogReader opens generic SSH Docker container logs
   "-o",
   "ControlPersist=120s",
   "-o",
-  "ControlPath=/var/folders/5_/jbzry3nj0xb52hy9mh6kjhj40000gn/T/appaloft-runtime-log-141t6re.sock",
+  "ControlPath=<control-path>",
   "deployer@203.0.113.10",
   "docker logs --tail '25' --follow 'appaloft-dep_web'",
 ]

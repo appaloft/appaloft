@@ -401,7 +401,9 @@ describe("RuntimeResourceRuntimeLogReader", () => {
     expect(calls[0]?.args.at(-1)).toBe(
       "docker logs --tail '25' --follow 'appaloft-dep_web'",
     );
-    const snapshotArgs = [...(calls[0]?.args ?? [])];
+    const snapshotArgs = (calls[0]?.args ?? []).map((arg) =>
+      arg.startsWith("ControlPath=") ? "ControlPath=<control-path>" : arg,
+    );
     const identityIndex = snapshotArgs.indexOf("-i");
     if (identityIndex >= 0 && snapshotArgs[identityIndex + 1]) {
       snapshotArgs[identityIndex + 1] = "<identity-file>";
