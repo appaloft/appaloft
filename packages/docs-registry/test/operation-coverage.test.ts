@@ -1,5 +1,7 @@
 import "../../application/node_modules/reflect-metadata/Reflect.js";
 import { describe, expect, test } from "bun:test";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { operationCatalog } from "../../application/src/operation-catalog";
 import {
@@ -7,6 +9,12 @@ import {
   publicDocsHelpTopics,
   publicDocsOperationCoverage,
 } from "../src";
+
+const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
+
+function repositoryFile(path: string): ReturnType<typeof Bun.file> {
+  return Bun.file(resolve(repositoryRoot, path));
+}
 
 describe("public docs operation coverage", () => {
   function requireCatalogOperation(operationKey: string) {
@@ -117,8 +125,8 @@ describe("public docs operation coverage", () => {
   test("[SRV-LIFE-ENTRY-012-WEB] server detail lifecycle actions record Web docs coverage", async () => {
     const topic = publicDocsHelpTopics["server.deployment-target"];
     const proxyTopic = publicDocsHelpTopics["server.proxy-readiness"];
-    const workflow = await Bun.file("docs/workflows/deployment-target-lifecycle.md").text();
-    const implementationPlan = await Bun.file(
+    const workflow = await repositoryFile("docs/workflows/deployment-target-lifecycle.md").text();
+    const implementationPlan = await repositoryFile(
       "docs/implementation/deployment-target-lifecycle-plan.md",
     ).text();
 
@@ -185,8 +193,10 @@ describe("public docs operation coverage", () => {
   test("[ROUTE-TLS-ENTRY-002][ROUTE-TLS-ENTRY-007] resource-scoped domain binding Web coverage is traceable", async () => {
     const bindingTopic = publicDocsHelpTopics["domain.custom-domain-binding"];
     const ownershipTopic = publicDocsHelpTopics["domain.ownership-check"];
-    const testMatrix = await Bun.file("docs/testing/routing-domain-and-tls-test-matrix.md").text();
-    const implementationPlan = await Bun.file(
+    const testMatrix = await repositoryFile(
+      "docs/testing/routing-domain-and-tls-test-matrix.md",
+    ).text();
+    const implementationPlan = await repositoryFile(
       "docs/implementation/domain-bindings.create-plan.md",
     ).text();
 
@@ -220,11 +230,13 @@ describe("public docs operation coverage", () => {
 
   test("[RES-DIAG-ENTRY-001] resource diagnostic copy Web coverage is traceable", async () => {
     const topic = publicDocsHelpTopics["diagnostics.safe-support-payload"];
-    const testMatrix = await Bun.file(
+    const testMatrix = await repositoryFile(
       "docs/testing/resource-diagnostic-summary-test-matrix.md",
     ).text();
-    const workflow = await Bun.file("docs/workflows/resource-diagnostic-summary.md").text();
-    const plan = await Bun.file("docs/implementation/resource-diagnostic-summary-plan.md").text();
+    const workflow = await repositoryFile("docs/workflows/resource-diagnostic-summary.md").text();
+    const plan = await repositoryFile(
+      "docs/implementation/resource-diagnostic-summary-plan.md",
+    ).text();
 
     expect(getPublicDocsOperationCoverage("resources.diagnostic-summary")).toMatchObject({
       operationKey: "resources.diagnostic-summary",
@@ -270,12 +282,14 @@ describe("public docs operation coverage", () => {
   });
 
   test("[AGENT-DEPLOY-SKILL-001][AGENT-DEPLOY-SKILL-002] deploy skill is safe and operation-backed", async () => {
-    const skill = await Bun.file("docs/agent/appaloft-deploy-skill.md").text();
-    const fullSkill = await Bun.file("docs/agent/appaloft-skill.md").text();
-    const packagedSkill = await Bun.file("skills/appaloft/SKILL.md").text();
-    const surfaces = await Bun.file("skills/appaloft/references/surfaces.md").text();
-    const cliEntrypoints = await Bun.file("skills/appaloft/references/cli-entrypoints.md").text();
-    const mcpTools = await Bun.file("skills/appaloft/references/mcp-tools.md").text();
+    const skill = await repositoryFile("docs/agent/appaloft-deploy-skill.md").text();
+    const fullSkill = await repositoryFile("docs/agent/appaloft-skill.md").text();
+    const packagedSkill = await repositoryFile("skills/appaloft/SKILL.md").text();
+    const surfaces = await repositoryFile("skills/appaloft/references/surfaces.md").text();
+    const cliEntrypoints = await repositoryFile(
+      "skills/appaloft/references/cli-entrypoints.md",
+    ).text();
+    const mcpTools = await repositoryFile("skills/appaloft/references/mcp-tools.md").text();
     const operationKeys = new Set(operationCatalog.map((operation) => operation.key));
 
     for (const operationKey of [
@@ -355,16 +369,16 @@ describe("public docs operation coverage", () => {
     );
     expect(topic.description).toContain("without recovery mutations");
 
-    const durableAdr = await Bun.file(
+    const durableAdr = await repositoryFile(
       "docs/decisions/ADR-054-durable-process-delivery-baseline.md",
     ).text();
-    const durableSpec = await Bun.file(
+    const durableSpec = await repositoryFile(
       "docs/specs/060-durable-process-delivery-baseline/spec.md",
     ).text();
-    const durablePlan = await Bun.file(
+    const durablePlan = await repositoryFile(
       "docs/specs/060-durable-process-delivery-baseline/plan.md",
     ).text();
-    const durableMatrix = await Bun.file(
+    const durableMatrix = await repositoryFile(
       "docs/testing/durable-process-delivery-test-matrix.md",
     ).text();
 
@@ -446,11 +460,11 @@ describe("public docs operation coverage", () => {
           "docs/specs/049-redis-provider-native-realization/plan.md",
           "docs/RESOURCES.md",
           "docs/PRODUCT_ROADMAP.md",
-        ].map((path) => Bun.file(path).text()),
+        ].map((path) => repositoryFile(path).text()),
       )
     ).join("\n");
-    const apiDescriptions = await Bun.file("packages/orpc/src/index.ts").text();
-    const resourcesOverview = await Bun.file("docs/RESOURCES.md").text();
+    const apiDescriptions = await repositoryFile("packages/orpc/src/index.ts").text();
+    const resourcesOverview = await repositoryFile("docs/RESOURCES.md").text();
     const normalizedSourceOfTruth = sourceOfTruth.replace(/\s+/g, " ");
     expect(sourceOfTruth).toContain("injected provider capability");
     expect(sourceOfTruth).toContain("shell-local artifact materialization");
@@ -506,29 +520,31 @@ describe("public docs operation coverage", () => {
     }
 
     const topic = publicDocsHelpTopics["storage.volume-lifecycle"];
-    const coreOperations = await Bun.file("docs/CORE_OPERATIONS.md").text();
-    const matrix = await Bun.file("docs/testing/storage-volume-test-matrix.md").text();
-    const runtimeSpec = await Bun.file(
+    const coreOperations = await repositoryFile("docs/CORE_OPERATIONS.md").text();
+    const matrix = await repositoryFile("docs/testing/storage-volume-test-matrix.md").text();
+    const runtimeSpec = await repositoryFile(
       "docs/specs/070-storage-volume-runtime-realization-and-cleanup/spec.md",
     ).text();
-    const lifecycleSpec = await Bun.file(
+    const lifecycleSpec = await repositoryFile(
       "docs/specs/032-storage-volume-lifecycle-and-resource-attachment/spec.md",
     ).text();
-    const lifecyclePlan = await Bun.file(
+    const lifecyclePlan = await repositoryFile(
       "docs/specs/032-storage-volume-lifecycle-and-resource-attachment/plan.md",
     ).text();
-    const runtimePlan = await Bun.file(
+    const runtimePlan = await repositoryFile(
       "docs/specs/070-storage-volume-runtime-realization-and-cleanup/plan.md",
     ).text();
-    const runtimeAdr = await Bun.file(
+    const runtimeAdr = await repositoryFile(
       "docs/decisions/ADR-064-storage-volume-runtime-realization-and-cleanup.md",
     ).text();
-    const workflow = await Bun.file("docs/workflows/storage-volume-lifecycle.md").text();
-    const cleanupSpec = await Bun.file("docs/commands/storage-volumes.cleanup-runtime.md").text();
-    const publicDocs = await Bun.file(
+    const workflow = await repositoryFile("docs/workflows/storage-volume-lifecycle.md").text();
+    const cleanupSpec = await repositoryFile(
+      "docs/commands/storage-volumes.cleanup-runtime.md",
+    ).text();
+    const publicDocs = await repositoryFile(
       "apps/docs/src/content/docs/en/resources/storage-volumes.md",
     ).text();
-    const roadmap = await Bun.file("docs/PRODUCT_ROADMAP.md").text();
+    const roadmap = await repositoryFile("docs/PRODUCT_ROADMAP.md").text();
 
     expect(topic.specReferences).toEqual(
       expect.arrayContaining([
@@ -619,21 +635,21 @@ describe("public docs operation coverage", () => {
   });
 
   test("[DEP-BIND-SECRET-RESOLVE-007] dependency runtime injection operation map records active secret resolution", async () => {
-    const operationMap = await Bun.file("docs/BUSINESS_OPERATION_MAP.md").text();
-    const domainModel = await Bun.file("docs/DOMAIN_MODEL.md").text();
-    const adr = await Bun.file(
+    const operationMap = await repositoryFile("docs/BUSINESS_OPERATION_MAP.md").text();
+    const domainModel = await repositoryFile("docs/DOMAIN_MODEL.md").text();
+    const adr = await repositoryFile(
       "docs/decisions/ADR-041-dependency-runtime-secret-value-resolution.md",
     ).text();
-    const spec = await Bun.file(
+    const spec = await repositoryFile(
       "docs/specs/048-dependency-runtime-secret-value-resolution/spec.md",
     ).text();
-    const redisRealizationPlan = await Bun.file(
+    const redisRealizationPlan = await repositoryFile(
       "docs/specs/049-redis-provider-native-realization/plan.md",
     ).text();
-    const tasks = await Bun.file(
+    const tasks = await repositoryFile(
       "docs/specs/048-dependency-runtime-secret-value-resolution/tasks.md",
     ).text();
-    const roadmap = await Bun.file("docs/PRODUCT_ROADMAP.md").text();
+    const roadmap = await repositoryFile("docs/PRODUCT_ROADMAP.md").text();
     const runtimeInjectionRow = operationMap
       .split("\n")
       .find((line) => line.startsWith("| Materialize dependency binding runtime environment |"));
@@ -834,41 +850,41 @@ describe("public docs operation coverage", () => {
       topicId: "advanced.maintenance-workers",
     });
     const maintenanceTopic = publicDocsHelpTopics["advanced.maintenance-workers"];
-    const diagnosticsMatrix = await Bun.file(
+    const diagnosticsMatrix = await repositoryFile(
       "docs/testing/system-diagnostics-test-matrix.md",
     ).text();
-    const advancedDocs = await Bun.file(
+    const advancedDocs = await repositoryFile(
       "apps/docs/src/content/docs/en/self-hosting/advanced.md",
     ).text();
-    const configDocs = await Bun.file(
+    const configDocs = await repositoryFile(
       "apps/docs/src/content/docs/en/reference/configuration.md",
     ).text();
-    const zhConfigDocs = await Bun.file(
+    const zhConfigDocs = await repositoryFile(
       "apps/docs/src/content/docs/reference/configuration.md",
     ).text();
-    const maintenanceWorkerStatusReader = await Bun.file(
+    const maintenanceWorkerStatusReader = await repositoryFile(
       "apps/shell/src/maintenance-worker-status-reader.ts",
     ).text();
-    const domainModel = await Bun.file("docs/DOMAIN_MODEL.md").text();
-    const scheduledRuntimePrunePlan = await Bun.file(
+    const domainModel = await repositoryFile("docs/DOMAIN_MODEL.md").text();
+    const scheduledRuntimePrunePlan = await repositoryFile(
       "docs/specs/061-scheduled-runtime-prune-automation/plan.md",
     ).text();
-    const scheduledRuntimePruneSpec = await Bun.file(
+    const scheduledRuntimePruneSpec = await repositoryFile(
       "docs/specs/061-scheduled-runtime-prune-automation/spec.md",
     ).text();
-    const scheduledRuntimePruneTasks = await Bun.file(
+    const scheduledRuntimePruneTasks = await repositoryFile(
       "docs/specs/061-scheduled-runtime-prune-automation/tasks.md",
     ).text();
-    const scheduledHistoryRetentionPlan = await Bun.file(
+    const scheduledHistoryRetentionPlan = await repositoryFile(
       "docs/specs/067-scheduled-history-retention-automation/plan.md",
     ).text();
-    const scheduledHistoryRetentionSpec = await Bun.file(
+    const scheduledHistoryRetentionSpec = await repositoryFile(
       "docs/specs/067-scheduled-history-retention-automation/spec.md",
     ).text();
-    const scheduledHistoryRetentionTasks = await Bun.file(
+    const scheduledHistoryRetentionTasks = await repositoryFile(
       "docs/specs/067-scheduled-history-retention-automation/tasks.md",
     ).text();
-    const scheduledHistoryRetentionMatrix = await Bun.file(
+    const scheduledHistoryRetentionMatrix = await repositoryFile(
       "docs/testing/scheduled-history-retention-test-matrix.md",
     ).text();
     const normalizedScheduledRuntimePruneTasks = scheduledRuntimePruneTasks.replace(/\s+/g, " ");
@@ -980,19 +996,25 @@ describe("public docs operation coverage", () => {
 
   test("[TERM-SESSION-ENTRY-007] [TERM-SESSION-ENTRY-008] terminal lifecycle operations record docs coverage", async () => {
     const topic = publicDocsHelpTopics["server.terminal-session"];
-    const openSpec = await Bun.file("docs/commands/terminal-sessions.open.md").text();
-    const lifecycleCommandSpec = await Bun.file(
+    const openSpec = await repositoryFile("docs/commands/terminal-sessions.open.md").text();
+    const lifecycleCommandSpec = await repositoryFile(
       "docs/commands/terminal-sessions.lifecycle.md",
     ).text();
-    const lifecycleSpec = await Bun.file("docs/queries/terminal-sessions.lifecycle.md").text();
-    const errorSpec = await Bun.file("docs/errors/terminal-sessions.md").text();
-    const workflow = await Bun.file("docs/workflows/operator-terminal-session.md").text();
-    const matrix = await Bun.file("docs/testing/operator-terminal-session-test-matrix.md").text();
-    const adr = await Bun.file(
+    const lifecycleSpec = await repositoryFile(
+      "docs/queries/terminal-sessions.lifecycle.md",
+    ).text();
+    const errorSpec = await repositoryFile("docs/errors/terminal-sessions.md").text();
+    const workflow = await repositoryFile("docs/workflows/operator-terminal-session.md").text();
+    const matrix = await repositoryFile(
+      "docs/testing/operator-terminal-session-test-matrix.md",
+    ).text();
+    const adr = await repositoryFile(
       "docs/decisions/ADR-022-operator-terminal-session-boundary.md",
     ).text();
-    const roadmap = await Bun.file("docs/PRODUCT_ROADMAP.md").text();
-    const plan = await Bun.file("docs/implementation/operator-terminal-session-plan.md").text();
+    const roadmap = await repositoryFile("docs/PRODUCT_ROADMAP.md").text();
+    const plan = await repositoryFile(
+      "docs/implementation/operator-terminal-session-plan.md",
+    ).text();
 
     for (const operationKey of [
       "terminal-sessions.open",
@@ -1239,7 +1261,7 @@ describe("public docs operation coverage", () => {
     );
     expect(topic.webSurfaces?.join("\n")).toContain("preview policy");
 
-    const operationMap = await Bun.file("docs/BUSINESS_OPERATION_MAP.md").text();
+    const operationMap = await repositoryFile("docs/BUSINESS_OPERATION_MAP.md").text();
     const previewWorkflowRow = operationMap
       .split("\n")
       .find((line) => line.startsWith("| Product-grade preview deployments |"));
@@ -1278,55 +1300,61 @@ describe("public docs operation coverage", () => {
     expect(durableProcessRow).toContain("process-attempt claim/completion bindings");
     expect(durableProcessRow).not.toContain("Preview cleanup, certificate issuance");
 
-    const previewWorkflowDoc = await Bun.file(
+    const previewWorkflowDoc = await repositoryFile(
       "docs/workflows/github-action-pr-preview-deploy.md",
     ).text();
-    const productGradePreviewSpec = await Bun.file(
+    const productGradePreviewSpec = await repositoryFile(
       "docs/specs/046-product-grade-preview-deployments/spec.md",
     ).text();
-    const productGradePreviewMatrix = await Bun.file(
+    const productGradePreviewMatrix = await repositoryFile(
       "docs/testing/product-grade-preview-deployments-test-matrix.md",
     ).text();
-    const domainModel = await Bun.file("docs/DOMAIN_MODEL.md").text();
-    const durableProcessMatrix = await Bun.file(
+    const domainModel = await repositoryFile("docs/DOMAIN_MODEL.md").text();
+    const durableProcessMatrix = await repositoryFile(
       "docs/testing/durable-process-delivery-test-matrix.md",
     ).text();
-    const productGradePreviewPlan = await Bun.file(
+    const productGradePreviewPlan = await repositoryFile(
       "docs/specs/046-product-grade-preview-deployments/plan.md",
     ).text();
-    const productGradePreviewTasks = await Bun.file(
+    const productGradePreviewTasks = await repositoryFile(
       "docs/specs/046-product-grade-preview-deployments/tasks.md",
     ).text();
-    const actionServerConfigPlan = await Bun.file(
+    const actionServerConfigPlan = await repositoryFile(
       "docs/specs/050-action-server-config-deploy/plan.md",
     ).text();
-    const actionServerConfigTasks = await Bun.file(
+    const actionServerConfigTasks = await repositoryFile(
       "docs/specs/050-action-server-config-deploy/tasks.md",
     ).text();
-    const actionServerConfigSpec = await Bun.file(
+    const actionServerConfigSpec = await repositoryFile(
       "docs/specs/050-action-server-config-deploy/spec.md",
     ).text();
-    const actionServerConfigWorkflow = await Bun.file(
+    const actionServerConfigWorkflow = await repositoryFile(
       "docs/workflows/action-server-config-deploy.md",
     ).text();
-    const controlPlaneMatrix = await Bun.file(
+    const controlPlaneMatrix = await repositoryFile(
       "docs/testing/control-plane-modes-test-matrix.md",
     ).text();
-    const controlPlaneWorkflow = await Bun.file(
+    const controlPlaneWorkflow = await repositoryFile(
       "docs/workflows/control-plane-mode-selection-and-adoption.md",
     ).text();
-    const controlPlaneAdr = await Bun.file(
+    const controlPlaneAdr = await repositoryFile(
       "docs/decisions/ADR-025-control-plane-modes-and-action-execution.md",
     ).text();
-    const actionDeployPlan = await Bun.file(
+    const actionDeployPlan = await repositoryFile(
       "docs/implementation/github-action-deploy-action-plan.md",
     ).text();
-    const deployActionYaml = await Bun.file(".github/actions/deploy-action/action.yml").text();
-    const deployActionReadme = await Bun.file(".github/actions/deploy-action/README.md").text();
-    const maintenanceWorkerStatusReader = await Bun.file(
+    const deployActionYaml = await repositoryFile(
+      ".github/actions/deploy-action/action.yml",
+    ).text();
+    const deployActionReadme = await repositoryFile(
+      ".github/actions/deploy-action/README.md",
+    ).text();
+    const maintenanceWorkerStatusReader = await repositoryFile(
       "apps/shell/src/maintenance-worker-status-reader.ts",
     ).text();
-    const webHomeViewTest = await Bun.file("apps/web/test/e2e-webview/home.webview.test.ts").text();
+    const webHomeViewTest = await repositoryFile(
+      "apps/web/test/e2e-webview/home.webview.test.ts",
+    ).text();
     const normalizedActionServerConfigSpec = actionServerConfigSpec.replace(/\s+/g, " ");
     const normalizedActionServerConfigWorkflow = actionServerConfigWorkflow.replace(/\s+/g, " ");
     const normalizedControlPlaneMatrix = controlPlaneMatrix.replace(/\s+/g, " ");
@@ -1488,7 +1516,7 @@ describe("public docs operation coverage", () => {
       "product-grade preview orchestration remain migration gaps",
     );
 
-    const roadmap = await Bun.file("docs/PRODUCT_ROADMAP.md").text();
+    const roadmap = await repositoryFile("docs/PRODUCT_ROADMAP.md").text();
     const previewRoadmapBlock = roadmap.slice(
       roadmap.indexOf("Phase 7 product-grade preview deployment Spec Round"),
       roadmap.indexOf("Phase 7 preview deployment Docs Round"),
@@ -1511,8 +1539,10 @@ describe("public docs operation coverage", () => {
   test("[PREVIEW-CLEANUP-ENTRY-001] preview cleanup docs record active API and CLI coverage", async () => {
     const coverage = getPublicDocsOperationCoverage("deployments.cleanup-preview");
     const topic = publicDocsHelpTopics["deployment.preview-cleanup"];
-    const commandSpec = await Bun.file("docs/commands/deployments.cleanup-preview.md").text();
-    const matrix = await Bun.file("docs/testing/deployments.cleanup-preview-test-matrix.md").text();
+    const commandSpec = await repositoryFile("docs/commands/deployments.cleanup-preview.md").text();
+    const matrix = await repositoryFile(
+      "docs/testing/deployments.cleanup-preview-test-matrix.md",
+    ).text();
 
     expect(coverage).toMatchObject({
       operationKey: "deployments.cleanup-preview",
@@ -1629,13 +1659,13 @@ describe("public docs operation coverage", () => {
       );
     }
 
-    const resourceVariableSpec = await Bun.file(
+    const resourceVariableSpec = await repositoryFile(
       "docs/commands/resources.import-variables.md",
     ).text();
-    const resourceVariablePlan = await Bun.file(
+    const resourceVariablePlan = await repositoryFile(
       "docs/specs/031-resource-secret-operations-and-effective-config/plan.md",
     ).text();
-    const resourceProfileMatrix = await Bun.file(
+    const resourceProfileMatrix = await repositoryFile(
       "docs/testing/resource-profile-lifecycle-test-matrix.md",
     ).text();
 
@@ -1684,7 +1714,7 @@ describe("public docs operation coverage", () => {
   });
 
   test("[ZSSH-RUNTIME-004][ZSSH-RUNTIME-005] workload catalog docs record GitHub Actions real-target gates", async () => {
-    const workflow = await Bun.file(
+    const workflow = await repositoryFile(
       "docs/workflows/workload-framework-detection-and-planning.md",
     ).text();
     const frameworkCatalogArtifacts = await Promise.all(
@@ -1695,48 +1725,50 @@ describe("public docs operation coverage", () => {
         "docs/specs/015-python-framework-planner-contract-and-asgi-wsgi-catalog/plan.md",
         "docs/specs/016-jvm-framework-planner-contract-and-spring-boot-catalog/spec.md",
         "docs/specs/016-jvm-framework-planner-contract-and-spring-boot-catalog/plan.md",
-      ].map((path) => Bun.file(path).text()),
+      ].map((path) => repositoryFile(path).text()),
     );
     const frameworkCatalogSource = frameworkCatalogArtifacts.join("\n");
-    const matrix = await Bun.file(
+    const matrix = await repositoryFile(
       "docs/testing/workload-framework-detection-and-planning-test-matrix.md",
     ).text();
-    const substratePlan = await Bun.file(
+    const substratePlan = await repositoryFile(
       "docs/implementation/deployment-runtime-substrate-plan.md",
     ).text();
-    const quickDeployMatrix = await Bun.file("docs/testing/quick-deploy-test-matrix.md").text();
-    const quickDeployWorkflow = await Bun.file("docs/workflows/quick-deploy.md").text();
-    const resourcesCreateCommand = await Bun.file("docs/commands/resources.create.md").text();
-    const resourcesCreateMatrix = await Bun.file(
+    const quickDeployMatrix = await repositoryFile(
+      "docs/testing/quick-deploy-test-matrix.md",
+    ).text();
+    const quickDeployWorkflow = await repositoryFile("docs/workflows/quick-deploy.md").text();
+    const resourcesCreateCommand = await repositoryFile("docs/commands/resources.create.md").text();
+    const resourcesCreateMatrix = await repositoryFile(
       "docs/testing/resources.create-test-matrix.md",
     ).text();
-    const resourcesFirstDeployWorkflow = await Bun.file(
+    const resourcesFirstDeployWorkflow = await repositoryFile(
       "docs/workflows/resources.create-and-first-deploy.md",
     ).text();
-    const deploymentPlanMatrix = await Bun.file(
+    const deploymentPlanMatrix = await repositoryFile(
       "docs/testing/deployment-plan-preview-test-matrix.md",
     ).text();
-    const deploymentPlanSpec = await Bun.file(
+    const deploymentPlanSpec = await repositoryFile(
       "docs/specs/013-deployment-plan-preview/spec.md",
     ).text();
-    const deploymentPlanPlan = await Bun.file(
+    const deploymentPlanPlan = await repositoryFile(
       "docs/specs/013-deployment-plan-preview/plan.md",
     ).text();
-    const zsshSpec = await Bun.file(
+    const zsshSpec = await repositoryFile(
       "docs/specs/019-zero-to-ssh-supported-catalog-acceptance-harness/spec.md",
     ).text();
-    const zsshPlan = await Bun.file(
+    const zsshPlan = await repositoryFile(
       "docs/specs/019-zero-to-ssh-supported-catalog-acceptance-harness/plan.md",
     ).text();
-    const zsshTasks = await Bun.file(
+    const zsshTasks = await repositoryFile(
       "docs/specs/019-zero-to-ssh-supported-catalog-acceptance-harness/tasks.md",
     ).text();
-    const operationMap = await Bun.file("docs/BUSINESS_OPERATION_MAP.md").text();
+    const operationMap = await repositoryFile("docs/BUSINESS_OPERATION_MAP.md").text();
     const normalizedOperationMap = operationMap.replace(/\s+/g, " ");
     const staticSiteWorkflowRow = operationMap
       .split("\n")
       .find((line) => line.startsWith("| First-class static site deployment |"));
-    const roadmap = await Bun.file("docs/PRODUCT_ROADMAP.md").text();
+    const roadmap = await repositoryFile("docs/PRODUCT_ROADMAP.md").text();
 
     for (const source of [workflow, matrix, zsshSpec, zsshPlan, operationMap, roadmap]) {
       expect(source).toContain("GitHub Actions");
@@ -1873,8 +1905,10 @@ describe("public docs operation coverage", () => {
   });
 
   test("[QUICK-DEPLOY-WF-052][CONFIG-FILE-STATE-010] SSH target docs record GitHub Actions real-target gates", async () => {
-    const quickDeployMatrix = await Bun.file("docs/testing/quick-deploy-test-matrix.md").text();
-    const deploymentConfigMatrix = await Bun.file(
+    const quickDeployMatrix = await repositoryFile(
+      "docs/testing/quick-deploy-test-matrix.md",
+    ).text();
+    const deploymentConfigMatrix = await repositoryFile(
       "docs/testing/deployment-config-file-test-matrix.md",
     ).text();
 
@@ -1894,7 +1928,7 @@ describe("public docs operation coverage", () => {
     );
     expect(deploymentConfigMatrix).toContain(".github/workflows/public-launch-cron-smoke.yml");
     expect(deploymentConfigMatrix).toContain("require_public_launch_cron_smoke");
-    const deploymentConfigWorkflow = await Bun.file(
+    const deploymentConfigWorkflow = await repositoryFile(
       "docs/workflows/deployment-config-file-bootstrap.md",
     ).text();
     expect(deploymentConfigWorkflow).toContain("GitHub Actions/local explicit shell e2e harness");
@@ -1927,22 +1961,34 @@ describe("public docs operation coverage", () => {
     }
 
     const topic = publicDocsHelpTopics["scheduled-task.resource-lifecycle"];
-    const plan = await Bun.file("docs/specs/044-scheduled-task-resource-shape/plan.md").text();
-    const spec = await Bun.file("docs/specs/044-scheduled-task-resource-shape/spec.md").text();
-    const tasks = await Bun.file("docs/specs/044-scheduled-task-resource-shape/tasks.md").text();
-    const matrix = await Bun.file("docs/testing/scheduled-task-resource-test-matrix.md").text();
-    const roadmap = await Bun.file("docs/PRODUCT_ROADMAP.md").text();
-    const shellRuntimeRegistration = await Bun.file(
+    const plan = await repositoryFile(
+      "docs/specs/044-scheduled-task-resource-shape/plan.md",
+    ).text();
+    const spec = await repositoryFile(
+      "docs/specs/044-scheduled-task-resource-shape/spec.md",
+    ).text();
+    const tasks = await repositoryFile(
+      "docs/specs/044-scheduled-task-resource-shape/tasks.md",
+    ).text();
+    const matrix = await repositoryFile(
+      "docs/testing/scheduled-task-resource-test-matrix.md",
+    ).text();
+    const roadmap = await repositoryFile("docs/PRODUCT_ROADMAP.md").text();
+    const shellRuntimeRegistration = await repositoryFile(
       "apps/shell/src/register-runtime-dependencies.ts",
     ).text();
-    const runAdmissionService = await Bun.file(
+    const runAdmissionService = await repositoryFile(
       "packages/application/src/operations/scheduled-tasks/scheduled-task-run-admission.service.ts",
     ).text();
-    const scheduledTaskRunner = await Bun.file("apps/shell/src/scheduled-task-runner.ts").text();
-    const processAttemptJournalTest = await Bun.file(
+    const scheduledTaskRunner = await repositoryFile(
+      "apps/shell/src/scheduled-task-runner.ts",
+    ).text();
+    const processAttemptJournalTest = await repositoryFile(
       "packages/persistence/pg/test/process-attempt-journal.pglite.test.ts",
     ).text();
-    const webInstanceTest = await Bun.file("apps/web/test/e2e-webview/home.webview.test.ts").text();
+    const webInstanceTest = await repositoryFile(
+      "apps/web/test/e2e-webview/home.webview.test.ts",
+    ).text();
     const normalizedSpec = spec.replace(/\s+/g, " ");
 
     expect(topic.specReferences).toEqual(
@@ -1954,8 +2000,8 @@ describe("public docs operation coverage", () => {
     );
     expect(topic.webSurfaces?.join("\n")).toContain("Resource detail scheduled-task controls");
 
-    const operationMap = await Bun.file("docs/BUSINESS_OPERATION_MAP.md").text();
-    const scheduledTaskDocs = await Bun.file(
+    const operationMap = await repositoryFile("docs/BUSINESS_OPERATION_MAP.md").text();
+    const scheduledTaskDocs = await repositoryFile(
       "apps/docs/src/content/docs/en/resources/scheduled-tasks.md",
     ).text();
     const scheduledTaskRow = operationMap
@@ -2065,34 +2111,34 @@ describe("public docs operation coverage", () => {
       });
     }
 
-    const operationMap = await Bun.file("docs/BUSINESS_OPERATION_MAP.md").text();
-    const usageMatrix = await Bun.file(
+    const operationMap = await repositoryFile("docs/BUSINESS_OPERATION_MAP.md").text();
+    const usageMatrix = await repositoryFile(
       "docs/testing/runtime-usage-attribution-test-matrix.md",
     ).text();
-    const monitoringMatrix = await Bun.file(
+    const monitoringMatrix = await repositoryFile(
       "docs/testing/runtime-monitoring-observation-test-matrix.md",
     ).text();
-    const monitoringSpec = await Bun.file(
+    const monitoringSpec = await repositoryFile(
       "docs/specs/069-runtime-monitoring-observation-boundary/spec.md",
     ).text();
-    const productRoadmap = await Bun.file("docs/PRODUCT_ROADMAP.md").text();
-    const usageSpec = await Bun.file(
+    const productRoadmap = await repositoryFile("docs/PRODUCT_ROADMAP.md").text();
+    const usageSpec = await repositoryFile(
       "docs/specs/068-runtime-usage-attribution-and-monitoring/spec.md",
     ).text();
-    const inspectQuerySpec = await Bun.file("docs/queries/runtime-usage.inspect.md").text();
-    const usagePlan = await Bun.file(
+    const inspectQuerySpec = await repositoryFile("docs/queries/runtime-usage.inspect.md").text();
+    const usagePlan = await repositoryFile(
       "docs/specs/068-runtime-usage-attribution-and-monitoring/plan.md",
     ).text();
-    const usageTasks = await Bun.file(
+    const usageTasks = await repositoryFile(
       "docs/specs/068-runtime-usage-attribution-and-monitoring/tasks.md",
     ).text();
-    const monitoringPlan = await Bun.file(
+    const monitoringPlan = await repositoryFile(
       "docs/specs/069-runtime-monitoring-observation-boundary/plan.md",
     ).text();
-    const monitoringTasks = await Bun.file(
+    const monitoringTasks = await repositoryFile(
       "docs/specs/069-runtime-monitoring-observation-boundary/tasks.md",
     ).text();
-    const apiDescriptions = await Bun.file("packages/orpc/src/index.ts").text();
+    const apiDescriptions = await repositoryFile("packages/orpc/src/index.ts").text();
     const runtimeMonitoringRow = operationMap
       .split("\n")
       .find((line) => line.startsWith("| Runtime usage attribution and monitoring |"));

@@ -11,7 +11,7 @@ sidebar: { label: "Preview and promote", order: 2 }
 > Maturity: **Private preview**. Immutable capture, exact-digest candidates, and durable Promotion
 > are implemented. Candidate Preview currently covers statically publishable output.
 
-# From workspace to candidate
+# From workspace to candidate [#sandbox-preview-promotion]
 
 Capture requires a ready Sandbox with no active Run. It validates relative paths, file count, and
 total size; hashes every file; and hashes an ordered safe manifest. Preview then reads only the

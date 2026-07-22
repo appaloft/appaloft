@@ -8,13 +8,24 @@ const frameworkFixturesRoot = new URL(
   import.meta.url,
 ).pathname;
 
-const localDockerSubstrateSmoke =
-  "apps/shell/test/e2e/quick-deploy-local-docker-substrates.workflow.e2e.ts";
-const localDockerFrameworkSmoke =
-  "apps/shell/test/e2e/quick-deploy-framework-fixtures-docker.workflow.e2e.ts";
-const genericSshFrameworkSmoke =
-  "apps/shell/test/e2e/quick-deploy-framework-fixtures-ssh.workflow.e2e.ts";
-const frameworkFixtureWorkflow = ".github/workflows/framework-fixture-e2e.yml";
+const repositoryRoot = join(import.meta.dir, "../../../..");
+
+const localDockerSubstrateSmoke = join(
+  repositoryRoot,
+  "apps/shell/test/e2e/quick-deploy-local-docker-substrates.workflow.e2e.ts",
+);
+const localDockerFrameworkSmoke = join(
+  repositoryRoot,
+  "apps/shell/test/e2e/quick-deploy-framework-fixtures-docker.workflow.e2e.ts",
+);
+const genericSshFrameworkSmoke = join(
+  repositoryRoot,
+  "apps/shell/test/e2e/quick-deploy-framework-fixtures-ssh.workflow.e2e.ts",
+);
+const frameworkFixtureWorkflow = join(
+  repositoryRoot,
+  ".github/workflows/framework-fixture-e2e.yml",
+);
 const frameworkSmokeSourceOfTruthDocs = [
   "docs/specs/014-framework-planner-contract-and-js-ts-catalog/spec.md",
   "docs/specs/014-framework-planner-contract-and-js-ts-catalog/plan.md",
@@ -333,7 +344,7 @@ describe("framework fixture real smoke coverage", () => {
     const localDockerSubstrateSmokeSource = readFileSync(localDockerSubstrateSmoke, "utf8");
     const genericSshSmokeSource = readFileSync(genericSshFrameworkSmoke, "utf8");
     const frameworkFixtureWorkflowSource = readFileSync(frameworkFixtureWorkflow, "utf8");
-    const packageJson = JSON.parse(readFileSync("package.json", "utf8")) as {
+    const packageJson = JSON.parse(readFileSync(join(repositoryRoot, "package.json"), "utf8")) as {
       scripts?: Record<string, string>;
     };
     const scripts = packageJson.scripts ?? {};
@@ -496,7 +507,7 @@ describe("framework fixture real smoke coverage", () => {
 
   test("[WF-PLAN-SMOKE-005][WF-PLAN-SMOKE-006] source-of-truth docs do not preserve stale full-catalog smoke gaps", () => {
     for (const docPath of frameworkSmokeSourceOfTruthDocs) {
-      const text = readFileSync(docPath, "utf8");
+      const text = readFileSync(join(repositoryRoot, docPath), "utf8");
       expect(text, docPath).not.toContain(
         "fixture-by-fixture real Docker/SSH smoke remains a migration gap",
       );
@@ -532,10 +543,13 @@ describe("framework fixture real smoke coverage", () => {
     }
 
     const workflow = readFileSync(
-      "docs/workflows/workload-framework-detection-and-planning.md",
+      join(repositoryRoot, "docs/workflows/workload-framework-detection-and-planning.md"),
       "utf8",
     );
-    const quickDeployWorkflow = readFileSync("docs/workflows/quick-deploy.md", "utf8");
+    const quickDeployWorkflow = readFileSync(
+      join(repositoryRoot, "docs/workflows/quick-deploy.md"),
+      "utf8",
+    );
     expect(workflow).toContain("shared GitHub Actions/local explicit");
     expect(workflow).toContain("framework smoke descriptors");
     expect(workflow).toContain("framework descriptor list plus the local Docker substrate smoke");

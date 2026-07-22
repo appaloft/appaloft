@@ -11,7 +11,7 @@ sidebar: { label: "运行 Agent", order: 0 }
 > 成熟度：**Private preview**。API 已实现；Pi 适配器要求运营方提供固定版本、固定 digest 的
 > Sandbox template，并设置 `APPALOFT_PI_SANDBOX_TEMPLATE_ID`。
 
-# 在 Sandbox 中运行 Agent
+# 在 Sandbox 中运行 Agent [#sandbox-agent-runtime]
 
 Agent Runtime 从属于一个已经 ready 的 Sandbox。应用开发者保留 chat/session；Appaloft 管理隔离
 执行、每个 Runtime 同时一个 active Run、fresh/continue lineage、事件 readback 和取消。

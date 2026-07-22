@@ -129,6 +129,9 @@ describe("storage volume persistence", () => {
         context,
         StorageVolumeByIdSpec.create(StorageVolumeId.rehydrate("stv_demo")),
       );
+      const summariesByIds = await storageReadModel.list(context, {
+        storageVolumeIds: ["stv_missing", "stv_demo"],
+      });
 
       expect(persistedResource?.toState().storageAttachments[0]?.destinationPath.value).toBe(
         "/data",
@@ -156,6 +159,7 @@ describe("storage volume persistence", () => {
           },
         ],
       });
+      expect(summariesByIds.map((item) => item.id)).toEqual(["stv_demo"]);
       await expect(storageReadModel.countAttachments(context, "stv_demo")).resolves.toBe(1);
 
       await database.db

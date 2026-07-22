@@ -3139,8 +3139,9 @@ describe("pglite persistence integration", () => {
         archivedAt: "2026-01-01T00:01:00.000Z",
       });
       const context = createTestExecutionContext();
+      const resourceReadModel = new PgResourceReadModel(database.db);
       const listResourcesQueryService = new ListResourcesQueryService(
-        new PgResourceReadModel(database.db),
+        resourceReadModel,
         new EmptyDestinationRepository(),
         new EmptyServerRepository(),
         new DisabledDefaultAccessDomainProvider(),
@@ -3156,6 +3157,12 @@ describe("pglite persistence integration", () => {
         projectId: archivedTarget.projectId,
         lifecycleStatus: "archived",
       });
+      const archivedByIds = await resourceReadModel.list(toRepositoryContext(context), {
+        resourceIds: [activeTarget.resourceId, archivedTarget.resourceId],
+        includePreviewResources: true,
+        lifecycleStatus: "archived",
+        limit: 2,
+      });
 
       expect(defaultList.items.map((item) => item.id)).toEqual([activeTarget.resourceId]);
       expect(archivedProjectDefaultList.items).toEqual([]);
@@ -3166,6 +3173,7 @@ describe("pglite persistence integration", () => {
           archivedAt: "2026-01-01T00:01:00.000Z",
         },
       ]);
+      expect(archivedByIds.map((item) => item.id)).toEqual([archivedTarget.resourceId]);
     } finally {
       await closeDatabase?.();
       rmSync(workspaceDir, { recursive: true, force: true });

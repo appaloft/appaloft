@@ -48,6 +48,7 @@ import {
   type ProcessAttemptCompletionResult,
   type ProcessAttemptRecord,
   type ProcessAttemptRecorder,
+  type ResourceReadModel,
   type RuntimeTargetCapacityPruneResult,
   type RuntimeTargetCapacityPruner,
   type ServerRepository,
@@ -58,6 +59,12 @@ const emptyDeploymentReadModel: DeploymentReadModel = {
   list: async () => [],
   findOne: async () => null,
   findTimeline: async () => [],
+};
+
+const emptyResourceReadModel: ResourceReadModel = {
+  count: async () => 0,
+  list: async () => [],
+  findOne: async () => null,
 };
 
 class RecordingCommandBus implements Pick<CommandBus, "execute"> {
@@ -692,6 +699,7 @@ describe("scheduled runtime prune", () => {
       new PruneServerCapacityUseCase(
         new MemoryServerRepository(deploymentTarget()),
         emptyDeploymentReadModel,
+        emptyResourceReadModel,
         new FakeCapacityPruner(),
         auditRecorder,
         new SequenceIdGenerator(),

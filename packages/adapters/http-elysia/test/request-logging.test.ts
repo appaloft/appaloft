@@ -18,21 +18,47 @@ interface CapturedLogEntry {
 
 class CapturingLogger implements AppLogger {
   readonly entries: CapturedLogEntry[] = [];
+  readonly #listeners = new Set<(entry: CapturedLogEntry) => void>();
+
+  waitForMessage(message: string): Promise<CapturedLogEntry> {
+    const captured = this.entries.find((entry) => entry.message === message);
+    if (captured) {
+      return Promise.resolve(captured);
+    }
+
+    return new Promise((resolve) => {
+      const listener = (entry: CapturedLogEntry) => {
+        if (entry.message !== message) {
+          return;
+        }
+        this.#listeners.delete(listener);
+        resolve(entry);
+      };
+      this.#listeners.add(listener);
+    });
+  }
+
+  private capture(entry: CapturedLogEntry): void {
+    this.entries.push(entry);
+    for (const listener of this.#listeners) {
+      listener(entry);
+    }
+  }
 
   debug(message: string, context?: Record<string, unknown>): void {
-    this.entries.push({ level: "debug", message, ...(context ? { context } : {}) });
+    this.capture({ level: "debug", message, ...(context ? { context } : {}) });
   }
 
   info(message: string, context?: Record<string, unknown>): void {
-    this.entries.push({ level: "info", message, ...(context ? { context } : {}) });
+    this.capture({ level: "info", message, ...(context ? { context } : {}) });
   }
 
   warn(message: string, context?: Record<string, unknown>): void {
-    this.entries.push({ level: "warn", message, ...(context ? { context } : {}) });
+    this.capture({ level: "warn", message, ...(context ? { context } : {}) });
   }
 
   error(message: string, context?: Record<string, unknown>): void {
-    this.entries.push({ level: "error", message, ...(context ? { context } : {}) });
+    this.capture({ level: "error", message, ...(context ? { context } : {}) });
   }
 }
 
@@ -56,64 +82,42 @@ function createTestApp(logger: AppLogger) {
   });
 }
 
-async function withServer<T>(
-  app: ReturnType<typeof createHttpApp>,
-  callback: (baseUrl: string) => Promise<T>,
-): Promise<T> {
-  app.listen({
-    hostname: "127.0.0.1",
-    port: 0,
-  });
-
-  const port = app.server?.port;
-  if (typeof port !== "number") {
-    throw new Error("HTTP test server did not expose a port");
-  }
-
-  try {
-    return await callback(`http://127.0.0.1:${port}`);
-  } finally {
-    app.server?.stop(true);
-  }
-}
-
 describe("HTTP request logging", () => {
   test("logs completed backend API requests", async () => {
     const logger = new CapturingLogger();
     const app = createTestApp(logger);
 
-    await withServer(app, async (baseUrl) => {
-      const response = await fetch(`${baseUrl}/api/health`, {
+    const completedRequest = logger.waitForMessage("http_request.completed");
+    const response = await app.handle(
+      new Request("http://localhost/api/health", {
         headers: {
           "x-request-id": "req_http_log_test",
         },
-      });
+      }),
+    );
+    const entry = await completedRequest;
 
-      const entry = logger.entries.find((item) => item.message === "http_request.completed");
-
-      expect(response.status).toBe(200);
-      expect(entry).toMatchObject({
-        level: "info",
-        context: {
-          method: "GET",
-          path: "/api/health",
-          statusCode: 200,
-          requestId: "req_http_log_test",
-        },
-      });
-      expect(typeof entry?.context?.durationMs).toBe("number");
+    expect(response.status).toBe(200);
+    expect(entry).toMatchObject({
+      level: "info",
+      context: {
+        method: "GET",
+        path: "/api/health",
+        statusCode: 200,
+        requestId: "req_http_log_test",
+      },
     });
+    expect(typeof entry.context?.durationMs).toBe("number");
   });
 
   test("does not log static console fallback requests", async () => {
     const logger = new CapturingLogger();
     const app = createTestApp(logger);
 
-    await withServer(app, async (baseUrl) => {
-      const response = await fetch(`${baseUrl}/`);
+    const response = await app.handle(new Request("http://localhost/"));
+    await response.text();
 
-      expect(response.status).toBe(200);
-      expect(logger.entries).toEqual([]);
-    });
+    expect(response.status).toBe(200);
+    expect(logger.entries).toEqual([]);
   });
 });

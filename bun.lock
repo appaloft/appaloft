@@ -168,6 +168,9 @@
         "@appaloft/core": "workspace:*",
         "@appaloft/deployment-config": "workspace:*",
       },
+      "devDependencies": {
+        "reflect-metadata": "^0.2.2",
+      },
     },
     "packages/adapters/http-elysia": {
       "name": "@appaloft/adapter-http-elysia",

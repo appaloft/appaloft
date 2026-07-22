@@ -12,7 +12,7 @@ sidebar: { label: "Run agents", order: 0 }
 > operator-provisioned Sandbox template pinned by version and digest, with
 > `APPALOFT_PI_SANDBOX_TEMPLATE_ID` configured.
 
-# Run an agent in a Sandbox
+# Run an agent in a Sandbox [#sandbox-agent-runtime]
 
 An Agent Runtime belongs to one ready Sandbox. Your application keeps the chat/session; Appaloft
 owns isolated execution, one active Run per Runtime, fresh/continue lineage, event readback, and
