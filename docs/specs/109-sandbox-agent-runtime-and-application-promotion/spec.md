@@ -33,7 +33,7 @@ first Deployment is complete only after verified proof.
 | --- | --- | --- | --- | --- |
 | AGENT-SPEC-001 | Create runtime | A ready Sandbox and admitted harness template exist | `sandboxes.agents.runtimes.create` is called | A tenant-scoped runtime is persisted under the Sandbox and returns stable runtime/harness/template identity. |
 | AGENT-SPEC-002 | Submit run | A runtime has no active Run | `sandboxes.agents.runs.create` supplies fresh or valid parent lineage | One Run becomes active; duplicate idempotency returns the same Run and concurrent submission fails with current active run id. Task text is encrypted at rest and decrypted only at the harness boundary. |
-| AGENT-SPEC-003 | Observe and cancel | A Run is accepted/running/waiting | events are streamed or cancellation is requested | Events are bounded, redacted and cursor-replayable; cancel is idempotent and eventually terminal. |
+| AGENT-SPEC-003 | Observe and cancel | A Run is accepted/running/waiting | bounded events are read, the event follow stream is opened, or cancellation is requested | Harness frames become observable while execution is active; events are bounded, redacted and cursor-replayable; reconnect resumes after the supplied sequence; the stream closes on terminal state or caller abort; cancel is idempotent and eventually terminal. |
 | AGENT-SPEC-004 | Controlled capability | Harness requests network, credential, public port, external write or promotion | an external actor approves/rejects | Run waits durably; approval binds run/tool digest/capability/destination/expiry and the harness cannot self-approve. |
 | AGENT-SPEC-005 | Credential custody | A Run needs model or tool credentials | the harness calls through its grant | The destination-bound broker injects outside Sandbox; plaintext never enters state, files, events, errors or snapshots. |
 | ARTIFACT-SPEC-001 | Freeze source | No active Run exists and a safe source root is selected | `sandboxes.source-artifacts.create` executes | Files are captured into an immutable manifest/digest and safe provenance descriptor; unsafe entries and secret matches fail closed, while private storage references remain internal. |
@@ -55,8 +55,9 @@ first Deployment is complete only after verified proof.
 
 ## Public Surfaces
 
-- API/generated SDK: complete write/read/event surface.
-- CLI: complete lifecycle, diagnostic and acceptance surface.
+- API/generated SDK: complete write/read/event surface, including Run-event SSE and resource-handle
+  `agent.stream({ task })` / `run.events.stream()` ergonomics over the same operations.
+- CLI: complete lifecycle, diagnostic, event-follow and acceptance surface.
 - Web: readback, approval, audit and recovery; no generic chat UI.
 - MCP: descriptors for safe runtime/run/read operations; approval and acceptance require scopes that
   cannot be held by a Sandbox runtime identity.

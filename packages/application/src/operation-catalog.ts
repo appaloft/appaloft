@@ -360,6 +360,7 @@ import {
   showSandboxCandidatePreviewInputSchema,
   showSandboxPromotionInputSchema,
   showSandboxSourceArtifactInputSchema,
+  streamSandboxAgentRunEventsInputSchema,
   terminateSandboxAgentRuntimeInputSchema,
 } from "./sandbox-agent-runtime-messages";
 import { tokens } from "./tokens";
@@ -4859,6 +4860,21 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft sandbox agent runtime create <sandboxId>",
       orpc: { method: "POST", path: "/api/sandboxes/{sandboxId}/agent-runtimes" },
+    },
+  },
+  {
+    key: "sandboxes.agents.runs.events.stream",
+    kind: "query",
+    domain: "sandboxes",
+    messageName: "StreamSandboxAgentRunEventsQuery",
+    handlerName: "SandboxAgentQueryHandler",
+    serviceName: "SandboxAgentDeliveryService",
+    inputSchema: streamSandboxAgentRunEventsInputSchema,
+    serviceToken: tokens.sandboxAgentDeliveryService,
+    transportAccess: { productSession: { minRole: "member" } },
+    transports: {
+      cli: "appaloft sandbox agent run events <runId> --follow",
+      orpcStream: { method: "GET", path: "/api/sandbox-agent-runs/{runId}/events/stream" },
     },
   },
   ...(

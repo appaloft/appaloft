@@ -15,12 +15,14 @@ import {
   type Query,
   type QueryBus,
   ResolveSandboxAgentApprovalCommand,
+  StreamSandboxAgentRunEventsQuery,
 } from "@appaloft/application";
 import { ok } from "@appaloft/core";
 
 describe("CLI sandbox agent delivery commands", () => {
   test("[SBX-CLI-AGENT-001] maps the agent-to-promotion chain to shared commands", async () => {
     const commands: Command<unknown>[] = [];
+    const queries: Query<unknown>[] = [];
     const commandBus = {
       execute: async <T>(_context: unknown, command: Command<T>) => {
         commands.push(command as Command<unknown>);
@@ -28,7 +30,27 @@ describe("CLI sandbox agent delivery commands", () => {
       },
     } as unknown as CommandBus;
     const queryBus = {
-      execute: async <T>(_context: unknown, _query: Query<T>) => ok({ items: [] } as T),
+      execute: async <T>(_context: unknown, query: Query<T>) => {
+        queries.push(query as Query<unknown>);
+        if (query instanceof StreamSandboxAgentRunEventsQuery) {
+          return ok({
+            mode: "stream",
+            runId: "srun_cli",
+            stream: {
+              async *[Symbol.asyncIterator]() {
+                yield {
+                  kind: "closed",
+                  schemaVersion: "sandbox-agent.run-events/v1",
+                  runId: "srun_cli",
+                  reason: "terminal",
+                };
+              },
+              async close() {},
+            },
+          } as T);
+        }
+        return ok({ items: [] } as T);
+      },
     } as unknown as QueryBus;
     const executionContextFactory: ExecutionContextFactory = {
       create: (input) => createExecutionContext({ ...input, requestId: "req_agent_cli" }),
@@ -69,6 +91,18 @@ describe("CLI sandbox agent delivery commands", () => {
         "Build it",
         "--idempotency-key",
         "run-cli",
+      ]);
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "sandbox",
+        "agent",
+        "run",
+        "events",
+        "srun_cli",
+        "--follow",
+        "--after-sequence",
+        "2",
       ]);
       await program.parseAsync([
         "node",
@@ -142,5 +176,11 @@ describe("CLI sandbox agent delivery commands", () => {
     expect(commands.at(-1)).toMatchObject({
       input: { promotionId: "sprom_cli", expectedArtifactDigest: digest },
     });
+    expect(queries).toContainEqual(
+      expect.objectContaining({
+        constructor: StreamSandboxAgentRunEventsQuery,
+        input: { runId: "srun_cli", afterSequence: 2 },
+      }),
+    );
   });
 });

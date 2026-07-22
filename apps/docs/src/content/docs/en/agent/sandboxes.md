@@ -4,7 +4,7 @@ description: "Understand the ownership and security boundary between an Agent Ru
 docType: concept
 localeState: { zh-CN: complete, en-US: complete }
 searchAliases: ["agent sandbox", "isolation", "VPS"]
-relatedOperations: [sandboxes.create, sandboxes.show, sandboxes.exec, sandbox-processes.terminate]
+relatedOperations: [sandboxes.create, sandboxes.show, sandboxes.exec, sandboxes.agents.runs.events.stream, sandbox-processes.terminate]
 sidebar: { label: "Agent Sandboxes", order: 1 }
 ---
 
@@ -38,10 +38,20 @@ const sandbox = await appaloft.sandboxes.create({
 try {
   await sandbox.files.write({ path: "job/input.txt", contentBase64: "aGVsbG8=" });
   await sandbox.exec({ argv: ["python3", "/workspace/job.py"], timeoutMs: 10_000 });
+
+  const agent = await sandbox.agents.create({ harness: "pi" });
+  const run = await agent.stream({ task: "Check the test failures and fix production code" });
+  for await (const envelope of run.fullStream) {
+    if (envelope.kind === "event") console.log(envelope.data);
+  }
 } finally {
   await sandbox.terminate();
 }
 ```
+
+Run events are persisted incrementally while execution is active. After disconnecting, use
+`run.events.stream({ afterSequence })` to resume after the last acknowledged sequence. Closing a
+browser or API connection only stops reading; cancel the Run explicitly to stop execution.
 
 Production credentials must not enter Sandbox environment variables, files, Run events, or errors.
 External access should use a destination-bound credential broker that fails closed on a destination,

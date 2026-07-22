@@ -32,6 +32,7 @@ describe("PiSandboxAgentHarness", () => {
   test("[AGENT-PI-006] admits only the pinned Sandbox template and translates JSONL", async () => {
     let polls = 0;
     let captured: Parameters<PiSandboxExecutionPort["exec"]>[2] | undefined;
+    const emitted: Array<{ type: string; data: Record<string, unknown>; processPoll: number }> = [];
     const files = new Map([
       [".appaloft-agent/srun_pi/stdout.jsonl", new TextEncoder().encode('{"type":"message","text":"done"}\n')],
       [".appaloft-agent/srun_pi/stderr.log", new Uint8Array()],
@@ -83,6 +84,9 @@ describe("PiSandboxAgentHarness", () => {
       task: "Build it",
       context: { mode: "fresh" },
       requestApproval: async () => "rejected",
+      emitEvent: async (event) => {
+        emitted.push({ ...event, processPoll: polls });
+      },
     });
     expect(captured?.background).toBe(true);
     expect(captured?.argv).toContain("--no-session");
@@ -92,7 +96,14 @@ describe("PiSandboxAgentHarness", () => {
     expect(captured?.argv).toContain("appaloft");
     expect(captured?.argv).toContain("read,bash,edit,write,grep,find,ls");
     expect(captured?.argv).toContain("Build it");
-    expect(result.events).toEqual([{ type: "message", data: { type: "message", text: "done" } }]);
+    expect(emitted).toEqual([
+      {
+        type: "message",
+        data: { type: "message", text: "done" },
+        processPoll: 1,
+      },
+    ]);
+    expect(result.events).toEqual([]);
     expect(result.outcomeDigest).toStartWith("sha256:");
   });
 

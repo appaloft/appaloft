@@ -33,6 +33,17 @@
 - [x] Add runnable Agent SDK quickstart for the private-preview contract.
 - [x] Keep private-preview/available claims synchronized with tests.
 
+## Slice 5: Live Run Event Stream
+
+- [x] Append harness output/tool/progress frames during active execution through the neutral harness
+  event sink, with redaction and monotonic sequence persistence.
+- [x] Add cursor-replayable, cancellable `sandboxes.agents.runs.events.stream` HTTP/oRPC and generated
+  SDK operation with terminal/aborted close envelopes.
+- [x] Add `run.events.stream()` and `agent.stream({ task, context })` SDK resource-handle ergonomics
+  without moving caller session ownership into Appaloft.
+- [x] Add CLI follow, public docs and stable test bindings for application, Pi adapter, HTTP and SDK
+  boundaries.
+
 ## Verification And Sync
 
 - [x] Run core/application/persistence/adapter/transport/SDK/CLI/catalog-derived MCP suites.

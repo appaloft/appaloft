@@ -373,8 +373,11 @@ Accepted target model:
 - `SandboxPromotion` owns plan, external acceptance and durable cross-context workflow state. It
   creates a new Resource, binds the exact artifact as `zip-artifact`, creates the first Deployment
   and completes only after `DeploymentProof.verdict = verified`.
-- Runtime/Run events are data-plane execution facts. Audit is a separate control-plane governance
-  projection. Domain Events do not become Billing Events without an explicit consumer policy.
+- Runtime/Run events are data-plane execution facts appended while the harness executes. Bounded
+  replay and cancellable live follow consume the same redacted, monotonic persisted sequence;
+  disconnect is observation-only and never mutates the Run. Audit is a separate control-plane
+  governance projection. Domain Events do not become Billing Events without an explicit consumer
+  policy.
 
 Governing artifacts:
 - [ADR-092](./decisions/ADR-092-sandbox-agent-runtime-and-application-promotion-boundary.md)
@@ -1320,6 +1323,8 @@ Meaning:
 Rules:
 - a Runtime may claim at most one active Run and releases the claim only through a terminal transition
 - Run context inheritance is explicit; caller conversation history is outside Appaloft ownership
+- Run event follow replays strictly after a supplied sequence and closes on terminal Run state or
+  caller abort without keeping the Run-create command open
 - approval cannot be resolved by the harness or a Sandbox-scoped identity
 - Source Artifact capture is safe-root confined and reference-protected after acceptance
 - Promotion plan/accept binds artifact digest and explicit new Resource target

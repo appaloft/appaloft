@@ -7,6 +7,7 @@
 | `sandboxes.agents.runs.list` | Runs for one Runtime with lineage/status/usage summary. | bounded by runtime scope |
 | `sandboxes.agents.runs.show` | One Run lifecycle, parent, approval wait and safe outcome summary. | one |
 | `sandboxes.agents.runs.events` | Cursor replay of bounded redacted Run events. | 500 events |
+| `sandboxes.agents.runs.events.stream` | Replay after one sequence and follow the same persisted redacted Run-event sequence until terminal state or caller abort. | 500 events per read cycle |
 | `sandboxes.agents.approvals.list` | Pending/resolved approval descriptors for a Run. | bounded by Run scope |
 | `sandboxes.agents.approvals.show` | One exact-request approval descriptor. | one |
 | `sandboxes.source-artifacts.list` | Artifact summaries scoped to Sandbox. | bounded by Sandbox scope |
@@ -18,3 +19,7 @@
 Queries are tenant-scoped and mutation-free. Run events omit hidden reasoning, raw secret/tool
 payloads, full file contents and unbounded stdout/stderr. Promotion readback references authoritative
 Resource, Deployment and proof identities instead of copying their complete state.
+
+The follow stream emits `event`, `error` and `closed` envelopes. Every event carries its monotonic
+Run sequence so reconnect can pass `afterSequence`; a terminal Run closes with `reason=terminal`,
+and caller cancellation closes with `reason=aborted`. It does not keep the Run-create command open.

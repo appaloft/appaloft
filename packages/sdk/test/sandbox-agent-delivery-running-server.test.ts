@@ -44,6 +44,30 @@ class RecordingBus {
     const input = (message as unknown as { input?: Record<string, unknown> }).input ?? {};
     const name = message.constructor.name;
     this.messages.push({ name, input });
+    if (name === "StreamSandboxAgentRunEventsQuery") {
+      const stream = {
+        async *[Symbol.asyncIterator]() {
+          yield {
+            kind: "event",
+            schemaVersion: "sandbox-agent.run-events/v1",
+            cursor: "1",
+            runId: "srun_sdk",
+            sequence: 1,
+            occurredAt: "2026-07-20T00:00:00.000Z",
+            eventType: "message",
+            data: { text: "working" },
+          };
+          yield {
+            kind: "closed",
+            schemaVersion: "sandbox-agent.run-events/v1",
+            runId: "srun_sdk",
+            reason: "terminal",
+          };
+        },
+        async close() {},
+      };
+      return Promise.resolve(ok({ mode: "stream", runId: "srun_sdk", stream } as T));
+    }
     const values: Record<string, unknown> = {
       CreateSandboxCommand: { sandboxId: "sbx_sdk", status: "ready" },
       CreateSandboxAgentRuntimeCommand: { runtimeId: "srt_sdk", status: "ready" },
@@ -129,6 +153,20 @@ describe("sandbox agent delivery SDK running server", () => {
 
     expect(agent).toMatchObject({ runtimeId: "srt_sdk", sandboxId: "sbx_sdk" });
     expect(run).toMatchObject({ runId: "srun_sdk", runtimeId: "srt_sdk" });
+    const runEvents = [];
+    for await (const envelope of run.events.stream()) runEvents.push(envelope);
+    expect(runEvents).toEqual([
+      expect.objectContaining({ kind: "event", eventType: "message", sequence: 1 }),
+      expect.objectContaining({ kind: "closed", reason: "terminal" }),
+    ]);
+    const streamedRun = await agent.stream({
+      prompt: "Check the test failures and fix the production code.",
+      idempotencyKey: "run-sdk-stream",
+    });
+    const fullStream = [];
+    for await (const envelope of streamedRun.fullStream) fullStream.push(envelope);
+    expect(streamedRun).toMatchObject({ runId: "srun_sdk", runtimeId: "srt_sdk" });
+    expect(fullStream).toEqual(runEvents);
     expect(await client.sandboxes.agents.approvals.list({ runId: "srun_sdk" })).toMatchObject({
       ok: true,
       data: { items: [] },
@@ -167,6 +205,9 @@ describe("sandbox agent delivery SDK running server", () => {
       "CreateSandboxCommand",
       "CreateSandboxAgentRuntimeCommand",
       "CreateSandboxAgentRunCommand",
+      "StreamSandboxAgentRunEventsQuery",
+      "CreateSandboxAgentRunCommand",
+      "StreamSandboxAgentRunEventsQuery",
       "ListSandboxAgentApprovalsQuery",
       "CreateSandboxSourceArtifactCommand",
       "CreateSandboxCandidatePreviewCommand",

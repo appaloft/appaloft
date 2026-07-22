@@ -104,6 +104,13 @@ function parseJsonEvents(stdout: string): SandboxAgentHarnessEvent[] {
   return events;
 }
 
+async function emitJsonEvents(
+  stdout: string,
+  emitEvent: (event: SandboxAgentHarnessEvent) => Promise<void>,
+): Promise<void> {
+  for (const event of parseJsonEvents(stdout)) await emitEvent(event);
+}
+
 export class PiSandboxAgentHarness implements SandboxAgentHarness {
   readonly key = "pi";
   readonly templateId: string;
@@ -223,6 +230,19 @@ export class PiSandboxAgentHarness implements SandboxAgentHarness {
       };
       this.active.set(input.runId, active);
       const deadline = Date.now() + (this.options.timeoutMs ?? 30 * 60_000);
+      let stdoutCursor = 0;
+      const emitAvailableOutput = async (includeTrailing: boolean) => {
+        if (!input.emitEvent) return;
+        const stdoutResult = await this.execution.readFile(input.executionContext, input.sandboxId, {
+          path: stdoutPath,
+        });
+        if (stdoutResult.isErr()) return;
+        const stdout = new TextDecoder().decode(stdoutResult.value);
+        const end = includeTrailing ? stdout.length : stdout.lastIndexOf("\n") + 1;
+        if (end <= stdoutCursor) return;
+        await emitJsonEvents(stdout.slice(stdoutCursor, end), input.emitEvent);
+        stdoutCursor = end;
+      };
       while (true) {
         if (active.cancelled) throw new Error("pi_process_cancelled");
         const processes = await this.execution.listProcesses(
@@ -232,6 +252,7 @@ export class PiSandboxAgentHarness implements SandboxAgentHarness {
         if (processes.isErr()) throw new Error(processes.error.message);
         const process = processes.value.find((candidate) => candidate.processId === active.processId);
         if (!process || process.status !== "running") break;
+        await emitAvailableOutput(false);
         if (Date.now() >= deadline) {
           await this.execution.terminateProcess(
             input.executionContext,
@@ -253,11 +274,14 @@ export class PiSandboxAgentHarness implements SandboxAgentHarness {
       const stdout = new TextDecoder().decode(stdoutResult.value);
       const stderr = new TextDecoder().decode(stderrResult.value);
       const exitCode = Number(new TextDecoder().decode(exitResult.value));
+      if (input.emitEvent) {
+        await emitJsonEvents(stdout.slice(stdoutCursor), input.emitEvent);
+      }
       if (exitCode !== 0) {
         throw new Error(`pi_process_failed:${String(stderr).slice(0, 256)}`);
       }
       return {
-        events: parseJsonEvents(stdout),
+        events: input.emitEvent ? [] : parseJsonEvents(stdout),
         outcomeDigest: await sha256(stdout),
       };
     } finally {
