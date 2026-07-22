@@ -2,11 +2,79 @@
 
 This repository is a backend-core deployment platform, not a web-first CRUD app.
 
+## Directory Guide
+
+This file is the repository-level source of truth for agents working in the public Appaloft repository. Read it before editing code, tests, public documentation, workflows, or package boundaries.
+
+- Keep this root file focused on repository-wide architecture, workflow, validation, and commands.
+- If a directory gains a scoped `AGENTS.md`, read the closest file before working there; scoped rules may add constraints but must not weaken this root contract.
+- Session-specific goals belong in the prompt or an implementation plan, not in this permanent repository charter.
+
+Core documentation:
+
+- Product, setup, and repository map: [README.md](README.md).
+- Contribution workflow: [CONTRIBUTING.md](CONTRIBUTING.md).
+- Architecture and domain model: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/DOMAIN_MODEL.md](docs/DOMAIN_MODEL.md).
+- Business operation map and catalog: [docs/BUSINESS_OPERATION_MAP.md](docs/BUSINESS_OPERATION_MAP.md) and [docs/CORE_OPERATIONS.md](docs/CORE_OPERATIONS.md).
+- Decisions: [docs/decisions/README.md](docs/decisions/README.md).
+- Testing: [docs/TESTING.md](docs/TESTING.md) and `docs/testing/**`.
+- Release workflow: [docs/RELEASE.md](docs/RELEASE.md).
+
 ## Project Goal
 
 - model deployment as `detect -> plan -> execute -> verify -> rollback`
 - keep `CLI`, `HTTP API`, and future `MCP tools` as first-class interfaces
 - keep `web` as a static console that consumes contracts over HTTP
+
+## Development Workflow
+
+### Environment Baseline
+
+- Use the Bun version pinned by `package.json`; `bun run bun:version:check` verifies repository version sources stay synchronized.
+- Run repository commands from the Appaloft root unless a command explicitly uses `--cwd <workspace>`.
+- On a fresh checkout, after changing workspace manifests, or after adding/removing packages or bin entrypoints, run `bun install`. Use `--frozen-lockfile` when reproducing CI.
+- The default local development flow uses PGlite. PostgreSQL, Docker, SSH, provider, and release smokes require their documented prerequisites and are not part of the default agent validation loop.
+
+### Validation Strategy
+
+- Docs-only changes: run `git diff --check`, verify every relative link and command, and run the governing docs-registry tests when public help anchors or operation coverage change.
+- TypeScript changes: run the most focused affected test first, then `bun run lint:ci`, `bun run typecheck`, and the matching unit/integration suite.
+- Package, workspace, bin, or build-boundary changes: run `bun install --frozen-lockfile`, `bun run bun:version:check`, and `bun run build` in addition to affected tests.
+- Command-owning modules or executable shell construction: run `bun run check:ash` and follow `docs/ai/ASH_COMMAND_CONSTRUCTION.md`.
+- CLI, HTTP, SDK, operation-catalog, or Web changes must converge on the same command/query schema and operation semantics; validate each affected entrypoint rather than only one transport.
+- Docker, SSH, provider, release, and public-launch smokes are explicit opt-in checks. Record prerequisites, external effects, cost, cleanup, and evidence before running them.
+
+### Common Commands
+
+Run these from the repository root:
+
+```bash
+# Install and toolchain consistency
+bun install
+bun run bun:version:check
+
+# Local PGlite development
+export APPALOFT_DATABASE_DRIVER=pglite
+bun run db:migrate
+bun run dev
+
+# Repository validation
+bun run lint:ci
+bun run typecheck
+bun run test
+bun run build
+```
+
+Use focused checks before repository-wide suites:
+
+```bash
+bun test path/to/file.test.ts
+bun test packages/<workspace>/test
+bun run check:ash
+bun test packages/docs-registry/test
+```
+
+Replace placeholders with confirmed paths; do not execute `<workspace>` or `path/to/...` literally. Run tests that read repository-level fixtures from the repository root; use `--cwd` only when the workspace script explicitly supports a package-local working directory. `bun run test:unit`, `bun run test:integration`, and `bun run test:e2e` mirror the explicit suite boundaries used by CI. Consult `package.json` and `docs/TESTING.md` before selecting manual smoke commands.
 
 ## Dependency Direction
 
@@ -70,16 +138,16 @@ This repository is a backend-core deployment platform, not a web-first CRUD app.
 - list/read-model queries must be bounded by default in the backend handler, use case, query service, or read model; no caller omission may result in loading an entire table
 - tenant context is a required backend execution concept; `ExecutionContext` must always carry a tenant context, product-session tenants are resolved from the authenticated session/current organization, and Web or ordinary API callers must never supply tenant input explicitly
 - tenant context must flow from `ExecutionContext` into `RepositoryContext`; adapters and Web surfaces must not make users or callers select or pass their own tenant id for ordinary product-session operations
-- the human-facing and AI-facing source of truth for business operation relationships, workflow sequencing, event progression, and rebuild gates is [docs/BUSINESS_OPERATION_MAP.md](/Users/nichenqin/projects/appaloft/docs/BUSINESS_OPERATION_MAP.md)
-- the human-facing and AI-facing source of truth for business operations is [docs/CORE_OPERATIONS.md](/Users/nichenqin/projects/appaloft/docs/CORE_OPERATIONS.md)
-- the human-facing and AI-facing source of truth for domain boundaries and aggregate names is [docs/DOMAIN_MODEL.md](/Users/nichenqin/projects/appaloft/docs/DOMAIN_MODEL.md)
-- agents must read [docs/decisions/README.md](/Users/nichenqin/projects/appaloft/docs/decisions/README.md) and relevant ADRs before interpreting local command/event/workflow/testing specs
-- agents must locate a requested behavior in [docs/BUSINESS_OPERATION_MAP.md](/Users/nichenqin/projects/appaloft/docs/BUSINESS_OPERATION_MAP.md) before adding or changing ADRs, local specs, operation catalog entries, Web/API/CLI entrypoints, or code
+- the human-facing and AI-facing source of truth for business operation relationships, workflow sequencing, event progression, and rebuild gates is [docs/BUSINESS_OPERATION_MAP.md](docs/BUSINESS_OPERATION_MAP.md)
+- the human-facing and AI-facing source of truth for business operations is [docs/CORE_OPERATIONS.md](docs/CORE_OPERATIONS.md)
+- the human-facing and AI-facing source of truth for domain boundaries and aggregate names is [docs/DOMAIN_MODEL.md](docs/DOMAIN_MODEL.md)
+- agents must read [docs/decisions/README.md](docs/decisions/README.md) and relevant ADRs before interpreting local command/event/workflow/testing specs
+- agents must locate a requested behavior in [docs/BUSINESS_OPERATION_MAP.md](docs/BUSINESS_OPERATION_MAP.md) before adding or changing ADRs, local specs, operation catalog entries, Web/API/CLI entrypoints, or code
 - agents must read global contracts before local specs:
-  - [docs/errors/model.md](/Users/nichenqin/projects/appaloft/docs/errors/model.md)
-  - [docs/errors/neverthrow-conventions.md](/Users/nichenqin/projects/appaloft/docs/errors/neverthrow-conventions.md)
-  - [docs/architecture/async-lifecycle-and-acceptance.md](/Users/nichenqin/projects/appaloft/docs/architecture/async-lifecycle-and-acceptance.md)
-  - [docs/architecture/adapter-command-query-boundary.md](/Users/nichenqin/projects/appaloft/docs/architecture/adapter-command-query-boundary.md)
+  - [docs/errors/model.md](docs/errors/model.md)
+  - [docs/errors/neverthrow-conventions.md](docs/errors/neverthrow-conventions.md)
+  - [docs/architecture/async-lifecycle-and-acceptance.md](docs/architecture/async-lifecycle-and-acceptance.md)
+  - [docs/architecture/adapter-command-query-boundary.md](docs/architecture/adapter-command-query-boundary.md)
 - formal source-of-truth semantics for business operations live in `docs/decisions/**`, global contracts under `docs/errors/**` and `docs/architecture/**`, and local specs under `docs/commands/**`, `docs/events/**`, `docs/workflows/**`, and `docs/testing/**`
 - docs/ai/** contains background analysis and migration context only; it must not override ADRs, global contracts, or normative local specs
 - if a behavior is absent from `docs/BUSINESS_OPERATION_MAP.md`, add or position it there in a Spec Round before writing local specs or implementation code
@@ -88,7 +156,7 @@ This repository is a backend-core deployment platform, not a web-first CRUD app.
 - new business capabilities must update both `docs/CORE_OPERATIONS.md` and `packages/application/src/operation-catalog.ts` in the same change
 - transport input parameters must reuse the matching command/query input schema, not redefine parallel transport-only input shapes
 - adapters dispatch through `CommandBus` or `QueryBus`, not by calling application services directly
-- adapters must not import application repository ports, core repository specs, or call repository `findOne`/`upsert` for business workflows; see [docs/architecture/adapter-command-query-boundary.md](/Users/nichenqin/projects/appaloft/docs/architecture/adapter-command-query-boundary.md)
+- adapters must not import application repository ports, core repository specs, or call repository `findOne`/`upsert` for business workflows; see [docs/architecture/adapter-command-query-boundary.md](docs/architecture/adapter-command-query-boundary.md)
 - adapters and application services must not peel aggregate `toState()` for business predicates when a core aggregate/value object method can answer the rule
 - handlers are registered with `@CommandHandler(...)` or `@QueryHandler(...)`
 - handlers may call a use case or application service, but must not embed persistence or transport logic
@@ -111,9 +179,9 @@ This repository is a backend-core deployment platform, not a web-first CRUD app.
 
 ## Public Documentation Rules
 
-- public documentation is a first-class product surface governed by [ADR-029: Public Documentation Round And Platform](/Users/nichenqin/projects/appaloft/docs/decisions/ADR-029-public-documentation-round-and-platform.md)
-- public docs structure is governed by [docs/documentation/public-docs-structure.md](/Users/nichenqin/projects/appaloft/docs/documentation/public-docs-structure.md)
-- public docs coverage is governed by [docs/testing/public-documentation-test-matrix.md](/Users/nichenqin/projects/appaloft/docs/testing/public-documentation-test-matrix.md)
+- public documentation is a first-class product surface governed by [ADR-030: Public Documentation Round And Platform](docs/decisions/ADR-030-public-documentation-round-and-platform.md)
+- public docs structure is governed by [docs/documentation/public-docs-structure.md](docs/documentation/public-docs-structure.md)
+- public docs coverage is governed by [docs/testing/public-documentation-test-matrix.md](docs/testing/public-documentation-test-matrix.md)
 - user-visible changes to input, output, status, recovery, workflow sequencing, or entrypoint affordances require a Docs Round outcome before the behavior is considered complete
 - Docs Round outcomes must identify the public page or stable anchor, reuse an existing anchor, mark the behavior not user-facing with a reason, or record an explicit migration gap
 - public docs must be task-oriented and must not mirror internal spec directories one-to-one
@@ -135,7 +203,7 @@ This repository is a backend-core deployment platform, not a web-first CRUD app.
 - for aggregate repositories, prefer `findOne(spec)` and `upsert/update(aggregate, mutateSpec)` over ad-hoc filter bags
 - do not leak `postgres.js` or `PGlite` client types outside `packages/persistence/pg`
 
-## Environment Rules
+## Deployment Environment Rules
 
 - precedence is `defaults < system < organization < project < environment < deployment snapshot`
 - each deployment must persist an immutable environment snapshot
