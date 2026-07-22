@@ -63,8 +63,8 @@ import {
 } from "./git-source-metadata";
 import {
   gitSubmoduleUpdateArgs,
-  githubHttpsSubmodulePrefix,
 } from "./git-source-submodules";
+import { gitHubHttpAuthEnvironment, gitHubHttpAuthRedactions } from "./git-source-auth";
 import {
   dockerContainerEnvironmentKeyVerificationCommand,
   dockerPublishedPortCommand,
@@ -160,13 +160,6 @@ function isGitHubHttpsLocator(locator: string): boolean {
   } catch {
     return false;
   }
-}
-
-function withGitHubAccessToken(locator: string, accessToken: string): string {
-  const parsed = new URL(locator);
-  parsed.username = "x-access-token";
-  parsed.password = accessToken;
-  return parsed.toString();
 }
 
 function isRemoteGitSourceKind(kind: string): boolean {
@@ -987,16 +980,13 @@ export class LocalExecutionBackend implements ExecutionBackend {
           accessTokenKind: "installation",
         })
       : null;
-    const cloneLocator = accessToken
-      ? withGitHubAccessToken(source.locator, accessToken)
-      : source.locator;
-    const tokenizedGithubHttpsPrefix = accessToken
-      ? withGitHubAccessToken(githubHttpsSubmodulePrefix, accessToken)
-      : undefined;
+    const cloneLocator = source.locator;
+    const gitEnv = accessToken
+      ? gitHubHttpAuthEnvironment(input.env, accessToken)
+      : input.env;
     const redactions = [
       cloneLocator,
-      ...(accessToken ? [accessToken] : []),
-      ...(tokenizedGithubHttpsPrefix ? [tokenizedGithubHttpsPrefix] : []),
+      ...(accessToken ? gitHubHttpAuthRedactions(accessToken) : []),
     ];
 
     timeline.push(phaseLog("package", `Clone remote git source into ${sourceDir}`));
@@ -1019,7 +1009,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       command: "git",
       args: cloneArgs,
       cwd: input.runtimeDir,
-      env: input.env,
+      env: gitEnv,
       redactions,
     });
     this.pushCommandOutput(timeline, {
@@ -1079,10 +1069,10 @@ export class LocalExecutionBackend implements ExecutionBackend {
       command: "git",
       args: gitSubmoduleUpdateArgs({
         workdir: sourceDir,
-        tokenizedGithubHttpsPrefix,
+        rewriteGithubSshToHttps: Boolean(accessToken),
       }),
       cwd: input.runtimeDir,
-      env: input.env,
+      env: gitEnv,
       redactions,
     });
     this.pushCommandOutput(timeline, {

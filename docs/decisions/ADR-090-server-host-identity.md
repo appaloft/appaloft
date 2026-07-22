@@ -13,7 +13,8 @@ display was ambiguous.
 
 ## Decision
 
-- `HostAddress` owns the canonical server host identity.
+- `HostAddress` owns the canonical server host identity. It accepts internal single-label DNS names
+  because SSH/server identity is not a durable public domain or TLS issuance request.
 - Registration accepts one explicit hostname, IPv4 address, raw IPv6 literal, bracketed IPv6
   literal, or the retained `user@host` compatibility form. DNS names are lowercase without a final
   dot; IPv6 is stored in canonical compressed form without brackets.
@@ -32,6 +33,8 @@ display was ambiguous.
 Provider provisioning adapters must resolve a network allocation to an explicit host before calling
 `servers.register`. Existing invalid persisted values remain readable but cannot be newly created.
 This is neutral Community behavior and does not add provider-specific provisioning logic.
+`PublicDomainName` remains a separate durable routing/TLS value and continues to require a
+multi-label public DNS hostname.
 
 ## References
 

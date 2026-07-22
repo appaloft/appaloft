@@ -38,7 +38,9 @@ Choose:
 
 - Resource: which resource the hostname should reach.
 - Environment: where the binding applies.
-- Hostname: the full domain, such as `app.example.com`.
+- Hostname: the full public multi-label domain, such as `app.example.com`. Single-label internal
+  server names belong to server connectivity and are rejected here because public DNS ownership
+  and managed TLS cannot be established for them.
 - Access policy: proxy/default entrypoint and HTTPS expectations.
 - Certificate policy: automatic issue, imported certificate, or TLS later.
 

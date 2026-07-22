@@ -22,6 +22,7 @@ host, duplicating equivalent address spellings, or rendering ambiguous endpoints
 | SERVER-BOOT-HOST-005 | An IPv6-only generic SSH server | connectivity runs | SSH receives host and port as separate argv values |
 | SERVER-BOOT-HOST-006 | SSH reports network unreachable | results are normalized | metadata reports `failureKind = network-unreachable` |
 | SERVER-BOOT-HOST-007 | A valid legacy IPv6 spelling is persisted | migration 100 runs | the row stores canonical host identity |
+| SERVER-BOOT-HOST-008 | A server is reachable through an internal single-label DNS name | host identity is created | the hostname is accepted and canonicalized without treating it as a public domain/TLS request |
 | SERVER-BOOT-CMD-004 | Same organization, provider, canonical host, and port | registration repeats | `conflict`; no duplicate target or event |
 
 ## Boundaries

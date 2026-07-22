@@ -38,6 +38,7 @@ import {
   type AuditEventRecorder,
   type AuditEventRecordInput,
   type Clock,
+  type DeploymentReadModel,
   type IdGenerator,
   type ProcessAttemptClaimer,
   type ProcessAttemptClaimInput,
@@ -51,6 +52,13 @@ import {
   type RuntimeTargetCapacityPruner,
   type ServerRepository,
 } from "../src/ports";
+
+const emptyDeploymentReadModel: DeploymentReadModel = {
+  count: async () => 0,
+  list: async () => [],
+  findOne: async () => null,
+  findTimeline: async () => [],
+};
 
 class RecordingCommandBus implements Pick<CommandBus, "execute"> {
   readonly commands: Command<unknown>[] = [];
@@ -683,6 +691,7 @@ describe("scheduled runtime prune", () => {
     const commandBus = new PruneServerCapacityUseCaseCommandBus(
       new PruneServerCapacityUseCase(
         new MemoryServerRepository(deploymentTarget()),
+        emptyDeploymentReadModel,
         new FakeCapacityPruner(),
         auditRecorder,
         new SequenceIdGenerator(),

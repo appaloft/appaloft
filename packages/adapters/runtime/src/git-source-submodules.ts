@@ -2,29 +2,27 @@ export const githubHttpsSubmodulePrefix = "https://github.com/";
 export const githubSshSubmodulePrefix = "git@github.com:";
 
 export function gitSubmoduleCredentialRewriteArgs(input: {
-  tokenizedGithubHttpsPrefix?: string | undefined;
+  rewriteGithubSshToHttps?: boolean | undefined;
 }): string[] {
-  if (!input.tokenizedGithubHttpsPrefix) {
+  if (!input.rewriteGithubSshToHttps) {
     return [];
   }
 
   return [
     "-c",
-    `url.${input.tokenizedGithubHttpsPrefix}.insteadOf=${githubHttpsSubmodulePrefix}`,
-    "-c",
-    `url.${input.tokenizedGithubHttpsPrefix}.insteadOf=${githubSshSubmodulePrefix}`,
+    `url.${githubHttpsSubmodulePrefix}.insteadOf=${githubSshSubmodulePrefix}`,
   ];
 }
 
 export function gitSubmoduleUpdateArgs(input: {
   workdir: string;
-  tokenizedGithubHttpsPrefix?: string | undefined;
+  rewriteGithubSshToHttps?: boolean | undefined;
 }): string[] {
   return [
     "-C",
     input.workdir,
     ...gitSubmoduleCredentialRewriteArgs({
-      tokenizedGithubHttpsPrefix: input.tokenizedGithubHttpsPrefix,
+      rewriteGithubSshToHttps: input.rewriteGithubSshToHttps,
     }),
     "submodule",
     "update",

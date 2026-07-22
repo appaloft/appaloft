@@ -41,6 +41,8 @@
 - [ ] APP-CONN-020: deferred-gap - add manual-secret fallback lifecycle tests when a product surface accepts one-time provider token material through a credential-store port.
 - [x] APP-CONN-020: add credential-store contract tests proving callback writes secret material through a port and read models only expose redacted references.
 - [x] APP-CONN-021: add Web source tests for connect-from-hostname, Cloudflare-branded connect action, callback return binding id, and readiness rerun trigger.
+- [x] APP-CONN-023: add local and SSH Git transport tests proving installation tokens stay out of
+  repository URLs, argv, Git remote/config state, errors, and logs.
 - [ ] APP-CONN-021: deferred-gap - add end-to-end domain-binding product-flow tests for provider callback, zone discovery, hostname rematch, plan, accept, and apply in one browser/API scenario; current coverage is split across application, Cloud HTTP callback, Web source, and WebView tests.
 
 ## Implementation
@@ -76,6 +78,8 @@
 - [x] Update `connections.connect.callback` to validate pending attempt status, exchange provider payload through the authorization adapter, apply returned secret-ref readback, and connect the owner-scoped `Connection`.
 - [x] Update `connections.connect.callback` to support adapter-written credential refs and safe provider resource readback.
 - [x] Update DNS readiness/connect flow so a hostname without a matching zone can start provider authorization and then re-run readiness after callback on the resource domain-binding page.
+- [x] Route GitHub App installation tokens through ephemeral Git process environment or SSH stdin,
+  while keeping clone and submodule locators credential-free.
 
 ## Verification
 

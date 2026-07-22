@@ -18,36 +18,36 @@ describe("git source submodules", () => {
     ]);
   });
 
-  test("rewrites GitHub HTTPS and SSH submodule locators through provider credentials", () => {
-    const tokenizedGithubHttpsPrefix = "https://x-access-token:secret-token@github.com/";
-
+  test("[CONFIG-FILE-GITHUB-SOURCE-002] rewrites GitHub SSH submodules without credentials in argv", () => {
     expect(
       gitSubmoduleCredentialRewriteArgs({
-        tokenizedGithubHttpsPrefix,
+        rewriteGithubSshToHttps: true,
       }),
     ).toEqual([
       "-c",
-      `url.${tokenizedGithubHttpsPrefix}.insteadOf=${githubHttpsSubmodulePrefix}`,
-      "-c",
-      `url.${tokenizedGithubHttpsPrefix}.insteadOf=${githubSshSubmodulePrefix}`,
+      `url.${githubHttpsSubmodulePrefix}.insteadOf=${githubSshSubmodulePrefix}`,
     ]);
 
     expect(
       gitSubmoduleUpdateArgs({
         workdir: "/tmp/app/source",
-        tokenizedGithubHttpsPrefix,
+        rewriteGithubSshToHttps: true,
       }),
     ).toEqual([
       "-C",
       "/tmp/app/source",
       "-c",
-      `url.${tokenizedGithubHttpsPrefix}.insteadOf=${githubHttpsSubmodulePrefix}`,
-      "-c",
-      `url.${tokenizedGithubHttpsPrefix}.insteadOf=${githubSshSubmodulePrefix}`,
+      `url.${githubHttpsSubmodulePrefix}.insteadOf=${githubSshSubmodulePrefix}`,
       "submodule",
       "update",
       "--init",
       "--recursive",
     ]);
+    expect(
+      gitSubmoduleUpdateArgs({
+        workdir: "/tmp/app/source",
+        rewriteGithubSshToHttps: true,
+      }).join(" "),
+    ).not.toContain("x-access-token");
   });
 });

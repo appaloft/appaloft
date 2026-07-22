@@ -67,7 +67,9 @@ Common inputs:
 
 - `host`: one explicit hostname, IPv4 address, or IPv6 address. Raw and bracketed IPv6 are accepted
   and stored canonically; CIDR/network prefixes, URLs, and `host:port` are rejected. Appaloft never
-  guesses a host such as `::1` from an allocated `/64`; pass `port` separately.
+  guesses a host such as `::1` from an allocated `/64`; pass `port` separately. A resolvable
+  single-label internal name such as `build-node` is valid server identity. It is not a public
+  custom domain and is not eligible for public DNS ownership or managed TLS issuance.
 - `port`: SSH port, usually 22.
 - `user`: system user.
 - credential: SSH key path, saved credential, or one-time secret input.

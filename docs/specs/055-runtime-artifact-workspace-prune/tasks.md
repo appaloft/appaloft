@@ -8,6 +8,7 @@
 - [x] RT-CAP-PRUNE-005: add CLI and oRPC dispatch tests.
 - [x] RT-CAP-PRUNE-006: add destructive prune audit output tests.
 - [x] RT-CAP-PRUNE-007: add explicit Docker build-cache and unused-image category tests.
+- [x] RT-CAP-PRUNE-013: add application protection-set and runtime adapter fail-closed tests.
 
 ## Source Of Truth
 
@@ -24,6 +25,8 @@
   categories.
 - [x] Add contracts/oRPC/CLI entrypoints.
 - [x] Add audit recorder port, persistence implementation, and destructive prune audit wiring.
+- [x] Derive complete server-scoped active-runtime/rollback protection and pass it to the runtime
+  adapter before stopped-container mutation.
 
 ## Entrypoints And Docs
 
@@ -40,7 +43,11 @@
 - [x] Re-run focused application, persistence, runtime adapter, CLI, oRPC, docs-registry tests and
   touched package typecheck/lint after audit output wiring.
 - [x] Run focused Web source/WebView coverage for `RT-CAP-WEB-001`.
+- [x] Run focused application, persistence read-model, runtime adapter, typecheck, lint, and Ash
+  command-safety verification for `RT-CAP-PRUNE-013`.
 
 ## Post-Implementation Sync
 
 - [x] Reconcile spec, plan, tasks, durable docs, tests, and code after audit output wiring.
+- [x] Reconcile stopped-container protection semantics across ADR-047, command docs, matrix, tests,
+  and code.
