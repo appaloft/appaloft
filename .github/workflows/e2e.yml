@@ -8,13 +8,6 @@ on:
       - reopened
       - ready_for_review
       - labeled
-    paths-ignore:
-      - ".github/workflows/**"
-      - "docs/**"
-      - "*.md"
-      - "*.mdx"
-      - "LICENSE"
-      - "LICENSE.*"
   workflow_dispatch:
 
 concurrency:
