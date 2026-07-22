@@ -4807,6 +4807,24 @@ export const generatedSdkOperations = [
     facadeDefault: true,
   },
   {
+    operationKey: "sandboxes.agents.runs.events.stream",
+    operationGroup: "sandboxes",
+    operationMethod: "agentsRunsEventsStream",
+    facadePath: ["sandboxes", "agents", "runs", "events", "stream"],
+    operationId: "sandboxes.agents.runs.eventStream",
+    kind: "query",
+    domain: "sandboxes",
+    messageName: "StreamSandboxAgentRunEventsQuery",
+    route: {
+      method: "GET",
+      path: "/sandbox-agent-runs/{runId}/events/stream",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: true,
+    facadeDefault: true,
+  },
+  {
     operationKey: "sandboxes.agents.runs.list",
     operationGroup: "sandboxes",
     operationMethod: "agentsRunsList",
@@ -7080,7 +7098,9 @@ export interface GeneratedAppaloftClient {
       readonly runs: {
         readonly cancel: AppaloftSdkFacadeMethod;
         readonly create: AppaloftSdkFacadeMethod;
-        readonly events: AppaloftSdkFacadeMethod;
+        readonly events: AppaloftSdkFacadeMethod & {
+          readonly stream: AppaloftSdkFacadeMethod;
+        };
         readonly list: AppaloftSdkFacadeMethod;
         readonly show: AppaloftSdkFacadeMethod;
       };

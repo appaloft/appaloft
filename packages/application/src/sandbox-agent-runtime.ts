@@ -57,6 +57,7 @@ export interface SandboxAgentHarness {
     runId: string;
     task: string;
     context: { mode: "fresh" } | { mode: "continue"; parentRunId: string };
+    emitEvent?(event: SandboxAgentHarnessEvent): Promise<void>;
     requestApproval(input: {
       capability: SandboxAgentApprovalCapability;
       requestDigest: string;
@@ -108,6 +109,41 @@ export interface SandboxAgentRunEventRecord {
   data: Record<string, unknown>;
   createdAt: string;
 }
+
+export type SandboxAgentRunEventEnvelope =
+  | {
+      kind: "event";
+      schemaVersion: "sandbox-agent.run-events/v1";
+      cursor: string;
+      runId: string;
+      sequence: number;
+      occurredAt: string;
+      eventType: string;
+      data: Record<string, unknown>;
+    }
+  | {
+      kind: "error";
+      schemaVersion: "sandbox-agent.run-events/v1";
+      runId: string;
+      code: "cursor-gap" | "stream-failed";
+      retryable: boolean;
+    }
+  | {
+      kind: "closed";
+      schemaVersion: "sandbox-agent.run-events/v1";
+      runId: string;
+      reason: "terminal" | "aborted";
+    };
+
+export interface SandboxAgentRunEventStream extends AsyncIterable<SandboxAgentRunEventEnvelope> {
+  close(): Promise<void>;
+}
+
+export type StreamSandboxAgentRunEventsResult = {
+  mode: "stream";
+  runId: string;
+  stream: SandboxAgentRunEventStream;
+};
 
 export interface CandidatePreviewRecord {
   previewId: string;
@@ -1080,6 +1116,30 @@ export class SandboxAgentDeliveryService {
       );
       if (task.isErr()) throw new Error(`sandbox_agent_task_unprotect_failed:${task.error.code}`);
       const contextState = record.run.toState().context.toState();
+      const persistedEvents = await this.dependencies.repository.listRunEvents(
+        repositoryContext,
+        runId,
+      );
+      let nextSequence = persistedEvents.at(-1)?.sequence ?? 0;
+      let remainingEvents = Math.max(1_000 - persistedEvents.length, 0);
+      const persistHarnessEvents = async (events: readonly SandboxAgentHarnessEvent[]) => {
+        const accepted = events.slice(0, remainingEvents);
+        if (accepted.length === 0) return;
+        const createdAt = this.dependencies.clock.now();
+        const records = accepted.map((event) => {
+          const sequence = ++nextSequence;
+          return {
+            eventId: `${runId}:${sequence}`,
+            runId,
+            sequence,
+            type: event.type.slice(0, 120),
+            data: redact(event.data) as Record<string, unknown>,
+            createdAt,
+          };
+        });
+        remainingEvents -= records.length;
+        await this.dependencies.repository.appendRunEvents(repositoryContext, runId, records);
+      };
       const result = await harness.execute({
         executionContext: context,
         sandboxId: record.sandboxId,
@@ -1090,6 +1150,7 @@ export class SandboxAgentDeliveryService {
           contextState.mode === "fresh"
             ? { mode: "fresh" }
             : { mode: "continue", parentRunId: contextState.parentRunId.value },
+        emitEvent: (event) => persistHarnessEvents([event]),
         requestApproval: (approvalInput) => this.requestRunApproval(context, record, approvalInput),
       });
       const currentRecord =
@@ -1110,19 +1171,7 @@ export class SandboxAgentDeliveryService {
         await this.dependencies.repository.saveRuntime(repositoryContext, currentRuntimeRecord);
         return ok(runDescriptor(currentRecord));
       }
-      const createdAt = this.dependencies.clock.now();
-      await this.dependencies.repository.appendRunEvents(
-        repositoryContext,
-        runId,
-        result.events.slice(0, 1_000).map((event, index) => ({
-          eventId: `${runId}:${index + 1}`,
-          runId,
-          sequence: index + 1,
-          type: event.type.slice(0, 120),
-          data: redact(event.data) as Record<string, unknown>,
-          createdAt,
-        })),
-      );
+      await persistHarnessEvents(result.events);
       const completedAt = asUpdatedAt(this.dependencies.clock.now());
       if (completedAt.isErr()) return err(completedAt.error);
       const completed = currentRecord.run.complete({
@@ -1247,6 +1296,103 @@ export class SandboxAgentDeliveryService {
     const all = await this.dependencies.repository.listRunEvents(repositoryContext, runId);
     const items = all.filter((event) => event.sequence > after).slice(0, limit);
     return ok({ items, nextSequence: items.at(-1)?.sequence ?? null });
+  }
+
+  async streamRunEvents(
+    context: ExecutionContext,
+    runId: string,
+    input: { afterSequence?: number; limit?: number },
+    signal?: AbortSignal,
+  ): Promise<Result<StreamSandboxAgentRunEventsResult>> {
+    const repositoryContext = toRepositoryContext(context);
+    if (!(await this.dependencies.repository.findRun(repositoryContext, runId))) {
+      return err(domainError.notFound("SandboxAgentRun", runId));
+    }
+    const repository = this.dependencies.repository;
+    const limit = Math.min(Math.max(input.limit ?? 100, 1), 500);
+    const initialSequence = input.afterSequence ?? 0;
+    let closed = false;
+    const stream: SandboxAgentRunEventStream = {
+      close: async () => {
+        closed = true;
+      },
+      async *[Symbol.asyncIterator]() {
+        let cursor = initialSequence;
+        while (!closed) {
+          if (signal?.aborted) {
+            yield {
+              kind: "closed",
+              schemaVersion: "sandbox-agent.run-events/v1",
+              runId,
+              reason: "aborted",
+            };
+            return;
+          }
+          const [record, all] = await Promise.all([
+            repository.findRun(repositoryContext, runId),
+            repository.listRunEvents(repositoryContext, runId),
+          ]);
+          if (!record) {
+            yield {
+              kind: "error",
+              schemaVersion: "sandbox-agent.run-events/v1",
+              runId,
+              code: "stream-failed",
+              retryable: false,
+            };
+            return;
+          }
+          const first = all[0];
+          if (first && first.sequence > cursor + 1) {
+            yield {
+              kind: "error",
+              schemaVersion: "sandbox-agent.run-events/v1",
+              runId,
+              code: "cursor-gap",
+              retryable: false,
+            };
+            return;
+          }
+          for (const event of all
+            .filter((candidate) => candidate.sequence > cursor)
+            .slice(0, limit)) {
+            cursor = event.sequence;
+            yield {
+              kind: "event",
+              schemaVersion: "sandbox-agent.run-events/v1",
+              cursor: String(event.sequence),
+              runId,
+              sequence: event.sequence,
+              occurredAt: event.createdAt,
+              eventType: event.type,
+              data: event.data,
+            };
+          }
+          if (all.some((event) => event.sequence > cursor)) continue;
+          if (record.run.toState().status.isTerminal()) {
+            yield {
+              kind: "closed",
+              schemaVersion: "sandbox-agent.run-events/v1",
+              runId,
+              reason: "terminal",
+            };
+            return;
+          }
+          await new Promise<void>((resolve) => {
+            const onAbort = () => {
+              clearTimeout(timeout);
+              resolve();
+            };
+            const timeout = setTimeout(() => {
+              signal?.removeEventListener("abort", onAbort);
+              resolve();
+            }, 50);
+            signal?.addEventListener("abort", onAbort, { once: true });
+          });
+        }
+      },
+    };
+    return ok({ mode: "stream", runId, stream });
   }
 
   async createSourceArtifact(

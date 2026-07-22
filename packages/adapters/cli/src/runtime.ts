@@ -12,6 +12,7 @@ import {
   type ResourceRuntimeLogsResult,
   type StreamDeploymentTimelineResult,
   type StreamOperatorWorkEventsResult,
+  type StreamSandboxAgentRunEventsResult,
   type TerminalSessionDescriptor,
   type TerminalSessionGateway,
 } from "@appaloft/application";
@@ -357,6 +358,14 @@ function operatorWorkEventStreamErrorFromUnknown(error: unknown): DomainError {
 
   return domainError.infra("Operator work event stream failed", {
     phase: "cli-operator-work-event-stream",
+    message: error instanceof Error ? error.message : String(error),
+  });
+}
+
+function sandboxAgentRunEventStreamErrorFromUnknown(error: unknown): DomainError {
+  if (isDomainError(error)) return error;
+  return domainError.infra("Sandbox Agent Run event stream failed", {
+    phase: "cli-sandbox-agent-run-event-stream",
     message: error instanceof Error ? error.message : String(error),
   });
 }
@@ -776,6 +785,31 @@ export const runOperatorWorkEventStreamQuery = (
         }
       },
       catch: operatorWorkEventStreamErrorFromUnknown,
+    });
+  });
+
+export const runSandboxAgentRunEventStreamQuery = (
+  message: Result<AppQuery<StreamSandboxAgentRunEventsResult>>,
+): Effect.Effect<void, DomainError, CliRuntime> =>
+  Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const query = yield* resultToEffect(message);
+    const result = yield* Effect.promise(() => cli.executeQuery(query));
+    const output = yield* resultToEffect(result);
+
+    yield* Effect.tryPromise({
+      try: async () => {
+        try {
+          for await (const envelope of output.stream) {
+            await Effect.runPromise(print(envelope));
+            if (envelope.kind === "error") throw new Error(envelope.code);
+            if (envelope.kind === "closed") break;
+          }
+        } finally {
+          await closeAsyncIterableIfPresent(output.stream);
+        }
+      },
+      catch: sandboxAgentRunEventStreamErrorFromUnknown,
     });
   });
 

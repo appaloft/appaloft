@@ -7,6 +7,7 @@ ready Sandbox
   -> create Sandbox Agent Runtime
   -> submit Sandbox Agent Run
   -> execute admitted harness work
+     -> append redacted Run frames -> bounded replay / cancellable live follow
      -> optional waiting-approval -> external resolve -> resume/reject
   -> terminal Run + development preview
   -> freeze Source Artifact
@@ -32,6 +33,10 @@ ready Sandbox
 
 Only the documented transitions are valid. Sandbox pause prevents new Runs; Sandbox termination
 terminates Runtime/Run access but retains sanitized lifecycle and independent artifact/Promotion facts.
+
+Run event follow is an observation query over persisted frames. It may reconnect after the last
+observed sequence and closes when the Run is terminal or the caller aborts; disconnect never
+cancels, retries or otherwise mutates the Run.
 
 ## Approval And Supersede
 

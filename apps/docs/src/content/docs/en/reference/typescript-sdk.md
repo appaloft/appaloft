@@ -103,7 +103,12 @@ const sandbox = await appaloft.sandboxes.create(sandboxInput);
 
 try {
   const agent = await sandbox.agents.create({ harness: "pi" });
-  const run = await agent.runs.create({ task: "Analyze and update the workspace" });
+  const run = await agent.stream({ prompt: "Analyze and update the workspace" });
+
+  for await (const envelope of run.fullStream) {
+    if (envelope.kind === "event") console.log(envelope.eventType, envelope.data);
+    if (envelope.kind === "error") throw new Error(envelope.code);
+  }
 } finally {
   await sandbox.terminate();
 }
@@ -112,6 +117,11 @@ try {
 `Agent` is an SDK alias for a Sandbox Agent Runtime. The Pi shorthand defaults to the admitted
 `aht_pi_managed_v1` harness template, fresh Run context, and generated idempotency keys. Explicit
 `harnessTemplateId`, `context`, and `idempotencyKey` values override those SDK defaults.
+`agent.stream({ task })` creates a Run and returns that same Run's durable event sequence as
+`fullStream`; `prompt` is a migration-friendly alias for `task`. Appaloft does not own the chat
+session: the caller still stores messages and decides between fresh context and continuation with
+`parentRunId`. Existing Runs can be read or resumed with `run.events.list()` and
+`run.events.stream({ afterSequence, signal })`.
 
 Sandbox handles also expose `sandbox.files.read/write`, `sandbox.exec`, and `sandbox.terminate`.
 These methods only inject the handle's `sandboxId`; they still call the generated public operations.

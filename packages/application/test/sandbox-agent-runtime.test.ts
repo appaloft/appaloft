@@ -173,6 +173,86 @@ describe("SandboxAgentDeliveryService", () => {
     expect(events._unsafeUnwrap().items).toHaveLength(2);
   });
 
+  test("[AGENT-STREAM-009] persists active harness frames and follows them through terminal close", async () => {
+    let releaseRun: (() => void) | undefined;
+    let framePersisted: (() => void) | undefined;
+    const runGate = new Promise<void>((resolve) => {
+      releaseRun = resolve;
+    });
+    const frameGate = new Promise<void>((resolve) => {
+      framePersisted = resolve;
+    });
+    const harness: SandboxAgentHarness = {
+      key: "fake",
+      templateId: "aht_fake_1",
+      version: "1.0.0",
+      templateDigest: `sha256:${"a".repeat(64)}`,
+      async execute(input) {
+        await input.emitEvent?.({
+          type: "message",
+          data: { text: "working", apiToken: "must-redact" },
+        });
+        await input.emitEvent?.({
+          type: "tool-result",
+          data: { tool: "test", status: "passed" },
+        });
+        framePersisted?.();
+        await runGate;
+        return { events: [], outcomeDigest: "sha256:stream-complete" };
+      },
+      async cancel() {},
+    };
+    const { service } = fixture({ harness });
+    const runtime = await service.createRuntime(context, {
+      sandboxId: "sbx_demo",
+      harnessKey: "fake",
+      harnessTemplateId: "aht_fake_1",
+      idempotencyKey: "runtime_stream",
+    });
+    await service.createRun(context, {
+      sandboxId: "sbx_demo",
+      runtimeId: runtime._unsafeUnwrap().runtimeId,
+      task: "stream the work",
+      context: { mode: "fresh" },
+      idempotencyKey: "run_stream",
+    });
+
+    const reconciling = service.reconcileRun(context, "srun_test");
+    await frameGate;
+    expect((await service.showRun(context, "sar_test", "srun_test"))._unsafeUnwrap().status).toBe(
+      "running",
+    );
+    const persisted = (await service.listRunEvents(context, "srun_test", {}))._unsafeUnwrap();
+    expect(persisted.items).toHaveLength(2);
+    expect(JSON.stringify(persisted)).not.toContain("must-redact");
+
+    const opened = await service.streamRunEvents(
+      context,
+      "srun_test",
+      { afterSequence: 1, limit: 100 },
+      new AbortController().signal,
+    );
+    const stream = opened._unsafeUnwrap().stream;
+    const iterator = stream[Symbol.asyncIterator]();
+    expect(await iterator.next()).toEqual({
+      done: false,
+      value: expect.objectContaining({
+        kind: "event",
+        runId: "srun_test",
+        sequence: 2,
+        eventType: "tool-result",
+      }),
+    });
+
+    releaseRun?.();
+    await reconciling;
+    expect(await iterator.next()).toEqual({
+      done: false,
+      value: expect.objectContaining({ kind: "closed", reason: "terminal" }),
+    });
+    await stream.close();
+  });
+
   test("[PROMOTION-PROOF-004] completes only after verified Deployment proof", async () => {
     const { service } = fixture();
     await service.createRuntime(context, {

@@ -4,7 +4,7 @@ description: "理解 Agent Runtime 与隔离 Sandbox 的所有权和安全边界
 docType: concept
 localeState: { zh-CN: complete, en-US: complete }
 searchAliases: ["agent sandbox", "isolation", "VPS"]
-relatedOperations: [sandboxes.create, sandboxes.show, sandboxes.exec, sandbox-processes.terminate]
+relatedOperations: [sandboxes.create, sandboxes.show, sandboxes.exec, sandboxes.agents.runs.events.stream, sandbox-processes.terminate]
 sidebar: { label: "Agent Sandboxes", order: 1 }
 ---
 
@@ -40,10 +40,20 @@ const sandbox = await appaloft.sandboxes.create({
 try {
   await sandbox.files.write({ path: "job/input.txt", contentBase64: "aGVsbG8=" });
   await sandbox.exec({ argv: ["python3", "/workspace/job.py"], timeoutMs: 10_000 });
+
+  const agent = await sandbox.agents.create({ harness: "pi" });
+  const run = await agent.stream({ task: "检查测试失败并修复生产代码" });
+  for await (const envelope of run.fullStream) {
+    if (envelope.kind === "event") console.log(envelope.data);
+  }
 } finally {
   await sandbox.terminate();
 }
 ```
+
+Run 事件会在执行过程中增量持久化；断线后可使用
+`run.events.stream({ afterSequence })` 从已确认 sequence 之后继续。终止浏览器或 API 连接只会
+停止读取，不会取消 Run；需要停止执行时应显式调用 Run cancel operation。
 
 生产凭据不应写入 Sandbox 环境变量、文件、Run event 或错误。需要调用外部目标时，应使用
 destination-bound credential broker；destination、method、expiry 与变换方式不匹配时 fail closed。
