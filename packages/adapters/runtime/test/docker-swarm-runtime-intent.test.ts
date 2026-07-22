@@ -437,6 +437,7 @@ describe("renderDockerSwarmRuntimeIntent", () => {
     });
 
     const plan = renderDockerSwarmApplyPlan(intent)._unsafeUnwrap();
+    expect(plan.steps).toMatchSnapshot();
     expect(plan.steps.map((step) => step.step)).toEqual([
       "wait-for-component-readiness",
       "create-candidate-service",

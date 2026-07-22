@@ -6,6 +6,7 @@
       "name": "appaloft",
       "devDependencies": {
         "@appaloft/adapter-packaging": "workspace:*",
+        "@appaloft/ash": "workspace:*",
         "@biomejs/biome": "^2.5.1",
         "@types/node": "^22.20.0",
         "@types/semver": "^7.7.1",
@@ -524,6 +525,7 @@
       "name": "@appaloft/provider-edge-proxy-caddy",
       "dependencies": {
         "@appaloft/application": "workspace:*",
+        "@appaloft/ash": "workspace:*",
         "@appaloft/core": "workspace:*",
       },
     },
@@ -531,6 +533,7 @@
       "name": "@appaloft/provider-edge-proxy-traefik",
       "dependencies": {
         "@appaloft/application": "workspace:*",
+        "@appaloft/ash": "workspace:*",
         "@appaloft/core": "workspace:*",
       },
     },

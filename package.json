@@ -3,6 +3,7 @@
   "version": "1.2.0",
   "devDependencies": {
     "@appaloft/adapter-packaging": "workspace:*",
+    "@appaloft/ash": "workspace:*",
     "@biomejs/biome": "^2.5.1",
     "@types/node": "^22.20.0",
     "@types/semver": "^7.7.1",

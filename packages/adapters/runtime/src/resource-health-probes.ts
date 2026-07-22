@@ -20,6 +20,7 @@ import {
 import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { ash } from "@appaloft/ash";
 
 const responsePreviewLimit = 4096;
 const dockerSwarmHealthProbeTimeoutExitCode = 124;
@@ -60,10 +61,6 @@ interface SshRuntimeHealthTarget {
   host: string;
   identityFile?: string;
   port: string;
-}
-
-function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, "'\\''")}'`;
 }
 
 function hostWithUsername(host: string, username?: string): string {
@@ -117,8 +114,8 @@ function dockerSwarmServicePsCommand(service: string): string {
     "ps",
     "--no-trunc",
     "--format",
-    shellQuote("{{json .}}"),
-    shellQuote(service),
+    ash.quote("{{json .}}"),
+    ash.quote(service),
   ].join(" ");
 }
 
@@ -127,8 +124,8 @@ function dockerContainerInspectCommand(container: string): string {
     "docker",
     "inspect",
     "--format",
-    shellQuote("{{json .State}}"),
-    shellQuote(container),
+    ash.quote("{{json .State}}"),
+    ash.quote(container),
   ].join(" ");
 }
 

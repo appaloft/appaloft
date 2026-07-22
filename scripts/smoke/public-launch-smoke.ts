@@ -1,6 +1,7 @@
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { ash } from "@appaloft/ash";
 
 type SmokeScenario = "basic-docker" | "github-repo" | "scheduled-task-cron";
 
@@ -326,10 +327,10 @@ function cleanupRemoteDeployments(): void {
     const remoteRoot = `${remoteRuntimeRoot.replace(/\/+$/, "")}/ssh-deployments/${normalizedDeploymentId}`;
     runSsh(
       [
-        `docker compose -p ${shellQuote(containerName)} down --remove-orphans >/dev/null 2>&1 || true`,
-        `docker rm -f ${shellQuote(containerName)} >/dev/null 2>&1 || true`,
-        `docker image rm -f ${shellQuote(imageName)} >/dev/null 2>&1 || true`,
-        `rm -rf ${shellQuote(remoteRoot)}`,
+        `docker compose -p ${ash.quote(containerName)} down --remove-orphans >/dev/null 2>&1 || true`,
+        `docker rm -f ${ash.quote(containerName)} >/dev/null 2>&1 || true`,
+        `docker image rm -f ${ash.quote(imageName)} >/dev/null 2>&1 || true`,
+        `rm -rf ${ash.quote(remoteRoot)}`,
       ].join(" && "),
     );
   }
@@ -356,10 +357,6 @@ function runSsh(command: string): CliResult {
 
 function safeDockerName(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9_.-]/g, "-");
-}
-
-function shellQuote(value: string): string {
-  return `'${value.replaceAll("'", "'\\''")}'`;
 }
 
 function parseJson<T>(raw: string): T {

@@ -1,6 +1,7 @@
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { ash } from "@appaloft/ash";
 import {
   type ExecutionContext,
   type ResourceRuntimeControlOperation,
@@ -83,10 +84,6 @@ export type RuntimeControlCommandResolution =
       result: ResourceRuntimeControlTargetResult;
     };
 
-function shellQuote(input: string): string {
-  return `'${input.replaceAll("'", "'\\''")}'`;
-}
-
 function repositoryContext(context: ExecutionContext): RepositoryContext {
   return {
     locale: context.locale,
@@ -118,7 +115,7 @@ function hostWithUsername(host: string, username?: string): string {
 }
 
 function remoteCommandWithCwd(command: string, cwd?: string): string {
-  return cwd ? `cd ${shellQuote(cwd)} && ${command}` : command;
+  return cwd ? `cd ${ash.quote(cwd)} && ${command}` : command;
 }
 
 function writeSshIdentityFile(privateKey: string): {
@@ -210,7 +207,7 @@ export function dockerContainerRuntimeControlCommand(input: {
   containerName: string;
   quote?: (value: string) => string;
 }): string {
-  const quote = input.quote ?? shellQuote;
+  const quote = input.quote ?? ash.quote;
   return `docker ${commandVerb(input.operation)} ${quote(input.containerName)}`;
 }
 
@@ -221,7 +218,7 @@ export function dockerComposeRuntimeControlCommand(input: {
   serviceName?: string;
   quote?: (value: string) => string;
 }): string {
-  const quote = input.quote ?? shellQuote;
+  const quote = input.quote ?? ash.quote;
   return [
     "docker compose",
     "-p",
@@ -241,7 +238,7 @@ export function planResourceRuntimeControlCommand(
     quote?: (value: string) => string;
   },
 ): RuntimeControlCommandResolution {
-  const quote = input?.quote ?? shellQuote;
+  const quote = input?.quote ?? ash.quote;
   const runtimeNames = deriveRuntimeInstanceNames({
     deploymentId: request.deploymentId,
     metadata: request.runtimeMetadata,
@@ -482,7 +479,7 @@ export class RuntimeControlShellCommandExecutor implements RuntimeControlCommand
 export class RuntimeResourceRuntimeControlTarget implements ResourceRuntimeControlTargetPort {
   constructor(
     private readonly executor: RuntimeControlCommandExecutor,
-    private readonly quote: (value: string) => string = shellQuote,
+    private readonly quote: (value: string) => string = ash.quote,
   ) {}
 
   async control(

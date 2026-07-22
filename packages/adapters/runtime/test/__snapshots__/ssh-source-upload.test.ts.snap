@@ -1,0 +1,19 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`SSH source upload [DEP-CREATE-PKG-001] git workspace upload respects git ignore rules 1`] = `"if git -C '/tmp/appaloft source' rev-parse --is-inside-work-tree >/dev/null 2>&1; then { git -C '/tmp/appaloft source' ls-files -z --cached --recurse-submodules ; git -C '/tmp/appaloft source' ls-files -z --others --exclude-standard ; } | tar --null -czf - -C '/tmp/appaloft source' --files-from -; else tar -czf - '--exclude' '.git' '--exclude' '.turbo' '--exclude' 'node_modules' '--exclude' '.svelte-kit' '--exclude' '.next/cache' '--exclude' 'coverage' -C '/tmp/appaloft source' . ; fi | ssh '-p' '22' 'deploy@example.test' 'mkdir -p /var/lib/appaloft/runtime/source'"`;
+
+exports[`SSH Compose failure diagnostics [DEP-CREATE-ASYNC-004B] captures bounded stack logs before failed candidate cleanup 1`] = `"docker compose -p 'appaloft-dep_failed' -f '/srv/stocktruth/docker-compose.production.yml' -f '/srv/stocktruth/.appaloft.compose.labels.override.yml' logs --no-color --tail '200'"`;
+
+exports[`SSH Docker image version metadata renders remote Docker pull before digest inspect 1`] = `"docker pull 'ghcr.io/acme/api:latest' >&2 && docker image inspect --format '{{json .RepoDigests}}' 'ghcr.io/acme/api:latest' && docker image inspect --format '{{.Id}}' 'ghcr.io/acme/api:latest'"`;
+
+exports[`SSH preview artifact cleanup [DEPLOYMENTS-CLEANUP-PREVIEW-007] renders a POSIX sh-compatible sibling artifact sweep 1`] = `
+"containers="$(docker ps -aq --filter 'label=appaloft.source-fingerprint=source-fingerprint%3Av1:preview%3Apr%3A51:github:provider-repository%3A1240442607:.:appaloft.preview.yaml' 2>/dev/null || true)"; if [ -n "$containers" ]; then printf '%s\\n' "$containers" | xargs -r docker rm -f >/dev/null 2>&1 || true; printf 'preview-containers\\n'; fi && images="$(docker image ls -q --filter 'label=appaloft.source-fingerprint=source-fingerprint%3Av1:preview%3Apr%3A51:github:provider-repository%3A1240442607:.:appaloft.preview.yaml' 2>/dev/null | sort -u || true)"; if [ -n "$images" ]; then printf '%s\\n' "$images" | xargs -r docker image rm -f >/dev/null 2>&1 || true; printf 'preview-images\\n'; fi && if [ -d '/var/lib/appaloft/runtime/ssh-deployments' ]; then find '/var/lib/appaloft/runtime/ssh-deployments' -mindepth 2 -maxdepth 2 -name '.appaloft-preview-artifact.json' -type f -exec sh -c 'fingerprint=$1
+shift
+for marker in "$@"; do
+if grep -Fq "$fingerprint" "$marker"; then
+root=$(dirname "$marker")
+rm -rf "$root"
+printf "preview-workspace:%s\\n" "$root"
+fi
+done' sh 'source-fingerprint%3Av1:preview%3Apr%3A51:github:provider-repository%3A1240442607:.:appaloft.preview.yaml' {} +; fi"
+`;

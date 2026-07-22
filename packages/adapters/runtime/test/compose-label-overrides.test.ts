@@ -2,13 +2,10 @@ import { describe, expect, test } from "bun:test";
 import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { ash } from "@appaloft/ash";
 
 import { renderComposeOwnershipLabelOverrideScript } from "../src/compose-label-overrides";
 import { dockerLabelsFromAssignments } from "../src/runtime-commands";
-
-function shellQuote(input: string): string {
-  return `'${input.replaceAll("'", "'\\''")}'`;
-}
 
 describe("compose ownership label overrides", () => {
   test("[RT-USAGE-002] renders an override generator with Appaloft ownership labels", () => {
@@ -45,7 +42,7 @@ describe("compose ownership label overrides", () => {
           },
         },
       ],
-      quote: shellQuote,
+      quote: ash.quote,
     });
 
     expect(script).toContain(
@@ -87,7 +84,7 @@ describe("compose ownership label overrides", () => {
         "traefik.http.routers.dep.rule=Host(`compose.example.com`)",
       ]),
       targetNetworkName: "appaloft-edge",
-      quote: shellQuote,
+      quote: ash.quote,
     });
 
     expect(script).toContain("target_service='web'");
@@ -113,7 +110,7 @@ describe("compose ownership label overrides", () => {
       targetLabels: dockerLabelsFromAssignments(["traefik.enable=true"]),
       targetNetworkName: "appaloft-edge",
       sharedNetworkNames: ["appaloft-edge"],
-      quote: shellQuote,
+      quote: ash.quote,
     });
 
     expect(script).toContain("managed dependency networks");
@@ -128,7 +125,7 @@ describe("compose ownership label overrides", () => {
       labels: dockerLabelsFromAssignments(["appaloft.managed=true"]),
       targetServiceName: "web",
       targetNetworkName: "appaloft-edge",
-      quote: shellQuote,
+      quote: ash.quote,
     });
 
     expect(script).toContain(
@@ -155,7 +152,7 @@ describe("compose ownership label overrides", () => {
         labels: dockerLabelsFromAssignments(["appaloft.managed=true"]),
         targetServiceName: "web",
         targetNetworkName: "appaloft-edge",
-        quote: shellQuote,
+        quote: ash.quote,
       });
       const process = Bun.spawn(["/bin/sh", "-c", script], {
         env: { ...Bun.env, PATH: `${directory}:${Bun.env.PATH ?? ""}` },
@@ -205,7 +202,7 @@ describe("compose ownership label overrides", () => {
           networkName: "appaloft-edge",
         },
       ],
-      quote: shellQuote,
+      quote: ash.quote,
     });
 
     expect(script).toContain('if [ "$service" = \'web\' ]; then');
@@ -230,7 +227,7 @@ describe("compose ownership label overrides", () => {
       targetLabels: dockerLabelsFromAssignments([
         "traefik.http.middlewares.canonical.redirectregex.replacement=https://example.test/${1}",
       ]),
-      quote: shellQuote,
+      quote: ash.quote,
     });
 
     expect(script).toContain(
@@ -248,7 +245,7 @@ describe("compose ownership label overrides", () => {
       labels: dockerLabelsFromAssignments(["appaloft.managed=true"]),
       targetServiceName: "web",
       environmentKeys: ["PUBLIC_MARKER", "SECRET_MARKER", "SECRET_MARKER"],
-      quote: shellQuote,
+      quote: ash.quote,
     });
 
     expect(script).toContain("target_service='web'");
@@ -265,7 +262,7 @@ describe("compose ownership label overrides", () => {
       labels: dockerLabelsFromAssignments(["appaloft.managed=true"]),
       targetLabels: dockerLabelsFromAssignments(["traefik.enable=true"]),
       targetNetworkName: "appaloft-edge",
-      quote: shellQuote,
+      quote: ash.quote,
     });
 
     expect(script).toContain('service_count="$(printf "%s\\n" "$services"');

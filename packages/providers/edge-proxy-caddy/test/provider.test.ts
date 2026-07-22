@@ -2,6 +2,28 @@ import { describe, expect, test } from "bun:test";
 import { CaddyEdgeProxyProvider } from "../src";
 
 describe("CaddyEdgeProxyProvider", () => {
+  test("[ASH-PROVIDER-002] snapshots rendered proxy shell commands", async () => {
+    const provider = new CaddyEdgeProxyProvider();
+    const ensure = await provider.ensureProxy(
+      { correlationId: "req_caddy_ash_snapshot" },
+      { proxyKind: "caddy", httpPort: 8080, httpsPort: 8443 },
+    );
+    const diagnostics = await provider.diagnoseProxy(
+      { correlationId: "req_caddy_ash_snapshot" },
+      { proxyKind: "caddy", httpPort: 8080, httpsPort: 8443 },
+    );
+
+    expect({
+      ensure: {
+        networkCommand: ensure._unsafeUnwrap().networkCommand,
+        containerCommand: ensure._unsafeUnwrap().containerCommand,
+      },
+      diagnostics: diagnostics
+        ._unsafeUnwrap()
+        .checks.map(({ name, command }) => ({ name, command })),
+    }).toMatchSnapshot();
+  });
+
   test("renders provider-owned Docker labels and ensure plan", async () => {
     const provider = new CaddyEdgeProxyProvider();
     const ensure = await provider.ensureProxy(

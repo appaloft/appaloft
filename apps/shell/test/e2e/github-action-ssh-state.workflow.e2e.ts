@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { cpSync, existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { ash } from "@appaloft/ash";
 import {
   cleanupWorkspace,
   createShellE2eWorkspace,
@@ -56,10 +57,6 @@ interface ResourceHealthSummary {
 
 function expandHome(path: string): string {
   return path === "~" || path.startsWith("~/") ? join(homedir(), path.slice(2)) : path;
-}
-
-function shellQuote(value: string): string {
-  return `'${value.replaceAll("'", "'\\''")}'`;
 }
 
 function publicRouteHost(host: string, suffix: string): string | undefined {
@@ -139,9 +136,9 @@ function remoteCleanup(config: SshConfig, remoteRuntimeRoot: string, deploymentI
   runSsh(
     config,
     [
-      `docker rm -f ${shellQuote(containerName)} >/dev/null 2>&1 || true`,
-      `docker image rm -f ${shellQuote(imageName)} >/dev/null 2>&1 || true`,
-      `rm -rf ${shellQuote(remoteRoot)}`,
+      `docker rm -f ${ash.quote(containerName)} >/dev/null 2>&1 || true`,
+      `docker image rm -f ${ash.quote(imageName)} >/dev/null 2>&1 || true`,
+      `rm -rf ${ash.quote(remoteRoot)}`,
     ].join(" && "),
   );
 }
@@ -241,7 +238,7 @@ function verifyRemoteHttpRoute(config: SshConfig, domain: string): void {
       "code=$(curl",
       "--silent --show-error",
       "--max-time 15",
-      `--header ${shellQuote(`Host: ${domain}`)}`,
+      `--header ${ash.quote(`Host: ${domain}`)}`,
       '--output "$body_file"',
       '--write-out "%{http_code}"',
       "http://127.0.0.1/health",
@@ -255,16 +252,16 @@ function verifyRemoteHttpRoute(config: SshConfig, domain: string): void {
       "--quiet",
       "--timeout=15",
       "--tries=1",
-      `--header=${shellQuote(`Host: ${domain}`)}`,
+      `--header=${ash.quote(`Host: ${domain}`)}`,
       '--output-document="$body_file"',
       "http://127.0.0.1/health",
     ].join(" "),
     'cat "$body_file"',
     "fi",
     "grep -F 'hello from express' \"$body_file\" >/dev/null",
-    `grep -F ${shellQuote(`"host":"${domain}"`)} "$body_file" >/dev/null`,
+    `grep -F ${ash.quote(`"host":"${domain}"`)} "$body_file" >/dev/null`,
   ].join("\n");
-  const result = runSsh(config, `sh -lc ${shellQuote(script)}`);
+  const result = runSsh(config, `sh -lc ${ash.quote(script)}`);
 
   expect(
     result.exitCode,
@@ -323,9 +320,9 @@ describe("GitHub Action SSH remote-state workflow e2e", () => {
       suffix,
     });
 
-    const cleanup = runSsh(config, `rm -rf ${shellQuote(remoteRuntimeRoot)}`);
+    const cleanup = runSsh(config, `rm -rf ${ash.quote(remoteRuntimeRoot)}`);
     expect(cleanup.exitCode, cleanup.stderr).toBe(0);
-    const routeCleanup = runSsh(config, `rm -rf ${shellQuote(routeRemoteRuntimeRoot)}`);
+    const routeCleanup = runSsh(config, `rm -rf ${ash.quote(routeRemoteRuntimeRoot)}`);
     expect(routeCleanup.exitCode, routeCleanup.stderr).toBe(0);
 
     firstWorkspace = createShellE2eWorkspace("appaloft-remote-state-runner-a-", {
@@ -366,10 +363,10 @@ describe("GitHub Action SSH remote-state workflow e2e", () => {
     }
 
     if (config && remoteRuntimeRoot) {
-      runSsh(config, `rm -rf ${shellQuote(remoteRuntimeRoot)}`);
+      runSsh(config, `rm -rf ${ash.quote(remoteRuntimeRoot)}`);
     }
     if (config && routeRemoteRuntimeRoot) {
-      runSsh(config, `rm -rf ${shellQuote(routeRemoteRuntimeRoot)}`);
+      runSsh(config, `rm -rf ${ash.quote(routeRemoteRuntimeRoot)}`);
     }
 
     if (firstWorkspace) {

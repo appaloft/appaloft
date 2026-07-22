@@ -20,6 +20,7 @@ describe("SSH runtime environment files", () => {
     expect(contents).toContain("export APPALOFT_DEPLOYMENT_ID='dep_123'");
     expect(contents).toContain("export DATABASE_URL='postgres://user:p'\\''ass@example.test/db'");
     expect(contents).toContain("export PORT='3000'");
+    expect(contents).toMatchSnapshot();
   });
 
   test("renders private remote write command and redacts encoded payload", () => {
@@ -33,9 +34,20 @@ describe("SSH runtime environment files", () => {
     expect(rendered.command).toContain("mv \"$tmp\" '/srv/app/.appaloft/runtime.env'");
     expect(rendered.redactions).toContain(contents);
     expect(rendered.redactions).toContain(Buffer.from(contents, "utf8").toString("base64"));
+    expect(rendered.command).toMatchSnapshot();
   });
 
   test("wraps remote compose commands after loading the runtime environment file", () => {
+    expect({
+      required: withRemoteRuntimeEnvironmentFile({
+        envFile: "/srv/app/.appaloft/runtime.env",
+        command: "docker compose up -d",
+      }),
+      optional: withOptionalRemoteRuntimeEnvironmentFile({
+        envFile: "/srv/app/.appaloft/runtime.env",
+        command: "docker compose down",
+      }),
+    }).toMatchSnapshot();
     expect(
       withRemoteRuntimeEnvironmentFile({
         envFile: "/srv/app/.appaloft/runtime.env",

@@ -72,10 +72,6 @@ function expandHome(path: string): string {
   return path === "~" || path.startsWith("~/") ? join(homedir(), path.slice(2)) : path;
 }
 
-function shellQuote(value: string): string {
-  return `'${value.replaceAll("'", "'\\''")}'`;
-}
-
 function sshConfig(): {
   host: string;
   port: string;
@@ -575,7 +571,7 @@ describe("runtime target capacity prune adapter", () => {
       const workspace = `${remoteRoot}/ssh-deployments/preview_capacity_prune_ssh`;
       const prepared = ssh(
         config,
-        `mkdir -p ${shellQuote(workspace)} && printf '%s\\n' preview > ${shellQuote(
+        `mkdir -p ${ash.quote(workspace)} && printf '%s\\n' preview > ${ash.quote(
           `${workspace}/artifact.txt`,
         )}`,
       );
@@ -619,7 +615,7 @@ describe("runtime target capacity prune adapter", () => {
             expect.objectContaining({ action: "matched", target: workspace }),
           ]),
         });
-        expect(ssh(config, `test -d ${shellQuote(workspace)}`).exitCode).toBe(0);
+        expect(ssh(config, `test -d ${ash.quote(workspace)}`).exitCode).toBe(0);
 
         const destructive = await adapter.prune(
           {
@@ -646,9 +642,9 @@ describe("runtime target capacity prune adapter", () => {
             expect.objectContaining({ action: "pruned", target: workspace }),
           ]),
         });
-        expect(ssh(config, `test ! -d ${shellQuote(workspace)}`).exitCode).toBe(0);
+        expect(ssh(config, `test ! -d ${ash.quote(workspace)}`).exitCode).toBe(0);
       } finally {
-        ssh(config, `rm -rf ${shellQuote(remoteRoot)}`);
+        ssh(config, `rm -rf ${ash.quote(remoteRoot)}`);
       }
     }, 120000);
   }

@@ -169,6 +169,7 @@ describe("RuntimeResourceRuntimeControlTarget", () => {
         serverId: "srv_demo",
       },
     ]);
+    expect(executor.executions).toMatchSnapshot();
     expect(JSON.stringify(executor.executions)).not.toContain("container-id");
   });
 
@@ -217,6 +218,7 @@ describe("RuntimeResourceRuntimeControlTarget", () => {
         serverId: "srv_demo",
       },
     ]);
+    expect(executor.executions).toMatchSnapshot();
   });
 
   test("[RUNTIME-CTRL-ADAPTER-002] blocks Compose control when retained compose metadata is missing", async () => {

@@ -1,0 +1,25 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`RuntimeResourceRuntimeControlTarget [RUNTIME-CTRL-ADAPTER-001] maps Docker container stop/start/restart to scoped container commands 1`] = `
+[
+  {
+    "command": "docker restart 'retained-web'",
+    "operation": "restart",
+    "providerKey": "local-shell",
+    "serverId": "srv_demo",
+    "workingDirectory": "/srv/appaloft/runtime/dep_web",
+  },
+]
+`;
+
+exports[`RuntimeResourceRuntimeControlTarget [RUNTIME-CTRL-ADAPTER-002] scopes Compose runtime control by project, file, and service 1`] = `
+[
+  {
+    "command": "docker compose -p 'web-dep_web' -f '/srv/web/docker-compose.yml' stop 'api'",
+    "operation": "stop",
+    "providerKey": "generic-ssh",
+    "serverId": "srv_demo",
+    "workingDirectory": "/srv/web",
+  },
+]
+`;

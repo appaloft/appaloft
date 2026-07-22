@@ -11,6 +11,7 @@ import {
 } from "node:fs";
 import { createServer } from "node:net";
 import { dirname, resolve } from "node:path";
+import { ash } from "@appaloft/ash";
 import {
   createDeploymentProgressEvent,
   deploymentProgressSteps,
@@ -346,10 +347,6 @@ function composePublicHealthUrl(input: {
 
 function sanitizeName(input: string): string {
   return input.toLowerCase().replace(/[^a-z0-9_.-]/g, "-");
-}
-
-function shellQuote(input: string): string {
-  return `'${input.replaceAll("'", "'\\''")}'`;
 }
 
 function summarizeCommandFailureOutput(input: { stdout: string; stderr: string }): string | undefined {
@@ -808,7 +805,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     });
 
     const inspect = await runShellCommand({
-      command: `docker inspect --format ${shellQuote(format)} ${shellQuote(input.containerName)}`,
+      command: `docker inspect --format ${ash.quote(format)} ${ash.quote(input.containerName)}`,
       cwd: input.workdir,
       env: input.env,
     });
@@ -841,7 +838,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     });
 
     const dockerLogs = await runShellCommand({
-      command: `docker logs --tail 50 ${shellQuote(input.containerName)}`,
+      command: `docker logs --tail 50 ${ash.quote(input.containerName)}`,
       cwd: input.workdir,
       env: input.env,
     });
@@ -1731,7 +1728,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
             pull: forceRedeploy,
             noCache: forceRedeploy,
           }),
-          { quote: shellQuote },
+          { quote: ash.quote },
         );
         timeline.push(phaseLog("package", buildCommand));
         await this.report(context, {
@@ -1823,7 +1820,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     }
 
     if (forceRedeploy && !shouldBuildImage) {
-      const pullCommand = `docker pull ${shellQuote(image)}`;
+      const pullCommand = `docker pull ${ash.quote(image)}`;
       timeline.push(phaseLog("package", pullCommand));
       const pull = await runShellCommand({
         command: pullCommand,
@@ -2016,7 +2013,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
           containerName,
           ignoreMissing: true,
         }),
-        { quote: shellQuote },
+        { quote: ash.quote },
       ),
       cwd: workdir,
       env,
@@ -2024,7 +2021,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     if (usesDirectHostPort && supersededDeploymentIds.length > 0) {
       await runShellCommand({
         command: renderRuntimeCommandString(removeSupersededResourceContainersSpec, {
-          quote: shellQuote,
+          quote: ash.quote,
         }),
         cwd: workdir,
         env,
@@ -2123,7 +2120,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     }
     const realizeStorageVolumesCommand = renderDockerVolumeRealizationScript({
       realizations: storageVolumeRealizations.value,
-      quote: shellQuote,
+      quote: ash.quote,
     });
     if (realizeStorageVolumesCommand.length > 0) {
       timeline.push(phaseLog("deploy", "Realize Docker storage volumes with Appaloft ownership labels"));
@@ -2185,11 +2182,11 @@ export class LocalExecutionBackend implements ExecutionBackend {
         }),
       ],
     });
-    const runCommand = renderRuntimeCommandString(runCommandSpec, { quote: shellQuote });
+    const runCommand = renderRuntimeCommandString(runCommandSpec, { quote: ash.quote });
     timeline.push(
       phaseLog(
         "deploy",
-        renderRuntimeCommandString(runCommandSpec, { quote: shellQuote, mode: "display" }),
+        renderRuntimeCommandString(runCommandSpec, { quote: ash.quote, mode: "display" }),
       ),
     );
     await this.report(context, {
@@ -2253,14 +2250,14 @@ export class LocalExecutionBackend implements ExecutionBackend {
       command: dockerContainerEnvironmentKeyVerificationCommand({
         containerName,
         expectedKeys: dockerEnvVariables.map((variable) => variable.name),
-        quote: shellQuote,
+        quote: ash.quote,
       }),
       cwd: workdir,
       env,
     });
     if (environmentKeyVerification.failed) {
       await runShellCommand({
-        command: `docker rm -f ${shellQuote(containerName)}`,
+        command: `docker rm -f ${ash.quote(containerName)}`,
         cwd: workdir,
         env,
       });
@@ -2400,7 +2397,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       command: dockerPublishedPortCommand({
         containerName,
         containerPort,
-        quote: shellQuote,
+        quote: ash.quote,
       }),
       cwd: workdir,
       env,
@@ -2534,7 +2531,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     if (!usesDirectHostPort && supersededDeploymentIds.length > 0) {
       const cleanup = await runShellCommand({
         command: renderRuntimeCommandString(removeSupersededResourceContainersSpec, {
-          quote: shellQuote,
+          quote: ash.quote,
         }),
         cwd: workdir,
         env,
@@ -2915,7 +2912,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         mounts: storageMounts.value,
         volumeRealizations: storageVolumeRealizations.value,
         environmentKeys: Object.keys(runtimeEnvPlaceholders),
-        quote: shellQuote,
+        quote: ash.quote,
       }),
       cwd: workdir,
       env: runtimeEnv.value.env,
@@ -2963,7 +2960,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         pull: true,
         noCache: isForceRedeployDeployment(state),
       }),
-      { quote: shellQuote },
+      { quote: ash.quote },
     );
     timeline.push(phaseLog("deploy", upCommand));
     await this.report(context, {
@@ -3003,7 +3000,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         command: dockerRemoveResourceContainersCommand({
           resourceId: state.resourceId.value,
           deploymentIds: [state.id.value],
-          quote: shellQuote,
+          quote: ash.quote,
         }),
         cwd: workdir,
         env: runtimeEnv.value.env,
@@ -3050,7 +3047,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         command: dockerRemoveResourceContainersCommand({
           resourceId: state.resourceId.value,
           deploymentIds: [state.id.value],
-          quote: shellQuote,
+          quote: ash.quote,
         }),
         cwd: workdir,
         env: runtimeEnv.value.env,
@@ -3075,7 +3072,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
           command: dockerRemoveResourceContainersCommand({
             resourceId: state.resourceId.value,
             deploymentIds: [state.id.value],
-            quote: shellQuote,
+            quote: ash.quote,
           }),
           cwd: workdir,
           env: runtimeEnv.value.env,
@@ -3098,7 +3095,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     const containerVerification = await waitForComposeDeploymentContainers({
       deploymentId: state.id.value,
       ...(targetServiceName ? { targetServiceName } : {}),
-      quote: shellQuote,
+      quote: ash.quote,
       ...containerVerificationWait,
       run: (command) =>
         runShellCommand({
@@ -3113,7 +3110,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         command: dockerRemoveResourceContainersCommand({
           resourceId: state.resourceId.value,
           deploymentIds: [state.id.value],
-          quote: shellQuote,
+          quote: ash.quote,
         }),
         cwd: workdir,
         env: runtimeEnv.value.env,
@@ -3140,7 +3137,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       command: dockerContainerEnvironmentKeyVerificationCommand({
         containerName: targetContainer?.id ?? "",
         expectedKeys: Object.keys(runtimeEnvPlaceholders),
-        quote: shellQuote,
+        quote: ash.quote,
       }),
       cwd: workdir,
       env: runtimeEnv.value.env,
@@ -3150,7 +3147,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         command: dockerRemoveResourceContainersCommand({
           resourceId: state.resourceId.value,
           deploymentIds: [state.id.value],
-          quote: shellQuote,
+          quote: ash.quote,
         }),
         cwd: workdir,
         env: runtimeEnv.value.env,
@@ -3187,7 +3184,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         command: dockerPublishedPortCommand({
           containerName: targetContainer.id,
           containerPort,
-          quote: shellQuote,
+          quote: ash.quote,
         }),
         cwd: workdir,
         env: runtimeEnv.value.env,
@@ -3204,7 +3201,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
           command: dockerRemoveResourceContainersCommand({
             resourceId: state.resourceId.value,
             deploymentIds: [state.id.value],
-            quote: shellQuote,
+            quote: ash.quote,
           }),
           cwd: workdir,
           env: runtimeEnv.value.env,
@@ -3232,7 +3229,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
           command: dockerRemoveResourceContainersCommand({
             resourceId: state.resourceId.value,
             deploymentIds: [state.id.value],
-            quote: shellQuote,
+            quote: ash.quote,
           }),
           cwd: workdir,
           env: runtimeEnv.value.env,
@@ -3286,7 +3283,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
             command: dockerRemoveResourceContainersCommand({
               resourceId: state.resourceId.value,
               deploymentIds: [state.id.value],
-              quote: shellQuote,
+              quote: ash.quote,
             }),
             cwd: workdir,
             env: runtimeEnv.value.env,
@@ -3318,7 +3315,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         command: dockerRemoveResourceContainersCommand({
           resourceId: state.resourceId.value,
           deploymentIds: supersededDeploymentIds,
-          quote: shellQuote,
+          quote: ash.quote,
         }),
         cwd: workdir,
         env: runtimeEnv.value.env,
@@ -3454,7 +3451,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       case "docker-container": {
         const containerName = metadata.containerName ?? runtimeInstanceNames.containerName;
         await runShellCommand({
-          command: `docker rm -f ${shellQuote(containerName)} >/dev/null 2>&1 || true`,
+          command: `docker rm -f ${ash.quote(containerName)} >/dev/null 2>&1 || true`,
           cwd: workdir,
           env,
         });
@@ -3467,9 +3464,9 @@ export class LocalExecutionBackend implements ExecutionBackend {
           const composeProjectName =
             metadata.composeProjectName ?? runtimeInstanceNames.composeProjectName;
           if (composeFile) {
-            const composeProjectFlag = `-p ${shellQuote(composeProjectName)} `;
+            const composeProjectFlag = `-p ${ash.quote(composeProjectName)} `;
             await runShellCommand({
-              command: `docker compose ${composeProjectFlag}-f ${shellQuote(composeFile)} down`,
+              command: `docker compose ${composeProjectFlag}-f ${ash.quote(composeFile)} down`,
               cwd: workdir,
               env,
             });
@@ -3514,7 +3511,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     }
     if (artifactCleanup.imageName) {
       await runShellCommand({
-        command: `docker image rm ${shellQuote(artifactCleanup.imageName)} >/dev/null 2>&1 || true`,
+        command: `docker image rm ${ash.quote(artifactCleanup.imageName)} >/dev/null 2>&1 || true`,
         cwd: workdir,
         env,
       });
@@ -3596,9 +3593,9 @@ export class LocalExecutionBackend implements ExecutionBackend {
             const composeProjectName =
               metadata.composeProjectName ?? runtimeInstanceNames.composeProjectName;
             if (composeFile) {
-              const composeProjectFlag = `-p ${shellQuote(composeProjectName)} `;
+              const composeProjectFlag = `-p ${ash.quote(composeProjectName)} `;
               await runShellCommand({
-                command: `docker compose ${composeProjectFlag}-f ${shellQuote(composeFile)} down`,
+                command: `docker compose ${composeProjectFlag}-f ${ash.quote(composeFile)} down`,
                 cwd: workdir,
                 env,
               });

@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { ash } from "@appaloft/ash";
 import {
   type AppSpan,
   type DeploymentReadModel,
@@ -113,10 +114,6 @@ function docker(args: readonly string[]): ProcessResult {
   };
 }
 
-function shellQuote(value: string): string {
-  return `'${value.replaceAll("'", "'\\''")}'`;
-}
-
 function safeDockerName(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9_.-]/g, "-");
 }
@@ -184,11 +181,11 @@ function ssh(config: SshConfig, command: string): ProcessResult {
 }
 
 function ensureRemoteDockerImage(config: SshConfig, image: string): void {
-  if (ssh(config, `docker image inspect ${shellQuote(image)} >/dev/null`).exitCode === 0) {
+  if (ssh(config, `docker image inspect ${ash.quote(image)} >/dev/null`).exitCode === 0) {
     return;
   }
 
-  const pulled = ssh(config, `docker pull ${shellQuote(image)}`);
+  const pulled = ssh(config, `docker pull ${ash.quote(image)}`);
   expect(pulled.exitCode, pulled.stderr).toBe(0);
 }
 
@@ -267,11 +264,11 @@ function sshServer(config: SshConfig): Server {
 
 function commandIntent(marker: string, providerKey: string): string {
   return [
-    `echo ${shellQuote(marker)}`,
+    `echo ${ash.quote(marker)}`,
     'test "$APPALOFT_SCHEDULED_TASK_RUN_ID" = "str_real_runtime"',
     'test "$APPALOFT_SCHEDULED_TASK_ID" = "tsk_real_runtime"',
     'test "$APPALOFT_RESOURCE_ID" = "res_scheduled_task_smoke"',
-    `test "$APPALOFT_RUNTIME_PROVIDER" = ${shellQuote(providerKey)}`,
+    `test "$APPALOFT_RUNTIME_PROVIDER" = ${ash.quote(providerKey)}`,
     'test "$APPALOFT_RUNTIME_EXECUTION_KIND" = "docker-container"',
     'test "$API_TOKEN" = "abc123"',
   ].join("; ");
@@ -341,8 +338,8 @@ describe("scheduled task runtime real SSH Docker smoke", () => {
       const started = ssh(
         config,
         [
-          `docker rm -f ${shellQuote(sourceContainer)} >/dev/null 2>&1 || true`,
-          `docker run -d --name ${shellQuote(sourceContainer)} ${shellQuote(smokeImage)} sh -lc 'sleep 300'`,
+          `docker rm -f ${ash.quote(sourceContainer)} >/dev/null 2>&1 || true`,
+          `docker run -d --name ${ash.quote(sourceContainer)} ${ash.quote(smokeImage)} sh -lc 'sleep 300'`,
         ].join("; "),
       );
       expect(started.exitCode, started.stderr).toBe(0);
@@ -378,7 +375,7 @@ describe("scheduled task runtime real SSH Docker smoke", () => {
           "scheduled-task-real-ssh-docker",
         );
       } finally {
-        ssh(config, `docker rm -f ${shellQuote(sourceContainer)} >/dev/null 2>&1 || true`);
+        ssh(config, `docker rm -f ${ash.quote(sourceContainer)} >/dev/null 2>&1 || true`);
       }
     }, 120000);
   }

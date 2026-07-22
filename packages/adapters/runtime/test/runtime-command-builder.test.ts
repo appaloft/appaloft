@@ -1,13 +1,10 @@
 import { describe, expect, test } from "bun:test";
+import { ash } from "@appaloft/ash";
 import {
   RuntimeCommandBuilder,
   dockerLabelsFromAssignments,
   renderRuntimeCommandString,
 } from "../src/runtime-commands";
-
-function shellQuote(input: string): string {
-  return `'${input.replaceAll("'", "'\\''")}'`;
-}
 
 describe("runtime command builder", () => {
   test("renders Docker image builds from typed specs", () => {
@@ -18,7 +15,7 @@ describe("runtime command builder", () => {
     });
 
     expect(spec.kind).toBe("docker-build-image");
-    expect(renderRuntimeCommandString(spec, { quote: shellQuote })).toBe(
+    expect(renderRuntimeCommandString(spec, { quote: ash.quote })).toBe(
       "docker build -t 'appaloft-image-dep_1:latest' -f '/srv/app/Dockerfile.appaloft' '/srv/app'",
     );
   });
@@ -34,7 +31,7 @@ describe("runtime command builder", () => {
       ]),
     });
 
-    expect(renderRuntimeCommandString(spec, { quote: shellQuote })).toContain(
+    expect(renderRuntimeCommandString(spec, { quote: ash.quote })).toContain(
       "--label 'appaloft.source-fingerprint=source-fingerprint:v1:preview%3Apr%3A14'",
     );
   });
@@ -48,7 +45,7 @@ describe("runtime command builder", () => {
       noCache: true,
     });
 
-    expect(renderRuntimeCommandString(spec, { quote: shellQuote })).toBe(
+    expect(renderRuntimeCommandString(spec, { quote: ash.quote })).toBe(
       "docker build --pull --no-cache -t 'appaloft-image-dep_1:latest' -f '/srv/app/Dockerfile.appaloft' '/srv/app'",
     );
   });
@@ -90,7 +87,7 @@ describe("runtime command builder", () => {
     });
 
     expect(spec.kind).toBe("docker-run-container");
-    expect(renderRuntimeCommandString(spec, { quote: shellQuote })).toBe(
+    expect(renderRuntimeCommandString(spec, { quote: ash.quote })).toBe(
       [
         "docker run -d --name 'appaloft-dep_1'",
         "--network 'appaloft-edge'",
@@ -105,7 +102,7 @@ describe("runtime command builder", () => {
         "'registry.example.com/app:2026-04-16'",
       ].join(" "),
     );
-    expect(renderRuntimeCommandString(spec, { quote: shellQuote, mode: "display" })).toContain(
+    expect(renderRuntimeCommandString(spec, { quote: ash.quote, mode: "display" })).toContain(
       "-e 'DATABASE_URL=[redacted]'",
     );
   });
@@ -128,7 +125,7 @@ describe("runtime command builder", () => {
       }),
     ]);
 
-    const command = renderRuntimeCommandString(spec, { quote: shellQuote });
+    const command = renderRuntimeCommandString(spec, { quote: ash.quote });
 
     expect(command).toContain("docker rm -f 'appaloft-dep_1' >/dev/null 2>&1 || true");
     expect(command).toContain("docker ps -aq --filter 'label=appaloft.resource-id=res_1'");
@@ -149,7 +146,7 @@ describe("runtime command builder", () => {
       ],
     });
 
-    expect(renderRuntimeCommandString(spec, { quote: shellQuote })).toContain("-p 80:3001");
+    expect(renderRuntimeCommandString(spec, { quote: ash.quote })).toContain("-p 80:3001");
   });
 
   test("renders Docker container restart policies", () => {
@@ -159,7 +156,7 @@ describe("runtime command builder", () => {
       restartPolicy: "unless-stopped",
     });
 
-    expect(renderRuntimeCommandString(spec, { quote: shellQuote })).toBe(
+    expect(renderRuntimeCommandString(spec, { quote: ash.quote })).toBe(
       "docker run -d --name 'appaloft-dep_3' --restart 'unless-stopped' 'app:latest'",
     );
   });
@@ -173,7 +170,7 @@ describe("runtime command builder", () => {
       workingDirectory: "/srv/app",
     });
 
-    expect(renderRuntimeCommandString(spec, { quote: shellQuote })).toBe(
+    expect(renderRuntimeCommandString(spec, { quote: ash.quote })).toBe(
       "cd '/srv/app' && docker compose -p 'preview-123-dep-1' -f '/srv/app/docker-compose.yml' -f '/srv/app/.appaloft.compose.labels.override.yml' up -d --build --scale 'worker=4'",
     );
   });
@@ -188,7 +185,7 @@ describe("runtime command builder", () => {
       portableDockerCompose: true,
     });
 
-    const command = renderRuntimeCommandString(spec, { quote: shellQuote });
+    const command = renderRuntimeCommandString(spec, { quote: ash.quote });
 
     expect(command).toContain(
       "docker compose -f '/srv/app/docker-compose.yml' config --services >/dev/null 2>&1",
@@ -215,7 +212,7 @@ describe("runtime command builder", () => {
       pull: true,
     });
 
-    expect(renderRuntimeCommandString(spec, { quote: shellQuote })).toBe(
+    expect(renderRuntimeCommandString(spec, { quote: ash.quote })).toBe(
       "cd '/srv/app' && docker compose -p 'preview-123-dep-1' -f '/srv/app/docker-compose.yml' -f '/srv/app/.appaloft.compose.labels.override.yml' pull --ignore-buildable && docker compose -p 'preview-123-dep-1' -f '/srv/app/docker-compose.yml' -f '/srv/app/.appaloft.compose.labels.override.yml' build --pull && docker compose -p 'preview-123-dep-1' -f '/srv/app/docker-compose.yml' -f '/srv/app/.appaloft.compose.labels.override.yml' up -d --build",
     );
   });
@@ -230,7 +227,7 @@ describe("runtime command builder", () => {
       noCache: true,
     });
 
-    expect(renderRuntimeCommandString(spec, { quote: shellQuote })).toBe(
+    expect(renderRuntimeCommandString(spec, { quote: ash.quote })).toBe(
       "cd '/srv/app' && docker compose -p 'preview-123-dep-1' -f '/srv/app/docker-compose.yml' -f '/srv/app/.appaloft.compose.labels.override.yml' pull --ignore-buildable && docker compose -p 'preview-123-dep-1' -f '/srv/app/docker-compose.yml' -f '/srv/app/.appaloft.compose.labels.override.yml' build --pull --no-cache && docker compose -p 'preview-123-dep-1' -f '/srv/app/docker-compose.yml' -f '/srv/app/.appaloft.compose.labels.override.yml' up -d --build",
     );
   });

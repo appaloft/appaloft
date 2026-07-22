@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { join } from "node:path";
+import { ash } from "@appaloft/ash";
 import {
   cleanupWorkspace,
   createShellE2eWorkspace,
@@ -24,10 +25,6 @@ const failingFixtureDir = fixturePath("docker-exits-fast");
 const staticFixtureDir = fixturePath("static-site");
 const composeFixtureFile = join(fixturePath("docker-compose-hello"), "docker-compose.yml");
 const prebuiltImage = process.env.APPALOFT_E2E_SSH_PREBUILT_IMAGE ?? "nginx:1.27-alpine";
-
-function shellQuote(value: string): string {
-  return `'${value.replaceAll("'", "'\\''")}'`;
-}
 
 describe("quick deploy SSH workflow e2e", () => {
   if (!enabled) {
@@ -181,7 +178,7 @@ describe("quick deploy SSH workflow e2e", () => {
     let deploymentId: string | undefined;
 
     try {
-      const preflightPull = runSsh(config, `docker pull ${shellQuote(prebuiltImage)}`);
+      const preflightPull = runSsh(config, `docker pull ${ash.quote(prebuiltImage)}`);
       expect(preflightPull.exitCode, preflightPull.stderr).toBe(0);
 
       const deployment = runShellCli(

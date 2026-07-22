@@ -104,10 +104,6 @@ function seedPocketBaseSqliteFile(path: string): void {
   }
 }
 
-function shellQuote(value: string): string {
-  return `'${value.replaceAll("'", "'\\''")}'`;
-}
-
 function expandHome(path: string): string {
   return path === "~" || path.startsWith("~/") ? join(homedir(), path.slice(2)) : path;
 }
@@ -986,9 +982,9 @@ describe("storage volume backup runtime provider", () => {
         const prepared = ssh(
           config,
           [
-            `rm -rf ${shellQuote(remoteRoot)}`,
-            `mkdir -p ${shellQuote(remoteSeedDir)} ${shellQuote(remoteExtractDir)}`,
-            `docker volume rm -f ${shellQuote(sourceVolumeName)} ${shellQuote(targetVolumeName)} >/dev/null 2>&1 || true`,
+            `rm -rf ${ash.quote(remoteRoot)}`,
+            `mkdir -p ${ash.quote(remoteSeedDir)} ${ash.quote(remoteExtractDir)}`,
+            `docker volume rm -f ${ash.quote(sourceVolumeName)} ${ash.quote(targetVolumeName)} >/dev/null 2>&1 || true`,
           ].join(" && "),
         );
         expect(prepared.exitCode, prepared.stderr).toBe(0);
@@ -1019,14 +1015,14 @@ describe("storage volume backup runtime provider", () => {
           [
             "docker volume create",
             "--label",
-            shellQuote("appaloft.managed=true"),
+            ash.quote("appaloft.managed=true"),
             "--label",
-            shellQuote(`appaloft.storage-volume-id=${sourceVolumeId}`),
+            ash.quote(`appaloft.storage-volume-id=${sourceVolumeId}`),
             "--label",
-            shellQuote("appaloft.storage-volume-kind=named-volume"),
+            ash.quote("appaloft.storage-volume-kind=named-volume"),
             "--label",
-            shellQuote("appaloft.storage-runtime-realized-by=deployment-execution"),
-            shellQuote(sourceVolumeName),
+            ash.quote("appaloft.storage-runtime-realized-by=deployment-execution"),
+            ash.quote(sourceVolumeName),
           ].join(" "),
         );
         expect(created.exitCode, created.stderr).toBe(0);
@@ -1035,11 +1031,11 @@ describe("storage volume backup runtime provider", () => {
           config,
           [
             "docker run --rm",
-            `-v ${shellQuote(`${sourceVolumeName}:/source`)}`,
-            `-v ${shellQuote(`${remoteSeedDir}:/seed:ro`)}`,
+            `-v ${ash.quote(`${sourceVolumeName}:/source`)}`,
+            `-v ${ash.quote(`${remoteSeedDir}:/seed:ro`)}`,
             "alpine:3.20",
             "sh -c",
-            shellQuote(
+            ash.quote(
               "cp /seed/data.db /source/data.db && mkdir -p /source/pb_migrations && printf '001_create_records\\n' > /source/pb_migrations/001.txt",
             ),
           ].join(" "),
@@ -1076,7 +1072,7 @@ describe("storage volume backup runtime provider", () => {
         expect(storeResult.isOk()).toBe(true);
         const artifactHandle = storeResult._unsafeUnwrap().artifactHandle;
         expect(artifactHandle).toStartWith(targetRef);
-        expect(ssh(config, `test -f ${shellQuote(artifactHandle)}`).exitCode).toBe(0);
+        expect(ssh(config, `test -f ${ash.quote(artifactHandle)}`).exitCode).toBe(0);
 
         const restoreResult = await targetProvider.restore({
           backupId,
@@ -1087,17 +1083,17 @@ describe("storage volume backup runtime provider", () => {
           runtimeTarget,
         });
         expect(restoreResult.isOk()).toBe(true);
-        expect(ssh(config, `docker volume inspect ${shellQuote(targetVolumeName)} >/dev/null`).exitCode).toBe(0);
+        expect(ssh(config, `docker volume inspect ${ash.quote(targetVolumeName)} >/dev/null`).exitCode).toBe(0);
 
         const extracted = ssh(
           config,
           [
             "docker run --rm",
-            `-v ${shellQuote(`${targetVolumeName}:/target:ro`)}`,
-            `-v ${shellQuote(`${remoteExtractDir}:/extract`)}`,
+            `-v ${ash.quote(`${targetVolumeName}:/target:ro`)}`,
+            `-v ${ash.quote(`${remoteExtractDir}:/extract`)}`,
             "alpine:3.20",
             "sh -c",
-            shellQuote(
+            ash.quote(
               "cp /target/data.db /extract/data.db && cp /target/pb_migrations/001.txt /extract/001.txt",
             ),
           ].join(" "),
@@ -1157,8 +1153,8 @@ describe("storage volume backup runtime provider", () => {
         ssh(
           config,
           [
-            `docker volume rm -f ${shellQuote(sourceVolumeName)} ${shellQuote(targetVolumeName)} >/dev/null 2>&1 || true`,
-            `rm -rf ${shellQuote(remoteRoot)}`,
+            `docker volume rm -f ${ash.quote(sourceVolumeName)} ${ash.quote(targetVolumeName)} >/dev/null 2>&1 || true`,
+            `rm -rf ${ash.quote(remoteRoot)}`,
           ].join(" ; "),
         );
         rmSync(tmpRoot, { recursive: true, force: true });

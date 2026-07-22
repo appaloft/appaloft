@@ -19,6 +19,7 @@ import {
   type ResourceAccessFailureRendererTarget,
 } from "@appaloft/application";
 import { sanitizeAppliedRouteContextMetadata } from "@appaloft/application/resource-access-failure-diagnostics";
+import { type AshScript, ash } from "@appaloft/ash";
 import {
   type DomainError,
   deploymentRouteIdentityHeaderName,
@@ -62,10 +63,6 @@ function sanitizeRouteName(input: { deploymentId: string; suffix?: string }): st
     .filter(Boolean)
     .join("-")
     .replace(/[^a-zA-Z0-9-]/g, "-");
-}
-
-function shellQuote(input: string): string {
-  return `'${input.replaceAll("'", "'\\''")}'`;
 }
 
 export interface TraefikResourceAccessFailureMiddlewareInput {
@@ -375,7 +372,7 @@ function routeProbeCommand(input: {
   httpPort: number;
   networkName: string;
   token: string;
-}): string {
+}): AshScript {
   const containerName = `appaloft-proxy-probe-${input.token}`;
   const router = `appaloft-proxy-probe-${input.token}`;
   const service = `${router}-svc`;
@@ -383,58 +380,37 @@ function routeProbeCommand(input: {
   const url = `http://127.0.0.1:${input.httpPort}/ping`;
   const hostHeader = `Host: ${hostname}`;
 
-  return [
-    `cleanup() { docker rm -f ${shellQuote(containerName)} >/dev/null 2>&1 || true; }`,
-    [
-      "probe_http() {",
-      "if command -v curl >/dev/null 2>&1; then",
-      `curl -fsS --max-time 2 -H ${shellQuote(hostHeader)} ${shellQuote(url)} >/dev/null`,
-      "else",
-      `wget -q --timeout=2 --header=${shellQuote(hostHeader)} -O /dev/null ${shellQuote(url)}`,
-      "fi",
-      "}",
-    ].join("\n"),
-    [
-      "dump_http() {",
-      "if command -v curl >/dev/null 2>&1; then",
-      `curl -sS -i --max-time 2 -H ${shellQuote(hostHeader)} ${shellQuote(url)} || true`,
-      "else",
-      `wget -S --timeout=2 --header=${shellQuote(hostHeader)} -O - ${shellQuote(url)} || true`,
-      "fi",
-      "}",
-    ].join("\n"),
-    "trap cleanup EXIT",
-    "cleanup",
-    [
-      "docker run -d",
-      `--name ${shellQuote(containerName)}`,
-      `--network ${shellQuote(input.networkName)}`,
-      "--label traefik.enable=true",
-      `--label ${shellQuote(`traefik.docker.network=${input.networkName}`)}`,
-      `--label ${shellQuote(`traefik.http.routers.${router}.rule=Host(\`${hostname}\`)`)}`,
-      `--label ${shellQuote(`traefik.http.routers.${router}.entrypoints=web`)}`,
-      `--label ${shellQuote(`traefik.http.routers.${router}.service=${service}`)}`,
-      `--label ${shellQuote(`traefik.http.services.${service}.loadbalancer.server.port=80`)}`,
-      traefikImage,
-      "--ping=true",
-      "--entrypoints.web.address=:80",
-      "--ping.entrypoint=web",
-      ">/dev/null",
-    ].join(" "),
-    [
-      "i=0",
-      'while [ "$i" -lt 15 ]; do',
-      "if probe_http; then",
-      `printf '%s\\n' ${shellQuote(`Traefik Docker label route probe passed for ${hostname}`)}`,
-      "exit 0",
-      "fi",
-      "i=$((i + 1))",
-      "sleep 1",
-      "done",
-    ].join("\n"),
-    "dump_http",
-    "exit 1",
-  ].join("\n");
+  return ash`
+    cleanup() { docker rm -f ${ash.arg(containerName)} >/dev/null 2>&1 || true; }
+    probe_http() {
+      if command -v curl >/dev/null 2>&1; then
+        curl -fsS --max-time 2 -H ${ash.arg(hostHeader)} ${ash.arg(url)} >/dev/null
+      else
+        wget -q --timeout=2 --header=${ash.arg(hostHeader)} -O /dev/null ${ash.arg(url)}
+      fi
+    }
+    dump_http() {
+      if command -v curl >/dev/null 2>&1; then
+        curl -sS -i --max-time 2 -H ${ash.arg(hostHeader)} ${ash.arg(url)} || true
+      else
+        wget -S --timeout=2 --header=${ash.arg(hostHeader)} -O - ${ash.arg(url)} || true
+      fi
+    }
+    trap cleanup EXIT
+    cleanup
+    docker run -d --name ${ash.arg(containerName)} --network ${ash.arg(input.networkName)} --label traefik.enable=true --label ${ash.arg(`traefik.docker.network=${input.networkName}`)} --label ${ash.arg(`traefik.http.routers.${router}.rule=Host(\`${hostname}\`)`)} --label ${ash.arg(`traefik.http.routers.${router}.entrypoints=web`)} --label ${ash.arg(`traefik.http.routers.${router}.service=${service}`)} --label ${ash.arg(`traefik.http.services.${service}.loadbalancer.server.port=80`)} ${ash.arg(traefikImage)} --ping=true --entrypoints.web.address=:80 --ping.entrypoint=web >/dev/null
+    i=0
+    while [ "$i" -lt 15 ]; do
+      if probe_http; then
+        printf '%s\n' ${ash.arg(`Traefik Docker label route probe passed for ${hostname}`)}
+        exit 0
+      fi
+      i=$((i + 1))
+      sleep 1
+    done
+    dump_http
+    exit 1
+  `;
 }
 
 function labelsForTraefik(input: {
@@ -624,41 +600,29 @@ export class TraefikEdgeProxyProvider implements EdgeProxyProvider {
       `--certificatesresolvers.${defaultTraefikCertificateResolver}.acme.httpchallenge.entrypoint=web`,
       `--certificatesresolvers.${defaultTraefikCertificateResolver}.acme.storage=${defaultTraefikAcmeStoragePath}`,
     ];
-    const runningWithExpectedImageCommand = [
-      `docker inspect -f '{{.State.Running}}' ${containerName} 2>/dev/null | grep true >/dev/null`,
-      `[ "$(docker inspect -f '{{.Config.Image}}' ${containerName} 2>/dev/null)" = "${traefikImage}" ]`,
-      ...acmeResolverArgs.map(
-        (arg) =>
-          `docker inspect -f '{{range .Args}}{{println .}}{{end}}' ${containerName} 2>/dev/null | grep -Fx -- ${shellQuote(arg)} >/dev/null`,
-      ),
-    ].join(" && ");
+    const networkCommand = ash`
+      docker network inspect ${ash.arg(traefikEdgeNetworkName)} >/dev/null 2>&1 || docker network create ${ash.arg(traefikEdgeNetworkName)}
+    `;
+    const containerCommand = ash`
+      docker inspect -f '{{.State.Running}}' ${ash.arg(containerName)} 2>/dev/null | grep true >/dev/null &&
+      [ "$(docker inspect -f '{{.Config.Image}}' ${ash.arg(containerName)} 2>/dev/null)" = ${ash.arg(traefikImage)} ] &&
+      docker inspect -f '{{range .Args}}{{println .}}{{end}}' ${ash.arg(containerName)} 2>/dev/null | grep -Fx -- ${ash.arg(acmeResolverArgs[0] ?? "")} >/dev/null &&
+      docker inspect -f '{{range .Args}}{{println .}}{{end}}' ${ash.arg(containerName)} 2>/dev/null | grep -Fx -- ${ash.arg(acmeResolverArgs[1] ?? "")} >/dev/null &&
+      docker inspect -f '{{range .Args}}{{println .}}{{end}}' ${ash.arg(containerName)} 2>/dev/null | grep -Fx -- ${ash.arg(acmeResolverArgs[2] ?? "")} >/dev/null ||
+      (
+        docker rm -f ${ash.arg(containerName)} >/dev/null 2>&1 || true
+        docker run -d --restart unless-stopped --name ${ash.arg(containerName)} --network ${ash.arg(traefikEdgeNetworkName)} -p ${ash.arg(`${httpPort}:80`)} -p ${ash.arg(`${httpsPort}:443`)} --add-host host.docker.internal:host-gateway -v /var/run/docker.sock:/var/run/docker.sock:ro -v ${ash.arg(`${defaultTraefikAcmeVolumeName}:/letsencrypt`)} ${ash.arg(traefikImage)} --providers.docker=true --providers.docker.exposedbydefault=false --providers.docker.network=${ash.arg(traefikEdgeNetworkName)} --entrypoints.web.address=:80 --entrypoints.websecure.address=:443 ${ash.list(acmeResolverArgs)}
+      )
+    `;
 
     return ok({
       providerKey: this.key,
       proxyKind: "traefik",
       displayName: this.displayName,
       networkName: traefikEdgeNetworkName,
-      networkCommand: `docker network inspect ${traefikEdgeNetworkName} >/dev/null 2>&1 || docker network create ${traefikEdgeNetworkName}`,
+      networkCommand: ash.render(networkCommand).trim(),
       containerName,
-      containerCommand: [
-        `${runningWithExpectedImageCommand} || (docker rm -f ${containerName} >/dev/null 2>&1 || true; docker run -d`,
-        "--restart unless-stopped",
-        `--name ${containerName}`,
-        `--network ${traefikEdgeNetworkName}`,
-        `-p ${httpPort}:80`,
-        `-p ${httpsPort}:443`,
-        "--add-host host.docker.internal:host-gateway",
-        "-v /var/run/docker.sock:/var/run/docker.sock:ro",
-        `-v ${defaultTraefikAcmeVolumeName}:/letsencrypt`,
-        traefikImage,
-        "--providers.docker=true",
-        "--providers.docker.exposedbydefault=false",
-        `--providers.docker.network=${traefikEdgeNetworkName}`,
-        "--entrypoints.web.address=:80",
-        "--entrypoints.websecure.address=:443",
-        ...acmeResolverArgs,
-        ")",
-      ].join(" "),
+      containerCommand: ash.render(containerCommand).trim(),
       metadata: {
         httpPort: String(httpPort),
         httpsPort: String(httpsPort),
@@ -692,11 +656,13 @@ export class TraefikEdgeProxyProvider implements EdgeProxyProvider {
       checks: [
         {
           name: "edge-proxy-container",
-          command: [
-            `actual="$(docker inspect -f 'status={{.State.Status}} image={{.Config.Image}}' ${shellQuote(containerName)} 2>/dev/null)"`,
-            'printf "%s\\n" "$actual"',
-            `[ "$actual" = ${shellQuote(`status=running image=${traefikImage}`)} ]`,
-          ].join("; "),
+          command: ash
+            .render(ash`
+              actual="$(docker inspect -f 'status={{.State.Status}} image={{.Config.Image}}' ${ash.arg(containerName)} 2>/dev/null)"
+              printf "%s\n" "$actual"
+              [ "$actual" = ${ash.arg(`status=running image=${traefikImage}`)} ]
+            `)
+            .trim(),
           timeoutMs: 8_000,
           successMessage: "Traefik proxy container image is compatible",
           failureMessage:
@@ -708,11 +674,13 @@ export class TraefikEdgeProxyProvider implements EdgeProxyProvider {
         },
         {
           name: "edge-proxy-provider-logs",
-          command: [
-            `logs="$(docker logs --tail 80 ${shellQuote(containerName)} 2>&1 || true)"`,
-            'printf "%s\\n" "$logs" | tail -n 20',
-            '! printf "%s\\n" "$logs" | grep -E \'client version .* too old|Provider error|Failed to retrieve information of the docker client\'',
-          ].join("; "),
+          command: ash
+            .render(ash`
+              logs="$(docker logs --tail 80 ${ash.arg(containerName)} 2>&1 || true)"
+              printf "%s\n" "$logs" | tail -n 20
+              ! printf "%s\n" "$logs" | grep -E 'client version .* too old|Provider error|Failed to retrieve information of the docker client'
+            `)
+            .trim(),
           timeoutMs: 8_000,
           successMessage: "Traefik Docker provider logs have no compatibility errors",
           failureMessage: "Traefik Docker provider logs contain compatibility errors",
@@ -722,11 +690,15 @@ export class TraefikEdgeProxyProvider implements EdgeProxyProvider {
         },
         {
           name: "edge-proxy-route-probe",
-          command: routeProbeCommand({
-            httpPort,
-            networkName: traefikEdgeNetworkName,
-            token,
-          }),
+          command: ash
+            .render(
+              routeProbeCommand({
+                httpPort,
+                networkName: traefikEdgeNetworkName,
+                token,
+              }),
+            )
+            .trim(),
           timeoutMs: 30_000,
           successMessage: "Traefik can discover Docker labels and route to a probe container",
           failureMessage: "Traefik could not route to a Docker label probe container",

@@ -20,6 +20,12 @@ interface Rule {
   readonly shellOwnerOnly?: boolean;
 }
 
+export const ashCommandConstructionSourceGlobs = [
+  "apps/*/src/**/*.ts",
+  "packages/*/src/**/*.ts",
+  "packages/providers/*/src/**/*.ts",
+] as const;
+
 const rules: readonly Rule[] = [
   {
     rule: "no-handwritten-shell-quoting",
@@ -84,27 +90,19 @@ const legacyViolationBudgets = new Map<
   string,
   Partial<Record<AshCommandConstructionViolation["rule"], number>>
 >([
-  [
-    "apps/shell/src/remote-pglite-state-sync.ts",
-    { "no-handwritten-shell-quoting": 1, "no-plain-shell-command-type": 2 },
-  ],
+  ["apps/shell/src/remote-pglite-state-sync.ts", { "no-plain-shell-command-type": 2 }],
   ["apps/shell/src/remote-state-work-read-model.ts", { "no-plain-shell-command-type": 1 }],
-  [
-    "apps/shell/src/ssh-mutation-coordinator.ts",
-    { "no-handwritten-shell-quoting": 1, "no-plain-shell-command-type": 1 },
-  ],
+  ["apps/shell/src/ssh-mutation-coordinator.ts", { "no-plain-shell-command-type": 1 }],
   ["packages/server/src/remote-state-work-read-model.ts", { "no-plain-shell-command-type": 1 }],
-  [
-    "packages/server/src/ssh-mutation-coordinator.ts",
-    { "no-handwritten-shell-quoting": 1, "no-plain-shell-command-type": 1 },
-  ],
+  ["packages/server/src/ssh-mutation-coordinator.ts", { "no-plain-shell-command-type": 1 }],
 ]);
 
-async function checkRepository(): Promise<void> {
-  const repositoryRoot = resolve(import.meta.dir, "..");
-  const files = (
+export async function discoverAshCommandConstructionSourceFiles(
+  repositoryRoot = resolve(import.meta.dir, ".."),
+): Promise<string[]> {
+  return (
     await Promise.all(
-      ["apps/*/src/**/*.ts", "packages/*/src/**/*.ts"].map((pattern) =>
+      ashCommandConstructionSourceGlobs.map((pattern) =>
         Array.fromAsync(
           new Bun.Glob(pattern).scan({
             cwd: repositoryRoot,
@@ -117,6 +115,11 @@ async function checkRepository(): Promise<void> {
     .flat()
     .filter((file) => file !== "packages/ash/src/index.ts")
     .sort();
+}
+
+async function checkRepository(): Promise<void> {
+  const repositoryRoot = resolve(import.meta.dir, "..");
+  const files = await discoverAshCommandConstructionSourceFiles(repositoryRoot);
   const violations = rejectViolationsBeyondLegacyBudget(
     (
       await Promise.all(

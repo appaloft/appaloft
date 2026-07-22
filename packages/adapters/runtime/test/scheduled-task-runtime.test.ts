@@ -340,6 +340,7 @@ describe("RuntimeTargetScheduledTaskRuntimePort", () => {
     });
 
     expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchSnapshot();
     expect(result._unsafeUnwrap()).toBe(
       [
         "docker rm -f 'appaloft-task-str_manual' >/dev/null 2>&1 || true",
@@ -362,6 +363,7 @@ describe("RuntimeTargetScheduledTaskRuntimePort", () => {
     });
 
     expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchSnapshot();
     expect(result._unsafeUnwrap()).toBe(
       "docker compose -p 'appaloft-dep-live' -f '/srv/app/compose.yml' run --rm --no-deps --env 'API_TOKEN=abc123' --workdir '/app' 'api' sh -lc 'bun run migrate'",
     );
@@ -385,6 +387,7 @@ describe("RuntimeTargetScheduledTaskRuntimePort", () => {
 
     expect(result.isOk()).toBe(true);
     const command = result._unsafeUnwrap();
+    expect(command).toMatchSnapshot();
     expect(command).toContain("docker service inspect 'appaloft-res-api-dst-prod-dep-live_web'");
     expect(command).toContain(
       "docker service create --name 'appaloft-task-str-swarm' --restart-condition none --mode replicated-job --network 'appaloft-edge'",

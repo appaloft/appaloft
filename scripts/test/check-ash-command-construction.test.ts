@@ -1,7 +1,17 @@
 import { describe, expect, test } from "bun:test";
-import { findAshCommandConstructionViolations } from "../check-ash-command-construction";
+import {
+  discoverAshCommandConstructionSourceFiles,
+  findAshCommandConstructionViolations,
+} from "../check-ash-command-construction";
 
 describe("ash command construction architecture check", () => {
+  test("[ASH-GUARD-000] scans nested provider source packages", async () => {
+    const files = await discoverAshCommandConstructionSourceFiles();
+
+    expect(files).toContain("packages/providers/edge-proxy-traefik/src/index.ts");
+    expect(files).toContain("packages/providers/edge-proxy-caddy/src/index.ts");
+  });
+
   test("[ASH-GUARD-001] rejects handwritten shell quoting and string-built command scripts", () => {
     const source = `
       function shellQuote(input: string): string {

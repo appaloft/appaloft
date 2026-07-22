@@ -1,0 +1,20 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`remote PGlite state sync [CONFIG-FILE-STATE-014] postgres-control-plane mode does not create remote PGlite backups 1`] = `
+[
+  {
+    "args": [
+      "-p",
+      "22",
+      "-o",
+      "BatchMode=yes",
+      "-o",
+      "StrictHostKeyChecking=accept-new",
+      "203.0.113.10",
+      "data_root='/var/lib/appaloft/runtime/state'; backend_marker="$data_root/backend.json"; mkdir -p "$data_root"; if [ ! -f "$backend_marker" ]; then now="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"; printf '{"schemaVersion":"%s","stateBackend":"postgres-control-plane","updatedAt":"%s","owner":"appaloft-control-plane"}\\n' 'server-state-backend/v1' "$now" > "$backend_marker"; fi; cat "$backend_marker"",
+    ],
+    "command": "ssh",
+    "redactions": [],
+  },
+]
+`;

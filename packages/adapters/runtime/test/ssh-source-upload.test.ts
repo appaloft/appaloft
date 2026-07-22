@@ -40,6 +40,7 @@ describe("SSH source upload", () => {
       sshArgs: ["-p", "22", "deploy@example.test"],
     });
 
+    expect(command).toMatchSnapshot();
     expect(command).toContain("git -C '/tmp/appaloft source' rev-parse --is-inside-work-tree");
     expect(command).toContain(
       "git -C '/tmp/appaloft source' ls-files -z --cached --recurse-submodules",
@@ -63,6 +64,7 @@ describe("SSH Compose failure diagnostics", () => {
       tail: 200,
     });
 
+    expect(command).toMatchSnapshot();
     expect(command).toContain("docker compose -p 'appaloft-dep_failed'");
     expect(command).toContain("-f '/srv/stocktruth/docker-compose.production.yml'");
     expect(command).toContain("-f '/srv/stocktruth/.appaloft.compose.labels.override.yml'");
@@ -77,6 +79,7 @@ describe("SSH Docker image version metadata", () => {
 
     const syntaxCheck = spawnSync("sh", ["-n", "-c", command], { encoding: "utf8" });
 
+    expect(command).toMatchSnapshot();
     expect(syntaxCheck.status).toBe(0);
     expect(command).toContain("docker pull 'ghcr.io/acme/api:latest' >&2");
     expect(command).toContain(" && docker image inspect --format '{{json .RepoDigests}}'");
@@ -173,6 +176,7 @@ describe("SSH preview artifact cleanup", () => {
     const syntaxCheck = spawnSync("sh", ["-n", "-c", command], { encoding: "utf8" });
     const dashSyntaxCheck = spawnSync("dash", ["-n", "-c", command], { encoding: "utf8" });
 
+    expect(command).toMatchSnapshot();
     expect(syntaxCheck.status).toBe(0);
     expect(dashSyntaxCheck.status).toBe(0);
     expect(command).toContain('for marker in "$@"; do\nif grep -Fq "$fingerprint" "$marker"; then');

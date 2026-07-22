@@ -861,6 +861,7 @@ describe("DockerSwarmExecutionBackend", () => {
       "promote-route-target",
       "cleanup-superseded-services",
     ]);
+    expect(runner.calls).toMatchSnapshot();
     expect(runner.calls[0]?.command).toContain(
       "--name 'appaloft-res-api-dst-prod-dep-swarm-backend_web'",
     );

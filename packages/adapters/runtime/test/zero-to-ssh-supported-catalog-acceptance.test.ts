@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
+import { ash } from "@appaloft/ash";
 import type { ExecutionBackend, ExecutionContext } from "@appaloft/application";
 import {
   ConfigScopeValue,
@@ -202,10 +203,6 @@ function createSource(input: {
     displayName: DisplayNameText.rehydrate(input.displayName),
     ...(input.inspection ? { inspection: input.inspection } : {}),
   });
-}
-
-function shellQuote(input: string): string {
-  return `'${input.replaceAll("'", "'\\''")}'`;
 }
 
 class HermeticExecutionBackend implements ExecutionBackend {
@@ -904,7 +901,7 @@ describe("Zero-to-SSH supported catalog acceptance harness", () => {
               }),
             ],
           }),
-          { quote: shellQuote },
+          { quote: ash.quote },
         );
 
         expect(runCommand).toContain("docker run -d");

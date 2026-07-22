@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
+import { ash } from "@appaloft/ash";
 import type { ExecutionContext } from "@appaloft/application";
 import {
   ConfigScopeValue,
@@ -695,10 +696,6 @@ interface ResourceProfileDeploySmoke {
   };
 }
 
-function shellQuote(input: string): string {
-  return `'${input.replaceAll("'", "'\\''")}'`;
-}
-
 function localFixtureProfile(input: {
   fixture: string;
   strategy?: ResourceRuntimeStrategy;
@@ -1010,7 +1007,7 @@ describe("DefaultRuntimePlanResolver framework fixtures", () => {
           dockerfilePath: `${source.locator}/${plan.execution.dockerfilePath}`,
           contextPath: source.locator,
         }),
-        { quote: shellQuote },
+        { quote: ash.quote },
       );
       const runCommand = renderRuntimeCommandString(
         docker.runContainer({
@@ -1023,7 +1020,7 @@ describe("DefaultRuntimePlanResolver framework fixtures", () => {
             }),
           ],
         }),
-        { quote: shellQuote },
+        { quote: ash.quote },
       );
 
       expect(buildCommand).toContain("docker build");
