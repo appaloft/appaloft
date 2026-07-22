@@ -1,0 +1,83 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`server SSH mutation coordinator snapshots rendered acquire and release commands 1`] = `
+[
+  
+"sh -lc 'set -eu
+data_root='\\''/var/lib/appaloft/runtime/state'\\''
+scope_kind='\\''preview-lifecycle'\\''
+scope_hash='\\''b2a5839fa8cbe1cc63c1da5b'\\''
+stale_after_seconds='\\''30'\\''
+coordination_root="$data_root/locks/coordination"
+scope_root="$coordination_root/$scope_kind"
+recovered_root="$coordination_root/recovered/$scope_kind"
+lock_dir="$scope_root/$scope_hash.lock"
+owner_file="$lock_dir/owner.json"
+now="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+now_epoch="$(date -u +%s)"
+stamp="$(date -u +"%Y-%m-%dT%H-%M-%SZ")"
+mkdir -p "$scope_root" "$recovered_root"
+if ! mkdir "$lock_dir"; then
+  if [ ! -d "$lock_dir" ]; then
+    echo "SSH mutation coordination lock could not be created" >&2
+    exit 1
+  fi
+  last_heartbeat=""
+  recorded_stale_after=""
+  lock_age_seconds=""
+  if [ -f "$owner_file" ]; then
+    last_heartbeat="$(sed -n '\\''s/.*"lastHeartbeatAt"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p'\\'' "$owner_file" | head -n 1 || true)"
+    if [ -z "$last_heartbeat" ]; then
+      last_heartbeat="$(sed -n '\\''s/.*"startedAt"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p'\\'' "$owner_file" | head -n 1 || true)"
+    fi
+    recorded_stale_after="$(sed -n '\\''s/.*"staleAfterSeconds"[[:space:]]*:[[:space:]]*\\([0-9][0-9]*\\).*/\\1/p'\\'' "$owner_file" | head -n 1 || true)"
+  fi
+  [ -n "$recorded_stale_after" ] || recorded_stale_after="$stale_after_seconds"
+  if [ -n "$last_heartbeat" ]; then
+    heartbeat_epoch="$(date -u -d "$last_heartbeat" +%s 2>/dev/null || date -j -u -f "%Y-%m-%dT%H:%M:%SZ" "$last_heartbeat" +%s 2>/dev/null || true)"
+  else
+    heartbeat_epoch=""
+  fi
+  if [ -z "$heartbeat_epoch" ]; then
+    heartbeat_epoch="$(stat -c %Y "$lock_dir" 2>/dev/null || stat -f %m "$lock_dir" 2>/dev/null || true)"
+  fi
+  if [ -n "$heartbeat_epoch" ]; then
+    lock_age_seconds=$((now_epoch - heartbeat_epoch))
+  fi
+  if [ -n "$lock_age_seconds" ] && [ "$lock_age_seconds" -ge "$recorded_stale_after" ]; then
+    recovered_path="$recovered_root/$scope_hash-$stamp-$$.lock"
+    if mv "$lock_dir" "$recovered_path" 2>/dev/null; then
+      printf '\\''{"phase":"%s","recoveredAt":"%s","scopeKind":%s,"scopeKey":%s,"recoveredBy":%s,"lockToken":%s,"lockAgeSeconds":%s}
+'\\'' "operation-coordination" "$now" '\\''"preview-lifecycle"'\\'' '\\''"source-fingerprint:v1:branch%3Amain"'\\'' '\\''"req_server_ssh_mutation_snapshot"'\\'' '\\''"<lock-token>"'\\'' "$lock_age_seconds" > "$recovered_path/recovered.json"
+      mkdir "$lock_dir"
+    else
+      if [ -f "$owner_file" ]; then cat "$owner_file" >&2; fi
+      exit 73
+    fi
+  else
+    if [ -f "$owner_file" ]; then cat "$owner_file" >&2; fi
+    exit 73
+  fi
+fi
+printf '\\''{"ownerId":%s,"label":%s,"lockToken":%s,"operationKey":%s,"coordinationMode":%s,"scopeKind":%s,"scopeKey":%s,"startedAt":"%s","lastHeartbeatAt":"%s","staleAfterSeconds":%s}
+'\\'' '\\''"req_server_ssh_mutation_snapshot"'\\'' '\\''"deployments.cleanup-preview"'\\'' '\\''"<lock-token>"'\\'' '\\''"deployments.cleanup-preview"'\\'' '\\''"serialize-with-bounded-wait"'\\'' '\\''"preview-lifecycle"'\\'' '\\''"source-fingerprint:v1:branch%3Amain"'\\'' "$now" "$now" "$stale_after_seconds" > "$owner_file"
+printf "coordinated %s %s\\n" "$scope_kind" "$scope_hash"'"
+,
+  
+"sh -lc 'set -eu
+data_root='\\''/var/lib/appaloft/runtime/state'\\''
+scope_kind='\\''preview-lifecycle'\\''
+scope_hash='\\''b2a5839fa8cbe1cc63c1da5b'\\''
+expected_owner_id_fragment='\\''"ownerId":"req_server_ssh_mutation_snapshot"'\\''
+expected_lock_token_fragment='\\''"lockToken":"<lock-token>"'\\''
+lock_dir="$data_root/locks/coordination/$scope_kind/$scope_hash.lock"
+owner_file="$lock_dir/owner.json"
+[ -d "$lock_dir" ] || exit 0
+[ -f "$owner_file" ] || { rm -rf "$lock_dir"; exit 0; }
+grep -F "$expected_owner_id_fragment" "$owner_file" >/dev/null 2>&1 || { cat "$owner_file" >&2; exit 75; }
+grep -F "$expected_lock_token_fragment" "$owner_file" >/dev/null 2>&1 || { cat "$owner_file" >&2; exit 75; }
+rm -rf "$lock_dir"
+printf "released %s %s\\n" "$scope_kind" "$scope_hash"'"
+,
+]
+`;

@@ -1,6 +1,7 @@
 import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
+import { ash } from "@appaloft/ash";
 import {
   BuildStrategyKindValue,
   ConfigKey,
@@ -57,10 +58,6 @@ import {
   RuntimeCommandBuilder,
   renderRuntimeCommandString,
 } from "../src/runtime-commands";
-
-function shellQuote(input: string): string {
-  return `'${input.replaceAll("'", "'\\''")}'`;
-}
 
 function testContext(requestId: string): ExecutionContext {
   return {
@@ -259,8 +256,8 @@ describe("dependency runtime secret resolution", () => {
         },
       ],
     });
-    expect(renderRuntimeCommandString(command, { quote: shellQuote })).toContain(secretValue);
-    const display = renderRuntimeCommandString(command, { quote: shellQuote, mode: "display" });
+    expect(renderRuntimeCommandString(command, { quote: ash.quote })).toContain(secretValue);
+    const display = renderRuntimeCommandString(command, { quote: ash.quote, mode: "display" });
     expect(display).toContain("DATABASE_URL=[redacted]");
     expect(display).not.toContain(secretValue);
   });
@@ -336,8 +333,8 @@ describe("dependency runtime secret resolution", () => {
         },
       ],
     });
-    expect(renderRuntimeCommandString(command, { quote: shellQuote })).toContain(secretValue);
-    const display = renderRuntimeCommandString(command, { quote: shellQuote, mode: "display" });
+    expect(renderRuntimeCommandString(command, { quote: ash.quote })).toContain(secretValue);
+    const display = renderRuntimeCommandString(command, { quote: ash.quote, mode: "display" });
     expect(display).toContain("REDIS_URL=[redacted]");
     expect(display).not.toContain(secretValue);
   });

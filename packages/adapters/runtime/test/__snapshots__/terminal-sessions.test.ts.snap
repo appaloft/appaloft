@@ -1,0 +1,17 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`RuntimeTerminalSessionGateway [TERM-SESSION-TRANSPORT-001] [TERM-SESSION-WORKSPACE-001] opens local container terminals through docker exec 1`] = `
+{
+  "args": [
+    "docker",
+    "exec",
+    "-i",
+    "-w",
+    "/app",
+    "appaloft-dep_1",
+    "sh",
+    "-lc",
+    "export APPALOFT_TERMINAL_WORKDIR="$PWD"; export PS1='\\u@\\h:\\W\\$ '; if command -v bash >/dev/null 2>&1; then exec bash --noprofile --norc -i; fi; exec \${SHELL:-/bin/sh} -i",
+  ],
+}
+`;

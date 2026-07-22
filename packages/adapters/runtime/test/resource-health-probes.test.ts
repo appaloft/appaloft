@@ -18,6 +18,15 @@ import {
 } from "@appaloft/core";
 import { RuntimeResourceHealthProbeRunner } from "../src/resource-health-probes";
 
+function snapshotSshArgs(args: readonly string[]): string[] {
+  const snapshot = [...args];
+  const identityIndex = snapshot.indexOf("-i");
+  if (identityIndex >= 0 && snapshot[identityIndex + 1]) {
+    snapshot[identityIndex + 1] = "<identity-file>";
+  }
+  return snapshot;
+}
+
 class StaticServerRepository implements ServerRepository {
   constructor(private readonly server: Server | null) {}
 
@@ -131,6 +140,7 @@ describe("RuntimeResourceHealthProbeRunner", () => {
   test("[SWARM-TARGET-OBS-002] probes Docker Swarm service health through the Swarm manager over SSH", async () => {
     const runner = new RuntimeResourceHealthProbeRunner(
       async (input) => {
+        expect(snapshotSshArgs(input.args)).toMatchSnapshot();
         expect(input.args[0]).toBe("ssh");
         expect(input.args).toContain("2222");
         expect(input.args).toContain("IdentitiesOnly=yes");
@@ -197,6 +207,7 @@ describe("RuntimeResourceHealthProbeRunner", () => {
   test("[RES-HEALTH-QRY-010] probes Docker container state on an SSH target", async () => {
     const runner = new RuntimeResourceHealthProbeRunner(
       async (input) => {
+        expect(snapshotSshArgs(input.args)).toMatchSnapshot();
         expect(input.args[0]).toBe("ssh");
         expect(input.args).toContain("2222");
         expect(input.args).toContain("IdentitiesOnly=yes");

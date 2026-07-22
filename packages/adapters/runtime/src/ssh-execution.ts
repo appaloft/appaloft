@@ -1,5 +1,6 @@
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { ash } from "@appaloft/ash";
 import {
   createDeploymentProgressEvent,
   deploymentProgressSteps,
@@ -168,10 +169,6 @@ function sanitizeName(input: string): string {
   return input.toLowerCase().replace(/[^a-z0-9_.-]/g, "-");
 }
 
-function shellQuote(input: string): string {
-  return `'${input.replaceAll("'", "'\\''")}'`;
-}
-
 export function buildRemoteComposeFailureLogsCommand(input: {
   composeFile: string;
   additionalComposeFiles?: readonly string[];
@@ -182,17 +179,17 @@ export function buildRemoteComposeFailureLogsCommand(input: {
   return [
     "docker compose",
     "-p",
-    shellQuote(input.projectName),
+    ash.quote(input.projectName),
     "-f",
-    shellQuote(input.composeFile),
+    ash.quote(input.composeFile),
     ...(input.additionalComposeFiles ?? []).flatMap((composeFile) => [
       "-f",
-      shellQuote(composeFile),
+      ash.quote(composeFile),
     ]),
     "logs",
     "--no-color",
     "--tail",
-    shellQuote(String(tail)),
+    ash.quote(String(tail)),
   ].join(" ");
 }
 
@@ -205,8 +202,8 @@ function remoteGeneratedDockerBuildAssetPath(remoteWorkdir: string, relativePath
 function remoteWriteTextFileCommand(path: string, contents: string): string {
   const encoded = Buffer.from(contents, "utf8").toString("base64");
   return [
-    `mkdir -p ${shellQuote(dirname(path))}`,
-    `printf %s ${shellQuote(encoded)} | base64 -d > ${shellQuote(path)}`,
+    `mkdir -p ${ash.quote(dirname(path))}`,
+    `printf %s ${ash.quote(encoded)} | base64 -d > ${ash.quote(path)}`,
   ].join(" && ");
 }
 
@@ -291,15 +288,15 @@ export function parseRemoteDockerImageVersionMetadataOutput(input: {
 }
 
 function dockerPullWithStderrCommand(image: string): string {
-  return `docker pull ${shellQuote(image)} >&2`;
+  return `docker pull ${ash.quote(image)} >&2`;
 }
 
 function dockerRepoDigestsInspectCommand(image: string): string {
-  return `docker image inspect --format ${shellQuote("{{json .RepoDigests}}")} ${shellQuote(image)}`;
+  return `docker image inspect --format ${ash.quote("{{json .RepoDigests}}")} ${ash.quote(image)}`;
 }
 
 function dockerImageIdInspectCommand(image: string): string {
-  return `docker image inspect --format ${shellQuote("{{.Id}}")} ${shellQuote(image)}`;
+  return `docker image inspect --format ${ash.quote("{{.Id}}")} ${ash.quote(image)}`;
 }
 
 export function buildRemoteDockerImageVersionMetadataCommand(image: string): string {
@@ -371,16 +368,16 @@ export function buildLocalWorkspaceUploadCommand(input: {
     "tar",
     "-czf",
     "-",
-    ...buildLocalWorkspaceUploadTarExcludeArgs().map((arg) => shellQuote(arg)),
+    ...buildLocalWorkspaceUploadTarExcludeArgs().map((arg) => ash.quote(arg)),
     "-C",
-    shellQuote(input.localWorkdir),
+    ash.quote(input.localWorkdir),
     ".",
   ].join(" ");
   const gitAwareTarCommand = [
     "if",
     "git",
     "-C",
-    shellQuote(input.localWorkdir),
+    ash.quote(input.localWorkdir),
     "rev-parse",
     "--is-inside-work-tree",
     ">/dev/null",
@@ -389,7 +386,7 @@ export function buildLocalWorkspaceUploadCommand(input: {
     "{",
     "git",
     "-C",
-    shellQuote(input.localWorkdir),
+    ash.quote(input.localWorkdir),
     "ls-files",
     "-z",
     "--cached",
@@ -397,7 +394,7 @@ export function buildLocalWorkspaceUploadCommand(input: {
     ";",
     "git",
     "-C",
-    shellQuote(input.localWorkdir),
+    ash.quote(input.localWorkdir),
     "ls-files",
     "-z",
     "--others",
@@ -410,7 +407,7 @@ export function buildLocalWorkspaceUploadCommand(input: {
     "-czf",
     "-",
     "-C",
-    shellQuote(input.localWorkdir),
+    ash.quote(input.localWorkdir),
     "--files-from",
     "-;",
     "else",
@@ -423,8 +420,8 @@ export function buildLocalWorkspaceUploadCommand(input: {
     gitAwareTarCommand,
     "|",
     "ssh",
-    ...input.sshArgs.map((arg) => shellQuote(arg)),
-    shellQuote(input.remotePrepareCommand),
+    ...input.sshArgs.map((arg) => ash.quote(arg)),
+    ash.quote(input.remotePrepareCommand),
   ].join(" ");
 }
 
@@ -459,7 +456,7 @@ function remotePreviewArtifactMarkerCommand(remoteRoot: string, state: Deploymen
   const metadata = state.runtimePlan.execution.metadata ?? {};
   const sourceFingerprint = previewSourceFingerprintFromMetadata(metadata);
   if (!sourceFingerprint) {
-    return `mkdir -p ${shellQuote(remoteRoot)}`;
+    return `mkdir -p ${ash.quote(remoteRoot)}`;
   }
 
   const marker = {
@@ -478,8 +475,8 @@ function remotePreviewArtifactMarkerCommand(remoteRoot: string, state: Deploymen
   const encoded = Buffer.from(JSON.stringify(marker, null, 2), "utf8").toString("base64");
 
   return [
-    `mkdir -p ${shellQuote(remoteRoot)}`,
-    `printf %s ${shellQuote(encoded)} | base64 -d > ${shellQuote(
+    `mkdir -p ${ash.quote(remoteRoot)}`,
+    `printf %s ${ash.quote(encoded)} | base64 -d > ${ash.quote(
       `${remoteRoot}/${previewArtifactMarkerFileName}`,
     )}`,
   ].join(" && ");
@@ -504,13 +501,13 @@ export function buildRemotePreviewArtifactSweepCommand(input: {
   ].join("\n");
 
   return [
-    `containers="$(docker ps -aq --filter ${shellQuote(sourceFingerprintLabel)} 2>/dev/null || true)"; if [ -n "$containers" ]; then printf '%s\\n' "$containers" | xargs -r docker rm -f >/dev/null 2>&1 || true; printf 'preview-containers\\n'; fi`,
-    `images="$(docker image ls -q --filter ${shellQuote(sourceFingerprintLabel)} 2>/dev/null | sort -u || true)"; if [ -n "$images" ]; then printf '%s\\n' "$images" | xargs -r docker image rm -f >/dev/null 2>&1 || true; printf 'preview-images\\n'; fi`,
-    `if [ -d ${shellQuote(deploymentsRoot)} ]; then find ${shellQuote(
+    `containers="$(docker ps -aq --filter ${ash.quote(sourceFingerprintLabel)} 2>/dev/null || true)"; if [ -n "$containers" ]; then printf '%s\\n' "$containers" | xargs -r docker rm -f >/dev/null 2>&1 || true; printf 'preview-containers\\n'; fi`,
+    `images="$(docker image ls -q --filter ${ash.quote(sourceFingerprintLabel)} 2>/dev/null | sort -u || true)"; if [ -n "$images" ]; then printf '%s\\n' "$images" | xargs -r docker image rm -f >/dev/null 2>&1 || true; printf 'preview-images\\n'; fi`,
+    `if [ -d ${ash.quote(deploymentsRoot)} ]; then find ${ash.quote(
       deploymentsRoot,
-    )} -mindepth 2 -maxdepth 2 -name ${shellQuote(
+    )} -mindepth 2 -maxdepth 2 -name ${ash.quote(
       previewArtifactMarkerFileName,
-    )} -type f -exec sh -c ${shellQuote(markerSweepScript)} sh ${shellQuote(
+    )} -type f -exec sh -c ${ash.quote(markerSweepScript)} sh ${ash.quote(
       input.sourceFingerprint,
     )} {} +; fi`,
   ].join(" && ");
@@ -746,7 +743,7 @@ export function dockerContainerNetworkIpCommand(input: {
   networkName: string;
 }): string {
   const format = `{{with index .NetworkSettings.Networks ${JSON.stringify(input.networkName)}}}{{.IPAddress}}{{end}}`;
-  return `docker inspect --format ${shellQuote(format)} ${shellQuote(input.containerName)}`;
+  return `docker inspect --format ${ash.quote(format)} ${ash.quote(input.containerName)}`;
 }
 
 export function parseDockerContainerNetworkIp(output: string): string | undefined {
@@ -768,27 +765,27 @@ function remoteInternalHealthCheckCommand(url: string, options: HttpHealthCheckO
     'trap \'rm -f "$body_file"\' EXIT',
     [
       "code=$(curl",
-      `--request ${shellQuote(options.method)}`,
+      `--request ${ash.quote(options.method)}`,
       "--silent --show-error",
       `--max-time ${timeoutSeconds}`,
       '--output "$body_file"',
       '--write-out "%{http_code}"',
-      shellQuote(url),
+      ash.quote(url),
       ")",
     ].join(" "),
-    `test "$code" = ${shellQuote(String(options.expectedStatusCode))}`,
+    `test "$code" = ${ash.quote(String(options.expectedStatusCode))}`,
     ...(options.expectedResponseText
-      ? [`grep -F -- ${shellQuote(options.expectedResponseText)} "$body_file" >/dev/null`]
+      ? [`grep -F -- ${ash.quote(options.expectedResponseText)} "$body_file" >/dev/null`]
       : []),
   ].join(" && ");
   const wgetFallback =
     options.method === "GET" &&
     options.expectedStatusCode === 200 &&
     !options.expectedResponseText
-      ? ` || (command -v wget >/dev/null 2>&1 && wget -q --timeout=${timeoutSeconds} --tries=1 -O /dev/null ${shellQuote(url)})`
+      ? ` || (command -v wget >/dev/null 2>&1 && wget -q --timeout=${timeoutSeconds} --tries=1 -O /dev/null ${ash.quote(url)})`
       : "";
 
-  return `(sh -lc ${shellQuote(curlScript)})${wgetFallback}`;
+  return `(sh -lc ${ash.quote(curlScript)})${wgetFallback}`;
 }
 
 async function runProcess(input: {
@@ -1139,7 +1136,7 @@ export class SshExecutionBackend implements ExecutionBackend {
 
     const inspect = await this.runRemoteCommand({
       target: input.target,
-      command: `docker inspect --format ${shellQuote(format)} ${shellQuote(input.containerName)}`,
+      command: `docker inspect --format ${ash.quote(format)} ${ash.quote(input.containerName)}`,
       cwd: input.runtimeDir,
       env: input.env,
     });
@@ -1173,7 +1170,7 @@ export class SshExecutionBackend implements ExecutionBackend {
 
     const dockerLogs = await this.runRemoteCommand({
       target: input.target,
-      command: `docker logs --tail 50 ${shellQuote(input.containerName)}`,
+      command: `docker logs --tail 50 ${ash.quote(input.containerName)}`,
       cwd: input.runtimeDir,
       env: input.env,
     });
@@ -1595,12 +1592,12 @@ export class SshExecutionBackend implements ExecutionBackend {
           : `${deployKeyPrivateKey}\n`;
         const encodedKey = Buffer.from(normalizedKey, "utf8").toString("base64");
         setupCommand = [
-          `mkdir -p ${shellQuote(`${input.remoteRoot}/.ssh`)}`,
-          `install -m 600 /dev/null ${shellQuote(remoteDeployKeyPath)}`,
-          `printf %s ${shellQuote(encodedKey)} | base64 -d > ${shellQuote(remoteDeployKeyPath)}`,
-          `chmod 600 ${shellQuote(remoteDeployKeyPath)}`,
+          `mkdir -p ${ash.quote(`${input.remoteRoot}/.ssh`)}`,
+          `install -m 600 /dev/null ${ash.quote(remoteDeployKeyPath)}`,
+          `printf %s ${ash.quote(encodedKey)} | base64 -d > ${ash.quote(remoteDeployKeyPath)}`,
+          `chmod 600 ${ash.quote(remoteDeployKeyPath)}`,
         ].join(" && ");
-        cloneEnv = `GIT_SSH_COMMAND=${shellQuote(
+        cloneEnv = `GIT_SSH_COMMAND=${ash.quote(
           `ssh -i ${remoteDeployKeyPath} -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new`,
         )}`;
         redactions.push(deployKeyPrivateKey, normalizedKey, encodedKey);
@@ -1616,14 +1613,14 @@ export class SshExecutionBackend implements ExecutionBackend {
         message: `Clone git source ${source.displayName} on target`,
       });
       const branchOption = source.metadata?.gitRef
-        ? `--branch ${shellQuote(source.metadata.gitRef)} `
+        ? `--branch ${ash.quote(source.metadata.gitRef)} `
         : "";
       const cloneCommand = [
         previewArtifactMarkerCommand,
-        `rm -rf ${shellQuote(remoteSourceRoot)}`,
-        `mkdir -p ${shellQuote(remoteSourceRoot)}`,
+        `rm -rf ${ash.quote(remoteSourceRoot)}`,
+        `mkdir -p ${ash.quote(remoteSourceRoot)}`,
         ...(setupCommand ? [setupCommand] : []),
-        `${cloneEnv} git clone --depth 1 ${branchOption}${shellQuote(cloneLocator)} ${shellQuote(remoteSourceRoot)}`.trim(),
+        `${cloneEnv} git clone --depth 1 ${branchOption}${ash.quote(cloneLocator)} ${ash.quote(remoteSourceRoot)}`.trim(),
       ].join(" && ");
       const authenticatedClone = githubAccessToken
         ? remoteGitHubHttpAuthInvocation(cloneCommand, githubAccessToken)
@@ -1686,7 +1683,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         workdir: remoteSourceRoot,
         rewriteGithubSshToHttps: Boolean(githubAccessToken),
       });
-      const submoduleCommand = `${cloneEnv} git ${submoduleArgs.map((arg) => shellQuote(arg)).join(" ")}`.trim();
+      const submoduleCommand = `${cloneEnv} git ${submoduleArgs.map((arg) => ash.quote(arg)).join(" ")}`.trim();
       const authenticatedSubmodule = githubAccessToken
         ? remoteGitHubHttpAuthInvocation(submoduleCommand, githubAccessToken)
         : undefined;
@@ -1753,7 +1750,7 @@ export class SshExecutionBackend implements ExecutionBackend {
 
       const commit = await this.runRemoteCommand({
         target: input.target,
-        command: `git -C ${shellQuote(remoteSourceRoot)} rev-parse --verify HEAD`,
+        command: `git -C ${ash.quote(remoteSourceRoot)} rev-parse --verify HEAD`,
         cwd: input.runtimeDir,
         env: input.env,
       });
@@ -1850,14 +1847,14 @@ export class SshExecutionBackend implements ExecutionBackend {
         target: input.target,
         command: [
           previewArtifactMarkerCommand,
-          `rm -rf ${shellQuote(remoteSourceRoot)}`,
-          `mkdir -p ${shellQuote(remoteSourceRoot)}`,
-          `mkdir -p "$(dirname ${shellQuote(remoteTargetFile)})"`,
-          `printf %s ${shellQuote(
+          `rm -rf ${ash.quote(remoteSourceRoot)}`,
+          `mkdir -p ${ash.quote(remoteSourceRoot)}`,
+          `mkdir -p "$(dirname ${ash.quote(remoteTargetFile)})"`,
+          `printf %s ${ash.quote(
             Buffer.from(content.endsWith("\n") ? content : `${content}\n`, "utf8").toString(
               "base64",
             ),
-          )} | base64 -d > ${shellQuote(remoteTargetFile)}`,
+          )} | base64 -d > ${ash.quote(remoteTargetFile)}`,
         ].join(" && "),
         cwd: input.runtimeDir,
         env: input.env,
@@ -1950,9 +1947,9 @@ export class SshExecutionBackend implements ExecutionBackend {
       status: "running",
       message: "Upload source workspace over SSH",
     });
-    const remotePrepareCommand = `${previewArtifactMarkerCommand} && rm -rf ${shellQuote(
+    const remotePrepareCommand = `${previewArtifactMarkerCommand} && rm -rf ${ash.quote(
       remoteWorkdir,
-    )} && mkdir -p ${shellQuote(remoteWorkdir)} && tar -xzf - -C ${shellQuote(remoteWorkdir)}`;
+    )} && mkdir -p ${ash.quote(remoteWorkdir)} && tar -xzf - -C ${ash.quote(remoteWorkdir)}`;
     const uploadCommand = buildLocalWorkspaceUploadCommand({
       localWorkdir,
       remotePrepareCommand,
@@ -1979,7 +1976,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       timeline.push(phaseLog("package", message, "error"));
       await this.runRemoteCommand({
         target: input.target,
-        command: `rm -rf ${shellQuote(remoteWorkdir)}`,
+        command: `rm -rf ${ash.quote(remoteWorkdir)}`,
         cwd: input.runtimeDir,
         env: input.env,
       });
@@ -2273,7 +2270,7 @@ export class SshExecutionBackend implements ExecutionBackend {
               pull: forceRedeploy,
               noCache: forceRedeploy,
             }),
-            { quote: shellQuote },
+            { quote: ash.quote },
           );
           timeline.push(phaseLog("package", `Build Docker image ${image} on SSH target`));
           await this.report(context, {
@@ -2334,7 +2331,7 @@ export class SshExecutionBackend implements ExecutionBackend {
           if (generatedRemoteContextAssetPaths.length > 0) {
             await this.runRemoteCommand({
               target,
-              command: `rm -f ${generatedRemoteContextAssetPaths.map(shellQuote).join(" ")}`,
+              command: `rm -f ${generatedRemoteContextAssetPaths.map(ash.quote).join(" ")}`,
               cwd: runtimeDir,
               env,
             });
@@ -2558,7 +2555,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       }
       const realizeStorageVolumesCommand = renderDockerVolumeRealizationScript({
         realizations: storageVolumeRealizations.value,
-        quote: shellQuote,
+        quote: ash.quote,
       });
       if (realizeStorageVolumesCommand.length > 0) {
         timeline.push(phaseLog("deploy", "Realize SSH Docker storage volumes with Appaloft ownership labels"));
@@ -2630,7 +2627,7 @@ export class SshExecutionBackend implements ExecutionBackend {
           ],
         }),
       ]);
-      const runCommand = renderRuntimeCommandString(runCommandSpec, { quote: shellQuote });
+      const runCommand = renderRuntimeCommandString(runCommandSpec, { quote: ash.quote });
       const imageVersionMetadataResult = await this.resolveRemoteDockerImageVersionMetadata({
         context,
         deploymentId: state.id.value,
@@ -2708,7 +2705,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         command: dockerContainerEnvironmentKeyVerificationCommand({
           containerName,
           expectedKeys: dockerEnvVariables.map((variable) => variable.name),
-          quote: shellQuote,
+          quote: ash.quote,
         }),
         cwd: runtimeDir,
         env,
@@ -2716,7 +2713,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       if (environmentKeyVerification.failed) {
         await this.runRemoteCommand({
           target,
-          command: `docker rm -f ${shellQuote(containerName)}`,
+          command: `docker rm -f ${ash.quote(containerName)}`,
           cwd: runtimeDir,
           env,
         });
@@ -2859,7 +2856,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         command: dockerPublishedPortCommand({
           containerName,
           containerPort: port,
-          quote: shellQuote,
+          quote: ash.quote,
         }),
         cwd: runtimeDir,
         env,
@@ -2877,7 +2874,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         });
         await this.runRemoteCommand({
           target,
-          command: `docker rm -f ${shellQuote(containerName)}`,
+          command: `docker rm -f ${ash.quote(containerName)}`,
           cwd: runtimeDir,
           env,
         });
@@ -2962,7 +2959,7 @@ export class SshExecutionBackend implements ExecutionBackend {
                 pathPrefix: route.pathPrefix,
               })),
             ),
-            quote: shellQuote,
+            quote: ash.quote,
           })
         : "";
       let routeConflictCleanupAttempted = false;
@@ -3039,7 +3036,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             });
             await this.runRemoteCommand({
               target,
-              command: `docker rm -f ${shellQuote(containerName)}`,
+              command: `docker rm -f ${ash.quote(containerName)}`,
               cwd: runtimeDir,
               env,
             });
@@ -3142,7 +3139,7 @@ export class SshExecutionBackend implements ExecutionBackend {
               });
               await this.runRemoteCommand({
                 target,
-                command: `docker rm -f ${shellQuote(containerName)}`,
+                command: `docker rm -f ${ash.quote(containerName)}`,
                 cwd: runtimeDir,
                 env,
               });
@@ -3191,7 +3188,7 @@ export class SshExecutionBackend implements ExecutionBackend {
 
       if (!usesDirectHostPort && supersededDeploymentIds.length > 0) {
         const cleanupCommand = renderRuntimeCommandString(removeSupersededResourceContainersSpec, {
-          quote: shellQuote,
+          quote: ash.quote,
         });
         const cleanup = await this.runRemoteCommand({
           target,
@@ -3835,7 +3832,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             mounts: storageMounts.value,
             volumeRealizations: storageVolumeRealizations.value,
             environmentKeys: runtimeEnvVariables.map((variable) => variable.name),
-            quote: shellQuote,
+            quote: ash.quote,
           }),
         }),
         cwd: runtimeDir,
@@ -3875,7 +3872,7 @@ export class SshExecutionBackend implements ExecutionBackend {
           pull: true,
           noCache: isForceRedeployDeployment(state),
         }),
-        { quote: shellQuote },
+        { quote: ash.quote },
       );
       timeline.push(phaseLog("deploy", `Run docker compose on SSH target with ${remoteComposeFile}`));
       await this.report(context, {
@@ -3907,7 +3904,7 @@ export class SshExecutionBackend implements ExecutionBackend {
           command: dockerRemoveResourceContainersCommand({
             resourceId: state.resourceId.value,
             deploymentIds: [state.id.value],
-            quote: shellQuote,
+            quote: ash.quote,
           }),
           cwd: runtimeDir,
           env: runtimeEnv.value.env,
@@ -4017,7 +4014,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       const containerVerification = await waitForComposeDeploymentContainers({
         deploymentId: state.id.value,
         ...(targetServiceName ? { targetServiceName } : {}),
-        quote: shellQuote,
+        quote: ash.quote,
         ...containerVerificationWait,
         run: (command) =>
           this.runRemoteCommand({
@@ -4055,7 +4052,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             command: dockerContainerEnvironmentKeyVerificationCommand({
               containerName: targetContainer.id,
               expectedKeys: runtimeEnvVariables.map((variable) => variable.name),
-              quote: shellQuote,
+              quote: ash.quote,
             }),
             cwd: runtimeDir,
             env: runtimeEnv.value.env,
@@ -4112,7 +4109,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             command: dockerPublishedPortCommand({
               containerName: targetContainer.id,
               containerPort: port,
-              quote: shellQuote,
+              quote: ash.quote,
             }),
             cwd: runtimeDir,
             env: runtimeEnv.value.env,
@@ -4246,7 +4243,7 @@ export class SshExecutionBackend implements ExecutionBackend {
           command: dockerRemoveResourceContainersCommand({
             resourceId: state.resourceId.value,
             deploymentIds: supersededDeploymentIds,
-            quote: shellQuote,
+            quote: ash.quote,
           }),
           cwd: runtimeDir,
           env: runtimeEnv.value.env,
@@ -4346,7 +4343,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       if (state.runtimePlan.execution.kind === "docker-container") {
         await this.runRemoteCommand({
           target,
-          command: `docker rm -f ${shellQuote(containerName)} >/dev/null 2>&1 || true`,
+          command: `docker rm -f ${ash.quote(containerName)} >/dev/null 2>&1 || true`,
           cwd: runtimeDir,
           env,
           redactions,
@@ -4361,9 +4358,9 @@ export class SshExecutionBackend implements ExecutionBackend {
             target,
             command: withOptionalRemoteRuntimeEnvironmentFile({
               envFile: `${remoteWorkdir}/.appaloft/runtime.env`,
-              command: `docker compose -p ${shellQuote(
+              command: `docker compose -p ${ash.quote(
                 metadata.composeProjectName ?? runtimeInstanceNames.composeProjectName,
-              )} -f ${shellQuote(remoteComposeFile)} down`,
+              )} -f ${ash.quote(remoteComposeFile)} down`,
             }),
             cwd: runtimeDir,
             env,
@@ -4385,7 +4382,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       if (remoteArtifactRoot) {
         const workspaceCleanup = await this.runRemoteCommand({
           target,
-          command: `rm -rf ${shellQuote(remoteArtifactRoot)}`,
+          command: `rm -rf ${ash.quote(remoteArtifactRoot)}`,
           cwd: runtimeDir,
           env,
           redactions,
@@ -4408,7 +4405,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       if (artifactCleanup.imageName) {
         await this.runRemoteCommand({
           target,
-          command: `docker image rm ${shellQuote(artifactCleanup.imageName)} >/dev/null 2>&1 || true`,
+          command: `docker image rm ${ash.quote(artifactCleanup.imageName)} >/dev/null 2>&1 || true`,
           cwd: runtimeDir,
           env,
           redactions,
@@ -4509,7 +4506,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       if (state.runtimePlan.execution.kind === "docker-container") {
         await this.runRemoteCommand({
           target,
-          command: `docker rm -f ${shellQuote(metadata.containerName ?? runtimeInstanceNames.containerName)}`,
+          command: `docker rm -f ${ash.quote(metadata.containerName ?? runtimeInstanceNames.containerName)}`,
           cwd: runtimeDir,
           env,
           redactions,
@@ -4524,9 +4521,9 @@ export class SshExecutionBackend implements ExecutionBackend {
             target,
             command: withOptionalRemoteRuntimeEnvironmentFile({
               envFile: `${remoteWorkdir}/.appaloft/runtime.env`,
-              command: `docker compose -p ${shellQuote(
+              command: `docker compose -p ${ash.quote(
                 metadata.composeProjectName ?? runtimeInstanceNames.composeProjectName,
-              )} -f ${shellQuote(remoteComposeFile)} down`,
+              )} -f ${ash.quote(remoteComposeFile)} down`,
             }),
             cwd: runtimeDir,
             env,

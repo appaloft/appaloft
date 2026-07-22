@@ -1,0 +1,53 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`RuntimeResourceHealthProbeRunner [SWARM-TARGET-OBS-002] probes Docker Swarm service health through the Swarm manager over SSH 1`] = `
+[
+  "ssh",
+  "-p",
+  "2222",
+  "-i",
+  "<identity-file>",
+  "-o",
+  "IdentitiesOnly=yes",
+  "-o",
+  "BatchMode=yes",
+  "-o",
+  "PreferredAuthentications=publickey",
+  "-o",
+  "PasswordAuthentication=no",
+  "-o",
+  "KbdInteractiveAuthentication=no",
+  "-o",
+  "NumberOfPasswordPrompts=0",
+  "-o",
+  "StrictHostKeyChecking=accept-new",
+  "deployer@203.0.113.10",
+  "docker service ps --no-trunc --format '{{json .}}' 'appaloft-res-web-dst-demo-dep-web_web'",
+]
+`;
+
+exports[`RuntimeResourceHealthProbeRunner [RES-HEALTH-QRY-010] probes Docker container state on an SSH target 1`] = `
+[
+  "ssh",
+  "-p",
+  "2222",
+  "-i",
+  "<identity-file>",
+  "-o",
+  "IdentitiesOnly=yes",
+  "-o",
+  "BatchMode=yes",
+  "-o",
+  "PreferredAuthentications=publickey",
+  "-o",
+  "PasswordAuthentication=no",
+  "-o",
+  "KbdInteractiveAuthentication=no",
+  "-o",
+  "NumberOfPasswordPrompts=0",
+  "-o",
+  "StrictHostKeyChecking=accept-new",
+  "deployer@203.0.113.10",
+  "docker inspect --format '{{json .State}}' 'appaloft-dep_web'",
+]
+`;

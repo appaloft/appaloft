@@ -11,6 +11,7 @@ import {
   serverStateBackendMarkerSchemaVersion,
   serverStateBackendMismatchError,
 } from "@appaloft/adapter-cli";
+import { ash } from "@appaloft/ash";
 import { type AppConfig, resolveConfig } from "@appaloft/config";
 import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
 import {
@@ -91,10 +92,6 @@ export interface PrepareRemotePgliteStateSyncInput {
 const explicitLocalStateBackends = new Set(["local-pglite", "postgres-control-plane"]);
 const remoteStateRevisionConflictExitCode = 76;
 const remotePgliteMaintenanceLockStaleAfterMs = 3 * 60_000;
-
-function shellQuote(input: string): string {
-  return `'${input.replaceAll("'", "'\\''")}'`;
-}
 
 function readOption(argv: readonly string[], name: string): string | undefined {
   const prefix = `${name}=`;
@@ -309,21 +306,21 @@ function parseRemoteRevisionConflict(
 function remoteArchiveCommand(dataRoot: string, readOnly: boolean): string {
   if (readOnly) {
     return [
-      `test -d ${shellQuote(dataRoot)}/pglite`,
-      `cd ${shellQuote(dataRoot)}`,
+      `test -d ${ash.quote(dataRoot)}/pglite`,
+      `cd ${ash.quote(dataRoot)}`,
       "tar -czf - pglite source-links server-applied-routes",
     ].join(" && ");
   }
 
   return [
-    `mkdir -p ${shellQuote(dataRoot)}/pglite ${shellQuote(dataRoot)}/source-links ${shellQuote(dataRoot)}/server-applied-routes`,
-    `cd ${shellQuote(dataRoot)}`,
+    `mkdir -p ${ash.quote(dataRoot)}/pglite ${ash.quote(dataRoot)}/source-links ${ash.quote(dataRoot)}/server-applied-routes`,
+    `cd ${ash.quote(dataRoot)}`,
     "tar -czf - pglite source-links server-applied-routes",
   ].join(" && ");
 }
 
 function remoteRevisionReadCommand(dataRoot: string, readOnly: boolean): string {
-  const quotedDataRoot = shellQuote(dataRoot);
+  const quotedDataRoot = ash.quote(dataRoot);
 
   return [
     `data_root=${quotedDataRoot}`,
@@ -334,14 +331,14 @@ function remoteRevisionReadCommand(dataRoot: string, readOnly: boolean): string 
 }
 
 function remoteControlPlaneBackendMarkerEnsureCommand(dataRoot: string): string {
-  const quotedDataRoot = shellQuote(dataRoot);
+  const quotedDataRoot = ash.quote(dataRoot);
 
   return [
     `data_root=${quotedDataRoot}`,
     `backend_marker="$data_root/${serverStateBackendMarkerFile}"`,
     'mkdir -p "$data_root"',
     'if [ ! -f "$backend_marker" ]; then now="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"; printf \'{"schemaVersion":"%s","stateBackend":"postgres-control-plane","updatedAt":"%s","owner":"appaloft-control-plane"}\\n\' ' +
-      `${shellQuote(serverStateBackendMarkerSchemaVersion)} "$now" > "$backend_marker"; fi`,
+      `${ash.quote(serverStateBackendMarkerSchemaVersion)} "$now" > "$backend_marker"; fi`,
     'cat "$backend_marker"',
   ].join("; ");
 }
@@ -353,14 +350,14 @@ function remoteExtractCommand(input: {
   backupRetentionDays: number;
   backupMaxCount: number;
 }): string {
-  const quotedDataRoot = shellQuote(input.dataRoot);
+  const quotedDataRoot = ash.quote(input.dataRoot);
 
   return [
     `data_root=${quotedDataRoot}`,
-    `expected_revision=${shellQuote(String(input.expectedRevision))}`,
-    `next_revision=${shellQuote(String(input.nextRevision))}`,
-    `backup_retention_days=${shellQuote(String(input.backupRetentionDays))}`,
-    `backup_max_count=${shellQuote(String(input.backupMaxCount))}`,
+    `expected_revision=${ash.quote(String(input.expectedRevision))}`,
+    `next_revision=${ash.quote(String(input.nextRevision))}`,
+    `backup_retention_days=${ash.quote(String(input.backupRetentionDays))}`,
+    `backup_max_count=${ash.quote(String(input.backupMaxCount))}`,
     'backup_dir="$data_root/backups/sync-$(date +%Y%m%d%H%M%S)-$$"',
     'incoming_dir="$data_root/.incoming-sync-$$"',
     'recovery_file="$data_root/recovery/remote-sync-upload.json"',

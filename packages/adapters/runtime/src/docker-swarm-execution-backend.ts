@@ -1,6 +1,7 @@
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { ash } from "@appaloft/ash";
 import {
   DeploymentTargetByIdSpec,
   DeploymentTargetId,
@@ -98,10 +99,6 @@ type SwarmExecutionPhase = "deploy" | "verify" | "rollback";
 type SwarmLogLevel = "debug" | "info" | "warn" | "error";
 const dockerSwarmShellCommandTimeoutExitCode = 124;
 const defaultDockerSwarmShellCommandTimeoutMs = 60_000;
-
-function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, "'\\''")}'`;
-}
 
 function commandParts(parts: readonly string[]): string {
   return parts.filter((part) => part.trim().length > 0).join(" ");

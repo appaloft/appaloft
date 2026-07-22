@@ -61,6 +61,11 @@ describe("SSH mutation coordinator", () => {
 
     expect(result).toEqual(ok("done"));
     expect(commands).toHaveLength(2);
+    expect(
+      commands.map(({ command }) =>
+        command.replaceAll(/req_ssh_mutation_test:\d+:[a-z0-9]+/g, "<lock-token>"),
+      ),
+    ).toMatchSnapshot();
     expect(commands[0]?.command).toContain('coordination_root="$data_root/locks/coordination"');
     expect(commands[0]?.command).toContain('lock_dir="$scope_root/$scope_hash.lock"');
     expect(commands[0]?.command).toContain('date -j -u -f "%Y-%m-%dT%H:%M:%SZ"');

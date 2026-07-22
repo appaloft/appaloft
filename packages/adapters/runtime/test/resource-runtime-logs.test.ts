@@ -349,6 +349,7 @@ describe("RuntimeResourceRuntimeLogReader", () => {
       "25",
       "appaloft-dep_web",
     ]);
+    expect(calls[0]?.args).toMatchSnapshot();
     expect(events).toContainEqual(
       expect.objectContaining({
         kind: "line",
@@ -400,6 +401,12 @@ describe("RuntimeResourceRuntimeLogReader", () => {
     expect(calls[0]?.args.at(-1)).toBe(
       "docker logs --tail '25' --follow 'appaloft-dep_web'",
     );
+    const snapshotArgs = [...(calls[0]?.args ?? [])];
+    const identityIndex = snapshotArgs.indexOf("-i");
+    if (identityIndex >= 0 && snapshotArgs[identityIndex + 1]) {
+      snapshotArgs[identityIndex + 1] = "<identity-file>";
+    }
+    expect(snapshotArgs).toMatchSnapshot();
   });
 
   test("derives Docker container name for in-flight deployments before terminal metadata is recorded", async () => {

@@ -7,6 +7,7 @@
   },
   "dependencies": {
     "@appaloft/application": "workspace:*",
+    "@appaloft/ash": "workspace:*",
     "@appaloft/core": "workspace:*"
   },
   "scripts": {

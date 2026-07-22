@@ -1,10 +1,7 @@
 import { dirname } from "node:path";
+import { ash } from "@appaloft/ash";
 
 import type { DockerEnvironmentVariableInput } from "./runtime-commands";
-
-function shellQuote(input: string): string {
-  return `'${input.replaceAll("'", "'\\''")}'`;
-}
 
 function assertShellIdentifier(name: string): void {
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
@@ -28,7 +25,7 @@ export function renderRuntimeEnvironmentShellFile(input: {
     }
     assertShellIdentifier(variable.name);
     seen.add(variable.name);
-    lines.push(`export ${variable.name}=${shellQuote(variable.value)}`);
+    lines.push(`export ${variable.name}=${ash.quote(variable.value)}`);
   }
 
   return `${lines.join("\n")}\n`;
@@ -40,12 +37,12 @@ export function renderRemotePrivateTextFileCommand(input: {
 }): { command: string; redactions: string[] } {
   const encoded = Buffer.from(input.contents, "utf8").toString("base64");
   const command = [
-    `mkdir -p ${shellQuote(dirname(input.path))}`,
-    `tmp="$(mktemp ${shellQuote(`${input.path}.tmp.XXXXXX`)})"`,
+    `mkdir -p ${ash.quote(dirname(input.path))}`,
+    `tmp="$(mktemp ${ash.quote(`${input.path}.tmp.XXXXXX`)})"`,
     `trap 'rm -f "$tmp"' 0`,
-    `printf %s ${shellQuote(encoded)} | base64 -d > "$tmp"`,
+    `printf %s ${ash.quote(encoded)} | base64 -d > "$tmp"`,
     'chmod 600 "$tmp"',
-    `mv "$tmp" ${shellQuote(input.path)}`,
+    `mv "$tmp" ${ash.quote(input.path)}`,
     "trap - 0",
   ].join(" && ");
 
@@ -59,14 +56,14 @@ export function withRemoteRuntimeEnvironmentFile(input: {
   envFile: string;
   command: string;
 }): string {
-  return `{ . ${shellQuote(input.envFile)}; } && {\n${input.command}\n}`;
+  return `{ . ${ash.quote(input.envFile)}; } && {\n${input.command}\n}`;
 }
 
 export function withOptionalRemoteRuntimeEnvironmentFile(input: {
   envFile: string;
   command: string;
 }): string {
-  return `{ if [ -f ${shellQuote(input.envFile)} ]; then . ${shellQuote(
+  return `{ if [ -f ${ash.quote(input.envFile)} ]; then . ${ash.quote(
     input.envFile,
   )}; fi; } && {\n${input.command}\n}`;
 }

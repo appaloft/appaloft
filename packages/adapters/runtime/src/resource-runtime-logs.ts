@@ -1,6 +1,7 @@
 import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { ash } from "@appaloft/ash";
 import {
   DeploymentTargetByIdSpec,
   DeploymentTargetId,
@@ -191,10 +192,6 @@ function tailTextLines(text: string, count: number): string[] {
     .split(/\r?\n/)
     .filter((line) => line.length > 0)
     .slice(-count);
-}
-
-function shellQuote(input: string): string {
-  return `'${input.replaceAll("'", "'\\''")}'`;
 }
 
 function metadataValue(
@@ -658,7 +655,7 @@ function sshArgs(
 }
 
 function remoteCommandWithCwd(command: string, cwd?: string): string {
-  return cwd ? `cd ${shellQuote(cwd)} && ${command}` : command;
+  return cwd ? `cd ${ash.quote(cwd)} && ${command}` : command;
 }
 
 function dockerLogsCommand(input: {
@@ -669,9 +666,9 @@ function dockerLogsCommand(input: {
     "docker",
     "logs",
     "--tail",
-    shellQuote(String(input.request.tailLines)),
+    ash.quote(String(input.request.tailLines)),
     ...(input.request.follow ? ["--follow"] : []),
-    shellQuote(input.containerName),
+    ash.quote(input.containerName),
   ].join(" ");
 }
 
@@ -683,13 +680,13 @@ function dockerComposeLogsCommand(input: {
     "docker",
     "compose",
     "-f",
-    shellQuote(input.composeFile),
+    ash.quote(input.composeFile),
     "logs",
     "--no-color",
     "--tail",
-    shellQuote(String(input.request.tailLines)),
+    ash.quote(String(input.request.tailLines)),
     ...(input.request.follow ? ["--follow"] : []),
-    ...(input.request.serviceName ? [shellQuote(input.request.serviceName)] : []),
+    ...(input.request.serviceName ? [ash.quote(input.request.serviceName)] : []),
   ].join(" ");
 }
 
@@ -719,9 +716,9 @@ function dockerSwarmServiceLogsShellCommand(input: {
     "logs",
     "--raw",
     "--tail",
-    shellQuote(String(input.request.tailLines)),
+    ash.quote(String(input.request.tailLines)),
     ...(input.request.follow ? ["--follow"] : []),
-    shellQuote(input.serviceName),
+    ash.quote(input.serviceName),
   ].join(" ");
 }
 

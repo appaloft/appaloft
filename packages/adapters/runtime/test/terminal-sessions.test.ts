@@ -269,6 +269,7 @@ describe("RuntimeTerminalSessionGateway", () => {
         expect.stringContaining("exec ${SHELL:-/bin/sh} -i"),
       ],
     });
+    expect(spawns[0]).toMatchSnapshot();
     expect(JSON.stringify(spawns[0])).not.toContain("/host/runtime/dep_1/source");
     await gateway.close("term_runtime");
   });

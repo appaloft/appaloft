@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
+import { ash } from "@appaloft/ash";
 import {
   dockerStorageMountsFromRuntimeMetadata,
   dockerStorageVolumeRealizationsFromRuntimeMetadata,
@@ -7,10 +8,6 @@ import {
 } from "../src/storage-runtime-mounts";
 
 const repoFile = (path: string) => new URL(`../../../../${path}`, import.meta.url);
-
-function shellQuote(input: string): string {
-  return `'${input.replaceAll("'", "'\\''")}'`;
-}
 
 describe("storage runtime mounts", () => {
   test("[STOR-RUNTIME-001] converts storage mount metadata to Docker mounts", () => {
@@ -95,7 +92,7 @@ describe("storage runtime mounts", () => {
 
     const script = renderDockerVolumeRealizationScript({
       realizations: realizations._unsafeUnwrap(),
-      quote: shellQuote,
+      quote: ash.quote,
     });
 
     expect(script).toContain("docker volume create");

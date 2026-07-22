@@ -8,6 +8,7 @@ import {
   type MutationCoordinatorRunExclusiveInput,
   validateCoordinationScope,
 } from "@appaloft/application";
+import { ash } from "@appaloft/ash";
 import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
 
 const lockConflictExitCode = 73;
@@ -55,10 +56,6 @@ interface RemoteCoordinationLockMetadata {
   startedAt?: string;
   lastHeartbeatAt?: string;
   staleAfterSeconds?: number;
-}
-
-function shellQuote(input: string): string {
-  return `'${input.replaceAll("'", "'\\''")}'`;
 }
 
 function jsonString(value: string): string {
@@ -129,10 +126,10 @@ function remoteAcquireCommand(input: {
 }): string {
   const script = [
     "set -eu",
-    `data_root=${shellQuote(input.dataRoot)}`,
-    `scope_kind=${shellQuote(input.scopeKind)}`,
-    `scope_hash=${shellQuote(input.scopeHash)}`,
-    `stale_after_seconds=${shellQuote(String(input.staleAfterSeconds))}`,
+    `data_root=${ash.quote(input.dataRoot)}`,
+    `scope_kind=${ash.quote(input.scopeKind)}`,
+    `scope_hash=${ash.quote(input.scopeHash)}`,
+    `stale_after_seconds=${ash.quote(String(input.staleAfterSeconds))}`,
     'coordination_root="$data_root/locks/coordination"',
     'scope_root="$coordination_root/$scope_kind"',
     'recovered_root="$coordination_root/recovered/$scope_kind"',
@@ -172,7 +169,7 @@ function remoteAcquireCommand(input: {
     '  if [ -n "$lock_age_seconds" ] && [ "$lock_age_seconds" -ge "$recorded_stale_after" ]; then',
     '    recovered_path="$recovered_root/$scope_hash-$stamp-$$.lock"',
     '    if mv "$lock_dir" "$recovered_path" 2>/dev/null; then',
-    `      printf '{"phase":"%s","recoveredAt":"%s","scopeKind":%s,"scopeKey":%s,"recoveredBy":%s,"lockToken":%s,"lockAgeSeconds":%s}\n' "operation-coordination" "$now" ${shellQuote(jsonString(input.scopeKind))} ${shellQuote(jsonString(input.scopeKey))} ${shellQuote(jsonString(input.ownerId))} ${shellQuote(jsonString(input.lockToken))} "$lock_age_seconds" > "$recovered_path/recovered.json"`,
+    `      printf '{"phase":"%s","recoveredAt":"%s","scopeKind":%s,"scopeKey":%s,"recoveredBy":%s,"lockToken":%s,"lockAgeSeconds":%s}\n' "operation-coordination" "$now" ${ash.quote(jsonString(input.scopeKind))} ${ash.quote(jsonString(input.scopeKey))} ${ash.quote(jsonString(input.ownerId))} ${ash.quote(jsonString(input.lockToken))} "$lock_age_seconds" > "$recovered_path/recovered.json"`,
     '      mkdir "$lock_dir"',
     "    else",
     '      if [ -f "$owner_file" ]; then cat "$owner_file" >&2; fi',
@@ -183,11 +180,11 @@ function remoteAcquireCommand(input: {
     `    exit ${lockConflictExitCode}`,
     "  fi",
     "fi",
-    `printf '{"ownerId":%s,"label":%s,"lockToken":%s,"operationKey":%s,"coordinationMode":%s,"scopeKind":%s,"scopeKey":%s,"startedAt":"%s","lastHeartbeatAt":"%s","staleAfterSeconds":%s}\n' ${shellQuote(jsonString(input.ownerId))} ${shellQuote(jsonString(input.label))} ${shellQuote(jsonString(input.lockToken))} ${shellQuote(jsonString(input.operationKey))} ${shellQuote(jsonString(input.coordinationMode))} ${shellQuote(jsonString(input.scopeKind))} ${shellQuote(jsonString(input.scopeKey))} "$now" "$now" "$stale_after_seconds" > "$owner_file"`,
+    `printf '{"ownerId":%s,"label":%s,"lockToken":%s,"operationKey":%s,"coordinationMode":%s,"scopeKind":%s,"scopeKey":%s,"startedAt":"%s","lastHeartbeatAt":"%s","staleAfterSeconds":%s}\n' ${ash.quote(jsonString(input.ownerId))} ${ash.quote(jsonString(input.label))} ${ash.quote(jsonString(input.lockToken))} ${ash.quote(jsonString(input.operationKey))} ${ash.quote(jsonString(input.coordinationMode))} ${ash.quote(jsonString(input.scopeKind))} ${ash.quote(jsonString(input.scopeKey))} "$now" "$now" "$stale_after_seconds" > "$owner_file"`,
     'printf "coordinated %s %s\\n" "$scope_kind" "$scope_hash"',
   ].join("\n");
 
-  return `sh -lc ${shellQuote(script)}`;
+  return `sh -lc ${ash.quote(script)}`;
 }
 
 function remoteHeartbeatCommand(input: {
@@ -202,12 +199,12 @@ function remoteHeartbeatCommand(input: {
   const expectedLockTokenFragment = `"lockToken":${jsonString(input.lockToken)}`;
   const script = [
     "set -eu",
-    `data_root=${shellQuote(input.dataRoot)}`,
-    `scope_kind=${shellQuote(input.scopeKind)}`,
-    `scope_hash=${shellQuote(input.scopeHash)}`,
-    `stale_after_seconds=${shellQuote(String(input.staleAfterSeconds))}`,
-    `expected_owner_id_fragment=${shellQuote(expectedOwnerIdFragment)}`,
-    `expected_lock_token_fragment=${shellQuote(expectedLockTokenFragment)}`,
+    `data_root=${ash.quote(input.dataRoot)}`,
+    `scope_kind=${ash.quote(input.scopeKind)}`,
+    `scope_hash=${ash.quote(input.scopeHash)}`,
+    `stale_after_seconds=${ash.quote(String(input.staleAfterSeconds))}`,
+    `expected_owner_id_fragment=${ash.quote(expectedOwnerIdFragment)}`,
+    `expected_lock_token_fragment=${ash.quote(expectedLockTokenFragment)}`,
     'now="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"',
     'lock_dir="$data_root/locks/coordination/$scope_kind/$scope_hash.lock"',
     'owner_file="$lock_dir/owner.json"',
@@ -221,7 +218,7 @@ function remoteHeartbeatCommand(input: {
     'mv "$owner_file.tmp" "$owner_file"',
   ].join("\n");
 
-  return `sh -lc ${shellQuote(script)}`;
+  return `sh -lc ${ash.quote(script)}`;
 }
 
 function remoteReleaseCommand(input: {
@@ -235,11 +232,11 @@ function remoteReleaseCommand(input: {
   const expectedLockTokenFragment = `"lockToken":${jsonString(input.lockToken)}`;
   const script = [
     "set -eu",
-    `data_root=${shellQuote(input.dataRoot)}`,
-    `scope_kind=${shellQuote(input.scopeKind)}`,
-    `scope_hash=${shellQuote(input.scopeHash)}`,
-    `expected_owner_id_fragment=${shellQuote(expectedOwnerIdFragment)}`,
-    `expected_lock_token_fragment=${shellQuote(expectedLockTokenFragment)}`,
+    `data_root=${ash.quote(input.dataRoot)}`,
+    `scope_kind=${ash.quote(input.scopeKind)}`,
+    `scope_hash=${ash.quote(input.scopeHash)}`,
+    `expected_owner_id_fragment=${ash.quote(expectedOwnerIdFragment)}`,
+    `expected_lock_token_fragment=${ash.quote(expectedLockTokenFragment)}`,
     'lock_dir="$data_root/locks/coordination/$scope_kind/$scope_hash.lock"',
     'owner_file="$lock_dir/owner.json"',
     '[ -d "$lock_dir" ] || exit 0',
@@ -250,7 +247,7 @@ function remoteReleaseCommand(input: {
     'printf "released %s %s\\n" "$scope_kind" "$scope_hash"',
   ].join("\n");
 
-  return `sh -lc ${shellQuote(script)}`;
+  return `sh -lc ${ash.quote(script)}`;
 }
 
 function remoteInfraError(input: {
