@@ -235,6 +235,7 @@ describe("release build workflow", () => {
       "uses: ./.github/workflows/public-launch-github-repo-smoke.yml",
     );
     expect(releaseWorkflow).toContain("uses: ./.github/workflows/public-launch-cron-smoke.yml");
+    expect(releaseWorkflow.match(/confirm_live_ssh_smoke: true/g)).toHaveLength(3);
     expect(releaseWorkflow).toContain("uses: ./.github/workflows/framework-fixture-e2e.yml");
     expect(releaseWorkflow).toContain("uses: ./.github/workflows/scheduled-task-e2e.yml");
     expect(releaseWorkflow).toContain("uses: ./.github/workflows/storage-cleanup-e2e.yml");
@@ -451,6 +452,9 @@ describe("release build workflow", () => {
       "APPALOFT_PUBLIC_LAUNCH_SMOKE_SCENARIO: basic-docker",
     );
     expect(publicLaunchBasicDockerWorkflow).toContain(
+      "Confirm that the caller authorizes the live public Appaloft basic Docker smoke.",
+    );
+    expect(publicLaunchBasicDockerWorkflow).toContain(
       "bun run smoke:public-launch:basic-docker:evidence",
     );
     expect(publicLaunchBasicDockerWorkflow).toContain("name: public-launch-basic-docker-evidence");
@@ -459,6 +463,9 @@ describe("release build workflow", () => {
     );
     expect(publicLaunchGitHubRepoWorkflow).toContain(
       "APPALOFT_PUBLIC_LAUNCH_SMOKE_SCENARIO: github-repo",
+    );
+    expect(publicLaunchGitHubRepoWorkflow).toContain(
+      "Confirm that the caller authorizes the live public Appaloft GitHub repo smoke.",
     );
     expect(publicLaunchGitHubRepoWorkflow).toContain(
       "APPALOFT_PUBLIC_LAUNCH_SMOKE_GITHUB_TREE_URL",
@@ -472,6 +479,9 @@ describe("release build workflow", () => {
     );
     expect(publicLaunchCronWorkflow).toContain(
       "APPALOFT_PUBLIC_LAUNCH_SMOKE_SCENARIO: scheduled-task-cron",
+    );
+    expect(publicLaunchCronWorkflow).toContain(
+      "Confirm that the caller authorizes the live public Appaloft scheduled task smoke.",
     );
     expect(publicLaunchCronWorkflow).toContain(
       "bun run smoke:public-launch:scheduled-task-cron:evidence",

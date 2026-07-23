@@ -3,6 +3,11 @@ name: Public Launch Cron Smoke
 on:
   workflow_call:
     inputs:
+      confirm_live_ssh_smoke:
+        description: Confirm that the caller authorizes the live public Appaloft scheduled task smoke.
+        required: false
+        default: false
+        type: boolean
       required:
         description: Fail when the public launch smoke SSH secrets are not configured.
         required: false

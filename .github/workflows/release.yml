@@ -220,6 +220,7 @@ jobs:
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     uses: ./.github/workflows/public-launch-basic-docker-smoke.yml
     with:
+      confirm_live_ssh_smoke: true
       required: ${{ github.event_name == 'workflow_dispatch' && inputs.require_public_launch_basic_docker_smoke }}
     secrets: inherit
 
@@ -228,6 +229,7 @@ jobs:
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     uses: ./.github/workflows/public-launch-github-repo-smoke.yml
     with:
+      confirm_live_ssh_smoke: true
       required: ${{ github.event_name == 'workflow_dispatch' && inputs.require_public_launch_github_repo_smoke }}
     secrets: inherit
 
@@ -236,6 +238,7 @@ jobs:
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     uses: ./.github/workflows/public-launch-cron-smoke.yml
     with:
+      confirm_live_ssh_smoke: true
       required: ${{ github.event_name == 'workflow_dispatch' && inputs.require_public_launch_cron_smoke }}
     secrets: inherit
 
