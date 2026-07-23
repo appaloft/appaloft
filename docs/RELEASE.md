@@ -20,6 +20,11 @@ GitHub Release, and distribution artifacts.
 - Release Please is configured to keep pre-`1.0.0` feature and minor bumps on the current patch
   line by default. Use the `release_as` workflow input only when the roadmap gate explicitly allows
   a target minor, or when a hotfix needs an explicit version.
+- `release_as` selects the version for an existing releasable Conventional Commit; it does not
+  create a release PR when every commit since the latest tag is non-releasable, such as `test:`.
+  When downstream provenance requires a new tag after a test-only merge, first land a genuine
+  releasable release-process fix or product change, then run `Release` with the required patch
+  version. Do not move an existing tag or bypass the release PR.
 - The GitHub Release body is generated from `CHANGELOG.md` plus the built release artifact list,
   so the release page includes install commands, direct download links, known gaps, and the
   conventional-commit changelog.
