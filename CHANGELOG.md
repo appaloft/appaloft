@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.3.0](https://github.com/appaloft/appaloft/compare/v1.2.0...v1.3.0) (2026-07-23)
+
+
+### Features
+
+* **deploy:** broaden zero-config planning ([#789](https://github.com/appaloft/appaloft/issues/789)) ([2d6a2c4](https://github.com/appaloft/appaloft/commit/2d6a2c45d982dfaa80be22a9ecec00368e227754))
+* **sandbox:** stream agent run events ([#795](https://github.com/appaloft/appaloft/issues/795)) ([6337c52](https://github.com/appaloft/appaloft/commit/6337c5201937967562174b98d81a00d6596e6366))
+
+
+### Bug Fixes
+
+* confirm managed dependency retention release ([#787](https://github.com/appaloft/appaloft/issues/787)) ([0434a43](https://github.com/appaloft/appaloft/commit/0434a439997a8ca7e609470e3c5b8e9ff8a2ccd2))
+* harden deployment runtime safety contracts ([#791](https://github.com/appaloft/appaloft/issues/791)) ([b8d1e73](https://github.com/appaloft/appaloft/commit/b8d1e73a0c27765e401efa7af7331e3b3d5f3f4b))
+* ignore deleted domain bindings in delete blockers ([#790](https://github.com/appaloft/appaloft/issues/790)) ([7850848](https://github.com/appaloft/appaloft/commit/78508480e0f9d4dc5b0b1afe2f1dffc2ab003110))
+* prove current deployment route truth ([#793](https://github.com/appaloft/appaloft/issues/793)) ([fcc2bcb](https://github.com/appaloft/appaloft/commit/fcc2bcb665436b125ea1cca8dafcabadb9cdd3f1))
+* verify current managed deployment routes ([#788](https://github.com/appaloft/appaloft/issues/788)) ([92163c5](https://github.com/appaloft/appaloft/commit/92163c5d4c7fa30e2c468f1a994bfb90a3dd9604))
+
+
+### Documentation
+
+* clarify repository agent guidance ([#792](https://github.com/appaloft/appaloft/issues/792)) ([1fa286a](https://github.com/appaloft/appaloft/commit/1fa286a7064d97556eaf3aae653889ec1391d0ae))
+
 ## [1.2.0](https://github.com/appaloft/appaloft/compare/v1.1.0...v1.2.0) (2026-07-21)
 
 
