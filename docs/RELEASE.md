@@ -55,7 +55,9 @@ docker build --build-arg APPALOFT_APP_VERSION=0.1.0 -t appaloft-all-in-one:local
   `public-launch-cron-smoke.yml`: GitHub Actions secret-gated public launch smokes used by nightly
   and release. They prove that public Appaloft can register a temporary project/server, deploy a
   basic Docker image, deploy a public GitHub repository, run scheduled-task execution over the same
-  SSH Docker target, and clean up the Appaloft-scoped runtime artifacts. They require SSH
+  SSH Docker target, and clean up the Appaloft-scoped runtime artifacts. A publishing Release job
+  explicitly confirms these live reusable-workflow calls; direct manual smoke dispatches still
+  require `confirm_live_ssh_smoke=true`. They require SSH
   test-target secrets and can be made required for a manual release run with
   `require_public_launch_basic_docker_smoke=true`,
   `require_public_launch_github_repo_smoke=true`, and
@@ -251,7 +253,9 @@ flows.
    dry-run-first scoped runtime workspace prune over generic SSH. Set
    `require_preview_provider_e2e=true` when the release should prove live GitHub PR-comment preview
    feedback. When one of those inputs is true, missing SSH target secrets or GitHub preview provider
-   smoke secrets fail the reusable workflow instead of silently accepting the release.
+   smoke secrets fail the reusable workflow instead of silently accepting the release. When a
+   release is created, the Release workflow passes the explicit live-smoke confirmation to all
+   three public-launch reusable workflows.
 5. Review the single Release Please PR. It must include the generated version/changelog changes and
    the `docs/PRODUCT_ROADMAP.md` release alignment commit. When `release_as` is set, the workflow
    also enforces that the release PR title, body, version files, and changelog use that exact
