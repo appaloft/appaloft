@@ -5,8 +5,6 @@
 
 ### Bug Fixes
 
-* **release:** document test-only patch handoff ([0c6593c](https://github.com/appaloft/appaloft/commit/0c6593c8f73330af7ca83a62b5c886f429706229))
-* **release:** document test-only patch handoff ([0c6593c](https://github.com/appaloft/appaloft/commit/0c6593c8f73330af7ca83a62b5c886f429706229))
 * **release:** document test-only patch handoff ([62589d7](https://github.com/appaloft/appaloft/commit/62589d7b619b25bd7915feaa597c8b0d2cd3b6ae))
 
 ## [1.3.1](https://github.com/appaloft/appaloft/compare/v1.3.0...v1.3.1) (2026-07-23)
