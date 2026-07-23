@@ -32,6 +32,8 @@ describe("CLI safe error evidence", () => {
       stateBackend: "ssh-pglite",
       sourcePostgresMajor: "17",
       requiredPostgresMajor: "18",
+      workspaceId: null,
+      sandboxId: null,
       exitCode: 23,
       retryable: true,
     });
@@ -58,6 +60,8 @@ describe("CLI safe error evidence", () => {
       stateBackend: null,
       sourcePostgresMajor: null,
       requiredPostgresMajor: null,
+      workspaceId: null,
+      sandboxId: null,
       exitCode: null,
       retryable: false,
     });
@@ -84,5 +88,27 @@ describe("CLI safe error evidence", () => {
     });
     expect(output).not.toContain("/private/operator/key");
     expect(output).not.toContain("secret-value");
+  });
+
+  test("[AGENT-WS-CLI-012] exposes only safe partial Workspace recovery ids", () => {
+    const output = formatSafeCliError({
+      code: "sandbox_agent_harness_unavailable",
+      category: "user",
+      message: "secret provider detail",
+      retryable: false,
+      details: {
+        phase: "agent-workspace-runtime-create",
+        workspaceId: "sbx_partial",
+        sandboxId: "sbx_partial",
+        providerHandle: "secret-provider-handle",
+      },
+    } satisfies DomainError);
+
+    expect(JSON.parse(output)).toMatchObject({
+      phase: "agent-workspace-runtime-create",
+      workspaceId: "sbx_partial",
+      sandboxId: "sbx_partial",
+    });
+    expect(output).not.toContain("secret-provider-handle");
   });
 });

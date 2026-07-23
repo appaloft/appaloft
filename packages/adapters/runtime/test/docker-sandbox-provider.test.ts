@@ -11,6 +11,11 @@ import {
 
 class CapturingRunner implements SandboxDockerCommandRunner {
   readonly calls: Array<{ argv: readonly string[]; stdin?: Uint8Array }> = [];
+  readonly terminalCalls: Array<{
+    argv: readonly string[];
+    initialRows: number;
+    initialCols: number;
+  }> = [];
   runtimes = '{"io.containerd.runc.v2":{"path":"runc"},"runsc":{"path":"runsc"}}';
   resolvedPath: string | undefined;
   executionFailure: SandboxDockerCommandResult["failure"];
@@ -45,6 +50,27 @@ class CapturingRunner implements SandboxDockerCommandRunner {
     return this.result("");
   }
 
+  async openTerminal(
+    argv: readonly string[],
+    input: { initialRows: number; initialCols: number },
+  ) {
+    this.terminalCalls.push({
+      argv: [...argv],
+      initialRows: input.initialRows,
+      initialCols: input.initialCols,
+    });
+    return {
+      stdin: {
+        write() {},
+        end() {},
+      },
+      stdout: null,
+      stderr: null,
+      exited: new Promise<number>(() => {}),
+      kill() {},
+    };
+  }
+
   private result(stdout: string): SandboxDockerCommandResult {
     return { exitCode: 0, stdout: new TextEncoder().encode(stdout), stderr: "" };
   }
@@ -65,6 +91,38 @@ const request = {
 };
 
 describe("DockerSandboxProvider", () => {
+  test("[TERM-SESSION-SANDBOX-001] opens the managed container shell through a PTY runner", async () => {
+    const runner = new CapturingRunner();
+    const provider = new DockerSandboxProvider({ isolation: "gvisor", runner });
+    await provider.provision(request);
+
+    await provider.openTerminal({
+      sandboxId: "sbx_demo",
+      providerHandle: "appaloft-sbx_demo",
+      cwd: "src",
+      initialRows: 32,
+      initialCols: 120,
+    });
+
+    expect(runner.terminalCalls).toEqual([
+      {
+        argv: [
+          "docker",
+          "exec",
+          "-it",
+          "-w",
+          "/workspace/src",
+          "appaloft-sbx_demo",
+          "sh",
+          "-lc",
+          expect.stringContaining("export HOME=/workspace"),
+        ],
+        initialRows: 32,
+        initialCols: 120,
+      },
+    ]);
+  });
+
   test("[SBX-RUNTIME-002] provisions a constrained gVisor container without shell interpolation", async () => {
     const runner = new CapturingRunner();
     const provider = new DockerSandboxProvider({ isolation: "gvisor", runner });

@@ -115,6 +115,10 @@ Product constraints:
 - [x] Use `Build with agents. Ship with proof.` as the product slogan and label Agent Runtime,
   Source Artifact/Candidate Preview, and Sandbox Promotion as private preview until their named
   acceptance matrices pass in a configured hosted environment.
+- [x] Keep Agent Workspace itself in Public Appaloft as an additive entry workflow over Sandbox,
+  Agent Runtime, Terminal Session and Sandbox Port operations. Cloud may host it, but must not own
+  a separate Workspace aggregate or operation family. Pi and OpenCode are the first public harness
+  adapters; release readiness remains gated by Spec 111 and its test matrix.
 - [x] Keep Delivery Evidence Chain claims limited to observed delivery evidence; do not imply
   formal correctness, security, vulnerability absence, or compliance.
 - [x] Treat Appaloft as a self-hosted deployment control plane, not a web-first CRUD app.

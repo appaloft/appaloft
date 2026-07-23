@@ -7,6 +7,7 @@ import {
   type SandboxProcessDescriptor,
   type SandboxProvider,
   type SandboxProviderRequest,
+  type SandboxTerminalProcess,
 } from "@appaloft/application";
 import { type SandboxIsolation, SandboxWorkspacePath } from "@appaloft/core";
 
@@ -22,6 +23,10 @@ export interface SandboxDockerCommandRunner {
     argv: readonly string[],
     input?: { stdin?: Uint8Array; timeoutMs?: number },
   ): Promise<SandboxDockerCommandResult>;
+  openTerminal?(
+    argv: readonly string[],
+    input: { initialRows: number; initialCols: number },
+  ): Promise<SandboxTerminalProcess>;
 }
 
 export interface SandboxPortPublisher {
@@ -41,6 +46,74 @@ export interface SandboxPortPublisher {
 }
 
 export class BunSandboxDockerCommandRunner implements SandboxDockerCommandRunner {
+  async openTerminal(
+    argv: readonly string[],
+    input: { initialRows: number; initialCols: number },
+  ): Promise<SandboxTerminalProcess> {
+    let controller: ReadableStreamDefaultController<Uint8Array> | undefined;
+    let terminalClosed = false;
+    const stdout = new ReadableStream<Uint8Array>({
+      start(nextController) {
+        controller = nextController;
+      },
+    });
+    const process = Bun.spawn([...argv], {
+      env: {
+        ...Bun.env,
+        TERM: "xterm-256color",
+      },
+      terminal: {
+        cols: input.initialCols,
+        rows: input.initialRows,
+        data(_terminal, data) {
+          if (!terminalClosed) {
+            controller?.enqueue(new Uint8Array(data));
+          }
+        },
+        exit() {
+          if (!terminalClosed) {
+            terminalClosed = true;
+            controller?.close();
+          }
+        },
+      },
+    });
+    const terminal = process.terminal;
+    if (!terminal) {
+      process.kill();
+      throw new Error("Bun did not attach a PTY to the Sandbox terminal process");
+    }
+    const closeTerminal = () => {
+      if (!terminalClosed) {
+        terminalClosed = true;
+        terminal.close();
+        controller?.close();
+      }
+    };
+    return {
+      stdin: {
+        write(data) {
+          return terminal.write(data);
+        },
+        end() {
+          closeTerminal();
+        },
+      },
+      stdout,
+      stderr: null,
+      exited: process.exited,
+      kill() {
+        process.kill();
+      },
+      resize(rows, cols) {
+        terminal.resize(cols, rows);
+      },
+      async cleanup() {
+        closeTerminal();
+      },
+    };
+  }
+
   async run(
     argv: readonly string[],
     input: { stdin?: Uint8Array; timeoutMs?: number } = {},
@@ -266,6 +339,39 @@ export class DockerSandboxProvider implements SandboxProvider {
   async terminate(request: { sandboxId: string; providerHandle: string }): Promise<void> {
     await this.assertHandle(request);
     await this.docker(["rm", "-f", request.providerHandle]);
+  }
+
+  async openTerminal(request: {
+    sandboxId: string;
+    providerHandle: string;
+    cwd?: string;
+    initialRows: number;
+    initialCols: number;
+  }): Promise<SandboxTerminalProcess> {
+    await this.assertHandle(request);
+    if (!this.runner.openTerminal) {
+      throw new Error("Sandbox Docker command runner does not support PTY sessions");
+    }
+    const cwd = request.cwd
+      ? await this.confinedWorkspacePath(request, request.cwd, "existing")
+      : "/workspace";
+    return this.runner.openTerminal(
+      [
+        "docker",
+        "exec",
+        "-it",
+        "-w",
+        cwd,
+        request.providerHandle,
+        "sh",
+        "-lc",
+        'export HOME=/workspace; export XDG_DATA_HOME=/workspace/.local/share; if command -v bash >/dev/null 2>&1; then exec bash --noprofile --norc -i; fi; exec sh -i',
+      ],
+      {
+        initialRows: request.initialRows,
+        initialCols: request.initialCols,
+      },
+    );
   }
 
   async listOwnedRuntimes(request: { ownerScope: string; limit: number; cursor?: string }) {

@@ -10,6 +10,7 @@ import {
 } from "./internal.js";
 
 export const defaultPiHarnessTemplateId = "aht_pi_managed_v1";
+export const defaultOpenCodeHarnessTemplateId = "aht_opencode_managed_v1";
 
 export interface AppaloftSandboxCreateInput extends AppaloftSdkFacadeInput {
   readonly source:
@@ -59,6 +60,55 @@ export interface AppaloftAgentCreateInput {
   readonly harness: string;
   readonly harnessTemplateId?: string;
   readonly idempotencyKey?: string;
+}
+
+export interface AppaloftWorkspaceCreateInput {
+  readonly sandbox: AppaloftSandboxCreateInput;
+  readonly harness: "pi" | "opencode";
+  readonly harnessTemplateId?: string;
+  readonly idempotencyKey?: string;
+}
+
+export interface AppaloftWorkspace {
+  readonly workspaceId: string;
+  readonly sandboxId: string;
+  readonly sandbox: AppaloftSandbox;
+  readonly agent: AppaloftAgent;
+}
+
+export interface AppaloftWorkspaceDescriptor {
+  readonly workspaceId: string;
+  readonly sandboxId: string;
+  readonly sandbox: AppaloftSandboxDescriptor;
+  readonly agentRuntimes: readonly AppaloftAgentDescriptor[];
+}
+
+export interface AppaloftWorkspaceListInput extends AppaloftSdkFacadeInput {
+  readonly limit?: number;
+  readonly offset?: number;
+}
+
+export interface AppaloftWorkspaceList {
+  readonly items: readonly AppaloftWorkspaceDescriptor[];
+  readonly [key: string]: unknown;
+}
+
+export class AppaloftWorkspaceCreateError extends Error {
+  readonly workspaceId: string;
+  readonly sandboxId: string;
+  readonly cause: unknown;
+
+  constructor(sandboxId: string, cause: unknown) {
+    super(
+      `Agent Workspace Runtime creation failed after Sandbox ${sandboxId} was created: ${
+        cause instanceof Error ? cause.message : String(cause)
+      }`,
+    );
+    this.name = "AppaloftWorkspaceCreateError";
+    this.workspaceId = sandboxId;
+    this.sandboxId = sandboxId;
+    this.cause = cause;
+  }
 }
 
 export interface AppaloftRunCreateInput {
@@ -160,6 +210,11 @@ export type AppaloftClient = Omit<GeneratedAppaloftClient, "sandboxes"> & {
   readonly sandboxes: Omit<GeneratedSandboxes, "create"> & {
     readonly create: (input: AppaloftSandboxCreateInput) => Promise<AppaloftSandbox>;
   };
+  readonly workspaces: {
+    readonly create: (input: AppaloftWorkspaceCreateInput) => Promise<AppaloftWorkspace>;
+    readonly list: (input?: AppaloftWorkspaceListInput) => Promise<AppaloftWorkspaceList>;
+    readonly show: (workspaceId: string) => Promise<AppaloftWorkspaceDescriptor>;
+  };
 };
 
 export function createAppaloftClient(options: AppaloftSdkClientOptions): AppaloftClient {
@@ -176,11 +231,48 @@ export function createAppaloftClient(options: AppaloftSdkClientOptions): Appalof
       return createSandboxHandle(operations, descriptor);
     },
   };
+  const workspaces = {
+    create: async (input: AppaloftWorkspaceCreateInput): Promise<AppaloftWorkspace> => {
+      const sandbox = await sandboxes.create(input.sandbox);
+      try {
+        const agent = await sandbox.agents.create({
+          harness: input.harness,
+          ...(input.harnessTemplateId ? { harnessTemplateId: input.harnessTemplateId } : {}),
+          ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),
+        });
+        return {
+          workspaceId: sandbox.sandboxId,
+          sandboxId: sandbox.sandboxId,
+          sandbox,
+          agent,
+        };
+      } catch (error) {
+        throw new AppaloftWorkspaceCreateError(sandbox.sandboxId, error);
+      }
+    },
+    list: async (input: AppaloftWorkspaceListInput = {}): Promise<AppaloftWorkspaceList> => {
+      const sandboxesResult = unwrapOperation<{
+        readonly items: readonly AppaloftSandboxDescriptor[];
+        readonly [key: string]: unknown;
+      }>(await operations.sandboxes.list(input));
+      const items = await Promise.all(
+        sandboxesResult.items.map((sandbox) => createWorkspaceDescriptor(operations, sandbox)),
+      );
+      return { ...sandboxesResult, items };
+    },
+    show: async (workspaceId: string): Promise<AppaloftWorkspaceDescriptor> => {
+      const sandbox = unwrapOperation<AppaloftSandboxDescriptor>(
+        await operations.sandboxes.show({ sandboxId: workspaceId }),
+      );
+      return createWorkspaceDescriptor(operations, sandbox);
+    },
+  };
 
   return {
     ...operations,
     operations,
     sandboxes,
+    workspaces,
   } as AppaloftClient;
 }
 
@@ -196,7 +288,11 @@ function createSandboxHandle(
       create: async (input) => {
         const harnessTemplateId =
           input.harnessTemplateId ??
-          (input.harness === "pi" ? defaultPiHarnessTemplateId : undefined);
+          (input.harness === "pi"
+            ? defaultPiHarnessTemplateId
+            : input.harness === "opencode"
+              ? defaultOpenCodeHarnessTemplateId
+              : undefined);
         if (!harnessTemplateId) {
           throw new TypeError(`harnessTemplateId is required for harness ${input.harness}`);
         }
@@ -227,6 +323,22 @@ function createSandboxHandle(
       ),
     terminate: async <T>() =>
       unwrapOperation<T>(await operations.sandboxes.terminate<T>({ sandboxId })),
+  };
+}
+
+async function createWorkspaceDescriptor(
+  operations: GeneratedAppaloftClient,
+  sandbox: AppaloftSandboxDescriptor,
+): Promise<AppaloftWorkspaceDescriptor> {
+  const sandboxId = requiredResourceId(sandbox.sandboxId, "sandboxId");
+  const runtimes = unwrapOperation<{ readonly items: readonly AppaloftAgentDescriptor[] }>(
+    await operations.sandboxes.agents.runtimes.list({ sandboxId }),
+  );
+  return {
+    workspaceId: sandboxId,
+    sandboxId,
+    sandbox,
+    agentRuntimes: runtimes.items,
   };
 }
 

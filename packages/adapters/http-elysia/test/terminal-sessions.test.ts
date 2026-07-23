@@ -29,6 +29,10 @@ class TestTerminalSession implements TerminalSession {
   private readonly waiters: Array<(result: IteratorResult<TerminalSessionFrame>) => void> = [];
   private closed = false;
 
+  isClosed(): boolean {
+    return this.closed;
+  }
+
   async write(data: string): Promise<void> {
     this.writes.push(data);
   }
@@ -36,6 +40,8 @@ class TestTerminalSession implements TerminalSession {
   async resize(input: { rows: number; cols: number }): Promise<void> {
     this.resizes.push(input);
   }
+
+  async detach(): Promise<void> {}
 
   async close(): Promise<void> {
     if (this.closed) {
@@ -277,6 +283,63 @@ describe("terminal session websocket", () => {
       expect(terminalSessionGateway.attachedSessionId).toBe("term_test");
     } finally {
       socket.close();
+      app.server?.stop(true);
+    }
+  });
+
+  test("[TERM-SESSION-TRANSPORT-009][CLOUD-WSP-BROWSER-021] transport disconnect detaches without terminating the managed terminal", async () => {
+    const terminalSessionGateway = new TestTerminalSessionGateway();
+    const app = createHttpApp({
+      config: resolveConfig({
+        flags: {
+          appVersion: "0.1.0-test",
+          authProvider: "none",
+          webStaticDir: "",
+        },
+      }),
+      commandBus: {} as unknown as CommandBus,
+      queryBus: {} as unknown as QueryBus,
+      logger: {
+        debug() {},
+        error() {},
+        info() {},
+        warn() {},
+      },
+      executionContextFactory: {
+        create(input) {
+          return createExecutionContext(input);
+        },
+      },
+      terminalSessionGateway,
+    });
+
+    app.listen({
+      hostname: "127.0.0.1",
+      port: 0,
+    });
+
+    const port = app.server?.port;
+    if (typeof port !== "number") {
+      throw new Error("HTTP test server did not expose a port");
+    }
+
+    const socket = new WebSocket(`ws://127.0.0.1:${port}/api/terminal-sessions/term_test/attach`);
+
+    try {
+      await waitForOpen(socket);
+      expect(JSON.parse(await waitForMessage(socket))).toEqual({
+        kind: "ready",
+        sessionId: "term_test",
+      });
+      socket.close();
+      await waitFor(
+        () => socket.readyState === WebSocket.CLOSED,
+        "WebSocket did not close after client disconnect",
+      );
+      await wait(20);
+
+      expect(terminalSessionGateway.session.isClosed()).toBe(false);
+    } finally {
       app.server?.stop(true);
     }
   });

@@ -254,6 +254,8 @@ export interface SafeCliErrorEvidence {
   stateBackend: string | null;
   sourcePostgresMajor: string | null;
   requiredPostgresMajor: string | null;
+  workspaceId: string | null;
+  sandboxId: string | null;
   exitCode: number | null;
   retryable: boolean;
 }
@@ -279,6 +281,8 @@ export function safeCliErrorEvidence(error: unknown): SafeCliErrorEvidence {
       stateBackend: null,
       sourcePostgresMajor: null,
       requiredPostgresMajor: null,
+      workspaceId: null,
+      sandboxId: null,
       exitCode: null,
       retryable: false,
     };
@@ -294,6 +298,8 @@ export function safeCliErrorEvidence(error: unknown): SafeCliErrorEvidence {
     stateBackend: safeErrorDetail(error, "stateBackend"),
     sourcePostgresMajor: safePostgresMajorDetail(error, "sourcePostgresMajor"),
     requiredPostgresMajor: safePostgresMajorDetail(error, "requiredPostgresMajor"),
+    workspaceId: safeErrorDetail(error, "workspaceId"),
+    sandboxId: safeErrorDetail(error, "sandboxId"),
     exitCode: typeof exitCode === "number" && Number.isInteger(exitCode) ? exitCode : null,
     retryable: error.retryable,
   };
@@ -496,7 +502,7 @@ async function pipeTerminalSession(input: {
     }
     stdin.pause?.();
     if (!sessionClosed) {
-      await session.close();
+      await session.detach();
     }
   }
 }

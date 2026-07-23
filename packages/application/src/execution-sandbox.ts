@@ -140,6 +140,20 @@ export interface SandboxProcessDescriptor {
   exitCode?: number;
 }
 
+export interface SandboxTerminalProcess {
+  stdin: {
+    write(data: string | Uint8Array): void | number | Promise<void | number>;
+    flush?(): void | Promise<void>;
+    end?(): void | Promise<void>;
+  };
+  stdout: ReadableStream<Uint8Array> | null;
+  stderr: ReadableStream<Uint8Array> | null;
+  exited: Promise<number>;
+  kill(): void;
+  resize?(rows: number, cols: number): void | Promise<void>;
+  cleanup?(): Promise<void>;
+}
+
 export interface SandboxProvider {
   readonly key: string;
   readonly capabilities: SandboxProviderCapabilities;
@@ -153,6 +167,13 @@ export interface SandboxProvider {
     realizedIsolation: SandboxIsolation;
   }>;
   terminate(request: { sandboxId: string; providerHandle: string }): Promise<void>;
+  openTerminal?(request: {
+    sandboxId: string;
+    providerHandle: string;
+    cwd?: string;
+    initialRows: number;
+    initialCols: number;
+  }): Promise<SandboxTerminalProcess>;
   exec(request: {
     sandboxId: string;
     providerHandle: string;

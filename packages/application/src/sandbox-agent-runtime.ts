@@ -39,6 +39,13 @@ export interface SandboxAgentHarnessEvent {
   data: Record<string, unknown>;
 }
 
+export interface SandboxAgentHarnessInteraction {
+  transport: "managed-terminal" | "native-attach";
+  command: readonly string[];
+  sessionRecovery: "managed-run-lineage" | "native-session-store";
+  serverPort?: number;
+}
+
 export type SandboxAgentSandboxSource =
   | { kind: "image"; image: string }
   | { kind: "snapshot"; snapshotId: string }
@@ -49,7 +56,18 @@ export interface SandboxAgentHarness {
   readonly templateId: string;
   readonly version: string;
   readonly templateDigest: string;
+  readonly interaction?: SandboxAgentHarnessInteraction;
   admitSandbox?(source: SandboxAgentSandboxSource): boolean;
+  prepareRuntime?(input: {
+    executionContext: ExecutionContext;
+    sandboxId: string;
+    runtimeId: string;
+  }): Promise<void>;
+  terminateRuntime?(input: {
+    executionContext: ExecutionContext;
+    sandboxId: string;
+    runtimeId: string;
+  }): Promise<void>;
   execute(input: {
     executionContext: ExecutionContext;
     sandboxId: string;
@@ -526,6 +544,7 @@ export interface SandboxAgentRuntimeDescriptor {
   harnessKey: string;
   harnessTemplateId: string;
   status: string;
+  interaction?: SandboxAgentHarnessInteraction;
   activeRunId?: string;
   createdAt: string;
   updatedAt?: string;
@@ -602,7 +621,10 @@ function redact(value: unknown, key = "", depth = 0): unknown {
   return value;
 }
 
-function runtimeDescriptor(record: SandboxAgentRuntimeRecord): SandboxAgentRuntimeDescriptor {
+function runtimeDescriptor(
+  record: SandboxAgentRuntimeRecord,
+  interaction?: SandboxAgentHarnessInteraction,
+): SandboxAgentRuntimeDescriptor {
   const state = record.runtime.toState();
   return {
     runtimeId: state.id.value,
@@ -610,6 +632,7 @@ function runtimeDescriptor(record: SandboxAgentRuntimeRecord): SandboxAgentRunti
     harnessKey: record.harnessKey,
     harnessTemplateId: state.harnessTemplateId.value,
     status: state.status.value,
+    ...(interaction ? { interaction } : {}),
     ...(state.activeRunId ? { activeRunId: state.activeRunId.value } : {}),
     createdAt: state.createdAt.value,
     ...(state.updatedAt ? { updatedAt: state.updatedAt.value } : {}),
@@ -747,7 +770,14 @@ export class SandboxAgentDeliveryService {
       input.sandboxId,
       input.idempotencyKey,
     );
-    if (existing) return ok(runtimeDescriptor(existing));
+    if (existing) {
+      return ok(
+        runtimeDescriptor(
+          existing,
+          this.dependencies.harnessRegistry.resolve(existing.harnessKey)?.interaction,
+        ),
+      );
+    }
     const sandbox = await this.dependencies.sandboxReader.show(context, input.sandboxId);
     if (sandbox.status !== "ready") {
       return err(domainError.conflict("Sandbox must be ready before Runtime creation"));
@@ -779,15 +809,31 @@ export class SandboxAgentDeliveryService {
       createdAt: createdAt.value,
     });
     if (runtime.isErr()) return err(runtime.error);
-    const updatedAt = asUpdatedAt(this.dependencies.clock.now());
-    if (updatedAt.isErr()) return err(updatedAt.error);
-    const ready = runtime.value.markReady({ at: updatedAt.value });
-    if (ready.isErr()) return err(ready.error);
     const record = {
       runtime: runtime.value,
       harnessKey: input.harnessKey,
       idempotencyKey: input.idempotencyKey,
     };
+    if (harness.prepareRuntime) {
+      try {
+        await harness.prepareRuntime({
+          executionContext: context,
+          sandboxId: input.sandboxId,
+          runtimeId: runtimeId.value.value,
+        });
+      } catch (error) {
+        const failedAt = asUpdatedAt(this.dependencies.clock.now());
+        if (failedAt.isErr()) return err(failedAt.error);
+        const failed = runtime.value.markFailed({ at: failedAt.value });
+        if (failed.isErr()) return err(failed.error);
+        await this.dependencies.repository.saveRuntime(repositoryContext, record);
+        return err(infrastructureError(error));
+      }
+    }
+    const updatedAt = asUpdatedAt(this.dependencies.clock.now());
+    if (updatedAt.isErr()) return err(updatedAt.error);
+    const ready = runtime.value.markReady({ at: updatedAt.value });
+    if (ready.isErr()) return err(ready.error);
     try {
       await this.dependencies.repository.saveRuntime(repositoryContext, record);
     } catch (error) {
@@ -797,9 +843,14 @@ export class SandboxAgentDeliveryService {
         input.idempotencyKey,
       );
       if (!raced) return err(infrastructureError(error));
-      return ok(runtimeDescriptor(raced));
+      return ok(
+        runtimeDescriptor(
+          raced,
+          this.dependencies.harnessRegistry.resolve(raced.harnessKey)?.interaction,
+        ),
+      );
     }
-    return ok(runtimeDescriptor(record));
+    return ok(runtimeDescriptor(record, harness.interaction));
   }
 
   async listRuntimes(
@@ -810,7 +861,14 @@ export class SandboxAgentDeliveryService {
       toRepositoryContext(context),
       sandboxId,
     );
-    return ok({ items: items.map(runtimeDescriptor) });
+    return ok({
+      items: items.map((record) =>
+        runtimeDescriptor(
+          record,
+          this.dependencies.harnessRegistry.resolve(record.harnessKey)?.interaction,
+        ),
+      ),
+    });
   }
 
   async showRuntime(
@@ -825,7 +883,12 @@ export class SandboxAgentDeliveryService {
     if (!record || record.runtime.toState().sandboxId.value !== sandboxId) {
       return err(domainError.notFound("SandboxAgentRuntime", runtimeId));
     }
-    return ok(runtimeDescriptor(record));
+    return ok(
+      runtimeDescriptor(
+        record,
+        this.dependencies.harnessRegistry.resolve(record.harnessKey)?.interaction,
+      ),
+    );
   }
 
   async terminateRuntime(
@@ -843,12 +906,24 @@ export class SandboxAgentDeliveryService {
       const cancelled = await this.cancelRun(context, runtimeId, state.activeRunId.value);
       if (cancelled.isErr()) return err(cancelled.error);
     }
+    const harness = this.dependencies.harnessRegistry.resolve(record.harnessKey);
+    if (harness?.terminateRuntime) {
+      try {
+        await harness.terminateRuntime({
+          executionContext: context,
+          sandboxId,
+          runtimeId,
+        });
+      } catch (error) {
+        return err(infrastructureError(error));
+      }
+    }
     const at = asUpdatedAt(this.dependencies.clock.now());
     if (at.isErr()) return err(at.error);
     const terminated = record.runtime.terminate({ at: at.value });
     if (terminated.isErr()) return err(terminated.error);
     await this.dependencies.repository.saveRuntime(repositoryContext, record);
-    return ok(runtimeDescriptor(record));
+    return ok(runtimeDescriptor(record, harness?.interaction));
   }
 
   async createRun(

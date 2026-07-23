@@ -106,6 +106,8 @@ class FakeTerminalSession implements TerminalSession {
     this.resizes.push(input);
   }
 
+  async detach(): Promise<void> {}
+
   async close(): Promise<void> {
     this.closed = true;
   }

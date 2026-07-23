@@ -73,7 +73,8 @@ Use Appaloft when you want:
 
 | Delivery stage | Maturity | Current boundary |
 | --- | --- | --- |
-| Run Agents | Private preview | Harness-neutral Runtime and observable/cancellable Run APIs are implemented; the first adapter is pinned Pi and requires an operator-provisioned Sandbox template. |
+| Agent Workspaces | Public alpha | Public CLI/SDK compose Sandbox, Pi/OpenCode Runtime, reconnectable Terminal Session, and expiring port exposure; provider and gateway availability is deployment-dependent. |
+| Run Agents | Public alpha | Harness-neutral Runtime and observable/cancellable Run APIs are implemented; Pi and OpenCode require operator-provisioned pinned Sandbox templates. |
 | Work in Sandboxes | Private preview | Resource, network, process, file, lifecycle, snapshot, and credential-broker boundaries are implemented; hosted worker availability is configuration-dependent. |
 | Preview & Promote | Private preview | Idle-workspace capture, immutable Source Artifact, exact-digest candidate preview, and plan/accept/retry Promotion are implemented; candidate preview currently targets statically publishable output. |
 | Deploy & Verify | Available | Existing folder, Git, zip, image, Docker, Compose, static artifact, Deployment, health, logs, retry, rollback, and proof readback remain supported. |
@@ -81,11 +82,11 @@ Use Appaloft when you want:
 “Delivery Evidence Chain” means Appaloft can preserve and read the observations linking an accepted
 candidate to a Deployment result. It does not claim formal correctness, security, or compliance.
 
-## Agent SDK Quickstart (Private Preview)
+## Agent Workspace SDK Quickstart (Public Alpha)
 
 The API hierarchy makes Runtime ownership explicit: agents belong to a Sandbox. After an operator
-provisions a Pi-enabled Sandbox template and sets `APPALOFT_PI_SANDBOX_TEMPLATE_ID`, an application
-developer can use the generated SDK without running Pi in the application process:
+provisions a Pi- or OpenCode-enabled Sandbox template, an application developer can use the public
+SDK without running the agent harness in the application process:
 
 ```ts
 import { createAppaloftClient } from "@appaloft/sdk";
@@ -98,20 +99,22 @@ const appaloft = createAppaloftClient({
   },
 });
 
-const sandbox = await appaloft.sandboxes.create({
-  source: { kind: "template", templateId: process.env.PI_SANDBOX_TEMPLATE_ID! },
-  requestedIsolation: "gvisor",
-  limits: {
-    cpuMillis: 2_000,
-    memoryBytes: 2_147_483_648,
-    diskBytes: 10_737_418_240,
-    maxProcesses: 128,
+const workspace = await appaloft.workspaces.create({
+  sandbox: {
+    source: { kind: "template", templateId: process.env.OPENCODE_SANDBOX_TEMPLATE_ID! },
+    requestedIsolation: "gvisor",
+    limits: {
+      cpuMillis: 2_000,
+      memoryBytes: 2_147_483_648,
+      diskBytes: 10_737_418_240,
+      maxProcesses: 128,
+    },
+    networkPolicy: { mode: "deny", rules: [] },
   },
-  networkPolicy: { mode: "deny", rules: [] },
+  harness: "opencode",
 });
 
-const agent = await sandbox.agents.create({ harness: "pi" });
-const run = await agent.runs.create({
+const run = await workspace.agent.runs.create({
   task: "Build the requested application in /workspace/app",
 });
 ```
@@ -120,9 +123,8 @@ The caller owns chat/session state. Appaloft owns the isolated execution, lifecy
 artifact boundary, Promotion checkpoints, and production delivery evidence.
 
 See the official [Sandbox Agent examples](https://github.com/appaloft/examples/tree/main/sandbox-agent)
-for complete Chat-to-App, human approval, and Preview-to-Promotion flows. The feature is Private
-Preview and requires an Appaloft 1.2+ control plane and matching SDK; Agent operations currently
-use a product session rather than a deploy token.
+for complete Chat-to-App, human approval, and Preview-to-Promotion flows. Workspace and Agent
+operations currently use a product session rather than a deploy token.
 
 Resource-handle methods throw `AppaloftSdkRequestError` on failure. The complete generated,
 non-throwing operation facade remains available under `appaloft.operations`.

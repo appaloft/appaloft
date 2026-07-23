@@ -4587,6 +4587,11 @@ export type TerminalSessionTargetScope =
       deployment: DeploymentSummary;
       server: ServerSummary;
       workingDirectory?: string;
+    }
+  | {
+      kind: "sandbox";
+      sandboxId: string;
+      workingDirectory?: string;
     };
 
 export interface TerminalSessionOpenRequest {
@@ -4598,10 +4603,11 @@ export interface TerminalSessionOpenRequest {
 
 export interface TerminalSessionDescriptor {
   sessionId: string;
-  scope: "server" | "resource";
-  serverId: string;
+  scope: "server" | "resource" | "sandbox";
+  serverId?: string;
   resourceId?: string;
   deploymentId?: string;
+  sandboxId?: string;
   transport: {
     kind: "websocket";
     path: string;
@@ -4639,10 +4645,11 @@ export interface ExpireTerminalSessionsResponse {
 }
 
 export interface ListTerminalSessionsInput {
-  scope?: "server" | "resource";
+  scope?: "server" | "resource" | "sandbox";
   serverId?: string;
   resourceId?: string;
   deploymentId?: string;
+  sandboxId?: string;
   limit?: number;
 }
 
@@ -4675,6 +4682,7 @@ export type TerminalSessionFrame =
 export interface TerminalSession extends AsyncIterable<TerminalSessionFrame> {
   write(data: string): Promise<void>;
   resize(input: { rows: number; cols: number }): Promise<void>;
+  detach(): Promise<void>;
   close(): Promise<void>;
 }
 

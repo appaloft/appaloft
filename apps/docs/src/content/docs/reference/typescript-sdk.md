@@ -114,8 +114,8 @@ try {
 }
 ```
 
-`Agent` 是 Sandbox Agent Runtime 的 SDK 别名。Pi 简写默认使用已准入的
-`aht_pi_managed_v1` harness template、fresh Run context 和自动生成的 idempotency key；显式传入
+`Agent` 是 Sandbox Agent Runtime 的 SDK 别名。Pi/OpenCode 简写默认使用已准入的
+`aht_pi_managed_v1`/`aht_opencode_managed_v1` harness template、fresh Run context 和自动生成的 idempotency key；显式传入
 `harnessTemplateId`、`context` 或 `idempotencyKey` 会覆盖这些 SDK 默认值。
 `agent.stream({ task })` 会创建一个 Run 并把同一 Run 的持久化事件作为 `fullStream` 返回；
 `prompt` 是方便从 AI SDK 迁移的 `task` 别名。Appaloft 不接管聊天会话：调用方仍负责保存消息和
@@ -128,6 +128,18 @@ Sandbox handle 还提供 `sandbox.files.read/write`、`sandbox.exec` 和 `sandbo
 资源方法直接返回 descriptor，失败时抛出 `AppaloftSdkRequestError`。需要完整且不抛异常的
 `{ ok, status, data/error }` facade 时使用 `appaloft.operations`，例如
 `appaloft.operations.sandboxes.create(input)`。
+
+需要一次创建 Sandbox 和 Runtime 时，可以使用公共 Workspace 入口：
+
+```ts
+const workspace = await appaloft.workspaces.create({
+  sandbox: sandboxInput,
+  harness: "opencode",
+});
+```
+
+`workspaceId` 等于 `sandboxId`。如果 Runtime 创建失败，`AppaloftWorkspaceCreateError` 仍会携带
+已创建的 id，便于重试或清理。
 
 ## 结构化错误 [#typescript-sdk-errors]
 

@@ -17,6 +17,8 @@ import {
   type Clock,
   type ExecutionContext,
   type IdGenerator,
+  type SandboxProviderRegistry,
+  type SandboxRepository,
   type ServerRepository,
   type TerminalSession,
   type TerminalSessionDescriptor,
@@ -33,10 +35,12 @@ type TerminalSpawnOptions = {
   stdout: "pipe";
   stderr: "pipe";
 };
-type TerminalSubprocess = Pick<
-  Bun.Subprocess<"pipe", "pipe", "pipe">,
-  "stdin" | "stdout" | "stderr" | "exited" | "kill"
-> & {
+type TerminalSubprocess = {
+  stdin: WritableTerminalStdin;
+  stdout: ReadableStream<Uint8Array> | null;
+  stderr: ReadableStream<Uint8Array> | null;
+  exited: Promise<number>;
+  kill(): void;
   resize?: (rows: number, cols: number) => void | Promise<void>;
 };
 type TerminalSpawn = (args: string[], options: TerminalSpawnOptions) => TerminalSubprocess;
@@ -51,8 +55,8 @@ type TerminalSessionFinalization =
     };
 type WritableTerminalStdin = {
   write(data: string | Uint8Array): void | number | Promise<void | number>;
-  flush?: () => void | Promise<void>;
-  end?: () => void | Promise<void>;
+  flush?: () => void | number | Promise<void | number>;
+  end?: () => void | number | Promise<void | number>;
 };
 type SshTerminalTarget = {
   host: string;
@@ -99,8 +103,16 @@ class TerminalSessionQueue implements AsyncIterable<TerminalSessionFrame> {
 
   [Symbol.asyncIterator](): AsyncIterator<TerminalSessionFrame> {
     const replay = this.events.length > 0 ? [] : this.retainedOutputFrames.slice();
+    let detached = false;
+    let pendingWaiter:
+      | ((result: IteratorResult<TerminalSessionFrame>) => void)
+      | undefined;
     return {
       next: () => {
+        if (detached) {
+          return Promise.resolve({ value: undefined, done: true });
+        }
+
         const replayEvent = replay.shift();
         if (replayEvent) {
           return Promise.resolve({ value: replayEvent, done: false });
@@ -116,8 +128,25 @@ class TerminalSessionQueue implements AsyncIterable<TerminalSessionFrame> {
         }
 
         return new Promise<IteratorResult<TerminalSessionFrame>>((resolve) => {
-          this.waiters.push(resolve);
+          pendingWaiter = (result) => {
+            pendingWaiter = undefined;
+            resolve(result);
+          };
+          this.waiters.push(pendingWaiter);
         });
+      },
+      return: () => {
+        detached = true;
+        if (pendingWaiter) {
+          const waiter = pendingWaiter;
+          pendingWaiter = undefined;
+          const index = this.waiters.indexOf(waiter);
+          if (index >= 0) {
+            this.waiters.splice(index, 1);
+          }
+          waiter({ value: undefined, done: true });
+        }
+        return Promise.resolve({ value: undefined, done: true });
       },
     };
   }
@@ -143,7 +172,7 @@ class TerminalSessionQueue implements AsyncIterable<TerminalSessionFrame> {
   }
 }
 
-class RuntimeTerminalSession implements TerminalSession {
+class RuntimeTerminalSession {
   private closed = false;
 
   constructor(
@@ -168,6 +197,10 @@ class RuntimeTerminalSession implements TerminalSession {
   async resize(input: { rows: number; cols: number }): Promise<void> {
     this.onActivity();
     await this.subprocess.resize?.(input.rows, input.cols);
+  }
+
+  attach(): TerminalSession {
+    return new RuntimeTerminalSessionAttachment(this, this.queue);
   }
 
   async close(): Promise<void> {
@@ -229,8 +262,43 @@ class RuntimeTerminalSession implements TerminalSession {
     await this.onFinalized(finalization);
   }
 
+}
+
+class RuntimeTerminalSessionAttachment implements TerminalSession {
+  private detached = false;
+  private readonly iterators = new Set<AsyncIterator<TerminalSessionFrame>>();
+
+  constructor(
+    private readonly session: RuntimeTerminalSession,
+    private readonly queue: TerminalSessionQueue,
+  ) {}
+
+  write(data: string): Promise<void> {
+    return this.session.write(data);
+  }
+
+  resize(input: { rows: number; cols: number }): Promise<void> {
+    return this.session.resize(input);
+  }
+
+  async detach(): Promise<void> {
+    if (this.detached) {
+      return;
+    }
+
+    this.detached = true;
+    await Promise.all([...this.iterators].map((iterator) => iterator.return?.()));
+    this.iterators.clear();
+  }
+
+  close(): Promise<void> {
+    return this.session.close();
+  }
+
   [Symbol.asyncIterator](): AsyncIterator<TerminalSessionFrame> {
-    return this.queue[Symbol.asyncIterator]();
+    const iterator = this.queue[Symbol.asyncIterator]();
+    this.iterators.add(iterator);
+    return iterator;
   }
 }
 
@@ -541,6 +609,8 @@ export class RuntimeTerminalSessionGateway implements TerminalSessionGateway {
   constructor(
     private readonly input: {
       serverRepository?: ServerRepository;
+      sandboxRepository?: SandboxRepository;
+      sandboxProviderRegistry?: SandboxProviderRegistry;
       logger?: AppLogger;
       allowTerminalSessions: boolean;
       spawnProcess?: TerminalSpawn;
@@ -567,36 +637,124 @@ export class RuntimeTerminalSessionGateway implements TerminalSessionGateway {
       );
     }
 
-    const providerKey =
-      request.scope.kind === "resource"
-        ? request.scope.deployment.runtimePlan.target.providerKey
-        : request.scope.server.providerKey;
-    const workingDirectory =
-      request.scope.kind === "resource" ? request.scope.workingDirectory : undefined;
-    const spawnSpecResult = await this.createSpawnSpec(context, request, providerKey);
+    let providerKey: string;
+    let workingDirectory: string | undefined;
+    let subprocess: TerminalSubprocess;
+    let cleanup: () => Promise<void>;
 
-    if (spawnSpecResult.isErr()) {
-      return err(spawnSpecResult.error);
+    if (request.scope.kind === "sandbox") {
+      if (!this.input.sandboxRepository || !this.input.sandboxProviderRegistry) {
+        return err(
+          domainError.terminalSessionNotConfigured(
+            "Sandbox terminal sessions require Sandbox runtime dependencies",
+            {
+              sandboxId: request.scope.sandboxId,
+            },
+          ),
+        );
+      }
+      const stored = await this.input.sandboxRepository.find(
+        toRepositoryContext(context),
+        request.scope.sandboxId,
+      );
+      if (!stored) {
+        return err(domainError.notFound("sandbox", request.scope.sandboxId));
+      }
+      const state = stored.sandbox.toState();
+      if (!stored.sandbox.canUseRuntime() || !state.providerHandle) {
+        return err(
+          domainError.terminalSessionContextMismatch(
+            "Sandbox terminal sessions require a ready Sandbox runtime",
+            {
+              sandboxId: request.scope.sandboxId,
+              sandboxStatus: state.status.value,
+            },
+          ),
+        );
+      }
+      const provider = this.input.sandboxProviderRegistry.get(stored.providerKey);
+      if (!provider?.openTerminal) {
+        return err(
+          domainError.terminalSessionUnsupported(
+            "Sandbox provider does not support terminal sessions",
+            {
+              sandboxId: request.scope.sandboxId,
+              providerKey: stored.providerKey,
+            },
+          ),
+        );
+      }
+      try {
+        const terminal = await provider.openTerminal({
+          sandboxId: request.scope.sandboxId,
+          providerHandle: state.providerHandle,
+          ...(request.scope.workingDirectory
+            ? { cwd: request.scope.workingDirectory }
+            : {}),
+          initialRows: request.initialRows,
+          initialCols: request.initialCols,
+        });
+        providerKey = stored.providerKey;
+        workingDirectory = request.scope.workingDirectory;
+        subprocess = terminal;
+        cleanup = terminal.cleanup ?? (async () => {});
+      } catch (error) {
+        return err(
+          domainError.terminalSessionFailed("Failed to start Sandbox terminal session", {
+            phase: "terminal-session-sandbox-start",
+            sandboxId: request.scope.sandboxId,
+            message: error instanceof Error ? error.message : String(error),
+          }),
+        );
+      }
+    } else {
+      providerKey =
+        request.scope.kind === "resource"
+          ? request.scope.deployment.runtimePlan.target.providerKey
+          : request.scope.server.providerKey;
+      workingDirectory =
+        request.scope.kind === "resource" ? request.scope.workingDirectory : undefined;
+      const spawnSpecResult = await this.createSpawnSpec(context, request, providerKey);
+
+      if (spawnSpecResult.isErr()) {
+        return err(spawnSpecResult.error);
+      }
+
+      const spawnSpec = spawnSpecResult.value;
+      try {
+        subprocess = (this.input.spawnProcess ?? Bun.spawn)(spawnSpec.args, {
+          ...(spawnSpec.cwd ? { cwd: spawnSpec.cwd } : {}),
+          stdin: "pipe",
+          stdout: "pipe",
+          stderr: "pipe",
+        });
+        cleanup = spawnSpec.cleanup;
+      } catch (error) {
+        await spawnSpec.cleanup();
+        return err(
+          domainError.terminalSessionFailed("Failed to start terminal session", {
+            phase: "terminal-session-start",
+            message: error instanceof Error ? error.message : String(error),
+          }),
+        );
+      }
     }
-
-    const spawnSpec = spawnSpecResult.value;
     const queue = new TerminalSessionQueue(this.outputRetentionBytes());
 
     try {
-      const subprocess = (this.input.spawnProcess ?? Bun.spawn)(spawnSpec.args, {
-        ...(spawnSpec.cwd ? { cwd: spawnSpec.cwd } : {}),
-        stdin: "pipe",
-        stdout: "pipe",
-        stderr: "pipe",
-      });
       const summary = {
         sessionId: request.sessionId,
         scope: request.scope.kind,
-        serverId: request.scope.server.id,
+        ...(request.scope.kind !== "sandbox" ? { serverId: request.scope.server.id } : {}),
         ...(request.scope.kind === "resource"
           ? {
               resourceId: request.scope.resource.id,
               deploymentId: request.scope.deployment.id,
+            }
+          : {}),
+        ...(request.scope.kind === "sandbox"
+          ? {
+              sandboxId: request.scope.sandboxId,
             }
           : {}),
         transport: {
@@ -617,7 +775,7 @@ export class RuntimeTerminalSessionGateway implements TerminalSessionGateway {
       const session = new RuntimeTerminalSession(
         subprocess,
         queue,
-        spawnSpec.cleanup,
+        cleanup,
         async (finalization) => {
           this.sessions.delete(request.sessionId);
           await this.recordSessionClosedAudit(context, summary, finalization);
@@ -640,7 +798,7 @@ export class RuntimeTerminalSessionGateway implements TerminalSessionGateway {
 
       return ok(summary);
     } catch (error) {
-      await spawnSpec.cleanup();
+      await cleanup();
       return err(
         domainError.terminalSessionFailed("Failed to start terminal session", {
           phase: "terminal-session-start",
@@ -654,7 +812,7 @@ export class RuntimeTerminalSessionGateway implements TerminalSessionGateway {
     const entry = this.sessions.get(sessionId);
 
     return entry
-      ? ok(entry.session)
+      ? ok(entry.session.attach())
       : err(
           domainError.terminalSessionNotFound("Terminal session was not found", {
             sessionId,
@@ -663,10 +821,11 @@ export class RuntimeTerminalSessionGateway implements TerminalSessionGateway {
   }
 
   list(input?: {
-    scope?: "server" | "resource";
+    scope?: "server" | "resource" | "sandbox";
     serverId?: string;
     resourceId?: string;
     deploymentId?: string;
+    sandboxId?: string;
     limit?: number;
   }): TerminalSessionSummary[] {
     const limit = input?.limit ?? 50;
@@ -678,6 +837,7 @@ export class RuntimeTerminalSessionGateway implements TerminalSessionGateway {
       .filter((summary) =>
         input?.deploymentId ? summary.deploymentId === input.deploymentId : true,
       )
+      .filter((summary) => (input?.sandboxId ? summary.sandboxId === input.sandboxId : true))
       .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
       .slice(0, limit);
   }
@@ -744,6 +904,17 @@ export class RuntimeTerminalSessionGateway implements TerminalSessionGateway {
     request: TerminalSessionOpenRequest,
     providerKey: string,
   ): Promise<Result<{ args: string[]; cwd?: string; cleanup: () => Promise<void> }>> {
+    if (request.scope.kind === "sandbox") {
+      return err(
+        domainError.terminalSessionUnsupported(
+          "Sandbox terminal sessions must use a Sandbox provider",
+          {
+            sandboxId: request.scope.sandboxId,
+            providerKey,
+          },
+        ),
+      );
+    }
     switch (providerKey) {
       case "local-shell": {
         const metadata = runtimeMetadata(request);
@@ -951,19 +1122,21 @@ export class RuntimeTerminalSessionGateway implements TerminalSessionGateway {
 
     const result = await recorder.record(toRepositoryContext(context), {
       id: auditEventId,
-      aggregateId: summary.resourceId ?? summary.serverId,
+      aggregateId:
+        summary.resourceId ?? summary.sandboxId ?? summary.serverId ?? summary.sessionId,
       eventType: input.eventType,
       payload: {
         ...input.payload,
         sessionId: summary.sessionId,
         scope: summary.scope,
-        serverId: summary.serverId,
         providerKey: summary.providerKey,
         entrypoint: context.entrypoint,
         requestId: context.requestId,
         ...(context.actor ? { actorKind: context.actor.kind, actorId: context.actor.id } : {}),
         ...(summary.resourceId ? { resourceId: summary.resourceId } : {}),
         ...(summary.deploymentId ? { deploymentId: summary.deploymentId } : {}),
+        ...(summary.serverId ? { serverId: summary.serverId } : {}),
+        ...(summary.sandboxId ? { sandboxId: summary.sandboxId } : {}),
       },
       createdAt: this.now(),
     });

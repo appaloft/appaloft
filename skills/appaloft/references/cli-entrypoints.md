@@ -38,6 +38,10 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
   `--preview <previewEnvironmentId>` on logs, health, diagnostics, effective config, runtime
   control, and terminal commands when the user is operating a preview rather than its parent
   resource.
+- `appaloft workspace create/list/show/pause/resume/terminate/terminal/preview` is a public
+  convenience workflow over the Sandbox, Agent Runtime, Terminal Session, and Sandbox Port
+  operations below. Its `workspaceId` is the underlying `sandboxId`; do not invent a Workspace
+  aggregate or Cloud-only operation.
 
 ## Catalog
 
@@ -199,7 +203,7 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft resource log-archives show <archiveId>` - `resources.runtime-log-archives.show`
 - `appaloft resource log-archives prune --before <iso>` - `resources.runtime-log-archives.prune`
 - `appaloft resource runtime-control-attempts prune --before <iso>` - `resources.runtime-control-attempts.prune`
-- `appaloft server terminal <serverId>; appaloft resource terminal [resourceId] [--preview <previewEnvironmentId>]` - `terminal-sessions.open`
+- `appaloft server terminal <serverId>; appaloft resource terminal [resourceId] [--preview <previewEnvironmentId>]; appaloft sandbox terminal <sandboxId>` - `terminal-sessions.open`
 - `appaloft terminal-session list` - `terminal-sessions.list`
 - `appaloft terminal-session show <sessionId>` - `terminal-sessions.show`
 - `appaloft terminal-session close <sessionId>` - `terminal-sessions.close`

@@ -2133,7 +2133,7 @@ export const operationCatalog = [
     inputSchema: openTerminalSessionCommandInputSchema,
     serviceToken: tokens.openTerminalSessionUseCase,
     transports: {
-      cli: "appaloft server terminal <serverId>; appaloft resource terminal [resourceId] [--preview <previewEnvironmentId>]",
+      cli: "appaloft server terminal <serverId>; appaloft resource terminal [resourceId] [--preview <previewEnvironmentId>]; appaloft sandbox terminal <sandboxId>",
       orpc: { method: "POST", path: "/api/terminal-sessions" },
     },
   },

@@ -113,6 +113,7 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-091: Execution Sandbox Boundary](./ADR-091-execution-sandbox-boundary.md) | Accepted | Defines provider-neutral isolated execution, lifecycle, process/file/port capability, network and credential policy, templates, snapshots, reconciliation, and safe public handles without creating an Agent Runtime or exposing host access. |
 | [ADR-092: Sandbox Agent Runtime And Application Promotion Boundary](./ADR-092-sandbox-agent-runtime-and-application-promotion-boundary.md) | Accepted | Defines Runtime/Run ownership under Sandbox, immutable Source Artifact, exact Candidate Preview, explicit Promotion, and proof-gated completion. |
 | [ADR-093: AI Application Delivery Positioning And Claim Boundary](./ADR-093-ai-application-delivery-positioning-and-claim-boundary.md) | Accepted | Defines the AI application delivery category, public maturity labels, product path, and bounded Delivery Evidence Chain claim. |
+| [ADR-094: Agent Workspace Entry Workflow](./ADR-094-agent-workspace-entry-workflow.md) | Accepted | Defines Agent Workspace as a public workflow over Sandbox, Agent Runtime, Terminal Session and expiring port operations, with Pi and OpenCode as adapters rather than a Cloud-only aggregate. |
 
 ## Authoring Rules
 

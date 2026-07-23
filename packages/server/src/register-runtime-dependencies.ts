@@ -1898,6 +1898,8 @@ export function registerRuntimeDependencies(
           idGenerator: dependencyContainer.resolve(tokens.idGenerator),
           logger: dependencyContainer.resolve(tokens.logger),
           serverRepository: dependencyContainer.resolve(tokens.serverRepository),
+          sandboxRepository: dependencyContainer.resolve(tokens.sandboxRepository),
+          sandboxProviderRegistry: dependencyContainer.resolve(tokens.sandboxProviderRegistry),
         }),
     ),
   });

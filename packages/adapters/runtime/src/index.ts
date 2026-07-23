@@ -102,6 +102,7 @@ export {
 } from "./docker-sandbox-provider";
 export { HermeticSandboxProvider } from "./execution-sandbox-provider";
 export * from "./pi-sandbox-agent-harness";
+export * from "./opencode-sandbox-agent-harness";
 
 export { RuntimeServerConnectivityChecker } from "./server-connectivity";
 export { RuntimeDeploymentHealthChecker } from "./deployment-health";

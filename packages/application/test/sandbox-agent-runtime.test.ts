@@ -120,6 +120,52 @@ function fixture(
 }
 
 describe("SandboxAgentDeliveryService", () => {
+  test("[AGENT-WS-START-009] persists failed startup and invokes harness termination", async () => {
+    const failedHarness: SandboxAgentHarness = {
+      key: "failed",
+      templateId: "aht_fake_1",
+      version: "1.0.0",
+      templateDigest: `sha256:${"a".repeat(64)}`,
+      async prepareRuntime() {
+        throw new Error("server did not start");
+      },
+      async execute() {
+        return { events: [], outcomeDigest: "sha256:unreachable" };
+      },
+      async cancel() {},
+    };
+    const failedFixture = fixture({ harness: failedHarness });
+    const failed = await failedFixture.service.createRuntime(context, {
+      sandboxId: "sbx_demo",
+      harnessKey: "failed",
+      harnessTemplateId: "aht_fake_1",
+      idempotencyKey: "runtime_failed",
+    });
+    expect(failed.isErr()).toBe(true);
+    expect(
+      (await failedFixture.service.listRuntimes(context, "sbx_demo"))._unsafeUnwrap().items,
+    ).toEqual([expect.objectContaining({ harnessKey: "failed", status: "failed" })]);
+
+    let terminated = false;
+    const readyHarness: SandboxAgentHarness = {
+      ...failedHarness,
+      key: "ready",
+      async prepareRuntime() {},
+      async terminateRuntime() {
+        terminated = true;
+      },
+    };
+    const readyFixture = fixture({ harness: readyHarness });
+    await readyFixture.service.createRuntime(context, {
+      sandboxId: "sbx_demo",
+      harnessKey: "ready",
+      harnessTemplateId: "aht_fake_1",
+      idempotencyKey: "runtime_ready",
+    });
+    await readyFixture.service.terminateRuntime(context, "sbx_demo", "sar_test");
+    expect(terminated).toBe(true);
+  });
+
   test("[PROMOTION-SCOPE-001] runtime-style deploy tokens cannot resolve external intent", async () => {
     const { service } = fixture();
     const runtimeIdentity = createExecutionContext({

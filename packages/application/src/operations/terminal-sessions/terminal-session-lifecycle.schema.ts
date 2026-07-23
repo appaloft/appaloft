@@ -13,10 +13,11 @@ const terminalSessionLimitSchema = z
   .optional();
 
 export const listTerminalSessionsQueryInputSchema = z.object({
-  scope: z.enum(["server", "resource"]).optional(),
+  scope: z.enum(["server", "resource", "sandbox"]).optional(),
   serverId: z.string().trim().min(1).optional(),
   resourceId: z.string().trim().min(1).optional(),
   deploymentId: z.string().trim().min(1).optional(),
+  sandboxId: z.string().trim().min(1).optional(),
   limit: terminalSessionLimitSchema,
 });
 
