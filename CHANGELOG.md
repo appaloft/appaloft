@@ -5,8 +5,6 @@
 
 ### Bug Fixes
 
-* **release:** confirm reusable public launch smokes ([4c2540d](https://github.com/appaloft/appaloft/commit/4c2540db475f2701e3daddef59b39720d7e5a228))
-* **release:** confirm reusable public launch smokes ([4c2540d](https://github.com/appaloft/appaloft/commit/4c2540db475f2701e3daddef59b39720d7e5a228))
 * **release:** confirm reusable public launch smokes ([613a1dc](https://github.com/appaloft/appaloft/commit/613a1dc603899377252ffcc9a2dc4d43d42845be))
 
 ## [1.3.0](https://github.com/appaloft/appaloft/compare/v1.2.0...v1.3.0) (2026-07-23)
