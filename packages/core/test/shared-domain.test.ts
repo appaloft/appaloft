@@ -45,6 +45,84 @@ describe("Shared domain errors", () => {
       details: { projectId: "prj_demo" },
     });
   });
+
+  test("[CORE-SHARED-ERR-002] catalog errors keep unique codes and expected categories", () => {
+    const samples = [
+      domainError.resourceContextMismatch("ctx"),
+      domainError.resourceDependencyBindingContextMismatch("bind-ctx"),
+      domainError.resourceDependencyBindingRotationBlocked("rotate"),
+      domainError.resourceRuntimeLogsContextMismatch("logs-ctx"),
+      domainError.resourceRuntimeLogsUnavailable("logs-unavail"),
+      domainError.resourceRuntimeLogsNotConfigured("logs-missing"),
+      domainError.resourceRuntimeLogStreamFailed("logs-stream"),
+      domainError.resourceRuntimeLogCancelled("logs-cancel"),
+      domainError.terminalSessionContextMismatch("term-ctx"),
+      domainError.terminalSessionWorkspaceUnavailable("term-ws"),
+      domainError.terminalSessionNotConfigured("term-cfg"),
+      domainError.terminalSessionUnsupported("term-unsup"),
+      domainError.terminalSessionPolicyDenied("term-policy"),
+      domainError.terminalSessionFailed("term-fail"),
+      domainError.terminalSessionNotFound("term-missing"),
+      domainError.resourceDiagnosticContextMismatch("diag-ctx"),
+      domainError.resourceDiagnosticUnavailable("diag-unavail"),
+      domainError.resourceDiagnosticRedactionFailed("diag-redact"),
+      domainError.resourceAccessFailureEvidenceUnavailable("access-evidence"),
+      domainError.resourceHealthUnavailable("health-unavail"),
+      domainError.resourceHealthAggregationFailed("health-agg"),
+      domainError.resourceSlugConflict("slug"),
+      domainError.resourceArchived("archived"),
+      domainError.resourceAutoDeploySourceMissing("auto-source"),
+      domainError.resourceAutoDeployPolicyBlocked("auto-block"),
+      domainError.resourceAutoDeploySecretRequired("auto-secret"),
+      domainError.resourceAutoDeploySecretUnavailable("auto-secret-miss"),
+      domainError.sourceEventScopeRequired("src-scope"),
+      domainError.sourceEventNotFound("src-missing"),
+      domainError.sourceEventReadUnavailable("src-read"),
+      domainError.auditEventScopeRequired("audit-scope"),
+      domainError.auditEventNotFound("audit-missing"),
+      domainError.serverInactive("server-inactive"),
+      domainError.serverDeleteBlocked("server-delete"),
+      domainError.projectSlugConflict("project-slug"),
+      domainError.projectDeleteBlocked("project-delete"),
+      domainError.environmentArchived("env-archived"),
+      domainError.environmentLocked("env-locked"),
+      domainError.resourceDeleteBlocked("resource-delete"),
+      domainError.dependencyResourceDeleteBlocked("dep-delete"),
+      domainError.dependencyResourceBackupBlocked("dep-backup"),
+      domainError.dependencyResourceRestoreBlocked("dep-restore"),
+      domainError.deploymentNotRedeployable("no-redeploy"),
+      domainError.deploymentNotRetryable("no-retry"),
+      domainError.deploymentNotRollbackReady("no-rollback"),
+      domainError.deploymentCancelNotAllowed("no-cancel"),
+      domainError.domainBindingContextMismatch("domain-ctx"),
+      domainError.domainVerificationNotPending("domain-pending"),
+      domainError.domainOwnershipUnverified("domain-owner"),
+      domainError.dnsLookupFailed("dns-lookup"),
+      domainError.certificateNotAllowed("cert-deny"),
+      domainError.certificateAttemptConflict("cert-conflict"),
+      domainError.certificateProviderUnavailable("cert-provider"),
+      domainError.proxyProviderUnavailable("proxy-provider"),
+    ];
+
+    const codes = samples.map((error) => error.code);
+    expect(new Set(codes).size).toBe(codes.length);
+    expect(
+      samples.every((error) => typeof error.message === "string" && error.message.length > 0),
+    ).toBe(true);
+    expect(
+      samples
+        .filter((error) => error.category === "provider" || error.retryable)
+        .map((error) => error.code),
+    ).toEqual(
+      expect.arrayContaining([
+        "resource_runtime_logs_not_configured",
+        "resource_runtime_log_stream_failed",
+        "certificate_provider_unavailable",
+        "proxy_provider_unavailable",
+        "dns_lookup_failed",
+      ]),
+    );
+  });
 });
 
 describe("Shared value objects", () => {
