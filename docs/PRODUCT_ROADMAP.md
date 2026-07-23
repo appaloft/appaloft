@@ -52,10 +52,10 @@ Version plan:
 Current release alignment:
 
 <!-- release-alignment:start -->
-- [x] On 2026-07-23, the latest public release is `v1.3.0`; root package
-  and Release Please manifest on `main` are `1.3.0`; the release PR target is
-  `1.3.1`.
-- [x] On 2026-07-23, the roadmap gate allows `Release-As: 1.3.1` because
+- [x] On 2026-07-23, the latest public release is `v1.3.1`; root package
+  and Release Please manifest on `main` are `1.3.1`; the release PR target is
+  `1.3.2`.
+- [x] On 2026-07-23, the roadmap gate allows `Release-As: 1.3.2` because
   Phase 0 through Phase 12 release rules, required items, and exit criteria are checked.
 <!-- release-alignment:end -->
 
