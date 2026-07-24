@@ -14,12 +14,16 @@ import { ok, type Result } from "@appaloft/core";
 import { ShellGitHubPreviewFeedbackWriter } from "../src/register-runtime-dependencies";
 
 class StubIntegrationAuthPort implements IntegrationAuthPort {
+  readonly requests: Array<{ accessTokenKind?: "installation" | "user" }> = [];
+
   constructor(private readonly accessToken: string | null) {}
 
   async getProviderAccessToken(
     _context: ExecutionContext,
     _providerKey: "github",
+    request?: { accessTokenKind?: "installation" | "user" },
   ): Promise<string | null> {
+    this.requests.push(request ?? {});
     return this.accessToken;
   }
 }
@@ -57,8 +61,9 @@ function previewFeedbackInput(): PreviewFeedbackWriterInput {
 describe("ShellGitHubPreviewFeedbackWriter", () => {
   test("[PG-PREVIEW-FEEDBACK-001] uses worker token when no request-scoped GitHub token exists", async () => {
     const usedTokens: string[] = [];
+    const integrationAuthPort = new StubIntegrationAuthPort(null);
     const writer = new ShellGitHubPreviewFeedbackWriter(
-      new StubIntegrationAuthPort(null),
+      integrationAuthPort,
       "worker-token",
       (accessToken) => new CapturingPreviewFeedbackWriter(accessToken, usedTokens),
     );
@@ -72,13 +77,15 @@ describe("ShellGitHubPreviewFeedbackWriter", () => {
     );
 
     expect(result._unsafeUnwrap()).toEqual({ providerFeedbackId: "feedback_1" });
+    expect(integrationAuthPort.requests).toEqual([{ accessTokenKind: "installation" }]);
     expect(usedTokens).toEqual(["worker-token"]);
   });
 
-  test("[PG-PREVIEW-FEEDBACK-001] prefers request-scoped GitHub token over worker token", async () => {
+  test("[PG-PREVIEW-CREDENTIAL-001] requests an installation token before worker fallback", async () => {
     const usedTokens: string[] = [];
+    const integrationAuthPort = new StubIntegrationAuthPort("installation-token");
     const writer = new ShellGitHubPreviewFeedbackWriter(
-      new StubIntegrationAuthPort("request-token"),
+      integrationAuthPort,
       "worker-token",
       (accessToken) => new CapturingPreviewFeedbackWriter(accessToken, usedTokens),
     );
@@ -92,7 +99,8 @@ describe("ShellGitHubPreviewFeedbackWriter", () => {
     );
 
     expect(result._unsafeUnwrap()).toEqual({ providerFeedbackId: "feedback_1" });
-    expect(usedTokens).toEqual(["request-token"]);
+    expect(integrationAuthPort.requests).toEqual([{ accessTokenKind: "installation" }]);
+    expect(usedTokens).toEqual(["installation-token"]);
   });
 
   test("[PG-PREVIEW-FEEDBACK-001] returns safe configuration error without a request or worker token", async () => {

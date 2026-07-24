@@ -51,6 +51,7 @@ admission, and durable cleanup retry state.
 | PG-PREVIEW-CONFIG-001 | integration | Scoped preview configuration | Policy defines preview-only variables, secret refs, and route/domain rules | Preview materialization uses only preview-scoped values and safe references; production secrets/routes are not copied by default | `validation_error` or `permission`, phase `preview-config-resolution` |
 | PG-PREVIEW-DEPLOY-001 | application | Deployment dispatch remains ids-only | Preview environment context is resolved | `deployments.create` receives only project/environment/resource/server/destination ids; PR, branch, source, route, and preview details remain read-model/process context | None |
 | PG-PREVIEW-FEEDBACK-001 | integration | Feedback idempotency and retry | Existing PR comment/check/status exists or provider update fails transiently | Feedback is updated in place when possible; retryable provider failures record feedback retry state without rewriting accepted deployment result | `provider_error`, phase `preview-feedback`, retriable by provider classification |
+| PG-PREVIEW-CREDENTIAL-001 | integration | Preview worker credential rehydration | A preview feedback operation has tenant context while the safe connection projection and request scope contain no installation token | The feedback writer explicitly requests a short-lived GitHub App installation token, does not select user OAuth, never persists or returns token material, and uses the configured worker token only as a compatibility fallback | `validation_error`, phase `preview-feedback`, when neither installation nor fallback credential is available |
 | PG-PREVIEW-PROVIDER-001 | provider smoke | Live GitHub PR comment feedback gate | `APPALOFT_GITHUB_PREVIEW_PROVIDER_SMOKE=true` and GitHub smoke secrets identify a repository, pull request, and feedback token | The GitHub PR-comment writer creates or updates a marker comment through the live provider API, returns only safe provider feedback metadata, and the reusable Actions gate skips unless secrets exist or a manual run marks it required | `provider_error`, phase `preview-feedback`, retriable by provider classification |
 | PG-PREVIEW-CLEANUP-001 | process | Close/delete cleanup preserves history | PR is closed or `preview-environments.delete` is accepted for an active preview | Runtime, route desired state, source link, provider metadata, and feedback are cleaned or marked already clean; deployment history/audit remain readable | None |
 | PG-PREVIEW-CLEANUP-002 | process | Cleanup retry state | Runtime cleanup, provider metadata deletion, or feedback update fails transiently | Cleanup attempt records safe phase, attempt id, retry owner, next retry time, and sanitized detail; process-attempt retry generation creates a pending retry attempt; cleanup executes only after atomic claim and records completion or retry scheduling through process-attempt completion | `infra_error` or `provider_error`, phase `preview-cleanup-retry` |
@@ -142,16 +143,17 @@ preview deployment by resolving the pull-request head SHA when automatic process
 has no deployment id yet, reuses that deployment id for later append-only status updates, returns
 safe retryable provider errors without response bodies/tokens, and routes all supported channels
 through the composite GitHub writer.
-Shell wiring registers a GitHub preview feedback writer that obtains a request-scoped GitHub
-access token through the existing integration auth port when available, or falls back to the
-explicit preview feedback worker token for webhook and scheduler execution contexts, before
-delegating to the composite GitHub feedback writer.
-`apps/shell/test/github-preview-feedback-writer.test.ts` covers the shell feedback transport for
-webhook/scheduler worker contexts: request-scoped GitHub tokens are preferred when present,
-`APPALOFT_GITHUB_PREVIEW_FEEDBACK_TOKEN` is used when no request auth scope exists, and missing
-token configuration returns a safe `preview-feedback` validation error without leaking token
-material. `packages/config/test/index.test.ts` covers parsing that worker token from runtime
-configuration.
+Shell wiring registers a GitHub preview feedback writer that explicitly requests a short-lived
+installation token through the existing integration auth port, using tenant context instead of
+browser-safe connection projections or user OAuth. It falls back to the explicit preview feedback
+worker token only when no installation credential can be minted, before delegating to the
+composite GitHub feedback writer.
+`packages/server/test/github-app-source-auth.test.ts` and
+`apps/shell/test/github-preview-feedback-writer.test.ts` cover the credential boundary: feedback
+requests `accessTokenKind: "installation"`, installation credentials win over the compatibility
+worker token, the worker token is used only when installation minting is unavailable, and missing
+credentials return a safe `preview-feedback` validation error without leaking token material.
+`packages/config/test/index.test.ts` covers parsing that fallback token from runtime configuration.
 `PG-PREVIEW-CLEANUP-001` has initial core and application coverage in
 `packages/core/test/preview-environment.test.ts` and
 `packages/application/test/product-grade-preview-policy.test.ts`. The coverage proves cleanup

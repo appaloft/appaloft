@@ -902,19 +902,20 @@ export class ShellGitHubPreviewFeedbackWriter implements PreviewFeedbackWriter {
     context: ExecutionContext,
     input: PreviewFeedbackWriterInput,
   ): Promise<Result<PreviewFeedbackWriterResult>> {
-    const requestAccessToken = await this.integrationAuthPort.getProviderAccessToken(
+    const installationAccessToken = await this.integrationAuthPort.getProviderAccessToken(
       context,
       "github",
+      { accessTokenKind: "installation" },
     );
-    const accessToken = requestAccessToken?.trim()
-      ? requestAccessToken
+    const accessToken = installationAccessToken?.trim()
+      ? installationAccessToken
       : this.workerAccessToken?.trim()
         ? this.workerAccessToken
         : undefined;
     if (!accessToken) {
       return err(
         domainError.validation(
-          "GitHub account or preview feedback worker token is not configured",
+          "GitHub App installation or preview feedback worker token is not configured",
           {
             phase: "preview-feedback",
             provider: "github",
