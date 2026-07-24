@@ -18,6 +18,10 @@ Project, Environment, Resource, Deployment, DomainBinding, or DeploymentTarget i
 `install.sh` owns a special self-hosted **instance bootstrap route** for the Appaloft console.
 
 - The installer defaults to a resident Traefik edge proxy.
+- The installer-managed resident Traefik proxy uses the exact reviewed default owned by the
+  Traefik edge proxy provider contract. Rerunning the installer reconciles an Appaloft-managed
+  proxy to that default; an explicitly overridden image or an externally managed proxy remains
+  operator-owned.
 - When `--domain <domain>` is supplied, the installer writes a Traefik console route from that
   domain to the Appaloft app service and sets `APPALOFT_WEB_ORIGIN=https://<domain>`.
 - When no domain is supplied, the installer keeps the console reachable through a direct host port

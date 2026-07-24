@@ -100,6 +100,12 @@ The provider owns the proxy-specific ensure plan. Runtime execution owns how the
 Provider ensure plans may mutate only provider-owned proxy assets and must not mutate user workload
 containers.
 
+The provider-owned ensure plan must use an exact reviewed proxy image patch tag. Its installed-image
+readiness guard must compare against that exact image so an older or otherwise incompatible
+Appaloft-managed proxy is replaced through the same idempotent bootstrap path. The self-hosted
+installer default and real-provider smoke fixtures must remain synchronized with the provider
+baseline; compatibility smokes on another supported line must also use an exact reviewed patch tag.
+
 ## Runtime Failure Classification
 
 Runtime executors must translate expected proxy execution failures into stable Appaloft error codes

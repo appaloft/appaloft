@@ -505,7 +505,11 @@ function removeSmokeEdgeProxy(): void {
 
 function prepareSmokeEdgeProxy(input: { edgeNetworkName: string; publishedPort: string }): void {
   removeSmokeEdgeProxy();
-  commandOutput(["docker", "pull", Bun.env.APPALOFT_DOCKER_SWARM_TRAEFIK_IMAGE ?? "traefik:v2.11"]);
+  commandOutput([
+    "docker",
+    "pull",
+    Bun.env.APPALOFT_DOCKER_SWARM_TRAEFIK_IMAGE ?? "traefik:v2.11.52",
+  ]);
   commandOutput([
     "docker",
     "service",
@@ -520,7 +524,7 @@ function prepareSmokeEdgeProxy(input: { edgeNetworkName: string; publishedPort: 
     `published=${input.publishedPort},target=80,mode=host`,
     "--mount",
     "type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock,readonly",
-    Bun.env.APPALOFT_DOCKER_SWARM_TRAEFIK_IMAGE ?? "traefik:v2.11",
+    Bun.env.APPALOFT_DOCKER_SWARM_TRAEFIK_IMAGE ?? "traefik:v2.11.52",
     "--providers.docker=true",
     "--providers.docker.swarmMode=true",
     "--providers.docker.exposedByDefault=false",
