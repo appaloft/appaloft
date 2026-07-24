@@ -1,26 +1,43 @@
 import {
+  AcquireWorkspaceWriterLeaseCommand,
+  AddWorkspaceCollaborationLaneCommand,
+  AddWorkspaceCollaborationParticipantCommand,
   ApproveAgentTaskRunCommand,
+  ArchiveWorkspaceCollaborationLaneCommand,
   CancelAgentTaskRunCommand,
+  ChangeWorkspaceCollaborationParticipantRoleCommand,
+  CloseWorkspaceCollaborationCommand,
   CreateAgentTaskRunCommand,
   CreateSandboxAgentRuntimeCommand,
   CreateSandboxCommand,
+  CreateWorkspaceCollaborationCommand,
   DeliverAgentTaskRunCommand,
   ExecuteSandboxCommand,
   ExposeSandboxPortCommand,
   IssueSandboxAgentAttachAccessCommand,
+  IssueWorkspaceCollaborationNativeAttachCommand,
+  IssueWorkspaceCollaborationTerminalAccessCommand,
   ListAgentTaskRunsQuery,
   ListSandboxAgentHarnessesQuery,
   ListSandboxAgentRuntimesQuery,
   ListSandboxesQuery,
+  ListWorkspaceCollaborationsQuery,
+  OfferWorkspaceCollaborationHandoffCommand,
   OpenTerminalSessionCommand,
   PauseSandboxCommand,
+  ReleaseWorkspaceWriterLeaseCommand,
+  RemoveWorkspaceCollaborationParticipantCommand,
+  RenewWorkspaceWriterLeaseCommand,
+  ResolveWorkspaceCollaborationHandoffCommand,
   ResumeAgentTaskRunCommand,
   ResumeSandboxCommand,
   ShowAgentTaskRunQuery,
   ShowSandboxQuery,
   ShowTerminalSessionQuery,
+  ShowWorkspaceCollaborationQuery,
   TerminateSandboxAgentRuntimeCommand,
   TerminateSandboxCommand,
+  TransferWorkspaceWriterLeaseCommand,
 } from "@appaloft/application";
 import { domainError } from "@appaloft/core";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
@@ -47,6 +64,20 @@ const terminalSessionId = Options.text("session-id").pipe(Options.optional);
 const repository = Options.text("repo").pipe(Options.optional);
 const repositoryRef = Options.text("ref").pipe(Options.optional);
 const workspaceBranch = Options.text("branch").pipe(Options.optional);
+const collaborationId = Args.text({ name: "collaborationId" });
+const collaborationLaneId = Options.text("lane-id");
+const collaborationRole = Options.choice("role", [
+  "owner",
+  "editor",
+  "reviewer",
+  "viewer",
+] as const);
+const collaborationPurpose = Options.choice("purpose", [
+  "builder",
+  "reviewer",
+  "tester",
+  "custom",
+] as const);
 
 interface SandboxResult {
   readonly sandboxId: string;
@@ -128,6 +159,11 @@ function validateGitRef(value: string | undefined, label: string): string | unde
     throw domainError.validation(`Workspace ${label} is invalid`);
   }
   return normalized;
+}
+
+function requireOption(value: string | undefined, label: string): string {
+  if (value?.trim()) return value.trim();
+  throw domainError.validation(`${label} is required`);
 }
 
 function repositoryNetworkRules(locator: string): Array<{
@@ -712,6 +748,333 @@ const harness = EffectCommand.make("harness").pipe(
   EffectCommand.withSubcommands([harnessList]),
 );
 
+const collaborationCreate = EffectCommand.make(
+  "create",
+  {
+    name: Options.text("name"),
+    workspaceId: Options.text("workspace-id"),
+    lanePurpose: Options.choice("lane-purpose", [
+      "builder",
+      "reviewer",
+      "tester",
+      "custom",
+    ] as const).pipe(Options.withDefault("builder")),
+    laneLabel: Options.text("lane-label").pipe(Options.withDefault("Builder")),
+    branch: Options.text("branch").pipe(Options.optional),
+  },
+  ({ branch, laneLabel, lanePurpose, name, workspaceId }) =>
+    runCommand(
+      CreateWorkspaceCollaborationCommand.create({
+        name,
+        workspaceId,
+        lanePurpose,
+        laneLabel,
+        ...(optionalValue(branch) ? { branch: optionalValue(branch) } : {}),
+      }),
+    ),
+);
+
+const collaborationList = EffectCommand.make("list", {}, () =>
+  runQuery(ListWorkspaceCollaborationsQuery.create({})),
+);
+
+const collaborationShow = EffectCommand.make("show", { collaborationId }, ({ collaborationId }) =>
+  runQuery(ShowWorkspaceCollaborationQuery.create({ collaborationId })),
+);
+
+const collaborationParticipantAdd = EffectCommand.make(
+  "add",
+  {
+    collaborationId,
+    subjectKind: Options.choice("subject-kind", ["user", "agent-runtime"] as const),
+    subjectId: Options.text("subject-id").pipe(Options.optional),
+    runtimeId: Options.text("runtime-id").pipe(Options.optional),
+    workspaceId: Options.text("workspace-id").pipe(Options.optional),
+    role: collaborationRole,
+  },
+  ({ collaborationId, role, runtimeId, subjectId, subjectKind, workspaceId }) => {
+    const subject =
+      subjectKind === "user"
+        ? {
+            kind: "user" as const,
+            subjectId: requireOption(optionalValue(subjectId), "--subject-id"),
+          }
+        : {
+            kind: "agent-runtime" as const,
+            runtimeId: requireOption(optionalValue(runtimeId), "--runtime-id"),
+            workspaceId: requireOption(optionalValue(workspaceId), "--workspace-id"),
+          };
+    return runCommand(
+      AddWorkspaceCollaborationParticipantCommand.create({
+        collaborationId,
+        subject,
+        role,
+      }),
+    );
+  },
+);
+
+const collaborationParticipantRole = EffectCommand.make(
+  "role",
+  {
+    collaborationId,
+    participantId: Options.text("participant-id"),
+    role: collaborationRole,
+  },
+  ({ collaborationId, participantId, role }) =>
+    runCommand(
+      ChangeWorkspaceCollaborationParticipantRoleCommand.create({
+        collaborationId,
+        participantId,
+        role,
+      }),
+    ),
+);
+
+const collaborationParticipantRemove = EffectCommand.make(
+  "remove",
+  {
+    collaborationId,
+    participantId: Options.text("participant-id"),
+  },
+  ({ collaborationId, participantId }) =>
+    runCommand(
+      RemoveWorkspaceCollaborationParticipantCommand.create({
+        collaborationId,
+        participantId,
+      }),
+    ),
+);
+
+const collaborationParticipant = EffectCommand.make("participant").pipe(
+  EffectCommand.withDescription("Manage user and Agent Runtime participants"),
+  EffectCommand.withSubcommands([
+    collaborationParticipantAdd,
+    collaborationParticipantRole,
+    collaborationParticipantRemove,
+  ]),
+);
+
+const collaborationLaneAdd = EffectCommand.make(
+  "add",
+  {
+    collaborationId,
+    workspaceId: Options.text("workspace-id"),
+    purpose: collaborationPurpose,
+    label: Options.text("label"),
+    branch: Options.text("branch").pipe(Options.optional),
+  },
+  ({ branch, collaborationId, label, purpose, workspaceId }) =>
+    runCommand(
+      AddWorkspaceCollaborationLaneCommand.create({
+        collaborationId,
+        workspaceId,
+        purpose,
+        label,
+        ...(optionalValue(branch) ? { branch: optionalValue(branch) } : {}),
+      }),
+    ),
+);
+
+const collaborationLaneArchive = EffectCommand.make(
+  "archive",
+  { collaborationId, laneId: collaborationLaneId },
+  ({ collaborationId, laneId }) =>
+    runCommand(ArchiveWorkspaceCollaborationLaneCommand.create({ collaborationId, laneId })),
+);
+
+const collaborationLane = EffectCommand.make("lane").pipe(
+  EffectCommand.withDescription("Manage isolated Workspace lanes"),
+  EffectCommand.withSubcommands([collaborationLaneAdd, collaborationLaneArchive]),
+);
+
+const collaborationWriterAcquire = EffectCommand.make(
+  "acquire",
+  {
+    collaborationId,
+    laneId: collaborationLaneId,
+    expiresAt: Options.text("expires-at"),
+  },
+  ({ collaborationId, expiresAt, laneId }) =>
+    runCommand(AcquireWorkspaceWriterLeaseCommand.create({ collaborationId, laneId, expiresAt })),
+);
+
+const collaborationWriterRenew = EffectCommand.make(
+  "renew",
+  {
+    collaborationId,
+    laneId: collaborationLaneId,
+    expiresAt: Options.text("expires-at"),
+    generation: Options.integer("generation"),
+  },
+  ({ collaborationId, expiresAt, generation, laneId }) =>
+    runCommand(
+      RenewWorkspaceWriterLeaseCommand.create({
+        collaborationId,
+        laneId,
+        expiresAt,
+        expectedGeneration: generation,
+      }),
+    ),
+);
+
+const collaborationWriterRelease = EffectCommand.make(
+  "release",
+  {
+    collaborationId,
+    laneId: collaborationLaneId,
+    generation: Options.integer("generation"),
+  },
+  ({ collaborationId, generation, laneId }) =>
+    runCommand(
+      ReleaseWorkspaceWriterLeaseCommand.create({
+        collaborationId,
+        laneId,
+        expectedGeneration: generation,
+      }),
+    ),
+);
+
+const collaborationWriterTransfer = EffectCommand.make(
+  "transfer",
+  {
+    collaborationId,
+    laneId: collaborationLaneId,
+    generation: Options.integer("generation"),
+    toParticipantId: Options.text("to-participant-id"),
+    expiresAt: Options.text("expires-at"),
+  },
+  ({ collaborationId, expiresAt, generation, laneId, toParticipantId }) =>
+    runCommand(
+      TransferWorkspaceWriterLeaseCommand.create({
+        collaborationId,
+        laneId,
+        expectedGeneration: generation,
+        toParticipantId,
+        expiresAt,
+      }),
+    ),
+);
+
+const collaborationWriter = EffectCommand.make("writer").pipe(
+  EffectCommand.withDescription("Acquire, renew, release or transfer a fenced writer lease"),
+  EffectCommand.withSubcommands([
+    collaborationWriterAcquire,
+    collaborationWriterRenew,
+    collaborationWriterRelease,
+    collaborationWriterTransfer,
+  ]),
+);
+
+const collaborationTerminalAccess = EffectCommand.make(
+  "terminal-access",
+  {
+    collaborationId,
+    laneId: collaborationLaneId,
+    sessionId: Options.text("session-id"),
+    access: Options.choice("access", ["observe", "write"] as const),
+    generation: Options.integer("generation").pipe(Options.optional),
+  },
+  ({ access, collaborationId, generation, laneId, sessionId }) =>
+    runCommand(
+      IssueWorkspaceCollaborationTerminalAccessCommand.create({
+        collaborationId,
+        laneId,
+        sessionId,
+        access,
+        ...(optionalValue(generation) !== undefined
+          ? { expectedGeneration: optionalValue(generation) }
+          : {}),
+      }),
+    ),
+);
+
+const collaborationNativeAttach = EffectCommand.make(
+  "native-attach",
+  {
+    collaborationId,
+    laneId: collaborationLaneId,
+    runtimeId: Options.text("runtime-id"),
+    expiresAt: Options.text("expires-at"),
+    generation: Options.integer("generation"),
+  },
+  ({ collaborationId, expiresAt, generation, laneId, runtimeId }) =>
+    runCommand(
+      IssueWorkspaceCollaborationNativeAttachCommand.create({
+        collaborationId,
+        laneId,
+        runtimeId,
+        expiresAt,
+        expectedGeneration: generation,
+      }),
+    ),
+);
+
+const collaborationHandoffOffer = EffectCommand.make(
+  "offer",
+  {
+    collaborationId,
+    sourceLaneId: Options.text("source-lane-id"),
+    targetLaneId: Options.text("target-lane-id"),
+    artifactId: Options.text("artifact-id"),
+    expectedDigest: Options.text("expected-digest"),
+  },
+  ({ artifactId, collaborationId, expectedDigest, sourceLaneId, targetLaneId }) =>
+    runCommand(
+      OfferWorkspaceCollaborationHandoffCommand.create({
+        collaborationId,
+        sourceLaneId,
+        targetLaneId,
+        artifactId,
+        expectedDigest,
+      }),
+    ),
+);
+
+const collaborationHandoffResolve = EffectCommand.make(
+  "resolve",
+  {
+    collaborationId,
+    handoffId: Options.text("handoff-id"),
+    decision: Options.choice("decision", ["accept", "reject"] as const),
+  },
+  ({ collaborationId, decision, handoffId }) =>
+    runCommand(
+      ResolveWorkspaceCollaborationHandoffCommand.create({
+        collaborationId,
+        handoffId,
+        decision,
+      }),
+    ),
+);
+
+const collaborationHandoff = EffectCommand.make("handoff").pipe(
+  EffectCommand.withDescription("Offer and resolve immutable artifact handoffs"),
+  EffectCommand.withSubcommands([collaborationHandoffOffer, collaborationHandoffResolve]),
+);
+
+const collaborationClose = EffectCommand.make("close", { collaborationId }, ({ collaborationId }) =>
+  runCommand(CloseWorkspaceCollaborationCommand.create({ collaborationId })),
+);
+
+const collaboration = EffectCommand.make("collaboration").pipe(
+  EffectCommand.withDescription(
+    "Coordinate isolated Workspaces, Agent participants, review and writer handoff",
+  ),
+  EffectCommand.withSubcommands([
+    collaborationCreate,
+    collaborationList,
+    collaborationShow,
+    collaborationParticipant,
+    collaborationLane,
+    collaborationWriter,
+    collaborationTerminalAccess,
+    collaborationNativeAttach,
+    collaborationHandoff,
+    collaborationClose,
+  ]),
+);
+
 export const agentWorkspaceCommand = EffectCommand.make("workspace").pipe(
   EffectCommand.withDescription("Create and operate public Agent Workspaces with Pi or OpenCode"),
   EffectCommand.withSubcommands([
@@ -727,5 +1090,6 @@ export const agentWorkspaceCommand = EffectCommand.make("workspace").pipe(
     preview,
     harness,
     task,
+    collaboration,
   ]),
 );

@@ -27,6 +27,13 @@
         sandboxId: string;
       };
   type TerminalStatus = "idle" | "connecting" | "connected" | "disconnected" | "failed";
+  type TerminalAttachmentAccess = {
+    access: "observe" | "write";
+    transport: {
+      kind: "websocket";
+      path: string;
+    };
+  };
 
   let {
     scope,
@@ -38,6 +45,7 @@
     fallbackLabel = "",
     docsHref = "",
     docsAriaLabel = "",
+    issueAttachmentAccess,
   }: {
     scope: TerminalScope;
     title?: string;
@@ -48,6 +56,7 @@
     fallbackLabel?: string;
     docsHref?: string;
     docsAriaLabel?: string;
+    issueAttachmentAccess?: (sessionId: string) => Promise<TerminalAttachmentAccess>;
   } = $props();
 
   let terminalElement = $state<HTMLDivElement | null>(null);
@@ -55,6 +64,7 @@
   let socket = $state<WebSocket | null>(null);
   let descriptor = $state<TerminalSessionDescriptor | null>(null);
   let status = $state<TerminalStatus>("idle");
+  let attachmentMode = $state<"observe" | "write">("write");
   let errorMessage = $state("");
   let autoOpenAttempted = false;
   let visibilityObserver: IntersectionObserver | null = null;
@@ -127,7 +137,7 @@
   }
 
   function sendResize(): void {
-    if (!socket || socket.readyState !== WebSocket.OPEN) {
+    if (attachmentMode === "observe" || !socket || socket.readyState !== WebSocket.OPEN) {
       return;
     }
 
@@ -165,6 +175,9 @@
   }
 
   function queueTerminalInput(data: string): void {
+    if (attachmentMode === "observe") {
+      return;
+    }
     pendingInput += data;
 
     if (shouldFlushInputImmediately(data)) {
@@ -239,6 +252,7 @@
     socket = ws;
 
     ws.onopen = () => {
+      status = "connected";
       sendResize();
       focusTerminal();
     };
@@ -289,6 +303,13 @@
           initialRows: terminalRows,
           initialCols: terminalCols,
         });
+      }
+      if (issueAttachmentAccess) {
+        const grant = await issueAttachmentAccess(target.sessionId);
+        attachmentMode = grant.access;
+        target = { ...target, transport: grant.transport };
+      } else {
+        attachmentMode = "write";
       }
       connectTerminal(target);
     } catch (error) {
@@ -417,6 +438,9 @@
     </div>
     <div class="flex shrink-0 flex-wrap items-center gap-2">
       <Badge variant={terminalStatusVariant(status)}>{terminalStatusLabel(status)}</Badge>
+      {#if attachmentMode === "observe" && status === "connected"}
+        <Badge variant="outline">{$t(i18nKeys.console.terminal.readOnly)}</Badge>
+      {/if}
       <Button
         type="button"
         variant={status === "connected" ? "outline" : "default"}

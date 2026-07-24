@@ -19,6 +19,93 @@ const sandboxInput = {
 } as const;
 
 describe("Agent Workspace SDK handles", () => {
+  test("[COLLAB-SURFACE-013] provides collaboration handles for leases, observers and native attach", async () => {
+    const requests: Request[] = [];
+    const descriptor = {
+      schemaVersion: "workspace-collaboration/v1",
+      collaborationId: "wsc_issue_123",
+      name: "Issue 123",
+      status: "active",
+      revision: 1,
+      participants: [],
+      lanes: [
+        {
+          laneId: "wln_builder",
+          workspaceId: "sbx_builder",
+          purpose: "builder",
+          label: "Builder",
+        },
+      ],
+      handoffs: [],
+    } as const;
+    const appaloft = createAppaloftClient({
+      baseUrl: "https://appaloft.example/api",
+      fetch: async (request) => {
+        requests.push(request);
+        const path = new URL(request.url).pathname;
+        if (
+          path === "/api/workspace-collaborations/wsc_issue_123/lanes/wln_builder/terminal-access"
+        ) {
+          return Response.json({
+            access: "observe",
+            workspaceId: "sbx_builder",
+            url: "wss://terminal.example.test?access_token=cap_observer",
+          });
+        }
+        if (
+          path === "/api/workspace-collaborations/wsc_issue_123/lanes/wln_builder/native-attach"
+        ) {
+          return Response.json({
+            transport: "native-attach",
+            clientCommand: ["opencode", "attach", "https://attach.example.test"],
+          });
+        }
+        return Response.json(descriptor, {
+          status: path === "/api/workspace-collaborations" ? 201 : 200,
+        });
+      },
+    });
+
+    const collaboration = await appaloft.workspaceCollaborations.create({
+      name: "Issue 123",
+      workspaceId: "sbx_builder",
+    });
+    const leased = await collaboration.writerLeases.acquire(
+      "wln_builder",
+      "2026-07-24T02:00:00.000Z",
+    );
+    const observer = await leased.lanesApi.issueTerminalAccess({
+      laneId: "wln_builder",
+      sessionId: "term_builder",
+      access: "observe",
+    });
+    const attach = await leased.lanesApi.issueNativeAttach({
+      laneId: "wln_builder",
+      runtimeId: "sar_opencode",
+      expiresAt: "2026-07-24T02:00:00.000Z",
+      expectedGeneration: 1,
+    });
+
+    expect(collaboration.collaborationId).toBe("wsc_issue_123");
+    expect(observer).toMatchObject({ access: "observe", workspaceId: "sbx_builder" });
+    expect(attach).toMatchObject({
+      transport: "native-attach",
+      clientCommand: ["opencode", "attach", "https://attach.example.test"],
+    });
+    expect(requests.map((request) => new URL(request.url).pathname)).toEqual([
+      "/api/workspace-collaborations",
+      "/api/workspace-collaborations/wsc_issue_123/lanes/wln_builder/writer-lease",
+      "/api/workspace-collaborations/wsc_issue_123/lanes/wln_builder/terminal-access",
+      "/api/workspace-collaborations/wsc_issue_123/lanes/wln_builder/native-attach",
+    ]);
+    expect(await requests[0]?.json()).toEqual({
+      name: "Issue 123",
+      workspaceId: "sbx_builder",
+      lanePurpose: "builder",
+      laneLabel: "Builder",
+    });
+  });
+
   test("[AGENT-WS-SDK-013] composes Sandbox and OpenCode Runtime creation", async () => {
     const requests: Request[] = [];
     const appaloft = createAppaloftClient({

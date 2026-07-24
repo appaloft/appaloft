@@ -1043,6 +1043,39 @@ not create provider-specific operation names. See
 [ADR-094](./decisions/ADR-094-agent-workspace-entry-workflow.md) and
 [Agent Workspace Workflow](./workflows/agent-workspace.md).
 
+## Workspace Collaboration
+
+`WorkspaceCollaboration` is the public team and multi-Agent coordination owner. Every lane references
+an existing Sandbox-backed Workspace. Terminal Session, Agent Runtime, Source Artifact and Preview
+lifecycle stay with their existing operation families.
+
+| Capability | Kind | Operation Key | Message | CLI | oRPC / HTTP |
+| --- | --- | --- | --- | --- | --- |
+| Create collaboration | Command | `workspace-collaborations.create` | `CreateWorkspaceCollaborationCommand` | `appaloft workspace collaboration create` | `POST /api/workspace-collaborations` |
+| List collaborations | Query | `workspace-collaborations.list` | `ListWorkspaceCollaborationsQuery` | `appaloft workspace collaboration list` | `GET /api/workspace-collaborations` |
+| Show collaboration | Query | `workspace-collaborations.show` | `ShowWorkspaceCollaborationQuery` | `appaloft workspace collaboration show <collaborationId>` | `GET /api/workspace-collaborations/{collaborationId}` |
+| Add participant | Command | `workspace-collaborations.participants.add` | `AddWorkspaceCollaborationParticipantCommand` | `appaloft workspace collaboration participant add <collaborationId>` | `POST /api/workspace-collaborations/{collaborationId}/participants` |
+| Change participant role | Command | `workspace-collaborations.participants.change-role` | `ChangeWorkspaceCollaborationParticipantRoleCommand` | `appaloft workspace collaboration participant role <collaborationId>` | `POST /api/workspace-collaborations/{collaborationId}/participants/{participantId}/role` |
+| Remove participant | Command | `workspace-collaborations.participants.remove` | `RemoveWorkspaceCollaborationParticipantCommand` | `appaloft workspace collaboration participant remove <collaborationId>` | `DELETE /api/workspace-collaborations/{collaborationId}/participants/{participantId}` |
+| Add Workspace lane | Command | `workspace-collaborations.lanes.add` | `AddWorkspaceCollaborationLaneCommand` | `appaloft workspace collaboration lane add <collaborationId>` | `POST /api/workspace-collaborations/{collaborationId}/lanes` |
+| Archive Workspace lane | Command | `workspace-collaborations.lanes.archive` | `ArchiveWorkspaceCollaborationLaneCommand` | `appaloft workspace collaboration lane archive <collaborationId>` | `POST /api/workspace-collaborations/{collaborationId}/lanes/{laneId}/archive` |
+| Acquire writer | Command | `workspace-collaborations.writer-leases.acquire` | `AcquireWorkspaceWriterLeaseCommand` | `appaloft workspace collaboration writer acquire <collaborationId>` | `POST /api/workspace-collaborations/{collaborationId}/lanes/{laneId}/writer-lease` |
+| Renew writer | Command | `workspace-collaborations.writer-leases.renew` | `RenewWorkspaceWriterLeaseCommand` | `appaloft workspace collaboration writer renew <collaborationId>` | `POST /api/workspace-collaborations/{collaborationId}/lanes/{laneId}/writer-lease/renew` |
+| Release writer | Command | `workspace-collaborations.writer-leases.release` | `ReleaseWorkspaceWriterLeaseCommand` | `appaloft workspace collaboration writer release <collaborationId>` | `POST /api/workspace-collaborations/{collaborationId}/lanes/{laneId}/writer-lease/release` |
+| Transfer writer | Command | `workspace-collaborations.writer-leases.transfer` | `TransferWorkspaceWriterLeaseCommand` | `appaloft workspace collaboration writer transfer <collaborationId>` | `POST /api/workspace-collaborations/{collaborationId}/lanes/{laneId}/writer-lease/transfer` |
+| Offer immutable handoff | Command | `workspace-collaborations.handoffs.offer` | `OfferWorkspaceCollaborationHandoffCommand` | `appaloft workspace collaboration handoff offer <collaborationId>` | `POST /api/workspace-collaborations/{collaborationId}/handoffs` |
+| Resolve handoff | Command | `workspace-collaborations.handoffs.resolve` | `ResolveWorkspaceCollaborationHandoffCommand` | `appaloft workspace collaboration handoff resolve <collaborationId>` | `POST /api/workspace-collaborations/{collaborationId}/handoffs/{handoffId}/resolve` |
+| Authorize lane access | Query | `workspace-collaborations.lanes.authorize-access` | `AuthorizeWorkspaceCollaborationLaneAccessQuery` | SDK/Console | `GET /api/workspace-collaborations/{collaborationId}/lanes/{laneId}/access` |
+| Issue Terminal attachment | Command | `workspace-collaborations.lanes.terminal-access.issue` | `IssueWorkspaceCollaborationTerminalAccessCommand` | `appaloft workspace collaboration terminal-access <collaborationId>` | `POST /api/workspace-collaborations/{collaborationId}/lanes/{laneId}/terminal-access` |
+| Issue native Agent attach | Command | `workspace-collaborations.lanes.native-attach.issue` | `IssueWorkspaceCollaborationNativeAttachCommand` | `appaloft workspace collaboration native-attach <collaborationId>` | `POST /api/workspace-collaborations/{collaborationId}/lanes/{laneId}/native-attach` |
+| Close collaboration | Command | `workspace-collaborations.close` | `CloseWorkspaceCollaborationCommand` | `appaloft workspace collaboration close <collaborationId>` | `POST /api/workspace-collaborations/{collaborationId}/close` |
+
+The caller identity always comes from `ExecutionContext`; it is never accepted as input. Observer
+Terminal capabilities cannot write, resize or close. Writer and native-attach capabilities require
+the current lease generation and fail closed after transfer. See
+[ADR-096](./decisions/ADR-096-workspace-collaboration-boundary.md) and
+[Workspace Collaboration Workflow](./workflows/workspace-collaboration.md).
+
 ## Deployments
 
 Business meaning:
