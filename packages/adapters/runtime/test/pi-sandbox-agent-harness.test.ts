@@ -91,6 +91,8 @@ describe("PiSandboxAgentHarness", () => {
     expect(captured?.background).toBe(true);
     expect(captured?.argv).toContain("--no-session");
     expect(captured?.argv).toContain("--offline");
+    expect(captured?.argv).toContain("--print");
+    expect(captured?.argv).toContain("--no-approve");
     expect(captured?.argv).toContain("--no-extensions");
     expect(captured?.argv).toContain("--provider");
     expect(captured?.argv).toContain("appaloft");
