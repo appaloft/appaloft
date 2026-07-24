@@ -23,6 +23,12 @@ function fixture(
   } = {},
 ) {
   const counters = { resources: 0, deployments: 0 };
+  const exposedPorts: Array<{
+    sandboxId: string;
+    port: number;
+    visibility: "private";
+    expiresAt: string;
+  }> = [];
   const harness: SandboxAgentHarness = options.harness ?? {
     key: "fake",
     templateId: "aht_fake_1",
@@ -51,6 +57,18 @@ function fixture(
           workspaceRevision: "rev_1",
           source: { kind: "template", templateId: "aht_fake_1" },
         };
+      },
+    },
+    sandboxAccess: {
+      async exposePort(_context, sandboxId, input) {
+        exposedPorts.push({ sandboxId, ...input });
+        return ok({
+          exposureId: "sbp_attach",
+          port: input.port,
+          visibility: input.visibility,
+          url: "https://attach.example.test/capability",
+          expiresAt: input.expiresAt,
+        });
       },
     },
     harnessRegistry: new SandboxAgentHarnessRegistry([harness]),
@@ -116,10 +134,117 @@ function fixture(
     clock: { now: () => "2026-07-20T00:00:00.000Z" },
     idGenerator: { next: (prefix) => `${prefix}_test` },
   });
-  return { service, queued, counters };
+  return { service, queued, counters, exposedPorts };
 }
 
 describe("SandboxAgentDeliveryService", () => {
+  test("[AGENT-ADAPTER-018] lists neutral harness capabilities and admitted templates", async () => {
+    const { service } = fixture({
+      harness: {
+        key: "opencode",
+        templateId: "aht_opencode_managed_v1",
+        sandboxTemplateId: "sbt_opencode",
+        version: "1.2.3",
+        templateDigest: `sha256:${"a".repeat(64)}`,
+        interaction: {
+          transport: "native-attach",
+          command: ["opencode", "attach"],
+          sessionRecovery: "native-session-store",
+          serverPort: 4096,
+        },
+        capabilities: {
+          taskMode: true,
+          interactive: true,
+          backgroundRuns: true,
+          nativeSession: true,
+          persistentPaths: ["/workspace"],
+          healthcheck: { kind: "http", port: 4096, path: "/global/health" },
+        },
+        async execute() {
+          return { events: [], outcomeDigest: "sha256:complete" };
+        },
+        async cancel() {},
+      },
+    });
+
+    expect((await service.listHarnesses(context))._unsafeUnwrap()).toEqual([
+      expect.objectContaining({
+        key: "opencode",
+        harnessTemplateId: "aht_opencode_managed_v1",
+        sandboxTemplateId: "sbt_opencode",
+        capabilities: expect.objectContaining({ nativeSession: true, taskMode: true }),
+      }),
+    ]);
+  });
+
+  test("[AGENT-WS-ATTACH-016] refreshes the native runtime and issues scoped attach access", async () => {
+    let prepareCalls = 0;
+    const { service, exposedPorts } = fixture({
+      harness: {
+        key: "opencode",
+        templateId: "aht_opencode_managed_v1",
+        version: "1.2.3",
+        templateDigest: `sha256:${"a".repeat(64)}`,
+        interaction: {
+          transport: "native-attach",
+          command: ["opencode", "attach", "http://127.0.0.1:4096", "--dir", "/workspace"],
+          sessionRecovery: "native-session-store",
+          serverPort: 4096,
+        },
+        async prepareRuntime() {
+          prepareCalls += 1;
+        },
+        async execute() {
+          return { events: [], outcomeDigest: "sha256:complete" };
+        },
+        async cancel() {},
+      },
+    });
+    const runtime = (
+      await service.createRuntime(context, {
+        sandboxId: "sbx_demo",
+        harnessKey: "opencode",
+        harnessTemplateId: "aht_opencode_managed_v1",
+        idempotencyKey: "runtime_attach",
+      })
+    )._unsafeUnwrap();
+
+    const attach = (
+      await service.issueAttachAccess(context, {
+        sandboxId: "sbx_demo",
+        runtimeId: runtime.runtimeId,
+        expiresAt: "2026-07-20T01:00:00.000Z",
+      })
+    )._unsafeUnwrap();
+
+    expect(prepareCalls).toBe(2);
+    expect(exposedPorts).toEqual([
+      {
+        sandboxId: "sbx_demo",
+        port: 4096,
+        visibility: "private",
+        expiresAt: "2026-07-20T01:00:00.000Z",
+      },
+    ]);
+    expect(attach).toEqual({
+      workspaceId: "sbx_demo",
+      runtimeId: runtime.runtimeId,
+      transport: "native-attach",
+      access: expect.objectContaining({
+        exposureId: "sbp_attach",
+        visibility: "private",
+        url: "https://attach.example.test/capability",
+      }),
+      clientCommand: [
+        "opencode",
+        "attach",
+        "https://attach.example.test/capability",
+        "--dir",
+        "/workspace",
+      ],
+    });
+  });
+
   test("[AGENT-WS-START-009] persists failed startup and invokes harness termination", async () => {
     const failedHarness: SandboxAgentHarness = {
       key: "failed",

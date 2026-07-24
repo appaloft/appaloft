@@ -4,7 +4,7 @@ description: "Create, reconnect to, and preview a Pi or OpenCode remote developm
 docType: task
 localeState: { zh-CN: complete, en-US: complete }
 searchAliases: ["remote development", "OpenCode", "Pi", "workspace"]
-relatedOperations: [sandboxes.create, sandboxes.agents.runtimes.create, terminal-sessions.open, sandbox-ports.expose]
+relatedOperations: [sandboxes.create, sandboxes.agents.harnesses.list, sandboxes.agents.runtimes.create, sandboxes.agents.runtimes.attach, sandboxes.agent-tasks.create, terminal-sessions.open, sandbox-ports.expose]
 sidebar: { label: "Agent Workspace", order: 0 }
 ---
 
@@ -22,6 +22,8 @@ database record.
 appaloft workspace create \
   --harness opencode \
   --sandbox-template sbt_opencode \
+  --repo https://github.com/acme/web.git \
+  --branch feature/login \
   --isolation gvisor \
   --cpu-millis 2000 \
   --memory-bytes 2147483648 \
@@ -32,6 +34,11 @@ appaloft workspace create \
 Use `--harness pi` for Pi. The default harness templates are
 `aht_opencode_managed_v1` and `aht_pi_managed_v1`; an operator must register matching pinned-version
 Sandbox templates in the runtime.
+
+`appaloft workspace harness list` returns the adapters actually registered by the deployment,
+including admitted Sandbox Template, interaction, session recovery, persistent paths, healthcheck,
+and task capabilities. The Console creation flow reads this public catalog instead of branching on
+agent names.
 
 The SDK exposes the same convenience composition:
 
@@ -51,17 +58,28 @@ Runtime creation or explicitly terminate that Sandbox.
 ## Reconnect after disconnecting
 
 ```bash
-appaloft workspace terminal <workspaceId> --attach
+appaloft workspace connect <workspaceId>
+appaloft workspace connect <workspaceId> --session-id <terminalSessionId>
 ```
 
 Appaloft owns the Terminal Session PTY. A client disconnect only detaches. While the Session TTL and
-Sandbox remain active, a later attach replays bounded output and resumes the same process. A template
-may include tmux, but Appaloft does not require it for Workspace reconnection.
+Sandbox remain active, reconnecting with the same `terminalSessionId` replays bounded output and
+resumes the same process. Reopening the Workspace detail in Console also discovers and reconnects the
+latest active Sandbox Session. A template may include tmux, but Appaloft does not require it for
+Workspace reconnection.
 
-An OpenCode Runtime starts a loopback-only `opencode serve` process inside the Sandbox and places
-HOME/XDG data below `/workspace`, so OpenCode session data follows the persistent Workspace
-filesystem. Native remote attach requires an authenticated, scoped gateway supplied by the
-deployment. Do not publish the OpenCode server port directly.
+An OpenCode Runtime starts `opencode serve` inside the Sandbox provider's private network namespace
+without publishing a host port and places HOME/XDG data below `/workspace`, so OpenCode session data
+follows the persistent Workspace filesystem. Native remote attach requires an authenticated,
+scoped gateway supplied by the deployment. Do not publish the OpenCode server port directly.
+
+```bash
+appaloft workspace attach <workspaceId>
+```
+
+This command refreshes the remote OpenCode server and model capability, issues a revocable private
+access descriptor for at most one hour and returns the local `opencode attach` handoff. Providers
+without a secure gateway report attach as unavailable.
 
 ## Temporary development preview
 
@@ -95,5 +113,34 @@ array identifies a partial Workspace that can be retried or cleaned up, not hidd
 Workspace table.
 
 Pause/resume preserves the Sandbox identity. Terminate removes the Sandbox and its owned runtime
-state. Git clone/source materialization is not hidden inside Workspace create yet; the first version
-requires a template or caller to prepare `/workspace` explicitly.
+state. `workspace create --repo/--ref/--branch` can materialize Git source through an argv-safe
+workflow. A failure returns the already-created Workspace identity for retry or cleanup. This
+entrypoint currently accepts only HTTPS locators without a username, password, or token. Credentials
+for a private repository must come from a trusted deployment source integration or template and
+must never be embedded in the URL.
+
+## Run, review, and deliver a task
+
+```bash
+appaloft workspace task run <workspaceId> \
+  --runtime-id <runtimeId> \
+  --task "Fix issue #123 and run tests" \
+  --check-arg bun \
+  --check-arg test
+
+appaloft workspace task show <workspaceId> <taskRunId>
+appaloft workspace task resume <workspaceId> <taskRunId>
+appaloft workspace task approve <workspaceId> <taskRunId>
+appaloft workspace task deliver <workspaceId> <taskRunId> \
+  --branch fix/issue-123 \
+  --commit-message "fix: resolve issue 123" \
+  --pull-request-title "Fix issue 123"
+```
+
+The server persists and resumes Task Runs. Disconnecting does not cancel the agent. Finalization
+runs explicit argv checks, stores bounded and redacted Git status/stat/patch, and can start a
+Development Preview or create an immutable Source Artifact/Candidate Preview. Approval and source
+delivery require an external user or trusted CLI actor; a Sandbox runtime identity cannot approve
+itself. The server resolves GitHub delivery credentials through integration auth and injects them
+only through bounded stdin to the Git/GitHub CLI child process; they never enter Task state, argv, or
+logs.

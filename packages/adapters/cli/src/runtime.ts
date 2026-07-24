@@ -553,6 +553,47 @@ export const runTerminalCommand = (
       })
     : runCommand(message);
 
+export const attachTerminalSession = <
+  T extends TerminalSessionDescriptor | { item: TerminalSessionDescriptor },
+>(
+  message: Result<AppQuery<T>>,
+  options: { initialRows?: number; initialCols?: number } = {},
+): Effect.Effect<void, DomainError, CliRuntime> =>
+  Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    if (!cli.terminalSessionGateway) {
+      return yield* Effect.fail(
+        domainError.terminalSessionNotConfigured(
+          "CLI terminal attach requires terminal session gateway",
+          { phase: "cli-terminal-attach" },
+        ),
+      );
+    }
+    const query = yield* resultToEffect(message);
+    const result = yield* Effect.promise(() => cli.executeQuery(query));
+    const output = yield* resultToEffect(result);
+    const descriptor =
+      (output as { item?: TerminalSessionDescriptor }).item ??
+      (output as TerminalSessionDescriptor);
+    yield* Effect.tryPromise({
+      try: () =>
+        pipeTerminalSession({
+          descriptor,
+          gateway: cli.terminalSessionGateway as TerminalSessionGateway,
+          io: cli.terminalIO,
+          ...(typeof options.initialRows === "number" && typeof options.initialCols === "number"
+            ? {
+                initialSize: {
+                  rows: options.initialRows,
+                  cols: options.initialCols,
+                },
+              }
+            : {}),
+        }),
+      catch: terminalSessionErrorFromUnknown,
+    });
+  });
+
 export const runCommand = <T>(
   message: Result<AppCommand<T>>,
 ): Effect.Effect<void, DomainError, CliRuntime> =>

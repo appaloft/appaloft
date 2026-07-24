@@ -2,6 +2,7 @@ import { AppaloftSdkRequestError } from "./internal.js";
 import {
   AppaloftWorkspaceCreateError,
   createAppaloftClient,
+  createAppaloftWorkspaceTasks,
   defaultOpenCodeHarnessTemplateId,
   defaultPiHarnessTemplateId,
 } from "./resource-client.js";
@@ -22,6 +23,13 @@ export type {
   AppaloftAgentCreateInput,
   AppaloftAgentDescriptor,
   AppaloftAgentStreamInput,
+  AppaloftAgentTaskChanges,
+  AppaloftAgentTaskCheckInput,
+  AppaloftAgentTaskCheckResult,
+  AppaloftAgentTaskDeliveryInput,
+  AppaloftAgentTaskPreviewInput,
+  AppaloftAgentTaskResult,
+  AppaloftAgentTaskRunInput,
   AppaloftClient,
   AppaloftRun,
   AppaloftRunCreateInput,
@@ -38,11 +46,13 @@ export type {
   AppaloftWorkspaceDescriptor,
   AppaloftWorkspaceList,
   AppaloftWorkspaceListInput,
+  AppaloftWorkspaceTasks,
 } from "./resource-client.js";
 export {
   AppaloftSdkRequestError,
   AppaloftWorkspaceCreateError,
   createAppaloftClient,
+  createAppaloftWorkspaceTasks,
   defaultOpenCodeHarnessTemplateId,
   defaultPiHarnessTemplateId,
 };

@@ -9,7 +9,11 @@ import {
   type SandboxProviderRequest,
   type SandboxTerminalProcess,
 } from "@appaloft/application";
-import { type SandboxIsolation, SandboxWorkspacePath } from "@appaloft/core";
+import {
+  type SandboxIsolation,
+  type SandboxNetworkPolicyState,
+  SandboxWorkspacePath,
+} from "@appaloft/core";
 
 export interface SandboxDockerCommandResult {
   exitCode: number;
@@ -43,6 +47,16 @@ export interface SandboxPortPublisher {
     containerName: string;
     exposureId: string;
   }): Promise<void>;
+}
+
+export interface SandboxEgressPolicyAdapter {
+  configure(input: {
+    sandboxId: string;
+    containerName: string;
+    networkPolicy: SandboxNetworkPolicyState;
+  }): Promise<{ proxyUrl: string; noProxy?: readonly string[] }>;
+  renew?(input: { sandboxId: string; containerName: string }): Promise<void>;
+  revoke(input: { sandboxId: string; containerName: string }): Promise<void>;
 }
 
 export class BunSandboxDockerCommandRunner implements SandboxDockerCommandRunner {
@@ -180,6 +194,7 @@ type DockerSandboxProviderInput = {
   isolation?: Extract<SandboxIsolation, "container-trusted" | "gvisor">;
   runner?: SandboxDockerCommandRunner;
   portPublisher?: SandboxPortPublisher;
+  egressPolicy?: SandboxEgressPolicyAdapter;
   internalNetwork?: string;
   now?: () => string;
   credentialBroker?: boolean;
@@ -198,9 +213,10 @@ function containerName(sandboxId: string): string {
 
 export class DockerSandboxProvider implements SandboxProvider {
   readonly key: string;
-  readonly capabilities;
+  readonly capabilities: SandboxProvider["capabilities"];
   private readonly runner: SandboxDockerCommandRunner;
   private readonly portPublisher: SandboxPortPublisher | undefined;
+  private readonly egressPolicy: SandboxEgressPolicyAdapter | undefined;
   private readonly now: () => string;
   private readonly runtimeName: "runc" | "runsc";
   private readonly networkName: string;
@@ -215,6 +231,9 @@ export class DockerSandboxProvider implements SandboxProvider {
     if (input.portPublisher && !input.internalNetwork) {
       throw new Error("Sandbox port publishing requires an internal Docker network");
     }
+    if (input.egressPolicy && !input.internalNetwork) {
+      throw new Error("Sandbox egress policy requires an internal Docker network");
+    }
     this.networkName = input.internalNetwork ?? "none";
     this.capabilities = {
       isolation,
@@ -223,11 +242,12 @@ export class DockerSandboxProvider implements SandboxProvider {
       processes: true,
       files: true,
       ports: Boolean(input.portPublisher),
-      networkPolicy: ["deny" as const],
+      networkPolicy: input.egressPolicy ? ["deny", "allowlist"] : ["deny"],
       credentialBroker: input.credentialBroker ?? false,
     };
     this.runner = input.runner ?? new BunSandboxDockerCommandRunner();
     this.portPublisher = input.portPublisher;
+    this.egressPolicy = input.egressPolicy;
     this.now = input.now ?? (() => new Date().toISOString());
   }
 
@@ -257,7 +277,7 @@ export class DockerSandboxProvider implements SandboxProvider {
     if (request.requestedIsolation !== this.capabilities.isolation) {
       throw new Error("Docker provider isolation does not match the admitted Sandbox request");
     }
-    if (request.networkPolicy.mode !== "deny") {
+    if (request.networkPolicy.mode === "allowlist" && !this.egressPolicy) {
       throw new Error("Docker provider requires an egress policy adapter for allowlist mode");
     }
     await this.probe();
@@ -277,46 +297,91 @@ export class DockerSandboxProvider implements SandboxProvider {
       request.source.kind === "snapshot"
         ? "cp -a /appaloft-snapshot-workspace/. /workspace/ && trap : TERM INT; sleep infinity & wait"
         : "trap : TERM INT; sleep infinity & wait";
-    await this.docker([
-      "create",
-      "--name",
-      name,
-      "--label",
-      "appaloft.managed=true",
-      "--label",
-      `appaloft.sandbox.id=${request.sandboxId}`,
-      "--label",
-      `appaloft.sandbox.owner=${this.ownerScope(request.ownerScope)}`,
-      "--runtime",
-      this.runtimeName,
-      "--network",
-      this.networkName,
-      "--cpus",
-      String(request.limits.cpuMillis / 1000),
-      "--memory",
-      `${memoryMb}m`,
-      "--pids-limit",
-      String(request.limits.maxProcesses),
-      "--cap-drop",
-      "ALL",
-      "--security-opt",
-      "no-new-privileges=true",
-      "--read-only",
-      "--tmpfs",
-      "/tmp:rw,noexec,nosuid,size=64m",
-      "--tmpfs",
-      `/workspace:rw,nosuid,nodev,size=${diskMb}m`,
-      "--workdir",
-      "/workspace",
-      image,
-      "sh",
-      "-c",
-      startup,
-    ]);
+    let egress: { proxyUrl: string; noProxy?: readonly string[] } | undefined;
+    let envFile: string | undefined;
     try {
+      egress =
+        request.networkPolicy.mode === "allowlist"
+          ? await this.egressPolicy?.configure({
+              sandboxId: request.sandboxId,
+              containerName: name,
+              networkPolicy: request.networkPolicy,
+            })
+          : undefined;
+      envFile = egress
+        ? await this.writeEgressEnvFile(request.sandboxId, egress)
+        : undefined;
+      await this.docker([
+        "create",
+        "--name",
+        name,
+        "--label",
+        "appaloft.managed=true",
+        "--label",
+        `appaloft.sandbox.id=${request.sandboxId}`,
+        "--label",
+        `appaloft.sandbox.owner=${this.ownerScope(request.ownerScope)}`,
+        "--label",
+        `appaloft.sandbox.egress=${egress ? "allowlist" : "deny"}`,
+        "--runtime",
+        this.runtimeName,
+        "--network",
+        this.networkName,
+        ...(envFile ? ["--env-file", envFile] : []),
+        "--cpus",
+        String(request.limits.cpuMillis / 1000),
+        "--memory",
+        `${memoryMb}m`,
+        "--pids-limit",
+        String(request.limits.maxProcesses),
+        "--cap-drop",
+        "ALL",
+        "--security-opt",
+        "no-new-privileges=true",
+        "--read-only",
+        "--tmpfs",
+        "/tmp:rw,noexec,nosuid,size=64m",
+        "--tmpfs",
+        `/workspace:rw,nosuid,nodev,size=${diskMb}m`,
+        "--workdir",
+        "/workspace",
+        image,
+        "sh",
+        "-c",
+        startup,
+      ]);
       await this.docker(["start", name]);
+      if (envFile) {
+        await this.removeWorkerFile(envFile);
+        envFile = undefined;
+      }
     } catch (error) {
-      await this.runner.run(["docker", "rm", "-f", name]);
+      const cleanupFailures: string[] = [];
+      const removed = await this.runner.run(["docker", "rm", "-f", name]);
+      if (removed.exitCode !== 0) cleanupFailures.push("container");
+      if (egress) {
+        try {
+          await this.egressPolicy?.revoke({
+            sandboxId: request.sandboxId,
+            containerName: name,
+          });
+        } catch {
+          cleanupFailures.push("egress policy");
+        }
+      }
+      if (envFile) {
+        try {
+          await this.removeWorkerFile(envFile);
+        } catch {
+          cleanupFailures.push("transient environment file");
+        }
+      }
+      if (cleanupFailures.length > 0) {
+        throw new Error(
+          `Docker Sandbox provision failed and cleanup was incomplete (${cleanupFailures.join(", ")})`,
+          { cause: error },
+        );
+      }
       throw error;
     }
     return { providerHandle: name, realizedIsolation: this.capabilities.isolation };
@@ -330,6 +395,10 @@ export class DockerSandboxProvider implements SandboxProvider {
   async resume(request: { sandboxId: string; providerHandle: string }) {
     await this.assertHandle(request);
     await this.docker(["unpause", request.providerHandle]);
+    await this.egressPolicy?.renew?.({
+      sandboxId: request.sandboxId,
+      containerName: request.providerHandle,
+    });
     return {
       providerHandle: request.providerHandle,
       realizedIsolation: this.capabilities.isolation,
@@ -337,8 +406,12 @@ export class DockerSandboxProvider implements SandboxProvider {
   }
 
   async terminate(request: { sandboxId: string; providerHandle: string }): Promise<void> {
-    await this.assertHandle(request);
-    await this.docker(["rm", "-f", request.providerHandle]);
+    const containerExists = await this.assertHandleIfPresent(request);
+    try {
+      if (containerExists) await this.docker(["rm", "-f", request.providerHandle]);
+    } finally {
+      await this.revokeExternalAccess(request);
+    }
   }
 
   async openTerminal(request: {
@@ -427,7 +500,11 @@ export class DockerSandboxProvider implements SandboxProvider {
     if (text(inspected.stdout).trim() !== ownerScope) {
       throw new Error("Docker container is not owned by the requested owner scope");
     }
-    await this.docker(["rm", "-f", request.providerHandle]);
+    try {
+      await this.docker(["rm", "-f", request.providerHandle]);
+    } finally {
+      await this.revokeExternalAccess(request);
+    }
   }
 
   async exec(request: {
@@ -446,20 +523,77 @@ export class DockerSandboxProvider implements SandboxProvider {
     if (request.background) {
       const processId = `spr_${randomUUID().replaceAll("-", "")}`;
       const pidFile = `/workspace/.appaloft-process-${processId}.pid`;
-      await this.docker([
-        "exec",
-        ...(request.stdin ? ["-i"] : []),
-        "-d",
-        "-w",
-        cwd,
-        request.providerHandle,
-        "sh",
-        "-c",
-        'echo $$ > "$1"; shift; exec "$@"',
-        "appaloft-background",
-        pidFile,
-        ...request.argv,
-      ]);
+      if (request.stdin) {
+        const inputPipe = `/tmp/appaloft-process-${processId}.stdin`;
+        try {
+          await this.docker([
+            "exec",
+            request.providerHandle,
+            "sh",
+            "-c",
+            'umask 077; mkfifo "$1"',
+            "appaloft-background-input",
+            inputPipe,
+          ]);
+          await this.docker([
+            "exec",
+            "-d",
+            "-w",
+            cwd,
+            request.providerHandle,
+            "sh",
+            "-c",
+            'pid_file="$1"; input_pipe="$2"; shift 2; ( exec "$@" < "$input_pipe" ) & child=$!; printf "%s\\n" "$child" > "$pid_file"; wait "$child"; code=$?; rm -f -- "$pid_file" "$input_pipe"; exit "$code"',
+            "appaloft-background",
+            pidFile,
+            inputPipe,
+            ...request.argv,
+          ]);
+          await this.docker(
+            [
+              "exec",
+              "-i",
+              request.providerHandle,
+              "sh",
+              "-c",
+              'input_pipe="$1"; cat > "$input_pipe"; code=$?; rm -f -- "$input_pipe"; exit "$code"',
+              "appaloft-background-input",
+              inputPipe,
+            ],
+            {
+              stdin: request.stdin,
+              timeoutMs: Math.min(request.timeoutMs ?? 30_000, 30_000),
+            },
+          );
+        } catch (error) {
+          await this.runner.run([
+            "docker",
+            "exec",
+            request.providerHandle,
+            "sh",
+            "-c",
+            '[ -f "$1" ] && kill "$(cat "$1")" 2>/dev/null; rm -f -- "$1" "$2"',
+            "appaloft-background-cleanup",
+            pidFile,
+            inputPipe,
+          ]);
+          throw error;
+        }
+      } else {
+        await this.docker([
+          "exec",
+          "-d",
+          "-w",
+          cwd,
+          request.providerHandle,
+          "sh",
+          "-c",
+          'pid_file="$1"; shift; ( exec "$@" ) & child=$!; printf "%s\\n" "$child" > "$pid_file"; wait "$child"; code=$?; rm -f -- "$pid_file"; exit "$code"',
+          "appaloft-background",
+          pidFile,
+          ...request.argv,
+        ]);
+      }
       return { mode: "background", processId };
     }
     const processId = `spr_${randomUUID().replaceAll("-", "")}`;
@@ -563,7 +697,7 @@ export class DockerSandboxProvider implements SandboxProvider {
       request.providerHandle,
       "sh",
       "-c",
-      '[ -f "$1" ] && kill "$(cat "$1")" && rm -f "$1"',
+      'if [ -f "$1" ]; then pid="$(cat "$1")"; kill "$pid" 2>/dev/null || true; rm -f -- "$1"; fi',
       "appaloft-process-terminate",
       pidFile,
     ]);
@@ -789,12 +923,143 @@ export class DockerSandboxProvider implements SandboxProvider {
   async updateNetworkPolicy(request: {
     sandboxId: string;
     providerHandle: string;
-    networkPolicy: { mode: "deny" | "allowlist"; rules: unknown[] };
+    networkPolicy: SandboxNetworkPolicyState;
   }): Promise<void> {
     await this.assertHandle(request);
-    if (request.networkPolicy.mode !== "deny" || request.networkPolicy.rules.length > 0) {
+    if (request.networkPolicy.mode === "deny") {
+      await this.egressPolicy?.revoke({
+        sandboxId: request.sandboxId,
+        containerName: request.providerHandle,
+      });
+      return;
+    }
+    if (!this.egressPolicy) {
       throw new Error("Docker provider requires an egress adapter for allowlist mode");
     }
+    const inspected = await this.docker([
+      "inspect",
+      "--format",
+      '{{index .Config.Labels "appaloft.sandbox.egress"}}',
+      request.providerHandle,
+    ]);
+    if (text(inspected.stdout).trim() !== "allowlist") {
+      throw new Error("Docker Sandbox must be recreated to enable allowlist egress");
+    }
+    await this.egressPolicy.configure({
+      sandboxId: request.sandboxId,
+      containerName: request.providerHandle,
+      networkPolicy: request.networkPolicy,
+    });
+  }
+
+  private async writeEgressEnvFile(
+    sandboxId: string,
+    input: { proxyUrl: string; noProxy?: readonly string[] },
+  ): Promise<string> {
+    let proxy: URL;
+    try {
+      proxy = new URL(input.proxyUrl);
+    } catch {
+      throw new Error("Sandbox egress adapter returned an invalid proxy URL");
+    }
+    if (
+      !["http:", "https:"].includes(proxy.protocol) ||
+      !proxy.hostname ||
+      /[\r\n\0]/u.test(input.proxyUrl)
+    ) {
+      throw new Error("Sandbox egress adapter returned an unsafe proxy URL");
+    }
+    const noProxy = ["127.0.0.1", "localhost", "::1", ...(input.noProxy ?? [])];
+    if (
+      noProxy.length > 64 ||
+      noProxy.some(
+        (entry) =>
+          !entry ||
+          entry.length > 253 ||
+          /[\s,\r\n\0]/u.test(entry),
+      )
+    ) {
+      throw new Error("Sandbox egress adapter returned an invalid no-proxy list");
+    }
+    const content = [
+      `HTTP_PROXY=${input.proxyUrl}`,
+      `HTTPS_PROXY=${input.proxyUrl}`,
+      `http_proxy=${input.proxyUrl}`,
+      `https_proxy=${input.proxyUrl}`,
+      `NO_PROXY=${noProxy.join(",")}`,
+      `no_proxy=${noProxy.join(",")}`,
+      "APPALOFT_SANDBOX_EGRESS_PROXY=1",
+      "",
+    ].join("\n");
+    const directory = "/var/tmp/appaloft-sandbox-env";
+    const path = `${directory}/${sandboxId}-${randomUUID()}.env`;
+    await this.workerCommand(["mkdir", "-p", directory]);
+    await this.workerCommand(
+      ["dd", "if=/dev/stdin", `of=${path}`, "status=none"],
+      { stdin: new TextEncoder().encode(content) },
+    );
+    await this.workerCommand(["chmod", "600", path]);
+    return path;
+  }
+
+  private async removeWorkerFile(path: string): Promise<void> {
+    const result = await this.runner.run(["rm", "-f", "--", path]);
+    if (result.exitCode !== 0) {
+      throw new Error("Sandbox worker failed to remove a transient environment file");
+    }
+  }
+
+  private async revokeExternalAccess(input: {
+    sandboxId: string;
+    providerHandle: string;
+  }): Promise<void> {
+    const cleanups: Promise<void>[] = [];
+    if (this.portPublisher) {
+      cleanups.push(
+        (async () => {
+          const exposures = await this.portPublisher?.list({
+            sandboxId: input.sandboxId,
+            containerName: input.providerHandle,
+          });
+          const revoked = await Promise.allSettled(
+            (exposures ?? []).map((exposure) =>
+              this.portPublisher?.revoke({
+                sandboxId: input.sandboxId,
+                containerName: input.providerHandle,
+                exposureId: exposure.exposureId,
+              }),
+            ),
+          );
+          if (revoked.some((result) => result.status === "rejected")) {
+            throw new Error("Sandbox provider failed to revoke every port exposure");
+          }
+        })(),
+      );
+    }
+    if (this.egressPolicy) {
+      cleanups.push(
+        this.egressPolicy.revoke({
+          sandboxId: input.sandboxId,
+          containerName: input.providerHandle,
+        }),
+      );
+    }
+    const results = await Promise.allSettled(cleanups);
+    const failures = results.filter((result) => result.status === "rejected");
+    if (failures.length > 0) {
+      throw new Error("Sandbox provider failed to revoke external access");
+    }
+  }
+
+  private async workerCommand(
+    argv: readonly string[],
+    input?: { stdin?: Uint8Array; timeoutMs?: number },
+  ): Promise<SandboxDockerCommandResult> {
+    const result = await this.runner.run(argv, input);
+    if (result.exitCode !== 0) {
+      throw new Error(`Sandbox worker command failed: ${result.stderr || text(result.stdout)}`);
+    }
+    return result;
   }
 
   private workspacePath(path: string): string {
@@ -852,6 +1117,41 @@ export class DockerSandboxProvider implements SandboxProvider {
     if (text(inspected.stdout).trim() !== request.sandboxId) {
       throw new Error("Docker container is not owned by the requested Sandbox");
     }
+  }
+
+  private async assertHandleIfPresent(request: {
+    sandboxId: string;
+    providerHandle: string;
+  }): Promise<boolean> {
+    if (request.providerHandle !== containerName(request.sandboxId)) {
+      throw new Error("Sandbox provider handle does not match the managed container");
+    }
+    const inspected = await this.docker(
+      [
+        "inspect",
+        "--format",
+        '{{index .Config.Labels "appaloft.sandbox.id"}}',
+        request.providerHandle,
+      ],
+      undefined,
+      true,
+    );
+    if (inspected.exitCode === 0) {
+      if (text(inspected.stdout).trim() !== request.sandboxId) {
+        throw new Error("Docker container is not owned by the requested Sandbox");
+      }
+      return true;
+    }
+    const listed = await this.docker([
+      "ps",
+      "-a",
+      "--filter",
+      `name=^/${request.providerHandle}$`,
+      "--format",
+      "{{.Names}}",
+    ]);
+    if (!text(listed.stdout).trim()) return false;
+    throw new Error(`Docker Sandbox inspect failed: ${inspected.stderr || text(inspected.stdout)}`);
   }
 
   private async docker(

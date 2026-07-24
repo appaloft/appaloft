@@ -46,6 +46,15 @@ export interface SandboxAgentHarnessInteraction {
   serverPort?: number;
 }
 
+export interface SandboxAgentHarnessCapabilities {
+  taskMode: boolean;
+  interactive: boolean;
+  backgroundRuns: boolean;
+  nativeSession: boolean;
+  persistentPaths: readonly string[];
+  healthcheck?: { kind: "process" } | { kind: "http"; port: number; path: string };
+}
+
 export type SandboxAgentSandboxSource =
   | { kind: "image"; image: string }
   | { kind: "snapshot"; snapshotId: string }
@@ -54,9 +63,11 @@ export type SandboxAgentSandboxSource =
 export interface SandboxAgentHarness {
   readonly key: string;
   readonly templateId: string;
+  readonly sandboxTemplateId?: string;
   readonly version: string;
   readonly templateDigest: string;
   readonly interaction?: SandboxAgentHarnessInteraction;
+  readonly capabilities?: SandboxAgentHarnessCapabilities;
   admitSandbox?(source: SandboxAgentSandboxSource): boolean;
   prepareRuntime?(input: {
     executionContext: ExecutionContext;
@@ -103,6 +114,10 @@ export class SandboxAgentHarnessRegistry {
 
   resolve(key: string): SandboxAgentHarness | null {
     return this.harnesses.get(key) ?? null;
+  }
+
+  list(): readonly SandboxAgentHarness[] {
+    return [...this.harnesses.values()].sort((left, right) => left.key.localeCompare(right.key));
   }
 }
 
@@ -226,6 +241,10 @@ export interface SandboxAgentDeliveryRepository {
   findPreview(
     context: RepositoryContext,
     previewId: string,
+  ): Promise<CandidatePreviewRecord | null>;
+  findPreviewByArtifactId(
+    context: RepositoryContext,
+    artifactId: string,
   ): Promise<CandidatePreviewRecord | null>;
   savePromotion(context: RepositoryContext, promotion: SandboxPromotion): Promise<void>;
   findPromotion(context: RepositoryContext, promotionId: string): Promise<SandboxPromotion | null>;
@@ -426,6 +445,21 @@ export class InMemorySandboxAgentDeliveryRepository implements SandboxAgentDeliv
     return preview ? { ...preview } : null;
   }
 
+  async findPreviewByArtifactId(
+    context: RepositoryContext,
+    artifactId: string,
+  ): Promise<CandidatePreviewRecord | null> {
+    const prefix = `${tenantKey(context)}:`;
+    const preview = [...this.previews.entries()].find(
+      ([key, candidate]) =>
+        key.startsWith(prefix) &&
+        candidate.artifactId === artifactId &&
+        candidate.status !== "deleted" &&
+        candidate.status !== "expired",
+    )?.[1];
+    return preview ? { ...preview } : null;
+  }
+
   async savePromotion(context: RepositoryContext, promotion: SandboxPromotion): Promise<void> {
     this.promotions.set(this.key(context, promotion.id.value), promotion);
   }
@@ -461,11 +495,32 @@ export interface SandboxAgentDeliveryDependencies {
       source: SandboxAgentSandboxSource;
     }>;
   };
+  sandboxAccess?: {
+    exposePort(
+      context: ExecutionContext,
+      sandboxId: string,
+      input: {
+        port: number;
+        visibility: "private";
+        expiresAt: string;
+      },
+    ): Promise<
+      Result<{
+        exposureId: string;
+        port: number;
+        visibility: "private" | "organization" | "public";
+        url: string;
+        expiresAt: string;
+      }>
+    >;
+  };
   harnessRegistry: SandboxAgentHarnessRegistry;
   workQueue: {
     enqueue(
       context: ExecutionContext,
-      item: { kind: "sandbox-agent-run" | "sandbox-promotion"; id: string },
+      item:
+        | { kind: "sandbox-agent-run" | "sandbox-promotion"; id: string }
+        | { kind: "agent-task-run"; id: string; workspaceId: string },
     ): Promise<void>;
   };
   artifactCapture: {
@@ -545,9 +600,20 @@ export interface SandboxAgentRuntimeDescriptor {
   harnessTemplateId: string;
   status: string;
   interaction?: SandboxAgentHarnessInteraction;
+  capabilities: SandboxAgentHarnessCapabilities;
   activeRunId?: string;
   createdAt: string;
   updatedAt?: string;
+}
+
+export interface SandboxAgentHarnessDescriptor {
+  key: string;
+  harnessTemplateId: string;
+  sandboxTemplateId?: string;
+  version: string;
+  templateDigest: string;
+  interaction?: SandboxAgentHarnessInteraction;
+  capabilities: SandboxAgentHarnessCapabilities;
 }
 
 export interface SandboxAgentRunDescriptor {
@@ -624,6 +690,7 @@ function redact(value: unknown, key = "", depth = 0): unknown {
 function runtimeDescriptor(
   record: SandboxAgentRuntimeRecord,
   interaction?: SandboxAgentHarnessInteraction,
+  capabilities?: SandboxAgentHarnessCapabilities,
 ): SandboxAgentRuntimeDescriptor {
   const state = record.runtime.toState();
   return {
@@ -633,6 +700,14 @@ function runtimeDescriptor(
     harnessTemplateId: state.harnessTemplateId.value,
     status: state.status.value,
     ...(interaction ? { interaction } : {}),
+    capabilities: capabilities ?? {
+      taskMode: true,
+      interactive: interaction !== undefined,
+      backgroundRuns: true,
+      nativeSession: interaction?.sessionRecovery === "native-session-store",
+      persistentPaths: [],
+      healthcheck: { kind: "process" },
+    },
     ...(state.activeRunId ? { activeRunId: state.activeRunId.value } : {}),
     createdAt: state.createdAt.value,
     ...(state.updatedAt ? { updatedAt: state.updatedAt.value } : {}),
@@ -755,6 +830,129 @@ async function sha256(value: string): Promise<string> {
 export class SandboxAgentDeliveryService {
   constructor(private readonly dependencies: SandboxAgentDeliveryDependencies) {}
 
+  listHarnesses(_context: ExecutionContext): Promise<Result<SandboxAgentHarnessDescriptor[]>> {
+    return Promise.resolve(
+      ok(
+        this.dependencies.harnessRegistry.list().map((harness) => ({
+          key: harness.key,
+          harnessTemplateId: harness.templateId,
+          ...(harness.sandboxTemplateId ? { sandboxTemplateId: harness.sandboxTemplateId } : {}),
+          version: harness.version,
+          templateDigest: harness.templateDigest,
+          ...(harness.interaction ? { interaction: harness.interaction } : {}),
+          capabilities:
+            harness.capabilities ??
+            Object.freeze({
+              taskMode: true,
+              interactive: harness.interaction !== undefined,
+              backgroundRuns: true,
+              nativeSession: harness.interaction?.sessionRecovery === "native-session-store",
+              persistentPaths: Object.freeze(["/workspace"]),
+              healthcheck: Object.freeze({ kind: "process" as const }),
+            }),
+        })),
+      ),
+    );
+  }
+
+  async issueAttachAccess(
+    context: ExecutionContext,
+    input: { sandboxId: string; runtimeId: string; expiresAt: string },
+  ): Promise<
+    Result<{
+      workspaceId: string;
+      runtimeId: string;
+      transport: "native-attach";
+      access: {
+        exposureId: string;
+        port: number;
+        visibility: "private" | "organization" | "public";
+        url: string;
+        expiresAt: string;
+      };
+      clientCommand: string[];
+    }>
+  > {
+    const requestedExpiry = Date.parse(input.expiresAt);
+    const now = Date.parse(this.dependencies.clock.now());
+    if (
+      !Number.isFinite(requestedExpiry) ||
+      !Number.isFinite(now) ||
+      requestedExpiry <= now ||
+      requestedExpiry > now + 60 * 60_000
+    ) {
+      return err(
+        domainError.validation("Native attach access must expire within one hour", {
+          code: "agent_workspace_native_attach_expiry_invalid",
+        }),
+      );
+    }
+    const runtime = await this.showRuntime(context, input.sandboxId, input.runtimeId);
+    if (runtime.isErr()) return err(runtime.error);
+    const harness = this.dependencies.harnessRegistry.resolve(runtime.value.harnessKey);
+    const interaction = harness?.interaction;
+    if (
+      !harness ||
+      interaction?.transport !== "native-attach" ||
+      !interaction.serverPort ||
+      !this.dependencies.sandboxAccess
+    ) {
+      return err(
+        domainError.conflict("Sandbox Agent Runtime does not support scoped native attach", {
+          code: "agent_workspace_native_attach_unavailable",
+        }),
+      );
+    }
+    try {
+      await harness.prepareRuntime?.({
+        executionContext: context,
+        sandboxId: input.sandboxId,
+        runtimeId: input.runtimeId,
+      });
+    } catch (error) {
+      return err(infrastructureError(error));
+    }
+    const access = await this.dependencies.sandboxAccess.exposePort(context, input.sandboxId, {
+      port: interaction.serverPort,
+      visibility: "private",
+      expiresAt: input.expiresAt,
+    });
+    if (access.isErr()) return err(access.error);
+    let accessUrl: URL;
+    try {
+      accessUrl = new URL(access.value.url);
+    } catch {
+      return err(
+        domainError.conflict("Sandbox provider returned invalid native attach access", {
+          code: "agent_workspace_native_attach_access_invalid",
+        }),
+      );
+    }
+    if (
+      access.value.visibility !== "private" ||
+      accessUrl.hostname === "localhost" ||
+      accessUrl.hostname === "127.0.0.1" ||
+      accessUrl.hostname === "::1"
+    ) {
+      return err(
+        domainError.conflict("Sandbox provider returned unsafe native attach access", {
+          code: "agent_workspace_native_attach_access_unsafe",
+        }),
+      );
+    }
+    return ok({
+      workspaceId: input.sandboxId,
+      runtimeId: input.runtimeId,
+      transport: "native-attach",
+      access: access.value,
+      clientCommand: interaction.command.map((argument) =>
+        /^https?:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?(?:\/.*)?$/u.test(argument)
+          ? access.value.url
+          : argument,
+      ),
+    });
+  }
+
   async createRuntime(
     context: ExecutionContext,
     input: {
@@ -775,6 +973,7 @@ export class SandboxAgentDeliveryService {
         runtimeDescriptor(
           existing,
           this.dependencies.harnessRegistry.resolve(existing.harnessKey)?.interaction,
+          this.dependencies.harnessRegistry.resolve(existing.harnessKey)?.capabilities,
         ),
       );
     }
@@ -843,14 +1042,10 @@ export class SandboxAgentDeliveryService {
         input.idempotencyKey,
       );
       if (!raced) return err(infrastructureError(error));
-      return ok(
-        runtimeDescriptor(
-          raced,
-          this.dependencies.harnessRegistry.resolve(raced.harnessKey)?.interaction,
-        ),
-      );
+      const racedHarness = this.dependencies.harnessRegistry.resolve(raced.harnessKey);
+      return ok(runtimeDescriptor(raced, racedHarness?.interaction, racedHarness?.capabilities));
     }
-    return ok(runtimeDescriptor(record, harness.interaction));
+    return ok(runtimeDescriptor(record, harness.interaction, harness.capabilities));
   }
 
   async listRuntimes(
@@ -866,6 +1061,7 @@ export class SandboxAgentDeliveryService {
         runtimeDescriptor(
           record,
           this.dependencies.harnessRegistry.resolve(record.harnessKey)?.interaction,
+          this.dependencies.harnessRegistry.resolve(record.harnessKey)?.capabilities,
         ),
       ),
     });
@@ -883,12 +1079,8 @@ export class SandboxAgentDeliveryService {
     if (!record || record.runtime.toState().sandboxId.value !== sandboxId) {
       return err(domainError.notFound("SandboxAgentRuntime", runtimeId));
     }
-    return ok(
-      runtimeDescriptor(
-        record,
-        this.dependencies.harnessRegistry.resolve(record.harnessKey)?.interaction,
-      ),
-    );
+    const harness = this.dependencies.harnessRegistry.resolve(record.harnessKey);
+    return ok(runtimeDescriptor(record, harness?.interaction, harness?.capabilities));
   }
 
   async terminateRuntime(
@@ -923,7 +1115,7 @@ export class SandboxAgentDeliveryService {
     const terminated = record.runtime.terminate({ at: at.value });
     if (terminated.isErr()) return err(terminated.error);
     await this.dependencies.repository.saveRuntime(repositoryContext, record);
-    return ok(runtimeDescriptor(record, harness?.interaction));
+    return ok(runtimeDescriptor(record, harness?.interaction, harness?.capabilities));
   }
 
   async createRun(
@@ -1572,6 +1764,11 @@ export class SandboxAgentDeliveryService {
     if (artifact?.toState().status.value !== "available") {
       return err(domainError.notFound("SourceArtifact", input.artifactId));
     }
+    const existing = await this.dependencies.repository.findPreviewByArtifactId(
+      repositoryContext,
+      input.artifactId,
+    );
+    if (existing) return ok(existing);
     const state = artifact.toState();
     const previewIdResult = PromotionCandidatePreviewId.create(
       this.dependencies.idGenerator.next("sprev"),

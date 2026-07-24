@@ -163,7 +163,8 @@ export type ControlPlaneSecretPurpose =
   | "resource-variable"
   | "dependency-resource"
   | "dependency-binding"
-  | "sandbox-agent-task";
+  | "sandbox-agent-task"
+  | "agent-task-state";
 
 export interface ControlPlaneSecretContext {
   purpose: ControlPlaneSecretPurpose;

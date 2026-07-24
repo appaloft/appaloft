@@ -557,6 +557,17 @@ export class PgSandboxAgentDeliveryRepository implements SandboxAgentDeliveryRep
       .executeTakeFirst();
     return row ? previewRecord(row) : null;
   }
+  async findPreviewByArtifactId(context: RepositoryContext, artifactId: string) {
+    const row = await resolveRepositoryExecutor(this.db, context)
+      .selectFrom("sandbox_candidate_previews")
+      .selectAll()
+      .where("tenant_id", "=", tenantId(context))
+      .where("artifact_id", "=", artifactId)
+      .where("status", "not in", ["deleted", "expired"])
+      .orderBy("expires_at", "desc")
+      .executeTakeFirst();
+    return row ? previewRecord(row) : null;
+  }
 
   async savePromotion(context: RepositoryContext, value: SandboxPromotion) {
     const state = value.toState();

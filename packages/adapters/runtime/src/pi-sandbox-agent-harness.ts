@@ -114,8 +114,17 @@ async function emitJsonEvents(
 export class PiSandboxAgentHarness implements SandboxAgentHarness {
   readonly key = "pi";
   readonly templateId: string;
+  readonly sandboxTemplateId: string;
   readonly version: string;
   readonly templateDigest: string;
+  readonly capabilities = Object.freeze({
+    taskMode: true,
+    interactive: true,
+    backgroundRuns: true,
+    nativeSession: false,
+    persistentPaths: Object.freeze(["/workspace", "/workspace/.appaloft-agent"]),
+    healthcheck: Object.freeze({ kind: "process" as const }),
+  });
   private readonly active = new Map<
     string,
     { context: ExecutionContext; sandboxId: string; processId: string; cancelled: boolean }
@@ -126,6 +135,7 @@ export class PiSandboxAgentHarness implements SandboxAgentHarness {
     private readonly options: PiSandboxAgentHarnessOptions,
   ) {
     this.templateId = options.templateId;
+    this.sandboxTemplateId = options.sandboxTemplateId;
     this.version = options.version;
     this.templateDigest = options.templateDigest;
   }

@@ -45,9 +45,10 @@ the non-throwing generated operations remain at `appaloft.operations`.
 
 Run events have count, depth, and string bounds and recursively redact credential, secret,
 password, token, and authorization fields. They are not audit events or a full model transcript.
-Pi runs as a terminable background process in the Sandbox. OpenCode uses one Sandbox-local
-loopback server and a separate attached client process. Cancellation terminates the client process and
-prevents a late success result from overwriting `cancelled`.
+Pi runs as a terminable background process in the Sandbox. OpenCode uses one server confined to the
+Sandbox provider's private network namespace, without a published host port, and a separate attached
+client process. Cancellation terminates the client process and prevents a late success result from
+overwriting `cancelled`.
 
 The official examples repository contains runnable, end-to-end-oriented source for
 [Chat-to-App](https://github.com/appaloft/examples/blob/main/sandbox-agent/src/chat-to-app.ts),

@@ -19,8 +19,22 @@ const context = createExecutionContext({
   tenant: { tenantId: "tenant_opencode" },
 });
 
+const modelAccess = {
+  async issue() {
+    return {
+      capabilityId: "smc_opencode",
+      baseUrl: "http://sandbox-gateway:8788/m/smc_opencode/secret/v1",
+      accessToken: "appaloft-scoped-capability",
+      provider: "appaloft",
+      model: "coding-model",
+      expiresAt: "2099-01-01T00:00:00.000Z",
+    };
+  },
+  async revoke() {},
+};
+
 describe("OpenCodeSandboxAgentHarness", () => {
-  test("[AGENT-OPENCODE-011] prepares one pinned loopback server and translates attached JSON runs", async () => {
+  test("[AGENT-OPENCODE-011] prepares one pinned private-network server and translates attached JSON runs", async () => {
     const files = new Map<string, Uint8Array>();
     const calls: Parameters<OpenCodeSandboxExecutionPort["exec"]>[2][] = [];
     let runPolls = 0;
@@ -95,6 +109,7 @@ describe("OpenCodeSandboxAgentHarness", () => {
       cwd: "app",
       port: 4096,
       startupPollIntervalMs: 1,
+      modelAccess,
     });
 
     expect(
@@ -136,11 +151,14 @@ describe("OpenCodeSandboxAgentHarness", () => {
         "XDG_DATA_HOME=/workspace/.local/share",
         "serve",
         "--hostname",
-        "127.0.0.1",
+        "0.0.0.0",
         "--port",
         "4096",
       ]),
     });
+    expect(server?.stdin).toBeInstanceOf(Uint8Array);
+    expect(JSON.stringify(server?.argv)).not.toContain("/secret/");
+    expect(JSON.stringify(server?.argv)).not.toContain("appaloft-scoped-capability");
     const run = calls.find((call) => Array.isArray(call.argv) && call.argv.includes("run"));
     expect(run?.argv).toEqual(
       expect.arrayContaining([
@@ -149,6 +167,8 @@ describe("OpenCodeSandboxAgentHarness", () => {
         "http://127.0.0.1:4096",
         "--dir",
         "/workspace/app",
+        "--model",
+        "appaloft/coding-model",
         "--format",
         "json",
         "--auto",
@@ -167,9 +187,141 @@ describe("OpenCodeSandboxAgentHarness", () => {
       },
     ]);
     expect(result.outcomeDigest).toStartWith("sha256:");
-    expect(new TextDecoder().decode(files.get(".appaloft-agent/sar_open/opencode-process-id"))).toBe(
-      "spr_server",
-    );
+    expect(
+      JSON.parse(
+        new TextDecoder().decode(files.get(".appaloft-agent/sar_open/opencode-process-id")),
+      ),
+    ).toEqual({
+      schemaVersion: "opencode-server-marker/v2",
+      processId: "spr_server",
+      capabilityId: "smc_opencode",
+      expiresAt: "2099-01-01T00:00:00.000Z",
+      provider: "appaloft",
+      model: "coding-model",
+    });
+  });
+
+  test("[AGENT-OPENCODE-011] cleans server and model capability when durable startup state fails", async () => {
+    const terminated: string[] = [];
+    const revoked: string[] = [];
+    const execution: OpenCodeSandboxExecutionPort = {
+      async exec(_context, _sandboxId, input) {
+        if (input.argv.includes("--version")) {
+          return ok({
+            mode: "foreground",
+            frames: [
+              { kind: "stdout", sequence: 1, data: "1.1.60\n" },
+              { kind: "exit", sequence: 2, exitCode: 0 },
+            ],
+          });
+        }
+        return ok({ mode: "background", processId: "spr_server" });
+      },
+      async listProcesses() {
+        return ok([{ processId: "spr_server", status: "running" }]);
+      },
+      async terminateProcess(_context, _sandboxId, processId) {
+        terminated.push(processId);
+        return ok(undefined);
+      },
+      async readFile() {
+        return err({
+          code: "sandbox_file_not_found",
+          category: "user",
+          message: "missing",
+          retryable: false,
+          details: {},
+        });
+      },
+      async writeFile() {
+        return err({
+          code: "sandbox_marker_write_failed",
+          category: "system",
+          message: "marker unavailable",
+          retryable: true,
+          details: {},
+        });
+      },
+      async removeFile() {
+        return ok(undefined);
+      },
+    };
+    const harness = new OpenCodeSandboxAgentHarness(execution, {
+      templateId: "aht_opencode_managed_v1",
+      sandboxTemplateId: "stp_opencode_pinned",
+      version: "1.1.60",
+      templateDigest: `sha256:${"b".repeat(64)}`,
+      startupPollIntervalMs: 1,
+      modelAccess: {
+        ...modelAccess,
+        async revoke(input) {
+          revoked.push(input.capabilityId);
+        },
+      },
+    });
+
+    await expect(
+      harness.prepareRuntime?.({
+        executionContext: context,
+        sandboxId: "sbx_open",
+        runtimeId: "sar_open",
+      }),
+    ).rejects.toThrow("marker unavailable");
+    expect(terminated).toEqual(["spr_server"]);
+    expect(revoked).toEqual(["smc_opencode"]);
+  });
+
+  test("[AGENT-OPENCODE-011] uses the provider workspace root by default and preserves exec errors", async () => {
+    const calls: Parameters<OpenCodeSandboxExecutionPort["exec"]>[2][] = [];
+    const execution: OpenCodeSandboxExecutionPort = {
+      async exec(_context, _sandboxId, input) {
+        calls.push(input);
+        return err({
+          code: "sandbox_exec_rejected",
+          category: "user",
+          message: "Sandbox exec was rejected",
+          retryable: false,
+          details: {},
+        });
+      },
+      async listProcesses() {
+        return ok([]);
+      },
+      async terminateProcess() {
+        return ok(undefined);
+      },
+      async readFile() {
+        return err({
+          code: "sandbox_file_not_found",
+          category: "user",
+          message: "missing",
+          retryable: false,
+          details: {},
+        });
+      },
+      async writeFile(_context, _sandboxId, input) {
+        return ok({ path: input.path, sizeBytes: input.content.byteLength });
+      },
+      async removeFile() {
+        return ok(undefined);
+      },
+    };
+    const harness = new OpenCodeSandboxAgentHarness(execution, {
+      templateId: "aht_opencode_managed_v1",
+      sandboxTemplateId: "stp_opencode_pinned",
+      version: "1.1.60",
+      templateDigest: `sha256:${"b".repeat(64)}`,
+      modelAccess,
+    });
+
+    await expect(
+      harness.prepareRuntime?.({
+        executionContext: context,
+        sandboxId: "sbx_open",
+        runtimeId: "sar_open",
+      }),
+    ).rejects.toThrow("Sandbox exec was rejected");
+    expect(calls).toEqual([{ argv: ["opencode", "--version"] }]);
   });
 
   test("[AGENT-WS-OPEN-008] cancellation stops the attached client and runtime termination stops the server", async () => {
@@ -177,7 +329,16 @@ describe("OpenCodeSandboxAgentHarness", () => {
     const files = new Map<string, Uint8Array>([
       [
         ".appaloft-agent/sar_open/opencode-process-id",
-        new TextEncoder().encode("spr_server"),
+        new TextEncoder().encode(
+          JSON.stringify({
+            schemaVersion: "opencode-server-marker/v2",
+            processId: "spr_server",
+            capabilityId: "smc_opencode",
+            expiresAt: "2099-01-01T00:00:00.000Z",
+            provider: "appaloft",
+            model: "coding-model",
+          }),
+        ),
       ],
     ]);
     const execution: OpenCodeSandboxExecutionPort = {
@@ -212,6 +373,7 @@ describe("OpenCodeSandboxAgentHarness", () => {
       version: "1.1.60",
       templateDigest: `sha256:${"b".repeat(64)}`,
       startupPollIntervalMs: 1,
+      modelAccess,
     });
 
     const running = harness.execute({

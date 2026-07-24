@@ -46,10 +46,10 @@ facade 保留在 `appaloft.operations`。
 Run 事件会限制数量、深度和字符串大小，并递归 redact credential、secret、password、token 与
 authorization 字段。它们不是 audit event，也不能代替完整模型 transcript。
 
-Pi 在 Sandbox 内作为可终止后台进程运行；OpenCode 使用 Sandbox 内 loopback server 和独立的
-attached client process。取消会终止实际 client 进程，并防止迟到的成功结果覆盖
-`cancelled` 状态。当前 managed template 只应开放 Sandbox 内部能力；外部发布和 secret 使用必须
-继续通过 Appaloft 控制面。
+Pi 在 Sandbox 内作为可终止后台进程运行；OpenCode 使用限制在 Sandbox provider 私有网络命名
+空间内且不发布宿主机端口的 server，以及独立的 attached client process。取消会终止实际 client
+进程，并防止迟到的成功结果覆盖 `cancelled` 状态。当前 managed template 只应开放 Sandbox
+内部能力；外部发布和 secret 使用必须继续通过 Appaloft 控制面。
 
 官方 examples 仓库提供完整源码：
 [Chat-to-App](https://github.com/appaloft/examples/blob/main/sandbox-agent/src/chat-to-app.ts)、

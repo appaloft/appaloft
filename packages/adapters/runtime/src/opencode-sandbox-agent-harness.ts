@@ -46,6 +46,29 @@ export interface OpenCodeSandboxExecutionPort {
   ): Promise<Result<void>>;
 }
 
+export interface OpenCodeSandboxModelAccessProvider {
+  issue(input: {
+    executionContext: ExecutionContext;
+    sandboxId: string;
+    runtimeId: string;
+    runId: string;
+  }): Promise<{
+    capabilityId: string;
+    baseUrl: string;
+    accessToken: string;
+    provider: string;
+    model: string;
+    expiresAt: string;
+  }>;
+  revoke(input: {
+    executionContext: ExecutionContext;
+    sandboxId: string;
+    runtimeId: string;
+    runId: string;
+    capabilityId: string;
+  }): Promise<void>;
+}
+
 export interface OpenCodeSandboxAgentHarnessOptions {
   templateId: string;
   sandboxTemplateId: string;
@@ -57,6 +80,7 @@ export interface OpenCodeSandboxAgentHarnessOptions {
   timeoutMs?: number;
   startupPollAttempts?: number;
   startupPollIntervalMs?: number;
+  modelAccess?: OpenCodeSandboxModelAccessProvider;
 }
 
 async function sha256(value: string): Promise<string> {
@@ -117,9 +141,11 @@ function normalizedCwd(value: string | undefined): string {
 export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
   readonly key = "opencode";
   readonly templateId: string;
+  readonly sandboxTemplateId: string;
   readonly version: string;
   readonly templateDigest: string;
   readonly interaction;
+  readonly capabilities;
   private readonly active = new Map<
     string,
     { context: ExecutionContext; sandboxId: string; processId: string; cancelled: boolean }
@@ -133,6 +159,7 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
     private readonly options: OpenCodeSandboxAgentHarnessOptions,
   ) {
     this.templateId = options.templateId;
+    this.sandboxTemplateId = options.sandboxTemplateId;
     this.version = options.version.trim();
     this.templateDigest = options.templateDigest;
     this.executable = options.executable?.trim() || "opencode";
@@ -157,6 +184,22 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
       sessionRecovery: "native-session-store" as const,
       serverPort: this.port,
     });
+    this.capabilities = Object.freeze({
+      taskMode: true,
+      interactive: true,
+      backgroundRuns: true,
+      nativeSession: true,
+      persistentPaths: Object.freeze([
+        "/workspace",
+        "/workspace/.local/share/opencode",
+        "/workspace/.appaloft-agent",
+      ]),
+      healthcheck: Object.freeze({
+        kind: "http" as const,
+        port: this.port,
+        path: "/global/health",
+      }),
+    });
   }
 
   admitSandbox(source: Parameters<NonNullable<SandboxAgentHarness["admitSandbox"]>>[0]): boolean {
@@ -173,49 +216,143 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
       path: markerPath,
     });
     if (marked.isOk()) {
-      const processId = new TextDecoder().decode(marked.value).trim();
+      const marker = this.parseServerMarker(new TextDecoder().decode(marked.value));
       const processes = await this.execution.listProcesses(
         input.executionContext,
         input.sandboxId,
       );
+      if (processes.isErr()) throw new Error(processes.error.message);
       if (
-        processes.isOk() &&
+        marker &&
+        marker.schemaVersion === "opencode-server-marker/v2" &&
+        marker.provider &&
+        marker.model &&
+        new Date(marker.expiresAt).getTime() >
+          Date.now() + (this.options.timeoutMs ?? 30 * 60_000) &&
         processes.value.some(
-          (process) => process.processId === processId && process.status === "running",
+          (process) => process.processId === marker.processId && process.status === "running",
         )
       ) {
         return;
       }
+      const legacyProcessId = marker
+        ? undefined
+        : this.parseLegacyProcessId(new TextDecoder().decode(marked.value));
+      const processId = marker?.processId ?? legacyProcessId;
+      if (
+        processId &&
+        processes.value.some(
+          (process) => process.processId === processId && process.status === "running",
+        )
+      ) {
+        const terminated = await this.execution.terminateProcess(
+          input.executionContext,
+          input.sandboxId,
+          processId,
+        );
+        if (terminated.isErr()) throw new Error(terminated.error.message);
+      }
+      if (marker) {
+        await this.options.modelAccess?.revoke({
+          ...input,
+          runId: input.runtimeId,
+          capabilityId: marker.capabilityId,
+        });
+      }
+      const removed = await this.execution.removeFile(
+        input.executionContext,
+        input.sandboxId,
+        { path: markerPath },
+      );
+      if (removed.isErr()) throw new Error(removed.error.message);
     }
 
     const version = await this.execution.exec(input.executionContext, input.sandboxId, {
       argv: [this.executable, "--version"],
-      cwd: this.cwd,
+      ...(this.cwd === "." ? {} : { cwd: this.cwd }),
     });
-    if (
-      version.isErr() ||
-      !foregroundSucceeded(version.value) ||
-      !foregroundText(version.value).includes(this.version)
-    ) {
+    if (version.isErr()) throw new Error(version.error.message);
+    if (!foregroundSucceeded(version.value) || !foregroundText(version.value).includes(this.version)) {
       throw new Error("opencode_harness_version_mismatch");
     }
 
+    const modelAccess = this.options.modelAccess;
+    if (!modelAccess) throw new Error("opencode_model_access_unavailable");
+    const capability = await modelAccess.issue({
+      ...input,
+      runId: input.runtimeId,
+    });
+    let modelGateway: URL | undefined;
+    try {
+      modelGateway = new URL(capability.baseUrl);
+    } catch {
+      modelGateway = undefined;
+    }
+    const capabilityExpiry = Date.parse(capability.expiresAt);
+    if (
+      !/^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,159}$/u.test(capability.capabilityId) ||
+      !capability.accessToken ||
+      /[\r\n\0]/u.test(capability.accessToken) ||
+      !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,119}$/u.test(capability.provider) ||
+      !/^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,159}$/u.test(capability.model) ||
+      !modelGateway ||
+      !["http:", "https:"].includes(modelGateway.protocol) ||
+      !modelGateway.hostname ||
+      modelGateway.username ||
+      modelGateway.password ||
+      ["localhost", "127.0.0.1", "::1"].includes(modelGateway.hostname.toLowerCase()) ||
+      !Number.isFinite(capabilityExpiry) ||
+      capabilityExpiry <= Date.now() + (this.options.timeoutMs ?? 30 * 60_000)
+    ) {
+      await modelAccess.revoke({
+        ...input,
+        runId: input.runtimeId,
+        capabilityId: capability.capabilityId,
+      });
+      throw new Error("opencode_model_access_invalid");
+    }
+    const config = JSON.stringify({
+      model: `${capability.provider}/${capability.model}`,
+      provider: {
+        [capability.provider]: {
+          npm: "@ai-sdk/openai-compatible",
+          name: "Appaloft scoped model gateway",
+          options: {
+            baseURL: capability.baseUrl,
+            apiKey: "{env:APPALOFT_MODEL_ACCESS_TOKEN}",
+          },
+          models: {
+            [capability.model]: { name: capability.model },
+          },
+        },
+      },
+    });
     const started = await this.execution.exec(input.executionContext, input.sandboxId, {
       argv: [
+        "sh",
+        "-c",
+        'IFS= read -r config; IFS= read -r token; export OPENCODE_CONFIG_CONTENT="$config"; export APPALOFT_MODEL_ACCESS_TOKEN="$token"; exec "$@"',
+        "appaloft-opencode-server",
         "env",
         "HOME=/workspace",
         "XDG_DATA_HOME=/workspace/.local/share",
         this.executable,
         "serve",
         "--hostname",
-        "127.0.0.1",
+        "0.0.0.0",
         "--port",
         String(this.port),
       ],
-      cwd: this.cwd,
+      ...(this.cwd === "." ? {} : { cwd: this.cwd }),
       background: true,
+      stdin: new TextEncoder().encode(`${config}\n${capability.accessToken}\n`),
     });
     if (started.isErr() || started.value.mode !== "background") {
+      await modelAccess.revoke({
+        ...input,
+        runId: input.runtimeId,
+        capabilityId: capability.capabilityId,
+      });
       throw new Error(
         started.isErr() ? started.error.message : "opencode_server_background_process_required",
       );
@@ -238,16 +375,29 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
           input.sandboxId,
           {
             path: markerPath,
-            content: new TextEncoder().encode(processId),
+            content: new TextEncoder().encode(
+              JSON.stringify({
+                schemaVersion: "opencode-server-marker/v2",
+                processId,
+                capabilityId: capability.capabilityId,
+                expiresAt: capability.expiresAt,
+                provider: capability.provider,
+                model: capability.model,
+              }),
+            ),
           },
         );
-        if (written.isErr()) throw new Error(written.error.message);
+        if (written.isErr()) {
+          await this.cleanupStartedServer(input, processId, capability.capabilityId);
+          throw new Error(written.error.message);
+        }
         return;
       }
       await new Promise((resolve) =>
         setTimeout(resolve, this.options.startupPollIntervalMs ?? 100),
       );
     }
+    await this.cleanupStartedServer(input, processId, capability.capabilityId);
     throw new Error("opencode_server_start_failed");
   }
 
@@ -261,14 +411,19 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
       path: markerPath,
     });
     if (marker.isErr()) return;
-    const processId = new TextDecoder().decode(marker.value).trim();
-    if (processId) {
+    const parsed = this.parseServerMarker(new TextDecoder().decode(marker.value));
+    if (parsed) {
       const terminated = await this.execution.terminateProcess(
         input.executionContext,
         input.sandboxId,
-        processId,
+        parsed.processId,
       );
       if (terminated.isErr()) throw new Error(terminated.error.message);
+      await this.options.modelAccess?.revoke({
+        ...input,
+        runId: input.runtimeId,
+        capabilityId: parsed.capabilityId,
+      });
     }
     const removed = await this.execution.removeFile(input.executionContext, input.sandboxId, {
       path: markerPath,
@@ -278,6 +433,14 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
 
   async execute(input: Parameters<SandboxAgentHarness["execute"]>[0]) {
     await this.prepareRuntime(input);
+    const marker = await this.execution.readFile(input.executionContext, input.sandboxId, {
+      path: this.serverMarkerPath(input.runtimeId),
+    });
+    if (marker.isErr()) throw new Error(marker.error.message);
+    const server = this.parseServerMarker(new TextDecoder().decode(marker.value));
+    if (!server?.provider || !server.model) {
+      throw new Error("opencode_model_identity_unavailable");
+    }
     const outputRoot = `.appaloft-agent/${input.runId}`;
     const stdoutPath = `${outputRoot}/stdout.jsonl`;
     const stderrPath = `${outputRoot}/stderr.log`;
@@ -303,6 +466,8 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
       `http://127.0.0.1:${this.port}`,
       "--dir",
       this.cwd === "." ? "/workspace" : `/workspace/${this.cwd}`,
+      "--model",
+      `${server.provider}/${server.model}`,
       "--format",
       "json",
       "--auto",
@@ -311,7 +476,7 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
     ];
     const result = await this.execution.exec(input.executionContext, input.sandboxId, {
       argv,
-      cwd: this.cwd,
+      ...(this.cwd === "." ? {} : { cwd: this.cwd }),
       background: true,
     });
     if (result.isErr()) throw new Error(result.error.message);
@@ -408,6 +573,79 @@ export class OpenCodeSandboxAgentHarness implements SandboxAgentHarness {
 
   private serverMarkerPath(runtimeId: string): string {
     return `.appaloft-agent/${runtimeId}/opencode-process-id`;
+  }
+
+  private parseServerMarker(
+    value: string,
+  ): {
+    schemaVersion?: string;
+    processId: string;
+    capabilityId: string;
+    expiresAt: string;
+    provider?: string;
+    model?: string;
+  } | null {
+    try {
+      const parsed = JSON.parse(value) as Record<string, unknown>;
+      if (
+        typeof parsed.processId === "string" &&
+        typeof parsed.capabilityId === "string" &&
+        typeof parsed.expiresAt === "string"
+      ) {
+        return {
+          ...(parsed.schemaVersion === "opencode-server-marker/v2"
+            ? { schemaVersion: parsed.schemaVersion }
+            : {}),
+          processId: parsed.processId,
+          capabilityId: parsed.capabilityId,
+          expiresAt: parsed.expiresAt,
+          ...(typeof parsed.provider === "string" ? { provider: parsed.provider } : {}),
+          ...(typeof parsed.model === "string" ? { model: parsed.model } : {}),
+        };
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  }
+
+  private parseLegacyProcessId(value: string): string | undefined {
+    const processId = value.trim();
+    return /^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,159}$/u.test(processId)
+      ? processId
+      : undefined;
+  }
+
+  private async cleanupStartedServer(
+    input: {
+      executionContext: ExecutionContext;
+      sandboxId: string;
+      runtimeId: string;
+    },
+    processId: string,
+    capabilityId: string,
+  ): Promise<void> {
+    const terminated = await this.execution.terminateProcess(
+      input.executionContext,
+      input.sandboxId,
+      processId,
+    );
+    let revokeError: unknown;
+    try {
+      await this.options.modelAccess?.revoke({
+        ...input,
+        runId: input.runtimeId,
+        capabilityId,
+      });
+    } catch (error) {
+      revokeError = error;
+    }
+    if (terminated.isErr()) throw new Error(terminated.error.message);
+    if (revokeError) {
+      throw revokeError instanceof Error
+        ? revokeError
+        : new Error("opencode_model_access_revoke_failed");
+    }
   }
 
   private workspaceFilePath(path: string): string {

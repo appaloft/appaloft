@@ -8,6 +8,7 @@ const id = z.string().trim().min(1).max(160);
 const digest = z.string().regex(/^sha256:[a-f0-9]{64}$/);
 const idempotencyKey = z.string().trim().min(1).max(256);
 
+export const listSandboxAgentHarnessesInputSchema = z.object({}).strict();
 export const createSandboxAgentRuntimeInputSchema = z
   .object({
     sandboxId: id,
@@ -20,12 +21,15 @@ export const listSandboxAgentRuntimesInputSchema = z.object({ sandboxId: id }).s
 export const showSandboxAgentRuntimeInputSchema = z
   .object({ sandboxId: id, runtimeId: id })
   .strict();
+export const issueSandboxAgentAttachAccessInputSchema = showSandboxAgentRuntimeInputSchema
+  .extend({ expiresAt: z.iso.datetime() })
+  .strict();
 export const terminateSandboxAgentRuntimeInputSchema = showSandboxAgentRuntimeInputSchema;
 export const createSandboxAgentRunInputSchema = z
   .object({
     sandboxId: id,
     runtimeId: id,
-    task: z.string().trim().min(1).max(256),
+    task: z.string().trim().min(1).max(16_384),
     context: z.discriminatedUnion("mode", [
       z.object({ mode: z.literal("fresh") }).strict(),
       z.object({ mode: z.literal("continue"), parentRunId: id }).strict(),
@@ -130,6 +134,11 @@ export class TerminateSandboxAgentRuntimeCommand extends AgentCommand {
     return command(terminateSandboxAgentRuntimeInputSchema, input, (value) => new this(value));
   }
 }
+export class IssueSandboxAgentAttachAccessCommand extends AgentCommand {
+  static create(input: unknown) {
+    return command(issueSandboxAgentAttachAccessInputSchema, input, (value) => new this(value));
+  }
+}
 export class CreateSandboxAgentRunCommand extends AgentCommand {
   static create(input: unknown) {
     return command(createSandboxAgentRunInputSchema, input, (value) => new this(value));
@@ -184,6 +193,11 @@ export class RetrySandboxPromotionCommand extends AgentCommand {
 export class ListSandboxAgentRuntimesQuery extends AgentQuery {
   static create(input: unknown) {
     return query(listSandboxAgentRuntimesInputSchema, input, (value) => new this(value));
+  }
+}
+export class ListSandboxAgentHarnessesQuery extends AgentQuery {
+  static create(input: unknown = {}) {
+    return query(listSandboxAgentHarnessesInputSchema, input, (value) => new this(value));
   }
 }
 export class ShowSandboxAgentRuntimeQuery extends AgentQuery {

@@ -1146,7 +1146,8 @@ export class ExecutionSandboxService {
         }),
       );
     }
-    if (input.stdin && (input.stdin.byteLength > 16 * 1024 * 1024 || input.background)) {
+    const stdinLimit = input.background ? 64 * 1024 : 16 * 1024 * 1024;
+    if (input.stdin && input.stdin.byteLength > stdinLimit) {
       return err(
         domainError.validation("Sandbox stdin is invalid for this execution mode", {
           phase: "execution-sandbox-exec-admission",

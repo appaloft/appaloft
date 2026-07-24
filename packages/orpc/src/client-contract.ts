@@ -575,6 +575,13 @@ export interface BootstrapFirstAdminResponse {
   loginUrl?: string;
 }
 
+type SandboxOperationResponse = Record<string, unknown>;
+type SandboxListResponse = { items: SandboxOperationResponse[] } & Record<string, unknown>;
+type SandboxAgentTaskInput = {
+  workspaceId: string;
+  taskRunId: string;
+};
+
 export type AppaloftOrpcClientContract = {
   auth: {
     bootstrapStatus: Client<
@@ -603,6 +610,219 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       QueryEntitlementsInput,
       QueryEntitlementsResponse,
+      AppaloftClientError
+    >;
+  };
+  sandboxes: {
+    create: Client<
+      AppaloftClientContext,
+      SandboxOperationResponse,
+      SandboxOperationResponse,
+      AppaloftClientError
+    >;
+    list: Client<
+      AppaloftClientContext,
+      { limit?: number; offset?: number },
+      SandboxListResponse,
+      AppaloftClientError
+    >;
+    show: Client<
+      AppaloftClientContext,
+      { sandboxId: string },
+      SandboxOperationResponse,
+      AppaloftClientError
+    >;
+    pause: Client<
+      AppaloftClientContext,
+      { sandboxId: string },
+      SandboxOperationResponse,
+      AppaloftClientError
+    >;
+    resume: Client<
+      AppaloftClientContext,
+      { sandboxId: string },
+      SandboxOperationResponse,
+      AppaloftClientError
+    >;
+    terminate: Client<
+      AppaloftClientContext,
+      { sandboxId: string },
+      SandboxOperationResponse,
+      AppaloftClientError
+    >;
+    exec: Client<
+      AppaloftClientContext,
+      {
+        sandboxId: string;
+        argv: string[];
+        cwd?: string;
+        background?: boolean;
+        timeoutMs?: number;
+        stdinBase64?: string;
+      },
+      SandboxOperationResponse,
+      AppaloftClientError
+    >;
+    ports: {
+      expose: Client<
+        AppaloftClientContext,
+        {
+          sandboxId: string;
+          port: number;
+          visibility?: "private" | "organization" | "public";
+          expiresAt?: string;
+        },
+        SandboxOperationResponse,
+        AppaloftClientError
+      >;
+      list: Client<
+        AppaloftClientContext,
+        { sandboxId: string },
+        SandboxOperationResponse[],
+        AppaloftClientError
+      >;
+      revoke: Client<
+        AppaloftClientContext,
+        { sandboxId: string; exposureId: string },
+        SandboxOperationResponse,
+        AppaloftClientError
+      >;
+    };
+    agents: {
+      harnesses: {
+        list: Client<
+          AppaloftClientContext,
+          Record<string, never>,
+          SandboxOperationResponse[],
+          AppaloftClientError
+        >;
+      };
+      runtimes: {
+        create: Client<
+          AppaloftClientContext,
+          {
+            sandboxId: string;
+            harnessKey: string;
+            harnessTemplateId: string;
+            idempotencyKey: string;
+          },
+          SandboxOperationResponse,
+          AppaloftClientError
+        >;
+        list: Client<
+          AppaloftClientContext,
+          { sandboxId: string },
+          { items: SandboxOperationResponse[] },
+          AppaloftClientError
+        >;
+        show: Client<
+          AppaloftClientContext,
+          { sandboxId: string; runtimeId: string },
+          SandboxOperationResponse,
+          AppaloftClientError
+        >;
+        attach: Client<
+          AppaloftClientContext,
+          { sandboxId: string; runtimeId: string; expiresAt: string },
+          SandboxOperationResponse,
+          AppaloftClientError
+        >;
+        terminate: Client<
+          AppaloftClientContext,
+          { sandboxId: string; runtimeId: string },
+          SandboxOperationResponse,
+          AppaloftClientError
+        >;
+      };
+      runs: {
+        events: Client<
+          AppaloftClientContext,
+          { runId: string; afterSequence?: number; limit?: number },
+          {
+            items: {
+              eventId: string;
+              runId: string;
+              sequence: number;
+              type: string;
+              data: Record<string, unknown>;
+              createdAt: string;
+            }[];
+            nextSequence: number | null;
+          },
+          AppaloftClientError
+        >;
+      };
+    };
+    agentTasks: {
+      create: Client<
+        AppaloftClientContext,
+        {
+          workspaceId: string;
+          runtimeId: string;
+          task: string;
+          runContext: { mode: "fresh" } | { mode: "continue"; parentRunId: string };
+          idempotencyKey: string;
+          checks: { name: string; argv: string[]; required: boolean }[];
+          preview?: {
+            startArgv: string[];
+            port: number;
+            visibility: "private" | "organization" | "public";
+            expiresAt?: string;
+          };
+          immutableReview: boolean;
+          sourceRoot: string;
+        },
+        SandboxOperationResponse,
+        AppaloftClientError
+      >;
+      list: Client<
+        AppaloftClientContext,
+        { workspaceId: string; runtimeId: string },
+        { items: SandboxOperationResponse[] },
+        AppaloftClientError
+      >;
+      show: Client<
+        AppaloftClientContext,
+        SandboxAgentTaskInput,
+        SandboxOperationResponse,
+        AppaloftClientError
+      >;
+      resume: Client<
+        AppaloftClientContext,
+        SandboxAgentTaskInput,
+        SandboxOperationResponse,
+        AppaloftClientError
+      >;
+      cancel: Client<
+        AppaloftClientContext,
+        SandboxAgentTaskInput,
+        SandboxOperationResponse,
+        AppaloftClientError
+      >;
+      approve: Client<
+        AppaloftClientContext,
+        SandboxAgentTaskInput,
+        SandboxOperationResponse,
+        AppaloftClientError
+      >;
+      deliver: Client<
+        AppaloftClientContext,
+        SandboxAgentTaskInput & {
+          branch: string;
+          commitMessage: string;
+          remote: string;
+          pullRequest?: { provider: "github"; title: string; body?: string; base?: string };
+        },
+        SandboxOperationResponse,
+        AppaloftClientError
+      >;
+    };
+  };
+  sandboxTemplates: {
+    list: Client<
+      AppaloftClientContext,
+      { limit?: number; offset?: number },
+      { items: SandboxOperationResponse[] },
       AppaloftClientError
     >;
   };

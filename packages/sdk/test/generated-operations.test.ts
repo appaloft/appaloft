@@ -9,7 +9,7 @@ describe("generated SDK operation metadata", () => {
         operation.operationGroup === "sandboxes" || operation.operationGroup.startsWith("sandbox-"),
     );
 
-    expect(operations).toHaveLength(56);
+    expect(operations).toHaveLength(65);
     expect(
       operations.find((operation) => operation.operationKey === "sandboxes.create"),
     ).toMatchObject({
