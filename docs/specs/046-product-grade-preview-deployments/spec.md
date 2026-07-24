@@ -118,6 +118,7 @@ Non-scheduled compensation must exist even when the periodic scheduler is disabl
 | PG-PREVIEW-SPEC-008 | Quota and expiry are enforced | A repository or project exceeds preview count, age, or resource quota | Preview policy evaluates a create/update event or scheduler scans previews | New previews are blocked or old previews are scheduled for cleanup according to policy, with read-model visibility and safe user guidance. |
 | PG-PREVIEW-SPEC-009 | Public surfaces stay normalized | Web, CLI, HTTP/oRPC, or future MCP surfaces inspect product-grade previews | Users list, show, configure, deploy, or delete previews | Output uses Appaloft preview policy/environment language with stable operation keys and help anchors, not provider-native webhook payloads or GitHub API objects. Web presents previews as derived runtime environments under Resources by default; global preview views are secondary rollups, not primary resource peers. |
 | PG-PREVIEW-SPEC-010 | Preview policy selects base Environment Profile safely | Product-grade preview policy includes an Environment Profile base id | A verified PR preview event is evaluated | The policy decision records only the safe base environment id, then the existing preview lifecycle creates/updates the derived preview environment and dispatches ids-only deployment; fork previews with secret scopes remain blocked before dispatch unless policy explicitly allows safe no-secret previews. |
+| PG-PREVIEW-SPEC-011 | Worker feedback rehydrates GitHub App credentials | A preview feedback operation runs with tenant context after the browser-safe GitHub connection projection has removed secret material | The feedback writer selects provider credentials | It explicitly requests a short-lived GitHub App installation token from the integration auth port, never substitutes a user OAuth token or expects token material in the projection, and uses the configured preview worker token only as a compatibility fallback when no installation credential can be minted. |
 
 ## Error And Async Semantics
 
@@ -275,10 +276,11 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   for supplied provider deployment ids and for automatic product-grade preview feedback; when no
   deployment id is present, the GitHub writer resolves the pull-request head SHA, creates a
   transient GitHub preview deployment, records that deployment id as the provider feedback id, and
-  appends deployment statuses to that deployment timeline. Shell wiring resolves the GitHub access
-  token per request through the existing integration auth port when a user request is in scope, or
-  through the explicit preview feedback worker token for webhook/scheduler execution contexts,
-  before delegating to the composite GitHub feedback writer.
+  appends deployment statuses to that deployment timeline. Shell wiring explicitly requests a
+  short-lived GitHub App installation token from the integration auth port using tenant context;
+  it does not consume browser-safe connection projections or user OAuth tokens. The explicit
+  preview feedback worker token remains a compatibility fallback for webhook/scheduler contexts
+  where no installation credential can be minted.
 - Preview environment cleanup now has an initial application service that loads the durable preview
   environment, marks cleanup requested without deleting preview history, and delegates runtime,
   route, source-link, provider metadata, and feedback cleanup to a port with safe source-scope
@@ -325,9 +327,10 @@ durable preview/source/cleanup/feedback state with terminal or retryable visibil
   idempotent `github-deployment-status` feedback after ids-only deployment dispatch. Retryable
   deployment-status feedback failures are recorded as safe feedback state without changing the
   accepted deployment result to `err`.
-- GitHub preview feedback worker transport is available for self-hosted/control-plane webhook and
-  scheduler contexts through an explicit runtime token. Full GitHub App installation-token
-  onboarding remains a separate governed public enablement decision outside this active baseline.
+- GitHub preview feedback worker transport selects tenant-scoped GitHub App installation
+  credentials first and retains an explicit runtime token as a compatibility fallback for
+  self-hosted/control-plane webhook and scheduler contexts. Broader hosted onboarding and
+  provider-smoke coverage remain separate governed public enablement work.
 - GitHub PR-comment preview feedback now has a secret-gated live provider smoke gate:
   `bun run smoke:preview-provider:github` updates a marker comment on a configured pull request, and
   `.github/workflows/preview-provider-e2e.yml` lets nightly skip when secrets are absent while
