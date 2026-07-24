@@ -34,6 +34,7 @@ function provider(): SandboxProvider & { removed: SandboxOwnedRuntime[] } {
     removed,
     async listOwnedRuntimes(request) {
       expect(request.ownerScope).toBe("tenant_a");
+      expect(request.ownerOrganizationId).toBe("org_a");
       return {
         items: [
           {
