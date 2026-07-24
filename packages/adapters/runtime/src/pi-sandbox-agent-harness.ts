@@ -165,6 +165,55 @@ async function emitJsonEvents(
   for (const event of parseJsonEvents(stdout)) await emitEvent(event);
 }
 
+const piSandboxFailureCodes = [
+  "pi_model_access_unavailable",
+  "pi_model_gateway_host_unresolved",
+  "pi_model_gateway_unreachable",
+  "pi_model_unauthorized",
+  "pi_model_endpoint_not_found",
+  "pi_cli_option_unsupported",
+  "pi_filesystem_read_only",
+  "pi_permission_denied",
+  "pi_out_of_memory",
+  "pi_process_cancelled",
+  "pi_process_timeout",
+  "pi_process_result_unavailable",
+  "pi_process_failed",
+] as const;
+
+export type PiSandboxFailureCode = (typeof piSandboxFailureCodes)[number];
+
+export function classifyPiSandboxFailure(value: unknown): PiSandboxFailureCode {
+  const message = value instanceof Error ? value.message : String(value);
+  const known = piSandboxFailureCodes.find((code) => message === code);
+  if (known) return known;
+  if (/ENOTFOUND|EAI_AGAIN|getaddrinfo|host not found|name resolution/i.test(message)) {
+    return "pi_model_gateway_host_unresolved";
+  }
+  if (/ECONNREFUSED|ECONNRESET|network is unreachable|fetch failed|connection refused/i.test(message)) {
+    return "pi_model_gateway_unreachable";
+  }
+  if (/\b401\b|unauthorized|invalid api key|authentication failed/i.test(message)) {
+    return "pi_model_unauthorized";
+  }
+  if (/\b404\b|endpoint not found|route not found/i.test(message)) {
+    return "pi_model_endpoint_not_found";
+  }
+  if (/unknown option|unexpected option|unrecognized option/i.test(message)) {
+    return "pi_cli_option_unsupported";
+  }
+  if (/read-only file system|\bEROFS\b/i.test(message)) {
+    return "pi_filesystem_read_only";
+  }
+  if (/permission denied|\bEACCES\b|\bEPERM\b/i.test(message)) {
+    return "pi_permission_denied";
+  }
+  if (/out of memory|\bENOMEM\b|heap limit/i.test(message)) {
+    return "pi_out_of_memory";
+  }
+  return "pi_process_failed";
+}
+
 export class PiSandboxAgentHarness implements SandboxAgentHarness {
   readonly key = "pi";
   readonly templateId: string;
@@ -311,12 +360,25 @@ export class PiSandboxAgentHarness implements SandboxAgentHarness {
         await emitJsonEvents(stdout.slice(stdoutCursor), input.emitEvent);
       }
       if (exitCode !== 0) {
-        throw new Error(`pi_process_failed:${String(stderr).slice(0, 256)}`);
+        throw new Error(classifyPiSandboxFailure(stderr));
       }
       return {
         events: input.emitEvent ? [] : parseJsonEvents(stdout),
         outcomeDigest: await sha256(stdout),
       };
+    } catch (error) {
+      const code = classifyPiSandboxFailure(error);
+      if (input.emitEvent) {
+        try {
+          await input.emitEvent({
+            type: "run-error",
+            data: { source: "pi", code },
+          });
+        } catch {
+          // The original secret-safe failure code remains authoritative when event persistence fails.
+        }
+      }
+      throw new Error(code);
     } finally {
       this.active.delete(input.runId);
       await this.cleanup(input.executionContext, input.sandboxId, outputRoot);
