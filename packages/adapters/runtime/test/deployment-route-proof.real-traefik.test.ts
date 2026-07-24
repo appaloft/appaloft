@@ -105,7 +105,7 @@ realTraefikTest(
         `127.0.0.1:${port}:80`,
         "-v",
         "/var/run/docker.sock:/var/run/docker.sock:ro",
-        "traefik:v3.6.2",
+        "traefik:v3.6.23",
         "--providers.docker=true",
         "--providers.docker.exposedbydefault=false",
         `--providers.docker.network=${network}`,

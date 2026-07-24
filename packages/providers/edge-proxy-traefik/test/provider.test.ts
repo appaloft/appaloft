@@ -165,7 +165,7 @@ describe("TraefikEdgeProxyProvider", () => {
       networkName: "appaloft-edge",
       containerName: "appaloft-traefik",
     });
-    expect(ensure._unsafeUnwrap().containerCommand).toContain("traefik:v3.6.2");
+    expect(ensure._unsafeUnwrap().containerCommand).toContain("traefik:v3.6.23");
     expect(ensure._unsafeUnwrap().containerCommand).toContain(
       "--add-host host.docker.internal:host-gateway",
     );
@@ -185,7 +185,7 @@ describe("TraefikEdgeProxyProvider", () => {
       "-v 'appaloft-traefik-acme:/letsencrypt'",
     );
     expect(ensure._unsafeUnwrap().metadata).toMatchObject({
-      image: "traefik:v3.6.2",
+      image: "traefik:v3.6.23",
     });
     expect(diagnostics.isOk()).toBe(true);
     expect(diagnostics._unsafeUnwrap().checks.map((check) => check.name)).toEqual([
@@ -195,7 +195,7 @@ describe("TraefikEdgeProxyProvider", () => {
     ]);
     const routeProbeCommand = diagnostics._unsafeUnwrap().checks[2]?.command ?? "";
     const routeProbeSyntax = Bun.spawnSync(["sh", "-n", "-c", routeProbeCommand]);
-    expect(diagnostics._unsafeUnwrap().checks[0]?.command).toContain("traefik:v3.6.2");
+    expect(diagnostics._unsafeUnwrap().checks[0]?.command).toContain("traefik:v3.6.23");
     expect(routeProbeCommand).toContain("traefik.enable=true");
     expect(routeProbeSyntax.exitCode).toBe(0);
     expect(routeProbeSyntax.stderr.toString()).toBe("");

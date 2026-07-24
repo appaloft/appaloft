@@ -7,7 +7,7 @@ exports[`TraefikEdgeProxyProvider [ASH-PROVIDER-001] snapshots rendered proxy sh
       "command": 
 "actual="$(docker inspect -f 'status={{.State.Status}} image={{.Config.Image}}' 'appaloft-traefik' 2>/dev/null)"
 printf "%s\\n" "$actual"
-[ "$actual" = 'status=running image=traefik:v3.6.2' ]"
+[ "$actual" = 'status=running image=traefik:v3.6.23' ]"
 ,
       "name": "edge-proxy-container",
     },
@@ -38,7 +38,7 @@ dump_http() {
 }
 trap cleanup EXIT
 cleanup
-docker run -d --name 'appaloft-proxy-probe-loyw3v28' --network 'appaloft-edge' --label traefik.enable=true --label 'traefik.docker.network=appaloft-edge' --label 'traefik.http.routers.appaloft-proxy-probe-loyw3v28.rule=Host(\`appaloft-proxy-probe-loyw3v28.local.appaloft.test\`)' --label 'traefik.http.routers.appaloft-proxy-probe-loyw3v28.entrypoints=web' --label 'traefik.http.routers.appaloft-proxy-probe-loyw3v28.service=appaloft-proxy-probe-loyw3v28-svc' --label 'traefik.http.services.appaloft-proxy-probe-loyw3v28-svc.loadbalancer.server.port=80' 'traefik:v3.6.2' --ping=true --entrypoints.web.address=:80 --ping.entrypoint=web >/dev/null
+docker run -d --name 'appaloft-proxy-probe-loyw3v28' --network 'appaloft-edge' --label traefik.enable=true --label 'traefik.docker.network=appaloft-edge' --label 'traefik.http.routers.appaloft-proxy-probe-loyw3v28.rule=Host(\`appaloft-proxy-probe-loyw3v28.local.appaloft.test\`)' --label 'traefik.http.routers.appaloft-proxy-probe-loyw3v28.entrypoints=web' --label 'traefik.http.routers.appaloft-proxy-probe-loyw3v28.service=appaloft-proxy-probe-loyw3v28-svc' --label 'traefik.http.services.appaloft-proxy-probe-loyw3v28-svc.loadbalancer.server.port=80' 'traefik:v3.6.23' --ping=true --entrypoints.web.address=:80 --ping.entrypoint=web >/dev/null
 i=0
 while [ "$i" -lt 15 ]; do
   if probe_http; then
@@ -57,13 +57,13 @@ exit 1"
   "ensure": {
     "containerCommand": 
 "docker inspect -f '{{.State.Running}}' 'appaloft-traefik' 2>/dev/null | grep true >/dev/null &&
-[ "$(docker inspect -f '{{.Config.Image}}' 'appaloft-traefik' 2>/dev/null)" = 'traefik:v3.6.2' ] &&
+[ "$(docker inspect -f '{{.Config.Image}}' 'appaloft-traefik' 2>/dev/null)" = 'traefik:v3.6.23' ] &&
 docker inspect -f '{{range .Args}}{{println .}}{{end}}' 'appaloft-traefik' 2>/dev/null | grep -Fx -- '--certificatesresolvers.appaloft.acme.httpchallenge=true' >/dev/null &&
 docker inspect -f '{{range .Args}}{{println .}}{{end}}' 'appaloft-traefik' 2>/dev/null | grep -Fx -- '--certificatesresolvers.appaloft.acme.httpchallenge.entrypoint=web' >/dev/null &&
 docker inspect -f '{{range .Args}}{{println .}}{{end}}' 'appaloft-traefik' 2>/dev/null | grep -Fx -- '--certificatesresolvers.appaloft.acme.storage=/letsencrypt/acme.json' >/dev/null ||
 (
   docker rm -f 'appaloft-traefik' >/dev/null 2>&1 || true
-  docker run -d --restart unless-stopped --name 'appaloft-traefik' --network 'appaloft-edge' -p '8080:80' -p '8443:443' --add-host host.docker.internal:host-gateway -v /var/run/docker.sock:/var/run/docker.sock:ro -v 'appaloft-traefik-acme:/letsencrypt' 'traefik:v3.6.2' --providers.docker=true --providers.docker.exposedbydefault=false --providers.docker.network='appaloft-edge' --entrypoints.web.address=:80 --entrypoints.websecure.address=:443 '--certificatesresolvers.appaloft.acme.httpchallenge=true' '--certificatesresolvers.appaloft.acme.httpchallenge.entrypoint=web' '--certificatesresolvers.appaloft.acme.storage=/letsencrypt/acme.json'
+  docker run -d --restart unless-stopped --name 'appaloft-traefik' --network 'appaloft-edge' -p '8080:80' -p '8443:443' --add-host host.docker.internal:host-gateway -v /var/run/docker.sock:/var/run/docker.sock:ro -v 'appaloft-traefik-acme:/letsencrypt' 'traefik:v3.6.23' --providers.docker=true --providers.docker.exposedbydefault=false --providers.docker.network='appaloft-edge' --entrypoints.web.address=:80 --entrypoints.websecure.address=:443 '--certificatesresolvers.appaloft.acme.httpchallenge=true' '--certificatesresolvers.appaloft.acme.httpchallenge.entrypoint=web' '--certificatesresolvers.appaloft.acme.storage=/letsencrypt/acme.json'
 )"
 ,
     "networkCommand": "docker network inspect 'appaloft-edge' >/dev/null 2>&1 || docker network create 'appaloft-edge'",
