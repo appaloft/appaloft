@@ -217,6 +217,24 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft terminal-session show <sessionId>` - `terminal-sessions.show`
 - `appaloft terminal-session close <sessionId>` - `terminal-sessions.close`
 - `appaloft terminal-session expire` - `terminal-sessions.expire`
+- `appaloft workspace collaboration create` - `workspace-collaborations.create`
+- `appaloft workspace collaboration list` - `workspace-collaborations.list`
+- `appaloft workspace collaboration show <collaborationId>` - `workspace-collaborations.show`
+- `appaloft workspace collaboration participant add <collaborationId>` - `workspace-collaborations.participants.add`
+- `appaloft workspace collaboration participant role <collaborationId> <participantId>` - `workspace-collaborations.participants.change-role`
+- `appaloft workspace collaboration participant remove <collaborationId> <participantId>` - `workspace-collaborations.participants.remove`
+- `appaloft workspace collaboration lane add <collaborationId>` - `workspace-collaborations.lanes.add`
+- `appaloft workspace collaboration lane archive <collaborationId> <laneId>` - `workspace-collaborations.lanes.archive`
+- `appaloft workspace collaboration writer acquire <collaborationId> <laneId>` - `workspace-collaborations.writer-leases.acquire`
+- `appaloft workspace collaboration writer renew <collaborationId> <laneId>` - `workspace-collaborations.writer-leases.renew`
+- `appaloft workspace collaboration writer release <collaborationId> <laneId>` - `workspace-collaborations.writer-leases.release`
+- `appaloft workspace collaboration writer transfer <collaborationId> <laneId>` - `workspace-collaborations.writer-leases.transfer`
+- `appaloft workspace collaboration handoff offer <collaborationId>` - `workspace-collaborations.handoffs.offer`
+- `appaloft workspace collaboration handoff resolve <collaborationId> <handoffId>` - `workspace-collaborations.handoffs.resolve`
+- `appaloft workspace collaboration access <collaborationId> <laneId>` - `workspace-collaborations.lanes.authorize-access`
+- `appaloft workspace collaboration terminal <collaborationId> <laneId>` - `workspace-collaborations.lanes.terminal-access.issue`
+- `appaloft workspace collaboration attach <collaborationId> <laneId>` - `workspace-collaborations.lanes.native-attach.issue`
+- `appaloft workspace collaboration close <collaborationId>` - `workspace-collaborations.close`
 - `appaloft resource diagnose [resourceId] [--preview <previewEnvironmentId>]` - `resources.diagnostic-summary`
 - `appaloft resource access-failure <requestId>` - `resources.access-failure-evidence.lookup`
 - `appaloft resource health [resourceId] [--preview <previewEnvironmentId>]` - `resources.health`

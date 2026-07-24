@@ -91,6 +91,25 @@ exposure 到期、被 revoke 或 Sandbox 被清理后，地址必须失效。它
 不同团队成员使用不同 Sandbox 时，文件、进程、Terminal Session 和端口 exposure 都有独立
 identity；两人都监听内部 3000 端口也不会互相占用。
 
+## 多人和多 Agent 协作
+
+一个 Collaboration 把已有的 Workspace/Sandbox 作为独立 Lane 组织起来，不接管它们的生命周期：
+
+```bash
+appaloft workspace collaboration create
+appaloft workspace collaboration participant add <collaborationId>
+appaloft workspace collaboration lane add <collaborationId>
+appaloft workspace collaboration writer acquire <collaborationId> <laneId>
+```
+
+参与者可以是团队成员，也可以是 Pi、OpenCode 或其他 Agent Runtime。每条 Lane 同时只有一个持有
+租约的 writer；其他参与者可通过带时效、可撤销的 access descriptor 旁观同一个真实 PTY 输出，
+但不能发送输入。writer 转交会增加 fencing generation，旧客户端即使仍连接也不能继续写入。
+
+Console 和 CLI 只管理连接、权限、重连与交接，不重新实现 Agent 自己的 TUI。支持 native attach
+的 Agent 可以获得原生客户端连接命令；其他交互式 Agent 继续使用其自身 TUI 所在的受管 PTY。
+评审交接绑定不可变 Source Artifact digest，接受或拒绝不会把两个 Workspace 的工作目录直接合并。
+
 ## 生命周期
 
 ```bash

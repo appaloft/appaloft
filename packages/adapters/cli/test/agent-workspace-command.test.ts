@@ -2,6 +2,9 @@ import "../../../application/node_modules/reflect-metadata/Reflect.js";
 
 import { describe, expect, test } from "bun:test";
 import {
+  AcquireWorkspaceWriterLeaseCommand,
+  AddWorkspaceCollaborationLaneCommand,
+  AddWorkspaceCollaborationParticipantCommand,
   ApproveAgentTaskRunCommand,
   CancelAgentTaskRunCommand,
   type Command,
@@ -9,18 +12,23 @@ import {
   CreateAgentTaskRunCommand,
   CreateSandboxAgentRuntimeCommand,
   CreateSandboxCommand,
+  CreateWorkspaceCollaborationCommand,
   createExecutionContext,
   DeliverAgentTaskRunCommand,
   ExecuteSandboxCommand,
   type ExecutionContextFactory,
+  IssueWorkspaceCollaborationNativeAttachCommand,
+  IssueWorkspaceCollaborationTerminalAccessCommand,
   ListAgentTaskRunsQuery,
   ListSandboxAgentRuntimesQuery,
   ListSandboxesQuery,
+  ListWorkspaceCollaborationsQuery,
   type Query,
   type QueryBus,
   ResumeAgentTaskRunCommand,
   ShowAgentTaskRunQuery,
   ShowSandboxQuery,
+  ShowWorkspaceCollaborationQuery,
   TerminateSandboxAgentRuntimeCommand,
   TerminateSandboxCommand,
 } from "@appaloft/application";
@@ -103,6 +111,157 @@ describe("Agent Workspace CLI", () => {
         harnessTemplateId: "aht_opencode_managed_v1",
       },
     });
+  });
+
+  test("[COLLAB-SURFACE-013] exposes collaboration creation, membership, lanes and access grants", async () => {
+    const commands: Command<unknown>[] = [];
+    const queries: Query<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, command: Command<T>) => {
+        commands.push(command as Command<unknown>);
+        return ok({ status: "active" } as T);
+      },
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, query: Query<T>) => {
+        queries.push(query as Query<unknown>);
+        return ok({ items: [] } as T);
+      },
+    } as unknown as QueryBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) => createExecutionContext({ ...input, requestId: "req_collaboration_cli" }),
+    };
+    const { createCliProgram } = await import("../src");
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory,
+    });
+    const write = process.stdout.write;
+    process.stdout.write = (() => true) as typeof process.stdout.write;
+    try {
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "workspace",
+        "collaboration",
+        "create",
+        "--name",
+        "Issue 123",
+        "--workspace-id",
+        "sbx_builder",
+      ]);
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "workspace",
+        "collaboration",
+        "participant",
+        "add",
+        "wsc_123",
+        "--subject-kind",
+        "agent-runtime",
+        "--runtime-id",
+        "sar_reviewer",
+        "--workspace-id",
+        "sbx_reviewer",
+        "--role",
+        "reviewer",
+      ]);
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "workspace",
+        "collaboration",
+        "lane",
+        "add",
+        "wsc_123",
+        "--workspace-id",
+        "sbx_reviewer",
+        "--purpose",
+        "reviewer",
+        "--label",
+        "Review",
+      ]);
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "workspace",
+        "collaboration",
+        "writer",
+        "acquire",
+        "wsc_123",
+        "--lane-id",
+        "wln_builder",
+        "--expires-at",
+        "2026-07-24T02:00:00.000Z",
+      ]);
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "workspace",
+        "collaboration",
+        "terminal-access",
+        "wsc_123",
+        "--lane-id",
+        "wln_builder",
+        "--session-id",
+        "term_builder",
+        "--access",
+        "write",
+        "--generation",
+        "1",
+      ]);
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "workspace",
+        "collaboration",
+        "native-attach",
+        "wsc_123",
+        "--lane-id",
+        "wln_builder",
+        "--runtime-id",
+        "sar_opencode",
+        "--expires-at",
+        "2026-07-24T02:00:00.000Z",
+        "--generation",
+        "1",
+      ]);
+      await program.parseAsync(["node", "appaloft", "workspace", "collaboration", "list"]);
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "workspace",
+        "collaboration",
+        "show",
+        "wsc_123",
+      ]);
+    } finally {
+      process.stdout.write = write;
+    }
+
+    expect(commands.map((command) => command.constructor)).toEqual([
+      CreateWorkspaceCollaborationCommand,
+      AddWorkspaceCollaborationParticipantCommand,
+      AddWorkspaceCollaborationLaneCommand,
+      AcquireWorkspaceWriterLeaseCommand,
+      IssueWorkspaceCollaborationTerminalAccessCommand,
+      IssueWorkspaceCollaborationNativeAttachCommand,
+    ]);
+    expect(commands[4]).toMatchObject({
+      input: {
+        collaborationId: "wsc_123",
+        laneId: "wln_builder",
+        sessionId: "term_builder",
+        access: "write",
+        expectedGeneration: 1,
+      },
+    });
+    expect(queries[0]).toBeInstanceOf(ListWorkspaceCollaborationsQuery);
+    expect(queries[1]).toBeInstanceOf(ShowWorkspaceCollaborationQuery);
   });
 
   test("[AGENT-WS-FLOW-003] lists and shows Workspace views without a Workspace repository", async () => {

@@ -115,6 +115,7 @@ import { storageVolumeBackupPoliciesMigration } from "./migrations/106_storage_v
 import { controlPlanePortabilityArtifactsMigration } from "./migrations/107_control_plane_portability_artifacts";
 import { tunnelSessionsMigration } from "./migrations/108_tunnel_sessions";
 import { sandboxAgentDeliveryMigration } from "./migrations/109_sandbox_agent_delivery";
+import { workspaceCollaborationsMigration } from "./migrations/110_workspace_collaborations";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -326,6 +327,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "107_control_plane_portability_artifacts": controlPlanePortabilityArtifactsMigration,
       "108_tunnel_sessions": tunnelSessionsMigration,
       "109_sandbox_agent_delivery": sandboxAgentDeliveryMigration,
+      "110_workspace_collaborations": workspaceCollaborationsMigration,
     };
   }
 }

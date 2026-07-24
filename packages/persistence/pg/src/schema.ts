@@ -1247,6 +1247,7 @@ export interface Database {
   sandbox_source_artifacts: SandboxSourceArtifactsTable;
   sandbox_candidate_previews: SandboxCandidatePreviewsTable;
   sandbox_promotions: SandboxPromotionsTable;
+  workspace_collaborations: WorkspaceCollaborationsTable;
   account: BetterAuthAccountsTable;
   projects: ProjectsTable;
   servers: ServersTable;
@@ -1432,4 +1433,14 @@ export interface SandboxPromotionsTable {
   created_at: TimestampColumn;
   updated_at: UpdatableTimestampColumn;
   expires_at: string;
+}
+
+export interface WorkspaceCollaborationsTable {
+  tenant_id: string;
+  id: string;
+  status: string;
+  revision: number;
+  state: ColumnType<Record<string, unknown>, Record<string, unknown>, Record<string, unknown>>;
+  created_at: TimestampColumn;
+  updated_at: UpdatableTimestampColumn;
 }

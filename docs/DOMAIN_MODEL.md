@@ -418,6 +418,37 @@ Governing artifacts:
 - [Agent Workspace Workflow](./workflows/agent-workspace.md)
 - [Agent Workspace Test Matrix](./testing/agent-workspace-test-matrix.md)
 
+### Workspace Collaboration
+
+`WorkspaceCollaboration` is a public coordination aggregate over existing Agent Workspaces. It owns
+participants, isolated Workspace lanes, an exclusive expiring writer lease per lane and immutable
+Source Artifact handoffs. It never provisions, pauses, resumes or terminates a Sandbox, and it does
+not own Organization membership, Agent conversation state, Preview lifecycle or source contents.
+
+A participant is either a tenant-scoped human subject or a `SandboxAgentRuntime` identity. Each
+lane references one existing `workspaceId = sandboxId` and declares a neutral builder, reviewer,
+tester or custom purpose. Independent agents should use independent lanes by default. When several
+clients deliberately share one lane, the writer lease provides one holder, monotonically increasing
+generation and expiry so transfer or reacquisition fences stale terminal/native-attach
+capabilities.
+
+Managed Terminal Sessions remain the PTY owner. A collaboration attachment capability grants either
+read-only observation or generation-fenced writing; observer clients receive the real output stream
+but cannot write, resize or close the process. Native attach remains harness-owned and is issued
+only after collaboration writer authorization. Appaloft does not reproduce Pi, OpenCode, Claude
+Code, Codex or another vendor TUI.
+
+Candidate handoff references an immutable `SourceArtifactId` plus expected digest. Accepting or
+rejecting records responsibility but never silently modifies the target Workspace. Existing
+Development Preview and Candidate Preview descriptors may be composed into collaboration views
+without adding a second exposure lifecycle.
+
+Governing artifacts:
+- [ADR-096](./decisions/ADR-096-workspace-collaboration-boundary.md)
+- [Spec 113](./specs/113-workspace-collaboration/spec.md)
+- [Workspace Collaboration Workflow](./workflows/workspace-collaboration.md)
+- [Workspace Collaboration Test Matrix](./testing/workspace-collaboration-test-matrix.md)
+
 ### Operator/Internal State
 
 Owns:

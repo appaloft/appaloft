@@ -115,6 +115,7 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-093: AI Application Delivery Positioning And Claim Boundary](./ADR-093-ai-application-delivery-positioning-and-claim-boundary.md) | Accepted | Defines the AI application delivery category, public maturity labels, product path, and bounded Delivery Evidence Chain claim. |
 | [ADR-094: Agent Workspace Entry Workflow](./ADR-094-agent-workspace-entry-workflow.md) | Accepted | Defines Agent Workspace as a public workflow over Sandbox, Agent Runtime, Terminal Session and expiring port operations, with Pi and OpenCode as adapters rather than a Cloud-only aggregate. |
 | [ADR-095: Agent Task Run Workflow](./ADR-095-agent-task-run-workflow.md) | Accepted | Defines Agent Task Run as a resumable public workflow over Agent Run, checks, Git changes, Development Preview, immutable review artifacts, external approval and forge-neutral pull-request delivery. |
+| [ADR-096: Workspace Collaboration Boundary](./ADR-096-workspace-collaboration-boundary.md) | Accepted | Defines public multi-Workspace coordination, human and Agent Runtime participants, exclusive generation-fenced writer leases, read-only PTY observers, native attach authorization and immutable artifact handoffs without duplicating Workspace lifecycle or vendor TUIs. |
 
 ## Authoring Rules
 

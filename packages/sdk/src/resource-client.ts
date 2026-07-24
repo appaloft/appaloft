@@ -332,9 +332,112 @@ export interface AppaloftSandbox extends AppaloftSandboxDescriptor {
   readonly terminate: <T = unknown>() => Promise<T>;
 }
 
+export interface AppaloftWorkspaceCollaborationDescriptor extends Record<string, unknown> {
+  readonly schemaVersion: "workspace-collaboration/v1";
+  readonly collaborationId: string;
+  readonly name: string;
+  readonly status: "active" | "closed";
+  readonly revision: number;
+  readonly participants: readonly Readonly<Record<string, unknown>>[];
+  readonly lanes: readonly Readonly<Record<string, unknown>>[];
+  readonly handoffs: readonly Readonly<Record<string, unknown>>[];
+}
+
+export interface AppaloftWorkspaceCollaborationCreateInput extends AppaloftSdkFacadeInput {
+  readonly name: string;
+  readonly workspaceId: string;
+  readonly lanePurpose?: "builder" | "reviewer" | "tester" | "custom";
+  readonly laneLabel?: string;
+  readonly branch?: string;
+}
+
+export interface AppaloftWorkspaceCollaboration extends AppaloftWorkspaceCollaborationDescriptor {
+  readonly refresh: () => Promise<AppaloftWorkspaceCollaboration>;
+  readonly participantsApi: {
+    readonly add: (input: {
+      readonly subject:
+        | { readonly kind: "user"; readonly subjectId: string }
+        | {
+            readonly kind: "agent-runtime";
+            readonly runtimeId: string;
+            readonly workspaceId: string;
+          };
+      readonly role: "owner" | "editor" | "reviewer" | "viewer";
+    }) => Promise<AppaloftWorkspaceCollaboration>;
+    readonly changeRole: (
+      participantId: string,
+      role: "owner" | "editor" | "reviewer" | "viewer",
+    ) => Promise<AppaloftWorkspaceCollaboration>;
+    readonly remove: (participantId: string) => Promise<AppaloftWorkspaceCollaboration>;
+  };
+  readonly lanesApi: {
+    readonly add: (input: {
+      readonly workspaceId: string;
+      readonly purpose: "builder" | "reviewer" | "tester" | "custom";
+      readonly label: string;
+      readonly branch?: string;
+    }) => Promise<AppaloftWorkspaceCollaboration>;
+    readonly archive: (laneId: string) => Promise<AppaloftWorkspaceCollaboration>;
+    readonly authorize: (input: {
+      readonly laneId: string;
+      readonly access: "observe" | "write";
+      readonly expectedGeneration?: number;
+    }) => Promise<Readonly<Record<string, unknown>>>;
+    readonly issueTerminalAccess: (input: {
+      readonly laneId: string;
+      readonly sessionId: string;
+      readonly access: "observe" | "write";
+      readonly expectedGeneration?: number;
+    }) => Promise<Readonly<Record<string, unknown>>>;
+    readonly issueNativeAttach: (input: {
+      readonly laneId: string;
+      readonly runtimeId: string;
+      readonly expiresAt: string;
+      readonly expectedGeneration: number;
+    }) => Promise<Readonly<Record<string, unknown>>>;
+  };
+  readonly writerLeases: {
+    readonly acquire: (
+      laneId: string,
+      expiresAt: string,
+    ) => Promise<AppaloftWorkspaceCollaboration>;
+    readonly renew: (
+      laneId: string,
+      expectedGeneration: number,
+      expiresAt: string,
+    ) => Promise<AppaloftWorkspaceCollaboration>;
+    readonly release: (
+      laneId: string,
+      expectedGeneration: number,
+    ) => Promise<AppaloftWorkspaceCollaboration>;
+    readonly transfer: (input: {
+      readonly laneId: string;
+      readonly expectedGeneration: number;
+      readonly toParticipantId: string;
+      readonly expiresAt: string;
+    }) => Promise<AppaloftWorkspaceCollaboration>;
+  };
+  readonly handoffsApi: {
+    readonly offer: (input: {
+      readonly sourceLaneId: string;
+      readonly targetLaneId: string;
+      readonly artifactId: string;
+      readonly expectedDigest: string;
+    }) => Promise<AppaloftWorkspaceCollaboration>;
+    readonly resolve: (
+      handoffId: string,
+      decision: "accept" | "reject",
+    ) => Promise<AppaloftWorkspaceCollaboration>;
+  };
+  readonly close: () => Promise<AppaloftWorkspaceCollaboration>;
+}
+
 type GeneratedSandboxes = GeneratedAppaloftClient["sandboxes"];
 
-export type AppaloftClient = Omit<GeneratedAppaloftClient, "sandboxes"> & {
+export type AppaloftClient = Omit<
+  GeneratedAppaloftClient,
+  "sandboxes" | "workspaceCollaborations"
+> & {
   readonly operations: GeneratedAppaloftClient;
   readonly sandboxes: Omit<GeneratedSandboxes, "create"> & {
     readonly create: (input: AppaloftSandboxCreateInput) => Promise<AppaloftSandbox>;
@@ -343,6 +446,16 @@ export type AppaloftClient = Omit<GeneratedAppaloftClient, "sandboxes"> & {
     readonly create: (input: AppaloftWorkspaceCreateInput) => Promise<AppaloftWorkspace>;
     readonly list: (input?: AppaloftWorkspaceListInput) => Promise<AppaloftWorkspaceList>;
     readonly show: (workspaceId: string) => Promise<AppaloftWorkspaceDescriptor>;
+  };
+  readonly workspaceCollaborations: {
+    readonly create: (
+      input: AppaloftWorkspaceCollaborationCreateInput,
+    ) => Promise<AppaloftWorkspaceCollaboration>;
+    readonly list: () => Promise<{
+      readonly schemaVersion?: string;
+      readonly items: readonly AppaloftWorkspaceCollaboration[];
+    }>;
+    readonly show: (collaborationId: string) => Promise<AppaloftWorkspaceCollaboration>;
   };
 };
 
@@ -428,13 +541,186 @@ export function createAppaloftClient(options: AppaloftSdkClientOptions): Appalof
       return createWorkspaceDescriptor(operations, sandbox);
     },
   };
+  const workspaceCollaborations = {
+    create: async (
+      input: AppaloftWorkspaceCollaborationCreateInput,
+    ): Promise<AppaloftWorkspaceCollaboration> => {
+      const descriptor = unwrapOperation<AppaloftWorkspaceCollaborationDescriptor>(
+        await operations.workspaceCollaborations.create({
+          name: input.name,
+          workspaceId: input.workspaceId,
+          lanePurpose: input.lanePurpose ?? "builder",
+          laneLabel: input.laneLabel ?? "Builder",
+          ...(input.branch ? { branch: input.branch } : {}),
+        }),
+      );
+      return createWorkspaceCollaborationHandle(operations, descriptor);
+    },
+    list: async () => {
+      const result = unwrapOperation<{
+        readonly schemaVersion?: string;
+        readonly items: readonly AppaloftWorkspaceCollaborationDescriptor[];
+      }>(await operations.workspaceCollaborations.list({}));
+      return {
+        ...result,
+        items: result.items.map((item) => createWorkspaceCollaborationHandle(operations, item)),
+      };
+    },
+    show: async (collaborationId: string): Promise<AppaloftWorkspaceCollaboration> => {
+      const descriptor = unwrapOperation<AppaloftWorkspaceCollaborationDescriptor>(
+        await operations.workspaceCollaborations.show({ collaborationId }),
+      );
+      return createWorkspaceCollaborationHandle(operations, descriptor);
+    },
+  };
 
   return {
     ...operations,
     operations,
     sandboxes,
     workspaces,
+    workspaceCollaborations,
   } as AppaloftClient;
+}
+
+function createWorkspaceCollaborationHandle(
+  operations: GeneratedAppaloftClient,
+  descriptor: AppaloftWorkspaceCollaborationDescriptor,
+): AppaloftWorkspaceCollaboration {
+  const collaborationId = requiredResourceId(descriptor.collaborationId, "collaborationId");
+  const wrap = async (
+    operation: Promise<AppaloftSdkOperationResult<unknown>>,
+  ): Promise<AppaloftWorkspaceCollaboration> =>
+    createWorkspaceCollaborationHandle(
+      operations,
+      unwrapOperation<AppaloftWorkspaceCollaborationDescriptor>(
+        (await operation) as AppaloftSdkOperationResult<AppaloftWorkspaceCollaborationDescriptor>,
+      ),
+    );
+  return {
+    ...descriptor,
+    collaborationId,
+    refresh: async () =>
+      createWorkspaceCollaborationHandle(
+        operations,
+        unwrapOperation<AppaloftWorkspaceCollaborationDescriptor>(
+          await operations.workspaceCollaborations.show({ collaborationId }),
+        ),
+      ),
+    participantsApi: {
+      add: (input) =>
+        wrap(
+          operations.workspaceCollaborations.participants.add({
+            collaborationId,
+            ...input,
+          }),
+        ),
+      changeRole: (participantId, role) =>
+        wrap(
+          operations.workspaceCollaborations.participants.changeRole({
+            collaborationId,
+            participantId,
+            role,
+          }),
+        ),
+      remove: (participantId) =>
+        wrap(
+          operations.workspaceCollaborations.participants.remove({
+            collaborationId,
+            participantId,
+          }),
+        ),
+    },
+    lanesApi: {
+      add: (input) =>
+        wrap(
+          operations.workspaceCollaborations.lanes.add({
+            collaborationId,
+            ...input,
+          }),
+        ),
+      archive: (laneId) =>
+        wrap(
+          operations.workspaceCollaborations.lanes.archive({
+            collaborationId,
+            laneId,
+          }),
+        ),
+      authorize: async (input) =>
+        unwrapOperation<Readonly<Record<string, unknown>>>(
+          await operations.workspaceCollaborations.lanes.authorizeAccess({
+            collaborationId,
+            ...input,
+          }),
+        ),
+      issueTerminalAccess: async (input) =>
+        unwrapOperation<Readonly<Record<string, unknown>>>(
+          await operations.workspaceCollaborations.lanes.terminalAccess.issue({
+            collaborationId,
+            ...input,
+          }),
+        ),
+      issueNativeAttach: async (input) =>
+        unwrapOperation<Readonly<Record<string, unknown>>>(
+          await operations.workspaceCollaborations.lanes.nativeAttach.issue({
+            collaborationId,
+            ...input,
+          }),
+        ),
+    },
+    writerLeases: {
+      acquire: (laneId, expiresAt) =>
+        wrap(
+          operations.workspaceCollaborations.writerLeases.acquire({
+            collaborationId,
+            laneId,
+            expiresAt,
+          }),
+        ),
+      renew: (laneId, expectedGeneration, expiresAt) =>
+        wrap(
+          operations.workspaceCollaborations.writerLeases.renew({
+            collaborationId,
+            laneId,
+            expectedGeneration,
+            expiresAt,
+          }),
+        ),
+      release: (laneId, expectedGeneration) =>
+        wrap(
+          operations.workspaceCollaborations.writerLeases.release({
+            collaborationId,
+            laneId,
+            expectedGeneration,
+          }),
+        ),
+      transfer: (input) =>
+        wrap(
+          operations.workspaceCollaborations.writerLeases.transfer({
+            collaborationId,
+            ...input,
+          }),
+        ),
+    },
+    handoffsApi: {
+      offer: (input) =>
+        wrap(
+          operations.workspaceCollaborations.handoffs.offer({
+            collaborationId,
+            ...input,
+          }),
+        ),
+      resolve: (handoffId, decision) =>
+        wrap(
+          operations.workspaceCollaborations.handoffs.resolve({
+            collaborationId,
+            handoffId,
+            decision,
+          }),
+        ),
+    },
+    close: () => wrap(operations.workspaceCollaborations.close({ collaborationId })),
+  };
 }
 
 export function createAppaloftWorkspaceTasks(

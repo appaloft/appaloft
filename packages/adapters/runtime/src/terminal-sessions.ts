@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -21,6 +22,7 @@ import {
   type SandboxRepository,
   type ServerRepository,
   type TerminalSession,
+  type TerminalSessionAttachmentGrant,
   type TerminalSessionDescriptor,
   type TerminalSessionFrame,
   type TerminalSessionGateway,
@@ -66,9 +68,13 @@ type SshTerminalTarget = {
 };
 
 class TerminalSessionQueue implements AsyncIterable<TerminalSessionFrame> {
-  private readonly events: TerminalSessionFrame[] = [];
+  private readonly pendingBeforeFirstAttachment: TerminalSessionFrame[] = [];
   private readonly retainedOutputFrames: TerminalSessionFrame[] = [];
-  private readonly waiters: Array<(result: IteratorResult<TerminalSessionFrame>) => void> = [];
+  private readonly subscribers = new Set<{
+    events: TerminalSessionFrame[];
+    waiter?: (result: IteratorResult<TerminalSessionFrame>) => void;
+    detached: boolean;
+  }>();
   private retainedOutputBytes = 0;
   private closed = false;
 
@@ -80,14 +86,20 @@ class TerminalSessionQueue implements AsyncIterable<TerminalSessionFrame> {
     }
 
     this.retainOutput(event);
-
-    const waiter = this.waiters.shift();
-    if (waiter) {
-      waiter({ value: event, done: false });
-      return;
+    if (this.subscribers.size === 0) {
+      this.pendingBeforeFirstAttachment.push(event);
+    } else {
+      for (const subscriber of this.subscribers) {
+        if (subscriber.detached) continue;
+        const waiter = subscriber.waiter;
+        if (waiter) {
+          delete subscriber.waiter;
+          waiter({ value: event, done: false });
+        } else {
+          subscriber.events.push(event);
+        }
+      }
     }
-
-    this.events.push(event);
   }
 
   close(): void {
@@ -96,29 +108,31 @@ class TerminalSessionQueue implements AsyncIterable<TerminalSessionFrame> {
     }
 
     this.closed = true;
-    for (const waiter of this.waiters.splice(0)) {
-      waiter({ value: undefined, done: true });
+    for (const subscriber of this.subscribers) {
+      subscriber.waiter?.({ value: undefined, done: true });
+      delete subscriber.waiter;
     }
   }
 
   [Symbol.asyncIterator](): AsyncIterator<TerminalSessionFrame> {
-    const replay = this.events.length > 0 ? [] : this.retainedOutputFrames.slice();
-    let detached = false;
-    let pendingWaiter:
-      | ((result: IteratorResult<TerminalSessionFrame>) => void)
-      | undefined;
+    const subscriber = {
+      events:
+        this.subscribers.size === 0 && this.pendingBeforeFirstAttachment.length > 0
+          ? this.pendingBeforeFirstAttachment.splice(0)
+          : this.retainedOutputFrames.slice(),
+      detached: false,
+    } as {
+      events: TerminalSessionFrame[];
+      waiter?: (result: IteratorResult<TerminalSessionFrame>) => void;
+      detached: boolean;
+    };
+    this.subscribers.add(subscriber);
     return {
       next: () => {
-        if (detached) {
+        if (subscriber.detached) {
           return Promise.resolve({ value: undefined, done: true });
         }
-
-        const replayEvent = replay.shift();
-        if (replayEvent) {
-          return Promise.resolve({ value: replayEvent, done: false });
-        }
-
-        const event = this.events.shift();
+        const event = subscriber.events.shift();
         if (event) {
           return Promise.resolve({ value: event, done: false });
         }
@@ -128,22 +142,18 @@ class TerminalSessionQueue implements AsyncIterable<TerminalSessionFrame> {
         }
 
         return new Promise<IteratorResult<TerminalSessionFrame>>((resolve) => {
-          pendingWaiter = (result) => {
-            pendingWaiter = undefined;
+          subscriber.waiter = (result) => {
+            delete subscriber.waiter;
             resolve(result);
           };
-          this.waiters.push(pendingWaiter);
         });
       },
       return: () => {
-        detached = true;
-        if (pendingWaiter) {
-          const waiter = pendingWaiter;
-          pendingWaiter = undefined;
-          const index = this.waiters.indexOf(waiter);
-          if (index >= 0) {
-            this.waiters.splice(index, 1);
-          }
+        subscriber.detached = true;
+        this.subscribers.delete(subscriber);
+        if (subscriber.waiter) {
+          const waiter = subscriber.waiter;
+          delete subscriber.waiter;
           waiter({ value: undefined, done: true });
         }
         return Promise.resolve({ value: undefined, done: true });
@@ -164,7 +174,11 @@ class TerminalSessionQueue implements AsyncIterable<TerminalSessionFrame> {
       this.retainedOutputBytes > this.maxRetainedOutputBytes &&
       this.retainedOutputFrames.length > 0
     ) {
-      const removed = this.retainedOutputFrames.shift();
+      const outputIndex = this.retainedOutputFrames.findIndex(
+        (candidate) => candidate.kind === "output",
+      );
+      if (outputIndex < 0) break;
+      const [removed] = this.retainedOutputFrames.splice(outputIndex, 1);
       if (removed?.kind === "output") {
         this.retainedOutputBytes -= new TextEncoder().encode(removed.data).byteLength;
       }
@@ -199,8 +213,15 @@ class RuntimeTerminalSession {
     await this.subprocess.resize?.(input.rows, input.cols);
   }
 
-  attach(): TerminalSession {
-    return new RuntimeTerminalSessionAttachment(this, this.queue);
+  attach(input?: {
+    access: "observe" | "write";
+    canWrite?: () => boolean;
+  }): TerminalSession {
+    return new RuntimeTerminalSessionAttachment(
+      this,
+      this.queue,
+      input ?? { access: "write" },
+    );
   }
 
   async close(): Promise<void> {
@@ -271,14 +292,20 @@ class RuntimeTerminalSessionAttachment implements TerminalSession {
   constructor(
     private readonly session: RuntimeTerminalSession,
     private readonly queue: TerminalSessionQueue,
+    private readonly policy: {
+      access: "observe" | "write";
+      canWrite?: () => boolean;
+    },
   ) {}
 
-  write(data: string): Promise<void> {
-    return this.session.write(data);
+  async write(data: string): Promise<void> {
+    this.requireWriteAccess("write");
+    await this.session.write(data);
   }
 
-  resize(input: { rows: number; cols: number }): Promise<void> {
-    return this.session.resize(input);
+  async resize(input: { rows: number; cols: number }): Promise<void> {
+    this.requireWriteAccess("resize");
+    await this.session.resize(input);
   }
 
   async detach(): Promise<void> {
@@ -291,14 +318,29 @@ class RuntimeTerminalSessionAttachment implements TerminalSession {
     this.iterators.clear();
   }
 
-  close(): Promise<void> {
-    return this.session.close();
+  async close(): Promise<void> {
+    this.requireWriteAccess("close");
+    await this.session.close();
   }
 
   [Symbol.asyncIterator](): AsyncIterator<TerminalSessionFrame> {
     const iterator = this.queue[Symbol.asyncIterator]();
     this.iterators.add(iterator);
     return iterator;
+  }
+
+  private requireWriteAccess(action: "write" | "resize" | "close"): void {
+    if (this.policy.access === "write" && (this.policy.canWrite?.() ?? true)) {
+      return;
+    }
+    throw domainError.terminalSessionPolicyDenied(
+      "Terminal attachment does not hold current writer access",
+      {
+        phase: "terminal-session-attachment-access",
+        access: this.policy.access,
+        action,
+      },
+    );
   }
 }
 
@@ -597,12 +639,25 @@ async function readTerminalOutput(input: {
 }
 
 export class RuntimeTerminalSessionGateway implements TerminalSessionGateway {
+  private readonly attachmentFences = new Map<string, number>();
   private readonly sessions = new Map<
     string,
     {
       session: RuntimeTerminalSession;
       summary: TerminalSessionSummary;
       lastActivityAt: string;
+      collaborationManaged: boolean;
+      attachmentGrants: Map<
+        string,
+        {
+          access: "observe" | "write";
+          collaborationId: string;
+          laneId: string;
+          workspaceId: string;
+          participantId: string;
+          writerLeaseGeneration?: number;
+        }
+      >;
     }
   >();
 
@@ -787,6 +842,8 @@ export class RuntimeTerminalSessionGateway implements TerminalSessionGateway {
         session,
         summary,
         lastActivityAt: summary.createdAt,
+        collaborationManaged: false,
+        attachmentGrants: new Map(),
       });
       await this.recordSessionOpenedAudit(context, summary);
       queue.push({
@@ -808,16 +865,140 @@ export class RuntimeTerminalSessionGateway implements TerminalSessionGateway {
     }
   }
 
-  attach(sessionId: string): Result<TerminalSession> {
-    const entry = this.sessions.get(sessionId);
+  issueAttachmentAccess(input: {
+    sessionId: string;
+    access: "observe" | "write";
+    collaborationId: string;
+    laneId: string;
+    workspaceId: string;
+    participantId: string;
+    writerLeaseGeneration?: number;
+  }): Result<TerminalSessionAttachmentGrant> {
+    const entry = this.sessions.get(input.sessionId);
+    if (!entry) {
+      return err(
+        domainError.terminalSessionNotFound("Terminal session was not found", {
+          sessionId: input.sessionId,
+        }),
+      );
+    }
+    if (entry.summary.scope !== "sandbox" || entry.summary.sandboxId !== input.workspaceId) {
+      return err(
+        domainError.terminalSessionContextMismatch(
+          "Terminal session does not belong to the Collaboration Lane Workspace",
+          {
+            sessionId: input.sessionId,
+            workspaceId: input.workspaceId,
+            terminalWorkspaceId: entry.summary.sandboxId ?? "",
+          },
+        ),
+      );
+    }
+    const fenceKey = this.attachmentFenceKey(input.collaborationId, input.laneId);
+    if (input.access === "write") {
+      if (!input.writerLeaseGeneration || input.writerLeaseGeneration < 1) {
+        return err(
+          domainError.terminalSessionPolicyDenied(
+            "Writer attachment requires a positive writer lease generation",
+            {
+              sessionId: input.sessionId,
+              laneId: input.laneId,
+            },
+          ),
+        );
+      }
+      const currentFence = this.attachmentFences.get(fenceKey);
+      if (currentFence !== undefined && currentFence !== input.writerLeaseGeneration) {
+        return err(
+          domainError.terminalSessionPolicyDenied(
+            "Writer attachment lease generation is stale",
+            {
+              sessionId: input.sessionId,
+              laneId: input.laneId,
+              generation: currentFence,
+              expectedGeneration: input.writerLeaseGeneration,
+            },
+          ),
+        );
+      }
+      this.attachmentFences.set(fenceKey, input.writerLeaseGeneration);
+    }
+    const accessToken = randomUUID().replaceAll("-", "");
+    entry.collaborationManaged = true;
+    entry.attachmentGrants.set(accessToken, {
+      access: input.access,
+      collaborationId: input.collaborationId,
+      laneId: input.laneId,
+      workspaceId: input.workspaceId,
+      participantId: input.participantId,
+      ...(input.writerLeaseGeneration !== undefined
+        ? { writerLeaseGeneration: input.writerLeaseGeneration }
+        : {}),
+    });
+    return ok({
+      sessionId: input.sessionId,
+      access: input.access,
+      transport: {
+        kind: "websocket",
+        path: `/api/terminal-sessions/${encodeURIComponent(input.sessionId)}/attach?access_token=${encodeURIComponent(accessToken)}`,
+      },
+      collaborationId: input.collaborationId,
+      laneId: input.laneId,
+      workspaceId: input.workspaceId,
+      participantId: input.participantId,
+      ...(input.writerLeaseGeneration !== undefined
+        ? { writerLeaseGeneration: input.writerLeaseGeneration }
+        : {}),
+    });
+  }
 
-    return entry
-      ? ok(entry.session.attach())
-      : err(
+  advanceAttachmentFence(input: {
+    collaborationId: string;
+    laneId: string;
+    generation: number;
+  }): void {
+    this.attachmentFences.set(
+      this.attachmentFenceKey(input.collaborationId, input.laneId),
+      input.generation,
+    );
+  }
+
+  attach(sessionId: string, accessToken?: string): Result<TerminalSession> {
+    const entry = this.sessions.get(sessionId);
+    if (!entry) {
+      return err(
           domainError.terminalSessionNotFound("Terminal session was not found", {
             sessionId,
           }),
         );
+    }
+    if (!entry.collaborationManaged) {
+      return ok(entry.session.attach());
+    }
+    const grant = accessToken ? entry.attachmentGrants.get(accessToken) : undefined;
+    if (!grant) {
+      return err(
+        domainError.terminalSessionPolicyDenied(
+          "Collaboration-managed Terminal Session requires attachment access",
+          {
+            sessionId,
+            phase: "terminal-session-attachment-access",
+          },
+        ),
+      );
+    }
+    const fenceKey = this.attachmentFenceKey(grant.collaborationId, grant.laneId);
+    return ok(
+      entry.session.attach({
+        access: grant.access,
+        ...(grant.access === "write"
+          ? {
+              canWrite: () =>
+                this.attachmentFences.get(fenceKey) === grant.writerLeaseGeneration,
+            }
+          : {}),
+      }),
+    );
   }
 
   list(input?: {
@@ -973,6 +1154,10 @@ export class RuntimeTerminalSessionGateway implements TerminalSessionGateway {
           }),
         );
     }
+  }
+
+  private attachmentFenceKey(collaborationId: string, laneId: string): string {
+    return `${collaborationId}:${laneId}`;
   }
 
   private async resolveSshTarget(

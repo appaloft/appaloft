@@ -375,6 +375,26 @@ import {
   terminateSandboxAgentRuntimeInputSchema,
 } from "./sandbox-agent-runtime-messages";
 import { tokens } from "./tokens";
+import {
+  acquireWorkspaceWriterLeaseInputSchema,
+  addWorkspaceCollaborationLaneInputSchema,
+  addWorkspaceCollaborationParticipantInputSchema,
+  archiveWorkspaceCollaborationLaneInputSchema,
+  authorizeWorkspaceCollaborationLaneAccessInputSchema,
+  changeWorkspaceCollaborationParticipantRoleInputSchema,
+  closeWorkspaceCollaborationInputSchema,
+  createWorkspaceCollaborationInputSchema,
+  issueWorkspaceCollaborationNativeAttachInputSchema,
+  issueWorkspaceCollaborationTerminalAccessInputSchema,
+  listWorkspaceCollaborationsInputSchema,
+  offerWorkspaceCollaborationHandoffInputSchema,
+  releaseWorkspaceWriterLeaseInputSchema,
+  removeWorkspaceCollaborationParticipantInputSchema,
+  renewWorkspaceWriterLeaseInputSchema,
+  resolveWorkspaceCollaborationHandoffInputSchema,
+  showWorkspaceCollaborationInputSchema,
+  transferWorkspaceWriterLeaseInputSchema,
+} from "./workspace-collaboration-messages";
 
 type OperationKind = "command" | "query";
 type OperationDomain =
@@ -415,7 +435,8 @@ type OperationDomain =
   | "tunnels"
   | "system"
   | "terminal-sessions"
-  | "sandboxes";
+  | "sandboxes"
+  | "workspace-collaborations";
 
 export interface OperationCatalogEntry {
   key: string;
@@ -4981,6 +5002,186 @@ export const operationCatalog = [
     serviceName: "AgentTaskRunService",
     inputSchema,
     serviceToken: tokens.agentTaskRunService,
+    transportAccess: { productSession: { minRole: "member" as const } },
+    transports: { cli, orpc: { method, path } },
+  })),
+  ...(
+    [
+      [
+        "workspace-collaborations.create",
+        "CreateWorkspaceCollaborationCommand",
+        "WorkspaceCollaborationCommandHandler",
+        createWorkspaceCollaborationInputSchema,
+        "POST",
+        "/api/workspace-collaborations",
+        "appaloft workspace collaboration create",
+      ],
+      [
+        "workspace-collaborations.list",
+        "ListWorkspaceCollaborationsQuery",
+        "WorkspaceCollaborationQueryHandler",
+        listWorkspaceCollaborationsInputSchema,
+        "GET",
+        "/api/workspace-collaborations",
+        "appaloft workspace collaboration list",
+      ],
+      [
+        "workspace-collaborations.show",
+        "ShowWorkspaceCollaborationQuery",
+        "WorkspaceCollaborationQueryHandler",
+        showWorkspaceCollaborationInputSchema,
+        "GET",
+        "/api/workspace-collaborations/{collaborationId}",
+        "appaloft workspace collaboration show <collaborationId>",
+      ],
+      [
+        "workspace-collaborations.participants.add",
+        "AddWorkspaceCollaborationParticipantCommand",
+        "WorkspaceCollaborationCommandHandler",
+        addWorkspaceCollaborationParticipantInputSchema,
+        "POST",
+        "/api/workspace-collaborations/{collaborationId}/participants",
+        "appaloft workspace collaboration participant add <collaborationId>",
+      ],
+      [
+        "workspace-collaborations.participants.change-role",
+        "ChangeWorkspaceCollaborationParticipantRoleCommand",
+        "WorkspaceCollaborationCommandHandler",
+        changeWorkspaceCollaborationParticipantRoleInputSchema,
+        "POST",
+        "/api/workspace-collaborations/{collaborationId}/participants/{participantId}/role",
+        "appaloft workspace collaboration participant role <collaborationId> <participantId>",
+      ],
+      [
+        "workspace-collaborations.participants.remove",
+        "RemoveWorkspaceCollaborationParticipantCommand",
+        "WorkspaceCollaborationCommandHandler",
+        removeWorkspaceCollaborationParticipantInputSchema,
+        "DELETE",
+        "/api/workspace-collaborations/{collaborationId}/participants/{participantId}",
+        "appaloft workspace collaboration participant remove <collaborationId> <participantId>",
+      ],
+      [
+        "workspace-collaborations.lanes.add",
+        "AddWorkspaceCollaborationLaneCommand",
+        "WorkspaceCollaborationCommandHandler",
+        addWorkspaceCollaborationLaneInputSchema,
+        "POST",
+        "/api/workspace-collaborations/{collaborationId}/lanes",
+        "appaloft workspace collaboration lane add <collaborationId>",
+      ],
+      [
+        "workspace-collaborations.lanes.archive",
+        "ArchiveWorkspaceCollaborationLaneCommand",
+        "WorkspaceCollaborationCommandHandler",
+        archiveWorkspaceCollaborationLaneInputSchema,
+        "POST",
+        "/api/workspace-collaborations/{collaborationId}/lanes/{laneId}/archive",
+        "appaloft workspace collaboration lane archive <collaborationId> <laneId>",
+      ],
+      [
+        "workspace-collaborations.writer-leases.acquire",
+        "AcquireWorkspaceWriterLeaseCommand",
+        "WorkspaceCollaborationCommandHandler",
+        acquireWorkspaceWriterLeaseInputSchema,
+        "POST",
+        "/api/workspace-collaborations/{collaborationId}/lanes/{laneId}/writer-lease",
+        "appaloft workspace collaboration writer acquire <collaborationId> <laneId>",
+      ],
+      [
+        "workspace-collaborations.writer-leases.renew",
+        "RenewWorkspaceWriterLeaseCommand",
+        "WorkspaceCollaborationCommandHandler",
+        renewWorkspaceWriterLeaseInputSchema,
+        "POST",
+        "/api/workspace-collaborations/{collaborationId}/lanes/{laneId}/writer-lease/renew",
+        "appaloft workspace collaboration writer renew <collaborationId> <laneId>",
+      ],
+      [
+        "workspace-collaborations.writer-leases.release",
+        "ReleaseWorkspaceWriterLeaseCommand",
+        "WorkspaceCollaborationCommandHandler",
+        releaseWorkspaceWriterLeaseInputSchema,
+        "POST",
+        "/api/workspace-collaborations/{collaborationId}/lanes/{laneId}/writer-lease/release",
+        "appaloft workspace collaboration writer release <collaborationId> <laneId>",
+      ],
+      [
+        "workspace-collaborations.writer-leases.transfer",
+        "TransferWorkspaceWriterLeaseCommand",
+        "WorkspaceCollaborationCommandHandler",
+        transferWorkspaceWriterLeaseInputSchema,
+        "POST",
+        "/api/workspace-collaborations/{collaborationId}/lanes/{laneId}/writer-lease/transfer",
+        "appaloft workspace collaboration writer transfer <collaborationId> <laneId>",
+      ],
+      [
+        "workspace-collaborations.handoffs.offer",
+        "OfferWorkspaceCollaborationHandoffCommand",
+        "WorkspaceCollaborationCommandHandler",
+        offerWorkspaceCollaborationHandoffInputSchema,
+        "POST",
+        "/api/workspace-collaborations/{collaborationId}/handoffs",
+        "appaloft workspace collaboration handoff offer <collaborationId>",
+      ],
+      [
+        "workspace-collaborations.handoffs.resolve",
+        "ResolveWorkspaceCollaborationHandoffCommand",
+        "WorkspaceCollaborationCommandHandler",
+        resolveWorkspaceCollaborationHandoffInputSchema,
+        "POST",
+        "/api/workspace-collaborations/{collaborationId}/handoffs/{handoffId}/resolve",
+        "appaloft workspace collaboration handoff resolve <collaborationId> <handoffId>",
+      ],
+      [
+        "workspace-collaborations.lanes.authorize-access",
+        "AuthorizeWorkspaceCollaborationLaneAccessQuery",
+        "WorkspaceCollaborationQueryHandler",
+        authorizeWorkspaceCollaborationLaneAccessInputSchema,
+        "GET",
+        "/api/workspace-collaborations/{collaborationId}/lanes/{laneId}/access",
+        "appaloft workspace collaboration access <collaborationId> <laneId>",
+      ],
+      [
+        "workspace-collaborations.lanes.terminal-access.issue",
+        "IssueWorkspaceCollaborationTerminalAccessCommand",
+        "WorkspaceCollaborationCommandHandler",
+        issueWorkspaceCollaborationTerminalAccessInputSchema,
+        "POST",
+        "/api/workspace-collaborations/{collaborationId}/lanes/{laneId}/terminal-access",
+        "appaloft workspace collaboration terminal <collaborationId> <laneId>",
+      ],
+      [
+        "workspace-collaborations.lanes.native-attach.issue",
+        "IssueWorkspaceCollaborationNativeAttachCommand",
+        "WorkspaceCollaborationCommandHandler",
+        issueWorkspaceCollaborationNativeAttachInputSchema,
+        "POST",
+        "/api/workspace-collaborations/{collaborationId}/lanes/{laneId}/native-attach",
+        "appaloft workspace collaboration attach <collaborationId> <laneId>",
+      ],
+      [
+        "workspace-collaborations.close",
+        "CloseWorkspaceCollaborationCommand",
+        "WorkspaceCollaborationCommandHandler",
+        closeWorkspaceCollaborationInputSchema,
+        "POST",
+        "/api/workspace-collaborations/{collaborationId}/close",
+        "appaloft workspace collaboration close <collaborationId>",
+      ],
+    ] as const
+  ).map(([key, messageName, handlerName, inputSchema, method, path, cli]) => ({
+    key,
+    kind:
+      handlerName === "WorkspaceCollaborationCommandHandler"
+        ? ("command" as const)
+        : ("query" as const),
+    domain: "workspace-collaborations" as const,
+    messageName,
+    handlerName,
+    serviceName: "WorkspaceCollaborationService",
+    inputSchema,
+    serviceToken: tokens.workspaceCollaborationService,
     transportAccess: { productSession: { minRole: "member" as const } },
     transports: { cli, orpc: { method, path } },
   })),

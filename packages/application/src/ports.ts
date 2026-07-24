@@ -4687,12 +4687,40 @@ export interface TerminalSession extends AsyncIterable<TerminalSessionFrame> {
   close(): Promise<void>;
 }
 
+export interface TerminalSessionAttachmentGrant {
+  sessionId: string;
+  access: "observe" | "write";
+  transport: {
+    kind: "websocket";
+    path: string;
+  };
+  collaborationId: string;
+  laneId: string;
+  workspaceId: string;
+  participantId: string;
+  writerLeaseGeneration?: number;
+}
+
 export interface TerminalSessionGateway {
   open(
     context: ExecutionContext,
     request: TerminalSessionOpenRequest,
   ): Promise<Result<TerminalSessionDescriptor>>;
-  attach(sessionId: string): Result<TerminalSession>;
+  issueAttachmentAccess?(input: {
+    sessionId: string;
+    access: "observe" | "write";
+    collaborationId: string;
+    laneId: string;
+    workspaceId: string;
+    participantId: string;
+    writerLeaseGeneration?: number;
+  }): Result<TerminalSessionAttachmentGrant>;
+  advanceAttachmentFence?(input: {
+    collaborationId: string;
+    laneId: string;
+    generation: number;
+  }): void;
+  attach(sessionId: string, accessToken?: string): Result<TerminalSession>;
   list(input?: ListTerminalSessionsInput): TerminalSessionSummary[];
   show(sessionId: string): Result<TerminalSessionSummary>;
   close(sessionId: string): Promise<Result<CloseTerminalSessionResponse>>;

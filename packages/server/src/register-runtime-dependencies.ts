@@ -239,6 +239,7 @@ import {
   PgStorageVolumeReadModel,
   PgStorageVolumeRepository,
   PgTunnelSessionRepository,
+  PgWorkspaceCollaborationRepository,
 } from "@appaloft/persistence-pg";
 import { createBuiltinPlugins } from "@appaloft/plugin-builtins";
 import { LocalPluginHost } from "@appaloft/plugin-host";
@@ -1206,6 +1207,11 @@ export function registerRuntimeDependencies(
   container.register(tokens.sandboxAgentDeliveryRepository, {
     useFactory: instanceCachingFactory(
       () => new PgSandboxAgentDeliveryRepository(input.database.db),
+    ),
+  });
+  container.register(tokens.workspaceCollaborationRepository, {
+    useFactory: instanceCachingFactory(
+      () => new PgWorkspaceCollaborationRepository(input.database.db),
     ),
   });
   container.register(tokens.sandboxProviderRegistry, {
