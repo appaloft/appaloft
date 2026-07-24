@@ -45,6 +45,7 @@ export interface SandboxProviderCapabilities {
 export interface SandboxProviderRequest {
   sandboxId: string;
   ownerScope: string;
+  ownerOrganizationId?: string;
   source: { kind: "image"; image: string } | { kind: "snapshot"; providerHandle: string };
   requestedIsolation: SandboxIsolation;
   limits: SandboxResourceLimitsState;
@@ -241,6 +242,7 @@ export interface SandboxProvider {
   }): Promise<void>;
   listOwnedRuntimes?(request: {
     ownerScope: string;
+    ownerOrganizationId?: string;
     limit: number;
     cursor?: string;
   }): Promise<{ items: SandboxOwnedRuntime[]; nextCursor?: string }>;
@@ -889,9 +891,14 @@ export class ExecutionSandboxService {
       providerSource = { kind: "image", image: resolved.value.image };
     }
     try {
+      const repositoryContext = toRepositoryContext(context);
+      const ownerOrganizationId =
+        repositoryContext.tenant?.organizationId ??
+        repositoryContext.principal?.activeOrganization?.organizationId;
       const observed = await provider.provision({
         sandboxId,
-        ownerScope: tenantId(toRepositoryContext(context)),
+        ownerScope: tenantId(repositoryContext),
+        ...(ownerOrganizationId ? { ownerOrganizationId } : {}),
         source: providerSource,
         requestedIsolation: state.requestedIsolation.value,
         limits: state.limits.toState(),
@@ -999,6 +1006,9 @@ export class ExecutionSandboxService {
   ): Promise<Result<{ retained: string[]; removed: string[]; failed: string[] }>> {
     const repositoryContext = toRepositoryContext(context);
     const ownerScope = tenantId(repositoryContext);
+    const ownerOrganizationId =
+      repositoryContext.tenant?.organizationId ??
+      repositoryContext.principal?.activeOrganization?.organizationId;
     const limit = Math.min(Math.max(input.limit ?? 500, 1), 500);
     const providers = input.providerKey
       ? [this.providerRegistry.get(input.providerKey)].filter(
@@ -1040,7 +1050,12 @@ export class ExecutionSandboxService {
       let cursor: string | undefined;
       do {
         const inventory = await this.providerOperation("execution-sandbox-provider-inventory", () =>
-          listOwnedRuntimes({ ownerScope, limit, ...(cursor ? { cursor } : {}) }),
+          listOwnedRuntimes({
+            ownerScope,
+            ...(ownerOrganizationId ? { ownerOrganizationId } : {}),
+            limit,
+            ...(cursor ? { cursor } : {}),
+          }),
         );
         if (inventory.isErr()) return err(inventory.error);
         for (const runtime of inventory.value.items) {

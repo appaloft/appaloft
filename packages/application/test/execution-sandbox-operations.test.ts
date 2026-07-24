@@ -19,6 +19,9 @@ function provider(input: { isolation?: "container-trusted" | "gvisor" } = {}) {
   let terminateCalls = 0;
   let updatedNetworkMode: "deny" | "allowlist" | undefined;
   let lastProvisionSource: Parameters<SandboxProvider["provision"]>[0]["source"] | undefined;
+  let lastProvisionOwner:
+    | Pick<Parameters<SandboxProvider["provision"]>[0], "ownerScope" | "ownerOrganizationId">
+    | undefined;
   const adapter: SandboxProvider = {
     key: "hermetic",
     capabilities: {
@@ -34,6 +37,12 @@ function provider(input: { isolation?: "container-trusted" | "gvisor" } = {}) {
     async provision(request) {
       provisionCalls += 1;
       lastProvisionSource = request.source;
+      lastProvisionOwner = {
+        ownerScope: request.ownerScope,
+        ...(request.ownerOrganizationId
+          ? { ownerOrganizationId: request.ownerOrganizationId }
+          : {}),
+      };
       return {
         providerHandle: `handle:${request.sandboxId}`,
         realizedIsolation: input.isolation ?? "gvisor",
@@ -99,6 +108,7 @@ function provider(input: { isolation?: "container-trusted" | "gvisor" } = {}) {
     terminateCalls: () => terminateCalls,
     updatedNetworkMode: () => updatedNetworkMode,
     lastProvisionSource: () => lastProvisionSource,
+    lastProvisionOwner: () => lastProvisionOwner,
   };
 }
 
@@ -141,6 +151,10 @@ describe("ExecutionSandboxService", () => {
     const provisioned = await app.reconcile(context, "sbx_test");
     expect(provisioned._unsafeUnwrap().status).toBe("ready");
     expect(fake.provisionCalls()).toBe(1);
+    expect(fake.lastProvisionOwner()).toEqual({
+      ownerScope: "tenant_a",
+      ownerOrganizationId: "org_a",
+    });
   });
 
   test("[SBX-API-003] public create closes provisioning for synchronous external callers", async () => {
