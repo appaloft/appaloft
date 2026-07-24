@@ -663,6 +663,11 @@ import {
   UnsetResourceVariableUseCase,
   UpsertGitHubAppInstallationCommandHandler,
   UpsertGitHubAppInstallationUseCase,
+  WorkspaceCollaborationCommandHandler,
+  type WorkspaceCollaborationDependencies,
+  WorkspaceCollaborationQueryHandler,
+  type WorkspaceCollaborationRepository,
+  WorkspaceCollaborationService,
 } from "@appaloft/application";
 import { type AshScript, ash } from "@appaloft/ash";
 import {
@@ -3266,6 +3271,8 @@ export function registerApplicationServices(
   container.registerSingleton(SandboxAgentQueryHandler);
   container.registerSingleton(AgentTaskRunCommandHandler);
   container.registerSingleton(AgentTaskRunQueryHandler);
+  container.registerSingleton(WorkspaceCollaborationCommandHandler);
+  container.registerSingleton(WorkspaceCollaborationQueryHandler);
   container.registerSingleton(RevokeDeployTokenCommandHandler);
   container.registerSingleton(
     tokens.certificateProviderSelectionPolicy,
@@ -3504,6 +3511,42 @@ export function registerApplicationServices(
         stateProtector: dependencyContainer.resolve(tokens.controlPlaneSecretProtector),
         clock: dependencyContainer.resolve(tokens.clock),
       } satisfies AgentTaskRunDependencies);
+    }),
+  });
+  container.register(tokens.workspaceCollaborationService, {
+    useFactory: instanceCachingFactory((dependencyContainer) => {
+      const sandboxService = dependencyContainer.resolve<ExecutionSandboxService>(
+        tokens.executionSandboxService,
+      );
+      const agentService = dependencyContainer.resolve<SandboxAgentDeliveryService>(
+        tokens.sandboxAgentDeliveryService,
+      );
+      return new WorkspaceCollaborationService({
+        repository: dependencyContainer.resolve<WorkspaceCollaborationRepository>(
+          tokens.workspaceCollaborationRepository,
+        ),
+        sandboxReader: {
+          async show(context: ExecutionContext, workspaceId: string) {
+            const shown = await sandboxService.show(context, workspaceId);
+            return shown.map((value) => ({
+              sandboxId: workspaceId,
+              status: value.status,
+              createdAt: value.createdAt,
+            }));
+          },
+        },
+        agentReader: {
+          showRuntime: (context, workspaceId, runtimeId) =>
+            agentService.showRuntime(context, workspaceId, runtimeId),
+          showSourceArtifact: (context, artifactId) =>
+            agentService.showSourceArtifact(context, artifactId),
+        },
+        eventBus: dependencyContainer.resolve(tokens.eventBus),
+        clock: dependencyContainer.resolve(tokens.clock),
+        idGenerator: dependencyContainer.resolve(tokens.idGenerator),
+        terminalAccess: dependencyContainer.resolve(tokens.terminalSessionGateway),
+        agentAttach: agentService,
+      } satisfies WorkspaceCollaborationDependencies);
     }),
   });
   if (!container.isRegistered(tokens.durableWorkHandlerRegistry, true)) {

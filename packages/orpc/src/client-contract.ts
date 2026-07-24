@@ -818,6 +818,184 @@ export type AppaloftOrpcClientContract = {
       >;
     };
   };
+  workspaceCollaborations: {
+    create: Client<
+      AppaloftClientContext,
+      {
+        name: string;
+        workspaceId: string;
+        lanePurpose: "builder" | "reviewer" | "tester" | "custom";
+        laneLabel: string;
+        branch?: string;
+      },
+      SandboxOperationResponse,
+      AppaloftClientError
+    >;
+    list: Client<
+      AppaloftClientContext,
+      Record<string, never>,
+      { items: SandboxOperationResponse[] },
+      AppaloftClientError
+    >;
+    show: Client<
+      AppaloftClientContext,
+      { collaborationId: string },
+      SandboxOperationResponse,
+      AppaloftClientError
+    >;
+    close: Client<
+      AppaloftClientContext,
+      { collaborationId: string },
+      SandboxOperationResponse,
+      AppaloftClientError
+    >;
+    participants: {
+      add: Client<
+        AppaloftClientContext,
+        {
+          collaborationId: string;
+          subject:
+            | { kind: "user"; subjectId: string }
+            | { kind: "agent-runtime"; runtimeId: string; workspaceId: string };
+          role: "owner" | "editor" | "reviewer" | "viewer";
+        },
+        SandboxOperationResponse,
+        AppaloftClientError
+      >;
+      changeRole: Client<
+        AppaloftClientContext,
+        {
+          collaborationId: string;
+          participantId: string;
+          role: "owner" | "editor" | "reviewer" | "viewer";
+        },
+        SandboxOperationResponse,
+        AppaloftClientError
+      >;
+      remove: Client<
+        AppaloftClientContext,
+        { collaborationId: string; participantId: string },
+        SandboxOperationResponse,
+        AppaloftClientError
+      >;
+    };
+    lanes: {
+      add: Client<
+        AppaloftClientContext,
+        {
+          collaborationId: string;
+          workspaceId: string;
+          purpose: "builder" | "reviewer" | "tester" | "custom";
+          label: string;
+          branch?: string;
+        },
+        SandboxOperationResponse,
+        AppaloftClientError
+      >;
+      archive: Client<
+        AppaloftClientContext,
+        { collaborationId: string; laneId: string },
+        SandboxOperationResponse,
+        AppaloftClientError
+      >;
+      authorizeAccess: Client<
+        AppaloftClientContext,
+        {
+          collaborationId: string;
+          laneId: string;
+          access: "observe" | "write";
+          expectedGeneration?: number;
+        },
+        SandboxOperationResponse,
+        AppaloftClientError
+      >;
+      terminalAccess: {
+        issue: Client<
+          AppaloftClientContext,
+          {
+            collaborationId: string;
+            laneId: string;
+            sessionId: string;
+            access: "observe" | "write";
+            expectedGeneration?: number;
+          },
+          SandboxOperationResponse,
+          AppaloftClientError
+        >;
+      };
+      nativeAttach: {
+        issue: Client<
+          AppaloftClientContext,
+          {
+            collaborationId: string;
+            laneId: string;
+            runtimeId: string;
+            expiresAt: string;
+            expectedGeneration: number;
+          },
+          SandboxOperationResponse,
+          AppaloftClientError
+        >;
+      };
+    };
+    writerLeases: {
+      acquire: Client<
+        AppaloftClientContext,
+        { collaborationId: string; laneId: string; expiresAt: string },
+        SandboxOperationResponse,
+        AppaloftClientError
+      >;
+      renew: Client<
+        AppaloftClientContext,
+        {
+          collaborationId: string;
+          laneId: string;
+          expectedGeneration: number;
+          expiresAt: string;
+        },
+        SandboxOperationResponse,
+        AppaloftClientError
+      >;
+      release: Client<
+        AppaloftClientContext,
+        { collaborationId: string; laneId: string; expectedGeneration: number },
+        SandboxOperationResponse,
+        AppaloftClientError
+      >;
+      transfer: Client<
+        AppaloftClientContext,
+        {
+          collaborationId: string;
+          laneId: string;
+          expectedGeneration: number;
+          toParticipantId: string;
+          expiresAt: string;
+        },
+        SandboxOperationResponse,
+        AppaloftClientError
+      >;
+    };
+    handoffs: {
+      offer: Client<
+        AppaloftClientContext,
+        {
+          collaborationId: string;
+          sourceLaneId: string;
+          targetLaneId: string;
+          artifactId: string;
+          expectedDigest: string;
+        },
+        SandboxOperationResponse,
+        AppaloftClientError
+      >;
+      resolve: Client<
+        AppaloftClientContext,
+        { collaborationId: string; handoffId: string; decision: "accept" | "reject" },
+        SandboxOperationResponse,
+        AppaloftClientError
+      >;
+    };
+  };
   sandboxTemplates: {
     list: Client<
       AppaloftClientContext,

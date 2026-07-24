@@ -21,3 +21,4 @@ export * from "./shared/value-object";
 export * from "./shared/version";
 export * from "./workload-delivery";
 export * from "./workspace";
+export * from "./workspace-collaboration";

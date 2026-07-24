@@ -77,6 +77,7 @@ class TestTerminalSession implements TerminalSession {
 class TestTerminalSessionGateway implements TerminalSessionGateway {
   readonly session = new TestTerminalSession();
   attachedSessionId = "";
+  attachedAccessToken: string | undefined;
 
   async open(
     _context: ExecutionContext,
@@ -95,8 +96,9 @@ class TestTerminalSessionGateway implements TerminalSessionGateway {
     });
   }
 
-  attach(sessionId: string): Result<TerminalSession> {
+  attach(sessionId: string, accessToken?: string): Result<TerminalSession> {
     this.attachedSessionId = sessionId;
+    this.attachedAccessToken = accessToken;
     return ok(this.session);
   }
 }
@@ -204,7 +206,9 @@ describe("terminal session websocket", () => {
       throw new Error("HTTP test server did not expose a port");
     }
 
-    const socket = new WebSocket(`ws://127.0.0.1:${port}/api/terminal-sessions/term_test/attach`);
+    const socket = new WebSocket(
+      `ws://127.0.0.1:${port}/api/terminal-sessions/term_test/attach?access_token=writer_test`,
+    );
 
     try {
       await waitForOpen(socket);
@@ -220,6 +224,7 @@ describe("terminal session websocket", () => {
         "Input frame was not routed to terminal session",
       );
       expect(terminalSessionGateway.attachedSessionId).toBe("term_test");
+      expect(terminalSessionGateway.attachedAccessToken).toBe("writer_test");
     } finally {
       socket.close();
       app.server?.stop(true);

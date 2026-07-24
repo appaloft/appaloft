@@ -627,6 +627,20 @@ export interface SandboxAgentRunDescriptor {
   updatedAt?: string;
 }
 
+export interface SandboxAgentNativeAttachDescriptor {
+  workspaceId: string;
+  runtimeId: string;
+  transport: "native-attach";
+  access: {
+    exposureId: string;
+    port: number;
+    visibility: "private" | "organization" | "public";
+    url: string;
+    expiresAt: string;
+  };
+  clientCommand: string[];
+}
+
 export interface SandboxAgentApprovalDescriptor {
   approvalId: string;
   sandboxId: string;
@@ -858,21 +872,7 @@ export class SandboxAgentDeliveryService {
   async issueAttachAccess(
     context: ExecutionContext,
     input: { sandboxId: string; runtimeId: string; expiresAt: string },
-  ): Promise<
-    Result<{
-      workspaceId: string;
-      runtimeId: string;
-      transport: "native-attach";
-      access: {
-        exposureId: string;
-        port: number;
-        visibility: "private" | "organization" | "public";
-        url: string;
-        expiresAt: string;
-      };
-      clientCommand: string[];
-    }>
-  > {
+  ): Promise<Result<SandboxAgentNativeAttachDescriptor>> {
     const requestedExpiry = Date.parse(input.expiresAt);
     const now = Date.parse(this.dependencies.clock.now());
     if (

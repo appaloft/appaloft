@@ -66,3 +66,4 @@ export * from "./storage-volume-backup-policy-repository";
 export * from "./storage-volume-backup-repository";
 export * from "./storage-volume-repository";
 export * from "./tunnel-session-repository";
+export * from "./workspace-collaboration-repository";

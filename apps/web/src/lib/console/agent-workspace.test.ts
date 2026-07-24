@@ -21,6 +21,17 @@ const shell = await readFile(
   new URL("../components/console/ConsoleShell.svelte", import.meta.url),
   "utf8",
 );
+const collaborationDetailPage = await readFile(
+  new URL(
+    "../../routes/workspace-collaborations/[collaborationId=consoleObjectId]/+page.svelte",
+    import.meta.url,
+  ),
+  "utf8",
+);
+const terminalPanel = await readFile(
+  new URL("../components/console/TerminalSessionPanel.svelte", import.meta.url),
+  "utf8",
+);
 
 describe("public Agent Workspace Console", () => {
   test("[AGENT-WS-WEB-017] uses the public adapter catalog and canonical Workspace operations", () => {
@@ -59,5 +70,24 @@ describe("public Agent Workspace Console", () => {
     expect(taskPanel).toContain("selectedTask.changes.patch");
     expect(taskPanel).toContain("selectedTask.developmentPreview.url");
     expect(taskPanel).toContain("selectedTask.delivery?.pullRequestUrl");
+  });
+
+  test("[COLLAB-SURFACE-013][COLLAB-PREVIEW-011] exposes multi-lane collaboration without replacing Agent TUIs", () => {
+    expect(listPage).toContain("workspaceCollaborations.list");
+    expect(listPage).toContain("workspaceCollaborations.create");
+    expect(listPage).toContain("capabilities.fetch");
+    expect(collaborationDetailPage).toContain("workspaceCollaborations.participants.add");
+    expect(collaborationDetailPage).toContain("workspaceCollaborations.lanes.add");
+    expect(collaborationDetailPage).toContain("workspaceCollaborations.writerLeases.acquire");
+    expect(collaborationDetailPage).toContain("workspaceCollaborations.writerLeases.transfer");
+    expect(collaborationDetailPage).toContain("workspaceCollaborations.lanes.terminalAccess.issue");
+    expect(collaborationDetailPage).toContain("workspaceCollaborations.lanes.nativeAttach.issue");
+    expect(collaborationDetailPage).toContain("workspaceCollaborations.handoffs.offer");
+    expect(collaborationDetailPage).toContain("sandboxes.ports");
+    expect(collaborationDetailPage).toContain(".list({ sandboxId: lane.workspaceId })");
+    expect(collaborationDetailPage).toContain("<TerminalSessionPanel");
+    expect(terminalPanel).toContain("issueAttachmentAccess");
+    expect(terminalPanel).toContain('attachmentMode === "observe"');
+    expect(collaborationDetailPage).not.toContain("renderAgentTui");
   });
 });

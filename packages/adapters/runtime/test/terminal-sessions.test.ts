@@ -228,6 +228,121 @@ function resourceTerminalRequest(
 }
 
 describe("RuntimeTerminalSessionGateway", () => {
+  test("[COLLAB-OBSERVE-006][COLLAB-RECONNECT-007][COLLAB-TRANSFER-005] broadcasts the real PTY while observer and stale writer input fail closed", async () => {
+    const stdout = controlledStream();
+    const writes: string[] = [];
+    const gateway = new RuntimeTerminalSessionGateway({
+      allowTerminalSessions: true,
+      sandboxRepository: {
+        async find() {
+          return {
+            tenantId: "org_a",
+            providerKey: "cloud-docker-gvisor",
+            sandbox: {
+              canUseRuntime: () => true,
+              toState: () => ({
+                status: { value: "ready" },
+                providerHandle: "appaloft-sbx_workspace",
+              }),
+            },
+          };
+        },
+      } as unknown as SandboxRepository,
+      sandboxProviderRegistry: {
+        get() {
+          return {
+            openTerminal: async () => ({
+              stdin: {
+                write(data: string) {
+                  writes.push(data);
+                },
+                end() {},
+              },
+              stdout: stdout.stream,
+              stderr: null,
+              exited: new Promise<number>(() => {}),
+              kill() {},
+            }),
+          };
+        },
+      } as unknown as SandboxProviderRegistry,
+    });
+    const context = createExecutionContext({
+      requestId: "req_collaboration_terminal",
+      entrypoint: "http",
+      tenant: { tenantId: "org_a", organizationId: "org_a" },
+    });
+    await gateway
+      .open(context, {
+        sessionId: "term_collaboration",
+        scope: { kind: "sandbox", sandboxId: "sbx_workspace" },
+        initialRows: 24,
+        initialCols: 80,
+      })
+      .then((result) => result._unsafeUnwrap());
+    const observerGrant = gateway
+      .issueAttachmentAccess({
+        sessionId: "term_collaboration",
+        access: "observe",
+        collaborationId: "wco_demo",
+        laneId: "wcl_builder",
+        workspaceId: "sbx_workspace",
+        participantId: "wcp_reviewer",
+      })
+      ._unsafeUnwrap();
+    const writerGrant = gateway
+      .issueAttachmentAccess({
+        sessionId: "term_collaboration",
+        access: "write",
+        collaborationId: "wco_demo",
+        laneId: "wcl_builder",
+        workspaceId: "sbx_workspace",
+        participantId: "wcp_editor",
+        writerLeaseGeneration: 1,
+      })
+      ._unsafeUnwrap();
+    const token = (path: string) =>
+      new URL(path, "http://appaloft.local").searchParams.get("access_token") ?? "";
+    const observer = gateway
+      .attach("term_collaboration", token(observerGrant.transport.path))
+      ._unsafeUnwrap();
+    const writer = gateway
+      .attach("term_collaboration", token(writerGrant.transport.path))
+      ._unsafeUnwrap();
+    const observerFrames = readFrames(observer, 2);
+    const writerFrames = readFrames(writer, 1);
+    stdout.write("agent says hello");
+    expect(await observerFrames).toEqual([
+      { kind: "ready", sessionId: "term_collaboration" },
+      { kind: "output", stream: "stdout", data: "agent says hello" },
+    ]);
+    expect(await writerFrames).toEqual([
+      { kind: "output", stream: "stdout", data: "agent says hello" },
+    ]);
+    await expect(observer.write("steer\n")).rejects.toMatchObject({
+      code: "terminal_session_policy_denied",
+    });
+    await writer.write("review\n");
+    expect(writes).toEqual(["review\n"]);
+    await writer.detach();
+    const reconnectedWriter = gateway
+      .attach("term_collaboration", token(writerGrant.transport.path))
+      ._unsafeUnwrap();
+    await reconnectedWriter.write("continue\n");
+    expect(writes).toEqual(["review\n", "continue\n"]);
+
+    gateway.advanceAttachmentFence({
+      collaborationId: "wco_demo",
+      laneId: "wcl_builder",
+      generation: 2,
+    });
+    await expect(reconnectedWriter.write("stale\n")).rejects.toMatchObject({
+      code: "terminal_session_policy_denied",
+    });
+    expect(writes).toEqual(["review\n", "continue\n"]);
+    await gateway.close("term_collaboration");
+  });
+
   test("[TERM-SESSION-SANDBOX-001][TERM-SESSION-TRANSPORT-003] opens and resizes a Sandbox provider PTY", async () => {
     const calls: Array<{
       sandboxId: string;

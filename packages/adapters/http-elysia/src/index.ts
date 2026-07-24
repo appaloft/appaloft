@@ -165,6 +165,9 @@ interface TerminalWebSocket {
     params?: {
       sessionId?: string;
     };
+    query?: {
+      access_token?: string;
+    };
   };
   send(message: string): void;
   close(code?: number, reason?: string): void;
@@ -1613,7 +1616,8 @@ export function createHttpApp(input: {
       return;
     }
 
-    const result = input.terminalSessionGateway.attach(sessionId);
+    const accessToken = socket.data?.query?.access_token;
+    const result = input.terminalSessionGateway.attach(sessionId, accessToken);
     result.match(
       (session) => {
         terminalSessionsBySocket.set(socketKey, session);
@@ -2045,19 +2049,34 @@ export function createHttpApp(input: {
           return;
         }
 
-        switch (parsed.kind) {
-          case "input":
-            await session.write(parsed.data);
-            break;
-          case "resize":
-            await session.resize({
-              rows: parsed.rows,
-              cols: parsed.cols,
-            });
-            break;
-          case "close":
-            await session.close();
-            break;
+        try {
+          switch (parsed.kind) {
+            case "input":
+              await session.write(parsed.data);
+              break;
+            case "resize":
+              await session.resize({
+                rows: parsed.rows,
+                cols: parsed.cols,
+              });
+              break;
+            case "close":
+              await session.close();
+              break;
+          }
+        } catch (error) {
+          ws.send(
+            JSON.stringify({
+              kind: "error",
+              error:
+                error && typeof error === "object"
+                  ? error
+                  : {
+                      code: "terminal_session_failed",
+                      message: String(error),
+                    },
+            }),
+          );
         }
       },
       close(ws) {

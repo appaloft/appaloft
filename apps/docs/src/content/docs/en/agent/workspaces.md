@@ -98,6 +98,28 @@ Preview.
 Different team members use different Sandboxes, so files, processes, Terminal Sessions, and port
 exposures have independent identities. Both can listen on internal port 3000 without colliding.
 
+## Collaborate with people and multiple agents
+
+A Collaboration organizes existing Workspace/Sandbox identities as independent Lanes without
+owning their lifecycle:
+
+```bash
+appaloft workspace collaboration create
+appaloft workspace collaboration participant add <collaborationId>
+appaloft workspace collaboration lane add <collaborationId>
+appaloft workspace collaboration writer acquire <collaborationId> <laneId>
+```
+
+Participants can be team members or Pi, OpenCode, and other Agent Runtimes. Each Lane has at most
+one leased writer. Other participants can observe the same real PTY output through expiring,
+revocable access descriptors but cannot send input. Transferring the writer increments the fencing
+generation, so a stale client cannot keep writing even if it remains connected.
+
+Console and CLI manage connection, authorization, reconnection, and handoff without reimplementing
+an Agent's TUI. Agents with native attach support can receive a native client command; other
+interactive Agents continue to use their own TUI inside a managed PTY. Review handoffs bind an
+immutable Source Artifact digest and never merge two Workspace directories directly.
+
 ## Lifecycle
 
 ```bash

@@ -5,6 +5,7 @@
   import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
 
   import { readErrorMessage } from "$lib/api/client";
+  import { capabilities, capabilityKey } from "$lib/capabilities";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
@@ -45,12 +46,31 @@
     sandbox: SandboxDescriptor;
     runtimes: RuntimeDescriptor[];
   };
+  type WorkspaceCollaborationDescriptor = {
+    collaborationId: string;
+    name: string;
+    status: string;
+    participants: readonly unknown[];
+    lanes: readonly unknown[];
+  };
 
   let createOpen = $state(false);
+  let collaborationCreateOpen = $state(false);
   let selectedHarnessKey = $state("opencode");
   let repository = $state("");
   let repositoryRef = $state("");
   let branch = $state("");
+  let collaborationName = $state("");
+  let collaborationWorkspaceId = $state("");
+  const collaborationCreateCapability = {
+    operationKey: "workspace-collaborations.create",
+  } as const;
+
+  $effect(() => {
+    if (browser) {
+      void capabilities.fetch([collaborationCreateCapability]);
+    }
+  });
 
   const catalogQuery = createQuery(() =>
     queryOptions({
@@ -91,6 +111,19 @@
         );
         return workspaces.filter((workspace) => workspace.runtimes.length > 0);
       },
+    }),
+  );
+
+  const collaborationsQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["workspace-collaborations"],
+      enabled: browser,
+      queryFn: async () =>
+        (
+          (await orpcClient.workspaceCollaborations.list({})) as {
+            items: WorkspaceCollaborationDescriptor[];
+          }
+        ).items,
     }),
   );
 
@@ -219,7 +252,29 @@
     },
   }));
 
+  const createCollaborationMutation = createMutation(() => ({
+    mutationFn: async () =>
+      (await orpcClient.workspaceCollaborations.create({
+        name: collaborationName,
+        workspaceId: collaborationWorkspaceId,
+        lanePurpose: "builder",
+        laneLabel: "Builder",
+      })) as WorkspaceCollaborationDescriptor,
+    onSuccess: async (collaboration) => {
+      collaborationCreateOpen = false;
+      collaborationName = "";
+      await queryClient.invalidateQueries({ queryKey: ["workspace-collaborations"] });
+      await goto(
+        `/workspace-collaborations/${encodeURIComponent(collaboration.collaborationId)}`,
+      );
+    },
+  }));
+
   const workspaces = $derived(workspacesQuery.data ?? []);
+  const collaborations = $derived(collaborationsQuery.data ?? []);
+  const canCreateCollaboration = $derived(
+    $capabilities.capabilities[capabilityKey(collaborationCreateCapability)]?.allowed === true,
+  );
 </script>
 
 <svelte:head>
@@ -295,6 +350,78 @@
         {/each}
       </div>
     {/if}
+
+    <section class="space-y-4 border-t pt-6" data-workspace-collaborations>
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 class="text-xl font-semibold">
+            {$t(i18nKeys.console.workspaceCollaborations.pageTitle)}
+          </h2>
+          <p class="mt-1 max-w-3xl text-sm text-muted-foreground">
+            {$t(i18nKeys.console.workspaceCollaborations.pageDescription)}
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          disabled={workspaces.length === 0 || !canCreateCollaboration}
+          onclick={() => {
+            collaborationWorkspaceId ||= workspaces[0]?.sandbox.sandboxId ?? "";
+            collaborationCreateOpen = true;
+          }}
+        >
+          <Plus class="size-4" />
+          {$t(i18nKeys.console.workspaceCollaborations.create)}
+        </Button>
+      </div>
+
+      {#if collaborationsQuery.isPending}
+        <div class="h-28 animate-pulse rounded-xl border bg-muted/40"></div>
+      {:else if collaborationsQuery.error}
+        <p class="text-sm text-destructive">{readErrorMessage(collaborationsQuery.error)}</p>
+      {:else if collaborations.length === 0}
+        <div class="rounded-xl border border-dashed p-6">
+          <h3 class="font-semibold">
+            {$t(i18nKeys.console.workspaceCollaborations.emptyTitle)}
+          </h3>
+          <p class="mt-1 text-sm text-muted-foreground">
+            {$t(i18nKeys.console.workspaceCollaborations.emptyBody)}
+          </p>
+        </div>
+      {:else}
+        <div class="grid gap-3 md:grid-cols-2">
+          {#each collaborations as collaboration (collaboration.collaborationId)}
+            <article class="rounded-xl border bg-card p-5">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <h3 class="font-semibold">{collaboration.name}</h3>
+                  <p class="mt-1 font-mono text-xs text-muted-foreground">
+                    {collaboration.collaborationId}
+                  </p>
+                </div>
+                <Badge variant="outline">{collaboration.status}</Badge>
+              </div>
+              <div class="mt-3 flex gap-2 text-xs text-muted-foreground">
+                <span>
+                  {$t(i18nKeys.console.workspaceCollaborations.lanes)}:
+                  {collaboration.lanes.length}
+                </span>
+                <span>
+                  {$t(i18nKeys.console.workspaceCollaborations.participants)}:
+                  {collaboration.participants.length}
+                </span>
+              </div>
+              <Button
+                class="mt-4 w-full"
+                variant="outline"
+                href={`/workspace-collaborations/${encodeURIComponent(collaboration.collaborationId)}`}
+              >
+                {$t(i18nKeys.console.workspaceCollaborations.open)}
+              </Button>
+            </article>
+          {/each}
+        </div>
+      {/if}
+    </section>
   </div>
 </ConsoleShell>
 
@@ -358,6 +485,64 @@
           {createWorkspaceMutation.isPending
             ? $t(i18nKeys.console.agentWorkspaces.creating)
             : $t(i18nKeys.console.agentWorkspaces.create)}
+        </Button>
+      </Dialog.Footer>
+    </form>
+  </Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={collaborationCreateOpen}>
+  <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)} class="sm:max-w-lg">
+    <Dialog.Header>
+      <Dialog.Title>{$t(i18nKeys.console.workspaceCollaborations.createTitle)}</Dialog.Title>
+      <Dialog.Description>
+        {$t(i18nKeys.console.workspaceCollaborations.pageDescription)}
+      </Dialog.Description>
+    </Dialog.Header>
+    <form
+      class="space-y-4"
+      onsubmit={(event) => {
+        event.preventDefault();
+        createCollaborationMutation.mutate();
+      }}
+    >
+      <label class="grid gap-1.5 text-sm">
+        <span class="font-medium">{$t(i18nKeys.console.workspaceCollaborations.name)}</span>
+        <input
+          class="h-10 rounded-md border bg-background px-3"
+          required
+          bind:value={collaborationName}
+        />
+      </label>
+      <label class="grid gap-1.5 text-sm">
+        <span class="font-medium">
+          {$t(i18nKeys.console.workspaceCollaborations.initialWorkspace)}
+        </span>
+        <Select.Root bind:value={collaborationWorkspaceId} type="single">
+          <Select.Trigger class="w-full">{collaborationWorkspaceId}</Select.Trigger>
+          <Select.Content>
+            {#each workspaces as workspace (workspace.sandbox.sandboxId)}
+              <Select.Item value={workspace.sandbox.sandboxId}>
+                {workspace.sandbox.sandboxId}
+              </Select.Item>
+            {/each}
+          </Select.Content>
+        </Select.Root>
+      </label>
+      {#if createCollaborationMutation.error}
+        <p class="text-sm text-destructive">
+          {readErrorMessage(createCollaborationMutation.error)}
+        </p>
+      {/if}
+      <Dialog.Footer>
+        <Button
+          type="submit"
+          disabled={!collaborationName.trim() ||
+            !collaborationWorkspaceId ||
+            !canCreateCollaboration ||
+            createCollaborationMutation.isPending}
+        >
+          {$t(i18nKeys.console.workspaceCollaborations.create)}
         </Button>
       </Dialog.Footer>
     </form>

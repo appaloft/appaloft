@@ -3,10 +3,13 @@ import {
   AcceptConnectorCapabilityPlanCommand,
   AcceptDependencyResourceProvisioningPlanCommand,
   AcceptSandboxPromotionCommand,
+  AcquireWorkspaceWriterLeaseCommand,
   type ActionDeployTokenAuthorizationPort,
   type ActionDeployTokenRequestedScope,
   type ActionDeployTokenResolvedScope,
   type ActionDeployTokenWorkflow,
+  AddWorkspaceCollaborationLaneCommand,
+  AddWorkspaceCollaborationParticipantCommand,
   type AppLogger,
   ApplyActionPreviewRouteCommand,
   ApplyConnectorCapabilityCommand,
@@ -16,12 +19,17 @@ import {
   ArchiveProjectCommand,
   ArchiveResourceCommand,
   ArchiveResourceRuntimeLogsCommand,
+  ArchiveWorkspaceCollaborationLaneCommand,
   AttachResourceStorageCommand,
   type AuthBootstrapStatus,
+  AuthorizeWorkspaceCollaborationLaneAccessQuery,
   acceptBlueprintInstallCommandInputSchema,
   acceptConnectorCapabilityPlanCommandInputSchema,
   acceptDependencyResourceProvisioningPlanInputSchema,
   acceptSandboxPromotionInputSchema,
+  acquireWorkspaceWriterLeaseInputSchema,
+  addWorkspaceCollaborationLaneInputSchema,
+  addWorkspaceCollaborationParticipantInputSchema,
   applyConnectorCapabilityCommandInputSchema,
   approveAgentTaskRunInputSchema,
   archiveDeploymentCommandInputSchema,
@@ -29,7 +37,9 @@ import {
   archiveProjectCommandInputSchema,
   archiveResourceCommandInputSchema,
   archiveResourceRuntimeLogsCommandInputSchema,
+  archiveWorkspaceCollaborationLaneInputSchema,
   attachResourceStorageCommandInputSchema,
+  authorizeWorkspaceCollaborationLaneAccessInputSchema,
   BindResourceDependencyCommand,
   BootstrapFirstAdminCommand,
   BootstrapServerProxyCommand,
@@ -45,6 +55,7 @@ import {
   ChangeAccountProfileCommand,
   ChangeOrganizationMemberRoleCommand,
   ChangeOrganizationProfileCommand,
+  ChangeWorkspaceCollaborationParticipantRoleCommand,
   CheckDomainBindingDeleteSafetyQuery,
   CheckProjectDeleteSafetyQuery,
   CheckResourceDeleteSafetyQuery,
@@ -53,6 +64,7 @@ import {
   CleanupStorageVolumeRuntimeCommand,
   CloneEnvironmentCommand,
   CloseTerminalSessionCommand,
+  CloseWorkspaceCollaborationCommand,
   type Command,
   type CommandBus,
   CompleteConnectionCallbackCommand,
@@ -112,6 +124,7 @@ import {
   CreateStorageVolumeBackupPlanQuery,
   CreateStorageVolumeCommand,
   CreateStorageVolumeRestorePlanQuery,
+  CreateWorkspaceCollaborationCommand,
   cancelAgentTaskRunInputSchema,
   cancelDeploymentCommandInputSchema,
   cancelOperatorWorkCommandInputSchema,
@@ -119,6 +132,7 @@ import {
   changeAccountProfileCommandInputSchema,
   changeOrganizationMemberRoleCommandInputSchema,
   changeOrganizationProfileCommandInputSchema,
+  changeWorkspaceCollaborationParticipantRoleInputSchema,
   checkDomainBindingDeleteSafetyQueryInputSchema,
   checkProjectDeleteSafetyQueryInputSchema,
   checkResourceDeleteSafetyQueryInputSchema,
@@ -127,6 +141,7 @@ import {
   cleanupStorageVolumeRuntimeCommandInputSchema,
   cloneEnvironmentCommandInputSchema,
   closeTerminalSessionCommandInputSchema,
+  closeWorkspaceCollaborationInputSchema,
   completeConnectionCallbackCommandInputSchema,
   configureAuditEventLegalHoldCommandInputSchema,
   configureDefaultAccessDomainPolicyCommandInputSchema,
@@ -182,6 +197,7 @@ import {
   createStorageVolumeBackupPlanQueryInputSchema,
   createStorageVolumeCommandInputSchema,
   createStorageVolumeRestorePlanQueryInputSchema,
+  createWorkspaceCollaborationInputSchema,
   DeactivateServerCommand,
   DeadLetterOperatorWorkCommand,
   DeleteAccountCommand,
@@ -302,6 +318,8 @@ import {
   InviteOrganizationMemberCommand,
   IssueOrRenewCertificateCommand,
   IssueSandboxAgentAttachAccessCommand,
+  IssueWorkspaceCollaborationNativeAttachCommand,
+  IssueWorkspaceCollaborationTerminalAccessCommand,
   importCertificateCommandInputSchema,
   importControlPlaneCommandInputSchema,
   importDependencyResourceCommandInputSchema,
@@ -313,6 +331,8 @@ import {
   inviteOrganizationMemberCommandInputSchema,
   issueOrRenewCertificateCommandInputSchema,
   issueSandboxAgentAttachAccessInputSchema,
+  issueWorkspaceCollaborationNativeAttachInputSchema,
+  issueWorkspaceCollaborationTerminalAccessInputSchema,
   ListAccountSessionsQuery,
   ListAgentTaskRunsQuery,
   ListAuditEventArchivesQuery,
@@ -378,6 +398,7 @@ import {
   ListTerminalSessionsQuery,
   ListTunnelSessionsQuery,
   ListUsageIntentRecordsQuery,
+  ListWorkspaceCollaborationsQuery,
   LockEnvironmentCommand,
   listAccountSessionsQueryInputSchema,
   listAgentTaskRunsInputSchema,
@@ -441,11 +462,14 @@ import {
   listTunnelSessionsQueryInputSchema,
   listUsageIntentRecordsInputSchema,
   listUsageIntentRecordsResponseSchema,
+  listWorkspaceCollaborationsInputSchema,
   lockEnvironmentCommandInputSchema,
   MarkOperatorWorkRecoveredCommand,
   markOperatorWorkRecoveredCommandInputSchema,
+  OfferWorkspaceCollaborationHandoffCommand,
   OpenTerminalSessionCommand,
   type OperatorWorkEventStreamEnvelope,
+  offerWorkspaceCollaborationHandoffInputSchema,
   openTerminalSessionCommandInputSchema,
   operationCatalog,
   PauseSandboxCommand,
@@ -509,14 +533,17 @@ import {
   RedeployDeploymentCommand,
   RegisterServerCommand,
   ReleaseAuditEventLegalHoldCommand,
+  ReleaseWorkspaceWriterLeaseCommand,
   RelinkSourceLinkCommand,
   RemoveOrganizationMemberCommand,
   RemoveSandboxFileCommand,
+  RemoveWorkspaceCollaborationParticipantCommand,
   RenameDependencyResourceCommand,
   RenameEnvironmentCommand,
   RenameProjectCommand,
   RenameServerCommand,
   RenameStorageVolumeCommand,
+  RenewWorkspaceWriterLeaseCommand,
   ReorderProjectsCommand,
   ReorderServersCommand,
   ReplaySourceEventCommand,
@@ -526,6 +553,7 @@ import {
   ResolveGenericSignedSourceEventSecretQuery,
   ResolvePreviewPullRequestContextQuery,
   ResolveSandboxAgentApprovalCommand,
+  ResolveWorkspaceCollaborationHandoffCommand,
   ResourceAccessFailureEvidenceLookupQuery,
   ResourceDiagnosticSummaryQuery,
   ResourceEffectiveConfigQuery,
@@ -570,19 +598,23 @@ import {
   redeployDeploymentCommandInputSchema,
   registerServerCommandInputSchema,
   releaseAuditEventLegalHoldCommandInputSchema,
+  releaseWorkspaceWriterLeaseInputSchema,
   relinkSourceLinkCommandInputSchema,
   removeOrganizationMemberCommandInputSchema,
   removeSandboxFileCommandInputSchema,
+  removeWorkspaceCollaborationParticipantInputSchema,
   renameDependencyResourceCommandInputSchema,
   renameEnvironmentCommandInputSchema,
   renameProjectCommandInputSchema,
   renameServerCommandInputSchema,
   renameStorageVolumeCommandInputSchema,
+  renewWorkspaceWriterLeaseInputSchema,
   reorderProjectsCommandInputSchema,
   reorderServersCommandInputSchema,
   replaySourceEventCommandInputSchema,
   resetResourceHealthCommandInputSchema,
   resolveSandboxAgentApprovalInputSchema,
+  resolveWorkspaceCollaborationHandoffInputSchema,
   resourceAccessFailureEvidenceLookupQueryInputSchema,
   resourceHealthHistoryQueryInputSchema,
   resourceProxyConfigurationPreviewQueryInputSchema,
@@ -667,6 +699,7 @@ import {
   ShowStorageVolumeQuery,
   ShowTerminalSessionQuery,
   ShowTunnelSessionQuery,
+  ShowWorkspaceCollaborationQuery,
   type SourceEventVerificationPort,
   StartConnectionCommand,
   StartResourceRuntimeCommand,
@@ -743,6 +776,7 @@ import {
   showStorageVolumeQueryInputSchema,
   showTerminalSessionQueryInputSchema,
   showTunnelSessionQueryInputSchema,
+  showWorkspaceCollaborationInputSchema,
   startConnectionCommandInputSchema,
   startTunnelCommandInputSchema,
   streamDeploymentTimelineQueryInputSchema,
@@ -756,12 +790,14 @@ import {
   TerminateSandboxProcessCommand,
   TestServerConnectivityCommand,
   TransferOrganizationOwnerCommand,
+  TransferWorkspaceWriterLeaseCommand,
   tenantContextForPrincipal,
   terminateSandboxAgentRuntimeInputSchema,
   terminateSandboxProcessCommandInputSchema,
   testDraftServerConnectivityCommandInputSchema,
   testRegisteredServerConnectivityCommandInputSchema,
   transferOrganizationOwnerCommandInputSchema,
+  transferWorkspaceWriterLeaseInputSchema,
   UnbindResourceDependencyCommand,
   UnlockEnvironmentCommand,
   UnsetEnvironmentVariableCommand,
@@ -7782,6 +7818,196 @@ export const deliverAgentTaskRunProcedure = base
   .handler(async ({ input, context }) =>
     executeCommand(context, DeliverAgentTaskRunCommand.create(input)),
   );
+export const createWorkspaceCollaborationProcedure = base
+  .route({ method: "POST", path: "/workspace-collaborations", successStatus: 201 })
+  .input(createWorkspaceCollaborationInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, CreateWorkspaceCollaborationCommand.create(input)),
+  );
+export const listWorkspaceCollaborationsProcedure = base
+  .route({ method: "GET", path: "/workspace-collaborations", successStatus: 200 })
+  .input(listWorkspaceCollaborationsInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListWorkspaceCollaborationsQuery.create(input)),
+  );
+export const showWorkspaceCollaborationProcedure = base
+  .route({
+    method: "GET",
+    path: "/workspace-collaborations/{collaborationId}",
+    successStatus: 200,
+  })
+  .input(showWorkspaceCollaborationInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowWorkspaceCollaborationQuery.create(input)),
+  );
+export const addWorkspaceCollaborationParticipantProcedure = base
+  .route({
+    method: "POST",
+    path: "/workspace-collaborations/{collaborationId}/participants",
+    successStatus: 200,
+  })
+  .input(addWorkspaceCollaborationParticipantInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, AddWorkspaceCollaborationParticipantCommand.create(input)),
+  );
+export const changeWorkspaceCollaborationParticipantRoleProcedure = base
+  .route({
+    method: "POST",
+    path: "/workspace-collaborations/{collaborationId}/participants/{participantId}/role",
+    successStatus: 200,
+  })
+  .input(changeWorkspaceCollaborationParticipantRoleInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ChangeWorkspaceCollaborationParticipantRoleCommand.create(input)),
+  );
+export const removeWorkspaceCollaborationParticipantProcedure = base
+  .route({
+    method: "DELETE",
+    path: "/workspace-collaborations/{collaborationId}/participants/{participantId}",
+    successStatus: 200,
+  })
+  .input(removeWorkspaceCollaborationParticipantInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RemoveWorkspaceCollaborationParticipantCommand.create(input)),
+  );
+export const addWorkspaceCollaborationLaneProcedure = base
+  .route({
+    method: "POST",
+    path: "/workspace-collaborations/{collaborationId}/lanes",
+    successStatus: 200,
+  })
+  .input(addWorkspaceCollaborationLaneInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, AddWorkspaceCollaborationLaneCommand.create(input)),
+  );
+export const archiveWorkspaceCollaborationLaneProcedure = base
+  .route({
+    method: "POST",
+    path: "/workspace-collaborations/{collaborationId}/lanes/{laneId}/archive",
+    successStatus: 200,
+  })
+  .input(archiveWorkspaceCollaborationLaneInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ArchiveWorkspaceCollaborationLaneCommand.create(input)),
+  );
+export const acquireWorkspaceWriterLeaseProcedure = base
+  .route({
+    method: "POST",
+    path: "/workspace-collaborations/{collaborationId}/lanes/{laneId}/writer-lease",
+    successStatus: 200,
+  })
+  .input(acquireWorkspaceWriterLeaseInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, AcquireWorkspaceWriterLeaseCommand.create(input)),
+  );
+export const renewWorkspaceWriterLeaseProcedure = base
+  .route({
+    method: "POST",
+    path: "/workspace-collaborations/{collaborationId}/lanes/{laneId}/writer-lease/renew",
+    successStatus: 200,
+  })
+  .input(renewWorkspaceWriterLeaseInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RenewWorkspaceWriterLeaseCommand.create(input)),
+  );
+export const releaseWorkspaceWriterLeaseProcedure = base
+  .route({
+    method: "POST",
+    path: "/workspace-collaborations/{collaborationId}/lanes/{laneId}/writer-lease/release",
+    successStatus: 200,
+  })
+  .input(releaseWorkspaceWriterLeaseInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ReleaseWorkspaceWriterLeaseCommand.create(input)),
+  );
+export const transferWorkspaceWriterLeaseProcedure = base
+  .route({
+    method: "POST",
+    path: "/workspace-collaborations/{collaborationId}/lanes/{laneId}/writer-lease/transfer",
+    successStatus: 200,
+  })
+  .input(transferWorkspaceWriterLeaseInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, TransferWorkspaceWriterLeaseCommand.create(input)),
+  );
+export const offerWorkspaceCollaborationHandoffProcedure = base
+  .route({
+    method: "POST",
+    path: "/workspace-collaborations/{collaborationId}/handoffs",
+    successStatus: 200,
+  })
+  .input(offerWorkspaceCollaborationHandoffInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, OfferWorkspaceCollaborationHandoffCommand.create(input)),
+  );
+export const resolveWorkspaceCollaborationHandoffProcedure = base
+  .route({
+    method: "POST",
+    path: "/workspace-collaborations/{collaborationId}/handoffs/{handoffId}/resolve",
+    successStatus: 200,
+  })
+  .input(resolveWorkspaceCollaborationHandoffInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ResolveWorkspaceCollaborationHandoffCommand.create(input)),
+  );
+export const authorizeWorkspaceCollaborationLaneAccessProcedure = base
+  .route({
+    method: "GET",
+    path: "/workspace-collaborations/{collaborationId}/lanes/{laneId}/access",
+    successStatus: 200,
+  })
+  .input(authorizeWorkspaceCollaborationLaneAccessInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, AuthorizeWorkspaceCollaborationLaneAccessQuery.create(input)),
+  );
+export const issueWorkspaceCollaborationTerminalAccessProcedure = base
+  .route({
+    method: "POST",
+    path: "/workspace-collaborations/{collaborationId}/lanes/{laneId}/terminal-access",
+    successStatus: 201,
+  })
+  .input(issueWorkspaceCollaborationTerminalAccessInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, IssueWorkspaceCollaborationTerminalAccessCommand.create(input)),
+  );
+export const issueWorkspaceCollaborationNativeAttachProcedure = base
+  .route({
+    method: "POST",
+    path: "/workspace-collaborations/{collaborationId}/lanes/{laneId}/native-attach",
+    successStatus: 201,
+  })
+  .input(issueWorkspaceCollaborationNativeAttachInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, IssueWorkspaceCollaborationNativeAttachCommand.create(input)),
+  );
+export const closeWorkspaceCollaborationProcedure = base
+  .route({
+    method: "POST",
+    path: "/workspace-collaborations/{collaborationId}/close",
+    successStatus: 200,
+  })
+  .input(closeWorkspaceCollaborationInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, CloseWorkspaceCollaborationCommand.create(input)),
+  );
 export const listSandboxAgentRunEventsProcedure = base
   .route({ method: "GET", path: "/sandbox-agent-runs/{runId}/events", successStatus: 200 })
   .input(listSandboxAgentRunEventsInputSchema)
@@ -8011,6 +8237,38 @@ export const appaloftOrpcRouter = {
       show: showSandboxPromotionProcedure,
       accept: acceptSandboxPromotionProcedure,
       retry: retrySandboxPromotionProcedure,
+    },
+  },
+  workspaceCollaborations: {
+    create: createWorkspaceCollaborationProcedure,
+    list: listWorkspaceCollaborationsProcedure,
+    show: showWorkspaceCollaborationProcedure,
+    close: closeWorkspaceCollaborationProcedure,
+    participants: {
+      add: addWorkspaceCollaborationParticipantProcedure,
+      changeRole: changeWorkspaceCollaborationParticipantRoleProcedure,
+      remove: removeWorkspaceCollaborationParticipantProcedure,
+    },
+    lanes: {
+      add: addWorkspaceCollaborationLaneProcedure,
+      archive: archiveWorkspaceCollaborationLaneProcedure,
+      authorizeAccess: authorizeWorkspaceCollaborationLaneAccessProcedure,
+      terminalAccess: {
+        issue: issueWorkspaceCollaborationTerminalAccessProcedure,
+      },
+      nativeAttach: {
+        issue: issueWorkspaceCollaborationNativeAttachProcedure,
+      },
+    },
+    writerLeases: {
+      acquire: acquireWorkspaceWriterLeaseProcedure,
+      renew: renewWorkspaceWriterLeaseProcedure,
+      release: releaseWorkspaceWriterLeaseProcedure,
+      transfer: transferWorkspaceWriterLeaseProcedure,
+    },
+    handoffs: {
+      offer: offerWorkspaceCollaborationHandoffProcedure,
+      resolve: resolveWorkspaceCollaborationHandoffProcedure,
     },
   },
   sandboxSnapshots: {
@@ -10909,6 +11167,23 @@ export function mountAppaloftOrpcRoutes(
     "/api/sandbox-promotions/:promotionId",
     "/api/sandbox-promotions/:promotionId/accept",
     "/api/sandbox-promotions/:promotionId/retry",
+    "/api/workspace-collaborations",
+    "/api/workspace-collaborations/:collaborationId",
+    "/api/workspace-collaborations/:collaborationId/close",
+    "/api/workspace-collaborations/:collaborationId/participants",
+    "/api/workspace-collaborations/:collaborationId/participants/:participantId",
+    "/api/workspace-collaborations/:collaborationId/participants/:participantId/role",
+    "/api/workspace-collaborations/:collaborationId/lanes",
+    "/api/workspace-collaborations/:collaborationId/lanes/:laneId/archive",
+    "/api/workspace-collaborations/:collaborationId/lanes/:laneId/access",
+    "/api/workspace-collaborations/:collaborationId/lanes/:laneId/terminal-access",
+    "/api/workspace-collaborations/:collaborationId/lanes/:laneId/native-attach",
+    "/api/workspace-collaborations/:collaborationId/lanes/:laneId/writer-lease",
+    "/api/workspace-collaborations/:collaborationId/lanes/:laneId/writer-lease/renew",
+    "/api/workspace-collaborations/:collaborationId/lanes/:laneId/writer-lease/release",
+    "/api/workspace-collaborations/:collaborationId/lanes/:laneId/writer-lease/transfer",
+    "/api/workspace-collaborations/:collaborationId/handoffs",
+    "/api/workspace-collaborations/:collaborationId/handoffs/:handoffId/resolve",
     "/api/sandbox-snapshots",
     "/api/sandbox-snapshots/:snapshotId",
     "/api/sandbox-templates",

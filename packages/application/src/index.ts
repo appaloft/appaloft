@@ -96,3 +96,6 @@ export * from "./usage-intent-handlers";
 export * from "./usage-intent-messages";
 export * from "./use-cases";
 export * from "./workspace";
+export * from "./workspace-collaboration";
+export * from "./workspace-collaboration-handlers";
+export * from "./workspace-collaboration-messages";
