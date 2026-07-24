@@ -11,7 +11,7 @@ sidebar: { label: "Agent Workspace", order: 0 }
 > 成熟度：**Public alpha**。Workspace CLI、SDK 和底层 operation 属于 Public Appaloft；具体
 > Sandbox provider、模板、网关和公网地址能力取决于部署配置。
 
-# 创建一个 Agent Workspace
+# 创建一个 Agent Workspace [#agent-workspace]
 
 Agent Workspace 是公共工作流，不是 Cloud 专属资源。它把一个 Sandbox 和其中一个 Pi 或 OpenCode
 Runtime 组合起来；`workspaceId` 就是 `sandboxId`，因此没有第二份生命周期或数据库记录。

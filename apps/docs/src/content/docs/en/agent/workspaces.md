@@ -12,7 +12,7 @@ sidebar: { label: "Agent Workspace", order: 0 }
 > Appaloft. Concrete Sandbox providers, templates, gateways, and public URL support depend on the
 > deployment configuration.
 
-# Create an Agent Workspace
+# Create an Agent Workspace [#agent-workspace]
 
 Agent Workspace is a public workflow, not a Cloud-only resource. It composes one Sandbox and one Pi
 or OpenCode Runtime. The `workspaceId` is the `sandboxId`, so there is no second lifecycle or
