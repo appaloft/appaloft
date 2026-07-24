@@ -126,6 +126,51 @@ describe("sandbox agent delivery SDK running server", () => {
 
   afterAll(() => server?.stop(true));
 
+  test("[AGENT-WS-HTTP-020] mounts harness, attach and Agent Task operations on the running HTTP server", async () => {
+    if (!server) throw new Error("SDK test server was not started");
+    const baseUrl = `http://127.0.0.1:${server.port}`;
+    const requests = [
+      new Request(`${baseUrl}/api/sandbox-agent-harnesses`),
+      new Request(`${baseUrl}/api/sandboxes/sbx_sdk/agent-runtimes/srt_sdk/attach`, {
+        method: "POST",
+      }),
+      new Request(`${baseUrl}/api/sandboxes/sbx_sdk/agent-task-runs`),
+      new Request(`${baseUrl}/api/sandboxes/sbx_sdk/agent-task-runs`, {
+        method: "POST",
+      }),
+      new Request(`${baseUrl}/api/sandboxes/sbx_sdk/agent-task-runs/srun_sdk`),
+      new Request(`${baseUrl}/api/sandboxes/sbx_sdk/agent-task-runs/srun_sdk/resume`, {
+        method: "POST",
+      }),
+      new Request(`${baseUrl}/api/sandboxes/sbx_sdk/agent-task-runs/srun_sdk/cancel`, {
+        method: "POST",
+      }),
+      new Request(`${baseUrl}/api/sandboxes/sbx_sdk/agent-task-runs/srun_sdk/approve`, {
+        method: "POST",
+      }),
+      new Request(`${baseUrl}/api/sandboxes/sbx_sdk/agent-task-runs/srun_sdk/deliver`, {
+        method: "POST",
+      }),
+    ];
+
+    for (const request of requests) {
+      const response = await fetch(request);
+      expect(response.status, `${request.method} ${request.url}`).toBe(401);
+      expect(response.headers.get("content-type"), `${request.method} ${request.url}`).toContain(
+        "application/json",
+      );
+      expect(await response.json(), `${request.method} ${request.url}`).toMatchObject({
+        error: {
+          code: "product_auth_missing",
+          details: {
+            endpoint: new URL(request.url).pathname,
+            method: request.method,
+          },
+        },
+      });
+    }
+  });
+
   test("[TS-SDK-AGENT-001][TS-SDK-RESOURCE-001] executes the Sandbox handle to promotion contract over HTTP", async () => {
     if (!server) throw new Error("SDK test server was not started");
     const client = createAppaloftClient({
