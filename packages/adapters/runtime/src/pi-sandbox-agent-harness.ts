@@ -169,6 +169,7 @@ const piSandboxFailureCodes = [
   "pi_model_access_unavailable",
   "pi_model_gateway_host_unresolved",
   "pi_model_gateway_unreachable",
+  "pi_model_configuration_invalid",
   "pi_model_unauthorized",
   "pi_model_endpoint_not_found",
   "pi_cli_option_unsupported",
@@ -183,6 +184,12 @@ const piSandboxFailureCodes = [
 
 export type PiSandboxFailureCode = (typeof piSandboxFailureCodes)[number];
 
+export type PiSandboxFailurePhase =
+  | "start-process"
+  | "poll-process"
+  | "read-process-result"
+  | "validate-process-result";
+
 export function classifyPiSandboxFailure(value: unknown): PiSandboxFailureCode {
   const message = value instanceof Error ? value.message : String(value);
   const known = piSandboxFailureCodes.find((code) => message === code);
@@ -190,8 +197,19 @@ export function classifyPiSandboxFailure(value: unknown): PiSandboxFailureCode {
   if (/ENOTFOUND|EAI_AGAIN|getaddrinfo|host not found|name resolution/i.test(message)) {
     return "pi_model_gateway_host_unresolved";
   }
-  if (/ECONNREFUSED|ECONNRESET|network is unreachable|fetch failed|connection refused/i.test(message)) {
+  if (
+    /ECONNREFUSED|ECONNRESET|network is unreachable|fetch failed|connection refused|connection error/i.test(
+      message,
+    )
+  ) {
     return "pi_model_gateway_unreachable";
+  }
+  if (
+    /unknown (model|provider)|(model|provider).*(not found|not configured|unavailable)/i.test(
+      message,
+    )
+  ) {
+    return "pi_model_configuration_invalid";
   }
   if (/\b401\b|unauthorized|invalid api key|authentication failed/i.test(message)) {
     return "pi_model_unauthorized";
@@ -294,6 +312,7 @@ export class PiSandboxAgentHarness implements SandboxAgentHarness {
       agentDir,
       ...piArgv,
     ];
+    let failurePhase: PiSandboxFailurePhase = "start-process";
     try {
       const result = await this.execution.exec(input.executionContext, input.sandboxId, {
         argv,
@@ -311,6 +330,7 @@ export class PiSandboxAgentHarness implements SandboxAgentHarness {
         cancelled: false,
       };
       this.active.set(input.runId, active);
+      failurePhase = "poll-process";
       const deadline = Date.now() + (this.options.timeoutMs ?? 30 * 60_000);
       let stdoutCursor = 0;
       const emitAvailableOutput = async (includeTrailing: boolean) => {
@@ -345,6 +365,7 @@ export class PiSandboxAgentHarness implements SandboxAgentHarness {
         }
         await new Promise((resolve) => setTimeout(resolve, 250));
       }
+      failurePhase = "read-process-result";
       const [stdoutResult, stderrResult, exitResult] = await Promise.all([
         this.execution.readFile(input.executionContext, input.sandboxId, { path: stdoutPath }),
         this.execution.readFile(input.executionContext, input.sandboxId, { path: stderrPath }),
@@ -356,11 +377,12 @@ export class PiSandboxAgentHarness implements SandboxAgentHarness {
       const stdout = new TextDecoder().decode(stdoutResult.value);
       const stderr = new TextDecoder().decode(stderrResult.value);
       const exitCode = Number(new TextDecoder().decode(exitResult.value));
+      failurePhase = "validate-process-result";
       if (input.emitEvent) {
         await emitJsonEvents(stdout.slice(stdoutCursor), input.emitEvent);
       }
       if (exitCode !== 0) {
-        throw new Error(classifyPiSandboxFailure(stderr));
+        throw new Error(classifyPiSandboxFailure(`${stderr}\n${stdout}`));
       }
       return {
         events: input.emitEvent ? [] : parseJsonEvents(stdout),
@@ -372,7 +394,7 @@ export class PiSandboxAgentHarness implements SandboxAgentHarness {
         try {
           await input.emitEvent({
             type: "run-error",
-            data: { source: "pi", code },
+            data: { source: "pi", code, phase: failurePhase },
           });
         } catch {
           // The original secret-safe failure code remains authoritative when event persistence fails.
