@@ -72,6 +72,15 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 - `appaloft sandbox template list` - `sandbox-templates.list`
 - `appaloft sandbox template show <templateId>` - `sandbox-templates.show`
 - `appaloft sandbox template delete <templateId>` - `sandbox-templates.delete`
+- `appaloft workspace harness list` - `sandboxes.agents.harnesses.list`
+- `appaloft workspace attach <workspaceId>` - `sandboxes.agents.runtimes.attach`
+- `appaloft workspace task run <workspaceId>` - `sandboxes.agent-tasks.create`
+- `appaloft workspace task list <workspaceId>` - `sandboxes.agent-tasks.list`
+- `appaloft workspace task show <workspaceId> <taskRunId>` - `sandboxes.agent-tasks.show`
+- `appaloft workspace task resume <workspaceId> <taskRunId>` - `sandboxes.agent-tasks.resume`
+- `appaloft workspace task cancel <workspaceId> <taskRunId>` - `sandboxes.agent-tasks.cancel`
+- `appaloft workspace task approve <workspaceId> <taskRunId>` - `sandboxes.agent-tasks.approve`
+- `appaloft workspace task deliver <workspaceId> <taskRunId>` - `sandboxes.agent-tasks.deliver`
 - `appaloft sandbox agent runtime create <sandboxId>` - `sandboxes.agents.runtimes.create`
 - `appaloft sandbox agent runtime list <sandboxId>` - `sandboxes.agents.runtimes.list`
 - `appaloft sandbox agent runtime show <sandboxId> <runtimeId>` - `sandboxes.agents.runtimes.show`
