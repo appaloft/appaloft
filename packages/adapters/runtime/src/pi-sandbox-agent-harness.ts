@@ -52,14 +52,7 @@ export interface PiSandboxModelAccessProvider {
     sandboxId: string;
     runtimeId: string;
     runId: string;
-  }): Promise<{
-    capabilityId: string;
-    baseUrl: string;
-    accessToken: string;
-    provider: string;
-    model: string;
-    expiresAt: string;
-  }>;
+  }): Promise<PiSandboxModelAccess>;
   revoke(input: {
     executionContext: ExecutionContext;
     sandboxId: string;
@@ -67,6 +60,15 @@ export interface PiSandboxModelAccessProvider {
     runId: string;
     capabilityId: string;
   }): Promise<void>;
+}
+
+export interface PiSandboxModelAccess {
+  capabilityId: string;
+  baseUrl: string;
+  accessToken: string;
+  provider: string;
+  model: string;
+  expiresAt: string;
 }
 
 export interface PiSandboxAgentHarnessOptions {
@@ -79,6 +81,58 @@ export interface PiSandboxAgentHarnessOptions {
   timeoutMs?: number;
   offlineStartup?: boolean;
   modelAccess?: PiSandboxModelAccessProvider;
+}
+
+export function createPiSandboxModelConfig(modelAccess: PiSandboxModelAccess): string {
+  return JSON.stringify({
+    providers: {
+      [modelAccess.provider]: {
+        baseUrl: modelAccess.baseUrl,
+        api: "openai-completions",
+        apiKey: modelAccess.accessToken,
+        authHeader: true,
+        models: [
+          {
+            id: modelAccess.model,
+            name: modelAccess.model,
+            reasoning: false,
+            input: ["text"],
+            contextWindow: 128_000,
+            maxTokens: 16_384,
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+          },
+        ],
+      },
+    },
+  });
+}
+
+export function createPiSandboxArgv(input: {
+  executable?: string;
+  offlineStartup?: boolean;
+  modelAccess: PiSandboxModelAccess;
+  prompt: string;
+}): string[] {
+  return [
+    input.executable ?? "pi",
+    "--mode",
+    "json",
+    "--no-session",
+    "--tools",
+    "read,bash,edit,write,grep,find,ls",
+    "--no-extensions",
+    "--no-skills",
+    "--no-prompt-templates",
+    "--no-context-files",
+    "--no-approve",
+    "--provider",
+    input.modelAccess.provider,
+    "--model",
+    input.modelAccess.model,
+    ...(input.offlineStartup === false ? [] : ["--offline"]),
+    "--print",
+    input.prompt,
+  ];
 }
 
 async function sha256(value: string): Promise<string> {
@@ -156,27 +210,7 @@ export class PiSandboxAgentHarness implements SandboxAgentHarness {
     const modelAccess = await modelAccessProvider.issue(input);
     const outputRoot = `.appaloft-agent/${input.runId}`;
     const agentDir = `${outputRoot}/agent`;
-    const modelConfig = JSON.stringify({
-      providers: {
-        [modelAccess.provider]: {
-          baseUrl: modelAccess.baseUrl,
-          api: "openai-completions",
-          apiKey: modelAccess.accessToken,
-          authHeader: true,
-          models: [
-            {
-              id: modelAccess.model,
-              name: modelAccess.model,
-              reasoning: false,
-              input: ["text"],
-              contextWindow: 128_000,
-              maxTokens: 16_384,
-              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-            },
-          ],
-        },
-      },
-    });
+    const modelConfig = createPiSandboxModelConfig(modelAccess);
     const configured = await this.execution.writeFile(input.executionContext, input.sandboxId, {
       path: `${agentDir}/models.json`,
       content: new TextEncoder().encode(modelConfig),
@@ -188,25 +222,14 @@ export class PiSandboxAgentHarness implements SandboxAgentHarness {
       });
       throw new Error(configured.error.message);
     }
-    const piArgv = [
-      this.options.executable ?? "pi",
-      "--mode",
-      "json",
-      "--no-session",
-      "--tools",
-      "read,bash,edit,write,grep,find,ls",
-      "--no-extensions",
-      "--no-skills",
-      "--no-prompt-templates",
-      "--no-context-files",
-      "--no-approve",
-      "--provider",
-      modelAccess.provider,
-      "--model",
-      modelAccess.model,
-      ...(this.options.offlineStartup === false ? [] : ["--offline"]),
+    const piArgv = createPiSandboxArgv({
+      ...(this.options.executable ? { executable: this.options.executable } : {}),
+      ...(this.options.offlineStartup === undefined
+        ? {}
+        : { offlineStartup: this.options.offlineStartup }),
+      modelAccess,
       prompt,
-    ];
+    });
     const stdoutPath = `${outputRoot}/stdout.jsonl`;
     const stderrPath = `${outputRoot}/stderr.log`;
     const exitPath = `${outputRoot}/exit-code`;
