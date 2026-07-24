@@ -3,14 +3,13 @@ title: "Run agents"
 description: "Create a Runtime inside an Appaloft Sandbox and submit observable, cancellable Agent Runs."
 docType: task
 localeState: { zh-CN: complete, en-US: complete }
-searchAliases: ["Agent Runtime", "Pi", "Agent Run"]
+searchAliases: ["Agent Runtime", "Pi", "OpenCode", "Agent Run"]
 relatedOperations: [sandboxes.agents.runtimes.create, sandboxes.agents.runs.create, sandboxes.agents.runs.events, sandboxes.agents.runs.cancel]
 sidebar: { label: "Run agents", order: 0 }
 ---
 
-> Maturity: **Private preview**. The API is implemented. The Pi adapter requires an
-> operator-provisioned Sandbox template pinned by version and digest, with
-> `APPALOFT_PI_SANDBOX_TEMPLATE_ID` configured.
+> Maturity: **Public alpha**. The public API supports Pi and OpenCode adapters. Both require an
+> operator-provisioned Sandbox template pinned by version and digest.
 
 # Run an agent in a Sandbox [#sandbox-agent-runtime]
 
@@ -31,20 +30,25 @@ Agent operations currently require a product session. Do not substitute a deploy
 backend example until a scoped long-lived application credential is explicitly available.
 
 ```ts
-const sandbox = await appaloft.sandboxes.create(sandboxInput);
-const agent = await sandbox.agents.create({ harness: "pi" });
+const workspace = await appaloft.workspaces.create({
+  sandbox: sandboxInput,
+  harness: "opencode",
+});
+const agent = workspace.agent;
 const run = await agent.runs.create({ task: "Build the requested app in /workspace/app" });
 ```
 
-The SDK maps `Agent` to the canonical Sandbox Agent Runtime, uses the admitted Pi template default,
+The SDK maps `Agent` to the canonical Sandbox Agent Runtime, uses the admitted Pi/OpenCode template defaults,
 and generates idempotency keys. Pass `harnessTemplateId`, `context`, or `idempotencyKey` when the
 caller needs an explicit pin or continuation. Resource methods throw `AppaloftSdkRequestError`;
 the non-throwing generated operations remain at `appaloft.operations`.
 
 Run events have count, depth, and string bounds and recursively redact credential, secret,
 password, token, and authorization fields. They are not audit events or a full model transcript.
-Pi runs as a terminable background process in the Sandbox. Cancellation terminates that process and
-prevents a late success result from overwriting `cancelled`.
+Pi runs as a terminable background process in the Sandbox. OpenCode uses one server confined to the
+Sandbox provider's private network namespace, without a published host port, and a separate attached
+client process. Cancellation terminates the client process and prevents a late success result from
+overwriting `cancelled`.
 
 The official examples repository contains runnable, end-to-end-oriented source for
 [Chat-to-App](https://github.com/appaloft/examples/blob/main/sandbox-agent/src/chat-to-app.ts),

@@ -164,7 +164,7 @@ Implemented operations:
 | Show reusable SSH credential usage | Query | `credentials.show` | `ShowSshCredentialQuery` | `ShowSshCredentialQueryInput` | `appaloft server credential-show <credentialId>` | `GET /api/credentials/ssh/{credentialId}` |
 | Delete reusable SSH credential when unused | Command | `credentials.delete-ssh` | `DeleteSshCredentialCommand` | `DeleteSshCredentialCommandInput` | `appaloft server credential-delete <credentialId> --confirm <credentialId>` | `DELETE /api/credentials/ssh/{credentialId}` |
 | Rotate reusable SSH credential in place | Command | `credentials.rotate-ssh` | `RotateSshCredentialCommand` | `RotateSshCredentialCommandInput` | `appaloft server credential-rotate <credentialId> --private-key-file <path> --confirm <credentialId>` | `POST /api/credentials/ssh/{credentialId}/rotate` |
-| Open deployment target terminal | Command | `terminal-sessions.open` | `OpenTerminalSessionCommand` | `OpenTerminalSessionCommandInput` | `appaloft server terminal <serverId>` | `POST /api/terminal-sessions`; attach: `WS /api/terminal-sessions/{sessionId}/attach` |
+| Open deployment target or Sandbox terminal | Command | `terminal-sessions.open` | `OpenTerminalSessionCommand` | `OpenTerminalSessionCommandInput` | `appaloft server terminal <serverId>`; `appaloft sandbox terminal <sandboxId>` | `POST /api/terminal-sessions`; attach: `WS /api/terminal-sessions/{sessionId}/attach` |
 | List terminal sessions | Query | `terminal-sessions.list` | `ListTerminalSessionsQuery` | `ListTerminalSessionsQueryInput` | `appaloft terminal-session list` | `GET /api/terminal-sessions` |
 | Show terminal session | Query | `terminal-sessions.show` | `ShowTerminalSessionQuery` | `ShowTerminalSessionQueryInput` | `appaloft terminal-session show <sessionId>` | `GET /api/terminal-sessions/{sessionId}` |
 | Close terminal session | Command | `terminal-sessions.close` | `CloseTerminalSessionCommand` | `CloseTerminalSessionCommandInput` | `appaloft terminal-session close <sessionId>` | `POST /api/terminal-sessions/{sessionId}/close` |
@@ -982,7 +982,9 @@ addressable. Pi is an adapter and therefore does not appear in operation names.
 
 | Operation | Type | Message | Input | CLI | HTTP/oRPC |
 | --- | --- | --- | --- | --- | --- |
+| `sandboxes.agents.harnesses.list` | Query | `ListSandboxAgentHarnessesQuery` | Empty | `appaloft workspace harness list` | `GET /api/sandbox-agent-harnesses` |
 | `sandboxes.agents.runtimes.create` | Command | `CreateSandboxAgentRuntimeCommand` | Sandbox id, harness/template keys, idempotency key | `appaloft sandbox agent runtime create <sandboxId>` | `POST /api/sandboxes/{sandboxId}/agent-runtimes` |
+| `sandboxes.agents.runtimes.attach` | Command | `IssueSandboxAgentAttachAccessCommand` | Sandbox/runtime ids, expiry no later than one hour | `appaloft workspace attach <workspaceId>` | `POST /api/sandboxes/{sandboxId}/agent-runtimes/{runtimeId}/attach` |
 | `sandboxes.agents.runtimes.list` | Query | `ListSandboxAgentRuntimesQuery` | Sandbox id | `appaloft sandbox agent runtime list <sandboxId>` | `GET /api/sandboxes/{sandboxId}/agent-runtimes` |
 | `sandboxes.agents.runtimes.show` | Query | `ShowSandboxAgentRuntimeQuery` | Sandbox id, runtime id | `appaloft sandbox agent runtime show <sandboxId> <runtimeId>` | `GET /api/sandboxes/{sandboxId}/agent-runtimes/{runtimeId}` |
 | `sandboxes.agents.runtimes.terminate` | Command | `TerminateSandboxAgentRuntimeCommand` | Sandbox id, runtime id | `appaloft sandbox agent runtime terminate <sandboxId> <runtimeId>` | `POST /api/sandboxes/{sandboxId}/agent-runtimes/{runtimeId}/terminate` |
@@ -1007,10 +1009,39 @@ addressable. Pi is an adapter and therefore does not appear in operation names.
 | `sandboxes.promotions.show` | Query | `ShowSandboxPromotionQuery` | Promotion id | `appaloft sandbox promote show <promotionId>` | `GET /api/sandbox-promotions/{promotionId}` |
 | `sandboxes.promotions.accept` | Command | `AcceptSandboxPromotionCommand` | Promotion id, expected digest, idempotency key | `appaloft sandbox promote accept <promotionId>` | `POST /api/sandbox-promotions/{promotionId}/accept` |
 | `sandboxes.promotions.retry` | Command | `RetrySandboxPromotionCommand` | Promotion id, idempotency key | `appaloft sandbox promote retry <promotionId>` | `POST /api/sandbox-promotions/{promotionId}/retry` |
+| `sandboxes.agent-tasks.create` | Command | `CreateAgentTaskRunCommand` | Workspace/runtime ids, task, checks, optional preview/review plan, idempotency key | `appaloft workspace task run <workspaceId>` | `POST /api/sandboxes/{workspaceId}/agent-task-runs` |
+| `sandboxes.agent-tasks.list` | Query | `ListAgentTaskRunsQuery` | Workspace/runtime ids | `appaloft workspace task list <workspaceId>` | `GET /api/sandboxes/{workspaceId}/agent-task-runs` |
+| `sandboxes.agent-tasks.show` | Query | `ShowAgentTaskRunQuery` | Workspace/task Run ids | `appaloft workspace task show <workspaceId> <taskRunId>` | `GET /api/sandboxes/{workspaceId}/agent-task-runs/{taskRunId}` |
+| `sandboxes.agent-tasks.resume` | Command | `ResumeAgentTaskRunCommand` | Workspace/task Run ids | `appaloft workspace task resume <workspaceId> <taskRunId>` | `POST /api/sandboxes/{workspaceId}/agent-task-runs/{taskRunId}/resume` |
+| `sandboxes.agent-tasks.cancel` | Command | `CancelAgentTaskRunCommand` | Workspace/task Run ids | `appaloft workspace task cancel <workspaceId> <taskRunId>` | `POST /api/sandboxes/{workspaceId}/agent-task-runs/{taskRunId}/cancel` |
+| `sandboxes.agent-tasks.approve` | Command | `ApproveAgentTaskRunCommand` | Workspace/task Run ids, external actor context | `appaloft workspace task approve <workspaceId> <taskRunId>` | `POST /api/sandboxes/{workspaceId}/agent-task-runs/{taskRunId}/approve` |
+| `sandboxes.agent-tasks.deliver` | Command | `DeliverAgentTaskRunCommand` | Workspace/task Run ids, structured branch/commit/remote/PR intent | `appaloft workspace task deliver <workspaceId> <taskRunId>` | `POST /api/sandboxes/{workspaceId}/agent-task-runs/{taskRunId}/deliver` |
 
-`sandboxes.agents.approvals.resolve` and `sandboxes.promotions.accept/retry` require control-plane scopes
-that Sandbox Runtime identities cannot hold. All event/file/output fields follow the bounded and
-redacted contracts in the governing specs.
+`sandboxes.agents.approvals.resolve`, `sandboxes.agent-tasks.approve/deliver` and
+`sandboxes.promotions.accept/retry` require control-plane scopes that Sandbox Runtime identities
+cannot hold. All event/file/output fields follow the bounded and redacted contracts in the
+governing specs.
+
+## Agent Workspace Entry Workflow
+
+`Agent Workspace` is a public convenience workflow and does not add operation keys. Its CLI and SDK
+surfaces dispatch the canonical operations below:
+
+| Workspace action | Canonical operations | CLI / SDK |
+| --- | --- | --- |
+| Create | `sandboxes.create` -> `sandboxes.agents.runtimes.create` | `appaloft workspace create`; `appaloft.workspaces.create(...)` |
+| Adapter catalog | `sandboxes.agents.harnesses.list` | `appaloft workspace harness list`; Console capability-driven creation |
+| List/show | `sandboxes.list/show` + `sandboxes.agents.runtimes.list` | `appaloft workspace list/show`; `appaloft.workspaces.list/show` |
+| Pause/resume/terminate | `sandboxes.pause/resume/terminate` | `appaloft workspace pause/resume/terminate` |
+| Terminal | `terminal-sessions.open(scope=sandbox)` | `appaloft workspace terminal <workspaceId> [--attach]` |
+| Native attach | `sandboxes.agents.runtimes.attach` | `appaloft workspace attach <workspaceId>`; `workspace.agent.attach()`; Console Attach |
+| Development preview | `sandbox-ports.expose/list/revoke` | `appaloft workspace preview <workspaceId> <port>` |
+| Task Run | `sandboxes.agent-tasks.create/list/show/resume/cancel/approve/deliver` | `appaloft workspace task ...`; `workspace.tasks.*`; Console Task panel |
+
+The convenience `workspaceId` is the Sandbox id. Pi and OpenCode remain harness adapter keys and do
+not create provider-specific operation names. See
+[ADR-094](./decisions/ADR-094-agent-workspace-entry-workflow.md) and
+[Agent Workspace Workflow](./workflows/agent-workspace.md).
 
 ## Deployments
 

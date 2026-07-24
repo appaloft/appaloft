@@ -228,6 +228,9 @@ Implemented now:
   the selected Appaloft state backend rather than as committed repository config
 
 Accepted target model:
+- `SandboxAgentHarnessRegistry` exposes a neutral adapter catalog with admitted Sandbox Template,
+  interaction, session recovery, persistent-path, healthcheck and task capabilities. Pi, OpenCode
+  and custom command harnesses are adapter registrations, not domain enum values.
 - generated default access domains are resolved through a provider-neutral application port and
   concrete infrastructure adapters governed by [ADR-017](./decisions/ADR-017-default-access-domain-and-proxy-routing.md)
 - concrete generated-domain provider packages live under `packages/providers/default-access-domain-*`
@@ -378,11 +381,42 @@ Accepted target model:
   disconnect is observation-only and never mutates the Run. Audit is a separate control-plane
   governance projection. Domain Events do not become Billing Events without an explicit consumer
   policy.
+- `AgentTaskRun` is an application process manager keyed by the underlying `SandboxAgentRunId`.
+  Its protected, tamper-evident state document lives below the Workspace and coordinates checks,
+  bounded Git evidence, Development Preview, immutable review, external approval and structured
+  source-control delivery. It is not another aggregate, conversation model or background-job
+  owner.
 
 Governing artifacts:
 - [ADR-092](./decisions/ADR-092-sandbox-agent-runtime-and-application-promotion-boundary.md)
 - [Spec 109](./specs/109-sandbox-agent-runtime-and-application-promotion/spec.md)
 - [Test Matrix](./testing/sandbox-agent-runtime-and-application-promotion-test-matrix.md)
+- [ADR-095](./decisions/ADR-095-agent-task-run-workflow.md)
+- [Agent Task Run Test Matrix](./testing/agent-task-run-test-matrix.md)
+
+### Agent Workspace Entry Workflow
+
+`Agent Workspace` is a public entry workflow, not an aggregate root. It composes one `Sandbox`, one
+subordinate `SandboxAgentRuntime`, optional `TerminalSession` access and optional Sandbox port
+exposures. Its public convenience `workspaceId` is the underlying `SandboxId`; no duplicate
+Workspace repository or lifecycle status is allowed.
+
+Pi and OpenCode are downstream harness adapters. Pi provides managed Runs and terminal-based
+interactive use. OpenCode may prepare one server reachable only inside the Sandbox provider's
+private network namespace, without publishing a host port, so managed Runs and a scoped native
+attach gateway can share its native session store. Harness state must stay below the Sandbox
+workspace, and provider credentials, host handles or direct server addresses must not enter
+aggregate state.
+
+Cloud and third-party products may add placement, entitlement, metering, managed templates,
+identity-aware attach gateways and preview-domain adapters. Those overlays consume the public
+workflow and do not redefine its operation language.
+
+Governing artifacts:
+- [ADR-094](./decisions/ADR-094-agent-workspace-entry-workflow.md)
+- [Spec 111](./specs/111-agent-workspace-entry-workflow/spec.md)
+- [Agent Workspace Workflow](./workflows/agent-workspace.md)
+- [Agent Workspace Test Matrix](./testing/agent-workspace-test-matrix.md)
 
 ### Operator/Internal State
 

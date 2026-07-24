@@ -13,6 +13,7 @@ import { tokens } from "./tokens";
 
 type AgentCommand =
   | messages.CreateSandboxAgentRuntimeCommand
+  | messages.IssueSandboxAgentAttachAccessCommand
   | messages.TerminateSandboxAgentRuntimeCommand
   | messages.CreateSandboxAgentRunCommand
   | messages.CancelSandboxAgentRunCommand
@@ -25,6 +26,7 @@ type AgentCommand =
   | messages.AcceptSandboxPromotionCommand
   | messages.RetrySandboxPromotionCommand;
 type AgentQuery =
+  | messages.ListSandboxAgentHarnessesQuery
   | messages.ListSandboxAgentRuntimesQuery
   | messages.ShowSandboxAgentRuntimeQuery
   | messages.ListSandboxAgentRunsQuery
@@ -53,6 +55,11 @@ export class SandboxAgentCommandHandler implements CommandHandlerContract<AgentC
       return this.service.createRuntime(
         context,
         input as Parameters<SandboxAgentDeliveryService["createRuntime"]>[1],
+      );
+    if (command instanceof messages.IssueSandboxAgentAttachAccessCommand)
+      return this.service.issueAttachAccess(
+        context,
+        input as Parameters<SandboxAgentDeliveryService["issueAttachAccess"]>[1],
       );
     if (command instanceof messages.TerminateSandboxAgentRuntimeCommand)
       return this.service.terminateRuntime(
@@ -111,6 +118,8 @@ export class SandboxAgentQueryHandler implements QueryHandlerContract<AgentQuery
   ) {}
   handle(context: ExecutionContext, query: AgentQuery): Promise<Result<unknown>> {
     const input = query.input;
+    if (query instanceof messages.ListSandboxAgentHarnessesQuery)
+      return this.service.listHarnesses(context);
     if (query instanceof messages.ListSandboxAgentRuntimesQuery)
       return this.service.listRuntimes(context, text(input, "sandboxId"));
     if (query instanceof messages.ShowSandboxAgentRuntimeQuery)
@@ -152,6 +161,7 @@ export class SandboxAgentQueryHandler implements QueryHandlerContract<AgentQuery
 
 for (const command of [
   messages.CreateSandboxAgentRuntimeCommand,
+  messages.IssueSandboxAgentAttachAccessCommand,
   messages.TerminateSandboxAgentRuntimeCommand,
   messages.CreateSandboxAgentRunCommand,
   messages.CancelSandboxAgentRunCommand,
@@ -167,6 +177,7 @@ for (const command of [
   CommandHandler(command)(SandboxAgentCommandHandler);
 
 for (const query of [
+  messages.ListSandboxAgentHarnessesQuery,
   messages.ListSandboxAgentRuntimesQuery,
   messages.ShowSandboxAgentRuntimeQuery,
   messages.ListSandboxAgentRunsQuery,

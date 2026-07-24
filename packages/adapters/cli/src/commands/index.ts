@@ -1,5 +1,5 @@
 import { Command as EffectCommand } from "@effect/cli";
-
+import { agentWorkspaceCommand } from "./agent-workspace.js";
 import { auditEventCommand } from "./audit-event.js";
 import { authCommand } from "./auth.js";
 import { blueprintCommand } from "./blueprint.js";
@@ -84,6 +84,7 @@ export const mainCommand = EffectCommand.make("appaloft").pipe(
     retentionDefaultCommand,
     runtimeUsageCommand,
     runtimeMonitoringCommand,
+    agentWorkspaceCommand,
     sandboxCommand,
     remoteStateCommand,
     operatorWorkCommand,

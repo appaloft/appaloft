@@ -109,6 +109,33 @@ export const publicDocsHelpTopics = {
       "docs/testing/sandbox-agent-runtime-and-application-promotion-test-matrix.md",
     ],
   },
+  "agent.workspace": {
+    id: "agent.workspace",
+    title: "Agent Workspace",
+    description:
+      "How to create, reconnect to, preview, and run durable tasks in a Pi or OpenCode remote development environment.",
+    page: {
+      "zh-CN": "agent/workspaces",
+      "en-US": "en/agent/workspaces",
+    },
+    anchor: "agent-workspace",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["web", "cli", "http-api", "mcp"],
+    relatedOperation: "sandboxes.agents.harnesses.list",
+    aliases: ["agent workspace", "remote development", "OpenCode", "Pi", "远程开发"],
+    specReferences: [
+      "docs/specs/111-agent-workspace-entry-workflow/spec.md",
+      "docs/specs/112-agent-task-run-workflow/spec.md",
+      "docs/testing/agent-workspace-test-matrix.md",
+      "docs/testing/agent-task-run-test-matrix.md",
+    ],
+    webSurfaces: [
+      "apps/web/src/routes/workspaces: create, reconnect, preview, task evidence, approval, and delivery",
+    ],
+  },
   "agent.preview-promotion": {
     id: "agent.preview-promotion",
     title: "Sandbox preview and promotion",
@@ -2999,6 +3026,21 @@ export type PublicDocsOperationCoverage =
     };
 
 export const publicDocsOperationCoverage = [
+  ...[
+    "sandboxes.agents.harnesses.list",
+    "sandboxes.agents.runtimes.attach",
+    "sandboxes.agent-tasks.create",
+    "sandboxes.agent-tasks.list",
+    "sandboxes.agent-tasks.show",
+    "sandboxes.agent-tasks.resume",
+    "sandboxes.agent-tasks.cancel",
+    "sandboxes.agent-tasks.approve",
+    "sandboxes.agent-tasks.deliver",
+  ].map((operationKey) => ({
+    operationKey,
+    status: "documented" as const,
+    topicId: "agent.workspace" as const,
+  })),
   ...[
     "sandboxes.agents.runtimes.create",
     "sandboxes.agents.runtimes.list",

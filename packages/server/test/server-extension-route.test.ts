@@ -1154,6 +1154,8 @@ class TestTerminalSession implements TerminalSession {
 
   async resize() {}
 
+  async detach() {}
+
   async close() {}
 }
 

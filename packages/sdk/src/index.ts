@@ -1,5 +1,11 @@
 import { AppaloftSdkRequestError } from "./internal.js";
-import { createAppaloftClient, defaultPiHarnessTemplateId } from "./resource-client.js";
+import {
+  AppaloftWorkspaceCreateError,
+  createAppaloftClient,
+  createAppaloftWorkspaceTasks,
+  defaultOpenCodeHarnessTemplateId,
+  defaultPiHarnessTemplateId,
+} from "./resource-client.js";
 
 export type {
   AppaloftSdkAuth,
@@ -17,6 +23,13 @@ export type {
   AppaloftAgentCreateInput,
   AppaloftAgentDescriptor,
   AppaloftAgentStreamInput,
+  AppaloftAgentTaskChanges,
+  AppaloftAgentTaskCheckInput,
+  AppaloftAgentTaskCheckResult,
+  AppaloftAgentTaskDeliveryInput,
+  AppaloftAgentTaskPreviewInput,
+  AppaloftAgentTaskResult,
+  AppaloftAgentTaskRunInput,
   AppaloftClient,
   AppaloftRun,
   AppaloftRunCreateInput,
@@ -28,5 +41,18 @@ export type {
   AppaloftSandboxExecInput,
   AppaloftSandboxFileReadInput,
   AppaloftSandboxFileWriteInput,
+  AppaloftWorkspace,
+  AppaloftWorkspaceCreateInput,
+  AppaloftWorkspaceDescriptor,
+  AppaloftWorkspaceList,
+  AppaloftWorkspaceListInput,
+  AppaloftWorkspaceTasks,
 } from "./resource-client.js";
-export { AppaloftSdkRequestError, createAppaloftClient, defaultPiHarnessTemplateId };
+export {
+  AppaloftSdkRequestError,
+  AppaloftWorkspaceCreateError,
+  createAppaloftClient,
+  createAppaloftWorkspaceTasks,
+  defaultOpenCodeHarnessTemplateId,
+  defaultPiHarnessTemplateId,
+};

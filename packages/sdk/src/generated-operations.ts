@@ -4699,6 +4699,132 @@ export const generatedSdkOperations = [
     facadeDefault: true,
   },
   {
+    operationKey: "sandboxes.agent-tasks.approve",
+    operationGroup: "sandboxes",
+    operationMethod: "agentTasksApprove",
+    facadePath: ["sandboxes", "agentTasks", "approve"],
+    operationId: "sandboxes.agentTasks.approve",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "ApproveAgentTaskRunCommand",
+    route: {
+      method: "POST",
+      path: "/sandboxes/{workspaceId}/agent-task-runs/{taskRunId}/approve",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandboxes.agent-tasks.cancel",
+    operationGroup: "sandboxes",
+    operationMethod: "agentTasksCancel",
+    facadePath: ["sandboxes", "agentTasks", "cancel"],
+    operationId: "sandboxes.agentTasks.cancel",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "CancelAgentTaskRunCommand",
+    route: {
+      method: "POST",
+      path: "/sandboxes/{workspaceId}/agent-task-runs/{taskRunId}/cancel",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandboxes.agent-tasks.create",
+    operationGroup: "sandboxes",
+    operationMethod: "agentTasksCreate",
+    facadePath: ["sandboxes", "agentTasks", "create"],
+    operationId: "sandboxes.agentTasks.create",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "CreateAgentTaskRunCommand",
+    route: {
+      method: "POST",
+      path: "/sandboxes/{workspaceId}/agent-task-runs",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandboxes.agent-tasks.deliver",
+    operationGroup: "sandboxes",
+    operationMethod: "agentTasksDeliver",
+    facadePath: ["sandboxes", "agentTasks", "deliver"],
+    operationId: "sandboxes.agentTasks.deliver",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "DeliverAgentTaskRunCommand",
+    route: {
+      method: "POST",
+      path: "/sandboxes/{workspaceId}/agent-task-runs/{taskRunId}/deliver",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandboxes.agent-tasks.list",
+    operationGroup: "sandboxes",
+    operationMethod: "agentTasksList",
+    facadePath: ["sandboxes", "agentTasks", "list"],
+    operationId: "sandboxes.agentTasks.list",
+    kind: "query",
+    domain: "sandboxes",
+    messageName: "ListAgentTaskRunsQuery",
+    route: {
+      method: "GET",
+      path: "/sandboxes/{workspaceId}/agent-task-runs",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandboxes.agent-tasks.resume",
+    operationGroup: "sandboxes",
+    operationMethod: "agentTasksResume",
+    facadePath: ["sandboxes", "agentTasks", "resume"],
+    operationId: "sandboxes.agentTasks.resume",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "ResumeAgentTaskRunCommand",
+    route: {
+      method: "POST",
+      path: "/sandboxes/{workspaceId}/agent-task-runs/{taskRunId}/resume",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandboxes.agent-tasks.show",
+    operationGroup: "sandboxes",
+    operationMethod: "agentTasksShow",
+    facadePath: ["sandboxes", "agentTasks", "show"],
+    operationId: "sandboxes.agentTasks.show",
+    kind: "query",
+    domain: "sandboxes",
+    messageName: "ShowAgentTaskRunQuery",
+    route: {
+      method: "GET",
+      path: "/sandboxes/{workspaceId}/agent-task-runs/{taskRunId}",
+    },
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
     operationKey: "sandboxes.agents.approvals.list",
     operationGroup: "sandboxes",
     operationMethod: "agentsApprovalsList",
@@ -4750,6 +4876,24 @@ export const generatedSdkOperations = [
       path: "/sandbox-agent-approvals/{approvalId}",
     },
     docsHref: "/docs/agent/run-agents/#sandbox-agent-runtime",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandboxes.agents.harnesses.list",
+    operationGroup: "sandboxes",
+    operationMethod: "agentsHarnessesList",
+    facadePath: ["sandboxes", "agents", "harnesses", "list"],
+    operationId: "sandboxes.agents.harnesses.list",
+    kind: "query",
+    domain: "sandboxes",
+    messageName: "ListSandboxAgentHarnessesQuery",
+    route: {
+      method: "GET",
+      path: "/sandbox-agent-harnesses",
+    },
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -4864,6 +5008,24 @@ export const generatedSdkOperations = [
       path: "/sandbox-agent-runtimes/{runtimeId}/runs/{runId}",
     },
     docsHref: "/docs/agent/run-agents/#sandbox-agent-runtime",
+    authPolicy: "product-session",
+    errorFamily: "structured-platform-error",
+    streaming: false,
+    facadeDefault: true,
+  },
+  {
+    operationKey: "sandboxes.agents.runtimes.attach",
+    operationGroup: "sandboxes",
+    operationMethod: "agentsRuntimesAttach",
+    facadePath: ["sandboxes", "agents", "runtimes", "attach"],
+    operationId: "sandboxes.agents.runtimes.attach",
+    kind: "command",
+    domain: "sandboxes",
+    messageName: "IssueSandboxAgentAttachAccessCommand",
+    route: {
+      method: "POST",
+      path: "/sandboxes/{sandboxId}/agent-runtimes/{runtimeId}/attach",
+    },
     authPolicy: "product-session",
     errorFamily: "structured-platform-error",
     streaming: false,
@@ -7120,6 +7282,9 @@ export interface GeneratedAppaloftClient {
         readonly resolve: AppaloftSdkFacadeMethod;
         readonly show: AppaloftSdkFacadeMethod;
       };
+      readonly harnesses: {
+        readonly list: AppaloftSdkFacadeMethod;
+      };
       readonly runs: {
         readonly cancel: AppaloftSdkFacadeMethod;
         readonly create: AppaloftSdkFacadeMethod;
@@ -7130,11 +7295,21 @@ export interface GeneratedAppaloftClient {
         readonly show: AppaloftSdkFacadeMethod;
       };
       readonly runtimes: {
+        readonly attach: AppaloftSdkFacadeMethod;
         readonly create: AppaloftSdkFacadeMethod;
         readonly list: AppaloftSdkFacadeMethod;
         readonly show: AppaloftSdkFacadeMethod;
         readonly terminate: AppaloftSdkFacadeMethod;
       };
+    };
+    readonly agentTasks: {
+      readonly approve: AppaloftSdkFacadeMethod;
+      readonly cancel: AppaloftSdkFacadeMethod;
+      readonly create: AppaloftSdkFacadeMethod;
+      readonly deliver: AppaloftSdkFacadeMethod;
+      readonly list: AppaloftSdkFacadeMethod;
+      readonly resume: AppaloftSdkFacadeMethod;
+      readonly show: AppaloftSdkFacadeMethod;
     };
     readonly candidatePreviews: {
       readonly create: AppaloftSdkFacadeMethod;

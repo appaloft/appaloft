@@ -7,6 +7,8 @@ import {
   createExecutionContext,
   type IdGenerator,
   type RepositoryContext,
+  type SandboxProviderRegistry,
+  type SandboxRepository,
   type ServerRepository,
   type TerminalSessionOpenRequest,
 } from "@appaloft/application";
@@ -226,6 +228,98 @@ function resourceTerminalRequest(
 }
 
 describe("RuntimeTerminalSessionGateway", () => {
+  test("[TERM-SESSION-SANDBOX-001][TERM-SESSION-TRANSPORT-003] opens and resizes a Sandbox provider PTY", async () => {
+    const calls: Array<{
+      sandboxId: string;
+      providerHandle: string;
+      cwd?: string;
+      initialRows: number;
+      initialCols: number;
+    }> = [];
+    const resizeCalls: Array<{ rows: number; cols: number }> = [];
+    const gateway = new RuntimeTerminalSessionGateway({
+      allowTerminalSessions: true,
+      sandboxRepository: {
+        async find() {
+          return {
+            tenantId: "org_a",
+            providerKey: "cloud-docker-gvisor",
+            sandbox: {
+              canUseRuntime: () => true,
+              toState: () => ({
+                status: { value: "ready" },
+                providerHandle: "appaloft-sbx_workspace",
+              }),
+            },
+          };
+        },
+      } as unknown as SandboxRepository,
+      sandboxProviderRegistry: {
+        get() {
+          return {
+            openTerminal: async (input: (typeof calls)[number]) => {
+              calls.push(input);
+              return {
+                stdin: {
+                  write() {},
+                  end() {},
+                },
+                stdout: closedStream(),
+                stderr: null,
+                exited: new Promise<number>(() => {}),
+                kill() {},
+                resize(rows: number, cols: number) {
+                  resizeCalls.push({ rows, cols });
+                },
+              };
+            },
+          };
+        },
+      } as unknown as SandboxProviderRegistry,
+    });
+    const context = createExecutionContext({
+      requestId: "req_terminal_sandbox_test",
+      entrypoint: "http",
+      tenant: {
+        tenantId: "org_a",
+        organizationId: "org_a",
+        source: "test",
+      },
+    });
+
+    const result = await gateway.open(context, {
+      sessionId: "term_sandbox",
+      scope: {
+        kind: "sandbox",
+        sandboxId: "sbx_workspace",
+        workingDirectory: "app",
+      },
+      initialRows: 32,
+      initialCols: 120,
+    });
+
+    expect(result._unsafeUnwrap()).toMatchObject({
+      sessionId: "term_sandbox",
+      scope: "sandbox",
+      sandboxId: "sbx_workspace",
+      providerKey: "cloud-docker-gvisor",
+      workingDirectory: "app",
+    });
+    expect(calls).toEqual([
+      {
+        sandboxId: "sbx_workspace",
+        providerHandle: "appaloft-sbx_workspace",
+        cwd: "app",
+        initialRows: 32,
+        initialCols: 120,
+      },
+    ]);
+    const attached = gateway.attach("term_sandbox")._unsafeUnwrap();
+    await attached.resize({ rows: 40, cols: 160 });
+    expect(resizeCalls).toEqual([{ rows: 40, cols: 160 }]);
+    await gateway.close("term_sandbox");
+  });
+
   test("[TERM-SESSION-TRANSPORT-001] [TERM-SESSION-WORKSPACE-001] opens local container terminals through docker exec", async () => {
     const spawns: Array<{ args: string[]; cwd?: string }> = [];
     const gateway = new RuntimeTerminalSessionGateway({
