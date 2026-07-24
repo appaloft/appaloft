@@ -9,6 +9,10 @@ import {
   AcceptConnectorCapabilityPlanUseCase,
   AcceptDependencyResourceProvisioningPlanCommandHandler,
   AcceptDependencyResourceProvisioningPlanUseCase,
+  AgentTaskRunCommandHandler,
+  type AgentTaskRunDependencies,
+  AgentTaskRunQueryHandler,
+  AgentTaskRunService,
   ApplyActionPreviewRouteCommandHandler,
   ApplyActionPreviewRouteUseCase,
   ApplyConnectorCapabilityCommandHandler,
@@ -3260,6 +3264,8 @@ export function registerApplicationServices(
   container.registerSingleton(SandboxQueryHandler);
   container.registerSingleton(SandboxAgentCommandHandler);
   container.registerSingleton(SandboxAgentQueryHandler);
+  container.registerSingleton(AgentTaskRunCommandHandler);
+  container.registerSingleton(AgentTaskRunQueryHandler);
   container.registerSingleton(RevokeDeployTokenCommandHandler);
   container.registerSingleton(
     tokens.certificateProviderSelectionPolicy,
@@ -3470,6 +3476,7 @@ export function registerApplicationServices(
             };
           },
         },
+        sandboxAccess: sandboxService,
         harnessRegistry: dependencyContainer.resolve(tokens.sandboxAgentHarnessRegistry),
         workQueue: dependencyContainer.resolve(tokens.sandboxAgentWorkQueue),
         artifactCapture: dependencyContainer.resolve(tokens.sandboxAgentArtifactCapture),
@@ -3481,6 +3488,24 @@ export function registerApplicationServices(
       } satisfies SandboxAgentDeliveryDependencies);
     }),
   });
+  container.register(tokens.agentTaskRunService, {
+    useFactory: instanceCachingFactory((dependencyContainer) => {
+      const sandboxService = dependencyContainer.resolve<ExecutionSandboxService>(
+        tokens.executionSandboxService,
+      );
+      const agentService = dependencyContainer.resolve<SandboxAgentDeliveryService>(
+        tokens.sandboxAgentDeliveryService,
+      );
+      return new AgentTaskRunService({
+        agents: agentService,
+        sandbox: sandboxService,
+        workQueue: dependencyContainer.resolve(tokens.sandboxAgentWorkQueue),
+        integrationAuth: dependencyContainer.resolve(tokens.integrationAuthPort),
+        stateProtector: dependencyContainer.resolve(tokens.controlPlaneSecretProtector),
+        clock: dependencyContainer.resolve(tokens.clock),
+      } satisfies AgentTaskRunDependencies);
+    }),
+  });
   if (!container.isRegistered(tokens.durableWorkHandlerRegistry, true)) {
     container.register(tokens.durableWorkHandlerRegistry, {
       useFactory: instanceCachingFactory(
@@ -3489,6 +3514,7 @@ export function registerApplicationServices(
             return item.kind === sandboxAgentDeliveryDurableWorkKind
               ? new SandboxAgentDurableWorkHandler(
                   dependencyContainer.resolve(tokens.sandboxAgentDeliveryService),
+                  dependencyContainer.resolve(tokens.agentTaskRunService),
                 )
               : undefined;
           },

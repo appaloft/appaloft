@@ -76,6 +76,7 @@ Then:
 | TERM-SESSION-WORKSPACE-006 | unit | Resource renamed after deployment | Workspace resolution still uses deployment metadata, not resource name or slug. |
 | TERM-SESSION-WORKSPACE-007 | unit | Concurrent deployments for same resource | Each selected deployment resolves to its own deployment-id workspace. |
 | TERM-SESSION-WORKSPACE-008 | unit | Source locator fallback | Rejects URL-like or SSH-style Git `workingDirectory` values when no adapter workspace metadata exists. |
+| TERM-SESSION-SANDBOX-001 | application/runtime/provider/CLI integration | Ready tenant-scoped Sandbox | Command delegates Sandbox scope; gateway resolves exact tenant Sandbox and provider handle; Docker provider opens a confined PTY; CLI dispatches the shared command. |
 
 ## Transport Matrix
 
@@ -89,12 +90,13 @@ Then:
 | TERM-SESSION-TRANSPORT-006 | integration | Client closes | WebSocket closes or CLI exits | Backend PTY/SSH/process is closed. |
 | TERM-SESSION-TRANSPORT-007 | integration | Backend exits | Shell exits normally | Closed frame is emitted; session is removed. |
 | TERM-SESSION-TRANSPORT-008 | integration | Backend fails | PTY/SSH errors after open | Structured error frame is emitted; backend is closed. |
-| TERM-SESSION-LIFE-001 | integration | List active sessions | One server session and one resource session are active | List returns safe descriptors sorted newest first and no terminal output, command text, private keys, tokens, or environment secrets. |
+| TERM-SESSION-TRANSPORT-009 | HTTP/runtime integration | Transport disconnect and reattach | WebSocket/CLI transport disconnects without an explicit close frame | Only the attachment iterator detaches; managed session remains active and a later attach can receive bounded retained output. |
+| TERM-SESSION-LIFE-001 | integration | List active sessions | Server, resource, or Sandbox sessions are active | List returns safe descriptors sorted newest first and no terminal output, command text, private keys, tokens, or environment secrets. |
 | TERM-SESSION-LIFE-002 | integration | Show active session | Session id is active | Show returns the safe descriptor and lifecycle status without attaching to the transport. |
 | TERM-SESSION-LIFE-003 | integration | Close active session | Session id is active | Gateway closes backend resources, removes the session from active readback, and returns `status = closed`. |
 | TERM-SESSION-LIFE-004 | integration | Close missing session | Session id is unknown or already removed | Command returns `terminal_session_not_found` and does not close another session. |
 | TERM-SESSION-LIFE-005 | integration | Expire old sessions | Active sessions exist before and after cutoff, or idle past and active within the configured active-session TTL when no cutoff is supplied | Only sessions older than the explicit cutoff or idle past the configured gateway TTL close; terminal input, resize, and backend output refresh activity; response returns safe counts and ids. |
-| TERM-SESSION-LIFE-006 | integration | Durable audit metadata | Runtime gateway is configured with the audit recorder | Opening and closing a terminal session records `terminal-session-opened` and `terminal-session-closed` audit rows on the server/resource aggregate with safe scope, target, actor, entrypoint, request, provider, timestamp, and close-reason metadata only. |
+| TERM-SESSION-LIFE-006 | integration | Durable audit metadata | Runtime gateway is configured with the audit recorder | Opening and closing a terminal session records `terminal-session-opened` and `terminal-session-closed` audit rows on the server/resource/Sandbox aggregate with safe scope, target, actor, entrypoint, request, provider, timestamp, and close-reason metadata only. |
 
 ## Entrypoint Matrix
 

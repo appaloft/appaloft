@@ -10,6 +10,7 @@ import {
   type AppLogger,
   ApplyActionPreviewRouteCommand,
   ApplyConnectorCapabilityCommand,
+  ApproveAgentTaskRunCommand,
   ArchiveDeploymentCommand,
   ArchiveEnvironmentCommand,
   ArchiveProjectCommand,
@@ -22,6 +23,7 @@ import {
   acceptDependencyResourceProvisioningPlanInputSchema,
   acceptSandboxPromotionInputSchema,
   applyConnectorCapabilityCommandInputSchema,
+  approveAgentTaskRunInputSchema,
   archiveDeploymentCommandInputSchema,
   archiveEnvironmentCommandInputSchema,
   archiveProjectCommandInputSchema,
@@ -36,6 +38,7 @@ import {
   bootstrapFirstAdminCommandInputSchema,
   bootstrapServerProxyCommandInputSchema,
   brokerSandboxCredentialRequestCommandInputSchema,
+  CancelAgentTaskRunCommand,
   CancelDeploymentCommand,
   CancelOperatorWorkCommand,
   CancelSandboxAgentRunCommand,
@@ -83,6 +86,7 @@ import {
   CountResourcesQuery,
   CountServersQuery,
   CreateActionSourceLinkDeploymentCommand,
+  CreateAgentTaskRunCommand,
   CreateAuditEventArchiveCommand,
   CreateBlueprintInstallPlanQuery,
   CreateDependencyResourceBackupCommand,
@@ -108,6 +112,7 @@ import {
   CreateStorageVolumeBackupPlanQuery,
   CreateStorageVolumeCommand,
   CreateStorageVolumeRestorePlanQuery,
+  cancelAgentTaskRunInputSchema,
   cancelDeploymentCommandInputSchema,
   cancelOperatorWorkCommandInputSchema,
   cancelSandboxAgentRunInputSchema,
@@ -152,6 +157,7 @@ import {
   countProjectsQueryInputSchema,
   countResourcesQueryInputSchema,
   countServersQueryInputSchema,
+  createAgentTaskRunInputSchema,
   createAuditEventArchiveCommandInputSchema,
   createBlueprintInstallPlanQueryInputSchema,
   createDependencyResourceBackupCommandInputSchema,
@@ -197,6 +203,7 @@ import {
   DeleteSourceLinkCommand,
   DeleteSshCredentialCommand,
   DeleteStorageVolumeCommand,
+  DeliverAgentTaskRunCommand,
   DeploymentPlanQuery,
   type DeploymentProgressEvent,
   type DeploymentProgressObserver,
@@ -229,6 +236,7 @@ import {
   deleteSourceLinkCommandInputSchema,
   deleteSshCredentialCommandInputSchema,
   deleteStorageVolumeCommandInputSchema,
+  deliverAgentTaskRunInputSchema,
   deploymentPlanQueryInputSchema,
   deploymentProofQueryInputSchema,
   deploymentRecoveryReadinessQueryInputSchema,
@@ -293,6 +301,7 @@ import {
   InspectServerCapacityQuery,
   InviteOrganizationMemberCommand,
   IssueOrRenewCertificateCommand,
+  IssueSandboxAgentAttachAccessCommand,
   importCertificateCommandInputSchema,
   importControlPlaneCommandInputSchema,
   importDependencyResourceCommandInputSchema,
@@ -303,7 +312,9 @@ import {
   inspectServerCapacityQueryInputSchema,
   inviteOrganizationMemberCommandInputSchema,
   issueOrRenewCertificateCommandInputSchema,
+  issueSandboxAgentAttachAccessInputSchema,
   ListAccountSessionsQuery,
+  ListAgentTaskRunsQuery,
   ListAuditEventArchivesQuery,
   ListAuditEventLegalHoldsQuery,
   ListAuditEventsQuery,
@@ -339,6 +350,7 @@ import {
   ListRouteSurfaceDecisionsQuery,
   ListRuntimeMonitoringSamplesQuery,
   ListSandboxAgentApprovalsQuery,
+  ListSandboxAgentHarnessesQuery,
   ListSandboxAgentRunEventsQuery,
   ListSandboxAgentRunsQuery,
   ListSandboxAgentRuntimesQuery,
@@ -368,6 +380,7 @@ import {
   ListUsageIntentRecordsQuery,
   LockEnvironmentCommand,
   listAccountSessionsQueryInputSchema,
+  listAgentTaskRunsInputSchema,
   listAuditEventArchivesQueryInputSchema,
   listAuditEventLegalHoldsQueryInputSchema,
   listAuditEventsQueryInputSchema,
@@ -400,6 +413,7 @@ import {
   listRouteSurfaceDecisionsResponseSchema,
   listRuntimeMonitoringSamplesQueryInputSchema,
   listSandboxAgentApprovalsInputSchema,
+  listSandboxAgentHarnessesInputSchema,
   listSandboxAgentRunEventsInputSchema,
   listSandboxAgentRunsInputSchema,
   listSandboxAgentRuntimesInputSchema,
@@ -527,6 +541,7 @@ import {
   RestoreProjectCommand,
   RestoreResourceCommand,
   RestoreStorageVolumeBackupCommand,
+  ResumeAgentTaskRunCommand,
   ResumeSandboxCommand,
   RetryCertificateCommand,
   RetryDeploymentCommand,
@@ -575,6 +590,7 @@ import {
   restoreProjectCommandInputSchema,
   restoreResourceCommandInputSchema,
   restoreStorageVolumeBackupCommandInputSchema,
+  resumeAgentTaskRunInputSchema,
   retryCertificateCommandInputSchema,
   retryDeploymentCommandInputSchema,
   retryDomainBindingVerificationCommandInputSchema,
@@ -600,6 +616,7 @@ import {
   SetProjectDescriptionCommand,
   SetResourceVariableCommand,
   ShowAccountProfileQuery,
+  ShowAgentTaskRunQuery,
   ShowAuditEventArchiveQuery,
   ShowAuditEventLegalHoldQuery,
   ShowAuditEventQuery,
@@ -675,6 +692,7 @@ import {
   setProjectDescriptionCommandInputSchema,
   setResourceVariableCommandInputSchema,
   showAccountProfileQueryInputSchema,
+  showAgentTaskRunInputSchema,
   showAuditEventArchiveQueryInputSchema,
   showAuditEventLegalHoldQueryInputSchema,
   showAuditEventQueryInputSchema,
@@ -7592,6 +7610,14 @@ export const deleteSandboxTemplateProcedure = base
     executeCommand(context, DeleteSandboxTemplateCommand.create(input)),
   );
 
+export const listSandboxAgentHarnessesProcedure = base
+  .route({ method: "GET", path: "/sandbox-agent-harnesses", successStatus: 200 })
+  .input(listSandboxAgentHarnessesInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListSandboxAgentHarnessesQuery.create(input)),
+  );
+
 export const createSandboxAgentRuntimeProcedure = base
   .route({ method: "POST", path: "/sandboxes/{sandboxId}/agent-runtimes", successStatus: 201 })
   .input(createSandboxAgentRuntimeInputSchema)
@@ -7616,6 +7642,17 @@ export const showSandboxAgentRuntimeProcedure = base
   .output(sandboxOperationResponseSchema)
   .handler(async ({ input, context }) =>
     executeQuery(context, ShowSandboxAgentRuntimeQuery.create(input)),
+  );
+export const issueSandboxAgentAttachAccessProcedure = base
+  .route({
+    method: "POST",
+    path: "/sandboxes/{sandboxId}/agent-runtimes/{runtimeId}/attach",
+    successStatus: 201,
+  })
+  .input(issueSandboxAgentAttachAccessInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, IssueSandboxAgentAttachAccessCommand.create(input)),
   );
 export const terminateSandboxAgentRuntimeProcedure = base
   .route({
@@ -7667,6 +7704,83 @@ export const cancelSandboxAgentRunProcedure = base
   .output(sandboxOperationResponseSchema)
   .handler(async ({ input, context }) =>
     executeCommand(context, CancelSandboxAgentRunCommand.create(input)),
+  );
+export const createAgentTaskRunProcedure = base
+  .route({
+    method: "POST",
+    path: "/sandboxes/{workspaceId}/agent-task-runs",
+    successStatus: 202,
+  })
+  .input(createAgentTaskRunInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, CreateAgentTaskRunCommand.create(input)),
+  );
+export const listAgentTaskRunsProcedure = base
+  .route({
+    method: "GET",
+    path: "/sandboxes/{workspaceId}/agent-task-runs",
+    successStatus: 200,
+  })
+  .input(listAgentTaskRunsInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListAgentTaskRunsQuery.create(input)),
+  );
+export const showAgentTaskRunProcedure = base
+  .route({
+    method: "GET",
+    path: "/sandboxes/{workspaceId}/agent-task-runs/{taskRunId}",
+    successStatus: 200,
+  })
+  .input(showAgentTaskRunInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowAgentTaskRunQuery.create(input)),
+  );
+export const resumeAgentTaskRunProcedure = base
+  .route({
+    method: "POST",
+    path: "/sandboxes/{workspaceId}/agent-task-runs/{taskRunId}/resume",
+    successStatus: 202,
+  })
+  .input(resumeAgentTaskRunInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ResumeAgentTaskRunCommand.create(input)),
+  );
+export const cancelAgentTaskRunProcedure = base
+  .route({
+    method: "POST",
+    path: "/sandboxes/{workspaceId}/agent-task-runs/{taskRunId}/cancel",
+    successStatus: 200,
+  })
+  .input(cancelAgentTaskRunInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, CancelAgentTaskRunCommand.create(input)),
+  );
+export const approveAgentTaskRunProcedure = base
+  .route({
+    method: "POST",
+    path: "/sandboxes/{workspaceId}/agent-task-runs/{taskRunId}/approve",
+    successStatus: 200,
+  })
+  .input(approveAgentTaskRunInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ApproveAgentTaskRunCommand.create(input)),
+  );
+export const deliverAgentTaskRunProcedure = base
+  .route({
+    method: "POST",
+    path: "/sandboxes/{workspaceId}/agent-task-runs/{taskRunId}/deliver",
+    successStatus: 202,
+  })
+  .input(deliverAgentTaskRunInputSchema)
+  .output(sandboxOperationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, DeliverAgentTaskRunCommand.create(input)),
   );
 export const listSandboxAgentRunEventsProcedure = base
   .route({ method: "GET", path: "/sandbox-agent-runs/{runId}/events", successStatus: 200 })
@@ -7847,10 +7961,14 @@ export const appaloftOrpcRouter = {
       create: createSandboxSnapshotProcedure,
     },
     agents: {
+      harnesses: {
+        list: listSandboxAgentHarnessesProcedure,
+      },
       runtimes: {
         create: createSandboxAgentRuntimeProcedure,
         list: listSandboxAgentRuntimesProcedure,
         show: showSandboxAgentRuntimeProcedure,
+        attach: issueSandboxAgentAttachAccessProcedure,
         terminate: terminateSandboxAgentRuntimeProcedure,
       },
       runs: {
@@ -7866,6 +7984,15 @@ export const appaloftOrpcRouter = {
         show: showSandboxAgentApprovalProcedure,
         resolve: resolveSandboxAgentApprovalProcedure,
       },
+    },
+    agentTasks: {
+      create: createAgentTaskRunProcedure,
+      list: listAgentTaskRunsProcedure,
+      show: showAgentTaskRunProcedure,
+      resume: resumeAgentTaskRunProcedure,
+      cancel: cancelAgentTaskRunProcedure,
+      approve: approveAgentTaskRunProcedure,
+      deliver: deliverAgentTaskRunProcedure,
     },
     sourceArtifacts: {
       create: createSandboxSourceArtifactProcedure,

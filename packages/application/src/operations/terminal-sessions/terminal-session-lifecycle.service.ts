@@ -29,6 +29,7 @@ export class TerminalSessionLifecycleService {
         ...(query.serverId ? { serverId: query.serverId } : {}),
         ...(query.resourceId ? { resourceId: query.resourceId } : {}),
         ...(query.deploymentId ? { deploymentId: query.deploymentId } : {}),
+        ...(query.sandboxId ? { sandboxId: query.sandboxId } : {}),
         ...(query.limit ? { limit: query.limit } : {}),
       }),
     };

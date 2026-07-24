@@ -63,7 +63,17 @@ export function formatDomainError(error: DomainError): string {
   ];
   const lines = [error.message, details.join(" ")];
 
-  if (phase === "remote-state-lock") {
+  if (phase === "agent-workspace-runtime-create") {
+    const workspaceLine = formatDetailLine("workspace", error, [
+      "workspaceId",
+      "sandboxId",
+      "harness",
+    ]);
+
+    if (workspaceLine) {
+      lines.push(workspaceLine);
+    }
+  } else if (phase === "remote-state-lock") {
     const lockLine = formatDetailLine("lock", error, [
       "stateBackend",
       "host",

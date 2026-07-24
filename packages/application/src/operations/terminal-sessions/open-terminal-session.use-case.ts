@@ -36,7 +36,8 @@ const defaultOperationGuardPort = new AllowAllOperationGuardPort();
 
 type ResolvedTerminalScope =
   | { kind: "server"; serverId: string }
-  | { kind: "resource"; resourceId: string; deploymentId?: string };
+  | { kind: "resource"; resourceId: string; deploymentId?: string }
+  | { kind: "sandbox"; sandboxId: string };
 
 function metadataValue(deployment: DeploymentSummary, key: string): string | undefined {
   const value = deployment.runtimePlan.execution.metadata?.[key];
@@ -180,7 +181,7 @@ export class OpenTerminalSessionUseCase {
       };
     } else {
       scope =
-        command.scope.kind === "server"
+        command.scope.kind === "server" || command.scope.kind === "sandbox"
           ? command.scope
           : {
               kind: "resource",
@@ -198,10 +199,12 @@ export class OpenTerminalSessionUseCase {
         resourceRefs:
           scope.kind === "server"
             ? { serverId: scope.serverId }
-            : {
-                resourceId: scope.resourceId,
-                ...(scope.deploymentId ? { deploymentId: scope.deploymentId } : {}),
-              },
+            : scope.kind === "sandbox"
+              ? { sandboxId: scope.sandboxId }
+              : {
+                  resourceId: scope.resourceId,
+                  ...(scope.deploymentId ? { deploymentId: scope.deploymentId } : {}),
+                },
       });
       if (checked.isErr()) {
         return err(checked.error);
@@ -234,6 +237,19 @@ export class OpenTerminalSessionUseCase {
         scope: {
           kind: "server",
           server,
+        },
+        initialRows: command.initialRows,
+        initialCols: command.initialCols,
+      });
+    }
+
+    if (scope.kind === "sandbox") {
+      return this.terminalSessionGateway.open(context, {
+        sessionId: this.idGenerator.next("term"),
+        scope: {
+          kind: "sandbox",
+          sandboxId: scope.sandboxId,
+          ...(command.relativeDirectory ? { workingDirectory: command.relativeDirectory } : {}),
         },
         initialRows: command.initialRows,
         initialCols: command.initialCols,

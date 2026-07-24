@@ -114,8 +114,8 @@ try {
 }
 ```
 
-`Agent` is an SDK alias for a Sandbox Agent Runtime. The Pi shorthand defaults to the admitted
-`aht_pi_managed_v1` harness template, fresh Run context, and generated idempotency keys. Explicit
+`Agent` is an SDK alias for a Sandbox Agent Runtime. The Pi/OpenCode shorthands default to the admitted
+`aht_pi_managed_v1`/`aht_opencode_managed_v1` harness templates, fresh Run context, and generated idempotency keys. Explicit
 `harnessTemplateId`, `context`, and `idempotencyKey` values override those SDK defaults.
 `agent.stream({ task })` creates a Run and returns that same Run's durable event sequence as
 `fullStream`; `prompt` is a migration-friendly alias for `task`. Appaloft does not own the chat
@@ -129,6 +129,18 @@ These methods only inject the handle's `sandboxId`; they still call the generate
 Resource methods return descriptors directly and throw `AppaloftSdkRequestError` on failure. For
 the complete non-throwing `{ ok, status, data/error }` facade, use `appaloft.operations`, for example
 `appaloft.operations.sandboxes.create(input)`.
+
+Use the public Workspace entrypoint when a caller wants to create the Sandbox and Runtime together:
+
+```ts
+const workspace = await appaloft.workspaces.create({
+  sandbox: sandboxInput,
+  harness: "opencode",
+});
+```
+
+The `workspaceId` equals the `sandboxId`. If Runtime creation fails,
+`AppaloftWorkspaceCreateError` retains the created id for retry or cleanup.
 
 ## Structured errors [#typescript-sdk-errors]
 

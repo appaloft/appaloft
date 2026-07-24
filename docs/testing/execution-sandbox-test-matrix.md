@@ -43,7 +43,8 @@ isolation claims.
 | SBX-API-001 | HTTP/oRPC contract | Catalog route parity | Sandbox routes dispatch shared schemas with tenant/auth policy. | `packages/orpc/test/execution-sandbox.http.test.ts` | passed |
 | SBX-STREAM-001 | persistence/HTTP/SDK contract | Lifecycle and process event stream | Bounded cursor replay followed by cancellable SSE live follow preserves ordering, reports cursor gaps and emits one process terminal frame. | `packages/persistence/pg/test/execution-sandbox-event-store.test.ts`; `packages/orpc/test/execution-sandbox-stream.http.test.ts`; SDK running-server stream suite | passed |
 | SBX-SDK-001 | running-server e2e | External TypeScript application | SDK completes template/create/exec/files/snapshot/restore/terminate/delete. | `packages/sdk/test/execution-sandbox-running-server.test.ts` | passed |
-| SBX-CLI-001 | CLI integration | Operator commands | CLI maps to shared operation messages and prints safe output. | `packages/adapters/cli/test/execution-sandbox-command.test.ts` | passed |
+| SBX-CLI-001 | CLI integration | Operator commands | CLI maps lifecycle/exec/file and `sandbox terminal` to shared operation messages and prints safe output. | `packages/adapters/cli/test/execution-sandbox-command.test.ts` | passed |
+| TERM-SESSION-SANDBOX-001 | application/runtime/provider integration | Interactive Sandbox terminal | A ready tenant-scoped Sandbox provider exposes `openTerminal`. | Command, gateway and provider open a confined PTY with resize and no host credential disclosure. | passed |
 | SBX-MCP-001 | generated contract | MCP parity | All 31 Sandbox operations generate from the catalog, including event-stream and credential-broker descriptors. | `packages/ai/mcp/test/execution-sandbox-tools.test.ts` | passed |
 | SBX-DOCS-001 | public docs | Reference/security coverage | Docs cover SDK auth, isolation truth, network safety, lifecycle and cleanup. | docs and spec review | passed |
 
@@ -55,6 +56,6 @@ isolation claims.
   truthful unsupported evidence.
 - Kata, microVM and Kubernetes Agent Sandbox providers require their own future runtime rows before
   those capability claims become active.
-- Interactive bidirectional terminal attach remains a compatible extension. Current APIs expose
-  persisted lifecycle/process SSE and destination-bound credential brokerage without claiming an
-  interactive terminal session.
+- Interactive bidirectional terminal attach is an optional provider extension. Current Docker
+  Sandbox providers expose a confined Bun PTY through the shared terminal-session transport;
+  providers without `openTerminal` fail closed without weakening command/file/process APIs.

@@ -14,9 +14,9 @@
 
 ## Normative Contract
 
-`terminal-sessions.open` starts an ephemeral interactive operator terminal for either a deployment
-target/server, a resource-owned deployment workspace, or a resource runtime container target when
-the selected deployment exposes retained container identity metadata.
+`terminal-sessions.open` starts an ephemeral interactive operator terminal for a deployment
+target/server, a resource-owned deployment workspace, a resource runtime container target, or a
+ready tenant-scoped Execution Sandbox.
 
 It is not:
 
@@ -48,10 +48,11 @@ This command inherits:
 
 | Field | Required | Domain meaning | Validation source |
 | --- | --- | --- | --- |
-| `scope.kind` | Yes | Whether the terminal is server-scoped or resource-scoped. | Command schema |
+| `scope.kind` | Yes | Whether the terminal is server-, resource-, preview-, or Sandbox-scoped. | Command schema |
 | `scope.serverId` | Required for server scope | Deployment target/server to connect to. | Deployment target id value object / command schema |
 | `scope.resourceId` | Required for resource scope | Resource whose latest or selected deployment workspace or retained runtime container target is opened. | Resource id value object / command schema |
 | `scope.deploymentId` | Optional for resource scope | Deployment/runtime instance whose workspace should be opened instead of latest observable. | Deployment id value object / command schema |
+| `scope.sandboxId` | Required for Sandbox scope | Ready tenant-scoped Sandbox whose provider-owned PTY should be opened. | Sandbox id / command schema |
 | `relativeDirectory` | No | Additional directory below the resolved root workspace. | Safe relative path value object / command schema |
 | `initialRows` | No | Initial terminal row count. | Command schema bounded integer |
 | `initialCols` | No | Initial terminal column count. | Command schema bounded integer |
@@ -70,10 +71,11 @@ The public command input must not accept:
 ```ts
 type TerminalSessionDescriptor = {
   sessionId: string;
-  scope: "server" | "resource";
-  serverId: string;
+  scope: "server" | "resource" | "sandbox";
+  serverId?: string;
   resourceId?: string;
   deploymentId?: string;
+  sandboxId?: string;
   workingDirectory?: string;
   providerKey: string;
   createdAt: string;
@@ -97,7 +99,9 @@ host path. Consumers must not reconstruct filesystem paths from resource names, 
 3. Resolve the terminal scope:
    - for server scope, load the deployment target/server and credential context;
    - for resource scope, load the resource and resolve the selected or latest observable
-     deployment/runtime instance.
+     deployment/runtime instance;
+   - for Sandbox scope, defer tenant-scoped Sandbox lookup and ready-state/provider validation to
+     the terminal gateway.
 4. Resolve a safe initial working directory or a runtime container target.
 5. Open a terminal session through `TerminalSessionGateway`.
 6. Return the session descriptor and transport path.
@@ -156,6 +160,8 @@ Binary transport is allowed later if it preserves the same logical frame semanti
 | --- | --- | --- | --- |
 | Server missing | `serverId` cannot be resolved or is not visible | Reject during context resolution | `err(not_found)` |
 | Resource missing | `resourceId` cannot be resolved or is not visible | Reject during context resolution | `err(not_found)` |
+| Sandbox missing or cross-tenant | `sandboxId` cannot be resolved in the current repository context | Reject during terminal target resolution | `err(not_found)` |
+| Sandbox not ready | Sandbox has no active provider handle | Reject before provider mutation | `err(terminal_session_context_mismatch)` |
 | Deployment mismatch | `deploymentId` does not belong to `resourceId` | Reject during context resolution | `err(terminal_session_context_mismatch)` |
 | No observable deployment | Resource scope has no runtime placement | Reject during terminal target resolution | `err(terminal_session_workspace_unavailable)` |
 | Source locator fallback | Runtime execution only exposes a source locator such as `https://...` or `git@host:org/repo.git` as `workingDirectory` | Reject during workspace resolution instead of opening a shell in the locator text | `err(terminal_session_workspace_unavailable)` |
@@ -166,7 +172,7 @@ Binary transport is allowed later if it preserves the same logical frame semanti
 | Hosted control plane disabled | Runtime mode disallows direct shell | Reject during policy gate | `err(terminal_session_policy_denied)` |
 | Session opens | Gateway starts PTY/SSH session | Return descriptor | `ok(TerminalSessionDescriptor)` |
 | Backend closes after open | PTY/SSH exits | Emit close frame | Session closed |
-| Client disconnects | WebSocket closes or abort signal fires | Close backend resources | Session closed |
+| Client disconnects | WebSocket closes or CLI attach exits without an explicit close frame | Detach that transport while preserving the managed backend session for bounded reconnect | Session remains active until explicit close, backend exit, or expiry |
 
 ## Handler Boundary
 
@@ -187,6 +193,7 @@ It must not:
 | Web resource detail | Resource terminal tab/action dispatches `terminal-sessions.open` with resource scope and attaches to returned WebSocket. | Implemented |
 | Web server detail/list | Server terminal action dispatches `terminal-sessions.open` with server scope and attaches to returned WebSocket. | Implemented: server detail opens and attaches; server list deep-links to the terminal tab |
 | CLI | `appaloft server terminal <serverId>` and `appaloft resource terminal <resourceId>` reuse the same command schema and print the descriptor by default; `--attach` connects the local TTY to the accepted terminal session. | Implemented descriptor open and explicit interactive attach |
+| CLI Sandbox | `appaloft sandbox terminal <sandboxId>` opens the provider-backed Sandbox PTY; `--attach` uses the same local TTY bridge. | Implemented |
 | HTTP/oRPC | Command endpoint plus WebSocket attach endpoint. | Implemented |
 | Automation / MCP | Future tool can request a session only when an interactive transport is available. | Future |
 
@@ -205,6 +212,12 @@ deployment-target aggregate state.
 Application command/schema/handler/use case, terminal gateway port, runtime adapter, oRPC command
 endpoint, WebSocket attach transport, CLI descriptor commands, explicit CLI `--attach`, and Web
 terminal component are implemented.
+
+Sandbox scope is additive and provider-neutral. The runtime gateway resolves the Sandbox through the
+tenant-scoped repository, requires `ready` state and an exact provider handle, then calls the
+provider's optional `openTerminal` capability. The Docker provider uses Bun's PTY transport around
+`docker exec -it`, confines the requested directory below `/workspace`, forwards resize, and keeps
+the host shell and Docker socket outside the Sandbox contract.
 
 Resource terminals can open either the latest observable deployment workspace, a retained runtime
 container target, or a selected deployment attempt supplied through `scope.deploymentId`; selected

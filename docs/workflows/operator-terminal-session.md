@@ -4,9 +4,9 @@
 
 Operator terminal access is an interactive workflow over `terminal-sessions.open`.
 
-The workflow starts from either a selected server or a selected resource. It opens an ephemeral
-shell through an application/runtime port and transports bidirectional terminal frames until the
-operator or backend closes the session.
+The workflow starts from a selected server, resource, preview runtime, or ready Execution Sandbox.
+It opens an ephemeral shell through an application/runtime port and transports bidirectional
+terminal frames until the operator, lifecycle policy, or backend closes the session.
 
 ## Global References
 
@@ -27,6 +27,7 @@ Let operators answer and act on:
 
 - can I inspect the selected server directly?
 - can I inspect the source workspace used by the current resource deployment?
+- can I attach to a task-scoped Sandbox without receiving host credentials?
 - can I run diagnostic commands while seeing terminal output in the Web console or CLI?
 
 The workflow must not replace runtime logs, deployment logs, health, proxy configuration previews,
@@ -34,14 +35,16 @@ or diagnostic summaries. It is privileged manual operator access.
 
 ## User Flow
 
-1. User opens a server page or resource detail page.
+1. User opens a server, resource, or Sandbox surface.
 2. The surface offers a terminal affordance only when the selected scope can resolve a target and
    terminal access is allowed by runtime mode and policy.
 3. The client dispatches `terminal-sessions.open`.
 4. The command returns a terminal session descriptor with a transport path.
 5. The client attaches to the transport and renders terminal output.
 6. User input, resize, heartbeat, close, and backend output move as terminal session frames.
-7. Navigation away, explicit close, disconnect, timeout, or backend exit closes the PTY/SSH/process.
+7. Explicit close, navigation that sends a close frame, timeout, or backend exit closes the
+   PTY/SSH/process. An ungraceful transport disconnect only detaches that transport so the accepted
+   managed session may be reattached.
 8. Operators can list/show active sessions and explicitly close or expire sessions through
    `terminal-sessions.list`, `terminal-sessions.show`, `terminal-sessions.close`, and
    `terminal-sessions.expire` without reading terminal input/output.
@@ -60,6 +63,10 @@ terminal sessions.
 Deployment detail pages may deep-link to a resource terminal with a selected `deploymentId`, but
 the terminal scope remains resource-owned.
 
+Sandbox lifecycle/Workspace surfaces own Sandbox-scoped terminal entrypoints. They must resolve the
+Sandbox through the current tenant repository context and may not turn a Sandbox terminal into
+host-level SSH or Docker access.
+
 The first Web placement is resolved as a resource-owned operational tab. Deployment detail pages
 link into that tab with `tab=terminal&deploymentId=<id>`, and the resource page
 preserves the selected deployment id when opening `terminal-sessions.open`.
@@ -76,6 +83,9 @@ or enters the retained runtime container/service target directly when a containe
 no source workspace. The user-facing resource id, resource name, or slug must never be used as the
 checkout directory. Source locators such as HTTPS Git URLs and SSH-style Git remotes must not be
 used as terminal working directories when adapter workspace metadata is missing.
+
+Sandbox scope starts at `/workspace` or a validated relative directory below it. The provider
+revalidates the exact Sandbox/provider handle and resolves symbolic links before PTY spawn.
 
 For current runtime adapters, expected mappings are:
 
@@ -97,7 +107,8 @@ implementation because user input and resize frames must flow back to the backen
 The transport must:
 
 - attach only to an accepted session;
-- close backend resources when the client disconnects;
+- detach a disconnected transport without terminating the accepted managed session;
+- close backend resources on explicit close, backend exit, or expiry;
 - emit structured close and error frames;
 - support resize frames;
 - avoid sending raw private keys, tokens, or command strings in error details.
@@ -125,7 +136,8 @@ CLI must:
 HTTP/WebSocket must:
 
 - reuse the command input schema for open/admission;
-- propagate disconnects as abort/cancellation;
+- detach on transport disconnect and reserve backend termination for explicit close/lifecycle
+  policy;
 - keep terminal frame shapes transport-owned and documented.
 
 ## Current Implementation Notes And Governed Follow-Ups
@@ -137,6 +149,10 @@ retained metadata identifies the Compose file, project, and service, CLI descrip
 explicit CLI `--attach` sessions. Deployment detail pages now deep-link to the Resource terminal tab
 with the selected deployment id, so the resource-owned terminal command can resolve that
 deployment's workspace instead of always falling back to the latest runtime-owning attempt.
+
+Execution Sandbox scope is also implemented for providers that advertise `openTerminal`. The Docker
+provider uses a Bun PTY around a confined `docker exec -it`; `appaloft sandbox terminal
+<sandboxId> [--attach]` and HTTP/oRPC callers reuse the same command and transport.
 
 Active session list/show/close/expire is modeled as gateway-owned lifecycle over ephemeral
 sessions. Web Instance management can list active sessions, close one active session, and expire

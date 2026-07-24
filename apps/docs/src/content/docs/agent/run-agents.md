@@ -3,13 +3,13 @@ title: "运行 Agent"
 description: "在 Appaloft Sandbox 内创建 Runtime，并提交可观察、可取消的 Agent Run。"
 docType: task
 localeState: { zh-CN: complete, en-US: complete }
-searchAliases: ["Agent Runtime", "Pi", "Agent Run"]
+searchAliases: ["Agent Runtime", "Pi", "OpenCode", "Agent Run"]
 relatedOperations: [sandboxes.agents.runtimes.create, sandboxes.agents.runs.create, sandboxes.agents.runs.events, sandboxes.agents.runs.cancel]
 sidebar: { label: "运行 Agent", order: 0 }
 ---
 
-> 成熟度：**Private preview**。API 已实现；Pi 适配器要求运营方提供固定版本、固定 digest 的
-> Sandbox template，并设置 `APPALOFT_PI_SANDBOX_TEMPLATE_ID`。
+> 成熟度：**Public alpha**。公共 API 支持 Pi 与 OpenCode adapter；两者都要求运营方提供
+> 固定版本、固定 digest 的 Sandbox template。
 
 # 在 Sandbox 中运行 Agent [#sandbox-agent-runtime]
 
@@ -29,12 +29,16 @@ Agent Runtime 从属于一个已经 ready 的 Sandbox。应用开发者保留 ch
 token 当成等价认证方式。
 
 ```ts
-const sandbox = await appaloft.sandboxes.create(sandboxInput);
-const agent = await sandbox.agents.create({ harness: "pi" });
+const workspace = await appaloft.workspaces.create({
+  sandbox: sandboxInput,
+  harness: "opencode",
+});
+const agent = workspace.agent;
 const run = await agent.runs.create({ task: "Build the requested app in /workspace/app" });
 ```
 
-SDK 中的 `Agent` 是 canonical Sandbox Agent Runtime 的便捷别名。SDK 默认使用已准入的 Pi template，
+SDK 中的 `Agent` 是 canonical Sandbox Agent Runtime 的便捷别名。SDK 默认使用已准入的
+Pi/OpenCode template，
 并生成 idempotency key；需要显式 pin 或 continuation 时可以传入 `harnessTemplateId`、`context` 或
 `idempotencyKey`。资源方法失败时抛出 `AppaloftSdkRequestError`；不抛异常的完整 generated operation
 facade 保留在 `appaloft.operations`。
@@ -42,9 +46,10 @@ facade 保留在 `appaloft.operations`。
 Run 事件会限制数量、深度和字符串大小，并递归 redact credential、secret、password、token 与
 authorization 字段。它们不是 audit event，也不能代替完整模型 transcript。
 
-Pi 在 Sandbox 内作为可终止后台进程运行。取消会终止实际进程，并防止迟到的成功结果覆盖
-`cancelled` 状态。当前 managed template 只应开放 Sandbox 内部能力；外部发布和 secret 使用必须
-继续通过 Appaloft 控制面。
+Pi 在 Sandbox 内作为可终止后台进程运行；OpenCode 使用限制在 Sandbox provider 私有网络命名
+空间内且不发布宿主机端口的 server，以及独立的 attached client process。取消会终止实际 client
+进程，并防止迟到的成功结果覆盖 `cancelled` 状态。当前 managed template 只应开放 Sandbox
+内部能力；外部发布和 secret 使用必须继续通过 Appaloft 控制面。
 
 官方 examples 仓库提供完整源码：
 [Chat-to-App](https://github.com/appaloft/examples/blob/main/sandbox-agent/src/chat-to-app.ts)、

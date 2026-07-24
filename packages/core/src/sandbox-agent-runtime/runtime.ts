@@ -90,6 +90,20 @@ export class SandboxAgentRuntime extends AggregateRoot<
     return ok(undefined);
   }
 
+  markFailed(input: { at: UpdatedAt }): Result<void> {
+    if (this.state.status.value !== "starting") {
+      return err(
+        domainError.conflict("Sandbox Agent Runtime cannot fail startup", {
+          status: this.state.status.value,
+        }),
+      );
+    }
+    this.state.status = SandboxAgentRuntimeStatusValue.rehydrate("failed");
+    this.state.updatedAt = input.at;
+    this.recordDomainEvent("sandbox-agent-runtime-start-failed", input.at, {});
+    return ok(undefined);
+  }
+
   claimRun(input: { runId: SandboxAgentRunId; at: UpdatedAt }): Result<void> {
     if (!this.state.status.canAcceptRun()) {
       return err(

@@ -148,7 +148,7 @@ class RecordingTerminalSessionGateway implements TerminalSessionGateway {
     const descriptor: TerminalSessionDescriptor = {
       sessionId: request.sessionId,
       scope: request.scope.kind,
-      serverId: request.scope.server.id,
+      ...(request.scope.kind !== "sandbox" ? { serverId: request.scope.server.id } : {}),
       ...(request.scope.kind === "resource"
         ? {
             resourceId: request.scope.resource.id,
@@ -159,10 +159,13 @@ class RecordingTerminalSessionGateway implements TerminalSessionGateway {
         kind: "websocket",
         path: `/api/terminal-sessions/${request.sessionId}/attach`,
       },
+      ...(request.scope.kind === "sandbox" ? { sandboxId: request.scope.sandboxId } : {}),
       providerKey:
         request.scope.kind === "resource"
           ? request.scope.deployment.runtimePlan.target.providerKey
-          : request.scope.server.providerKey,
+          : request.scope.kind === "server"
+            ? request.scope.server.providerKey
+            : "sandbox-provider",
       ...(request.scope.kind === "resource"
         ? { workingDirectory: request.scope.workingDirectory }
         : {}),
@@ -188,6 +191,7 @@ class RecordingTerminalSessionGateway implements TerminalSessionGateway {
       .filter((summary) =>
         input?.deploymentId ? summary.deploymentId === input.deploymentId : true,
       )
+      .filter((summary) => (input?.sandboxId ? summary.sandboxId === input.sandboxId : true))
       .slice(0, input?.limit ?? 50);
   }
 
@@ -363,6 +367,43 @@ function createUseCase(input?: {
 }
 
 describe("OpenTerminalSessionUseCase", () => {
+  test("[TERM-SESSION-SANDBOX-001] delegates a tenant-scoped Sandbox terminal target to the gateway", async () => {
+    const context = createExecutionContext({
+      entrypoint: "http",
+      tenant: {
+        tenantId: "org_a",
+        organizationId: "org_a",
+        source: "test",
+      },
+    });
+    const { gateway, useCase } = createUseCase();
+    const command = OpenTerminalSessionCommand.create({
+      scope: {
+        kind: "sandbox",
+        sandboxId: "sbx_workspace",
+      },
+      relativeDirectory: "app",
+      initialRows: 32,
+      initialCols: 120,
+    })._unsafeUnwrap();
+
+    const result = await useCase.execute(context, command);
+
+    expect(result._unsafeUnwrap()).toMatchObject({
+      scope: "sandbox",
+      sandboxId: "sbx_workspace",
+    });
+    expect(gateway.calls[0]).toMatchObject({
+      scope: {
+        kind: "sandbox",
+        sandboxId: "sbx_workspace",
+        workingDirectory: "app",
+      },
+      initialRows: 32,
+      initialCols: 120,
+    });
+  });
+
   test("[TERMINAL-SESSION-AUTHZ-001] checks operation guard before opening terminal gateway sessions", async () => {
     const context = createExecutionContext({ entrypoint: "http" });
     const operationGuardPort = new DenyingOperationGuardPort({ resourceId: "res_web" });

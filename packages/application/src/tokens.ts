@@ -6,6 +6,7 @@ export const tokens = {
   executionSandboxService: Symbol.for("appaloft.execution_sandbox_service"),
   sandboxAgentDeliveryRepository: Symbol.for("appaloft.sandbox_agent_delivery_repository"),
   sandboxAgentDeliveryService: Symbol.for("appaloft.sandbox_agent_delivery_service"),
+  agentTaskRunService: Symbol.for("appaloft.agent_task_run_service"),
   sandboxAgentHarnessRegistry: Symbol.for("appaloft.sandbox_agent_harness_registry"),
   sandboxAgentArtifactCapture: Symbol.for("appaloft.sandbox_agent_artifact_capture"),
   sandboxAgentPreviewProvider: Symbol.for("appaloft.sandbox_agent_preview_provider"),

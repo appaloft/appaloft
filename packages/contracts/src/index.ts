@@ -6655,10 +6655,11 @@ export const resourceRuntimeLogsStreamResponseSchema = z.object({
 
 export const terminalSessionDescriptorSchema = z.object({
   sessionId: z.string(),
-  scope: z.enum(["server", "resource"]),
-  serverId: z.string(),
+  scope: z.enum(["server", "resource", "sandbox"]),
+  serverId: z.string().optional(),
   resourceId: z.string().optional(),
   deploymentId: z.string().optional(),
+  sandboxId: z.string().optional(),
   transport: z.object({
     kind: z.literal("websocket"),
     path: z.string(),

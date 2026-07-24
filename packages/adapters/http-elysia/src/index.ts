@@ -2068,7 +2068,7 @@ export function createHttpApp(input: {
         if (sessionId) {
           terminalSessionsBySessionId.delete(sessionId);
         }
-        void session?.close();
+        void session?.detach();
       },
     });
 

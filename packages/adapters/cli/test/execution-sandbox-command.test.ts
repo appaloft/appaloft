@@ -9,6 +9,7 @@ import {
   ExecuteSandboxCommand,
   type ExecutionContextFactory,
   ListSandboxesQuery,
+  OpenTerminalSessionCommand,
   type Query,
   type QueryBus,
   WriteSandboxFileCommand,
@@ -87,6 +88,19 @@ describe("CLI execution sandbox commands", () => {
         "--content-base64",
         "AP8B",
       ]);
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "sandbox",
+        "terminal",
+        "sbx_cli",
+        "--directory",
+        "app",
+        "--rows",
+        "32",
+        "--cols",
+        "120",
+      ]);
     } finally {
       process.stdout.write = write;
     }
@@ -96,5 +110,15 @@ describe("CLI execution sandbox commands", () => {
     expect(commands[1]).toBeInstanceOf(ExecuteSandboxCommand);
     expect(commands[1]).toMatchObject({ input: { argv: ["python", "-V"] } });
     expect(commands[2]).toBeInstanceOf(WriteSandboxFileCommand);
+    expect(commands[3]).toBeInstanceOf(OpenTerminalSessionCommand);
+    expect(commands[3]).toMatchObject({
+      scope: {
+        kind: "sandbox",
+        sandboxId: "sbx_cli",
+      },
+      relativeDirectory: "app",
+      initialRows: 32,
+      initialCols: 120,
+    });
   });
 });

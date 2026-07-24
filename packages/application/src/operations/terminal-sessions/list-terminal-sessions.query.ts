@@ -15,10 +15,11 @@ export {
 
 export class ListTerminalSessionsQuery extends Query<TerminalSessionList> {
   constructor(
-    public readonly scope?: "server" | "resource",
+    public readonly scope?: "server" | "resource" | "sandbox",
     public readonly serverId?: string,
     public readonly resourceId?: string,
     public readonly deploymentId?: string,
+    public readonly sandboxId?: string,
     public readonly limit?: number,
   ) {
     super();
@@ -32,6 +33,7 @@ export class ListTerminalSessionsQuery extends Query<TerminalSessionList> {
           trimToUndefined(parsed.serverId),
           trimToUndefined(parsed.resourceId),
           trimToUndefined(parsed.deploymentId),
+          trimToUndefined(parsed.sandboxId),
           parsed.limit,
         ),
     );

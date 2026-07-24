@@ -254,6 +254,8 @@ export interface SafeCliErrorEvidence {
   stateBackend: string | null;
   sourcePostgresMajor: string | null;
   requiredPostgresMajor: string | null;
+  workspaceId: string | null;
+  sandboxId: string | null;
   exitCode: number | null;
   retryable: boolean;
 }
@@ -279,6 +281,8 @@ export function safeCliErrorEvidence(error: unknown): SafeCliErrorEvidence {
       stateBackend: null,
       sourcePostgresMajor: null,
       requiredPostgresMajor: null,
+      workspaceId: null,
+      sandboxId: null,
       exitCode: null,
       retryable: false,
     };
@@ -294,6 +298,8 @@ export function safeCliErrorEvidence(error: unknown): SafeCliErrorEvidence {
     stateBackend: safeErrorDetail(error, "stateBackend"),
     sourcePostgresMajor: safePostgresMajorDetail(error, "sourcePostgresMajor"),
     requiredPostgresMajor: safePostgresMajorDetail(error, "requiredPostgresMajor"),
+    workspaceId: safeErrorDetail(error, "workspaceId"),
+    sandboxId: safeErrorDetail(error, "sandboxId"),
     exitCode: typeof exitCode === "number" && Number.isInteger(exitCode) ? exitCode : null,
     retryable: error.retryable,
   };
@@ -496,7 +502,7 @@ async function pipeTerminalSession(input: {
     }
     stdin.pause?.();
     if (!sessionClosed) {
-      await session.close();
+      await session.detach();
     }
   }
 }
@@ -546,6 +552,47 @@ export const runTerminalCommand = (
         });
       })
     : runCommand(message);
+
+export const attachTerminalSession = <
+  T extends TerminalSessionDescriptor | { item: TerminalSessionDescriptor },
+>(
+  message: Result<AppQuery<T>>,
+  options: { initialRows?: number; initialCols?: number } = {},
+): Effect.Effect<void, DomainError, CliRuntime> =>
+  Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    if (!cli.terminalSessionGateway) {
+      return yield* Effect.fail(
+        domainError.terminalSessionNotConfigured(
+          "CLI terminal attach requires terminal session gateway",
+          { phase: "cli-terminal-attach" },
+        ),
+      );
+    }
+    const query = yield* resultToEffect(message);
+    const result = yield* Effect.promise(() => cli.executeQuery(query));
+    const output = yield* resultToEffect(result);
+    const descriptor =
+      (output as { item?: TerminalSessionDescriptor }).item ??
+      (output as TerminalSessionDescriptor);
+    yield* Effect.tryPromise({
+      try: () =>
+        pipeTerminalSession({
+          descriptor,
+          gateway: cli.terminalSessionGateway as TerminalSessionGateway,
+          io: cli.terminalIO,
+          ...(typeof options.initialRows === "number" && typeof options.initialCols === "number"
+            ? {
+                initialSize: {
+                  rows: options.initialRows,
+                  cols: options.initialCols,
+                },
+              }
+            : {}),
+        }),
+      catch: terminalSessionErrorFromUnknown,
+    });
+  });
 
 export const runCommand = <T>(
   message: Result<AppCommand<T>>,

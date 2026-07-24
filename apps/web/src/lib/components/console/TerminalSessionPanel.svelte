@@ -21,6 +21,10 @@
         kind: "resource";
         resourceId: string;
         deploymentId?: string;
+      }
+    | {
+        kind: "sandbox";
+        sandboxId: string;
       };
   type TerminalStatus = "idle" | "connecting" | "connected" | "disconnected" | "failed";
 
@@ -210,6 +214,7 @@
       case "closed":
         status = "disconnected";
         socket = null;
+        descriptor = null;
         break;
       case "error":
         status = "failed";
@@ -220,15 +225,42 @@
     }
   }
 
-  function closeTerminal(): void {
+  function detachTerminal(): void {
     flushTerminalInput();
     const activeSocket = socket;
     socket = null;
-    if (activeSocket?.readyState === WebSocket.OPEN) {
-      activeSocket.send(JSON.stringify({ kind: "close" }));
-    }
     activeSocket?.close();
     status = status === "idle" ? "idle" : "disconnected";
+  }
+
+  function connectTerminal(opened: TerminalSessionDescriptor): void {
+    const ws = new WebSocket(terminalSocketUrl(opened.transport.path));
+    descriptor = opened;
+    socket = ws;
+
+    ws.onopen = () => {
+      sendResize();
+      focusTerminal();
+    };
+    ws.onmessage = (event) => {
+      try {
+        const parsed = JSON.parse(String(event.data)) as TerminalSessionFrame;
+        handleTerminalFrame(parsed);
+      } catch {
+        status = "failed";
+        errorMessage = $t(i18nKeys.console.terminal.sessionError);
+      }
+    };
+    ws.onerror = () => {
+      status = "failed";
+      errorMessage = $t(i18nKeys.console.terminal.sessionError);
+    };
+    ws.onclose = () => {
+      if (status === "connecting" || status === "connected") {
+        status = "disconnected";
+      }
+      socket = null;
+    };
   }
 
   async function openTerminal(): Promise<void> {
@@ -236,44 +268,29 @@
       return;
     }
 
-    closeTerminal();
-    clearTerminal();
+    detachTerminal();
     status = "connecting";
     errorMessage = "";
 
     try {
-      const opened = await orpcClient.terminalSessions.open({
-        scope,
-        initialRows: terminalRows,
-        initialCols: terminalCols,
-      });
-      const ws = new WebSocket(terminalSocketUrl(opened.transport.path));
-      descriptor = opened;
-      socket = ws;
-
-      ws.onopen = () => {
-        sendResize();
-        focusTerminal();
-      };
-      ws.onmessage = (event) => {
-        try {
-          const parsed = JSON.parse(String(event.data)) as TerminalSessionFrame;
-          handleTerminalFrame(parsed);
-        } catch {
-          status = "failed";
-          errorMessage = $t(i18nKeys.console.terminal.sessionError);
-        }
-      };
-      ws.onerror = () => {
-        status = "failed";
-        errorMessage = $t(i18nKeys.console.terminal.sessionError);
-      };
-      ws.onclose = () => {
-        if (status === "connecting" || status === "connected") {
-          status = "disconnected";
-        }
-        socket = null;
-      };
+      let target = descriptor;
+      if (!target && scope.kind === "sandbox") {
+        const listed = await orpcClient.terminalSessions.list({
+          scope: "sandbox",
+          sandboxId: scope.sandboxId,
+          limit: 20,
+        });
+        target = listed.items.find((item) => item.status === "active") ?? null;
+      }
+      if (!target) {
+        clearTerminal();
+        target = await orpcClient.terminalSessions.open({
+          scope,
+          initialRows: terminalRows,
+          initialCols: terminalCols,
+        });
+      }
+      connectTerminal(target);
     } catch (error) {
       status = "failed";
       errorMessage = readTerminalErrorMessage(error);
@@ -282,7 +299,7 @@
 
   function handleAction(): void {
     if (status === "connected") {
-      closeTerminal();
+      detachTerminal();
       return;
     }
 
@@ -382,7 +399,7 @@
     if (inputFlushTimer) {
       clearTimeout(inputFlushTimer);
     }
-    closeTerminal();
+    detachTerminal();
     terminal?.destroy();
   });
 </script>

@@ -47,6 +47,12 @@ export const openTerminalSessionCommandInputSchema = z
           deploymentId: z.string().trim().min(1, "Deployment id is required").optional(),
         })
         .strict(),
+      z
+        .object({
+          kind: z.literal("sandbox"),
+          sandboxId: z.string().trim().min(1, "Sandbox id is required"),
+        })
+        .strict(),
     ]),
     relativeDirectory: safeRelativeDirectory("Relative directory").optional(),
     initialRows: z.number().int().min(10).max(120).default(24),

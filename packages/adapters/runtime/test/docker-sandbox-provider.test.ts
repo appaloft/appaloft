@@ -6,14 +6,21 @@ import {
   DockerSandboxProvider,
   type SandboxDockerCommandRunner,
   type SandboxDockerCommandResult,
+  type SandboxEgressPolicyAdapter,
   type SandboxPortPublisher,
 } from "../src/docker-sandbox-provider";
 
 class CapturingRunner implements SandboxDockerCommandRunner {
   readonly calls: Array<{ argv: readonly string[]; stdin?: Uint8Array }> = [];
+  readonly terminalCalls: Array<{
+    argv: readonly string[];
+    initialRows: number;
+    initialCols: number;
+  }> = [];
   runtimes = '{"io.containerd.runc.v2":{"path":"runc"},"runsc":{"path":"runsc"}}';
   resolvedPath: string | undefined;
   executionFailure: SandboxDockerCommandResult["failure"];
+  failureCommandIncludes: string | undefined;
   inventory = "";
 
   async run(
@@ -22,6 +29,13 @@ class CapturingRunner implements SandboxDockerCommandRunner {
   ): Promise<SandboxDockerCommandResult> {
     this.calls.push({ argv: [...argv], ...(input.stdin ? { stdin: input.stdin.slice() } : {}) });
     const command = argv.join(" ");
+    if (this.failureCommandIncludes && command.includes(this.failureCommandIncludes)) {
+      return {
+        exitCode: 1,
+        stdout: new Uint8Array(),
+        stderr: "injected worker failure",
+      };
+    }
     if (command.includes("info --format")) return this.result(this.runtimes);
     if (command.includes("network inspect --format")) return this.result("true\n");
     if (command.includes("ps -a --filter")) return this.result(this.inventory);
@@ -32,6 +46,7 @@ class CapturingRunner implements SandboxDockerCommandRunner {
       return this.result("python@sha256:abc123\n");
     if (command.includes("inspect --format") && !command.includes("image inspect")) {
       if (command.includes("appaloft.sandbox.owner")) return this.result("tenant_a\n");
+      if (command.includes("appaloft.sandbox.egress")) return this.result("allowlist\n");
       return this.result("sbx_demo\n");
     }
     if (command.includes("image inspect")) return this.result("4096\n");
@@ -43,6 +58,27 @@ class CapturingRunner implements SandboxDockerCommandRunner {
         ...(this.executionFailure ? { failure: this.executionFailure } : {}),
       };
     return this.result("");
+  }
+
+  async openTerminal(
+    argv: readonly string[],
+    input: { initialRows: number; initialCols: number },
+  ) {
+    this.terminalCalls.push({
+      argv: [...argv],
+      initialRows: input.initialRows,
+      initialCols: input.initialCols,
+    });
+    return {
+      stdin: {
+        write() {},
+        end() {},
+      },
+      stdout: null,
+      stderr: null,
+      exited: new Promise<number>(() => {}),
+      kill() {},
+    };
   }
 
   private result(stdout: string): SandboxDockerCommandResult {
@@ -65,6 +101,38 @@ const request = {
 };
 
 describe("DockerSandboxProvider", () => {
+  test("[TERM-SESSION-SANDBOX-001] opens the managed container shell through a PTY runner", async () => {
+    const runner = new CapturingRunner();
+    const provider = new DockerSandboxProvider({ isolation: "gvisor", runner });
+    await provider.provision(request);
+
+    await provider.openTerminal({
+      sandboxId: "sbx_demo",
+      providerHandle: "appaloft-sbx_demo",
+      cwd: "src",
+      initialRows: 32,
+      initialCols: 120,
+    });
+
+    expect(runner.terminalCalls).toEqual([
+      {
+        argv: [
+          "docker",
+          "exec",
+          "-it",
+          "-w",
+          "/workspace/src",
+          "appaloft-sbx_demo",
+          "sh",
+          "-lc",
+          expect.stringContaining("export HOME=/workspace"),
+        ],
+        initialRows: 32,
+        initialCols: 120,
+      },
+    ]);
+  });
+
   test("[SBX-RUNTIME-002] provisions a constrained gVisor container without shell interpolation", async () => {
     const runner = new CapturingRunner();
     const provider = new DockerSandboxProvider({ isolation: "gvisor", runner });
@@ -133,21 +201,25 @@ describe("DockerSandboxProvider", () => {
   test("[SBX-PORT-001] enables publishing only on a verified internal Docker network", async () => {
     const runner = new CapturingRunner();
     const exposed: unknown[] = [];
+    const revoked: unknown[] = [];
+    const exposure = {
+      exposureId: "sexp_1",
+      port: 3000,
+      visibility: "private" as const,
+      url: "https://preview.example.test/signed",
+      expiresAt: "2026-07-20T01:00:00.000Z",
+    };
     const publisher: SandboxPortPublisher = {
       async expose(input) {
         exposed.push(input);
-        return {
-          exposureId: "sexp_1",
-          port: input.port,
-          visibility: input.visibility,
-          url: "https://preview.example.test/signed",
-          expiresAt: "2026-07-20T01:00:00.000Z",
-        };
+        return { ...exposure, port: input.port, visibility: input.visibility };
       },
       async list() {
-        return [];
+        return [exposure];
       },
-      async revoke() {},
+      async revoke(input) {
+        revoked.push(input);
+      },
     };
     const provider = new DockerSandboxProvider({
       isolation: "gvisor",
@@ -169,6 +241,174 @@ describe("DockerSandboxProvider", () => {
       }),
     ).toMatchObject({ exposureId: "sexp_1", port: 3000 });
     expect(exposed).toHaveLength(1);
+    await provider.terminate({
+      sandboxId: "sbx_demo",
+      providerHandle: "appaloft-sbx_demo",
+    });
+    expect(revoked).toEqual([
+      {
+        sandboxId: "sbx_demo",
+        containerName: "appaloft-sbx_demo",
+        exposureId: "sexp_1",
+      },
+    ]);
+  });
+
+  test("[SBX-PORT-001] retries external-access cleanup after the managed container is gone", async () => {
+    const runner = new CapturingRunner();
+    runner.failureCommandIncludes = "docker inspect --format";
+    const revoked: unknown[] = [];
+    const provider = new DockerSandboxProvider({
+      isolation: "gvisor",
+      runner,
+      internalNetwork: "appaloft-sandbox-internal",
+      egressPolicy: {
+        async configure() {
+          return { proxyUrl: "http://sandbox-gateway:8789" };
+        },
+        async revoke(input) {
+          revoked.push(input);
+        },
+      },
+    });
+
+    await provider.terminate({
+      sandboxId: "sbx_demo",
+      providerHandle: "appaloft-sbx_demo",
+    });
+
+    expect(revoked).toEqual([
+      {
+        sandboxId: "sbx_demo",
+        containerName: "appaloft-sbx_demo",
+      },
+    ]);
+    expect(
+      runner.calls.some(
+        (call) =>
+          call.argv[0] === "docker" &&
+          call.argv[1] === "rm" &&
+          call.argv.includes("appaloft-sbx_demo"),
+      ),
+    ).toBe(false);
+  });
+
+  test("[AGENT-WS-EGRESS-019] injects only a scoped proxy env file and revokes it with the Sandbox", async () => {
+    const runner = new CapturingRunner();
+    const configured: unknown[] = [];
+    const revoked: unknown[] = [];
+    const egressPolicy: SandboxEgressPolicyAdapter = {
+      async configure(input) {
+        configured.push(input);
+        return {
+          proxyUrl: "http://seg_demo:scoped-token@sandbox-gateway:8789",
+          noProxy: ["sandbox-gateway"],
+        };
+      },
+      async revoke(input) {
+        revoked.push(input);
+      },
+    };
+    const provider = new DockerSandboxProvider({
+      isolation: "gvisor",
+      runner,
+      internalNetwork: "appaloft-sandbox-internal",
+      egressPolicy,
+    });
+    const allowlist = {
+      ...request,
+      networkPolicy: {
+        mode: "allowlist" as const,
+        rules: [{ kind: "domain" as const, value: "github.com", ports: [443] }],
+      },
+    };
+
+    await provider.provision(allowlist);
+    expect(provider.capabilities.networkPolicy).toEqual(["deny", "allowlist"]);
+    expect(configured).toEqual([
+      {
+        sandboxId: "sbx_demo",
+        containerName: "appaloft-sbx_demo",
+        networkPolicy: allowlist.networkPolicy,
+      },
+    ]);
+    const envWrite = runner.calls.find((call) => call.argv[0] === "dd");
+    expect(new TextDecoder().decode(envWrite?.stdin)).toContain(
+      "HTTPS_PROXY=http://seg_demo:scoped-token@sandbox-gateway:8789",
+    );
+    const create = runner.calls.find((call) => call.argv[1] === "create")?.argv ?? [];
+    expect(create).toContain("appaloft-sandbox-internal");
+    expect(create).toContain("--env-file");
+    expect(create.join(" ")).not.toContain("scoped-token");
+    expect(
+      runner.calls.some(
+        (call) =>
+          call.argv[0] === "rm" &&
+          call.argv[1] === "-f" &&
+          call.argv[2] === "--",
+      ),
+    ).toBe(true);
+
+    await provider.updateNetworkPolicy({
+      sandboxId: "sbx_demo",
+      providerHandle: "appaloft-sbx_demo",
+      networkPolicy: {
+        mode: "allowlist",
+        rules: [{ kind: "domain", value: "registry.npmjs.org", ports: [443] }],
+      },
+    });
+    expect(configured).toHaveLength(2);
+
+    await provider.terminate({
+      sandboxId: "sbx_demo",
+      providerHandle: "appaloft-sbx_demo",
+    });
+    expect(revoked).toEqual([
+      {
+        sandboxId: "sbx_demo",
+        containerName: "appaloft-sbx_demo",
+      },
+    ]);
+  });
+
+  test("[AGENT-WS-EGRESS-019] removes the container and revokes egress when transient secret cleanup fails", async () => {
+    const runner = new CapturingRunner();
+    runner.failureCommandIncludes = "rm -f -- /var/tmp/appaloft-sandbox-env/";
+    const revoked: unknown[] = [];
+    const provider = new DockerSandboxProvider({
+      isolation: "gvisor",
+      runner,
+      internalNetwork: "appaloft-sandbox-internal",
+      egressPolicy: {
+        async configure() {
+          return { proxyUrl: "http://seg_demo:scoped-token@sandbox-gateway:8789" };
+        },
+        async revoke(input) {
+          revoked.push(input);
+        },
+      },
+    });
+
+    await expect(
+      provider.provision({
+        ...request,
+        networkPolicy: {
+          mode: "allowlist",
+          rules: [{ kind: "domain", value: "github.com", ports: [443] }],
+        },
+      }),
+    ).rejects.toThrow("cleanup was incomplete");
+    expect(
+      runner.calls.some(
+        (call) =>
+          call.argv[0] === "docker" &&
+          call.argv[1] === "rm" &&
+          call.argv.includes("appaloft-sbx_demo"),
+      ),
+    ).toBe(true);
+    expect(revoked).toEqual([
+      { sandboxId: "sbx_demo", containerName: "appaloft-sbx_demo" },
+    ]);
   });
 
   test("[SBX-PROC-001] returns ordered stdout/stderr/exit frames from direct argv execution", async () => {
@@ -235,6 +475,66 @@ describe("DockerSandboxProvider", () => {
         retryable: false,
       });
     }
+  });
+
+  test("[SBX-PROC-001] streams bounded launch input through a private pipe without placing it in argv", async () => {
+    const runner = new CapturingRunner();
+    const provider = new DockerSandboxProvider({ isolation: "gvisor", runner });
+    await provider.provision(request);
+    const secret = new TextEncoder().encode("scoped-launch-secret\n");
+    const result = await provider.exec({
+      sandboxId: "sbx_demo",
+      providerHandle: "appaloft-sbx_demo",
+      argv: ["agent-server", "serve"],
+      background: true,
+      stdin: secret,
+    });
+
+    expect(result).toMatchObject({ mode: "background" });
+    const launch = runner.calls.find((call) => call.argv.includes("-d"));
+    const delivered = runner.calls.at(-1);
+    expect(launch?.argv).not.toContain("-i");
+    expect(launch?.argv.join(" ")).toContain('wait "$child"');
+    expect(launch?.argv.join(" ")).toContain('rm -f -- "$pid_file" "$input_pipe"');
+    expect(delivered?.argv).toContain("-i");
+    expect(runner.calls.every((call) => !call.argv.join(" ").includes("scoped-launch-secret"))).toBe(
+      true,
+    );
+    expect(new TextDecoder().decode(delivered?.stdin)).toBe("scoped-launch-secret\n");
+  });
+
+  test("[SBX-PROC-001] cleans up a detached process when private input delivery fails", async () => {
+    const runner = new CapturingRunner();
+    const provider = new DockerSandboxProvider({ isolation: "gvisor", runner });
+    await provider.provision(request);
+    runner.failureCommandIncludes = "cat >";
+
+    expect(
+      provider.exec({
+        sandboxId: "sbx_demo",
+        providerHandle: "appaloft-sbx_demo",
+        argv: ["agent-server", "serve"],
+        background: true,
+        stdin: new TextEncoder().encode("bounded-input\n"),
+      }),
+    ).rejects.toThrow("injected worker failure");
+    expect(runner.calls.at(-1)?.argv.join(" ")).toContain("appaloft-background-cleanup");
+  });
+
+  test("[SBX-PROC-001] process termination is idempotent after a background command exits", async () => {
+    const runner = new CapturingRunner();
+    const provider = new DockerSandboxProvider({ isolation: "gvisor", runner });
+    await provider.provision(request);
+
+    await provider.terminateProcess({
+      sandboxId: "sbx_demo",
+      providerHandle: "appaloft-sbx_demo",
+      processId: "spr_deadbeef",
+    });
+
+    const terminated = runner.calls.at(-1)?.argv.join(" ") ?? "";
+    expect(terminated).toContain('kill "$pid" 2>/dev/null || true');
+    expect(terminated).toContain('rm -f -- "$1"');
   });
 
   test("[SBX-FILE-003] revalidates handles and paths before Docker mutation", async () => {

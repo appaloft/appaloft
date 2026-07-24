@@ -14,6 +14,19 @@ const createdAt = CreatedAt.rehydrate("2026-07-20T00:00:00.000Z");
 const updatedAt = UpdatedAt.rehydrate("2026-07-20T00:00:01.000Z");
 
 describe("Sandbox Agent Runtime", () => {
+  test("[AGENT-WS-START-009] records an explicit terminal state when harness startup fails", () => {
+    const runtime = SandboxAgentRuntime.create({
+      id: SandboxAgentRuntimeId.rehydrate("sar_failed"),
+      sandboxId: SandboxId.rehydrate("sbx_failed"),
+      harnessTemplateId: AgentHarnessTemplateId.rehydrate("aht_opencode_1"),
+      createdAt,
+    })._unsafeUnwrap();
+
+    expect(runtime.markFailed({ at: updatedAt }).isOk()).toBe(true);
+    expect(runtime.toState().status.value).toBe("failed");
+    expect(runtime.markReady({ at: updatedAt }).isErr()).toBe(true);
+  });
+
   test("[AGENT-CORE-001] owns one active Run claim and releases it idempotently", () => {
     const runtime = SandboxAgentRuntime.create({
       id: SandboxAgentRuntimeId.rehydrate("sar_demo"),

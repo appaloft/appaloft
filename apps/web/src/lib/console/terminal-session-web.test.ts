@@ -90,6 +90,10 @@ describe("terminal session Web console surface", () => {
     expect(panelSource).toContain("<DocsHelpLink");
     expect(panelSource).toContain("ws.onopen");
     expect(panelSource).toContain("sendResize()");
+    expect(panelSource).toContain("function detachTerminal()");
+    expect(panelSource).not.toContain('kind: "close"');
+    expect(panelSource).toContain("orpcClient.terminalSessions.list");
+    expect(panelSource).toContain('item.status === "active"');
   });
 
   test("[TERM-SESSION-ENTRY-001][TERM-SESSION-ENTRY-002][TERM-SESSION-ENTRY-003] terminal docs do not keep stale Web coverage gaps", async () => {

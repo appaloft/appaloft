@@ -16,7 +16,9 @@ The first supported scopes are:
 
 - server scope: open a shell on a selected deployment target/server;
 - resource scope: open a shell on the target that currently hosts a selected resource and start in
-  the resolved project workspace directory for the selected or latest observable deployment.
+  the resolved project workspace directory for the selected or latest observable deployment;
+- Sandbox scope: open a provider-owned PTY only for a ready tenant-scoped Execution Sandbox, with
+  any relative directory confined below the Sandbox workspace.
 
 Resource terminal directory resolution must use deployment runtime placement metadata, not a
 resource name or resource id as a filesystem path. Current deployment workspaces remain
@@ -35,7 +37,7 @@ terminal-sessions.open
   -> TerminalSessionGateway port
       -> local-shell PTY adapter
       -> generic-SSH PTY adapter
-      -> future provider-native terminal adapters
+      -> provider-native Sandbox PTY adapter
 ```
 
 The Web console must render terminal UI as a consumer of this command and the terminal transport.
@@ -105,7 +107,8 @@ Command input must use a discriminated scope:
 type OpenTerminalSessionCommandInput = {
   scope:
     | { kind: "server"; serverId: string }
-    | { kind: "resource"; resourceId: string; deploymentId?: string };
+    | { kind: "resource"; resourceId: string; deploymentId?: string }
+    | { kind: "sandbox"; sandboxId: string };
   initialRows?: number;
   initialCols?: number;
   relativeDirectory?: string;
@@ -122,10 +125,11 @@ The command returns an accepted session descriptor:
 ```ts
 type TerminalSessionDescriptor = {
   sessionId: string;
-  scope: "server" | "resource";
-  serverId: string;
+  scope: "server" | "resource" | "sandbox";
+  serverId?: string;
   resourceId?: string;
   deploymentId?: string;
+  sandboxId?: string;
   workingDirectory?: string;
   providerKey: string;
   createdAt: string;
@@ -165,7 +169,8 @@ Terminal sessions must:
 - require an authenticated/authorized actor when auth is enabled;
 - be disabled or explicitly gated in hosted-control-plane mode until a provider-native isolation
   boundary exists;
-- close backend PTY, SSH, and child-process resources on disconnect, timeout, or command close;
+- detach a disconnected transport without terminating a managed session, so a client may reconnect;
+- close backend PTY, SSH, and child-process resources on explicit close, backend exit, or timeout;
 - avoid persisting terminal input/output by default;
 - record only safe audit metadata such as actor, scope, server id, resource id, deployment id,
   started/closed timestamps, close reason, and coarse error code;
@@ -174,7 +179,7 @@ Terminal sessions must:
 
 ## Consequences
 
-The feature is resource/server owned in the UI but implemented as a shared terminal session
+The feature is resource/server/Sandbox owned in the UI but implemented as a shared terminal session
 business capability.
 
 Resource terminal UX can start in the deployed project directory without changing deployment
@@ -211,8 +216,10 @@ SSH source preparation records `remoteWorkdir`; remote Git materialization uses
 The default remote runtime root is `/var/lib/appaloft/runtime` and can be overridden with
 `APPALOFT_REMOTE_RUNTIME_ROOT`.
 
-Current local-shell terminal support uses a Bun subprocess bridge rather than a true local PTY, so
-resize is a no-op for local targets. Generic SSH uses `ssh -tt` for an interactive remote TTY.
+Current local-shell resource/server terminal support uses a Bun subprocess bridge rather than a true
+local PTY, so resize is a no-op for those local targets. Generic SSH uses `ssh -tt`. The Docker
+Sandbox provider uses Bun PTY support around `docker exec -it`; resize is forwarded to that PTY and
+the provider revalidates the tenant-scoped Sandbox handle and workspace confinement before spawn.
 The runtime gateway records durable `terminal-session-opened` and `terminal-session-closed` audit
 metadata through the configured audit recorder; terminal input/output, raw commands, private keys,
 tokens, and environment secret values are not persisted.

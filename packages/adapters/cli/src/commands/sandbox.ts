@@ -27,6 +27,7 @@ import {
   ListSandboxSnapshotsQuery,
   ListSandboxSourceArtifactsQuery,
   ListSandboxTemplatesQuery,
+  OpenTerminalSessionCommand,
   PauseSandboxCommand,
   PlanSandboxPromotionCommand,
   ReadSandboxFileQuery,
@@ -59,6 +60,7 @@ import {
   runCommand,
   runQuery,
   runSandboxAgentRunEventStreamQuery,
+  runTerminalCommand,
 } from "../runtime.js";
 
 const sandboxId = Args.text({ name: "sandboxId" });
@@ -75,6 +77,10 @@ const promotionId = Args.text({ name: "promotionId" });
 const path = Options.text("path");
 const limit = Options.text("limit").pipe(Options.optional);
 const offset = Options.text("offset").pipe(Options.optional);
+const terminalDirectory = Options.text("directory").pipe(Options.optional);
+const terminalRows = Options.text("rows").pipe(Options.withDefault("24"));
+const terminalCols = Options.text("cols").pipe(Options.withDefault("80"));
+const attachTerminal = Options.boolean("attach").pipe(Options.withDefault(false));
 
 function page(
   limitValue: Parameters<typeof optionalNumber>[0],
@@ -155,6 +161,33 @@ const resume = EffectCommand.make("resume", { sandboxId }, ({ sandboxId }) =>
 );
 const terminate = EffectCommand.make("terminate", { sandboxId }, ({ sandboxId }) =>
   runCommand(TerminateSandboxCommand.create({ sandboxId })),
+);
+const terminal = EffectCommand.make(
+  "terminal",
+  {
+    sandboxId,
+    directory: terminalDirectory,
+    rows: terminalRows,
+    cols: terminalCols,
+    attach: attachTerminal,
+  },
+  ({ attach, cols, directory, rows, sandboxId }) =>
+    runTerminalCommand(
+      OpenTerminalSessionCommand.create({
+        scope: {
+          kind: "sandbox",
+          sandboxId,
+        },
+        ...(optionalValue(directory) ? { relativeDirectory: optionalValue(directory) } : {}),
+        initialRows: Number(rows),
+        initialCols: Number(cols),
+      }),
+      {
+        attach,
+        initialRows: Number(rows),
+        initialCols: Number(cols),
+      },
+    ),
 );
 const exec = EffectCommand.make(
   "exec",
@@ -575,6 +608,7 @@ export const sandboxCommand = EffectCommand.make("sandbox").pipe(
     pause,
     resume,
     terminate,
+    terminal,
     exec,
     file,
     process,

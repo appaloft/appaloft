@@ -5,6 +5,7 @@
   import {
     Check,
     ChevronDown,
+    Bot,
     Database,
     FolderOpen,
     Gauge,
@@ -110,6 +111,11 @@
     { href: "/", labelKey: i18nKeys.console.nav.home, icon: Gauge },
     { href: "/projects", labelKey: i18nKeys.console.nav.projects, icon: FolderOpen },
     { href: "/servers", labelKey: i18nKeys.console.nav.servers, icon: Server },
+    {
+      href: "/workspaces",
+      labelKey: i18nKeys.console.nav.agentWorkspaces,
+      icon: Bot,
+    },
     {
       href: "/dependency-resources",
       labelKey: i18nKeys.console.nav.dependencyResources,

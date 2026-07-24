@@ -77,7 +77,9 @@ Enterprise customer-owned execution while creating a private replacement for pub
 ## Migration Gaps
 
 - No existing public Sandbox operations or persistence rows exist; this feature is additive.
-- Existing terminal sessions may later add a `sandbox` scope, but terminal attachment is not a
-  prerequisite for command/file/process APIs and must not grant host access.
+- Existing terminal sessions now expose an optional `sandbox` scope through provider
+  `openTerminal`. This remains additive to command/file/process APIs, requires a ready
+  tenant-scoped Sandbox and exact provider handle, confines the working directory below
+  `/workspace`, and must not grant host access.
 - Existing Server runtime preparation needs a neutral sandbox-capability probe before a BYOS host
   can be selected for untrusted execution.

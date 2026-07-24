@@ -1,4 +1,5 @@
 import { domainError, err, ok, type Result } from "@appaloft/core";
+import { type AgentTaskRunService } from "./agent-task-run";
 import {
   type DurableWorkHandler,
   type DurableWorkHandlerResult,
@@ -10,6 +11,8 @@ import { type ExecutionContext, toRepositoryContext } from "./execution-context"
 import { type SandboxAgentDeliveryService } from "./sandbox-agent-runtime";
 
 export const sandboxAgentDeliveryDurableWorkKind = "sandbox-agent-delivery";
+const agentTaskRunMaxAttempts = 8_640;
+const agentTaskRunPollIntervalMs = 10_000;
 
 export class DurableSandboxAgentWorkQueue {
   constructor(
@@ -20,7 +23,9 @@ export class DurableSandboxAgentWorkQueue {
 
   async enqueue(
     context: ExecutionContext,
-    input: { kind: "sandbox-agent-run" | "sandbox-promotion"; id: string },
+    input:
+      | { kind: "sandbox-agent-run" | "sandbox-promotion"; id: string }
+      | { kind: "agent-task-run"; id: string; workspaceId: string },
   ): Promise<void> {
     const now = this.clock.now();
     const item: DurableWorkItemRecord = {
@@ -30,7 +35,9 @@ export class DurableSandboxAgentWorkQueue {
       operationKey:
         input.kind === "sandbox-agent-run"
           ? "sandboxes.agents.runs.execute"
-          : "sandboxes.promotions.execute",
+          : input.kind === "sandbox-promotion"
+            ? "sandboxes.promotions.execute"
+            : "sandboxes.agent-tasks.reconcile",
       queueBackend: "database",
       dedupeKey: `${input.kind}:${input.id}`,
       requestId: context.requestId,
@@ -38,13 +45,14 @@ export class DurableSandboxAgentWorkQueue {
       subjectId: input.id,
       priority: 0,
       attemptCount: 0,
-      maxAttempts: 5,
+      maxAttempts: input.kind === "agent-task-run" ? agentTaskRunMaxAttempts : 5,
       availableAt: now,
       updatedAt: now,
       safeInput: {
         tenantId: context.tenant?.tenantId ?? "tenant_instance",
         itemKind: input.kind,
         itemId: input.id,
+        ...(input.kind === "agent-task-run" ? { workspaceId: input.workspaceId } : {}),
       },
     };
     const recorded = await this.queue.recordItem(toRepositoryContext(context), item);
@@ -53,7 +61,10 @@ export class DurableSandboxAgentWorkQueue {
 }
 
 export class SandboxAgentDurableWorkHandler implements DurableWorkHandler {
-  constructor(private readonly service: SandboxAgentDeliveryService) {}
+  constructor(
+    private readonly service: SandboxAgentDeliveryService,
+    private readonly taskService?: AgentTaskRunService,
+  ) {}
 
   async handle(
     context: ExecutionContext,
@@ -65,7 +76,9 @@ export class SandboxAgentDurableWorkHandler implements DurableWorkHandler {
     const itemId = item.safeInput?.itemId;
     if (
       typeof tenantId !== "string" ||
-      (itemKind !== "sandbox-agent-run" && itemKind !== "sandbox-promotion") ||
+      (itemKind !== "sandbox-agent-run" &&
+        itemKind !== "sandbox-promotion" &&
+        itemKind !== "agent-task-run") ||
       typeof itemId !== "string"
     ) {
       return err(domainError.invariant("Sandbox Agent durable work input is invalid"));
@@ -77,7 +90,11 @@ export class SandboxAgentDurableWorkHandler implements DurableWorkHandler {
     const result =
       itemKind === "sandbox-agent-run"
         ? await this.service.reconcileRun(tenantContext, itemId)
-        : await this.service.reconcilePromotion(tenantContext, itemId);
+        : itemKind === "sandbox-promotion"
+          ? await this.service.reconcilePromotion(tenantContext, itemId)
+          : this.taskService && typeof item.safeInput?.workspaceId === "string"
+            ? await this.taskService.reconcile(tenantContext, item.safeInput.workspaceId, itemId)
+            : err(domainError.invariant("Agent Task durable work service is unavailable"));
     if (result.isErr() && result.error.details?.code === "sandbox_agent_approval_pending") {
       return ok({
         status: "retry-scheduled",
@@ -91,8 +108,22 @@ export class SandboxAgentDurableWorkHandler implements DurableWorkHandler {
         },
       });
     }
+    if (result.isErr() && result.error.details?.code === "agent_task_run_pending") {
+      return ok({
+        status: "retry-scheduled",
+        phase: "agent-task-run",
+        step: "awaiting-agent-run",
+        retriable: true,
+        nextAvailableAt: new Date(Date.now() + agentTaskRunPollIntervalMs).toISOString(),
+        safeDetails: { subjectId: itemId },
+      });
+    }
     if (result.isErr()) return err(result.error);
-    if (itemKind === "sandbox-promotion" && result.value.status === "verifying") {
+    if (
+      itemKind === "sandbox-promotion" &&
+      "status" in result.value &&
+      result.value.status === "verifying"
+    ) {
       return ok({
         status: "retry-scheduled",
         phase: "promotion",
@@ -104,7 +135,12 @@ export class SandboxAgentDurableWorkHandler implements DurableWorkHandler {
     }
     return ok({
       status: "succeeded",
-      phase: itemKind === "sandbox-agent-run" ? "agent-run" : "promotion",
+      phase:
+        itemKind === "sandbox-agent-run"
+          ? "agent-run"
+          : itemKind === "sandbox-promotion"
+            ? "promotion"
+            : "agent-task-run",
       step: "completed",
       safeDetails: { subjectId: itemId },
     });
