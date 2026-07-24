@@ -74,6 +74,7 @@ Then:
 | EDGE-PROXY-PROVIDER-008 | contract | Provider render fails | Provider cannot render safe config | `err` | `proxy_configuration_render_failed` | Error contains code, phase, retriable, provider key. |
 | EDGE-PROXY-PROVIDER-009 | contract | Provider renders reload plan | Route realization changes provider-owned configuration | Reload plan returned | None | Plan uses `automatic` or provider-produced `command` reload steps; application code does not hardcode reload commands. |
 | EDGE-PROXY-PROVIDER-010 | contract | Provider classifies gateway failure | Provider observes a route/upstream gateway failure | `ResourceAccessFailureDiagnostic` returned | None | Provider maps concrete failure to stable `resource_access_*` code without exposing raw proxy text. |
+| EDGE-PROXY-PROVIDER-011 | contract | Reviewed proxy image baseline stays synchronized | Provider default, self-hosted installer, diagnostics, and real-provider smoke fixtures are inspected | Every Appaloft-owned default uses the exact reviewed Traefik patch image; compatibility smokes on another supported line use an exact reviewed patch | None | One drift guard rejects the previous vulnerable pin and floating old-line smoke tags; provider ensure output and installer output have executable assertions. |
 
 ## Server Bootstrap Matrix
 
@@ -195,6 +196,11 @@ failure middleware and attaching it to served route labels when a safe diagnosti
 is supplied. Runtime helper coverage now verifies running-service renderer target forwarding,
 explicit override behavior, and loopback/no-service exclusion; real proxy error-page probing
 remains follow-up coverage under the resource access failure diagnostics matrix.
+
+`EDGE-PROXY-PROVIDER-011` binds the reviewed Traefik image baseline across the provider package,
+self-hosted installer, provider diagnostics, route/TLS real-provider fixtures, and Docker Swarm
+compatibility smoke. The default v3 line and compatibility v2 line both use exact reviewed patch
+tags; explicit operator overrides remain outside the repository default contract.
 
 ## Open Questions
 

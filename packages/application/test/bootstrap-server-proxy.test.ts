@@ -59,7 +59,7 @@ class RecordingProxyBootstrapper implements ServerEdgeProxyBootstrapper {
         ? { errorCode: this.failure?.errorCode ?? "edge_proxy_start_failed" }
         : {}),
       metadata: {
-        image: "traefik:v3.6.2",
+        image: "traefik:v3.6.23",
       },
     });
   }

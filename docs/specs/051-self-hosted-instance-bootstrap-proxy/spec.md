@@ -13,6 +13,7 @@ manually author reverse-proxy configuration.
 | INSTANCE-BOOTSTRAP-SPEC-002 | Install with a domain | `install.sh --domain <domain>` sets `APPALOFT_WEB_ORIGIN=https://<domain>`, writes the console bootstrap route to Traefik, enables ACME HTTP challenge storage, and keeps the direct host port available. |
 | INSTANCE-BOOTSTRAP-SPEC-003 | Reconfigure instance domain | Rerunning the installer with a new `--domain` is idempotent and preserves existing database volumes. |
 | INSTANCE-BOOTSTRAP-SPEC-004 | Console guidance | The Web console exposes an Instance page that shows the current origin and the installation or rerun commands operators need for domain and Action configuration. |
+| INSTANCE-BOOTSTRAP-SPEC-005 | Managed proxy security baseline | The installer default uses the same exact reviewed Traefik patch image as the provider ensure plan; rerunning the installer reconciles an Appaloft-managed proxy while explicit image overrides and external proxies remain operator-owned. |
 
 ## Boundaries
 

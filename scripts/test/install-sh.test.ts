@@ -757,7 +757,7 @@ test("install.sh can force colored progress and success output", async () => {
   }
 });
 
-test("install.sh configures Traefik console domain bootstrap when a domain is supplied", async () => {
+test("[INSTANCE-BOOTSTRAP-SPEC-005] install.sh configures the reviewed Traefik console domain bootstrap", async () => {
   const tempRoot = await mkdtemp(join(tmpdir(), "appaloft-install-test-"));
 
   try {
@@ -790,6 +790,7 @@ test("install.sh configures Traefik console domain bootstrap when a domain is su
 
     const compose = await Bun.file(join(home, "docker-compose.yml")).text();
     expect(compose).toContain("container_name: appaloft-traefik");
+    expect(compose).toContain("image: ${APPALOFT_TRAEFIK_IMAGE}");
     expect(compose).toContain("--providers.docker.network=$" + "{APPALOFT_EDGE_NETWORK_NAME}");
     expect(compose).not.toContain("--providers.swarm=true");
     expect(compose).toContain("traefik.http.routers.appaloft-console.rule");
@@ -801,6 +802,7 @@ test("install.sh configures Traefik console domain bootstrap when a domain is su
     expect(compose).toContain("appaloft-edge:");
 
     const env = await Bun.file(join(home, ".env")).text();
+    expect(env).toContain("APPALOFT_TRAEFIK_IMAGE=traefik:v3.6.23");
     expect(env).toContain("APPALOFT_HTTP_PORT=3721");
     expect(env).toContain("APPALOFT_WEB_ORIGIN=https://console.appaloft.example.test");
     expect(env).toContain("APPALOFT_CONSOLE_DOMAIN=console.appaloft.example.test");

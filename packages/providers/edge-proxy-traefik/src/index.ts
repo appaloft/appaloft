@@ -30,7 +30,7 @@ import {
 } from "@appaloft/core";
 
 export const traefikEdgeNetworkName = "appaloft-edge";
-const traefikImage = "traefik:v3.6.2";
+const traefikImage = "traefik:v3.6.23";
 const defaultAccessFailureMiddlewareName = "appaloft-resource-access-errors";
 const defaultAccessFailureRendererPath = "/.appaloft/resource-access-failure";
 const defaultAccessFailureStatuses = [404, 502, 503, 504] as const;

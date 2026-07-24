@@ -39,6 +39,10 @@ The standard self-hosted installation can still be updated by rerunning the inst
 curl -fsSL https://appaloft.com/install.sh | sudo sh
 ```
 
+Rerunning also reconciles an Appaloft-managed resident Traefik proxy to the release's reviewed
+default image. If you set `APPALOFT_TRAEFIK_IMAGE` explicitly or reuse an external proxy, review and
+upgrade that operator-owned image separately.
+
 To target a specific version:
 
 ```bash

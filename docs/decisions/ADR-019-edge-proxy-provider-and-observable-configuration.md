@@ -112,6 +112,28 @@ packages/providers/edge-proxy-*
 
 These package names are implementation examples, not domain model names. A concrete provider package may generate labels, config files, container startup commands, log collection commands, health probes, and diagnostic metadata.
 
+### Provider Image Security Baseline
+
+Appaloft-owned edge proxy defaults are release-sensitive executable dependencies. A concrete
+provider must use an exact reviewed patch tag for its default image; floating major/minor tags and
+known-vulnerable patch tags are not valid defaults.
+
+The concrete provider package, self-hosted installer, provider diagnostics, and real-provider smoke
+fixtures must stay synchronized with the reviewed compatibility line:
+
+- the provider ensure plan and installer-managed resident proxy use the same exact default image;
+- the compatibility guard treats a different Appaloft-managed image as stale and recreates it
+  through the existing idempotent ensure/bootstrap path;
+- compatibility smokes that intentionally remain on another supported major/minor line pin an exact
+  reviewed patch release for that line;
+- an explicit operator image override remains operator-owned and is not silently rewritten, but it
+  must not weaken the repository's default or smoke baseline;
+- every baseline update must bind the provider contract, installer output, and real-provider smoke
+  references through one drift-guard test.
+
+Security baseline updates that preserve provider behavior are patch/hotfix changes under this
+existing provider boundary. They do not add a public command, aggregate, or configuration field.
+
 ### Composition Root
 
 The shell/Elysia composition root registers the active edge proxy provider or provider registry through dependency injection.
@@ -313,6 +335,11 @@ diagnostic command plans for server connectivity checks. Traefik diagnostics inc
 compatibility, Docker provider log scanning, and a bounded Docker-label route probe. Persisted
 provider log collection and richer long-running diagnostic history remain future provider
 capabilities.
+
+The Traefik default and installer-managed resident proxy now use an exact reviewed patch image.
+Repository contract coverage keeps the provider default, installer default, diagnostics, and
+real-provider smoke fixtures synchronized. The Docker Swarm compatibility smoke remains on its
+separate supported Traefik line but also uses an exact reviewed patch tag.
 
 The 2026-05-01 Phase 6 access-failure baseline keeps the edge diagnostic page as an internal
 transport/read workflow and adds an additive envelope/read-model bridge: the safe diagnostic
