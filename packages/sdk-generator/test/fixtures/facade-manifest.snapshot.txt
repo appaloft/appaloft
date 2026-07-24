@@ -243,15 +243,24 @@ appaloft.sandboxTemplates.create -> sandbox-templates.create POST /sandbox-templ
 appaloft.sandboxTemplates.delete -> sandbox-templates.delete DELETE /sandbox-templates/{templateId}
 appaloft.sandboxTemplates.list -> sandbox-templates.list GET /sandbox-templates
 appaloft.sandboxTemplates.show -> sandbox-templates.show GET /sandbox-templates/{templateId}
+appaloft.sandboxes.agentTasks.approve -> sandboxes.agent-tasks.approve POST /sandboxes/{workspaceId}/agent-task-runs/{taskRunId}/approve
+appaloft.sandboxes.agentTasks.cancel -> sandboxes.agent-tasks.cancel POST /sandboxes/{workspaceId}/agent-task-runs/{taskRunId}/cancel
+appaloft.sandboxes.agentTasks.create -> sandboxes.agent-tasks.create POST /sandboxes/{workspaceId}/agent-task-runs
+appaloft.sandboxes.agentTasks.deliver -> sandboxes.agent-tasks.deliver POST /sandboxes/{workspaceId}/agent-task-runs/{taskRunId}/deliver
+appaloft.sandboxes.agentTasks.list -> sandboxes.agent-tasks.list GET /sandboxes/{workspaceId}/agent-task-runs
+appaloft.sandboxes.agentTasks.resume -> sandboxes.agent-tasks.resume POST /sandboxes/{workspaceId}/agent-task-runs/{taskRunId}/resume
+appaloft.sandboxes.agentTasks.show -> sandboxes.agent-tasks.show GET /sandboxes/{workspaceId}/agent-task-runs/{taskRunId}
 appaloft.sandboxes.agents.approvals.list -> sandboxes.agents.approvals.list GET /sandbox-agent-runs/{runId}/approvals
 appaloft.sandboxes.agents.approvals.resolve -> sandboxes.agents.approvals.resolve POST /sandbox-agent-approvals/{approvalId}/resolve
 appaloft.sandboxes.agents.approvals.show -> sandboxes.agents.approvals.show GET /sandbox-agent-approvals/{approvalId}
+appaloft.sandboxes.agents.harnesses.list -> sandboxes.agents.harnesses.list GET /sandbox-agent-harnesses
 appaloft.sandboxes.agents.runs.cancel -> sandboxes.agents.runs.cancel POST /sandbox-agent-runtimes/{runtimeId}/runs/{runId}/cancel
 appaloft.sandboxes.agents.runs.create -> sandboxes.agents.runs.create POST /sandboxes/{sandboxId}/agent-runtimes/{runtimeId}/runs
 appaloft.sandboxes.agents.runs.events -> sandboxes.agents.runs.events GET /sandbox-agent-runs/{runId}/events
 appaloft.sandboxes.agents.runs.events.stream -> sandboxes.agents.runs.events.stream GET /sandbox-agent-runs/{runId}/events/stream stream
 appaloft.sandboxes.agents.runs.list -> sandboxes.agents.runs.list GET /sandbox-agent-runtimes/{runtimeId}/runs
 appaloft.sandboxes.agents.runs.show -> sandboxes.agents.runs.show GET /sandbox-agent-runtimes/{runtimeId}/runs/{runId}
+appaloft.sandboxes.agents.runtimes.attach -> sandboxes.agents.runtimes.attach POST /sandboxes/{sandboxId}/agent-runtimes/{runtimeId}/attach
 appaloft.sandboxes.agents.runtimes.create -> sandboxes.agents.runtimes.create POST /sandboxes/{sandboxId}/agent-runtimes
 appaloft.sandboxes.agents.runtimes.list -> sandboxes.agents.runtimes.list GET /sandboxes/{sandboxId}/agent-runtimes
 appaloft.sandboxes.agents.runtimes.show -> sandboxes.agents.runtimes.show GET /sandboxes/{sandboxId}/agent-runtimes/{runtimeId}
