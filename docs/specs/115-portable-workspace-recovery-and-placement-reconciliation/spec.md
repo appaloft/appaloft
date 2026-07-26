@@ -39,6 +39,7 @@ maintenance-driven relocation when a provider reports that its current placement
 | PORT-MOVE-002 | Maintenance relocation | A ready Sandbox requires relocation and supports compute-released portable recovery | Maintenance runs | It pauses and resumes through the existing lifecycle, preserves SandboxId and reports the migrated Sandbox. |
 | PORT-MOVE-003 | Failed cutover | Pause succeeds but target restore fails | Maintenance completes | The Sandbox remains paused with source recovery intact and the failure is reported for retry. |
 | PORT-MOVE-004 | Capability reissue | Relocation succeeds | A user reconnects | Old terminal/native attach/port capabilities remain invalid and new capabilities can be issued. |
+| PORT-MOVE-005 | Nested provider handle persistence | A composition wraps an opaque portable recovery handle with safe placement metadata | Pause or resume succeeds | The bounded nested handle is persisted atomically; composition overhead does not strand recovery state after source compute is released. |
 
 ## Acceptance
 
@@ -47,4 +48,5 @@ maintenance-driven relocation when a provider reports that its current placement
 - a real two-provider Docker smoke restores workspace bytes through one shared recovery root;
 - integration tests prove an inactive placement requests relocation and the replacement binding
   points to a different active placement;
+- core tests accept bounded nested provider/recovery handles while rejecting oversized values;
 - no public descriptor contains store root, Server id, host, credential or signed URL.
