@@ -17,6 +17,8 @@
   catalog.
 - Compile an Agent Workspace Profile into existing Workspace create composition and persist only
   the resolved Adapter/Profile snapshot needed for recovery.
+- Resolve Profile credential bindings against the pinned Adapter manifest before Workspace or
+  Sandbox effects; emit only normalized requirement/reference metadata for the runtime grant layer.
 - Implement Declarative Harness execution through existing Sandbox process/terminal boundaries.
 - Keep Trusted Code Adapter registration at composition time.
 - Add CLI local file/package loading; the server receives canonical content and never fetches an

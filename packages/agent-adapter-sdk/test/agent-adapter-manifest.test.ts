@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   agentAdapterApiVersion,
   agentAdapterSchemaVersion,
+  resolveAgentAdapterCredentialBindings,
   validateAgentAdapterManifest,
 } from "../src";
 
@@ -273,6 +274,96 @@ describe("Agent Adapter manifest validation", () => {
     expect(escapingPath).toMatchObject({
       ok: false,
       issues: [{ code: "invalid_manifest", path: ["persistentPaths", 0] }],
+    });
+  });
+
+  test("[ADAPTER-CRED-006] resolves required credential references without secret values", () => {
+    const resolved = resolveAgentAdapterCredentialBindings(validManifest(), [
+      {
+        requirementId: "model-api",
+        secretRef: "vault://agents/codex#openai-api-key",
+      },
+    ]);
+
+    expect(resolved).toEqual({
+      ok: true,
+      bindings: [
+        {
+          requirementId: "model-api",
+          kind: "model-api",
+          purpose: "Call the configured model provider.",
+          delivery: {
+            kind: "process-environment",
+            variable: "OPENAI_API_KEY",
+          },
+          secretRef: "vault://agents/codex#openai-api-key",
+        },
+      ],
+    });
+    expect(JSON.stringify(resolved)).not.toContain("secretValue");
+  });
+
+  test("[ADAPTER-CRED-006] rejects missing, unknown, duplicate, raw and ambiguous stdin bindings", () => {
+    expect(resolveAgentAdapterCredentialBindings(validManifest(), [])).toMatchObject({
+      ok: false,
+      issues: [{ code: "missing_required_credential", requirementId: "model-api" }],
+    });
+    const unknown = resolveAgentAdapterCredentialBindings(validManifest(), [
+      { requirementId: "unknown", secretRef: "vault://agents/unknown#token" },
+    ]);
+    expect(unknown.ok).toBe(false);
+    if (!unknown.ok) {
+      expect(unknown.issues.map(({ code, requirementId }) => ({ code, requirementId }))).toEqual([
+        { code: "unknown_credential_requirement", requirementId: "unknown" },
+        { code: "missing_required_credential", requirementId: "model-api" },
+      ]);
+    }
+    const duplicate = resolveAgentAdapterCredentialBindings(validManifest(), [
+      { requirementId: "model-api", secretRef: "vault://agents/codex#first" },
+      { requirementId: "model-api", secretRef: "vault://agents/codex#second" },
+    ]);
+    expect(duplicate.ok).toBe(false);
+    if (!duplicate.ok) {
+      expect(duplicate.issues.map(({ code, requirementId }) => ({ code, requirementId }))).toEqual([
+        { code: "duplicate_credential_binding", requirementId: "model-api" },
+      ]);
+    }
+    expect(
+      resolveAgentAdapterCredentialBindings(validManifest(), [
+        { requirementId: "model-api", secretRef: "raw-model-api-key" },
+      ]),
+    ).toMatchObject({
+      ok: false,
+      issues: [{ code: "invalid_credential_binding", path: [0, "secretRef"] }],
+    });
+
+    const stdinManifest = {
+      ...validManifest(),
+      credentials: [
+        {
+          id: "first",
+          kind: "custom",
+          required: true,
+          purpose: "First stdin credential.",
+          delivery: { kind: "stdin" },
+        },
+        {
+          id: "second",
+          kind: "custom",
+          required: true,
+          purpose: "Second stdin credential.",
+          delivery: { kind: "stdin" },
+        },
+      ],
+    } as const;
+    expect(
+      resolveAgentAdapterCredentialBindings(stdinManifest, [
+        { requirementId: "first", secretRef: "secret://agents/first" },
+        { requirementId: "second", secretRef: "secret://agents/second" },
+      ]),
+    ).toMatchObject({
+      ok: false,
+      issues: [{ code: "ambiguous_stdin_credential_bindings" }],
     });
   });
 });
