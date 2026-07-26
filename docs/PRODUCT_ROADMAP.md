@@ -119,11 +119,15 @@ Product constraints:
   Agent Runtime, Terminal Session and Sandbox Port operations. Cloud may host it, but must not own
   a separate Workspace aggregate or operation family. Pi and OpenCode are the first public harness
   adapters; release readiness remains gated by Spec 111 and its test matrix.
-- [ ] Deliver the first Workspace hibernation/recovery slice under
+- [x] Deliver the first Workspace hibernation/recovery slice under
   [ADR-097](./decisions/ADR-097-workspace-hibernation-and-recovery.md) and
   [Spec 114](./specs/114-workspace-hibernation-and-recovery/spec.md): truthful compute-releasing
-  pause/resume, idle auto-suspend, quota admission and provider placement. Docker recovery remains
-  provider-local until a portable recovery provider passes the migration matrix.
+  pause/resume, idle auto-suspend, quota admission and provider placement.
+- [x] Deliver portable Docker provider-family recovery and placement reconciliation under
+  [ADR-098](./decisions/ADR-098-portable-workspace-recovery-and-placement-reconciliation.md) and
+  [Spec 115](./specs/115-portable-workspace-recovery-and-placement-reconciliation/spec.md):
+  integrity-checked shared recovery packages, retry-safe cross-provider restore and maintenance
+  relocation without exposing provider topology.
 - [x] Keep Delivery Evidence Chain claims limited to observed delivery evidence; do not imply
   formal correctness, security, vulnerability absence, or compliance.
 - [x] Treat Appaloft as a self-hosted deployment control plane, not a web-first CRUD app.

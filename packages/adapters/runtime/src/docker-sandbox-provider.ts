@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import {
   type SandboxExecResult,
@@ -198,6 +198,11 @@ type DockerSandboxProviderInput = {
   internalNetwork?: string;
   now?: () => string;
   credentialBroker?: boolean;
+  portableRecovery?: {
+    kind: "shared-filesystem";
+    rootPath: string;
+    storeId: string;
+  };
 };
 
 function text(bytes: Uint8Array): string {
@@ -218,6 +223,76 @@ function hibernationImage(sandboxId: string): string {
   return `appaloft-sandbox-hibernate:${sandboxId}`;
 }
 
+const portableRecoveryHandlePrefix = "appaloft-docker-recovery:v1:";
+
+interface PortableRecoveryHandle {
+  sandboxId: string;
+  packageId: string;
+  digest: string;
+}
+
+function normalizedPortableRecoveryConfig(
+  input: DockerSandboxProviderInput["portableRecovery"],
+): DockerSandboxProviderInput["portableRecovery"] {
+  if (!input) return undefined;
+  const rootPath = input.rootPath.trim().replace(/\/+$/, "");
+  if (
+    !rootPath.startsWith("/") ||
+    rootPath === "" ||
+    rootPath.length > 512 ||
+    /[\0\r\n]/u.test(rootPath) ||
+    rootPath.split("/").some((segment) => segment === "." || segment === "..")
+  ) {
+    throw new Error("Sandbox portable recovery root must be a safe absolute path");
+  }
+  const storeId = input.storeId.trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/.test(storeId)) {
+    throw new Error("Sandbox portable recovery store id is invalid");
+  }
+  return { kind: "shared-filesystem", rootPath, storeId };
+}
+
+function portableRecoveryFamily(storeId: string): string {
+  const digest = createHash("sha256").update(storeId, "utf8").digest("hex");
+  return `docker-workspace-tar-v1:${digest.slice(0, 32)}`;
+}
+
+function encodePortableRecoveryHandle(input: PortableRecoveryHandle): string {
+  return `${portableRecoveryHandlePrefix}${Buffer.from(JSON.stringify(input)).toString("base64url")}`;
+}
+
+function decodePortableRecoveryHandle(
+  providerHandle: string,
+  expectedSandboxId: string,
+): PortableRecoveryHandle {
+  if (!providerHandle.startsWith(portableRecoveryHandlePrefix)) {
+    throw new Error("Docker portable recovery handle is invalid");
+  }
+  const encoded = providerHandle.slice(portableRecoveryHandlePrefix.length);
+  try {
+    const decoded = Buffer.from(encoded, "base64url");
+    if (decoded.toString("base64url") !== encoded) throw new Error("non-canonical handle");
+    const value = JSON.parse(decoded.toString("utf8")) as Partial<PortableRecoveryHandle>;
+    if (
+      value.sandboxId !== expectedSandboxId ||
+      !/^sbx_[A-Za-z0-9_.-]{1,120}$/.test(value.sandboxId) ||
+      typeof value.packageId !== "string" ||
+      !/^pr_[0-9a-f]{32}$/.test(value.packageId) ||
+      typeof value.digest !== "string" ||
+      !/^sha256:[0-9a-f]{64}$/.test(value.digest)
+    ) {
+      throw new Error("invalid recovery handle");
+    }
+    return {
+      sandboxId: value.sandboxId,
+      packageId: value.packageId,
+      digest: value.digest,
+    };
+  } catch {
+    throw new Error("Docker portable recovery handle is invalid");
+  }
+}
+
 export class DockerSandboxProvider implements SandboxProvider {
   readonly key: string;
   readonly capabilities: SandboxProvider["capabilities"];
@@ -227,6 +302,7 @@ export class DockerSandboxProvider implements SandboxProvider {
   private readonly now: () => string;
   private readonly runtimeName: "runc" | "runsc";
   private readonly networkName: string;
+  private readonly portableRecovery: DockerSandboxProviderInput["portableRecovery"];
 
   constructor(input: DockerSandboxProviderInput = {}) {
     const isolation = input.isolation ?? "container-trusted";
@@ -242,11 +318,17 @@ export class DockerSandboxProvider implements SandboxProvider {
       throw new Error("Sandbox egress policy requires an internal Docker network");
     }
     this.networkName = input.internalNetwork ?? "none";
+    this.portableRecovery = normalizedPortableRecoveryConfig(input.portableRecovery);
     this.capabilities = {
       isolation,
       pause: {
         mode: "compute-released",
-        portability: "provider-local",
+        ...(this.portableRecovery
+          ? {
+              portability: "provider-family" as const,
+              recoveryFamily: portableRecoveryFamily(this.portableRecovery.storeId),
+            }
+          : { portability: "provider-local" as const }),
       },
       snapshot: ["filesystem" as const],
       processes: true,
@@ -416,27 +498,39 @@ export class DockerSandboxProvider implements SandboxProvider {
       helper: `${containerName(request.sandboxId)}-hibernate`,
       label: `appaloft.hibernate.sandbox=${request.sandboxId}`,
     });
+    let portableHandle: string | undefined;
     try {
+      if (this.portableRecovery) {
+        portableHandle = await this.storePortableRecovery(request.sandboxId, image);
+        await this.docker(["image", "rm", image]);
+      }
       await this.revokeExternalAccess(request);
       await this.docker(["rm", "-f", request.providerHandle]);
     } catch (error) {
+      if (portableHandle) {
+        await this.deletePortableRecovery(request.sandboxId, portableHandle).catch(() => undefined);
+      }
       await this.runner.run(["docker", "image", "rm", image]);
       throw error;
     }
-    return { providerHandle: image };
+    return { providerHandle: portableHandle ?? image };
   }
 
   async resume(request: SandboxProviderRequest & { providerHandle: string }) {
     const expected = hibernationImage(request.sandboxId);
-    if (request.providerHandle !== expected) {
+    const portable = request.providerHandle.startsWith(portableRecoveryHandlePrefix);
+    if (!portable && request.providerHandle !== expected) {
       throw new Error("Docker hibernation handle does not match the Sandbox");
+    }
+    if (portable) {
+      await this.loadPortableRecovery(request.sandboxId, request.providerHandle, expected);
     }
     const inspected = await this.docker([
       "image",
       "inspect",
       "--format",
       '{{index .Config.Labels "appaloft.hibernate.sandbox"}}',
-      request.providerHandle,
+      expected,
     ]);
     if (text(inspected.stdout).trim() !== request.sandboxId) {
       throw new Error("Docker hibernation image is not owned by the Sandbox");
@@ -446,7 +540,7 @@ export class DockerSandboxProvider implements SandboxProvider {
       "inspect",
       "--format",
       '{{index .Config.Labels "appaloft.sandbox.base-image"}}',
-      request.providerHandle,
+      expected,
     ]);
     const baseImage = text(inspectedBaseImage.stdout).trim();
     if (!/^sha256:[0-9a-f]{64}$/.test(baseImage)) {
@@ -470,7 +564,7 @@ export class DockerSandboxProvider implements SandboxProvider {
         "ALL",
         "--security-opt",
         "no-new-privileges=true",
-        request.providerHandle,
+        expected,
         "sh",
         "-c",
         "trap : TERM INT; sleep infinity & wait",
@@ -486,7 +580,10 @@ export class DockerSandboxProvider implements SandboxProvider {
         `docker exec ${helper} tar -C /appaloft-snapshot-workspace -cf - . | docker exec -i ${provisioned.providerHandle} tar -xf - -C /workspace`,
       ]);
       await this.docker(["rm", "-f", helper]);
-      await this.docker(["image", "rm", request.providerHandle]);
+      await this.docker(["image", "rm", expected]);
+      if (portable) {
+        await this.deletePortableRecovery(request.sandboxId, request.providerHandle);
+      }
       return provisioned;
     } catch (error) {
       if (provisioned) {
@@ -499,10 +596,20 @@ export class DockerSandboxProvider implements SandboxProvider {
       throw error;
     } finally {
       await this.runner.run(["docker", "rm", "-f", helper]);
+      if (portable) await this.runner.run(["docker", "image", "rm", expected]);
     }
   }
 
   async terminate(request: { sandboxId: string; providerHandle: string }): Promise<void> {
+    if (request.providerHandle.startsWith(portableRecoveryHandlePrefix)) {
+      await this.deletePortableRecovery(request.sandboxId, request.providerHandle);
+      await this.runner.run(["docker", "image", "rm", hibernationImage(request.sandboxId)]);
+      await this.revokeExternalAccess({
+        sandboxId: request.sandboxId,
+        providerHandle: containerName(request.sandboxId),
+      });
+      return;
+    }
     if (request.providerHandle === hibernationImage(request.sandboxId)) {
       const inspected = await this.runner.run([
         "docker",
@@ -1199,6 +1306,85 @@ export class DockerSandboxProvider implements SandboxProvider {
       throw new Error(`Sandbox worker command failed: ${result.stderr || text(result.stdout)}`);
     }
     return result;
+  }
+
+  private portableRecoveryPath(sandboxId: string, packageId: string): string {
+    if (!this.portableRecovery) {
+      throw new Error("Docker portable recovery store is not configured");
+    }
+    containerName(sandboxId);
+    if (!/^pr_[0-9a-f]{32}$/.test(packageId)) {
+      throw new Error("Docker portable recovery package id is invalid");
+    }
+    return `${this.portableRecovery.rootPath}/v1/${sandboxId}-${packageId}.tar`;
+  }
+
+  private async storePortableRecovery(sandboxId: string, image: string): Promise<string> {
+    if (!this.portableRecovery) {
+      throw new Error("Docker portable recovery store is not configured");
+    }
+    const packageId = `pr_${randomUUID().replaceAll("-", "")}`;
+    const path = this.portableRecoveryPath(sandboxId, packageId);
+    const partialPath = `${path}.partial`;
+    await this.workerCommand(["mkdir", "-p", "--", `${this.portableRecovery.rootPath}/v1`]);
+    await this.workerCommand(["chmod", "700", `${this.portableRecovery.rootPath}/v1`]);
+    await this.workerCommand(["rm", "-f", "--", partialPath]);
+    try {
+      await this.docker(["save", "--output", partialPath, image]);
+      await this.workerCommand(["chmod", "600", partialPath]);
+      const observed = await this.workerCommand(["sha256sum", "--", partialPath]);
+      const digest = text(observed.stdout).trim().split(/\s+/u)[0];
+      if (!digest || !/^[0-9a-f]{64}$/.test(digest)) {
+        throw new Error("Docker portable recovery digest is invalid");
+      }
+      await this.workerCommand(["mv", "--", partialPath, path]);
+      return encodePortableRecoveryHandle({
+        sandboxId,
+        packageId,
+        digest: `sha256:${digest}`,
+      });
+    } catch (error) {
+      await this.runner.run(["rm", "-f", "--", partialPath]);
+      throw error;
+    }
+  }
+
+  private async loadPortableRecovery(
+    sandboxId: string,
+    providerHandle: string,
+    image: string,
+  ): Promise<void> {
+    if (!this.portableRecovery) {
+      throw new Error("Docker portable recovery store is not configured");
+    }
+    const recovery = decodePortableRecoveryHandle(providerHandle, sandboxId);
+    const path = this.portableRecoveryPath(sandboxId, recovery.packageId);
+    const observed = await this.workerCommand(["sha256sum", "--", path]);
+    const digest = text(observed.stdout).trim().split(/\s+/u)[0];
+    if (`sha256:${digest}` !== recovery.digest) {
+      throw new Error("Docker portable recovery package digest does not match");
+    }
+    await this.docker(["load", "--input", path]);
+    const ownership = await this.docker([
+      "image",
+      "inspect",
+      "--format",
+      '{{index .Config.Labels "appaloft.hibernate.sandbox"}}',
+      image,
+    ]);
+    if (text(ownership.stdout).trim() !== sandboxId) {
+      await this.runner.run(["docker", "image", "rm", image]);
+      throw new Error("Docker portable recovery package is not owned by the Sandbox");
+    }
+  }
+
+  private async deletePortableRecovery(
+    sandboxId: string,
+    providerHandle: string,
+  ): Promise<void> {
+    const recovery = decodePortableRecoveryHandle(providerHandle, sandboxId);
+    const path = this.portableRecoveryPath(sandboxId, recovery.packageId);
+    await this.workerCommand(["rm", "-f", "--", path]);
   }
 
   private workspacePath(path: string): string {

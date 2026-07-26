@@ -334,8 +334,9 @@ Accepted target model:
   while `compute-released` replaces it with subordinate one-shot recovery state and requires new
   terminal, native attach and port capabilities after resume.
 - compute-released recovery declares `provider-local`, `provider-family` or `portable` scope.
-  Provider-local Docker recovery supports same-registered-Server resume only; it must fail closed
-  instead of pretending to support cross-server migration.
+  Provider-local Docker recovery supports same-provider resume only. Docker providers configured
+  with the same shared recovery root identity use an integrity-checked provider-family package and
+  can recover on another compatible placement.
 - successful runtime capability use advances safe `lastActivityAt`. An explicit maintenance policy
   may auto-suspend only idle Sandboxes whose provider truthfully advertises compute release.
 - quota admission and provider placement are public application ports. Hosted entitlement,
@@ -356,6 +357,9 @@ Accepted target model:
 - lifecycle progression and provider effects are asynchronous, attempted, observable, idempotent,
   and reconciled. TTL and idle expiry use the same aggregate transition and exact owned-resource
   cleanup as explicit termination.
+- a provider may report that an owned ready runtime requires relocation without exposing topology.
+  Maintenance relocates only compute-released provider-family/portable recovery through the
+  existing pause/resume lifecycle and retains the source package on failed cutover.
 - Community, Cloud, Enterprise, Kubernetes, VPS, and third-party implementations translate behind
   provider ports; their topology, commercial policy, and vendor DTOs do not enter core.
 
@@ -366,6 +370,9 @@ Governing artifacts:
 - [ADR-097: Workspace Hibernation And Recovery](./decisions/ADR-097-workspace-hibernation-and-recovery.md)
 - [Workspace Hibernation And Recovery](./specs/114-workspace-hibernation-and-recovery/spec.md)
 - [Workspace Hibernation And Recovery Test Matrix](./testing/workspace-hibernation-and-recovery-test-matrix.md)
+- [ADR-098: Portable Workspace Recovery And Placement Reconciliation](./decisions/ADR-098-portable-workspace-recovery-and-placement-reconciliation.md)
+- [Portable Workspace Recovery And Placement Reconciliation](./specs/115-portable-workspace-recovery-and-placement-reconciliation/spec.md)
+- [Portable Workspace Recovery Test Matrix](./testing/portable-workspace-recovery-test-matrix.md)
 
 ### Sandbox Agent Runtime And Application Promotion
 

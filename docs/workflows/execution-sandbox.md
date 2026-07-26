@@ -57,12 +57,20 @@ sandbox-templates.create (optional)
 ## Pause, Snapshot And Restore
 
 - Pause is one-to-one: the same Sandbox id becomes paused and can resume.
+- Compute-released recovery declares provider-local, provider-family or portable compatibility.
+  Cross-provider resume requires a compatible family or portable recovery; incompatibility fails
+  before target effects.
+- A provider may request placement reconciliation for a ready runtime. Maintenance performs the
+  move through the same pause/resume lifecycle only when compute is released and recovery is
+  portable. Failed cutover leaves the Sandbox paused with its source recovery package for retry.
 - Snapshot is one-to-many: capture creates an independent Snapshot id; new create commands may use
   it as source.
 - Providers declare filesystem-only or filesystem-plus-memory support. Appaloft never upgrades the
   claim beyond returned evidence.
 - Active streams/connections may be interrupted by pause/snapshot and clients must reconnect from
   stream cursors/read models.
+- Shared recovery handles never expose the configured store root. Packages are digest checked and
+  removed only after successful target readiness or explicit termination.
 
 ## Expiry And Cleanup
 

@@ -18,3 +18,6 @@
 | HIB-DOCKER-003 | Runtime adapter | Terminate a paused Docker Sandbox | Owned recovery image is removed idempotently. |
 | HIB-CAP-001 | Integration | Terminal/native attach/port capability existed before hibernation | Old capability is unusable; a newly issued capability works after resume. |
 | HIB-SNAPSHOT-001 | Integration | Hibernation and reusable Snapshot coexist | Hibernation recovery never appears in Snapshot list/show and Snapshot retention is unchanged. |
+
+Portable cross-placement recovery and drain reconciliation continue in
+[Portable Workspace Recovery Test Matrix](./portable-workspace-recovery-test-matrix.md).

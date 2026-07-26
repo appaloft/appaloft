@@ -258,6 +258,7 @@ export interface SandboxProvider {
     cursor?: string;
   }): Promise<{ items: SandboxOwnedRuntime[]; nextCursor?: string }>;
   removeOwnedRuntime?(runtime: SandboxOwnedRuntime): Promise<void>;
+  requiresRelocation?(request: { sandboxId: string; providerHandle: string }): Promise<boolean>;
 }
 
 export class SandboxProviderRegistry {
@@ -1109,7 +1110,13 @@ export class ExecutionSandboxService {
       protectedSandboxIds?: readonly string[];
     } = {},
   ): Promise<
-    Result<{ expired: string[]; suspended: string[]; reconciled: string[]; failed: string[] }>
+    Result<{
+      expired: string[];
+      suspended: string[];
+      migrated: string[];
+      reconciled: string[];
+      failed: string[];
+    }>
   > {
     const repositoryContext = toRepositoryContext(context);
     const now = this.clock.now();
@@ -1120,6 +1127,7 @@ export class ExecutionSandboxService {
     });
     const expired: string[] = [];
     const suspended: string[] = [];
+    const migrated: string[] = [];
     const reconciled: string[] = [];
     const failed: string[] = [];
     const protectedSandboxIds = new Set(input.protectedSandboxIds ?? []);
@@ -1155,6 +1163,49 @@ export class ExecutionSandboxService {
         if (result.isOk()) reconciled.push(state.id.value);
         else failed.push(state.id.value);
         continue;
+      }
+      if (
+        state.status.value === "ready" &&
+        state.providerHandle &&
+        !protectedSandboxIds.has(state.id.value)
+      ) {
+        const provider = this.providerRegistry.get(stored.providerKey);
+        if (provider?.requiresRelocation) {
+          const relocation = await this.providerOperation(
+            "execution-sandbox-relocation-observation",
+            () =>
+              provider.requiresRelocation?.({
+                sandboxId: state.id.value,
+                providerHandle: state.providerHandle as string,
+              }) ?? Promise.resolve(false),
+          );
+          if (relocation.isErr()) {
+            failed.push(state.id.value);
+            continue;
+          }
+          if (relocation.value) {
+            const pauseCapability = provider.capabilities.pause || undefined;
+            if (
+              pauseCapability?.mode !== "compute-released" ||
+              pauseCapability?.portability === "provider-local"
+            ) {
+              failed.push(state.id.value);
+              continue;
+            }
+            const paused = await this.pause(context, state.id.value);
+            if (paused.isErr()) {
+              failed.push(state.id.value);
+              continue;
+            }
+            const resumed = await this.resume(context, state.id.value);
+            if (resumed.isErr()) {
+              failed.push(state.id.value);
+              continue;
+            }
+            migrated.push(state.id.value);
+            continue;
+          }
+        }
       }
       if (
         state.status.value === "ready" &&
@@ -1205,7 +1256,7 @@ export class ExecutionSandboxService {
         reconciled.push(state.id.value);
       }
     }
-    return ok({ expired, suspended, reconciled, failed });
+    return ok({ expired, suspended, migrated, reconciled, failed });
   }
 
   async reconcileProviderOrphans(
@@ -1302,6 +1353,7 @@ export class ExecutionSandboxService {
         tenantId: string;
         expired: number;
         suspended: number;
+        migrated: number;
         reconciled: number;
         removedOrphans: number;
         failed: number;
@@ -1320,6 +1372,7 @@ export class ExecutionSandboxService {
       tenantId: string;
       expired: number;
       suspended: number;
+      migrated: number;
       reconciled: number;
       removedOrphans: number;
       failed: number;
@@ -1346,6 +1399,7 @@ export class ExecutionSandboxService {
           tenantId: maintenanceTenantId,
           expired: lifecycle.isOk() ? lifecycle.value.expired.length : 0,
           suspended: lifecycle.isOk() ? lifecycle.value.suspended.length : 0,
+          migrated: lifecycle.isOk() ? lifecycle.value.migrated.length : 0,
           reconciled: lifecycle.isOk() ? lifecycle.value.reconciled.length : 0,
           removedOrphans: orphans.isOk() ? orphans.value.removed.length : 0,
           failed:

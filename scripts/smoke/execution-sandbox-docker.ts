@@ -1,3 +1,6 @@
+import { mkdtemp, readdir, rm, stat } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { DockerSandboxProvider } from "../../packages/adapters/runtime/src/docker-sandbox-provider";
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -7,9 +10,27 @@ function assert(condition: unknown, message: string): asserts condition {
 const suffix = `${Date.now()}${Math.floor(Math.random() * 10_000)}`;
 const sourceSandboxId = `sbx_smoke_${suffix}`;
 const restoredSandboxId = `sbx_restore_${suffix}`;
+const portableSandboxId = `sbx_portable_${suffix}`;
 const snapshotId = `ssn_smoke_${suffix}`;
 const ownerScope = `smoke_${suffix}`;
 const provider = new DockerSandboxProvider({ isolation: "container-trusted" });
+const portableRecoveryRoot = await mkdtemp(join(tmpdir(), "appaloft-portable-recovery-"));
+const portableProviderInput = {
+  isolation: "container-trusted" as const,
+  portableRecovery: {
+    kind: "shared-filesystem" as const,
+    rootPath: portableRecoveryRoot,
+    storeId: `smoke-${suffix}`,
+  },
+};
+const portableSourceProvider = new DockerSandboxProvider({
+  ...portableProviderInput,
+  key: "portable-source",
+});
+const portableTargetProvider = new DockerSandboxProvider({
+  ...portableProviderInput,
+  key: "portable-target",
+});
 const limits = {
   cpuMillis: 500,
   memoryBytes: 128 * 1024 * 1024,
@@ -19,6 +40,8 @@ const limits = {
 const handles = new Map<string, string>();
 let snapshotHandle: string | undefined;
 let hibernationHandle: string | undefined;
+let portableRecoveryHandle: string | undefined;
+let portableRecoveryPath: string | undefined;
 
 async function removeOwnedContainer(sandboxId: string, handle: string): Promise<void> {
   const inspected = Bun.spawnSync([
@@ -69,6 +92,15 @@ async function cleanup(): Promise<void> {
       Bun.spawnSync(["docker", "image", "rm", hibernationHandle]);
     }
   }
+  if (portableRecoveryHandle) {
+    await portableSourceProvider
+      .terminate({
+        sandboxId: portableSandboxId,
+        providerHandle: portableRecoveryHandle,
+      })
+      .catch(() => undefined);
+  }
+  await rm(portableRecoveryRoot, { recursive: true, force: true });
 }
 
 try {
@@ -243,6 +275,84 @@ try {
   await provider.deleteSnapshot({ snapshotId, providerHandle: snapshot.providerHandle });
   snapshotHandle = undefined;
 
+  const portable = await portableSourceProvider.provision({
+    sandboxId: portableSandboxId,
+    ownerScope,
+    source: { kind: "image", image: "alpine:latest" },
+    requestedIsolation: "container-trusted",
+    limits,
+    networkPolicy: { mode: "deny", rules: [] },
+  });
+  handles.set(portableSandboxId, portable.providerHandle);
+  await portableSourceProvider.writeFile({
+    sandboxId: portableSandboxId,
+    providerHandle: portable.providerHandle,
+    path: "portable/marker.bin",
+    content: new Uint8Array([80, 79, 82, 84]),
+  });
+  const portablePaused = await portableSourceProvider.pause({
+    sandboxId: portableSandboxId,
+    providerHandle: portable.providerHandle,
+  });
+  portableRecoveryHandle = portablePaused.providerHandle;
+  handles.delete(portableSandboxId);
+  assert(
+    portablePaused.providerHandle.startsWith("appaloft-docker-recovery:v1:"),
+    "portable pause did not return an external recovery handle",
+  );
+  assert(
+    Bun.spawnSync(["docker", "inspect", portable.providerHandle]).exitCode !== 0,
+    "portable pause retained the source allocation",
+  );
+  assert(
+    Bun.spawnSync(["docker", "image", "inspect", `appaloft-sandbox-hibernate:${portableSandboxId}`])
+      .exitCode !== 0,
+    "portable pause retained a provider-local hibernation image",
+  );
+  const portableRecoveryFiles = (await readdir(`${portableRecoveryRoot}/v1`)).filter(
+    (name) => name.startsWith(`${portableSandboxId}-pr_`) && name.endsWith(".tar"),
+  );
+  assert(portableRecoveryFiles.length === 1, "portable pause did not persist one recovery package");
+  portableRecoveryPath = `${portableRecoveryRoot}/v1/${portableRecoveryFiles[0]}`;
+  assert(await Bun.file(portableRecoveryPath).exists(), "portable recovery package is missing");
+  assert(
+    ((await stat(`${portableRecoveryRoot}/v1`)).mode & 0o777) === 0o700,
+    "portable recovery directory permissions are not 0700",
+  );
+  assert(
+    ((await stat(portableRecoveryPath)).mode & 0o777) === 0o600,
+    "portable recovery package permissions are not 0600",
+  );
+  const portableResumed = await portableTargetProvider.resume({
+    sandboxId: portableSandboxId,
+    ownerScope,
+    source: { kind: "image", image: "alpine:latest" },
+    requestedIsolation: "container-trusted",
+    limits,
+    networkPolicy: { mode: "deny", rules: [] },
+    providerHandle: portablePaused.providerHandle,
+  });
+  portableRecoveryHandle = undefined;
+  handles.set(portableSandboxId, portableResumed.providerHandle);
+  const portableBytes = await portableTargetProvider.readFile({
+    sandboxId: portableSandboxId,
+    providerHandle: portableResumed.providerHandle,
+    path: "portable/marker.bin",
+  });
+  assert(
+    new TextDecoder().decode(portableBytes) === "PORT",
+    "portable target restore did not preserve workspace bytes",
+  );
+  assert(
+    portableRecoveryPath !== undefined && !(await Bun.file(portableRecoveryPath).exists()),
+    "portable target restore retained the one-shot recovery package",
+  );
+  await portableTargetProvider.terminate({
+    sandboxId: portableSandboxId,
+    providerHandle: portableResumed.providerHandle,
+  });
+  handles.delete(portableSandboxId);
+
   const gvisor = new DockerSandboxProvider({ isolation: "gvisor" });
   try {
     await gvisor.probe();
@@ -252,6 +362,7 @@ try {
   }
   console.log("SBX-RUNTIME-003 Docker sandbox closed loop passed");
   console.log("HIB-DOCKER-001/002 compute-released hibernation closed loop passed");
+  console.log("PORT-REC-001/002 portable two-provider recovery closed loop passed");
 } finally {
   await cleanup();
 }
