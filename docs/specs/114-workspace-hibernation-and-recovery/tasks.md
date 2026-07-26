@@ -21,6 +21,6 @@
 
 - [x] Pass core/application/provider targeted tests.
 - [x] Pass Docker real-provider hibernate/restore smoke.
-- [ ] Pass public lint, typecheck, test and build.
-- [ ] Pass Cloud composed integration checks.
-- [ ] Record Registered Server acceptance and exact cleanup evidence.
+- [x] Pass public lint, typecheck, test and build.
+- [x] Pass hosted composed integration checks.
+- [x] Record registered Server acceptance and exact cleanup evidence.
