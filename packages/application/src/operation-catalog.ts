@@ -28,6 +28,7 @@ import {
   listSandboxSnapshotsQueryInputSchema,
   listSandboxTemplatesQueryInputSchema,
   removeSandboxFileCommandInputSchema,
+  resumeSandboxCommandInputSchema,
   revokeSandboxCredentialCommandInputSchema,
   revokeSandboxPortCommandInputSchema,
   sandboxFilePathInputSchema,
@@ -5554,7 +5555,8 @@ export const operationCatalog = [
     messageName,
     handlerName: "SandboxCommandHandler",
     serviceName: "ExecutionSandboxService",
-    inputSchema: sandboxLifecycleCommandInputSchema,
+    inputSchema:
+      action === "resume" ? resumeSandboxCommandInputSchema : sandboxLifecycleCommandInputSchema,
     serviceToken: tokens.executionSandboxService,
     transportAccess: { productSession: { minRole: "member" as const } },
     transports: {

@@ -14,6 +14,8 @@ import {
   SandboxIsolationLevel,
   SandboxNetworkPolicy,
   type SandboxNetworkPolicyState,
+  type SandboxPauseMode,
+  type SandboxRecoveryPortability,
   SandboxResourceLimits,
   type SandboxResourceLimitsState,
   SandboxSnapshot,
@@ -33,7 +35,13 @@ import { type Clock, type EventBus, type IdGenerator } from "./ports";
 
 export interface SandboxProviderCapabilities {
   isolation: SandboxIsolation;
-  pause: boolean;
+  pause:
+    | false
+    | {
+        mode: SandboxPauseMode;
+        portability: SandboxRecoveryPortability;
+        recoveryFamily?: string;
+      };
   snapshot: ("filesystem" | "filesystem-memory")[];
   processes: boolean;
   files: boolean;
@@ -162,8 +170,11 @@ export interface SandboxProvider {
     providerHandle: string;
     realizedIsolation: SandboxIsolation;
   }>;
-  pause(request: { sandboxId: string; providerHandle: string }): Promise<void>;
-  resume(request: { sandboxId: string; providerHandle: string }): Promise<{
+  pause(request: {
+    sandboxId: string;
+    providerHandle: string;
+  }): Promise<{ providerHandle: string }>;
+  resume(request: SandboxProviderRequest & { providerHandle: string }): Promise<{
     providerHandle: string;
     realizedIsolation: SandboxIsolation;
   }>;
@@ -261,15 +272,24 @@ export class SandboxProviderRegistry {
     isolation: SandboxIsolationLevel;
     providerKey?: string;
   }): SandboxProvider | null {
+    return this.listCompatible(input)[0] ?? null;
+  }
+  listCompatible(input: {
+    isolation: SandboxIsolationLevel;
+    providerKey?: string;
+    networkMode?: "deny" | "allowlist";
+  }): SandboxProvider[] {
     const candidates = input.providerKey
       ? [this.providers.get(input.providerKey)].filter((item): item is SandboxProvider =>
           Boolean(item),
         )
       : [...this.providers.values()];
-    return (
-      candidates.find((provider) =>
-        SandboxIsolationLevel.rehydrate(provider.capabilities.isolation).satisfies(input.isolation),
-      ) ?? null
+    return candidates.filter(
+      (provider) =>
+        SandboxIsolationLevel.rehydrate(provider.capabilities.isolation).satisfies(
+          input.isolation,
+        ) &&
+        (!input.networkMode || provider.capabilities.networkPolicy.includes(input.networkMode)),
     );
   }
   get(key: string): SandboxProvider | null {
@@ -283,6 +303,13 @@ export class SandboxProviderRegistry {
 export type StoredSandbox = { tenantId: string; providerKey: string; sandbox: Sandbox };
 export type StoredSnapshot = { tenantId: string; providerKey: string; snapshot: SandboxSnapshot };
 export type StoredTemplate = { tenantId: string; template: SandboxTemplate };
+export interface SandboxQuotaUsage {
+  activeSandboxes: number;
+  cpuMillis: number;
+  memoryBytes: number;
+  diskBytes: number;
+  maxProcesses: number;
+}
 export interface SandboxRepository {
   save(context: RepositoryContext, sandbox: Sandbox, providerKey: string): Promise<void>;
   find(context: RepositoryContext, sandboxId: string): Promise<StoredSandbox | null>;
@@ -302,6 +329,7 @@ export interface SandboxRepository {
     context: RepositoryContext,
     input: { limit: number; offset: number },
   ): Promise<string[]>;
+  summarizeActiveUsage(context: RepositoryContext): Promise<SandboxQuotaUsage>;
   saveSnapshot(
     context: RepositoryContext,
     snapshot: SandboxSnapshot,
@@ -398,6 +426,33 @@ export class InMemorySandboxRepository implements SandboxRepository {
     return [...new Set([...this.items.values()].map((item) => item.tenantId))]
       .sort()
       .slice(input.offset, input.offset + input.limit);
+  }
+  async summarizeActiveUsage(context: RepositoryContext): Promise<SandboxQuotaUsage> {
+    return [...this.items.values()]
+      .filter((item) => item.tenantId === tenantId(context))
+      .filter((item) => !item.sandbox.toState().status.isTerminal())
+      .reduce<SandboxQuotaUsage>(
+        (usage, item) => {
+          const state = item.sandbox.toState();
+          const limits = state.limits.toState();
+          const releasesCompute =
+            state.status.value === "paused" && state.suspension?.mode === "compute-released";
+          return {
+            activeSandboxes: usage.activeSandboxes + 1,
+            cpuMillis: usage.cpuMillis + (releasesCompute ? 0 : limits.cpuMillis),
+            memoryBytes: usage.memoryBytes + (releasesCompute ? 0 : limits.memoryBytes),
+            diskBytes: usage.diskBytes + limits.diskBytes,
+            maxProcesses: usage.maxProcesses + (releasesCompute ? 0 : limits.maxProcesses),
+          };
+        },
+        {
+          activeSandboxes: 0,
+          cpuMillis: 0,
+          memoryBytes: 0,
+          diskBytes: 0,
+          maxProcesses: 0,
+        },
+      );
   }
   async saveCredentialGrant(
     context: RepositoryContext,
@@ -511,10 +566,16 @@ export interface SandboxDescriptor {
   networkPolicy: SandboxNetworkPolicyState;
   createdAt: string;
   updatedAt?: string;
+  lastActivityAt?: string;
   expiresAt?: string;
   providerKey: string;
   attemptId?: string;
   provisionAttempts: number;
+  suspension?: {
+    mode: SandboxPauseMode;
+    portability: SandboxRecoveryPortability;
+    recoveryFamily?: string;
+  };
 }
 
 export interface SandboxSnapshotDescriptor {
@@ -563,9 +624,70 @@ function descriptor(stored: StoredSandbox): SandboxDescriptor {
     provisionAttempts: state.provisionAttempts,
     ...(state.realizedIsolation ? { realizedIsolation: state.realizedIsolation.value } : {}),
     ...(state.updatedAt ? { updatedAt: state.updatedAt.value } : {}),
+    ...(state.lastActivityAt ? { lastActivityAt: state.lastActivityAt.value } : {}),
     ...(state.expiresAt ? { expiresAt: state.expiresAt.value } : {}),
     ...(state.currentAttemptId ? { attemptId: state.currentAttemptId } : {}),
+    ...(state.suspension ? { suspension: { ...state.suspension } } : {}),
   };
+}
+
+export interface SandboxQuotaPolicy {
+  admit(
+    context: ExecutionContext,
+    input: { usage: SandboxQuotaUsage; requested: SandboxResourceLimitsState },
+  ): Result<void> | Promise<Result<void>>;
+}
+
+export class StaticSandboxQuotaPolicy implements SandboxQuotaPolicy {
+  constructor(private readonly maximum: SandboxQuotaUsage) {}
+
+  admit(
+    _context: ExecutionContext,
+    input: { usage: SandboxQuotaUsage; requested: SandboxResourceLimitsState },
+  ): Result<void> {
+    const projected = {
+      activeSandboxes: input.usage.activeSandboxes + 1,
+      cpuMillis: input.usage.cpuMillis + input.requested.cpuMillis,
+      memoryBytes: input.usage.memoryBytes + input.requested.memoryBytes,
+      diskBytes: input.usage.diskBytes + input.requested.diskBytes,
+      maxProcesses: input.usage.maxProcesses + input.requested.maxProcesses,
+    };
+    const exceeded = (Object.keys(projected) as Array<keyof SandboxQuotaUsage>).find(
+      (field) => projected[field] > this.maximum[field],
+    );
+    return exceeded
+      ? err({
+          code: "sandbox_quota_exceeded",
+          category: "user",
+          message: "Sandbox quota would be exceeded",
+          retryable: false,
+          details: {
+            phase: "execution-sandbox-quota-admission",
+            field: exceeded,
+            requested: projected[exceeded],
+            maximum: this.maximum[exceeded],
+          },
+        })
+      : ok(undefined);
+  }
+}
+
+export interface SandboxPlacementPolicy {
+  select(
+    context: ExecutionContext,
+    input: {
+      candidates: ReadonlyArray<{
+        providerKey: string;
+        isolation: SandboxIsolation;
+        pauseMode: SandboxPauseMode | "unsupported";
+      }>;
+      requestedIsolation: SandboxIsolation;
+    },
+  ): Result<string> | Promise<Result<string>>;
+}
+
+export interface SandboxMaintenancePolicy {
+  idleSuspendAfterSeconds?: number;
 }
 
 function snapshotDescriptor(stored: StoredSnapshot): SandboxSnapshotDescriptor {
@@ -617,6 +739,8 @@ export class ExecutionSandboxService {
   private readonly eventBus: EventBus | undefined;
   private readonly eventObserver: SandboxEventObserver | undefined;
   private readonly credentialBroker: SandboxCredentialBroker | undefined;
+  private readonly quotaPolicy: SandboxQuotaPolicy | undefined;
+  private readonly placementPolicy: SandboxPlacementPolicy | undefined;
   constructor(input: {
     repository: SandboxRepository;
     providerRegistry: SandboxProviderRegistry;
@@ -625,6 +749,8 @@ export class ExecutionSandboxService {
     eventBus?: EventBus;
     eventObserver?: SandboxEventObserver;
     credentialBroker?: SandboxCredentialBroker;
+    quotaPolicy?: SandboxQuotaPolicy;
+    placementPolicy?: SandboxPlacementPolicy;
   }) {
     this.repository = input.repository;
     this.providerRegistry = input.providerRegistry;
@@ -633,6 +759,8 @@ export class ExecutionSandboxService {
     this.eventBus = input.eventBus;
     this.eventObserver = input.eventObserver;
     this.credentialBroker = input.credentialBroker;
+    this.quotaPolicy = input.quotaPolicy;
+    this.placementPolicy = input.placementPolicy;
   }
 
   private async saveSandbox(
@@ -657,6 +785,28 @@ export class ExecutionSandboxService {
         details: { phase },
       });
     }
+  }
+
+  private async touchActivity(
+    context: ExecutionContext,
+    stored: StoredSandbox,
+  ): Promise<Result<void>> {
+    const touched = stored.sandbox.touchActivity({
+      at: UpdatedAt.rehydrate(this.clock.now()),
+    });
+    if (touched.isErr()) return err(touched.error);
+    await this.saveSandbox(context, stored.sandbox, stored.providerKey);
+    return ok(undefined);
+  }
+
+  private async withActivity<T>(
+    context: ExecutionContext,
+    stored: StoredSandbox,
+    result: Result<T>,
+  ): Promise<Result<T>> {
+    if (result.isErr()) return err(result.error);
+    const touched = await this.touchActivity(context, stored);
+    return touched.isErr() ? err(touched.error) : ok(result.value);
   }
 
   async create(
@@ -709,22 +859,47 @@ export class ExecutionSandboxService {
       return err(domainError.conflict("Sandbox snapshot belongs to a different provider"));
     }
     const chosenProviderKey = input.providerKey ?? sourceProviderKey;
-    const provider = this.providerRegistry.findCompatible({
-      isolation: isolation.value,
-      ...(chosenProviderKey ? { providerKey: chosenProviderKey } : {}),
-    });
-    if (!provider) return err(isolationUnsupported(input.requestedIsolation, []));
     const limits = SandboxResourceLimits.create(input.limits);
     if (limits.isErr()) return err(limits.error);
     const networkPolicy = SandboxNetworkPolicy.create(input.networkPolicy);
     if (networkPolicy.isErr()) return err(networkPolicy.error);
-    if (!provider.capabilities.networkPolicy.includes(networkPolicy.value.toState().mode)) {
-      return err(
-        domainError.conflict("Sandbox provider does not support the requested network policy", {
-          phase: "execution-sandbox-network-placement",
-          requestedMode: networkPolicy.value.toState().mode,
-        }),
-      );
+    const candidates = this.providerRegistry.listCompatible({
+      isolation: isolation.value,
+      ...(chosenProviderKey ? { providerKey: chosenProviderKey } : {}),
+      networkMode: networkPolicy.value.toState().mode,
+    });
+    let provider: SandboxProvider | undefined;
+    if (this.placementPolicy && !chosenProviderKey) {
+      const selected = await this.placementPolicy.select(context, {
+        candidates: candidates.map((candidate) => ({
+          providerKey: candidate.key,
+          isolation: candidate.capabilities.isolation,
+          pauseMode: candidate.capabilities.pause
+            ? candidate.capabilities.pause.mode
+            : "unsupported",
+        })),
+        requestedIsolation: input.requestedIsolation,
+      });
+      if (selected.isErr()) return err(selected.error);
+      provider = candidates.find((candidate) => candidate.key === selected.value);
+      if (!provider) {
+        return err(
+          domainError.conflict("Sandbox placement policy selected an incompatible provider", {
+            phase: "execution-sandbox-placement-policy",
+            providerKey: selected.value,
+          }),
+        );
+      }
+    } else {
+      provider = candidates[0];
+    }
+    if (!provider) return err(isolationUnsupported(input.requestedIsolation, []));
+    if (this.quotaPolicy) {
+      const admitted = await this.quotaPolicy.admit(context, {
+        usage: await this.repository.summarizeActiveUsage(repositoryContext),
+        requested: limits.value.toState(),
+      });
+      if (admitted.isErr()) return err(admitted.error);
     }
     if (input.source.kind === "template") {
       const template = await this.repository.findTemplate(
@@ -927,8 +1102,15 @@ export class ExecutionSandboxService {
 
   async maintain(
     context: ExecutionContext,
-    input: { limit?: number; maxProvisionAttempts?: number } = {},
-  ): Promise<Result<{ expired: string[]; reconciled: string[]; failed: string[] }>> {
+    input: {
+      limit?: number;
+      maxProvisionAttempts?: number;
+      idleSuspendAfterSeconds?: number;
+      protectedSandboxIds?: readonly string[];
+    } = {},
+  ): Promise<
+    Result<{ expired: string[]; suspended: string[]; reconciled: string[]; failed: string[] }>
+  > {
     const repositoryContext = toRepositoryContext(context);
     const now = this.clock.now();
     const at = UpdatedAt.rehydrate(now);
@@ -937,8 +1119,10 @@ export class ExecutionSandboxService {
       limit: Math.min(Math.max(input.limit ?? 100, 1), 500),
     });
     const expired: string[] = [];
+    const suspended: string[] = [];
     const reconciled: string[] = [];
     const failed: string[] = [];
+    const protectedSandboxIds = new Set(input.protectedSandboxIds ?? []);
     for (const stored of candidates) {
       const state = stored.sandbox.toState();
       if (state.expiresAt && state.expiresAt.toDate() <= new Date(now)) {
@@ -972,6 +1156,30 @@ export class ExecutionSandboxService {
         else failed.push(state.id.value);
         continue;
       }
+      if (
+        state.status.value === "ready" &&
+        input.idleSuspendAfterSeconds !== undefined &&
+        !protectedSandboxIds.has(state.id.value)
+      ) {
+        const provider = this.providerRegistry.get(stored.providerKey);
+        const pauseCapability = provider?.capabilities.pause;
+        const idleAfterSeconds = Math.min(
+          Math.max(Math.floor(input.idleSuspendAfterSeconds), 1),
+          365 * 24 * 60 * 60,
+        );
+        const lastActivityAt =
+          state.lastActivityAt?.toDate() ?? state.updatedAt?.toDate() ?? state.createdAt.toDate();
+        if (
+          pauseCapability &&
+          pauseCapability.mode === "compute-released" &&
+          lastActivityAt.getTime() + idleAfterSeconds * 1_000 <= new Date(now).getTime()
+        ) {
+          const result = await this.pause(context, state.id.value);
+          if (result.isOk()) suspended.push(state.id.value);
+          else failed.push(state.id.value);
+          continue;
+        }
+      }
       if (state.status.value === "terminating") {
         const provider = this.providerRegistry.get(stored.providerKey);
         if (!provider || !state.providerHandle) {
@@ -997,7 +1205,7 @@ export class ExecutionSandboxService {
         reconciled.push(state.id.value);
       }
     }
-    return ok({ expired, reconciled, failed });
+    return ok({ expired, suspended, reconciled, failed });
   }
 
   async reconcileProviderOrphans(
@@ -1082,12 +1290,18 @@ export class ExecutionSandboxService {
 
   async maintainAllTenants(
     context: ExecutionContext,
-    input: { tenantLimit?: number; sandboxLimit?: number } = {},
+    input: {
+      tenantLimit?: number;
+      sandboxLimit?: number;
+      idleSuspendAfterSeconds?: number;
+      protectedSandboxIds?: readonly string[];
+    } = {},
   ): Promise<
     Result<{
       tenants: Array<{
         tenantId: string;
         expired: number;
+        suspended: number;
         reconciled: number;
         removedOrphans: number;
         failed: number;
@@ -1105,6 +1319,7 @@ export class ExecutionSandboxService {
     const tenants: Array<{
       tenantId: string;
       expired: number;
+      suspended: number;
       reconciled: number;
       removedOrphans: number;
       failed: number;
@@ -1119,14 +1334,18 @@ export class ExecutionSandboxService {
           ...context,
           tenant: { tenantId: maintenanceTenantId, source: "sandbox-maintenance-runner" },
         };
-        const lifecycle = await this.maintain(
-          tenantContext,
-          input.sandboxLimit ? { limit: input.sandboxLimit } : {},
-        );
+        const lifecycle = await this.maintain(tenantContext, {
+          ...(input.sandboxLimit ? { limit: input.sandboxLimit } : {}),
+          ...(input.idleSuspendAfterSeconds !== undefined
+            ? { idleSuspendAfterSeconds: input.idleSuspendAfterSeconds }
+            : {}),
+          ...(input.protectedSandboxIds ? { protectedSandboxIds: input.protectedSandboxIds } : {}),
+        });
         const orphans = await this.reconcileProviderOrphans(tenantContext);
         tenants.push({
           tenantId: maintenanceTenantId,
           expired: lifecycle.isOk() ? lifecycle.value.expired.length : 0,
+          suspended: lifecycle.isOk() ? lifecycle.value.suspended.length : 0,
           reconciled: lifecycle.isOk() ? lifecycle.value.reconciled.length : 0,
           removedOrphans: orphans.isOk() ? orphans.value.removed.length : 0,
           failed:
@@ -1202,7 +1421,7 @@ export class ExecutionSandboxService {
             ];
       await this.eventBus.publish(context, events);
     }
-    return executed;
+    return this.withActivity(context, ready.value.stored, executed);
   }
 
   async streamEvents(
@@ -1353,7 +1572,7 @@ export class ExecutionSandboxService {
         return err(domainError.validation("Sandbox broker request body exceeds the size limit"));
       }
     }
-    return this.credentialBroker.request(context, {
+    const response = await this.credentialBroker.request(context, {
       sandboxId,
       grant: grant.toState(),
       method: input.method,
@@ -1362,6 +1581,7 @@ export class ExecutionSandboxService {
       ...(body ? { body } : {}),
       timeoutMs: Math.min(Math.max(input.timeoutMs ?? 30_000, 1), 60_000),
     });
+    return this.withActivity(context, ready.value.stored, response);
   }
 
   async writeFile(
@@ -1376,7 +1596,7 @@ export class ExecutionSandboxService {
     if (!ready.value.provider.capabilities.files) {
       return err(domainError.conflict("Sandbox provider does not support files"));
     }
-    return this.providerOperation("execution-sandbox-file-write", () =>
+    const result = await this.providerOperation("execution-sandbox-file-write", () =>
       ready.value.provider.writeFile({
         sandboxId,
         providerHandle: ready.value.providerHandle,
@@ -1384,6 +1604,7 @@ export class ExecutionSandboxService {
         content: input.content,
       }),
     );
+    return this.withActivity(context, ready.value.stored, result);
   }
 
   async listFiles(
@@ -1398,13 +1619,14 @@ export class ExecutionSandboxService {
     if (!ready.value.provider.capabilities.files) {
       return err(domainError.conflict("Sandbox provider does not support files"));
     }
-    return this.providerOperation("execution-sandbox-file-list", () =>
+    const result = await this.providerOperation("execution-sandbox-file-list", () =>
       ready.value.provider.listFiles({
         sandboxId,
         providerHandle: ready.value.providerHandle,
         path: path.value.value,
       }),
     );
+    return this.withActivity(context, ready.value.stored, result);
   }
 
   async readFile(
@@ -1419,13 +1641,14 @@ export class ExecutionSandboxService {
     if (!ready.value.provider.capabilities.files) {
       return err(domainError.conflict("Sandbox provider does not support files"));
     }
-    return this.providerOperation("execution-sandbox-file-read", () =>
+    const result = await this.providerOperation("execution-sandbox-file-read", () =>
       ready.value.provider.readFile({
         sandboxId,
         providerHandle: ready.value.providerHandle,
         path: path.value.value,
       }),
     );
+    return this.withActivity(context, ready.value.stored, result);
   }
 
   async removeFile(
@@ -1440,7 +1663,7 @@ export class ExecutionSandboxService {
     if (!ready.value.provider.capabilities.files) {
       return err(domainError.conflict("Sandbox provider does not support files"));
     }
-    return this.providerOperation("execution-sandbox-file-remove", () =>
+    const result = await this.providerOperation("execution-sandbox-file-remove", () =>
       ready.value.provider.removeFile({
         sandboxId,
         providerHandle: ready.value.providerHandle,
@@ -1448,6 +1671,7 @@ export class ExecutionSandboxService {
         ...(input.recursive !== undefined ? { recursive: input.recursive } : {}),
       }),
     );
+    return this.withActivity(context, ready.value.stored, result);
   }
 
   async listProcesses(
@@ -1459,12 +1683,13 @@ export class ExecutionSandboxService {
     if (!ready.value.provider.capabilities.processes) {
       return err(domainError.conflict("Sandbox provider does not support processes"));
     }
-    return this.providerOperation("execution-sandbox-process-list", () =>
+    const result = await this.providerOperation("execution-sandbox-process-list", () =>
       ready.value.provider.listProcesses({
         sandboxId,
         providerHandle: ready.value.providerHandle,
       }),
     );
+    return this.withActivity(context, ready.value.stored, result);
   }
 
   async showProcess(
@@ -1494,13 +1719,14 @@ export class ExecutionSandboxService {
     if (!ready.value.provider.capabilities.processes) {
       return err(domainError.conflict("Sandbox provider does not support processes"));
     }
-    return this.providerOperation("execution-sandbox-process-terminate", () =>
+    const result = await this.providerOperation("execution-sandbox-process-terminate", () =>
       ready.value.provider.terminateProcess({
         sandboxId,
         providerHandle: ready.value.providerHandle,
         processId,
       }),
     );
+    return this.withActivity(context, ready.value.stored, result);
   }
 
   async exposePort(
@@ -1535,7 +1761,7 @@ export class ExecutionSandboxService {
     if (!ready.value.provider.capabilities.ports) {
       return err(domainError.conflict("Sandbox provider does not support port publishing"));
     }
-    return this.providerOperation("execution-sandbox-port-expose", () =>
+    const result = await this.providerOperation("execution-sandbox-port-expose", () =>
       ready.value.provider.exposePort({
         sandboxId,
         providerHandle: ready.value.providerHandle,
@@ -1544,6 +1770,7 @@ export class ExecutionSandboxService {
         ...(input.expiresAt ? { expiresAt: input.expiresAt } : {}),
       }),
     );
+    return this.withActivity(context, ready.value.stored, result);
   }
 
   async listPorts(
@@ -1555,12 +1782,13 @@ export class ExecutionSandboxService {
     if (!ready.value.provider.capabilities.ports) {
       return err(domainError.conflict("Sandbox provider does not support port publishing"));
     }
-    return this.providerOperation("execution-sandbox-port-list", () =>
+    const result = await this.providerOperation("execution-sandbox-port-list", () =>
       ready.value.provider.listPorts({
         sandboxId,
         providerHandle: ready.value.providerHandle,
       }),
     );
+    return this.withActivity(context, ready.value.stored, result);
   }
 
   async revokePort(
@@ -1573,13 +1801,14 @@ export class ExecutionSandboxService {
     if (!ready.value.provider.capabilities.ports) {
       return err(domainError.conflict("Sandbox provider does not support port publishing"));
     }
-    return this.providerOperation("execution-sandbox-port-revoke", () =>
+    const result = await this.providerOperation("execution-sandbox-port-revoke", () =>
       ready.value.provider.revokePort({
         sandboxId,
         providerHandle: ready.value.providerHandle,
         exposureId,
       }),
     );
+    return this.withActivity(context, ready.value.stored, result);
   }
 
   async updateNetworkPolicy(
@@ -1632,28 +1861,93 @@ export class ExecutionSandboxService {
       await this.saveSandbox(context, ready.value.stored.sandbox, ready.value.stored.providerKey);
       return err(observed.error);
     }
-    const paused = ready.value.stored.sandbox.markPaused({ at });
+    const pauseCapability = ready.value.provider.capabilities.pause;
+    if (!pauseCapability) {
+      return err(domainError.conflict("Sandbox provider does not support pause"));
+    }
+    const paused = ready.value.stored.sandbox.markPaused({
+      at,
+      providerHandle: observed.value.providerHandle,
+      suspension: pauseCapability,
+    });
     if (paused.isErr()) return err(paused.error);
     await this.saveSandbox(context, ready.value.stored.sandbox, ready.value.stored.providerKey);
     return ok(descriptor(ready.value.stored));
   }
 
-  async resume(context: ExecutionContext, sandboxId: string): Promise<Result<SandboxDescriptor>> {
+  async resume(
+    context: ExecutionContext,
+    sandboxId: string,
+    input: { providerKey?: string } = {},
+  ): Promise<Result<SandboxDescriptor>> {
     const repositoryContext = toRepositoryContext(context);
     const stored = await this.repository.find(repositoryContext, sandboxId);
     if (!stored) return err(domainError.notFound("Sandbox", sandboxId));
     const state = stored.sandbox.toState();
-    if (state.status.value !== "paused" || !state.providerHandle) {
+    if (state.status.value !== "paused" || !state.providerHandle || !state.suspension) {
       return err(domainError.conflict("Sandbox is not paused"));
     }
-    const provider = this.providerRegistry.get(stored.providerKey);
+    const targetProviderKey = input.providerKey ?? stored.providerKey;
+    if (targetProviderKey !== stored.providerKey) {
+      const targetCapability = this.providerRegistry.get(targetProviderKey)?.capabilities.pause;
+      const compatibleFamily =
+        state.suspension.portability === "provider-family" &&
+        Boolean(state.suspension.recoveryFamily) &&
+        targetCapability !== undefined &&
+        targetCapability !== false &&
+        targetCapability.recoveryFamily === state.suspension.recoveryFamily;
+      if (
+        state.suspension.mode === "process-frozen" ||
+        state.suspension.portability === "provider-local" ||
+        (state.suspension.portability === "provider-family" && !compatibleFamily)
+      ) {
+        return err({
+          code: "sandbox_recovery_not_portable",
+          category: "user",
+          message: "Sandbox recovery state cannot move to the requested provider",
+          retryable: false,
+          details: {
+            phase: "execution-sandbox-recovery-placement",
+            sourceProviderKey: stored.providerKey,
+            targetProviderKey,
+            portability: state.suspension.portability,
+          },
+        });
+      }
+    }
+    const provider = this.providerRegistry.get(targetProviderKey);
     if (!provider) return err(domainError.infra("Sandbox provider is unavailable"));
+    if (
+      !SandboxIsolationLevel.rehydrate(provider.capabilities.isolation).satisfies(
+        state.requestedIsolation,
+      ) ||
+      !provider.capabilities.networkPolicy.includes(state.networkPolicy.toState().mode)
+    ) {
+      return err(
+        domainError.conflict("Sandbox recovery provider is incompatible", {
+          phase: "execution-sandbox-recovery-placement",
+          targetProviderKey,
+        }),
+      );
+    }
     const at = UpdatedAt.rehydrate(this.clock.now());
     const requested = stored.sandbox.requestResume({ at });
     if (requested.isErr()) return err(requested.error);
     await this.saveSandbox(context, stored.sandbox, stored.providerKey);
+    const ownerOrganizationId =
+      repositoryContext.tenant?.organizationId ??
+      repositoryContext.principal?.activeOrganization?.organizationId;
     const observed = await this.providerOperation("execution-sandbox-resume", () =>
-      provider.resume({ sandboxId, providerHandle: state.providerHandle as string }),
+      provider.resume({
+        sandboxId,
+        providerHandle: state.providerHandle as string,
+        ownerScope: tenantId(repositoryContext),
+        ...(ownerOrganizationId ? { ownerOrganizationId } : {}),
+        source: { kind: "snapshot", providerHandle: state.providerHandle as string },
+        requestedIsolation: state.requestedIsolation.value,
+        limits: state.limits.toState(),
+        networkPolicy: state.networkPolicy.toState(),
+      }),
     );
     if (observed.isErr()) {
       stored.sandbox.markResumeFailed({ code: observed.error.code, at });
@@ -1666,8 +1960,8 @@ export class ExecutionSandboxService {
       at,
     });
     if (resumed.isErr()) return err(resumed.error);
-    await this.saveSandbox(context, stored.sandbox, stored.providerKey);
-    return ok(descriptor(stored));
+    await this.saveSandbox(context, stored.sandbox, targetProviderKey);
+    return ok(descriptor({ ...stored, providerKey: targetProviderKey }));
   }
 
   async createSnapshot(

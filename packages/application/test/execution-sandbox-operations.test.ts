@@ -1,11 +1,13 @@
 import "reflect-metadata";
 import { describe, expect, test } from "bun:test";
+import { ok } from "@appaloft/core";
 import {
   createExecutionContext,
   ExecutionSandboxService,
   InMemorySandboxRepository,
   type SandboxProvider,
   SandboxProviderRegistry,
+  StaticSandboxQuotaPolicy,
 } from "../src";
 
 const context = createExecutionContext({
@@ -26,7 +28,7 @@ function provider(input: { isolation?: "container-trusted" | "gvisor" } = {}) {
     key: "hermetic",
     capabilities: {
       isolation: input.isolation ?? "gvisor",
-      pause: true,
+      pause: { mode: "compute-released", portability: "provider-local" },
       snapshot: ["filesystem"],
       processes: true,
       files: true,
@@ -48,7 +50,9 @@ function provider(input: { isolation?: "container-trusted" | "gvisor" } = {}) {
         realizedIsolation: input.isolation ?? "gvisor",
       };
     },
-    async pause() {},
+    async pause(request) {
+      return { providerHandle: `recovery:${request.sandboxId}` };
+    },
     async resume(request) {
       return {
         providerHandle: request.providerHandle,
@@ -210,7 +214,7 @@ describe("ExecutionSandboxService", () => {
     ).toBe(true);
   });
 
-  test("[SBX-CMD-003] closes pause/resume, port and snapshot capabilities", async () => {
+  test("[SBX-CMD-003][HIB-SNAPSHOT-001] closes pause/resume, port and snapshot capabilities", async () => {
     const fake = provider();
     const app = service(fake.adapter);
     await app.create(context, createInput);
@@ -289,10 +293,185 @@ describe("ExecutionSandboxService", () => {
 
     expect((await app.maintain(context))._unsafeUnwrap()).toEqual({
       expired: ["sbx_test"],
+      suspended: [],
       reconciled: [],
       failed: [],
     });
     expect(fake.terminateCalls()).toBe(1);
     expect((await app.show(context, "sbx_test"))._unsafeUnwrap().status).toBe("expired");
+  });
+
+  test("[HIB-APP-001][HIB-APP-002] persists compute-released recovery on one identity", async () => {
+    const fake = provider();
+    const app = service(fake.adapter);
+    await app.createAndReconcile(context, createInput);
+
+    const paused = (await app.pause(context, "sbx_test"))._unsafeUnwrap();
+    expect(paused).toMatchObject({
+      sandboxId: "sbx_test",
+      status: "paused",
+      suspension: {
+        mode: "compute-released",
+        portability: "provider-local",
+      },
+    });
+    const resumed = (await app.resume(context, "sbx_test"))._unsafeUnwrap();
+    expect(resumed).toMatchObject({
+      sandboxId: "sbx_test",
+      status: "ready",
+      providerKey: "hermetic",
+    });
+    expect(resumed.suspension).toBeUndefined();
+  });
+
+  test("[HIB-APP-003] retains paused recovery metadata when resume fails", async () => {
+    const fake = provider();
+    fake.adapter.resume = async () => {
+      throw new Error("injected resume failure");
+    };
+    const app = service(fake.adapter);
+    await app.createAndReconcile(context, createInput);
+    await app.pause(context, "sbx_test");
+
+    expect((await app.resume(context, "sbx_test")).isErr()).toBe(true);
+    expect((await app.show(context, "sbx_test"))._unsafeUnwrap()).toMatchObject({
+      status: "paused",
+      suspension: {
+        mode: "compute-released",
+        portability: "provider-local",
+      },
+    });
+  });
+
+  test("[HIB-APP-004] auto-suspends only idle compute-released Sandboxes", async () => {
+    let current = "2026-07-20T00:00:00.000Z";
+    const released = provider();
+    const app = service(released.adapter, () => current);
+    const { expiresAt: _expiresAt, ...withoutExpiry } = createInput;
+    await app.createAndReconcile(context, withoutExpiry);
+    current = "2026-07-20T00:02:00.000Z";
+
+    expect(
+      (
+        await app.maintain(context, {
+          idleSuspendAfterSeconds: 60,
+          protectedSandboxIds: ["sbx_test"],
+        })
+      )._unsafeUnwrap().suspended,
+    ).toEqual([]);
+    expect((await app.maintain(context, { idleSuspendAfterSeconds: 60 }))._unsafeUnwrap()).toEqual({
+      expired: [],
+      suspended: ["sbx_test"],
+      reconciled: [],
+      failed: [],
+    });
+
+    const frozen = provider();
+    frozen.adapter.capabilities.pause = {
+      mode: "process-frozen",
+      portability: "provider-local",
+    };
+    const frozenApp = service(frozen.adapter, () => current);
+    await frozenApp.createAndReconcile(context, withoutExpiry);
+    current = "2026-07-20T00:04:00.000Z";
+    expect(
+      (await frozenApp.maintain(context, { idleSuspendAfterSeconds: 60 }))._unsafeUnwrap()
+        .suspended,
+    ).toEqual([]);
+  });
+
+  test("[HIB-QUOTA-001] rejects quota overflow before persistence and provider effects", async () => {
+    const fake = provider();
+    const repository = new InMemorySandboxRepository();
+    const app = new ExecutionSandboxService({
+      repository,
+      providerRegistry: new SandboxProviderRegistry([fake.adapter]),
+      clock: { now: () => "2026-07-20T00:00:00.000Z" },
+      idGenerator: { next: (prefix) => `${prefix}_test` },
+      quotaPolicy: new StaticSandboxQuotaPolicy({
+        activeSandboxes: 1,
+        ...createInput.limits,
+      }),
+    });
+    expect((await app.createAndReconcile(context, createInput)).isOk()).toBe(true);
+    const rejected = await app.create(context, createInput);
+    expect(rejected.isErr()).toBe(true);
+    if (rejected.isErr()) expect(rejected.error.code).toBe("sandbox_quota_exceeded");
+    expect((await app.list(context, {}))._unsafeUnwrap().items).toHaveLength(1);
+    expect(fake.provisionCalls()).toBe(1);
+  });
+
+  test("[HIB-QUOTA-002] admits the exact boundary and releases paused compute usage", async () => {
+    const fake = provider();
+    const repository = new InMemorySandboxRepository();
+    let sequence = 0;
+    const app = new ExecutionSandboxService({
+      repository,
+      providerRegistry: new SandboxProviderRegistry([fake.adapter]),
+      clock: { now: () => "2026-07-20T00:00:00.000Z" },
+      idGenerator: { next: (prefix) => `${prefix}_${++sequence}` },
+      quotaPolicy: new StaticSandboxQuotaPolicy({
+        activeSandboxes: 2,
+        cpuMillis: createInput.limits.cpuMillis,
+        memoryBytes: createInput.limits.memoryBytes,
+        diskBytes: createInput.limits.diskBytes * 2,
+        maxProcesses: createInput.limits.maxProcesses,
+      }),
+    });
+    const first = (await app.createAndReconcile(context, createInput))._unsafeUnwrap();
+    await app.pause(context, first.sandboxId);
+    expect(await repository.summarizeActiveUsage(context)).toEqual({
+      activeSandboxes: 1,
+      cpuMillis: 0,
+      memoryBytes: 0,
+      diskBytes: createInput.limits.diskBytes,
+      maxProcesses: 0,
+    });
+    expect((await app.createAndReconcile(context, createInput)).isOk()).toBe(true);
+    expect((await app.create(context, createInput)).isErr()).toBe(true);
+    expect(fake.provisionCalls()).toBe(2);
+  });
+
+  test("[HIB-PLACE-001][HIB-MIGRATE-001] selects placement and rejects local recovery moves", async () => {
+    const first = provider();
+    const second = provider();
+    const firstAdapter: SandboxProvider = { ...first.adapter, key: "server-a" };
+    const secondAdapter: SandboxProvider = { ...second.adapter, key: "server-b" };
+    const repository = new InMemorySandboxRepository();
+    const app = new ExecutionSandboxService({
+      repository,
+      providerRegistry: new SandboxProviderRegistry([firstAdapter, secondAdapter]),
+      clock: { now: () => "2026-07-20T00:00:00.000Z" },
+      idGenerator: { next: (prefix) => `${prefix}_test` },
+      placementPolicy: {
+        select: () => ok("server-b"),
+      },
+    });
+    const created = (await app.createAndReconcile(context, createInput))._unsafeUnwrap();
+    expect(created.providerKey).toBe("server-b");
+    await app.pause(context, created.sandboxId);
+
+    const rejected = await app.resume(context, created.sandboxId, { providerKey: "server-a" });
+    expect(rejected.isErr()).toBe(true);
+    if (rejected.isErr()) expect(rejected.error.code).toBe("sandbox_recovery_not_portable");
+    expect((await app.show(context, created.sandboxId))._unsafeUnwrap().status).toBe("paused");
+  });
+
+  test("[HIB-PLACE-002] rejects a placement result outside compatible candidates", async () => {
+    const fake = provider();
+    const repository = new InMemorySandboxRepository();
+    const app = new ExecutionSandboxService({
+      repository,
+      providerRegistry: new SandboxProviderRegistry([fake.adapter]),
+      clock: { now: () => "2026-07-20T00:00:00.000Z" },
+      idGenerator: { next: (prefix) => `${prefix}_test` },
+      placementPolicy: {
+        select: () => ok("unknown-provider"),
+      },
+    });
+
+    expect((await app.create(context, createInput)).isErr()).toBe(true);
+    expect((await app.list(context, {}))._unsafeUnwrap().items).toEqual([]);
+    expect(fake.provisionCalls()).toBe(0);
   });
 });

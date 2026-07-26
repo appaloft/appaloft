@@ -1,5 +1,6 @@
 import {
   type RepositoryContext,
+  type SandboxQuotaUsage,
   type SandboxRepository,
   type StoredSandbox,
   type StoredSnapshot,
@@ -42,6 +43,12 @@ type SerializedSandboxState = {
   currentAttemptId?: string;
   providerHandle?: string;
   provisionAttempts: number;
+  lastActivityAt?: string;
+  suspension?: {
+    mode: "process-frozen" | "compute-released";
+    portability: "provider-local" | "provider-family" | "portable";
+    recoveryFamily?: string;
+  };
 };
 
 function contextTenantId(context: RepositoryContext): string {
@@ -74,6 +81,8 @@ function sandboxState(sandbox: Sandbox): SerializedSandboxState {
     ...(state.realizedIsolation ? { realizedIsolation: state.realizedIsolation.value } : {}),
     ...(state.currentAttemptId ? { currentAttemptId: state.currentAttemptId } : {}),
     ...(state.providerHandle ? { providerHandle: state.providerHandle } : {}),
+    ...(state.lastActivityAt ? { lastActivityAt: state.lastActivityAt.value } : {}),
+    ...(state.suspension ? { suspension: { ...state.suspension } } : {}),
   };
 }
 
@@ -113,6 +122,10 @@ function sandboxFromRow(row: SandboxRow): Sandbox {
       : {}),
     ...(state.currentAttemptId ? { currentAttemptId: state.currentAttemptId } : {}),
     ...(state.providerHandle ? { providerHandle: state.providerHandle } : {}),
+    ...(state.lastActivityAt
+      ? { lastActivityAt: UpdatedAt.rehydrate(state.lastActivityAt) }
+      : { lastActivityAt: UpdatedAt.rehydrate(requiredTimestamp(row.created_at)) }),
+    ...(state.suspension ? { suspension: { ...state.suspension } } : {}),
   });
 }
 
@@ -287,6 +300,37 @@ export class PgExecutionSandboxRepository implements SandboxRepository {
       .offset(input.offset)
       .execute();
     return rows.map((row) => row.tenant_id);
+  }
+
+  async summarizeActiveUsage(context: RepositoryContext): Promise<SandboxQuotaUsage> {
+    const rows = await resolveRepositoryExecutor(this.db, context)
+      .selectFrom("execution_sandboxes")
+      .select(["status", "state"])
+      .where("tenant_id", "=", contextTenantId(context))
+      .where("status", "not in", ["terminated", "expired"])
+      .execute();
+    return rows.reduce<SandboxQuotaUsage>(
+      (usage, row) => {
+        const state = objectState<SerializedSandboxState>(row.state);
+        const limits = state.limits;
+        const releasesCompute =
+          row.status === "paused" && state.suspension?.mode === "compute-released";
+        return {
+          activeSandboxes: usage.activeSandboxes + 1,
+          cpuMillis: usage.cpuMillis + (releasesCompute ? 0 : limits.cpuMillis),
+          memoryBytes: usage.memoryBytes + (releasesCompute ? 0 : limits.memoryBytes),
+          diskBytes: usage.diskBytes + limits.diskBytes,
+          maxProcesses: usage.maxProcesses + (releasesCompute ? 0 : limits.maxProcesses),
+        };
+      },
+      {
+        activeSandboxes: 0,
+        cpuMillis: 0,
+        memoryBytes: 0,
+        diskBytes: 0,
+        maxProcesses: 0,
+      },
+    );
   }
 
   async saveCredentialGrant(

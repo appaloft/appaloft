@@ -33,7 +33,10 @@ export class HermeticSandboxProvider implements SandboxProvider {
   ) {
     this.capabilities = {
       isolation: input.isolation ?? ("container-trusted" as const),
-      pause: true,
+      pause: {
+        mode: "process-frozen" as const,
+        portability: "provider-local" as const,
+      },
       snapshot: ["filesystem" as const],
       processes: true,
       files: true,
@@ -70,11 +73,15 @@ export class HermeticSandboxProvider implements SandboxProvider {
     return { providerHandle: handle, realizedIsolation: this.capabilities.isolation };
   }
 
-  async pause(request: { sandboxId: string; providerHandle: string }): Promise<void> {
+  async pause(request: {
+    sandboxId: string;
+    providerHandle: string;
+  }): Promise<{ providerHandle: string }> {
     this.runtime(request).paused = true;
+    return { providerHandle: request.providerHandle };
   }
 
-  async resume(request: { sandboxId: string; providerHandle: string }) {
+  async resume(request: SandboxProviderRequest & { providerHandle: string }) {
     const runtime = this.runtime(request);
     runtime.paused = false;
     return {

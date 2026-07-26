@@ -41,6 +41,13 @@ export interface AppaloftSandboxCreateInput extends AppaloftSdkFacadeInput {
 export interface AppaloftSandboxDescriptor extends Record<string, unknown> {
   readonly sandboxId: string;
   readonly status: string;
+  readonly providerKey?: string;
+  readonly lastActivityAt?: string;
+  readonly suspension?: {
+    readonly mode: "process-frozen" | "compute-released";
+    readonly portability: "provider-local" | "provider-family" | "portable";
+    readonly recoveryFamily?: string;
+  };
 }
 
 export interface AppaloftAgentDescriptor extends Record<string, unknown> {
@@ -188,6 +195,7 @@ export interface AppaloftAgentTaskResult {
     | "checks-failed"
     | "awaiting-approval"
     | "approved"
+    | "delivering"
     | "delivered"
     | "failed"
     | "cancelled";
@@ -329,6 +337,8 @@ export interface AppaloftSandbox extends AppaloftSandboxDescriptor {
     readonly read: <T = unknown>(input: AppaloftSandboxFileReadInput) => Promise<T>;
   };
   readonly exec: <T = unknown>(input: AppaloftSandboxExecInput) => Promise<T>;
+  readonly pause: () => Promise<AppaloftSandbox>;
+  readonly resume: (input?: { readonly providerKey?: string }) => Promise<AppaloftSandbox>;
   readonly terminate: <T = unknown>() => Promise<T>;
 }
 
@@ -890,7 +900,7 @@ function requireSuccessfulExec(value: unknown, phase: string): void {
     (frame): frame is Extract<(typeof result.frames)[number], { kind: "exit" }> =>
       frame.kind === "exit",
   );
-  if (!exit || exit.exitCode !== 0) {
+  if (exit?.exitCode !== 0) {
     const stderr = result.frames
       .flatMap((frame) => (frame.kind === "stderr" ? [frame.data] : []))
       .join("")
@@ -962,6 +972,23 @@ function createSandboxHandle(
           ...input,
           argv: [...input.argv],
         }),
+      ),
+    pause: async () =>
+      createSandboxHandle(
+        operations,
+        unwrapOperation<AppaloftSandboxDescriptor>(
+          await operations.sandboxes.pause<AppaloftSandboxDescriptor>({ sandboxId }),
+        ),
+      ),
+    resume: async (input = {}) =>
+      createSandboxHandle(
+        operations,
+        unwrapOperation<AppaloftSandboxDescriptor>(
+          await operations.sandboxes.resume<AppaloftSandboxDescriptor>({
+            sandboxId,
+            ...(input.providerKey ? { providerKey: input.providerKey } : {}),
+          }),
+        ),
       ),
     terminate: async <T>() =>
       unwrapOperation<T>(await operations.sandboxes.terminate<T>({ sandboxId })),

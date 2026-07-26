@@ -20,6 +20,12 @@
     sandboxId: string;
     status: string;
     expiresAt?: string;
+    lastActivityAt?: string;
+    suspension?: {
+      mode: "process-frozen" | "compute-released";
+      portability: "provider-local" | "provider-family" | "portable";
+      recoveryFamily?: string;
+    };
   };
   type RuntimeDescriptor = {
     runtimeId: string;
@@ -190,6 +196,22 @@
             <p class="mt-2 text-sm text-muted-foreground">
               {$t(i18nKeys.console.agentWorkspaces.persistentData)}
             </p>
+            {#if sandbox.status === "paused" && sandbox.suspension}
+              <p
+                class="mt-2 max-w-2xl text-sm text-muted-foreground"
+                data-workspace-suspension={sandbox.suspension.mode}
+              >
+                {sandbox.suspension.mode === "compute-released"
+                  ? $t(i18nKeys.console.agentWorkspaces.computeReleased)
+                  : $t(i18nKeys.console.agentWorkspaces.processFrozen)}
+              </p>
+            {/if}
+            {#if sandbox.lastActivityAt}
+              <p class="mt-1 font-mono text-xs text-muted-foreground">
+                {$t(i18nKeys.console.agentWorkspaces.lastActivity)} ·
+                {sandbox.lastActivityAt}
+              </p>
+            {/if}
           </div>
           <div class="flex flex-wrap gap-2">
             <Button

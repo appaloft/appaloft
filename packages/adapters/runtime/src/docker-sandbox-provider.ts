@@ -211,6 +211,13 @@ function containerName(sandboxId: string): string {
   return `appaloft-${sandboxId}`;
 }
 
+function hibernationImage(sandboxId: string): string {
+  if (!/^sbx_[A-Za-z0-9_.-]{1,120}$/.test(sandboxId)) {
+    throw new Error("Sandbox id cannot be rendered as a Docker hibernation image");
+  }
+  return `appaloft-sandbox-hibernate:${sandboxId}`;
+}
+
 export class DockerSandboxProvider implements SandboxProvider {
   readonly key: string;
   readonly capabilities: SandboxProvider["capabilities"];
@@ -237,7 +244,10 @@ export class DockerSandboxProvider implements SandboxProvider {
     this.networkName = input.internalNetwork ?? "none";
     this.capabilities = {
       isolation,
-      pause: true,
+      pause: {
+        mode: "compute-released",
+        portability: "provider-local",
+      },
       snapshot: ["filesystem" as const],
       processes: true,
       files: true,
@@ -286,7 +296,7 @@ export class DockerSandboxProvider implements SandboxProvider {
     const diskMb = Math.max(4, Math.ceil(request.limits.diskBytes / (1024 * 1024)));
     if (
       request.source.kind === "snapshot" &&
-      !/^appaloft-sandbox-snapshot:ssn_[A-Za-z0-9_.-]{1,120}$/.test(
+      !/^appaloft-sandbox-(?:snapshot:ssn_|hibernate:sbx_)[A-Za-z0-9_.-]{1,120}$/.test(
         request.source.providerHandle,
       )
     ) {
@@ -295,8 +305,8 @@ export class DockerSandboxProvider implements SandboxProvider {
     const image = request.source.kind === "image" ? request.source.image : request.source.providerHandle;
     const startup =
       request.source.kind === "snapshot"
-        ? "cp -a /appaloft-snapshot-workspace/. /workspace/ && trap : TERM INT; sleep infinity & wait"
-        : "trap : TERM INT; sleep infinity & wait";
+        ? "set -e; cp -a /appaloft-snapshot-workspace/. /workspace/; touch /tmp/.appaloft-workspace-ready; trap : TERM INT; sleep infinity & wait"
+        : "set -e; touch /tmp/.appaloft-workspace-ready; trap : TERM INT; sleep infinity & wait";
     let egress: { proxyUrl: string; noProxy?: readonly string[] } | undefined;
     let envFile: string | undefined;
     try {
@@ -351,6 +361,13 @@ export class DockerSandboxProvider implements SandboxProvider {
         startup,
       ]);
       await this.docker(["start", name]);
+      await this.docker([
+        "exec",
+        name,
+        "sh",
+        "-c",
+        "i=0; while [ $i -lt 100 ]; do test -f /tmp/.appaloft-workspace-ready && exit 0; i=$((i+1)); sleep 0.05; done; exit 1",
+      ]);
       if (envFile) {
         await this.removeWorkerFile(envFile);
         envFile = undefined;
@@ -387,25 +404,123 @@ export class DockerSandboxProvider implements SandboxProvider {
     return { providerHandle: name, realizedIsolation: this.capabilities.isolation };
   }
 
-  async pause(request: { sandboxId: string; providerHandle: string }): Promise<void> {
+  async pause(request: {
+    sandboxId: string;
+    providerHandle: string;
+  }): Promise<{ providerHandle: string }> {
     await this.assertHandle(request);
-    await this.docker(["pause", request.providerHandle]);
+    const image = hibernationImage(request.sandboxId);
+    await this.captureWorkspaceImage({
+      ...request,
+      image,
+      helper: `${containerName(request.sandboxId)}-hibernate`,
+      label: `appaloft.hibernate.sandbox=${request.sandboxId}`,
+    });
+    try {
+      await this.revokeExternalAccess(request);
+      await this.docker(["rm", "-f", request.providerHandle]);
+    } catch (error) {
+      await this.runner.run(["docker", "image", "rm", image]);
+      throw error;
+    }
+    return { providerHandle: image };
   }
 
-  async resume(request: { sandboxId: string; providerHandle: string }) {
-    await this.assertHandle(request);
-    await this.docker(["unpause", request.providerHandle]);
-    await this.egressPolicy?.renew?.({
-      sandboxId: request.sandboxId,
-      containerName: request.providerHandle,
-    });
-    return {
-      providerHandle: request.providerHandle,
-      realizedIsolation: this.capabilities.isolation,
-    };
+  async resume(request: SandboxProviderRequest & { providerHandle: string }) {
+    const expected = hibernationImage(request.sandboxId);
+    if (request.providerHandle !== expected) {
+      throw new Error("Docker hibernation handle does not match the Sandbox");
+    }
+    const inspected = await this.docker([
+      "image",
+      "inspect",
+      "--format",
+      '{{index .Config.Labels "appaloft.hibernate.sandbox"}}',
+      request.providerHandle,
+    ]);
+    if (text(inspected.stdout).trim() !== request.sandboxId) {
+      throw new Error("Docker hibernation image is not owned by the Sandbox");
+    }
+    const inspectedBaseImage = await this.docker([
+      "image",
+      "inspect",
+      "--format",
+      '{{index .Config.Labels "appaloft.sandbox.base-image"}}',
+      request.providerHandle,
+    ]);
+    const baseImage = text(inspectedBaseImage.stdout).trim();
+    if (!/^sha256:[0-9a-f]{64}$/.test(baseImage)) {
+      throw new Error("Docker hibernation image has no valid base image identity");
+    }
+    const helper = `${containerName(request.sandboxId)}-hibernate-restore`;
+    await this.runner.run(["docker", "rm", "-f", helper]);
+    let provisioned: Awaited<ReturnType<DockerSandboxProvider["provision"]>> | undefined;
+    try {
+      await this.docker([
+        "create",
+        "--name",
+        helper,
+        "--label",
+        "appaloft.managed=true",
+        "--label",
+        `appaloft.hibernate.restore=${request.sandboxId}`,
+        "--network",
+        "none",
+        "--cap-drop",
+        "ALL",
+        "--security-opt",
+        "no-new-privileges=true",
+        request.providerHandle,
+        "sh",
+        "-c",
+        "trap : TERM INT; sleep infinity & wait",
+      ]);
+      await this.docker(["start", helper]);
+      provisioned = await this.provision({
+        ...request,
+        source: { kind: "image", image: baseImage },
+      });
+      await this.workerCommand([
+        "sh",
+        "-c",
+        `docker exec ${helper} tar -C /appaloft-snapshot-workspace -cf - . | docker exec -i ${provisioned.providerHandle} tar -xf - -C /workspace`,
+      ]);
+      await this.docker(["rm", "-f", helper]);
+      await this.docker(["image", "rm", request.providerHandle]);
+      return provisioned;
+    } catch (error) {
+      if (provisioned) {
+        await this.runner.run(["docker", "rm", "-f", provisioned.providerHandle]);
+        await this.revokeExternalAccess({
+          sandboxId: request.sandboxId,
+          providerHandle: provisioned.providerHandle,
+        });
+      }
+      throw error;
+    } finally {
+      await this.runner.run(["docker", "rm", "-f", helper]);
+    }
   }
 
   async terminate(request: { sandboxId: string; providerHandle: string }): Promise<void> {
+    if (request.providerHandle === hibernationImage(request.sandboxId)) {
+      const inspected = await this.runner.run([
+        "docker",
+        "image",
+        "inspect",
+        "--format",
+        '{{index .Config.Labels "appaloft.hibernate.sandbox"}}',
+        request.providerHandle,
+      ]);
+      if (inspected.exitCode === 0 && text(inspected.stdout).trim() === request.sandboxId) {
+        await this.docker(["image", "rm", request.providerHandle]);
+      }
+      await this.revokeExternalAccess({
+        sandboxId: request.sandboxId,
+        providerHandle: containerName(request.sandboxId),
+      });
+      return;
+    }
     const containerExists = await this.assertHandleIfPresent(request);
     try {
       if (containerExists) await this.docker(["rm", "-f", request.providerHandle]);
@@ -835,6 +950,75 @@ export class DockerSandboxProvider implements SandboxProvider {
     });
   }
 
+  private async captureWorkspaceImage(input: {
+    sandboxId: string;
+    providerHandle: string;
+    image: string;
+    helper: string;
+    label: string;
+  }): Promise<number> {
+    const inspectedBaseImage = await this.docker([
+      "inspect",
+      "--format",
+      '{{index .Config.Labels "appaloft.sandbox.base-image"}}',
+      input.providerHandle,
+    ]);
+    const declaredBaseImage = text(inspectedBaseImage.stdout).trim();
+    const inspectedRuntimeImage = await this.docker([
+      "inspect",
+      "--format",
+      "{{.Image}}",
+      input.providerHandle,
+    ]);
+    const runtimeImage = text(inspectedRuntimeImage.stdout).trim();
+    const sourceImage =
+      /^sha256:[0-9a-f]{64}$/.test(declaredBaseImage) ? declaredBaseImage : runtimeImage;
+    if (!/^sha256:[0-9a-f]{64}$/.test(sourceImage)) {
+      throw new Error("Docker Sandbox base image identity is invalid");
+    }
+    await this.runner.run(["docker", "rm", "-f", input.helper]);
+    try {
+      await this.docker([
+        "create",
+        "--name",
+        input.helper,
+        "--label",
+        "appaloft.managed=true",
+        "--label",
+        input.label,
+        "--label",
+        `appaloft.sandbox.base-image=${sourceImage}`,
+        "--network",
+        "none",
+        "--cap-drop",
+        "ALL",
+        "--security-opt",
+        "no-new-privileges=true",
+        sourceImage,
+        "sh",
+        "-c",
+        "trap : TERM INT; sleep infinity & wait",
+      ]);
+      await this.docker(["start", input.helper]);
+      await this.workerCommand([
+        "sh",
+        "-c",
+        `docker exec ${input.providerHandle} tar -C /workspace -cf - . | docker exec -i ${input.helper} sh -c 'rm -rf /appaloft-snapshot-workspace && mkdir -p /appaloft-snapshot-workspace && tar -xf - -C /appaloft-snapshot-workspace'`,
+      ]);
+      await this.docker(["commit", input.helper, input.image]);
+    } finally {
+      await this.runner.run(["docker", "rm", "-f", input.helper]);
+    }
+    const inspected = await this.docker([
+      "image",
+      "inspect",
+      "--format",
+      "{{.Size}}",
+      input.image,
+    ]);
+    return Number(text(inspected.stdout).trim());
+  }
+
   async captureSnapshot(request: {
     sandboxId: string;
     providerHandle: string;
@@ -843,63 +1027,18 @@ export class DockerSandboxProvider implements SandboxProvider {
   }): Promise<{ providerHandle: string; sizeBytes: number }> {
     await this.assertHandle(request);
     if (request.capability !== "filesystem") throw new Error("Unsupported snapshot capability");
+    if (!/^ssn_[A-Za-z0-9_.-]{1,120}$/.test(request.snapshotId)) {
+      throw new Error("Sandbox snapshot id is invalid");
+    }
     const image = `appaloft-sandbox-snapshot:${request.snapshotId}`;
     const helper = `${containerName(request.sandboxId)}-snapshot-${request.snapshotId}`;
-    const inspectedSource = await this.docker([
-      "inspect",
-      "--format",
-      "{{.Config.Image}}",
-      request.providerHandle,
-    ]);
-    const sourceImage = text(inspectedSource.stdout).trim();
-    const archive = await this.docker([
-      "exec",
-      request.providerHandle,
-      "tar",
-      "-C",
-      "/workspace",
-      "-cf",
-      "-",
-      ".",
-    ]);
-    await this.docker([
-      "create",
-      "--name",
+    const sizeBytes = await this.captureWorkspaceImage({
+      ...request,
+      image,
       helper,
-      "--label",
-      "appaloft.managed=true",
-      "--label",
-      `appaloft.snapshot.id=${request.snapshotId}`,
-      "--network",
-      "none",
-      "--cap-drop",
-      "ALL",
-      "--security-opt",
-      "no-new-privileges=true",
-      sourceImage,
-      "sh",
-      "-c",
-      "trap : TERM INT; sleep infinity & wait",
-    ]);
-    try {
-      await this.docker(["start", helper]);
-      await this.docker(
-        [
-          "exec",
-          "-i",
-          helper,
-          "sh",
-          "-c",
-          "mkdir -p /appaloft-snapshot-workspace && tar -xf - -C /appaloft-snapshot-workspace",
-        ],
-        { stdin: archive.stdout },
-      );
-      await this.docker(["commit", helper, image]);
-    } finally {
-      await this.runner.run(["docker", "rm", "-f", helper]);
-    }
-    const inspected = await this.docker(["image", "inspect", "--format", "{{.Size}}", image]);
-    return { providerHandle: image, sizeBytes: Number(text(inspected.stdout).trim()) };
+      label: `appaloft.snapshot.id=${request.snapshotId}`,
+    });
+    return { providerHandle: image, sizeBytes };
   }
 
   async deleteSnapshot(request: { snapshotId: string; providerHandle: string }): Promise<void> {

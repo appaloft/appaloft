@@ -156,8 +156,19 @@ const show = EffectCommand.make("show", { sandboxId }, ({ sandboxId }) =>
 const pause = EffectCommand.make("pause", { sandboxId }, ({ sandboxId }) =>
   runCommand(PauseSandboxCommand.create({ sandboxId })),
 );
-const resume = EffectCommand.make("resume", { sandboxId }, ({ sandboxId }) =>
-  runCommand(ResumeSandboxCommand.create({ sandboxId })),
+const resume = EffectCommand.make(
+  "resume",
+  {
+    sandboxId,
+    provider: Options.text("provider").pipe(Options.optional),
+  },
+  ({ sandboxId, provider }) =>
+    runCommand(
+      ResumeSandboxCommand.create({
+        sandboxId,
+        ...(optionalValue(provider) ? { providerKey: optionalValue(provider) } : {}),
+      }),
+    ),
 );
 const terminate = EffectCommand.make("terminate", { sandboxId }, ({ sandboxId }) =>
   runCommand(TerminateSandboxCommand.create({ sandboxId })),

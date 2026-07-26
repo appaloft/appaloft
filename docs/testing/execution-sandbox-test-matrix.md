@@ -23,7 +23,7 @@ isolation claims.
 | SBX-DOM-004 | core unit | Snapshot capability and retention | Snapshot lifecycle remains independent of the source Sandbox. | `packages/core/test/execution-sandbox-snapshot.test.ts` | passed |
 | SBX-CMD-001 | application integration | Accepted create | Intent persists before provider mutation; external create closes first reconciliation; providers receive the opaque tenant owner scope and the authorized organization id when one exists. | `packages/application/test/execution-sandbox-operations.test.ts` | passed |
 | SBX-CMD-002 | application integration | Provider mismatch | Provider is not called when isolation or capability cannot be met. | same | passed |
-| SBX-CMD-003 | application integration | Pause/resume/terminate/expire | Valid transitions dispatch idempotent provider work and terminal access is denied. | same | passed |
+| SBX-CMD-003 | application integration | Pause/resume/terminate/expire | Valid transitions dispatch idempotent provider work, observed pause continuity is explicit, and terminal access is denied. Compute-released behavior is expanded by the Workspace Hibernation And Recovery matrix. | same | passed |
 | SBX-CMD-004 | application/provider | Bounded foreground exec | Ordered stdout/stderr and one terminal/error frame preserve argv/cwd/stdin/timeout/output limits. | `packages/adapters/runtime/test/docker-sandbox-provider.test.ts` | passed |
 | SBX-CMD-005 | application/provider | Background process lifecycle | Start/list/show/terminate use safe ids; live attach/events are not claimed. | application + hermetic provider tests | passed |
 | SBX-FILE-001 | application/provider | Binary file CRUD | Bytes round-trip without text coercion. | application, provider and SDK tests | passed |
