@@ -274,6 +274,13 @@ should record the previous same-resource runtime-owning deployment attempt that 
 for cleanup after the new candidate succeeds. Cleanup must target that superseded attempt identity,
 not every runtime instance that shares the same resource label.
 
+For Git-backed replacements, source materialization is candidate-first and attempt-scoped.
+Local-shell and generic-SSH adapters clone into the new Deployment attempt's workspace, initialize
+required submodules, and resolve the selected ref to an exact commit before any Docker/Compose
+mutation. Authentication failure, target-network failure, an unavailable repository, or a
+deleted/missing ref fails only the new attempt. The previous runtime, route, and source workspace
+remain untouched.
+
 For reverse-proxy resources, replacement is candidate-first. The runtime adapter must keep the
 previous successful runtime instance for the same resource serving until the replacement candidate
 has passed the required apply, internal health, proxy route realization, and public route

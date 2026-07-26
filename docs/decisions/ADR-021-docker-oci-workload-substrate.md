@@ -26,6 +26,7 @@ The accepted v1 runtime progression is:
 ```text
 detect source
   -> plan containerizable runtime
+  -> materialize attempt-scoped source and resolve the requested Git ref
   -> build or pull OCI/Docker image artifact
   -> start replacement container(s) or Compose project
   -> realize proxy route against the resource workload endpoint
@@ -55,6 +56,13 @@ started. Buildable services may then build with refreshed base images according 
 policy. A successful Compose command is only apply evidence: the adapter must resolve the
 configured target service and complete the required runtime health and public-route verification
 steps before it records deployment success.
+
+Git-backed source materialization is also a pre-mutation gate. Local-shell and generic-SSH runtime
+adapters must clone into a directory owned by the new Deployment attempt, initialize required
+submodules, and resolve the requested ref to an exact commit before starting, stopping, replacing,
+or cleaning any workload runtime. Authentication failure, target-network failure, an unavailable
+repository, or a deleted/missing ref fails only the new attempt. It must not overwrite a previous
+attempt's source workspace, stop its containers, remove its Compose project, or change its route.
 
 This preflight relies on the supported Compose v2/v5 CLI and its `pull --ignore-buildable`
 contract. Legacy Compose v1 is not a safe fallback for this rollout sequence; targets that only
@@ -179,6 +187,9 @@ Cleanup and replacement are resource-scoped:
 - reverse-proxy and route-mediated rollout strategies must keep the previous successful
   same-resource runtime serving until the replacement candidate passes required health, route, and
   public verification gates;
+- Git-backed replacement candidates must finish attempt-scoped source materialization and exact
+  commit resolution before any workload mutation; source acquisition failure must leave the
+  superseded runtime and source workspace untouched;
 - failed replacement candidates must be cleaned up separately from superseded successful runtime
   instances;
 - it must not stop another resource because it shares the same internal port, image, service name,
