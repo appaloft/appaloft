@@ -623,6 +623,7 @@ import {
   restoreResourceCommandInputSchema,
   restoreStorageVolumeBackupCommandInputSchema,
   resumeAgentTaskRunInputSchema,
+  resumeSandboxCommandInputSchema,
   retryCertificateCommandInputSchema,
   retryDeploymentCommandInputSchema,
   retryDomainBindingVerificationCommandInputSchema,
@@ -7458,7 +7459,7 @@ export const pauseSandboxProcedure = base
 
 export const resumeSandboxProcedure = base
   .route({ method: "POST", path: "/sandboxes/{sandboxId}/resume", successStatus: 200 })
-  .input(sandboxLifecycleCommandInputSchema)
+  .input(resumeSandboxCommandInputSchema)
   .output(sandboxOperationResponseSchema)
   .handler(async ({ input, context }) =>
     executeCommand(context, ResumeSandboxCommand.create(input)),

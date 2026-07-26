@@ -116,6 +116,7 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-094: Agent Workspace Entry Workflow](./ADR-094-agent-workspace-entry-workflow.md) | Accepted | Defines Agent Workspace as a public workflow over Sandbox, Agent Runtime, Terminal Session and expiring port operations, with Pi and OpenCode as adapters rather than a Cloud-only aggregate. |
 | [ADR-095: Agent Task Run Workflow](./ADR-095-agent-task-run-workflow.md) | Accepted | Defines Agent Task Run as a resumable public workflow over Agent Run, checks, Git changes, Development Preview, immutable review artifacts, external approval and forge-neutral pull-request delivery. |
 | [ADR-096: Workspace Collaboration Boundary](./ADR-096-workspace-collaboration-boundary.md) | Accepted | Defines public multi-Workspace coordination, human and Agent Runtime participants, exclusive generation-fenced writer leases, read-only PTY observers, native attach authorization and immutable artifact handoffs without duplicating Workspace lifecycle or vendor TUIs. |
+| [ADR-097: Workspace Hibernation And Recovery](./ADR-097-workspace-hibernation-and-recovery.md) | Accepted | Grades pause continuity, keeps same-identity hibernation separate from reusable snapshots, and defines idle auto-suspend, quota admission, placement and recovery portability boundaries. |
 
 ## Authoring Rules
 

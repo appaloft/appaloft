@@ -1,7 +1,7 @@
 import { AggregateRoot } from "../shared/entity";
 import { domainError } from "../shared/errors";
 import { err, ok, type Result } from "../shared/result";
-import { type CreatedAt, type ExpiresAt, type UpdatedAt } from "../shared/temporal";
+import { type CreatedAt, type ExpiresAt, UpdatedAt } from "../shared/temporal";
 import { ScalarValueObject } from "../shared/value-object";
 import { type SandboxNetworkPolicy } from "./network-policy";
 import {
@@ -16,6 +16,13 @@ export type SandboxSource =
   | { kind: "template"; templateId: SandboxTemplateId }
   | { kind: "image"; image: string }
   | { kind: "snapshot"; snapshotId: SandboxSnapshotId };
+export type SandboxPauseMode = "process-frozen" | "compute-released";
+export type SandboxRecoveryPortability = "provider-local" | "provider-family" | "portable";
+export interface SandboxSuspension {
+  mode: SandboxPauseMode;
+  portability: SandboxRecoveryPortability;
+  recoveryFamily?: string;
+}
 export type SandboxStatus =
   | "requested"
   | "provisioning"
@@ -55,10 +62,12 @@ export interface SandboxState {
   networkPolicy: SandboxNetworkPolicy;
   createdAt: CreatedAt;
   updatedAt?: UpdatedAt;
+  lastActivityAt?: UpdatedAt;
   expiresAt?: ExpiresAt;
   currentAttemptId?: string;
   provisionAttempts: number;
   providerHandle?: string;
+  suspension?: SandboxSuspension;
 }
 
 function transitionError(status: SandboxStatus, action: string) {
@@ -99,6 +108,7 @@ export class Sandbox extends AggregateRoot<SandboxState, SandboxId> {
       ...input,
       status: SandboxStatusValue.requested(),
       provisionAttempts: 0,
+      lastActivityAt: UpdatedAt.rehydrate(input.createdAt.value),
     });
     sandbox.recordDomainEvent("sandbox-requested", input.createdAt, {
       requestedIsolation: input.requestedIsolation.value,
@@ -117,6 +127,22 @@ export class Sandbox extends AggregateRoot<SandboxState, SandboxId> {
 
   canUseRuntime(): boolean {
     return this.state.status.value === "ready";
+  }
+
+  touchActivity(input: { at: UpdatedAt }): Result<void> {
+    if (!this.canUseRuntime()) {
+      return err(transitionError(this.state.status.value, "record runtime activity"));
+    }
+    if (this.state.lastActivityAt && input.at.toDate() < this.state.lastActivityAt.toDate()) {
+      return err(
+        domainError.invariant("Sandbox activity cannot move backwards", {
+          phase: "execution-sandbox-activity",
+        }),
+      );
+    }
+    this.state.lastActivityAt = input.at;
+    this.state.updatedAt = input.at;
+    return ok(undefined);
   }
 
   updateNetworkPolicy(input: { networkPolicy: SandboxNetworkPolicy; at: UpdatedAt }): Result<void> {
@@ -176,6 +202,8 @@ export class Sandbox extends AggregateRoot<SandboxState, SandboxId> {
     this.state.status = SandboxStatusValue.rehydrate("ready");
     this.state.realizedIsolation = input.realizedIsolation;
     this.state.providerHandle = handle;
+    delete this.state.suspension;
+    this.state.lastActivityAt = input.at;
     this.state.updatedAt = input.at;
     this.recordDomainEvent(wasResuming ? "sandbox-resumed" : "sandbox-ready", input.at, {
       realizedIsolation: input.realizedIsolation.value,
@@ -194,13 +222,47 @@ export class Sandbox extends AggregateRoot<SandboxState, SandboxId> {
     return ok(undefined);
   }
 
-  markPaused(input: { at: UpdatedAt }): Result<void> {
+  markPaused(input: {
+    at: UpdatedAt;
+    providerHandle: string;
+    suspension: SandboxSuspension;
+  }): Result<void> {
     if (this.state.status.value !== "pausing") {
       return err(transitionError(this.state.status.value, "become paused"));
     }
+    const handle = input.providerHandle.trim();
+    if (!handle || handle.length > 512 || /\s/.test(handle)) {
+      return err(
+        domainError.validation("Sandbox recovery handle is invalid", {
+          phase: "execution-sandbox-provider-observation",
+          field: "providerHandle",
+        }),
+      );
+    }
+    if (
+      input.suspension.portability === "provider-family" &&
+      !input.suspension.recoveryFamily?.trim()
+    ) {
+      return err(
+        domainError.validation("Provider-family recovery requires a recovery family", {
+          phase: "execution-sandbox-provider-observation",
+          field: "recoveryFamily",
+        }),
+      );
+    }
     this.state.status = SandboxStatusValue.rehydrate("paused");
+    this.state.providerHandle = handle;
+    this.state.suspension = {
+      ...input.suspension,
+      ...(input.suspension.recoveryFamily
+        ? { recoveryFamily: input.suspension.recoveryFamily.trim() }
+        : {}),
+    };
     this.state.updatedAt = input.at;
-    this.recordDomainEvent("sandbox-paused", input.at, {});
+    this.recordDomainEvent("sandbox-paused", input.at, {
+      mode: input.suspension.mode,
+      portability: input.suspension.portability,
+    });
     return ok(undefined);
   }
 
@@ -250,6 +312,7 @@ export class Sandbox extends AggregateRoot<SandboxState, SandboxId> {
     }
     this.state.status = SandboxStatusValue.rehydrate("terminated");
     delete this.state.providerHandle;
+    delete this.state.suspension;
     this.state.updatedAt = input.at;
     this.recordDomainEvent("sandbox-terminated", input.at, {});
     return ok(undefined);
@@ -262,6 +325,7 @@ export class Sandbox extends AggregateRoot<SandboxState, SandboxId> {
     }
     this.state.status = SandboxStatusValue.rehydrate("expired");
     delete this.state.providerHandle;
+    delete this.state.suspension;
     this.state.updatedAt = input.at;
     this.recordDomainEvent("sandbox-expired", input.at, {});
     return ok(undefined);

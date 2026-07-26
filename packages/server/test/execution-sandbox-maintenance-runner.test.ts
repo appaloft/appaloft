@@ -27,13 +27,15 @@ const executionContextFactory: ExecutionContextFactory = {
 describe("execution sandbox maintenance runner", () => {
   test("[SBX-MAINTENANCE-001] starts immediately with a system context and can stop", async () => {
     let observedContext: ExecutionContext | undefined;
+    let observedInput: Parameters<ExecutionSandboxService["maintainAllTenants"]>[1] | undefined;
     let resolveCalled: (() => void) | undefined;
     const called = new Promise<void>((resolve) => {
       resolveCalled = resolve;
     });
     const service: Pick<ExecutionSandboxService, "maintainAllTenants"> = {
-      async maintainAllTenants(context) {
+      async maintainAllTenants(context, input) {
         observedContext = context;
+        observedInput = input;
         resolveCalled?.();
         return ok({ tenants: [] });
       },
@@ -43,6 +45,19 @@ describe("execution sandbox maintenance runner", () => {
       executionContextFactory,
       logger,
       intervalSeconds: 5,
+      terminalSessionGateway: {
+        list: () => [
+          {
+            sessionId: "term_active",
+            scope: "sandbox",
+            sandboxId: "sbx_active",
+            transport: { kind: "websocket", path: "/terminal" },
+            providerKey: "docker",
+            createdAt: "2026-07-20T00:00:00.000Z",
+            status: "active",
+          },
+        ],
+      },
     });
 
     runner.start();
@@ -54,5 +69,6 @@ describe("execution sandbox maintenance runner", () => {
       kind: "system",
       id: "execution-sandbox-maintenance-runner",
     });
+    expect(observedInput).toEqual({ protectedSandboxIds: ["sbx_active"] });
   });
 });

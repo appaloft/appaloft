@@ -89,6 +89,14 @@ describe("Sandbox SDK resource handles", () => {
             mode: "foreground",
             frames: [{ kind: "exit", sequence: 1, exitCode: 0 }],
           });
+        if (path.endsWith("/pause"))
+          return Response.json({
+            sandboxId: "sbx_job",
+            status: "paused",
+            suspension: { mode: "compute-released", portability: "provider-local" },
+          });
+        if (path.endsWith("/resume"))
+          return Response.json({ sandboxId: "sbx_job", status: "ready" });
         if (path.endsWith("/terminate"))
           return Response.json({ sandboxId: "sbx_job", status: "terminated" });
         throw new Error(`Unexpected SDK request ${request.method} ${path}`);
@@ -99,16 +107,21 @@ describe("Sandbox SDK resource handles", () => {
     await sandbox.files.write({ path: "job/input.txt", contentBase64: "b2s=" });
     await sandbox.files.read({ path: "job/input.txt" });
     await sandbox.exec({ argv: ["python3", "job.py"], timeoutMs: 1_000 });
-    await sandbox.terminate();
+    const paused = await sandbox.pause();
+    const resumed = await paused.resume({ providerKey: "server-a" });
+    await resumed.terminate();
 
     expect(requests.map((request) => new URL(request.url).pathname)).toEqual([
       "/api/sandboxes",
       "/api/sandboxes/sbx_job/files/write",
       "/api/sandboxes/sbx_job/files/read",
       "/api/sandboxes/sbx_job/exec",
+      "/api/sandboxes/sbx_job/pause",
+      "/api/sandboxes/sbx_job/resume",
       "/api/sandboxes/sbx_job/terminate",
     ]);
     expect(await requests[3]?.json()).toEqual({ argv: ["python3", "job.py"], timeoutMs: 1_000 });
+    expect(await requests[5]?.json()).toEqual({ providerKey: "server-a" });
   });
 
   test("[TS-SDK-RESOURCE-002] throws a safe structured request error", async () => {
