@@ -62,6 +62,14 @@ export function createExecutionSandboxMaintenanceRunner(input: {
         expiredCount: result.value.tenants.reduce((total, item) => total + item.expired, 0),
         suspendedCount: result.value.tenants.reduce((total, item) => total + item.suspended, 0),
         reconciledCount: result.value.tenants.reduce((total, item) => total + item.reconciled, 0),
+        snapshotCapturedCount: result.value.tenants.reduce(
+          (total, item) => total + item.snapshotsCaptured,
+          0,
+        ),
+        snapshotPrunedCount: result.value.tenants.reduce(
+          (total, item) => total + item.snapshotsPruned,
+          0,
+        ),
         removedOrphanCount: result.value.tenants.reduce(
           (total, item) => total + item.removedOrphans,
           0,

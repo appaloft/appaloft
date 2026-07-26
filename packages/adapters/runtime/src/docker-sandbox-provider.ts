@@ -224,9 +224,17 @@ function hibernationImage(sandboxId: string): string {
 }
 
 const portableRecoveryHandlePrefix = "appaloft-docker-recovery:v1:";
+const portableSnapshotHandlePrefix = "appaloft-docker-snapshot:v1:";
 
 interface PortableRecoveryHandle {
   sandboxId: string;
+  packageId: string;
+  digest: string;
+}
+
+interface PortableSnapshotHandle {
+  snapshotId: string;
+  sourceSandboxId: string;
   packageId: string;
   digest: string;
 }
@@ -293,6 +301,42 @@ function decodePortableRecoveryHandle(
   }
 }
 
+function encodePortableSnapshotHandle(input: PortableSnapshotHandle): string {
+  return `${portableSnapshotHandlePrefix}${Buffer.from(JSON.stringify(input)).toString("base64url")}`;
+}
+
+function decodePortableSnapshotHandle(providerHandle: string): PortableSnapshotHandle {
+  if (!providerHandle.startsWith(portableSnapshotHandlePrefix)) {
+    throw new Error("Docker portable Snapshot handle is invalid");
+  }
+  const encoded = providerHandle.slice(portableSnapshotHandlePrefix.length);
+  try {
+    const decoded = Buffer.from(encoded, "base64url");
+    if (decoded.toString("base64url") !== encoded) throw new Error("non-canonical handle");
+    const value = JSON.parse(decoded.toString("utf8")) as Partial<PortableSnapshotHandle>;
+    if (
+      typeof value.snapshotId !== "string" ||
+      !/^ssn_[A-Za-z0-9_.-]{1,120}$/.test(value.snapshotId) ||
+      typeof value.sourceSandboxId !== "string" ||
+      !/^sbx_[A-Za-z0-9_.-]{1,120}$/.test(value.sourceSandboxId) ||
+      typeof value.packageId !== "string" ||
+      !/^ps_[0-9a-f]{32}$/.test(value.packageId) ||
+      typeof value.digest !== "string" ||
+      !/^sha256:[0-9a-f]{64}$/.test(value.digest)
+    ) {
+      throw new Error("invalid Snapshot handle");
+    }
+    return {
+      snapshotId: value.snapshotId,
+      sourceSandboxId: value.sourceSandboxId,
+      packageId: value.packageId,
+      digest: value.digest,
+    };
+  } catch {
+    throw new Error("Docker portable Snapshot handle is invalid");
+  }
+}
+
 export class DockerSandboxProvider implements SandboxProvider {
   readonly key: string;
   readonly capabilities: SandboxProvider["capabilities"];
@@ -331,6 +375,12 @@ export class DockerSandboxProvider implements SandboxProvider {
           : { portability: "provider-local" as const }),
       },
       snapshot: ["filesystem" as const],
+      snapshotRecovery: this.portableRecovery
+        ? {
+            portability: "provider-family" as const,
+            recoveryFamily: portableRecoveryFamily(this.portableRecovery.storeId),
+          }
+        : { portability: "provider-local" as const },
       processes: true,
       files: true,
       ports: Boolean(input.portPublisher),
@@ -373,20 +423,29 @@ export class DockerSandboxProvider implements SandboxProvider {
       throw new Error("Docker provider requires an egress policy adapter for allowlist mode");
     }
     await this.probe();
+    let source = request.source;
+    let portableSnapshotImage: string | undefined;
+    if (
+      source.kind === "snapshot" &&
+      source.providerHandle.startsWith(portableSnapshotHandlePrefix)
+    ) {
+      portableSnapshotImage = await this.loadPortableSnapshot(source.providerHandle);
+      source = { ...source, providerHandle: portableSnapshotImage };
+    }
     const name = containerName(request.sandboxId);
     const memoryMb = Math.max(4, Math.ceil(request.limits.memoryBytes / (1024 * 1024)));
     const diskMb = Math.max(4, Math.ceil(request.limits.diskBytes / (1024 * 1024)));
     if (
-      request.source.kind === "snapshot" &&
+      source.kind === "snapshot" &&
       !/^appaloft-sandbox-(?:snapshot:ssn_|hibernate:sbx_)[A-Za-z0-9_.-]{1,120}$/.test(
-        request.source.providerHandle,
+        source.providerHandle,
       )
     ) {
       throw new Error("Docker snapshot provider handle is invalid");
     }
-    const image = request.source.kind === "image" ? request.source.image : request.source.providerHandle;
+    const image = source.kind === "image" ? source.image : source.providerHandle;
     const startup =
-      request.source.kind === "snapshot"
+      source.kind === "snapshot"
         ? "set -e; cp -a /appaloft-snapshot-workspace/. /workspace/; touch /tmp/.appaloft-workspace-ready; trap : TERM INT; sleep infinity & wait"
         : "set -e; touch /tmp/.appaloft-workspace-ready; trap : TERM INT; sleep infinity & wait";
     let egress: { proxyUrl: string; noProxy?: readonly string[] } | undefined;
@@ -481,7 +540,13 @@ export class DockerSandboxProvider implements SandboxProvider {
           { cause: error },
         );
       }
+      if (portableSnapshotImage) {
+        await this.runner.run(["docker", "image", "rm", portableSnapshotImage]);
+      }
       throw error;
+    }
+    if (portableSnapshotImage) {
+      await this.runner.run(["docker", "image", "rm", portableSnapshotImage]);
     }
     return { providerHandle: name, realizedIsolation: this.capabilities.isolation };
   }
@@ -496,7 +561,7 @@ export class DockerSandboxProvider implements SandboxProvider {
       ...request,
       image,
       helper: `${containerName(request.sandboxId)}-hibernate`,
-      label: `appaloft.hibernate.sandbox=${request.sandboxId}`,
+      labels: [`appaloft.hibernate.sandbox=${request.sandboxId}`],
     });
     let portableHandle: string | undefined;
     try {
@@ -1062,7 +1127,7 @@ export class DockerSandboxProvider implements SandboxProvider {
     providerHandle: string;
     image: string;
     helper: string;
-    label: string;
+    labels: readonly string[];
   }): Promise<number> {
     const inspectedBaseImage = await this.docker([
       "inspect",
@@ -1091,8 +1156,7 @@ export class DockerSandboxProvider implements SandboxProvider {
         input.helper,
         "--label",
         "appaloft.managed=true",
-        "--label",
-        input.label,
+        ...input.labels.flatMap((label) => ["--label", label]),
         "--label",
         `appaloft.sandbox.base-image=${sourceImage}`,
         "--network",
@@ -1131,7 +1195,7 @@ export class DockerSandboxProvider implements SandboxProvider {
     providerHandle: string;
     snapshotId: string;
     capability: "filesystem" | "filesystem-memory";
-  }): Promise<{ providerHandle: string; sizeBytes: number }> {
+  }): ReturnType<SandboxProvider["captureSnapshot"]> {
     await this.assertHandle(request);
     if (request.capability !== "filesystem") throw new Error("Unsupported snapshot capability");
     if (!/^ssn_[A-Za-z0-9_.-]{1,120}$/.test(request.snapshotId)) {
@@ -1143,12 +1207,48 @@ export class DockerSandboxProvider implements SandboxProvider {
       ...request,
       image,
       helper,
-      label: `appaloft.snapshot.id=${request.snapshotId}`,
+      labels: [
+        `appaloft.snapshot.id=${request.snapshotId}`,
+        `appaloft.snapshot.source-sandbox=${request.sandboxId}`,
+      ],
     });
-    return { providerHandle: image, sizeBytes };
+    if (this.portableRecovery) {
+      const providerHandle = await this.storePortableSnapshot({
+        snapshotId: request.snapshotId,
+        sourceSandboxId: request.sandboxId,
+        image,
+      });
+      try {
+        await this.docker(["image", "rm", image]);
+      } catch (error) {
+        await this.deletePortableSnapshot(providerHandle).catch(() => undefined);
+        throw error;
+      }
+      return {
+        providerHandle,
+        sizeBytes,
+        portability: "provider-family" as const,
+        recoveryFamily: portableRecoveryFamily(this.portableRecovery.storeId),
+      };
+    }
+    return { providerHandle: image, sizeBytes, portability: "provider-local" as const };
   }
 
   async deleteSnapshot(request: { snapshotId: string; providerHandle: string }): Promise<void> {
+    if (request.providerHandle.startsWith(portableSnapshotHandlePrefix)) {
+      const snapshot = decodePortableSnapshotHandle(request.providerHandle);
+      if (snapshot.snapshotId !== request.snapshotId) {
+        throw new Error("Docker portable Snapshot handle does not match the Snapshot");
+      }
+      await this.deletePortableSnapshot(request.providerHandle);
+      await this.runner.run([
+        "docker",
+        "image",
+        "rm",
+        `appaloft-sandbox-snapshot:${request.snapshotId}`,
+      ]);
+      return;
+    }
     const expected = `appaloft-sandbox-snapshot:${request.snapshotId}`;
     if (request.providerHandle !== expected) {
       throw new Error("Sandbox snapshot provider handle does not match the managed image");
@@ -1319,6 +1419,19 @@ export class DockerSandboxProvider implements SandboxProvider {
     return `${this.portableRecovery.rootPath}/v1/${sandboxId}-${packageId}.tar`;
   }
 
+  private portableSnapshotPath(snapshotId: string, packageId: string): string {
+    if (!this.portableRecovery) {
+      throw new Error("Docker portable recovery store is not configured");
+    }
+    if (
+      !/^ssn_[A-Za-z0-9_.-]{1,120}$/.test(snapshotId) ||
+      !/^ps_[0-9a-f]{32}$/.test(packageId)
+    ) {
+      throw new Error("Docker portable Snapshot package identity is invalid");
+    }
+    return `${this.portableRecovery.rootPath}/v1/snapshots/${snapshotId}-${packageId}.tar`;
+  }
+
   private async storePortableRecovery(sandboxId: string, image: string): Promise<string> {
     if (!this.portableRecovery) {
       throw new Error("Docker portable recovery store is not configured");
@@ -1384,6 +1497,78 @@ export class DockerSandboxProvider implements SandboxProvider {
   ): Promise<void> {
     const recovery = decodePortableRecoveryHandle(providerHandle, sandboxId);
     const path = this.portableRecoveryPath(sandboxId, recovery.packageId);
+    await this.workerCommand(["rm", "-f", "--", path]);
+  }
+
+  private async storePortableSnapshot(input: {
+    snapshotId: string;
+    sourceSandboxId: string;
+    image: string;
+  }): Promise<string> {
+    if (!this.portableRecovery) {
+      throw new Error("Docker portable recovery store is not configured");
+    }
+    const packageId = `ps_${randomUUID().replaceAll("-", "")}`;
+    const path = this.portableSnapshotPath(input.snapshotId, packageId);
+    const partialPath = `${path}.partial`;
+    const directory = `${this.portableRecovery.rootPath}/v1/snapshots`;
+    await this.workerCommand(["mkdir", "-p", "--", directory]);
+    await this.workerCommand(["chmod", "700", directory]);
+    await this.workerCommand(["rm", "-f", "--", partialPath]);
+    try {
+      await this.docker(["save", "--output", partialPath, input.image]);
+      await this.workerCommand(["chmod", "600", partialPath]);
+      const observed = await this.workerCommand(["sha256sum", "--", partialPath]);
+      const digest = text(observed.stdout).trim().split(/\s+/u)[0];
+      if (!digest || !/^[0-9a-f]{64}$/.test(digest)) {
+        throw new Error("Docker portable Snapshot digest is invalid");
+      }
+      await this.workerCommand(["mv", "--", partialPath, path]);
+      return encodePortableSnapshotHandle({
+        snapshotId: input.snapshotId,
+        sourceSandboxId: input.sourceSandboxId,
+        packageId,
+        digest: `sha256:${digest}`,
+      });
+    } catch (error) {
+      await this.runner.run(["rm", "-f", "--", partialPath]);
+      throw error;
+    }
+  }
+
+  private async loadPortableSnapshot(providerHandle: string): Promise<string> {
+    if (!this.portableRecovery) {
+      throw new Error("Docker portable recovery store is not configured");
+    }
+    const snapshot = decodePortableSnapshotHandle(providerHandle);
+    const path = this.portableSnapshotPath(snapshot.snapshotId, snapshot.packageId);
+    const observed = await this.workerCommand(["sha256sum", "--", path]);
+    const digest = text(observed.stdout).trim().split(/\s+/u)[0];
+    if (`sha256:${digest}` !== snapshot.digest) {
+      throw new Error("Docker portable Snapshot package digest does not match");
+    }
+    await this.docker(["load", "--input", path]);
+    const image = `appaloft-sandbox-snapshot:${snapshot.snapshotId}`;
+    const ownership = await this.docker([
+      "image",
+      "inspect",
+      "--format",
+      '{{index .Config.Labels "appaloft.snapshot.id"}}|{{index .Config.Labels "appaloft.snapshot.source-sandbox"}}',
+      image,
+    ]);
+    if (
+      text(ownership.stdout).trim() !==
+      `${snapshot.snapshotId}|${snapshot.sourceSandboxId}`
+    ) {
+      await this.runner.run(["docker", "image", "rm", image]);
+      throw new Error("Docker portable Snapshot package ownership does not match");
+    }
+    return image;
+  }
+
+  private async deletePortableSnapshot(providerHandle: string): Promise<void> {
+    const snapshot = decodePortableSnapshotHandle(providerHandle);
+    const path = this.portableSnapshotPath(snapshot.snapshotId, snapshot.packageId);
     await this.workerCommand(["rm", "-f", "--", path]);
   }
 

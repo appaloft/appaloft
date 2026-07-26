@@ -3,9 +3,11 @@ import { domainError } from "../shared/errors";
 import { err, ok, type Result } from "../shared/result";
 import { type CreatedAt, type ExpiresAt, type UpdatedAt } from "../shared/temporal";
 import { ScalarValueObject } from "../shared/value-object";
+import { type SandboxRecoveryPortability } from "./sandbox";
 import { type SandboxId, type SandboxSnapshotId } from "./values";
 
 export type SandboxSnapshotCapability = "filesystem" | "filesystem-memory";
+export type SandboxSnapshotReason = "manual" | "scheduled" | "pre-termination";
 export type SandboxSnapshotStatus = "requested" | "capturing" | "ready" | "failed" | "deleted";
 
 const snapshotStatusBrand: unique symbol = Symbol("SandboxSnapshotStatusValue");
@@ -26,7 +28,10 @@ export interface SandboxSnapshotState {
   id: SandboxSnapshotId;
   sourceSandboxId: SandboxId;
   capability: SandboxSnapshotCapability;
+  reason: SandboxSnapshotReason;
   status: SandboxSnapshotStatusValue;
+  portability: SandboxRecoveryPortability;
+  recoveryFamily?: string;
   createdAt: CreatedAt;
   updatedAt?: UpdatedAt;
   expiresAt?: ExpiresAt;
@@ -47,7 +52,11 @@ export class SandboxSnapshot extends AggregateRoot<SandboxSnapshotState, Sandbox
   private constructor(state: SandboxSnapshotState) {
     super(state);
   }
-  static create(input: Omit<SandboxSnapshotState, "status">): Result<SandboxSnapshot> {
+  static create(
+    input: Omit<SandboxSnapshotState, "status" | "reason" | "portability"> & {
+      reason?: SandboxSnapshotReason;
+    },
+  ): Result<SandboxSnapshot> {
     if (input.expiresAt && input.expiresAt.toDate() <= input.createdAt.toDate()) {
       return err(
         domainError.validation("Sandbox snapshot expiry must be after creation", {
@@ -58,11 +67,14 @@ export class SandboxSnapshot extends AggregateRoot<SandboxSnapshotState, Sandbox
     }
     const snapshot = new SandboxSnapshot({
       ...input,
+      reason: input.reason ?? "manual",
+      portability: "provider-local",
       status: SandboxSnapshotStatusValue.requested(),
     });
     snapshot.recordDomainEvent("sandbox-snapshot-requested", input.createdAt, {
       sourceSandboxId: input.sourceSandboxId.value,
       capability: input.capability,
+      reason: input.reason ?? "manual",
     });
     return ok(snapshot);
   }
@@ -84,7 +96,13 @@ export class SandboxSnapshot extends AggregateRoot<SandboxSnapshotState, Sandbox
     this.state.updatedAt = input.at;
     return ok(undefined);
   }
-  markReady(input: { providerHandle: string; sizeBytes: number; at: UpdatedAt }): Result<void> {
+  markReady(input: {
+    providerHandle: string;
+    sizeBytes: number;
+    portability: SandboxRecoveryPortability;
+    recoveryFamily?: string;
+    at: UpdatedAt;
+  }): Result<void> {
     if (this.state.status.value !== "capturing") {
       return err(snapshotTransitionError(this.state.status.value, "become ready"));
     }
@@ -92,7 +110,12 @@ export class SandboxSnapshot extends AggregateRoot<SandboxSnapshotState, Sandbox
       !input.providerHandle.trim() ||
       /\s/.test(input.providerHandle) ||
       !Number.isSafeInteger(input.sizeBytes) ||
-      input.sizeBytes < 0
+      input.sizeBytes < 0 ||
+      (input.portability === "provider-family" && !input.recoveryFamily?.trim()) ||
+      (input.portability !== "provider-family" && input.recoveryFamily !== undefined) ||
+      (input.recoveryFamily !== undefined &&
+        (!/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}$/.test(input.recoveryFamily) ||
+          /\s/.test(input.recoveryFamily)))
     ) {
       return err(
         domainError.validation("Sandbox snapshot provider observation is invalid", {
@@ -103,10 +126,16 @@ export class SandboxSnapshot extends AggregateRoot<SandboxSnapshotState, Sandbox
     this.state.status = SandboxSnapshotStatusValue.rehydrate("ready");
     this.state.providerHandle = input.providerHandle;
     this.state.sizeBytes = input.sizeBytes;
+    this.state.portability = input.portability;
+    if (input.recoveryFamily) this.state.recoveryFamily = input.recoveryFamily;
+    else delete this.state.recoveryFamily;
     this.state.updatedAt = input.at;
     this.recordDomainEvent("sandbox-snapshot-ready", input.at, {
       sourceSandboxId: this.state.sourceSandboxId.value,
       capability: this.state.capability,
+      reason: this.state.reason,
+      portability: input.portability,
+      recoveryFamily: input.recoveryFamily ?? null,
       sizeBytes: input.sizeBytes,
       attemptId: this.state.currentAttemptId ?? null,
     });

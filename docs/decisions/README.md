@@ -118,6 +118,7 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-096: Workspace Collaboration Boundary](./ADR-096-workspace-collaboration-boundary.md) | Accepted | Defines public multi-Workspace coordination, human and Agent Runtime participants, exclusive generation-fenced writer leases, read-only PTY observers, native attach authorization and immutable artifact handoffs without duplicating Workspace lifecycle or vendor TUIs. |
 | [ADR-097: Workspace Hibernation And Recovery](./ADR-097-workspace-hibernation-and-recovery.md) | Accepted | Grades pause continuity, keeps same-identity hibernation separate from reusable snapshots, and defines idle auto-suspend, quota admission, placement and recovery portability boundaries. |
 | [ADR-098: Portable Workspace Recovery And Placement Reconciliation](./ADR-098-portable-workspace-recovery-and-placement-reconciliation.md) | Accepted | Defines integrity-checked shared recovery packages, explicit recovery-family compatibility and provider-neutral maintenance relocation without exposing topology or adding a Cloud-only migration aggregate. |
+| [ADR-099: Reusable Workspace Snapshot Policy](./ADR-099-reusable-workspace-snapshot-policy.md) | Accepted | Defines policy-driven reusable Snapshot capture, retention, destructive cleanup gates and portable one-to-many restore without claiming process continuity. |
 
 ## Authoring Rules
 

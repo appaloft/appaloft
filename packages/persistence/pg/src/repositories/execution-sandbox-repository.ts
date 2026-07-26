@@ -131,6 +131,9 @@ function sandboxFromRow(row: SandboxRow): Sandbox {
 
 type SerializedSnapshotState = {
   capability: "filesystem" | "filesystem-memory";
+  reason?: "manual" | "scheduled" | "pre-termination";
+  portability?: "provider-local" | "provider-family" | "portable";
+  recoveryFamily?: string;
   currentAttemptId?: string;
   providerHandle?: string;
   sizeBytes?: number;
@@ -168,6 +171,8 @@ function snapshotFromRow(row: SnapshotRow): SandboxSnapshot {
     id: SandboxSnapshotId.rehydrate(row.id),
     sourceSandboxId: SandboxId.rehydrate(row.source_sandbox_id),
     capability: state.capability,
+    reason: state.reason ?? "manual",
+    portability: state.portability ?? "provider-local",
     status: SandboxSnapshotStatusValue.rehydrate(
       row.status as Parameters<typeof SandboxSnapshotStatusValue.rehydrate>[0],
     ),
@@ -179,6 +184,7 @@ function snapshotFromRow(row: SnapshotRow): SandboxSnapshot {
     ...(state.currentAttemptId ? { currentAttemptId: state.currentAttemptId } : {}),
     ...(state.providerHandle ? { providerHandle: state.providerHandle } : {}),
     ...(state.sizeBytes !== undefined ? { sizeBytes: state.sizeBytes } : {}),
+    ...(state.recoveryFamily ? { recoveryFamily: state.recoveryFamily } : {}),
   });
 }
 
@@ -418,9 +424,12 @@ export class PgExecutionSandboxRepository implements SandboxRepository {
     const state = snapshot.toState();
     const serialized: SerializedSnapshotState = {
       capability: state.capability,
+      reason: state.reason,
+      portability: state.portability,
       ...(state.currentAttemptId ? { currentAttemptId: state.currentAttemptId } : {}),
       ...(state.providerHandle ? { providerHandle: state.providerHandle } : {}),
       ...(state.sizeBytes !== undefined ? { sizeBytes: state.sizeBytes } : {}),
+      ...(state.recoveryFamily ? { recoveryFamily: state.recoveryFamily } : {}),
     };
     const row = {
       tenant_id: contextTenantId(context),
@@ -473,6 +482,47 @@ export class PgExecutionSandboxRepository implements SandboxRepository {
       .orderBy("created_at", "desc")
       .limit(input.limit)
       .offset(input.offset)
+      .execute();
+    return rows.map((row) => ({
+      tenantId: row.tenant_id,
+      providerKey: row.provider_key,
+      snapshot: snapshotFromRow(row),
+    }));
+  }
+
+  async listSnapshotsForSandbox(
+    context: RepositoryContext,
+    sandboxId: string,
+    input: { limit: number },
+  ): Promise<StoredSnapshot[]> {
+    const rows = await resolveRepositoryExecutor(this.db, context)
+      .selectFrom("execution_sandbox_snapshots")
+      .selectAll()
+      .where("tenant_id", "=", contextTenantId(context))
+      .where("source_sandbox_id", "=", sandboxId)
+      .orderBy("created_at", "desc")
+      .limit(input.limit)
+      .execute();
+    return rows.map((row) => ({
+      tenantId: row.tenant_id,
+      providerKey: row.provider_key,
+      snapshot: snapshotFromRow(row),
+    }));
+  }
+
+  async listSnapshotsForMaintenance(
+    context: RepositoryContext,
+    input: { expiresBefore: string; limit: number },
+  ): Promise<StoredSnapshot[]> {
+    const rows = await resolveRepositoryExecutor(this.db, context)
+      .selectFrom("execution_sandbox_snapshots")
+      .selectAll()
+      .where("tenant_id", "=", contextTenantId(context))
+      .where("status", "not in", ["capturing", "deleted"])
+      .where("expires_at", "is not", null)
+      .where("expires_at", "<=", input.expiresBefore)
+      .orderBy("expires_at", "asc")
+      .limit(input.limit)
       .execute();
     return rows.map((row) => ({
       tenantId: row.tenant_id,

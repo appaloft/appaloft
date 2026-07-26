@@ -128,6 +128,10 @@ Product constraints:
   [Spec 115](./specs/115-portable-workspace-recovery-and-placement-reconciliation/spec.md):
   integrity-checked shared recovery packages, retry-safe cross-provider restore and maintenance
   relocation without exposing provider topology.
+- [x] Deliver reusable Workspace Snapshot policy under
+  [ADR-099](./decisions/ADR-099-reusable-workspace-snapshot-policy.md) and
+  [Spec 116](./specs/116-reusable-workspace-snapshot-policy/spec.md): scheduled capture, exact
+  retention, required/best-effort destructive recovery gates and portable one-to-many restore.
 - [x] Keep Delivery Evidence Chain claims limited to observed delivery evidence; do not imply
   formal correctness, security, vulnerability absence, or compliance.
 - [x] Treat Appaloft as a self-hosted deployment control plane, not a web-first CRUD app.

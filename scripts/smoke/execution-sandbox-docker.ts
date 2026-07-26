@@ -12,6 +12,11 @@ const sourceSandboxId = `sbx_smoke_${suffix}`;
 const restoredSandboxId = `sbx_restore_${suffix}`;
 const portableSandboxId = `sbx_portable_${suffix}`;
 const snapshotId = `ssn_smoke_${suffix}`;
+const portableSnapshotId = `ssn_portable_${suffix}`;
+const portableSnapshotRestoreIds = [
+  `sbx_snapshot_restore_a_${suffix}`,
+  `sbx_snapshot_restore_b_${suffix}`,
+];
 const ownerScope = `smoke_${suffix}`;
 const provider = new DockerSandboxProvider({ isolation: "container-trusted" });
 const portableRecoveryRoot = await mkdtemp(join(tmpdir(), "appaloft-portable-recovery-"));
@@ -42,6 +47,8 @@ let snapshotHandle: string | undefined;
 let hibernationHandle: string | undefined;
 let portableRecoveryHandle: string | undefined;
 let portableRecoveryPath: string | undefined;
+let portableSnapshotHandle: string | undefined;
+let portableSnapshotPath: string | undefined;
 
 async function removeOwnedContainer(sandboxId: string, handle: string): Promise<void> {
   const inspected = Bun.spawnSync([
@@ -97,6 +104,14 @@ async function cleanup(): Promise<void> {
       .terminate({
         sandboxId: portableSandboxId,
         providerHandle: portableRecoveryHandle,
+      })
+      .catch(() => undefined);
+  }
+  if (portableSnapshotHandle) {
+    await portableTargetProvider
+      .deleteSnapshot({
+        snapshotId: portableSnapshotId,
+        providerHandle: portableSnapshotHandle,
       })
       .catch(() => undefined);
   }
@@ -347,6 +362,72 @@ try {
     portableRecoveryPath !== undefined && !(await Bun.file(portableRecoveryPath).exists()),
     "portable target restore retained the one-shot recovery package",
   );
+  const reusableSnapshot = await portableTargetProvider.captureSnapshot({
+    sandboxId: portableSandboxId,
+    providerHandle: portableResumed.providerHandle,
+    snapshotId: portableSnapshotId,
+    capability: "filesystem",
+  });
+  portableSnapshotHandle = reusableSnapshot.providerHandle;
+  assert(
+    reusableSnapshot.portability === "provider-family" &&
+      reusableSnapshot.recoveryFamily ===
+        portableTargetProvider.capabilities.snapshotRecovery?.recoveryFamily,
+    "portable reusable Snapshot did not declare the shared recovery family",
+  );
+  const portableSnapshotFiles = await readdir(`${portableRecoveryRoot}/v1/snapshots`);
+  const portableSnapshotFile = portableSnapshotFiles.find(
+    (name) => name.startsWith(`${portableSnapshotId}-ps_`) && name.endsWith(".tar"),
+  );
+  assert(portableSnapshotFile, "portable reusable Snapshot package is missing");
+  portableSnapshotPath = `${portableRecoveryRoot}/v1/snapshots/${portableSnapshotFile}`;
+
+  for (const [index, restoreSandboxId] of portableSnapshotRestoreIds.entries()) {
+    const restoringProvider = index === 0 ? portableSourceProvider : portableTargetProvider;
+    const restoredSnapshot = await restoringProvider.provision({
+      sandboxId: restoreSandboxId,
+      ownerScope,
+      source: {
+        kind: "snapshot",
+        providerHandle: reusableSnapshot.providerHandle,
+        portability: reusableSnapshot.portability,
+        ...(reusableSnapshot.recoveryFamily
+          ? { recoveryFamily: reusableSnapshot.recoveryFamily }
+          : {}),
+      },
+      requestedIsolation: "container-trusted",
+      limits,
+      networkPolicy: { mode: "deny", rules: [] },
+    });
+    handles.set(restoreSandboxId, restoredSnapshot.providerHandle);
+    const restoredPortableBytes = await restoringProvider.readFile({
+      sandboxId: restoreSandboxId,
+      providerHandle: restoredSnapshot.providerHandle,
+      path: "portable/marker.bin",
+    });
+    assert(
+      new TextDecoder().decode(restoredPortableBytes) === "PORT",
+      `portable reusable Snapshot restore ${index + 1} did not preserve workspace bytes`,
+    );
+    assert(
+      await Bun.file(portableSnapshotPath).exists(),
+      `portable reusable Snapshot package was consumed by restore ${index + 1}`,
+    );
+    await restoringProvider.terminate({
+      sandboxId: restoreSandboxId,
+      providerHandle: restoredSnapshot.providerHandle,
+    });
+    handles.delete(restoreSandboxId);
+  }
+  await portableTargetProvider.deleteSnapshot({
+    snapshotId: portableSnapshotId,
+    providerHandle: reusableSnapshot.providerHandle,
+  });
+  portableSnapshotHandle = undefined;
+  assert(
+    !(await Bun.file(portableSnapshotPath).exists()),
+    "portable reusable Snapshot exact deletion retained the package",
+  );
   await portableTargetProvider.terminate({
     sandboxId: portableSandboxId,
     providerHandle: portableResumed.providerHandle,
@@ -363,6 +444,7 @@ try {
   console.log("SBX-RUNTIME-003 Docker sandbox closed loop passed");
   console.log("HIB-DOCKER-001/002 compute-released hibernation closed loop passed");
   console.log("PORT-REC-001/002 portable two-provider recovery closed loop passed");
+  console.log("SNAP-PORT-001/002/005 reusable portable Snapshot closed loop passed");
 } finally {
   await cleanup();
 }
