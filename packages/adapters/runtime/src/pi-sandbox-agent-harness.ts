@@ -316,7 +316,7 @@ export class PiSandboxAgentHarness implements SandboxAgentHarness {
     try {
       const result = await this.execution.exec(input.executionContext, input.sandboxId, {
         argv,
-        ...(this.options.cwd ? { cwd: this.options.cwd } : {}),
+        ...(this.options.cwd && this.options.cwd !== "." ? { cwd: this.options.cwd } : {}),
         background: true,
       });
       if (result.isErr()) throw new Error(result.error.message);

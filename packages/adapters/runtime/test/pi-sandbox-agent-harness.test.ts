@@ -71,6 +71,7 @@ describe("PiSandboxAgentHarness", () => {
       version: "1.2.3",
       templateDigest: `sha256:${"a".repeat(64)}`,
       timeoutMs: 2_000,
+      cwd: ".",
       modelAccess,
     });
 
@@ -89,6 +90,7 @@ describe("PiSandboxAgentHarness", () => {
       },
     });
     expect(captured?.background).toBe(true);
+    expect(captured?.cwd).toBeUndefined();
     expect(captured?.argv).toContain("--no-session");
     expect(captured?.argv).toContain("--offline");
     expect(captured?.argv).toContain("--print");
