@@ -2,6 +2,7 @@ import {
   type AppLogger,
   type ExecutionContextFactory,
   type ExecutionSandboxService,
+  type TerminalSessionGateway,
 } from "@appaloft/application";
 
 export interface ExecutionSandboxMaintenanceRunner {
@@ -16,6 +17,8 @@ export function createExecutionSandboxMaintenanceRunner(input: {
   intervalSeconds?: number;
   tenantLimit?: number;
   sandboxLimit?: number;
+  idleSuspendAfterSeconds?: number;
+  terminalSessionGateway?: Pick<TerminalSessionGateway, "list">;
 }): ExecutionSandboxMaintenanceRunner {
   let timer: ReturnType<typeof setInterval> | undefined;
   let running = false;
@@ -33,9 +36,20 @@ export function createExecutionSandboxMaintenanceRunner(input: {
           label: "Execution Sandbox maintenance runner",
         },
       });
+      const protectedSandboxIds = [
+        ...new Set(
+          (input.terminalSessionGateway?.list({ scope: "sandbox", limit: 10_000 }) ?? [])
+            .map((session) => session.sandboxId)
+            .filter((sandboxId): sandboxId is string => Boolean(sandboxId)),
+        ),
+      ];
       const result = await input.service.maintainAllTenants(context, {
         ...(input.tenantLimit ? { tenantLimit: input.tenantLimit } : {}),
         ...(input.sandboxLimit ? { sandboxLimit: input.sandboxLimit } : {}),
+        ...(input.idleSuspendAfterSeconds !== undefined
+          ? { idleSuspendAfterSeconds: input.idleSuspendAfterSeconds }
+          : {}),
+        ...(protectedSandboxIds.length > 0 ? { protectedSandboxIds } : {}),
       });
       if (result.isErr()) {
         input.logger.error("execution_sandbox_maintenance.run_failed", {
@@ -46,6 +60,7 @@ export function createExecutionSandboxMaintenanceRunner(input: {
       input.logger.info("execution_sandbox_maintenance.tick_completed", {
         tenantCount: result.value.tenants.length,
         expiredCount: result.value.tenants.reduce((total, item) => total + item.expired, 0),
+        suspendedCount: result.value.tenants.reduce((total, item) => total + item.suspended, 0),
         reconciledCount: result.value.tenants.reduce((total, item) => total + item.reconciled, 0),
         removedOrphanCount: result.value.tenants.reduce(
           (total, item) => total + item.removedOrphans,

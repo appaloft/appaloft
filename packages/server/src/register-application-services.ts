@@ -542,8 +542,10 @@ import {
   SandboxAgentHarnessRegistry,
   SandboxAgentQueryHandler,
   SandboxCommandHandler,
+  type SandboxPlacementPolicy,
   type SandboxProviderRegistry,
   SandboxQueryHandler,
+  type SandboxQuotaPolicy,
   type SandboxRepository,
   ScheduledDependencyBackupService,
   ScheduledHistoryRetentionService,
@@ -3412,6 +3414,20 @@ export function registerApplicationServices(
           ...(dependencyContainer.isRegistered(tokens.sandboxCredentialBroker)
             ? {
                 credentialBroker: dependencyContainer.resolve(tokens.sandboxCredentialBroker),
+              }
+            : {}),
+          ...(dependencyContainer.isRegistered(tokens.sandboxQuotaPolicy)
+            ? {
+                quotaPolicy: dependencyContainer.resolve<SandboxQuotaPolicy>(
+                  tokens.sandboxQuotaPolicy,
+                ),
+              }
+            : {}),
+          ...(dependencyContainer.isRegistered(tokens.sandboxPlacementPolicy)
+            ? {
+                placementPolicy: dependencyContainer.resolve<SandboxPlacementPolicy>(
+                  tokens.sandboxPlacementPolicy,
+                ),
               }
             : {}),
         }),

@@ -176,6 +176,17 @@ describe("external application sandbox SDK", () => {
     expect(await created.exec({ argv: ["python", "-V"] })).toMatchObject({
       mode: "foreground",
     });
+    const paused = await created.pause();
+    expect(paused).toMatchObject({
+      sandboxId,
+      status: "paused",
+      suspension: {
+        mode: "process-frozen",
+        portability: "provider-local",
+      },
+    });
+    const resumedHandle = await paused.resume();
+    expect(resumedHandle).toMatchObject({ sandboxId, status: "ready" });
     const streamed = [];
     for await (const envelope of client.sandboxes.events.stream({
       sandboxId,

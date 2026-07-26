@@ -118,7 +118,9 @@ export class SandboxCommandHandler implements CommandHandlerContract<SandboxComm
     if (command instanceof PauseSandboxCommand)
       return this.service.pause(context, text(input, "sandboxId"));
     if (command instanceof ResumeSandboxCommand)
-      return this.service.resume(context, text(input, "sandboxId"));
+      return this.service.resume(context, text(input, "sandboxId"), {
+        ...(typeof input.providerKey === "string" ? { providerKey: input.providerKey } : {}),
+      });
     if (command instanceof TerminateSandboxCommand)
       return this.service.terminate(context, text(input, "sandboxId"));
     if (command instanceof ExecuteSandboxCommand) {

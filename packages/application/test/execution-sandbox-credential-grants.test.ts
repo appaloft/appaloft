@@ -22,7 +22,7 @@ function provider(): SandboxProvider {
     key: "credential-test",
     capabilities: {
       isolation: "gvisor",
-      pause: true,
+      pause: { mode: "process-frozen", portability: "provider-local" },
       snapshot: ["filesystem"],
       processes: true,
       files: true,
@@ -33,7 +33,9 @@ function provider(): SandboxProvider {
     async provision(request) {
       return { providerHandle: `runtime:${request.sandboxId}`, realizedIsolation: "gvisor" };
     },
-    async pause() {},
+    async pause(request) {
+      return { providerHandle: request.providerHandle };
+    },
     async resume(request) {
       return { providerHandle: request.providerHandle, realizedIsolation: "gvisor" };
     },

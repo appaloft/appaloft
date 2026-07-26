@@ -56,6 +56,10 @@ describe("public Agent Workspace Console", () => {
     expect(detailPage).toContain('sandbox.status !== "paused"');
     expect(detailPage).toContain('sandbox.status !== "ready"');
     expect(detailPage).toContain("{#if workspaceReady}");
+    expect(detailPage).toContain("data-workspace-suspension");
+    expect(detailPage).toContain("sandbox.suspension.mode");
+    expect(detailPage).toContain("agentWorkspaces.computeReleased");
+    expect(detailPage).toContain("agentWorkspaces.processFrozen");
   });
 
   test("[AGENT-TASK-WEB-010] exposes task evidence, external approval and delivery recovery", () => {

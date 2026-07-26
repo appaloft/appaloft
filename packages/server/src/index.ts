@@ -1993,10 +1993,19 @@ export async function createAppaloftServer(
     logger,
     ...(durableWorkHandlerRegistry ? { handlerRegistry: durableWorkHandlerRegistry } : {}),
   });
+  const sandboxMaintenancePolicy = resolveOptionalToken<{
+    idleSuspendAfterSeconds?: number;
+  }>(childContainer, tokens.sandboxMaintenancePolicy);
   const executionSandboxMaintenanceRunner = createExecutionSandboxMaintenanceRunner({
     service: resolveToken<ExecutionSandboxService>(childContainer, tokens.executionSandboxService),
     executionContextFactory,
     logger,
+    terminalSessionGateway,
+    ...(sandboxMaintenancePolicy?.idleSuspendAfterSeconds !== undefined
+      ? {
+          idleSuspendAfterSeconds: sandboxMaintenancePolicy.idleSuspendAfterSeconds,
+        }
+      : {}),
   });
   const webStaticDir = await resolveWebStaticDir(config, options);
   const docsStaticDir = await resolveDocsStaticDir(config, options);

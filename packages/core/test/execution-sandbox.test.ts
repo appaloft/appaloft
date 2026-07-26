@@ -48,7 +48,7 @@ describe("Execution Sandbox", () => {
     expect(SandboxWorkspacePath.create("/etc/passwd").isErr()).toBe(true);
   });
 
-  test("[SBX-DOM-002] enforces lifecycle transitions and records safe facts", () => {
+  test("[SBX-DOM-002][HIB-CORE-001] enforces lifecycle transitions and records safe facts", () => {
     const sandbox = fixture();
     expect(sandbox.toState().status.value).toBe("requested");
 
@@ -69,8 +69,21 @@ describe("Execution Sandbox", () => {
     expect(sandbox.toState().status.value).toBe("ready");
     expect(sandbox.canUseRuntime()).toBe(true);
     sandbox.requestPause({ at: UpdatedAt.rehydrate("2026-07-20T00:00:03.000Z") })._unsafeUnwrap();
-    sandbox.markPaused({ at: UpdatedAt.rehydrate("2026-07-20T00:00:04.000Z") })._unsafeUnwrap();
+    sandbox
+      .markPaused({
+        at: UpdatedAt.rehydrate("2026-07-20T00:00:04.000Z"),
+        providerHandle: "recovery-handle-1",
+        suspension: {
+          mode: "compute-released",
+          portability: "provider-local",
+        },
+      })
+      ._unsafeUnwrap();
     expect(sandbox.toState().status.value).toBe("paused");
+    expect(sandbox.toState().suspension).toEqual({
+      mode: "compute-released",
+      portability: "provider-local",
+    });
     expect(sandbox.canUseRuntime()).toBe(false);
     sandbox.requestResume({ at: UpdatedAt.rehydrate("2026-07-20T00:00:05.000Z") })._unsafeUnwrap();
     sandbox
@@ -90,5 +103,28 @@ describe("Execution Sandbox", () => {
       sandbox.requestPause({ at: UpdatedAt.rehydrate("2026-07-20T00:00:09.000Z") }).isErr(),
     ).toBe(true);
     expect(JSON.stringify(sandbox.pullDomainEvents())).not.toContain("sandbox-handle-1");
+  });
+
+  test("[HIB-CORE-002] records runtime activity monotonically without payload", () => {
+    const sandbox = fixture();
+    sandbox
+      .startProvisioning({
+        attemptId: "sat_create_1",
+        at: UpdatedAt.rehydrate("2026-07-20T00:00:01.000Z"),
+      })
+      ._unsafeUnwrap();
+    sandbox
+      .markReady({
+        realizedIsolation: SandboxIsolationLevel.gvisor(),
+        providerHandle: "sandbox-handle-1",
+        at: UpdatedAt.rehydrate("2026-07-20T00:00:02.000Z"),
+      })
+      ._unsafeUnwrap();
+
+    sandbox.touchActivity({ at: UpdatedAt.rehydrate("2026-07-20T00:00:03.000Z") })._unsafeUnwrap();
+    expect(sandbox.toState().lastActivityAt?.value).toBe("2026-07-20T00:00:03.000Z");
+    expect(
+      sandbox.touchActivity({ at: UpdatedAt.rehydrate("2026-07-20T00:00:02.000Z") }).isErr(),
+    ).toBe(true);
   });
 });

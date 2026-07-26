@@ -42,13 +42,28 @@ class CapturingRunner implements SandboxDockerCommandRunner {
     if (command.includes("realpath"))
       return this.result(`${this.resolvedPath ?? argv.at(-1)}\n`);
     if (command.includes("tar -C /workspace -cf -")) return this.result("archive");
-    if (command.includes("inspect --format {{.Config.Image}}"))
-      return this.result("python@sha256:abc123\n");
+    if (
+      command.includes("appaloft.sandbox.base-image") &&
+      !command.includes("image inspect")
+    )
+      return this.result("\n");
+    if (command.includes("inspect --format {{.Image}}"))
+      return this.result(`sha256:${"a".repeat(64)}\n`);
     if (command.includes("inspect --format") && !command.includes("image inspect")) {
       if (command.includes("appaloft.sandbox.owner")) return this.result("tenant_a\n");
       if (command.includes("appaloft.sandbox.egress")) return this.result("allowlist\n");
       return this.result("sbx_demo\n");
     }
+    if (
+      command.includes("image inspect") &&
+      command.includes("appaloft.hibernate.sandbox")
+    )
+      return this.result("sbx_demo\n");
+    if (
+      command.includes("image inspect") &&
+      command.includes("appaloft.sandbox.base-image")
+    )
+      return this.result(`sha256:${"a".repeat(64)}\n`);
     if (command.includes("image inspect")) return this.result("4096\n");
     if (command.includes("exec -w") && !command.includes(" -d "))
       return {
@@ -592,11 +607,101 @@ describe("DockerSandboxProvider", () => {
       (call) => call.argv[1] === "create" && call.argv.includes("appaloft.snapshot.id=ssn_demo"),
     );
     expect(helperCreate?.argv).not.toContain("--mount");
-    const restoreArchive = runner.calls.find(
-      (call) =>
-        call.argv[1] === "exec" &&
-        call.argv.some((part) => part.includes("appaloft-snapshot-workspace")),
+    expect(helperCreate?.argv).toContain(
+      `appaloft.sandbox.base-image=sha256:${"a".repeat(64)}`,
     );
-    expect(restoreArchive?.stdin).toBeDefined();
+    const workspaceTransfer = runner.calls.find(
+      (call) =>
+        call.argv[0] === "sh" &&
+        call.argv[1] === "-c" &&
+        call.argv.some((part) => part.includes("tar -C /workspace")),
+    );
+    expect(workspaceTransfer?.argv.join(" ")).toContain(
+      "docker exec appaloft-sbx_demo tar -C /workspace -cf - .",
+    );
+    expect(workspaceTransfer?.argv.join(" ")).toContain(
+      "docker exec -i appaloft-sbx_demo-snapshot-ssn_demo",
+    );
+    expect(workspaceTransfer?.argv.join(" ")).toContain(
+      "rm -rf /appaloft-snapshot-workspace",
+    );
+  });
+
+  test("[HIB-DOCKER-001][HIB-DOCKER-002] releases compute and restores workspace state", async () => {
+    const runner = new CapturingRunner();
+    const provider = new DockerSandboxProvider({ isolation: "gvisor", runner });
+    const provisioned = await provider.provision(request);
+
+    const paused = await provider.pause({
+      sandboxId: "sbx_demo",
+      providerHandle: provisioned.providerHandle,
+    });
+    expect(paused).toEqual({
+      providerHandle: "appaloft-sandbox-hibernate:sbx_demo",
+    });
+    expect(provider.capabilities.pause).toEqual({
+      mode: "compute-released",
+      portability: "provider-local",
+    });
+    expect(
+      runner.calls.some(
+        (call) =>
+          call.argv[1] === "create" &&
+          call.argv.includes("appaloft.hibernate.sandbox=sbx_demo"),
+      ),
+    ).toBe(true);
+    expect(
+      runner.calls.some(
+        (call) =>
+          call.argv.join(" ") === "docker rm -f appaloft-sbx_demo",
+      ),
+    ).toBe(true);
+
+    const resumed = await provider.resume({
+      ...request,
+      providerHandle: paused.providerHandle,
+    });
+    expect(resumed).toEqual({
+      providerHandle: "appaloft-sbx_demo",
+      realizedIsolation: "gvisor",
+    });
+    const restoredCreate = runner.calls
+      .filter((call) => call.argv[1] === "create")
+      .find((call) => call.argv.includes(`sha256:${"a".repeat(64)}`));
+    expect(restoredCreate?.argv).toBeDefined();
+    expect(
+      runner.calls.some(
+        (call) =>
+          call.argv[0] === "sh" &&
+          call.argv[1] === "-c" &&
+          call.argv.join(" ").includes(
+            "tar -C /appaloft-snapshot-workspace -cf - .",
+          ),
+      ),
+    ).toBe(true);
+    expect(
+      runner.calls.some(
+        (call) =>
+          call.argv.join(" ") ===
+          "docker image rm appaloft-sandbox-hibernate:sbx_demo",
+      ),
+    ).toBe(true);
+  });
+
+  test("[HIB-DOCKER-003] terminates provider-local recovery idempotently", async () => {
+    const runner = new CapturingRunner();
+    const provider = new DockerSandboxProvider({ isolation: "gvisor", runner });
+
+    await provider.terminate({
+      sandboxId: "sbx_demo",
+      providerHandle: "appaloft-sandbox-hibernate:sbx_demo",
+    });
+    expect(
+      runner.calls.some(
+        (call) =>
+          call.argv.join(" ") ===
+          "docker image rm appaloft-sandbox-hibernate:sbx_demo",
+      ),
+    ).toBe(true);
   });
 });

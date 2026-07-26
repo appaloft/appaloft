@@ -330,7 +330,17 @@ Accepted target model:
   `Resource`, `DeploymentTarget`, terminal session, or AI-agent orchestration record.
 - `SandboxTemplate` owns reusable admitted startup policy; `SandboxSnapshot` owns reusable captured
   state. Pause preserves one Sandbox identity, while snapshot creates an independent source for
-  later Sandboxes.
+  later Sandboxes. Pause continuity is explicit: `process-frozen` retains the provider allocation,
+  while `compute-released` replaces it with subordinate one-shot recovery state and requires new
+  terminal, native attach and port capabilities after resume.
+- compute-released recovery declares `provider-local`, `provider-family` or `portable` scope.
+  Provider-local Docker recovery supports same-registered-Server resume only; it must fail closed
+  instead of pretending to support cross-server migration.
+- successful runtime capability use advances safe `lastActivityAt`. An explicit maintenance policy
+  may auto-suspend only idle Sandboxes whose provider truthfully advertises compute release.
+- quota admission and provider placement are public application ports. Hosted entitlement,
+  metering, topology and scheduling strategy remain downstream adapters and never create a Cloud
+  Workspace aggregate.
 - `SandboxProcess`, confined file entries, and port exposures are provider-observed runtime
   readbacks/capabilities rather than aggregate roots.
 - public callers receive Appaloft ids and safe access descriptors. Host addresses, SSH access,
@@ -353,6 +363,9 @@ Governing artifacts:
 - [ADR-091](./decisions/ADR-091-execution-sandbox-boundary.md)
 - [Execution Sandbox Platform](./specs/108-execution-sandbox-platform/spec.md)
 - [Execution Sandbox Test Matrix](./testing/execution-sandbox-test-matrix.md)
+- [ADR-097: Workspace Hibernation And Recovery](./decisions/ADR-097-workspace-hibernation-and-recovery.md)
+- [Workspace Hibernation And Recovery](./specs/114-workspace-hibernation-and-recovery/spec.md)
+- [Workspace Hibernation And Recovery Test Matrix](./testing/workspace-hibernation-and-recovery-test-matrix.md)
 
 ### Sandbox Agent Runtime And Application Promotion
 

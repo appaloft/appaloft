@@ -96,6 +96,9 @@ export const brokerSandboxCredentialRequestCommandInputSchema = z
   })
   .strict();
 export const sandboxLifecycleCommandInputSchema = showSandboxQueryInputSchema;
+export const resumeSandboxCommandInputSchema = showSandboxQueryInputSchema
+  .extend({ providerKey: z.string().trim().min(1).max(120).optional() })
+  .strict();
 export const executeSandboxCommandInputSchema = z
   .object({
     sandboxId: sandboxIdSchema,
@@ -255,7 +258,7 @@ export class PauseSandboxCommand extends SandboxCommandMessage {
 export class ResumeSandboxCommand extends SandboxCommandMessage {
   static create(input: unknown) {
     return commandCreate(
-      sandboxLifecycleCommandInputSchema,
+      resumeSandboxCommandInputSchema,
       input,
       (value) => new ResumeSandboxCommand(value),
     );

@@ -1344,6 +1344,8 @@ export const enUS = {
       capabilities: "Agent capabilities",
       checks: "Checks",
       commitMessage: "Commit message",
+      computeReleased:
+        "Compute is released. Durable workspace files remain; after resume, open new terminal, native attach and preview capabilities.",
       create: "Create workspace",
       createDescription:
         "Create an isolated, persistent workspace and start a Pi or OpenCode runtime.",
@@ -1362,6 +1364,7 @@ export const enUS = {
       expiresAt: "Workspace expiry",
       harness: "Agent",
       immutableReview: "Capture immutable review artifact",
+      lastActivity: "Last Sandbox activity",
       lifecycle: "Workspace lifecycle",
       liveActivity: "Live activity",
       liveActivityEmpty: "Waiting for agent activity…",
@@ -1373,6 +1376,7 @@ export const enUS = {
       pageTitle: "Agent workspaces",
       pause: "Pause",
       persistentData: "Code and agent state persist across reconnects.",
+      processFrozen: "The runtime is paused in place and still holds its provider allocation.",
       previewCommand: "Preview start command",
       previewPort: "Preview port",
       pullRequestTitle: "Pull request title",
