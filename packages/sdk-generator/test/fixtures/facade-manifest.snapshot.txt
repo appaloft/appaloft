@@ -3,6 +3,12 @@ appaloft.account.profile.change -> account.profile.change POST /account/profile
 appaloft.account.profile.show -> account.profile.show GET /account/profile
 appaloft.account.sessions.list -> account.sessions.list GET /account/sessions
 appaloft.account.sessions.revoke -> account.sessions.revoke POST /account/sessions/{sessionId}/revoke
+appaloft.agentAdapters.disable -> agent-adapters.disable POST /agent-adapters/{installationId}/disable
+appaloft.agentAdapters.install -> agent-adapters.install POST /agent-adapters
+appaloft.agentAdapters.list -> agent-adapters.list GET /agent-adapters
+appaloft.agentAdapters.show -> agent-adapters.show GET /agent-adapters/{installationId}
+appaloft.agentAdapters.uninstall -> agent-adapters.uninstall DELETE /agent-adapters/{installationId}
+appaloft.agentAdapters.validate -> agent-adapters.validate POST /agent-adapters/validate
 appaloft.auditEvents.archives.create -> audit-events.archives.create POST /audit-events/archives
 appaloft.auditEvents.archives.list -> audit-events.archives.list GET /audit-events/archives
 appaloft.auditEvents.archives.prune -> audit-events.archives.prune POST /audit-events/archives/prune

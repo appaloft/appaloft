@@ -3466,6 +3466,7 @@ describe("console page structure", () => {
     expect(organizationPageSource).toContain("data-organization-members-display-surface");
     expect(organizationPageSource).toContain("data-organization-invitations-display-surface");
     expect(organizationPageSource).toContain("data-organization-deploy-tokens-display-surface");
+    expect(organizationPageSource).toContain("data-organization-agent-adapters-display-surface");
     expect(organizationPageSource).toContain("data-organization-archived-projects-display-surface");
     expect(organizationPageSource).toContain("data-organization-danger-display-surface");
     expect(organizationPageSource).toContain("data-organization-danger-blocker-check");
@@ -3475,9 +3476,6 @@ describe("console page structure", () => {
     expect(organizationPageSource).toContain("data-organization-profile-edit-dialog");
     expect(organizationPageSource).toContain("data-organization-deploy-token-create-dialog");
     expect(organizationPageSource).toContain("data-organization-delete-dialog");
-    expect(organizationPageSource).not.toContain('from "$lib/components/ui/textarea"');
-    expect(organizationPageSource).not.toContain("<Textarea");
-
     const profileDisplaySurface = sourceBetween(
       organizationPageSource,
       "data-organization-profile-display-surface",
@@ -3496,6 +3494,11 @@ describe("console page structure", () => {
     const deployTokensDisplaySurface = sourceBetween(
       organizationPageSource,
       "data-organization-deploy-tokens-display-surface",
+      '{#if activeSection === "agent-adapters"}',
+    );
+    const agentAdaptersDisplaySurface = sourceBetween(
+      organizationPageSource,
+      "data-organization-agent-adapters-display-surface",
       '{#if activeSection === "archived-projects"}',
     );
     const archivedProjectsDisplaySurface = sourceBetween(
@@ -3519,6 +3522,7 @@ describe("console page structure", () => {
       membersDisplaySurface,
       invitationsDisplaySurface,
       deployTokensDisplaySurface,
+      agentAdaptersDisplaySurface,
       archivedProjectsDisplaySurface,
       dangerDisplaySurface,
       operationNoticeDisplaySurface,
@@ -3543,6 +3547,7 @@ describe("console page structure", () => {
     expect(organizationPageSource).toContain('page.url.pathname.endsWith("/members")');
     expect(organizationPageSource).toContain('page.url.pathname.endsWith("/invitations")');
     expect(organizationPageSource).toContain('page.url.pathname.endsWith("/deploy-tokens")');
+    expect(organizationPageSource).toContain('page.url.pathname.endsWith("/agent-adapters")');
     expect(organizationPageSource).toContain('page.url.pathname.endsWith("/archived-projects")');
     expect(organizationPageSource).toContain('page.url.pathname.endsWith("/danger-zone")');
     expect(organizationPageSource).not.toContain('page.url.searchParams.get("section")');
@@ -3623,7 +3628,7 @@ describe("console page structure", () => {
       )?.[0] ?? "";
     const deployTokensSectionSource =
       organizationPageSource.match(
-        /{#if activeSection === "deploy-tokens"}[\s\S]*?{#if activeSection === "archived-projects"}/,
+        /{#if activeSection === "deploy-tokens"}[\s\S]*?{#if activeSection === "agent-adapters"}/,
       )?.[0] ?? "";
     const memberLifecycleDialogSource =
       organizationPageSource.match(

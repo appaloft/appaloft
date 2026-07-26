@@ -1,3 +1,4 @@
+export * from "./agent-adapter-registry-repository";
 export * from "./audit-event-archive-store";
 export * from "./audit-event-legal-hold-store";
 export * from "./audit-event-read-model";

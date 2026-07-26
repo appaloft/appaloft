@@ -974,6 +974,34 @@ Current boundary:
 - Web Resource detail source-event diagnostics consume `source-events.list`; CLI and HTTP/oRPC
   read surfaces are active for operator diagnostics and API consumers.
 
+## Agent Adapter Installations
+
+These operations implement ADR-100's tenant-scoped registry for declarative Agent Adapter
+definitions. Validation never loads manifest code or starts an Agent. Definitions are immutable and
+may deduplicate by digest across tenants; every installation, read, lifecycle mutation, and active
+Workspace reference remains tenant-scoped.
+
+| Operation | Type | Message | Input | CLI | HTTP/oRPC |
+| --- | --- | --- | --- | --- | --- |
+| `agent-adapters.validate` | Query | `ValidateAgentAdapterQuery` | Declarative manifest | `appaloft agent-adapter validate <manifest>` | `POST /api/agent-adapters/validate` |
+| `agent-adapters.install` | Command | `InstallAgentAdapterCommand` | Declarative manifest | `appaloft agent-adapter install <manifest>` | `POST /api/agent-adapters` |
+| `agent-adapters.list` | Query | `ListAgentAdaptersQuery` | Optional bounded limit | `appaloft agent-adapter list` | `GET /api/agent-adapters` |
+| `agent-adapters.show` | Query | `ShowAgentAdapterQuery` | Installation id | `appaloft agent-adapter show <installationId>` | `GET /api/agent-adapters/{installationId}` |
+| `agent-adapters.disable` | Command | `DisableAgentAdapterCommand` | Installation id | `appaloft agent-adapter disable <installationId>` | `POST /api/agent-adapters/{installationId}/disable` |
+| `agent-adapters.uninstall` | Command | `UninstallAgentAdapterCommand` | Installation id | `appaloft agent-adapter uninstall <installationId>` | `DELETE /api/agent-adapters/{installationId}` |
+
+Product-session members may list and show installations. Administrators may validate, install,
+disable, and uninstall. Disable is idempotent and blocks new Workspace resolution while preserving
+existing recovery references. Uninstall is idempotent only after the active Workspace reference
+reader returns zero; otherwise it fails with a conflict and retains the installation.
+
+Public task guidance is available in
+[Manage Agent Adapters](../apps/docs/src/content/docs/agent/agent-adapters.md). The domain boundary,
+follow-up Profile slice, and acceptance evidence remain governed by
+[ADR-100](./decisions/ADR-100-agent-adapter-distribution-and-workspace-profile-boundary.md),
+[Spec 117](./specs/117-agent-adapter-sdk-and-workspace-profiles/spec.md), and the
+[Test Matrix](./testing/agent-adapter-sdk-and-workspace-profile-test-matrix.md).
+
 ## Sandbox Agent Runtime And Application Promotion
 
 These operations implement ADR-092's harness-neutral path from a Sandbox to a proof-verified new

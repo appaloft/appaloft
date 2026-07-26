@@ -101,6 +101,7 @@ const zhTree: NavFolder[] = [
     name: "Agent 工作流",
     children: [
       page("运行 Agent", "agent/run-agents"),
+      page("Agent Adapter", "agent/agent-adapters"),
       page("Agent Sandboxes", "agent/sandboxes"),
       page("预览与 Promote", "agent/preview-promote"),
       page("Delivery Evidence Chain", "agent/delivery-evidence"),
@@ -225,6 +226,7 @@ const enTree = prefixTree(
       name: "Agent Workflows",
       children: [
         page("Run agents", "agent/run-agents"),
+        page("Agent Adapters", "agent/agent-adapters"),
         page("Agent Sandboxes", "agent/sandboxes"),
         page("Preview and promote", "agent/preview-promote"),
         page("Delivery Evidence Chain", "agent/delivery-evidence"),

@@ -229,6 +229,7 @@ import {
   DetachResourceStorageCommand,
   DiffEnvironmentProfileQuery,
   DiffEnvironmentsQuery,
+  DisableAgentAdapterCommand,
   DoctorQuery,
   DuplicateEnvironmentProfileCommand,
   deactivateServerCommandInputSchema,
@@ -260,6 +261,8 @@ import {
   detachResourceStorageCommandInputSchema,
   diffEnvironmentProfileQueryInputSchema,
   diffEnvironmentsQueryInputSchema,
+  disableAgentAdapterInputSchema,
+  disableAgentAdapterResponseSchema,
   duplicateEnvironmentProfileCommandInputSchema,
   type EnvironmentDuplicatePlanSummary,
   type EnvironmentDuplicateProfileApplyResult,
@@ -315,6 +318,7 @@ import {
   InspectRuntimeUsageQuery,
   type InspectRuntimeUsageQueryInput,
   InspectServerCapacityQuery,
+  InstallAgentAdapterCommand,
   InviteOrganizationMemberCommand,
   IssueOrRenewCertificateCommand,
   IssueSandboxAgentAttachAccessCommand,
@@ -328,12 +332,15 @@ import {
   inspectDomainBindingDnsReadinessQueryInputSchema,
   inspectRuntimeUsageQueryInputSchema,
   inspectServerCapacityQueryInputSchema,
+  installAgentAdapterInputSchema,
+  installAgentAdapterResponseSchema,
   inviteOrganizationMemberCommandInputSchema,
   issueOrRenewCertificateCommandInputSchema,
   issueSandboxAgentAttachAccessInputSchema,
   issueWorkspaceCollaborationNativeAttachInputSchema,
   issueWorkspaceCollaborationTerminalAccessInputSchema,
   ListAccountSessionsQuery,
+  ListAgentAdaptersQuery,
   ListAgentTaskRunsQuery,
   ListAuditEventArchivesQuery,
   ListAuditEventLegalHoldsQuery,
@@ -401,6 +408,8 @@ import {
   ListWorkspaceCollaborationsQuery,
   LockEnvironmentCommand,
   listAccountSessionsQueryInputSchema,
+  listAgentAdaptersInputSchema,
+  listAgentAdaptersResponseSchema,
   listAgentTaskRunsInputSchema,
   listAuditEventArchivesQueryInputSchema,
   listAuditEventLegalHoldsQueryInputSchema,
@@ -649,6 +658,7 @@ import {
   SetProjectDescriptionCommand,
   SetResourceVariableCommand,
   ShowAccountProfileQuery,
+  ShowAgentAdapterQuery,
   ShowAgentTaskRunQuery,
   ShowAuditEventArchiveQuery,
   ShowAuditEventLegalHoldQuery,
@@ -726,6 +736,8 @@ import {
   setProjectDescriptionCommandInputSchema,
   setResourceVariableCommandInputSchema,
   showAccountProfileQueryInputSchema,
+  showAgentAdapterInputSchema,
+  showAgentAdapterResponseSchema,
   showAgentTaskRunInputSchema,
   showAuditEventArchiveQueryInputSchema,
   showAuditEventLegalHoldQueryInputSchema,
@@ -800,13 +812,19 @@ import {
   transferOrganizationOwnerCommandInputSchema,
   transferWorkspaceWriterLeaseInputSchema,
   UnbindResourceDependencyCommand,
+  UninstallAgentAdapterCommand,
   UnlockEnvironmentCommand,
   UnsetEnvironmentVariableCommand,
   UnsetResourceVariableCommand,
   unbindResourceDependencyCommandInputSchema,
+  uninstallAgentAdapterInputSchema,
+  uninstallAgentAdapterResponseSchema,
   unlockEnvironmentCommandInputSchema,
   unsetEnvironmentVariableCommandInputSchema,
   unsetResourceVariableCommandInputSchema,
+  ValidateAgentAdapterQuery,
+  validateAgentAdapterInputSchema,
+  validateAgentAdapterResponseSchema,
   WriteSandboxFileCommand,
   withExecutionAuthProviderAccessTokens,
   writeSandboxFileCommandInputSchema,
@@ -7819,6 +7837,52 @@ export const deliverAgentTaskRunProcedure = base
   .handler(async ({ input, context }) =>
     executeCommand(context, DeliverAgentTaskRunCommand.create(input)),
   );
+export const validateAgentAdapterProcedure = base
+  .route({ method: "POST", path: "/agent-adapters/validate", successStatus: 200 })
+  .input(validateAgentAdapterInputSchema)
+  .output(validateAgentAdapterResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ValidateAgentAdapterQuery.create(input)),
+  );
+export const installAgentAdapterProcedure = base
+  .route({ method: "POST", path: "/agent-adapters", successStatus: 201 })
+  .input(installAgentAdapterInputSchema)
+  .output(installAgentAdapterResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, InstallAgentAdapterCommand.create(input)),
+  );
+export const listAgentAdaptersProcedure = base
+  .route({ method: "GET", path: "/agent-adapters", successStatus: 200 })
+  .input(listAgentAdaptersInputSchema)
+  .output(listAgentAdaptersResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListAgentAdaptersQuery.create(input)),
+  );
+export const showAgentAdapterProcedure = base
+  .route({ method: "GET", path: "/agent-adapters/{installationId}", successStatus: 200 })
+  .input(showAgentAdapterInputSchema)
+  .output(showAgentAdapterResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowAgentAdapterQuery.create(input)),
+  );
+export const disableAgentAdapterProcedure = base
+  .route({
+    method: "POST",
+    path: "/agent-adapters/{installationId}/disable",
+    successStatus: 200,
+  })
+  .input(disableAgentAdapterInputSchema)
+  .output(disableAgentAdapterResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, DisableAgentAdapterCommand.create(input)),
+  );
+export const uninstallAgentAdapterProcedure = base
+  .route({ method: "DELETE", path: "/agent-adapters/{installationId}", successStatus: 200 })
+  .input(uninstallAgentAdapterInputSchema)
+  .output(uninstallAgentAdapterResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, UninstallAgentAdapterCommand.create(input)),
+  );
 export const createWorkspaceCollaborationProcedure = base
   .route({ method: "POST", path: "/workspace-collaborations", successStatus: 201 })
   .input(createWorkspaceCollaborationInputSchema)
@@ -8239,6 +8303,14 @@ export const appaloftOrpcRouter = {
       accept: acceptSandboxPromotionProcedure,
       retry: retrySandboxPromotionProcedure,
     },
+  },
+  agentAdapters: {
+    validate: validateAgentAdapterProcedure,
+    install: installAgentAdapterProcedure,
+    list: listAgentAdaptersProcedure,
+    show: showAgentAdapterProcedure,
+    disable: disableAgentAdapterProcedure,
+    uninstall: uninstallAgentAdapterProcedure,
   },
   workspaceCollaborations: {
     create: createWorkspaceCollaborationProcedure,
@@ -11176,6 +11248,10 @@ export function mountAppaloftOrpcRoutes(
     "/api/sandbox-promotions/:promotionId",
     "/api/sandbox-promotions/:promotionId/accept",
     "/api/sandbox-promotions/:promotionId/retry",
+    "/api/agent-adapters/validate",
+    "/api/agent-adapters",
+    "/api/agent-adapters/:installationId",
+    "/api/agent-adapters/:installationId/disable",
     "/api/workspace-collaborations",
     "/api/workspace-collaborations/:collaborationId",
     "/api/workspace-collaborations/:collaborationId/close",

@@ -1,4 +1,9 @@
 import {
+  type AgentAdapterInstallationResponse,
+  type UninstallAgentAdapterResponse,
+  type ValidateAgentAdapterResponse,
+} from "@appaloft/application";
+import {
   type AcceptBlueprintInstallCommandInput,
   type AcceptBlueprintInstallCommandResponse,
   type AcceptConnectorCapabilityPlanCommandInput,
@@ -610,6 +615,44 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       QueryEntitlementsInput,
       QueryEntitlementsResponse,
+      AppaloftClientError
+    >;
+  };
+  agentAdapters: {
+    validate: Client<
+      AppaloftClientContext,
+      { manifest: unknown },
+      ValidateAgentAdapterResponse,
+      AppaloftClientError
+    >;
+    install: Client<
+      AppaloftClientContext,
+      { manifest: unknown },
+      AgentAdapterInstallationResponse,
+      AppaloftClientError
+    >;
+    list: Client<
+      AppaloftClientContext,
+      { limit?: number },
+      AgentAdapterInstallationResponse[],
+      AppaloftClientError
+    >;
+    show: Client<
+      AppaloftClientContext,
+      { installationId: string },
+      AgentAdapterInstallationResponse,
+      AppaloftClientError
+    >;
+    disable: Client<
+      AppaloftClientContext,
+      { installationId: string },
+      AgentAdapterInstallationResponse,
+      AppaloftClientError
+    >;
+    uninstall: Client<
+      AppaloftClientContext,
+      { installationId: string },
+      UninstallAgentAdapterResponse,
       AppaloftClientError
     >;
   };

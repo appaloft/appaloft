@@ -12,6 +12,7 @@
     "@appaloft/adapter-runtime": "workspace:*",
     "@appaloft/adapter-secret-protection": "workspace:*",
     "@appaloft/ai-mcp": "workspace:*",
+    "@appaloft/agent-adapter-sdk": "workspace:*",
     "@appaloft/application": "workspace:*",
     "@appaloft/ash": "workspace:*",
     "@appaloft/auth-better": "workspace:*",
