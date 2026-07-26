@@ -45,6 +45,12 @@ surfaces. If a command is absent here, treat it as unsupported until the operati
 
 ## Catalog
 
+- `appaloft agent-adapter validate <manifest>` - `agent-adapters.validate`
+- `appaloft agent-adapter install <manifest>` - `agent-adapters.install`
+- `appaloft agent-adapter list` - `agent-adapters.list`
+- `appaloft agent-adapter show <installationId>` - `agent-adapters.show`
+- `appaloft agent-adapter disable <installationId>` - `agent-adapters.disable`
+- `appaloft agent-adapter uninstall <installationId>` - `agent-adapters.uninstall`
 - `appaloft sandbox create` - `sandboxes.create`
 - `appaloft sandbox list` - `sandboxes.list`
 - `appaloft sandbox show <sandboxId>` - `sandboxes.show`

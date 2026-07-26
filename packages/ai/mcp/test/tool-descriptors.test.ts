@@ -148,7 +148,7 @@ describe("MCP tool descriptors", () => {
     expect(toolContractsByOperationKey.get("deployments.create")).toMatchObject({
       name: "deployments_create",
       cliCommand:
-        "appaloft deploy [path-or-source] [--config appaloft.yml] [--env KEY=VALUE] [--secret KEY=ci-env:NAME] [--preview pull-request]",
+        "appaloft deploy [path-or-source] [--config appaloft.yml] [--application <config-key>] [--env KEY=VALUE] [--secret KEY=ci-env:NAME] [--preview pull-request]; appaloft deployments create --project <projectId> --environment <environmentId> --resource <resourceId> --server <serverId> [--destination <destinationId>]",
       httpRoute: "POST /api/deployments",
       alternateHttpRoutes: ["POST /api/deployments/stream"],
     });

@@ -1463,6 +1463,55 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
         },
       ],
     }),
+    "/api/rpc/organizations/currentContext": {
+      json: {
+        user: {
+          userId: "usr_admin",
+          email: "admin@example.com",
+          displayName: "Admin User",
+        },
+        currentOrganization: {
+          organizationId: "org_self_hosted",
+          name: "Self-hosted Appaloft",
+          slug: "self-hosted-appaloft",
+          role: "owner",
+        },
+        organizations: [
+          {
+            organizationId: "org_self_hosted",
+            name: "Self-hosted Appaloft",
+            slug: "self-hosted-appaloft",
+            role: "owner",
+          },
+        ],
+        loginMethods: selfHostedAuthE2eLoginMethods(),
+        permissions: {
+          canInviteMembers: true,
+          canListMembers: true,
+          canManageDeployTokens: true,
+          canRemoveMembers: true,
+          canTransferOwnership: true,
+          canUpdateMemberRoles: true,
+        },
+      },
+    },
+    "/api/rpc/agentAdapters/list": {
+      json: [
+        {
+          installationId: "aai_opencode",
+          definitionDigest: `sha256:${"a".repeat(64)}`,
+          adapterId: "opencode",
+          adapterVersion: "1.0.0",
+          displayName: "OpenCode",
+          status: "enabled",
+          compatibility: {
+            status: "compatible",
+            unavailableOptionalCapabilities: [],
+          },
+          installedAt: "2026-07-26T12:00:00.000Z",
+        },
+      ],
+    },
     "/api/rpc/auth/bootstrapStatus": () => ({
       json: selfHostedAuthE2eBootstrapStatus(),
     }),
@@ -5546,6 +5595,45 @@ describe.serial("console e2e with Bun.WebView", () => {
     } finally {
       resetSelfHostedAuthE2eState();
     }
+  }, 45_000);
+
+  test("[ADAPTER-SURFACE-011] shows tenant Agent Adapter installations in organization settings", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+    resetSelfHostedAuthE2eState();
+
+    {
+      await using view = createWebView({ width: 1280, height: 900 });
+      await view.navigate(`${previewUrl}/organization/agent-adapters`);
+
+      await expectAnyText(view, ["Agent Adapters", "Agent 适配器"]);
+      await expectText(view, "OpenCode");
+      await expectText(view, "aai_opencode");
+      await expectAnyText(view, ["Compatible", "兼容"]);
+      await expectElement(view, "[data-organization-agent-adapters-display-surface]");
+      expect(
+        await view.evaluate<boolean>(
+          `document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1`,
+        ),
+      ).toBe(true);
+    }
+
+    {
+      await using view = createWebView({ width: 390, height: 820 });
+      await view.navigate(`${previewUrl}/organization/agent-adapters`);
+
+      await expectText(view, "OpenCode");
+      await expectElement(view, "[data-organization-agent-adapters-display-surface]");
+      expect(
+        await view.evaluate<boolean>(
+          `document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1`,
+        ),
+      ).toBe(true);
+    }
+
+    expect(
+      recordedApiRequests.some((request) => request.pathname === "/api/rpc/agentAdapters/list"),
+    ).toBe(true);
   }, 45_000);
 
   test("[SELF-HOSTED-AUTH-WEB-001] signs out from the console shell", async () => {

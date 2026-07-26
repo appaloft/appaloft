@@ -144,6 +144,8 @@ import {
 import { gitlabIntegration } from "@appaloft/integration-gitlab";
 import {
   type DatabaseConnection,
+  PgAgentAdapterInstallationReferenceReader,
+  PgAgentAdapterRegistryRepository,
   PgAuditEventArchiveStore,
   PgAuditEventLegalHoldStore,
   PgAuditEventReadModel,
@@ -1207,6 +1209,16 @@ export function registerRuntimeDependencies(
   container.register(tokens.sandboxAgentDeliveryRepository, {
     useFactory: instanceCachingFactory(
       () => new PgSandboxAgentDeliveryRepository(input.database.db),
+    ),
+  });
+  container.register(tokens.agentAdapterRegistryRepository, {
+    useFactory: instanceCachingFactory(
+      () => new PgAgentAdapterRegistryRepository(input.database.db),
+    ),
+  });
+  container.register(tokens.agentAdapterInstallationReferenceReader, {
+    useFactory: instanceCachingFactory(
+      () => new PgAgentAdapterInstallationReferenceReader(input.database.db),
     ),
   });
   container.register(tokens.workspaceCollaborationRepository, {

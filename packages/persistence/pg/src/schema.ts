@@ -1236,6 +1236,9 @@ export interface ConnectorAuthorizationAttemptsTable {
 }
 
 export interface Database {
+  agent_adapter_definitions: AgentAdapterDefinitionsTable;
+  agent_adapter_installations: AgentAdapterInstallationsTable;
+  agent_adapter_workspace_references: AgentAdapterWorkspaceReferencesTable;
   execution_sandboxes: ExecutionSandboxesTable;
   execution_sandbox_snapshots: ExecutionSandboxSnapshotsTable;
   execution_sandbox_templates: ExecutionSandboxTemplatesTable;
@@ -1443,4 +1446,34 @@ export interface WorkspaceCollaborationsTable {
   state: ColumnType<Record<string, unknown>, Record<string, unknown>, Record<string, unknown>>;
   created_at: TimestampColumn;
   updated_at: UpdatableTimestampColumn;
+}
+
+export interface AgentAdapterDefinitionsTable {
+  digest: string;
+  adapter_id: string;
+  adapter_version: string;
+  display_name: string;
+  canonical_manifest: string;
+  registered_at: TimestampColumn;
+}
+
+export interface AgentAdapterInstallationsTable {
+  tenant_id: string;
+  id: string;
+  definition_digest: string;
+  adapter_id: string;
+  adapter_version: string;
+  status: string;
+  revision: number;
+  installed_at: TimestampColumn;
+  updated_at: UpdatableTimestampColumn;
+}
+
+export interface AgentAdapterWorkspaceReferencesTable {
+  tenant_id: string;
+  installation_id: string;
+  workspace_id: string;
+  active: boolean;
+  created_at: TimestampColumn;
+  released_at: NullableUpdatableTimestampColumn;
 }

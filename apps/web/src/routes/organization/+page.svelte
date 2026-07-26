@@ -4,14 +4,17 @@
   import { page } from "$app/state";
   import {
     ArrowRight,
+    Bot,
     Building2,
     BookOpen,
     FolderOpen,
     KeyRound,
+    PackagePlus,
     Pencil,
     RotateCw,
     ShieldCheck,
     ShieldAlert,
+    Power,
     Trash2,
     UserPlus,
     UsersRound,
@@ -32,6 +35,7 @@
   import { Button } from "$lib/components/ui/button";
   import * as Dialog from "$lib/components/ui/dialog";
   import { Input } from "$lib/components/ui/input";
+  import { Textarea } from "$lib/components/ui/textarea";
   import * as Select from "$lib/components/ui/select";
   import ConsoleDataSkeleton from "$lib/components/console/ConsoleDataSkeleton.svelte";
   import { webDocsHrefs } from "$lib/console/docs-help";
@@ -46,11 +50,13 @@
   type DeployTokenWorkflow = "preview-cleanup" | "server-config-deploy" | "source-link-deploy";
   type MemberLifecycleAction = "remove" | "restore";
   type DeployTokenLifecycleAction = "rotate" | "revoke";
+  type AgentAdapterLifecycleAction = "disable" | "uninstall";
   type OrganizationManagementSection =
     | "profile"
     | "members"
     | "invitations"
     | "deploy-tokens"
+    | "agent-adapters"
     | "archived-projects"
     | "danger-zone";
   type Props = {
@@ -109,6 +115,9 @@
   let ownerTransferDialogOpen = $state(false);
   let memberLifecycleDialogOpen = $state(false);
   let deployTokenLifecycleDialogOpen = $state(false);
+  let agentAdapterInstallDialogOpen = $state(false);
+  let agentAdapterDetailDialogOpen = $state(false);
+  let agentAdapterLifecycleDialogOpen = $state(false);
   let deleteOrganizationDialogOpen = $state(false);
   let selectedMemberRoleMemberId = $state("");
   let selectedOwnerTransferMemberId = $state("");
@@ -116,6 +125,10 @@
   let selectedMemberLifecycleAction = $state<MemberLifecycleAction | null>(null);
   let selectedDeployTokenId = $state("");
   let selectedDeployTokenLifecycleAction = $state<DeployTokenLifecycleAction | null>(null);
+  let agentAdapterManifestText = $state("");
+  let validatedAgentAdapterDigest = $state("");
+  let selectedAgentAdapterInstallationId = $state("");
+  let selectedAgentAdapterLifecycleAction = $state<AgentAdapterLifecycleAction | null>(null);
   let { section = null }: Props = $props();
 
   const contextQuery = createQuery(() =>
@@ -155,6 +168,9 @@
     }
     if (page.url.pathname.endsWith("/deploy-tokens")) {
       return "deploy-tokens";
+    }
+    if (page.url.pathname.endsWith("/agent-adapters")) {
+      return "agent-adapters";
     }
     if (page.url.pathname.endsWith("/archived-projects")) {
       return "archived-projects";
@@ -208,6 +224,7 @@
   const canManageDeployTokens = $derived(
     context?.permissions?.canManageDeployTokens ?? canManageByRole,
   );
+  const canManageAgentAdapters = $derived(canManageByRole);
   const canChangeOrganizationProfile = $derived(currentRole === "owner" || currentRole === "admin");
   const canDeleteOrganization = $derived(currentRole === "owner");
   const shouldLoadOrganizationProfile = $derived(activeSection === "profile");
@@ -220,6 +237,7 @@
   const shouldLoadDeployTokens = $derived(
     activeSection === "profile" || activeSection === "deploy-tokens",
   );
+  const shouldLoadAgentAdapters = $derived(activeSection === "agent-adapters");
   const shouldLoadArchivedProjects = $derived(activeSection === "archived-projects");
 
   const membersQuery = createQuery(() =>
@@ -281,6 +299,21 @@
       enabled: browser && Boolean(currentOrganizationId) && canManageDeployTokens && shouldLoadDeployTokens,
     }),
   );
+  const agentAdaptersQuery = createQuery(() =>
+    orpc.agentAdapters.list.queryOptions({
+      input: { limit: 100 },
+      enabled: browser && Boolean(currentOrganizationId) && shouldLoadAgentAdapters,
+    }),
+  );
+  const selectedAgentAdapterQuery = createQuery(() =>
+    orpc.agentAdapters.show.queryOptions({
+      input: { installationId: selectedAgentAdapterInstallationId },
+      enabled:
+        browser &&
+        agentAdapterDetailDialogOpen &&
+        Boolean(selectedAgentAdapterInstallationId),
+    }),
+  );
 
   const profileQuery = createQuery(() =>
     orpc.organizations.showProfile.queryOptions({
@@ -325,6 +358,7 @@
       operationNotice = $t(i18nKeys.console.organization.switchSucceeded);
       void queryClient.invalidateQueries({ queryKey: orpc.organizations.key({ type: "query" }) });
       void queryClient.invalidateQueries({ queryKey: orpc.deployTokens.key({ type: "query" }) });
+      void queryClient.invalidateQueries({ queryKey: orpc.agentAdapters.key({ type: "query" }) });
     },
     onError: (error) => {
       operationNotice = "";
@@ -516,6 +550,77 @@
     },
   }));
 
+  function parsedAgentAdapterManifest(): unknown {
+    return JSON.parse(agentAdapterManifestText) as unknown;
+  }
+
+  const validateAgentAdapterMutation = createMutation(() => ({
+    mutationFn: () =>
+      orpcClient.agentAdapters.validate({
+        manifest: parsedAgentAdapterManifest(),
+      }),
+    onSuccess: (result) => {
+      validatedAgentAdapterDigest = result.definitionDigest;
+      operationError = "";
+      operationNotice = $t(i18nKeys.console.organization.agentAdapterValidated);
+    },
+    onError: (error) => {
+      validatedAgentAdapterDigest = "";
+      operationNotice = "";
+      operationError = readErrorMessage(error);
+    },
+  }));
+
+  const installAgentAdapterMutation = createMutation(() => ({
+    mutationFn: () =>
+      orpcClient.agentAdapters.install({
+        manifest: parsedAgentAdapterManifest(),
+      }),
+    onSuccess: () => {
+      agentAdapterManifestText = "";
+      validatedAgentAdapterDigest = "";
+      agentAdapterInstallDialogOpen = false;
+      operationError = "";
+      operationNotice = $t(i18nKeys.console.organization.agentAdapterInstalled);
+      void queryClient.invalidateQueries({ queryKey: orpc.agentAdapters.key({ type: "query" }) });
+    },
+    onError: (error) => {
+      operationNotice = "";
+      operationError = readErrorMessage(error);
+    },
+  }));
+
+  const disableAgentAdapterMutation = createMutation(() => ({
+    mutationFn: (installationId: string) =>
+      orpcClient.agentAdapters.disable({ installationId }),
+    onSuccess: () => {
+      setAgentAdapterLifecycleDialogOpen(false);
+      operationError = "";
+      operationNotice = $t(i18nKeys.console.organization.agentAdapterDisabled);
+      void queryClient.invalidateQueries({ queryKey: orpc.agentAdapters.key({ type: "query" }) });
+    },
+    onError: (error) => {
+      operationNotice = "";
+      operationError = readErrorMessage(error);
+    },
+  }));
+
+  const uninstallAgentAdapterMutation = createMutation(() => ({
+    mutationFn: (installationId: string) =>
+      orpcClient.agentAdapters.uninstall({ installationId }),
+    onSuccess: () => {
+      setAgentAdapterLifecycleDialogOpen(false);
+      agentAdapterDetailDialogOpen = false;
+      operationError = "";
+      operationNotice = $t(i18nKeys.console.organization.agentAdapterUninstalled);
+      void queryClient.invalidateQueries({ queryKey: orpc.agentAdapters.key({ type: "query" }) });
+    },
+    onError: (error) => {
+      operationNotice = "";
+      operationError = readErrorMessage(error);
+    },
+  }));
+
   const members = $derived(membersQuery.data?.items ?? []);
   const activeMembers = $derived(members.filter((member) => member.status !== "deactivated"));
   const removedMembers = $derived(members.filter((member) => member.status === "deactivated"));
@@ -530,6 +635,7 @@
   );
   const invitations = $derived(invitationsQuery.data?.items ?? []);
   const deployTokens = $derived(deployTokensQuery.data?.items ?? []);
+  const agentAdapters = $derived(agentAdaptersQuery.data ?? []);
   const selectedDeployToken = $derived(
     deployTokens.find((token) => token.tokenId === selectedDeployTokenId) ?? null,
   );
@@ -565,6 +671,11 @@
       canManageDeployTokens &&
       deployTokensQuery.isPending,
   );
+  const agentAdaptersSectionLoading = $derived(
+    Boolean(currentOrganizationId) &&
+      activeSection === "agent-adapters" &&
+      agentAdaptersQuery.isPending,
+  );
   const archivedProjectsSectionLoading = $derived(
     Boolean(currentOrganizationId) &&
       activeSection === "archived-projects" &&
@@ -582,6 +693,26 @@
       canManageDeployTokens &&
       tokenName.trim().length > 0 &&
       !createDeployTokenMutation.isPending,
+  );
+  const canSubmitAgentAdapterManifest = $derived(
+    Boolean(currentOrganizationId) &&
+      canManageAgentAdapters &&
+      agentAdapterManifestText.trim().length > 0 &&
+      !validateAgentAdapterMutation.isPending &&
+      !installAgentAdapterMutation.isPending,
+  );
+  const selectedAgentAdapter = $derived(
+    agentAdapters.find(
+      (adapter) => adapter.installationId === selectedAgentAdapterInstallationId,
+    ) ?? null,
+  );
+  const canSubmitAgentAdapterLifecycleAction = $derived(
+    Boolean(selectedAgentAdapter) &&
+      Boolean(selectedAgentAdapterLifecycleAction) &&
+      canManageAgentAdapters &&
+      (selectedAgentAdapterLifecycleAction === "disable"
+        ? selectedAgentAdapter?.status === "enabled" && !disableAgentAdapterMutation.isPending
+        : !uninstallAgentAdapterMutation.isPending),
   );
   const canSubmitMemberRole = $derived(
     Boolean(selectedMemberRoleMember) &&
@@ -695,6 +826,52 @@
   function setDeployTokenCreateDialogOpen(open: boolean): void {
     deployTokenCreateDialogOpen = open;
     void setModalOpen(page, "create-deploy-token", open);
+  }
+
+  function openAgentAdapterInstallDialog(): void {
+    agentAdapterManifestText = "";
+    validatedAgentAdapterDigest = "";
+    operationError = "";
+    agentAdapterInstallDialogOpen = true;
+  }
+
+  function setAgentAdapterInstallDialogOpen(open: boolean): void {
+    agentAdapterInstallDialogOpen = open;
+    if (!open) {
+      agentAdapterManifestText = "";
+      validatedAgentAdapterDigest = "";
+      operationError = "";
+    }
+  }
+
+  function openAgentAdapterDetailDialog(installationId: string): void {
+    selectedAgentAdapterInstallationId = installationId;
+    operationError = "";
+    agentAdapterDetailDialogOpen = true;
+  }
+
+  function setAgentAdapterDetailDialogOpen(open: boolean): void {
+    agentAdapterDetailDialogOpen = open;
+    if (!open) {
+      selectedAgentAdapterInstallationId = "";
+      operationError = "";
+    }
+  }
+
+  function openAgentAdapterLifecycleDialog(installationId: string): void {
+    selectedAgentAdapterInstallationId = installationId;
+    selectedAgentAdapterLifecycleAction = null;
+    operationError = "";
+    agentAdapterLifecycleDialogOpen = true;
+  }
+
+  function setAgentAdapterLifecycleDialogOpen(open: boolean): void {
+    agentAdapterLifecycleDialogOpen = open;
+    if (!open) {
+      selectedAgentAdapterInstallationId = "";
+      selectedAgentAdapterLifecycleAction = null;
+      operationError = "";
+    }
   }
 
   function openOrganizationProfileDialog(): void {
@@ -979,6 +1156,19 @@
     }
   }
 
+  function validateAgentAdapter(event: SubmitEvent): void {
+    event.preventDefault();
+    if (canSubmitAgentAdapterManifest) {
+      validateAgentAdapterMutation.mutate();
+    }
+  }
+
+  function installAgentAdapter(): void {
+    if (canSubmitAgentAdapterManifest) {
+      installAgentAdapterMutation.mutate();
+    }
+  }
+
   function switchOrganization(organizationId: string): void {
     if (
       !organizationId ||
@@ -1101,10 +1291,26 @@
     revokeDeployTokenMutation.mutate(token.tokenId);
   }
 
+  function submitAgentAdapterLifecycleAction(): void {
+    const adapter = selectedAgentAdapter;
+    const action = selectedAgentAdapterLifecycleAction;
+    if (!adapter || !action || !canSubmitAgentAdapterLifecycleAction) {
+      return;
+    }
+
+    if (action === "disable") {
+      disableAgentAdapterMutation.mutate(adapter.installationId);
+      return;
+    }
+
+    uninstallAgentAdapterMutation.mutate(adapter.installationId);
+  }
+
   function centeredOrganizationSectionClass(baseClass: string): string {
     return activeSection === "members" ||
       activeSection === "invitations" ||
       activeSection === "deploy-tokens" ||
+      activeSection === "agent-adapters" ||
       activeSection === "archived-projects"
       ? `mx-auto w-full max-w-6xl ${baseClass}`
       : baseClass;
@@ -1779,6 +1985,126 @@
                     <ShieldCheck class="size-3.5" />
                     {$t(i18nKeys.console.organization.lifecycleManageAction)}
                   </Button>
+                </div>
+              </div>
+            {/each}
+          </div>
+        {/if}
+      </section>
+      {/if}
+
+      {#if activeSection === "agent-adapters"}
+      <section
+        class={centeredOrganizationSectionClass("space-y-5")}
+        data-organization-agent-adapters-display-surface
+      >
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div class="max-w-2xl">
+            <div class="flex items-center gap-2">
+              <Bot class="size-5 text-primary" />
+              <h2 class="text-lg font-semibold">
+                {$t(i18nKeys.console.organization.agentAdaptersTitle)}
+              </h2>
+            </div>
+            <p class="mt-2 text-sm leading-6 text-muted-foreground">
+              {$t(i18nKeys.console.organization.agentAdaptersDescription)}
+            </p>
+          </div>
+          {#if canManageAgentAdapters}
+            <Button type="button" onclick={openAgentAdapterInstallDialog}>
+              <PackagePlus class="size-4" />
+              {$t(i18nKeys.console.organization.agentAdapterInstallAction)}
+            </Button>
+          {/if}
+        </div>
+
+        {#if agentAdaptersSectionLoading}
+          <div class="console-record-list">
+            <div class="console-record-row">
+              <ConsoleDataSkeleton
+                name="organization-agent-adapters-row-0"
+                loading={true}
+                class="block w-full"
+                fallbackClass="block h-12 w-full animate-pulse rounded-md bg-muted/50"
+              >
+                {#snippet capture()}
+                  <div class="space-y-1">
+                    <h3 class="font-semibold">OpenCode</h3>
+                    <p class="text-sm text-muted-foreground">opencode · 1.0.0</p>
+                  </div>
+                {/snippet}
+                <div class="space-y-1" aria-hidden="true">
+                  <h3 class="font-semibold">OpenCode</h3>
+                  <p class="text-sm text-muted-foreground">opencode · 1.0.0</p>
+                </div>
+              </ConsoleDataSkeleton>
+            </div>
+          </div>
+        {:else if agentAdapters.length === 0}
+          <ConsoleEmptyState
+            tone="credential"
+            title={$t(i18nKeys.console.organization.agentAdaptersEmptyTitle)}
+            description={$t(i18nKeys.console.organization.agentAdaptersEmptyDescription)}
+            actionLabel={canManageAgentAdapters
+              ? $t(i18nKeys.console.organization.agentAdapterInstallAction)
+              : undefined}
+            onAction={openAgentAdapterInstallDialog}
+          />
+        {:else}
+          <div class="console-record-list">
+            {#each agentAdapters as adapter (adapter.installationId)}
+              <div
+                class="console-record-row gap-4 lg:grid-cols-[minmax(0,1fr)_18rem_auto] lg:items-center"
+              >
+                <div class="min-w-0 space-y-1">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <h3 class="truncate text-base font-semibold">{adapter.displayName}</h3>
+                    <Badge variant={adapter.status === "enabled" ? "outline" : "secondary"}>
+                      {adapter.status === "enabled"
+                        ? $t(i18nKeys.console.organization.agentAdapterStatusEnabled)
+                        : $t(i18nKeys.console.organization.agentAdapterStatusDisabled)}
+                    </Badge>
+                    <Badge variant="secondary">
+                      {adapter.compatibility.status === "compatible"
+                        ? $t(i18nKeys.console.organization.agentAdapterCompatible)
+                        : $t(i18nKeys.console.organization.agentAdapterUnchecked)}
+                    </Badge>
+                  </div>
+                  <p class="text-sm text-muted-foreground">
+                    {adapter.adapterId} · {adapter.adapterVersion}
+                  </p>
+                  <p class="break-all font-mono text-xs text-muted-foreground">
+                    {adapter.installationId}
+                  </p>
+                </div>
+                <div class="space-y-1 text-sm text-muted-foreground">
+                  <p>
+                    {$t(i18nKeys.console.organization.agentAdapterInstalledAt)} · {formatTime(
+                      adapter.installedAt,
+                    )}
+                  </p>
+                  <p class="break-all font-mono text-xs">{adapter.definitionDigest}</p>
+                </div>
+                <div class="flex flex-wrap gap-2 lg:justify-end">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onclick={() => openAgentAdapterDetailDialog(adapter.installationId)}
+                  >
+                    {$t(i18nKeys.common.actions.viewDetails)}
+                  </Button>
+                  {#if canManageAgentAdapters}
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onclick={() => openAgentAdapterLifecycleDialog(adapter.installationId)}
+                    >
+                      <ShieldCheck class="size-3.5" />
+                      {$t(i18nKeys.console.organization.lifecycleManageAction)}
+                    </Button>
+                  {/if}
                 </div>
               </div>
             {/each}
@@ -2490,6 +2816,205 @@
         </form>
       </Dialog.Content>
     {/if}
+  </Dialog.Root>
+
+  <Dialog.Root
+    bind:open={agentAdapterDetailDialogOpen}
+    onOpenChange={setAgentAdapterDetailDialogOpen}
+  >
+    <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)}>
+      <Dialog.Header>
+        <Dialog.Title>
+          {$t(i18nKeys.console.organization.agentAdapterDetailTitle)}
+        </Dialog.Title>
+        <Dialog.Description>
+          {$t(i18nKeys.console.organization.agentAdapterDetailDescription)}
+        </Dialog.Description>
+      </Dialog.Header>
+      <div class="space-y-4 px-5 pb-5">
+        {#if selectedAgentAdapterQuery.isPending}
+          <ConsoleDataSkeleton
+            name="organization-agent-adapter-detail"
+            loading={true}
+            class="block"
+          >
+            {#snippet capture()}
+              <div class="h-40 rounded-md border bg-muted/30"></div>
+            {/snippet}
+            <div class="h-40 rounded-md border bg-muted/30" aria-hidden="true"></div>
+          </ConsoleDataSkeleton>
+        {:else if selectedAgentAdapterQuery.data}
+          {@const adapter = selectedAgentAdapterQuery.data}
+          <dl class="grid gap-3 text-sm sm:grid-cols-2">
+            <div class="rounded-md border bg-muted/20 p-3">
+              <dt class="text-xs text-muted-foreground">
+                {$t(i18nKeys.console.organization.agentAdapterName)}
+              </dt>
+              <dd class="mt-1 font-medium">{adapter.displayName}</dd>
+            </div>
+            <div class="rounded-md border bg-muted/20 p-3">
+              <dt class="text-xs text-muted-foreground">
+                {$t(i18nKeys.console.organization.agentAdapterVersion)}
+              </dt>
+              <dd class="mt-1 font-mono">{adapter.adapterVersion}</dd>
+            </div>
+            <div class="rounded-md border bg-muted/20 p-3 sm:col-span-2">
+              <dt class="text-xs text-muted-foreground">
+                {$t(i18nKeys.console.organization.agentAdapterInstallationId)}
+              </dt>
+              <dd class="mt-1 break-all font-mono">{adapter.installationId}</dd>
+            </div>
+            <div class="rounded-md border bg-muted/20 p-3 sm:col-span-2">
+              <dt class="text-xs text-muted-foreground">
+                {$t(i18nKeys.console.organization.agentAdapterDigest)}
+              </dt>
+              <dd class="mt-1 break-all font-mono text-xs">{adapter.definitionDigest}</dd>
+            </div>
+          </dl>
+        {:else}
+          <p class="text-sm text-muted-foreground">
+            {$t(i18nKeys.console.organization.agentAdapterDetailUnavailable)}
+          </p>
+        {/if}
+      </div>
+    </Dialog.Content>
+  </Dialog.Root>
+
+  <Dialog.Root
+    bind:open={agentAdapterLifecycleDialogOpen}
+    onOpenChange={setAgentAdapterLifecycleDialogOpen}
+  >
+    <Dialog.Content
+      closeLabel={$t(i18nKeys.common.actions.close)}
+      data-organization-agent-adapter-lifecycle-dialog
+    >
+      <Dialog.Header>
+        <Dialog.Title>
+          {$t(i18nKeys.console.organization.agentAdapterLifecycleTitle)}
+        </Dialog.Title>
+        <Dialog.Description>
+          {$t(i18nKeys.console.organization.agentAdapterLifecycleDescription)}
+        </Dialog.Description>
+      </Dialog.Header>
+      <div class="space-y-4 px-5 pb-5">
+        <button
+          type="button"
+          class="w-full rounded-md border p-4 text-left transition-colors hover:bg-muted/40 disabled:cursor-not-allowed disabled:opacity-50"
+          class:border-primary={selectedAgentAdapterLifecycleAction === "disable"}
+          disabled={selectedAgentAdapter?.status !== "enabled"}
+          onclick={() => (selectedAgentAdapterLifecycleAction = "disable")}
+        >
+          <span class="flex items-center gap-2 font-medium">
+            <Power class="size-4" />
+            {$t(i18nKeys.console.organization.agentAdapterDisableAction)}
+          </span>
+          <span class="mt-1 block text-sm leading-6 text-muted-foreground">
+            {$t(i18nKeys.console.organization.agentAdapterDisableDescription)}
+          </span>
+        </button>
+        <button
+          type="button"
+          class="w-full rounded-md border p-4 text-left transition-colors hover:bg-muted/40"
+          class:border-destructive={selectedAgentAdapterLifecycleAction === "uninstall"}
+          onclick={() => (selectedAgentAdapterLifecycleAction = "uninstall")}
+        >
+          <span class="flex items-center gap-2 font-medium">
+            <Trash2 class="size-4" />
+            {$t(i18nKeys.console.organization.agentAdapterUninstallAction)}
+          </span>
+          <span class="mt-1 block text-sm leading-6 text-muted-foreground">
+            {$t(i18nKeys.console.organization.agentAdapterUninstallDescription)}
+          </span>
+        </button>
+        <Dialog.Footer class="px-0 pb-0">
+          <Button
+            type="button"
+            variant="outline"
+            onclick={() => setAgentAdapterLifecycleDialogOpen(false)}
+          >
+            {$t(i18nKeys.common.actions.close)}
+          </Button>
+          <Button
+            type="button"
+            variant={selectedAgentAdapterLifecycleAction === "uninstall" ? "destructive" : "default"}
+            disabled={!canSubmitAgentAdapterLifecycleAction}
+            onclick={submitAgentAdapterLifecycleAction}
+          >
+            {$t(i18nKeys.common.actions.confirm)}
+          </Button>
+        </Dialog.Footer>
+      </div>
+    </Dialog.Content>
+  </Dialog.Root>
+
+  <Dialog.Root
+    bind:open={agentAdapterInstallDialogOpen}
+    onOpenChange={setAgentAdapterInstallDialogOpen}
+  >
+    <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)}>
+      <Dialog.Header>
+        <Dialog.Title>
+          {$t(i18nKeys.console.organization.agentAdapterInstallTitle)}
+        </Dialog.Title>
+        <Dialog.Description>
+          {$t(i18nKeys.console.organization.agentAdapterInstallDescription)}
+        </Dialog.Description>
+      </Dialog.Header>
+      <form
+        class="space-y-4 px-5 pb-5"
+        onsubmit={validateAgentAdapter}
+        data-organization-agent-adapter-install-dialog
+      >
+        <label class="space-y-1.5 text-sm font-medium">
+          <span>{$t(i18nKeys.console.organization.agentAdapterManifestLabel)}</span>
+          <Textarea
+            bind:value={agentAdapterManifestText}
+            class="min-h-64 font-mono text-xs leading-5"
+            disabled={!canManageAgentAdapters}
+            placeholder={$t(i18nKeys.console.organization.agentAdapterManifestPlaceholder)}
+          />
+        </label>
+        <p class="text-xs leading-5 text-muted-foreground">
+          {$t(i18nKeys.console.organization.agentAdapterManifestNotice)}
+        </p>
+        {#if validatedAgentAdapterDigest}
+          <div class="rounded-md border border-primary/20 bg-primary/5 p-3">
+            <p class="text-xs font-medium">
+              {$t(i18nKeys.console.organization.agentAdapterValidatedDigest)}
+            </p>
+            <p class="mt-1 break-all font-mono text-xs">{validatedAgentAdapterDigest}</p>
+          </div>
+        {/if}
+        <Dialog.Footer class="px-0 pb-0">
+          <Button
+            type="button"
+            variant="outline"
+            onclick={() => setAgentAdapterInstallDialogOpen(false)}
+          >
+            {$t(i18nKeys.common.actions.close)}
+          </Button>
+          <Button
+            type="submit"
+            variant="outline"
+            disabled={!canSubmitAgentAdapterManifest}
+          >
+            {validateAgentAdapterMutation.isPending
+              ? $t(i18nKeys.console.organization.agentAdapterValidating)
+              : $t(i18nKeys.console.organization.agentAdapterValidateAction)}
+          </Button>
+          <Button
+            type="button"
+            disabled={!canSubmitAgentAdapterManifest}
+            onclick={installAgentAdapter}
+          >
+            <PackagePlus class="size-4" />
+            {installAgentAdapterMutation.isPending
+              ? $t(i18nKeys.console.organization.agentAdapterInstalling)
+              : $t(i18nKeys.console.organization.agentAdapterInstallAction)}
+          </Button>
+        </Dialog.Footer>
+      </form>
+    </Dialog.Content>
   </Dialog.Root>
 
   <Dialog.Root

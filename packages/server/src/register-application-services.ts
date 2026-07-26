@@ -4,11 +4,21 @@ import { mkdir, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  agentAdapterApiVersion,
+  agentAdapterHostCapabilities,
+  validateAgentAdapterManifest,
+} from "@appaloft/agent-adapter-sdk";
+import {
   AcceptBlueprintInstallCommandHandler,
   AcceptConnectorCapabilityPlanCommandHandler,
   AcceptConnectorCapabilityPlanUseCase,
   AcceptDependencyResourceProvisioningPlanCommandHandler,
   AcceptDependencyResourceProvisioningPlanUseCase,
+  AgentAdapterCommandHandler,
+  type AgentAdapterInstallationReferenceReader,
+  AgentAdapterInstallationService,
+  AgentAdapterQueryHandler,
+  type AgentAdapterRegistryRepository,
   AgentTaskRunCommandHandler,
   type AgentTaskRunDependencies,
   AgentTaskRunQueryHandler,
@@ -3274,6 +3284,8 @@ export function registerApplicationServices(
   container.registerSingleton(SandboxAgentQueryHandler);
   container.registerSingleton(AgentTaskRunCommandHandler);
   container.registerSingleton(AgentTaskRunQueryHandler);
+  container.registerSingleton(AgentAdapterCommandHandler);
+  container.registerSingleton(AgentAdapterQueryHandler);
   container.registerSingleton(WorkspaceCollaborationCommandHandler);
   container.registerSingleton(WorkspaceCollaborationQueryHandler);
   container.registerSingleton(RevokeDeployTokenCommandHandler);
@@ -3447,6 +3459,77 @@ export function registerApplicationServices(
       useValue: new SandboxAgentHarnessRegistry(),
     });
   }
+  container.register(tokens.agentAdapterInstallationService, {
+    useFactory: instanceCachingFactory((dependencyContainer) => {
+      const harnesses = dependencyContainer
+        .resolve<SandboxAgentHarnessRegistry>(tokens.sandboxAgentHarnessRegistry)
+        .list();
+      const sandboxTemplates = new Map<string, { id: string; version: string; digest: string }>();
+      for (const harness of harnesses) {
+        const id = harness.sandboxTemplateId ?? harness.templateId;
+        sandboxTemplates.set(id, {
+          id,
+          version: harness.version,
+          digest: harness.templateDigest,
+        });
+      }
+      return new AgentAdapterInstallationService({
+        repository: dependencyContainer.resolve<AgentAdapterRegistryRepository>(
+          tokens.agentAdapterRegistryRepository,
+        ),
+        referenceReader: dependencyContainer.resolve<AgentAdapterInstallationReferenceReader>(
+          tokens.agentAdapterInstallationReferenceReader,
+        ),
+        clock: dependencyContainer.resolve(tokens.clock),
+        idGenerator: dependencyContainer.resolve(tokens.idGenerator),
+        manifestValidator: {
+          validate: (manifest, mode) => {
+            const validated = validateAgentAdapterManifest(
+              manifest,
+              mode === "admission"
+                ? {
+                    adapterApiVersion: agentAdapterApiVersion,
+                    availableCapabilities: agentAdapterHostCapabilities,
+                    sandboxTemplates: [...sandboxTemplates.values()],
+                    runtimes: harnesses.map((harness) => ({
+                      id: harness.key,
+                      version: harness.version,
+                    })),
+                  }
+                : undefined,
+            );
+            if (!validated.ok) {
+              return {
+                ok: false,
+                issues: validated.issues.map((issue) => ({
+                  code: issue.code,
+                  path: issue.path.map(String),
+                  message: issue.message,
+                })),
+              };
+            }
+            return {
+              ok: true,
+              definition: {
+                manifest: validated.definition.manifest,
+                digest: validated.definition.digest,
+                canonicalManifest: validated.definition.canonicalManifest,
+                adapterId: validated.definition.manifest.id,
+                adapterVersion: validated.definition.manifest.version,
+                displayName: validated.definition.manifest.displayName,
+                compatibility: {
+                  ...validated.definition.compatibility,
+                  unavailableOptionalCapabilities: [
+                    ...validated.definition.compatibility.unavailableOptionalCapabilities,
+                  ],
+                },
+              },
+            };
+          },
+        },
+      });
+    }),
+  });
   if (!container.isRegistered(tokens.sandboxAgentWorkQueue, true)) {
     container.register(tokens.sandboxAgentWorkQueue, {
       useFactory: instanceCachingFactory(

@@ -598,6 +598,7 @@
         "@appaloft/adapter-http-elysia": "workspace:*",
         "@appaloft/adapter-runtime": "workspace:*",
         "@appaloft/adapter-secret-protection": "workspace:*",
+        "@appaloft/agent-adapter-sdk": "workspace:*",
         "@appaloft/ai-mcp": "workspace:*",
         "@appaloft/application": "workspace:*",
         "@appaloft/ash": "workspace:*",
