@@ -18,6 +18,7 @@
 ## Implementation
 
 - [x] Implement manifest schemas, canonicalization, digest, validator, and conformance API.
+- [x] Implement required/optional credential requirement-to-reference binding resolution.
 - [x] Implement definition/installation lifecycle and persistence.
 - [ ] Implement Profile validation, installation, compile, and resolved Workspace pinning.
 - [ ] Implement Declarative Harness resolver and fixture/Codex adapters.

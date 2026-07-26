@@ -32,5 +32,22 @@ Declarative commands are argv arrays whose executable must match a declared runt
 Shell interpreters and control-plane module entrypoints are rejected. Credentials are requirements
 with process-scoped delivery metadata; manifest fields never contain secret values.
 
+Bind an approved Profile or Workspace to named secret references before runtime effects:
+
+```ts
+import { resolveAgentAdapterCredentialBindings } from "@appaloft/agent-adapter-sdk";
+
+const bindings = resolveAgentAdapterCredentialBindings(manifest, [
+  {
+    requirementId: "model-api",
+    secretRef: "vault://agents/codex#model-api-key",
+  },
+]);
+```
+
+The resolver requires every required credential exactly once and rejects unknown, duplicate,
+raw-value, or ambiguous stdin bindings. Its successful result contains reference and delivery
+metadata only; resolving the referenced value remains a runtime grant concern.
+
 The returned digest covers the normalized manifest using canonical object-key ordering. Array order
 remains significant because command and interaction ordering may be semantic.
